@@ -105,12 +105,11 @@ async def semantic_search(
     AnswerEnvelope
         Semantic search response payload with findings and applied scope.
 
-    Raises
-    ------
-    VectorSearchError
-        If FAISS search fails or index is not available.
-    EmbeddingError
-        If embedding generation fails.
+    Notes
+    -----
+    This function delegates to ``_semantic_search_sync`` which may raise
+    ``VectorSearchError`` or ``EmbeddingError``. Those exceptions are not
+    explicitly caught or re-raised by this async wrapper function.
 
     Examples
     --------
@@ -138,18 +137,27 @@ async def semantic_search(
     - Applied scope is included in response envelope (`scope` field) for transparency.
     - If no scope is set, searches all indexed chunks without filtering.
     """
-    return await asyncio.to_thread(_semantic_search_sync, context, query, limit)
+    session_id = get_session_id()
+    scope = await get_effective_scope(context, session_id)
+    return await asyncio.to_thread(
+        _semantic_search_sync,
+        context,
+        query,
+        limit,
+        session_id,
+        scope,
+    )
 
 
 def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914
-    context: ApplicationContext, query: str, limit: int
+    context: ApplicationContext,
+    query: str,
+    limit: int,
+    session_id: str,
+    scope: ScopeIn | None,
 ) -> AnswerEnvelope:
     start_time = perf_counter()
     with _observe("semantic_search") as observation:
-        # Retrieve session scope for filtering (applied during DuckDB hydration)
-        session_id = get_session_id()
-        scope = get_effective_scope(context, session_id)
-
         LOGGER.debug(
             "Semantic search with scope",
             extra={
@@ -335,9 +343,6 @@ def _run_faiss_search(
         Query vector of shape (1, vec_dim).
     limit : int
         Maximum number of results to return.
-
-    Other Parameters
-    ----------------
     nprobe : int
         Number of IVF cells to probe during the search. Higher values improve
         recall at the cost of latency. Passed directly to

@@ -41,7 +41,8 @@ def test_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return repo_root
 
 
-def test_app_startup_with_valid_config(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_app_startup_with_valid_config() -> None:
     """Test that FastAPI app starts successfully with valid configuration."""
     with TestClient(app) as client:
         # App should start without errors
@@ -50,7 +51,8 @@ def test_app_startup_with_valid_config(test_repo: Path) -> None:
         assert response.json() == {"status": "ok"}
 
 
-def test_app_healthz_endpoint(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_app_healthz_endpoint() -> None:
     """Test that /healthz endpoint returns 200."""
     with TestClient(app) as client:
         response = client.get("/healthz")
@@ -58,7 +60,8 @@ def test_app_healthz_endpoint(test_repo: Path) -> None:
         assert response.json() == {"status": "ok"}
 
 
-def test_app_readyz_endpoint_healthy(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_app_readyz_endpoint_healthy() -> None:
     """Test that /readyz endpoint shows all checks pass."""
     with TestClient(app) as client:
         response = client.get("/readyz")
@@ -115,7 +118,8 @@ def test_app_readyz_shows_unhealthy_resources(
         assert data["checks"]["faiss_index"]["healthy"] is False
 
 
-def test_app_startup_with_preload_disabled(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_app_startup_with_preload_disabled() -> None:
     """Test that FAISS is lazy-loaded when FAISS_PRELOAD=0."""
     # FAISS_PRELOAD defaults to False, so this should work
     with TestClient(app) as client:
@@ -127,8 +131,8 @@ def test_app_startup_with_preload_disabled(test_repo: Path) -> None:
         assert response.status_code == 200
 
 
+@pytest.mark.usefixtures("test_repo")
 def test_app_startup_with_preload_enabled(
-    test_repo: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test that FAISS pre-loading works when FAISS_PRELOAD=1."""
@@ -144,7 +148,8 @@ def test_app_startup_with_preload_enabled(
         assert response.status_code == 200
 
 
-def test_app_context_in_state(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_app_context_in_state() -> None:
     """Test that ApplicationContext is stored in app.state."""
     with TestClient(app):
         # Access app through TestClient
@@ -156,7 +161,8 @@ def test_app_context_in_state(test_repo: Path) -> None:
         assert hasattr(app.state.context, "faiss_manager")
 
 
-def test_app_readiness_in_state(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_app_readiness_in_state() -> None:
     """Test that ReadinessProbe is stored in app.state."""
     with TestClient(app):
         assert hasattr(app.state, "readiness")

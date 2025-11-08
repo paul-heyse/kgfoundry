@@ -52,12 +52,10 @@ async def blame_range(
 
     Raises
     ------
-    PathOutsideRepositoryError
-        If path escapes repository root (raised by resolve_within_repo).
-    FileNotFoundError
-        If file doesn't exist (raised by resolve_within_repo or AsyncGitClient).
     GitOperationError
-        If Git blame operation fails.
+        If Git blame operation fails. This function calls ``resolve_within_repo``
+        which may raise ``PathOutsideRepositoryError`` or ``FileNotFoundError``,
+        but those exceptions are not explicitly caught or re-raised by this function.
 
     Examples
     --------
@@ -142,12 +140,10 @@ async def file_history(
 
     Raises
     ------
-    PathOutsideRepositoryError
-        If path escapes repository root (raised by resolve_within_repo).
-    FileNotFoundError
-        If file doesn't exist (raised by resolve_within_repo or AsyncGitClient).
     GitOperationError
-        If Git log operation fails.
+        If Git log operation fails. This function calls ``resolve_within_repo``
+        which may raise ``PathOutsideRepositoryError`` or ``FileNotFoundError``,
+        but those exceptions are not explicitly caught or re-raised by this function.
 
     Examples
     --------

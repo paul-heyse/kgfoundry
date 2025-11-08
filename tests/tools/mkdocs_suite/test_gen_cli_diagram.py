@@ -229,7 +229,7 @@ def test_update_cli_index_entry_preserves_double_newline(
 
     monkeypatch.setattr(gen_cli_module.mkdocs_gen_files, "open", fake_open)
 
-    gen_cli_module._update_cli_index_entry(enabled=True)
+    gen_cli_module._update_cli_index_entry(enabled=True)  # noqa: SLF001 - intentional test access to private function
     updated_content = buffers[gen_cli_module.DIAGRAM_INDEX_PATH].getvalue()
 
     assert (
@@ -239,7 +239,7 @@ def test_update_cli_index_entry_preserves_double_newline(
     assert updated_content.endswith("\n\n")
     assert gen_cli_module.CLI_INDEX_ENTRY.strip() in updated_content
 
-    gen_cli_module._update_cli_index_entry(enabled=False)
+    gen_cli_module._update_cli_index_entry(enabled=False)  # noqa: SLF001 - intentional test access to private function
     reverted_content = buffers[gen_cli_module.DIAGRAM_INDEX_PATH].getvalue()
 
     assert reverted_content == original_content

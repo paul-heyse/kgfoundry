@@ -604,23 +604,20 @@ def cli_run(cfg: CliRunConfig) -> Iterator[tuple[CliContext, EnvelopeBuilder]]:
     SystemExit
         Raised with exit code ``1`` when an exception occurs inside the context
         and ``cfg.exit_on_error`` evaluates to ``True``. The original exception
-        is chained via ``raise SystemExit(1) from exc`` where ``exc`` is the
+        is chained via ``raise SystemExit(1) from error`` where ``error`` is the
         caught exception.
-    Exception
-        When ``cfg.exit_on_error`` is ``False``, any exception raised inside
-        the context propagates unchanged to the caller. The exception is caught,
-        logged, and recorded in the envelope, then explicitly re-raised via
-        ``raise error`` where ``error`` is the caught exception.
 
     Notes
     -----
-    When ``cfg.exit_on_error`` is ``False`` any exception raised inside the
-    context propagates unchanged to the caller. The function catches exceptions
-    using ``except Exception as exc``, stores the exception in a local variable
-    for logging and envelope generation, and then explicitly re-raises it using
-    ``raise error`` (where ``error`` is the caught exception) to satisfy static
-    analysis tools.
-    """  # noqa: DOC502
+    Exception Propagation:
+        When ``cfg.exit_on_error`` is ``False``, any exception raised inside
+        the context propagates unchanged to the caller. The function catches
+        exceptions using ``except Exception as exc``, stores the exception in
+        ``error`` for logging and envelope generation, then re-raises it using
+        ``raise error``. The actual exception type matches whatever was
+        originally raised (any subclass of ``Exception``). This is a re-raise
+        of the caught exception, preserving its original type and traceback.
+    """
     metadata = _prepare_execution_metadata(cfg)
     envelope = _build_envelope(
         cfg,
@@ -699,7 +696,9 @@ def cli_run(cfg: CliRunConfig) -> Iterator[tuple[CliContext, EnvelopeBuilder]]:
         return
     if cfg.exit_on_error:
         raise SystemExit(1) from error
-    raise error  # Explicitly re-raise the caught exception (error is Exception | None)
+    # Re-raise the caught exception (error is always Exception subclass from except clause)
+    # Note: This re-raises the original exception, preserving its type and traceback
+    raise error
 
 
 __all__ = [

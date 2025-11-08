@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
@@ -10,10 +11,11 @@ import pytest
 
 from codeintel_rev.app.config_context import ApplicationContext, ResolvedPaths
 from codeintel_rev.app.middleware import session_id_var
-from codeintel_rev.app.scope_registry import ScopeRegistry
+from codeintel_rev.app.scope_store import ScopeStore
 from codeintel_rev.config.settings import (
     IndexConfig,
     PathsConfig,
+    RedisConfig,
     ServerLimits,
     Settings,
     VLLMConfig,
@@ -21,6 +23,40 @@ from codeintel_rev.config.settings import (
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.vllm_client import VLLMClient
+
+
+class _FakeRedis:
+    """Simple in-memory Redis mimic for tests."""
+
+    def __init__(self) -> None:
+        self._data: dict[str, tuple[bytes, float | None]] = {}
+
+    async def get(self, key: str) -> bytes | None:
+        record = self._data.get(key)
+        if record is None:
+            return None
+        value, expires_at = record
+        if expires_at is not None and expires_at <= 0:
+            return None
+        if expires_at is not None and expires_at <= time.monotonic():
+            self._data.pop(key, None)
+            return None
+        return value
+
+    async def setex(self, key: str, seconds: int, value: bytes) -> bool | None:
+        expires_at = time.monotonic() + seconds if seconds > 0 else None
+        self._data[key] = (value, expires_at)
+        return True
+
+    async def set(self, key: str, value: bytes) -> bool | None:
+        self._data[key] = (value, None)
+        return True
+
+    async def delete(self, key: str) -> int | None:
+        return 1 if self._data.pop(key, None) is not None else 0
+
+    async def close(self) -> None:
+        self._data.clear()
 
 
 @pytest.fixture
@@ -61,6 +97,12 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
             batch_size=32,
         ),
         limits=ServerLimits(),
+        redis=RedisConfig(
+            url="redis://127.0.0.1:6379/0",
+            scope_l1_size=64,
+            scope_l1_ttl_seconds=300,
+            scope_l2_ttl_seconds=3600,
+        ),
     )
 
     # Create resolved paths and ensure backing directories exist
@@ -105,14 +147,19 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
             "message": "Test commit",
         }
     ]
-    scope_registry = ScopeRegistry()
+    scope_store = ScopeStore(
+        _FakeRedis(),
+        l1_maxsize=settings.redis.scope_l1_size,
+        l1_ttl_seconds=settings.redis.scope_l1_ttl_seconds,
+        l2_ttl_seconds=settings.redis.scope_l2_ttl_seconds,
+    )
 
     return ApplicationContext(
         settings=settings,
         paths=paths,
         vllm_client=vllm_client,
         faiss_manager=faiss_manager,
-        scope_registry=scope_registry,
+        scope_store=scope_store,
         git_client=git_client,
         async_git_client=async_git_client,
     )
@@ -120,7 +167,15 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
 
 @pytest.fixture
 def mock_session_id() -> Iterator[str]:
-    """Provide a session ID bound to middleware context vars for adapter calls."""
+    """Provide a session ID bound to middleware context vars for adapter calls.
+
+    Yields
+    ------
+    str
+        Test session ID string that is bound to the middleware context variable
+        for the duration of the test. The context variable is automatically
+        reset when the fixture exits.
+    """
     session_id = "test-session"
     token = session_id_var.set(session_id)
     try:

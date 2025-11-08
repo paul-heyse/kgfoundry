@@ -22,8 +22,7 @@ Applying decorator to MCP tool:
 
 >>> @mcp.tool()
 >>> @handle_adapter_errors(
-...     operation="files:open_file",
-...     empty_result={"path": "", "content": "", "lines": 0, "size": 0}
+...     operation="files:open_file", empty_result={"path": "", "content": "", "lines": 0, "size": 0}
 ... )
 ... def open_file(path: str, start_line: int | None, end_line: int | None) -> dict:
 ...     context = get_context()
@@ -47,8 +46,8 @@ Error envelope structure:
 ...         "status": 404,
 ...         "detail": "File not found: src/main.py",
 ...         "instance": "urn:codeintel:files:open_file",
-...         "code": "file-not-found"
-...     }
+...         "code": "file-not-found",
+...     },
 ... }
 """
 
@@ -63,7 +62,6 @@ from kgfoundry_common.logging import get_logger, with_fields
 from kgfoundry_common.problem_details import build_problem_details
 
 if TYPE_CHECKING:
-
     from kgfoundry_common.problem_details import ProblemDetails
 
 LOGGER = get_logger(__name__)
@@ -149,7 +147,7 @@ def convert_exception_to_envelope(
     >>> envelope = convert_exception_to_envelope(
     ...     exc,
     ...     operation="files:open_file",
-    ...     empty_result={"path": "", "content": "", "lines": 0, "size": 0}
+    ...     empty_result={"path": "", "content": "", "lines": 0, "size": 0},
     ... )
     >>> envelope["error"]
     'File not found: src/main.py'
@@ -165,9 +163,7 @@ def convert_exception_to_envelope(
     >>> from kgfoundry_common.errors import VectorSearchError
     >>> exc = VectorSearchError("Search timeout", context={"query": "def main"})
     >>> envelope = convert_exception_to_envelope(
-    ...     exc,
-    ...     operation="search:text",
-    ...     empty_result={"matches": [], "total": 0}
+    ...     exc, operation="search:text", empty_result={"matches": [], "total": 0}
     ... )
     >>> envelope["problem"]["extensions"]["query"]
     'def main'
@@ -278,7 +274,7 @@ def handle_adapter_errors(
     operation: str,
     empty_result: Mapping[str, object],
 ) -> Callable[[F], F]:
-    """Decorator that converts adapter exceptions to unified error envelopes.
+    """Convert adapter exceptions to unified error envelopes.
 
     This decorator is applied to all MCP tool functions to provide automatic
     error handling. It catches all exceptions raised by adapters and converts
@@ -357,7 +353,7 @@ def handle_adapter_errors(
     >>> @mcp.tool()
     >>> @handle_adapter_errors(
     ...     operation="files:open_file",
-    ...     empty_result={"path": "", "content": "", "lines": 0, "size": 0}
+    ...     empty_result={"path": "", "content": "", "lines": 0, "size": 0},
     ... )
     ... def open_file(path: str, start_line: int | None, end_line: int | None) -> dict:
     ...     context = get_context()
@@ -366,10 +362,7 @@ def handle_adapter_errors(
     Async function:
 
     >>> @mcp.tool()
-    >>> @handle_adapter_errors(
-    ...     operation="git:blame_range",
-    ...     empty_result={"blame": []}
-    ... )
+    >>> @handle_adapter_errors(operation="git:blame_range", empty_result={"blame": []})
     ... async def blame_range(path: str, start_line: int, end_line: int) -> dict:
     ...     context = get_context()
     ...     return await history_adapter.blame_range(context, path, start_line, end_line)
@@ -402,7 +395,7 @@ def handle_adapter_errors(
         def wrapper(*args: object, **kwargs: object) -> dict:
             try:
                 return func(*args, **kwargs)  # type: ignore[return-value]
-            except Exception as exc:
+            except BaseException as exc:  # noqa: BLE001 - defensive catch ensures Problem Details emission
                 return convert_exception_to_envelope(exc, operation, empty_result)
 
         return cast("F", wrapper)

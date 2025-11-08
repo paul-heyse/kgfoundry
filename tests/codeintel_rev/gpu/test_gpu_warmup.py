@@ -8,15 +8,17 @@ Run with: pytest -m gpu tests/codeintel_rev/gpu/test_gpu_warmup.py
 
 from __future__ import annotations
 
+import importlib.util
+
 import pytest
 
 
 def _skip_if_no_cuda_torch() -> None:
     """Skip test if CUDA is not available to PyTorch."""
-    try:
-        import torch
-    except ImportError:
+    torch_spec = importlib.util.find_spec("torch")
+    if torch_spec is None:
         pytest.skip("PyTorch not installed")
+    torch = importlib.import_module("torch")
 
     if not torch.cuda.is_available():
         pytest.skip("CUDA not available to PyTorch")
@@ -24,10 +26,10 @@ def _skip_if_no_cuda_torch() -> None:
 
 def _skip_if_no_faiss_gpu() -> None:
     """Skip test if FAISS GPU is not available."""
-    try:
-        import faiss
-    except ImportError:
+    faiss_spec = importlib.util.find_spec("faiss")
+    if faiss_spec is None:
         pytest.skip("FAISS not installed")
+    faiss = importlib.import_module("faiss")
 
     if not hasattr(faiss, "StandardGpuResources"):
         pytest.skip("FAISS not built with GPU bindings")
@@ -45,8 +47,7 @@ def test_torch_small_matmul() -> None:
     """
     _skip_if_no_cuda_torch()
 
-    import torch
-
+    torch = importlib.import_module("torch")
     dev = torch.device("cuda:0")
     a = torch.randn(64, 64, device=dev)
     b = torch.randn(64, 64, device=dev)
@@ -64,7 +65,7 @@ def test_faiss_small_search_ip() -> None:
     """
     _skip_if_no_faiss_gpu()
 
-    import faiss
+    faiss = importlib.import_module("faiss")
     import numpy as np
 
     res = faiss.StandardGpuResources()

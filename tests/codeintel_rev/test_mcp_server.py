@@ -79,7 +79,8 @@ def mock_context(test_repo: Path) -> ApplicationContext:
     return context
 
 
-def test_set_scope_endpoint(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_set_scope_endpoint() -> None:
     """Test that set_scope endpoint calls adapter with context."""
     with TestClient(app) as client:
         # Note: FastMCP endpoints are mounted at /mcp
@@ -89,7 +90,8 @@ def test_set_scope_endpoint(test_repo: Path) -> None:
         assert response.status_code == 200
 
 
-def test_list_paths_endpoint(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_list_paths_endpoint() -> None:
     """Test that list_paths endpoint calls adapter with context."""
     with TestClient(app) as client:
         # Verify app has context initialized
@@ -100,7 +102,8 @@ def test_list_paths_endpoint(test_repo: Path) -> None:
         assert app.state.context is not None
 
 
-def test_open_file_endpoint(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_open_file_endpoint() -> None:
     """Test that open_file endpoint calls adapter with context."""
     with TestClient(app) as client:
         # Verify app has context initialized
@@ -109,7 +112,8 @@ def test_open_file_endpoint(test_repo: Path) -> None:
         assert hasattr(app.state, "context")
 
 
-def test_search_text_endpoint(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_search_text_endpoint() -> None:
     """Test that search_text endpoint calls adapter with context."""
     with TestClient(app) as client:
         # Verify app has context initialized
@@ -118,7 +122,8 @@ def test_search_text_endpoint(test_repo: Path) -> None:
         assert hasattr(app.state, "context")
 
 
-def test_semantic_search_endpoint(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_semantic_search_endpoint() -> None:
     """Test that semantic_search endpoint calls adapter with context."""
     with TestClient(app) as client:
         # Verify app has context initialized
@@ -127,7 +132,8 @@ def test_semantic_search_endpoint(test_repo: Path) -> None:
         assert hasattr(app.state, "context")
 
 
-def test_blame_range_endpoint(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_blame_range_endpoint() -> None:
     """Test that blame_range endpoint calls adapter with context."""
     with TestClient(app) as client:
         # Verify app has context initialized
@@ -136,7 +142,8 @@ def test_blame_range_endpoint(test_repo: Path) -> None:
         assert hasattr(app.state, "context")
 
 
-def test_file_history_endpoint(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_file_history_endpoint() -> None:
     """Test that file_history endpoint calls adapter with context."""
     with TestClient(app) as client:
         # Verify app has context initialized
@@ -145,7 +152,8 @@ def test_file_history_endpoint(test_repo: Path) -> None:
         assert hasattr(app.state, "context")
 
 
-def test_file_resource_endpoint(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_file_resource_endpoint() -> None:
     """Test that file_resource endpoint calls adapter with context."""
     with TestClient(app) as client:
         # Verify app has context initialized

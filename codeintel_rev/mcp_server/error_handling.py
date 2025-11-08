@@ -341,7 +341,7 @@ def handle_adapter_errors(
 
     Returns
     -------
-    Callable
+    Callable[[F], F]
         Decorator function that wraps the adapter call in try/except and
         converts exceptions to error envelopes.
 
@@ -421,7 +421,14 @@ def handle_adapter_errors(
             async def async_wrapper(*args: object, **kwargs: object) -> dict:
                 try:
                     return await func(*args, **kwargs)  # type: ignore[return-value]
-                except Exception as exc:
+                except (KeyboardInterrupt, SystemExit):
+                    # Re-raise system-level exceptions - these should propagate
+                    raise
+                except BaseException as exc:  # noqa: BLE001 - defensive catch ensures Problem Details emission
+                    # Catch all other exceptions (including Exception subclasses)
+                    # to ensure Problem Details are always emitted at the boundary.
+                    # This is a boundary handler that MUST catch all exceptions to
+                    # guarantee consistent error responses for clients.
                     return convert_exception_to_envelope(exc, operation, empty_result)
 
             return cast("F", async_wrapper)
@@ -430,7 +437,14 @@ def handle_adapter_errors(
         def sync_wrapper(*args: object, **kwargs: object) -> dict:
             try:
                 return func(*args, **kwargs)  # type: ignore[return-value]
-            except Exception as exc:
+            except (KeyboardInterrupt, SystemExit):
+                # Re-raise system-level exceptions - these should propagate
+                raise
+            except BaseException as exc:  # noqa: BLE001 - defensive catch ensures Problem Details emission
+                # Catch all other exceptions (including Exception subclasses)
+                # to ensure Problem Details are always emitted at the boundary.
+                # This is a boundary handler that MUST catch all exceptions to
+                # guarantee consistent error responses for clients.
                 return convert_exception_to_envelope(exc, operation, empty_result)
 
         return cast("F", sync_wrapper)

@@ -7,10 +7,9 @@ edge case coverage.
 from __future__ import annotations
 
 from typing import cast
-from unittest.mock import Mock
 
 import pytest
-from codeintel_rev.app.scope_registry import ScopeRegistry
+from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.mcp_server.scope_utils import (
     apply_language_filter,
@@ -21,51 +20,44 @@ from codeintel_rev.mcp_server.scope_utils import (
 )
 
 
-@pytest.fixture
-def mock_context() -> Mock:
-    """Create a mock ApplicationContext with scope registry.
-
-    Returns
-    -------
-    Mock
-        Mock ApplicationContext with initialized scope_registry.
-    """
-    context = Mock()
-    context.scope_registry = ScopeRegistry()
-    return context
-
-
 class TestGetEffectiveScope:
     """Tests for get_effective_scope function."""
 
-    def test_valid_session_id_with_scope(self, mock_context: Mock) -> None:
+    @pytest.mark.asyncio
+    async def test_valid_session_id_with_scope(
+        self, mock_application_context: ApplicationContext
+    ) -> None:
         """Test that valid session ID with scope returns scope."""
         # Arrange
         session_id = "test-session-123"
         scope: ScopeIn = cast("ScopeIn", {"languages": ["python"], "include_globs": ["**/*.py"]})
-        mock_context.scope_registry.set_scope(session_id, scope)
+        await mock_application_context.scope_store.set(session_id, scope)
 
         # Act
-        result = get_effective_scope(mock_context, session_id)
+        result = await get_effective_scope(mock_application_context, session_id)
 
         # Assert
         assert result == scope
 
-    def test_valid_session_id_without_scope(self, mock_context: Mock) -> None:
+    @pytest.mark.asyncio
+    async def test_valid_session_id_without_scope(
+        self, mock_application_context: ApplicationContext
+    ) -> None:
         """Test that valid session ID without scope returns None."""
         # Arrange
         session_id = "test-session-123"
 
         # Act
-        result = get_effective_scope(mock_context, session_id)
+        result = await get_effective_scope(mock_application_context, session_id)
 
         # Assert
         assert result is None
 
-    def test_none_session_id(self, mock_context: Mock) -> None:
+    @pytest.mark.asyncio
+    async def test_none_session_id(self, mock_application_context: ApplicationContext) -> None:
         """Test that None session ID returns None."""
         # Act
-        result = get_effective_scope(mock_context, None)
+        result = await get_effective_scope(mock_application_context, None)
 
         # Assert
         assert result is None

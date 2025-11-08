@@ -230,6 +230,27 @@ class ServerLimits(msgspec.Struct, frozen=True):
     semantic_overfetch_multiplier: int = 2
 
 
+class RedisConfig(msgspec.Struct, frozen=True):
+    """Redis configuration for scope storage.
+
+    Attributes
+    ----------
+    url : str
+        Redis connection URL. Defaults to local Redis on standard port.
+    scope_l1_size : int
+        Maximum number of entries to retain in the in-process L1 cache.
+    scope_l1_ttl_seconds : float
+        Time-to-live in seconds for L1 cache entries.
+    scope_l2_ttl_seconds : int
+        Time-to-live in seconds for Redis entries (L2 cache).
+    """
+
+    url: str = "redis://127.0.0.1:6379/0"
+    scope_l1_size: int = 256
+    scope_l1_ttl_seconds: float = 300.0
+    scope_l2_ttl_seconds: int = 3600
+
+
 class Settings(msgspec.Struct, frozen=True):
     """Global settings container for the entire code intelligence system.
 
@@ -255,12 +276,15 @@ class Settings(msgspec.Struct, frozen=True):
     limits : ServerLimits
         Server resource limits and rate limiting configuration. Protects against
         resource exhaustion and provides basic API rate limiting.
+    redis : RedisConfig
+        Redis configuration for session scope caching.
     """
 
     vllm: VLLMConfig
     paths: PathsConfig
     index: IndexConfig
     limits: ServerLimits
+    redis: RedisConfig
 
 
 def load_settings() -> Settings:
@@ -341,6 +365,14 @@ def load_settings() -> Settings:
         Rate limit queries per second (default: 10.0).
     RATE_LIMIT_BURST : int, optional
         Rate limit burst capacity (default: 20).
+    REDIS_URL : str, optional
+        Redis connection URL for Session scope storage (default: "redis://127.0.0.1:6379/0").
+    REDIS_SCOPE_L1_SIZE : int, optional
+        Maximum number of entries for the in-process L1 cache (default: 256).
+    REDIS_SCOPE_L1_TTL_SECONDS : float, optional
+        TTL in seconds for L1 cache entries (default: 300).
+    REDIS_SCOPE_L2_TTL_SECONDS : int, optional
+        TTL in seconds for Redis entries (default: 3600).
     """
     repo_root = os.environ.get("REPO_ROOT", str(Path.cwd()))
 
@@ -385,12 +417,20 @@ def load_settings() -> Settings:
         semantic_overfetch_multiplier=int(os.environ.get("SEMANTIC_OVERFETCH_MULTIPLIER", "2")),
     )
 
-    return Settings(vllm=vllm, paths=paths, index=index, limits=limits)
+    redis = RedisConfig(
+        url=os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0"),
+        scope_l1_size=int(os.environ.get("REDIS_SCOPE_L1_SIZE", "256")),
+        scope_l1_ttl_seconds=float(os.environ.get("REDIS_SCOPE_L1_TTL_SECONDS", "300")),
+        scope_l2_ttl_seconds=int(os.environ.get("REDIS_SCOPE_L2_TTL_SECONDS", "3600")),
+    )
+
+    return Settings(vllm=vllm, paths=paths, index=index, limits=limits, redis=redis)
 
 
 __all__ = [
     "IndexConfig",
     "PathsConfig",
+    "RedisConfig",
     "ServerLimits",
     "Settings",
     "VLLMConfig",

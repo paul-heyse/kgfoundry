@@ -94,8 +94,8 @@ def test_file_not_found_error_conversion() -> None:
 
     envelope = convert_exception_to_envelope(exc, operation, empty_result)
 
-    assert envelope["path"] == ""
-    assert envelope["content"] == ""
+    assert not envelope["path"]
+    assert not envelope["content"]
     assert envelope["lines"] == 0
     assert envelope["size"] == 0
     assert envelope["error"] == "File not found: test.py"
@@ -184,8 +184,8 @@ def test_exception_conversion_preserves_empty_result() -> None:
 
     envelope = convert_exception_to_envelope(exc, operation, empty_result)
 
-    assert envelope["path"] == ""
-    assert envelope["content"] == ""
+    assert not envelope["path"]
+    assert not envelope["content"]
     assert envelope["lines"] == 0
     assert envelope["size"] == 0
     assert envelope["truncated"] is False
@@ -252,14 +252,21 @@ def test_decorator_preserves_function_signature() -> None:
     empty_result = {"value": 0}
 
     @handle_adapter_errors(operation="test:operation", empty_result=empty_result)
-    def test_func(_param: str) -> dict:
-        """Test function docstring."""
+    def test_func(param: str) -> dict:
+        """Test function docstring.
+
+        Returns
+        -------
+        dict
+            Test result dictionary.
+        """
+        _ = param  # Parameter used for signature testing only
         return {"value": 1}
 
     assert test_func.__name__ == "test_func"
     assert test_func.__doc__ is not None
     assert "Test function docstring" in test_func.__doc__
-    assert "_param" in test_func.__annotations__
+    assert "param" in test_func.__annotations__
     # Return annotation may be stored as string or type
     assert test_func.__annotations__.get("return") in {dict, "dict"}
 
@@ -361,8 +368,8 @@ def test_decorator_empty_result_variations() -> None:
         raise FileNotFoundError(msg)
 
     result1 = open_file_func()
-    assert result1["path"] == ""
-    assert result1["content"] == ""
+    assert not result1["path"]
+    assert not result1["content"]
     assert result1["lines"] == 0
     assert result1["size"] == 0
 

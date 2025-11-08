@@ -6,6 +6,7 @@ correctness with real repository data and edge cases.
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 from datetime import datetime
 from pathlib import Path
@@ -30,19 +31,25 @@ def git_repo(tmp_path: Path) -> Path:
     Returns
     -------
     Path
-        Path to Git repository root.
+        Path to Git repository root. Repository is cleaned up after test.
 
-    Returns
-    -------
-    Path
-        Repository root path. Repository is cleaned up after test.
+    Raises
+    ------
+    RuntimeError
+        If git command is not found in PATH.
     """
     repo_root = tmp_path / "test_repo"
     repo_root.mkdir()
 
+    # Resolve git command to full path for security (S607)
+    git_cmd = shutil.which("git")
+    if git_cmd is None:
+        msg = "git command not found in PATH"
+        raise RuntimeError(msg)
+
     # Initialize Git repository
     subprocess.run(
-        ["git", "init"],
+        [git_cmd, "init"],
         cwd=repo_root,
         check=True,
         capture_output=True,
@@ -50,13 +57,13 @@ def git_repo(tmp_path: Path) -> Path:
 
     # Configure Git user (required for commits)
     subprocess.run(
-        ["git", "config", "user.name", "Test User"],
+        [git_cmd, "config", "user.name", "Test User"],
         cwd=repo_root,
         check=True,
         capture_output=True,
     )
     subprocess.run(
-        ["git", "config", "user.email", "test@example.com"],
+        [git_cmd, "config", "user.email", "test@example.com"],
         cwd=repo_root,
         check=True,
         capture_output=True,
@@ -101,14 +108,14 @@ def function3():
 
         # Stage and commit
         subprocess.run(
-            ["git", "add", "test.py"],
+            [git_cmd, "add", "test.py"],
             cwd=repo_root,
             check=True,
             capture_output=True,
         )
         subprocess.run(
             [
-                "git",
+                git_cmd,
                 "commit",
                 "-m",
                 f"Update function returns (commit {i + 1})",
@@ -145,14 +152,24 @@ class TestGitClientIntegration:
             datetime.fromisoformat(entry["date"].replace("Z", "+00:00"))
 
     def test_blame_range_commit_shas_match(self, git_repo: Path) -> None:
-        """blame_range commit SHAs should match actual Git commits."""
+        """blame_range commit SHAs should match actual Git commits.
+
+        Raises
+        ------
+        RuntimeError
+            If git command is not found in PATH.
+        """
         client = GitClient(repo_path=git_repo)
 
         entries = client.blame_range("test.py", start_line=1, end_line=10)
 
         # Get actual commit SHAs from git log
+        git_cmd = shutil.which("git")
+        if git_cmd is None:
+            msg = "git command not found in PATH"
+            raise RuntimeError(msg)
         result = subprocess.run(
-            ["git", "log", "--format=%H", "test.py"],
+            [git_cmd, "log", "--format=%H", "test.py"],
             cwd=git_repo,
             check=True,
             capture_output=True,

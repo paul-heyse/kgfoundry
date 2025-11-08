@@ -51,9 +51,9 @@ from pathlib import Path
 from threading import Lock
 from typing import TYPE_CHECKING
 
-# Import ScopeRegistry at runtime (not TYPE_CHECKING) to avoid circular dependency
-# scope_registry imports schemas, but config_context only needs ScopeRegistry type
-from codeintel_rev.app.scope_registry import ScopeRegistry
+import redis.asyncio as redis_asyncio
+
+from codeintel_rev.app.scope_store import ScopeStore
 from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.faiss_manager import FAISSManager
@@ -228,10 +228,8 @@ class ApplicationContext:
     faiss_manager : FAISSManager
         FAISS index manager that handles CPU and GPU indexes. GPU resources are
         lazily initialized on first search or optionally pre-loaded at startup.
-    scope_registry : ScopeRegistry
-        Thread-safe registry for storing per-session query scopes. Sessions are
-        identified by UUID and expire after 1 hour of inactivity. Used by adapters
-        to apply scope filters (path globs, languages) to search operations.
+    scope_store : ScopeStore
+        Redis-backed scope store for session-scoped query filters with L1/L2 caching.
     git_client : GitClient
         Typed Git operations client using GitPython. Provides structured APIs for
         blame and history operations without subprocess overhead. Lazy-initializes
@@ -283,7 +281,7 @@ class ApplicationContext:
     paths: ResolvedPaths
     vllm_client: VLLMClient
     faiss_manager: FAISSManager
-    scope_registry: ScopeRegistry
+    scope_store: ScopeStore
     git_client: GitClient
     async_git_client: AsyncGitClient
     _faiss_lock: Lock = field(default_factory=Lock, init=False)
@@ -346,8 +344,14 @@ class ApplicationContext:
             use_cuvs=settings.index.use_cuvs,
         )
 
-        # Initialize scope registry for session-scoped query constraints
-        scope_registry = ScopeRegistry()
+        # Initialize scope store for session-scoped query constraints
+        redis_client = redis_asyncio.from_url(settings.redis.url)
+        scope_store = ScopeStore(
+            redis_client,
+            l1_maxsize=settings.redis.scope_l1_size,
+            l1_ttl_seconds=settings.redis.scope_l1_ttl_seconds,
+            l2_ttl_seconds=settings.redis.scope_l2_ttl_seconds,
+        )
 
         # Initialize Git clients for blame and history operations
         git_client = GitClient(repo_path=paths.repo_root)
@@ -371,7 +375,7 @@ class ApplicationContext:
             paths=paths,
             vllm_client=vllm_client,
             faiss_manager=faiss_manager,
-            scope_registry=scope_registry,
+            scope_store=scope_store,
             git_client=git_client,
             async_git_client=async_git_client,
         )

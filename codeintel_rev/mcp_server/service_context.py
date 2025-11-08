@@ -35,8 +35,14 @@ def get_service_context() -> ApplicationContext:
     :meth:`ApplicationContext.create`. Subsequent calls return the cached
     instance so that adapters share the same settings, resolved paths, and
     long-lived clients.
+
+    Returns
+    -------
+    ApplicationContext
+        Cached application context instance with settings, resolved paths,
+        and long-lived clients (FAISS manager, vLLM client, DuckDB catalog).
     """
-    global _CACHED_CONTEXT
+    global _CACHED_CONTEXT  # noqa: PLW0603 - module-level cache protected by lock
     if _CACHED_CONTEXT is None:
         with _CONTEXT_LOCK:
             if _CACHED_CONTEXT is None:
@@ -51,6 +57,6 @@ def reset_service_context() -> None:
     between runs. The next call to :func:`get_service_context` will recreate the
     context from the latest configuration.
     """
-    global _CACHED_CONTEXT
+    global _CACHED_CONTEXT  # noqa: PLW0603 - module-level cache protected by lock
     with _CONTEXT_LOCK:
         _CACHED_CONTEXT = None

@@ -156,6 +156,7 @@ async def test_readiness_probe_materialize_reports_missing_table(
         paths=existing_settings.paths,
         index=_materialized_index_config(existing_settings.index, enabled=True),
         limits=existing_settings.limits,
+        redis=existing_settings.redis,
     )
     probe = ReadinessProbe(mock_context)
 
@@ -179,6 +180,7 @@ async def test_readiness_probe_materialize_validates_index(
         paths=existing_settings.paths,
         index=_materialized_index_config(existing_settings.index, enabled=True),
         limits=existing_settings.limits,
+        redis=existing_settings.redis,
     )
 
     with duckdb.connect(str(mock_context.paths.duckdb_path)) as connection:
@@ -289,7 +291,7 @@ def test_readiness_probe_check_directory_exists() -> None:
         path = Path(tmpdir)
 
         # Act
-        result = ReadinessProbe._check_directory(path)
+        result = ReadinessProbe._check_directory(path)  # noqa: SLF001 - intentional test access to private method
 
         # Assert
         assert result.healthy is True
@@ -303,7 +305,7 @@ def test_readiness_probe_check_directory_create() -> None:
         new_dir = Path(tmpdir) / "new_subdir"
 
         # Act
-        result = ReadinessProbe._check_directory(new_dir, create=True)
+        result = ReadinessProbe._check_directory(new_dir, create=True)  # noqa: SLF001 - intentional test access to private method
 
         # Assert
         assert result.healthy is True
@@ -319,7 +321,7 @@ def test_readiness_probe_check_file_exists() -> None:
 
     try:
         # Act
-        result = ReadinessProbe._check_file(path, description="test file")
+        result = ReadinessProbe._check_file(path, description="test file")  # noqa: SLF001 - intentional test access to private method
 
         # Assert
         assert result.healthy is True
@@ -333,7 +335,7 @@ def test_readiness_probe_check_file_optional() -> None:
     path = Path("/nonexistent/file.txt")
 
     # Act
-    result = ReadinessProbe._check_file(path, description="test file", optional=True)
+    result = ReadinessProbe._check_file(path, description="test file", optional=True)  # noqa: SLF001 - intentional test access to private method
 
     # Assert
     assert result.healthy is True  # Optional files don't fail readiness
@@ -347,7 +349,7 @@ def test_readiness_probe_check_file_required() -> None:
     path = Path("/nonexistent/file.txt")
 
     # Act
-    result = ReadinessProbe._check_file(path, description="test file", optional=False)
+    result = ReadinessProbe._check_file(path, description="test file", optional=False)  # noqa: SLF001 - intentional test access to private method
 
     # Assert
     assert result.healthy is False
@@ -364,12 +366,13 @@ def test_readiness_probe_check_vllm_invalid_url(mock_context: ApplicationContext
         paths=mock_context.settings.paths,
         index=mock_context.settings.index,
         limits=mock_context.settings.limits,
+        redis=mock_context.settings.redis,
     )
     mock_context.settings = new_settings
     probe = ReadinessProbe(mock_context)
 
     # Act
-    result = probe._check_vllm_connection()
+    result = probe._check_vllm_connection()  # noqa: SLF001 - intentional test access to private method
 
     # Assert
     assert result.healthy is False
@@ -386,6 +389,7 @@ def test_readiness_probe_check_vllm_success(mock_context: ApplicationContext) ->
         paths=mock_context.settings.paths,
         index=mock_context.settings.index,
         limits=mock_context.settings.limits,
+        redis=mock_context.settings.redis,
     )
     mock_context.settings = new_settings
     probe = ReadinessProbe(mock_context)
@@ -398,7 +402,7 @@ def test_readiness_probe_check_vllm_success(mock_context: ApplicationContext) ->
         mock_instance.get.return_value = mock_response
         mock_client.return_value.__enter__.return_value = mock_instance
 
-        result = probe._check_vllm_connection()
+        result = probe._check_vllm_connection()  # noqa: SLF001 - intentional test access to private method  # noqa: SLF001 - intentional test access to private method
 
     # Assert
     assert result.healthy is True
@@ -413,6 +417,7 @@ def test_readiness_probe_check_vllm_http_error(mock_context: ApplicationContext)
         paths=mock_context.settings.paths,
         index=mock_context.settings.index,
         limits=mock_context.settings.limits,
+        redis=mock_context.settings.redis,
     )
     mock_context.settings = new_settings
     probe = ReadinessProbe(mock_context)
@@ -423,7 +428,7 @@ def test_readiness_probe_check_vllm_http_error(mock_context: ApplicationContext)
         mock_instance.get.side_effect = httpx.HTTPError("Connection refused")
         mock_client.return_value.__enter__.return_value = mock_instance
 
-        result = probe._check_vllm_connection()
+        result = probe._check_vllm_connection()  # noqa: SLF001 - intentional test access to private method  # noqa: SLF001 - intentional test access to private method
 
     # Assert
     assert result.healthy is False

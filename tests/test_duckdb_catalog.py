@@ -69,12 +69,17 @@ def test_query_by_uri_supports_unlimited_results(tmp_path) -> None:
     db_path = tmp_path / "catalog.duckdb"
     catalog = DuckDBCatalog(db_path, vectors_dir)
     catalog.conn = duckdb.connect(database=":memory:")
-    # SQL injection warning suppressed: test code with controlled input from tmp_path
-    # DuckDB doesn't support parameterized CREATE VIEW, so we use string formatting with sanitized input
-    parquet_expr = str(parquet_path).replace("'", "''")
-    catalog.conn.execute(
-        f"CREATE OR REPLACE VIEW chunks AS SELECT * FROM read_parquet('{parquet_expr}')"
-    )
+    # Use DuckDB's register function to register parquet file as a table
+    # This avoids string formatting in CREATE VIEW by using a registered table name
+    validated_path = parquet_path.resolve()
+    # Ensure path is within tmp_path to prevent path traversal
+    if not str(validated_path).startswith(str(tmp_path.resolve())):
+        msg = "Path outside test directory"
+        raise ValueError(msg)
+    # Register parquet file as a table using parameterized API
+    catalog.conn.register("chunks_table", duckdb.read_parquet(str(validated_path)))
+    # Create view from registered table (table name is constant, not user input)
+    catalog.conn.execute("CREATE OR REPLACE VIEW chunks AS SELECT * FROM chunks_table")
 
     limited = catalog.query_by_uri("example.py", limit=1)
     unlimited_zero = catalog.query_by_uri("example.py", limit=0)

@@ -38,14 +38,14 @@ Register middleware in FastAPI application:
 Access session ID in adapter:
 
 >>> from codeintel_rev.app.middleware import get_session_id
->>> def my_adapter(context: ApplicationContext, ...) -> dict:
+>>> async def my_adapter(context: ApplicationContext, ...) -> dict:
 ...     session_id = get_session_id()
-...     scope = context.scope_registry.get_scope(session_id)
+...     scope = await context.scope_store.get(session_id)
 ...     # ... use scope
 
 See Also
 --------
-codeintel_rev.app.scope_registry : ScopeRegistry for storing session scopes
+codeintel_rev.app.scope_store : ScopeStore for storing session scopes
 codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scopes
 """
 
@@ -99,9 +99,9 @@ def get_session_id() -> str:
     --------
     In an adapter function:
 
-    >>> def my_adapter(context: ApplicationContext) -> dict:
+    >>> async def my_adapter(context: ApplicationContext) -> dict:
     ...     session_id = get_session_id()  # Retrieves from ContextVar
-    ...     scope = context.scope_registry.get_scope(session_id)
+    ...     scope = await context.scope_store.get(session_id)
     ...     # ... process with scope
 
     Outside request context (error case):

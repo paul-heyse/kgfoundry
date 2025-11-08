@@ -44,6 +44,12 @@ _LOG_EXTRA_BASE: dict[str, object] = {"component": "faiss_manager"}
 def _log_extra(**kwargs: object) -> dict[str, object]:
     """Build structured logging extras for FAISS manager events.
 
+    Parameters
+    ----------
+    **kwargs : object
+        Additional key-value pairs to include in logging extras. These are
+        merged with the base component name.
+
     Returns
     -------
     dict[str, object]
@@ -316,7 +322,7 @@ class FAISSManager:
         # Add with IDs
         cpu_index.add_with_ids(vectors_norm, ids.astype(np.int64))
 
-    def update_index(self, new_vectors: np.ndarray, new_ids: np.ndarray) -> None:
+    def update_index(self, new_vectors: np.ndarray, new_ids: np.ndarray) -> None:  # noqa: C901 - complex incremental indexing logic
         """Add new vectors to secondary index for fast incremental updates.
 
         Adds vectors to a secondary flat index (IndexFlatIP) which requires no
@@ -365,7 +371,7 @@ class FAISSManager:
                 extra=_log_extra(event="secondary_index_created"),
             )
 
-        def _build_primary_contains() -> Callable[[int], bool]:
+        def _build_primary_contains() -> Callable[[int], bool]:  # noqa: C901, PLR0911 - complex FAISS API compatibility layer
             try:
                 cpu_index = self._require_cpu_index()
             except RuntimeError:

@@ -93,6 +93,12 @@ class ErrorCode(StrEnum):
         Required resource unavailable.
     SESSION_ERROR
         Session management error.
+    FILE_OPERATION_ERROR
+        File operation failed.
+    GIT_OPERATION_ERROR
+        Git operation failed.
+    INVALID_PARAMETER
+        Invalid parameter value provided.
     ONTOLOGY_PARSE_ERROR
         Ontology parsing failed.
     LINKER_CALIBRATION_ERROR

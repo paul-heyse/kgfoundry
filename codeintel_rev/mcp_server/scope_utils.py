@@ -46,7 +46,7 @@ Filter paths by language:
 
 See Also
 --------
-codeintel_rev.app.scope_registry : ScopeRegistry for storing session scopes
+codeintel_rev.app.scope_store : ScopeStore for storing session scopes
 codeintel_rev.app.middleware : get_session_id for retrieving session ID
 """
 
@@ -113,20 +113,20 @@ LANGUAGE_EXTENSIONS: dict[str, list[str]] = {
 }
 
 
-def get_effective_scope(
+async def get_effective_scope(
     context: ApplicationContext,
     session_id: str | None,
 ) -> ScopeIn | None:
-    """Retrieve session scope from registry.
+    """Retrieve session scope from the scope store.
 
-    Helper function that wraps ScopeRegistry.get_scope with null-safety for
-    missing session IDs. Returns None if session_id is None or scope not found,
-    allowing adapters to gracefully fall back to "no scope" behavior.
+    Helper function that wraps ScopeStore.get with null-safety for missing session
+    IDs. Returns None if session_id is None or scope not found, allowing adapters
+    to gracefully fall back to "no scope" behavior.
 
     Parameters
     ----------
     context : ApplicationContext
-        Application context containing scope registry.
+        Application context containing scope store.
     session_id : str | None
         Session identifier to look up. If None, returns None immediately
         without registry access.
@@ -140,8 +140,8 @@ def get_effective_scope(
     --------
     >>> context = ApplicationContext.create()
     >>> session_id = "test-session-123"
-    >>> context.scope_registry.set_scope(session_id, {"languages": ["python"]})
-    >>> scope = get_effective_scope(context, session_id)
+    >>> await context.scope_store.set(session_id, {"languages": ["python"]})
+    >>> scope = await get_effective_scope(context, session_id)
     >>> scope
     {'languages': ['python']}
     >>> get_effective_scope(context, None)  # No session ID
@@ -154,7 +154,7 @@ def get_effective_scope(
     """
     if session_id is None:
         return None
-    return context.scope_registry.get_scope(session_id)
+    return await context.scope_store.get(session_id)
 
 
 def merge_scope_filters(

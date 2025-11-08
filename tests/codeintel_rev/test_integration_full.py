@@ -48,7 +48,8 @@ def test_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return repo_root
 
 
-def test_app_startup_with_valid_config(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_app_startup_with_valid_config() -> None:
     """Test that FastAPI app starts successfully with valid configuration."""
     with TestClient(app) as client:
         # App should start without errors
@@ -57,7 +58,8 @@ def test_app_startup_with_valid_config(test_repo: Path) -> None:
         assert response.json() == {"status": "ok"}
 
 
-def test_app_healthz_endpoint(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_app_healthz_endpoint() -> None:
     """Test that /healthz endpoint returns 200."""
     with TestClient(app) as client:
         response = client.get("/healthz")
@@ -66,7 +68,8 @@ def test_app_healthz_endpoint(test_repo: Path) -> None:
         assert data["status"] == "ok"
 
 
-def test_app_readyz_endpoint_healthy(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_app_readyz_endpoint_healthy() -> None:
     """Test that /readyz endpoint shows all checks healthy."""
     with TestClient(app) as client:
         response = client.get("/readyz")
@@ -97,8 +100,8 @@ def test_app_startup_fails_invalid_repo_root(
         ApplicationContext.create()
 
 
+@pytest.mark.usefixtures("test_repo")
 def test_app_startup_with_preload_disabled(
-    test_repo: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test that FAISS is lazy-loaded when FAISS_PRELOAD=0."""
@@ -115,8 +118,8 @@ def test_app_startup_with_preload_disabled(
         assert response.status_code == 200
 
 
+@pytest.mark.usefixtures("test_repo")
 def test_app_startup_with_preload_enabled(
-    test_repo: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Test that FAISS pre-loading works when FAISS_PRELOAD=1."""
@@ -145,7 +148,8 @@ def test_context_stored_in_app_state(test_repo: Path) -> None:
         assert context.paths.repo_root == test_repo.resolve()
 
 
-def test_readiness_probe_stored_in_app_state(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_readiness_probe_stored_in_app_state() -> None:
     """Test that ReadinessProbe is stored in app.state."""
     with TestClient(app):
         assert hasattr(app.state, "readiness")
@@ -155,7 +159,8 @@ def test_readiness_probe_stored_in_app_state(test_repo: Path) -> None:
         assert isinstance(readiness, ReadinessProbe)
 
 
-def test_mcp_tool_list_paths(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_mcp_tool_list_paths() -> None:
     """Test that list_paths MCP tool works end-to-end."""
     with TestClient(app) as client:
         # Call MCP tool endpoint (if available)
@@ -165,7 +170,8 @@ def test_mcp_tool_list_paths(test_repo: Path) -> None:
         assert response.status_code == 200
 
 
-def test_configuration_immutability(test_repo: Path) -> None:
+@pytest.mark.usefixtures("test_repo")
+def test_configuration_immutability() -> None:
     """Test that configuration is immutable after creation."""
     with TestClient(app):
         context = app.state.context

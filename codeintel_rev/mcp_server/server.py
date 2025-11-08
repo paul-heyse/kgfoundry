@@ -56,7 +56,7 @@ def get_context() -> ApplicationContext:
 
 
 @mcp.tool()
-def set_scope(scope: ScopeIn) -> dict:
+async def set_scope(scope: ScopeIn) -> dict:
     """Set query scope for subsequent operations.
 
     Parameters
@@ -70,7 +70,7 @@ def set_scope(scope: ScopeIn) -> dict:
         Effective scope configuration.
     """
     context = get_context()
-    return files_adapter.set_scope(context, scope)
+    return await files_adapter.set_scope(context, scope)
 
 
 @mcp.tool()
@@ -158,7 +158,7 @@ def open_file(
     operation="search:text",
     empty_result={"matches": [], "total": 0, "truncated": False},
 )
-def search_text(
+async def search_text(
     query: str,
     *,
     regex: bool = False,
@@ -191,7 +191,7 @@ def search_text(
         fields and Problem Details.
     """
     context = get_context()
-    return text_search_adapter.search_text(
+    return await text_search_adapter.search_text(
         context,
         query,
         regex=regex,

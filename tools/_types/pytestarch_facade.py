@@ -90,6 +90,7 @@ def _import(name: str) -> ModuleType:
 
 class _PytestarchModule(Protocol):
     def get_evaluable_architecture(
+        self,
         *args: object,
         **kwargs: object,
     ) -> EvaluableArchitectureProtocol:
@@ -111,6 +112,7 @@ class _PytestarchModule(Protocol):
         ...
 
     def get_evaluable_architecture_for_module_objects(
+        self,
         *args: object,
         **kwargs: object,
     ) -> EvaluableArchitectureProtocol:

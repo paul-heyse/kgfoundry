@@ -537,8 +537,13 @@ def _torch_smoke() -> tuple[bool, str]:
     tuple[bool, str]
         (success, message)
     """
+    import importlib.util
+
+    torch_spec = importlib.util.find_spec("torch")
+    if torch_spec is None:
+        return False, "torch module not found"
     try:
-        import torch
+        torch = importlib.import_module("torch")
     except (ImportError, ModuleNotFoundError) as exc:
         return False, f"torch import failed: {exc}"
 
@@ -572,8 +577,13 @@ def _faiss_smoke() -> tuple[bool, str]:
     tuple[bool, str]
         (success, message)
     """
+    import importlib.util
+
+    faiss_spec = importlib.util.find_spec("faiss")
+    if faiss_spec is None:
+        return False, "faiss module not found"
     try:
-        import faiss
+        faiss = importlib.import_module("faiss")
         import numpy as np
     except (ImportError, ModuleNotFoundError) as exc:
         return False, f"faiss import failed: {exc}"

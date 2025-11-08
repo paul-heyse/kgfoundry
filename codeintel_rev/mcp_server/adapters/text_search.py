@@ -5,6 +5,7 @@ Fast text search with regex support.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
@@ -13,7 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from codeintel_rev.app.middleware import get_session_id
-from codeintel_rev.mcp_server.schemas import Match
+from codeintel_rev.mcp_server.schemas import Match, ScopeIn
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope, merge_scope_filters
 from kgfoundry_common.errors import VectorSearchError
 from kgfoundry_common.logging import get_logger
@@ -84,7 +85,7 @@ def _observe(operation: str) -> Iterator[DurationObservation | _NoopObservation]
         yield _NoopObservation()
 
 
-def search_text(  # noqa: PLR0913 - context parameter required for dependency injection
+async def search_text(  # noqa: PLR0913 - context parameter required for dependency injection
     context: ApplicationContext,
     query: str,
     *,
@@ -95,78 +96,47 @@ def search_text(  # noqa: PLR0913 - context parameter required for dependency in
     exclude_globs: Sequence[str] | None = None,
     max_results: int = 50,
 ) -> dict:
-    """Fast text search using ripgrep.
+    """Fast text search using ripgrep (async wrapper).
 
-    Applies session scope path filters if set via `set_scope`. Explicit
-    parameters override session scope following this precedence:
-
-    1. `paths` limit the search roots and suppress scope-provided
-       ``include_globs`` unless explicit ``include_globs`` are supplied.
-    2. Explicit ``include_globs``/``exclude_globs`` override scope values.
-    3. Remaining scope filters are forwarded to ripgrep via ``--iglob`` options.
-
-    Parameters
-    ----------
-    context : ApplicationContext
-        Application context containing repo root and settings.
-    query : str
-        Search query (literal or regex).
-    regex : bool
-        Treat query as regex pattern.
-    case_sensitive : bool
-        Case-sensitive search.
-    paths : Sequence[str] | None
-        Paths to search in (relative to repo root). Overrides scope include globs when provided.
-    include_globs : Sequence[str] | None
-        Glob patterns to include. Overrides scope include globs when provided.
-    exclude_globs : Sequence[str] | None
-        Glob patterns to exclude. Overrides scope exclude globs when provided.
-    max_results : int
-        Maximum number of results.
+    Applies session scope path filters if set via `set_scope`. Explicit parameters
+    override session scope following the precedence rules documented above.
 
     Returns
     -------
     dict
-        Search matches with locations and previews.
-
-    Raises
-    ------
-    VectorSearchError
-        If search operation fails (timeout, subprocess error, etc.).
-
-    Examples
-    --------
-    Basic usage:
-
-    >>> result = search_text(context, "def main", regex=False)
-    >>> isinstance(result["matches"], list)
-    True
-
-    With session scope:
-
-    >>> set_scope(context, {"include_globs": ["src/**/*.py"]})
-    >>> result = search_text(context, "def main")
-    >>> # Searches only Python files in src/ directory
-
-    Explicit paths override scope:
-
-    >>> set_scope(context, {"include_globs": ["src/**"]})
-    >>> result = search_text(context, "def main", paths=["tests/"])
-    >>> # Searches tests/ directory (explicit override), not src/
-
-    Notes
-    -----
-    Scope Integration:
-    - Session scope is retrieved from registry using session ID (set by middleware).
-    - Explicit `paths` suppress scope `include_globs` unless explicit `include_globs` are supplied.
-    - Explicit `include_globs`/`exclude_globs` override scope-provided globs.
-    - Remaining scope filters are forwarded to ripgrep via ``--iglob``/``--iglob !`` options.
+        Search results containing matched paths and metadata.
     """
-    repo_root = context.paths.repo_root
-
-    # Retrieve session scope and merge with explicit filters
     session_id = get_session_id()
-    scope = get_effective_scope(context, session_id)
+    scope = await get_effective_scope(context, session_id)
+    return await asyncio.to_thread(
+        _search_text_sync,
+        context,
+        session_id,
+        scope,
+        query=query,
+        regex=regex,
+        case_sensitive=case_sensitive,
+        paths=paths,
+        include_globs=include_globs,
+        exclude_globs=exclude_globs,
+        max_results=max_results,
+    )
+
+
+def _search_text_sync(  # noqa: PLR0913, PLR0917
+    context: ApplicationContext,
+    session_id: str,
+    scope: ScopeIn | None,
+    *,
+    query: str,
+    regex: bool,
+    case_sensitive: bool,
+    paths: Sequence[str] | None,
+    include_globs: Sequence[str] | None,
+    exclude_globs: Sequence[str] | None,
+    max_results: int,
+) -> dict:
+    repo_root = context.paths.repo_root
 
     merged_filters = merge_scope_filters(
         scope,

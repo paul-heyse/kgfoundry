@@ -14,9 +14,7 @@ from typing import TYPE_CHECKING
 
 from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.errors import FileReadError, InvalidLineRangeError
-from codeintel_rev.io.path_utils import (
-    resolve_within_repo,
-)
+from codeintel_rev.io.path_utils import resolve_within_repo
 from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.mcp_server.scope_utils import (
     apply_language_filter,
@@ -31,7 +29,7 @@ if TYPE_CHECKING:
 LOGGER = get_logger(__name__)
 
 
-def set_scope(context: ApplicationContext, scope: ScopeIn) -> dict:
+async def set_scope(context: ApplicationContext, scope: ScopeIn) -> dict:
     """Set query scope for subsequent operations.
 
     Stores scope in the session-scoped registry keyed by session ID. Subsequent
@@ -65,18 +63,14 @@ def set_scope(context: ApplicationContext, scope: ScopeIn) -> dict:
     If no session ID is available, this function will raise RuntimeError.
     """
     session_id = get_session_id()
-    context.scope_registry.set_scope(session_id, scope)
+    await context.scope_store.set(session_id, scope)
 
     LOGGER.info(
         "Set scope for session",
         extra={"session_id": session_id, "scope": scope},
     )
 
-    return {
-        "effective_scope": scope,
-        "session_id": session_id,
-        "status": "ok",
-    }
+    return {"effective_scope": scope, "session_id": session_id, "status": "ok"}
 
 
 async def list_paths(
@@ -155,9 +149,13 @@ async def list_paths(
         "Listing paths (async)",
         extra={"path": path, "max_results": max_results},
     )
+    session_id = get_session_id()
+    scope = await get_effective_scope(context, session_id)
     return await asyncio.to_thread(
         _list_paths_sync,
         context,
+        session_id,
+        scope,
         path,
         include_globs,
         exclude_globs,
@@ -165,8 +163,10 @@ async def list_paths(
     )
 
 
-def _list_paths_sync(  # noqa: C901, PLR0912, PLR0914 - PathOutsideRepositoryError raised by resolve_within_repo; pre-existing complexity
+def _list_paths_sync(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0917 - PathOutsideRepositoryError raised by resolve_within_repo; pre-existing complexity
     context: ApplicationContext,
+    session_id: str,
+    scope: ScopeIn | None,
     path: str | None = None,
     include_globs: list[str] | None = None,
     exclude_globs: list[str] | None = None,
@@ -182,6 +182,11 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0914 - PathOutsideRepositoryErr
     ----------
     context : ApplicationContext
         Application context containing repo root and settings.
+    session_id : str
+        Session identifier for logging and scope resolution.
+    scope : ScopeIn | None
+        Session scope containing include/exclude globs and language filters.
+        Overridden by explicit ``include_globs`` and ``exclude_globs`` parameters.
     path : str | None
         Starting path relative to repo root (None = root).
     include_globs : list[str] | None
@@ -198,8 +203,6 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0914 - PathOutsideRepositoryErr
 
     Raises
     ------
-    PathOutsideRepositoryError
-        If path escapes repository root (raised by resolve_within_repo).
     FileNotFoundError
         If path doesn't exist or is not a directory.
     """
@@ -209,9 +212,6 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0914 - PathOutsideRepositoryErr
         error_msg = "Path not found or not a directory"
         raise FileNotFoundError(error_msg)
 
-    # Retrieve session scope and merge with explicit parameters
-    session_id = get_session_id()
-    scope = get_effective_scope(context, session_id)
     merged = merge_scope_filters(
         scope,
         {"include_globs": include_globs, "exclude_globs": exclude_globs},
@@ -351,8 +351,6 @@ def open_file(
 
     Raises
     ------
-    PathOutsideRepositoryError
-        If path escapes repository root (raised by resolve_within_repo).
     FileNotFoundError
         If file doesn't exist (raised by resolve_within_repo) or is not a file.
     FileReadError
@@ -433,7 +431,11 @@ __all__ = ["list_paths", "open_file", "set_scope"]
 
 
 def _resolve_search_root(repo_root: Path, requested: str | None) -> Path | None:
-    """Resolve search root path, raising exceptions on error.
+    """Resolve search root path, returning None if path doesn't exist or is not a directory.
+
+    This function calls ``resolve_within_repo`` which may raise exceptions, but
+    this function itself does not raise exceptions. It returns ``None`` when the
+    resolved path is not a directory.
 
     Parameters
     ----------
@@ -446,13 +448,9 @@ def _resolve_search_root(repo_root: Path, requested: str | None) -> Path | None:
     -------
     Path | None
         Resolved search root path, or None if path doesn't exist or is not a directory.
-
-    Raises
-    ------
-    PathOutsideRepositoryError
-        If path escapes repository root (raised by resolve_within_repo).
-    FileNotFoundError
-        If path doesn't exist (raised by resolve_within_repo).
+        Note: ``resolve_within_repo`` may raise ``PathOutsideRepositoryError`` or
+        ``FileNotFoundError`` before this function returns, but those exceptions
+        are not caught or re-raised by this function.
     """
     if requested is None:
         return repo_root

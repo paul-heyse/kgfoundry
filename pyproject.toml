@@ -729,9 +729,18 @@ runtime-evaluated-base-classes = [
     "T20",
     "PLR6301",  # pytest test classes require instance methods for test isolation
 ]
+# codeintel_rev tests inherit from tests/** suppressions
+"codeintel_rev/tests/**" = [
+    "D103",  # Missing docstring in public function
+    "ANN001",  # Missing type annotation for function argument
+    "S101",  # Use of assert detected
+    "PLR2004",  # Magic value used in comparison
+    "ARG001",  # Unused function argument
+]
 # Openspec implementation files need explicit exception handling for DOC502 compliance
 "openspec/changes/codeintel-config-lifecycle-management/implementation/config_context.py" = ["TRY203"]
 "openspec/changes/codeintel-performance-optimization/implementation/git_client.py" = ["TRY203"]
+"openspec/changes/codeintel-error-handling-standardization/implementation/errors.py" = ["ERA001"]  # Documentation examples in comments
 # tests/kgfoundry_common tests have proper docstrings and annotations - no blanket suppressions needed
 # Explicitly exclude from blanket suppression (empty list = no suppressions)
 "tests/kgfoundry_common/**" = []
@@ -746,6 +755,10 @@ runtime-evaluated-base-classes = [
 "tools/docs/observability.py" = ["DOC502"]
 "tools/navmap/observability.py" = ["DOC502"]
 "tools/docs/scan_observability.py" = ["DOC502"]
+# DOC502 false positives: exceptions are explicitly raised but ruff doesn't recognize conditional raises
+"codeintel_rev/mcp_server/adapters/semantic.py" = ["DOC502"]
+"codeintel_rev/mcp_server/adapters/files.py" = ["DOC502"]  # PathOutsideRepositoryError raised by resolve_within_repo helper
+"codeintel_rev/mcp_server/adapters/history.py" = ["DOC502"]  # PathOutsideRepositoryError raised by resolve_within_repo helper
 "docs/_scripts/**" = ["PLC2701"]  # docs._scripts is internal tooling; importing from docs._types and tools._shared is expected
 "docs/types/artifacts.py" = ["PLC2701"]  # docs/types is a facade re-exporting from private docs._types module
 "tools/lint/codemod_typing_migration.py" = ["N802"]  # LibCST visitor protocol requires CamelCase method names (leave_ImportFrom, leave_Call)

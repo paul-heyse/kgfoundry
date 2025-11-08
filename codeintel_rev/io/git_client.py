@@ -67,7 +67,7 @@ class GitClient:
     The Git repository is lazy-loaded on first access to avoid startup overhead
     for applications that may not use Git operations immediately.
 
-    Parameters
+    Attributes
     ----------
     repo_path : Path
         Path to repository root directory. GitPython will search parent

@@ -19,9 +19,7 @@ Raising file operation error:
 Raising invalid line range error with context:
 
 >>> raise InvalidLineRangeError(
-...     "start_line must be positive",
-...     path="src/main.py",
-...     line_range=(0, 10)
+...     "start_line must be positive", path="src/main.py", line_range=(0, 10)
 ... )
 
 Raising Git operation error:
@@ -29,11 +27,7 @@ Raising Git operation error:
 >>> try:
 ...     git_client.blame_range(path, start, end)
 ... except git.exc.GitCommandError as exc:
-...     raise GitOperationError(
-...         "Git blame failed",
-...         path=path,
-...         git_command="blame"
-...     ) from exc
+...     raise GitOperationError("Git blame failed", path=path, git_command="blame") from exc
 """
 
 from __future__ import annotations
@@ -145,7 +139,6 @@ class FileReadError(FileOperationError):
     """
 
 
-
 class InvalidLineRangeError(FileOperationError):
     """Raised when line range parameters are invalid.
 
@@ -178,7 +171,7 @@ class InvalidLineRangeError(FileOperationError):
     ...     raise InvalidLineRangeError(
     ...         "start_line must be a positive integer",
     ...         path="src/main.py",
-    ...         line_range=(start_line, end_line)
+    ...         line_range=(start_line, end_line),
     ...     )
 
     Start > end:
@@ -187,7 +180,7 @@ class InvalidLineRangeError(FileOperationError):
     ...     raise InvalidLineRangeError(
     ...         "start_line must be less than or equal to end_line",
     ...         path="src/main.py",
-    ...         line_range=(start_line, end_line)
+    ...         line_range=(start_line, end_line),
     ...     )
 
     Notes
@@ -256,9 +249,7 @@ class GitOperationError(KgFoundryError):
     ...     git_client.blame_range(path, 1, 10)
     ... except git.exc.GitCommandError as exc:
     ...     raise GitOperationError(
-    ...         "Git blame failed",
-    ...         path="src/main.py",
-    ...         git_command="blame"
+    ...         "Git blame failed", path="src/main.py", git_command="blame"
     ...     ) from exc
 
     Wrap GitCommandError from log:
@@ -267,9 +258,7 @@ class GitOperationError(KgFoundryError):
     ...     git_client.file_history(path, limit=50)
     ... except git.exc.GitCommandError as exc:
     ...     raise GitOperationError(
-    ...         "Git log failed",
-    ...         path="src/main.py",
-    ...         git_command="log"
+    ...         "Git log failed", path="src/main.py", git_command="log"
     ...     ) from exc
 
     Repository-level error (no specific file):
@@ -310,13 +299,11 @@ class GitOperationError(KgFoundryError):
 
 # ==================== Re-exports ====================
 
-# Search operation errors are already defined in kgfoundry_common.errors
+# Search operation errors are already defined in kgfoundry_common.errors.
 # We don't redefine them here, but document them for reference:
-#
 # - VectorSearchError: Raised for FAISS search failures, index not ready, etc.
 # - EmbeddingError: Raised for vLLM embedding generation failures
-#
-# Usage:
+# Usage example (documentation only, not executable code):
 #   from kgfoundry_common.errors import VectorSearchError, EmbeddingError
 #   raise VectorSearchError("Search timeout", context={"query": "..."})
 

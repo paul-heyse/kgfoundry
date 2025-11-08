@@ -429,31 +429,37 @@ def _prepare_index_directory(index_path: str) -> None:
     Path(index_path).parent.mkdir(parents=True, exist_ok=True)
 
 
+# Type aliases for CLI parameters to help pydoclint parse Annotated types correctly
+_ChunksParquetArg = Annotated[str, typer.Argument(..., help="Path to Parquet/JSONL with chunks")]
+_BackendOption = Annotated[str, typer.Option(help="lucene|pure", show_default=True)]
+_IndexDirOption = Annotated[str, typer.Option(help="Output index directory", show_default=True)]
+_DenseVectorsArg = Annotated[str, typer.Argument(..., help="Path to dense vectors JSON (skeleton)")]
+_IndexPathOption = Annotated[str, typer.Option(help="Output FAISS index path", show_default=True)]
+_FactoryOption = Annotated[str, typer.Option(help="FAISS factory string", show_default=True)]
+_MetricOption = Annotated[
+    str, typer.Option(help="Similarity metric ('ip' or 'l2')", show_default=True)
+]
+
+
 @app.command(name=SUBCOMMAND_INDEX_BM25)
 def index_bm25(
-    chunks_parquet: Annotated[
-        str,
-        typer.Argument(..., help="Path to Parquet/JSONL with chunks"),
-    ],
-    backend: Annotated[
-        str,
-        typer.Option(help="lucene|pure", show_default=True),
-    ] = "lucene",
-    index_dir: Annotated[
-        str,
-        typer.Option(help="Output index directory", show_default=True),
-    ] = "./_indices/bm25",
+    chunks_parquet: _ChunksParquetArg,
+    backend: _BackendOption = "lucene",
+    index_dir: _IndexDirOption = "./_indices/bm25",
 ) -> None:
     """Build a BM25 index from chunk metadata and emit a CLI envelope.
 
     Parameters
     ----------
-    chunks_parquet : str
-        Path to Parquet/JSONL file with chunks.
-    backend : str, optional
-        Backend to use: 'lucene' or 'pure'. Defaults to 'lucene'.
-    index_dir : str, optional
-        Output index directory. Defaults to './_indices/bm25'.
+    chunks_parquet : _ChunksParquetArg
+        Path to Parquet/JSONL file with chunks. Type alias for
+        ``Annotated[str, typer.Argument(...)]`` for CLI argument specification.
+    backend : _BackendOption, optional
+        Backend to use: 'lucene' or 'pure'. Defaults to 'lucene'. Type alias for
+        ``Annotated[str, typer.Option(...)]`` for CLI option specification.
+    index_dir : _IndexDirOption, optional
+        Output index directory. Defaults to './_indices/bm25'. Type alias for
+        ``Annotated[str, typer.Option(...)]`` for CLI option specification.
 
     Raises
     ------
@@ -562,35 +568,27 @@ def run_index_faiss(*, config: IndexCliConfig) -> dict[str, object]:
 
 @app.command(name=SUBCOMMAND_INDEX_FAISS)
 def index_faiss(
-    dense_vectors: Annotated[
-        str,
-        typer.Argument(..., help="Path to dense vectors JSON (skeleton)"),
-    ],
-    index_path: Annotated[
-        str,
-        typer.Option(help="Output FAISS index path", show_default=True),
-    ] = "./_indices/faiss/shard_000.idx",
-    factory: Annotated[
-        str,
-        typer.Option(help="FAISS factory string", show_default=True),
-    ] = "Flat",
-    metric: Annotated[
-        str,
-        typer.Option(help="Similarity metric ('ip' or 'l2')", show_default=True),
-    ] = "ip",
+    dense_vectors: _DenseVectorsArg,
+    index_path: _IndexPathOption = "./_indices/faiss/shard_000.idx",
+    factory: _FactoryOption = "Flat",
+    metric: _MetricOption = "ip",
 ) -> None:
     """Build a FAISS index and emit a structured CLI envelope.
 
     Parameters
     ----------
-    dense_vectors : str
-        Path to the dense vector payload (JSON skeleton format).
-    index_path : str, optional
+    dense_vectors : _DenseVectorsArg
+        Path to the dense vector payload (JSON skeleton format). Type alias for
+        ``Annotated[str, typer.Argument(...)]`` for CLI argument specification.
+    index_path : _IndexPathOption, optional
         Destination path for the serialized FAISS index. Defaults to './_indices/faiss/shard_000.idx'.
-    factory : str, optional
-        FAISS factory string describing index topology. Defaults to 'Flat'.
-    metric : str, optional
-        Similarity metric identifier (``"ip"`` or ``"l2"``). Defaults to 'ip'.
+        Type alias for ``Annotated[str, typer.Option(...)]`` for CLI option specification.
+    factory : _FactoryOption, optional
+        FAISS factory string describing index topology. Defaults to 'Flat'. Type alias for
+        ``Annotated[str, typer.Option(...)]`` for CLI option specification.
+    metric : _MetricOption, optional
+        Similarity metric identifier (``"ip"`` or ``"l2"``). Defaults to 'ip'. Type alias for
+        ``Annotated[str, typer.Option(...)]`` for CLI option specification.
 
     Raises
     ------

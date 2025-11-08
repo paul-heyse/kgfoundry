@@ -3,6 +3,7 @@ from __future__ import annotations
 import types
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Self, cast
@@ -72,7 +73,7 @@ class StubDuckDBCatalog:
                     "uri": "src/module.py",
                     "start_line": 0,
                     "end_line": 0,
-                    "preview": "print('hello world')",
+                    "preview": "code snippet",
                 }
             ]
         else:
@@ -294,6 +295,17 @@ class _BaseStubFAISSManager:
         return distances, ids
 
 
+@dataclass
+class StubContextConfig:
+    """Configuration for StubContext initialization."""
+
+    limits: list[str] | None = None
+    error: str | None = None
+    max_results: int = 5
+    catalog_chunks: list[dict[str, Any]] | None = None
+    faiss_nprobe: int = 128
+
+
 class StubContext:
     """Stub ApplicationContext for semantic adapter tests."""
 
@@ -301,11 +313,7 @@ class StubContext:
         self,
         *,
         faiss_manager: _BaseStubFAISSManager,
-        limits: list[str] | None = None,
-        error: str | None = None,
-        max_results: int = 5,
-        catalog_chunks: list[dict[str, Any]] | None = None,
-        faiss_nprobe: int = 128,
+        config: StubContextConfig | None = None,
     ) -> None:
         """Initialize stub context.
 
@@ -313,21 +321,17 @@ class StubContext:
         ----------
         faiss_manager : _BaseStubFAISSManager
             FAISS manager stub.
-        limits : list[str] | None, optional
-            Limits metadata. Defaults to None.
-        error : str | None, optional
-            Error message. Defaults to None.
-        max_results : int, optional
-            Maximum results setting. Defaults to 5.
-        catalog_chunks : list[dict[str, Any]] | None, optional
-            Chunks to return from catalog. Defaults to None.
+        config : StubContextConfig | None, optional
+            Configuration for stub context. Defaults to None (uses defaults).
         """
+        if config is None:
+            config = StubContextConfig()
         self.faiss_manager = faiss_manager
         self.vllm_client = StubVLLMClient(SimpleNamespace())
         self.settings = SimpleNamespace(
-            limits=SimpleNamespace(max_results=max_results),
+            limits=SimpleNamespace(max_results=config.max_results),
             vllm=SimpleNamespace(base_url="http://localhost"),
-            index=SimpleNamespace(faiss_nprobe=faiss_nprobe),
+            index=SimpleNamespace(faiss_nprobe=config.faiss_nprobe),
         )
         # Use tempfile for secure temporary paths in tests
         import tempfile
@@ -338,9 +342,9 @@ class StubContext:
             duckdb_path=temp_dir / "catalog.duckdb",
             vectors_dir=temp_dir / "vectors",
         )
-        self._limits = limits or []
-        self._error = error
-        self._catalog_chunks = catalog_chunks
+        self._limits = config.limits or []
+        self._error = config.error
+        self._catalog_chunks = config.catalog_chunks
 
     def ensure_faiss_ready(self) -> tuple[bool, list[str], str | None]:
         """Return readiness tuple.
@@ -369,8 +373,7 @@ class StubContext:
 async def test_semantic_search_gpu_success() -> None:
     context = StubContext(
         faiss_manager=_BaseStubFAISSManager(should_fail_gpu=False),
-        limits=[],
-        error=None,
+        config=StubContextConfig(limits=[], error=None),
     )
 
     # Mock session ID and scope (no scope for this test)
@@ -398,8 +401,9 @@ async def test_semantic_search_gpu_success() -> None:
 async def test_semantic_search_gpu_fallback() -> None:
     context = StubContext(
         faiss_manager=_BaseStubFAISSManager(should_fail_gpu=True),
-        limits=["FAISS GPU disabled - using CPU: simulated failure"],
-        error=None,
+        config=StubContextConfig(
+            limits=["FAISS GPU disabled - using CPU: simulated failure"], error=None
+        ),
     )
 
     # Mock session ID and scope (no scope for this test)
@@ -427,9 +431,7 @@ async def test_semantic_search_limit_truncates_to_max_results() -> None:
     faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
     context = StubContext(
         faiss_manager=faiss_manager,
-        limits=[],
-        error=None,
-        max_results=3,
+        config=StubContextConfig(limits=[], error=None, max_results=3),
     )
 
     # Mock session ID and scope (no scope for this test)
@@ -459,9 +461,7 @@ async def test_semantic_search_limit_enforces_minimum() -> None:
     faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
     context = StubContext(
         faiss_manager=faiss_manager,
-        limits=[],
-        error=None,
-        max_results=5,
+        config=StubContextConfig(limits=[], error=None, max_results=5),
     )
 
     # Mock session ID and scope (no scope for this test)
@@ -491,10 +491,7 @@ async def test_semantic_search_respects_configured_nprobe() -> None:
     faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
     context = StubContext(
         faiss_manager=faiss_manager,
-        limits=[],
-        error=None,
-        max_results=5,
-        faiss_nprobe=64,
+        config=StubContextConfig(limits=[], error=None, max_results=5, faiss_nprobe=64),
     )
 
     with (
@@ -546,9 +543,7 @@ async def test_semantic_search_with_scope_filters() -> None:
 
     context = StubContext(
         faiss_manager=faiss_manager,
-        limits=[],
-        error=None,
-        catalog_chunks=catalog_chunks,
+        config=StubContextConfig(limits=[], error=None, catalog_chunks=catalog_chunks),
     )
 
     # Mock session scope with Python language filter
@@ -608,9 +603,7 @@ async def test_semantic_search_no_scope() -> None:
 
     context = StubContext(
         faiss_manager=faiss_manager,
-        limits=[],
-        error=None,
-        catalog_chunks=catalog_chunks,
+        config=StubContextConfig(limits=[], error=None, catalog_chunks=catalog_chunks),
     )
 
     # Mock no session scope
@@ -644,9 +637,7 @@ async def test_semantic_search_faiss_not_ready() -> None:
     faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
     context = StubContext(
         faiss_manager=faiss_manager,
-        limits=[],
-        error="Index not built",
-        catalog_chunks=None,
+        config=StubContextConfig(limits=[], error="Index not built", catalog_chunks=None),
     )
 
     with (
@@ -665,9 +656,7 @@ async def test_semantic_search_embedding_error() -> None:
     faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
     context = StubContext(
         faiss_manager=faiss_manager,
-        limits=[],
-        error=None,
-        catalog_chunks=None,
+        config=StubContextConfig(limits=[], error=None, catalog_chunks=None),
     )
 
     with (
@@ -686,7 +675,7 @@ async def test_semantic_search_faiss_search_error() -> None:
     faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
 
     def failing_search(
-        _query: np.ndarray, *, _k: int, nprobe: int = 128
+        _query: np.ndarray, *, _k: int, _nprobe: int = 128
     ) -> tuple[np.ndarray, np.ndarray]:
         error_msg = "FAISS search failed"
         raise RuntimeError(error_msg)
@@ -695,9 +684,7 @@ async def test_semantic_search_faiss_search_error() -> None:
 
     context = StubContext(
         faiss_manager=faiss_manager,
-        limits=[],
-        error=None,
-        catalog_chunks=None,
+        config=StubContextConfig(limits=[], error=None, catalog_chunks=None),
     )
 
     with (
