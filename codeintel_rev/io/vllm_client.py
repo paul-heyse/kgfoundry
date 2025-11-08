@@ -42,7 +42,8 @@ class EmbeddingRequest(msgspec.Struct):
     model : str
         Model identifier string. Must match a model loaded by the vLLM server.
         Defaults to "nomic-ai/nomic-embed-code" which is a code-specific
-        embedding model with 2560 dimensions.
+        embedding model with 2560 dimensions. The embedding dimensionality is
+        surfaced via :class:`codeintel_rev.config.settings.VLLMConfig` ``embedding_dim``.
     """
 
     input: str | list[str]
@@ -62,7 +63,8 @@ class EmbeddingData(msgspec.Struct):
     embedding : list[float]
         Embedding vector as a list of floats. The length matches the model's
         dimension (e.g., 2560 for nomic-embed-code). Values are typically
-        normalized for cosine similarity.
+        normalized for cosine similarity. The expected size is available as
+        ``VLLMConfig.embedding_dim``.
     index : int
         Zero-based index indicating the position of this embedding in the
         original input batch. Used to match embeddings back to their input
@@ -206,7 +208,8 @@ class VLLMClient:
             Embedding vectors as a 2D NumPy array of shape (len(texts), vec_dim)
             where vec_dim is the model's embedding dimension (e.g., 2560).
             Dtype is float32 for memory efficiency. Returns empty array (shape
-            (0, vec_dim)) if texts is empty. The order matches the input texts.
+            (0, ``self.config.embedding_dim``)) if texts is empty. The order
+            matches the input texts.
 
         Notes
         -----
@@ -222,7 +225,7 @@ class VLLMClient:
         adding retry logic with exponential backoff for transient failures.
         """
         if not texts:
-            return np.array([], dtype=np.float32)
+            return np.empty((0, self.config.embedding_dim), dtype=np.float32)
 
         request = EmbeddingRequest(input=list(texts), model=self.config.model)
         payload = self._encoder.encode(request)
@@ -295,13 +298,14 @@ class VLLMClient:
         batch_size : int | None
             Batch size; defaults to config.batch_size.
 
-        Returns
-        -------
-        np.ndarray
-            Embeddings array of shape (len(texts), vec_dim).
+    Returns
+    -------
+    np.ndarray
+        Embeddings array of shape (len(texts), vec_dim). Returns an empty array
+        of shape ``(0, self.config.embedding_dim)`` when ``texts`` is empty.
         """
         if not texts:
-            return np.array([], dtype=np.float32)
+            return np.empty((0, self.config.embedding_dim), dtype=np.float32)
 
         bs = batch_size or self.config.batch_size
         all_vectors = []
@@ -338,7 +342,8 @@ class VLLMClient:
             Embedding vectors as a 2D NumPy array of shape (len(texts), vec_dim)
             where vec_dim is the model's embedding dimension (e.g., 2560).
             Dtype is float32 for memory efficiency. Returns empty array (shape
-            (0, vec_dim)) if texts is empty. The order matches the input texts.
+            (0, ``self.config.embedding_dim``)) if texts is empty. The order
+            matches the input texts.
 
         Examples
         --------
@@ -373,7 +378,7 @@ class VLLMClient:
         exceptions propagate to the caller - handle them appropriately.
         """
         if not texts:
-            return np.array([], dtype=np.float32)
+            return np.empty((0, self.config.embedding_dim), dtype=np.float32)
 
         # Lazy-initialize async client on first call
         if self._async_client is None:
