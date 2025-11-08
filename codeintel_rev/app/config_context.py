@@ -56,6 +56,7 @@ import redis.asyncio as redis_asyncio
 from codeintel_rev.app.scope_store import ScopeStore
 from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.vllm_client import VLLMClient
@@ -230,6 +231,8 @@ class ApplicationContext:
         lazily initialized on first search or optionally pre-loaded at startup.
     scope_store : ScopeStore
         Redis-backed scope store for session-scoped query filters with L1/L2 caching.
+    duckdb_manager : DuckDBManager
+        DuckDB manager for managing the DuckDB catalog database.
     git_client : GitClient
         Typed Git operations client using GitPython. Provides structured APIs for
         blame and history operations without subprocess overhead. Lazy-initializes
@@ -282,6 +285,7 @@ class ApplicationContext:
     vllm_client: VLLMClient
     faiss_manager: FAISSManager
     scope_store: ScopeStore
+    duckdb_manager: DuckDBManager
     git_client: GitClient
     async_git_client: AsyncGitClient
     _faiss_lock: Lock = field(default_factory=Lock, init=False)
@@ -361,6 +365,8 @@ class ApplicationContext:
             extra={"repo_path": str(paths.repo_root)},
         )
 
+        duckdb_manager = DuckDBManager(paths.duckdb_path, settings.duckdb)
+
         LOGGER.info(
             "Application context created",
             extra={
@@ -376,6 +382,7 @@ class ApplicationContext:
             vllm_client=vllm_client,
             faiss_manager=faiss_manager,
             scope_store=scope_store,
+            duckdb_manager=duckdb_manager,
             git_client=git_client,
             async_git_client=async_git_client,
         )
@@ -490,6 +497,7 @@ class ApplicationContext:
             self.paths.duckdb_path,
             self.paths.vectors_dir,
             materialize=self.settings.index.duckdb_materialize,
+            manager=self.duckdb_manager,
         )
         try:
             catalog.open()

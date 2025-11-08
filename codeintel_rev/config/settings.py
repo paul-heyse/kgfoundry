@@ -11,6 +11,8 @@ from pathlib import Path
 
 import msgspec
 
+from codeintel_rev.io.duckdb_manager import DuckDBConfig
+
 
 class VLLMConfig(msgspec.Struct, frozen=True):
     """vLLM embedding service configuration.
@@ -278,6 +280,8 @@ class Settings(msgspec.Struct, frozen=True):
         resource exhaustion and provides basic API rate limiting.
     redis : RedisConfig
         Redis configuration for session scope caching.
+    duckdb : DuckDBConfig
+        DuckDB connection configuration (threading, object cache).
     """
 
     vllm: VLLMConfig
@@ -285,6 +289,7 @@ class Settings(msgspec.Struct, frozen=True):
     index: IndexConfig
     limits: ServerLimits
     redis: RedisConfig
+    duckdb: DuckDBConfig
 
 
 def load_settings() -> Settings:
@@ -418,13 +423,34 @@ def load_settings() -> Settings:
     )
 
     redis = RedisConfig(
-        url=os.environ.get("REDIS_URL", "redis://127.0.0.1:6379/0"),
-        scope_l1_size=int(os.environ.get("REDIS_SCOPE_L1_SIZE", "256")),
-        scope_l1_ttl_seconds=float(os.environ.get("REDIS_SCOPE_L1_TTL_SECONDS", "300")),
-        scope_l2_ttl_seconds=int(os.environ.get("REDIS_SCOPE_L2_TTL_SECONDS", "3600")),
+        url=os.environ.get("REDIS_URL", RedisConfig.url),
+        scope_l1_size=int(os.environ.get("REDIS_SCOPE_L1_SIZE", RedisConfig.scope_l1_size)),
+        scope_l1_ttl_seconds=float(
+            os.environ.get("REDIS_SCOPE_L1_TTL_SECONDS", RedisConfig.scope_l1_ttl_seconds)
+        ),
+        scope_l2_ttl_seconds=int(
+            os.environ.get("REDIS_SCOPE_L2_TTL_SECONDS", RedisConfig.scope_l2_ttl_seconds)
+        ),
     )
 
-    return Settings(vllm=vllm, paths=paths, index=index, limits=limits, redis=redis)
+    duckdb_config = DuckDBConfig(
+        threads=int(os.environ.get("DUCKDB_THREADS", DuckDBConfig.threads)),
+        enable_object_cache=os.environ.get("DUCKDB_OBJECT_CACHE", "1").lower()
+        in {
+            "1",
+            "true",
+            "yes",
+        },
+    )
+
+    return Settings(
+        vllm=vllm,
+        paths=paths,
+        index=index,
+        limits=limits,
+        redis=redis,
+        duckdb=duckdb_config,
+    )
 
 
 __all__ = [

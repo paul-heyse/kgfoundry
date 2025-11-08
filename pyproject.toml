@@ -492,6 +492,7 @@ dependencies = [
     "fastmcp>=2.10.6",
     "cyclopts>=5.0.0a1",
     "pytest-benchmark>=5.2.2",
+    "fastapi-healthz>=1.2.7",
 ]
 
 [project.scripts]

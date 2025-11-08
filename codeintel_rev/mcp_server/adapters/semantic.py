@@ -7,8 +7,7 @@ the FAISS index, then hydrating results from DuckDB.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterator, Sequence
-from contextlib import contextmanager
+from collections.abc import Sequence
 from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING, cast
@@ -19,11 +18,11 @@ import numpy as np
 from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.vllm_client import VLLMClient
+from codeintel_rev.mcp_server.common.observability import observe_duration
 from codeintel_rev.mcp_server.schemas import AnswerEnvelope, Finding, MethodInfo, ScopeIn
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
 from kgfoundry_common.logging import get_logger
-from kgfoundry_common.observability import DurationObservation, MetricsProvider, observe_duration
 
 if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
@@ -31,55 +30,6 @@ if TYPE_CHECKING:
 SNIPPET_PREVIEW_CHARS = 500
 COMPONENT_NAME = "codeintel_mcp"
 LOGGER = get_logger(__name__)
-METRICS = MetricsProvider.default()
-
-
-def _supports_histogram_labels(histogram: object) -> bool:
-    labelnames = getattr(histogram, "_labelnames", None)
-    if labelnames is None:
-        return True
-    try:
-        return len(tuple(labelnames)) > 0
-    except TypeError:
-        return False
-
-
-_METRICS_ENABLED = _supports_histogram_labels(METRICS.operation_duration_seconds)
-
-
-class _NoopObservation:
-    """Fallback observation when Prometheus metrics are unavailable."""
-
-    def mark_error(self) -> None:
-        """No-op error marker."""
-
-    def mark_success(self) -> None:
-        """No-op success marker."""
-
-
-@contextmanager
-def _observe(operation: str) -> Iterator[DurationObservation | _NoopObservation]:
-    """Yield a metrics observation, falling back to a no-op when metrics are disabled.
-
-    Parameters
-    ----------
-    operation : str
-        Operation name for metrics labeling.
-
-    Yields
-    ------
-    DurationObservation | _NoopObservation
-        Metrics observation when Prometheus is configured, otherwise a no-op recorder.
-    """
-    if not _METRICS_ENABLED:
-        yield _NoopObservation()
-        return
-    try:
-        with observe_duration(METRICS, operation, component=COMPONENT_NAME) as observation:
-            yield observation
-            return
-    except ValueError:
-        yield _NoopObservation()
 
 
 async def semantic_search(
@@ -157,7 +107,7 @@ def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914
     scope: ScopeIn | None,
 ) -> AnswerEnvelope:
     start_time = perf_counter()
-    with _observe("semantic_search") as observation:
+    with observe_duration("semantic_search", COMPONENT_NAME) as observation:
         LOGGER.debug(
             "Semantic search with scope",
             extra={

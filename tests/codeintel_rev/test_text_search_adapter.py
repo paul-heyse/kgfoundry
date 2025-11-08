@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+from codeintel_rev.app.config_context import ResolvedPaths
 from codeintel_rev.mcp_server.adapters.text_search import search_text
 from codeintel_rev.mcp_server.schemas import ScopeIn
 
@@ -23,8 +27,6 @@ def mock_context(tmp_path: Path) -> Mock:
     Mock
         Mock ApplicationContext object.
     """
-    from codeintel_rev.app.config_context import ResolvedPaths
-
     context = Mock()
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -63,6 +65,78 @@ def _build_match(path: Path) -> str:
     )
 
 
+def _run_search(  # noqa: PLR0913
+    context: Mock,
+    query: str,
+    *,
+    regex: bool = False,
+    case_sensitive: bool = False,
+    paths: Sequence[str] | None = None,
+    include_globs: Sequence[str] | None = None,
+    exclude_globs: Sequence[str] | None = None,
+    max_results: int = 50,
+) -> dict:
+    """Execute the async search_text helper synchronously for tests.
+
+    Returns
+    -------
+    dict
+        Search results emitted by ``search_text``.
+    """
+    return asyncio.run(
+        search_text(
+            context,
+            query,
+            regex=regex,
+            case_sensitive=case_sensitive,
+            paths=paths,
+            include_globs=include_globs,
+            exclude_globs=exclude_globs,
+            max_results=max_results,
+        )
+    )
+
+
+def test_search_text_uses_observe_duration(mock_context: Mock) -> None:
+    """Adapters record metrics using the shared observe_duration helper."""
+    scope: ScopeIn = {}
+    observation = Mock()
+    observation.mark_success = Mock()
+    observation.mark_error = Mock()
+    calls: list[tuple[str, str]] = []
+
+    @contextmanager
+    def fake_observe(operation: str, component: str, **_kwargs: object) -> Iterator[Mock]:
+        calls.append((operation, component))
+        yield observation
+
+    with (
+        patch(
+            "codeintel_rev.mcp_server.adapters.text_search.get_session_id",
+            return_value="session-observe",
+        ),
+        patch(
+            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
+            return_value=scope,
+        ),
+        patch(
+            "codeintel_rev.mcp_server.adapters.text_search.observe_duration",
+            fake_observe,
+        ),
+        patch(
+            "codeintel_rev.mcp_server.adapters.text_search.run_subprocess",
+            return_value="",
+        ),
+    ):
+        result = _run_search(mock_context, "needle", max_results=5)
+
+    assert result["matches"] == []
+    assert result["total"] == 0
+    assert calls == [("text_search", "codeintel_mcp")]
+    observation.mark_success.assert_called_once()
+    observation.mark_error.assert_not_called()
+
+
 def test_search_text_scope_include_and_exclude(mock_context: Mock) -> None:
     """Scope include/exclude globs are forwarded as ripgrep ``--iglob`` options."""
     repo_root = mock_context.paths.repo_root
@@ -83,7 +157,7 @@ def test_search_text_scope_include_and_exclude(mock_context: Mock) -> None:
     ):
         mock_run.return_value = _build_match(repo_root / "src" / "main.py")
 
-        result = search_text(mock_context, "main", max_results=5)
+        result = _run_search(mock_context, "main", max_results=5)
 
         cmd = mock_run.call_args.args[0]
         iglob_values = [cmd[i + 1] for i, arg in enumerate(cmd) if arg == "--iglob"]
@@ -115,7 +189,7 @@ def test_search_text_explicit_paths_override_scope(mock_context: Mock) -> None:
     ):
         mock_run.return_value = _build_match(repo_root / "tests" / "test_main.py")
 
-        result = search_text(mock_context, "test", paths=["tests/"], max_results=5)
+        result = _run_search(mock_context, "test", paths=["tests/"], max_results=5)
 
         cmd = mock_run.call_args.args[0]
         iglob_values = [cmd[i + 1] for i, arg in enumerate(cmd) if arg == "--iglob"]
@@ -145,7 +219,7 @@ def test_search_text_explicit_globs_override_scope(mock_context: Mock) -> None:
     ):
         mock_run.return_value = _build_match(repo_root / "tests" / "integration" / "case.py")
 
-        result = search_text(
+        result = _run_search(
             mock_context,
             "case",
             include_globs=["tests/**/*.py"],
@@ -184,7 +258,7 @@ def test_search_text_timeout_error(mock_context: Mock) -> None:
         )
 
         with pytest.raises(VectorSearchError, match="Search timeout"):
-            search_text(mock_context, "query", max_results=5)
+            _run_search(mock_context, "query", max_results=5)
 
 
 def test_search_text_subprocess_error(mock_context: Mock) -> None:
@@ -205,8 +279,8 @@ def test_search_text_subprocess_error(mock_context: Mock) -> None:
             "Command failed", returncode=2, stderr="Error message"
         )
 
-        with pytest.raises(VectorSearchError, match="Command failed"):
-            search_text(mock_context, "query", max_results=5)
+        with pytest.raises(VectorSearchError, match="Error message"):
+            _run_search(mock_context, "query", max_results=5)
 
 
 def test_search_text_value_error(mock_context: Mock) -> None:
@@ -226,4 +300,4 @@ def test_search_text_value_error(mock_context: Mock) -> None:
         mock_run.side_effect = ValueError("Invalid query")
 
         with pytest.raises(VectorSearchError, match="Invalid query"):
-            search_text(mock_context, "query", max_results=5)
+            _run_search(mock_context, "query", max_results=5)

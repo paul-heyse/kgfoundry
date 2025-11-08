@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import time
+import time as time_module
 from concurrent.futures import ThreadPoolExecutor
 from typing import cast
 
@@ -80,28 +80,34 @@ class FakeRedis:
         self.set_calls = 0
         self.setex_calls: list[int] = []
 
-    async def get(self, key: str) -> bytes | None:
+    async def get(self, name: str) -> bytes | None:
         self.get_calls += 1
-        record = self._data.get(key)
+        record = self._data.get(name)
         if record is None:
             return None
         value, expires_at = record
-        if expires_at is not None and expires_at <= time.monotonic():
-            self._data.pop(key, None)
+        if expires_at is not None and expires_at <= time_module.monotonic():
+            self._data.pop(name, None)
             return None
         return value
 
-    async def setex(self, key: str, seconds: int, value: bytes) -> None:
-        expires_at = time.monotonic() + seconds if seconds > 0 else None
-        self.setex_calls.append(seconds)
-        self._data[key] = (value, expires_at)
+    async def setex(self, name: str, time: int, value: bytes) -> bool | None:
+        expires_at = time_module.monotonic() + time if time > 0 else None
+        self.setex_calls.append(time)
+        self._data[name] = (value, expires_at)
+        return True
 
-    async def set(self, key: str, value: bytes) -> None:
+    async def set(self, name: str, value: bytes) -> bool | None:
         self.set_calls += 1
-        self._data[key] = (value, None)
+        self._data[name] = (value, None)
+        return True
 
-    async def delete(self, key: str) -> None:
-        self._data.pop(key, None)
+    async def delete(self, *names: str) -> int | None:
+        removed = 0
+        for entry in names:
+            if self._data.pop(entry, None) is not None:
+                removed += 1
+        return removed
 
     async def close(self) -> None:
         self._data.clear()

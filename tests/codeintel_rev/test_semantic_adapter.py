@@ -20,33 +20,76 @@ from codeintel_rev.mcp_server.schemas import ScopeIn
 
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
 
+OBSERVATION_RECORDS: list[SimpleNamespace] = []
+
 
 @pytest.fixture(autouse=True)
-def _stub_metrics(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Provide a minimal metrics stub for semantic adapter tests."""
+def _patch_observe_duration(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Patch observe_duration so tests do not touch real metrics."""
+    OBSERVATION_RECORDS.clear()
 
-    class _Histogram:
-        def labels(self, **_: object) -> _Histogram:
-            return self
+    @contextmanager
+    def _fake_observe(operation: str, component: str, **_: object) -> Iterator[SimpleNamespace]:
+        record = SimpleNamespace(
+            operation=operation,
+            component=component,
+            success=False,
+            error=False,
+        )
 
-        def observe(self, _: object) -> None:
-            return None
+        def mark_success() -> None:
+            record.success = True
 
-    class _Counter:
-        def labels(self, **_: object) -> _Counter:
-            return self
+        def mark_error() -> None:
+            record.error = True
 
-        def inc(self, _: object | None = None) -> None:
-            return None
-
-    class _Metrics:
-        operation_duration_seconds = _Histogram()
-        runs_total = _Counter()
+        record.mark_success = mark_success  # type: ignore[attr-defined]
+        record.mark_error = mark_error  # type: ignore[attr-defined]
+        OBSERVATION_RECORDS.append(record)
+        yield record
 
     monkeypatch.setattr(
-        "codeintel_rev.mcp_server.adapters.semantic.METRICS",
-        _Metrics(),
+        "codeintel_rev.mcp_server.adapters.semantic.observe_duration",
+        _fake_observe,
     )
+
+
+@pytest.fixture
+def observe_duration_calls() -> list[SimpleNamespace]:
+    """Return recorded observation calls from the semantic adapter.
+
+    Returns
+    -------
+    list[SimpleNamespace]
+        Recorded observation entries captured by the patched helper.
+    """
+    return OBSERVATION_RECORDS
+
+
+@pytest.mark.asyncio
+async def test_semantic_search_observes_duration(
+    observe_duration_calls: list[SimpleNamespace],
+) -> None:
+    context = StubContext(
+        faiss_manager=_BaseStubFAISSManager(should_fail_gpu=False),
+        config=StubContextConfig(limits=[], error=None),
+    )
+
+    with (
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
+            return_value="session-observe",
+        ),
+        patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+    ):
+        result = await semantic_search(cast("ApplicationContext", context), "hello world", limit=1)
+
+    assert result.get("findings")
+    assert observe_duration_calls
+    observation = observe_duration_calls[0]
+    assert observation.operation == "semantic_search"
+    assert observation.component == "codeintel_mcp"
+    assert observation.success is True
 
 
 class StubDuckDBCatalog:

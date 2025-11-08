@@ -29,20 +29,24 @@ class _FakeRedis:
     def __init__(self) -> None:
         self._data: dict[str, bytes] = {}
 
-    async def get(self, key: str) -> bytes | None:
-        return self._data.get(key)
+    async def get(self, name: str) -> bytes | None:
+        return self._data.get(name)
 
-    async def setex(self, key: str, seconds: int, value: bytes) -> bool | None:
-        _ = seconds
-        self._data[key] = value
+    async def setex(self, name: str, time: int, value: bytes) -> bool | None:
+        _ = time
+        self._data[name] = value
         return True
 
-    async def set(self, key: str, value: bytes) -> bool | None:
-        self._data[key] = value
+    async def set(self, name: str, value: bytes) -> bool | None:
+        self._data[name] = value
         return True
 
-    async def delete(self, key: str) -> int | None:
-        return 1 if self._data.pop(key, None) is not None else 0
+    async def delete(self, *names: str) -> int | None:
+        removed = 0
+        for entry in names:
+            if self._data.pop(entry, None) is not None:
+                removed += 1
+        return removed
 
     async def close(self) -> None:
         self._data.clear()

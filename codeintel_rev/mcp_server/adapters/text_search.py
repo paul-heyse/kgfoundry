@@ -7,18 +7,17 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Iterator, Sequence
-from contextlib import contextmanager
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from codeintel_rev.app.middleware import get_session_id
+from codeintel_rev.mcp_server.common.observability import observe_duration
 from codeintel_rev.mcp_server.schemas import Match, ScopeIn
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope, merge_scope_filters
 from kgfoundry_common.errors import VectorSearchError
 from kgfoundry_common.logging import get_logger
-from kgfoundry_common.observability import DurationObservation, MetricsProvider, observe_duration
 from kgfoundry_common.subprocess_utils import (
     SubprocessError,
     SubprocessTimeoutError,
@@ -34,55 +33,16 @@ GREP_SPLIT_PARTS = 3
 COMMAND_NOT_FOUND_RETURN_CODE = 127
 COMPONENT_NAME = "codeintel_mcp"
 LOGGER = get_logger(__name__)
-METRICS = MetricsProvider.default()
 
 
-def _supports_histogram_labels(histogram: object) -> bool:
-    labelnames = getattr(histogram, "_labelnames", None)
-    if labelnames is None:
-        return True
-    try:
-        return len(tuple(labelnames)) > 0
-    except TypeError:
-        return False
-
-
-_METRICS_ENABLED = _supports_histogram_labels(METRICS.operation_duration_seconds)
-
-
-class _NoopObservation:
-    """Fallback observation when Prometheus metrics are unavailable."""
-
-    def mark_error(self) -> None:
-        """No-op error marker."""
+class Observation(Protocol):
+    """Interface describing the observation helpers used for metrics recording."""
 
     def mark_success(self) -> None:
-        """No-op success marker."""
+        """Mark the current operation as successful."""
 
-
-@contextmanager
-def _observe(operation: str) -> Iterator[DurationObservation | _NoopObservation]:
-    """Yield a metrics observation, falling back to a no-op when metrics are disabled.
-
-    Parameters
-    ----------
-    operation : str
-        Operation name for metrics labeling.
-
-    Yields
-    ------
-    DurationObservation | _NoopObservation
-        Metrics observation when Prometheus is configured, otherwise a no-op recorder.
-    """
-    if not _METRICS_ENABLED:
-        yield _NoopObservation()
-        return
-    try:
-        with observe_duration(METRICS, operation, component=COMPONENT_NAME) as observation:
-            yield observation
-            return
-    except ValueError:
-        yield _NoopObservation()
+    def mark_error(self) -> None:
+        """Mark the current operation as failed."""
 
 
 async def search_text(  # noqa: PLR0913 - context parameter required for dependency injection
@@ -123,7 +83,7 @@ async def search_text(  # noqa: PLR0913 - context parameter required for depende
     )
 
 
-def _search_text_sync(  # noqa: PLR0913, PLR0917
+def _search_text_sync(  # noqa: PLR0913
     context: ApplicationContext,
     session_id: str,
     scope: ScopeIn | None,
@@ -182,7 +142,7 @@ def _search_text_sync(  # noqa: PLR0913, PLR0917
 
     cmd = _build_ripgrep_command(params)
 
-    with _observe("text_search") as observation:
+    with observe_duration("text_search", COMPONENT_NAME) as observation:
         try:
             stdout = run_subprocess(cmd, cwd=repo_root, timeout=SEARCH_TIMEOUT_SECONDS)
         except SubprocessTimeoutError as exc:
@@ -231,7 +191,7 @@ def _search_text_sync(  # noqa: PLR0913, PLR0917
 
 def _fallback_grep(
     *,
-    observation: DurationObservation | _NoopObservation,
+    observation: Observation,
     repo_root: Path,
     query: str,
     case_sensitive: bool,
@@ -241,7 +201,7 @@ def _fallback_grep(
 
     Parameters
     ----------
-    observation : DurationObservation | _NoopObservation
+    observation : Observation
         Metrics observation context used to record success or failure.
     repo_root : Path
         Repository root directory.

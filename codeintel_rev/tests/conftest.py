@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import time
+import time as time_module
 from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
@@ -23,6 +23,7 @@ from codeintel_rev.config.settings import (
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.vllm_client import VLLMClient
+from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 
 
 class _FakeRedis:
@@ -31,29 +32,31 @@ class _FakeRedis:
     def __init__(self) -> None:
         self._data: dict[str, tuple[bytes, float | None]] = {}
 
-    async def get(self, key: str) -> bytes | None:
-        record = self._data.get(key)
+    async def get(self, name: str) -> bytes | None:
+        record = self._data.get(name)
         if record is None:
             return None
         value, expires_at = record
-        if expires_at is not None and expires_at <= 0:
-            return None
-        if expires_at is not None and expires_at <= time.monotonic():
-            self._data.pop(key, None)
+        if expires_at is not None and expires_at <= time_module.monotonic():
+            self._data.pop(name, None)
             return None
         return value
 
-    async def setex(self, key: str, seconds: int, value: bytes) -> bool | None:
-        expires_at = time.monotonic() + seconds if seconds > 0 else None
-        self._data[key] = (value, expires_at)
+    async def setex(self, name: str, time: int, value: bytes) -> bool | None:
+        expires_at = time_module.monotonic() + time if time > 0 else None
+        self._data[name] = (value, expires_at)
         return True
 
-    async def set(self, key: str, value: bytes) -> bool | None:
-        self._data[key] = (value, None)
+    async def set(self, name: str, value: bytes) -> bool | None:
+        self._data[name] = (value, None)
         return True
 
-    async def delete(self, key: str) -> int | None:
-        return 1 if self._data.pop(key, None) is not None else 0
+    async def delete(self, *names: str) -> int | None:
+        removed = 0
+        for entry in names:
+            if self._data.pop(entry, None) is not None:
+                removed += 1
+        return removed
 
     async def close(self) -> None:
         self._data.clear()
@@ -147,12 +150,14 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
             "message": "Test commit",
         }
     ]
+    redis_client = _FakeRedis()
     scope_store = ScopeStore(
-        _FakeRedis(),
+        redis_client,
         l1_maxsize=settings.redis.scope_l1_size,
         l1_ttl_seconds=settings.redis.scope_l1_ttl_seconds,
         l2_ttl_seconds=settings.redis.scope_l2_ttl_seconds,
     )
+    duckdb_manager = DuckDBManager(paths.duckdb_path, DuckDBConfig())
 
     return ApplicationContext(
         settings=settings,
@@ -160,6 +165,7 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
         vllm_client=vllm_client,
         faiss_manager=faiss_manager,
         scope_store=scope_store,
+        duckdb_manager=duckdb_manager,
         git_client=git_client,
         async_git_client=async_git_client,
     )

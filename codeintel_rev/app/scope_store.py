@@ -23,16 +23,16 @@ ScopeIn = ScopeMapping
 class SupportsAsyncRedis(Protocol):
     """Protocol describing the Redis operations required by ``ScopeStore``."""
 
-    async def get(self, key: str) -> bytes | None:
+    async def get(self, name: str) -> bytes | None:
         """Retrieve a value by ``key``."""
 
-    async def setex(self, key: str, seconds: int, value: bytes) -> bool | None:
+    async def setex(self, name: str, time: int, value: bytes) -> bool | None:
         """Set ``key`` to ``value`` with the provided TTL in seconds."""
 
-    async def set(self, key: str, value: bytes) -> bool | None:
+    async def set(self, name: str, value: bytes) -> bool | None:
         """Set ``key`` to ``value`` without TTL semantics."""
 
-    async def delete(self, key: str) -> int | None:
+    async def delete(self, *names: str) -> int | None:
         """Delete ``key`` if present."""
 
     async def close(self) -> None:

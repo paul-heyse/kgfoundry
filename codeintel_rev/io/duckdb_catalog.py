@@ -6,7 +6,7 @@ chunk retrieval and joins.
 
 from __future__ import annotations
 
-from contextlib import suppress
+from contextlib import AbstractContextManager, suppress
 from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING, Self
@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Self
 import duckdb
 import numpy as np
 
+from codeintel_rev.io.duckdb_manager import DuckDBManager
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.prometheus import build_histogram
 
@@ -59,21 +60,38 @@ class DuckDBCatalog:
         zero-copy queries.
     """
 
-    def __init__(self, db_path: Path, vectors_dir: Path, *, materialize: bool = False) -> None:
+    def __init__(
+        self,
+        db_path: Path,
+        vectors_dir: Path,
+        *,
+        materialize: bool = False,
+        manager: DuckDBManager | None = None,
+    ) -> None:
         self.db_path = db_path
         self.vectors_dir = vectors_dir
         self.materialize = materialize
         self.conn: duckdb.DuckDBPyConnection | None = None
         self._embedding_dim_cache: int | None = None
+        self._manager = manager
+        self._connection_cm: AbstractContextManager[duckdb.DuckDBPyConnection] | None = None
 
     def open(self) -> None:
         """Open database connection."""
-        self.conn = duckdb.connect(str(self.db_path))
+        if self._manager is not None:
+            self._connection_cm = self._manager.connection()
+            self.conn = self._connection_cm.__enter__()
+        else:
+            self.conn = duckdb.connect(str(self.db_path))
         self._ensure_views()
 
     def close(self) -> None:
         """Close database connection."""
-        if self.conn:
+        if self._connection_cm is not None and self.conn is not None:
+            self._connection_cm.__exit__(None, None, None)
+            self._connection_cm = None
+            self.conn = None
+        elif self.conn:
             self.conn.close()
             self.conn = None
 
