@@ -377,6 +377,7 @@ class FAISSManager:
             id_map = cpu_index.id_map  # type: ignore[attr-defined]
 
             if hasattr(id_map, "contains"):
+
                 def _contains(id_val: int) -> bool:
                     try:
                         return bool(id_map.contains(int(id_val)))  # type: ignore[attr-defined]
@@ -386,6 +387,7 @@ class FAISSManager:
                 return _contains
 
             if hasattr(id_map, "search"):
+
                 def _contains(id_val: int) -> bool:
                     try:
                         return int(id_map.search(int(id_val))) >= 0  # type: ignore[attr-defined]
@@ -395,6 +397,7 @@ class FAISSManager:
                 return _contains
 
             if hasattr(id_map, "find"):
+
                 def _contains(id_val: int) -> bool:
                     try:
                         return int(id_map.find(int(id_val))) >= 0  # type: ignore[attr-defined]

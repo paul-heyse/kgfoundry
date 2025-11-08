@@ -102,7 +102,6 @@ def test_update_index_skips_duplicates(tmp_index_path: Path) -> None:
 
 def test_update_index_skips_primary_duplicates(tmp_index_path: Path) -> None:
     """IDs already present in the primary index are ignored during updates."""
-
     vec_dim = _UNIT_TEST_VEC_DIM
     manager = FAISSManager(index_path=tmp_index_path, vec_dim=vec_dim)
 
@@ -166,46 +165,61 @@ def test_dual_index_search(tmp_index_path: Path) -> None:
     assert primary_result_count > 0 or secondary_result_count > 0
 
 
-def test_merged_search_results_are_unique(tmp_index_path: Path) -> None:
-    """Merged dual-index search results deduplicate overlapping chunk IDs."""
-
-    vec_dim = _UNIT_TEST_VEC_DIM
-    manager = FAISSManager(index_path=tmp_index_path, vec_dim=vec_dim)
-
-    primary_vectors = _rng.normal(0.5, 0.15, (3, vec_dim)).astype(np.float32)
-    primary_vectors = np.clip(primary_vectors, 0.0, 1.0)
+def _setup_primary_index(manager: FAISSManager, vec_dim: int) -> tuple[np.ndarray, np.ndarray]:
+    """Setup primary index with test vectors."""
+    primary_vectors = np.clip(_rng.normal(0.5, 0.15, (3, vec_dim)).astype(np.float32), 0.0, 1.0)
     manager.build_index(primary_vectors)
     primary_ids = np.array([1, 2, 3], dtype=np.int64)
     manager.add_vectors(primary_vectors, primary_ids)
+    return primary_vectors, primary_ids
 
-    unique_secondary_vector = _rng.normal(0.5, 0.15, (1, vec_dim)).astype(np.float32)
-    unique_secondary_vector = np.clip(unique_secondary_vector, 0.0, 1.0)
-    unique_secondary_id = np.array([101], dtype=np.int64)
-    manager.update_index(unique_secondary_vector, unique_secondary_id)
 
-    assert manager.secondary_index is not None
-
+def _add_duplicate_to_secondary(
+    manager: FAISSManager, primary_vectors: np.ndarray, primary_ids: np.ndarray
+) -> tuple[int, np.ndarray]:
+    """Add duplicate vector to secondary index."""
     duplicate_id = int(primary_ids[0])
-    duplicate_vector_secondary = np.clip(primary_vectors[0] * 1.05, 0.0, 1.0).astype(np.float32)
-    duplicate_vector_secondary = duplicate_vector_secondary.reshape(1, -1)
-    duplicate_norm = duplicate_vector_secondary.copy()
+    duplicate_vector = (
+        np.clip(primary_vectors[0] * 1.05, 0.0, 1.0).astype(np.float32).reshape(1, -1)
+    )
+    duplicate_norm = duplicate_vector.copy()
     faiss.normalize_L2(duplicate_norm)
+    assert manager.secondary_index is not None
     manager.secondary_index.add_with_ids(duplicate_norm, np.array([duplicate_id], dtype=np.int64))
     manager.incremental_ids.add(duplicate_id)
+    return duplicate_id, duplicate_vector
 
-    query = duplicate_vector_secondary.copy()
 
-    primary_dists, primary_ids_result = manager._search_primary(query, k=3)
+def test_merged_search_results_are_unique(tmp_index_path: Path) -> None:
+    """Merged dual-index search results deduplicate overlapping chunk IDs."""
+    vec_dim = _UNIT_TEST_VEC_DIM
+    manager = FAISSManager(index_path=tmp_index_path, vec_dim=vec_dim)
+
+    # Setup primary and secondary indexes
+    primary_vectors, primary_ids = _setup_primary_index(manager, vec_dim)
+    unique_secondary = np.clip(_rng.normal(0.5, 0.15, (1, vec_dim)).astype(np.float32), 0.0, 1.0)
+    manager.update_index(unique_secondary, np.array([101], dtype=np.int64))
+
+    # Add duplicate to secondary
+    duplicate_id, duplicate_vector = _add_duplicate_to_secondary(
+        manager, primary_vectors, primary_ids
+    )
+
+    # Search both indexes
+    query = duplicate_vector.copy()
+    primary_dists, primary_ids_result = manager._search_primary(query, k=3, nprobe=128)
     secondary_dists, secondary_ids_result = manager._search_secondary(query, k=3)
 
     assert duplicate_id in primary_ids_result[0]
     assert duplicate_id in secondary_ids_result[0]
 
+    # Verify merged search deduplicates
     merged_dists, merged_ids = manager.search(query, k=3)
     merged_row = merged_ids[0]
     valid_ids = [rid for rid in merged_row if rid >= 0]
     assert len(valid_ids) == len(set(valid_ids))
 
+    # Verify duplicate appears in both results
     primary_idx = np.where(primary_ids_result[0] == duplicate_id)[0]
     secondary_idx = np.where(secondary_ids_result[0] == duplicate_id)[0]
     assert primary_idx.size == 1

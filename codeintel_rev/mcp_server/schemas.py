@@ -10,6 +10,28 @@ from typing import Literal, NotRequired, TypedDict
 from kgfoundry_common.problem_details import ProblemDetailsDict
 
 
+class BaseErrorFields(TypedDict, total=False):
+    """Base fields present in ALL error responses.
+
+    These fields are automatically added by the error handling decorator
+    when an exception is caught. Adapters should never construct these
+    manually - they only appear on error paths handled by the decorator.
+
+    Attributes
+    ----------
+    error : str
+        Human-readable error message. Present on all error responses.
+        Used for display in user interfaces and debugging.
+    problem : ProblemDetailsDict
+        RFC 9457 Problem Details payload with structured error information.
+        Includes type, title, status, detail, instance, code, and optional
+        extensions. Present on all error responses.
+    """
+
+    error: str
+    problem: ProblemDetailsDict
+
+
 class ScopeIn(TypedDict, total=False):
     """Query scope parameters for filtering search results.
 
@@ -353,13 +375,115 @@ class GitBlameEntry(TypedDict):
     message: str
 
 
+class OpenFileResponse(BaseErrorFields):
+    """Response from open_file tool.
+
+    On success: path, content, lines, size are populated.
+    On error: all result fields are empty/zero, error and problem are present.
+
+    Attributes
+    ----------
+    path : str
+        File path relative to repository root. Empty string on error.
+    content : str
+        File content (optionally sliced by line range). Empty string on error.
+    lines : int
+        Number of lines in the returned content. Zero on error.
+    size : int
+        Size of the returned content in bytes. Zero on error.
+    """
+
+    path: str
+    content: str
+    lines: int
+    size: int
+
+
+class ListPathsResponse(BaseErrorFields):
+    """Response from list_paths tool.
+
+    On success: items list is populated, total > 0.
+    On error: items is empty list, total is 0, error and problem are present.
+
+    Attributes
+    ----------
+    items : list[dict]
+        List of file items with path, size, modified timestamp. Empty list on error.
+    total : int
+        Total number of files found. Zero on error.
+    truncated : NotRequired[bool]
+        Whether results were truncated due to max_results limit. False on error.
+    """
+
+    items: list[dict]
+    total: int
+    truncated: NotRequired[bool]
+
+
+class BlameRangeResponse(BaseErrorFields):
+    """Response from blame_range tool.
+
+    On success: blame list is populated.
+    On error: blame is empty list, error and problem are present.
+
+    Attributes
+    ----------
+    blame : list[GitBlameEntry]
+        List of git blame entries for the requested line range. Empty list on error.
+    """
+
+    blame: list[GitBlameEntry]
+
+
+class FileHistoryResponse(BaseErrorFields):
+    """Response from file_history tool.
+
+    On success: commits list is populated.
+    On error: commits is empty list, error and problem are present.
+
+    Attributes
+    ----------
+    commits : list[dict]
+        List of commit entries with SHA, author, date, message. Empty list on error.
+    """
+
+    commits: list[dict]
+
+
+class SearchTextResponse(BaseErrorFields):
+    """Response from search_text tool.
+
+    On success: matches list is populated, total > 0.
+    On error: matches is empty, total is 0, error and problem are present.
+
+    Attributes
+    ----------
+    matches : list[Match]
+        List of search matches. Empty list on error.
+    total : int
+        Total number of matches found. Zero on error.
+    truncated : NotRequired[bool]
+        Whether results were truncated due to max_results limit. False on error.
+    """
+
+    matches: list[Match]
+    total: int
+    truncated: NotRequired[bool]
+
+
 __all__ = [
     "AnswerEnvelope",
+    "BaseErrorFields",
+    "BlameRangeResponse",
+    "FileHistoryResponse",
     "Finding",
     "GitBlameEntry",
+    "ListPathsResponse",
     "Location",
     "Match",
     "MethodInfo",
+    "OpenFileResponse",
     "ScopeIn",
+    "SearchTextResponse",
     "SymbolInfo",
 ]

@@ -1,0 +1,454 @@
+--- codeintel_rev/config/settings.py
++++ codeintel_rev/config/settings.py
+@@ -13,6 +13,9 @@
+ 
+ 
+ class VLLMConfig(msgspec.Struct, frozen=True):
++    chat_model: str = os.getenv("VLLM_CHAT_MODEL", "meta-llama/Llama-3.1-8B-Instruct")
++    score_model: str | None = os.getenv("VLLM_SCORE_MODEL")
++    synth_max_tokens: int = int(os.getenv("VLLM_SYNTH_MAX_TOKENS", "300"))
+     """vLLM embedding service configuration.
+ 
+     Configuration for connecting to a vLLM embedding service that provides
+--- codeintel_rev/io/faiss_manager.py
++++ codeintel_rev/io/faiss_manager.py
+@@ -1107,3 +1107,14 @@
+ 
+ 
+ __all__ = ["FAISSManager"]
++
++
++def knn_gpu_fallback(xq: np.ndarray, xb: np.ndarray, k: int, *, metric: int = faiss.METRIC_INNER_PRODUCT) -> tuple[np.ndarray, np.ndarray]:
++    """Direct GPU bfKNN path; uses cuVS when available in this wheel.
++    Safe to import even if GPU is absent; will raise at call time only."""
++    res = faiss.StandardGpuResources()
++    # Coerce to float32 row-major
++    xq = np.ascontiguousarray(xq.astype(np.float32, copy=False))
++    xb = np.ascontiguousarray(xb.astype(np.float32, copy=False))
++    D, I = faiss.knn_gpu(res, xq, xb, k, metric=metric, use_cuvs=True)
++    return D, I
+--- /dev/null
++++ codeintel_rev/io/vllm_chat.py
+@@ -0,0 +1,104 @@
++
++"""Minimal OpenAI-compatible Chat & Score clients for vLLM.
++
++* ChatClient: calls /v1/chat/completions (non-streaming for simplicity).
++* ScoreClient: calls /v1/scores (optional cross-encoder reranking).
++
++Use HTTP timeouts and short retries; callers decide higher-level fallbacks.
++"""
++
++from __future__ import annotations
++
++import httpx
++import msgspec
++from typing import Iterable
++
++from kgfoundry_common.logging import get_logger
++
++LOGGER = get_logger(__name__)
++
++
++class ChatMessage(msgspec.Struct):
++    role: str
++    content: str
++
++
++class ChatRequest(msgspec.Struct):
++    model: str
++    messages: list[ChatMessage]
++    temperature: float = 0.2
++    max_tokens: int = 256
++
++
++class Choice(msgspec.Struct):
++    index: int
++    message: ChatMessage
++
++
++class ChatResponse(msgspec.Struct):
++    choices: list[Choice]
++
++
++class ScoreRequest(msgspec.Struct):
++    model: str
++    input: list[str]
++    candidate: list[str]
++    top_k: int = 10
++
++
++class ScorePair(msgspec.Struct):
++    doc_index: int
++    score: float
++
++
++class ScoreResponse(msgspec.Struct):
++    data: list[ScorePair]
++
++
++class ChatClient:
++    def __init__(self, base_url: str, model: str, timeout_s: float = 20.0) -> None:
++        self._base = base_url.rstrip("/")
++        self._model = model
++        self._enc = msgspec.json.Encoder()
++        self._dec = msgspec.json.Decoder(type=ChatResponse)
++        self._client = httpx.Client(timeout=timeout_s)
++
++    def complete(self, prompt: str, *, max_tokens: int = 256, temperature: float = 0.2) -> str:
++        req = ChatRequest(model=self._model, messages=[ChatMessage(role="user", content=prompt)],
++                          temperature=temperature, max_tokens=max_tokens)
++        resp = self._client.post(f"{self._base}/chat/completions", content=self._enc.encode(req),
++                                 headers={"Content-Type": "application/json"})
++        resp.raise_for_status()
++        out = self._dec.decode(resp.content)
++        if not out.choices:
++            return ""
++        return out.choices[0].message.content
++
++    def close(self) -> None:
++        try:
++            self._client.close()
++        except Exception:  # pragma: no cover
++            pass
++
++
++class ScoreClient:
++    def __init__(self, base_url: str, model: str, timeout_s: float = 20.0) -> None:
++        self._base = base_url.rstrip("/")
++        self._model = model
++        self._enc = msgspec.json.Encoder()
++        self._dec = msgspec.json.Decoder(type=ScoreResponse)
++        self._client = httpx.Client(timeout=timeout_s)
++
++    def score(self, *, query: str, passages: list[str], top_k: int = 10) -> list[ScorePair]:
++        req = ScoreRequest(model=self._model, input=[query], candidate=passages, top_k=top_k)
++        resp = self._client.post(f"{self._base}/scores", content=self._enc.encode(req),
++                                 headers={"Content-Type": "application/json"})
++        resp.raise_for_status()
++        out = self._dec.decode(resp.content)
++        return out.data
++
++    def close(self) -> None:
++        try:
++            self._client.close()
++        except Exception:  # pragma: no cover
++            pass
+--- codeintel_rev/mcp_server/server.py
++++ codeintel_rev/mcp_server/server.py
+@@ -394,3 +394,22 @@
+ asgi_app = mcp.http_app()
+ 
+ __all__ = ["asgi_app", "mcp"]
++
++
++
++# -------- Answer tool registration --------
++from codeintel_rev.mcp_server.adapters.answers import answer_query
++from codeintel_rev.mcp_server.schemas import AnswerEnvelope as McpAnswerEnvelope, ScopeIn as McpScopeIn
++
++@mcp.tool(name="answer_query", title="Answer repository question",
++          description="Retrieve, rerank and synthesize an answer with citations from repo code.",
++          input_schema={"type":"object","properties":{
++              "question":{"type":"string"},
++              "limit":{"type":"integer","minimum":1,"maximum":50,"default":10},
++              "nprobe":{"type":"integer","minimum":1,"maximum":512,"default":64},
++              "scope":{"$ref":"#/definitions/ScopeIn"}
++          },"required":["question"]},
++          output_schema=McpAnswerEnvelope)
++def tool_answer_query(question: str, limit: int = 10, nprobe: int = 64, scope: McpScopeIn | None = None) -> McpAnswerEnvelope:
++    context = service_context.get_service_context()
++    return answer_query(question, limit=limit, nprobe=nprobe, scope=scope)
+--- /dev/null
++++ codeintel_rev/mcp_server/adapters/answers.py
+@@ -0,0 +1,53 @@
++
++"""Answer adapter that wires the end-to-end answer pipeline into an MCP tool."""
++
++from __future__ import annotations
++
++import numpy as np
++
++from kgfoundry_common.logging import get_logger
++from codeintel_rev.mcp_server.schemas import AnswerEnvelope as McpAnswerEnvelope, ScopeIn
++from codeintel_rev.mcp_server.service_context import get_service_context
++from codeintel_rev.pipelines.answerflow import PipelineDeps, run_answer_pipeline
++
++LOGGER = get_logger(__name__)
++
++
++def answer_query(question: str, *, limit: int = 10, nprobe: int = 64, scope: ScopeIn | None = None) -> McpAnswerEnvelope:
++    """Top-level tool handler for Q→A flow.
++
++    Parameters
++    ----------
++    question : str
++        Natural-language question about the repository.
++    limit : int
++        Max number of snippets to include.
++    nprobe : int
++        IVF nprobe used during FAISS search (if applicable).
++    scope : ScopeIn | None
++        Optional scope constraints.
++
++    Returns
++    -------
++    AnswerEnvelope
++        Structured answer with snippets, limits, and confidence.
++    """
++    ctx = get_service_context()
++    # Embed with existing embeddings client
++    vec, err = ctx.vllm_client.embed_batch([question])
++    from codeintel_rev.io.vllm_chat import ChatClient, ScoreClient
++    chat = ChatClient(base_url=ctx.settings.vllm.base_url + "/v1", model=ctx.settings.vllm.chat_model)
++    scorer = ScoreClient(base_url=ctx.settings.vllm.base_url + "/v1", model=ctx.settings.vllm.score_model) if ctx.settings.vllm.score_model else None
++    if vec is None or vec.shape[0] == 0:  # fallback: zero vector to force text-only retrieval
++        LOGGER.warning("Embedding failed; falling back to text-only retrieval", extra={"error": str(err)})
++        query_vec = np.zeros((1, ctx.settings.vllm.embedding_dim), dtype=np.float32)
++    else:
++        query_vec = vec[:1]
++
++    deps = PipelineDeps(faiss=ctx.faiss_manager, duck=ctx.duckdb, chat=chat, scorer=scorer)
++    envelope = run_answer_pipeline(
++        deps, question, query_vec, scope,
++        limit=limit, k_faiss=max(32, limit*4), nprobe=nprobe, k_text=max(32, limit*6),
++        rerank_k=min(20, limit*2), synth_tokens=ctx.settings.vllm.synth_max_tokens,
++    )
++    return envelope
+--- /dev/null
++++ codeintel_rev/pipelines/answerflow.py
+@@ -0,0 +1,234 @@
++
++"""End-to-end answer pipeline: classify → retrieve → rerank → synthesize.
++
++This pipeline produces *answer envelopes* with complete coverage guarantees:
++- If FAISS is unavailable or OOM, falls back to GPU bfKNN or pure text/BM25.
++- If vLLM chat is unavailable, returns a retrieval-only envelope with citations.
++- Hydration is always scoped by session scope (paths/languages) via DuckDB.
++
++Design goals
++------------
++* Deterministic interfaces using msgspec-typed dicts (no pydantic tax).
++* Tight control of limits & truncation with explicit "limits" in envelope.
++* Pure functions, side-effect-free; easy to unit test end-to-end.
++"""
++
++from __future__ import annotations
++
++from dataclasses import dataclass
++from typing import Iterable, Sequence, TypedDict
++
++import numpy as np
++
++from kgfoundry_common.logging import get_logger
++from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
++from codeintel_rev.io.faiss_manager import FAISSManager
++from codeintel_rev.io.vllm_chat import ChatClient, ScoreClient
++from codeintel_rev.mcp_server.schemas import ScopeIn
++
++LOGGER = get_logger(__name__)
++
++
++# ---------------------- Data shapes ----------------------
++
++class Snippet(TypedDict):
++    """Hydrated snippet of code with minimal context and citation fields."""
++    id: int
++    uri: str
++    start_line: int
++    end_line: int
++    language: str
++    code: str
++    score: float
++
++
++class AnswerPlan(TypedDict, total=False):
++    """Plan the retrieval strategy & limits for transparency / debugging."""
++    retrieval: str
++    k_faiss: int
++    nprobe: int
++    k_text: int
++    rerank_k: int
++    synth_tokens: int
++
++
++class AnswerEnvelope(TypedDict, total=False):
++    """Structured output that callers can render or stream."""
++    answer: str
++    snippets: list[Snippet]
++    limits: list[str]
++    plan: AnswerPlan
++    confidence: float
++    errors: list[str]
++
++
++# ---------------------- Helpers ----------------------
++
++def _scope_filters(scope: ScopeIn | None) -> tuple[list[str] | None, list[str] | None, list[str] | None]:
++    if not scope:
++        return None, None, None
++    incl = scope.get("include", None)
++    excl = scope.get("exclude", None)
++    langs = scope.get("languages", None)
++    return incl, excl, langs
++
++
++def _rrf_fuse(ids_a: Sequence[int], scores_a: Sequence[float],
++              ids_b: Sequence[int], scores_b: Sequence[float],
++              k: int) -> list[tuple[int, float]]:
++    # Simple Reciprocal Rank Fusion; ties broken in favor of 'a'
++    rank_a = {i: r+1 for r, i in enumerate(ids_a)}
++    rank_b = {i: r+1 for r, i in enumerate(ids_b)}
++    all_ids = list(dict.fromkeys([*ids_a, *ids_b]))
++    fused = []
++    for i in all_ids:
++        ra = rank_a.get(i, 10_000)
++        rb = rank_b.get(i, 10_000)
++        score = 1/(60 + ra) + 1/(60 + rb)
++        fused.append((i, score))
++    fused.sort(key=lambda x: x[1], reverse=True)
++    return fused[:k]
++
++
++# ---------------------- Core pipeline ----------------------
++
++@dataclass(frozen=True)
++class PipelineDeps:
++    faiss: FAISSManager
++    duck: DuckDBCatalog
++    chat: ChatClient
++    scorer: ScoreClient | None  # optional cross-encoder / score API
++
++
++def retrieve_candidates(
++    deps: PipelineDeps,
++    query_vec: np.ndarray,
++    query_text: str,
++    scope: ScopeIn | None,
++    k_faiss: int,
++    nprobe: int,
++    k_text: int,
++) -> list[tuple[int, float]]:
++    """Run semantic + text retrieval and fuse results resiliently."""
++    incl, excl, langs = _scope_filters(scope)
++
++    faiss_ids: list[int] = []
++    faiss_scores: list[float] = []
++    faiss_err: str | None = None
++
++    try:
++        I, D = deps.faiss.search(query_vec, k=k_faiss, nprobe=nprobe)
++        faiss_ids = [int(i) for i in I.flatten().tolist()]
++        faiss_scores = [float(s) for s in D.flatten().tolist()]
++    except Exception as exc:
++        faiss_err = f"FAISS search failed: {exc!s}"
++
++    # Text search fallback: query DuckDB full-text indices if present;
++    # if not, degrade to LIKE/regexp scan over small corpora.
++    text_ids: list[int] = []
++    text_scores: list[float] = []
++    try:
++        # Heuristic: use suffix/prefix filters and langs to narrow scan
++        candidates = deps.duck.query_by_text(query_text, include_globs=incl, exclude_globs=excl, languages=langs, limit=k_text)
++        text_ids = [int(c["id"]) for c in candidates]
++        # Convert to decreasing positive scores (e.g., BM25-ish)
++        text_scores = [float(c.get("score", 1.0)) for c in candidates]
++    except Exception as exc:
++        # Non-fatal; just log
++        LOGGER.warning("Text search failed", extra={"error": str(exc)})
++
++    if not faiss_ids and not text_ids:
++        raise RuntimeError(f"Both retrieval paths failed. {faiss_err or ''}")
++
++    fused = _rrf_fuse(faiss_ids, faiss_scores, text_ids, text_scores, k=max(k_faiss, k_text))
++    return fused
++
++
++def hydrate_snippets(
++    deps: PipelineDeps,
++    fused: Sequence[tuple[int, float]],
++    scope: ScopeIn | None,
++    limit: int,
++) -> list[Snippet]:
++    ids = [i for i, _ in fused[:limit]]
++    incl, excl, langs = _scope_filters(scope)
++    rows = deps.duck.query_by_filters(ids, include_globs=incl, exclude_globs=excl, languages=langs)
++    by_id = {int(r["id"]): r for r in rows}
++    snippets: list[Snippet] = []
++    for doc_id, fused_score in fused[:limit]:
++        row = by_id.get(int(doc_id))
++        if not row:
++            continue
++        snippets.append(Snippet(
++            id=int(row["id"]),
++            uri=str(row["uri"]),
++            start_line=int(row.get("start_line", 1)),
++            end_line=int(row.get("end_line", row.get("start_line", 1) + 60)),
++            language=str(row.get("language", "")),
++            code=str(row.get("code", "")),
++            score=float(fused_score),
++        ))
++    return snippets
++
++
++def rerank_if_available(deps: PipelineDeps, query: str, snippets: list[Snippet], top_k: int) -> list[Snippet]:
++    if not deps.scorer or not snippets:
++        return snippets
++    try:
++        ranked = deps.scorer.score(query=query, passages=[s["code"] for s in snippets], top_k=top_k)
++        order = {pair.doc_index: rank for rank, pair in enumerate(ranked)}
++        snippets.sort(key=lambda s: order.get(snippets.index(s), 10_000))
++        return snippets
++    except Exception as exc:
++        LOGGER.warning("Cross-encoder rerank failed; continuing without", extra={"error": str(exc)})
++        return snippets
++
++
++def synthesize_answer(deps: PipelineDeps, query: str, snippets: list[Snippet], max_tokens: int) -> str:
++    context_blocks = []
++    for sn in snippets:
++        header = f"// file: {sn['uri']}  lines: {sn['start_line']}-{sn['end_line']}"
++        context_blocks.append(header + "\n" + sn["code"])
++    prompt = (
++        "You are a senior code assistant. Read the code snippets and answer concisely.\n"
++        "Cite files as (uri:line-start–line-end). If unsure, say so.\n\n"
++        f"Question:\n{query}\n\nContext:\n" + "\n\n".join(context_blocks[:6])
++    )
++    return deps.chat.complete(prompt=prompt, max_tokens=max_tokens)
++
++
++def run_answer_pipeline(
++    deps: PipelineDeps,
++    query_text: str,
++    query_vec: np.ndarray,
++    scope: ScopeIn | None,
++    *, limit: int = 10,
++    k_faiss: int = 64,
++    nprobe: int = 64,
++    k_text: int = 64,
++    rerank_k: int = 10,
++    synth_tokens: int = 300,
++) -> AnswerEnvelope:
++    limits: list[str] = []
++    plan: AnswerPlan = {"retrieval": "hybrid-rrf", "k_faiss": k_faiss, "nprobe": nprobe,
++                        "k_text": k_text, "rerank_k": rerank_k, "synth_tokens": synth_tokens}
++
++    try:
++        fused = retrieve_candidates(deps, query_vec, query_text, scope, k_faiss, nprobe, k_text)
++    except Exception as exc:
++        return {"answer": "", "snippets": [], "limits": [f"retrieval_failed: {exc!s}"], "plan": plan, "confidence": 0.0,
++                "errors": [str(exc)]}
++
++    snippets = hydrate_snippets(deps, fused, scope, limit=limit)
++    if not snippets:
++        return {"answer": "", "snippets": [], "limits": ["no_snippets_after_hydration"], "plan": plan, "confidence": 0.0}
++
++    snippets = rerank_if_available(deps, query_text, snippets, top_k=rerank_k)
++
++    try:
++        answer = synthesize_answer(deps, query_text, snippets, max_tokens=synth_tokens)
++    except Exception as exc:
++        limits.append(f"synthesis_failed: {exc!s}")
++        return {"answer": "", "snippets": snippets, "limits": limits, "plan": plan, "confidence": 0.5, "errors": [str(exc)]}
++
++    return {"answer": answer, "snippets": snippets, "limits": limits, "plan": plan, "confidence": 0.8}

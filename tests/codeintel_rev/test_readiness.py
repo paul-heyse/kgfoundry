@@ -289,7 +289,7 @@ def test_readiness_probe_check_directory_exists() -> None:
         path = Path(tmpdir)
 
         # Act
-        result = ReadinessProbe._check_directory(path)  # noqa: SLF001 - testing private method
+        result = ReadinessProbe._check_directory(path)
 
         # Assert
         assert result.healthy is True
@@ -303,7 +303,7 @@ def test_readiness_probe_check_directory_create() -> None:
         new_dir = Path(tmpdir) / "new_subdir"
 
         # Act
-        result = ReadinessProbe._check_directory(new_dir, create=True)  # noqa: SLF001 - testing private method
+        result = ReadinessProbe._check_directory(new_dir, create=True)
 
         # Assert
         assert result.healthy is True
@@ -319,7 +319,7 @@ def test_readiness_probe_check_file_exists() -> None:
 
     try:
         # Act
-        result = ReadinessProbe._check_file(path, description="test file")  # noqa: SLF001 - testing private method
+        result = ReadinessProbe._check_file(path, description="test file")
 
         # Assert
         assert result.healthy is True
@@ -333,7 +333,7 @@ def test_readiness_probe_check_file_optional() -> None:
     path = Path("/nonexistent/file.txt")
 
     # Act
-    result = ReadinessProbe._check_file(path, description="test file", optional=True)  # noqa: SLF001 - testing private method
+    result = ReadinessProbe._check_file(path, description="test file", optional=True)
 
     # Assert
     assert result.healthy is True  # Optional files don't fail readiness
@@ -347,7 +347,7 @@ def test_readiness_probe_check_file_required() -> None:
     path = Path("/nonexistent/file.txt")
 
     # Act
-    result = ReadinessProbe._check_file(path, description="test file", optional=False)  # noqa: SLF001 - testing private method
+    result = ReadinessProbe._check_file(path, description="test file", optional=False)
 
     # Assert
     assert result.healthy is False
@@ -369,7 +369,7 @@ def test_readiness_probe_check_vllm_invalid_url(mock_context: ApplicationContext
     probe = ReadinessProbe(mock_context)
 
     # Act
-    result = probe._check_vllm_connection()  # noqa: SLF001 - testing private method
+    result = probe._check_vllm_connection()
 
     # Assert
     assert result.healthy is False
@@ -398,7 +398,7 @@ def test_readiness_probe_check_vllm_success(mock_context: ApplicationContext) ->
         mock_instance.get.return_value = mock_response
         mock_client.return_value.__enter__.return_value = mock_instance
 
-        result = probe._check_vllm_connection()  # noqa: SLF001 - testing private method
+        result = probe._check_vllm_connection()
 
     # Assert
     assert result.healthy is True
@@ -423,7 +423,7 @@ def test_readiness_probe_check_vllm_http_error(mock_context: ApplicationContext)
         mock_instance.get.side_effect = httpx.HTTPError("Connection refused")
         mock_client.return_value.__enter__.return_value = mock_instance
 
-        result = probe._check_vllm_connection()  # noqa: SLF001 - testing private method
+        result = probe._check_vllm_connection()
 
     # Assert
     assert result.healthy is False

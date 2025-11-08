@@ -170,7 +170,6 @@ def test_small_corpus_flat_index(tmp_index_path: Path) -> None:
 
 def test_small_corpus_search_returns_results(tmp_index_path: Path) -> None:
     """Regression: searching flat indexes skips nprobe assignment and succeeds."""
-
     vec_dim = _UNIT_TEST_VEC_DIM
     n_vectors = 32  # Small corpus ensures flat index selection
     manager = FAISSManager(index_path=tmp_index_path, vec_dim=vec_dim)

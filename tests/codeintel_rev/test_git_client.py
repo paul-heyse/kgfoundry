@@ -69,7 +69,7 @@ class TestGitClientLazyInit:
 
     def test_repo_not_created_until_access(self, git_client: GitClient) -> None:
         """Repo should not be created until first property access."""
-        assert git_client._repo is None  # noqa: SLF001 - testing internal state
+        assert git_client._repo is None
 
     def test_repo_created_on_first_access(self, git_client: GitClient, mock_repo: Mock) -> None:
         """Repo should be created on first access and cached."""
@@ -79,7 +79,7 @@ class TestGitClientLazyInit:
 
             assert repo1 is mock_repo
             assert repo2 is mock_repo
-            assert git_client._repo is mock_repo  # noqa: SLF001 - testing internal state
+            assert git_client._repo is mock_repo
 
     def test_repo_initialization_error(self, git_client: GitClient) -> None:
         """InvalidGitRepositoryError should be raised for invalid repos."""
@@ -103,7 +103,7 @@ class TestGitClientBlameRange:
         # Setup mock blame_incremental to return (commit, [10, 11, 12])
         blame_iter = [(mock_commit, [10, 11, 12])]
         mock_repo.blame_incremental.return_value = blame_iter
-        git_client._repo = mock_repo  # noqa: SLF001 - testing with mock repo  # noqa: SLF001 - testing with mock repo
+        git_client._repo = mock_repo
 
         entries = git_client.blame_range("test.py", start_line=10, end_line=12)
 
@@ -121,7 +121,7 @@ class TestGitClientBlameRange:
         # Return lines 5-15, but request only 10-12
         blame_iter = [(mock_commit, list(range(5, 16)))]
         mock_repo.blame_incremental.return_value = blame_iter
-        git_client._repo = mock_repo  # noqa: SLF001 - testing with mock repo
+        git_client._repo = mock_repo
 
         entries = git_client.blame_range("test.py", start_line=10, end_line=12)
 
@@ -133,7 +133,7 @@ class TestGitClientBlameRange:
         mock_repo.blame_incremental.side_effect = git.exc.GitCommandError(
             "does not exist", status=128
         )
-        git_client._repo = mock_repo  # noqa: SLF001 - testing with mock repo
+        git_client._repo = mock_repo
 
         with pytest.raises(FileNotFoundError, match=r"File not found: test\.py"):
             git_client.blame_range("test.py", start_line=1, end_line=10)
@@ -143,7 +143,7 @@ class TestGitClientBlameRange:
         mock_repo.blame_incremental.side_effect = git.exc.GitCommandError(
             "Permission denied", status=1
         )
-        git_client._repo = mock_repo  # noqa: SLF001 - testing with mock repo
+        git_client._repo = mock_repo
 
         with pytest.raises(git.exc.GitCommandError):
             git_client.blame_range("test.py", start_line=1, end_line=10)
@@ -167,7 +167,7 @@ class TestGitClientBlameRange:
     ) -> None:
         """blame_range should handle different error messages correctly."""
         mock_repo.blame_incremental.side_effect = git.exc.GitCommandError(error_msg, status=128)
-        git_client._repo = mock_repo  # noqa: SLF001 - testing with mock repo
+        git_client._repo = mock_repo
 
         if should_raise_file_not_found:
             with pytest.raises(FileNotFoundError):
@@ -183,7 +183,7 @@ class TestGitClientBlameRange:
         mock_commit.author.name = "José García"
         blame_iter = [(mock_commit, [10])]
         mock_repo.blame_incremental.return_value = blame_iter
-        git_client._repo = mock_repo  # noqa: SLF001 - testing with mock repo
+        git_client._repo = mock_repo
 
         entries = git_client.blame_range("test.py", start_line=10, end_line=10)
 
@@ -208,7 +208,7 @@ class TestGitClientFileHistory:
             commits.append(commit)
 
         mock_repo.iter_commits.return_value = iter(commits)
-        git_client._repo = mock_repo  # noqa: SLF001 - testing with mock repo
+        git_client._repo = mock_repo
 
         history = git_client.file_history("test.py", limit=10)
 
@@ -222,7 +222,7 @@ class TestGitClientFileHistory:
     def test_file_history_empty_history(self, git_client: GitClient, mock_repo: Mock) -> None:
         """file_history should return empty list for files with no history."""
         mock_repo.iter_commits.return_value = iter([])
-        git_client._repo = mock_repo  # noqa: SLF001 - testing with mock repo
+        git_client._repo = mock_repo
 
         history = git_client.file_history("test.py", limit=50)
 
@@ -243,7 +243,7 @@ class TestGitClientFileHistory:
 
         # Only return first 5 commits (simulating max_count behavior)
         mock_repo.iter_commits.return_value = iter(commits[:5])
-        git_client._repo = mock_repo  # noqa: SLF001 - testing with mock repo
+        git_client._repo = mock_repo
 
         history = git_client.file_history("test.py", limit=5)
 
@@ -254,7 +254,7 @@ class TestGitClientFileHistory:
     def test_file_history_file_not_found(self, git_client: GitClient, mock_repo: Mock) -> None:
         """file_history should raise FileNotFoundError for missing files."""
         mock_repo.iter_commits.side_effect = git.exc.GitCommandError("does not exist", status=128)
-        git_client._repo = mock_repo  # noqa: SLF001 - testing with mock repo
+        git_client._repo = mock_repo
 
         with pytest.raises(FileNotFoundError, match=r"File not found: test\.py"):
             git_client.file_history("test.py", limit=50)
@@ -262,7 +262,7 @@ class TestGitClientFileHistory:
     def test_file_history_git_command_error(self, git_client: GitClient, mock_repo: Mock) -> None:
         """file_history should propagate GitCommandError for other errors."""
         mock_repo.iter_commits.side_effect = git.exc.GitCommandError("Permission denied", status=1)
-        git_client._repo = mock_repo  # noqa: SLF001 - testing with mock repo
+        git_client._repo = mock_repo
 
         with pytest.raises(git.exc.GitCommandError):
             git_client.file_history("test.py", limit=50)
@@ -278,7 +278,7 @@ class TestAsyncGitClient:
         """Async blame_range should call sync client via asyncio.to_thread."""
         blame_iter = [(mock_commit, [10, 11])]
         mock_repo.blame_incremental.return_value = blame_iter
-        git_client._repo = mock_repo  # noqa: SLF001 - testing with mock repo
+        git_client._repo = mock_repo
 
         async_client = AsyncGitClient(git_client)
         entries = await async_client.blame_range("test.py", start_line=10, end_line=11)
@@ -293,7 +293,7 @@ class TestAsyncGitClient:
     ) -> None:
         """Async file_history should call sync client via asyncio.to_thread."""
         mock_repo.iter_commits.return_value = iter([mock_commit])
-        git_client._repo = mock_repo  # noqa: SLF001 - testing with mock repo
+        git_client._repo = mock_repo
 
         async_client = AsyncGitClient(git_client)
         commits = await async_client.file_history("test.py", limit=5)
@@ -309,7 +309,7 @@ class TestAsyncGitClient:
         mock_repo.blame_incremental.side_effect = git.exc.GitCommandError(
             "does not exist", status=128
         )
-        git_client._repo = mock_repo  # noqa: SLF001 - testing with mock repo
+        git_client._repo = mock_repo
 
         async_client = AsyncGitClient(git_client)
 
@@ -322,7 +322,7 @@ class TestAsyncGitClient:
     ) -> None:
         """Async file_history should propagate FileNotFoundError."""
         mock_repo.iter_commits.side_effect = git.exc.GitCommandError("does not exist", status=128)
-        git_client._repo = mock_repo  # noqa: SLF001 - testing with mock repo
+        git_client._repo = mock_repo
 
         async_client = AsyncGitClient(git_client)
 

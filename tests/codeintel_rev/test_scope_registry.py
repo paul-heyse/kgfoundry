@@ -90,7 +90,7 @@ def test_gauge_stays_consistent_during_overlapping_operations(
     release_notifier = threading.Event()
     release_gate = threading.Event()
     gateable_lock.configure(release_notifier, release_gate)
-    registry._lock = gateable_lock  # type: ignore[assignment]  # noqa: SLF001
+    registry._lock = gateable_lock  # type: ignore[assignment]
 
     set_done = threading.Event()
     clear_done = threading.Event()

@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING
 from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.mcp_server.schemas import Match
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope, merge_scope_filters
-from kgfoundry_common.errors import KgFoundryError, VectorSearchError
-from kgfoundry_common.logging import get_logger, with_fields
+from kgfoundry_common.errors import VectorSearchError
+from kgfoundry_common.logging import get_logger
 from kgfoundry_common.observability import DurationObservation, MetricsProvider, observe_duration
 from kgfoundry_common.subprocess_utils import (
     SubprocessError,
@@ -129,6 +129,11 @@ def search_text(  # noqa: PLR0913 - context parameter required for dependency in
     dict
         Search matches with locations and previews.
 
+    Raises
+    ------
+    VectorSearchError
+        If search operation fails (timeout, subprocess error, etc.).
+
     Examples
     --------
     Basic usage:
@@ -210,13 +215,13 @@ def search_text(  # noqa: PLR0913 - context parameter required for dependency in
     with _observe("text_search") as observation:
         try:
             stdout = run_subprocess(cmd, cwd=repo_root, timeout=SEARCH_TIMEOUT_SECONDS)
-        except SubprocessTimeoutError:
+        except SubprocessTimeoutError as exc:
             observation.mark_error()
-            error = VectorSearchError(
-                "Search timeout",
+            error_msg = "Search timeout"
+            raise VectorSearchError(
+                error_msg,
                 context={"query": query},
-            )
-            return _error_response(error, operation="text_search")
+            ) from exc
         except SubprocessError as exc:
             if exc.returncode == 1:
                 stdout = ""
@@ -231,20 +236,19 @@ def search_text(  # noqa: PLR0913 - context parameter required for dependency in
             else:
                 observation.mark_error()
                 error_message = (exc.stderr or "").strip() or str(exc)
-                error = VectorSearchError(
+                raise VectorSearchError(
                     error_message,
                     cause=exc,
                     context={"query": query, "returncode": exc.returncode},
-                )
-                return _error_response(error, operation="text_search")
+                ) from exc
         except ValueError as exc:
             observation.mark_error()
-            error = VectorSearchError(
-                str(exc),
+            error_msg = str(exc)
+            raise VectorSearchError(
+                error_msg,
                 cause=exc,
                 context={"query": query},
-            )
-            return _error_response(error, operation="text_search")
+            ) from exc
 
         matches, truncated = _parse_ripgrep_output(stdout, repo_root, max_results)
         observation.mark_success()
@@ -281,7 +285,12 @@ def _fallback_grep(
     Returns
     -------
     dict
-        Search results or error payload when fallback execution fails.
+        Search results.
+
+    Raises
+    ------
+    VectorSearchError
+        If fallback grep operation fails (timeout, subprocess error, etc.).
     """
     command = ["grep", "-r", "-n"]
 
@@ -292,33 +301,32 @@ def _fallback_grep(
 
     try:
         stdout = run_subprocess(command, cwd=repo_root, timeout=SEARCH_TIMEOUT_SECONDS)
-    except SubprocessTimeoutError:
+    except SubprocessTimeoutError as exc:
         observation.mark_error()
-        error = VectorSearchError(
-            "Search tool unavailable",
+        error_msg = "Search tool unavailable"
+        raise VectorSearchError(
+            error_msg,
             context={"query": query, "tool": "grep"},
-        )
-        return _error_response(error, operation="text_search_fallback")
+        ) from exc
     except SubprocessError as exc:
         if exc.returncode == 1:
             stdout = ""
         else:
             observation.mark_error()
             error_message = (exc.stderr or "").strip() or str(exc)
-            error = VectorSearchError(
+            raise VectorSearchError(
                 error_message,
                 cause=exc,
                 context={"query": query, "tool": "grep", "returncode": exc.returncode},
-            )
-            return _error_response(error, operation="text_search_fallback")
+            ) from exc
     except ValueError as exc:
         observation.mark_error()
-        error = VectorSearchError(
-            str(exc),
+        error_msg = str(exc)
+        raise VectorSearchError(
+            error_msg,
             cause=exc,
             context={"query": query, "tool": "grep"},
-        )
-        return _error_response(error, operation="text_search_fallback")
+        ) from exc
 
     matches: list[Match] = []
     for line in stdout.splitlines()[:max_results]:
@@ -346,38 +354,6 @@ def _fallback_grep(
         "matches": matches,
         "total": len(matches),
         "truncated": len(matches) >= max_results,
-    }
-
-
-def _error_response(error: KgFoundryError, *, operation: str) -> dict:
-    """Return standardized error payload with Problem Details.
-
-    Parameters
-    ----------
-    error : KgFoundryError
-        Error to convert to response.
-    operation : str
-        Operation name for logging.
-
-    Returns
-    -------
-    dict
-        Error response dictionary with matches, total, error, and problem fields.
-    """
-    problem = error.to_problem_details(instance=operation)
-    with with_fields(
-        LOGGER,
-        component=COMPONENT_NAME,
-        operation=operation,
-        error_code=error.code.value,
-    ) as adapter:
-        adapter.log(error.log_level, error.message, extra={"context": error.context})
-
-    return {
-        "matches": [],
-        "total": 0,
-        "error": error.message,
-        "problem": problem,
     }
 
 

@@ -73,7 +73,7 @@ def test_query_by_uri_supports_unlimited_results(tmp_path) -> None:
     # DuckDB doesn't support parameterized CREATE VIEW, so we use string formatting with sanitized input
     parquet_expr = str(parquet_path).replace("'", "''")
     catalog.conn.execute(
-        f"CREATE OR REPLACE VIEW chunks AS SELECT * FROM read_parquet('{parquet_expr}')"  # noqa: S608
+        f"CREATE OR REPLACE VIEW chunks AS SELECT * FROM read_parquet('{parquet_expr}')"
     )
 
     limited = catalog.query_by_uri("example.py", limit=1)

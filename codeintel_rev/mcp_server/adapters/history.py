@@ -11,10 +11,8 @@ from typing import TYPE_CHECKING
 
 import git.exc
 
-from codeintel_rev.io.path_utils import (
-    PathOutsideRepositoryError,
-    resolve_within_repo,
-)
+from codeintel_rev.errors import GitOperationError
+from codeintel_rev.io.path_utils import resolve_within_repo
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -50,17 +48,24 @@ async def blame_range(
     Returns
     -------
     dict
-        Dictionary with "blame" key containing list of GitBlameEntry dicts,
-        or "error" key if operation failed.
+        Dictionary with "blame" key containing list of GitBlameEntry dicts.
+
+    Raises
+    ------
+    PathOutsideRepositoryError
+        If path escapes repository root (raised by resolve_within_repo).
+    FileNotFoundError
+        If file doesn't exist (raised by resolve_within_repo or AsyncGitClient).
+    GitOperationError
+        If Git blame operation fails.
 
     Examples
     --------
     >>> result = blame_range(context, "README.md", 1, 10)
     >>> isinstance(result["blame"], list)
     True
-    >>> if "blame" in result:
-    ...     entry = result["blame"][0]
-    ...     "line" in entry and "author" in entry
+    >>> entry = result["blame"][0]
+    >>> "line" in entry and "author" in entry
     True
 
     Notes
@@ -68,24 +73,11 @@ async def blame_range(
     Async Pattern:
     - Uses AsyncGitClient which wraps GitClient operations in asyncio.to_thread.
     - This prevents blocking the event loop and enables concurrent Git operations.
-
-    The function validates that the path is within the repository before calling
-    AsyncGitClient. Path validation errors return {"blame": [], "error": "..."}.
-    AsyncGitClient raises FileNotFoundError for files not in repository, which is
-    caught and converted to error dict format.
     """
     repo_root = context.paths.repo_root
-    try:
-        file_path = resolve_within_repo(repo_root, path, allow_nonexistent=False)
-    except PathOutsideRepositoryError as exc:
-        LOGGER.warning(
-            "Path outside repository",
-            extra={"path": path, "error": str(exc)},
-        )
-        return {"blame": [], "error": str(exc)}
-    except FileNotFoundError:
-        LOGGER.warning("File not found", extra={"path": path})
-        return {"blame": [], "error": "File not found"}
+
+    # Path validation (raises PathOutsideRepositoryError or FileNotFoundError)
+    file_path = resolve_within_repo(repo_root, path, allow_nonexistent=False)
 
     # Use relative path for AsyncGitClient (it expects paths relative to repo root)
     relative_path = str(file_path.relative_to(repo_root))
@@ -101,29 +93,24 @@ async def blame_range(
             start_line=start_line,
             end_line=end_line,
         )
-    except FileNotFoundError as exc:
-        LOGGER.warning(
-            "File not found for blame",
-            extra={"path": relative_path, "error": str(exc)},
-        )
-        return {"blame": [], "error": "File not found"}
-    except git.exc.GitCommandError:
-        LOGGER.exception(
-            "Git blame failed",
-            extra={"path": relative_path},
-        )
-        return {"blame": [], "error": "Git operation failed"}
-    else:
-        LOGGER.debug(
-            "Git blame completed",
-            extra={
-                "path": relative_path,
-                "start_line": start_line,
-                "end_line": end_line,
-                "entries_count": len(entries),
-            },
-        )
-        return {"blame": entries}
+    except git.exc.GitCommandError as exc:
+        error_msg = "Git blame failed"
+        raise GitOperationError(
+            error_msg,
+            path=relative_path,
+            git_command="blame",
+        ) from exc
+
+    LOGGER.debug(
+        "Git blame completed",
+        extra={
+            "path": relative_path,
+            "start_line": start_line,
+            "end_line": end_line,
+            "entries_count": len(entries),
+        },
+    )
+    return {"blame": entries}
 
 
 async def file_history(
@@ -151,17 +138,24 @@ async def file_history(
     -------
     dict
         Dictionary with "commits" key containing list of commit dicts with
-        fields: sha, full_sha, author, email, date, message. Or "error" key
-        if operation failed.
+        fields: sha, full_sha, author, email, date, message.
+
+    Raises
+    ------
+    PathOutsideRepositoryError
+        If path escapes repository root (raised by resolve_within_repo).
+    FileNotFoundError
+        If file doesn't exist (raised by resolve_within_repo or AsyncGitClient).
+    GitOperationError
+        If Git log operation fails.
 
     Examples
     --------
     >>> result = file_history(context, "README.md", limit=10)
     >>> isinstance(result["commits"], list)
     True
-    >>> if "commits" in result:
-    ...     commit = result["commits"][0]
-    ...     "sha" in commit and "author" in commit
+    >>> commit = result["commits"][0]
+    >>> "sha" in commit and "author" in commit
     True
 
     Notes
@@ -169,24 +163,11 @@ async def file_history(
     Async Pattern:
     - Uses AsyncGitClient which wraps GitClient operations in asyncio.to_thread.
     - This prevents blocking the event loop and enables concurrent Git operations.
-
-    The function validates that the path is within the repository before calling
-    AsyncGitClient. Path validation errors return {"commits": [], "error": "..."}.
-    AsyncGitClient raises FileNotFoundError for files not in repository history,
-    which is caught and converted to error dict format.
     """
     repo_root = context.paths.repo_root
-    try:
-        file_path = resolve_within_repo(repo_root, path, allow_nonexistent=False)
-    except PathOutsideRepositoryError as exc:
-        LOGGER.warning(
-            "Path outside repository",
-            extra={"path": path, "error": str(exc)},
-        )
-        return {"commits": [], "error": str(exc)}
-    except FileNotFoundError:
-        LOGGER.warning("File not found", extra={"path": path})
-        return {"commits": [], "error": "File not found"}
+
+    # Path validation (raises PathOutsideRepositoryError or FileNotFoundError)
+    file_path = resolve_within_repo(repo_root, path, allow_nonexistent=False)
 
     # Use relative path for AsyncGitClient (it expects paths relative to repo root)
     relative_path = str(file_path.relative_to(repo_root))
@@ -198,24 +179,19 @@ async def file_history(
 
     try:
         commits = await context.async_git_client.file_history(path=relative_path, limit=limit)
-    except FileNotFoundError as exc:
-        LOGGER.warning(
-            "File not found for history",
-            extra={"path": relative_path, "error": str(exc)},
-        )
-        return {"commits": [], "error": "File not found"}
-    except git.exc.GitCommandError:
-        LOGGER.exception(
-            "Git log failed",
-            extra={"path": relative_path},
-        )
-        return {"commits": [], "error": "Git operation failed"}
-    else:
-        LOGGER.debug(
-            "Git history completed",
-            extra={"path": relative_path, "limit": limit, "commits_count": len(commits)},
-        )
-        return {"commits": commits}
+    except git.exc.GitCommandError as exc:
+        error_msg = "Git log failed"
+        raise GitOperationError(
+            error_msg,
+            path=relative_path,
+            git_command="log",
+        ) from exc
+
+    LOGGER.debug(
+        "Git history completed",
+        extra={"path": relative_path, "limit": limit, "commits_count": len(commits)},
+    )
+    return {"commits": commits}
 
 
 __all__ = ["blame_range", "file_history"]

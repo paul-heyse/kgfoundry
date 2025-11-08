@@ -10,6 +10,9 @@ import pytest
 from codeintel_rev.mcp_server.adapters.text_search import search_text
 from codeintel_rev.mcp_server.schemas import ScopeIn
 
+from kgfoundry_common.errors import VectorSearchError
+from kgfoundry_common.subprocess_utils import SubprocessError, SubprocessTimeoutError
+
 
 @pytest.fixture
 def mock_context(tmp_path: Path) -> Mock:
@@ -157,3 +160,70 @@ def test_search_text_explicit_globs_override_scope(mock_context: Mock) -> None:
         assert "src/**" not in iglob_values
         assert "!**/*.pyc" not in iglob_values
         assert result["matches"][0]["path"].endswith("tests/integration/case.py")
+
+
+# ==================== Error Handling Tests ====================
+
+
+def test_search_text_timeout_error(mock_context: Mock) -> None:
+    """Test search_text raises VectorSearchError on timeout."""
+    scope: ScopeIn = {}
+
+    with (
+        patch(
+            "codeintel_rev.mcp_server.adapters.text_search.get_session_id",
+            return_value="session-timeout",
+        ),
+        patch(
+            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope", return_value=scope
+        ),
+        patch("codeintel_rev.mcp_server.adapters.text_search.run_subprocess") as mock_run,
+    ):
+        mock_run.side_effect = SubprocessTimeoutError(
+            "Search timeout", command=["rg"], timeout_seconds=30
+        )
+
+        with pytest.raises(VectorSearchError, match="Search timeout"):
+            search_text(mock_context, "query", max_results=5)
+
+
+def test_search_text_subprocess_error(mock_context: Mock) -> None:
+    """Test search_text raises VectorSearchError on subprocess error."""
+    scope: ScopeIn = {}
+
+    with (
+        patch(
+            "codeintel_rev.mcp_server.adapters.text_search.get_session_id",
+            return_value="session-error",
+        ),
+        patch(
+            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope", return_value=scope
+        ),
+        patch("codeintel_rev.mcp_server.adapters.text_search.run_subprocess") as mock_run,
+    ):
+        mock_run.side_effect = SubprocessError(
+            "Command failed", returncode=2, stderr="Error message"
+        )
+
+        with pytest.raises(VectorSearchError, match="Command failed"):
+            search_text(mock_context, "query", max_results=5)
+
+
+def test_search_text_value_error(mock_context: Mock) -> None:
+    """Test search_text raises VectorSearchError on ValueError."""
+    scope: ScopeIn = {}
+
+    with (
+        patch(
+            "codeintel_rev.mcp_server.adapters.text_search.get_session_id",
+            return_value="session-value-error",
+        ),
+        patch(
+            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope", return_value=scope
+        ),
+        patch("codeintel_rev.mcp_server.adapters.text_search.run_subprocess") as mock_run,
+    ):
+        mock_run.side_effect = ValueError("Invalid query")
+
+        with pytest.raises(VectorSearchError, match="Invalid query"):
+            search_text(mock_context, "query", max_results=5)

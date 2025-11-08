@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from codeintel_rev.app.config_context import ApplicationContext, ResolvedPaths
-from codeintel_rev.app.scope_registry import ScopeRegistry
 from codeintel_rev.app.middleware import session_id_var
+from codeintel_rev.app.scope_registry import ScopeRegistry
 from codeintel_rev.config.settings import (
     IndexConfig,
     PathsConfig,
@@ -121,7 +121,6 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
 @pytest.fixture
 def mock_session_id() -> Iterator[str]:
     """Provide a session ID bound to middleware context vars for adapter calls."""
-
     session_id = "test-session"
     token = session_id_var.set(session_id)
     try:

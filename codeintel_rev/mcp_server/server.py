@@ -14,6 +14,7 @@ from codeintel_rev.mcp_server.adapters import files as files_adapter
 from codeintel_rev.mcp_server.adapters import history as history_adapter
 from codeintel_rev.mcp_server.adapters import semantic as semantic_adapter
 from codeintel_rev.mcp_server.adapters import text_search as text_search_adapter
+from codeintel_rev.mcp_server.error_handling import handle_adapter_errors
 from codeintel_rev.mcp_server.schemas import AnswerEnvelope, ScopeIn
 
 # Create FastMCP instance
@@ -73,6 +74,10 @@ def set_scope(scope: ScopeIn) -> dict:
 
 
 @mcp.tool()
+@handle_adapter_errors(
+    operation="files:list_paths",
+    empty_result={"items": [], "total": 0, "truncated": False},
+)
 async def list_paths(
     path: str | None = None,
     include_globs: list[str] | None = None,
@@ -80,6 +85,9 @@ async def list_paths(
     max_results: int = 1000,
 ) -> dict:
     """List files in scope (async).
+
+    Error handling is automatic via decorator. All exceptions are caught
+    and converted to unified error envelopes with Problem Details.
 
     Parameters
     ----------
@@ -95,7 +103,8 @@ async def list_paths(
     Returns
     -------
     dict
-        File listing with paths.
+        File listing with paths. On error, returns error envelope with
+        empty result fields and Problem Details.
     """
     context = get_context()
     return await files_adapter.list_paths(
@@ -108,12 +117,19 @@ async def list_paths(
 
 
 @mcp.tool()
+@handle_adapter_errors(
+    operation="files:open_file",
+    empty_result={"path": "", "content": "", "lines": 0, "size": 0},
+)
 def open_file(
     path: str,
     start_line: int | None = None,
     end_line: int | None = None,
 ) -> dict:
     """Read file content.
+
+    Error handling is automatic via decorator. All exceptions are caught
+    and converted to unified error envelopes with Problem Details.
 
     Parameters
     ----------
@@ -127,7 +143,8 @@ def open_file(
     Returns
     -------
     dict
-        File content and metadata.
+        File content and metadata. On error, returns error envelope with
+        empty result fields and Problem Details.
     """
     context = get_context()
     return files_adapter.open_file(context, path, start_line, end_line)
@@ -137,6 +154,10 @@ def open_file(
 
 
 @mcp.tool()
+@handle_adapter_errors(
+    operation="search:text",
+    empty_result={"matches": [], "total": 0, "truncated": False},
+)
 def search_text(
     query: str,
     *,
@@ -146,6 +167,9 @@ def search_text(
     max_results: int = 50,
 ) -> dict:
     """Fast text search (ripgrep-like).
+
+    Error handling is automatic via decorator. All exceptions are caught
+    and converted to unified error envelopes with Problem Details.
 
     Parameters
     ----------
@@ -163,7 +187,8 @@ def search_text(
     Returns
     -------
     dict
-        Search matches.
+        Search matches. On error, returns error envelope with empty result
+        fields and Problem Details.
     """
     context = get_context()
     return text_search_adapter.search_text(
@@ -177,11 +202,18 @@ def search_text(
 
 
 @mcp.tool()
+@handle_adapter_errors(
+    operation="search:semantic",
+    empty_result={"findings": [], "answer": "", "confidence": 0.0},
+)
 async def semantic_search(
     query: str,
     limit: int = 20,
 ) -> AnswerEnvelope:
     """Semantic code search using embeddings.
+
+    Error handling is automatic via decorator. All exceptions are caught
+    and converted to unified error envelopes with Problem Details.
 
     Parameters
     ----------
@@ -193,7 +225,8 @@ async def semantic_search(
     Returns
     -------
     AnswerEnvelope
-        Search results with findings.
+        Search results with findings. On error, returns error envelope with
+        empty result fields and Problem Details.
     """
     context = get_context()
     return await semantic_adapter.semantic_search(context, query, limit)
@@ -295,12 +328,19 @@ def references_at(
 
 
 @mcp.tool()
+@handle_adapter_errors(
+    operation="git:blame_range",
+    empty_result={"blame": []},
+)
 async def blame_range(
     path: str,
     start_line: int,
     end_line: int,
 ) -> dict:
     """Git blame for line range (async).
+
+    Error handling is automatic via decorator. All exceptions are caught
+    and converted to unified error envelopes with Problem Details.
 
     Parameters
     ----------
@@ -314,18 +354,26 @@ async def blame_range(
     Returns
     -------
     dict
-        Blame entries for each line.
+        Blame entries for each line. On error, returns error envelope with
+        empty result fields and Problem Details.
     """
     context = get_context()
     return await history_adapter.blame_range(context, path, start_line, end_line)
 
 
 @mcp.tool()
+@handle_adapter_errors(
+    operation="git:file_history",
+    empty_result={"commits": []},
+)
 async def file_history(
     path: str,
     limit: int = 50,
 ) -> dict:
     """Get file commit history (async).
+
+    Error handling is automatic via decorator. All exceptions are caught
+    and converted to unified error envelopes with Problem Details.
 
     Parameters
     ----------
@@ -337,7 +385,8 @@ async def file_history(
     Returns
     -------
     dict
-        Commit history.
+        Commit history. On error, returns error envelope with empty result
+        fields and Problem Details.
     """
     context = get_context()
     return await history_adapter.file_history(context, path, limit)

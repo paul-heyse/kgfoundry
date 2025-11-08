@@ -36,7 +36,6 @@ def get_service_context() -> ApplicationContext:
     instance so that adapters share the same settings, resolved paths, and
     long-lived clients.
     """
-
     global _CACHED_CONTEXT
     if _CACHED_CONTEXT is None:
         with _CONTEXT_LOCK:
@@ -52,7 +51,6 @@ def reset_service_context() -> None:
     between runs. The next call to :func:`get_service_context` will recreate the
     context from the latest configuration.
     """
-
     global _CACHED_CONTEXT
     with _CONTEXT_LOCK:
         _CACHED_CONTEXT = None

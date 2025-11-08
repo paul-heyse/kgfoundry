@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from codeintel_rev.app.middleware import get_session_id
+from codeintel_rev.errors import FileReadError, InvalidLineRangeError
 from codeintel_rev.io.path_utils import (
-    PathOutsideRepositoryError,
     resolve_within_repo,
 )
 from codeintel_rev.mcp_server.schemas import ScopeIn
@@ -165,7 +165,7 @@ async def list_paths(
     )
 
 
-def _list_paths_sync(  # noqa: C901, PLR0912, PLR0914 - pre-existing complexity from directory traversal logic + scope integration
+def _list_paths_sync(  # noqa: C901, PLR0912, PLR0914 - PathOutsideRepositoryError raised by resolve_within_repo; pre-existing complexity
     context: ApplicationContext,
     path: str | None = None,
     include_globs: list[str] | None = None,
@@ -195,11 +195,19 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0914 - pre-existing complexity 
     -------
     dict
         File listing with paths and metadata.
+
+    Raises
+    ------
+    PathOutsideRepositoryError
+        If path escapes repository root (raised by resolve_within_repo).
+    FileNotFoundError
+        If path doesn't exist or is not a directory.
     """
     repo_root = context.paths.repo_root
-    search_root, error = _resolve_search_root(repo_root, path)
+    search_root = _resolve_search_root(repo_root, path)
     if search_root is None:
-        return {"items": [], "total": 0, "error": error or "Path not found or not a directory"}
+        error_msg = "Path not found or not a directory"
+        raise FileNotFoundError(error_msg)
 
     # Retrieve session scope and merge with explicit parameters
     session_id = get_session_id()
@@ -317,7 +325,7 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0914 - pre-existing complexity 
     }
 
 
-def open_file(  # noqa: PLR0911 - pre-existing complexity from line validation logic
+def open_file(
     context: ApplicationContext,
     path: str,
     start_line: int | None = None,
@@ -339,9 +347,18 @@ def open_file(  # noqa: PLR0911 - pre-existing complexity from line validation l
     Returns
     -------
     dict
-        File content and metadata. When the requested line bounds are invalid,
-        an ``{"error": ...}`` payload describing the constraint violation is
-        returned instead of file content.
+        File content and metadata with keys: path, content, lines, size.
+
+    Raises
+    ------
+    PathOutsideRepositoryError
+        If path escapes repository root (raised by resolve_within_repo).
+    FileNotFoundError
+        If file doesn't exist (raised by resolve_within_repo) or is not a file.
+    FileReadError
+        If file is binary or has encoding issues.
+    InvalidLineRangeError
+        If line range parameters are invalid.
 
     Notes
     -----
@@ -357,48 +374,53 @@ def open_file(  # noqa: PLR0911 - pre-existing complexity from line validation l
     True
     """
     repo_root = context.paths.repo_root
-    try:
-        file_path = resolve_within_repo(
-            repo_root,
-            path,
-            allow_nonexistent=False,
-        )
-    except PathOutsideRepositoryError as exc:
-        return {"error": str(exc), "path": path}
-    except FileNotFoundError:
-        return {"error": "File not found", "path": path}
 
+    # Path validation (raises PathOutsideRepositoryError or FileNotFoundError)
+    file_path = resolve_within_repo(repo_root, path, allow_nonexistent=False)
+
+    # File type check
     if not file_path.is_file():
-        return {"error": "Not a file", "path": path}
+        error_msg = f"Not a file: {path}"
+        raise FileNotFoundError(error_msg)
 
+    # Read content (raises UnicodeDecodeError → wrapped by decorator)
     try:
         content = file_path.read_text(encoding="utf-8")
-    except UnicodeDecodeError:
-        return {"error": "Binary file or encoding error", "path": path}
+    except UnicodeDecodeError as exc:
+        error_msg = "Binary file or encoding error"
+        raise FileReadError(error_msg, path=path) from exc
 
-    # Validate and slice lines if requested
+    # Line validation (raise typed exceptions)
     if start_line is not None and start_line <= 0:
-        return {
-            "error": "start_line must be a positive integer",
-            "path": path,
-        }
+        error_msg = "start_line must be a positive integer"
+        raise InvalidLineRangeError(
+            error_msg,
+            path=path,
+            line_range=(start_line, end_line),
+        )
     if end_line is not None and end_line <= 0:
-        return {
-            "error": "end_line must be a positive integer",
-            "path": path,
-        }
+        error_msg = "end_line must be a positive integer"
+        raise InvalidLineRangeError(
+            error_msg,
+            path=path,
+            line_range=(start_line, end_line),
+        )
     if start_line is not None and end_line is not None and start_line > end_line:
-        return {
-            "error": "start_line must be less than or equal to end_line",
-            "path": path,
-        }
+        error_msg = "start_line must be less than or equal to end_line"
+        raise InvalidLineRangeError(
+            error_msg,
+            path=path,
+            line_range=(start_line, end_line),
+        )
 
+    # Line slicing logic (pure domain logic)
     if start_line is not None or end_line is not None:
         lines = content.splitlines(keepends=True)
         start_idx = (start_line - 1) if start_line is not None else 0
         end_idx = end_line if end_line is not None else len(lines)
         content = "".join(lines[start_idx:end_idx])
 
+    # Success case
     return {
         "path": path,
         "content": content,
@@ -410,22 +432,38 @@ def open_file(  # noqa: PLR0911 - pre-existing complexity from line validation l
 __all__ = ["list_paths", "open_file", "set_scope"]
 
 
-def _resolve_search_root(repo_root: Path, requested: str | None) -> tuple[Path | None, str | None]:
+def _resolve_search_root(repo_root: Path, requested: str | None) -> Path | None:
+    """Resolve search root path, raising exceptions on error.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory.
+    requested : str | None
+        Requested path (None = root).
+
+    Returns
+    -------
+    Path | None
+        Resolved search root path, or None if path doesn't exist or is not a directory.
+
+    Raises
+    ------
+    PathOutsideRepositoryError
+        If path escapes repository root (raised by resolve_within_repo).
+    FileNotFoundError
+        If path doesn't exist (raised by resolve_within_repo).
+    """
     if requested is None:
-        return repo_root, None
-    try:
-        search_root = resolve_within_repo(
-            repo_root,
-            requested,
-            allow_nonexistent=False,
-        )
-    except PathOutsideRepositoryError as exc:
-        return None, str(exc)
-    except FileNotFoundError:
-        return None, "Path not found or not a directory"
+        return repo_root
+
+    # Raises PathOutsideRepositoryError or FileNotFoundError
+    search_root = resolve_within_repo(repo_root, requested, allow_nonexistent=False)
+
     if not search_root.is_dir():
-        return None, "Path not found or not a directory"
-    return search_root, None
+        return None
+
+    return search_root
 
 
 def _matches_any(target: str, patterns: Sequence[str]) -> bool:

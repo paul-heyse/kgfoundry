@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import sys
 import types
-from pathlib import Path
 
 import pytest
 
@@ -60,7 +59,9 @@ def test_open_file_rejects_negative_bounds(mock_application_context) -> None:
     repo_root = mock_application_context.paths.repo_root
     (repo_root / "file.txt").write_text("line1\nline2\n", encoding="utf-8")
 
-    result = files_adapter.open_file(mock_application_context, "file.txt", start_line=-1, end_line=2)
+    result = files_adapter.open_file(
+        mock_application_context, "file.txt", start_line=-1, end_line=2
+    )
     _expect(
         condition="error" in result,
         message="Expected an error payload for negative bounds",

@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 from codeintel_rev.mcp_server.adapters.semantic import semantic_search
 from codeintel_rev.mcp_server.schemas import ScopeIn
 
+from kgfoundry_common.errors import EmbeddingError, VectorSearchError
+
 
 @pytest.fixture(autouse=True)
 def _stub_metrics(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -632,3 +634,78 @@ async def test_semantic_search_no_scope() -> None:
 
     # Verify query_by_ids was called (not query_by_filters)
     # This is verified by the fact that all chunks are returned
+
+
+# ==================== Error Handling Tests ====================
+
+
+async def test_semantic_search_faiss_not_ready() -> None:
+    """Test semantic_search raises VectorSearchError when FAISS is not ready."""
+    faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
+    context = StubContext(
+        faiss_manager=faiss_manager,
+        limits=[],
+        error="Index not built",
+        catalog_chunks=None,
+    )
+
+    with (
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
+            return_value="test-session-error",
+        ),
+        patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+        pytest.raises(VectorSearchError, match="Index not built"),
+    ):
+        await semantic_search(cast("ApplicationContext", context), "query", limit=10)
+
+
+async def test_semantic_search_embedding_error() -> None:
+    """Test semantic_search raises EmbeddingError when embedding fails."""
+    faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
+    context = StubContext(
+        faiss_manager=faiss_manager,
+        limits=[],
+        error=None,
+        catalog_chunks=None,
+    )
+
+    with (
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
+            return_value="test-session-embedding-error",
+        ),
+        patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+        pytest.raises(EmbeddingError, match="vLLM service unavailable"),
+    ):
+        await semantic_search(cast("ApplicationContext", context), "query", limit=10)
+
+
+async def test_semantic_search_faiss_search_error() -> None:
+    """Test semantic_search raises VectorSearchError when FAISS search fails."""
+    faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
+
+    def failing_search(
+        _query: np.ndarray, *, _k: int, nprobe: int = 128
+    ) -> tuple[np.ndarray, np.ndarray]:
+        error_msg = "FAISS search failed"
+        raise RuntimeError(error_msg)
+
+    faiss_manager.search = failing_search  # type: ignore[assignment]
+
+    context = StubContext(
+        faiss_manager=faiss_manager,
+        limits=[],
+        error=None,
+        catalog_chunks=None,
+    )
+
+    with (
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
+            return_value="test-session-search-error",
+        ),
+        patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+        pytest.raises(VectorSearchError, match="FAISS search failed"),
+    ):
+        await semantic_search(cast("ApplicationContext", context), "query", limit=10)

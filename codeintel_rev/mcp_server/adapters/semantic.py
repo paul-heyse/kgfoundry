@@ -21,10 +21,9 @@ from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.vllm_client import VLLMClient
 from codeintel_rev.mcp_server.schemas import AnswerEnvelope, Finding, MethodInfo, ScopeIn
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
-from kgfoundry_common.errors import EmbeddingError, KgFoundryError, VectorSearchError
-from kgfoundry_common.logging import get_logger, with_fields
+from kgfoundry_common.errors import EmbeddingError, VectorSearchError
+from kgfoundry_common.logging import get_logger
 from kgfoundry_common.observability import DurationObservation, MetricsProvider, observe_duration
-from kgfoundry_common.problem_details import ProblemDetails
 
 if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
@@ -106,6 +105,13 @@ async def semantic_search(
     AnswerEnvelope
         Semantic search response payload with findings and applied scope.
 
+    Raises
+    ------
+    VectorSearchError
+        If FAISS search fails or index is not available.
+    EmbeddingError
+        If embedding generation fails.
+
     Examples
     --------
     Basic usage:
@@ -171,24 +177,18 @@ def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914
         ready, faiss_limits, faiss_error = context.ensure_faiss_ready()
         limits_metadata = [*faiss_limits, *truncation_messages]
         if not ready:
-            failure_limits = [*limits_metadata, "FAISS index not available"]
-            error = VectorSearchError(
+            observation.mark_error()
+            raise VectorSearchError(
                 faiss_error or "Semantic search not available - index not built",
                 context={"faiss_index": str(context.paths.faiss_index)},
             )
-            observation.mark_error()
-            return _error_envelope(error, limits=failure_limits)
 
         embedding, embed_error = _embed_query(context.vllm_client, query)
         if embedding is None or embed_error is not None:
-            error = EmbeddingError(
+            observation.mark_error()
+            raise EmbeddingError(
                 embed_error or "Embedding service unavailable",
                 context={"vllm_url": context.settings.vllm.base_url},
-            )
-            observation.mark_error()
-            return _error_envelope(
-                error,
-                limits=[*limits_metadata, "vLLM embedding service error"],
             )
 
         has_include_globs = bool(scope and scope.get("include_globs"))
@@ -238,15 +238,11 @@ def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914
             nprobe=context.settings.index.faiss_nprobe,
         )
         if search_exc is not None:
-            error = VectorSearchError(
+            observation.mark_error()
+            raise VectorSearchError(
                 str(search_exc),
                 cause=search_exc,
                 context={"faiss_index": str(context.paths.faiss_index)},
-            )
-            observation.mark_error()
-            return _error_envelope(
-                error,
-                limits=[*limits_metadata, "FAISS search error"],
             )
 
         # Hydrate findings with scope filtering if scope has filters
@@ -257,25 +253,14 @@ def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914
             scope=scope,
         )
         if hydrate_exc is not None:
-            failure_limits = [*limits_metadata, "DuckDB hydration error"]
-            error = VectorSearchError(
+            observation.mark_error()
+            raise VectorSearchError(
                 str(hydrate_exc),
                 cause=hydrate_exc,
                 context={
                     "duckdb_path": str(context.paths.duckdb_path),
                     "vectors_dir": str(context.paths.vectors_dir),
                 },
-            )
-            observation.mark_error()
-            return _error_envelope(
-                error,
-                limits=failure_limits,
-                method=_build_method(
-                    len(findings),
-                    requested_limit,
-                    effective_limit,
-                    start_time,
-                ),
             )
 
         observation.mark_success()
@@ -475,50 +460,6 @@ def _hydrate_findings(
         return findings, exc
 
     return findings, None
-
-
-def _error_envelope(
-    error: KgFoundryError,
-    *,
-    limits: Sequence[str] | None,
-    method: MethodInfo | None = None,
-) -> AnswerEnvelope:
-    """Build an error envelope including Problem Details metadata.
-
-    Parameters
-    ----------
-    error : KgFoundryError
-        Error to convert to envelope.
-    limits : Sequence[str] | None
-        Search limitations or warnings.
-    method : MethodInfo | None, optional
-        Retrieval method metadata. Defaults to None.
-
-    Returns
-    -------
-    AnswerEnvelope
-        Error envelope with Problem Details.
-    """
-    problem: ProblemDetails = error.to_problem_details(instance="semantic_search")
-    with with_fields(
-        LOGGER,
-        component=COMPONENT_NAME,
-        operation="semantic_search",
-        error_code=error.code.value,
-    ) as adapter:
-        adapter.log(error.log_level, error.message, extra={"context": error.context})
-
-    extras: dict[str, object] = {"problem": problem}
-    if limits:
-        extras["limits"] = list(limits)
-    if method is not None:
-        extras["method"] = method
-    return _make_envelope(
-        findings=[],
-        answer=error.message,
-        confidence=0.0,
-        extras=extras,
-    )
 
 
 def _build_method(

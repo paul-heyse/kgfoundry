@@ -162,6 +162,9 @@ class ErrorCode(StrEnum):
     RUNTIME_ERROR = "runtime-error"
     RESOURCE_UNAVAILABLE = "resource-unavailable"
     SESSION_ERROR = "session-error"
+    FILE_OPERATION_ERROR = "file-operation-error"
+    GIT_OPERATION_ERROR = "git-operation-error"
+    INVALID_PARAMETER = "invalid-parameter"
 
     # Knowledge Graph & Ontology (6xx)
     ONTOLOGY_PARSE_ERROR = "ontology-parse-error"
