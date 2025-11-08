@@ -41,6 +41,11 @@ Production-grade MCP server for AI-assisted code review with SCIP indexing, sema
   explains the shared metrics helper, naming conventions, resource cleanup, and
   RFC 9457 error handling expectations.
 
+### Sparse Retrieval
+
+- [BM25 Architecture Guide](docs/architecture/bm25.md)
+- [SPLADE Architecture Guide](docs/architecture/splade.md)
+
 ## Features
 
 - **SCIP-based Indexing**: Uses Sourcegraph SCIP for precise symbol information

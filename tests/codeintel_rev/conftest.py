@@ -12,7 +12,6 @@ import pytest
 
 os.environ.setdefault("FAISS_OPT_LEVEL", "generic")
 
-import tests.codeintel_rev._faiss_stub  # noqa: F401  # ensure FAISS stub is registered
 from codeintel_rev.app.config_context import ApplicationContext, ResolvedPaths
 from codeintel_rev.app.middleware import session_id_var
 from codeintel_rev.app.scope_store import ScopeStore
@@ -28,6 +27,8 @@ from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.vllm_client import VLLMClient
+
+import tests.codeintel_rev._faiss_stub  # noqa: F401  # ensure FAISS stub is registered
 
 
 class _FakeRedis:

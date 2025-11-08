@@ -8,6 +8,7 @@ import duckdb
 import pytest
 from codeintel_rev.app.main import app
 from fastapi.testclient import TestClient
+
 from tests.conftest import HAS_FAISS_SUPPORT
 
 

@@ -109,7 +109,9 @@ def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914
     start_time = perf_counter()
     with observe_duration("semantic_search", COMPONENT_NAME) as observation:
         scope_languages = cast("Sequence[str] | None", scope.get("languages")) if scope else None
-        scope_include_globs = cast("Sequence[str] | None", scope.get("include_globs")) if scope else None
+        scope_include_globs = (
+            cast("Sequence[str] | None", scope.get("include_globs")) if scope else None
+        )
 
         LOGGER.debug(
             "Semantic search with scope",

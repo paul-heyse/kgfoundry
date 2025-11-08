@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# ruff: noqa: ALL
 """
 SPLADE-v3 (ONNX, CPU) + BM25 with Pyserini — Unified Playbook
 

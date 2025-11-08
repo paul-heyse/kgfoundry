@@ -104,6 +104,7 @@ The configuration lifecycle follows this sequence during application startup:
 | `SPLADE_MAX_TERMS` | Maximum number of terms retained for expanded queries | `3000` | `2000` |
 | `SPLADE_MAX_CLAUSE` | Lucene Boolean clause limit applied while indexing | `4096` | `8192` |
 | `SPLADE_BATCH_SIZE` | Default batch size for SPLADE encoding commands | `32` | `16` |
+| `SPLADE_THREADS` | Default worker threads for SPLADE impact index builds | `8` | `12` |
 
 > **GPU warm-up tip:** On CPU-only workstations, export `SKIP_GPU_WARMUP=1` before running pytest to bypass the FAISS GPU smoke test. Drop the variable on CUDA-capable hosts so the warm-up coverage runs.
 
@@ -127,6 +128,21 @@ codeintel bm25 build-index --threads 8
 Both commands write CLI envelopes beneath `docs/_data/cli/bm25/` and produce
 metadata files in the configured directories. The default values shown in the
 table above are used when the CLI options are omitted.
+- **SPLADE maintenance** adds complementary commands:
+
+```console
+# export (optimized + quantized) ONNX artifacts
+codeintel splade export-onnx --quantization-config avx512
+
+# encode a JSONL corpus into JsonVectorCollection shards
+codeintel splade encode data/corpus.jsonl --batch-size 16
+
+# build the Lucene impact index from vectors
+codeintel splade build-index --vectors-dir data/splade_vectors
+```
+
+SPLADE commands emit envelopes under `docs/_data/cli/splade/` and attach the
+generated metadata files so automation can track build history alongside BM25.
 - **Hugging Face authentication**: The `naver/splade-v3` checkpoint is gated. Run
   `huggingface-cli login` (or set `HF_TOKEN`) on any machine that will export or encode SPLADE
   artifacts.

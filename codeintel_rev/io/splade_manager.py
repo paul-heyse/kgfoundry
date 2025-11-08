@@ -5,12 +5,15 @@ from __future__ import annotations
 import importlib
 import json
 import logging
+import math
 import os
 import shutil
+import sys
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TextIO
 
 import msgspec
 
@@ -18,11 +21,45 @@ from codeintel_rev.io.path_utils import resolve_within_repo
 from kgfoundry_common.subprocess_utils import run_subprocess
 
 if TYPE_CHECKING:
+    from typing import Protocol
+
     from codeintel_rev.config.settings import Settings
+
+    class _SparseEncoderProtocol(Protocol):
+        def encode_document(self, sentences: Sequence[str]) -> Sequence[object]: ...
+
+        def decode(
+            self,
+            embeddings: object,
+            top_k: int | None = None,
+        ) -> Sequence[Sequence[tuple[str, float]]]: ...
+
+    class _OptimizerFunction(Protocol):
+        def __call__(
+            self,
+            model: Any,
+            *,
+            optimization_config: str,
+            model_name_or_path: str,
+            push_to_hub: bool,
+            create_pr: bool,
+        ) -> None: ...
+
+    class _QuantizerFunction(Protocol):
+        def __call__(
+            self,
+            model: Any,
+            *,
+            quantization_config: str | None,
+            model_name_or_path: str,
+            push_to_hub: bool,
+            create_pr: bool,
+        ) -> None: ...
+
 
 try:  # pragma: no cover - optional dependency
     from sentence_transformers import SparseEncoder
-except Exception:  # pragma: no cover - handled at runtime
+except ImportError:  # pragma: no cover - handled at runtime
     SparseEncoder = None  # type: ignore[misc]
 
 try:  # pragma: no cover - optional dependency
@@ -30,7 +67,7 @@ try:  # pragma: no cover - optional dependency
         export_dynamic_quantized_onnx_model,
         export_optimized_onnx_model,
     )
-except Exception:  # pragma: no cover - handled at runtime
+except ImportError:  # pragma: no cover - handled at runtime
     export_dynamic_quantized_onnx_model = None  # type: ignore[misc]
     export_optimized_onnx_model = None  # type: ignore[misc]
 
@@ -89,6 +126,28 @@ class SpladeEncodingSummary(msgspec.Struct, frozen=True):
     shard_count: int
 
 
+class SpladeExportOptions(msgspec.Struct, frozen=True):
+    """Options controlling SPLADE ONNX export behaviour."""
+
+    model_id: str | None = None
+    provider: str | None = None
+    file_name: str | None = None
+    optimize: bool = True
+    quantize: bool = True
+    quantization_config: str = "avx2"
+
+
+class SpladeEncodeOptions(msgspec.Struct, frozen=True):
+    """Options controlling SPLADE corpus encoding."""
+
+    output_dir: str | Path | None = None
+    batch_size: int | None = None
+    quantization: int | None = None
+    shard_size: int = 100_000
+    provider: str | None = None
+    onnx_file: str | None = None
+
+
 class SpladeBuildOptions(msgspec.Struct, frozen=True):
     """Options controlling SPLADE Lucene impact index builds."""
 
@@ -113,6 +172,31 @@ class SpladeIndexMetadata(msgspec.Struct, frozen=True):
     generator: str
 
 
+@dataclass
+class _ShardState:
+    """Mutable encoding state for shard rotation."""
+
+    vectors_dir: Path
+    quantization: int
+    shard_size: int
+    doc_count: int = 0
+    shard_index: int = 0
+    shard_handle: TextIO | None = None
+    shard_count: int = 0
+
+
+@dataclass
+class _ExportContext:
+    """Context for SPLADE export operations."""
+
+    model_id: str
+    model_dir: Path
+    onnx_dir: Path
+    provider: str
+    target_path: Path
+    options: SpladeExportOptions
+
+
 def _require_sparse_encoder() -> type:
     if SparseEncoder is None:  # pragma: no cover - defensive
         msg = (
@@ -123,7 +207,7 @@ def _require_sparse_encoder() -> type:
     return SparseEncoder  # type: ignore[return-value]
 
 
-def _require_export_helpers() -> tuple[object, object]:
+def _require_export_helpers() -> tuple[_OptimizerFunction, _QuantizerFunction]:
     if export_optimized_onnx_model is None or export_dynamic_quantized_onnx_model is None:
         msg = (
             "SPLADE export helpers are unavailable. Upgrade sentence-transformers to a "
@@ -171,7 +255,7 @@ def _quantize_tokens(pairs: Sequence[tuple[str, float]], quantization: int) -> d
     for token, weight in pairs:
         if weight <= 0:
             continue
-        quantized = int(round(weight * quantization))
+        quantized = math.floor(weight * float(quantization) + 0.5)
         if quantized > 0:
             vector[token] = quantized
     return vector
@@ -179,11 +263,224 @@ def _quantize_tokens(pairs: Sequence[tuple[str, float]], quantization: int) -> d
 
 def _iter_corpus(path: Path) -> Iterable[dict[str, object]]:
     with path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
+        for raw_line in handle:
+            line = raw_line.strip()
             if not line:
                 continue
             yield json.loads(line)
+
+
+def _open_writer(vectors_dir: Path, index: int) -> tuple[Path, TextIO]:
+    """Create a shard writer for the given shard index.
+
+    Returns
+    -------
+    tuple[Path, TextIO]
+        The shard path and an open text handle ready for writing.
+    """
+    shard_path = vectors_dir / f"part-{index:05d}.jsonl"
+    return shard_path, shard_path.open("w", encoding="utf-8")
+
+
+def _flush_batch(
+    encoder: _SparseEncoderProtocol,
+    batch: list[tuple[str, str]],
+    state: _ShardState,
+) -> None:
+    """Encode and persist the current batch of documents.
+
+    Raises
+    ------
+    RuntimeError
+        If a shard handle unexpectedly becomes unavailable.
+    """
+    if not batch:
+        return
+
+    texts = [text for _, text in batch]
+    embeddings = encoder.encode_document(texts)
+    decoded = encoder.decode(embeddings, top_k=None)
+
+    for (doc_id, _), token_pairs in zip(batch, decoded, strict=True):
+        vector = _quantize_tokens(token_pairs, state.quantization)
+        if state.shard_handle is None:
+            _, handle = _open_writer(state.vectors_dir, state.shard_index)
+            state.shard_handle = handle
+            state.shard_count += 1
+        handle = state.shard_handle
+        if handle is None:  # pragma: no cover - defensive
+            msg = "Shard handle unexpectedly missing during encoding."
+            raise RuntimeError(msg)
+        handle.write(
+            json.dumps({"id": doc_id, "contents": "", "vector": vector}, ensure_ascii=False) + "\n"
+        )
+        state.doc_count += 1
+        if state.doc_count % state.shard_size == 0:
+            handle.close()
+            state.shard_handle = None
+            state.shard_index += 1
+
+    batch.clear()
+
+
+def _persist_encoding_metadata(
+    *,
+    state: _ShardState,
+    vectors_dir: Path,
+    source_path: Path,
+    batch_size: int,
+    provider: str,
+) -> SpladeEncodingSummary:
+    """Write metadata for an encoding run and return the summary.
+
+    Returns
+    -------
+    SpladeEncodingSummary
+        Summary describing the encoded corpus.
+    """
+    metadata = SpladeEncodingMetadata(
+        doc_count=state.doc_count,
+        shard_count=state.shard_count,
+        quantization=state.quantization,
+        batch_size=batch_size,
+        provider=provider,
+        vectors_dir=str(vectors_dir),
+        source_path=str(source_path),
+        prepared_at=datetime.now(UTC).isoformat(),
+        generator=GENERATOR_NAME,
+    )
+    metadata_path = vectors_dir / ENCODING_METADATA_FILENAME
+    _write_struct(metadata_path, metadata)
+    return SpladeEncodingSummary(
+        doc_count=state.doc_count,
+        vectors_dir=str(vectors_dir),
+        metadata_path=str(metadata_path),
+        shard_count=state.shard_count,
+    )
+
+
+def _encode_records(
+    *,
+    encoder: _SparseEncoderProtocol,
+    state: _ShardState,
+    batch: list[tuple[str, str]],
+    batch_size: int,
+    source_path: Path,
+) -> None:
+    """Stream records from disk, validate them, and flush in batches.
+
+    Raises
+    ------
+    TypeError
+        If corpus entries are missing identifiers or text fields.
+    """
+    for record in _iter_corpus(source_path):
+        doc_id = record.get("id")
+        contents = record.get("contents") or record.get("text")
+        if not isinstance(doc_id, str):
+            msg = "SPLADE corpus entries must include string 'id' fields"
+            raise TypeError(msg)
+        if not isinstance(contents, str):
+            msg = f"Document '{doc_id}' is missing textual contents"
+            raise TypeError(msg)
+        batch.append((doc_id, contents))
+        if len(batch) >= batch_size:
+            _flush_batch(encoder, batch, state)
+
+    _flush_batch(encoder, batch, state)
+
+
+def _optimize_export(
+    encoder: _SparseEncoderProtocol,
+    ctx: _ExportContext,
+) -> Path:
+    """Run graph optimization if requested and return the base ONNX path.
+
+    Returns
+    -------
+    Path
+        Path to the base ONNX artifact (optimized or original).
+    """
+    base_onnx = ctx.onnx_dir / "model.onnx"
+    if not ctx.options.optimize:
+        return base_onnx
+
+    optimizer, _quantizer = _require_export_helpers()
+    optimized_path = ctx.onnx_dir / "model_O3.onnx"
+    optimizer(
+        model=encoder,
+        optimization_config="O3",
+        model_name_or_path=str(ctx.model_dir),
+        push_to_hub=False,
+        create_pr=False,
+    )
+    return optimized_path if optimized_path.exists() else base_onnx
+
+
+def _quantize_export(
+    *,
+    encoder: _SparseEncoderProtocol,
+    ctx: _ExportContext,
+    base_onnx: Path,
+) -> bool:
+    """Apply dynamic quantization and ensure the target ONNX exists.
+
+    Returns
+    -------
+    bool
+        ``True`` if a quantized artifact was produced; otherwise ``False``.
+    """
+    target_path = ctx.target_path
+    options = ctx.options
+    if not options.quantize:
+        if base_onnx.exists() and not target_path.exists():
+            shutil.copy2(base_onnx, target_path)
+        return False
+
+    _optimizer, quantizer = _require_export_helpers()
+    quantizer(
+        model=encoder,
+        quantization_config=options.quantization_config,
+        model_name_or_path=str(ctx.model_dir),
+        push_to_hub=False,
+        create_pr=False,
+    )
+
+    if target_path.exists():
+        return True
+    if base_onnx.exists():
+        shutil.copy2(base_onnx, target_path)
+        return True
+    return False
+
+
+def _persist_export_metadata(
+    *,
+    ctx: _ExportContext,
+    quantized: bool,
+) -> SpladeExportSummary:
+    """Write export metadata and return the resulting summary.
+
+    Returns
+    -------
+    SpladeExportSummary
+        Summary describing the exported ONNX artifact.
+    """
+    metadata = SpladeArtifactMetadata(
+        model_id=ctx.model_id,
+        model_dir=str(ctx.model_dir),
+        onnx_dir=str(ctx.onnx_dir),
+        onnx_file=ctx.target_path.name,
+        provider=ctx.provider,
+        optimized=ctx.options.optimize,
+        quantized=quantized,
+        quantization_config=(ctx.options.quantization_config if ctx.options.quantize else None),
+        exported_at=datetime.now(UTC).isoformat(),
+        generator=GENERATOR_NAME,
+    )
+    metadata_path = ctx.onnx_dir / ARTIFACT_METADATA_FILENAME
+    _write_struct(metadata_path, metadata)
+    return SpladeExportSummary(onnx_file=str(ctx.target_path), metadata_path=str(metadata_path))
 
 
 class SpladeArtifactsManager:
@@ -197,52 +494,43 @@ class SpladeArtifactsManager:
 
     @property
     def model_dir(self) -> Path:
+        """Return the repository-relative directory containing saved SPLADE weights.
+
+        Returns
+        -------
+        Path
+            Absolute path to the configured SPLADE model directory.
+        """
         return resolve_within_repo(self._repo_root, self._config.model_dir)
 
     @property
     def onnx_dir(self) -> Path:
+        """Return the directory where exported ONNX artifacts are stored.
+
+        Returns
+        -------
+        Path
+            Absolute path to the configured ONNX artifacts directory.
+        """
         return resolve_within_repo(self._repo_root, self._config.onnx_dir)
 
-    def export_onnx(
-        self,
-        *,
-        optimize: bool = True,
-        quantize: bool = True,
-        quantization_config: str = "avx2",
-        provider: str | None = None,
-        model_id: str | None = None,
-        file_name: str | None = None,
-    ) -> SpladeExportSummary:
+    def export_onnx(self, options: SpladeExportOptions | None = None) -> SpladeExportSummary:
         """Export SPLADE ONNX artifacts and record metadata.
 
         Parameters
         ----------
-        optimize : bool, optional
-            Whether to run Sentence-Transformers' graph optimizer (``O3``) after export.
-        quantize : bool, optional
-            When ``True`` run dynamic quantization to produce an int8 ONNX variant.
-        quantization_config : str, optional
-            Quantization preset passed to Sentence-Transformers (e.g., ``avx2`` or ``arm64``).
-        provider : str | None, optional
-            ONNX Runtime execution provider used during export. Defaults to configured provider.
-        model_id : str | None, optional
-            Hugging Face model identifier. Defaults to the configured SPLADE model id.
-        file_name : str | None, optional
-            Override for the exported ONNX file name. Defaults to ``SPLADE_ONNX_FILE``.
+        options : SpladeExportOptions | None, optional
+            Overrides for model identifier, provider, and export behaviour.
 
         Returns
         -------
         SpladeExportSummary
             Summary describing the exported artifact and metadata path.
-
-        Raises
-        ------
-        RuntimeError
-            If the required Sentence-Transformers components are unavailable.
         """
+        opts = options or SpladeExportOptions()
         sparse_encoder_cls = _require_sparse_encoder()
-        model_id = model_id or self._config.model_id
-        provider = provider or self._config.provider
+        model_id = opts.model_id or self._config.model_id
+        provider = opts.provider or self._config.provider
         model_dir = self.model_dir
         onnx_dir = self.onnx_dir
         onnx_dir.mkdir(parents=True, exist_ok=True)
@@ -254,63 +542,23 @@ class SpladeArtifactsManager:
 
         encoder = sparse_encoder_cls(model_id, backend="onnx", model_kwargs={"provider": provider})
         encoder.save_pretrained(str(model_dir))
-
-        base_onnx = onnx_dir / "model.onnx"
-        if optimize:
-            optimized_path = onnx_dir / "model_O3.onnx"
-            optimizer, quantizer = _require_export_helpers()
-            optimizer(
-                model=encoder,
-                optimization_config="O3",
-                model_name_or_path=str(model_dir),
-                push_to_hub=False,
-                create_pr=False,
-            )
-            if optimized_path.exists():
-                base_onnx = optimized_path
-
-        target_file = file_name or self._config.onnx_file
-        target_path = onnx_dir / target_file
-
-        quantized = False
-        if quantize:
-            _optimizer, quantizer = _require_export_helpers()
-            quantizer(
-                model=encoder,
-                quantization_config=quantization_config,
-                model_name_or_path=str(model_dir),
-                push_to_hub=False,
-                create_pr=False,
-            )
-            # Some ST versions place the quantized file in onnx_dir automatically.
-            # If not present, copy base ONNX as a conservative fallback.
-            if target_path.exists():
-                quantized = True
-            elif base_onnx.exists():
-                shutil.copy2(base_onnx, target_path)
-                quantized = True
-        elif base_onnx.exists():
-            shutil.copy2(base_onnx, target_path)
-
-        metadata = SpladeArtifactMetadata(
+        ctx = _ExportContext(
             model_id=model_id,
-            model_dir=str(model_dir),
-            onnx_dir=str(onnx_dir),
-            onnx_file=target_file,
+            model_dir=model_dir,
+            onnx_dir=onnx_dir,
             provider=provider,
-            optimized=optimize,
-            quantized=quantized,
-            quantization_config=quantization_config if quantize else None,
-            exported_at=datetime.now(UTC).isoformat(),
-            generator=GENERATOR_NAME,
+            target_path=onnx_dir / (opts.file_name or self._config.onnx_file),
+            options=opts,
         )
-        metadata_path = onnx_dir / ARTIFACT_METADATA_FILENAME
-        _write_struct(metadata_path, metadata)
+        base_onnx = _optimize_export(encoder, ctx)
+        quantized = _quantize_export(encoder=encoder, ctx=ctx, base_onnx=base_onnx)
+
+        summary = _persist_export_metadata(ctx=ctx, quantized=quantized)
         self._logger.info(
             "Exported SPLADE artifacts",
-            extra={"onnx_file": str(target_path), "metadata": str(metadata_path)},
+            extra={"onnx_file": summary.onnx_file, "metadata": summary.metadata_path},
         )
-        return SpladeExportSummary(onnx_file=str(target_path), metadata_path=str(metadata_path))
+        return summary
 
 
 class SpladeEncoderService:
@@ -324,18 +572,59 @@ class SpladeEncoderService:
 
     @property
     def vectors_dir(self) -> Path:
+        """Return the directory that stores SPLADE JsonVectorCollection shards.
+
+        Returns
+        -------
+        Path
+            Absolute path to the configured vectors directory.
+        """
         return resolve_within_repo(self._repo_root, self._config.vectors_dir)
+
+    def _resolve_vectors_dir(self, override: str | Path | None) -> Path:
+        """Resolve the vectors directory override or fall back to the configured path.
+
+        Returns
+        -------
+        Path
+            Absolute path to the directory where encoded vectors will be written.
+        """
+        if override is None:
+            resolved = self.vectors_dir
+        else:
+            resolved = resolve_within_repo(self._repo_root, override)
+        resolved.mkdir(parents=True, exist_ok=True)
+        return resolved
+
+    def _build_encoder(self, *, provider: str, onnx_file: str | None) -> _SparseEncoderProtocol:
+        """Instantiate a Sentence-Transformers SparseEncoder using configured paths.
+
+        Returns
+        -------
+        _SparseEncoderProtocol
+            Encoder instance configured for the requested provider and ONNX artifact.
+        """
+        sparse_encoder_cls = _require_sparse_encoder()
+        model_dir = resolve_within_repo(self._repo_root, self._config.model_dir)
+        onnx_dir = resolve_within_repo(self._repo_root, self._config.onnx_dir)
+        candidate = onnx_dir / (onnx_file or self._config.onnx_file)
+        if not candidate.exists():
+            candidate = onnx_dir / self._config.onnx_file
+
+        model_kwargs: dict[str, str] = {"provider": provider}
+        if candidate.exists():
+            model_kwargs["file_name"] = _serialize_relative(candidate, model_dir)
+
+        return sparse_encoder_cls(
+            str(model_dir),
+            backend="onnx",
+            model_kwargs=model_kwargs,
+        )
 
     def encode_corpus(
         self,
         source: str | Path,
-        *,
-        output_dir: str | Path | None = None,
-        batch_size: int | None = None,
-        quantization: int | None = None,
-        shard_size: int = 100_000,
-        provider: str | None = None,
-        onnx_file: str | None = None,
+        options: SpladeEncodeOptions | None = None,
     ) -> SpladeEncodingSummary:
         """Encode ``source`` JSONL into SPLADE JsonVectorCollection shards.
 
@@ -343,18 +632,8 @@ class SpladeEncoderService:
         ----------
         source : str | Path
             Path to the JSONL corpus containing ``id`` and ``contents``/``text`` fields.
-        output_dir : str | Path | None, optional
-            Directory for emitted JsonVectorCollection shards. Defaults to configured directory.
-        batch_size : int | None, optional
-            Batch size used during encoding. Defaults to the configured SPLADE batch size.
-        quantization : int | None, optional
-            Integer scaling factor applied to decoded token weights. Defaults to configuration.
-        shard_size : int, optional
-            Maximum number of documents per shard file before rotating to the next shard.
-        provider : str | None, optional
-            ONNX Runtime execution provider used for inference. Defaults to configured provider.
-        onnx_file : str | None, optional
-            Specific ONNX file to load. Defaults to ``SPLADE_ONNX_FILE``.
+        options : SpladeEncodeOptions | None, optional
+            Overrides for output directory, batch size, quantization, provider, and ONNX file.
 
         Returns
         -------
@@ -363,142 +642,57 @@ class SpladeEncoderService:
 
         Raises
         ------
-        RuntimeError
-            If Sentence-Transformers is unavailable.
-        ValueError
-            If corpus entries are missing ``id`` or textual content fields.
-        FileNotFoundError
-            If the input corpus path does not exist.
+        TypeError
+            If corpus entries are missing identifiers or textual content.
         """
-        sparse_encoder_cls = _require_sparse_encoder()
+        opts = options or SpladeEncodeOptions()
 
         source_path = resolve_within_repo(self._repo_root, source, allow_nonexistent=False)
-        vectors_dir = (
-            resolve_within_repo(self._repo_root, output_dir)
-            if output_dir is not None
-            else self.vectors_dir
+        vectors_dir = self._resolve_vectors_dir(opts.output_dir)
+        batch_size = opts.batch_size or self._config.batch_size
+        provider = opts.provider or self._config.provider
+
+        encoder = self._build_encoder(provider=provider, onnx_file=opts.onnx_file)
+
+        state = _ShardState(
+            vectors_dir=vectors_dir,
+            quantization=opts.quantization or self._config.quantization,
+            shard_size=opts.shard_size,
         )
-        vectors_dir.mkdir(parents=True, exist_ok=True)
+        batch: list[tuple[str, str]] = []
 
-        batch_size = batch_size or self._config.batch_size
-        quantization = quantization or self._config.quantization
-        provider = provider or self._config.provider
+        try:
+            _encode_records(
+                encoder=encoder,
+                state=state,
+                batch=batch,
+                batch_size=batch_size,
+                source_path=source_path,
+            )
+        except TypeError as exc:
+            raise TypeError(str(exc)) from exc
 
-        model_dir = resolve_within_repo(self._repo_root, self._config.model_dir)
-        onnx_dir = resolve_within_repo(self._repo_root, self._config.onnx_dir)
-        resolved_onnx = onnx_dir / (onnx_file or self._config.onnx_file)
-        if not resolved_onnx.exists():
-            resolved_onnx = onnx_dir / self._config.onnx_file
+        if state.shard_handle is not None:
+            state.shard_handle.close()
+            state.shard_handle = None
 
-        model_kwargs = {"provider": provider}
-        if resolved_onnx.exists():
-            relative = _serialize_relative(resolved_onnx, model_dir)
-            model_kwargs["file_name"] = relative
-
-        self._logger.info(
-            "Encoding SPLADE corpus",
-            extra={
-                "source": str(source_path),
-                "vectors_dir": str(vectors_dir),
-                "batch_size": batch_size,
-                "quantization": quantization,
-                "provider": provider,
-            },
-        )
-
-        encoder = sparse_encoder_cls(
-            str(model_dir),
-            backend="onnx",
-            model_kwargs=model_kwargs,
-        )
-
-        doc_count = 0
-        shard_index = 0
-        shard_path: Path | None = None
-        shard_handle = None
-
-        def _open_writer(idx: int):
-            path = vectors_dir / f"part-{idx:05d}.jsonl"
-            return path, path.open("w", encoding="utf-8")
-
-        batch_ids: list[str] = []
-        batch_texts: list[str] = []
-        shard_count = 0
-
-        def _flush(current_ids: Sequence[str], current_texts: Sequence[str]) -> None:
-            nonlocal shard_index, shard_handle, shard_path, doc_count, shard_count
-            if not current_ids:
-                return
-            embeddings = encoder.encode_document(list(current_texts))
-            decoded = encoder.decode(embeddings, top_k=None)
-            for doc_id, token_pairs in zip(current_ids, decoded):
-                vector = _quantize_tokens(token_pairs, quantization)
-                if shard_handle is None:
-                    shard_path, shard_handle = _open_writer(shard_index)
-                    shard_count += 1
-                assert shard_handle is not None  # for type checker
-                shard_handle.write(
-                    json.dumps(
-                        {"id": doc_id, "contents": "", "vector": vector},
-                        ensure_ascii=False,
-                    )
-                    + "\n"
-                )
-                doc_count += 1
-                if doc_count % shard_size == 0:
-                    shard_handle.close()
-                    shard_handle = None
-                    shard_index += 1
-
-        for record in _iter_corpus(source_path):
-            doc_id = record.get("id")
-            contents = record.get("contents") or record.get("text")
-            if not isinstance(doc_id, str):
-                msg = "SPLADE corpus entries must include string 'id' fields"
-                raise ValueError(msg)
-            if not isinstance(contents, str):
-                msg = f"Document '{doc_id}' is missing textual contents"
-                raise ValueError(msg)
-            batch_ids.append(doc_id)
-            batch_texts.append(contents)
-            if len(batch_ids) >= batch_size:
-                _flush(batch_ids, batch_texts)
-                batch_ids.clear()
-                batch_texts.clear()
-
-        _flush(batch_ids, batch_texts)
-
-        if shard_handle is not None:
-            shard_handle.close()
-
-        metadata = SpladeEncodingMetadata(
-            doc_count=doc_count,
-            shard_count=shard_count,
-            quantization=quantization,
+        summary = _persist_encoding_metadata(
+            state=state,
+            vectors_dir=vectors_dir,
+            source_path=source_path,
             batch_size=batch_size,
             provider=provider,
-            vectors_dir=str(vectors_dir),
-            source_path=str(source_path),
-            prepared_at=datetime.now(UTC).isoformat(),
-            generator=GENERATOR_NAME,
         )
-        metadata_path = vectors_dir / ENCODING_METADATA_FILENAME
-        _write_struct(metadata_path, metadata)
 
         self._logger.info(
             "Encoded SPLADE corpus",
             extra={
-                "doc_count": doc_count,
-                "vectors_dir": str(vectors_dir),
-                "metadata": str(metadata_path),
+                "doc_count": summary.doc_count,
+                "vectors_dir": summary.vectors_dir,
+                "metadata": summary.metadata_path,
             },
         )
-        return SpladeEncodingSummary(
-            doc_count=doc_count,
-            vectors_dir=str(vectors_dir),
-            metadata_path=str(metadata_path),
-            shard_count=shard_count,
-        )
+        return summary
 
 
 class SpladeIndexManager:
@@ -512,10 +706,24 @@ class SpladeIndexManager:
 
     @property
     def vectors_dir(self) -> Path:
+        """Return the configured JsonVectorCollection directory.
+
+        Returns
+        -------
+        Path
+            Absolute path to the JsonVectorCollection directory used for indexing.
+        """
         return resolve_within_repo(self._repo_root, self._config.vectors_dir)
 
     @property
     def index_dir(self) -> Path:
+        """Return the configured Lucene impact index directory.
+
+        Returns
+        -------
+        Path
+            Absolute path to the Lucene impact index output directory.
+        """
         return resolve_within_repo(self._repo_root, self._config.index_dir)
 
     def build_index(self, options: SpladeBuildOptions | None = None) -> SpladeIndexMetadata:
@@ -535,10 +743,6 @@ class SpladeIndexManager:
         ------
         FileExistsError
             If the index directory already exists and ``overwrite`` is ``False``.
-        RuntimeError
-            If Sentence-Transformers components required for metadata lookup are unavailable.
-        SubprocessError
-            When the underlying Pyserini command fails.
         """
         options = options or SpladeBuildOptions()
         vectors_dir = (
@@ -568,7 +772,7 @@ class SpladeIndexManager:
         )
 
         cmd = [
-            os.fspath(Path(os.sys.executable)),
+            os.fspath(Path(sys.executable)),
             "-m",
             "pyserini.index.lucene",
             "--collection",
@@ -633,8 +837,10 @@ __all__ = [
     "SpladeArtifactMetadata",
     "SpladeArtifactsManager",
     "SpladeBuildOptions",
+    "SpladeEncodeOptions",
     "SpladeEncodingMetadata",
     "SpladeEncodingSummary",
+    "SpladeExportOptions",
     "SpladeExportSummary",
     "SpladeIndexManager",
     "SpladeIndexMetadata",

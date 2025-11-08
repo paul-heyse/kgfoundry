@@ -19,6 +19,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from codeintel_rev.io.faiss_manager import FAISSManager
+
 from tests.conftest import HAS_FAISS_SUPPORT
 
 # Use modern numpy random generator

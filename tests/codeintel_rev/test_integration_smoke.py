@@ -2,19 +2,19 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from pathlib import Path
 
-import json
 import pytest
-
+from codeintel_rev.io.path_utils import PathOutsideRepositoryError
 from codeintel_rev.mcp_server.adapters import files as files_adapter
 from codeintel_rev.mcp_server.adapters import history as history_adapter
 from codeintel_rev.mcp_server.adapters import semantic as semantic_adapter
 from codeintel_rev.mcp_server.adapters import text_search as text_search_adapter
 from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.mcp_server.server import asgi_app, mcp
-from codeintel_rev.io.path_utils import PathOutsideRepositoryError
+
 from kgfoundry_common.errors import VectorSearchError
 
 

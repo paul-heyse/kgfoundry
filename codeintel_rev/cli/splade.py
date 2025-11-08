@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Annotated
 
 import typer
 from tools import CliContext, EnvelopeBuilder, cli_operation, sha256_file
@@ -11,9 +12,36 @@ from codeintel_rev.config.settings import load_settings
 from codeintel_rev.io.splade_manager import (
     SpladeArtifactsManager,
     SpladeBuildOptions,
+    SpladeEncodeOptions,
     SpladeEncoderService,
+    SpladeExportOptions,
     SpladeIndexManager,
 )
+
+OptimizeFlag = Annotated[
+    bool,
+    typer.Option(
+        "--optimize/--no-optimize",
+        help="Enable Sentence-Transformers graph optimization.",
+        show_default=True,
+    ),
+]
+QuantizeFlag = Annotated[
+    bool,
+    typer.Option(
+        "--quantize/--no-quantize",
+        help="Produce a dynamically quantized ONNX artifact.",
+        show_default=True,
+    ),
+]
+OverwriteFlag = Annotated[
+    bool,
+    typer.Option(
+        "--overwrite/--no-overwrite",
+        help="Overwrite existing impact index contents when rebuilding.",
+        show_default=True,
+    ),
+]
 
 app = typer.Typer(
     help="SPLADE maintenance commands (artifacts, encoding, and impact indexes).",
@@ -23,17 +51,35 @@ app = typer.Typer(
 
 
 def _create_artifacts_manager() -> SpladeArtifactsManager:
-    """Return an artifacts manager using the active settings."""
+    """Construct an artifacts manager using the active settings.
+
+    Returns
+    -------
+    SpladeArtifactsManager
+        Manager initialized with the current environment configuration.
+    """
     return SpladeArtifactsManager(load_settings())
 
 
 def _create_encoder_service() -> SpladeEncoderService:
-    """Return an encoder service using the active settings."""
+    """Construct an encoder service using the active settings.
+
+    Returns
+    -------
+    SpladeEncoderService
+        Encoder service initialized with the current environment configuration.
+    """
     return SpladeEncoderService(load_settings())
 
 
 def _create_index_manager() -> SpladeIndexManager:
-    """Return an index manager using the active settings."""
+    """Construct an index manager using the active settings.
+
+    Returns
+    -------
+    SpladeIndexManager
+        Index manager initialized with the current environment configuration.
+    """
     return SpladeIndexManager(load_settings())
 
 
@@ -48,28 +94,6 @@ MODEL_ID_OPTION = typer.Option(
     "--model-id",
     help="Override the configured SPLADE model identifier.",
 )
-PROVIDER_OPTION = typer.Option(
-    None,
-    "--provider",
-    help="Execution provider used during export or encoding (defaults to configuration).",
-)
-FILE_NAME_OPTION = typer.Option(
-    None,
-    "--file-name",
-    help="Custom ONNX file name to write (defaults to configured SPLADE_ONNX_FILE).",
-)
-OPTIMIZE_OPTION = typer.Option(
-    True,
-    "--optimize/--no-optimize",
-    help="Enable Sentence-Transformers graph optimization.",
-    show_default=True,
-)
-QUANTIZE_OPTION = typer.Option(
-    True,
-    "--quantize/--no-quantize",
-    help="Produce a dynamically quantized ONNX artifact.",
-    show_default=True,
-)
 QUANTIZATION_OPTION = typer.Option(
     "avx2",
     "--quantization-config",
@@ -81,10 +105,8 @@ QUANTIZATION_OPTION = typer.Option(
 def export_onnx(
     *,
     model_id: str | None = MODEL_ID_OPTION,
-    provider: str | None = PROVIDER_OPTION,
-    file_name: str | None = FILE_NAME_OPTION,
-    optimize: bool = OPTIMIZE_OPTION,
-    quantize: bool = QUANTIZE_OPTION,
+    optimize: OptimizeFlag = True,
+    quantize: QuantizeFlag = True,
     quantization_config: str = QUANTIZATION_OPTION,
 ) -> None:
     """Export SPLADE ONNX artifacts (optimized and quantized)."""
@@ -94,22 +116,10 @@ def export_onnx(
         ctx: CliContext,
         env: EnvelopeBuilder,
         *,
-        model_id: str | None,
-        provider: str | None,
-        file_name: str | None,
-        optimize: bool,
-        quantize: bool,
-        quantization_config: str,
+        options: SpladeExportOptions,
     ) -> None:
         manager = _create_artifacts_manager()
-        summary = manager.export_onnx(
-            model_id=model_id,
-            provider=provider,
-            file_name=file_name,
-            optimize=optimize,
-            quantize=quantize,
-            quantization_config=quantization_config,
-        )
+        summary = manager.export_onnx(options)
 
         metadata_path = Path(summary.metadata_path)
         _add_metadata_artifact(env, metadata_path)
@@ -118,8 +128,8 @@ def export_onnx(
             payload={
                 "onnx_file": summary.onnx_file,
                 "metadata_path": summary.metadata_path,
-                "optimized": optimize,
-                "quantized": quantize,
+                "optimized": options.optimize,
+                "quantized": options.quantize,
             },
         )
 
@@ -128,8 +138,8 @@ def export_onnx(
             extra={
                 "onnx_file": summary.onnx_file,
                 "metadata_path": summary.metadata_path,
-                "optimize": optimize,
-                "quantize": quantize,
+                "optimize": options.optimize,
+                "quantize": options.quantize,
             },
         )
         typer.echo(
@@ -138,12 +148,12 @@ def export_onnx(
         )
 
     _run(
-        model_id=model_id,
-        provider=provider,
-        file_name=file_name,
-        optimize=optimize,
-        quantize=quantize,
-        quantization_config=quantization_config,
+        options=SpladeExportOptions(
+            model_id=model_id,
+            optimize=optimize,
+            quantize=quantize,
+            quantization_config=quantization_config,
+        ),
     )
 
 
@@ -178,11 +188,6 @@ SHARD_SIZE_OPTION = typer.Option(
     help="Maximum documents per JsonVectorCollection shard before rotating.",
     show_default=True,
 )
-ONNX_FILE_OPTION = typer.Option(
-    None,
-    "--onnx-file",
-    help="Specific ONNX file name to load relative to the configured ONNX directory.",
-)
 
 
 @app.command("encode")
@@ -193,8 +198,6 @@ def encode(
     batch_size: int | None = BATCH_SIZE_OPTION,
     quantization: int | None = QUANTIZATION_OPTION_ENCODE,
     shard_size: int = SHARD_SIZE_OPTION,
-    provider: str | None = PROVIDER_OPTION,
-    onnx_file: str | None = ONNX_FILE_OPTION,
 ) -> None:
     """Encode a corpus into SPLADE JsonVectorCollection shards."""
 
@@ -204,23 +207,10 @@ def encode(
         env: EnvelopeBuilder,
         *,
         source: Path,
-        output_dir: Path | None,
-        batch_size: int | None,
-        quantization: int | None,
-        shard_size: int,
-        provider: str | None,
-        onnx_file: str | None,
+        options: SpladeEncodeOptions,
     ) -> None:
         service = _create_encoder_service()
-        summary = service.encode_corpus(
-            source,
-            output_dir=output_dir,
-            batch_size=batch_size,
-            quantization=quantization,
-            shard_size=shard_size,
-            provider=provider,
-            onnx_file=onnx_file,
-        )
+        summary = service.encode_corpus(source, options)
 
         metadata_path = Path(summary.metadata_path)
         _add_metadata_artifact(env, metadata_path)
@@ -250,12 +240,12 @@ def encode(
 
     _run(
         source=source,
-        output_dir=output_dir,
-        batch_size=batch_size,
-        quantization=quantization,
-        shard_size=shard_size,
-        provider=provider,
-        onnx_file=onnx_file,
+        options=SpladeEncodeOptions(
+            output_dir=output_dir,
+            batch_size=batch_size,
+            quantization=quantization,
+            shard_size=shard_size,
+        ),
     )
 
 
@@ -285,12 +275,6 @@ MAX_CLAUSE_OPTION = typer.Option(
     min=1,
     help="Override Lucene Boolean clause limit (defaults to configuration).",
 )
-OVERWRITE_OPTION = typer.Option(
-    True,
-    "--overwrite/--no-overwrite",
-    help="Overwrite existing impact index contents when rebuilding.",
-    show_default=True,
-)
 
 
 @app.command("build-index")
@@ -300,7 +284,7 @@ def build_index(
     index_dir: Path | None = INDEX_DIR_OPTION,
     threads: int | None = THREADS_OPTION,
     max_clause_count: int | None = MAX_CLAUSE_OPTION,
-    overwrite: bool = OVERWRITE_OPTION,
+    overwrite: OverwriteFlag = True,
 ) -> None:
     """Build a SPLADE Lucene impact index from JsonVectorCollection shards."""
 
@@ -309,20 +293,9 @@ def build_index(
         ctx: CliContext,
         env: EnvelopeBuilder,
         *,
-        vectors_dir: Path | None,
-        index_dir: Path | None,
-        threads: int | None,
-        max_clause_count: int | None,
-        overwrite: bool,
+        options: SpladeBuildOptions,
     ) -> None:
         manager = _create_index_manager()
-        options = SpladeBuildOptions(
-            vectors_dir=vectors_dir,
-            index_dir=index_dir,
-            threads=threads,
-            max_clause_count=max_clause_count,
-            overwrite=overwrite,
-        )
         metadata = manager.build_index(options)
 
         metadata_path = Path(metadata.index_dir) / "metadata.json"
@@ -355,11 +328,13 @@ def build_index(
         )
 
     _run(
-        vectors_dir=vectors_dir,
-        index_dir=index_dir,
-        threads=threads,
-        max_clause_count=max_clause_count,
-        overwrite=overwrite,
+        options=SpladeBuildOptions(
+            vectors_dir=vectors_dir,
+            index_dir=index_dir,
+            threads=threads,
+            max_clause_count=max_clause_count,
+            overwrite=overwrite,
+        ),
     )
 
 
@@ -370,4 +345,3 @@ def main() -> None:
 
 if __name__ == "__main__":  # pragma: no cover - manual execution entrypoint
     main()
-

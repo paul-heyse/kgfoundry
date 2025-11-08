@@ -25,8 +25,8 @@ from typing import TYPE_CHECKING, ParamSpec, Protocol, TypeVar, cast
 import pytest
 from prometheus_client.registry import CollectorRegistry
 
-from tests.bootstrap import ensure_src_path
 import tests.codeintel_rev._faiss_stub  # noqa: F401  # register FAISS stub early
+from tests.bootstrap import ensure_src_path
 
 # Ensure src path is available before importing kgfoundry_common modules
 # Note: ensure_src_path() is idempotent and already called by importing tests.bootstrap,

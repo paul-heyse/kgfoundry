@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 
 import pytest
-
 from codeintel_rev.mcp_server.adapters import text_search
+
 from kgfoundry_common.errors import VectorSearchError
 from kgfoundry_common.subprocess_utils import SubprocessError
 

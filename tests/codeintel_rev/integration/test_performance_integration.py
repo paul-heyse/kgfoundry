@@ -17,6 +17,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+
 from tests.conftest import HAS_FAISS_SUPPORT
 
 if HAS_FAISS_SUPPORT:

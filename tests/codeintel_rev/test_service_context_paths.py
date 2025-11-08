@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
 from codeintel_rev.app import config_context
 from codeintel_rev.mcp_server import service_context
 
