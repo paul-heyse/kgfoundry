@@ -48,7 +48,7 @@
   uv run pyright --warnings --pythonversion=3.13
   uv run pyrefly check
   uv run vulture src tools stubs --min-confidence 90
-  uv run pytest -q
+  SKIP_GPU_WARMUP=1 uv run pytest -q    # unset on CUDA-capable hosts
   uv run pip-audit
   # If OpenAPI changed: lint spec (e.g., spectral lint openapi.yaml)
   make artifacts && git diff --exit-code    # docs/nav/catalog/schemas in sync
@@ -356,7 +356,7 @@ Per-file ignores are defined in `pyproject.toml` for:
   - GPU tests are **skipped by default** in CI unless explicitly enabled
 - **Coverage (local whenever core paths change):**
   ```bash
-  uv run pytest -q --cov=src --cov-report=xml:coverage.xml --cov-report=html:htmlcov
+  SKIP_GPU_WARMUP=1 uv run pytest -q --cov=src --cov-report=xml:coverage.xml --cov-report=html:htmlcov
   ```
 
 ---
@@ -452,7 +452,7 @@ Example `PATH_MAP`:
 [ ] uv run ruff format && uv run ruff check --fix
 [ ] uv run pyright --warnings --pythonversion=3.13
 [ ] uv run pyrefly check
-[ ] uv run pytest -q
+[ ] SKIP_GPU_WARMUP=1 uv run pytest -q
 [ ] make artifacts && git diff --exit-code
 [ ] python tools/check_new_suppressions.py src
 [ ] python tools/check_imports.py
@@ -478,7 +478,7 @@ uv run pyright --warnings --pythonversion=3.13
 uv run pyrefly check
 
 # Tests (incl. doctests/xdoctest via pytest.ini)
-uv run pytest -q
+SKIP_GPU_WARMUP=1 uv run pytest -q
 
 # Artifacts (docstrings, navmap, schemas, portal)
 make artifacts
@@ -494,6 +494,8 @@ uv run vulture src tools stubs --min-confidence 90
 # All pre-commit hooks
 uvx pre-commit run --all-files
 ```
+
+> **Note:** Drop `SKIP_GPU_WARMUP=1` on CUDA-capable hosts or CI jobs that require GPU warm-up coverage.
 
 **Problem Details Reference:**
 - Example: `schema/examples/problem_details/search-missing-index.json`

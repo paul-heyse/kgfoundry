@@ -84,10 +84,12 @@ openspec validate <change-id> --strict
 ```bash
 uv run ruff format && uv run ruff check --fix
 uv run pyright --warnings --pythonversion=3.13 && uv run pyrefly check
-uv run pytest -q
+SKIP_GPU_WARMUP=1 uv run pytest -q    # unset on CUDA-capable hosts
 make artifacts && git diff --exit-code
 openspec validate <change-id> --strict
 ```
+
+> **Heads-up:** drop `SKIP_GPU_WARMUP=1` when running on GPU-capable hosts so the warm-up smoke tests execute.
 
 ---
 
@@ -474,7 +476,7 @@ openspec validate <change-id> --strict
 # Quality gates
 uv run ruff format && uv run ruff check --fix
 uv run pyright --warnings --pythonversion=3.13 && uv run pyrefly check
-uv run pytest -q
+SKIP_GPU_WARMUP=1 uv run pytest -q
 make artifacts && git diff --exit-code
 
 # Archive when done

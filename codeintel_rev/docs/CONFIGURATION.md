@@ -87,6 +87,8 @@ The configuration lifecycle follows this sequence during application startup:
 | `QUERY_TIMEOUT_S` | Query timeout in seconds | `30.0` | `60.0` |
 | `SEMANTIC_OVERFETCH_MULTIPLIER` | FAISS fan-out multiplier when scope filters active | `2` | `3` |
 
+> **GPU warm-up tip:** On CPU-only workstations, export `SKIP_GPU_WARMUP=1` before running pytest to bypass the FAISS GPU smoke test. Drop the variable on CUDA-capable hosts so the warm-up coverage runs.
+
 ## Configuration Best Practices
 
 ### Development Configuration

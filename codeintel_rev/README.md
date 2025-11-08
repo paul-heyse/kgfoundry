@@ -427,11 +427,13 @@ codeintel-rev/
 ### Running Tests
 
 ```bash
-# Unit tests
-uv run pytest tests/ -v
+# Unit tests (CPU-only workstations)
+SKIP_GPU_WARMUP=1 uv run pytest tests/ -v
+
+# Drop the env var on CUDA-capable hosts to exercise the GPU warm-up.
 
 # With coverage
-uv run pytest tests/ --cov=codeintel_rev --cov-report=html
+SKIP_GPU_WARMUP=1 uv run pytest tests/ --cov=codeintel_rev --cov-report=html
 ```
 
 ### Quality Gates

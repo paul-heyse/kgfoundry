@@ -309,7 +309,7 @@ ${BOLD}Environment ready.${RESET}
 Next steps:
   - Lint/format : uv run ruff format && uv run ruff check --fix
   - Type-check  : uv run pyright --warnings --pythonversion=3.13 && uv run pyrefly check
-  - Tests       : uv run pytest -q
+  - Tests       : SKIP_GPU_WARMUP=1 uv run pytest -q    # drop env var on GPU-capable hosts
   - Artifacts   : make artifacts && git diff --exit-code
   - Docs (open) : site/_build/html/index.html  (or Agent Portal at site/_build/agent/index.html)
 EOF
