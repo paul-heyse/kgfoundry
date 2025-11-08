@@ -25,16 +25,20 @@ def test_mcp_server_import() -> None:
     _expect(condition=asgi_app is not None, message="Expected ASGI application to be initialised")
 
 
-def test_file_operations() -> None:
+@pytest.mark.asyncio
+async def test_file_operations(mock_application_context, mock_session_id) -> None:
     """Verify file listing and reading adapters respond with expected keys."""
-    listing = files_adapter.list_paths(max_results=5)
+    repo_root = mock_application_context.paths.repo_root
+    (repo_root / "README.md").write_text("example content", encoding="utf-8")
+
+    listing = await files_adapter.list_paths(mock_application_context, max_results=5)
     _expect(condition="items" in listing, message="Expected 'items' key in list_paths result")
     _expect(
         condition=isinstance(listing.get("items"), list),
         message="Expected list_paths to return a list of items",
     )
 
-    opened = files_adapter.open_file("README.md")
+    opened = files_adapter.open_file(mock_application_context, "README.md")
     has_expected_key = {"content", "error"}.intersection(opened.keys())
     _expect(
         condition=bool(has_expected_key),
@@ -42,9 +46,12 @@ def test_file_operations() -> None:
     )
 
 
-def test_text_search() -> None:
+def test_text_search(mock_application_context, mock_session_id) -> None:
     """Exercise the text search adapter for basic responses."""
-    result = text_search_adapter.search_text("def", max_results=3)
+    repo_root = mock_application_context.paths.repo_root
+    (repo_root / "module.py").write_text("def sample():\n    return 1\n", encoding="utf-8")
+
+    result = text_search_adapter.search_text(mock_application_context, "def", max_results=3)
     _expect(condition="matches" in result, message="Expected 'matches' key in search results")
     _expect(
         condition=isinstance(result.get("matches"), list),
@@ -53,25 +60,46 @@ def test_text_search() -> None:
 
 
 @pytest.mark.asyncio
-async def test_semantic_search_no_index() -> None:
+async def test_semantic_search_no_index(mock_application_context, mock_session_id) -> None:
     """Semantic search should gracefully handle missing FAISS index."""
-    envelope = await semantic_adapter.semantic_search("integration smoke test", limit=5)
+    envelope = await semantic_adapter.semantic_search(
+        mock_application_context,
+        "integration smoke test",
+        limit=5,
+    )
     _expect(condition="answer" in envelope, message="Expected answer in semantic search envelope")
     findings = envelope.get("findings")
     _expect(condition=isinstance(findings, list), message="Findings should be returned as a list")
     _expect(condition="problem" in envelope, message="Expected Problem Details on failure")
 
 
-def test_git_history() -> None:
+@pytest.mark.asyncio
+async def test_git_history(mock_application_context, mock_session_id) -> None:
     """Ensure git history adapters expose expected keys."""
-    blame = history_adapter.blame_range("README.md", 1, 5)
+    repo_root = mock_application_context.paths.repo_root
+    (repo_root / "README.md").write_text("sample\ncontent\n", encoding="utf-8")
+    mock_application_context.async_git_client.blame_range.return_value = [
+        {"line": 1, "commit": "abc", "author": "Test", "date": "2024-01-01", "message": "Line"}
+    ]
+    mock_application_context.async_git_client.file_history.return_value = [
+        {
+            "sha": "abc",
+            "full_sha": "abcdef",
+            "author": "Test",
+            "email": "test@example.com",
+            "date": "2024-01-01T00:00:00Z",
+            "message": "Initial commit",
+        }
+    ]
+
+    blame = await history_adapter.blame_range(mock_application_context, "README.md", 1, 5)
     _expect(condition="blame" in blame, message="Expected blame data in blame_range result")
     _expect(
         condition=isinstance(blame.get("blame"), list),
         message="Blame data should be a list",
     )
 
-    history = history_adapter.file_history("README.md", limit=5)
+    history = await history_adapter.file_history(mock_application_context, "README.md", limit=5)
     _expect(condition="commits" in history, message="Expected commits in file_history result")
     _expect(
         condition=isinstance(history.get("commits"), list),
@@ -122,10 +150,10 @@ def test_parse_blame_porcelain_multiple_entries() -> None:
     )
 
 
-def test_scope_operations() -> None:
+def test_scope_operations(mock_application_context, mock_session_id) -> None:
     """Verify scope configuration round-trips through the adapter."""
     scope_request: ScopeIn = {"repos": ["test"], "languages": ["python"]}
-    result = files_adapter.set_scope(scope_request)
+    result = files_adapter.set_scope(mock_application_context, scope_request)
     _expect(condition=result.get("status") == "ok", message="Scope status should be 'ok'")
     effective_scope = result.get("effective_scope")
     _expect(
@@ -134,9 +162,9 @@ def test_scope_operations() -> None:
     )
 
 
-def test_path_escape_rejected_by_file_adapter() -> None:
+def test_path_escape_rejected_by_file_adapter(mock_application_context) -> None:
     """Adapters should reject attempts to escape the repository root."""
-    result = files_adapter.open_file("../etc/passwd")
+    result = files_adapter.open_file(mock_application_context, "../etc/passwd")
     _expect(condition="error" in result, message="Expected error for escaped path")
     _expect(
         condition="escapes repository root" in result["error"],
@@ -144,9 +172,10 @@ def test_path_escape_rejected_by_file_adapter() -> None:
     )
 
 
-def test_path_escape_rejected_by_history_adapter() -> None:
+@pytest.mark.asyncio
+async def test_path_escape_rejected_by_history_adapter(mock_application_context) -> None:
     """Git adapters should refuse to run commands on escaped paths."""
-    blame = history_adapter.blame_range("../etc/passwd", 1, 2)
+    blame = await history_adapter.blame_range(mock_application_context, "../etc/passwd", 1, 2)
     _expect(condition="error" in blame, message="Expected error for escaped path")
     _expect(
         condition="escapes repository root" in blame["error"],

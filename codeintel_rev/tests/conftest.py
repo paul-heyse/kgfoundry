@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock
+from typing import Iterator
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from codeintel_rev.app.config_context import ApplicationContext, ResolvedPaths
 from codeintel_rev.app.scope_registry import ScopeRegistry
+from codeintel_rev.app.middleware import session_id_var
 from codeintel_rev.config.settings import (
     IndexConfig,
     PathsConfig,
@@ -61,7 +63,7 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
         limits=ServerLimits(),
     )
 
-    # Create resolved paths
+    # Create resolved paths and ensure backing directories exist
     paths = ResolvedPaths(
         repo_root=repo_root,
         data_dir=repo_root / "data",
@@ -71,11 +73,38 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
         scip_index=repo_root / "index.scip.json",
     )
 
+    paths.data_dir.mkdir(parents=True, exist_ok=True)
+    paths.vectors_dir.mkdir(parents=True, exist_ok=True)
+    paths.faiss_index.parent.mkdir(parents=True, exist_ok=True)
+    paths.duckdb_path.parent.mkdir(parents=True, exist_ok=True)
+
     # Create mock clients
     vllm_client = MagicMock(spec=VLLMClient)
     faiss_manager = MagicMock(spec=FAISSManager)
+    faiss_manager.gpu_index = None
+    faiss_manager.gpu_disabled_reason = None
+    faiss_manager.clone_to_gpu.return_value = False
     git_client = MagicMock(spec=GitClient)
-    async_git_client = MagicMock(spec=AsyncGitClient)
+    async_git_client = AsyncMock(spec=AsyncGitClient)
+    async_git_client.blame_range.return_value = [
+        {
+            "line": 1,
+            "commit": "abc1234",
+            "author": "Test Author",
+            "date": "2024-01-01T00:00:00Z",
+            "message": "Test commit",
+        }
+    ]
+    async_git_client.file_history.return_value = [
+        {
+            "sha": "abc1234",
+            "full_sha": "abc1234abcdef",
+            "author": "Test Author",
+            "email": "test@example.com",
+            "date": "2024-01-01T00:00:00Z",
+            "message": "Test commit",
+        }
+    ]
     scope_registry = ScopeRegistry()
 
     return ApplicationContext(
@@ -87,3 +116,15 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
         git_client=git_client,
         async_git_client=async_git_client,
     )
+
+
+@pytest.fixture
+def mock_session_id() -> Iterator[str]:
+    """Provide a session ID bound to middleware context vars for adapter calls."""
+
+    session_id = "test-session"
+    token = session_id_var.set(session_id)
+    try:
+        yield session_id
+    finally:
+        session_id_var.reset(token)
