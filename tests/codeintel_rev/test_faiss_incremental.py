@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import faiss
 import numpy as np
 import pytest
 from codeintel_rev.io.faiss_manager import FAISSManager
@@ -99,6 +100,29 @@ def test_update_index_skips_duplicates(tmp_index_path: Path) -> None:
     assert manager.incremental_ids == {10, 11, 12, 13, 14, 15, 16, 17, 18}
 
 
+def test_update_index_skips_primary_duplicates(tmp_index_path: Path) -> None:
+    """IDs already present in the primary index are ignored during updates."""
+
+    vec_dim = _UNIT_TEST_VEC_DIM
+    manager = FAISSManager(index_path=tmp_index_path, vec_dim=vec_dim)
+
+    primary_vectors = _rng.normal(0.5, 0.15, (6, vec_dim)).astype(np.float32)
+    primary_vectors = np.clip(primary_vectors, 0.0, 1.0)
+    manager.build_index(primary_vectors)
+    primary_ids = np.arange(6, dtype=np.int64)
+    manager.add_vectors(primary_vectors, primary_ids)
+
+    update_vectors = _rng.normal(0.5, 0.15, (4, vec_dim)).astype(np.float32)
+    update_vectors = np.clip(update_vectors, 0.0, 1.0)
+    update_ids = np.array([2, 6, 6, 7], dtype=np.int64)
+
+    manager.update_index(update_vectors, update_ids)
+
+    assert manager.secondary_index is not None
+    assert manager.secondary_index.ntotal == 2  # type: ignore[attr-defined]
+    assert manager.incremental_ids == {6, 7}
+
+
 def test_dual_index_search(tmp_index_path: Path) -> None:
     """Test that search returns results from both primary and secondary indexes.
 
@@ -140,6 +164,61 @@ def test_dual_index_search(tmp_index_path: Path) -> None:
 
     # Should have results from both (exact counts depend on similarity)
     assert primary_result_count > 0 or secondary_result_count > 0
+
+
+def test_merged_search_results_are_unique(tmp_index_path: Path) -> None:
+    """Merged dual-index search results deduplicate overlapping chunk IDs."""
+
+    vec_dim = _UNIT_TEST_VEC_DIM
+    manager = FAISSManager(index_path=tmp_index_path, vec_dim=vec_dim)
+
+    primary_vectors = _rng.normal(0.5, 0.15, (3, vec_dim)).astype(np.float32)
+    primary_vectors = np.clip(primary_vectors, 0.0, 1.0)
+    manager.build_index(primary_vectors)
+    primary_ids = np.array([1, 2, 3], dtype=np.int64)
+    manager.add_vectors(primary_vectors, primary_ids)
+
+    unique_secondary_vector = _rng.normal(0.5, 0.15, (1, vec_dim)).astype(np.float32)
+    unique_secondary_vector = np.clip(unique_secondary_vector, 0.0, 1.0)
+    unique_secondary_id = np.array([101], dtype=np.int64)
+    manager.update_index(unique_secondary_vector, unique_secondary_id)
+
+    assert manager.secondary_index is not None
+
+    duplicate_id = int(primary_ids[0])
+    duplicate_vector_secondary = np.clip(primary_vectors[0] * 1.05, 0.0, 1.0).astype(np.float32)
+    duplicate_vector_secondary = duplicate_vector_secondary.reshape(1, -1)
+    duplicate_norm = duplicate_vector_secondary.copy()
+    faiss.normalize_L2(duplicate_norm)
+    manager.secondary_index.add_with_ids(duplicate_norm, np.array([duplicate_id], dtype=np.int64))
+    manager.incremental_ids.add(duplicate_id)
+
+    query = duplicate_vector_secondary.copy()
+
+    primary_dists, primary_ids_result = manager._search_primary(query, k=3)
+    secondary_dists, secondary_ids_result = manager._search_secondary(query, k=3)
+
+    assert duplicate_id in primary_ids_result[0]
+    assert duplicate_id in secondary_ids_result[0]
+
+    merged_dists, merged_ids = manager.search(query, k=3)
+    merged_row = merged_ids[0]
+    valid_ids = [rid for rid in merged_row if rid >= 0]
+    assert len(valid_ids) == len(set(valid_ids))
+
+    primary_idx = np.where(primary_ids_result[0] == duplicate_id)[0]
+    secondary_idx = np.where(secondary_ids_result[0] == duplicate_id)[0]
+    assert primary_idx.size == 1
+    assert secondary_idx.size == 1
+
+    expected_distance = max(
+        float(primary_dists[0, primary_idx[0]]),
+        float(secondary_dists[0, secondary_idx[0]]),
+    )
+    merged_idx = np.where(merged_row == duplicate_id)[0]
+    assert merged_idx.size == 1
+    merged_distance = float(merged_dists[0, merged_idx[0]])
+    assert np.isclose(merged_distance, expected_distance)
 
 
 def test_merge_indexes_combines_vectors(tmp_index_path: Path) -> None:
