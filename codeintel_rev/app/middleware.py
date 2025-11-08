@@ -135,9 +135,7 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
     FastMCP tool access). Session IDs enable stateful scope management across
     multiple MCP tool calls within the same session.
 
-    Attributes
-    ----------
-    None (stateless middleware).
+    This middleware is stateless and does not maintain any instance attributes.
 
     Notes
     -----
@@ -190,8 +188,9 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
         ----------
         request : Request
             Starlette Request object with headers and state.
-        call_next : Callable[[Request], Response]
-            Next middleware or route handler in the chain.
+        call_next : Callable[[Request], Awaitable[Response]]
+            Next middleware or route handler in the chain. Must be an async
+            callable that accepts a Request and returns an awaitable Response.
 
         Returns
         -------

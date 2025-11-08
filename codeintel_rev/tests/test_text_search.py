@@ -143,7 +143,11 @@ def test_search_text_fallback_normalizes_relative_paths(
 
     result = text_search.search_text("example", max_results=5)
 
-    _expect(condition=len(result["matches"]) == 2, message="Expected two normalized matches")
+    expected_match_count = 2
+    _expect(
+        condition=len(result["matches"]) == expected_match_count,
+        message="Expected two normalized matches",
+    )
     _expect(
         condition={match["line"] for match in result["matches"]} == {1, 2},
         message="Expected both relative paths to be preserved",

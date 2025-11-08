@@ -63,6 +63,11 @@ class _NoopObservation:
 def _observe(operation: str) -> Iterator[DurationObservation | _NoopObservation]:
     """Yield a metrics observation, falling back to a no-op when metrics are disabled.
 
+    Parameters
+    ----------
+    operation : str
+        Operation name for metrics labeling.
+
     Yields
     ------
     DurationObservation | _NoopObservation
@@ -262,7 +267,7 @@ def _fallback_grep(
 
     Parameters
     ----------
-    observation : Any
+    observation : DurationObservation | _NoopObservation
         Metrics observation context used to record success or failure.
     repo_root : Path
         Repository root directory.

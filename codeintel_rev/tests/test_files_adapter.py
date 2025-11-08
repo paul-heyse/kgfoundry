@@ -12,11 +12,11 @@ if "msgspec" not in sys.modules:
     msgspec_stub = types.ModuleType("msgspec")
 
     class _Struct:  # pragma: no cover - helper for test environment
-        def __init__(self, **kwargs) -> None:
+        def __init__(self, **kwargs: object) -> None:
             for key, value in kwargs.items():
                 setattr(self, key, value)
 
-        def __init_subclass__(cls, **kwargs):
+        def __init_subclass__(cls, **kwargs: object) -> None:
             super().__init_subclass__()
 
     msgspec_stub.Struct = _Struct
@@ -188,11 +188,17 @@ def test_list_paths_excludes_common_directories_by_default(
     response = files_adapter.list_paths()
 
     returned_paths = {item["path"] for item in response["items"]}
-    assert "src/module.py" in returned_paths
-    assert ".git/HEAD" not in returned_paths
-    assert ".venv/pyvenv.cfg" not in returned_paths
-    assert "node_modules/pkg/index.js" not in returned_paths
-    assert "src/module.pyc" not in returned_paths
-    assert "src/__pycache__/module.cpython-311.pyc" not in returned_paths
+    _expect(condition="src/module.py" in returned_paths, message="Expected src/module.py")
+    _expect(condition=".git/HEAD" not in returned_paths, message="Expected .git/HEAD excluded")
+    _expect(condition=".venv/pyvenv.cfg" not in returned_paths, message="Expected .venv excluded")
+    _expect(
+        condition="node_modules/pkg/index.js" not in returned_paths,
+        message="Expected node_modules excluded",
+    )
+    _expect(condition="src/module.pyc" not in returned_paths, message="Expected .pyc excluded")
+    _expect(
+        condition="src/__pycache__/module.cpython-311.pyc" not in returned_paths,
+        message="Expected __pycache__ excluded",
+    )
 
     reset_service_context()

@@ -67,13 +67,11 @@ class GitClient:
     The Git repository is lazy-loaded on first access to avoid startup overhead
     for applications that may not use Git operations immediately.
 
-    Attributes
+    Parameters
     ----------
     repo_path : Path
         Path to repository root directory. GitPython will search parent
         directories for .git if repo_path is a subdirectory.
-    _repo : git.Repo | None
-        Cached GitPython Repo instance (lazy-initialized on first property access).
 
     Examples
     --------
@@ -101,6 +99,9 @@ class GitClient:
 
     For async operations, use AsyncGitClient wrapper which runs operations in
     a threadpool via asyncio.to_thread.
+
+    Internal attributes (not part of public API):
+    - ``_repo``: Cached GitPython Repo instance (lazy-initialized on first property access)
     """
 
     repo_path: Path
@@ -407,10 +408,11 @@ class AsyncGitClient:
     asyncio.to_thread to offload operations to a threadpool. This enables
     concurrent Git operations without thread exhaustion.
 
-    Attributes
+    Parameters
     ----------
-    _sync_client : GitClient
-        Synchronous GitClient instance wrapped by this async client.
+    git_client : GitClient
+        Synchronous GitClient instance to wrap. The same instance can be
+        shared across multiple AsyncGitClient instances safely.
 
     Examples
     --------
@@ -437,17 +439,12 @@ class AsyncGitClient:
 
     For best performance, use AsyncGitClient when you need to perform multiple
     Git operations concurrently (e.g., blaming multiple files in parallel).
+
+    Internal attributes (not part of public API):
+    - ``_sync_client``: Synchronous GitClient instance wrapped by this async client
     """
 
     def __init__(self, git_client: GitClient) -> None:
-        """Initialize async wrapper.
-
-        Parameters
-        ----------
-        git_client : GitClient
-            Synchronous GitClient instance to wrap. The same instance can be
-            shared across multiple AsyncGitClient instances safely.
-        """
         self._sync_client = git_client
 
     async def blame_range(

@@ -73,7 +73,7 @@ def write_chunks_parquet(
         Chunk metadata.
     embeddings : np.ndarray
         Embeddings array of shape (len(chunks), vec_dim).
-    options : ParquetWriteOptions, optional
+    options : ParquetWriteOptions | None, optional
         Configuration for chunk identifiers, embedding dimension, and preview
         truncation length. Defaults to :class:`ParquetWriteOptions`.
 

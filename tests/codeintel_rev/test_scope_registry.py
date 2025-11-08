@@ -35,7 +35,7 @@ class GateableRLock:
         self._release_notifier = notifier
         self._release_gate = gate
 
-    def acquire(self, blocking: bool = True, timeout: float = -1.0) -> bool:
+    def acquire(self, *, blocking: bool = True, timeout: float = -1.0) -> bool:
         return self._lock.acquire(blocking=blocking, timeout=timeout)
 
     def release(self) -> None:
@@ -51,16 +51,32 @@ class GateableRLock:
             raise AssertionError(msg)
 
     def __enter__(self) -> Self:
+        """Enter context manager.
+
+        Returns
+        -------
+        Self
+            The lock instance for context manager chaining.
+        """
         self.acquire()
         return self
 
     def __exit__(self, exc_type: object, exc: object, tb: object) -> bool:
+        """Exit context manager.
+
+        Returns
+        -------
+        bool
+            Always returns False to not suppress exceptions.
+        """
         self.release()
         return False
 
 
 @pytest.mark.timeout(5)
-def test_gauge_stays_consistent_during_overlapping_operations(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_gauge_stays_consistent_during_overlapping_operations(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Gauge reflects cleared state when set/clear overlap."""
     gauge = GaugeProbe()
     monkeypatch.setattr(
@@ -74,7 +90,7 @@ def test_gauge_stays_consistent_during_overlapping_operations(monkeypatch: pytes
     release_notifier = threading.Event()
     release_gate = threading.Event()
     gateable_lock.configure(release_notifier, release_gate)
-    registry._lock = gateable_lock  # type: ignore[assignment]
+    registry._lock = gateable_lock  # type: ignore[assignment]  # noqa: SLF001
 
     set_done = threading.Event()
     clear_done = threading.Event()

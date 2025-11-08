@@ -42,7 +42,7 @@ def git_repo(tmp_path: Path) -> Path:
 
     # Initialize Git repository
     subprocess.run(
-        ["git", "init"],
+        ["git", "init"],  # noqa: S607
         cwd=repo_root,
         check=True,
         capture_output=True,
@@ -50,13 +50,13 @@ def git_repo(tmp_path: Path) -> Path:
 
     # Configure Git user (required for commits)
     subprocess.run(
-        ["git", "config", "user.name", "Test User"],
+        ["git", "config", "user.name", "Test User"],  # noqa: S607
         cwd=repo_root,
         check=True,
         capture_output=True,
     )
     subprocess.run(
-        ["git", "config", "user.email", "test@example.com"],
+        ["git", "config", "user.email", "test@example.com"],  # noqa: S607
         cwd=repo_root,
         check=True,
         capture_output=True,
@@ -152,7 +152,7 @@ class TestGitClientIntegration:
 
         # Get actual commit SHAs from git log
         result = subprocess.run(
-            ["git", "log", "--format=%H", "test.py"],
+            ["git", "log", "--format=%H", "test.py"],  # noqa: S607
             cwd=git_repo,
             check=True,
             capture_output=True,

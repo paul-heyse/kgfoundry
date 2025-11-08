@@ -62,6 +62,11 @@ class _NoopObservation:
 def _observe(operation: str) -> Iterator[DurationObservation | _NoopObservation]:
     """Yield a metrics observation, falling back to a no-op when metrics are disabled.
 
+    Parameters
+    ----------
+    operation : str
+        Operation name for metrics labeling.
+
     Yields
     ------
     DurationObservation | _NoopObservation
@@ -130,7 +135,9 @@ async def semantic_search(
     return await asyncio.to_thread(_semantic_search_sync, context, query, limit)
 
 
-def _semantic_search_sync(context: ApplicationContext, query: str, limit: int) -> AnswerEnvelope:  # noqa: PLR0914 - pre-existing complexity, refactoring doesn't increase it
+def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914
+    context: ApplicationContext, query: str, limit: int
+) -> AnswerEnvelope:
     start_time = perf_counter()
     with _observe("semantic_search") as observation:
         # Retrieve session scope for filtering (applied during DuckDB hydration)
@@ -184,14 +191,46 @@ def _semantic_search_sync(context: ApplicationContext, query: str, limit: int) -
                 limits=[*limits_metadata, "vLLM embedding service error"],
             )
 
-        # Over-fetch from FAISS to compensate for scope filtering
-        # Request 2x limit to ensure we have enough results after filtering
         has_include_globs = bool(scope and scope.get("include_globs"))
         has_exclude_globs = bool(scope and scope.get("exclude_globs"))
         has_languages = bool(scope and scope.get("languages"))
         has_scope_filters = has_include_globs or has_exclude_globs or has_languages
 
-        faiss_k = effective_limit * 2 if has_scope_filters else effective_limit
+        multiplier = max(1, context.settings.limits.semantic_overfetch_multiplier)
+        faiss_k_target = effective_limit
+        if has_scope_filters:
+            faiss_k_target = effective_limit * multiplier
+            additional = 0
+            if has_include_globs and has_languages:
+                additional = effective_limit
+            elif has_include_globs or has_languages:
+                additional = max(1, effective_limit // 2)
+            faiss_k_target += additional
+
+        faiss_k = max(
+            effective_limit,
+            min(max_results, faiss_k_target),
+        )
+        if faiss_k < faiss_k_target:
+            limits_metadata.append(
+                f"FAISS fan-out clamped to {faiss_k} (max_results={max_results})."
+            )
+
+        LOGGER.debug(
+            "Computed FAISS fan-out",
+            extra={
+                "requested_limit": requested_limit,
+                "effective_limit": effective_limit,
+                "faiss_k": faiss_k,
+                "faiss_k_target": faiss_k_target,
+                "multiplier": multiplier,
+                "has_scope_filters": has_scope_filters,
+                "has_include_globs": has_include_globs,
+                "has_exclude_globs": has_exclude_globs,
+                "has_languages": has_languages,
+            },
+        )
+
         result_ids, result_scores, search_exc = _run_faiss_search(
             context.faiss_manager,
             embedding,
@@ -300,6 +339,15 @@ def _run_faiss_search(
 ) -> tuple[list[int], list[float], Exception | None]:
     """Execute FAISS search and return result identifiers and scores.
 
+    Parameters
+    ----------
+    faiss_mgr : FAISSManager
+        FAISS index manager instance.
+    query_vector : np.ndarray
+        Query vector of shape (1, vec_dim).
+    limit : int
+        Maximum number of results to return.
+
     Returns
     -------
     tuple[list[int], list[float], Exception | None]
@@ -335,7 +383,7 @@ def _hydrate_findings(
         Chunk identifiers from FAISS search.
     scores : Sequence[float]
         Similarity scores aligned with chunk_ids.
-    scope : dict | None, optional
+    scope : ScopeIn | None, optional
         Session scope with optional `include_globs`, `exclude_globs`, and `languages`
         fields. If provided and contains filters, uses `query_by_filters` instead of
         `query_by_ids`. Defaults to None.

@@ -239,12 +239,6 @@ class ApplicationContext:
     async_git_client : AsyncGitClient
         Async wrapper around git_client for non-blocking Git operations. Runs
         synchronous GitPython operations in threadpool via asyncio.to_thread.
-    _faiss_lock : Lock
-        Thread lock for coordinating FAISS index loading (internal use only).
-    _faiss_loaded : bool
-        Flag indicating whether CPU index has been loaded (internal use only).
-    _faiss_gpu_attempted : bool
-        Flag indicating whether GPU clone has been attempted (internal use only).
 
     Examples
     --------
@@ -273,6 +267,11 @@ class ApplicationContext:
     are frozen dataclasses). The FAISS manager and vLLM client maintain internal
     state (connection pools, loaded indexes) but their configuration cannot be
     changed after initialization.
+
+    Internal attributes (not part of public API):
+    - ``_faiss_lock``: Thread lock for coordinating FAISS index loading
+    - ``_faiss_loaded``: Flag indicating whether CPU index has been loaded
+    - ``_faiss_gpu_attempted``: Flag indicating whether GPU clone has been attempted
 
     See Also
     --------

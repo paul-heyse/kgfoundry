@@ -384,10 +384,10 @@ class TestSetScopeToSemanticSearch:
         ]
 
         def mock_query_by_filters(
-            ids,
+            _ids,
             *,
-            include_globs=None,
-            exclude_globs=None,
+            _include_globs=None,
+            _exclude_globs=None,
             languages=None,
         ) -> list[dict]:
             # Filter by languages if provided
@@ -466,11 +466,11 @@ class TestSetScopeToSemanticSearch:
         ]
 
         def mock_query_by_filters(
-            ids,
+            _ids,
             *,
             include_globs=None,
-            exclude_globs=None,
-            languages=None,  # noqa: ARG001
+            _exclude_globs=None,
+            _languages=None,
         ) -> list[dict]:
             if include_globs:
                 import fnmatch
@@ -519,7 +519,7 @@ class TestSetScopeToSemanticSearch:
 
         search_call: dict[str, int] = {}
 
-        def fake_search(query: np.ndarray, k: int = 0) -> tuple[np.ndarray, np.ndarray]:
+        def fake_search(_query: np.ndarray, k: int = 0) -> tuple[np.ndarray, np.ndarray]:
             search_call["k"] = k
             return (
                 np.array([[0.9, 0.8]], dtype=np.float32),
@@ -551,9 +551,9 @@ class TestSetScopeToSemanticSearch:
         def mock_query_by_filters(
             ids,
             *,
-            include_globs=None,
+            _include_globs=None,
             exclude_globs=None,
-            languages=None,  # noqa: ARG001
+            _languages=None,
         ) -> list[dict]:
             assert exclude_globs == ["tests/**"]
             import fnmatch
@@ -566,7 +566,7 @@ class TestSetScopeToSemanticSearch:
                 if chunk_id not in ids:
                     continue
                 if exclude_globs and any(
-                    fnmatch.fnmatch(chunk_uri, cast(str, pattern)) for pattern in exclude_globs
+                    fnmatch.fnmatch(chunk_uri, cast("str", pattern)) for pattern in exclude_globs
                 ):
                     continue
                 filtered.append(chunk)
@@ -738,10 +738,10 @@ class TestMultiSessionIsolation:
         ]
 
         def mock_query_by_filters(
-            ids,
+            _ids,
             *,
-            include_globs=None,
-            exclude_globs=None,
+            _include_globs=None,
+            _exclude_globs=None,
             languages=None,
         ) -> list[dict]:
             if languages == ["python"]:

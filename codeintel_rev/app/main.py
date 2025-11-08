@@ -65,6 +65,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:  # noqa: C901, PLR0915 
     This function runs during FastAPI startup and shutdown, managing the
     configuration lifecycle explicitly rather than relying on lazy loading.
 
+    Parameters
+    ----------
+    app : FastAPI
+        FastAPI application instance. Used to store application context and
+        readiness probe in app.state.
+
     Startup sequence:
     1. Load configuration from environment (fail fast if invalid)
     2. Perform GPU warmup sequence (verify CUDA/torch/FAISS GPU availability)
@@ -89,6 +95,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:  # noqa: C901, PLR0915 
     ConfigurationError
         If configuration is invalid or required resources are missing.
         FastAPI will fail to start, preventing broken deployment.
+    Exception
+        If an unexpected error occurs during application startup. The error
+        is logged and re-raised to prevent FastAPI from starting in a broken state.
     """
     LOGGER.info("Starting application initialization")
 

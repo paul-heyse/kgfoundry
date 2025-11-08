@@ -52,7 +52,7 @@ class HttpClient:
     def __init__(self, settings: HttpSettings, retry_strategy: RetryStrategy | None = None) -> None:
         self.s = settings
         self.retry_strategy = retry_strategy  # may be None for single-attempt
-        # TODO(@http-client): # noqa: TD003 Initialize underlying HTTP client (httpx, requests, etc.)
+        # TODO(@http-client): # noqa: TD003, FIX002 Initialize underlying HTTP client (httpx, requests, etc.)
 
     def _policy_strategy_for(self, method: str) -> RetryStrategy | None:
         """Get retry strategy for a specific HTTP method.
@@ -137,7 +137,7 @@ class HttpClient:
             NotImplementedError
                 HTTP request implementation is not yet complete.
             """
-            # TODO(@http-client): # noqa: TD003 Implement actual HTTP request
+            # TODO(@http-client): # noqa: TD003, FIX002 Implement actual HTTP request
             # When implemented, use HttpRateLimitedError and HttpStatusError from
             # kgfoundry_common.http.errors for error handling.
             _ = params, json_body, data, timeout_s  # Placeholder for future use
@@ -161,7 +161,7 @@ class HttpClient:
         str
             Full URL.
         """
-        # TODO(@http-client): # noqa: TD003 Implement URL building logic
+        # TODO(@http-client): # noqa: TD003, FIX002 Implement URL building logic
         if url.startswith(("http://", "https://")):
             return url
         return f"{self.s.base_url.rstrip('/')}/{url.lstrip('/')}"
@@ -180,5 +180,5 @@ class HttpClient:
         dict[str, str]
             Merged headers dictionary.
         """
-        # TODO(@http-client): # noqa: TD003 Implement header merging logic
+        # TODO(@http-client): # noqa: TD003, FIX002 Implement header merging logic
         return headers or {}

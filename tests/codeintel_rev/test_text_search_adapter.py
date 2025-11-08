@@ -13,7 +13,13 @@ from codeintel_rev.mcp_server.schemas import ScopeIn
 
 @pytest.fixture
 def mock_context(tmp_path: Path) -> Mock:
-    """Create a mock ApplicationContext for testing."""
+    """Create a mock ApplicationContext for testing.
+
+    Returns
+    -------
+    Mock
+        Mock ApplicationContext object.
+    """
     from codeintel_rev.app.config_context import ResolvedPaths
 
     context = Mock()

@@ -100,9 +100,13 @@ def test_parse_blame_porcelain_multiple_entries() -> None:
         "\tprint('second line')",
     ]
 
-    entries = history_adapter._parse_blame_porcelain("\n".join(porcelain_lines) + "\n")
+    entries = history_adapter._parse_blame_porcelain("\n".join(porcelain_lines) + "\n")  # noqa: SLF001
 
-    _expect(condition=len(entries) == 2, message="Expected two blame entries to be parsed")
+    expected_entry_count = 2
+    _expect(
+        condition=len(entries) == expected_entry_count,
+        message="Expected two blame entries to be parsed",
+    )
     _expect(
         condition=[entry["line"] for entry in entries] == [1, 2],
         message="Expected blame entries to retain distinct line numbers",
@@ -111,8 +115,9 @@ def test_parse_blame_porcelain_multiple_entries() -> None:
         condition={entry["message"] for entry in entries} == {"First change", "Second change"},
         message="Expected commit summaries to be captured for each entry",
     )
+    expected_unique_dates = 2
     _expect(
-        condition=len({entry["date"] for entry in entries}) == 2,
+        condition=len({entry["date"] for entry in entries}) == expected_unique_dates,
         message="Expected unique ISO timestamps for each blame entry",
     )
 

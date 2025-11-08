@@ -121,21 +121,6 @@ class VLLMClient:
     config : VLLMConfig
         vLLM configuration including base URL, timeout, and model name.
 
-    Attributes
-    ----------
-    config : VLLMConfig
-        vLLM configuration.
-    _client : httpx.Client
-        Persistent HTTP client with connection pooling. Created during
-        initialization and reused across all requests.
-    _async_client : httpx.AsyncClient | None
-        Optional async HTTP client for concurrent embedding generation.
-        Lazy-initialized on first call to embed_batch_async.
-    _encoder : msgspec.json.Encoder
-        Fast JSON encoder for request serialization.
-    _decoder : msgspec.json.Decoder[EmbeddingResponse]
-        Fast JSON decoder for response deserialization.
-
     Examples
     --------
     Create client and embed batch:
@@ -159,16 +144,18 @@ class VLLMClient:
 
     These limits prevent overwhelming the vLLM server while allowing efficient
     connection reuse for high-throughput embedding workloads.
+
+    Internal attributes (not part of public API):
+    - ``config``: vLLM configuration
+    - ``_client``: Persistent HTTP client with connection pooling. Created during
+      initialization and reused across all requests
+    - ``_async_client``: Optional async HTTP client for concurrent embedding generation.
+      Lazy-initialized on first call to embed_batch_async
+    - ``_encoder``: Fast JSON encoder for request serialization
+    - ``_decoder``: Fast JSON decoder for response deserialization
     """
 
     def __init__(self, config: VLLMConfig) -> None:
-        """Initialize vLLM client with persistent HTTP connection pool.
-
-        Parameters
-        ----------
-        config : VLLMConfig
-            vLLM configuration including base URL, timeout, and model name.
-        """
         self.config = config
         self._encoder = msgspec.json.Encoder()
         self._decoder = msgspec.json.Decoder(EmbeddingResponse)

@@ -113,15 +113,6 @@ class ReadinessProbe:
     context : ApplicationContext
         Application context containing configuration and clients.
 
-    Attributes
-    ----------
-    _context : ApplicationContext
-        Application context with configuration and paths.
-    _lock : asyncio.Lock
-        Lock protecting _last_checks cache during concurrent refresh calls.
-    _last_checks : dict[str, CheckResult]
-        Cache of most recent check results keyed by resource name.
-
     Examples
     --------
     Initialize during application startup:
@@ -143,6 +134,11 @@ class ReadinessProbe:
     -----
     The probe maintains a cache of check results to avoid recomputing on every
     request. The cache is updated atomically via async lock during refresh().
+
+    Internal attributes (not part of public API):
+    - ``_context``: Application context with configuration and paths
+    - ``_lock``: Lock protecting _last_checks cache during concurrent refresh calls
+    - ``_last_checks``: Cache of most recent check results keyed by resource name
     """
 
     def __init__(self, context: ApplicationContext) -> None:
@@ -371,6 +367,11 @@ class ReadinessProbe:
     def _check_duckdb_catalog(self, path: Path) -> CheckResult:
         """Validate DuckDB catalog presence and optional materialization state.
 
+        Parameters
+        ----------
+        path : Path
+            Path to the DuckDB catalog file.
+
         Returns
         -------
         CheckResult
@@ -413,6 +414,11 @@ class ReadinessProbe:
     def _duckdb_table_exists(conn: duckdb.DuckDBPyConnection) -> bool:
         """Return True when `chunks_materialized` table exists.
 
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            DuckDB database connection.
+
         Returns
         -------
         bool
@@ -433,6 +439,11 @@ class ReadinessProbe:
     @staticmethod
     def _duckdb_index_exists(conn: duckdb.DuckDBPyConnection) -> bool:
         """Return True when `idx_chunks_materialized_uri` index exists.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            DuckDB database connection.
 
         Returns
         -------

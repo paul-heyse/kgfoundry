@@ -8,13 +8,15 @@ corpus size for optimal performance.
 from __future__ import annotations
 
 import importlib
-import logging
 from pathlib import Path
 
 import faiss
 import numpy as np
 
-logger = logging.getLogger(__name__)
+from kgfoundry_common.logging import get_logger
+
+LOGGER = get_logger(__name__)
+logger = LOGGER  # Alias for compatibility
 
 
 def _has_faiss_gpu_support() -> bool:
@@ -35,11 +37,24 @@ _FAISS_GPU_AVAILABLE = _has_faiss_gpu_support()
 _SMALL_CORPUS_THRESHOLD = 5000
 _MEDIUM_CORPUS_THRESHOLD = 50000
 
+_LOG_EXTRA_BASE: dict[str, object] = {"component": "faiss_manager"}
+
+
+def _log_extra(**kwargs: object) -> dict[str, object]:
+    """Build structured logging extras for FAISS manager events.
+
+    Returns
+    -------
+    dict[str, object]
+        Merged dictionary with component name and provided kwargs.
+    """
+    return {**_LOG_EXTRA_BASE, **kwargs}
+
 
 class FAISSManager:
     """FAISS index manager with adaptive indexing, GPU support, and incremental updates.
 
-    Uses a dual-index architecture for fast incremental updates:
+    Uses a dual-index architecture for fast incremental updates.
 
     **Primary Index** (built via `build_index()`):
     - Adaptive type selection based on corpus size
@@ -152,9 +167,9 @@ class FAISSManager:
         if n_vectors < _SMALL_CORPUS_THRESHOLD:
             # Small corpus: use flat index (exact search, no training)
             cpu_index = faiss.IndexFlatIP(self.vec_dim)  # type: ignore[attr-defined]
-            logger.info(
+            LOGGER.info(
                 "Using IndexFlatIP for small corpus",
-                extra={"n_vectors": n_vectors, "index_type": "flat"},
+                extra=_log_extra(n_vectors=n_vectors, index_type="flat"),
             )
         elif n_vectors < _MEDIUM_CORPUS_THRESHOLD:
             # Medium corpus: use IVFFlat with dynamic nlist
@@ -166,9 +181,9 @@ class FAISSManager:
                 quantizer, self.vec_dim, nlist, faiss.METRIC_INNER_PRODUCT
             )
             cpu_index.train(vectors)
-            logger.info(
+            LOGGER.info(
                 "Using IVFFlat for medium corpus",
-                extra={"n_vectors": n_vectors, "nlist": nlist, "index_type": "ivf_flat"},
+                extra=_log_extra(n_vectors=n_vectors, nlist=nlist, index_type="ivf_flat"),
             )
         else:
             # Large corpus: use IVF-PQ with dynamic nlist
@@ -178,21 +193,21 @@ class FAISSManager:
             index_string = f"OPQ64,IVF{nlist},PQ64"
             cpu_index = faiss.index_factory(self.vec_dim, index_string, faiss.METRIC_INNER_PRODUCT)
             cpu_index.train(vectors)
-            logger.info(
+            LOGGER.info(
                 "Using IVF-PQ for large corpus",
-                extra={"n_vectors": n_vectors, "nlist": nlist, "index_type": "ivf_pq"},
+                extra=_log_extra(n_vectors=n_vectors, nlist=nlist, index_type="ivf_pq"),
             )
 
         # Log memory estimate
         mem_est = self.estimate_memory_usage(n_vectors)
-        logger.info(
+        LOGGER.info(
             "Memory estimate for index",
-            extra={
-                "n_vectors": n_vectors,
-                "cpu_index_bytes": mem_est["cpu_index_bytes"],
-                "gpu_index_bytes": mem_est["gpu_index_bytes"],
-                "total_bytes": mem_est["total_bytes"],
-            },
+            extra=_log_extra(
+                n_vectors=n_vectors,
+                cpu_index_bytes=mem_est["cpu_index_bytes"],
+                gpu_index_bytes=mem_est["gpu_index_bytes"],
+                total_bytes=mem_est["total_bytes"],
+            ),
         )
 
         # Wrap in IDMap for ID management
@@ -343,7 +358,10 @@ class FAISSManager:
         if self.secondary_index is None:
             flat_index = faiss.IndexFlatIP(self.vec_dim)  # type: ignore[attr-defined]
             self.secondary_index = faiss.IndexIDMap2(flat_index)
-            logger.info("Created secondary flat index for incremental updates")
+            LOGGER.info(
+                "Created secondary flat index for incremental updates",
+                extra=_log_extra(event="secondary_index_created"),
+            )
 
         # Filter out duplicate IDs (skip vectors that are already indexed)
         new_ids_list = new_ids.tolist()
@@ -351,7 +369,10 @@ class FAISSManager:
         unique_indices = np.where(unique_mask)[0]
 
         if len(unique_indices) == 0:
-            logger.info("All %s vectors already indexed in secondary index", len(new_ids))
+            LOGGER.info(
+                "All vectors already indexed in secondary index",
+                extra=_log_extra(total=len(new_ids)),
+            )
             return
 
         # Filter to unique vectors and IDs
@@ -368,13 +389,13 @@ class FAISSManager:
         # Track incremental IDs
         self.incremental_ids.update(unique_ids.tolist())
 
-        logger.info(
-            "Added %s vectors to secondary index",
-            len(unique_ids),
-            extra={
-                "total_secondary_vectors": len(self.incremental_ids),
-                "skipped_duplicates": len(new_ids) - len(unique_ids),
-            },
+        LOGGER.info(
+            "Added vectors to secondary index",
+            extra=_log_extra(
+                added=len(unique_ids),
+                total_secondary_vectors=len(self.incremental_ids),
+                skipped_duplicates=len(new_ids) - len(unique_ids),
+            ),
         )
 
     def save_cpu_index(self) -> None:
@@ -446,7 +467,10 @@ class FAISSManager:
 
         self.secondary_index_path.parent.mkdir(parents=True, exist_ok=True)
         faiss.write_index(self.secondary_index, str(self.secondary_index_path))
-        logger.info("Persisted secondary FAISS index to %s", self.secondary_index_path)
+        LOGGER.info(
+            "Persisted secondary FAISS index",
+            extra=_log_extra(path=str(self.secondary_index_path)),
+        )
 
     def load_secondary_index(self) -> None:
         """Load secondary index from disk.
@@ -484,10 +508,12 @@ class FAISSManager:
                 # Fallback: assume sequential IDs if no id_map
                 self.incremental_ids = set(range(n_vectors))
 
-        logger.info(
-            "Loaded secondary FAISS index from %s (%s vectors)",
-            self.secondary_index_path,
-            len(self.incremental_ids),
+        LOGGER.info(
+            "Loaded secondary FAISS index",
+            extra=_log_extra(
+                path=str(self.secondary_index_path),
+                vectors=len(self.incremental_ids),
+            ),
         )
 
     def clone_to_gpu(self, device: int = 0) -> bool:
@@ -532,7 +558,10 @@ class FAISSManager:
 
         if not _FAISS_GPU_AVAILABLE:
             self.gpu_disabled_reason = "FAISS GPU symbols unavailable - running in CPU mode"
-            logger.info("Skipping GPU clone; %s", self.gpu_disabled_reason)
+            LOGGER.info(
+                "Skipping GPU clone; FAISS GPU symbols unavailable",
+                extra=_log_extra(reason=self.gpu_disabled_reason, device=device),
+            )
             return False
 
         try:
@@ -549,7 +578,10 @@ class FAISSManager:
                 try:
                     self._try_load_cuvs()
                 except (ImportError, RuntimeError, AttributeError) as exc:
-                    logger.warning("cuVS acceleration unavailable: %s", exc)
+                    LOGGER.warning(
+                        "cuVS acceleration unavailable",
+                        extra=_log_extra(reason=str(exc)),
+                    )
                 else:
                     co.use_cuvs = True
 
@@ -558,9 +590,9 @@ class FAISSManager:
             self.gpu_resources = None
             self.gpu_index = None
             self.gpu_disabled_reason = f"FAISS GPU disabled - using CPU: {exc}"
-            logger.warning(
-                "FAISS GPU initialization failed; continuing with CPU index: %s",
-                exc,
+            LOGGER.warning(
+                "FAISS GPU initialization failed; continuing with CPU index",
+                extra=_log_extra(reason=str(exc), device=device),
                 exc_info=True,
             )
             return False
@@ -631,13 +663,13 @@ class FAISSManager:
             merged_dists, merged_ids = self._merge_results(
                 primary_dists, primary_ids, secondary_dists, secondary_ids, k
             )
-            logger.debug(
+            LOGGER.debug(
                 "Dual-index search completed",
-                extra={
-                    "primary_results": primary_dists.shape[1],
-                    "secondary_results": secondary_dists.shape[1],
-                    "merged_results": merged_dists.shape[1],
-                },
+                extra=_log_extra(
+                    primary_results=primary_dists.shape[1],
+                    secondary_results=secondary_dists.shape[1],
+                    merged_results=merged_dists.shape[1],
+                ),
             )
             return merged_dists, merged_ids
 
@@ -816,7 +848,10 @@ class FAISSManager:
             (e.g., index does not support reconstruction or ID mapping).
         """
         if self.secondary_index is None or len(self.incremental_ids) == 0:
-            logger.info("No secondary index to merge - skipping merge operation")
+            LOGGER.info(
+                "No secondary index to merge - skipping merge operation",
+                extra=_log_extra(secondary_size=len(self.incremental_ids)),
+            )
             return
 
         try:
@@ -826,7 +861,10 @@ class FAISSManager:
             raise RuntimeError(msg) from exc
 
         # Extract vectors from both indexes
-        logger.info("Extracting vectors from primary and secondary indexes")
+        LOGGER.info(
+            "Extracting vectors from primary and secondary indexes",
+            extra=_log_extra(secondary_vectors=len(self.incremental_ids)),
+        )
         primary_vectors, primary_ids = self._extract_all_vectors(cpu_index)
         secondary_vectors, secondary_ids = self._extract_all_vectors(self.secondary_index)
 
@@ -834,11 +872,13 @@ class FAISSManager:
         all_vectors = np.vstack([primary_vectors, secondary_vectors])
         all_ids = np.concatenate([primary_ids, secondary_ids])
 
-        logger.info(
-            "Merging indexes: %s primary + %s secondary = %s total vectors",
-            len(primary_ids),
-            len(secondary_ids),
-            len(all_ids),
+        LOGGER.info(
+            "Merging indexes",
+            extra=_log_extra(
+                primary_vectors=len(primary_ids),
+                secondary_vectors=len(secondary_ids),
+                total_vectors=len(all_ids),
+            ),
         )
 
         # Rebuild primary index with combined dataset
@@ -851,14 +891,13 @@ class FAISSManager:
         self.secondary_gpu_index = None
         self.incremental_ids.clear()
 
-        logger.info(
-            "Successfully merged %s vectors into primary index",
-            len(secondary_ids),
-            extra={
-                "total_vectors": len(all_ids),
-                "primary_vectors": len(primary_ids),
-                "secondary_vectors": len(secondary_ids),
-            },
+        LOGGER.info(
+            "Successfully merged secondary vectors into primary index",
+            extra=_log_extra(
+                merged_secondary=len(secondary_ids),
+                total_vectors=len(all_ids),
+                primary_vectors=len(primary_ids),
+            ),
         )
 
     def _extract_all_vectors(self, index: faiss.Index) -> tuple[np.ndarray, np.ndarray]:

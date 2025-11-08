@@ -82,15 +82,6 @@ class ScopeRegistry:
     last-accessed timestamps for LRU expiration. Designed for concurrent access
     from FastAPI request handlers running in a threadpool.
 
-    Attributes
-    ----------
-    _scopes : dict[str, tuple[ScopeIn, float]]
-        Internal storage: {session_id: (scope, last_accessed_timestamp)}.
-        Timestamps are from time.monotonic() for monotonic clock guarantees.
-    _lock : RLock
-        Reentrant lock protecting dict operations. RLock allows same thread
-        to acquire lock multiple times (e.g., set_scope calls _update_timestamp).
-
     Notes
     -----
     The registry is NOT persistent—server restart clears all sessions. For
@@ -105,6 +96,12 @@ class ScopeRegistry:
     - All public methods acquire _lock before dict access.
     - RLock prevents deadlocks when methods call each other.
     - ContextVar in middleware ensures session ID isolation across threads.
+
+    Internal attributes (not part of public API):
+    - ``_scopes``: Internal storage: {session_id: (scope, last_accessed_timestamp)}.
+      Timestamps are from time.monotonic() for monotonic clock guarantees.
+    - ``_lock``: Reentrant lock protecting dict operations. RLock allows same thread
+      to acquire lock multiple times (e.g., set_scope calls _update_timestamp).
 
     Examples
     --------
@@ -131,11 +128,6 @@ class ScopeRegistry:
     """
 
     def __init__(self) -> None:
-        """Initialize empty scope registry.
-
-        The registry starts with no sessions. Sessions are created on first
-        set_scope call and expire after configured inactivity period.
-        """
         self._scopes: dict[str, tuple[ScopeIn, float]] = {}
         self._lock = RLock()
         # Initialize metrics gauge to 0
