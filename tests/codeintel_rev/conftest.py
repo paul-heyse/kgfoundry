@@ -1,50 +1,191 @@
-"""Shared pytest fixtures for tests in tests/codeintel_rev."""
+"""Shared pytest fixtures for codeintel_rev tests."""
 
-import sys
-import types
+from __future__ import annotations
 
-try:
-    import faiss  # type: ignore[import-untyped]
-except Exception:  # pragma: no cover - fallback to stub when FAISS import fails
-    sys.modules.pop("faiss", None)
-    faiss_module = sys.modules.setdefault("faiss", types.ModuleType("faiss"))
+import os
+import time as time_module
+from collections.abc import Iterator
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
 
-    if not hasattr(faiss_module, "read_index"):
+import pytest
 
-        def _read_index(_path: str) -> types.SimpleNamespace:
-            return types.SimpleNamespace(ntotal=0)
+os.environ.setdefault("FAISS_OPT_LEVEL", "generic")
 
-        faiss_module.read_index = _read_index  # type: ignore[attr-defined]
+import tests.codeintel_rev._faiss_stub  # noqa: F401  # ensure FAISS stub is registered
+from codeintel_rev.app.config_context import ApplicationContext, ResolvedPaths
+from codeintel_rev.app.middleware import session_id_var
+from codeintel_rev.app.scope_store import ScopeStore
+from codeintel_rev.config.settings import (
+    IndexConfig,
+    PathsConfig,
+    RedisConfig,
+    ServerLimits,
+    Settings,
+    VLLMConfig,
+)
+from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
+from codeintel_rev.io.faiss_manager import FAISSManager
+from codeintel_rev.io.git_client import AsyncGitClient, GitClient
+from codeintel_rev.io.vllm_client import VLLMClient
 
-    if not hasattr(faiss_module, "write_index"):
 
-        def _write_index(_index: object, _path: str) -> None:
+class _FakeRedis:
+    """Simple in-memory Redis mimic for tests."""
+
+    def __init__(self) -> None:
+        self._data: dict[str, tuple[bytes, float | None]] = {}
+
+    async def get(self, name: str) -> bytes | None:
+        record = self._data.get(name)
+        if record is None:
             return None
+        value, expires_at = record
+        if expires_at is not None and expires_at <= time_module.monotonic():
+            self._data.pop(name, None)
+            return None
+        return value
 
-        faiss_module.write_index = _write_index  # type: ignore[attr-defined]
+    async def setex(self, name: str, time: int, value: bytes) -> bool | None:
+        expires_at = time_module.monotonic() + time if time > 0 else None
+        self._data[name] = (value, expires_at)
+        return True
 
-    if not hasattr(faiss_module, "StandardGpuResources"):
+    async def set(self, name: str, value: bytes) -> bool | None:
+        self._data[name] = (value, None)
+        return True
 
-        class _StandardGpuResources:
-            def __init__(self) -> None:
-                self.initialized = True
+    async def delete(self, *names: str) -> int | None:
+        removed = 0
+        for entry in names:
+            if self._data.pop(entry, None) is not None:
+                removed += 1
+        return removed
 
-        faiss_module.StandardGpuResources = _StandardGpuResources  # type: ignore[attr-defined]
+    async def close(self) -> None:
+        self._data.clear()
 
-    if not hasattr(faiss_module, "GpuClonerOptions"):
 
-        class _GpuClonerOptions:
-            def __init__(self) -> None:
-                self.useFloat16 = False
+@pytest.fixture
+def mock_application_context(tmp_path: Path) -> ApplicationContext:
+    """Create a mock ApplicationContext for testing.
 
-        faiss_module.GpuClonerOptions = _GpuClonerOptions  # type: ignore[attr-defined]
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory path provided by pytest fixture.
 
-    if not hasattr(faiss_module, "index_cpu_to_gpu"):
+    Returns
+    -------
+    ApplicationContext
+        Mock application context with test paths and settings.
+    """
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
 
-        def _index_cpu_to_gpu(*_args: object, **_kwargs: object) -> None:
-            msg = "GPU unavailable in tests"
-            raise RuntimeError(msg)
+    settings = Settings(
+        paths=PathsConfig(
+            repo_root=str(repo_root),
+            data_dir="data",
+            vectors_dir="data/vectors",
+            faiss_index="data/faiss/index.faiss",
+            duckdb_path="data/catalog.duckdb",
+            scip_index="index.scip.json",
+        ),
+        index=IndexConfig(
+            vec_dim=2560,
+            chunk_budget=2200,
+            faiss_nlist=8192,
+            use_cuvs=True,
+        ),
+        vllm=VLLMConfig(
+            base_url="http://localhost:8001/v1",
+            batch_size=32,
+        ),
+        limits=ServerLimits(),
+        redis=RedisConfig(
+            url="redis://127.0.0.1:6379/0",
+            scope_l1_size=64,
+            scope_l1_ttl_seconds=300,
+            scope_l2_ttl_seconds=3600,
+        ),
+        duckdb=DuckDBConfig(),
+    )
 
-        faiss_module.index_cpu_to_gpu = _index_cpu_to_gpu  # type: ignore[attr-defined]
+    paths = ResolvedPaths(
+        repo_root=repo_root,
+        data_dir=repo_root / "data",
+        vectors_dir=repo_root / "data" / "vectors",
+        faiss_index=repo_root / "data" / "faiss" / "index.faiss",
+        duckdb_path=repo_root / "data" / "catalog.duckdb",
+        scip_index=repo_root / "index.scip.json",
+    )
 
-from codeintel_rev.tests.conftest import *  # noqa: F403,E402
+    paths.data_dir.mkdir(parents=True, exist_ok=True)
+    paths.vectors_dir.mkdir(parents=True, exist_ok=True)
+    paths.faiss_index.parent.mkdir(parents=True, exist_ok=True)
+    paths.duckdb_path.parent.mkdir(parents=True, exist_ok=True)
+
+    vllm_client = MagicMock(spec=VLLMClient)
+    faiss_manager = MagicMock(spec=FAISSManager)
+    faiss_manager.gpu_index = None
+    faiss_manager.gpu_disabled_reason = None
+    faiss_manager.clone_to_gpu.return_value = False
+    git_client = MagicMock(spec=GitClient)
+    async_git_client = AsyncMock(spec=AsyncGitClient)
+    async_git_client.blame_range.return_value = [
+        {
+            "line": 1,
+            "commit": "abc1234",
+            "author": "Test Author",
+            "date": "2024-01-01T00:00:00Z",
+            "message": "Test commit",
+        }
+    ]
+    async_git_client.file_history.return_value = [
+        {
+            "sha": "abc1234",
+            "full_sha": "abc1234abcdef",
+            "author": "Test Author",
+            "email": "test@example.com",
+            "date": "2024-01-01T00:00:00Z",
+            "message": "Test commit",
+        }
+    ]
+    redis_client = _FakeRedis()
+    scope_store = ScopeStore(
+        redis_client,
+        l1_maxsize=settings.redis.scope_l1_size,
+        l1_ttl_seconds=settings.redis.scope_l1_ttl_seconds,
+        l2_ttl_seconds=settings.redis.scope_l2_ttl_seconds,
+    )
+    duckdb_manager = DuckDBManager(paths.duckdb_path, DuckDBConfig())
+
+    return ApplicationContext(
+        settings=settings,
+        paths=paths,
+        vllm_client=vllm_client,
+        faiss_manager=faiss_manager,
+        scope_store=scope_store,
+        duckdb_manager=duckdb_manager,
+        git_client=git_client,
+        async_git_client=async_git_client,
+    )
+
+
+@pytest.fixture
+def mock_session_id() -> Iterator[str]:
+    """Provide a session ID bound to middleware context vars for adapter calls.
+
+    Yields
+    ------
+    str
+        Session ID string that is set in the middleware context variable.
+        The context variable is reset after the test completes.
+    """
+    session_id = "test-session"
+    token = session_id_var.set(session_id)
+    try:
+        yield session_id
+    finally:
+        session_id_var.reset(token)

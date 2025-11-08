@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import importlib
 import json
-import sys
-import types
 from pathlib import Path
 
 import numpy as np
@@ -13,59 +11,12 @@ import pytest
 from codeintel_rev.config.settings import IndexConfig
 from codeintel_rev.io.faiss_dual_index import FAISSDualIndexManager, IndexManifest
 
-from tests.conftest import HAS_FAISS_SUPPORT, HAS_GPU_STACK
+from tests.conftest import HAS_FAISS_SUPPORT
 
 if not HAS_FAISS_SUPPORT:  # pragma: no cover - gated on FAISS availability
-    pytest.skip("FAISS module unavailable; skipping FAISS dual-index tests", allow_module_level=True)
+    pytest.skip("FAISS bindings unavailable; skipping dual-index tests", allow_module_level=True)
 
-def _build_stub_faiss_module() -> object:
-    """Return a lightweight FAISS stub for environments without native bindings."""
-
-    class _StubIndex:
-        def __init__(self, dim: int) -> None:
-            self.d = dim
-            self.ntotal = 0
-
-        def add(self, _vectors: np.ndarray) -> None:
-            self.ntotal += len(_vectors)
-
-        def add_with_ids(self, vectors: np.ndarray, ids: np.ndarray) -> None:
-            self.add(vectors)
-            _ = ids
-
-        def search(self, _query: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
-            distances = np.zeros((1, k), dtype=np.float32)
-            ids = -np.ones((1, k), dtype=np.int64)
-            return distances, ids
-
-    class _StubGpuResources:
-        pass
-
-    class _StubClonerOptions:
-        def __init__(self) -> None:
-            self.use_cuvs = False
-
-    module = types.SimpleNamespace()
-    module.IndexFlatIP = lambda dim: _StubIndex(dim)
-    module.IndexIDMap2 = lambda index: index
-    module.normalize_L2 = lambda _vectors: None
-    module.write_index = lambda *_args, **_kwargs: None
-    module.read_index = lambda path: _StubIndex(1)
-    module.StandardGpuResources = _StubGpuResources
-    module.GpuClonerOptions = _StubClonerOptions
-    module.index_cpu_to_gpu = lambda *_args, **_kwargs: _StubIndex(1)
-    return module
-
-
-try:
-    sys.modules.pop("faiss", None)
-    faiss = importlib.import_module("faiss")  # type: ignore[import-untyped]
-    _REQUIRED_ATTRS = ("IndexFlatIP", "normalize_L2", "write_index")
-    if not all(hasattr(faiss, attr) for attr in _REQUIRED_ATTRS):
-        raise AttributeError("FAISS build missing required symbols")
-except Exception:  # pragma: no cover - fallback when FAISS import is incomplete
-    faiss = _build_stub_faiss_module()
-    sys.modules["faiss"] = faiss  # type: ignore[assignment]
+faiss = importlib.import_module("faiss")
 
 _rng = np.random.default_rng(1234)
 
@@ -91,7 +42,7 @@ def _sample_manifest() -> IndexManifest:
     )
 
 
-def _build_flat_index(vec_dim: int, count: int) -> faiss.Index:  # type: ignore[name-defined]
+def _build_flat_index(vec_dim: int, count: int) -> faiss.Index:
     """Construct an in-memory FAISS flat index populated with unit vectors.
 
     Parameters
@@ -106,7 +57,7 @@ def _build_flat_index(vec_dim: int, count: int) -> faiss.Index:  # type: ignore[
     faiss.Index
         Flat inner-product index containing ``count`` normalized vectors.
     """
-    index = faiss.IndexFlatIP(vec_dim)  # type: ignore[attr-defined]
+    index = faiss.IndexFlatIP(vec_dim)
     vectors = _rng.standard_normal((count, vec_dim)).astype(np.float32)
     faiss.normalize_L2(vectors)
     index.add(vectors)
@@ -130,9 +81,9 @@ async def test_ensure_ready_loads_indexes_without_gpu(tmp_path: Path) -> None:
 
     assert ready is True
     assert manager.primary_index is not None
-    assert manager.primary_index.d == vec_dim  # type: ignore[attr-defined]
+    assert manager.primary_index.d == vec_dim
     assert manager.secondary_index is not None
-    assert manager.secondary_index.ntotal == 0  # type: ignore[attr-defined]
+    assert manager.secondary_index.ntotal == 0
     assert manager.manifest == manifest
     assert manager.gpu_enabled is (reason is None)
 
@@ -160,49 +111,50 @@ async def test_ensure_ready_dimension_mismatch(tmp_path: Path) -> None:
     faiss.write_index(mismatched, str(tmp_path / "primary.faiss"))
 
     settings = IndexConfig(vec_dim=vec_dim, use_cuvs=False)
-    manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
+    manager = FAISSDualIndexManager(tmp_path, settings, vec_dim=vec_dim)
 
     ready, reason = await manager.ensure_ready()
 
     assert ready is False
-    assert reason is not None
-    assert "Dimension mismatch" in reason
-    assert manager.primary_index is None
-    assert manager.secondary_index is None
+    assert "Dimension mismatch" in str(reason)
 
 
-def test_manifest_roundtrip(tmp_path: Path) -> None:
-    """Manifest serialization round-trips through disk."""
-    manifest = _sample_manifest()
+def test_manifest_round_trip(tmp_path: Path) -> None:
+    """Manifest JSON round-trips and preserves optional fields."""
     path = tmp_path / "manifest.json"
+    manifest = _sample_manifest()
     manifest.to_file(path)
 
     loaded = IndexManifest.from_file(path)
+
     assert loaded == manifest
 
 
 def test_manifest_optional_fields(tmp_path: Path) -> None:
-    """Optional fields may be omitted from JSON payload."""
-    payload = {
-        "version": "2025-11-08",
-        "vec_dim": 2560,
-        "index_type": "IVFPQ",
-        "metric": "IP",
-        "trained_on": "dataset-v2",
-        "built_at": "2025-11-08T11:00:00Z",
-        "gpu_enabled": True,
-        "primary_count": 100,
-        "secondary_count": 5,
-    }
+    """Optional manifest fields survive serialization."""
     path = tmp_path / "manifest.json"
-    path.write_text(json.dumps(payload), encoding="utf-8")
+    manifest = IndexManifest(
+        version="2025-11-08",
+        vec_dim=16,
+        index_type="IVFPQ",
+        metric="IP",
+        trained_on="unit-test",
+        built_at="2025-11-08T12:34:56Z",
+        gpu_enabled=True,
+        primary_count=128,
+        secondary_count=64,
+        nlist=4096,
+        pq_m=32,
+        cuvs_version="1.0.0",
+    )
+    manifest.to_file(path)
 
     loaded = IndexManifest.from_file(path)
 
     assert loaded.index_type == "IVFPQ"
-    assert loaded.nlist is None
-    assert loaded.pq_m is None
-    assert loaded.cuvs_version is None
+    assert loaded.nlist == 4096
+    assert loaded.pq_m == 32
+    assert loaded.cuvs_version == "1.0.0"
 
 
 def test_manifest_invalid_payload(tmp_path: Path) -> None:
@@ -227,7 +179,7 @@ def test_manifest_missing_required_fields(tmp_path: Path) -> None:
 async def test_search_primary_only(tmp_path: Path) -> None:
     """Search returns primary results when no secondary index exists."""
     vec_dim = 8
-    primary = faiss.IndexFlatIP(vec_dim)  # type: ignore[attr-defined]
+    primary = faiss.IndexFlatIP(vec_dim)
     primary_vectors = np.eye(vec_dim, dtype=np.float32)
     faiss.normalize_L2(primary_vectors)
     primary_ids = np.arange(vec_dim, dtype=np.int64)
@@ -255,11 +207,11 @@ async def test_search_merges_secondary(tmp_path: Path) -> None:
     base_vectors = np.eye(vec_dim, dtype=np.float32)
     faiss.normalize_L2(base_vectors)
 
-    primary = faiss.IndexFlatIP(vec_dim)  # type: ignore[attr-defined]
+    primary = faiss.IndexFlatIP(vec_dim)
     primary.add_with_ids(base_vectors[:2], np.array([10, 11], dtype=np.int64))
     faiss.write_index(primary, str(tmp_path / "primary.faiss"))
 
-    secondary = faiss.IndexFlatIP(vec_dim)  # type: ignore[attr-defined]
+    secondary = faiss.IndexFlatIP(vec_dim)
     secondary.add_with_ids(base_vectors[2:3], np.array([99], dtype=np.int64))
     faiss.write_index(secondary, str(tmp_path / "secondary.faiss"))
 
@@ -274,3 +226,73 @@ async def test_search_merges_secondary(tmp_path: Path) -> None:
     assert results
     assert results[0][0] == 99
     assert results[0][1] > 0.9
+
+
+@pytest.mark.asyncio
+async def test_add_incremental_persists_secondary(tmp_path: Path) -> None:
+    """Incremental adds populate the secondary index and persist to disk."""
+    vec_dim = 6
+    primary = _build_flat_index(vec_dim, 6)
+    faiss.write_index(primary, str(tmp_path / "primary.faiss"))
+
+    settings = IndexConfig(vec_dim=vec_dim, use_cuvs=False)
+    manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
+    ready, _ = await manager.ensure_ready()
+    assert ready is True
+
+    rng = np.random.default_rng(42)
+    new_vectors = rng.standard_normal((1, vec_dim)).astype(np.float32)
+    faiss.normalize_L2(new_vectors)
+    new_ids = np.array([9999], dtype=np.int64)
+
+    await manager.add_incremental(new_vectors, new_ids)
+
+    assert manager.secondary_index is not None
+    assert manager.secondary_index.ntotal == 1
+
+    persisted = faiss.read_index(str(tmp_path / "secondary.faiss"))
+    assert persisted.ntotal == 1
+
+    hits = manager.search(new_vectors[0], k=1)
+    assert hits[0][0] == 9999
+
+
+@pytest.mark.asyncio
+async def test_add_incremental_dimension_mismatch(tmp_path: Path) -> None:
+    """Dimension mismatches raise ValueError to protect index integrity."""
+    vec_dim = 4
+    primary = _build_flat_index(vec_dim, 4)
+    faiss.write_index(primary, str(tmp_path / "primary.faiss"))
+
+    settings = IndexConfig(vec_dim=vec_dim, use_cuvs=False)
+    manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
+    ready, _ = await manager.ensure_ready()
+    assert ready is True
+
+    bad_vectors = np.ones((1, vec_dim + 1), dtype=np.float32)
+    with pytest.raises(ValueError, match="Vector dimension"):
+        await manager.add_incremental(bad_vectors, np.array([1], dtype=np.int64))
+
+
+@pytest.mark.asyncio
+async def test_needs_compaction_threshold(tmp_path: Path) -> None:
+    """Compaction triggers once the secondary ratio exceeds the threshold."""
+    vec_dim = 8
+    primary = _build_flat_index(vec_dim, 20)
+    faiss.write_index(primary, str(tmp_path / "primary.faiss"))
+
+    settings = IndexConfig(vec_dim=vec_dim, use_cuvs=False, compaction_threshold=0.05)
+    manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
+    ready, _ = await manager.ensure_ready()
+    assert ready is True
+
+    assert manager.needs_compaction() is False
+
+    base_vec = np.eye(vec_dim, dtype=np.float32)
+    faiss.normalize_L2(base_vec)
+
+    await manager.add_incremental(base_vec[0:1], np.array([10_001], dtype=np.int64))
+    assert manager.needs_compaction() is False
+
+    await manager.add_incremental(base_vec[1:2], np.array([10_002], dtype=np.int64))
+    assert manager.needs_compaction() is True

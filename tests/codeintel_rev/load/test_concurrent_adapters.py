@@ -73,6 +73,11 @@ async def test_concurrent_list_paths(mock_context: Mock) -> None:
     async def list_paths_task(_task_id: int) -> dict:
         """Single list_paths task.
 
+        Parameters
+        ----------
+        _task_id : int
+            Task identifier (unused, for task differentiation only).
+
         Returns
         -------
         dict
@@ -126,6 +131,11 @@ async def test_concurrent_blame_range(mock_context: Mock) -> None:
 
     async def blame_task(task_id: int) -> dict:
         """Single blame_range task.
+
+        Parameters
+        ----------
+        task_id : int
+            Task identifier used to select which file to blame.
 
         Returns
         -------
@@ -193,6 +203,11 @@ async def test_mixed_concurrent_operations(mock_context: Mock) -> None:
     async def blame_task(task_id: int) -> dict:
         """Single blame_range task.
 
+        Parameters
+        ----------
+        task_id : int
+            Task identifier used to select which file to blame.
+
         Returns
         -------
         dict
@@ -244,6 +259,11 @@ async def test_no_thread_exhaustion(mock_context: Mock) -> None:
 
     async def list_paths_task(_task_id: int) -> dict:
         """Single list_paths task.
+
+        Parameters
+        ----------
+        _task_id : int
+            Task identifier (unused, for task differentiation only).
 
         Returns
         -------

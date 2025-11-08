@@ -340,6 +340,11 @@ def test_decorator_preserves_function_signature() -> None:
     def test_func(param: str) -> dict:
         """Test function docstring.
 
+        Parameters
+        ----------
+        param : str
+            Test parameter used for signature testing only.
+
         Returns
         -------
         dict

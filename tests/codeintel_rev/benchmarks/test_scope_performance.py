@@ -463,6 +463,13 @@ def _run_hot_query(manager: DuckDBManager) -> None:
 def _average_duration(manager: DuckDBManager, iterations: int = 20) -> float:
     """Return the average execution time across repeated catalog queries.
 
+    Parameters
+    ----------
+    manager : DuckDBManager
+        DuckDB connection manager to use for queries.
+    iterations : int, optional
+        Number of query iterations to average. Defaults to 20.
+
     Returns
     -------
     float
@@ -493,8 +500,15 @@ def test_object_cache_benchmark(benchmark_catalog: DuckDBCatalog) -> None:
     )
 
 
-def _write_materialization_dataset(vectors_dir, row_count: int = 2_000) -> str:
+def _write_materialization_dataset(vectors_dir: Path, row_count: int = 2_000) -> str:
     """Create a Parquet dataset used for materialization benchmarks.
+
+    Parameters
+    ----------
+    vectors_dir : Path
+        Directory where the Parquet file will be written.
+    row_count : int, optional
+        Number of rows to generate in the dataset. Defaults to 2_000.
 
     Returns
     -------

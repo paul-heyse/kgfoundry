@@ -15,7 +15,7 @@ import numpy as np
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
-    import faiss  # type: ignore[import-not-found]
+    import faiss
 
     from codeintel_rev.config.settings import IndexConfig
 
@@ -90,14 +90,14 @@ class FAISSDualIndexManager:
         self._settings = settings
         self._vec_dim = vec_dim
 
-        self._primary_cpu: faiss.Index | None = None  # type: ignore[name-defined]
-        self._primary_gpu: faiss.Index | None = None  # type: ignore[name-defined]
-        self._secondary_cpu: faiss.Index | None = None  # type: ignore[name-defined]
-        self._secondary_gpu: faiss.Index | None = None  # type: ignore[name-defined]
+        self._primary_cpu: faiss.Index | None = None
+        self._primary_gpu: faiss.Index | None = None
+        self._secondary_cpu: faiss.Index | None = None
+        self._secondary_gpu: faiss.Index | None = None
         self._manifest: IndexManifest | None = None
         self._faiss_module: ModuleType | None = None
 
-        self._gpu_resources: faiss.StandardGpuResources | None = None  # type: ignore[name-defined]
+        self._gpu_resources: faiss.StandardGpuResources | None = None
         self._gpu_enabled: bool = False
         self._gpu_disabled_reason: str | None = None
 
@@ -112,12 +112,12 @@ class FAISSDualIndexManager:
         return self._gpu_disabled_reason
 
     @property
-    def primary_index(self) -> faiss.Index | None:  # type: ignore[name-defined]
+    def primary_index(self) -> faiss.Index | None:
         """Return the loaded primary FAISS index, if available."""
         return self._primary_cpu
 
     @property
-    def secondary_index(self) -> faiss.Index | None:  # type: ignore[name-defined]
+    def secondary_index(self) -> faiss.Index | None:
         """Return the loaded secondary FAISS index, if available."""
         return self._secondary_cpu
 
@@ -223,7 +223,7 @@ class FAISSDualIndexManager:
         fetch = max(k * 2, k)
 
         if hasattr(primary_index, "nprobe"):
-            primary_index.nprobe = nprobe_effective  # type: ignore[attr-defined]
+            primary_index.nprobe = nprobe_effective
         distances_p, ids_p = primary_index.search(query_norm, fetch)
 
         if secondary_index is not None and getattr(secondary_index, "ntotal", 0) > 0:
@@ -246,6 +246,117 @@ class FAISSDualIndexManager:
         sorted_results = sorted(results.items(), key=lambda item: item[1], reverse=True)
         return sorted_results[:k]
 
+    async def add_incremental(self, vectors: np.ndarray, chunk_ids: np.ndarray) -> None:
+        """Append vectors to the secondary index and persist them to disk.
+
+        Parameters
+        ----------
+        vectors : np.ndarray
+            2-D array of shape ``(n, vec_dim)`` containing the vectors to add. The
+            vectors are L2-normalized before insertion.
+        chunk_ids : np.ndarray
+            1-D array of shape ``(n,)`` containing the chunk identifiers to bind to
+            the provided vectors. IDs are coerced to ``int64``.
+
+        Raises
+        ------
+        RuntimeError
+            If :meth:`ensure_ready` has not been called yet.
+        ValueError
+            If the vectors do not match the configured embedding dimension or if
+            the number of vectors differs from the number of chunk IDs.
+        """
+        if self._primary_cpu is None or self._secondary_cpu is None:
+            msg = "FAISS indexes not loaded. Call ensure_ready() before add_incremental()."
+            raise RuntimeError(msg)
+
+        expected_rank = 2
+        if vectors.ndim != expected_rank:
+            msg = "vectors must have shape (n, vec_dim)"
+            raise ValueError(msg)
+        if vectors.shape[1] != self._vec_dim:
+            msg = f"Vector dimension {vectors.shape[1]} does not match expected {self._vec_dim}"
+            raise ValueError(msg)
+
+        ids = np.asarray(chunk_ids, dtype=np.int64)
+        if ids.ndim != 1:
+            msg = "chunk_ids must be a 1-D array"
+            raise ValueError(msg)
+        if vectors.shape[0] != ids.shape[0]:
+            msg = "vectors and chunk_ids must have the same length"
+            raise ValueError(msg)
+        if vectors.shape[0] == 0:
+            return
+
+        faiss_module = self._faiss_module or importlib.import_module("faiss")
+
+        vectors32 = np.ascontiguousarray(vectors, dtype=np.float32)
+        faiss_module.normalize_L2(vectors32)
+        self._secondary_cpu.add_with_ids(vectors32, ids)
+
+        secondary_path = self._index_dir / "secondary.faiss"
+        await asyncio.to_thread(faiss_module.write_index, self._secondary_cpu, str(secondary_path))
+
+        if self._gpu_enabled:
+            if self._gpu_resources is None:
+                self._gpu_enabled = False
+                self._secondary_gpu = None
+                self._primary_gpu = None
+                self._gpu_disabled_reason = "GPU resources unavailable during incremental add"
+                LOGGER.warning(
+                    "faiss_gpu_incremental_disabled",
+                    extra={"reason": self._gpu_disabled_reason},
+                )
+            else:
+                try:
+                    self._secondary_gpu = faiss_module.index_cpu_to_gpu(
+                        self._gpu_resources,
+                        0,
+                        self._secondary_cpu,
+                    )
+                except (AttributeError, RuntimeError) as exc:
+                    self._secondary_gpu = None
+                    self._primary_gpu = None
+                    self._gpu_resources = None
+                    self._gpu_enabled = False
+                    self._gpu_disabled_reason = f"Secondary GPU clone failed: {exc}"
+                    LOGGER.warning(
+                        "faiss_gpu_incremental_clone_failed",
+                        extra={"error": str(exc)},
+                    )
+
+        secondary_total = int(getattr(self._secondary_cpu, "ntotal", 0))
+        LOGGER.info(
+            "faiss_incremental_add",
+            extra={
+                "added": int(ids.size),
+                "secondary_total": secondary_total,
+                "index_dir": str(self._index_dir),
+            },
+        )
+
+    def needs_compaction(self) -> bool:
+        """Return ``True`` when the secondary index exceeds the compaction threshold.
+
+        Returns
+        -------
+        bool
+            ``True`` when ``secondary.ntotal / primary.ntotal`` is greater than the
+            configured compaction threshold; otherwise ``False``.
+        """
+        if self._primary_cpu is None or self._secondary_cpu is None:
+            return False
+
+        primary_total = int(getattr(self._primary_cpu, "ntotal", 0))
+        secondary_total = int(getattr(self._secondary_cpu, "ntotal", 0))
+        if secondary_total == 0:
+            return False
+
+        threshold = float(getattr(self._settings, "compaction_threshold", 0.05))
+        denominator = max(primary_total, 1)
+        ratio = secondary_total / denominator
+        return ratio > threshold
+
     def _reset_gpu_state(self) -> None:
         self._primary_gpu = None
         self._secondary_gpu = None
@@ -266,7 +377,7 @@ class FAISSDualIndexManager:
 
     async def _load_primary_index(
         self, faiss_module: ModuleType
-    ) -> tuple[faiss.Index | None, str | None]:  # type: ignore[name-defined]
+    ) -> tuple[faiss.Index | None, str | None]:
         primary_path = self._index_dir / "primary.faiss"
         if not primary_path.exists():
             reason = "Primary index not found"
@@ -301,7 +412,7 @@ class FAISSDualIndexManager:
 
         return primary_cpu, None
 
-    async def _load_secondary_index(self, faiss_module: ModuleType) -> faiss.Index:  # type: ignore[name-defined]
+    async def _load_secondary_index(self, faiss_module: ModuleType) -> faiss.Index:
         secondary_path = self._index_dir / "secondary.faiss"
         if secondary_path.exists():
             try:
@@ -312,7 +423,7 @@ class FAISSDualIndexManager:
                     extra={"path": str(secondary_path), "error": str(exc)},
                 )
 
-        return faiss_module.IndexFlatIP(self._vec_dim)  # type: ignore[attr-defined]
+        return faiss_module.IndexFlatIP(self._vec_dim)
 
     def _load_manifest(self) -> None:
         manifest_path = self._index_dir / "primary.manifest.json"
@@ -379,7 +490,7 @@ class FAISSDualIndexManager:
             extra={"use_cuvs": bool(self._settings.use_cuvs)},
         )
 
-    def _select_primary_index(self) -> faiss.Index:  # type: ignore[name-defined]
+    def _select_primary_index(self) -> faiss.Index:
         if self._primary_cpu is None:
             msg = "Primary index not loaded"
             raise RuntimeError(msg)
@@ -387,7 +498,7 @@ class FAISSDualIndexManager:
             return self._primary_gpu
         return self._primary_cpu
 
-    def _select_secondary_index(self) -> faiss.Index | None:  # type: ignore[name-defined]
+    def _select_secondary_index(self) -> faiss.Index | None:
         if self._secondary_cpu is None:
             return None
         if self._gpu_enabled and self._secondary_gpu is not None:

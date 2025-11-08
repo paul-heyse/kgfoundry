@@ -65,7 +65,18 @@ def _modules_available(modules: Iterable[str]) -> bool:
 
 
 def _has_distribution(dist_name: str) -> bool:
-    """Return True when the given package distribution is installed."""
+    """Return True when the given package distribution is installed.
+
+    Parameters
+    ----------
+    dist_name : str
+        Distribution package name to check.
+
+    Returns
+    -------
+    bool
+        True if the distribution is installed, False otherwise.
+    """
     try:
         metadata.version(dist_name)
     except metadata.PackageNotFoundError:
@@ -606,13 +617,13 @@ def _faiss_smoke() -> tuple[bool, str]:
         return False, "faiss built without GPU bindings (StandardGpuResources missing)"
 
     try:
-        ngpu = faiss.get_num_gpus() if hasattr(faiss, "get_num_gpus") else 0  # type: ignore[attr-defined]
+        ngpu = faiss.get_num_gpus() if hasattr(faiss, "get_num_gpus") else 0
         if ngpu <= 0:
             return False, "faiss.get_num_gpus() returned 0"
 
         res = faiss.StandardGpuResources()
         d = 64
-        idx = faiss.GpuIndexFlatIP(res, d)  # type: ignore[attr-defined]
+        idx = faiss.GpuIndexFlatIP(res, d)
         rs = np.random.RandomState(0)
         xb = rs.randn(128, d).astype("float32")
         xq = rs.randn(4, d).astype("float32")

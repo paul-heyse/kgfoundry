@@ -154,6 +154,11 @@ class TestGitClientIntegration:
     def test_blame_range_commit_shas_match(self, git_repo: Path) -> None:
         """blame_range commit SHAs should match actual Git commits.
 
+        Parameters
+        ----------
+        git_repo : Path
+            Path to the test Git repository fixture.
+
         Raises
         ------
         RuntimeError

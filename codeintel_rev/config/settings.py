@@ -171,6 +171,9 @@ class IndexConfig(msgspec.Struct, frozen=True):
     preview_max_chars : int
         Maximum number of characters to persist in the Parquet ``preview`` column.
         This controls indexing-time truncation. Defaults to 240 characters.
+    compaction_threshold : float
+        Fraction of primary index size that the secondary index can reach before a
+        compaction is recommended. Defaults to 0.05 (5%).
     """
 
     vec_dim: int = 2560
@@ -184,6 +187,7 @@ class IndexConfig(msgspec.Struct, frozen=True):
     faiss_preload: bool = False
     duckdb_materialize: bool = False
     preview_max_chars: int = 240
+    compaction_threshold: float = 0.05
 
 
 class ServerLimits(msgspec.Struct, frozen=True):
@@ -351,6 +355,8 @@ def load_settings() -> Settings:
         Number of IVF centroids (default: 8192).
     FAISS_NPROBE : int, optional
         Number of IVF cells to probe during search (default: 128).
+    FAISS_COMPACTION_THRESHOLD : float, optional
+        Secondary-to-primary ratio that triggers compaction (default: 0.05).
     BM25_K1 : float, optional
         BM25 k1 parameter (default: 0.9).
     BM25_B : float, optional
@@ -418,6 +424,7 @@ def load_settings() -> Settings:
         duckdb_materialize=os.environ.get("DUCKDB_MATERIALIZE", "0").lower()
         in {"1", "true", "yes"},
         preview_max_chars=int(os.environ.get("PREVIEW_MAX_CHARS", "240")),
+        compaction_threshold=float(os.environ.get("FAISS_COMPACTION_THRESHOLD", "0.05")),
     )
 
     limits = ServerLimits(

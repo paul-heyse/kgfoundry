@@ -705,6 +705,7 @@ def cli_run(cfg: CliRunConfig) -> Iterator[tuple[CliContext, EnvelopeBuilder]]:
     # Note: This re-raises the original exception, preserving its type and traceback
     # pydoclint limitation: it sees 'raise error' as a variable, not Exception type
     # The docstring correctly documents that Exception (or any subclass) can be raised
+    # DOC503: error is a variable holding Exception, not a literal exception type
     if isinstance(error, Exception):  # Type guard for pydoclint
         raise error
 

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from pathlib import Path
 
+import json
 import pytest
 
 from codeintel_rev.mcp_server.adapters import files as files_adapter
@@ -46,12 +48,32 @@ async def test_file_operations(mock_application_context, mock_session_id) -> Non
     )
 
 
-def test_text_search(mock_application_context, mock_session_id) -> None:
+@pytest.mark.asyncio
+async def test_text_search(
+    mock_application_context, mock_session_id, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Exercise the text search adapter for basic responses."""
     repo_root = mock_application_context.paths.repo_root
     (repo_root / "module.py").write_text("def sample():\n    return 1\n", encoding="utf-8")
 
-    result = text_search_adapter.search_text(mock_application_context, "def", max_results=3)
+    def _fake_run_subprocess(cmd: list[str], *, cwd: Path | None, timeout: int) -> str:
+        """Simulate ripgrep JSON output for deterministic tests."""
+        _ = (cmd, timeout)
+        sample_path = (cwd or repo_root) / "module.py"
+        payload = {
+            "type": "match",
+            "data": {
+                "path": {"text": str(sample_path.resolve())},
+                "lines": {"text": "def sample():\n"},
+                "line_number": 1,
+                "submatches": [{"start": 0}],
+            },
+        }
+        return json.dumps(payload)
+
+    monkeypatch.setattr(text_search_adapter, "run_subprocess", _fake_run_subprocess)
+
+    result = await text_search_adapter.search_text(mock_application_context, "def", max_results=3)
     _expect(condition="matches" in result, message="Expected 'matches' key in search results")
     _expect(
         condition=isinstance(result.get("matches"), list),
@@ -150,10 +172,11 @@ def test_parse_blame_porcelain_multiple_entries() -> None:
     )
 
 
-def test_scope_operations(mock_application_context, mock_session_id) -> None:
+@pytest.mark.asyncio
+async def test_scope_operations(mock_application_context, mock_session_id) -> None:
     """Verify scope configuration round-trips through the adapter."""
     scope_request: ScopeIn = {"repos": ["test"], "languages": ["python"]}
-    result = files_adapter.set_scope(mock_application_context, scope_request)
+    result = await files_adapter.set_scope(mock_application_context, scope_request)
     _expect(condition=result.get("status") == "ok", message="Scope status should be 'ok'")
     effective_scope = result.get("effective_scope")
     _expect(

@@ -115,14 +115,14 @@ def check_faiss() -> tuple[bool, dict[str, object]]:
         }
 
     try:
-        ngpu = faiss.get_num_gpus() if hasattr(faiss, "get_num_gpus") else 0  # type: ignore[attr-defined]
+        ngpu = faiss.get_num_gpus() if hasattr(faiss, "get_num_gpus") else 0
         info["faiss_visible_gpus"] = ngpu
         if ngpu <= 0:
             return False, {"error": "faiss.get_num_gpus() returned 0", **info}
 
         res = faiss.StandardGpuResources()
         d = 64
-        idx = faiss.GpuIndexFlatIP(res, d)  # type: ignore[attr-defined]
+        idx = faiss.GpuIndexFlatIP(res, d)
         rs = np.random.RandomState(0)
         xb = rs.randn(128, d).astype("float32")
         xq = rs.randn(4, d).astype("float32")

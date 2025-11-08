@@ -17,6 +17,13 @@ from fastapi.testclient import TestClient
 def test_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Set up a minimal test repository environment.
 
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory path provided by pytest fixture.
+    monkeypatch : pytest.MonkeyPatch
+        Pytest monkeypatch fixture for modifying environment variables.
+
     Returns
     -------
     Path

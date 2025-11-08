@@ -34,7 +34,7 @@ def _skip_if_no_faiss_gpu() -> None:
     if not hasattr(faiss, "StandardGpuResources"):
         pytest.skip("FAISS not built with GPU bindings")
 
-    if hasattr(faiss, "get_num_gpus") and faiss.get_num_gpus() <= 0:  # type: ignore[attr-defined]
+    if hasattr(faiss, "get_num_gpus") and faiss.get_num_gpus() <= 0:
         pytest.skip("FAISS sees 0 GPUs")
 
 
@@ -70,7 +70,7 @@ def test_faiss_small_search_ip() -> None:
 
     res = faiss.StandardGpuResources()
     d = 32
-    idx = faiss.GpuIndexFlatIP(res, d)  # type: ignore[attr-defined]
+    idx = faiss.GpuIndexFlatIP(res, d)
     rs = np.random.RandomState(123)
     xb = rs.randn(256, d).astype("float32")
     xq = rs.randn(3, d).astype("float32")

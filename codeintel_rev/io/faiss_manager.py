@@ -179,7 +179,7 @@ class FAISSManager:
 
         if n_vectors < _SMALL_CORPUS_THRESHOLD:
             # Small corpus: use flat index (exact search, no training)
-            cpu_index = faiss.IndexFlatIP(self.vec_dim)  # type: ignore[attr-defined]
+            cpu_index = faiss.IndexFlatIP(self.vec_dim)
             LOGGER.info(
                 "Using IndexFlatIP for small corpus",
                 extra=_log_extra(n_vectors=n_vectors, index_type="flat"),
@@ -189,8 +189,8 @@ class FAISSManager:
             nlist = min(int(np.sqrt(n_vectors)), n_vectors // 39)
             nlist = max(nlist, 100)  # Minimum 100 clusters
 
-            quantizer = faiss.IndexFlatIP(self.vec_dim)  # type: ignore[attr-defined]
-            cpu_index = faiss.IndexIVFFlat(  # type: ignore[attr-defined]
+            quantizer = faiss.IndexFlatIP(self.vec_dim)
+            cpu_index = faiss.IndexIVFFlat(
                 quantizer, self.vec_dim, nlist, faiss.METRIC_INNER_PRODUCT
             )
             cpu_index.train(vectors)
@@ -370,7 +370,7 @@ class FAISSManager:
         """
         # Initialize secondary index if it doesn't exist
         if self.secondary_index is None:
-            flat_index = faiss.IndexFlatIP(self.vec_dim)  # type: ignore[attr-defined]
+            flat_index = faiss.IndexFlatIP(self.vec_dim)
             self.secondary_index = faiss.IndexIDMap2(flat_index)
             LOGGER.info(
                 "Created secondary flat index for incremental updates",
@@ -383,51 +383,57 @@ class FAISSManager:
             except RuntimeError:
                 return lambda _id: False
 
-            if not hasattr(cpu_index, "id_map"):
+            id_map_obj = getattr(cpu_index, "id_map", None)
+            if id_map_obj is None:
                 return lambda _id: False
 
-            id_map = cpu_index.id_map  # type: ignore[attr-defined]
-
-            if hasattr(id_map, "contains"):
+            contains_raw = getattr(id_map_obj, "contains", None)
+            if callable(contains_raw):
+                contains_callable = cast("Callable[[int], bool]", contains_raw)
 
                 def _contains(id_val: int) -> bool:
                     try:
-                        return bool(id_map.contains(int(id_val)))  # type: ignore[attr-defined]
+                        return bool(contains_callable(int(id_val)))
                     except (TypeError, ValueError):
                         return False
 
                 return _contains
 
-            if hasattr(id_map, "search"):
+            search_raw = getattr(id_map_obj, "search", None)
+            if callable(search_raw):
+                search_callable = cast("Callable[[int], int]", search_raw)
 
                 def _contains(id_val: int) -> bool:
                     try:
-                        return int(id_map.search(int(id_val))) >= 0  # type: ignore[attr-defined]
+                        return search_callable(int(id_val)) >= 0
                     except (TypeError, ValueError):
                         return False
 
                 return _contains
 
-            if hasattr(id_map, "find"):
+            find_raw = getattr(id_map_obj, "find", None)
+            if callable(find_raw):
+                find_callable = cast("Callable[[int], int]", find_raw)
 
                 def _contains(id_val: int) -> bool:
                     try:
-                        return int(id_map.find(int(id_val))) >= 0  # type: ignore[attr-defined]
+                        return find_callable(int(id_val)) >= 0
                     except (TypeError, ValueError):
                         return False
 
                 return _contains
 
             try:
-                n_total = cpu_index.ntotal  # type: ignore[attr-defined]
+                n_total = cpu_index.ntotal
             except AttributeError:
                 return lambda _id: False
 
             try:
-                existing_ids = {
-                    int(id_map.at(idx))  # type: ignore[attr-defined]
-                    for idx in range(n_total)
-                }
+                at_raw = getattr(id_map_obj, "at", None)
+                if not callable(at_raw):
+                    return lambda _id: False
+                at_callable = cast("Callable[[int], int]", at_raw)
+                existing_ids = {int(at_callable(idx)) for idx in range(n_total)}
             except (AttributeError, TypeError, ValueError):
                 return lambda _id: False
 
@@ -578,13 +584,11 @@ class FAISSManager:
 
         # Restore incremental_ids from the loaded index
         if self.secondary_index is not None:
-            n_vectors = self.secondary_index.ntotal  # type: ignore[attr-defined]
-            if hasattr(self.secondary_index, "id_map"):
-                # Extract IDs from the index
-                self.incremental_ids = {
-                    self.secondary_index.id_map.at(i)  # type: ignore[attr-defined]
-                    for i in range(n_vectors)
-                }
+            n_vectors = self.secondary_index.ntotal
+            id_map_obj = getattr(self.secondary_index, "id_map", None)
+            if callable(getattr(id_map_obj, "at", None)):
+                at_callable = cast("Callable[[int], int]", id_map_obj.at)
+                self.incremental_ids = {at_callable(i) for i in range(n_vectors)}
             else:
                 # Fallback: assume sequential IDs if no id_map
                 self.incremental_ids = set(range(n_vectors))
@@ -1030,7 +1034,7 @@ class FAISSManager:
             This can occur with certain index types or if the index is not wrapped
             with IndexIDMap2.
         """
-        n_vectors = index.ntotal  # type: ignore[attr-defined]
+        n_vectors = index.ntotal
         if n_vectors == 0:
             return np.empty((0, self.vec_dim), dtype=np.float32), np.empty(0, dtype=np.int64)
 
@@ -1043,10 +1047,16 @@ class FAISSManager:
             raise RuntimeError(msg)
 
         # Extract vectors and IDs
+        id_map_obj = getattr(index, "id_map", None)
+        if not callable(getattr(id_map_obj, "at", None)):
+            msg = f"Index type {type(index).__name__} has invalid id_map interface."
+            raise RuntimeError(msg)
+        at_callable = cast("Callable[[int], int]", id_map_obj.at)
+
         for i in range(n_vectors):
             try:
-                vectors[i] = index.reconstruct(i)  # type: ignore[attr-defined]
-                ids[i] = index.id_map.at(i)  # type: ignore[attr-defined]
+                vectors[i] = index.reconstruct(i)
+                ids[i] = at_callable(i)
             except (AttributeError, RuntimeError) as exc:
                 msg = f"Failed to extract vector at index {i}: {exc}"
                 raise RuntimeError(msg) from exc

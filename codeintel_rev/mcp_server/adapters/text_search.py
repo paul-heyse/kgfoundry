@@ -10,7 +10,7 @@ import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, cast
 
 from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.mcp_server.common.observability import observe_duration
@@ -136,6 +136,13 @@ def _search_text_sync(  # noqa: PLR0913
         effective_include_globs = merged_filters.get("include_globs")
     effective_exclude_globs = merged_filters.get("exclude_globs")
 
+    scope_include_globs_raw = (
+        cast("Sequence[str] | None", scope.get("include_globs")) if scope else None
+    )
+    scope_exclude_globs_raw = (
+        cast("Sequence[str] | None", scope.get("exclude_globs")) if scope else None
+    )
+
     LOGGER.debug(
         "Searching text with scope filters",
         extra={
@@ -144,8 +151,8 @@ def _search_text_sync(  # noqa: PLR0913
             "explicit_paths": list(paths) if paths else None,
             "explicit_include_globs": list(include_globs) if include_globs is not None else None,
             "explicit_exclude_globs": list(exclude_globs) if exclude_globs is not None else None,
-            "scope_include_globs": scope.get("include_globs") if scope else None,  # type: ignore[typeddict-item]
-            "scope_exclude_globs": scope.get("exclude_globs") if scope else None,  # type: ignore[typeddict-item]
+            "scope_include_globs": scope_include_globs_raw,
+            "scope_exclude_globs": scope_exclude_globs_raw,
             "effective_paths": effective_paths,
             "effective_include_globs": effective_include_globs,
             "effective_exclude_globs": effective_exclude_globs,

@@ -118,7 +118,7 @@ def test_update_index_skips_primary_duplicates(tmp_index_path: Path) -> None:
     manager.update_index(update_vectors, update_ids)
 
     assert manager.secondary_index is not None
-    assert manager.secondary_index.ntotal == 2  # type: ignore[attr-defined]
+    assert manager.secondary_index.ntotal == 2
     assert manager.incremental_ids == {6, 7}
 
 
@@ -401,7 +401,7 @@ def test_merge_indexes_combines_vectors(tmp_index_path: Path) -> None:
 
     # Verify primary index now has all vectors (80 total)
     assert manager.cpu_index is not None
-    assert manager.cpu_index.ntotal == 80  # type: ignore[attr-defined]
+    assert manager.cpu_index.ntotal == 80
 
 
 def test_merge_indexes_no_secondary(tmp_index_path: Path) -> None:
@@ -427,7 +427,7 @@ def test_merge_indexes_no_secondary(tmp_index_path: Path) -> None:
 
     # Primary should be unchanged
     assert manager.cpu_index is not None
-    assert manager.cpu_index.ntotal == 50  # type: ignore[attr-defined]
+    assert manager.cpu_index.ntotal == 50
 
 
 @pytest.mark.parametrize(
@@ -484,7 +484,7 @@ def test_incremental_workflow_end_to_end(
     # Verify merge completed
     assert manager.secondary_index is None
     assert manager.cpu_index is not None
-    assert manager.cpu_index.ntotal == primary_size + secondary_size  # type: ignore[attr-defined]
+    assert manager.cpu_index.ntotal == primary_size + secondary_size
 
     # Step 5: Search after merge (should still work, now only primary)
     _distances2, result_ids2 = manager.search(query, k=10)

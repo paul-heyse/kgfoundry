@@ -128,6 +128,40 @@ async def test_list_paths_with_scope_language(mock_context: Mock) -> None:
         assert not any(path.endswith(".ts") for path in paths_list if path)
 
 
+async def test_list_paths_excludes_default_directories(mock_context: Mock) -> None:
+    """Default exclusion globs filter VCS, virtualenv, and cache paths."""
+    repo_root = mock_context.paths.repo_root
+    (repo_root / ".git").mkdir()
+    (repo_root / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    (repo_root / ".venv").mkdir()
+    (repo_root / ".venv" / "pyvenv.cfg").write_text("home=/tmp/python\n", encoding="utf-8")
+    (repo_root / "node_modules").mkdir()
+    (repo_root / "node_modules" / "pkg").mkdir(parents=True, exist_ok=True)
+    (repo_root / "node_modules" / "pkg" / "index.js").write_text(
+        "module.exports = {};\n", encoding="utf-8"
+    )
+    (repo_root / "src" / "__pycache__").mkdir()
+    (repo_root / "src" / "__pycache__" / "module.pyc").write_bytes(b"cache")
+    (repo_root / "src" / "module.pyc").write_bytes(b"compiled")
+
+    with (
+        patch(
+            "codeintel_rev.mcp_server.adapters.files.get_session_id",
+            return_value="default-scope",
+        ),
+        patch("codeintel_rev.mcp_server.adapters.files.get_effective_scope", return_value=None),
+    ):
+        response = await list_paths(mock_context)
+
+    returned_paths = {item["path"] for item in response["items"]}
+    assert "src/main.py" in returned_paths
+    assert ".git/HEAD" not in returned_paths
+    assert ".venv/pyvenv.cfg" not in returned_paths
+    assert "node_modules/pkg/index.js" not in returned_paths
+    assert "src/module.pyc" not in returned_paths
+    assert "src/__pycache__/module.pyc" not in returned_paths
+
+
 # ==================== open_file Tests ====================
 
 
