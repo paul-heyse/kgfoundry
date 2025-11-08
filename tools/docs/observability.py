@@ -263,14 +263,14 @@ def record_operation_metrics(
     None
         Context manager that yields control to the wrapped operation block.
 
-    Notes
-    -----
-    Any exception raised during the operation is explicitly re-raised after
-    recording error status and metrics. The exception is caught using
-    ``except Exception as exc``, metrics are updated to reflect the error,
-    and then the exception is explicitly re-raised using ``raise exc``
-    to satisfy static analysis tools that require explicit exception raising.
-    The specific exception type depends on what the wrapped operation raises.
+    Raises
+    ------
+    Exception
+        Any exception raised during the operation is explicitly re-raised after
+        recording error status and metrics. The exception is caught using
+        ``except Exception as exc``, metrics are updated to reflect the error,
+        and then the exception is explicitly re-raised. The specific exception
+        type depends on what the wrapped operation raises.
 
     Examples
     --------
@@ -300,9 +300,9 @@ def record_operation_metrics(
 
     try:
         yield
-    except Exception:
+    except Exception as exc:
         final_status = "error"
-        raise  # Explicitly re-raise the caught exception
+        raise exc  # noqa: TRY201
     finally:
         duration = time.monotonic() - start_time
 

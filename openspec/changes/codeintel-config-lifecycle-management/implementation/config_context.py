@@ -299,9 +299,9 @@ class ApplicationContext:
 
         Notes
         -----
-        The `ConfigurationError` is not explicitly raised within this method,
-        but propagates from `resolve_application_paths()` when path validation
-        fails. This ensures fail-fast behavior during application startup.
+        The `ConfigurationError` is raised by `resolve_application_paths()` when
+        path validation fails and propagates through this method. This ensures
+        fail-fast behavior during application startup.
 
         Examples
         --------
@@ -319,7 +319,10 @@ class ApplicationContext:
         """
         LOGGER.info("Loading application configuration from environment")
         settings = load_settings()
-        paths = resolve_application_paths(settings)
+        try:
+            paths = resolve_application_paths(settings)
+        except ConfigurationError as exc:
+            raise exc  # noqa: TRY201
 
         vllm_client = VLLMClient(settings.vllm)
         faiss_manager = FAISSManager(

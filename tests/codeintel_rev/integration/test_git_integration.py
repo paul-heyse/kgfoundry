@@ -101,13 +101,13 @@ def function3():
 
         # Stage and commit
         subprocess.run(
-            ["git", "add", "test.py"],
+            ["git", "add", "test.py"],  # noqa: S607
             cwd=repo_root,
             check=True,
             capture_output=True,
         )
         subprocess.run(
-            [
+            [  # noqa: S607
                 "git",
                 "commit",
                 "-m",

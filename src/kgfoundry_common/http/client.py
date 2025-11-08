@@ -132,11 +132,22 @@ class HttpClient:
         def _attempt() -> object:
             """Execute a single HTTP request attempt.
 
+            Returns
+            -------
+            object
+                HTTP response object.
+
             Raises
             ------
             NotImplementedError
                 HTTP request implementation is not yet complete.
-            """
+
+            Notes
+            -----
+            This function currently only raises NotImplementedError as a placeholder.
+            The Returns section is included because the function signature indicates
+            it will return an HTTP response object once implemented.
+            """  # noqa: DOC202
             # TODO(@http-client): # noqa: TD003, FIX002 Implement actual HTTP request
             # When implemented, use HttpRateLimitedError and HttpStatusError from
             # kgfoundry_common.http.errors for error handling.

@@ -729,6 +729,9 @@ runtime-evaluated-base-classes = [
     "T20",
     "PLR6301",  # pytest test classes require instance methods for test isolation
 ]
+# Openspec implementation files need explicit exception handling for DOC502 compliance
+"openspec/changes/codeintel-config-lifecycle-management/implementation/config_context.py" = ["TRY203"]
+"openspec/changes/codeintel-performance-optimization/implementation/git_client.py" = ["TRY203"]
 # tests/kgfoundry_common tests have proper docstrings and annotations - no blanket suppressions needed
 # Explicitly exclude from blanket suppression (empty list = no suppressions)
 "tests/kgfoundry_common/**" = []
@@ -737,6 +740,12 @@ runtime-evaluated-base-classes = [
 "**/*.pyi" = ["PIE790"]  # Stub files require ... literals
 "src/kgfoundry/tooling_bridge.py" = ["PLC2701", "TID251"]
 "docs/_types/**" = ["PLC2701"]  # docs._types is a special module namespace for typed facades
+# DOC502 false positives: ruff doesn't recognize `raise exc` as explicitly raising Exception
+"codeintel_rev/app/main.py" = ["DOC502"]
+"tools/_shared/metrics.py" = ["DOC502"]
+"tools/docs/observability.py" = ["DOC502"]
+"tools/navmap/observability.py" = ["DOC502"]
+"tools/docs/scan_observability.py" = ["DOC502"]
 "docs/_scripts/**" = ["PLC2701"]  # docs._scripts is internal tooling; importing from docs._types and tools._shared is expected
 "docs/types/artifacts.py" = ["PLC2701"]  # docs/types is a facade re-exporting from private docs._types module
 "tools/lint/codemod_typing_migration.py" = ["N802"]  # LibCST visitor protocol requires CamelCase method names (leave_ImportFrom, leave_Call)

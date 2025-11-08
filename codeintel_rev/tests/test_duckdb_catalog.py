@@ -87,6 +87,54 @@ def _write_chunk_parquet_with_embedding(parquet_path: Path, vec_dim: int) -> Non
         conn.close()
 
 
+def _write_chunks_parquet(path: Path) -> None:
+    connection = duckdb.connect(database=":memory:")
+    connection.execute("CREATE TABLE tmp (id INTEGER, uri VARCHAR, text VARCHAR)")
+    connection.executemany(
+        "INSERT INTO tmp VALUES (?, ?, ?)",
+        [
+            (2, "example.py", "second"),
+            (1, "example.py", "first"),
+            (3, "other.py", "other"),
+        ],
+    )
+    connection.execute("COPY tmp TO ? (FORMAT PARQUET)", [str(path)])
+    connection.close()
+
+
+def _table_exists(db_path: Path, table_name: str) -> bool:
+    connection = duckdb.connect(str(db_path))
+    try:
+        return (
+            connection.execute(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.tables
+                WHERE table_schema = 'main'
+                  AND table_name = ?
+                """,
+                [table_name],
+            ).fetchone()[0]
+            > 0
+        )
+    finally:
+        connection.close()
+
+
+def _index_exists(db_path: Path, index_name: str) -> bool:
+    connection = duckdb.connect(str(db_path))
+    try:
+        return (
+            connection.execute(
+                "SELECT COUNT(*) FROM pragma_show_indexes() WHERE name = ?",
+                [index_name],
+            ).fetchone()[0]
+            > 0
+        )
+    finally:
+        connection.close()
+
+
 class FakeVLLMClient:
     """Record embedding requests made during semantic search."""
 
@@ -329,3 +377,79 @@ async def test_semantic_search_handles_chunk_metadata(
         condition=context.catalog.queries == [[MATCHING_CHUNK_ID]],
         message="Unexpected chunk IDs during hydration",
     )
+
+
+def test_query_by_filters_returns_correct_results(tmp_path: Path) -> None:
+    vectors_dir = tmp_path / "vectors"
+    vectors_dir.mkdir()
+    parquet_path = vectors_dir / "chunks.parquet"
+    _write_chunk_parquet(parquet_path)
+
+    catalog_path = tmp_path / "catalog.duckdb"
+    with DuckDBCatalog(catalog_path, vectors_dir) as catalog:
+        results = catalog.query_by_filters([1], include_globs=["src/config_file.py"])
+        assert len(results) == 1
+        assert results[0]["uri"] == "src/config_file.py"
+
+
+def test_query_by_filters_handles_literal_underscore(tmp_path: Path) -> None:
+    vectors_dir = tmp_path / "vectors"
+    vectors_dir.mkdir()
+
+    catalog_path = tmp_path / "catalog.duckdb"
+    catalog = DuckDBCatalog(catalog_path, vectors_dir)
+    catalog.conn = duckdb.connect(database=":memory:")
+    catalog.conn.execute(
+        """
+        CREATE OR REPLACE VIEW chunks AS
+        SELECT * FROM (
+            SELECT
+                1::BIGINT AS id,
+                'src/config_file.py'::VARCHAR AS uri,
+                0::INTEGER AS start_line,
+                1::INTEGER AS end_line,
+                0::BIGINT AS start_byte,
+                10::BIGINT AS end_byte,
+                'underscore file'::VARCHAR AS preview,
+                [0.1, 0.2]::FLOAT[] AS embedding
+        )
+        """
+    )
+
+    results = catalog.query_by_filters([1], include_globs=["src/config_file.py"])
+    assert len(results) == 1
+    assert results[0]["uri"] == "src/config_file.py"
+
+
+def test_open_materialize_creates_table_and_index(tmp_path: Path) -> None:
+    vectors_dir = tmp_path / "vectors"
+    vectors_dir.mkdir()
+    parquet_path = vectors_dir / "chunks.parquet"
+    _write_chunks_parquet(parquet_path)
+
+    catalog_path = tmp_path / "catalog.duckdb"
+    with DuckDBCatalog(catalog_path, vectors_dir, materialize=True) as catalog:
+        assert catalog.count_chunks() == 3
+
+    assert _table_exists(catalog_path, "chunks_materialized") is True
+    assert _index_exists(catalog_path, "idx_chunks_materialized_uri") is True
+
+    connection = duckdb.connect(str(catalog_path))
+    try:
+        row_count = connection.execute("SELECT COUNT(*) FROM chunks_materialized").fetchone()[0]
+    finally:
+        connection.close()
+
+    assert row_count == 3
+
+
+def test_materialize_creates_empty_table_when_parquet_missing(tmp_path: Path) -> None:
+    vectors_dir = tmp_path / "vectors"
+    vectors_dir.mkdir()
+
+    catalog_path = tmp_path / "catalog.duckdb"
+    with DuckDBCatalog(catalog_path, vectors_dir, materialize=True) as catalog:
+        assert catalog.count_chunks() == 0
+
+    assert _table_exists(catalog_path, "chunks_materialized") is True
+    assert _index_exists(catalog_path, "idx_chunks_materialized_uri") is True

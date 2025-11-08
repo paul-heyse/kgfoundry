@@ -122,9 +122,8 @@ class GitClient:
         ------
         git.exc.InvalidGitRepositoryError
             If repo_path is not a valid Git repository or .git cannot be found
-            in parent directories.
-        git.exc.NoSuchPathError
-            If repo_path does not exist on filesystem.
+            in parent directories. This exception is raised explicitly when
+            GitPython fails to initialize the repository.
 
         Examples
         --------
@@ -145,7 +144,7 @@ class GitClient:
                     "Invalid Git repository",
                     extra={"repo_path": str(self.repo_path), "error": str(exc)},
                 )
-                raise
+                raise exc  # noqa: TRY201
         return self._repo
 
     def blame_range(self, path: str, start_line: int, end_line: int) -> list[GitBlameEntry]:
@@ -232,7 +231,7 @@ class GitClient:
                 raise FileNotFoundError(msg) from exc
             # Other Git errors (permission denied, etc.)
             LOGGER.exception("Git blame failed", extra={"path": path, "error": str(exc)})
-            raise
+            raise exc  # noqa: TRY201
 
         entries: list[GitBlameEntry] = []
         for commit, line_nums in blame_iter:
@@ -338,7 +337,7 @@ class GitClient:
                 raise FileNotFoundError(msg) from exc
             # Other Git errors
             LOGGER.exception("Git log failed", extra={"path": path, "error": str(exc)})
-            raise
+            raise exc  # noqa: TRY201
 
         commits: list[dict] = []
         for commit in commits_iter:
@@ -432,11 +431,16 @@ class AsyncGitClient:
         Raises
         ------
         FileNotFoundError
-            If file not found.
+            If file not found. Propagated from GitClient.blame_range.
         git.exc.GitCommandError
-            If Git operation fails.
+            If Git operation fails. Propagated from GitClient.blame_range.
         """
-        return await asyncio.to_thread(self._sync_client.blame_range, path, start_line, end_line)
+        try:
+            return await asyncio.to_thread(
+                self._sync_client.blame_range, path, start_line, end_line
+            )
+        except (FileNotFoundError, git.exc.GitCommandError) as exc:
+            raise exc  # noqa: TRY201
 
     async def file_history(self, path: str, limit: int = 50) -> list[dict]:
         """Async version of file_history (runs in threadpool).
@@ -458,11 +462,14 @@ class AsyncGitClient:
         Raises
         ------
         FileNotFoundError
-            If file not found.
+            If file not found. Propagated from GitClient.file_history.
         git.exc.GitCommandError
-            If Git operation fails.
+            If Git operation fails. Propagated from GitClient.file_history.
         """
-        return await asyncio.to_thread(self._sync_client.file_history, path, limit)
+        try:
+            return await asyncio.to_thread(self._sync_client.file_history, path, limit)
+        except (FileNotFoundError, git.exc.GitCommandError) as exc:
+            raise exc  # noqa: TRY201
 
 
 __all__ = ["AsyncGitClient", "GitClient"]

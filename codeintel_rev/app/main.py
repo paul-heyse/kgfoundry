@@ -71,20 +71,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:  # noqa: C901, PLR0915 
         FastAPI application instance. Used to store application context and
         readiness probe in app.state.
 
-    Startup sequence:
-    1. Load configuration from environment (fail fast if invalid)
-    2. Perform GPU warmup sequence (verify CUDA/torch/FAISS GPU availability)
-    3. Initialize long-lived clients (vLLM, FAISS manager)
-    4. Initialize scope registry for session-scoped query constraints
-    5. Run readiness checks (verify indexes exist, vLLM reachable)
-    6. Optionally pre-load FAISS index (controlled by FAISS_PRELOAD env var)
-    7. Start background pruning task for expired sessions
-
-    Shutdown sequence:
-    1. Cancel background pruning task
-    2. Clear readiness state
-    3. Explicitly close any open resources
-
     Yields
     ------
     None
@@ -98,6 +84,22 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:  # noqa: C901, PLR0915 
     Exception
         If an unexpected error occurs during application startup. The error
         is logged and re-raised to prevent FastAPI from starting in a broken state.
+
+    Notes
+    -----
+    Startup sequence:
+    1. Load configuration from environment (fail fast if invalid)
+    2. Perform GPU warmup sequence (verify CUDA/torch/FAISS GPU availability)
+    3. Initialize long-lived clients (vLLM, FAISS manager)
+    4. Initialize scope registry for session-scoped query constraints
+    5. Run readiness checks (verify indexes exist, vLLM reachable)
+    6. Optionally pre-load FAISS index (controlled by FAISS_PRELOAD env var)
+    7. Start background pruning task for expired sessions
+
+    Shutdown sequence:
+    1. Cancel background pruning task
+    2. Clear readiness state
+    3. Explicitly close any open resources
     """
     LOGGER.info("Starting application initialization")
 
@@ -181,9 +183,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:  # noqa: C901, PLR0915 
             extra={"error_code": exc.code.value, "context": exc.context},
         )
         raise
-    except Exception:
+    except Exception as exc:
         LOGGER.exception("Unexpected error during application startup")
-        raise
+        raise exc  # noqa: TRY201
 
     try:
         yield

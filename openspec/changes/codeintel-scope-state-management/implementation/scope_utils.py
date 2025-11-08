@@ -287,14 +287,16 @@ def apply_path_filters(
         normalized_path = path.replace("\\", "/")
 
         # Check include patterns
-        if include_globs:
-            if not any(path_matches_glob(normalized_path, pattern) for pattern in include_globs):
-                continue  # Path doesn't match any include pattern
+        if include_globs and not any(
+            path_matches_glob(normalized_path, pattern) for pattern in include_globs
+        ):
+            continue  # Path doesn't match any include pattern
 
         # Check exclude patterns
-        if exclude_globs:
-            if any(path_matches_glob(normalized_path, pattern) for pattern in exclude_globs):
-                continue  # Path matches an exclude pattern
+        if exclude_globs and any(
+            path_matches_glob(normalized_path, pattern) for pattern in exclude_globs
+        ):
+            continue  # Path matches an exclude pattern
 
         # Path passed both filters
         filtered.append(path)

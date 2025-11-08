@@ -218,14 +218,13 @@ def record_operation_metrics(
     None
         Context manager that yields control to the wrapped navmap operation block.
 
-    Notes
-    -----
-    Any exception raised within the context is explicitly re-raised after
-    metrics are recorded, allowing normal exception handling to proceed. The
-    exception is caught using ``except Exception as exc``, metrics are updated
-    to reflect the error, and then the exception is explicitly re-raised using
-    ``raise exc`` to satisfy static analysis tools that require
-    explicit exception raising.
+    Raises
+    ------
+    Exception
+        Any exception raised within the context is explicitly re-raised after
+        metrics are recorded, allowing normal exception handling to proceed. The
+        exception is caught using ``except Exception as exc``, metrics are updated
+        to reflect the error, and then the exception is explicitly re-raised.
 
     Examples
     --------
@@ -247,9 +246,9 @@ def record_operation_metrics(
 
     try:
         yield
-    except Exception:
+    except Exception as exc:
         final_status = "error"
-        raise  # Explicitly re-raise the caught exception
+        raise exc  # noqa: TRY201
     finally:
         duration = time.monotonic() - start_time
 

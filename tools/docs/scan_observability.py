@@ -376,13 +376,15 @@ def load_policy() -> ObservabilityPolicy:
         Loaded policy merged with defaults, or default policy if file doesn't
         exist or YAML parsing fails.
 
-    Notes
-    -----
-    Any exception raised during policy loading that is not a YAML parsing error
-    is explicitly re-raised after logging. YAML parsing issues are logged and
-    result in the default policy being returned. The exception is caught using
-    ``except Exception as exc`` and explicitly re-raises non-YAML errors using
-    ``raise exc`` to satisfy static analysis tools.
+    Raises
+    ------
+    Exception
+        Any exception raised during policy loading that is not a YAML parsing error
+        is explicitly re-raised after logging. YAML parsing issues are logged and
+        result in the default policy being returned. The exception is caught using
+        ``except Exception as exc`` and explicitly re-raises non-YAML errors using
+        ``raise exc`` to satisfy static analysis tools.
+
     """
     policy = DEFAULT_POLICY
     if yaml is None or not POLICY_PATH.exists():
@@ -408,7 +410,7 @@ def load_policy() -> ObservabilityPolicy:
                 "Failed to parse observability policy YAML: %s", exc
             )
             return policy
-        raise  # Explicitly re-raise non-YAML exceptions
+        raise exc  # noqa: TRY201
 
     if overrides_raw is None:
         return policy

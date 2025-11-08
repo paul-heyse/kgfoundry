@@ -1,0 +1,5 @@
+"""Implementation files for codeintel performance optimization proposal.
+
+These are reference implementations that may be moved to the main codebase
+once the proposal is approved and implemented.
+"""
