@@ -131,10 +131,10 @@ class IndexConfig(msgspec.Struct, frozen=True):
         provides good recall for millions of vectors. For smaller datasets (<100k),
         consider 4096; for very large (>10M), consider 16384.
     faiss_nprobe : int
-        Number of IVF cells to probe during search. Higher values improve recall
-        but slow down search. Defaults to 128, which probes ~1.5% of cells for
-        nlist=8192. For higher recall, increase to 256 or 512; for faster search,
-        decrease to 64.
+        Number of IVF cells to probe during live semantic search queries. Higher
+        values improve recall but increase response latency. Defaults to 128,
+        which probes ~1.5% of cells for nlist=8192. For higher recall, increase
+        to 256 or 512; for faster searches, decrease to 64.
     bm25_k1 : float
         BM25 term frequency saturation parameter. Controls how quickly term
         frequency saturates. Higher values (1.0-2.0) give more weight to

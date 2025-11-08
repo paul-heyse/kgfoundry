@@ -238,6 +238,7 @@ class _BaseStubFAISSManager:
         self.gpu_disabled_reason: str | None = None
         self.clone_invocations = 0
         self.last_k: int | None = None
+        self.last_nprobe: int | None = None
         self._search_ids = search_ids or [123]
 
     def load_cpu_index(self) -> None:
@@ -281,7 +282,8 @@ class _BaseStubFAISSManager:
         assert query.shape[0] == 1  # Batch size 1
         assert k >= 1
         self.last_k = k
-        assert nprobe == 128
+        self.last_nprobe = nprobe
+        assert nprobe >= 1
         # Return k results (or fewer if k > available chunks)
         # Use stored search_ids or default to [123]
         result_ids = self._search_ids[:k]
@@ -301,6 +303,7 @@ class StubContext:
         error: str | None = None,
         max_results: int = 5,
         catalog_chunks: list[dict[str, Any]] | None = None,
+        faiss_nprobe: int = 128,
     ) -> None:
         """Initialize stub context.
 
@@ -322,6 +325,7 @@ class StubContext:
         self.settings = SimpleNamespace(
             limits=SimpleNamespace(max_results=max_results),
             vllm=SimpleNamespace(base_url="http://localhost"),
+            index=SimpleNamespace(faiss_nprobe=faiss_nprobe),
         )
         # Use tempfile for secure temporary paths in tests
         import tempfile
@@ -478,6 +482,29 @@ async def test_semantic_search_limit_enforces_minimum() -> None:
     assert coverage is not None
     assert "/1 results" in coverage
     assert "requested 0" in coverage
+
+
+@pytest.mark.asyncio
+async def test_semantic_search_respects_configured_nprobe() -> None:
+    faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
+    context = StubContext(
+        faiss_manager=faiss_manager,
+        limits=[],
+        error=None,
+        max_results=5,
+        faiss_nprobe=64,
+    )
+
+    with (
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
+            return_value="test-session-123",
+        ),
+        patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+    ):
+        await semantic_search(cast("ApplicationContext", context), "hello", limit=1)
+
+    assert faiss_manager.last_nprobe == 64
 
 
 @pytest.mark.asyncio
