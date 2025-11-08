@@ -235,6 +235,7 @@ def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914
             context.faiss_manager,
             embedding,
             faiss_k,
+            nprobe=context.settings.index.faiss_nprobe,
         )
         if search_exc is not None:
             error = VectorSearchError(
@@ -336,6 +337,8 @@ def _run_faiss_search(
     faiss_mgr: FAISSManager,
     query_vector: np.ndarray,
     limit: int,
+    *,
+    nprobe: int,
 ) -> tuple[list[int], list[float], Exception | None]:
     """Execute FAISS search and return result identifiers and scores.
 
@@ -348,6 +351,13 @@ def _run_faiss_search(
     limit : int
         Maximum number of results to return.
 
+    Other Parameters
+    ----------------
+    nprobe : int
+        Number of IVF cells to probe during the search. Higher values improve
+        recall at the cost of latency. Passed directly to
+        :meth:`FAISSManager.search`.
+
     Returns
     -------
     tuple[list[int], list[float], Exception | None]
@@ -355,7 +365,7 @@ def _run_faiss_search(
         search succeeds; otherwise it contains the triggering exception.
     """
     try:
-        distances, ids = faiss_mgr.search(query_vector, k=limit)
+        distances, ids = faiss_mgr.search(query_vector, k=limit, nprobe=nprobe)
     except RuntimeError as exc:
         return [], [], exc
 

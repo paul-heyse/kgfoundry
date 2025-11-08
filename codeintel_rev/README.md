@@ -516,7 +516,7 @@ print(f"Total: {estimates['total_bytes']/1e9:.2f} GB")
 ```bash
 # Force specific nlist (used as fallback for large corpora)
 export FAISS_NLIST=16384  # More centroids = better recall, slower training
-export FAISS_NPROBE=256   # More probes = better recall, slower search
+export FAISS_NPROBE=256   # More probes = better recall, slower live searches
 
 # Enable cuVS acceleration (requires custom FAISS wheel)
 export USE_CUVS=1

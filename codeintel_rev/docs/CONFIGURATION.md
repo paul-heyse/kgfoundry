@@ -80,7 +80,7 @@ The configuration lifecycle follows this sequence during application startup:
 | `VEC_DIM` | Embedding vector dimension | `2560` | `2560` |
 | `CHUNK_BUDGET` | Target chunk size in characters | `2200` | `2200` |
 | `FAISS_NLIST` | Number of IVF centroids | `8192` | `16384` |
-| `FAISS_NPROBE` | Number of IVF cells to probe | `128` | `256` |
+| `FAISS_NPROBE` | Number of IVF cells to probe per live search (higher = better recall, slower queries) | `128` | `256` |
 | `USE_CUVS` | Enable cuVS GPU acceleration | `1` | `0` |
 | `DUCKDB_MATERIALIZE` | Materialize chunks into DuckDB table with secondary index | `0` | `1` |
 | `MAX_RESULTS` | Maximum results per query | `1000` | `500` |
