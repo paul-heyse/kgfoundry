@@ -76,25 +76,50 @@ class Chunk:
     symbols: tuple[str, ...]
     language: str
 
+@dataclass(frozen=True)
+class LineIndex:
+    """Line start bookkeeping for both character and byte positions."""
 
-def line_starts(text: str) -> list[int]:
-    """Compute byte offsets of each line start.
+    char_starts: list[int]
+    byte_starts: list[int]
+    char_to_byte: list[int]
 
-    Parameters
-    ----------
-    text : str
-        Source file content.
+    @property
+    def text_length(self) -> int:
+        """Return the decoded text length in characters."""
 
-    Returns
-    -------
-    list[int]
-        Byte offsets for start of each line.
-    """
-    starts = [0]
-    for i, ch in enumerate(text):
+        return len(self.char_to_byte) - 1
+
+
+def _utf8_length(ch: str) -> int:
+    """Return the UTF-8 encoded length for ``ch``."""
+
+    code_point = ord(ch)
+    if code_point <= 0x7F:
+        return 1
+    if code_point <= 0x7FF:
+        return 2
+    if code_point <= 0xFFFF:
+        return 3
+    return 4
+
+
+def line_starts(text: str) -> LineIndex:
+    """Compute character and byte offsets for each line start."""
+
+    char_starts = [0]
+    byte_starts = [0]
+    char_to_byte = [0]
+    byte_offset = 0
+
+    for index, ch in enumerate(text):
+        byte_offset += _utf8_length(ch)
+        char_to_byte.append(byte_offset)
         if ch == "\n":
-            starts.append(i + 1)
-    return starts
+            char_starts.append(index + 1)
+            byte_starts.append(byte_offset)
+
+    return LineIndex(char_starts=char_starts, byte_starts=byte_starts, char_to_byte=char_to_byte)
 
 
 def _line_index_from_byte(starts: Sequence[int], byte_offset: int) -> int:
@@ -116,37 +141,30 @@ def _line_index_from_byte(starts: Sequence[int], byte_offset: int) -> int:
     if index < 0:
         return 0
     return min(index, len(starts) - 1)
+def _char_index_for_line(line_index: LineIndex, line: int, character: int) -> int:
+    """Map a line/character pair to an absolute character index."""
+
+    if line >= len(line_index.char_starts):
+        return line_index.text_length
+
+    base = line_index.char_starts[line]
+    candidate = base + character
+    if candidate > line_index.text_length:
+        return line_index.text_length
+    return candidate
 
 
-def range_to_bytes(text: str, starts: list[int], rng: Range) -> tuple[int, int]:
-    """Convert line/char range to byte offsets.
+def range_to_bytes(text: str, line_index: LineIndex, rng: Range) -> tuple[int, int]:
+    """Convert line/character range to byte offsets."""
 
-    Parameters
-    ----------
-    text : str
-        Source file content.
-    starts : list[int]
-        Line start offsets from line_starts().
-    rng : Range
-        SCIP range (0-indexed lines and characters).
+    del text  # Parameters retained for backward compatibility.
 
-    Returns
-    -------
-    tuple[int, int]
-        (start_byte, end_byte).
-    """
-    n = len(text)
+    start_char = _char_index_for_line(line_index, rng.start_line, rng.start_character)
+    end_char = _char_index_for_line(line_index, rng.end_line, rng.end_character)
 
-    # Start position
-    if rng.start_line < len(starts):
-        start = min(starts[rng.start_line] + rng.start_character, n)
-    else:
-        start = n
-
-    end_candidate = starts[rng.end_line] + rng.end_character if rng.end_line < len(starts) else n
-    end = min(end_candidate, n)
-
-    return start, end
+    start_byte = line_index.char_to_byte[start_char]
+    end_byte = line_index.char_to_byte[end_char]
+    return start_byte, end_byte
 
 
 @dataclass(slots=True)
@@ -155,23 +173,24 @@ class _ChunkAccumulator:
 
     uri: str
     text: str
-    starts: Sequence[int]
+    encoded: bytes
+    line_index: LineIndex
     budget: int
     chunks: list[Chunk] = field(default_factory=list)
-    _current_start: int | None = None
-    _current_end: int | None = None
+    _current_start_char: int | None = None
+    _current_end_char: int | None = None
     _current_symbols: list[str] = field(default_factory=list)
     language: str = ""
 
     def add_symbol(self, symbol: SymbolDef, start: int, end: int) -> None:
         """Incorporate a symbol range into the current chunk set."""
-        if self._current_start is None or self._current_end is None:
+        if self._current_start_char is None or self._current_end_char is None:
             self._start_chunk(start, end, symbol.symbol)
             return
 
-        merged_end = max(self._current_end, end)
-        if merged_end - self._current_start <= self.budget:
-            self._current_end = merged_end
+        merged_end = max(self._current_end_char, end)
+        if merged_end - self._current_start_char <= self.budget:
+            self._current_end_char = merged_end
             self._current_symbols.append(symbol.symbol)
             return
 
@@ -195,16 +214,16 @@ class _ChunkAccumulator:
         return self.chunks
 
     def _start_chunk(self, start: int, end: int, symbol: str) -> None:
-        self._current_start = start
-        self._current_end = end
+        self._current_start_char = start
+        self._current_end_char = end
         self._current_symbols = [symbol]
 
     def _flush_current(self) -> None:
-        if self._current_start is None or self._current_end is None:
+        if self._current_start_char is None or self._current_end_char is None:
             return
         self._append_chunk(
-            self._current_start,
-            self._current_end,
+            self._current_start_char,
+            self._current_end_char,
             tuple(self._current_symbols),
         )
         self._reset()
@@ -217,16 +236,21 @@ class _ChunkAccumulator:
     ) -> None:
         if end <= start:
             return
-        start_line = _line_index_from_byte(self.starts, start)
-        end_line = _line_index_from_byte(self.starts, max(end - 1, 0))
+        start_byte = self.line_index.char_to_byte[start]
+        end_byte = self.line_index.char_to_byte[end]
+        if end_byte <= start_byte:
+            return
+        start_line = _line_index_from_byte(self.line_index.byte_starts, start_byte)
+        end_line = _line_index_from_byte(self.line_index.byte_starts, max(end_byte - 1, 0))
+        chunk_text = self.encoded[start_byte:end_byte].decode("utf-8")
         self.chunks.append(
             Chunk(
                 uri=self.uri,
-                start_byte=start,
-                end_byte=end,
+                start_byte=start_byte,
+                end_byte=end_byte,
                 start_line=start_line,
                 end_line=end_line,
-                text=self.text[start:end],
+                text=chunk_text,
                 symbols=symbols,
                 language=self.language,
             )
@@ -259,8 +283,8 @@ class _ChunkAccumulator:
             position = tentative_end
 
     def _reset(self) -> None:
-        self._current_start = None
-        self._current_end = None
+        self._current_start_char = None
+        self._current_end_char = None
         self._current_symbols = []
 
 
@@ -298,21 +322,30 @@ def chunk_file(
     chunk_language = language if language is not None else definitions[0].language
 
     uri = str(path)
-    starts = line_starts(text)
+    line_index = line_starts(text)
+    encoded = text.encode("utf-8")
     accumulator = _ChunkAccumulator(
         uri=uri,
         text=text,
-        starts=starts,
+        encoded=encoded,
+        line_index=line_index,
         budget=budget,
         language=chunk_language,
     )
 
-    symbols_with_bytes = sorted(
-        ((sym_def, *range_to_bytes(text, starts, sym_def.range)) for sym_def in definitions),
+    symbols_with_positions = sorted(
+        (
+            (
+                sym_def,
+                _char_index_for_line(line_index, sym_def.range.start_line, sym_def.range.start_character),
+                _char_index_for_line(line_index, sym_def.range.end_line, sym_def.range.end_character),
+            )
+            for sym_def in definitions
+        ),
         key=lambda item: item[1],
     )
 
-    for sym_def, start, end in symbols_with_bytes:
+    for sym_def, start, end in symbols_with_positions:
         accumulator.add_symbol(sym_def, start, end)
 
     return accumulator.finalize()
