@@ -8,6 +8,7 @@ corpus size for optimal performance.
 from __future__ import annotations
 
 import importlib
+from collections.abc import Callable
 from pathlib import Path
 
 import faiss
@@ -324,7 +325,8 @@ class FAISSManager:
 
         The secondary index is automatically created on first call. Vectors are
         L2-normalized automatically for cosine similarity. Duplicate IDs are
-        skipped to prevent conflicts.
+        skipped to prevent conflicts, including IDs that already exist in the
+        primary index.
 
         Parameters
         ----------
@@ -363,10 +365,74 @@ class FAISSManager:
                 extra=_log_extra(event="secondary_index_created"),
             )
 
-        # Filter out duplicate IDs (skip vectors that are already indexed)
-        new_ids_list = new_ids.tolist()
-        unique_mask = [id_val not in self.incremental_ids for id_val in new_ids_list]
-        unique_indices = np.where(unique_mask)[0]
+        def _build_primary_contains() -> Callable[[int], bool]:
+            try:
+                cpu_index = self._require_cpu_index()
+            except RuntimeError:
+                return lambda _id: False
+
+            if not hasattr(cpu_index, "id_map"):
+                return lambda _id: False
+
+            id_map = cpu_index.id_map  # type: ignore[attr-defined]
+
+            if hasattr(id_map, "contains"):
+                def _contains(id_val: int) -> bool:
+                    try:
+                        return bool(id_map.contains(int(id_val)))  # type: ignore[attr-defined]
+                    except (TypeError, ValueError):
+                        return False
+
+                return _contains
+
+            if hasattr(id_map, "search"):
+                def _contains(id_val: int) -> bool:
+                    try:
+                        return int(id_map.search(int(id_val))) >= 0  # type: ignore[attr-defined]
+                    except (TypeError, ValueError):
+                        return False
+
+                return _contains
+
+            if hasattr(id_map, "find"):
+                def _contains(id_val: int) -> bool:
+                    try:
+                        return int(id_map.find(int(id_val))) >= 0  # type: ignore[attr-defined]
+                    except (TypeError, ValueError):
+                        return False
+
+                return _contains
+
+            try:
+                n_total = cpu_index.ntotal  # type: ignore[attr-defined]
+            except AttributeError:
+                return lambda _id: False
+
+            try:
+                existing_ids = {
+                    int(id_map.at(idx))  # type: ignore[attr-defined]
+                    for idx in range(n_total)
+                }
+            except (AttributeError, TypeError, ValueError):
+                return lambda _id: False
+
+            return lambda id_val: int(id_val) in existing_ids
+
+        primary_contains = _build_primary_contains()
+
+        unique_indices: list[int] = []
+        seen_in_batch: set[int] = set()
+
+        for offset, id_val in enumerate(new_ids.tolist()):
+            id_int = int(id_val)
+            if id_int in seen_in_batch:
+                continue
+            seen_in_batch.add(id_int)
+            if id_int in self.incremental_ids:
+                continue
+            if primary_contains(id_int):
+                continue
+            unique_indices.append(offset)
 
         if len(unique_indices) == 0:
             LOGGER.info(
@@ -809,10 +875,24 @@ class FAISSManager:
         # Sort by distance (descending for inner product - higher is better)
         sorted_indices = np.argsort(-all_dists, axis=1)
 
-        # Take top k
-        top_k_indices = sorted_indices[:, :k]
-        merged_dists = np.take_along_axis(all_dists, top_k_indices, axis=1)
-        merged_ids = np.take_along_axis(all_ids, top_k_indices, axis=1)
+        n_queries = all_dists.shape[0]
+        filler = np.finfo(all_dists.dtype).min
+        merged_dists = np.full((n_queries, k), filler, dtype=all_dists.dtype)
+        merged_ids = np.full((n_queries, k), -1, dtype=all_ids.dtype)
+
+        for query_idx in range(n_queries):
+            seen: set[int] = set()
+            out_pos = 0
+            for candidate_idx in sorted_indices[query_idx]:
+                candidate_id = int(all_ids[query_idx, candidate_idx])
+                if candidate_id < 0 or candidate_id in seen:
+                    continue
+                seen.add(candidate_id)
+                merged_dists[query_idx, out_pos] = all_dists[query_idx, candidate_idx]
+                merged_ids[query_idx, out_pos] = candidate_id
+                out_pos += 1
+                if out_pos == k:
+                    break
 
         return merged_dists, merged_ids
 
