@@ -287,8 +287,8 @@ def chunk_file(
     budget : int
         Target chunk size in characters.
 
-        Returns
-        -------
+    Returns
+    -------
         list[Chunk]
             Generated chunks.
     """

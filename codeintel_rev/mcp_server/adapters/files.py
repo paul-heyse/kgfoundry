@@ -530,7 +530,6 @@ def _safe_stat(path: Path) -> os.stat_result | None:
 
 def _collect_language_extensions(languages: Sequence[str]) -> set[str]:
     """Return canonical file extensions for the requested languages."""
-
     extensions: set[str] = set()
     for language in languages:
         extensions.update(ext.lower() for ext in LANGUAGE_EXTENSIONS.get(language.lower(), []))
@@ -539,6 +538,5 @@ def _collect_language_extensions(languages: Sequence[str]) -> set[str]:
 
 def _matches_language(path: str, extensions: set[str]) -> bool:
     """Return True when the path matches one of the requested extensions."""
-
     normalized = path.lower()
     return any(normalized.endswith(ext) for ext in extensions)

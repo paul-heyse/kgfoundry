@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import importlib
 from dataclasses import dataclass
-from typing import NamedTuple, cast
+from typing import cast
 
 GriffeLoaderType = type[object]
 
