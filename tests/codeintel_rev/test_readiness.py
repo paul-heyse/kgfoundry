@@ -6,11 +6,12 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import duckdb
 import httpx
 import pytest
 from codeintel_rev.app.config_context import ApplicationContext, ResolvedPaths
 from codeintel_rev.app.readiness import CheckResult, ReadinessProbe
-from codeintel_rev.config.settings import Settings, VLLMConfig, load_settings
+from codeintel_rev.config.settings import IndexConfig, Settings, VLLMConfig, load_settings
 
 
 @pytest.fixture
@@ -46,6 +47,44 @@ def mock_context(tmp_path: Path) -> ApplicationContext:
     context.settings = settings
 
     return context
+
+
+def _materialized_index_config(index: IndexConfig, *, enabled: bool) -> IndexConfig:
+    """Return a copy of IndexConfig with duckdb_materialize toggled.
+
+    Parameters
+    ----------
+    index :
+        Baseline index configuration to copy.
+    enabled :
+        Flag indicating whether duckdb materialization should be enabled.
+
+    Returns
+    -------
+    IndexConfig
+        New configuration with identical fields and updated duckdb_materialize flag.
+    """
+    return IndexConfig(
+        vec_dim=index.vec_dim,
+        chunk_budget=index.chunk_budget,
+        faiss_nlist=index.faiss_nlist,
+        faiss_nprobe=index.faiss_nprobe,
+        bm25_k1=index.bm25_k1,
+        bm25_b=index.bm25_b,
+        rrf_k=index.rrf_k,
+        use_cuvs=index.use_cuvs,
+        faiss_preload=index.faiss_preload,
+        duckdb_materialize=enabled,
+        preview_max_chars=index.preview_max_chars,
+    )
+
+
+def _reset_duckdb_catalog(db_path: Path) -> None:
+    """Replace touch-based DuckDB placeholder with a valid, empty catalog."""
+    if db_path.exists():
+        db_path.unlink()
+    with duckdb.connect(str(db_path)):
+        pass
 
 
 def test_check_result_as_payload_healthy() -> None:
@@ -103,6 +142,69 @@ async def test_readiness_probe_all_healthy(mock_context: ApplicationContext) -> 
     assert results["faiss_index"].healthy is True
     assert results["duckdb_catalog"].healthy is True
     assert results["scip_index"].healthy is True
+
+
+@pytest.mark.asyncio
+async def test_readiness_probe_materialize_reports_missing_table(
+    mock_context: ApplicationContext,
+) -> None:
+    """Readiness should fail when materialization enabled but table missing."""
+    existing_settings = mock_context.settings
+    _reset_duckdb_catalog(mock_context.paths.duckdb_path)
+    mock_context.settings = Settings(
+        vllm=existing_settings.vllm,
+        paths=existing_settings.paths,
+        index=_materialized_index_config(existing_settings.index, enabled=True),
+        limits=existing_settings.limits,
+    )
+    probe = ReadinessProbe(mock_context)
+
+    results = await probe.refresh()
+    duckdb_result = results["duckdb_catalog"]
+
+    assert duckdb_result.healthy is False
+    assert duckdb_result.detail is not None
+    assert "chunks_materialized" in duckdb_result.detail
+
+
+@pytest.mark.asyncio
+async def test_readiness_probe_materialize_validates_index(
+    mock_context: ApplicationContext,
+) -> None:
+    """Readiness passes when materialized table and index exist."""
+    existing_settings = mock_context.settings
+    _reset_duckdb_catalog(mock_context.paths.duckdb_path)
+    mock_context.settings = Settings(
+        vllm=existing_settings.vllm,
+        paths=existing_settings.paths,
+        index=_materialized_index_config(existing_settings.index, enabled=True),
+        limits=existing_settings.limits,
+    )
+
+    with duckdb.connect(str(mock_context.paths.duckdb_path)) as connection:
+        connection.execute("DROP VIEW IF EXISTS chunks")
+        connection.execute("DROP TABLE IF EXISTS chunks_materialized")
+        connection.execute(
+            """
+            CREATE TABLE chunks_materialized AS
+            SELECT
+                1::BIGINT AS id,
+                'src/example.py'::VARCHAR AS uri,
+                0::INTEGER AS start_line,
+                10::INTEGER AS end_line,
+                0::BIGINT AS start_byte,
+                20::BIGINT AS end_byte,
+                'example preview'::VARCHAR AS preview,
+                [0.1, 0.2]::FLOAT[] AS embedding
+            """
+        )
+        connection.execute("CREATE VIEW chunks AS SELECT * FROM chunks_materialized")
+        connection.execute("CREATE INDEX idx_chunks_materialized_uri ON chunks_materialized(uri)")
+
+    probe = ReadinessProbe(mock_context)
+    results = await probe.refresh()
+
+    assert results["duckdb_catalog"].healthy is True
 
 
 @pytest.mark.asyncio

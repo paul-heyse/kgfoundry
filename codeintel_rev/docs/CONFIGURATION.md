@@ -82,8 +82,10 @@ The configuration lifecycle follows this sequence during application startup:
 | `FAISS_NLIST` | Number of IVF centroids | `8192` | `16384` |
 | `FAISS_NPROBE` | Number of IVF cells to probe | `128` | `256` |
 | `USE_CUVS` | Enable cuVS GPU acceleration | `1` | `0` |
+| `DUCKDB_MATERIALIZE` | Materialize chunks into DuckDB table with secondary index | `0` | `1` |
 | `MAX_RESULTS` | Maximum results per query | `1000` | `500` |
 | `QUERY_TIMEOUT_S` | Query timeout in seconds | `30.0` | `60.0` |
+| `SEMANTIC_OVERFETCH_MULTIPLIER` | FAISS fan-out multiplier when scope filters active | `2` | `3` |
 
 ## Configuration Best Practices
 
@@ -111,6 +113,7 @@ export REPO_ROOT=/var/lib/codeintel/repo
 export FAISS_PRELOAD=1  # Eager loading for consistent latency
 export FAISS_INDEX=/var/lib/codeintel/faiss/code.ivfpq.faiss
 export DUCKDB_PATH=/var/lib/codeintel/catalog.duckdb
+export DUCKDB_MATERIALIZE=1  # Persist chunks_materialized table with uri index
 export VLLM_URL=http://vllm-service:8001/v1
 export MAX_RESULTS=1000
 export QUERY_TIMEOUT_S=30.0
@@ -124,6 +127,7 @@ export QUERY_TIMEOUT_S=30.0
 **Trade-offs**:
 - Slower startup (2-10 seconds for FAISS loading)
 - Higher memory usage at startup
+- Materialized DuckDB catalog requires periodic re-indexing to keep table/index fresh
 
 ### Kubernetes Configuration
 

@@ -453,8 +453,9 @@ class ReadinessProbe:
         return (
             conn.execute(
                 """
-                SELECT COUNT(*) FROM pragma_show_indexes()
-                WHERE name = 'idx_chunks_materialized_uri'
+                SELECT COUNT(*) FROM duckdb_indexes
+                WHERE table_name = 'chunks_materialized'
+                  AND index_name = 'idx_chunks_materialized_uri'
                 """
             ).fetchone()[0]
             > 0
