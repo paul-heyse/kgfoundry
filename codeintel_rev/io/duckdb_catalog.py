@@ -6,15 +6,21 @@ chunk retrieval and joins.
 
 from __future__ import annotations
 
-from contextlib import AbstractContextManager, suppress
+from collections.abc import Iterator
+from contextlib import contextmanager, suppress
 from pathlib import Path
+from threading import Lock
 from time import perf_counter
 from typing import TYPE_CHECKING, Self
 
 import duckdb
 import numpy as np
 
-from codeintel_rev.io.duckdb_manager import DuckDBManager
+from codeintel_rev.io.duckdb_manager import (
+    DuckDBManager,
+    DuckDBQueryBuilder,
+    DuckDBQueryOptions,
+)
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.prometheus import build_histogram
 
@@ -58,6 +64,9 @@ class DuckDBCatalog:
         table (``chunks_materialized``) with a secondary index on ``uri``. When
         ``False`` (default), the catalog exposes Parquet files through a view for
         zero-copy queries.
+    log_queries : bool | None, optional
+        Enable debug logging of executed SQL statements when ``True``. Defaults to
+        ``None`` which inherits the global logging configuration.
     """
 
     def __init__(
@@ -67,33 +76,26 @@ class DuckDBCatalog:
         *,
         materialize: bool = False,
         manager: DuckDBManager | None = None,
+        log_queries: bool | None = None,
     ) -> None:
         self.db_path = db_path
         self.vectors_dir = vectors_dir
         self.materialize = materialize
-        self.conn: duckdb.DuckDBPyConnection | None = None
-        self._embedding_dim_cache: int | None = None
+        manager = manager or DuckDBManager(db_path)
         self._manager = manager
-        self._connection_cm: AbstractContextManager[duckdb.DuckDBPyConnection] | None = None
+        self._query_builder = DuckDBQueryBuilder()
+        self._embedding_dim_cache: int | None = None
+        self._init_lock = Lock()
+        self._views_ready = False
+        self._log_queries = log_queries if log_queries is not None else manager.config.log_queries
 
     def open(self) -> None:
-        """Open database connection."""
-        if self._manager is not None:
-            self._connection_cm = self._manager.connection()
-            self.conn = self._connection_cm.__enter__()
-        else:
-            self.conn = duckdb.connect(str(self.db_path))
-        self._ensure_views()
+        """Ensure catalog views are initialized."""
+        self._ensure_ready()
 
     def close(self) -> None:
-        """Close database connection."""
-        if self._connection_cm is not None and self.conn is not None:
-            self._connection_cm.__exit__(None, None, None)
-            self._connection_cm = None
-            self.conn = None
-        elif self.conn:
-            self.conn.close()
-            self.conn = None
+        """No-op for compatibility; connections are per-use via the manager."""
+        self._embedding_dim_cache = None
 
     def __enter__(self) -> Self:
         """Enter context manager.
@@ -110,42 +112,78 @@ class DuckDBCatalog:
         """Exit context manager."""
         self.close()
 
-    def _ensure_views(self) -> None:
-        """Create views over Parquet directories.
+    @property
+    def manager(self) -> DuckDBManager:
+        """Return the underlying DuckDB manager."""
+        return self._manager
 
-        Creates the `chunks` view over Parquet files and creates an index on the
-        `uri` column for efficient path filtering in `query_by_filters`.
+    def _ensure_ready(self) -> None:
+        """Initialize catalog views once in a threadsafe manner."""
+        if self._views_ready:
+            return
+        with self._init_lock:
+            if self._views_ready:
+                return
+            with self._manager.connection() as conn:
+                self._ensure_views(conn)
+            self._views_ready = True
 
-        Raises
+    @contextmanager
+    def connection(self) -> Iterator[duckdb.DuckDBPyConnection]:
+        """Yield a configured DuckDB connection.
+
+        Yields
         ------
-        RuntimeError
-            If the database connection has not been opened.
+        duckdb.DuckDBPyConnection
+            Connection configured with catalog pragmas and ready for queries.
         """
-        if not self.conn:
-            msg = "Connection not open"
-            raise RuntimeError(msg)
+        self._ensure_ready()
+        with self._manager.connection() as conn:
+            yield conn
+
+    def _log_query(self, sql: str, params: object | None = None) -> None:
+        """Emit debug log for executed DuckDB statement when enabled."""
+        if not self._log_queries:
+            return
+        LOGGER.debug(
+            "duckdb_query",
+            extra={
+                "sql": sql.strip(),
+                "params": params,
+                "duckdb_path": str(self.db_path),
+            },
+        )
+
+    def _ensure_views(self, conn: duckdb.DuckDBPyConnection) -> None:
+        """Create views over Parquet directories if they do not already exist."""
+        if self._relation_exists(conn, "chunks"):
+            return
 
         parquet_pattern = str(self.vectors_dir / "**/*.parquet")
         parquet_exists = any(self.vectors_dir.rglob("*.parquet"))
 
         if self.materialize:
             if parquet_exists:
-                self.conn.execute(
-                    """
+                sql = """
                     CREATE OR REPLACE TABLE chunks_materialized AS
                     SELECT * FROM read_parquet(?)
-                    """,
-                    [parquet_pattern],
-                )
+                    """
+                self._log_query(sql, [parquet_pattern])
+                conn.execute(sql, [parquet_pattern])
             else:
-                self.conn.execute(
-                    f"CREATE OR REPLACE TABLE chunks_materialized AS {_EMPTY_CHUNKS_SELECT}"
-                )
+                sql = f"CREATE OR REPLACE TABLE chunks_materialized AS {_EMPTY_CHUNKS_SELECT}"
+                self._log_query(sql, None)
+                conn.execute(sql)
 
-            self.conn.execute("CREATE OR REPLACE VIEW chunks AS SELECT * FROM chunks_materialized")
-            self.conn.execute(
+            view_sql = "CREATE OR REPLACE VIEW chunks AS SELECT * FROM chunks_materialized"
+            self._log_query(view_sql, None)
+            conn.execute(view_sql)
+
+            index_sql = (
                 "CREATE INDEX IF NOT EXISTS idx_chunks_materialized_uri ON chunks_materialized(uri)"
             )
+            self._log_query(index_sql, None)
+            conn.execute(index_sql)
             LOGGER.info(
                 "Materialized DuckDB chunks table",
                 extra={
@@ -156,10 +194,14 @@ class DuckDBCatalog:
             )
         else:
             if parquet_exists:
-                relation = self.conn.sql("SELECT * FROM read_parquet(?)", params=[parquet_pattern])
+                sql = "SELECT * FROM read_parquet(?)"
+                self._log_query(sql, [parquet_pattern])
+                relation = conn.sql(sql, params=[parquet_pattern])
                 relation.create_view("chunks", replace=True)
             else:
-                self.conn.execute(f"CREATE OR REPLACE VIEW chunks AS {_EMPTY_CHUNKS_SELECT}")
+                sql = f"CREATE OR REPLACE VIEW chunks AS {_EMPTY_CHUNKS_SELECT}"
+                self._log_query(sql, None)
+                conn.execute(sql)
             LOGGER.debug(
                 "Configured DuckDB chunks view",
                 extra={
@@ -168,6 +210,33 @@ class DuckDBCatalog:
                     "db_path": str(self.db_path),
                 },
             )
+
+    @staticmethod
+    def _relation_exists(conn: duckdb.DuckDBPyConnection, name: str) -> bool:
+        """Return True when a table or view with ``name`` exists in the main schema.
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            DuckDB connection used to inspect the catalog.
+        name : str
+            Table or view name to look up within the ``main`` schema.
+
+        Returns
+        -------
+        bool
+            ``True`` when the relation exists, otherwise ``False``.
+        """
+        row = conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM information_schema.tables
+            WHERE table_schema = 'main'
+              AND table_name = ?
+            """,
+            [name],
+        ).fetchone()
+        return bool(row and row[0])
 
     def query_by_ids(self, ids: Sequence[int]) -> list[dict]:
         """Query chunks by their unique IDs.
@@ -193,31 +262,23 @@ class DuckDBCatalog:
             from the chunks Parquet file (id, uri, text, start_line, end_line,
             symbols, etc.). Returns empty list if no IDs provided or no matches.
 
-        Raises
-        ------
-        RuntimeError
-            If the database connection is not open. Call open() or use the
-            context manager before querying.
         """
-        if not self.conn:
-            msg = "Connection not open"
-            raise RuntimeError(msg)
-
         if not ids:
             return []
 
-        relation = self.conn.execute(
-            """
+        sql = """
             SELECT c.*
             FROM chunks AS c
             JOIN UNNEST(?) WITH ORDINALITY AS ids(id, position)
                 ON c.id = ids.id
             ORDER BY ids.position
-            """,
-            [list(ids)],
-        )
-        rows = relation.fetchall()
-        cols = [desc[0] for desc in relation.description]
+            """
+        params = [list(ids)]
+        with self.connection() as conn:
+            self._log_query(sql, params)
+            relation = conn.execute(sql, params)
+            rows = relation.fetchall()
+            cols = [desc[0] for desc in relation.description]
         return [dict(zip(cols, row, strict=True)) for row in rows]
 
     def query_by_filters(  # noqa: C901, PLR0912, PLR0915, PLR0914 - complex filtering logic with SQL generation and post-processing
@@ -262,12 +323,6 @@ class DuckDBCatalog:
             columns from the chunks Parquet file. Results preserve input ID order
             (via JOIN with UNNEST ordinality). Returns empty list if no IDs provided
             or all chunks filtered out.
-
-        Raises
-        ------
-        RuntimeError
-            If the database connection is not open. Call open() or use the
-            context manager before querying.
 
         Examples
         --------
@@ -315,10 +370,6 @@ class DuckDBCatalog:
         - Python post-filtering adds ~1-2ms overhead per 1000 chunks.
         - Consider adding index on `uri` column for faster LIKE queries (see Task 14).
         """
-        if not self.conn:
-            msg = "Connection not open"
-            raise RuntimeError(msg)
-
         if not ids:
             return []
 
@@ -332,76 +383,54 @@ class DuckDBCatalog:
         )
 
         # Build base query with ID filtering
-        query_parts = [
-            "SELECT c.*",
-            "FROM chunks AS c",
-            "JOIN UNNEST(?) WITH ORDINALITY AS ids(id, position)",
-            "  ON c.id = ids.id",
-        ]
-        params: list[object] = [list(ids)]
-        where_clauses: list[str] = []
+        chunk_ids = list(ids)
 
-        # Convert simple globs to SQL LIKE patterns
-        simple_include_patterns: list[str] = []
+        simple_include_globs: list[str] = []
         complex_include_patterns: list[str] = []
-        simple_exclude_patterns: list[str] = []
+        simple_exclude_globs: list[str] = []
         complex_exclude_patterns: list[str] = []
 
         if include_globs:
             for pattern in include_globs:
                 if self._is_simple_glob(pattern):
-                    sql_pattern = self._glob_to_sql_like(pattern)
-                    simple_include_patterns.append(sql_pattern)
+                    simple_include_globs.append(pattern)
                 else:
                     complex_include_patterns.append(pattern)
 
         if exclude_globs:
             for pattern in exclude_globs:
                 if self._is_simple_glob(pattern):
-                    sql_pattern = self._glob_to_sql_like(pattern)
-                    simple_exclude_patterns.append(sql_pattern)
+                    simple_exclude_globs.append(pattern)
                 else:
                     complex_exclude_patterns.append(pattern)
 
-        # Add SQL WHERE clauses for simple patterns
-        if simple_include_patterns:
-            like_clauses = " OR ".join("c.uri LIKE ? ESCAPE '\\'" for _ in simple_include_patterns)
-            where_clauses.append(f"({like_clauses})")
-            params.extend(simple_include_patterns)
-
-        if simple_exclude_patterns:
-            for pattern in simple_exclude_patterns:
-                where_clauses.append("c.uri NOT LIKE ? ESCAPE '\\'")
-                params.append(pattern)
-
-        # Add language filter (SQL LIKE for extensions)
+        language_extensions: set[str] = set()
         if languages:
-            extensions: set[str] = set()
             for lang in languages:
-                lang_extensions = LANGUAGE_EXTENSIONS.get(lang.lower(), [])
-                extensions.update(lang_extensions)
+                extensions = LANGUAGE_EXTENSIONS.get(lang.lower(), [])
+                language_extensions.update(ext.lower() for ext in extensions)
+            if not language_extensions:
+                duration = perf_counter() - start_time
+                with suppress(ValueError):
+                    _scope_filter_duration_seconds.labels(filter_type="language").observe(duration)
+                return []
 
-            if extensions:
-                ext_clauses = " OR ".join("c.uri LIKE ? ESCAPE '\\'" for _ in extensions)
-                where_clauses.append(f"({ext_clauses})")
-                params.extend(f"%{DuckDBCatalog._escape_like_wildcards(ext)}" for ext in extensions)
-            else:
-                # No extensions found for requested languages -> no matches
-                # Return empty by adding impossible WHERE clause
-                where_clauses.append("1 = 0")
+        options = DuckDBQueryOptions(
+            include_globs=tuple(simple_include_globs) if simple_include_globs else None,
+            exclude_globs=tuple(simple_exclude_globs) if simple_exclude_globs else None,
+            select_columns=("c.*",),
+            preserve_order=True,
+        )
 
-        # Build final query
-        if where_clauses:
-            query_parts.append("WHERE " + " AND ".join(where_clauses))
+        sql, sql_params = self._query_builder.build_filter_query(
+            chunk_ids=chunk_ids,
+            options=options,
+        )
 
-        query_parts.append("ORDER BY ids.position")
-
-        query = "\n".join(query_parts)
-
-        # Execute SQL query
-        relation = self.conn.execute(query, params)
-        rows = relation.fetchall()
-        cols = [desc[0] for desc in relation.description]
+        with self.connection() as conn:
+            relation = conn.execute(sql, sql_params)
+            rows = relation.fetchall()
+            cols = [desc[0] for desc in relation.description]
         results = [dict(zip(cols, row, strict=True)) for row in rows]
 
         # Post-filter complex globs using Python fnmatch
@@ -425,6 +454,18 @@ class DuckDBCatalog:
                     continue  # Matches an exclude pattern
 
                 filtered_results.append(chunk)
+            results = filtered_results
+
+        # Post-filter languages when requested extensions were found
+        if language_extensions:
+            filtered_results = []
+            for chunk in results:
+                uri = chunk.get("uri", "")
+                if not isinstance(uri, str):
+                    continue
+                uri_lower = uri.lower()
+                if any(uri_lower.endswith(ext) for ext in language_extensions):
+                    filtered_results.append(chunk)
             results = filtered_results
 
         # Record filtering duration
@@ -484,69 +525,6 @@ class DuckDBCatalog:
 
         return True
 
-    @staticmethod
-    def _glob_to_sql_like(pattern: str) -> str:
-        """Convert simple glob pattern to SQL LIKE pattern.
-
-        Conversions:
-        - `*.py` → `%.py`
-        - `**/*.py` → `%.py` (same as `*.py`)
-        - `src/**` → `src/%`
-        - `src/*.py` → `src/%.py`
-
-        Parameters
-        ----------
-        pattern : str
-            Simple glob pattern (must pass `_is_simple_glob` check).
-
-        Returns
-        -------
-        str
-            SQL LIKE pattern ready for parameterized query.
-        """
-        # Normalize separators
-        normalized = pattern.replace("\\", "/")
-
-        starts_with_recursive = normalized.startswith("**/")
-        recursive_remainder = normalized[len("**/") :] if starts_with_recursive else ""
-
-        escaped = DuckDBCatalog._escape_like_wildcards(normalized)
-
-        # Replace ** with % (matches any characters including slashes)
-        escaped = escaped.replace("**", "%")
-
-        # Replace * with % (matches any characters)
-        escaped = escaped.replace("*", "%")
-
-        # Replace ? with _ (matches single character)
-        escaped = escaped.replace("?", "_")
-
-        if (
-            starts_with_recursive
-            and recursive_remainder.startswith("*")
-            and escaped.startswith("%/")
-        ):
-            escaped = escaped.replace("/%", "%", 1)
-            escaped = "%" + escaped.lstrip("%")
-
-        return escaped
-
-    @staticmethod
-    def _escape_like_wildcards(pattern: str) -> str:
-        """Escape literal SQL LIKE wildcards using backslash.
-
-        Parameters
-        ----------
-        pattern : str
-            Pattern string to escape.
-
-        Returns
-        -------
-        str
-            Escaped pattern string.
-        """
-        return pattern.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
     def get_chunk_by_id(self, chunk_id: int) -> dict | None:
         """Return a single chunk record by ID.
 
@@ -594,25 +572,17 @@ class DuckDBCatalog:
             corresponds to file order). Returns empty list if file not found or
             no chunks in file.
 
-        Raises
-        ------
-        RuntimeError
-            If the database connection is not open. Call open() or use the
-            context manager before querying.
         """
-        if not self.conn:
-            msg = "Connection not open"
-            raise RuntimeError(msg)
-
         sql = "SELECT * FROM chunks WHERE uri = ? ORDER BY id"
         params: list[object] = [uri]
         if limit > 0:
             sql = "SELECT * FROM chunks WHERE uri = ? ORDER BY id LIMIT ?"
             params.append(limit)
 
-        relation = self.conn.execute(sql, params)
-        rows = relation.fetchall()
-        cols = [desc[0] for desc in relation.description]
+        with self.connection() as conn:
+            relation = conn.execute(sql, params)
+            rows = relation.fetchall()
+            cols = [desc[0] for desc in relation.description]
         return [dict(zip(cols, row, strict=True)) for row in rows]
 
     def get_embeddings_by_ids(self, ids: Sequence[int]) -> np.ndarray:
@@ -641,31 +611,23 @@ class DuckDBCatalog:
             Returns empty array (shape (0, vec_dim)) if no IDs provided or no
             matches found. The array is ordered by the input ID sequence.
 
-        Raises
-        ------
-        RuntimeError
-            If the database connection is not open. Call open() or use the
-            context manager before querying.
         """
-        if not self.conn:
-            msg = "Connection not open"
-            raise RuntimeError(msg)
-
         if not ids:
             dim = self._embedding_dim()
             return np.empty((0, dim), dtype=np.float32)
 
-        relation = self.conn.execute(
-            """
-            SELECT c.id, c.embedding, ids.position
-            FROM chunks AS c
-            JOIN UNNEST(?) WITH ORDINALITY AS ids(id, position)
-                ON c.id = ids.id
-            ORDER BY ids.position
-            """,
-            [list(ids)],
-        )
-        rows = relation.fetchall()
+        with self.connection() as conn:
+            relation = conn.execute(
+                """
+                SELECT c.id, c.embedding, ids.position
+                FROM chunks AS c
+                JOIN UNNEST(?) WITH ORDINALITY AS ids(id, position)
+                    ON c.id = ids.id
+                ORDER BY ids.position
+                """,
+                [list(ids)],
+            )
+            rows = relation.fetchall()
         dim = self._embedding_dim()
         if not rows:
             return np.empty((0, dim), dtype=np.float32)
@@ -699,17 +661,9 @@ class DuckDBCatalog:
             Total number of chunks in the index. Returns 0 if the chunks view
             is empty or no Parquet files exist.
 
-        Raises
-        ------
-        RuntimeError
-            If the database connection is not open. Call open() or use the
-            context manager before querying.
         """
-        if not self.conn:
-            msg = "Connection not open"
-            raise RuntimeError(msg)
-
-        result = self.conn.execute("SELECT COUNT(*) FROM chunks").fetchone()
+        with self.connection() as conn:
+            result = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()
         return result[0] if result else 0
 
     def _embedding_dim(self) -> int:
@@ -719,18 +673,11 @@ class DuckDBCatalog:
         -------
         int
             Embedding dimension for the chunks table, or ``0`` when no rows exist.
-
-        Raises
-        ------
-        RuntimeError
-            If the database connection has not been opened.
         """
         if self._embedding_dim_cache is not None:
             return self._embedding_dim_cache
-        if not self.conn:
-            msg = "Connection not open"
-            raise RuntimeError(msg)
-        result = self.conn.execute("SELECT embedding FROM chunks LIMIT 1").fetchone()
+        with self.connection() as conn:
+            result = conn.execute("SELECT embedding FROM chunks LIMIT 1").fetchone()
         if result and result[0] is not None:
             self._embedding_dim_cache = len(result[0])
         else:

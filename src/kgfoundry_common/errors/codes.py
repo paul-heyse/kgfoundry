@@ -171,6 +171,10 @@ class ErrorCode(StrEnum):
     FILE_OPERATION_ERROR = "file-operation-error"
     GIT_OPERATION_ERROR = "git-operation-error"
     INVALID_PARAMETER = "invalid-parameter"
+    PATH_OUTSIDE_REPOSITORY = "path-outside-repo"
+    PATH_NOT_DIRECTORY = "path-not-directory"
+    PATH_NOT_FOUND = "path-not-found"
+    NOT_IMPLEMENTED = "not-implemented"
 
     # Knowledge Graph & Ontology (6xx)
     ONTOLOGY_PARSE_ERROR = "ontology-parse-error"

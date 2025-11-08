@@ -20,10 +20,10 @@ from codeintel_rev.config.settings import (
     Settings,
     VLLMConfig,
 )
+from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.vllm_client import VLLMClient
-from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 
 
 class _FakeRedis:
@@ -106,6 +106,7 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
             scope_l1_ttl_seconds=300,
             scope_l2_ttl_seconds=3600,
         ),
+        duckdb=DuckDBConfig(),
     )
 
     # Create resolved paths and ensure backing directories exist

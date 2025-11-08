@@ -68,18 +68,15 @@ def test_query_by_uri_supports_unlimited_results(tmp_path) -> None:
 
     db_path = tmp_path / "catalog.duckdb"
     catalog = DuckDBCatalog(db_path, vectors_dir)
-    catalog.conn = duckdb.connect(database=":memory:")
-    # Use DuckDB's register function to register parquet file as a table
-    # This avoids string formatting in CREATE VIEW by using a registered table name
     validated_path = parquet_path.resolve()
-    # Ensure path is within tmp_path to prevent path traversal
     if not str(validated_path).startswith(str(tmp_path.resolve())):
         msg = "Path outside test directory"
         raise ValueError(msg)
-    # Register parquet file as a table using parameterized API
-    catalog.conn.register("chunks_table", duckdb.read_parquet(str(validated_path)))
-    # Create view from registered table (table name is constant, not user input)
-    catalog.conn.execute("CREATE OR REPLACE VIEW chunks AS SELECT * FROM chunks_table")
+    with duckdb.connect(str(db_path)) as connection:
+        safe_path = str(validated_path).replace("'", "''")
+        connection.execute(
+            f"CREATE OR REPLACE VIEW chunks AS SELECT * FROM read_parquet('{safe_path}')"  # noqa: S608
+        )
 
     limited = catalog.query_by_uri("example.py", limit=1)
     unlimited_zero = catalog.query_by_uri("example.py", limit=0)
@@ -98,17 +95,17 @@ def test_get_embeddings_by_ids_skips_null_embeddings(tmp_path: Path) -> None:
 
     catalog_path = tmp_path / "catalog.duckdb"
     catalog = DuckDBCatalog(catalog_path, vectors_dir)
-    catalog.conn = duckdb.connect(database=":memory:")
-    catalog.conn.execute(
-        """
-        CREATE OR REPLACE VIEW chunks AS
-        SELECT * FROM (
-            SELECT 1::BIGINT AS id, [0.1, 0.2]::FLOAT[] AS embedding
-            UNION ALL
-            SELECT 2::BIGINT AS id, NULL::FLOAT[] AS embedding
+    with duckdb.connect(str(catalog_path)) as connection:
+        connection.execute(
+            """
+            CREATE OR REPLACE VIEW chunks AS
+            SELECT * FROM (
+                SELECT 1::BIGINT AS id, [0.1, 0.2]::FLOAT[] AS embedding
+                UNION ALL
+                SELECT 2::BIGINT AS id, NULL::FLOAT[] AS embedding
+            )
+            """
         )
-        """
-    )
 
     results = catalog.get_embeddings_by_ids([1, 2])
     assert results.shape == (1, 2)
@@ -121,23 +118,23 @@ def test_query_by_filters_handles_literal_percent(tmp_path: Path) -> None:
 
     catalog_path = tmp_path / "catalog.duckdb"
     catalog = DuckDBCatalog(catalog_path, vectors_dir)
-    catalog.conn = duckdb.connect(database=":memory:")
-    catalog.conn.execute(
-        """
-        CREATE OR REPLACE VIEW chunks AS
-        SELECT * FROM (
-            SELECT
-                1::BIGINT AS id,
-                'src/config%file.py'::VARCHAR AS uri,
-                0::INTEGER AS start_line,
-                1::INTEGER AS end_line,
-                0::BIGINT AS start_byte,
-                10::BIGINT AS end_byte,
-                'percent file'::VARCHAR AS preview,
-                [0.1, 0.2]::FLOAT[] AS embedding
+    with duckdb.connect(str(catalog_path)) as connection:
+        connection.execute(
+            """
+            CREATE OR REPLACE VIEW chunks AS
+            SELECT * FROM (
+                SELECT
+                    1::BIGINT AS id,
+                    'src/config%file.py'::VARCHAR AS uri,
+                    0::INTEGER AS start_line,
+                    1::INTEGER AS end_line,
+                    0::BIGINT AS start_byte,
+                    10::BIGINT AS end_byte,
+                    'percent file'::VARCHAR AS preview,
+                    [0.1, 0.2]::FLOAT[] AS embedding
+            )
+            """
         )
-        """
-    )
 
     results = catalog.query_by_filters([1], include_globs=["src/config%file.py"])
     assert len(results) == 1
@@ -150,23 +147,23 @@ def test_query_by_filters_handles_literal_underscore(tmp_path: Path) -> None:
 
     catalog_path = tmp_path / "catalog.duckdb"
     catalog = DuckDBCatalog(catalog_path, vectors_dir)
-    catalog.conn = duckdb.connect(database=":memory:")
-    catalog.conn.execute(
-        """
-        CREATE OR REPLACE VIEW chunks AS
-        SELECT * FROM (
-            SELECT
-                1::BIGINT AS id,
-                'src/config_file.py'::VARCHAR AS uri,
-                0::INTEGER AS start_line,
-                1::INTEGER AS end_line,
-                0::BIGINT AS start_byte,
-                10::BIGINT AS end_byte,
-                'underscore file'::VARCHAR AS preview,
-                [0.1, 0.2]::FLOAT[] AS embedding
+    with duckdb.connect(str(catalog_path)) as connection:
+        connection.execute(
+            """
+            CREATE OR REPLACE VIEW chunks AS
+            SELECT * FROM (
+                SELECT
+                    1::BIGINT AS id,
+                    'src/config_file.py'::VARCHAR AS uri,
+                    0::INTEGER AS start_line,
+                    1::INTEGER AS end_line,
+                    0::BIGINT AS start_byte,
+                    10::BIGINT AS end_byte,
+                    'underscore file'::VARCHAR AS preview,
+                    [0.1, 0.2]::FLOAT[] AS embedding
+            )
+            """
         )
-        """
-    )
 
     results = catalog.query_by_filters([1], include_globs=["src/config_file.py"])
     assert len(results) == 1

@@ -35,6 +35,12 @@ Production-grade MCP server for AI-assisted code review with SCIP indexing, sema
     └─────────────┘     └─────────────┘     └─────────────┘
 ```
 
+### Observability
+
+- [Observability Architecture Guide](docs/architecture/observability.md) —
+  explains the shared metrics helper, naming conventions, resource cleanup, and
+  RFC 9457 error handling expectations.
+
 ## Features
 
 - **SCIP-based Indexing**: Uses Sourcegraph SCIP for precise symbol information

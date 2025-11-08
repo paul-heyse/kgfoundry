@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 import git.exc
 
-from codeintel_rev.errors import GitOperationError
+from codeintel_rev.errors import GitOperationError, PathNotFoundError
 from codeintel_rev.io.path_utils import resolve_within_repo
 from kgfoundry_common.logging import get_logger
 
@@ -54,8 +54,10 @@ async def blame_range(
     ------
     GitOperationError
         If Git blame operation fails. This function calls ``resolve_within_repo``
-        which may raise ``PathOutsideRepositoryError`` or ``FileNotFoundError``,
-        but those exceptions are not explicitly caught or re-raised by this function.
+        which may raise ``PathOutsideRepositoryError``. If the requested path
+        does not exist, ``PathNotFoundError`` is raised.
+    PathNotFoundError
+        If the requested file path does not exist within the repository.
 
     Examples
     --------
@@ -74,8 +76,11 @@ async def blame_range(
     """
     repo_root = context.paths.repo_root
 
-    # Path validation (raises PathOutsideRepositoryError or FileNotFoundError)
-    file_path = resolve_within_repo(repo_root, path, allow_nonexistent=False)
+    try:
+        file_path = resolve_within_repo(repo_root, path, allow_nonexistent=False)
+    except FileNotFoundError as exc:
+        error_msg = f"Path not found: {path}"
+        raise PathNotFoundError(error_msg, path=path, cause=exc) from exc
 
     # Use relative path for AsyncGitClient (it expects paths relative to repo root)
     relative_path = str(file_path.relative_to(repo_root))
@@ -142,8 +147,10 @@ async def file_history(
     ------
     GitOperationError
         If Git log operation fails. This function calls ``resolve_within_repo``
-        which may raise ``PathOutsideRepositoryError`` or ``FileNotFoundError``,
-        but those exceptions are not explicitly caught or re-raised by this function.
+        which may raise ``PathOutsideRepositoryError``. If the requested path
+        does not exist, ``PathNotFoundError`` is raised.
+    PathNotFoundError
+        If the requested file path does not exist within the repository.
 
     Examples
     --------
@@ -162,8 +169,11 @@ async def file_history(
     """
     repo_root = context.paths.repo_root
 
-    # Path validation (raises PathOutsideRepositoryError or FileNotFoundError)
-    file_path = resolve_within_repo(repo_root, path, allow_nonexistent=False)
+    try:
+        file_path = resolve_within_repo(repo_root, path, allow_nonexistent=False)
+    except FileNotFoundError as exc:
+        error_msg = f"Path not found: {path}"
+        raise PathNotFoundError(error_msg, path=path, cause=exc) from exc
 
     # Use relative path for AsyncGitClient (it expects paths relative to repo root)
     relative_path = str(file_path.relative_to(repo_root))

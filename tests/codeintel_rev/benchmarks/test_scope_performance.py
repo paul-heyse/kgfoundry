@@ -20,6 +20,7 @@ from time import perf_counter
 import duckdb
 import pytest
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 
 # Number of chunks to create for benchmark
 # Reduced from 100K to 10K for faster fixture setup while still providing meaningful benchmarks
@@ -125,7 +126,6 @@ def benchmark_catalog(tmp_path_factory) -> DuckDBCatalog:
     vectors_dir.mkdir()
 
     catalog = DuckDBCatalog(db_path, vectors_dir)
-    catalog.conn = duckdb.connect(str(db_path))
 
     # Generate diverse URIs for benchmarking
     # Mix of languages: Python, TypeScript, JavaScript, Rust, Go, Java, etc.
@@ -141,47 +141,46 @@ def benchmark_catalog(tmp_path_factory) -> DuckDBCatalog:
         "java": [".java"],
     }
 
-    # Create chunks table structure first
-    catalog.conn.execute(
-        """
-        CREATE TABLE chunks (
-            id BIGINT,
-            uri VARCHAR,
-            start_line INTEGER,
-            end_line INTEGER,
-            start_byte BIGINT,
-            end_byte BIGINT,
-            preview VARCHAR,
-            embedding FLOAT[]
-        )
-        """
-    )
-
-    # Generate and insert chunks in batches for performance
-    batch_size = 10_000
-    chunk_id = 1
-
-    for batch_start in range(0, BENCHMARK_CHUNK_COUNT, batch_size):
-        batch_end = min(batch_start + batch_size, BENCHMARK_CHUNK_COUNT)
-        batch_data: list[tuple[int, str, int, int, int, int, str, list[float]]] = []
-
-        for _ in range(batch_start, batch_end):
-            uri = _generate_chunk_uri(chunk_id, languages, directories, extensions)
-            chunk_data = _generate_chunk_data(chunk_id, uri)
-            batch_data.append(chunk_data)
-            chunk_id += 1
-
-        # Insert batch using executemany for better performance
-        catalog.conn.executemany(
+    with duckdb.connect(str(db_path)) as connection:
+        connection.execute(
             """
-            INSERT INTO chunks (id, uri, start_line, end_line, start_byte, end_byte, preview, embedding)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            batch_data,
+            CREATE TABLE chunks (
+                id BIGINT,
+                uri VARCHAR,
+                start_line INTEGER,
+                end_line INTEGER,
+                start_byte BIGINT,
+                end_byte BIGINT,
+                preview VARCHAR,
+                embedding FLOAT[]
+            )
+            """
         )
 
-    # Create index on uri column for efficient filtering
-    catalog.conn.execute("CREATE INDEX IF NOT EXISTS idx_uri ON chunks(uri)")
+        # Generate and insert chunks in batches for performance
+        batch_size = 10_000
+        chunk_id = 1
+
+        for batch_start in range(0, BENCHMARK_CHUNK_COUNT, batch_size):
+            batch_end = min(batch_start + batch_size, BENCHMARK_CHUNK_COUNT)
+            batch_data: list[tuple[int, str, int, int, int, int, str, list[float]]] = []
+
+            for _ in range(batch_start, batch_end):
+                uri = _generate_chunk_uri(chunk_id, languages, directories, extensions)
+                chunk_data = _generate_chunk_data(chunk_id, uri)
+                batch_data.append(chunk_data)
+                chunk_id += 1
+
+            connection.executemany(
+                """
+                INSERT INTO chunks (id, uri, start_line, end_line, start_byte, end_byte, preview, embedding)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                batch_data,
+            )
+
+        # Create index on uri column for efficient filtering
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_uri ON chunks(uri)")
 
     return catalog
 
@@ -447,3 +446,126 @@ class TestScopeFilteringOverhead:
         assert overhead_ms < MAX_FILTER_OVERHEAD_MS, (
             f"Combined filter overhead {overhead_ms:.2f}ms exceeds threshold {MAX_FILTER_OVERHEAD_MS}ms"
         )
+
+
+def _run_hot_query(manager: DuckDBManager) -> None:
+    """Execute a representative aggregation to exercise DuckDB planning."""
+    with manager.connection() as conn:
+        conn.execute(
+            """
+            SELECT avg(end_line - start_line)
+            FROM chunks
+            WHERE uri LIKE 'src/%'
+            """
+        ).fetchone()
+
+
+def _average_duration(manager: DuckDBManager, iterations: int = 20) -> float:
+    """Return the average execution time across repeated catalog queries.
+
+    Returns
+    -------
+    float
+        Average duration per query in seconds.
+    """
+    for _ in range(5):
+        _run_hot_query(manager)
+    start = perf_counter()
+    for _ in range(iterations):
+        _run_hot_query(manager)
+    return (perf_counter() - start) / iterations
+
+
+@pytest.mark.benchmark
+def test_object_cache_benchmark(benchmark_catalog: DuckDBCatalog) -> None:
+    """Benchmark object cache impact by comparing cached vs uncached query times."""
+    benchmark_catalog.open()
+    db_path = benchmark_catalog.db_path
+
+    disabled = DuckDBManager(db_path, DuckDBConfig(enable_object_cache=False))
+    enabled = DuckDBManager(db_path, DuckDBConfig(enable_object_cache=True))
+
+    baseline = _average_duration(disabled)
+    cached = _average_duration(enabled)
+
+    assert cached <= baseline * 1.5, (
+        f"Object cache degraded query performance (cached={cached:.6f}s, baseline={baseline:.6f}s)"
+    )
+
+
+def _write_materialization_dataset(vectors_dir, row_count: int = 2_000) -> str:
+    """Create a Parquet dataset used for materialization benchmarks.
+
+    Returns
+    -------
+    str
+        Absolute path to the generated Parquet file.
+    """
+    parquet_path = vectors_dir / "chunks.parquet"
+    with duckdb.connect(database=":memory:") as connection:
+        connection.execute(
+            """
+            CREATE TABLE tmp (
+                id BIGINT,
+                uri VARCHAR,
+                start_line INTEGER,
+                end_line INTEGER,
+                start_byte BIGINT,
+                end_byte BIGINT,
+                preview VARCHAR,
+                embedding FLOAT[]
+            )
+            """
+        )
+        rows = []
+        for i in range(1, row_count + 1):
+            uri = f"src/module_{i}.py" if i % 2 == 0 else f"tests/test_{i}.py"
+            rows.append(
+                (i, uri, 1, 100, 0, 400, f"code snippet {i}", [0.1, 0.2]),
+            )
+        connection.executemany(
+            """
+            INSERT INTO tmp
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            rows,
+        )
+        connection.execute("COPY tmp TO ? (FORMAT PARQUET)", [str(parquet_path)])
+    return str(parquet_path)
+
+
+@pytest.mark.benchmark
+def test_materialized_vs_view_performance(tmp_path) -> None:
+    """Validate materialized catalogs are not slower than view-based catalogs."""
+    vectors_dir = tmp_path / "vectors"
+    vectors_dir.mkdir()
+    _write_materialization_dataset(vectors_dir)
+
+    view_catalog = DuckDBCatalog(tmp_path / "view.duckdb", vectors_dir, materialize=False)
+    materialized_catalog = DuckDBCatalog(
+        tmp_path / "materialized.duckdb",
+        vectors_dir,
+        materialize=True,
+    )
+
+    view_catalog.open()
+    materialized_catalog.open()
+
+    chunk_ids = list(range(1, 1001))
+
+    def _measure(catalog: DuckDBCatalog) -> float:
+        iterations = 15
+        for _ in range(3):
+            catalog.query_by_ids(chunk_ids)
+        start = perf_counter()
+        for _ in range(iterations):
+            catalog.query_by_ids(chunk_ids)
+        return (perf_counter() - start) / iterations
+
+    view_time = _measure(view_catalog)
+    materialized_time = _measure(materialized_catalog)
+
+    assert materialized_time <= view_time * 1.2, (
+        f"Materialized catalog slower than view "
+        f"(materialized={materialized_time:.6f}s, view={view_time:.6f}s)"
+    )

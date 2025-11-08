@@ -13,7 +13,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from codeintel_rev.app.middleware import get_session_id
-from codeintel_rev.errors import FileReadError, InvalidLineRangeError
+from codeintel_rev.errors import (
+    FileReadError,
+    InvalidLineRangeError,
+    PathNotDirectoryError,
+    PathNotFoundError,
+)
 from codeintel_rev.io.path_utils import resolve_within_repo
 from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.mcp_server.scope_utils import (
@@ -203,14 +208,13 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0917 - PathOu
 
     Raises
     ------
-    FileNotFoundError
-        If path doesn't exist or is not a directory.
+    PathNotFoundError
+        If the requested path does not exist within the repository.
+    PathNotDirectoryError
+        If the requested path exists but is not a directory.
     """
     repo_root = context.paths.repo_root
     search_root = _resolve_search_root(repo_root, path)
-    if search_root is None:
-        error_msg = "Path not found or not a directory"
-        raise FileNotFoundError(error_msg)
 
     merged = merge_scope_filters(
         scope,
@@ -351,8 +355,8 @@ def open_file(
 
     Raises
     ------
-    FileNotFoundError
-        If file doesn't exist (raised by resolve_within_repo) or is not a file.
+    PathNotFoundError
+        If the requested file does not exist or is not a regular file.
     FileReadError
         If file is binary or has encoding issues.
     InvalidLineRangeError
@@ -374,12 +378,16 @@ def open_file(
     repo_root = context.paths.repo_root
 
     # Path validation (raises PathOutsideRepositoryError or FileNotFoundError)
-    file_path = resolve_within_repo(repo_root, path, allow_nonexistent=False)
+    try:
+        file_path = resolve_within_repo(repo_root, path, allow_nonexistent=False)
+    except FileNotFoundError as exc:
+        error_msg = f"Path not found: {path}"
+        raise PathNotFoundError(error_msg, path=path, cause=exc) from exc
 
     # File type check
     if not file_path.is_file():
         error_msg = f"Not a file: {path}"
-        raise FileNotFoundError(error_msg)
+        raise PathNotFoundError(error_msg, path=path)
 
     # Read content (raises UnicodeDecodeError → wrapped by decorator)
     try:
@@ -430,12 +438,11 @@ def open_file(
 __all__ = ["list_paths", "open_file", "set_scope"]
 
 
-def _resolve_search_root(repo_root: Path, requested: str | None) -> Path | None:
-    """Resolve search root path, returning None if path doesn't exist or is not a directory.
+def _resolve_search_root(repo_root: Path, requested: str | None) -> Path:
+    """Resolve search root path, raising descriptive errors on failure.
 
-    This function calls ``resolve_within_repo`` which may raise exceptions, but
-    this function itself does not raise exceptions. It returns ``None`` when the
-    resolved path is not a directory.
+    This function calls ``resolve_within_repo`` and converts generic file
+    exceptions into domain-specific errors for consistent error handling.
 
     Parameters
     ----------
@@ -446,20 +453,30 @@ def _resolve_search_root(repo_root: Path, requested: str | None) -> Path | None:
 
     Returns
     -------
-    Path | None
-        Resolved search root path, or None if path doesn't exist or is not a directory.
-        Note: ``resolve_within_repo`` may raise ``PathOutsideRepositoryError`` or
-        ``FileNotFoundError`` before this function returns, but those exceptions
-        are not caught or re-raised by this function.
+    Path
+        Resolved search root path.
+
+    Raises
+    ------
+    PathOutsideRepositoryError
+        If the resolved path escapes the repository root.
+    PathNotFoundError
+        If the requested path does not exist within the repository.
+    PathNotDirectoryError
+        If the resolved path exists but is not a directory.
     """
     if requested is None:
         return repo_root
 
-    # Raises PathOutsideRepositoryError or FileNotFoundError
-    search_root = resolve_within_repo(repo_root, requested, allow_nonexistent=False)
+    try:
+        search_root = resolve_within_repo(repo_root, requested, allow_nonexistent=False)
+    except FileNotFoundError as exc:
+        error_msg = f"Path not found: {requested}"
+        raise PathNotFoundError(error_msg, path=requested, cause=exc) from exc
 
     if not search_root.is_dir():
-        return None
+        error_msg = f"Path is not a directory: {requested}"
+        raise PathNotDirectoryError(error_msg, path=requested)
 
     return search_root
 

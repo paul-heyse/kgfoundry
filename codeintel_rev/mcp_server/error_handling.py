@@ -55,9 +55,12 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from functools import wraps
+from http import HTTPStatus
 from typing import TYPE_CHECKING, TypeVar, cast
 
+from codeintel_rev.errors import PathNotDirectoryError, PathNotFoundError
 from codeintel_rev.io.path_utils import PathOutsideRepositoryError
 from kgfoundry_common.errors import KgFoundryError
 from kgfoundry_common.logging import get_logger, with_fields
@@ -72,8 +75,89 @@ COMPONENT_NAME = "codeintel_mcp"
 F = TypeVar("F", bound=Callable[..., object])
 
 
+@dataclass(frozen=True)
+class ProblemMapping:
+    code: str
+    title: str
+    status: int
+
+
+EXCEPTION_TO_ERROR_CODE: dict[type[BaseException], ProblemMapping] = {
+    PathOutsideRepositoryError: ProblemMapping(
+        "path-outside-repo", "Path Outside Repository", HTTPStatus.BAD_REQUEST
+    ),
+    PathNotDirectoryError: ProblemMapping(
+        "path-not-directory", "Path Not Directory", HTTPStatus.BAD_REQUEST
+    ),
+    PathNotFoundError: ProblemMapping("path-not-found", "Path Not Found", HTTPStatus.NOT_FOUND),
+    FileNotFoundError: ProblemMapping("path-not-found", "Path Not Found", HTTPStatus.NOT_FOUND),
+    ValueError: ProblemMapping("invalid-parameter", "Invalid Parameter", HTTPStatus.BAD_REQUEST),
+    NotImplementedError: ProblemMapping(
+        "not-implemented", "Not Implemented", HTTPStatus.NOT_IMPLEMENTED
+    ),
+}
+
+
+def format_error_response(exc: BaseException, *, instance: str) -> dict[str, object]:
+    """Return Problem Details payload for the provided exception.
+
+    Parameters
+    ----------
+    exc : BaseException
+        Exception instance to convert into Problem Details.
+    instance : str
+        RFC 9457 ``instance`` URI identifying the operation that failed.
+
+    Returns
+    -------
+    dict[str, object]
+        Dictionary containing ``problem`` (Problem Details payload) and
+        ``status`` (HTTP status code).
+    """
+    if isinstance(exc, KgFoundryError):
+        problem = exc.to_problem_details(instance=instance)
+        status = cast("int", problem.get("status", HTTPStatus.INTERNAL_SERVER_ERROR))
+        return {"problem": problem, "status": status}
+
+    if isinstance(exc, UnicodeDecodeError):
+        problem = build_problem_details(
+            problem_type="https://kgfoundry.dev/problems/unsupported-encoding",
+            title="Unsupported Encoding",
+            status=415,
+            detail=f"Binary file or encoding error: {exc.reason}",
+            instance=instance,
+            code="unsupported-encoding",
+            extensions={"encoding": exc.encoding, "reason": exc.reason},
+        )
+        return {"problem": problem, "status": 415}
+
+    for exc_type, mapping in EXCEPTION_TO_ERROR_CODE.items():
+        if isinstance(exc, exc_type):
+            detail = str(exc)
+            problem = build_problem_details(
+                problem_type=f"https://kgfoundry.dev/problems/{mapping.code}",
+                title=mapping.title,
+                status=mapping.status,
+                detail=detail,
+                instance=instance,
+                code=mapping.code,
+            )
+            return {"problem": problem, "status": mapping.status}
+
+    problem = build_problem_details(
+        problem_type="https://kgfoundry.dev/problems/internal-error",
+        title="Internal Error",
+        status=500,
+        detail=str(exc),
+        instance=instance,
+        code="internal-error",
+        extensions={"exception_type": type(exc).__name__},
+    )
+    return {"problem": problem, "status": 500}
+
+
 def convert_exception_to_envelope(
-    exc: Exception,
+    exc: BaseException,
     operation: str,
     empty_result: Mapping[str, object],
 ) -> dict:
@@ -170,48 +254,38 @@ def convert_exception_to_envelope(
     >>> envelope["problem"]["extensions"]["query"]
     'def main'
     """
-    problem: ProblemDetails
+    response = format_error_response(exc, instance=operation)
+    problem = cast("ProblemDetails", response["problem"])
+    status = cast("int", response["status"])
 
-    # KgFoundryError: Use built-in Problem Details conversion
     if isinstance(exc, KgFoundryError):
-        problem = exc.to_problem_details(instance=operation)
+        kg_exc = exc
         with with_fields(
             LOGGER,
             component=COMPONENT_NAME,
             operation=operation,
-            error_code=exc.code.value,
+            error_code=kg_exc.code.value,
         ) as adapter:
-            adapter.log(exc.log_level, exc.message, extra={"context": exc.context})
-
-    # FileNotFoundError: 404 Not Found
-    elif isinstance(exc, FileNotFoundError):
-        problem = build_problem_details(
-            problem_type="https://kgfoundry.dev/problems/file-not-found",
-            title="File Not Found",
-            status=404,
-            detail=str(exc),
-            instance=operation,
-            code="file-not-found",
-        )
+            adapter.log(kg_exc.log_level, kg_exc.message, extra={"context": kg_exc.context})
+    elif isinstance(exc, PathNotDirectoryError):
         LOGGER.warning(
-            "File not found",
+            "Path not directory",
             extra={
                 "component": COMPONENT_NAME,
                 "operation": operation,
                 "error": str(exc),
             },
         )
-
-    # PathOutsideRepositoryError: 403 Forbidden (security boundary violation)
-    elif isinstance(exc, PathOutsideRepositoryError):
-        problem = build_problem_details(
-            problem_type="https://kgfoundry.dev/problems/forbidden",
-            title="Forbidden",
-            status=403,
-            detail=str(exc),
-            instance=operation,
-            code="forbidden",
+    elif isinstance(exc, (PathNotFoundError, FileNotFoundError)):
+        LOGGER.warning(
+            "Path not found",
+            extra={
+                "component": COMPONENT_NAME,
+                "operation": operation,
+                "error": str(exc),
+            },
         )
+    elif isinstance(exc, PathOutsideRepositoryError):
         LOGGER.warning(
             "Path outside repository",
             extra={
@@ -220,18 +294,7 @@ def convert_exception_to_envelope(
                 "error": str(exc),
             },
         )
-
-    # UnicodeDecodeError: 415 Unsupported Media Type (binary file)
     elif isinstance(exc, UnicodeDecodeError):
-        problem = build_problem_details(
-            problem_type="https://kgfoundry.dev/problems/unsupported-encoding",
-            title="Unsupported Encoding",
-            status=415,
-            detail=f"Binary file or encoding error: {exc.reason}",
-            instance=operation,
-            code="unsupported-encoding",
-            extensions={"encoding": exc.encoding, "reason": exc.reason},
-        )
         LOGGER.warning(
             "Encoding error",
             extra={
@@ -241,17 +304,7 @@ def convert_exception_to_envelope(
                 "reason": exc.reason,
             },
         )
-
-    # ValueError: 400 Bad Request (invalid parameters)
     elif isinstance(exc, ValueError):
-        problem = build_problem_details(
-            problem_type="https://kgfoundry.dev/problems/invalid-parameter",
-            title="Invalid Parameter",
-            status=400,
-            detail=str(exc),
-            instance=operation,
-            code="invalid-parameter",
-        )
         LOGGER.warning(
             "Invalid parameter",
             extra={
@@ -260,20 +313,16 @@ def convert_exception_to_envelope(
                 "error": str(exc),
             },
         )
-
-    # Unknown exception: 500 Internal Server Error
-    # This catches all unexpected exceptions (RuntimeError, AttributeError, etc.)
-    else:
-        problem = build_problem_details(
-            problem_type="https://kgfoundry.dev/problems/internal-error",
-            title="Internal Error",
-            status=500,
-            detail=str(exc),
-            instance=operation,
-            code="internal-error",
-            extensions={"exception_type": type(exc).__name__},
+    elif isinstance(exc, NotImplementedError):
+        LOGGER.error(
+            "Operation not implemented",
+            extra={
+                "component": COMPONENT_NAME,
+                "operation": operation,
+                "error": str(exc),
+            },
         )
-        # Log with exception level to include stack trace for debugging
+    elif status >= HTTPStatus.INTERNAL_SERVER_ERROR:
         LOGGER.exception(  # noqa: LOG004 - intentional exception logging outside handler
             "Unexpected error",
             extra={
@@ -285,7 +334,6 @@ def convert_exception_to_envelope(
 
     # Build envelope: empty result fields + error + problem
     envelope = dict(empty_result)
-    # detail is always present in ProblemDetails from build_problem_details
     detail = problem.get("detail", str(exc))
     envelope["error"] = detail
     envelope["problem"] = problem
@@ -453,6 +501,8 @@ def handle_adapter_errors(
 
 
 __all__ = [
+    "EXCEPTION_TO_ERROR_CODE",
     "convert_exception_to_envelope",
+    "format_error_response",
     "handle_adapter_errors",
 ]

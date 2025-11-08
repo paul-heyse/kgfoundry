@@ -15,6 +15,7 @@ from codeintel_rev.config.settings import (
     Settings,
     VLLMConfig,
 )
+from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.vllm_client import VLLMClient
@@ -71,6 +72,7 @@ def _build_context(repo_root: Path) -> ApplicationContext:
             scope_l1_ttl_seconds=300,
             scope_l2_ttl_seconds=3600,
         ),
+        duckdb=DuckDBConfig(),
     )
 
     paths = ResolvedPaths(
@@ -94,6 +96,8 @@ def _build_context(repo_root: Path) -> ApplicationContext:
         l2_ttl_seconds=settings.redis.scope_l2_ttl_seconds,
     )
 
+    duckdb_manager = DuckDBManager(paths.duckdb_path, DuckDBConfig())
+
     vllm_client = MagicMock(spec=VLLMClient)
     faiss_manager = MagicMock(spec=FAISSManager)
     faiss_manager.gpu_index = None
@@ -107,6 +111,7 @@ def _build_context(repo_root: Path) -> ApplicationContext:
         vllm_client=vllm_client,
         faiss_manager=faiss_manager,
         scope_store=scope_store,
+        duckdb_manager=duckdb_manager,
         git_client=git_client,
         async_git_client=async_git_client,
     )

@@ -498,6 +498,7 @@ class ApplicationContext:
             self.paths.vectors_dir,
             materialize=self.settings.index.duckdb_materialize,
             manager=self.duckdb_manager,
+            log_queries=self.settings.duckdb.log_queries,
         )
         try:
             catalog.open()

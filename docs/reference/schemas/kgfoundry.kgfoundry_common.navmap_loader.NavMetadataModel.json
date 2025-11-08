@@ -1,0 +1,288 @@
+{
+  "$defs": {
+    "NavModuleMeta": {
+      "description": "Module-level metadata derived from registry interfaces or sidecars.",
+      "properties": {
+        "augment": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Augment"
+        },
+        "binary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Binary"
+        },
+        "extras": {
+          "additionalProperties": true,
+          "title": "Extras",
+          "type": "object"
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Owner"
+        },
+        "protocol": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Protocol"
+        },
+        "since": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Since"
+        },
+        "spec": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Spec"
+        },
+        "stability": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stability"
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "title": "NavModuleMeta",
+      "type": "object"
+    },
+    "NavSectionModel": {
+      "description": "Section grouping symbols for navigation.",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "symbols": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Symbols",
+          "type": "array"
+        },
+        "title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Title"
+        }
+      },
+      "required": [
+        "id",
+        "symbols"
+      ],
+      "title": "NavSectionModel",
+      "type": "object"
+    },
+    "NavSymbolModel": {
+      "description": "Symbol-level metadata exposed in navigation payloads.",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "extras": {
+          "additionalProperties": true,
+          "title": "Extras",
+          "type": "object"
+        },
+        "handler": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Handler"
+        },
+        "problem_details": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Problem Details",
+          "type": "array"
+        },
+        "summary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Summary"
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "title": "NavSymbolModel",
+      "type": "object"
+    }
+  },
+  "$id": "https://kgfoundry.dev/schemas/kgfoundry.kgfoundry_common.navmap_loader.NavMetadataModel.json#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed navigation metadata aligned with historical navmap structure.",
+  "examples": [
+    {
+      "exports": null,
+      "extras": null,
+      "module_meta": null,
+      "sections": null,
+      "symbols": null,
+      "synopsis": {},
+      "title": null
+    }
+  ],
+  "properties": {
+    "exports": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Exports",
+      "type": "array"
+    },
+    "extras": {
+      "additionalProperties": true,
+      "title": "Extras",
+      "type": "object"
+    },
+    "module_meta": {
+      "$ref": "#/$defs/NavModuleMeta"
+    },
+    "sections": {
+      "items": {
+        "$ref": "#/$defs/NavSectionModel"
+      },
+      "title": "Sections",
+      "type": "array"
+    },
+    "symbols": {
+      "additionalProperties": {
+        "$ref": "#/$defs/NavSymbolModel"
+      },
+      "title": "Symbols",
+      "type": "object"
+    },
+    "synopsis": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Synopsis"
+    },
+    "title": {
+      "title": "Title",
+      "type": "string"
+    }
+  },
+  "required": [
+    "title",
+    "exports",
+    "sections",
+    "module_meta",
+    "symbols"
+  ],
+  "title": "NavMetadataModel",
+  "type": "object"
+}

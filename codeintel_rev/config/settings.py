@@ -378,6 +378,12 @@ def load_settings() -> Settings:
         TTL in seconds for L1 cache entries (default: 300).
     REDIS_SCOPE_L2_TTL_SECONDS : int, optional
         TTL in seconds for Redis entries (default: 3600).
+    DUCKDB_THREADS : int, optional
+        Worker thread budget for DuckDB connections (default: 4).
+    DUCKDB_OBJECT_CACHE : str, optional
+        Enable DuckDB object cache ("1"/"true" to enable, default enabled).
+    DUCKDB_LOG_QUERIES : str, optional
+        Emit DuckDB SQL statements at debug level ("1"/"true" to enable).
     """
     repo_root = os.environ.get("REPO_ROOT", str(Path.cwd()))
 
@@ -422,20 +428,28 @@ def load_settings() -> Settings:
         semantic_overfetch_multiplier=int(os.environ.get("SEMANTIC_OVERFETCH_MULTIPLIER", "2")),
     )
 
+    redis_defaults = RedisConfig()
     redis = RedisConfig(
-        url=os.environ.get("REDIS_URL", RedisConfig.url),
-        scope_l1_size=int(os.environ.get("REDIS_SCOPE_L1_SIZE", RedisConfig.scope_l1_size)),
+        url=os.environ.get("REDIS_URL", redis_defaults.url),
+        scope_l1_size=int(os.environ.get("REDIS_SCOPE_L1_SIZE", str(redis_defaults.scope_l1_size))),
         scope_l1_ttl_seconds=float(
-            os.environ.get("REDIS_SCOPE_L1_TTL_SECONDS", RedisConfig.scope_l1_ttl_seconds)
+            os.environ.get("REDIS_SCOPE_L1_TTL_SECONDS", str(redis_defaults.scope_l1_ttl_seconds))
         ),
         scope_l2_ttl_seconds=int(
-            os.environ.get("REDIS_SCOPE_L2_TTL_SECONDS", RedisConfig.scope_l2_ttl_seconds)
+            os.environ.get("REDIS_SCOPE_L2_TTL_SECONDS", str(redis_defaults.scope_l2_ttl_seconds))
         ),
     )
 
+    duckdb_defaults = DuckDBConfig()
     duckdb_config = DuckDBConfig(
-        threads=int(os.environ.get("DUCKDB_THREADS", DuckDBConfig.threads)),
+        threads=int(os.environ.get("DUCKDB_THREADS", str(duckdb_defaults.threads))),
         enable_object_cache=os.environ.get("DUCKDB_OBJECT_CACHE", "1").lower()
+        in {
+            "1",
+            "true",
+            "yes",
+        },
+        log_queries=os.environ.get("DUCKDB_LOG_QUERIES", "0").lower()
         in {
             "1",
             "true",

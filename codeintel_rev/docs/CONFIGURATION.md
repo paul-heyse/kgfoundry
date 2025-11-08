@@ -74,6 +74,7 @@ The configuration lifecycle follows this sequence during application startup:
 | `VLLM_MODEL` | Embedding model identifier | `nomic-ai/nomic-embed-code` | `nomic-ai/nomic-embed-code` |
 | `VLLM_BATCH_SIZE` | Batch size for embedding requests | `64` | `128` |
 | `VLLM_TIMEOUT_S` | HTTP request timeout in seconds | `120.0` | `180.0` |
+| `DUCKDB_LOG_QUERIES` | Emit debug logs for every DuckDB SQL statement (`0` = disabled, `1` = enabled) | `0` | `1` |
 | `DATA_DIR` | Base directory for data storage | `data` | `data` |
 | `VECTORS_DIR` | Directory containing Parquet files | `data/vectors` | `data/vectors` |
 | `SCIP_INDEX` | Path to SCIP index file | `index.scip` | `index.scip.json` |
@@ -185,6 +186,13 @@ spec:
 - Use `/readyz` endpoint for readiness probe (validates all resources)
 - Use `/healthz` endpoint for liveness probe (basic connectivity check)
 - Mount persistent volumes for indexes and data
+
+### Observability Configuration
+
+Observability behavior (metrics, logging, Problem Details) is documented in
+[`docs/architecture/observability.md`](architecture/observability.md). Enable
+`DUCKDB_LOG_QUERIES=1` in environments where fine-grained query diagnostics are
+required; disable it in production to avoid verbose logs.
 
 ## Configuration Lifecycle
 

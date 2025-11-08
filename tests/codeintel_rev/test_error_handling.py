@@ -6,20 +6,105 @@ with various exception types and scenarios.
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 from codeintel_rev.errors import (
     FileOperationError,
     FileReadError,
     GitOperationError,
     InvalidLineRangeError,
+    PathNotDirectoryError,
+    PathNotFoundError,
 )
 from codeintel_rev.io.path_utils import PathOutsideRepositoryError
 from codeintel_rev.mcp_server.error_handling import (
     convert_exception_to_envelope,
+    format_error_response,
     handle_adapter_errors,
 )
 
 from kgfoundry_common.errors import EmbeddingError, KgFoundryError, VectorSearchError
+from kgfoundry_common.problem_details import ProblemDetails
+
+
+def test_format_error_response_path_outside_repo() -> None:
+    """format_error_response maps PathOutsideRepositoryError to 403 Forbidden."""
+    exc = PathOutsideRepositoryError("Path escapes repository")
+    response = format_error_response(exc, instance="files:list_paths")
+
+    problem = cast("ProblemDetails", response["problem"])
+    assert response["status"] == 403
+    code = problem.get("code")
+    problem_type = problem.get("type")
+    instance = problem.get("instance")
+    assert isinstance(code, str)
+    assert code == "forbidden"
+    assert isinstance(problem_type, str)
+    assert problem_type == "https://kgfoundry.dev/problems/forbidden"
+    assert isinstance(instance, str)
+    assert instance == "files:list_paths"
+
+
+def test_format_error_response_path_not_directory() -> None:
+    """format_error_response maps PathNotDirectoryError to 400."""
+    exc = PathNotDirectoryError("Not a directory", path="README.md")
+    response = format_error_response(exc, instance="files:list_paths")
+
+    problem = cast("ProblemDetails", response["problem"])
+    assert response["status"] == 400
+    code = problem.get("code")
+    title = problem.get("title")
+    assert isinstance(code, str)
+    assert code == "path-not-directory"
+    assert isinstance(title, str)
+    assert title == "Path Not Directory"
+
+
+def test_format_error_response_path_not_found() -> None:
+    """format_error_response maps PathNotFoundError to 404."""
+    exc = PathNotFoundError("Path not found", path="missing.py")
+    response = format_error_response(exc, instance="files:open_file")
+
+    problem = cast("ProblemDetails", response["problem"])
+    assert response["status"] == 404
+    code = problem.get("code")
+    assert isinstance(code, str)
+    assert code == "path-not-found"
+
+
+def test_format_error_response_not_implemented() -> None:
+    """format_error_response maps NotImplementedError to 501 Problem Details."""
+    exc = NotImplementedError("Operation not implemented")
+    response = format_error_response(exc, instance="feature:todo")
+
+    problem = cast("ProblemDetails", response["problem"])
+    assert response["status"] == 501
+    code = problem.get("code")
+    status = problem.get("status")
+    title = problem.get("title")
+    assert isinstance(code, str)
+    assert code == "not-implemented"
+    assert isinstance(status, int)
+    assert status == 501
+    assert isinstance(title, str)
+    assert title == "Not Implemented"
+
+
+def test_format_error_response_unknown_exception() -> None:
+    """format_error_response falls back to internal-error for unknown exceptions."""
+    exc = RuntimeError("Unexpected failure")
+    response = format_error_response(exc, instance="test:operation")
+
+    problem = cast("ProblemDetails", response["problem"])
+    assert response["status"] == 500
+    code = problem.get("code")
+    extensions = problem.get("extensions")
+    assert isinstance(code, str)
+    assert code == "internal-error"
+    assert isinstance(extensions, dict)
+    assert extensions.get("exception_type") == "RuntimeError"
+
 
 # ==================== Exception Conversion Tests ====================
 
@@ -102,9 +187,9 @@ def test_file_not_found_error_conversion() -> None:
 
     problem = envelope["problem"]
     assert problem["status"] == 404
-    assert problem["code"] == "file-not-found"
-    assert problem["type"] == "https://kgfoundry.dev/problems/file-not-found"
-    assert problem["title"] == "File Not Found"
+    assert problem["code"] == "path-not-found"
+    assert problem["type"] == "https://kgfoundry.dev/problems/path-not-found"
+    assert problem["title"] == "Path Not Found"
 
 
 def test_path_outside_repository_error_conversion() -> None:
@@ -116,10 +201,10 @@ def test_path_outside_repository_error_conversion() -> None:
     envelope = convert_exception_to_envelope(exc, operation, empty_result)
 
     problem = envelope["problem"]
-    assert problem["status"] == 403
-    assert problem["code"] == "forbidden"
-    assert problem["type"] == "https://kgfoundry.dev/problems/forbidden"
-    assert problem["title"] == "Forbidden"
+    assert problem["status"] == 400
+    assert problem["code"] == "path-outside-repo"
+    assert problem["type"] == "https://kgfoundry.dev/problems/path-outside-repo"
+    assert problem["title"] == "Path Outside Repository"
 
 
 def test_unicode_decode_error_conversion() -> None:

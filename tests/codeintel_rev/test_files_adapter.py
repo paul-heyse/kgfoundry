@@ -10,7 +10,12 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
-from codeintel_rev.errors import FileReadError, InvalidLineRangeError
+from codeintel_rev.errors import (
+    FileReadError,
+    InvalidLineRangeError,
+    PathNotDirectoryError,
+    PathNotFoundError,
+)
 from codeintel_rev.io.path_utils import PathOutsideRepositoryError
 from codeintel_rev.mcp_server.adapters.files import list_paths, open_file
 from codeintel_rev.mcp_server.schemas import ScopeIn
@@ -153,14 +158,14 @@ def test_open_file_path_outside_repository(mock_context: Mock) -> None:
 
 
 def test_open_file_not_found(mock_context: Mock) -> None:
-    """Test open_file raises FileNotFoundError for nonexistent files."""
-    with pytest.raises(FileNotFoundError, match="not found"):
+    """Test open_file raises PathNotFoundError for nonexistent files."""
+    with pytest.raises(PathNotFoundError, match="Path not found"):
         open_file(mock_context, "nonexistent.py")
 
 
 def test_open_file_not_a_file(mock_context: Mock) -> None:
-    """Test open_file raises FileNotFoundError when path is a directory."""
-    with pytest.raises(FileNotFoundError, match="Not a file"):
+    """Test open_file raises PathNotFoundError when path is a directory."""
+    with pytest.raises(PathNotFoundError, match="Not a file"):
         open_file(mock_context, "src")
 
 
@@ -215,18 +220,39 @@ def test_open_file_exception_context(mock_context: Mock) -> None:
 
 
 async def test_list_paths_path_not_found(mock_context: Mock) -> None:
-    """Test list_paths raises FileNotFoundError for nonexistent paths."""
-    with pytest.raises(FileNotFoundError, match="Path not found or not a directory"):
+    """Test list_paths raises PathNotFoundError for nonexistent paths."""
+    with (
+        patch(
+            "codeintel_rev.mcp_server.adapters.files.get_session_id",
+            return_value="test-session-error",
+        ),
+        patch("codeintel_rev.mcp_server.adapters.files.get_effective_scope", return_value=None),
+        pytest.raises(PathNotFoundError, match="Path not found"),
+    ):
         await list_paths(mock_context, path="nonexistent")
 
 
 async def test_list_paths_path_outside_repository(mock_context: Mock) -> None:
     """Test list_paths raises PathOutsideRepositoryError for paths outside repo."""
-    with pytest.raises(PathOutsideRepositoryError, match="escapes"):
+    with (
+        patch(
+            "codeintel_rev.mcp_server.adapters.files.get_session_id",
+            return_value="test-session-error",
+        ),
+        patch("codeintel_rev.mcp_server.adapters.files.get_effective_scope", return_value=None),
+        pytest.raises(PathOutsideRepositoryError, match="escapes"),
+    ):
         await list_paths(mock_context, path="../../etc")
 
 
 async def test_list_paths_path_is_file(mock_context: Mock) -> None:
-    """Test list_paths raises FileNotFoundError when path is a file, not directory."""
-    with pytest.raises(FileNotFoundError, match="Path not found or not a directory"):
+    """Test list_paths raises PathNotDirectoryError when path is a file, not directory."""
+    with (
+        patch(
+            "codeintel_rev.mcp_server.adapters.files.get_session_id",
+            return_value="test-session-error",
+        ),
+        patch("codeintel_rev.mcp_server.adapters.files.get_effective_scope", return_value=None),
+        pytest.raises(PathNotDirectoryError, match="Path is not a directory"),
+    ):
         await list_paths(mock_context, path="README.md")

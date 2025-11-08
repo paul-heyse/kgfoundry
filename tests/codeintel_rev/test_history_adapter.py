@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, Mock
 
 import git.exc
 import pytest
-from codeintel_rev.errors import GitOperationError
+from codeintel_rev.errors import GitOperationError, PathNotFoundError
 from codeintel_rev.io.path_utils import PathOutsideRepositoryError
 from codeintel_rev.mcp_server.adapters.history import blame_range, file_history
 
@@ -85,8 +85,8 @@ async def test_blame_range_path_outside_repository(mock_context: Mock) -> None:
 
 
 async def test_blame_range_file_not_found(mock_context: Mock) -> None:
-    """Test blame_range raises FileNotFoundError for nonexistent files."""
-    with pytest.raises(FileNotFoundError, match="not found"):
+    """Test blame_range raises PathNotFoundError for nonexistent files."""
+    with pytest.raises(PathNotFoundError, match="Path not found"):
         await blame_range(mock_context, "nonexistent.py", 1, 10)
 
 
@@ -131,8 +131,8 @@ async def test_file_history_path_outside_repository(mock_context: Mock) -> None:
 
 
 async def test_file_history_file_not_found(mock_context: Mock) -> None:
-    """Test file_history raises FileNotFoundError for nonexistent files."""
-    with pytest.raises(FileNotFoundError, match="not found"):
+    """Test file_history raises PathNotFoundError for nonexistent files."""
+    with pytest.raises(PathNotFoundError, match="Path not found"):
         await file_history(mock_context, "nonexistent.py", limit=10)
 
 

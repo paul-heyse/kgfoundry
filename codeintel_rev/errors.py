@@ -211,6 +211,44 @@ class InvalidLineRangeError(FileOperationError):
         )
 
 
+class PathNotFoundError(KgFoundryError):
+    """Raised when a requested repository path does not exist."""
+
+    def __init__(
+        self,
+        message: str,
+        path: str,
+        *,
+        cause: Exception | None = None,
+    ) -> None:
+        super().__init__(
+            message,
+            code=ErrorCode.PATH_NOT_FOUND,
+            http_status=404,
+            context={"path": path},
+            cause=cause,
+        )
+
+
+class PathNotDirectoryError(KgFoundryError):
+    """Raised when a repository path is expected to be a directory but is not."""
+
+    def __init__(
+        self,
+        message: str,
+        path: str,
+        *,
+        cause: Exception | None = None,
+    ) -> None:
+        super().__init__(
+            message,
+            code=ErrorCode.PATH_NOT_DIRECTORY,
+            http_status=400,
+            context={"path": path},
+            cause=cause,
+        )
+
+
 # ==================== Git Operation Errors ====================
 
 
@@ -311,4 +349,6 @@ __all__ = [
     "FileReadError",
     "GitOperationError",
     "InvalidLineRangeError",
+    "PathNotDirectoryError",
+    "PathNotFoundError",
 ]

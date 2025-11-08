@@ -10,11 +10,14 @@ Tests verify path and language filtering functionality, including:
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from types import SimpleNamespace
 
 import duckdb
 import pytest
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.io.duckdb_manager import DuckDBQueryOptions
 
 ALL_CHUNK_IDS = list(range(1, 12))
 
@@ -41,36 +44,26 @@ def test_catalog(tmp_path: Path) -> DuckDBCatalog:
     vectors_dir.mkdir()
 
     catalog = DuckDBCatalog(db_path, vectors_dir)
-    # Open connection manually to avoid _ensure_views() creating a view
-    # (we'll create a table instead for testing)
-    catalog.conn = duckdb.connect(str(db_path))
-
-    # Ensure connection is open
-    assert catalog.conn is not None
-
-    # Create chunks table with test data directly
-    # Schema: id, uri, start_line, end_line, start_byte, end_byte, preview, embedding
-    catalog.conn.execute(
-        """
-        CREATE TABLE chunks AS
-        SELECT * FROM VALUES
-            (1::BIGINT, 'src/main.py'::VARCHAR, 1::INTEGER, 10::INTEGER, 0::BIGINT, 100::BIGINT, 'def main():'::VARCHAR, [0.1, 0.2]::FLOAT[]),
-            (2::BIGINT, 'src/utils.py'::VARCHAR, 5::INTEGER, 15::INTEGER, 50::BIGINT, 150::BIGINT, 'def helper():'::VARCHAR, [0.3, 0.4]::FLOAT[]),
-            (3::BIGINT, 'tests/test_main.py'::VARCHAR, 1::INTEGER, 5::INTEGER, 0::BIGINT, 50::BIGINT, 'def test_main():'::VARCHAR, [0.5, 0.6]::FLOAT[]),
-            (4::BIGINT, 'tests/test_utils.py'::VARCHAR, 1::INTEGER, 5::INTEGER, 0::BIGINT, 50::BIGINT, 'def test_helper():'::VARCHAR, [0.7, 0.8]::FLOAT[]),
-            (5::BIGINT, 'src/app.ts'::VARCHAR, 1::INTEGER, 20::INTEGER, 0::BIGINT, 200::BIGINT, 'function app() {'::VARCHAR, [0.9, 1.0]::FLOAT[]),
-            (6::BIGINT, 'src/components/Button.tsx'::VARCHAR, 1::INTEGER, 30::INTEGER, 0::BIGINT, 300::BIGINT, 'export const Button'::VARCHAR, [1.1, 1.2]::FLOAT[]),
-            (7::BIGINT, 'docs/README.md'::VARCHAR, 1::INTEGER, 50::INTEGER, 0::BIGINT, 500::BIGINT, '# Documentation'::VARCHAR, [1.3, 1.4]::FLOAT[]),
-            (8::BIGINT, 'src/nested/deep/file.py'::VARCHAR, 1::INTEGER, 5::INTEGER, 0::BIGINT, 50::BIGINT, 'deep code'::VARCHAR, [1.5, 1.6]::FLOAT[]),
-            (9::BIGINT, 'lib/legacy.py'::VARCHAR, 1::INTEGER, 10::INTEGER, 0::BIGINT, 100::BIGINT, 'old code'::VARCHAR, [1.7, 1.8]::FLOAT[]),
-            (10::BIGINT, 'src/config.json'::VARCHAR, 1::INTEGER, 5::INTEGER, 0::BIGINT, 50::BIGINT, '{"key": "value"}'::VARCHAR, [1.9, 2.0]::FLOAT[]),
-            (11::BIGINT, 'main.py'::VARCHAR, 1::INTEGER, 20::INTEGER, 0::BIGINT, 200::BIGINT, 'def entry():'::VARCHAR, [2.1, 2.2]::FLOAT[])
-        AS t(id, uri, start_line, end_line, start_byte, end_byte, preview, embedding)
-        """
-    )
-
-    # Create index on uri column (can create index on table, not view)
-    catalog.conn.execute("CREATE INDEX IF NOT EXISTS idx_uri ON chunks(uri)")
+    with duckdb.connect(str(db_path)) as connection:
+        connection.execute(
+            """
+            CREATE TABLE chunks AS
+            SELECT * FROM VALUES
+                (1::BIGINT, 'src/main.py'::VARCHAR, 1::INTEGER, 10::INTEGER, 0::BIGINT, 100::BIGINT, 'def main():'::VARCHAR, [0.1, 0.2]::FLOAT[]),
+                (2::BIGINT, 'src/utils.py'::VARCHAR, 5::INTEGER, 15::INTEGER, 50::BIGINT, 150::BIGINT, 'def helper():'::VARCHAR, [0.3, 0.4]::FLOAT[]),
+                (3::BIGINT, 'tests/test_main.py'::VARCHAR, 1::INTEGER, 5::INTEGER, 0::BIGINT, 50::BIGINT, 'def test_main():'::VARCHAR, [0.5, 0.6]::FLOAT[]),
+                (4::BIGINT, 'tests/test_utils.py'::VARCHAR, 1::INTEGER, 5::INTEGER, 0::BIGINT, 50::BIGINT, 'def test_helper():'::VARCHAR, [0.7, 0.8]::FLOAT[]),
+                (5::BIGINT, 'src/app.ts'::VARCHAR, 1::INTEGER, 20::INTEGER, 0::BIGINT, 200::BIGINT, 'function app() {'::VARCHAR, [0.9, 1.0]::FLOAT[]),
+                (6::BIGINT, 'src/components/Button.tsx'::VARCHAR, 1::INTEGER, 30::INTEGER, 0::BIGINT, 300::BIGINT, 'export const Button'::VARCHAR, [1.1, 1.2]::FLOAT[]),
+                (7::BIGINT, 'docs/README.md'::VARCHAR, 1::INTEGER, 50::INTEGER, 0::BIGINT, 500::BIGINT, '# Documentation'::VARCHAR, [1.3, 1.4]::FLOAT[]),
+                (8::BIGINT, 'src/nested/deep/file.py'::VARCHAR, 1::INTEGER, 5::INTEGER, 0::BIGINT, 50::BIGINT, 'deep code'::VARCHAR, [1.5, 1.6]::FLOAT[]),
+                (9::BIGINT, 'lib/legacy.py'::VARCHAR, 1::INTEGER, 10::INTEGER, 0::BIGINT, 100::BIGINT, 'old code'::VARCHAR, [1.7, 1.8]::FLOAT[]),
+                (10::BIGINT, 'src/config.json'::VARCHAR, 1::INTEGER, 5::INTEGER, 0::BIGINT, 50::BIGINT, '{"key": "value"}'::VARCHAR, [1.9, 2.0]::FLOAT[]),
+                (11::BIGINT, 'main.py'::VARCHAR, 1::INTEGER, 20::INTEGER, 0::BIGINT, 200::BIGINT, 'def entry():'::VARCHAR, [2.1, 2.2]::FLOAT[])
+            AS t(id, uri, start_line, end_line, start_byte, end_byte, preview, embedding)
+            """
+        )
+        connection.execute("CREATE INDEX IF NOT EXISTS idx_uri ON chunks(uri)")
 
     return catalog
 
@@ -432,17 +425,92 @@ class TestQueryByFiltersEdgeCases:
         expected_ids = [1, 8, 3]  # 10 and 5 filtered out (not .py)
         assert result_ids == expected_ids
 
-    def test_closed_connection_raises_error(self, tmp_path: Path) -> None:
-        """Test that query_by_filters raises RuntimeError if connection closed."""
+
+class TestConcurrentAccess:
+    """Concurrency tests ensuring DuckDBCatalog handles parallel queries safely."""
+
+    def test_query_by_filters_thread_safe(self, test_catalog: DuckDBCatalog) -> None:
+        """Execute 100 concurrent filter queries without race conditions."""
+        test_catalog.open()
+
+        expected_uris = {
+            "src/main.py",
+            "src/utils.py",
+            "tests/test_main.py",
+            "tests/test_utils.py",
+            "src/nested/deep/file.py",
+            "lib/legacy.py",
+            "main.py",
+        }
+
+        def _worker() -> set[str]:
+            results = test_catalog.query_by_filters(
+                ALL_CHUNK_IDS,
+                include_globs=["**/*.py"],
+            )
+            return {row["uri"] for row in results}
+
+        with ThreadPoolExecutor(max_workers=12) as executor:
+            futures = [executor.submit(_worker) for _ in range(100)]
+            results = [future.result() for future in futures]
+
+        for uris in results:
+            assert uris == expected_uris
+
+    def test_query_without_explicit_open(self, tmp_path: Path) -> None:
+        """query_by_filters should lazily initialize without calling open()."""
         db_path = tmp_path / "test.duckdb"
         vectors_dir = tmp_path / "vectors"
         vectors_dir.mkdir()
 
         catalog = DuckDBCatalog(db_path, vectors_dir)
-        # Don't call catalog.open()
+        result = catalog.query_by_filters([1, 2, 3], include_globs=["**/*.py"])
+        assert result == []
 
-        with pytest.raises(RuntimeError, match="Connection not open"):
-            catalog.query_by_filters([1, 2, 3], include_globs=["**/*.py"])
+
+def test_query_by_filters_uses_query_builder(
+    test_catalog: DuckDBCatalog, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """query_by_filters delegates SQL generation to DuckDBQueryBuilder."""
+    calls: list[dict[str, object]] = []
+
+    def _fake_build_filter_query(
+        *,
+        chunk_ids: list[int],
+        options: DuckDBQueryOptions | None = None,
+    ) -> tuple[str, dict[str, list[int]]]:
+        calls.append(
+            {
+                "chunk_ids": list(chunk_ids),
+                "options": options,
+            }
+        )
+        sql = (
+            "SELECT c.*\n"
+            "FROM chunks AS c\n"
+            "JOIN UNNEST($ids) WITH ORDINALITY AS ids(id, position)\n"
+            "  ON c.id = ids.id\n"
+            "ORDER BY ids.position"
+        )
+        return sql, {"ids": list(chunk_ids)}
+
+    monkeypatch.setattr(
+        test_catalog,
+        "_query_builder",
+        SimpleNamespace(build_filter_query=_fake_build_filter_query),
+    )
+
+    results = test_catalog.query_by_filters([1, 2])
+
+    assert len(results) == 2
+    assert calls, "DuckDBQueryBuilder.build_filter_query should be invoked"
+    recorded = calls[0]
+    options = recorded["options"]
+    assert isinstance(options, DuckDBQueryOptions)
+    assert options.preserve_order is True
+    assert options.select_columns == ("c.*",)
+    assert options.include_globs is None
+    assert options.exclude_globs is None
 
 
 class TestQueryByFiltersParametrized:

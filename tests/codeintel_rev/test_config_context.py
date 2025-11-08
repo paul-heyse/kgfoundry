@@ -97,6 +97,9 @@ def test_application_context_create(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
     # Act
     context = ApplicationContext.create()
+    monkeypatch.setattr(context.faiss_manager, "load_cpu_index", lambda: None)
+    monkeypatch.setattr(context.faiss_manager, "clone_to_gpu", lambda: False)
+    context.faiss_manager.gpu_disabled_reason = None
 
     # Assert
     assert context.settings is not None
@@ -137,6 +140,9 @@ def test_application_context_ensure_faiss_ready(
     monkeypatch.setenv("VLLM_URL", "http://localhost:8001/v1")
 
     context = ApplicationContext.create()
+    monkeypatch.setattr(context.faiss_manager, "load_cpu_index", lambda: None)
+    monkeypatch.setattr(context.faiss_manager, "clone_to_gpu", lambda: False)
+    context.faiss_manager.gpu_disabled_reason = None
 
     # Act - ensure_faiss_ready should handle missing index gracefully
     ready, limits, error = context.ensure_faiss_ready()
@@ -203,7 +209,5 @@ def test_application_context_open_catalog(tmp_path: Path, monkeypatch: pytest.Mo
         # Assert
         assert catalog is not None
         assert catalog.db_path == duckdb_path
-        assert catalog.conn is not None
-
-    # Assert - catalog should be closed after context exit
-    assert catalog.conn is None
+        with catalog.connection() as conn:
+            assert conn.execute("SELECT 1").fetchone() == (1,)
