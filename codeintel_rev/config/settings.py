@@ -38,6 +38,10 @@ class VLLMConfig(msgspec.Struct, frozen=True):
         Number of texts to embed in a single batch request. Larger batches improve
         throughput but increase memory usage. Defaults to 64, which is a good
         balance for most GPU setups.
+    embedding_dim : int
+        Dimensionality of embeddings returned by the configured model. Defaults to
+        2560 to match the deployed nomic-embed-code checkpoint. Consumers should
+        keep this aligned with :class:`IndexConfig` ``vec_dim``.
     timeout_s : float
         HTTP request timeout in seconds. Embedding requests can take time for
         large batches, so this should be set appropriately. Defaults to 120 seconds.
@@ -46,6 +50,7 @@ class VLLMConfig(msgspec.Struct, frozen=True):
     base_url: str = "http://127.0.0.1:8001/v1"
     model: str = "nomic-ai/nomic-embed-code"
     batch_size: int = 64
+    embedding_dim: int = 2560
     timeout_s: float = 120.0
 
 
@@ -187,8 +192,9 @@ class IndexConfig(msgspec.Struct, frozen=True):
     ----------
     vec_dim : int
         Dimensionality of embedding vectors. Must match the embedding model's
-        output dimension. Defaults to 2560 for nomic-embed-code model. Changing
-        this requires re-indexing with a different model.
+        output dimension and stay aligned with :class:`VLLMConfig` ``embedding_dim``.
+        Defaults to 2560 for nomic-embed-code model. Changing this requires
+        re-indexing with a different model.
     chunk_budget : int
         Target chunk size in characters. The cAST chunker tries to pack symbols
         up to this size before splitting. Larger chunks provide more context but
@@ -419,6 +425,9 @@ def load_settings() -> Settings:
         Batch size for embedding requests (default: 64).
     VLLM_TIMEOUT_S : float, optional
         HTTP timeout for vLLM requests in seconds (default: 120.0).
+    VLLM_EMBED_DIM : int, optional
+        Embedding vector dimension for empty responses and validation
+        (default: 2560).
     REPO_ROOT : str, optional
         Repository root directory path (default: current working directory).
     DATA_DIR : str, optional
@@ -520,6 +529,7 @@ def load_settings() -> Settings:
         model=os.environ.get("VLLM_MODEL", "nomic-ai/nomic-embed-code"),
         batch_size=int(os.environ.get("VLLM_BATCH_SIZE", "64")),
         timeout_s=float(os.environ.get("VLLM_TIMEOUT_S", "120.0")),
+        embedding_dim=int(os.environ.get("VLLM_EMBED_DIM", "2560")),
     )
 
     paths = PathsConfig(
