@@ -363,12 +363,8 @@ def _hydrate_findings(
             if not valid_ids:
                 return [], None
 
-            include_globs = (
-                cast("list[str] | None", scope.get("include_globs")) if scope else None
-            )
-            exclude_globs = (
-                cast("list[str] | None", scope.get("exclude_globs")) if scope else None
-            )
+            include_globs = cast("list[str] | None", scope.get("include_globs")) if scope else None
+            exclude_globs = cast("list[str] | None", scope.get("exclude_globs")) if scope else None
             languages = cast("list[str] | None", scope.get("languages")) if scope else None
 
             has_filters = bool(include_globs or exclude_globs or languages)

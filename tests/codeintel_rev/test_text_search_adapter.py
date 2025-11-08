@@ -22,7 +22,7 @@ def mock_context(tmp_path: Path) -> Mock:
 
     # Create test files
     (repo_root / "src").mkdir()
-    (repo_root / "src" / "main.py").write_text('def main()\n')
+    (repo_root / "src" / "main.py").write_text("def main()\n")
     (repo_root / "src" / "utils.py").write_text("def helper()\n")
     (repo_root / "tests").mkdir()
     (repo_root / "tests" / "test_main.py").write_text("def test_main()\n")

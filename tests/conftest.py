@@ -560,7 +560,7 @@ def _torch_smoke() -> tuple[bool, str]:
         name = torch.cuda.get_device_name(0)
         cap = ".".join(map(str, torch.cuda.get_device_capability(0)))
         total = torch.cuda.get_device_properties(0).total_memory
-        msg = f"PyTorch CUDA OK: {name}, CC {cap}, total_mem={total/1e9:.2f} GB"
+        msg = f"PyTorch CUDA OK: {name}, CC {cap}, total_mem={total / 1e9:.2f} GB"
         return True, msg
 
 

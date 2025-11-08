@@ -60,7 +60,9 @@ class GateableRLock:
 
 
 @pytest.mark.timeout(5)
-def test_gauge_stays_consistent_during_overlapping_operations(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_gauge_stays_consistent_during_overlapping_operations(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Gauge reflects cleared state when set/clear overlap."""
     gauge = GaugeProbe()
     monkeypatch.setattr(

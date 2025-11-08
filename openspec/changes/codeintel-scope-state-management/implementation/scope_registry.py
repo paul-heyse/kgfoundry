@@ -162,7 +162,7 @@ class ScopeRegistry:
                 "session_id": session_id,
                 "scope_fields": list(scope.keys()),
                 "timestamp": timestamp,
-            }
+            },
         )
 
     def get_scope(self, session_id: str) -> ScopeIn | None:
@@ -201,10 +201,7 @@ class ScopeRegistry:
         with self._lock:
             entry = self._scopes.get(session_id)
             if entry is None:
-                LOGGER.debug(
-                    "Scope not found for session",
-                    extra={"session_id": session_id}
-                )
+                LOGGER.debug("Scope not found for session", extra={"session_id": session_id})
                 return None
 
             scope, _old_timestamp = entry
@@ -219,7 +216,7 @@ class ScopeRegistry:
                 extra={
                     "session_id": session_id,
                     "scope_fields": list(scope_copy.keys()),
-                }
+                },
             )
             return scope_copy
 
@@ -252,14 +249,10 @@ class ScopeRegistry:
         with self._lock:
             if session_id in self._scopes:
                 del self._scopes[session_id]
-                LOGGER.info(
-                    "Cleared scope for session",
-                    extra={"session_id": session_id}
-                )
+                LOGGER.info("Cleared scope for session", extra={"session_id": session_id})
             else:
                 LOGGER.debug(
-                    "Attempted to clear nonexistent session",
-                    extra={"session_id": session_id}
+                    "Attempted to clear nonexistent session", extra={"session_id": session_id}
                 )
 
     def prune_expired(self, max_age_seconds: int) -> int:
@@ -328,13 +321,10 @@ class ScopeRegistry:
                     "pruned_count": pruned_count,
                     "max_age_seconds": max_age_seconds,
                     "remaining_sessions": len(self._scopes),
-                }
+                },
             )
         else:
-            LOGGER.debug(
-                "No expired sessions to prune",
-                extra={"max_age_seconds": max_age_seconds}
-            )
+            LOGGER.debug("No expired sessions to prune", extra={"max_age_seconds": max_age_seconds})
 
         return pruned_count
 

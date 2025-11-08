@@ -138,22 +138,17 @@ class GitClient:
                 self._repo = git.Repo(self.repo_path, search_parent_directories=True)
                 LOGGER.debug(
                     "Initialized Git repository",
-                    extra={"repo_path": str(self.repo_path), "git_dir": str(self._repo.git_dir)}
+                    extra={"repo_path": str(self.repo_path), "git_dir": str(self._repo.git_dir)},
                 )
             except git.exc.InvalidGitRepositoryError as exc:
                 LOGGER.exception(
                     "Invalid Git repository",
-                    extra={"repo_path": str(self.repo_path), "error": str(exc)}
+                    extra={"repo_path": str(self.repo_path), "error": str(exc)},
                 )
                 raise
         return self._repo
 
-    def blame_range(
-        self,
-        path: str,
-        start_line: int,
-        end_line: int
-    ) -> list[GitBlameEntry]:
+    def blame_range(self, path: str, start_line: int, end_line: int) -> list[GitBlameEntry]:
         """Get Git blame for line range.
 
         Returns blame information for each line in the specified range, showing
@@ -227,22 +222,16 @@ class GitClient:
             blame_iter = self.repo.blame_incremental(
                 rev="HEAD",
                 file=path,
-                L=f"{start_line},{end_line}"  # Git line range format
+                L=f"{start_line},{end_line}",  # Git line range format
             )
         except git.exc.GitCommandError as exc:
             # Check if error is "does not exist" (file not found)
             if "does not exist" in str(exc).lower() or "bad file" in str(exc).lower():
-                LOGGER.warning(
-                    "File not found for blame",
-                    extra={"path": path, "error": str(exc)}
-                )
+                LOGGER.warning("File not found for blame", extra={"path": path, "error": str(exc)})
                 msg = f"File not found: {path}"
                 raise FileNotFoundError(msg) from exc
             # Other Git errors (permission denied, etc.)
-            LOGGER.exception(
-                "Git blame failed",
-                extra={"path": path, "error": str(exc)}
-            )
+            LOGGER.exception("Git blame failed", extra={"path": path, "error": str(exc)})
             raise
 
         entries: list[GitBlameEntry] = []
@@ -265,17 +254,13 @@ class GitClient:
                 "path": path,
                 "start_line": start_line,
                 "end_line": end_line,
-                "entries_count": len(entries)
-            }
+                "entries_count": len(entries),
+            },
         )
 
         return entries
 
-    def file_history(
-        self,
-        path: str,
-        limit: int = 50
-    ) -> list[dict]:
+    def file_history(self, path: str, limit: int = 50) -> list[dict]:
         """Get commit history for file.
 
         Returns list of commits that modified the specified file, ordered by
@@ -342,25 +327,17 @@ class GitClient:
         """
         try:
             # iter_commits with paths parameter gets commits affecting that file
-            commits_iter = self.repo.iter_commits(
-                rev="HEAD",
-                paths=path,
-                max_count=limit
-            )
+            commits_iter = self.repo.iter_commits(rev="HEAD", paths=path, max_count=limit)
         except git.exc.GitCommandError as exc:
             # Check if error is "does not exist" (file not found)
             if "does not exist" in str(exc).lower() or "bad file" in str(exc).lower():
                 LOGGER.warning(
-                    "File not found for history",
-                    extra={"path": path, "error": str(exc)}
+                    "File not found for history", extra={"path": path, "error": str(exc)}
                 )
                 msg = f"File not found: {path}"
                 raise FileNotFoundError(msg) from exc
             # Other Git errors
-            LOGGER.exception(
-                "Git log failed",
-                extra={"path": path, "error": str(exc)}
-            )
+            LOGGER.exception("Git log failed", extra={"path": path, "error": str(exc)})
             raise
 
         commits: list[dict] = []
@@ -377,7 +354,7 @@ class GitClient:
 
         LOGGER.debug(
             "Git history completed",
-            extra={"path": path, "limit": limit, "commits_count": len(commits)}
+            extra={"path": path, "limit": limit, "commits_count": len(commits)},
         )
 
         return commits
@@ -433,12 +410,7 @@ class AsyncGitClient:
         """
         self._sync_client = git_client
 
-    async def blame_range(
-        self,
-        path: str,
-        start_line: int,
-        end_line: int
-    ) -> list[GitBlameEntry]:
+    async def blame_range(self, path: str, start_line: int, end_line: int) -> list[GitBlameEntry]:
         """Async version of blame_range (runs in threadpool).
 
         See GitClient.blame_range for detailed documentation.
@@ -464,18 +436,9 @@ class AsyncGitClient:
         git.exc.GitCommandError
             If Git operation fails.
         """
-        return await asyncio.to_thread(
-            self._sync_client.blame_range,
-            path,
-            start_line,
-            end_line
-        )
+        return await asyncio.to_thread(self._sync_client.blame_range, path, start_line, end_line)
 
-    async def file_history(
-        self,
-        path: str,
-        limit: int = 50
-    ) -> list[dict]:
+    async def file_history(self, path: str, limit: int = 50) -> list[dict]:
         """Async version of file_history (runs in threadpool).
 
         See GitClient.file_history for detailed documentation.
@@ -499,11 +462,7 @@ class AsyncGitClient:
         git.exc.GitCommandError
             If Git operation fails.
         """
-        return await asyncio.to_thread(
-            self._sync_client.file_history,
-            path,
-            limit
-        )
+        return await asyncio.to_thread(self._sync_client.file_history, path, limit)
 
 
 __all__ = ["AsyncGitClient", "GitClient"]

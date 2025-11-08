@@ -71,8 +71,7 @@ LOGGER = get_logger(__name__)
 # FastMCP doesn't expose Request in tool functions, so we use ContextVar
 # for thread-safe session ID access in adapters
 session_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "session_id",
-    default=None
+    "session_id", default=None
 )
 
 
@@ -177,9 +176,7 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(
-        self,
-        request: Request,
-        call_next: Callable[[Request], Response]
+        self, request: Request, call_next: Callable[[Request], Response]
     ) -> Response:
         """Process request and inject session ID.
 
@@ -209,12 +206,12 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
             session_id = str(uuid.uuid4())
             LOGGER.debug(
                 "Generated session ID for request",
-                extra={"session_id": session_id, "path": request.url.path}
+                extra={"session_id": session_id, "path": request.url.path},
             )
         else:
             LOGGER.debug(
                 "Using client-provided session ID",
-                extra={"session_id": session_id, "path": request.url.path}
+                extra={"session_id": session_id, "path": request.url.path},
             )
 
         # Store in request.state (FastAPI convention)
@@ -225,7 +222,6 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
 
         # Invoke next handler
         return await call_next(request)
-
 
 
 __all__ = ["SessionScopeMiddleware", "get_session_id", "session_id_var"]

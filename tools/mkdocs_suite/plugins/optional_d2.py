@@ -49,9 +49,7 @@ class OptionalD2Plugin(BasePlugin[LegacyConfig]):
     """Conditionally delegate to the mkdocs-d2 plugin when available."""
 
     config_scheme: PlainConfigSchema = (
-        D2Plugin.config_scheme
-        if D2Plugin is not None
-        else BasePlugin.config_scheme
+        D2Plugin.config_scheme if D2Plugin is not None else BasePlugin.config_scheme
     )
 
     def __init__(self) -> None:

@@ -104,10 +104,7 @@ LANGUAGE_EXTENSIONS: dict[str, list[str]] = {
 }
 
 
-def get_effective_scope(
-    context: ApplicationContext,
-    session_id: str | None
-) -> ScopeIn | None:
+def get_effective_scope(context: ApplicationContext, session_id: str | None) -> ScopeIn | None:
     """Retrieve session scope from registry.
 
     Helper function that wraps ScopeRegistry.get_scope with null-safety for
@@ -148,10 +145,7 @@ def get_effective_scope(
     return context.scope_registry.get_scope(session_id)
 
 
-def merge_scope_filters(
-    scope: ScopeIn | None,
-    explicit_params: dict
-) -> dict:
+def merge_scope_filters(scope: ScopeIn | None, explicit_params: dict) -> dict:
     """Merge session scope with explicit adapter parameters.
 
     Combines scope fields with explicit function parameters, giving precedence
@@ -224,9 +218,7 @@ def merge_scope_filters(
 
 
 def apply_path_filters(
-    paths: list[str],
-    include_globs: list[str],
-    exclude_globs: list[str]
+    paths: list[str], include_globs: list[str], exclude_globs: list[str]
 ) -> list[str]:
     """Filter paths using glob patterns.
 
@@ -310,10 +302,7 @@ def apply_path_filters(
     return filtered
 
 
-def apply_language_filter(
-    paths: list[str],
-    languages: list[str]
-) -> list[str]:
+def apply_language_filter(paths: list[str], languages: list[str]) -> list[str]:
     """Filter paths by programming language.
 
     Returns only paths whose file extensions match the specified languages.
@@ -379,8 +368,7 @@ def apply_language_filter(
     if not extensions:
         # No known extensions for requested languages
         LOGGER.warning(
-            "No file extensions found for requested languages",
-            extra={"languages": languages}
+            "No file extensions found for requested languages", extra={"languages": languages}
         )
         return []
 
