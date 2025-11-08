@@ -695,6 +695,13 @@ class FAISSManager:
         tuple[np.ndarray, np.ndarray]
             Tuple of (distances, ids) from primary index search.
 
+        Notes
+        -----
+        Flat indexes (``IndexFlat*``) do not expose the ``nprobe`` attribute.
+        The method checks for attribute support before assigning so that flat
+        indexes skip the IVF-only parameter while IVF indexes continue to use
+        ``nprobe`` for recall control.
+
         Raises
         ------
         RuntimeError
@@ -707,7 +714,8 @@ class FAISSManager:
             raise RuntimeError(msg) from exc
 
         # Set nprobe (only affects IVF indexes)
-        index.nprobe = nprobe
+        if hasattr(index, "nprobe"):
+            index.nprobe = nprobe
 
         # Reshape query if needed
         if query.ndim == 1:

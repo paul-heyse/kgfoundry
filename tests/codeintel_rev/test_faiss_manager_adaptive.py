@@ -168,6 +168,29 @@ def test_small_corpus_flat_index(tmp_index_path: Path) -> None:
     )
 
 
+def test_small_corpus_search_returns_results(tmp_index_path: Path) -> None:
+    """Regression: searching flat indexes skips nprobe assignment and succeeds."""
+
+    vec_dim = _UNIT_TEST_VEC_DIM
+    n_vectors = 32  # Small corpus ensures flat index selection
+    manager = FAISSManager(index_path=tmp_index_path, vec_dim=vec_dim)
+
+    vectors = _rng.normal(0.5, 0.15, (n_vectors, vec_dim)).astype(np.float32)
+    vectors = np.clip(vectors, 0.0, 1.0)
+
+    manager.build_index(vectors)
+
+    ids = np.arange(n_vectors, dtype=np.int64)
+    manager.add_vectors(vectors, ids)
+
+    query = vectors[0]
+    distances, retrieved_ids = manager.search(query, k=5)
+
+    assert distances.shape == (1, 5)
+    assert retrieved_ids.shape == (1, 5)
+    assert retrieved_ids[0, 0] == ids[0]
+
+
 def test_medium_corpus_ivf_flat_nlist(tmp_index_path: Path) -> None:
     """Test that medium corpus (5K-50K) uses IVFFlat with dynamic nlist.
 
