@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from codeintel_rev.app import config_context
 from codeintel_rev.mcp_server import service_context
 
 
@@ -93,9 +94,9 @@ def test_service_context_resolves_paths(tmp_path: Path, monkeypatch: pytest.Monk
     expected_faiss_path.touch()
     expected_vectors_dir.mkdir(parents=True, exist_ok=True)
 
-    monkeypatch.setattr(service_context, "FAISSManager", RecordingFAISSManager)
-    monkeypatch.setattr(service_context, "DuckDBCatalog", RecordingDuckDBCatalog)
-    monkeypatch.setattr(service_context, "VLLMClient", DummyVLLMClient)
+    monkeypatch.setattr(config_context, "FAISSManager", RecordingFAISSManager)
+    monkeypatch.setattr(config_context, "DuckDBCatalog", RecordingDuckDBCatalog)
+    monkeypatch.setattr(config_context, "VLLMClient", DummyVLLMClient)
 
     service_context.reset_service_context()
 

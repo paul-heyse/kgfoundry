@@ -35,15 +35,6 @@ if "kgfoundry_common" not in sys.modules:
     sys.modules["kgfoundry_common"] = kgfoundry_common_stub
     sys.modules["kgfoundry_common.problem_details"] = problem_details_stub
 
-if "codeintel_rev.mcp_server.service_context" not in sys.modules:
-    service_context_stub = types.ModuleType("codeintel_rev.mcp_server.service_context")
-
-    def reset_service_context() -> None:  # pragma: no cover - test helper stub
-        """Test stub that mimics resetting cached service context."""
-
-    service_context_stub.reset_service_context = reset_service_context
-    sys.modules["codeintel_rev.mcp_server.service_context"] = service_context_stub
-
 from codeintel_rev.mcp_server.adapters import files as files_adapter
 from codeintel_rev.mcp_server.service_context import reset_service_context
 
