@@ -76,12 +76,39 @@ codeintel splade encode data/corpus.jsonl --batch-size 16
 
 # Build the Lucene impact index
 codeintel splade build-index --vectors-dir data/splade_vectors
+
+# Benchmark SPLADE ONNX latency using one or more queries
+codeintel splade bench --query "solar incentives" --runs 25 --warmup 5
 ```
 
 Each command writes an envelope under `docs/_data/cli/splade/` with the
 arguments, environment, duration, and metadata file digests. That envelope is
 the source of truth for automation (nightly rebuilds, dashboard updates) and
 ensures reproducibility.
+
+The `bench` command measures query encoding latency via ONNX Runtime. Pass
+`--query` for a single string or `--queries-file path/to/queries.txt` (one query
+per line) to benchmark batch scenarios. Results capture p50/p95/p99, min/max,
+and mean latency so operators can detect regressions after model upgrades.
+
+# Hybrid search integration
+
+The `HybridSearchEngine` (see `codeintel_rev/io/hybrid_search.py`) fuses SPLADE
+signals with BM25 and FAISS results using Reciprocal Rank Fusion (RRF). Query
+execution flow:
+
+1. Semantic adapter obtains dense hits from FAISS.
+2. Hybrid engine lazily loads Pyserini searchers (`BM25SearchProvider`,
+   `SpladeSearchProvider`) and gathers per-channel candidates
+   (`HYBRID_TOP_K_PER_CHANNEL`).
+3. RRF merges the three channels, producing fused chunk IDs and contribution
+   metadata (channel, rank, raw score).
+4. The adapter hydrates chunk metadata via DuckDB and annotates `Finding.why`
+   with a hybrid explanation (e.g., `Hybrid RRF (k=60): semantic rank=1, bm25 rank=2`).
+
+Operators can toggle channels with `HYBRID_ENABLE_BM25` / `HYBRID_ENABLE_SPLADE`.
+When disabled, the engine bypasses the associated provider and the adapter falls
+back to dense-only semantics without additional latency.
 
 # Observability
 
@@ -96,8 +123,7 @@ ensures reproducibility.
 
 - Integrate encoding/index metrics into the shared observability helpers so
   dashboards can surface durations and throughput.
-- Extend the CLI with benchmarking and training helpers (SPLADE finetuning,
-  ONNX latency probes).
+- Extend the CLI with SPLADE finetuning helpers for on-premise retraining.
 - Wire nightly automation to run `codeintel splade encode` +
   `codeintel splade build-index` on fixture corpora, publishing metadata diffs.
 

@@ -15,6 +15,7 @@ All benchmarks use pytest-benchmark plugin for accurate timing and reporting.
 
 from __future__ import annotations
 
+from pathlib import Path
 from time import perf_counter
 
 import duckdb

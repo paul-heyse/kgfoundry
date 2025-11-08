@@ -20,7 +20,7 @@ from importlib import import_module, metadata
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import ModuleType
-from typing import TYPE_CHECKING, ParamSpec, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ParamSpec, Protocol, TypeVar, cast
 
 import pytest
 from prometheus_client.registry import CollectorRegistry
@@ -113,7 +113,7 @@ HAS_GPU_STACK = _compute_has_gpu_stack()
 def _faiss_runtime_available() -> bool:
     try:
         faiss_module = import_module("faiss")
-    except Exception:
+    except ModuleNotFoundError:
         return False
     required_attrs = ("normalize_L2", "IndexFlatIP", "write_index")
     return all(hasattr(faiss_module, attr) for attr in required_attrs)
@@ -123,6 +123,11 @@ HAS_FAISS_SUPPORT = _faiss_runtime_available()
 # Expose GPU stack availability for tooling and test gating.
 
 # Expose GPU stack availability for tooling and test gating.
+
+if HAS_FAISS_SUPPORT:
+    FAISS_MODULE = cast("Any", import_module("faiss"))
+else:
+    FAISS_MODULE: Any | None = None
 
 pytest_plugins: tuple[str, ...] = ()
 # Pytest plugin modules auto-loaded for the test suite.

@@ -10,19 +10,21 @@ Tests verify that incremental updates work correctly:
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
 from codeintel_rev.io.faiss_manager import FAISSManager
 
-from tests.conftest import HAS_FAISS_SUPPORT
+from tests.conftest import FAISS_MODULE, HAS_FAISS_SUPPORT
 
 if not HAS_FAISS_SUPPORT:  # pragma: no cover - dependency-gated
     pytestmark = pytest.mark.skip(
         reason="FAISS bindings unavailable on this host",
     )
 else:
-    import faiss
+    assert FAISS_MODULE is not None
+    faiss_module: Any = FAISS_MODULE
 
 # Use modern numpy random generator
 _rng = np.random.default_rng(42)
@@ -219,7 +221,7 @@ def _add_duplicate_to_secondary(
         np.clip(primary_vectors[0] * 1.05, 0.0, 1.0).astype(np.float32).reshape(1, -1)
     )
     duplicate_norm = duplicate_vector.copy()
-    faiss.normalize_L2(duplicate_norm)
+    faiss_module.normalize_L2(duplicate_norm)
     assert manager.secondary_index is not None
     manager.secondary_index.add_with_ids(duplicate_norm, np.array([duplicate_id], dtype=np.int64))
     manager.incremental_ids.add(duplicate_id)

@@ -59,6 +59,7 @@ from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
+from codeintel_rev.io.hybrid_search import HybridSearchEngine
 from codeintel_rev.io.vllm_client import VLLMClient
 from kgfoundry_common.errors import ConfigurationError
 from kgfoundry_common.logging import get_logger
@@ -291,6 +292,8 @@ class ApplicationContext:
     _faiss_lock: Lock = field(default_factory=Lock, init=False)
     _faiss_loaded: bool = field(default=False, init=False)
     _faiss_gpu_attempted: bool = field(default=False, init=False)
+    _hybrid_engine: HybridSearchEngine | None = field(default=None, init=False, repr=False)
+    _hybrid_lock: Lock = field(default_factory=Lock, init=False, repr=False)
 
     @classmethod
     def create(cls) -> ApplicationContext:
@@ -386,6 +389,21 @@ class ApplicationContext:
             git_client=git_client,
             async_git_client=async_git_client,
         )
+
+    def get_hybrid_engine(self) -> HybridSearchEngine:
+        """Return the hybrid search engine, instantiating it lazily.
+
+        Returns
+        -------
+        HybridSearchEngine
+            Shared hybrid retrieval engine configured for the current settings.
+        """
+        if self._hybrid_engine is not None:
+            return self._hybrid_engine
+        with self._hybrid_lock:
+            if self._hybrid_engine is None:
+                self._hybrid_engine = HybridSearchEngine(self.settings, self.paths)
+            return self._hybrid_engine
 
     def ensure_faiss_ready(self) -> tuple[bool, list[str], str | None]:
         """Load FAISS index (once) and attempt GPU clone.

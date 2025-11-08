@@ -16,11 +16,13 @@ from codeintel_rev.app.config_context import ApplicationContext, ResolvedPaths
 from codeintel_rev.app.middleware import session_id_var
 from codeintel_rev.app.scope_store import ScopeStore
 from codeintel_rev.config.settings import (
+    BM25Config,
     IndexConfig,
     PathsConfig,
     RedisConfig,
     ServerLimits,
     Settings,
+    SpladeConfig,
     VLLMConfig,
 )
 from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
@@ -111,6 +113,8 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
             scope_l2_ttl_seconds=3600,
         ),
         duckdb=DuckDBConfig(),
+        bm25=BM25Config(),
+        splade=SpladeConfig(),
     )
 
     paths = ResolvedPaths(

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import types
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,7 +20,22 @@ from codeintel_rev.mcp_server.schemas import ScopeIn
 
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
 
-OBSERVATION_RECORDS: list[SimpleNamespace] = []
+
+@dataclass
+class _ObservationRecord:
+    operation: str
+    component: str
+    success: bool = False
+    error: bool = False
+
+    def mark_success(self) -> None:
+        self.success = True
+
+    def mark_error(self) -> None:
+        self.error = True
+
+
+OBSERVATION_RECORDS: list[_ObservationRecord] = []
 
 
 @pytest.fixture(autouse=True)
@@ -29,22 +44,8 @@ def _patch_observe_duration(monkeypatch: pytest.MonkeyPatch) -> None:
     OBSERVATION_RECORDS.clear()
 
     @contextmanager
-    def _fake_observe(operation: str, component: str, **_: object) -> Iterator[SimpleNamespace]:
-        record = SimpleNamespace(
-            operation=operation,
-            component=component,
-            success=False,
-            error=False,
-        )
-
-        def mark_success() -> None:
-            record.success = True
-
-        def mark_error() -> None:
-            record.error = True
-
-        record.mark_success = mark_success  # type: ignore[attr-defined]
-        record.mark_error = mark_error  # type: ignore[attr-defined]
+    def _fake_observe(operation: str, component: str, **_: object) -> Iterator[_ObservationRecord]:
+        record = _ObservationRecord(operation=operation, component=component)
         OBSERVATION_RECORDS.append(record)
         yield record
 
@@ -55,12 +56,12 @@ def _patch_observe_duration(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture
-def observe_duration_calls() -> list[SimpleNamespace]:
+def observe_duration_calls() -> list[_ObservationRecord]:
     """Return recorded observation calls from the semantic adapter.
 
     Returns
     -------
-    list[SimpleNamespace]
+    list[_ObservationRecord]
         Recorded observation entries captured by the patched helper.
     """
     return OBSERVATION_RECORDS
@@ -68,7 +69,7 @@ def observe_duration_calls() -> list[SimpleNamespace]:
 
 @pytest.mark.asyncio
 async def test_semantic_search_observes_duration(
-    observe_duration_calls: list[SimpleNamespace],
+    observe_duration_calls: list[_ObservationRecord],
 ) -> None:
     context = StubContext(
         faiss_manager=_BaseStubFAISSManager(should_fail_gpu=False),
@@ -342,6 +343,26 @@ class _BaseStubFAISSManager:
         return distances, ids
 
 
+class _DefaultStubHybridEngine:
+    """Default hybrid engine stub that yields no additional channels."""
+
+    def search(
+        self,
+        query: str,
+        *,
+        semantic_ids: Sequence[int],
+        semantic_scores: Sequence[float],
+        limit: int,
+    ) -> SimpleNamespace:
+        del query, semantic_ids, semantic_scores, limit
+        return SimpleNamespace(
+            docs=[],
+            contributions={},
+            channels=[],
+            warnings=[],
+        )
+
+
 @dataclass
 class StubContextConfig:
     """Configuration for StubContext initialization."""
@@ -352,6 +373,11 @@ class StubContextConfig:
     semantic_overfetch_multiplier: int = 2
     catalog_chunks: list[dict[str, Any]] | None = None
     faiss_nprobe: int = 128
+    hybrid_engine: Any | None = None
+    enable_bm25_channel: bool = True
+    enable_splade_channel: bool = True
+    hybrid_top_k_per_channel: int = 50
+    rrf_k: int = 60
 
 
 class StubContext:
@@ -381,7 +407,13 @@ class StubContext:
                 semantic_overfetch_multiplier=config.semantic_overfetch_multiplier,
             ),
             vllm=SimpleNamespace(base_url="http://localhost"),
-            index=SimpleNamespace(faiss_nprobe=config.faiss_nprobe),
+            index=SimpleNamespace(
+                faiss_nprobe=config.faiss_nprobe,
+                enable_bm25_channel=config.enable_bm25_channel,
+                enable_splade_channel=config.enable_splade_channel,
+                hybrid_top_k_per_channel=config.hybrid_top_k_per_channel,
+                rrf_k=config.rrf_k,
+            ),
         )
         # Use tempfile for secure temporary paths in tests
         import tempfile
@@ -395,6 +427,7 @@ class StubContext:
         self._limits = config.limits or []
         self._error = config.error
         self._catalog_chunks = config.catalog_chunks
+        self._hybrid_engine = config.hybrid_engine or _DefaultStubHybridEngine()
 
     def ensure_faiss_ready(self) -> tuple[bool, list[str], str | None]:
         """Return readiness tuple.
@@ -417,6 +450,16 @@ class StubContext:
             Stub catalog instance.
         """
         yield StubDuckDBCatalog(None, None, chunks=self._catalog_chunks)
+
+    def get_hybrid_engine(self) -> Any:
+        """Return configured hybrid engine stub.
+
+        Returns
+        -------
+        Any
+            Hybrid engine stub instance.
+        """
+        return self._hybrid_engine
 
 
 @pytest.mark.asyncio
@@ -679,6 +722,79 @@ async def test_semantic_search_no_scope() -> None:
     # This is verified by the fact that all chunks are returned
 
 
+@pytest.mark.asyncio
+async def test_semantic_search_hybrid_merges_channels() -> None:
+    class _HybridStub:
+        def search(
+            self,
+            query: str,
+            *,
+            semantic_ids: Sequence[int],
+            semantic_scores: Sequence[float],
+            limit: int,
+        ) -> SimpleNamespace:
+            del query, semantic_ids, semantic_scores, limit
+            docs = [
+                SimpleNamespace(doc_id="101", score=0.42),
+                SimpleNamespace(doc_id="102", score=0.35),
+            ]
+            contributions = {
+                "101": [("semantic", 1, 0.1), ("bm25", 2, 8.5)],
+                "102": [("splade", 1, 12.0)],
+            }
+            return SimpleNamespace(
+                docs=docs,
+                contributions=contributions,
+                channels=["semantic", "bm25", "splade"],
+                warnings=["bm25 warmed up"],
+            )
+
+    faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False, search_ids=[101, 102])
+    chunks = [
+        {"id": 101, "uri": "src/a.py", "start_line": 0, "end_line": 2, "preview": "a"},
+        {"id": 102, "uri": "src/b.py", "start_line": 5, "end_line": 9, "preview": "b"},
+    ]
+    context = StubContext(
+        faiss_manager=faiss_manager,
+        config=StubContextConfig(
+            limits=[],
+            error=None,
+            catalog_chunks=chunks,
+            hybrid_engine=_HybridStub(),
+        ),
+    )
+
+    with (
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
+            return_value="hybrid-session",
+        ),
+        patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+    ):
+        result = await semantic_search(cast("ApplicationContext", context), "hybrid query", limit=2)
+
+    answer = result.get("answer")
+    assert answer is not None
+    assert answer.startswith("Found 2 hybrid")
+    limits = result.get("limits")
+    assert limits is not None
+    assert "bm25 warmed up" in limits
+    findings = result.get("findings")
+    assert findings is not None
+    assert findings[0].get("chunk_id") == 101
+    why_message = findings[0].get("why")
+    assert why_message is not None
+    assert "Hybrid RRF" in why_message
+    assert "bm25" in why_message
+    method = result.get("method")
+    assert method is not None
+    retrieval = method.get("retrieval")
+    assert retrieval is not None
+    retrieval_set = set(retrieval)
+    missing_channels = {"semantic", "faiss", "bm25", "splade"} - retrieval_set
+    assert not missing_channels
+
+
 # ==================== Error Handling Tests ====================
 
 
@@ -728,15 +844,6 @@ async def test_semantic_search_embedding_error() -> None:
 async def test_semantic_search_faiss_search_error() -> None:
     """Test semantic_search raises VectorSearchError when FAISS search fails."""
     faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
-
-    def failing_search(
-        _query: np.ndarray, *, _k: int, _nprobe: int = 128
-    ) -> tuple[np.ndarray, np.ndarray]:
-        error_msg = "FAISS search failed"
-        raise RuntimeError(error_msg)
-
-    faiss_manager.search = failing_search  # type: ignore[assignment]
-
     context = StubContext(
         faiss_manager=faiss_manager,
         config=StubContextConfig(limits=[], error=None, catalog_chunks=None),

@@ -15,12 +15,16 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import pytest
 from codeintel_rev.io.faiss_manager import FAISSManager
 
-from tests.conftest import HAS_FAISS_SUPPORT
+from tests.conftest import FAISS_MODULE, HAS_FAISS_SUPPORT
+
+if TYPE_CHECKING:  # pragma: no cover - type checking only
+    import faiss
 
 # Use modern numpy random generator
 _rng = np.random.default_rng(42)
@@ -33,9 +37,21 @@ _benchmark_gate = pytest.mark.skipif(
 if not HAS_FAISS_SUPPORT:  # pragma: no cover - dependency-gated
     pytestmark = [_benchmark_gate, pytest.mark.skip(reason="FAISS bindings unavailable")]
 else:
-    import faiss
-
+    assert FAISS_MODULE is not None
     pytestmark = [_benchmark_gate]
+
+
+def _get_underlying_index(cpu_index: Any) -> Any:
+    """Return the underlying FAISS index from an ID map wrapper.
+
+    Returns
+    -------
+    Any
+        Underlying FAISS index instance.
+    """
+    assert hasattr(cpu_index, "index"), "Expected FAISS index wrapper to expose `index` attribute"
+    index_map = cast("faiss.IndexIDMap2", cpu_index)
+    return index_map.index
 
 
 @pytest.fixture
@@ -88,8 +104,8 @@ def test_small_corpus_flat_vs_ivf_pq(benchmark, tmp_index_path: Path) -> None:
     manager.build_index(vectors)
     assert manager.cpu_index is not None
     cpu_index = manager.cpu_index
-    underlying = cpu_index.index  # type: ignore[attr-defined]
-    assert isinstance(underlying, faiss.IndexFlatIP)  # type: ignore[attr-defined]
+    underlying = _get_underlying_index(cpu_index)
+    assert underlying.__class__.__name__ == "IndexFlatIP"
 
     print("\nSmall corpus benchmark (5K vectors):")
     print("  Adaptive selection uses flat index (no training)")
@@ -129,8 +145,8 @@ def test_medium_corpus_ivf_flat_vs_ivf_pq(benchmark, tmp_index_path: Path) -> No
     manager.build_index(vectors)
     assert manager.cpu_index is not None
     cpu_index = manager.cpu_index
-    underlying = cpu_index.index  # type: ignore[attr-defined]
-    assert isinstance(underlying, faiss.IndexIVFFlat)  # type: ignore[attr-defined]
+    underlying = _get_underlying_index(cpu_index)
+    assert underlying.__class__.__name__ == "IndexIVFFlat"
 
     print("\nMedium corpus benchmark (50K vectors):")
     print("  Adaptive selection uses IVFFlat with dynamic nlist")
@@ -176,7 +192,7 @@ def test_large_corpus_adaptive_vs_fixed(benchmark, tmp_index_path: Path) -> None
     manager.build_index(vectors)
     assert manager.cpu_index is not None
     cpu_index = manager.cpu_index
-    underlying = cpu_index.index  # type: ignore[attr-defined]
+    underlying = _get_underlying_index(cpu_index)
     assert hasattr(underlying, "nlist")  # IVF-PQ has nlist
 
     print("\nLarge corpus benchmark (100K vectors):")

@@ -8,12 +8,14 @@ import logging
 import math
 import os
 import shutil
+import statistics
 import sys
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TextIO
+from time import perf_counter
+from typing import TYPE_CHECKING, TextIO, cast
 
 import msgspec
 
@@ -28,6 +30,8 @@ if TYPE_CHECKING:
     class _SparseEncoderProtocol(Protocol):
         def encode_document(self, sentences: Sequence[str]) -> Sequence[object]: ...
 
+        def encode_query(self, queries: Sequence[str]) -> Sequence[object]: ...
+
         def decode(
             self,
             embeddings: object,
@@ -37,7 +41,7 @@ if TYPE_CHECKING:
     class _OptimizerFunction(Protocol):
         def __call__(
             self,
-            model: Any,
+            model: _SparseEncoderProtocol,
             *,
             optimization_config: str,
             model_name_or_path: str,
@@ -48,7 +52,7 @@ if TYPE_CHECKING:
     class _QuantizerFunction(Protocol):
         def __call__(
             self,
-            model: Any,
+            model: _SparseEncoderProtocol,
             *,
             quantization_config: str | None,
             model_name_or_path: str,
@@ -76,6 +80,8 @@ GENERATOR_NAME = "codeintel_rev.io.splade_manager"
 ARTIFACT_METADATA_FILENAME = "artifacts.json"
 ENCODING_METADATA_FILENAME = "vectors_metadata.json"
 INDEX_METADATA_FILENAME = "metadata.json"
+_PERCENTILE_MIN = 0.0
+_PERCENTILE_MAX = 100.0
 
 
 logger = logging.getLogger(__name__)
@@ -124,6 +130,31 @@ class SpladeEncodingSummary(msgspec.Struct, frozen=True):
     vectors_dir: str
     metadata_path: str
     shard_count: int
+
+
+class SpladeBenchmarkOptions(msgspec.Struct, frozen=True):
+    """Options controlling SPLADE encoder latency benchmarks."""
+
+    warmup_iterations: int = 3
+    measure_iterations: int = 10
+    provider: str | None = None
+    onnx_file: str | None = None
+
+
+class SpladeBenchmarkSummary(msgspec.Struct, frozen=True):
+    """Summary describing SPLADE encoder latency benchmarks."""
+
+    query_count: int
+    warmup_iterations: int
+    measure_iterations: int
+    min_latency_ms: float
+    max_latency_ms: float
+    mean_latency_ms: float
+    p50_latency_ms: float
+    p95_latency_ms: float
+    p99_latency_ms: float
+    provider: str
+    onnx_file: str | None
 
 
 class SpladeExportOptions(msgspec.Struct, frozen=True):
@@ -215,7 +246,9 @@ def _require_export_helpers() -> tuple[_OptimizerFunction, _QuantizerFunction]:
             "export_dynamic_quantized_onnx_model."
         )
         raise RuntimeError(msg)
-    return export_optimized_onnx_model, export_dynamic_quantized_onnx_model
+    return cast("_OptimizerFunction", export_optimized_onnx_model), cast(
+        "_QuantizerFunction", export_dynamic_quantized_onnx_model
+    )
 
 
 def _write_struct(target: Path, payload: msgspec.Struct) -> None:
@@ -248,6 +281,47 @@ def _serialize_relative(path: Path, base: Path) -> str:
         return str(path.relative_to(base))
     except ValueError:
         return str(path)
+
+
+def _percentile_value(sorted_values: Sequence[float], percentile: float) -> float:
+    """Return the percentile value using linear interpolation.
+
+    Parameters
+    ----------
+    sorted_values : Sequence[float]
+        Non-empty sorted sequence of latency values.
+    percentile : float
+        Desired percentile in the inclusive range [0, 100].
+
+    Returns
+    -------
+    float
+        Interpolated percentile value.
+
+    Raises
+    ------
+    ValueError
+        If :paramref:`sorted_values` is empty.
+    """
+    if not sorted_values:
+        message = "sorted_values cannot be empty."
+        raise ValueError(message)
+    if len(sorted_values) == 1:
+        return sorted_values[0]
+    if percentile <= _PERCENTILE_MIN:
+        return sorted_values[0]
+    if percentile >= _PERCENTILE_MAX:
+        return sorted_values[-1]
+
+    rank = (percentile / _PERCENTILE_MAX) * (len(sorted_values) - 1)
+    lower_index = math.floor(rank)
+    upper_index = math.ceil(rank)
+    if lower_index == upper_index:
+        return sorted_values[lower_index]
+    interpolation = rank - lower_index
+    lower_value = sorted_values[lower_index]
+    upper_value = sorted_values[upper_index]
+    return lower_value + (upper_value - lower_value) * interpolation
 
 
 def _quantize_tokens(pairs: Sequence[tuple[str, float]], quantization: int) -> dict[str, int]:
@@ -596,30 +670,48 @@ class SpladeEncoderService:
         resolved.mkdir(parents=True, exist_ok=True)
         return resolved
 
-    def _build_encoder(self, *, provider: str, onnx_file: str | None) -> _SparseEncoderProtocol:
-        """Instantiate a Sentence-Transformers SparseEncoder using configured paths.
+    def _initialise_encoder(
+        self,
+        *,
+        provider: str,
+        onnx_file: str | None,
+    ) -> tuple[_SparseEncoderProtocol, str | None]:
+        """Instantiate a SparseEncoder and return the resolved ONNX artifact (if any).
 
         Returns
         -------
-        _SparseEncoderProtocol
-            Encoder instance configured for the requested provider and ONNX artifact.
+        tuple[_SparseEncoderProtocol, str | None]
+            The encoder instance and the relative ONNX path used (``None`` when no artifact exists).
         """
         sparse_encoder_cls = _require_sparse_encoder()
         model_dir = resolve_within_repo(self._repo_root, self._config.model_dir)
         onnx_dir = resolve_within_repo(self._repo_root, self._config.onnx_dir)
-        candidate = onnx_dir / (onnx_file or self._config.onnx_file)
-        if not candidate.exists():
-            candidate = onnx_dir / self._config.onnx_file
+        search_paths: list[Path] = []
+        if onnx_file is not None:
+            search_paths.append(onnx_dir / onnx_file)
+        default_candidate = onnx_dir / self._config.onnx_file
+        if default_candidate not in search_paths:
+            search_paths.append(default_candidate)
 
         model_kwargs: dict[str, str] = {"provider": provider}
-        if candidate.exists():
-            model_kwargs["file_name"] = _serialize_relative(candidate, model_dir)
+        selected_relative: str | None = None
+        for candidate in search_paths:
+            if candidate.exists():
+                relative_path = _serialize_relative(candidate, model_dir)
+                model_kwargs["file_name"] = relative_path
+                selected_relative = relative_path
+                break
 
-        return sparse_encoder_cls(
+        encoder = sparse_encoder_cls(
             str(model_dir),
             backend="onnx",
             model_kwargs=model_kwargs,
         )
+        return encoder, selected_relative
+
+    def _build_encoder(self, *, provider: str, onnx_file: str | None) -> _SparseEncoderProtocol:
+        encoder, _ = self._initialise_encoder(provider=provider, onnx_file=onnx_file)
+        return encoder
 
     def encode_corpus(
         self,
@@ -692,6 +784,91 @@ class SpladeEncoderService:
                 "metadata": summary.metadata_path,
             },
         )
+        return summary
+
+    def benchmark_queries(
+        self,
+        queries: Sequence[str],
+        options: SpladeBenchmarkOptions | None = None,
+    ) -> SpladeBenchmarkSummary:
+        """Benchmark SPLADE query encoding latency.
+
+        Parameters
+        ----------
+        queries : Sequence[str]
+            One or more query strings to encode during the benchmark.
+        options : SpladeBenchmarkOptions | None, optional
+            Benchmark configuration overrides. Defaults to :class:`SpladeBenchmarkOptions`.
+
+        Returns
+        -------
+        SpladeBenchmarkSummary
+            Latency statistics captured across the measured iterations.
+
+        Raises
+        ------
+        ValueError
+            Raised when the query list is empty or the benchmark configuration is invalid.
+        """
+        normalised = [
+            query.strip() for query in queries if isinstance(query, str) and query.strip()
+        ]
+        if not normalised:
+            msg = "At least one non-empty query must be provided for benchmarking."
+            raise ValueError(msg)
+
+        opts = options or SpladeBenchmarkOptions()
+        if opts.warmup_iterations < 0:
+            msg = "warmup_iterations must be zero or greater."
+            raise ValueError(msg)
+        if opts.measure_iterations < 1:
+            msg = "measure_iterations must be at least one."
+            raise ValueError(msg)
+
+        provider = opts.provider or self._config.provider
+        encoder, selected_relative = self._initialise_encoder(
+            provider=provider,
+            onnx_file=opts.onnx_file,
+        )
+
+        # Warm-up iterations prime the ONNX runtime for more stable latency measurements.
+        for _ in range(opts.warmup_iterations):
+            encoder.encode_query(list(normalised))
+
+        latencies: list[float] = []
+        for _ in range(opts.measure_iterations):
+            start = perf_counter()
+            encoder.encode_query(list(normalised))
+            elapsed = (perf_counter() - start) * 1000.0
+            latencies.append(elapsed)
+
+        latencies.sort()
+        summary = SpladeBenchmarkSummary(
+            query_count=len(normalised),
+            warmup_iterations=opts.warmup_iterations,
+            measure_iterations=opts.measure_iterations,
+            min_latency_ms=min(latencies),
+            max_latency_ms=max(latencies),
+            mean_latency_ms=statistics.fmean(latencies),
+            p50_latency_ms=statistics.median(latencies),
+            p95_latency_ms=_percentile_value(latencies, 95.0),
+            p99_latency_ms=_percentile_value(latencies, 99.0),
+            provider=provider,
+            onnx_file=selected_relative,
+        )
+
+        self._logger.info(
+            "Benchmarked SPLADE encoder",
+            extra={
+                "query_count": summary.query_count,
+                "warmup_iterations": summary.warmup_iterations,
+                "measure_iterations": summary.measure_iterations,
+                "p50_ms": summary.p50_latency_ms,
+                "p95_ms": summary.p95_latency_ms,
+                "provider": summary.provider,
+            },
+        )
+
         return summary
 
 

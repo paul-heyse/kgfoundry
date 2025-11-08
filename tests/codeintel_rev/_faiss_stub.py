@@ -9,10 +9,14 @@ import types
 def ensure_faiss_stub() -> None:
     """Register a minimal ``faiss`` module stub for environments without FAISS."""
     try:
-        importlib.import_module("faiss")
-        return
-    except Exception:  # pragma: no cover - fallback when FAISS missing/broken
-        pass
+        module = importlib.import_module("faiss")
+    except (AttributeError, ImportError, ModuleNotFoundError, OSError, RuntimeError):
+        module = None
+    else:
+        required_attrs = ("normalize_L2", "IndexFlatIP", "write_index")
+        if all(hasattr(module, attr) for attr in required_attrs):
+            return
+        sys.modules.pop("faiss", None)
 
     if "faiss" in sys.modules:
         return

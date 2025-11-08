@@ -11,9 +11,9 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-import git.exc
 import pytest
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
+from git.exc import GitCommandError
 
 
 @pytest.fixture
@@ -267,8 +267,12 @@ class TestGitClientIntegration:
 
         # GitPython may raise GitCommandError instead of FileNotFoundError
         # depending on Git version, so catch both
-        with pytest.raises((FileNotFoundError, git.exc.GitCommandError)):  # type: ignore[arg-type]
+        try:
             client.blame_range("nonexistent.py", start_line=1, end_line=10)
+        except (FileNotFoundError, GitCommandError):
+            return
+
+        pytest.fail("Expected FileNotFoundError or GitCommandError for missing file")
 
     def test_file_history_file_not_found(self, git_repo: Path) -> None:
         """file_history should raise FileNotFoundError for missing files."""
@@ -286,7 +290,7 @@ class TestGitClientIntegration:
 
         # Request lines beyond file length - GitPython raises GitCommandError
         # for invalid line ranges, so we expect that exception
-        with pytest.raises(git.exc.GitCommandError):
+        with pytest.raises(GitCommandError):
             client.blame_range("test.py", start_line=100, end_line=200)
 
 

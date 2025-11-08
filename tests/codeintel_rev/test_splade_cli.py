@@ -9,6 +9,8 @@ import pytest
 from codeintel_rev.cli import app as root_app
 from codeintel_rev.cli import splade as splade_cli
 from codeintel_rev.io.splade_manager import (
+    SpladeBenchmarkOptions,
+    SpladeBenchmarkSummary,
     SpladeBuildOptions,
     SpladeEncodeOptions,
     SpladeEncodingSummary,
@@ -50,6 +52,7 @@ class _StubEncoderService:
     def __init__(self, tmp_path: Path) -> None:
         self.tmp_path = tmp_path
         self.calls: list[tuple[Path, SpladeEncodeOptions | None]] = []
+        self.benchmark_calls: list[tuple[list[str], SpladeBenchmarkOptions]] = []
 
     def encode_corpus(
         self,
@@ -70,6 +73,27 @@ class _StubEncoderService:
             vectors_dir=str(vectors_dir),
             metadata_path=str(metadata_path),
             shard_count=1,
+        )
+
+    def benchmark_queries(
+        self,
+        queries: list[str],
+        options: SpladeBenchmarkOptions | None = None,
+    ) -> SpladeBenchmarkSummary:
+        opts = options or SpladeBenchmarkOptions()
+        self.benchmark_calls.append((list(queries), opts))
+        return SpladeBenchmarkSummary(
+            query_count=len(queries),
+            warmup_iterations=opts.warmup_iterations,
+            measure_iterations=opts.measure_iterations,
+            min_latency_ms=5.0,
+            max_latency_ms=7.5,
+            mean_latency_ms=6.0,
+            p50_latency_ms=6.0,
+            p95_latency_ms=7.0,
+            p99_latency_ms=7.5,
+            provider=opts.provider or "CPUExecutionProvider",
+            onnx_file="onnx/model_qint8.onnx",
         )
 
 
@@ -204,3 +228,34 @@ def test_build_index_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
     assert options.threads == 12
     assert options.max_clause_count == 8192
     assert not options.overwrite
+
+
+def test_bench_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Bench should invoke the encoder service benchmark workflow."""
+    stub = _StubEncoderService(tmp_path)
+    _patch_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(splade_cli, "_create_encoder_service", lambda: stub)
+
+    result = runner.invoke(
+        root_app,
+        [
+            "splade",
+            "bench",
+            "--query",
+            "solar incentives",
+            "--runs",
+            "5",
+            "--warmup",
+            "2",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "Benchmark latency" in result.stdout
+    assert stub.benchmark_calls, "Expected benchmark_queries to be invoked"
+    queries, options = stub.benchmark_calls[0]
+    assert queries == ["solar incentives"]
+    assert options.measure_iterations == 5
+    assert options.warmup_iterations == 2
+    assert options.provider is None
+    assert options.onnx_file is None

@@ -14,16 +14,37 @@ from __future__ import annotations
 import asyncio
 import statistics
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import pytest
+from codeintel_rev.io.faiss_manager import FAISSManager
 
-from tests.conftest import HAS_FAISS_SUPPORT
+from tests.conftest import FAISS_MODULE, HAS_FAISS_SUPPORT
 
-if HAS_FAISS_SUPPORT:
-    from codeintel_rev.io.faiss_manager import FAISSManager
-else:  # pragma: no cover - dependency-gated
+if TYPE_CHECKING:  # pragma: no cover - type checking only
+    import faiss
+
+if not HAS_FAISS_SUPPORT:  # pragma: no cover - dependency-gated
     pytestmark = pytest.mark.skip(reason="FAISS bindings unavailable on this host")
+else:
+    assert FAISS_MODULE is not None
+# Unit tests use reduced dimensions for speed
+_UNIT_TEST_VEC_DIM = 256
+
+
+def _get_underlying_index(cpu_index: Any) -> Any:
+    """Return the underlying FAISS index from an ID map wrapper.
+
+    Returns
+    -------
+    Any
+        Underlying FAISS index instance.
+    """
+    assert hasattr(cpu_index, "index"), "Expected FAISS index wrapper to expose `index` attribute"
+    index_map = cast("faiss.IndexIDMap2", cpu_index)
+    return index_map.index
+
 
 # Use modern numpy random generator
 _rng = np.random.default_rng(42)
@@ -82,7 +103,7 @@ def test_indexing_pipeline_performance(tmp_index_path: Path) -> None:
 
     # Verify adaptive indexing was used (IVFFlat for medium corpus)
     assert manager.cpu_index is not None
-    underlying = manager.cpu_index.index  # type: ignore[attr-defined]
+    underlying = _get_underlying_index(manager.cpu_index)
     assert hasattr(underlying, "nlist"), "Expected IVFFlat index for medium corpus"
 
     # Indexing should complete in reasonable time (<5 minutes for 5K vectors)

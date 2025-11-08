@@ -5,12 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated
 
+import msgspec
 import typer
 from tools import CliContext, EnvelopeBuilder, cli_operation, sha256_file
 
 from codeintel_rev.config.settings import load_settings
 from codeintel_rev.io.splade_manager import (
     SpladeArtifactsManager,
+    SpladeBenchmarkOptions,
     SpladeBuildOptions,
     SpladeEncodeOptions,
     SpladeEncoderService,
@@ -275,6 +277,31 @@ MAX_CLAUSE_OPTION = typer.Option(
     min=1,
     help="Override Lucene Boolean clause limit (defaults to configuration).",
 )
+QUERY_OPTION = typer.Option(
+    None,
+    "--query",
+    "-q",
+    help="Query text to benchmark.",
+)
+QUERIES_FILE_OPTION = typer.Option(
+    None,
+    "--queries-file",
+    help="Path to a file containing one query per line.",
+)
+WARMUP_OPTION = typer.Option(
+    3,
+    "--warmup",
+    min=0,
+    help="Number of warm-up iterations before measuring latency.",
+    show_default=True,
+)
+RUNS_OPTION = typer.Option(
+    10,
+    "--runs",
+    min=1,
+    help="Number of measured iterations for the benchmark.",
+    show_default=True,
+)
 
 
 @app.command("build-index")
@@ -334,6 +361,85 @@ def build_index(
             threads=threads,
             max_clause_count=max_clause_count,
             overwrite=overwrite,
+        ),
+    )
+
+
+@app.command("bench")
+def bench(
+    *,
+    query: str | None = QUERY_OPTION,
+    queries_file: Path | None = QUERIES_FILE_OPTION,
+    warmup: int = WARMUP_OPTION,
+    runs: int = RUNS_OPTION,
+) -> None:
+    """Benchmark SPLADE query encoding latency.
+
+    Raises
+    ------
+    typer.BadParameter
+        If no queries are provided or the queries file is invalid.
+    """
+    query_values: list[str] = []
+    if query:
+        query_values.append(query)
+
+    if queries_file is not None:
+        file_path = queries_file
+        if not file_path.exists():
+            message = f"Queries file {file_path} does not exist."
+            raise typer.BadParameter(message, param_hint="--queries-file")
+        file_queries = [
+            line.strip()
+            for line in file_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        query_values.extend(file_queries)
+
+    if not query_values:
+        message = "Provide --query or --queries-file with at least one query."
+        raise typer.BadParameter(message, param_hint="--query")
+
+    @cli_operation(echo_args=True, echo_env=True)
+    def _run(
+        ctx: CliContext,
+        env: EnvelopeBuilder,
+        *,
+        queries: tuple[str, ...],
+        options: SpladeBenchmarkOptions,
+    ) -> None:
+        service = _create_encoder_service()
+        summary = service.benchmark_queries(list(queries), options)
+
+        env.set_result(
+            summary=(
+                f"Benchmarked {summary.query_count} queries "
+                f"(runs={summary.measure_iterations}, warmup={summary.warmup_iterations})"
+            ),
+            payload=msgspec.to_builtins(summary),
+        )
+        ctx.logger.info(
+            "splade_benchmark",
+            extra={
+                "query_count": summary.query_count,
+                "warmup_iterations": summary.warmup_iterations,
+                "measure_iterations": summary.measure_iterations,
+                "p50_ms": summary.p50_latency_ms,
+                "p95_ms": summary.p95_latency_ms,
+                "provider": summary.provider,
+            },
+        )
+        typer.echo(
+            "[splade] Benchmark latency "
+            f"(p50={summary.p50_latency_ms:.2f} ms, p95={summary.p95_latency_ms:.2f} ms, "
+            f"mean={summary.mean_latency_ms:.2f} ms)",
+        )
+
+    _run(
+        queries=tuple(query_values),
+        options=SpladeBenchmarkOptions(
+            warmup_iterations=warmup,
+            measure_iterations=runs,
         ),
     )
 

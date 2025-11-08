@@ -30,7 +30,8 @@ def test_mcp_server_import() -> None:
 
 
 @pytest.mark.asyncio
-async def test_file_operations(mock_application_context, mock_session_id) -> None:
+@pytest.mark.usefixtures("mock_session_id")
+async def test_file_operations(mock_application_context) -> None:
     """Verify file listing and reading adapters respond with expected keys."""
     repo_root = mock_application_context.paths.repo_root
     (repo_root / "README.md").write_text("example content", encoding="utf-8")
@@ -51,15 +52,20 @@ async def test_file_operations(mock_application_context, mock_session_id) -> Non
 
 
 @pytest.mark.asyncio
-async def test_text_search(
-    mock_application_context, mock_session_id, monkeypatch: pytest.MonkeyPatch
-) -> None:
+@pytest.mark.usefixtures("mock_session_id")
+async def test_text_search(mock_application_context, monkeypatch: pytest.MonkeyPatch) -> None:
     """Exercise the text search adapter for basic responses."""
     repo_root = mock_application_context.paths.repo_root
     (repo_root / "module.py").write_text("def sample():\n    return 1\n", encoding="utf-8")
 
     def _fake_run_subprocess(cmd: list[str], *, cwd: Path | None, timeout: int) -> str:
-        """Simulate ripgrep JSON output for deterministic tests."""
+        """Simulate ripgrep JSON output for deterministic tests.
+
+        Returns
+        -------
+        str
+            Serialized JSON payload mimicking ripgrep output.
+        """
         _ = (cmd, timeout)
         sample_path = (cwd or repo_root) / "module.py"
         payload = {
@@ -84,7 +90,8 @@ async def test_text_search(
 
 
 @pytest.mark.asyncio
-async def test_semantic_search_no_index(mock_application_context, mock_session_id) -> None:
+@pytest.mark.usefixtures("mock_session_id")
+async def test_semantic_search_no_index(mock_application_context) -> None:
     """Semantic search should gracefully handle missing FAISS index."""
     with pytest.raises(VectorSearchError):
         await semantic_adapter.semantic_search(
@@ -95,7 +102,8 @@ async def test_semantic_search_no_index(mock_application_context, mock_session_i
 
 
 @pytest.mark.asyncio
-async def test_git_history(mock_application_context, mock_session_id) -> None:
+@pytest.mark.usefixtures("mock_session_id")
+async def test_git_history(mock_application_context) -> None:
     """Ensure git history adapters expose expected keys."""
     repo_root = mock_application_context.paths.repo_root
     (repo_root / "README.md").write_text("sample\ncontent\n", encoding="utf-8")
@@ -129,7 +137,8 @@ async def test_git_history(mock_application_context, mock_session_id) -> None:
 
 
 @pytest.mark.asyncio
-async def test_scope_operations(mock_application_context, mock_session_id) -> None:
+@pytest.mark.usefixtures("mock_session_id")
+async def test_scope_operations(mock_application_context) -> None:
     """Verify scope configuration round-trips through the adapter."""
     scope_request: ScopeIn = {"repos": ["test"], "languages": ["python"]}
     result = await files_adapter.set_scope(mock_application_context, scope_request)

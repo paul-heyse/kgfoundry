@@ -51,6 +51,8 @@ class IndexIDMap(Index):
     def __init__(self, index: Index, /) -> None: ...
 
 class IndexIDMap2(IndexIDMap):
+    index: Index
+
     def contains(self, ident: int, /) -> bool: ...
     def search(self, ident: int, /) -> int: ...
     def find(self, ident: int, /) -> int: ...
@@ -64,8 +66,8 @@ class GpuClonerOptions:
     useFloat16CoarseQuantizer: bool  # noqa: N815
     useFloat16LookupTables: bool  # noqa: N815
     usePrecomputed: bool  # noqa: N815
-    reserveVecs: int
-    indicesOptions: int
+    reserveVecs: int  # noqa: N815
+    indicesOptions: int  # noqa: N815
     use_cuvs: bool
 
     def __init__(self) -> None: ...

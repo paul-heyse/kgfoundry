@@ -188,6 +188,10 @@ class Finding(TypedDict, total=False):
         Explanation of why this finding matches the query. Provides context and
         reasoning for the match (e.g., "Matches query 'data processing' because
         function name contains 'process' and docstring mentions 'data'").
+    chunk_id : int
+        Internal chunk identifier used for hydration bookkeeping and hybrid fusion.
+        Not all clients need this value; it is primarily used by the server when
+        combining multiple retrieval channels.
     """
 
     type: Literal["definition", "reference", "usage", "doc", "security", "api"]
@@ -196,6 +200,7 @@ class Finding(TypedDict, total=False):
     snippet: str
     score: float
     why: str
+    chunk_id: int
 
 
 class MethodInfo(TypedDict, total=False):

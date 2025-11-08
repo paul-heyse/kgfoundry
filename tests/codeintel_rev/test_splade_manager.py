@@ -13,6 +13,7 @@ from codeintel_rev.config.settings import load_settings
 from codeintel_rev.io.splade_manager import (
     SpladeArtifactMetadata,
     SpladeArtifactsManager,
+    SpladeBenchmarkOptions,
     SpladeBuildOptions,
     SpladeEncodeOptions,
     SpladeEncoderService,
@@ -93,6 +94,10 @@ class _StubEncoder:
         (onnx_dir / "model.onnx").write_text("base", encoding="utf-8")
 
     def encode_document(self, texts: list[str]) -> list[int]:
+        self._last_texts = list(texts)
+        return list(range(len(texts)))
+
+    def encode_query(self, texts: list[str]) -> list[int]:
         self._last_texts = list(texts)
         return list(range(len(texts)))
 
@@ -192,6 +197,41 @@ def test_encode_corpus_writes_vectors(
     content = json.loads(shard.read_text(encoding="utf-8").splitlines()[0])
     assert content["id"] == "doc1"
     assert content["vector"]["solar"] > 0
+
+
+def test_benchmark_queries_reports_latency(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Benchmarking should report latency percentiles for SPLADE query encoding."""
+    repo_root = _bootstrap_repo(tmp_path, monkeypatch)
+    quantized_file = Path(repo_root / "models" / "splade-v3" / "onnx" / "model_qint8.onnx")
+    quantized_file.write_text("quantized", encoding="utf-8")
+
+    settings = load_settings()
+    service = SpladeEncoderService(settings)
+
+    monkeypatch.setattr(
+        "codeintel_rev.io.splade_manager._require_sparse_encoder", lambda: _StubEncoder
+    )
+
+    timings = iter([0.0, 0.005, 0.100, 0.120, 0.200, 0.240])
+    monkeypatch.setattr(
+        "codeintel_rev.io.splade_manager.perf_counter",
+        lambda: next(timings),
+    )
+
+    summary = service.benchmark_queries(
+        ["renewable energy"],
+        SpladeBenchmarkOptions(warmup_iterations=1, measure_iterations=3),
+    )
+
+    assert summary.query_count == 1
+    assert summary.warmup_iterations == 1
+    assert summary.measure_iterations == 3
+    assert summary.min_latency_ms == pytest.approx(5.0, rel=1e-3)
+    assert summary.max_latency_ms == pytest.approx(40.0, rel=1e-3)
+    assert summary.p50_latency_ms == pytest.approx(20.0, rel=1e-3)
+    assert summary.p95_latency_ms == pytest.approx(38.0, rel=1e-3)
+    assert summary.provider == "CPUExecutionProvider"
+    assert summary.onnx_file == "onnx/model_qint8.onnx"
 
 
 def test_build_index_persists_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

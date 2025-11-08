@@ -3,11 +3,13 @@ from __future__ import annotations
 import sys
 from collections.abc import Sequence
 from pathlib import Path
+from typing import cast
 from uuid import uuid4
 
 import pytest
 from tools import CLIToolingContext
 from tools import cli_context_registry as registry_module
+from tools._shared.augment_registry import AugmentMetadataModel
 from tools.cli_context_registry import (
     CLIContextDefinition,
     context_for,
@@ -142,10 +144,10 @@ def test_operation_override_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
     dummy = DummyAugment()
     original_augment_for = registry_module.REGISTRY.augment_for
 
-    def fake_augment_for(target: str) -> DummyAugment:
+    def fake_augment_for(target: str) -> AugmentMetadataModel:
         if target == key:
-            return dummy
-        return original_augment_for(target)  # type: ignore[return-value]
+            return cast("AugmentMetadataModel", dummy)
+        return original_augment_for(target)
 
     monkeypatch.setattr(registry_module.REGISTRY, "augment_for", fake_augment_for)
 

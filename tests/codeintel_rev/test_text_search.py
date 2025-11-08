@@ -35,8 +35,9 @@ def _build_match_line(path: Path) -> str:
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_session_id")
 async def test_search_text_flag_prefixed_query(
-    mock_application_context, mock_session_id: str, monkeypatch: pytest.MonkeyPatch
+    mock_application_context, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Queries beginning with a dash should be passed after the `--` sentinel."""
     captured_commands: list[list[str]] = []
@@ -76,8 +77,9 @@ async def test_search_text_flag_prefixed_query(
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_session_id")
 async def test_search_text_surfaces_ripgrep_failure(
-    mock_application_context, mock_session_id: str, monkeypatch: pytest.MonkeyPatch
+    mock_application_context, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Return-code > 1 from ripgrep should surface an error message."""
 
@@ -98,8 +100,9 @@ async def test_search_text_surfaces_ripgrep_failure(
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_session_id")
 async def test_search_text_falls_back_to_grep(
-    mock_application_context, mock_session_id: str, monkeypatch: pytest.MonkeyPatch
+    mock_application_context, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Missing ripgrep binary should trigger the grep fallback."""
     captured_commands: list[list[str]] = []
@@ -128,8 +131,9 @@ async def test_search_text_falls_back_to_grep(
 
 
 @pytest.mark.asyncio
+@pytest.mark.usefixtures("mock_session_id")
 async def test_search_text_fallback_normalizes_relative_paths(
-    mock_application_context, mock_session_id: str, monkeypatch: pytest.MonkeyPatch
+    mock_application_context, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Relative grep results should be normalized to repo-relative paths."""
 

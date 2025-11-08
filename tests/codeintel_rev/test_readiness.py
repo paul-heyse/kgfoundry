@@ -163,6 +163,8 @@ async def test_readiness_probe_materialize_reports_missing_table(
         limits=existing_settings.limits,
         redis=existing_settings.redis,
         duckdb=existing_settings.duckdb,
+        bm25=existing_settings.bm25,
+        splade=existing_settings.splade,
     )
     probe = ReadinessProbe(mock_context)
 
@@ -188,6 +190,8 @@ async def test_readiness_probe_materialize_validates_index(
         limits=existing_settings.limits,
         redis=existing_settings.redis,
         duckdb=existing_settings.duckdb,
+        bm25=existing_settings.bm25,
+        splade=existing_settings.splade,
     )
 
     with duckdb.connect(str(mock_context.paths.duckdb_path)) as connection:
@@ -375,6 +379,8 @@ def test_readiness_probe_check_vllm_invalid_url(mock_context: ApplicationContext
         limits=mock_context.settings.limits,
         redis=mock_context.settings.redis,
         duckdb=mock_context.settings.duckdb,
+        bm25=mock_context.settings.bm25,
+        splade=mock_context.settings.splade,
     )
     mock_context.settings = new_settings
     probe = ReadinessProbe(mock_context)
@@ -399,6 +405,8 @@ def test_readiness_probe_check_vllm_success(mock_context: ApplicationContext) ->
         limits=mock_context.settings.limits,
         redis=mock_context.settings.redis,
         duckdb=mock_context.settings.duckdb,
+        bm25=mock_context.settings.bm25,
+        splade=mock_context.settings.splade,
     )
     mock_context.settings = new_settings
     probe = ReadinessProbe(mock_context)
@@ -428,6 +436,8 @@ def test_readiness_probe_check_vllm_http_error(mock_context: ApplicationContext)
         limits=mock_context.settings.limits,
         redis=mock_context.settings.redis,
         duckdb=mock_context.settings.duckdb,
+        bm25=mock_context.settings.bm25,
+        splade=mock_context.settings.splade,
     )
     mock_context.settings = new_settings
     probe = ReadinessProbe(mock_context)

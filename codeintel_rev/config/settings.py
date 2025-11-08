@@ -219,6 +219,16 @@ class IndexConfig(msgspec.Struct, frozen=True):
         more weight to lower-ranked results. Defaults to 60, which is standard
         for hybrid search. Lower values (30-40) favor top results; higher (80-100)
         give more weight to consensus across systems.
+    enable_bm25_channel : bool
+        Enable BM25 channel when performing hybrid retrieval. When disabled, BM25
+        results are excluded from fusion but the index can still be built for
+        other workflows. Defaults to ``True``.
+    enable_splade_channel : bool
+        Enable SPLADE channel when performing hybrid retrieval. When disabled,
+        SPLADE results are excluded from fusion. Defaults to ``True``.
+    hybrid_top_k_per_channel : int
+        Per-channel cutoff used when gathering candidates before RRF fusion.
+        Defaults to 50, which balances coverage with latency.
     use_cuvs : bool
         Enable cuVS (CUDA Vector Search) acceleration for FAISS GPU operations.
         cuVS provides optimized GPU kernels that can be 2-3x faster than standard
@@ -250,6 +260,9 @@ class IndexConfig(msgspec.Struct, frozen=True):
     bm25_k1: float = 0.9
     bm25_b: float = 0.4
     rrf_k: int = 60
+    enable_bm25_channel: bool = True
+    enable_splade_channel: bool = True
+    hybrid_top_k_per_channel: int = 50
     use_cuvs: bool = True
     faiss_preload: bool = False
     duckdb_materialize: bool = False
@@ -438,6 +451,12 @@ def load_settings() -> Settings:
         BM25 b parameter (default: 0.4).
     RRF_K : int, optional
         RRF fusion K parameter (default: 60).
+    HYBRID_ENABLE_BM25 : str, optional
+        Enable BM25 channel within hybrid retrieval fusion ("1"/"true" to enable, default enabled).
+    HYBRID_ENABLE_SPLADE : str, optional
+        Enable SPLADE channel within hybrid retrieval fusion ("1"/"true" to enable, default enabled).
+    HYBRID_TOP_K_PER_CHANNEL : int, optional
+        Per-channel candidate fan-out gathered prior to RRF fusion (default: 50).
     USE_CUVS : str, optional
         Enable cuVS acceleration: "1", "true", or "yes" (default: "1").
     FAISS_PRELOAD : str, optional
@@ -522,6 +541,11 @@ def load_settings() -> Settings:
         bm25_k1=float(os.environ.get("BM25_K1", "0.9")),
         bm25_b=float(os.environ.get("BM25_B", "0.4")),
         rrf_k=int(os.environ.get("RRF_K", "60")),
+        enable_bm25_channel=os.environ.get("HYBRID_ENABLE_BM25", "1").lower()
+        in {"1", "true", "yes"},
+        enable_splade_channel=os.environ.get("HYBRID_ENABLE_SPLADE", "1").lower()
+        in {"1", "true", "yes"},
+        hybrid_top_k_per_channel=int(os.environ.get("HYBRID_TOP_K_PER_CHANNEL", "50")),
         use_cuvs=os.environ.get("USE_CUVS", "1").lower() in {"1", "true", "yes"},
         faiss_preload=os.environ.get("FAISS_PRELOAD", "0").lower() in {"1", "true", "yes"},
         duckdb_materialize=os.environ.get("DUCKDB_MATERIALIZE", "0").lower()

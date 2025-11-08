@@ -88,6 +88,9 @@ The configuration lifecycle follows this sequence during application startup:
 | `MAX_RESULTS` | Maximum results per query | `1000` | `500` |
 | `QUERY_TIMEOUT_S` | Query timeout in seconds | `30.0` | `60.0` |
 | `SEMANTIC_OVERFETCH_MULTIPLIER` | FAISS fan-out multiplier when scope filters active | `2` | `3` |
+| `HYBRID_ENABLE_BM25` | Enable BM25 channel in hybrid retrieval (`1` = enabled, `0` = disabled) | `1` | `0` |
+| `HYBRID_ENABLE_SPLADE` | Enable SPLADE channel in hybrid retrieval (`1` = enabled, `0` = disabled) | `1` | `0` |
+| `HYBRID_TOP_K_PER_CHANNEL` | Per-channel candidate fan-out gathered before RRF fusion | `50` | `75` |
 | `LUCENE_DIR` | Base directory for sparse Lucene indexes | `data/lucene` | `/var/lib/codeintel/lucene` |
 | `SPLADE_DIR` | Legacy SPLADE directory (superseded by dedicated settings) | `data/splade` | `/var/lib/codeintel/splade` |
 | `BM25_JSONL_DIR` | Directory containing JsonCollection documents for BM25 indexing | `data/jsonl` | `/mnt/data/bm25/json` |
@@ -384,4 +387,7 @@ See `codeintel_rev/config/settings.py` for complete documentation of all configu
 - `codeintel_rev/app/readiness.py` - Readiness probe system
 - `codeintel_rev/config/settings.py` - Settings dataclasses and defaults
 - `AGENTS.md` - Development standards and design principles
+- `docs/architecture/bm25.md` - BM25 index management architecture
+- `docs/architecture/splade.md` - SPLADE pipeline architecture
+- `docs/operations/hybrid_search.md` - Hybrid retrieval operations runbook
 

@@ -12,19 +12,39 @@ For stress tests with large corpora, see test_faiss_manager_stress.py.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import pytest
 from codeintel_rev.io.faiss_manager import FAISSManager
 
-from tests.conftest import HAS_FAISS_SUPPORT
+from tests.conftest import FAISS_MODULE, HAS_FAISS_SUPPORT
+
+if TYPE_CHECKING:  # pragma: no cover - type checking only
+    import faiss
 
 if not HAS_FAISS_SUPPORT:  # pragma: no cover - dependency-gated
     pytestmark = pytest.mark.skip(
         reason="FAISS bindings unavailable on this host",
     )
-else:
-    import faiss
+
+# Narrow FAISS module to concrete type for static checking
+assert FAISS_MODULE is not None
+faiss_module: Any = FAISS_MODULE
+
+
+def _get_underlying_index(cpu_index: Any) -> Any:
+    """Return the underlying FAISS index from an ID map wrapper.
+
+    Returns
+    -------
+    Any
+        Underlying FAISS index instance.
+    """
+    assert hasattr(cpu_index, "index"), "Expected FAISS index wrapper to expose `index` attribute"
+    index_map = cast("faiss.IndexIDMap2", cpu_index)
+    return index_map.index
+
 
 # Use modern numpy random generator
 _rng = np.random.default_rng(42)
@@ -99,8 +119,8 @@ def test_adaptive_index_selection(tmp_index_path: Path, n_vectors: int, expected
     cpu_index = manager.cpu_index
 
     # Check index type by examining the underlying index structure
-    assert isinstance(cpu_index, faiss.IndexIDMap2)
-    underlying = cpu_index.index  # type: ignore[attr-defined]
+    assert isinstance(cpu_index, faiss_module.IndexIDMap2)
+    underlying = _get_underlying_index(cpu_index)
 
     # Get type information for debugging
     underlying_type = type(underlying)
@@ -127,7 +147,7 @@ def test_adaptive_index_selection(tmp_index_path: Path, n_vectors: int, expected
         assert has_metric_type, f"Expected flat index with metric_type, got {underlying_type_name}"
         assert not has_nlist, f"Expected flat index without nlist, got {underlying_type_name}"
         if metric_type is not None:
-            assert metric_type == faiss.METRIC_INNER_PRODUCT, (
+            assert metric_type == faiss_module.METRIC_INNER_PRODUCT, (
                 f"Expected METRIC_INNER_PRODUCT, got {metric_type}"
             )
     elif expected_type == "ivf_flat":
@@ -137,7 +157,7 @@ def test_adaptive_index_selection(tmp_index_path: Path, n_vectors: int, expected
             f"Expected IVFFlat index with metric_type, got {underlying_type_name}"
         )
         if metric_type is not None:
-            assert metric_type == faiss.METRIC_INNER_PRODUCT, (
+            assert metric_type == faiss_module.METRIC_INNER_PRODUCT, (
                 f"Expected METRIC_INNER_PRODUCT, got {metric_type}"
             )
     else:
@@ -168,8 +188,8 @@ def test_small_corpus_flat_index(tmp_index_path: Path) -> None:
     # Verify flat index was created
     assert manager.cpu_index is not None
     cpu_index = manager.cpu_index
-    assert isinstance(cpu_index, faiss.IndexIDMap2)
-    underlying = cpu_index.index  # type: ignore[attr-defined]
+    assert isinstance(cpu_index, faiss_module.IndexIDMap2)
+    underlying = _get_underlying_index(cpu_index)
     # Check by type name since isinstance may not work with dynamic types
     assert "FlatIP" in type(underlying).__name__, (
         f"Expected FlatIP, got {type(underlying).__name__}"
@@ -219,8 +239,9 @@ def test_medium_corpus_ivf_flat_nlist(tmp_index_path: Path) -> None:
     # Verify IVFFlat index
     assert manager.cpu_index is not None
     cpu_index = manager.cpu_index
-    assert isinstance(cpu_index, faiss.IndexIDMap2)
-    underlying = cpu_index.index  # type: ignore[attr-defined]
+    assert FAISS_MODULE is not None
+    assert isinstance(cpu_index, FAISS_MODULE.IndexIDMap2)
+    underlying = _get_underlying_index(cpu_index)
     # Check by type name since isinstance may not work with dynamic types
     assert "IVFFlat" in type(underlying).__name__, (
         f"Expected IVFFlat, got {type(underlying).__name__}"
@@ -229,7 +250,7 @@ def test_medium_corpus_ivf_flat_nlist(tmp_index_path: Path) -> None:
     # Verify nlist is calculated correctly
     expected_nlist = min(int(np.sqrt(n_vectors)), n_vectors // 39)
     expected_nlist = max(expected_nlist, 100)
-    assert underlying.nlist == expected_nlist  # type: ignore[attr-defined]
+    assert underlying.nlist == expected_nlist
 
 
 @pytest.mark.gpu
@@ -258,13 +279,14 @@ def test_large_corpus_ivf_pq_nlist(tmp_index_path: Path) -> None:
     # Verify IVF-PQ index
     assert manager.cpu_index is not None
     cpu_index = manager.cpu_index
-    assert isinstance(cpu_index, faiss.IndexIDMap2)
-    underlying = cpu_index.index  # type: ignore[attr-defined]
+    assert FAISS_MODULE is not None
+    assert isinstance(cpu_index, FAISS_MODULE.IndexIDMap2)
+    underlying = _get_underlying_index(cpu_index)
 
     # Verify nlist is calculated correctly
     expected_nlist = int(np.sqrt(n_vectors))
     expected_nlist = max(expected_nlist, 1024)
-    assert underlying.nlist == expected_nlist  # type: ignore[attr-defined]
+    assert underlying.nlist == expected_nlist
 
 
 def test_memory_estimation_small_corpus(tmp_index_path: Path) -> None:

@@ -23,7 +23,6 @@ from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.vllm_client import VLLMClient
 from codeintel_rev.mcp_server.adapters import files as files_adapter
-from codeintel_rev.mcp_server.adapters.files import _list_paths_sync
 from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.mcp_server.scope_utils import merge_scope_filters
 
@@ -147,7 +146,8 @@ async def test_set_scope_persists_in_store(tmp_path: Path, mock_session_id: str)
     assert stored == scope
 
 
-def test_list_paths_honours_scope_filters(tmp_path: Path, mock_session_id: str) -> None:
+@pytest.mark.asyncio
+async def test_list_paths_honours_scope_filters(tmp_path: Path, mock_session_id: str) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     _write_repo(repo_root)
@@ -156,15 +156,9 @@ def test_list_paths_honours_scope_filters(tmp_path: Path, mock_session_id: str) 
     scope: ScopeIn = cast("ScopeIn", {"include_globs": ["src/**"], "languages": []})
     assert session_id_var.get() == mock_session_id
 
-    result = _list_paths_sync(
-        context,
-        session_id=mock_session_id,
-        scope=scope,
-        path=None,
-        include_globs=None,
-        exclude_globs=None,
-        max_results=100,
-    )
+    await files_adapter.set_scope(context, scope)
+
+    result = await files_adapter.list_paths(context, max_results=100)
     paths = {item["path"] for item in result["items"]}
     assert all(path.startswith("src/") for path in paths), f"paths={sorted(paths)}"
 

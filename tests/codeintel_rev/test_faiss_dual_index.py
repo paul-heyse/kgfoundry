@@ -2,21 +2,22 @@
 
 from __future__ import annotations
 
-import importlib
 import json
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
 from codeintel_rev.config.settings import IndexConfig
 from codeintel_rev.io.faiss_dual_index import FAISSDualIndexManager, IndexManifest
 
-from tests.conftest import HAS_FAISS_SUPPORT
+from tests.conftest import FAISS_MODULE, HAS_FAISS_SUPPORT
 
 if not HAS_FAISS_SUPPORT:  # pragma: no cover - gated on FAISS availability
     pytest.skip("FAISS bindings unavailable; skipping dual-index tests", allow_module_level=True)
 
-faiss = importlib.import_module("faiss")
+assert FAISS_MODULE is not None
+faiss_module: Any = FAISS_MODULE
 
 _rng = np.random.default_rng(1234)
 
@@ -42,7 +43,7 @@ def _sample_manifest() -> IndexManifest:
     )
 
 
-def _build_flat_index(vec_dim: int, count: int) -> faiss.Index:
+def _build_flat_index(vec_dim: int, count: int) -> Any:
     """Construct an in-memory FAISS flat index populated with unit vectors.
 
     Parameters
@@ -54,12 +55,12 @@ def _build_flat_index(vec_dim: int, count: int) -> faiss.Index:
 
     Returns
     -------
-    faiss.Index
+    faiss_module.Index
         Flat inner-product index containing ``count`` normalized vectors.
     """
-    index = faiss.IndexFlatIP(vec_dim)
+    index = faiss_module.IndexFlatIP(vec_dim)
     vectors = _rng.standard_normal((count, vec_dim)).astype(np.float32)
-    faiss.normalize_L2(vectors)
+    faiss_module.normalize_L2(vectors)
     index.add(vectors)
     return index
 
@@ -69,7 +70,7 @@ async def test_ensure_ready_loads_indexes_without_gpu(tmp_path: Path) -> None:
     """Primary index loads, secondary auto-creates, and manifest is attached."""
     vec_dim = 16
     primary = _build_flat_index(vec_dim, 8)
-    faiss.write_index(primary, str(tmp_path / "primary.faiss"))
+    faiss_module.write_index(primary, str(tmp_path / "primary.faiss"))
 
     manifest = _sample_manifest()
     manifest.to_file(tmp_path / "primary.manifest.json")
@@ -108,7 +109,7 @@ async def test_ensure_ready_dimension_mismatch(tmp_path: Path) -> None:
     """Primary index dimension mismatch fails fast with message."""
     vec_dim = 32
     mismatched = _build_flat_index(vec_dim + 4, 4)
-    faiss.write_index(mismatched, str(tmp_path / "primary.faiss"))
+    faiss_module.write_index(mismatched, str(tmp_path / "primary.faiss"))
 
     settings = IndexConfig(vec_dim=vec_dim, use_cuvs=False)
     manager = FAISSDualIndexManager(tmp_path, settings, vec_dim=vec_dim)
@@ -179,12 +180,12 @@ def test_manifest_missing_required_fields(tmp_path: Path) -> None:
 async def test_search_primary_only(tmp_path: Path) -> None:
     """Search returns primary results when no secondary index exists."""
     vec_dim = 8
-    primary = faiss.IndexFlatIP(vec_dim)
+    primary = faiss_module.IndexFlatIP(vec_dim)
     primary_vectors = np.eye(vec_dim, dtype=np.float32)
-    faiss.normalize_L2(primary_vectors)
+    faiss_module.normalize_L2(primary_vectors)
     primary_ids = np.arange(vec_dim, dtype=np.int64)
     primary.add_with_ids(primary_vectors, primary_ids)
-    faiss.write_index(primary, str(tmp_path / "primary.faiss"))
+    faiss_module.write_index(primary, str(tmp_path / "primary.faiss"))
 
     settings = IndexConfig(vec_dim=vec_dim, use_cuvs=False)
     manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
@@ -205,15 +206,15 @@ async def test_search_merges_secondary(tmp_path: Path) -> None:
     """Secondary results are merged and deduplicated."""
     vec_dim = 8
     base_vectors = np.eye(vec_dim, dtype=np.float32)
-    faiss.normalize_L2(base_vectors)
+    faiss_module.normalize_L2(base_vectors)
 
-    primary = faiss.IndexFlatIP(vec_dim)
+    primary = faiss_module.IndexFlatIP(vec_dim)
     primary.add_with_ids(base_vectors[:2], np.array([10, 11], dtype=np.int64))
-    faiss.write_index(primary, str(tmp_path / "primary.faiss"))
+    faiss_module.write_index(primary, str(tmp_path / "primary.faiss"))
 
-    secondary = faiss.IndexFlatIP(vec_dim)
+    secondary = faiss_module.IndexFlatIP(vec_dim)
     secondary.add_with_ids(base_vectors[2:3], np.array([99], dtype=np.int64))
-    faiss.write_index(secondary, str(tmp_path / "secondary.faiss"))
+    faiss_module.write_index(secondary, str(tmp_path / "secondary.faiss"))
 
     settings = IndexConfig(vec_dim=vec_dim, use_cuvs=False)
     manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
@@ -233,7 +234,7 @@ async def test_add_incremental_persists_secondary(tmp_path: Path) -> None:
     """Incremental adds populate the secondary index and persist to disk."""
     vec_dim = 6
     primary = _build_flat_index(vec_dim, 6)
-    faiss.write_index(primary, str(tmp_path / "primary.faiss"))
+    faiss_module.write_index(primary, str(tmp_path / "primary.faiss"))
 
     settings = IndexConfig(vec_dim=vec_dim, use_cuvs=False)
     manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
@@ -242,7 +243,7 @@ async def test_add_incremental_persists_secondary(tmp_path: Path) -> None:
 
     rng = np.random.default_rng(42)
     new_vectors = rng.standard_normal((1, vec_dim)).astype(np.float32)
-    faiss.normalize_L2(new_vectors)
+    faiss_module.normalize_L2(new_vectors)
     new_ids = np.array([9999], dtype=np.int64)
 
     await manager.add_incremental(new_vectors, new_ids)
@@ -250,7 +251,7 @@ async def test_add_incremental_persists_secondary(tmp_path: Path) -> None:
     assert manager.secondary_index is not None
     assert manager.secondary_index.ntotal == 1
 
-    persisted = faiss.read_index(str(tmp_path / "secondary.faiss"))
+    persisted = faiss_module.read_index(str(tmp_path / "secondary.faiss"))
     assert persisted.ntotal == 1
 
     hits = manager.search(new_vectors[0], k=1)
@@ -262,7 +263,7 @@ async def test_add_incremental_dimension_mismatch(tmp_path: Path) -> None:
     """Dimension mismatches raise ValueError to protect index integrity."""
     vec_dim = 4
     primary = _build_flat_index(vec_dim, 4)
-    faiss.write_index(primary, str(tmp_path / "primary.faiss"))
+    faiss_module.write_index(primary, str(tmp_path / "primary.faiss"))
 
     settings = IndexConfig(vec_dim=vec_dim, use_cuvs=False)
     manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
@@ -279,7 +280,7 @@ async def test_needs_compaction_threshold(tmp_path: Path) -> None:
     """Compaction triggers once the secondary ratio exceeds the threshold."""
     vec_dim = 8
     primary = _build_flat_index(vec_dim, 20)
-    faiss.write_index(primary, str(tmp_path / "primary.faiss"))
+    faiss_module.write_index(primary, str(tmp_path / "primary.faiss"))
 
     settings = IndexConfig(vec_dim=vec_dim, use_cuvs=False, compaction_threshold=0.05)
     manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
@@ -289,7 +290,7 @@ async def test_needs_compaction_threshold(tmp_path: Path) -> None:
     assert manager.needs_compaction() is False
 
     base_vec = np.eye(vec_dim, dtype=np.float32)
-    faiss.normalize_L2(base_vec)
+    faiss_module.normalize_L2(base_vec)
 
     await manager.add_incremental(base_vec[0:1], np.array([10_001], dtype=np.int64))
     assert manager.needs_compaction() is False

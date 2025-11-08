@@ -7,7 +7,7 @@ import importlib
 import importlib.util
 import json
 import sys
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
 from contextlib import suppress
 from functools import cache
 from importlib import import_module
@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 JsonValue = str | int | float | bool | dict[str, "JsonValue"] | list["JsonValue"] | None
+type NavMetadataIterator = Generator[tuple[str, JsonValue]]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CLI_AUGMENT_PATH = REPO_ROOT / "openapi" / "_augment_cli.yaml"
@@ -263,7 +264,7 @@ class NavMetadataModel(BaseModel):
         """
         return self.as_mapping()[key]
 
-    def __iter__(self) -> Iterator[tuple[str, JsonValue]]:  # type: ignore[override]
+    def __iter__(self) -> NavMetadataIterator:
         """Iterate over flattened key-value pairs for dictionary compatibility.
 
         This method enables dictionary-like iteration over navigation metadata,
@@ -276,9 +277,8 @@ class NavMetadataModel(BaseModel):
         tuple[str, JsonValue]
             Key and value pairs for navigation metadata entries. Keys include
             standard fields (title, exports, sections, etc.) and any additional
-            fields from the extras dictionary. The return type annotation
-            ``Iterator[tuple[str, JsonValue]]`` is compatible with Pydantic's
-            ``TupleGenerator`` type alias.
+            fields from the extras dictionary. The iterator type aligns with
+            Pydantic's ``TupleGenerator`` alias.
 
         Notes
         -----
@@ -294,8 +294,7 @@ class NavMetadataModel(BaseModel):
         >>> for key, value in model:  # Iterate like a dictionary
         ...     print(f"{key}: {value}")
         """
-        items = self.as_mapping().items()
-        yield from items
+        yield from self.as_mapping().items()
 
     def as_mapping(self) -> dict[str, JsonValue]:
         """Return flattened navigation metadata as a standard dictionary.

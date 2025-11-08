@@ -628,7 +628,10 @@ extend-exclude = [
     "src/kgfoundry.egg-info/**",
     "kgfoundry.egg-info/**",
     "faiss/**",
+    "flashinfer",
+    "flashinfer/**",
     "codeintel/ts_languages/**",
+    "codeintel_rev/io/TEMP_BM25+SPLADE_GUIDE/**",
 ]
 
 [tool.ruff.format]

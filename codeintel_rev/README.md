@@ -45,13 +45,14 @@ Production-grade MCP server for AI-assisted code review with SCIP indexing, sema
 
 - [BM25 Architecture Guide](docs/architecture/bm25.md)
 - [SPLADE Architecture Guide](docs/architecture/splade.md)
+- [Hybrid Retrieval Runbook](docs/operations/hybrid_search.md)
 
 ## Features
 
 - **SCIP-based Indexing**: Uses Sourcegraph SCIP for precise symbol information
 - **cAST Chunking**: Structure-aware code chunking (2200 char budget)
 - **Semantic Search**: GPU FAISS with cuVS acceleration
-- **Hybrid Retrieval**: RRF fusion (future: BM25 + SPLADE + embeddings)
+- **Hybrid Retrieval**: RRF fusion combining FAISS, BM25, and SPLADE signals
 - **HTTP/3 Streaming**: QUIC + proper backpressure for token streams
 - **FastMCP Tools**: Full QueryScope catalog (search, symbols, history, docs)
 - **Production Edge**: NGINX with OAuth 2.1, streaming optimizations
@@ -135,6 +136,23 @@ This will:
 4. Write Parquet with vectors
 5. Build FAISS GPU index
 6. Initialize DuckDB catalog
+
+### 4a. Maintain Sparse Retrieval Artifacts
+
+```bash
+# BM25 corpus normalization and index build
+codeintel bm25 prepare-corpus data/corpus.jsonl --output-dir data/jsonl
+codeintel bm25 build-index --threads 12
+
+# SPLADE artifact export, encoding, and impact index build
+codeintel splade export-onnx --quantization-config avx2
+codeintel splade encode data/corpus.jsonl --batch-size 16 --shard-size 50000
+codeintel splade build-index --threads 12
+```
+
+The CLI commands emit structured envelopes (JSON) with metadata, SHA256 digests,
+and can be scheduled in CI for nightly rebuilds. See `codeintel bm25 --help`
+and `codeintel splade --help` for full command listings.
 
 ### 5. Start MCP Server
 

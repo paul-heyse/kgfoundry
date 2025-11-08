@@ -99,7 +99,7 @@ async def semantic_search(
     )
 
 
-def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914
+def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914, PLR0912
     context: ApplicationContext,
     query: str,
     limit: int,
@@ -208,11 +208,56 @@ def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914
                 context={"faiss_index": str(context.paths.faiss_index)},
             )
 
+        retrieval_channels: list[str] = ["semantic", "faiss"]
+        contribution_map: dict[int, list[tuple[str, int, float]]] | None = None
+        hydration_ids: list[int] = list(result_ids)
+        hydration_scores: list[float] = list(result_scores)
+
+        try:
+            hybrid_engine = context.get_hybrid_engine()
+        except RuntimeError as exc:  # pragma: no cover - defensive
+            limits_metadata.append(f"Hybrid search unavailable: {exc}")
+            LOGGER.warning("Hybrid engine unavailable", exc_info=exc)
+            hybrid_engine = None
+        if hybrid_engine is not None:
+            hybrid_result = hybrid_engine.search(
+                query=query,
+                semantic_ids=result_ids,
+                semantic_scores=result_scores,
+                limit=effective_limit,
+            )
+            if hybrid_result.warnings:
+                limits_metadata.extend(hybrid_result.warnings)
+            fused_ids: list[int] = []
+            fused_scores: list[float] = []
+            fused_contributions: dict[int, list[tuple[str, int, float]]] = {}
+            for doc in hybrid_result.docs:
+                try:
+                    chunk_id_int = int(doc.doc_id)
+                except ValueError:
+                    limits_metadata.append(
+                        f"Hybrid result skipped (non-numeric chunk id): {doc.doc_id}"
+                    )
+                    continue
+                fused_ids.append(chunk_id_int)
+                fused_scores.append(float(doc.score))
+                fused_contributions[chunk_id_int] = hybrid_result.contributions.get(
+                    doc.doc_id, []
+                )
+            if fused_ids:
+                hydration_ids = fused_ids
+                hydration_scores = fused_scores
+                contribution_map = fused_contributions
+                retrieval_channels = list(dict.fromkeys(["semantic", "faiss", *hybrid_result.channels]))
+
+        hydration_ids = hydration_ids[:effective_limit]
+        hydration_scores = hydration_scores[: len(hydration_ids)]
+
         # Hydrate findings with scope filtering if scope has filters
         findings, hydrate_exc = _hydrate_findings(
             context,
-            result_ids,
-            result_scores,
+            hydration_ids,
+            hydration_scores,
             scope=scope,
         )
         if hydrate_exc is not None:
@@ -242,16 +287,41 @@ def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914
                 },
             )
 
-        extras = _success_extras(
-            limits_metadata, len(findings), requested_limit, effective_limit, start_time
+        if contribution_map:
+            for finding in findings:
+                chunk_id_value = finding.get("chunk_id")
+                if chunk_id_value is None:
+                    continue
+                contributions = contribution_map.get(int(chunk_id_value))
+                if not contributions:
+                    continue
+                parts = [f"{channel} rank={rank}" for channel, rank, _ in contributions]
+                finding["why"] = (
+                    f"Hybrid RRF (k={context.settings.index.rrf_k}): " + ", ".join(parts)
+                )
+
+        method_metadata = _build_method(
+            len(findings),
+            requested_limit,
+            effective_limit,
+            start_time,
+            retrieval_channels,
         )
+        extras = _success_extras(limits_metadata, method_metadata)
         # Include applied scope in response envelope
         if scope:
             extras["scope"] = scope
 
+        hybrid_enabled = any(channel in {"bm25", "splade"} for channel in retrieval_channels)
+        answer_message = (
+            f"Found {len(findings)} hybrid results for: {query}"
+            if hybrid_enabled
+            else f"Found {len(findings)} semantically similar code chunks for: {query}"
+        )
+
         return _make_envelope(
             findings=findings,
-            answer=f"Found {len(findings)} semantically similar code chunks for: {query}",
+            answer=answer_message,
             confidence=0.85 if findings else 0.0,
             extras=extras,
         )
@@ -422,6 +492,7 @@ def _hydrate_findings(
                     "snippet": chunk["preview"][:SNIPPET_PREVIEW_CHARS],
                     "score": float(score),
                     "why": f"Semantic similarity: {score:.3f}",
+                    "chunk_id": int(chunk_id),
                 }
                 findings.append(finding)
     except (RuntimeError, OSError) as exc:
@@ -435,6 +506,7 @@ def _build_method(
     requested_limit: int,
     effective_limit: int,
     start_time: float,
+    retrieval_channels: Sequence[str],
 ) -> MethodInfo:
     """Build method metadata for the response.
 
@@ -448,6 +520,8 @@ def _build_method(
         Effective limit applied after clamping.
     start_time : float
         Search start time (monotonic clock).
+    retrieval_channels : Sequence[str]
+        Retrieval systems that contributed to the final result set.
 
     Returns
     -------
@@ -459,7 +533,7 @@ def _build_method(
     if requested_limit != effective_limit:
         coverage = f"{coverage} (requested {requested_limit})"
     return {
-        "retrieval": ["semantic", "faiss"],
+        "retrieval": list(dict.fromkeys(retrieval_channels)),
         "coverage": coverage,
     }
 
@@ -516,10 +590,7 @@ def _make_envelope(
 
 def _success_extras(
     limits: Sequence[str],
-    findings_count: int,
-    requested_limit: int,
-    effective_limit: int,
-    start_time: float,
+    method: MethodInfo,
 ) -> dict[str, object]:
     """Build a success extras payload with optional limits metadata.
 
@@ -527,23 +598,15 @@ def _success_extras(
     ----------
     limits : Sequence[str]
         Search limitations or warnings.
-    findings_count : int
-        Number of findings returned.
-    requested_limit : int
-        Requested result limit.
-    effective_limit : int
-        Effective limit applied after clamping.
-    start_time : float
-        Search start time (monotonic clock).
+    method : MethodInfo
+        Retrieval metadata to include in the response.
 
     Returns
     -------
     dict[str, object]
         Extras payload including method metadata and optional limits.
     """
-    extras: dict[str, object] = {
-        "method": _build_method(findings_count, requested_limit, effective_limit, start_time)
-    }
+    extras: dict[str, object] = {"method": method}
     if limits:
         extras["limits"] = list(limits)
     return extras
