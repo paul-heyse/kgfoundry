@@ -39,7 +39,7 @@ class SupportsAsyncRedis(Protocol):
         """Close open Redis connections."""
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _CacheRecord[ValueT]:
     """Internal cache record containing a value and its insertion timestamp."""
 
@@ -271,7 +271,7 @@ class AsyncSingleFlight[KeyT: Hashable, ValueT]:
                 self._inflight.pop(key, None)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ScopeStoreMetrics:
     """Runtime counters describing scope store cache performance."""
 

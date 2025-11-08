@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _ProcessRunnerState:
     runner: ProcessRunner
 

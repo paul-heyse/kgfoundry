@@ -312,7 +312,7 @@ def _prepare_extensions(values: Mapping[str, object] | None = None) -> dict[str,
     return {str(key): _coerce_json_value(val) for key, val in values.items()}
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _CommandContext:
     args: argparse.Namespace
     correlation_id: str
@@ -374,7 +374,7 @@ def _build_problem(
     )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _FailureOptions:
     extras: Mapping[str, object] | None = None
     exc: BaseException | None = None

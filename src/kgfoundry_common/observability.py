@@ -64,7 +64,7 @@ LOGGER = get_logger(__name__)
 StatusLiteral = Literal["success", "error"]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _ObservabilityCache:
     provider: MetricsProvider | None = None
     registry: MetricsRegistry | None = None
@@ -73,7 +73,7 @@ class _ObservabilityCache:
 _OBS_CACHE = _ObservabilityCache()
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 # [nav:anchor MetricsProvider]
 class MetricsProvider:
     """Provide component-level metrics for long-running operations.
@@ -133,7 +133,7 @@ class MetricsProvider:
         return _OBS_CACHE.provider
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 # [nav:anchor MetricsRegistry]
 class MetricsRegistry:
     """Expose request-level counters and histograms for HTTP surfaces.
@@ -212,7 +212,7 @@ def get_metrics_registry() -> MetricsRegistry:
     return _OBS_CACHE.registry
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DurationObservation:
     """Capture metrics and structured status for an in-flight operation."""
 

@@ -107,7 +107,7 @@ class _StubDiffManager:
         return {}
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class PipelineConfigOverrides:
     """Customization knobs for building pipeline configurations in tests."""
 
@@ -117,7 +117,7 @@ class PipelineConfigOverrides:
     diff_manager: DiffManager | None = None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _MetricsHistogram:
     labels_called: list[dict[str, object]] = field(default_factory=list)
     observed: list[float] = field(default_factory=list)
@@ -130,7 +130,7 @@ class _MetricsHistogram:
         self.observed.append(value)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _MetricsCounter:
     labels_called: list[dict[str, object]] = field(default_factory=list)
     increments: list[float] = field(default_factory=list)

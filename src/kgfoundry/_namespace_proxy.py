@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 # [nav:anchor NamespaceRegistry]
 class NamespaceRegistry:
     """Typed registry for lazy-loading module symbols.

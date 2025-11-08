@@ -120,7 +120,7 @@ def _build_problem(
     )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _ExecutionContext:
     logger: LoggerAdapter
     start: float
@@ -196,7 +196,7 @@ class NavmapPlaceholderError(NavmapError):
     """Raised when placeholder expansion fails."""
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class AllDictTemplate:
     """Sentinel for ``{name: TEMPLATE for name in __all__}`` structures.
 
@@ -602,7 +602,7 @@ def _replace_placeholders(value: NavTree, exports: Sequence[str]) -> ResolvedNav
     return value
 
 
-@dataclass
+@dataclass(frozen=True)
 class ModuleInfo:
     """Model the ModuleInfo.
 

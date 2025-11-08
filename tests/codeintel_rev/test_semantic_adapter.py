@@ -21,7 +21,7 @@ from codeintel_rev.mcp_server.schemas import ScopeIn
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
 
 
-@dataclass
+@dataclass(frozen=True)
 class _ObservationRecord:
     operation: str
     component: str
@@ -363,7 +363,7 @@ class _DefaultStubHybridEngine:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class StubContextConfig:
     """Configuration for StubContext initialization."""
 

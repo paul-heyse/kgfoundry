@@ -22,7 +22,7 @@ from codeintel_rev.errors import (
 from codeintel_rev.io.path_utils import PathOutsideRepositoryError, resolve_within_repo
 from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.mcp_server.scope_utils import (
-    apply_language_filter,
+    LANGUAGE_EXTENSIONS,
     get_effective_scope,
     merge_scope_filters,
 )
@@ -222,6 +222,9 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0917 - PathOu
     repo_root = context.paths.repo_root
     search_root = _resolve_search_root(repo_root, path)
 
+    if max_results <= 0:
+        return {"items": [], "total": 0, "truncated": False}
+
     merged = merge_scope_filters(
         scope,
         {
@@ -253,8 +256,21 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0917 - PathOu
     excludes = (merged.get("exclude_globs") or []) + default_excludes
     includes = merged.get("include_globs") or ["**"]
 
+    merged_languages = merged.get("languages")
+    language_extensions: set[str] | None = None
+    if merged_languages:
+        language_extensions = _collect_language_extensions(merged_languages)
+        if not language_extensions:
+            LOGGER.warning(
+                "No file extensions found for requested languages",
+                extra={"languages": merged_languages},
+            )
+            return {"items": [], "total": 0, "truncated": False}
+
     # Walk directory
-    items = []
+    items: list[dict[str, object]] = []
+    matched_count = 0
+    truncated = False
     for current_root, dirnames, filenames in os.walk(search_root):
         try:
             resolved_root = Path(current_root).resolve()
@@ -291,34 +307,27 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0917 - PathOu
                 continue
             if not _matches_any(relative_file, includes):
                 continue
+            if language_extensions and not _matches_language(relative_file, language_extensions):
+                continue
 
             stat_result = _safe_stat(file_path)
             if stat_result is None:
                 continue
 
-            items.append(
-                {
-                    "path": relative_file,
-                    "size": stat_result.st_size,
-                    "modified": stat_result.st_mtime,
-                }
-            )
-
-            if len(items) >= max_results:
+            matched_count += 1
+            entry = {
+                "path": relative_file,
+                "size": stat_result.st_size,
+                "modified": stat_result.st_mtime,
+            }
+            if len(items) < max_results:
+                items.append(entry)
+            if max_results and len(items) >= max_results:
+                truncated = True
                 break
 
-    # Apply language filter if scope has languages
-    merged_languages = merged.get("languages")
-    if merged_languages:
-        filtered_paths = apply_language_filter([item["path"] for item in items], merged_languages)
-        items = [item for item in items if item["path"] in filtered_paths]
-
-    if len(items) >= max_results:
-        return {
-            "items": items[:max_results],
-            "total": len(items),
-            "truncated": True,
-        }
+        if truncated:
+            break
 
     LOGGER.debug(
         "Listed paths with scope filters",
@@ -326,6 +335,7 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0917 - PathOu
             "session_id": session_id,
             "path": path,
             "item_count": len(items),
+            "matched_count": matched_count,
             "applied_scope": scope is not None,
             "languages": merged_languages,
         },
@@ -333,8 +343,8 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0917 - PathOu
 
     return {
         "items": items,
-        "total": len(items),
-        "truncated": len(items) >= max_results,
+        "total": matched_count,
+        "truncated": truncated,
     }
 
 
@@ -516,3 +526,19 @@ def _safe_stat(path: Path) -> os.stat_result | None:
         return path.stat()
     except OSError:
         return None
+
+
+def _collect_language_extensions(languages: Sequence[str]) -> set[str]:
+    """Return canonical file extensions for the requested languages."""
+
+    extensions: set[str] = set()
+    for language in languages:
+        extensions.update(ext.lower() for ext in LANGUAGE_EXTENSIONS.get(language.lower(), []))
+    return extensions
+
+
+def _matches_language(path: str, extensions: set[str]) -> bool:
+    """Return True when the path matches one of the requested extensions."""
+
+    normalized = path.lower()
+    return any(normalized.endswith(ext) for ext in extensions)

@@ -111,7 +111,7 @@ def _extract_stage(source: object, default: str | None = "unknown") -> str | Non
     return default
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class PluginManager:
     """Coordinate plugin execution across builder stages."""
 

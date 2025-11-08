@@ -66,7 +66,7 @@ __all__ = [
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 # [nav:anchor KgFoundryErrorConfig]
 class KgFoundryErrorConfig:
     """Configuration options used when instantiating :class:`KgFoundryError`."""

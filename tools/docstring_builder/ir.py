@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 IR_VERSION = "1.0"
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class IRParameter:
     """Parameter entry stored in the docstring IR."""
 
@@ -27,7 +27,7 @@ class IRParameter:
     display_name: str | None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class IRReturn:
     """Return or yield entry stored in the docstring IR."""
 
@@ -36,7 +36,7 @@ class IRReturn:
     kind: Literal["returns", "yields"]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class IRRaise:
     """Exception metadata stored in the docstring IR."""
 
@@ -44,7 +44,7 @@ class IRRaise:
     description: str
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class IRDocstring:
     """Top-level representation of a generated docstring."""
 

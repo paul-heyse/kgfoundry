@@ -130,7 +130,7 @@ class StatusFactory(Protocol):
         ...
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class TraceRuntime:
     """Container for optional OpenTelemetry runtime handles."""
 

@@ -188,7 +188,7 @@ class DocumentationMetrics:
         )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _DocsMetricsCache:
     """Singleton cache for documentation metrics."""
 

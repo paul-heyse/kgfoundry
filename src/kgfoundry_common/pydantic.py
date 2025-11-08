@@ -1,4 +1,5 @@
 """Compatibility helpers for Pydantic adapters used in kgfoundry."""
+
 # [nav:section public-api]
 
 from __future__ import annotations

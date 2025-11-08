@@ -47,7 +47,7 @@ class DocToolMetadata:
     problem_type: str
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocToolError(RuntimeError):
     """Structured exception carrying Problem Details metadata.
 
@@ -104,7 +104,7 @@ class ProblemDetailsInput:
     problem_type: str | None = None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocToolSettings:
     """Common runtime configuration for doc toolchain commands."""
 
@@ -230,7 +230,7 @@ def _docs_operation_duration() -> HistogramLike:
     )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocMetrics:
     """Prometheus-backed metrics helpers for doc toolchain commands."""
 
@@ -253,7 +253,7 @@ class DocMetrics:
         self._histogram.labels(operation=self.operation, status=status).observe(duration_seconds)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocToolContext:
     """Runtime context shared across doc toolchain operations."""
 
@@ -365,7 +365,7 @@ def create_doc_tool_context(settings: DocToolSettings) -> DocToolContext:
     return DocToolContext(settings=settings, logger=adapter, metrics=metrics)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocLifecycle:
     """Manage start/stop logging, metrics, and error handling for operations."""
 

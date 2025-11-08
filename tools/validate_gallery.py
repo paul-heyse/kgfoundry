@@ -48,7 +48,7 @@ __all__ = [
 ]
 
 
-@dataclass
+@dataclass(frozen=True)
 class ValidationResult:
     """Accumulate validation errors for a single gallery example file."""
 
@@ -69,7 +69,7 @@ class GalleryValidationError(RuntimeError):
     """Raised when parsing or validation cannot proceed for a gallery example."""
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class GalleryOptions:
     """CLI options extracted from argument parsing."""
 

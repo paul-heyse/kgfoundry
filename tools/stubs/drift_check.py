@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 LOGGER = get_logger(__name__)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ModuleSpec:
     """Describe the public API exported by a runtime module."""
 
@@ -24,7 +24,7 @@ class ModuleSpec:
     monitor: set[str] | None = None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DriftResult:
     """Outcome of inspecting a module for stub drift."""
 

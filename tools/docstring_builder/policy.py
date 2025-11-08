@@ -56,7 +56,7 @@ class PolicyAction(StrEnum):
             raise PolicyConfigurationError(message) from exc
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class PolicyException:
     """Represents an allowlisted violation."""
 
@@ -81,7 +81,7 @@ class PolicyException:
         return self.expires_on >= today
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class PolicySettings:
     """Resolved policy configuration with precedence applied."""
 
@@ -118,7 +118,7 @@ class PolicySettings:
         return mapping.get(rule, PolicyAction.ERROR)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class PolicyViolation:
     """Describes a policy violation detected during evaluation."""
 
@@ -139,7 +139,7 @@ class PolicyViolation:
         return self.action == PolicyAction.ERROR
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class PolicyReport:
     """Summary of policy evaluation across the run."""
 

@@ -80,7 +80,7 @@ class AllPlaceholder:
     __slots__ = ()
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class AllDictTemplate:
     """Sentinel for ``{name: TEMPLATE for name in __all__}`` structures.
 
@@ -1362,7 +1362,7 @@ def _prepare_extensions(values: Mapping[str, object] | None = None) -> dict[str,
     return {str(key): _coerce_json_value(val) for key, val in values.items()}
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _ExecutionContext:
     logger: LoggerAdapter
     start: float
@@ -1420,7 +1420,7 @@ def _build_problem(
     )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _FailureOptions:
     extras: Mapping[str, object] | None = None
     exc: BaseException | None = None

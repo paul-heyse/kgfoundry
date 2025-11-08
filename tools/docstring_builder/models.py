@@ -252,7 +252,7 @@ Examples
 """
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocstringIRParameter:
     """Typed representation of a parameter within the docstring IR."""
 
@@ -265,7 +265,7 @@ class DocstringIRParameter:
     description: str = ""
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocstringIRReturn:
     """Typed representation of a return or yield section."""
 
@@ -274,7 +274,7 @@ class DocstringIRReturn:
     description: str = ""
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocstringIRRaise:
     """Typed representation of an exception raised by the symbol."""
 
@@ -282,7 +282,7 @@ class DocstringIRRaise:
     description: str = ""
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocstringIR:
     """Aggregate typed intermediate representation for a symbol's docstring."""
 

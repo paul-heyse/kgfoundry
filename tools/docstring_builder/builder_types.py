@@ -147,7 +147,7 @@ def http_status_for_exit(status: ExitStatus) -> int:
     raise AssertionError(status)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocstringBuildRequest:
     """Typed request describing a docstring builder run."""
 
@@ -173,7 +173,7 @@ class DocstringBuildRequest:
     invoked_subcommand: str | None = None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocstringBuildResult:
     """Structured result produced by a docstring builder run."""
 

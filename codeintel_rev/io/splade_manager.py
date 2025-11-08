@@ -203,7 +203,7 @@ class SpladeIndexMetadata(msgspec.Struct, frozen=True):
     generator: str
 
 
-@dataclass
+@dataclass(frozen=True)
 class _ShardState:
     """Mutable encoding state for shard rotation."""
 
@@ -216,7 +216,7 @@ class _ShardState:
     shard_count: int = 0
 
 
-@dataclass
+@dataclass(frozen=True)
 class _ExportContext:
     """Context for SPLADE export operations."""
 

@@ -55,7 +55,7 @@ DEFAULT_EXTENSIONS: list[str] = [
 ]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class Symbol:
     """Serialized representation of a single symbol discovered during navmap generation.
 
@@ -121,7 +121,7 @@ class Symbol:
     is_alias: bool
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class NavMap:
     """Container for navmap metadata capturing the symbol structure of a codebase.
 
@@ -157,7 +157,7 @@ class NavMap:
     symbols: list[Symbol]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class NavmapBuildSettings:
     """Configuration flags controlling navmap generation."""
 

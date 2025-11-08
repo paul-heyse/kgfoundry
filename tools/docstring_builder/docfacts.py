@@ -25,7 +25,7 @@ DOCFACTS_VERSION: Final = "2.0"
 DOCFACTS_SCHEMA_PATH: Final = REPO_ROOT / "docs" / "_build" / "schema_docfacts.json"
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocFact:
     """Serializable representation of a symbol's documentation facts."""
 
@@ -144,7 +144,7 @@ class DocFact:
         )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocfactsProvenance:
     """Metadata describing how the DocFacts payload was generated."""
 
@@ -169,7 +169,7 @@ class DocfactsProvenance:
         }
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocfactsDocument:
     """Structured representation of the DocFacts artifact."""
 

@@ -66,7 +66,7 @@ class BM25BuildConfig:
     index_dir: str
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _CommandContext:
     """Structured context shared across a single command invocation."""
 

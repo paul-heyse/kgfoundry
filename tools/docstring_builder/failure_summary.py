@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from tools.docstring_builder.pipeline_types import ErrorEnvelope
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class RunSummarySnapshot:
     """Condensed view of pipeline run statistics."""
 
@@ -24,7 +24,7 @@ class RunSummarySnapshot:
     observability_path: Path
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class FailureSummaryRenderer:
     """Emit structured failure summaries for CLI output."""
 

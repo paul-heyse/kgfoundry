@@ -220,10 +220,12 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
         request.state.session_id = session_id
 
         # Store in ContextVar (for adapter access)
-        session_id_var.set(session_id)
-
-        # Invoke next handler
-        return await call_next(request)
+        token = session_id_var.set(session_id)
+        try:
+            # Invoke next handler
+            return await call_next(request)
+        finally:
+            session_id_var.reset(token)
 
 
 __all__ = ["SessionScopeMiddleware", "get_session_id", "session_id_var"]

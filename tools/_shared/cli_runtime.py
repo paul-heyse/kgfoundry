@@ -159,7 +159,7 @@ class CliRunConfig:
         return cls(command_path=normalize_route(segments), **kwargs)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class CliContext:
     """Runtime metadata supplied to Typer commands executed via :func:`cli_run`."""
 
@@ -183,7 +183,7 @@ class _RunSummary:
     problem: ProblemDetails | None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _ExecutionMetadata:
     """Collected metadata derived from the CLI run configuration."""
 

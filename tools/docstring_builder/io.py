@@ -33,7 +33,7 @@ class InvalidPathError(ValueError):
     """Raised when a user-supplied path falls outside the allowed workspace."""
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class SelectionCriteria:
     """Selection filters for docstring builder file discovery."""
 

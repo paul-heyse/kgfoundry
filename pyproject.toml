@@ -467,7 +467,7 @@ dependencies = [
     "griffe-pydantic>=1.1.8",
     "griffe-fieldz>=0.3.0",
     "griffe-public-wildcard-imports>=0.2.1",
-    "click>=8.3.0",
+    "click",
     "cyclonedx-python-lib>=11.5.0",
     "mkdocstrings-python>=1.18.2",
     "mkdocs-autorefs>=1.4.3",
@@ -504,6 +504,10 @@ dependencies = [
     "pyserini>=1.3.0",
     "onnxruntime>=1.18.0",
     "sentence-transformers>=5.1.2",
+    "fixit>=2.2.0",
+    "ufmt",
+    "usort",
+    "apache-tvm-ffi>=0.1.0b15",
 ]
 
 [project.scripts]
@@ -569,7 +573,8 @@ gpu = [
     "torchvision",
     "torchaudio",
     "apache-tvm-ffi",
-    "flashinfer-python",
+    "flashinfer-python==0.4.1",
+    "flashinfer-cubin==0.4.1",
     "compressed-tensors",
     "accelerate",
     "easyocr",
@@ -612,9 +617,12 @@ include = [
 [tool.hatch.metadata]
 allow-direct-references = true
 
-[tool.black]
-line-length = 100
-target-version = ["py312"]  # black currently supports up to py312; code runs on py313
+[tool.fixit]
+root = true                    # make this the config root
+python-version = "3.13"        # target version for rules
+enable = ["fixit.rules", "fixit.rules.extra"]       # Fixit’s built-ins are enabled by default
+
+
 
 [tool.ruff]
 line-length = 100

@@ -56,7 +56,7 @@ if TYPE_CHECKING:
 LOGGER = get_logger(__name__)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class GitClient:
     """Typed wrapper around GitPython for blame and history operations.
 

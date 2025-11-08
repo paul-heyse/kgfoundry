@@ -46,7 +46,7 @@ class ViolationRecord:
     """Line number of the violation."""
 
 
-@dataclass
+@dataclass(frozen=True)
 class TypingGateMetrics:
     """Collect and emit typing gate compliance metrics."""
 
@@ -59,7 +59,7 @@ class TypingGateMetrics:
     violations: list[ViolationRecord] = field(default_factory=list)
     """List of violations detected."""
 
-    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    timestamp: str = field(default_factory=datetime.now(UTC).isoformat)
     """Timestamp when metrics were collected."""
 
     def record_check(
@@ -102,7 +102,11 @@ class TypingGateMetrics:
             "compliance_rate": (
                 100.0
                 if self.checks_total == 0
-                else (100.0 * (self.checks_total - len(self.violations)) / self.checks_total)
+                else (
+                    100.0
+                    * (self.checks_total - len(self.violations))
+                    / self.checks_total
+                )
             ),
             "files_with_violations": len({v.filepath for v in self.violations}),
             "violation_types": list({v.violation_type for v in self.violations}),

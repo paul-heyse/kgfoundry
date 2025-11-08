@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from tools.docstring_builder.pipeline_types import ProcessingOptions
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DiffManager:
     """Track and emit diff artifacts produced by the pipeline."""
 

@@ -35,7 +35,7 @@ def _call_untyped_run_build(*args: object, **kwargs: object) -> object:
     return untyped(*args, **kwargs)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _PipelineCapture:
     files: list[Path] = field(default_factory=list)
     request: DocstringBuildRequest | None = None

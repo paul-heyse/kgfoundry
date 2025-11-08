@@ -190,7 +190,7 @@ def _new_preview_list() -> list[tuple[Path, str]]:
     return []
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class PipelineState:
     """Mutable state accumulated while processing files."""
 
@@ -238,7 +238,7 @@ def _load_cli_metadata_cached(
     return metadata, None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class PipelineConfig:
     """Configuration for PipelineRunner dependency injection."""
 

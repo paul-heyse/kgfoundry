@@ -151,7 +151,7 @@ class ExecutableDigestVerifier:
         raise ToolExecutionError(message, command=command, problem=problem)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ToolRunResult:
     """Structured result from invoking a subprocess."""
 
@@ -350,7 +350,7 @@ def _default_observer_factory(
     return observe_tool_run(command, cwd=cwd, timeout=timeout)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ProcessRunner:
     """High-level facade that executes tooling subprocesses with shared policies."""
 

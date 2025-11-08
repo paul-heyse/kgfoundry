@@ -87,7 +87,7 @@ def _load_apply_edits() -> ApplyEditsCallable:
     return cast("ApplyEditsCallable", module.apply_edits)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class FileProcessingContext:
     """Context for file processing with mutable state."""
 
@@ -98,7 +98,7 @@ class FileProcessingContext:
     message: str | None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class FileProcessor:
     """Process individual files for the docstring builder."""
 

@@ -25,7 +25,7 @@ TARGETS = [
 ]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocstringArgs:
     """Typed CLI options for the docstring checker."""
 

@@ -16,7 +16,7 @@ def test_coerce_optional_dict_handles_empty_values() -> None:
     assert materialised == {"key": "value"}
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _SchemaError:
     message: str
     absolute_path: tuple[str, ...] = ("root", "field")

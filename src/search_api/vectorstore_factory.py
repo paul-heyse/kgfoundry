@@ -180,7 +180,7 @@ class FaissAdapterSettings:
             raise ValueError(msg)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 # [nav:anchor FaissVectorstoreFactory]
 class FaissVectorstoreFactory:
     """Factory for building FAISS adapters with observability and error handling.

@@ -139,7 +139,7 @@ SRC_ROOT: Path = _get_src_root()
 STANDARD_METHOD_EXTENDED_SUMMARIES = _STANDARD_METHOD_EXTENDED_SUMMARIES
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _CollectedSymbol:
     qname: str
     node: ast.AST
@@ -147,7 +147,7 @@ class _CollectedSymbol:
     docstring: str | None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _RequiredSectionsContext:
     """Contextual data required to enforce docstring section completeness."""
 
@@ -158,7 +158,7 @@ class _RequiredSectionsContext:
     is_public: bool
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _ExampleContext:
     module_name: str
     name: str

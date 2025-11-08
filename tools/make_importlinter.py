@@ -230,7 +230,7 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ImportLinterArgs:
     """Typed CLI arguments for the import-linter generator."""
 

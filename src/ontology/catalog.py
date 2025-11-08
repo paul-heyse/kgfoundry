@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from kgfoundry_common.problem_details import JsonValue
 
 
-@dataclass
+@dataclass(frozen=True)
 class Concept:
     """Knowledge graph concept representation.
 

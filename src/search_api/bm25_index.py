@@ -4,6 +4,7 @@ This module bundles bm25 index logic for the kgfoundry stack. It groups related 
 downstream packages can import a single cohesive namespace. Refer to the functions and classes below
 for implementation specifics.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -19,7 +20,10 @@ import duckdb
 
 from kgfoundry_common.errors import ConfigurationError, DeserializationError
 from kgfoundry_common.navmap_loader import load_nav_metadata
-from kgfoundry_common.safe_pickle_v2 import UnsafeSerializationError, load_unsigned_legacy
+from kgfoundry_common.safe_pickle_v2 import (
+    UnsafeSerializationError,
+    load_unsigned_legacy,
+)
 from kgfoundry_common.serialization import (
     deserialize_json,
     serialize_json,
@@ -122,7 +126,7 @@ def _validate_parquet_path(
     if not is_allowed:
         allowed_str = ", ".join(str(root) for root in allowed_roots)
         msg = (
-            f"Path resolves outside allowed directories. "
+            "Path resolves outside allowed directories. "
             f"Resolved: {resolved}, Allowed roots: {allowed_str}"
         )
         raise ConfigurationError(msg)
@@ -175,7 +179,7 @@ def toks(text: str) -> list[str]:
 
 
 # [nav:anchor BM25Doc]
-@dataclass
+@dataclass(frozen=True)
 class BM25Doc:
     """Document representation for BM25 indexing and retrieval.
 
@@ -469,7 +473,10 @@ class BM25Index:
         """
         path_obj = Path(path)
         schema_path = (
-            Path(__file__).parent.parent.parent / "schema" / "models" / "bm25_metadata.v1.json"
+            Path(__file__).parent.parent.parent
+            / "schema"
+            / "models"
+            / "bm25_metadata.v1.json"
         )
         # Convert docs to JSON-serializable format
         docs_data = [
@@ -528,7 +535,10 @@ class BM25Index:
         """
         path_obj = Path(path)
         schema_path = (
-            Path(__file__).parent.parent.parent / "schema" / "models" / "bm25_metadata.v1.json"
+            Path(__file__).parent.parent.parent
+            / "schema"
+            / "models"
+            / "bm25_metadata.v1.json"
         )
         payload = cls._load_payload(path_obj, schema_path)
         return cls._index_from_payload(payload)
@@ -540,7 +550,9 @@ class BM25Index:
         return cast("dict[str, JsonValue]", raw)
 
     @classmethod
-    def _load_payload(cls, metadata_path: Path, schema_path: Path) -> dict[str, JsonValue]:
+    def _load_payload(
+        cls, metadata_path: Path, schema_path: Path
+    ) -> dict[str, JsonValue]:
         try:
             return cls._coerce_payload(deserialize_json(metadata_path, schema_path))
         except DeserializationError:
@@ -602,8 +614,16 @@ class BM25Index:
                     doc_id=str(doc_id) if isinstance(doc_id, str) else "",
                     title=str(title) if isinstance(title, str) else "",
                     section=str(section) if isinstance(section, str) else "",
-                    tf=(cast("dict[str, float]", tf_value) if isinstance(tf_value, dict) else {}),
-                    dl=(float(doc_length) if isinstance(doc_length, (int, float)) else 0.0),
+                    tf=(
+                        cast("dict[str, float]", tf_value)
+                        if isinstance(tf_value, dict)
+                        else {}
+                    ),
+                    dl=(
+                        float(doc_length)
+                        if isinstance(doc_length, (int, float))
+                        else 0.0
+                    ),
                 )
             )
         return docs
@@ -673,7 +693,9 @@ class BM25Index:
                 if tf <= 0.0:
                     continue
                 idf = self._idf(term)
-                denom = tf + self.k1 * (1.0 - self.b + self.b * (doc.dl / (self.avgdl or 1.0)))
+                denom = tf + self.k1 * (
+                    1.0 - self.b + self.b * (doc.dl / (self.avgdl or 1.0))
+                )
                 score += idf * ((tf * (self.k1 + 1.0)) / denom)
             scores[i] = score
 
@@ -693,8 +715,14 @@ class BM25Index:
             """
             return item[1]
 
-        ranked: list[tuple[int, float]] = sorted(enumerate(scores), key=key_func, reverse=True)
-        return [(self.docs[index].chunk_id, score) for index, score in ranked[:k] if score > 0.0]
+        ranked: list[tuple[int, float]] = sorted(
+            enumerate(scores), key=key_func, reverse=True
+        )
+        return [
+            (self.docs[index].chunk_id, score)
+            for index, score in ranked[:k]
+            if score > 0.0
+        ]
 
     def doc(self, index: int) -> BM25Doc:
         """Get document at the specified index.

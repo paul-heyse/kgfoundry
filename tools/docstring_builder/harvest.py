@@ -175,7 +175,7 @@ def _docstring_value(docstring: GriffeDocstringLike | None) -> str | None:
     return value if value is not None else None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ParameterHarvest:
     """Harvested signature information for a single parameter."""
 
@@ -211,7 +211,7 @@ def parameter_display_name(parameter: ParameterHarvest) -> str:
     return format_parameter_name(parameter.name, parameter.kind)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class SymbolHarvest:
     """Metadata describing a symbol subject to docstring generation."""
 
@@ -235,7 +235,7 @@ def _new_cst_index() -> dict[str, cst.CSTNode]:
     return {}
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class HarvestResult:
     """Container mapping harvested symbols to CST nodes."""
 

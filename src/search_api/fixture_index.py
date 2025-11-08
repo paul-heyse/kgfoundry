@@ -65,7 +65,7 @@ def tokenize(text: str) -> list[str]:
 
 
 # [nav:anchor FixtureDoc]
-@dataclass
+@dataclass(frozen=True)
 class FixtureDoc:
     """Document fixture for test and tutorial use.
 

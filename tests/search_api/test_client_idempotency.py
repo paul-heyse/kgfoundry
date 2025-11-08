@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from kgfoundry_common.types import JsonValue
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class StubResponse:
     """Simple HTTP response stub used for idempotency tests."""
 

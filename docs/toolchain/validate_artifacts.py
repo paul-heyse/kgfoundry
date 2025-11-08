@@ -53,7 +53,7 @@ def validate_artifacts(argv: Sequence[str] | None = None) -> int:
     return lifecycle.run(_run_validation)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _ValidationOptions:
     """CLI options for artifact validation."""
 

@@ -37,7 +37,7 @@ def _set_random_seed(seed: int | None) -> None:
     _RANDOM_SEED = seed
 
 
-@dataclass
+@dataclass(frozen=True)
 class WaitRetryAfterOrJitter(wait_base):
     """Wait strategy that respects Retry-After headers or uses exponential backoff with jitter.
 

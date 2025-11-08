@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from tools.docstring_builder.semantics import SemanticResult
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ProcessingOptions:
     """Runtime options controlling how a file is processed."""
 
@@ -27,7 +27,7 @@ class ProcessingOptions:
     baseline: str | None = None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class FileOutcome:
     """Result of processing a single file."""
 
@@ -42,7 +42,7 @@ class FileOutcome:
     ir: list[IRDocstring] = field(default_factory=list)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocfactsResult:
     """Outcome of reconciling DocFacts artifacts."""
 
@@ -51,7 +51,7 @@ class DocfactsResult:
     diff_path: Path | None = None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ErrorEnvelope:
     """Structured error entry returned by the pipeline."""
 

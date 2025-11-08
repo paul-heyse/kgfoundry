@@ -60,7 +60,7 @@ def symbol_delta(argv: Sequence[str] | None = None) -> int:
     return lifecycle.run(_run_symbol_delta)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _DeltaOptions:
     """CLI options materialised for delta generation."""
 

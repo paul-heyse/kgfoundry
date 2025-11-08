@@ -35,7 +35,7 @@ class _Counter(Protocol):
         ...
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class MetricsRecorder:
     """Record Prometheus metrics for docstring builder runs."""
 

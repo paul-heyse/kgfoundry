@@ -79,7 +79,7 @@ def check_file(path: Path) -> list[tuple[int, str]]:
     return unmanaged
 
 
-@dataclass
+@dataclass(frozen=True)
 class ScanResult:
     """Summary of scanned files and any unmanaged suppressions discovered."""
 

@@ -234,7 +234,14 @@ def _chunk_repository(
         if not top_level_defs:
             continue
 
-        file_chunks = chunk_file(full_path, text, top_level_defs, budget=budget)
+        file_language = top_level_defs[0].language if top_level_defs else ""
+        file_chunks = chunk_file(
+            full_path,
+            text,
+            top_level_defs,
+            budget=budget,
+            language=file_language,
+        )
         chunks.extend(file_chunks)
 
     logger.info("Chunked %s files into %s chunks", len(definitions_by_file), len(chunks))

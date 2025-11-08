@@ -127,7 +127,7 @@ def _score_value(item: tuple[str, float]) -> float:
 
 
 # [nav:anchor BM25Doc]
-@dataclass
+@dataclass(frozen=True)
 class BM25Doc:
     """Represent a document stored in the in-memory BM25 index.
 

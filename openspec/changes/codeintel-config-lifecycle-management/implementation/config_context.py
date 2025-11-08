@@ -195,7 +195,7 @@ def resolve_application_paths(settings: Settings) -> ResolvedPaths:
     )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ApplicationContext:
     """Application-wide context holding all configuration and long-lived clients.
 

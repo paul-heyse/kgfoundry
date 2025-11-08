@@ -66,9 +66,11 @@ class TestRuntimePackagesTypingImports:
                 source = py_file.read_text(encoding="utf-8")
 
                 for shim in deprecated_shims:
-                    assert f"from kgfoundry_common.typing import {shim}" not in source, (
+                    assert (
+                        f"from kgfoundry_common.typing import {shim}" not in source
+                    ), (
                         f"{py_file.name} imports deprecated {shim}. "
-                        f"Use gate_import() directly instead."
+                        "Use gate_import() directly instead."
                     )
 
     def test_gate_import_available_in_kgfoundry_common_typing(self) -> None:
@@ -137,6 +139,6 @@ def test_typing_facade_symbols_available() -> None:
     ]
 
     for symbol in essential_symbols:
-        assert hasattr(kgfoundry_common.typing, symbol), (
-            f"kgfoundry_common.typing should provide {symbol}"
-        )
+        assert hasattr(
+            kgfoundry_common.typing, symbol
+        ), f"kgfoundry_common.typing should provide {symbol}"

@@ -437,7 +437,7 @@ def load_policy() -> ObservabilityPolicy:
 # ---------- Data models -------------------------------------------------------
 
 
-@dataclass
+@dataclass(frozen=True)
 class MetricRow:
     """Model the MetricRow.
 
@@ -457,7 +457,7 @@ class MetricRow:
     source_link: dict[str, str]
 
 
-@dataclass
+@dataclass(frozen=True)
 class LogRow:
     """Model the LogRow.
 
@@ -476,7 +476,7 @@ class LogRow:
     runbook: str | None = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class TraceRow:
     """Model the TraceRow.
 
@@ -893,7 +893,7 @@ def read_ast(path: Path) -> tuple[str, ast.AST | None]:
     return (text, tree)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _ObservabilityExtractor:
     text: str
     path: Path

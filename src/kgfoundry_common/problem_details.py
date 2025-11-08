@@ -18,6 +18,7 @@ Examples
 >>> json_str = render_problem(problem)
 >>> assert "tool-failure" in json_str
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -75,7 +76,9 @@ __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 logger = get_logger(__name__)
 
 # Path to canonical Problem Details schema
-_SCHEMA_PATH = Path(__file__).parent.parent.parent / "schema" / "common" / "problem_details.json"
+_SCHEMA_PATH = (
+    Path(__file__).parent.parent.parent / "schema" / "common" / "problem_details.json"
+)
 
 
 # [nav:anchor ProblemDetails]
@@ -95,7 +98,7 @@ class ProblemDetails(TypedDict, total=False):
     extensions: dict[str, JsonValue]  # NotRequired via total=False
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 # [nav:anchor ProblemDetailsParams]
 class ProblemDetailsParams:
     """Parameters used to construct a Problem Details payload."""
@@ -109,7 +112,7 @@ class ProblemDetailsParams:
     extensions: Mapping[str, JsonValue] | None = None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 # [nav:anchor ExceptionProblemDetailsParams]
 class ExceptionProblemDetailsParams:
     """Parameters describing an exception converted to Problem Details."""
@@ -143,7 +146,9 @@ class ProblemDetailsValidationError(Exception):
     ProblemDetailsValidationError: Missing required field: type
     """
 
-    def __init__(self, message: str, validation_errors: list[str] | None = None) -> None:
+    def __init__(
+        self, message: str, validation_errors: list[str] | None = None
+    ) -> None:
         super().__init__(message)
         self.validation_errors = validation_errors or []
 
@@ -277,7 +282,9 @@ def _first_arg(args: tuple[object, ...], *, func_name: str) -> object:
     return args[0]
 
 
-def _coerce_problem_details_params(*args: object, **kwargs: object) -> ProblemDetailsParams:
+def _coerce_problem_details_params(
+    *args: object, **kwargs: object
+) -> ProblemDetailsParams:
     if len(args) > 0 and isinstance(args[0], ProblemDetailsParams):
         if len(args) > 1 or kwargs:
             _type_error("build_problem_details() received unexpected extra arguments")
@@ -290,20 +297,27 @@ def _coerce_problem_details_params(*args: object, **kwargs: object) -> ProblemDe
     values: dict[str, object] = dict(zip(positional, args, strict=False))
 
     remaining_fields = positional[len(args) :]
-    missing_fields = [field_name for field_name in remaining_fields if field_name not in kwargs]
+    missing_fields = [
+        field_name for field_name in remaining_fields if field_name not in kwargs
+    ]
     if missing_fields:
         missing = missing_fields[0]
         _type_error(f"build_problem_details() missing required argument: '{missing}'")
-    values.update({field_name: kwargs.pop(field_name) for field_name in remaining_fields})
+    values.update(
+        {field_name: kwargs.pop(field_name) for field_name in remaining_fields}
+    )
 
     code = kwargs.pop("code", None)
     extensions = kwargs.pop("extensions", None)
     if kwargs:
         unexpected = ", ".join(sorted(kwargs))
-        _type_error(f"build_problem_details() got unexpected keyword arguments: {unexpected}")
+        _type_error(
+            f"build_problem_details() got unexpected keyword arguments: {unexpected}"
+        )
 
     status_int = _ensure_int(
-        values["status"], message="build_problem_details() expected 'status' to be an int"
+        values["status"],
+        message="build_problem_details() expected 'status' to be an int",
     )
 
     return ProblemDetailsParams(
@@ -317,7 +331,9 @@ def _coerce_problem_details_params(*args: object, **kwargs: object) -> ProblemDe
     )
 
 
-def _coerce_exception_params(*args: object, **kwargs: object) -> ExceptionProblemDetailsParams:
+def _coerce_exception_params(
+    *args: object, **kwargs: object
+) -> ExceptionProblemDetailsParams:
     if len(args) > 0 and isinstance(args[0], ExceptionProblemDetailsParams):
         if len(args) > 1 or kwargs:
             _type_error("problem_from_exception() received unexpected extra arguments")
@@ -554,7 +570,7 @@ def build_configuration_problem(
     # Check class name to avoid circular import
     if type(config_error).__name__ != "ConfigurationError":
         msg = (
-            f"build_configuration_problem() expected ConfigurationError, "
+            "build_configuration_problem() expected ConfigurationError, "
             f"got {type(config_error).__name__}"
         )
         raise TypeError(msg)
@@ -586,7 +602,9 @@ def build_configuration_problem(
     # Get code value - should be ErrorCode enum with .value attribute
     code_obj: object = getattr(config_error, "code", None)
     value_attr: object = getattr(code_obj, "value", None)
-    code_value: str = value_attr if isinstance(value_attr, str) else "configuration-error"
+    code_value: str = (
+        value_attr if isinstance(value_attr, str) else "configuration-error"
+    )
 
     return build_problem_details(
         problem_type="https://kgfoundry.dev/problems/configuration-error",

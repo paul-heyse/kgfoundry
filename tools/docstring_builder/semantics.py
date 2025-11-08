@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from tools.docstring_builder.harvest import HarvestResult, SymbolHarvest
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class SemanticResult:
     """Rich schema information for a harvested symbol."""
 

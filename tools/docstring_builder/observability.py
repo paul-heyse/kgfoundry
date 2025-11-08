@@ -139,7 +139,7 @@ class DocstringBuilderMetrics:
         )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _DocstringBuilderMetricsCache:
     """Singleton cache for docstring builder metrics."""
 

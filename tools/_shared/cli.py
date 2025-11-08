@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 
     from tools._shared.problem_details import ProblemDetailsDict
 
-    @dataclass(slots=True)
+    @dataclass(slots=True, frozen=True)
     class CliFileResult:
         """Individual file processing result emitted by tooling CLIs."""
 
@@ -39,7 +39,7 @@ if TYPE_CHECKING:
         message: str | UnsetType = UNSET
         problem: ProblemDetailsDict | UnsetType = UNSET
 
-    @dataclass(slots=True)
+    @dataclass(slots=True, frozen=True)
     class CliErrorEntry:
         """Error-level entry attached to CLI envelopes."""
 
@@ -48,13 +48,13 @@ if TYPE_CHECKING:
         file: str | UnsetType = UNSET
         problem: ProblemDetailsDict | UnsetType = UNSET
 
-    @dataclass(slots=True)
+    @dataclass(slots=True, frozen=True)
     class CliEnvelope:
         """Typed representation of ``schema/tools/cli_envelope.json``."""
 
         schema_version: str = CLI_ENVELOPE_SCHEMA_VERSION
         schema_id: str = CLI_ENVELOPE_SCHEMA_ID
-        generated_at: str = field(default_factory=lambda: datetime.now(tz=UTC).isoformat())
+        generated_at: str = field(default_factory=datetime.now(tz=UTC).isoformat)
         status: CliStatus = "success"
         command: str = ""
         subcommand: str = ""
@@ -119,7 +119,9 @@ else:
         problem: ProblemDetailsDict | UnsetType = UNSET
 
 
-def new_cli_envelope(*, command: str, status: CliStatus, subcommand: str = "") -> CliEnvelope:
+def new_cli_envelope(
+    *, command: str, status: CliStatus, subcommand: str = ""
+) -> CliEnvelope:
     """Return a freshly initialised CLI envelope.
 
     Parameters
@@ -168,14 +170,16 @@ def render_cli_envelope(envelope: CliEnvelope, *, indent: int = 2) -> str:
     return json.dumps(payload, indent=indent)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class CliEnvelopeBuilder:
     """Mutable builder for assembling CLI envelopes."""
 
     envelope: CliEnvelope
 
     @classmethod
-    def create(cls, *, command: str, status: CliStatus, subcommand: str = "") -> CliEnvelopeBuilder:
+    def create(
+        cls, *, command: str, status: CliStatus, subcommand: str = ""
+    ) -> CliEnvelopeBuilder:
         """Instantiate a builder for ``command`` with the provided status.
 
         Parameters
@@ -192,7 +196,9 @@ class CliEnvelopeBuilder:
         CliEnvelopeBuilder
             New builder instance.
         """
-        return cls(new_cli_envelope(command=command, status=status, subcommand=subcommand))
+        return cls(
+            new_cli_envelope(command=command, status=status, subcommand=subcommand)
+        )
 
     def add_file(
         self,
@@ -232,7 +238,9 @@ class CliEnvelopeBuilder:
 
     def set_problem(self, problem: ProblemDetailsDict | None) -> None:
         """Attach a Problem Details payload to the envelope."""
-        replacement: ProblemDetailsDict | UnsetType = problem if problem is not None else UNSET
+        replacement: ProblemDetailsDict | UnsetType = (
+            problem if problem is not None else UNSET
+        )
         if TYPE_CHECKING:
             self.envelope = dataclass_replace(self.envelope, problem=replacement)
         else:

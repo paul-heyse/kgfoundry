@@ -50,7 +50,7 @@ MISSING_MODULE_PATTERNS = ("docs/_build/**",)
 LOGGER = get_logger(__name__)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class PipelineContextBuilder:
     """Builder for pipeline execution context with full dependency resolution.
 

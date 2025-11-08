@@ -35,7 +35,10 @@ MAX_FILTER_OVERHEAD_MS = 5.0
 
 
 def _generate_chunk_uri(
-    chunk_id: int, languages: list[str], directories: list[str], extensions: dict[str, list[str]]
+    chunk_id: int,
+    languages: list[str],
+    directories: list[str],
+    extensions: dict[str, list[str]],
 ) -> str:
     """Generate a URI for a chunk based on its ID.
 
@@ -92,9 +95,20 @@ def _generate_chunk_data(
     # Use a simpler embedding representation for performance
     # Generate smaller embedding array (100 dims) for faster insertion
     # Real embeddings are 2560-dim, but for benchmarks we only need realistic data size
-    embedding = [float(x % 100) / 100.0 for x in range(100)]  # 100-dim embedding for speed
+    embedding = [
+        float(x % 100) / 100.0 for x in range(100)
+    ]  # 100-dim embedding for speed
 
-    return (chunk_id, uri, start_line, end_line, start_byte, end_byte, preview, embedding)
+    return (
+        chunk_id,
+        uri,
+        start_line,
+        end_line,
+        start_byte,
+        end_byte,
+        preview,
+        embedding,
+    )
 
 
 @pytest.fixture(scope="session")
@@ -190,7 +204,9 @@ def benchmark_catalog(tmp_path_factory) -> DuckDBCatalog:
 class TestScopeFilteringPerformance:
     """Benchmark scope filtering performance overhead."""
 
-    def test_baseline_query_by_ids(self, benchmark_catalog: DuckDBCatalog, benchmark) -> None:
+    def test_baseline_query_by_ids(
+        self, benchmark_catalog: DuckDBCatalog, benchmark
+    ) -> None:
         """Benchmark baseline query_by_ids (no filtering).
 
         This establishes the baseline performance for retrieving chunks by ID
@@ -213,7 +229,9 @@ class TestScopeFilteringPerformance:
         assert len(result) == QUERY_CHUNK_COUNT
         assert all("id" in chunk for chunk in result)
 
-    def test_language_filter_performance(self, benchmark_catalog: DuckDBCatalog, benchmark) -> None:
+    def test_language_filter_performance(
+        self, benchmark_catalog: DuckDBCatalog, benchmark
+    ) -> None:
         """Benchmark query_by_filters with language filter.
 
         Measures the overhead of filtering chunks by programming language
@@ -254,7 +272,9 @@ class TestScopeFilteringPerformance:
         chunk_ids = list(range(1, QUERY_CHUNK_COUNT + 1))
 
         def _query() -> list[dict]:
-            return benchmark_catalog.query_by_filters(chunk_ids, include_globs=["src/**"])
+            return benchmark_catalog.query_by_filters(
+                chunk_ids, include_globs=["src/**"]
+            )
 
         result = benchmark(_query)
         # Verify filtering worked (should return only src/ paths)
@@ -312,7 +332,9 @@ class TestScopeFilteringPerformance:
         chunk_ids = list(range(1, QUERY_CHUNK_COUNT + 1))
 
         def _query() -> list[dict]:
-            return benchmark_catalog.query_by_filters(chunk_ids, include_globs=["src/**/test_*.py"])
+            return benchmark_catalog.query_by_filters(
+                chunk_ids, include_globs=["src/**/test_*.py"]
+            )
 
         result = benchmark(_query)
         # Verify filtering worked (should return only test files in src/)
@@ -333,7 +355,9 @@ class TestScopeFilteringOverhead:
     stays within acceptable limits (<5ms for typical queries).
     """
 
-    def test_language_filter_overhead_acceptable(self, benchmark_catalog: DuckDBCatalog) -> None:
+    def test_language_filter_overhead_acceptable(
+        self, benchmark_catalog: DuckDBCatalog
+    ) -> None:
         """Verify language filter overhead is <5ms.
 
         Compares language-filtered query performance against baseline and
@@ -366,11 +390,13 @@ class TestScopeFilteringOverhead:
         overhead_ms = filtered_time_ms - baseline_time_ms
 
         # Assert overhead is acceptable
-        assert overhead_ms < MAX_FILTER_OVERHEAD_MS, (
-            f"Language filter overhead {overhead_ms:.2f}ms exceeds threshold {MAX_FILTER_OVERHEAD_MS}ms"
-        )
+        assert (
+            overhead_ms < MAX_FILTER_OVERHEAD_MS
+        ), f"Language filter overhead {overhead_ms:.2f}ms exceeds threshold {MAX_FILTER_OVERHEAD_MS}ms"
 
-    def test_path_glob_filter_overhead_acceptable(self, benchmark_catalog: DuckDBCatalog) -> None:
+    def test_path_glob_filter_overhead_acceptable(
+        self, benchmark_catalog: DuckDBCatalog
+    ) -> None:
         """Verify path glob filter overhead is <5ms.
 
         Compares path-glob-filtered query performance against baseline and
@@ -403,11 +429,13 @@ class TestScopeFilteringOverhead:
         overhead_ms = filtered_time_ms - baseline_time_ms
 
         # Assert overhead is acceptable
-        assert overhead_ms < MAX_FILTER_OVERHEAD_MS, (
-            f"Path glob filter overhead {overhead_ms:.2f}ms exceeds threshold {MAX_FILTER_OVERHEAD_MS}ms"
-        )
+        assert (
+            overhead_ms < MAX_FILTER_OVERHEAD_MS
+        ), f"Path glob filter overhead {overhead_ms:.2f}ms exceeds threshold {MAX_FILTER_OVERHEAD_MS}ms"
 
-    def test_combined_filter_overhead_acceptable(self, benchmark_catalog: DuckDBCatalog) -> None:
+    def test_combined_filter_overhead_acceptable(
+        self, benchmark_catalog: DuckDBCatalog
+    ) -> None:
         """Verify combined filter overhead is <5ms.
 
         Compares combined (language + path) filter query performance against
@@ -444,9 +472,9 @@ class TestScopeFilteringOverhead:
         overhead_ms = filtered_time_ms - baseline_time_ms
 
         # Assert overhead is acceptable
-        assert overhead_ms < MAX_FILTER_OVERHEAD_MS, (
-            f"Combined filter overhead {overhead_ms:.2f}ms exceeds threshold {MAX_FILTER_OVERHEAD_MS}ms"
-        )
+        assert (
+            overhead_ms < MAX_FILTER_OVERHEAD_MS
+        ), f"Combined filter overhead {overhead_ms:.2f}ms exceeds threshold {MAX_FILTER_OVERHEAD_MS}ms"
 
 
 def _run_hot_query(manager: DuckDBManager) -> None:
@@ -496,9 +524,9 @@ def test_object_cache_benchmark(benchmark_catalog: DuckDBCatalog) -> None:
     baseline = _average_duration(disabled)
     cached = _average_duration(enabled)
 
-    assert cached <= baseline * 1.5, (
-        f"Object cache degraded query performance (cached={cached:.6f}s, baseline={baseline:.6f}s)"
-    )
+    assert (
+        cached <= baseline * 1.5
+    ), f"Object cache degraded query performance (cached={cached:.6f}s, baseline={baseline:.6f}s)"
 
 
 def _write_materialization_dataset(vectors_dir: Path, row_count: int = 2_000) -> str:
@@ -556,7 +584,9 @@ def test_materialized_vs_view_performance(tmp_path) -> None:
     vectors_dir.mkdir()
     _write_materialization_dataset(vectors_dir)
 
-    view_catalog = DuckDBCatalog(tmp_path / "view.duckdb", vectors_dir, materialize=False)
+    view_catalog = DuckDBCatalog(
+        tmp_path / "view.duckdb", vectors_dir, materialize=False
+    )
     materialized_catalog = DuckDBCatalog(
         tmp_path / "materialized.duckdb",
         vectors_dir,
@@ -581,6 +611,6 @@ def test_materialized_vs_view_performance(tmp_path) -> None:
     materialized_time = _measure(materialized_catalog)
 
     assert materialized_time <= view_time * 1.2, (
-        f"Materialized catalog slower than view "
+        "Materialized catalog slower than view "
         f"(materialized={materialized_time:.6f}s, view={view_time:.6f}s)"
     )

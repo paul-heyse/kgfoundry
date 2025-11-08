@@ -70,7 +70,7 @@ def _coerce_provenance_payload(data: object) -> dict[str, str] | None:
     }
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocfactsCoordinator:
     """Reconcile DocFacts artifacts for a pipeline run."""
 

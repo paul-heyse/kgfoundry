@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ParameterDoc:
     """Representation of a single parameter section entry."""
 
@@ -19,7 +19,7 @@ class ParameterDoc:
     kind: str = "positional_or_keyword"
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ReturnDoc:
     """Description for a return or yield value."""
 
@@ -28,7 +28,7 @@ class ReturnDoc:
     kind: Literal["returns", "yields"] = "returns"
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class RaiseDoc:
     """Exception raised by a callable."""
 
@@ -36,7 +36,7 @@ class RaiseDoc:
     description: str
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocstringSchema:
     """Structured docstring template information."""
 
@@ -50,7 +50,7 @@ class DocstringSchema:
     examples: list[str] = field(default_factory=list)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocstringEdit:
     """Mutation describing the new docstring for a symbol."""
 

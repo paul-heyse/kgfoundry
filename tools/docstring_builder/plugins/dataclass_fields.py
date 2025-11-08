@@ -43,7 +43,7 @@ _FIELD_FACTORY_NAMES = {
 }
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _FieldInfo:
     """Lightweight container describing a dataclass field."""
 

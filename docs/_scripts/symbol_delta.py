@@ -533,7 +533,7 @@ def _emit_problem(problem: ProblemDetailsDict | None, *, default_message: str) -
     sys.stderr.write(render_problem(payload) + "\n")
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DeltaArgs:
     """Command-line arguments controlling delta computation."""
 

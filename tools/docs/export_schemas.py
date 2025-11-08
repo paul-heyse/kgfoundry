@@ -487,7 +487,7 @@ def _diff_summary(old: Mapping[str, object], new: Mapping[str, object]) -> dict[
 # --------------------------- exporter core ---------------------------
 
 
-@dataclass
+@dataclass(frozen=True)
 class Cfg:
     """Model the Cfg.
 

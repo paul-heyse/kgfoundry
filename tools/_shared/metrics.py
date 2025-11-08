@@ -60,7 +60,7 @@ TOOL_DURATION_SECONDS: HistogramLike = build_histogram(
 )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ToolRunObservation:
     """Captures runtime details for a single subprocess invocation."""
 

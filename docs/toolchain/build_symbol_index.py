@@ -31,7 +31,7 @@ else:  # pragma: no cover - runtime alias for type checking
     DocToolContext = object
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _ArtifactSummary:
     """Outcome flags for symbol index artifacts."""
 
@@ -41,7 +41,7 @@ class _ArtifactSummary:
     symbol_count: int
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _ArtifactPaths:
     """Filesystem targets for symbol index artifacts."""
 

@@ -936,7 +936,7 @@ def _build_failure_problem(
     )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _FailureContext:
     """Contextual information captured when the CLI fails."""
 

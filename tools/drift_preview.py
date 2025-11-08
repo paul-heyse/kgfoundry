@@ -27,7 +27,7 @@ def write_html_diff(before: str, after: str, output: Path, title: str) -> None:
     output.write_text(html_output, encoding="utf-8")
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DocstringDriftEntry:
     """Represents drift between two versions of a source file."""
 

@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from tools.docstring_builder.docfacts import DocFact
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _HistogramStub:
     labels_called: list[dict[str, object]] = field(default_factory=list)
     observed: list[float] = field(default_factory=list)
@@ -32,7 +32,7 @@ class _HistogramStub:
         self.observed.append(value)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _CounterStub:
     labels_called: list[dict[str, object]] = field(default_factory=list)
     increments: list[float] = field(default_factory=list)

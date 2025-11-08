@@ -45,7 +45,7 @@ def _escape_docstring(text: str, indent: str) -> str:
     return f"{joined}\n"
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _DocstringTransformer(cst.CSTTransformer):
     module_name: str
     edits: Mapping[str, DocstringEdit]

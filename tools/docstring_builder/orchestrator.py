@@ -428,7 +428,7 @@ def _filter_docfacts_for_output(
     return filtered
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _DocfactState:
     config: BuilderConfig
     entries: dict[str, DocFact]
@@ -457,7 +457,7 @@ class _DocfactState:
         return _filter_docfacts_for_output(self.entries, self.sources, self.config)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _PipelineDependencies:
     config: BuilderConfig
     logger: LoggerLike
@@ -722,7 +722,7 @@ def _build_error_result(
     )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _PipelineInvocation:
     """Aggregate inputs required to execute the docstring builder pipeline."""
 

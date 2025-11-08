@@ -45,6 +45,8 @@ SELECT
     CAST(NULL AS BIGINT) AS start_byte,
     CAST(NULL AS BIGINT) AS end_byte,
     CAST(NULL AS VARCHAR) AS preview,
+    CAST(NULL AS VARCHAR) AS content,
+    CAST(NULL AS VARCHAR) AS lang,
     CAST(NULL AS FLOAT[]) AS embedding
 WHERE 1 = 0
 """

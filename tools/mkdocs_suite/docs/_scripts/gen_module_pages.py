@@ -319,7 +319,7 @@ class _GriffeClass(_GriffeWithMembers, Protocol):
 class _GriffeFunction(_GriffeWithMembers, Protocol): ...
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _RelationshipTables:
     imports: dict[str, set[str]]
     classes: dict[str, list[str]]
@@ -337,7 +337,7 @@ class OperationLink:
     spec_label: str | None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ModuleFacts:
     """Aggregated metadata used when rendering module pages."""
 

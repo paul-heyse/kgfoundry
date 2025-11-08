@@ -11,7 +11,8 @@ from typing import NamedTuple, cast
 GriffeLoaderType = type[object]
 
 
-class GriffeAPIPackage(NamedTuple):
+@dataclass(frozen=True)
+class GriffeAPIPackage:
     """Compatibility wrapper for Griffe module access across versions."""
 
     package: object
@@ -25,7 +26,7 @@ class GriffeAPIPackage(NamedTuple):
 GriffeAPI = GriffeAPIPackage  # backwards compat
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _GriffeCache:
     """Singleton cache for Griffe API."""
 

@@ -42,6 +42,8 @@ def get_chunks_schema(vec_dim: int) -> pa.Schema:
             pa.field("start_byte", pa.int64()),
             pa.field("end_byte", pa.int64()),
             pa.field("preview", pa.string()),
+            pa.field("content", pa.string()),
+            pa.field("lang", pa.string()),
             pa.field("embedding", pa.list_(pa.float32(), vec_dim)),
         ]
     )
@@ -97,6 +99,8 @@ def write_chunks_parquet(
     start_bytes = [c.start_byte for c in chunks]
     end_bytes = [c.end_byte for c in chunks]
     previews = [c.text[: options.preview_max_chars] for c in chunks]
+    contents = [c.text for c in chunks]
+    languages = [c.language for c in chunks]
 
     # Convert embeddings to FixedSizeList
     embeddings_flat = embeddings.astype(np.float32).ravel()
@@ -112,10 +116,12 @@ def write_chunks_parquet(
             "uri": uris,
             "start_line": start_lines,
             "end_line": end_lines,
-            "start_byte": start_bytes,
-            "end_byte": end_bytes,
-            "preview": previews,
-            "embedding": embedding_array,
+        "start_byte": start_bytes,
+        "end_byte": end_bytes,
+        "preview": previews,
+        "content": contents,
+        "lang": languages,
+        "embedding": embedding_array,
         },
         schema=get_chunks_schema(options.vec_dim),
     )

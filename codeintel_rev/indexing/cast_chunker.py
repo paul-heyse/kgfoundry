@@ -62,6 +62,9 @@ class Chunk:
         Tuple of SCIP symbol strings that are defined or referenced within this
         chunk. Symbols are in SCIP format (e.g., "python kgfoundry.core#Function.main").
         Used for symbol-aware search and filtering. Empty tuple if no symbols.
+    language : str
+        Programming language of the source file containing this chunk. Used for
+        filtering results by language scope and derived from SCIP metadata.
     """
 
     uri: str
@@ -71,6 +74,7 @@ class Chunk:
     end_line: int
     text: str
     symbols: tuple[str, ...]
+    language: str
 
 
 def line_starts(text: str) -> list[int]:
@@ -157,6 +161,7 @@ class _ChunkAccumulator:
     _current_start: int | None = None
     _current_end: int | None = None
     _current_symbols: list[str] = field(default_factory=list)
+    language: str = ""
 
     def add_symbol(self, symbol: SymbolDef, start: int, end: int) -> None:
         """Incorporate a symbol range into the current chunk set."""
@@ -223,6 +228,7 @@ class _ChunkAccumulator:
                 end_line=end_line,
                 text=self.text[start:end],
                 symbols=symbols,
+                language=self.language,
             )
         )
 
@@ -263,6 +269,7 @@ def chunk_file(
     text: str,
     definitions: list[SymbolDef],
     budget: int = 2200,
+    language: str | None = None,
 ) -> list[Chunk]:
     """Chunk file using SCIP symbol boundaries.
 
@@ -280,13 +287,15 @@ def chunk_file(
     budget : int
         Target chunk size in characters.
 
-    Returns
-    -------
-    list[Chunk]
-        Generated chunks.
+        Returns
+        -------
+        list[Chunk]
+            Generated chunks.
     """
     if not definitions:
         return []
+
+    chunk_language = language if language is not None else definitions[0].language
 
     uri = str(path)
     starts = line_starts(text)
@@ -295,6 +304,7 @@ def chunk_file(
         text=text,
         starts=starts,
         budget=budget,
+        language=chunk_language,
     )
 
     symbols_with_bytes = sorted(

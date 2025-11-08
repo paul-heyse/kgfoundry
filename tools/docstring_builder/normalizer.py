@@ -21,19 +21,19 @@ if TYPE_CHECKING:
     from tools.docstring_builder.harvest import SymbolHarvest
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _Section:
     title: str | None
     content: list[str]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _ParameterBlock:
     display_name: str
     description: list[str]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _ReturnBlock:
     description: list[str]
 

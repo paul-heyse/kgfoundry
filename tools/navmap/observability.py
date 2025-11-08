@@ -145,7 +145,7 @@ class NavmapMetrics:
         )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _NavmapMetricsCache:
     """Internal cache for navmap metrics singleton."""
 

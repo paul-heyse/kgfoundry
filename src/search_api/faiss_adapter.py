@@ -150,7 +150,7 @@ faiss = _load_faiss_module()
 HAVE_FAISS = faiss is not None
 
 
-@dataclass
+@dataclass(frozen=True)
 # [nav:anchor DenseVecs]
 class DenseVecs:
     """Dense vector matrix and ID mapping used to seed FAISS indexes."""

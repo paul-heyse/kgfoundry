@@ -22,7 +22,7 @@ _ENV_CONFIG = "KGF_DOCSTRINGS_CONFIG"
 _LEGACY_ENV_CONFIG = "DOCSTRING_BUILDER_CONFIG"
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ConfigSelection:
     """Selected configuration path and its provenance."""
 
@@ -30,7 +30,7 @@ class ConfigSelection:
     source: str
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class PackageSettings:
     """Per-package overrides to steer summaries and opt-outs."""
 
@@ -38,7 +38,7 @@ class PackageSettings:
     opt_out: set[str] = field(default_factory=set)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class BuilderConfig:
     """Runtime configuration resolved from ``docstring_builder.toml``."""
 

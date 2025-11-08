@@ -12,7 +12,7 @@ from kgfoundry_common.http.tenacity_retry import TenacityRetryStrategy
 from kgfoundry_common.http.types import RetryStrategy
 
 
-@dataclass
+@dataclass(frozen=True)
 class HttpSettings:
     """HTTP client configuration settings.
 

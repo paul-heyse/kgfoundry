@@ -319,7 +319,7 @@ def _emit_envelope(
 CommandHandler = Callable[[argparse.Namespace], int]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _NormalizedCliOptions:
     """Normalized CLI inputs shared between request building and listing."""
 

@@ -56,7 +56,7 @@ def tok(text: str) -> list[str]:
 
 
 # [nav:anchor SpladeDoc]
-@dataclass
+@dataclass(frozen=True)
 class SpladeDoc:
     """Document fixture for SPLADE index backed by sparse retrieval data."""
 

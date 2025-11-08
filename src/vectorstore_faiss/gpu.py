@@ -51,7 +51,7 @@ __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 logger = logging.getLogger(__name__)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 # [nav:anchor FaissGpuIndex]
 class FaissGpuIndex:
     """Small GPU-aware facade that delegates to :mod:`search_api.faiss_gpu`.
