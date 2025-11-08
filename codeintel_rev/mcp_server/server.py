@@ -82,6 +82,7 @@ async def list_paths(
     path: str | None = None,
     include_globs: list[str] | None = None,
     exclude_globs: list[str] | None = None,
+    languages: list[str] | None = None,
     max_results: int = 1000,
 ) -> dict:
     """List files in scope (async).
@@ -97,6 +98,8 @@ async def list_paths(
         Glob patterns to include.
     exclude_globs : list[str] | None
         Glob patterns to exclude.
+    languages : list[str] | None
+        Programming languages to include.
     max_results : int
         Maximum results to return.
 
@@ -112,6 +115,7 @@ async def list_paths(
         path=path,
         include_globs=include_globs,
         exclude_globs=exclude_globs,
+        languages=languages,
         max_results=max_results,
     )
 

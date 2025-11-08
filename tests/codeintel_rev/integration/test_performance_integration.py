@@ -17,7 +17,12 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from codeintel_rev.io.faiss_manager import FAISSManager
+from tests.conftest import HAS_FAISS_SUPPORT
+
+if HAS_FAISS_SUPPORT:
+    from codeintel_rev.io.faiss_manager import FAISSManager
+else:  # pragma: no cover - dependency-gated
+    pytestmark = pytest.mark.skip(reason="FAISS bindings unavailable on this host")
 
 # Use modern numpy random generator
 _rng = np.random.default_rng(42)

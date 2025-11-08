@@ -51,7 +51,7 @@ class RecordingFAISSManager:
 class RecordingDuckDBCatalog:
     """Stub DuckDB catalog capturing constructor arguments."""
 
-    def __init__(self, db_path: Path, vectors_dir: Path) -> None:
+    def __init__(self, db_path: Path, vectors_dir: Path, **_: object) -> None:
         self.db_path = db_path
         self.vectors_dir = vectors_dir
         self.open_called = False

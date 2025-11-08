@@ -17,15 +17,21 @@ from pathlib import Path
 import numpy as np
 import pytest
 from codeintel_rev.io.faiss_manager import FAISSManager
+from tests.conftest import HAS_FAISS_SUPPORT
 
 # Use modern numpy random generator
 _rng = np.random.default_rng(42)
 
 # Gate benchmarks behind opt-in environment variable
-pytestmark = pytest.mark.skipif(
+_benchmark_gate = pytest.mark.skipif(
     not os.getenv("RUN_BENCHMARKS"),
     reason="Benchmarks skipped by default. Set RUN_BENCHMARKS=1 to enable.",
 )
+
+if not HAS_FAISS_SUPPORT:  # pragma: no cover - dependency-gated
+    pytestmark = [_benchmark_gate, pytest.mark.skip(reason="FAISS bindings unavailable")]
+else:
+    pytestmark = [_benchmark_gate]
 
 
 @pytest.fixture

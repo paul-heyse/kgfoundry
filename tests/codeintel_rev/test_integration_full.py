@@ -12,6 +12,7 @@ from pathlib import Path
 import pytest
 from codeintel_rev.app.main import app
 from fastapi.testclient import TestClient
+from tests.conftest import HAS_FAISS_SUPPORT
 
 
 @pytest.fixture
@@ -126,6 +127,7 @@ def test_app_startup_with_preload_disabled(
 
 
 @pytest.mark.usefixtures("test_repo")
+@pytest.mark.skipif(not HAS_FAISS_SUPPORT, reason="FAISS bindings unavailable on this host")
 def test_app_startup_with_preload_enabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

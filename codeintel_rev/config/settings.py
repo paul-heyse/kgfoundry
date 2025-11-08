@@ -49,6 +49,73 @@ class VLLMConfig(msgspec.Struct, frozen=True):
     timeout_s: float = 120.0
 
 
+class BM25Config(msgspec.Struct, frozen=True):
+    """BM25 indexing and search configuration.
+
+    Attributes
+    ----------
+    corpus_json_dir : str
+        Directory containing per-document JSON files used to build the BM25 index.
+        Defaults to ``data/jsonl`` (relative to ``paths.repo_root``).
+    index_dir : str
+        Output directory for the Lucene index. Defaults to ``indexes/bm25``.
+    threads : int
+        Number of worker threads to use while building the index. Defaults to 8.
+    """
+
+    corpus_json_dir: str = "data/jsonl"
+    index_dir: str = "indexes/bm25"
+    threads: int = 8
+
+
+class SpladeConfig(msgspec.Struct, frozen=True):
+    """SPLADE v3 configuration covering model artifacts and index directories.
+
+    Attributes
+    ----------
+    model_id : str
+        Hugging Face model identifier used for training or export. Defaults to
+        ``naver/splade-v3``.
+    model_dir : str
+        Local directory that stores exported model artifacts. Defaults to
+        ``models/splade-v3``.
+    onnx_dir : str
+        Directory containing exported ONNX models. Defaults to ``models/splade-v3/onnx``.
+    onnx_file : str
+        Primary ONNX file name (relative to ``onnx_dir``). Defaults to ``model_qint8.onnx``.
+    vectors_dir : str
+        Directory that stores SPLADE JsonVectorCollection shards. Defaults to
+        ``data/splade_vectors``.
+    index_dir : str
+        Output directory for the Lucene impact index. Defaults to ``indexes/splade_v3_impact``.
+    provider : str
+        Default ONNX Runtime execution provider. Defaults to ``CPUExecutionProvider``.
+    quantization : int
+        Integer quantization factor applied during encoding. Defaults to ``100``.
+    max_terms : int
+        Maximum number of query terms to retain when expanding SPLADE queries. Defaults to ``3000``.
+    max_clause_count : int
+        Lucene Boolean clause limit applied during indexing. Defaults to ``4096``.
+    batch_size : int
+        Default encoding batch size for CLI utilities. Defaults to ``32``.
+    threads : int
+        Default thread count used for Lucene impact index builds. Defaults to ``8``.
+    """
+
+    model_id: str = "naver/splade-v3"
+    model_dir: str = "models/splade-v3"
+    onnx_dir: str = "models/splade-v3/onnx"
+    onnx_file: str = "model_qint8.onnx"
+    vectors_dir: str = "data/splade_vectors"
+    index_dir: str = "indexes/splade_v3_impact"
+    provider: str = "CPUExecutionProvider"
+    quantization: int = 100
+    max_terms: int = 3000
+    max_clause_count: int = 4096
+    batch_size: int = 32
+    threads: int = 8
+
+
 class PathsConfig(msgspec.Struct, frozen=True):
     """File system paths configuration.
 
@@ -286,6 +353,12 @@ class Settings(msgspec.Struct, frozen=True):
         Redis configuration for session scope caching.
     duckdb : DuckDBConfig
         DuckDB connection configuration (threading, object cache).
+    bm25 : BM25Config
+        BM25 indexing configuration, including corpus preparation directories and
+        default thread settings.
+    splade : SpladeConfig
+        SPLADE v3 configuration covering model artifacts, ONNX execution defaults, and
+        Lucene impact index locations.
     """
 
     vllm: VLLMConfig
@@ -294,6 +367,8 @@ class Settings(msgspec.Struct, frozen=True):
     limits: ServerLimits
     redis: RedisConfig
     duckdb: DuckDBConfig
+    bm25: BM25Config
+    splade: SpladeConfig
 
 
 def load_settings() -> Settings:
@@ -390,6 +465,34 @@ def load_settings() -> Settings:
         Enable DuckDB object cache ("1"/"true" to enable, default enabled).
     DUCKDB_LOG_QUERIES : str, optional
         Emit DuckDB SQL statements at debug level ("1"/"true" to enable).
+    BM25_JSONL_DIR : str, optional
+        Directory containing BM25 JsonCollection documents (default: "data/jsonl").
+    BM25_INDEX_DIR : str, optional
+        Directory for the Lucene BM25 index (default: "indexes/bm25").
+    BM25_THREADS : int, optional
+        Worker thread budget for BM25 indexing (default: 8).
+    SPLADE_MODEL_ID : str, optional
+        Hugging Face model identifier for SPLADE (default: "naver/splade-v3").
+    SPLADE_MODEL_DIR : str, optional
+        Local directory for SPLADE model artifacts (default: "models/splade-v3").
+    SPLADE_ONNX_DIR : str, optional
+        Directory that stores exported SPLADE ONNX artifacts (default: "models/splade-v3/onnx").
+    SPLADE_ONNX_FILE : str, optional
+        Primary SPLADE ONNX file name (default: "model_qint8.onnx").
+    SPLADE_VECTORS_DIR : str, optional
+        Directory containing SPLADE JsonVectorCollection shards (default: "data/splade_vectors").
+    SPLADE_INDEX_DIR : str, optional
+        Directory for the SPLADE impact index (default: "indexes/splade_v3_impact").
+    SPLADE_PROVIDER : str, optional
+        Default ONNX Runtime execution provider (default: "CPUExecutionProvider").
+    SPLADE_QUANTIZATION : int, optional
+        Integer quantization factor applied during SPLADE encoding (default: 100).
+    SPLADE_MAX_TERMS : int, optional
+        Maximum SPLADE query terms retained after expansion (default: 3000).
+    SPLADE_MAX_CLAUSE : int, optional
+        Lucene Boolean clause limit used while indexing SPLADE vectors (default: 4096).
+    SPLADE_BATCH_SIZE : int, optional
+        Default batch size for SPLADE encoding CLI commands (default: 32).
     """
     repo_root = os.environ.get("REPO_ROOT", str(Path.cwd()))
 
@@ -478,15 +581,36 @@ def load_settings() -> Settings:
         limits=limits,
         redis=redis,
         duckdb=duckdb_config,
+        bm25=BM25Config(
+            corpus_json_dir=os.environ.get("BM25_JSONL_DIR", "data/jsonl"),
+            index_dir=os.environ.get("BM25_INDEX_DIR", "indexes/bm25"),
+            threads=int(os.environ.get("BM25_THREADS", "8")),
+        ),
+        splade=SpladeConfig(
+            model_id=os.environ.get("SPLADE_MODEL_ID", "naver/splade-v3"),
+            model_dir=os.environ.get("SPLADE_MODEL_DIR", "models/splade-v3"),
+            onnx_dir=os.environ.get("SPLADE_ONNX_DIR", "models/splade-v3/onnx"),
+            onnx_file=os.environ.get("SPLADE_ONNX_FILE", "model_qint8.onnx"),
+            vectors_dir=os.environ.get("SPLADE_VECTORS_DIR", "data/splade_vectors"),
+            index_dir=os.environ.get("SPLADE_INDEX_DIR", "indexes/splade_v3_impact"),
+            provider=os.environ.get("SPLADE_PROVIDER", "CPUExecutionProvider"),
+            quantization=int(os.environ.get("SPLADE_QUANTIZATION", "100")),
+            max_terms=int(os.environ.get("SPLADE_MAX_TERMS", "3000")),
+            max_clause_count=int(os.environ.get("SPLADE_MAX_CLAUSE", "4096")),
+            batch_size=int(os.environ.get("SPLADE_BATCH_SIZE", "32")),
+            threads=int(os.environ.get("SPLADE_THREADS", "8")),
+        ),
     )
 
 
 __all__ = [
+    "BM25Config",
     "IndexConfig",
     "PathsConfig",
     "RedisConfig",
     "ServerLimits",
     "Settings",
+    "SpladeConfig",
     "VLLMConfig",
     "load_settings",
 ]

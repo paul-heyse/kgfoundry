@@ -3,9 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-import faiss
 import pytest
 from codeintel_rev.io.faiss_manager import FAISSManager
+from tests.conftest import HAS_FAISS_SUPPORT
+
+if not HAS_FAISS_SUPPORT:  # pragma: no cover - dependency-gated
+    pytestmark = pytest.mark.skip(
+        reason="FAISS bindings unavailable on this host",
+    )
+else:
+    import faiss
 
 
 class _SentinelGpuIndex:

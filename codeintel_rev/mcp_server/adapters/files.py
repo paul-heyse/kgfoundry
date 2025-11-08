@@ -83,6 +83,7 @@ async def list_paths(
     path: str | None = None,
     include_globs: list[str] | None = None,
     exclude_globs: list[str] | None = None,
+    languages: list[str] | None = None,
     max_results: int = 1000,
 ) -> dict:
     """List files in repository (async with threadpool offload).
@@ -104,6 +105,8 @@ async def list_paths(
         Glob patterns to include (e.g., ["*.py"]). Overrides session scope if provided.
     exclude_globs : list[str] | None
         Glob patterns to exclude (e.g., ["__pycache__", "*.pyc"]). Overrides session scope if provided.
+    languages : list[str] | None
+        Programming languages to include (overrides session scope when provided).
     max_results : int
         Maximum number of files to return.
 
@@ -164,6 +167,7 @@ async def list_paths(
         path,
         include_globs,
         exclude_globs,
+        languages,
         max_results,
     )
 
@@ -175,6 +179,7 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0917 - PathOu
     path: str | None = None,
     include_globs: list[str] | None = None,
     exclude_globs: list[str] | None = None,
+    languages: list[str] | None = None,
     max_results: int = 1000,
 ) -> dict:
     """List files in repository (synchronous implementation).
@@ -198,6 +203,8 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0917 - PathOu
         Glob patterns to include (e.g., ["*.py"]). Overrides session scope if provided.
     exclude_globs : list[str] | None
         Glob patterns to exclude (e.g., ["__pycache__", "*.pyc"]). Overrides session scope if provided.
+    languages : list[str] | None
+        Programming languages to include. Overrides session scope if provided.
     max_results : int
         Maximum number of files to return.
 
@@ -217,7 +224,11 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0917 - PathOu
 
     merged = merge_scope_filters(
         scope,
-        {"include_globs": include_globs, "exclude_globs": exclude_globs},
+        {
+            "include_globs": include_globs,
+            "exclude_globs": exclude_globs,
+            "languages": languages,
+        },
     )
 
     # Default excludes
@@ -297,11 +308,10 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0917 - PathOu
                 break
 
     # Apply language filter if scope has languages
-    if scope:
-        languages = scope.get("languages")
-        if languages:
-            filtered_paths = apply_language_filter([item["path"] for item in items], languages)
-            items = [item for item in items if item["path"] in filtered_paths]
+    merged_languages = merged.get("languages")
+    if merged_languages:
+        filtered_paths = apply_language_filter([item["path"] for item in items], merged_languages)
+        items = [item for item in items if item["path"] in filtered_paths]
 
     if len(items) >= max_results:
         return {
@@ -317,7 +327,7 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0917 - PathOu
             "path": path,
             "item_count": len(items),
             "applied_scope": scope is not None,
-            "languages": scope.get("languages") if scope else None,
+            "languages": merged_languages,
         },
     )
 

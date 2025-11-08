@@ -26,6 +26,7 @@ import pytest
 from prometheus_client.registry import CollectorRegistry
 
 from tests.bootstrap import ensure_src_path
+import tests.codeintel_rev._faiss_stub  # noqa: F401  # register FAISS stub early
 
 # Ensure src path is available before importing kgfoundry_common modules
 # Note: ensure_src_path() is idempotent and already called by importing tests.bootstrap,
@@ -107,9 +108,19 @@ def _compute_has_gpu_stack() -> bool:
 
 
 HAS_GPU_STACK = _compute_has_gpu_stack()
-HAS_FAISS_SUPPORT = _modules_available(("faiss",)) or _has_distribution("faiss-cpu")
+
+
+def _faiss_runtime_available() -> bool:
+    try:
+        faiss_module = import_module("faiss")
+    except Exception:
+        return False
+    required_attrs = ("normalize_L2", "IndexFlatIP", "write_index")
+    return all(hasattr(faiss_module, attr) for attr in required_attrs)
+
+
+HAS_FAISS_SUPPORT = _faiss_runtime_available()
 # Expose GPU stack availability for tooling and test gating.
-# HAS_FAISS_SUPPORT indicates FAISS is available (either GPU or CPU build).
 
 # Expose GPU stack availability for tooling and test gating.
 

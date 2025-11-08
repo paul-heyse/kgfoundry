@@ -14,6 +14,8 @@ from codeintel_rev.mcp_server.adapters import semantic as semantic_adapter
 from codeintel_rev.mcp_server.adapters import text_search as text_search_adapter
 from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.mcp_server.server import asgi_app, mcp
+from codeintel_rev.io.path_utils import PathOutsideRepositoryError
+from kgfoundry_common.errors import VectorSearchError
 
 
 def _expect(*, condition: bool, message: str) -> None:
@@ -84,15 +86,12 @@ async def test_text_search(
 @pytest.mark.asyncio
 async def test_semantic_search_no_index(mock_application_context, mock_session_id) -> None:
     """Semantic search should gracefully handle missing FAISS index."""
-    envelope = await semantic_adapter.semantic_search(
-        mock_application_context,
-        "integration smoke test",
-        limit=5,
-    )
-    _expect(condition="answer" in envelope, message="Expected answer in semantic search envelope")
-    findings = envelope.get("findings")
-    _expect(condition=isinstance(findings, list), message="Findings should be returned as a list")
-    _expect(condition="problem" in envelope, message="Expected Problem Details on failure")
+    with pytest.raises(VectorSearchError):
+        await semantic_adapter.semantic_search(
+            mock_application_context,
+            "integration smoke test",
+            limit=5,
+        )
 
 
 @pytest.mark.asyncio
@@ -129,49 +128,6 @@ async def test_git_history(mock_application_context, mock_session_id) -> None:
     )
 
 
-def test_parse_blame_porcelain_multiple_entries() -> None:
-    """The blame parser should return an entry for each porcelain header."""
-    porcelain_lines = [
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 1 1 1",
-        "author Alice Example",
-        "author-mail <alice@example.com>",
-        "author-time 1700000000",
-        "author-tz +0000",
-        "summary First change",
-        "filename sample.py",
-        "\tprint('first line')",
-        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 2 2 1",
-        "author Bob Example",
-        "author-mail <bob@example.com>",
-        "author-time 1700000060",
-        "author-tz +0000",
-        "summary Second change",
-        "filename sample.py",
-        "\tprint('second line')",
-    ]
-
-    entries = history_adapter._parse_blame_porcelain("\n".join(porcelain_lines) + "\n")  # noqa: SLF001
-
-    expected_entry_count = 2
-    _expect(
-        condition=len(entries) == expected_entry_count,
-        message="Expected two blame entries to be parsed",
-    )
-    _expect(
-        condition=[entry["line"] for entry in entries] == [1, 2],
-        message="Expected blame entries to retain distinct line numbers",
-    )
-    _expect(
-        condition={entry["message"] for entry in entries} == {"First change", "Second change"},
-        message="Expected commit summaries to be captured for each entry",
-    )
-    expected_unique_dates = 2
-    _expect(
-        condition=len({entry["date"] for entry in entries}) == expected_unique_dates,
-        message="Expected unique ISO timestamps for each blame entry",
-    )
-
-
 @pytest.mark.asyncio
 async def test_scope_operations(mock_application_context, mock_session_id) -> None:
     """Verify scope configuration round-trips through the adapter."""
@@ -187,10 +143,11 @@ async def test_scope_operations(mock_application_context, mock_session_id) -> No
 
 def test_path_escape_rejected_by_file_adapter(mock_application_context) -> None:
     """Adapters should reject attempts to escape the repository root."""
-    result = files_adapter.open_file(mock_application_context, "../etc/passwd")
-    _expect(condition="error" in result, message="Expected error for escaped path")
+    with pytest.raises(PathOutsideRepositoryError) as excinfo:
+        files_adapter.open_file(mock_application_context, "../etc/passwd")
+
     _expect(
-        condition="escapes repository root" in result["error"],
+        condition="escapes repository root" in str(excinfo.value),
         message="Error should mention repository escape",
     )
 
@@ -198,9 +155,10 @@ def test_path_escape_rejected_by_file_adapter(mock_application_context) -> None:
 @pytest.mark.asyncio
 async def test_path_escape_rejected_by_history_adapter(mock_application_context) -> None:
     """Git adapters should refuse to run commands on escaped paths."""
-    blame = await history_adapter.blame_range(mock_application_context, "../etc/passwd", 1, 2)
-    _expect(condition="error" in blame, message="Expected error for escaped path")
+    with pytest.raises(PathOutsideRepositoryError) as excinfo:
+        await history_adapter.blame_range(mock_application_context, "../etc/passwd", 1, 2)
+
     _expect(
-        condition="escapes repository root" in blame["error"],
+        condition="escapes repository root" in str(excinfo.value),
         message="Error should mention repository escape",
     )

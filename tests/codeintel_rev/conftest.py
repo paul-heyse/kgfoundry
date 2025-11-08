@@ -189,3 +189,13 @@ def mock_session_id() -> Iterator[str]:
         yield session_id
     finally:
         session_id_var.reset(token)
+
+
+@pytest.fixture(autouse=True)
+def _auto_session_id() -> Iterator[None]:
+    """Ensure a session ID is always present for tests that omit the fixture."""
+    token = session_id_var.set("auto-session")
+    try:
+        yield
+    finally:
+        session_id_var.reset(token)

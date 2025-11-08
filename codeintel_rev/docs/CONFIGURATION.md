@@ -88,8 +88,48 @@ The configuration lifecycle follows this sequence during application startup:
 | `MAX_RESULTS` | Maximum results per query | `1000` | `500` |
 | `QUERY_TIMEOUT_S` | Query timeout in seconds | `30.0` | `60.0` |
 | `SEMANTIC_OVERFETCH_MULTIPLIER` | FAISS fan-out multiplier when scope filters active | `2` | `3` |
+| `LUCENE_DIR` | Base directory for sparse Lucene indexes | `data/lucene` | `/var/lib/codeintel/lucene` |
+| `SPLADE_DIR` | Legacy SPLADE directory (superseded by dedicated settings) | `data/splade` | `/var/lib/codeintel/splade` |
+| `BM25_JSONL_DIR` | Directory containing JsonCollection documents for BM25 indexing | `data/jsonl` | `/mnt/data/bm25/json` |
+| `BM25_INDEX_DIR` | Directory where the BM25 Lucene index is stored | `indexes/bm25` | `/mnt/data/bm25/index` |
+| `BM25_THREADS` | Worker threads used while building BM25 indexes | `8` | `16` |
+| `SPLADE_MODEL_ID` | Hugging Face model identifier for SPLADE | `naver/splade-v3` | `models/splade-finetuned` |
+| `SPLADE_MODEL_DIR` | Directory for SPLADE model artifacts | `models/splade-v3` | `/srv/models/splade-v3` |
+| `SPLADE_ONNX_DIR` | Directory for exported SPLADE ONNX files | `models/splade-v3/onnx` | `/srv/models/splade-v3/onnx` |
+| `SPLADE_ONNX_FILE` | Default SPLADE ONNX file name used for inference | `model_qint8.onnx` | `model_qint8_avx2.onnx` |
+| `SPLADE_VECTORS_DIR` | Directory with SPLADE JsonVectorCollection shards | `data/splade_vectors` | `/mnt/data/splade/vectors` |
+| `SPLADE_INDEX_DIR` | Directory for SPLADE impact indexes | `indexes/splade_v3_impact` | `/mnt/data/splade/index` |
+| `SPLADE_PROVIDER` | Default ONNX Runtime execution provider | `CPUExecutionProvider` | `CUDAExecutionProvider` |
+| `SPLADE_QUANTIZATION` | Integer quantization factor applied during encoding | `100` | `50` |
+| `SPLADE_MAX_TERMS` | Maximum number of terms retained for expanded queries | `3000` | `2000` |
+| `SPLADE_MAX_CLAUSE` | Lucene Boolean clause limit applied while indexing | `4096` | `8192` |
+| `SPLADE_BATCH_SIZE` | Default batch size for SPLADE encoding commands | `32` | `16` |
 
 > **GPU warm-up tip:** On CPU-only workstations, export `SKIP_GPU_WARMUP=1` before running pytest to bypass the FAISS GPU smoke test. Drop the variable on CUDA-capable hosts so the warm-up coverage runs.
+
+### Sparse retrieval prerequisites
+
+- **Java 21 runtime**: Pyserini relies on the Lucene Java toolchain. Ensure `java` (JDK 21) is
+  available on the `PATH` before invoking BM25 or SPLADE index builders.
+
+### CLI helpers
+
+BM25 maintenance commands are exposed via the `codeintel` console script:
+
+```console
+# prepare a JsonCollection from data/corpus.jsonl (uses BM25_JSONL_DIR by default)
+codeintel bm25 prepare-corpus data/corpus.jsonl
+
+# build the Lucene index with an explicit thread override
+codeintel bm25 build-index --threads 8
+```
+
+Both commands write CLI envelopes beneath `docs/_data/cli/bm25/` and produce
+metadata files in the configured directories. The default values shown in the
+table above are used when the CLI options are omitted.
+- **Hugging Face authentication**: The `naver/splade-v3` checkpoint is gated. Run
+  `huggingface-cli login` (or set `HF_TOKEN`) on any machine that will export or encode SPLADE
+  artifacts.
 
 ### DuckDB Thread Safety & Pooling
 

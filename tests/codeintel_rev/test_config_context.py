@@ -172,6 +172,9 @@ def test_application_context_ensure_faiss_ready_cached(
     monkeypatch.setenv("VLLM_URL", "http://localhost:8001/v1")
 
     context = ApplicationContext.create()
+    monkeypatch.setattr(context.faiss_manager, "load_cpu_index", lambda: None)
+    monkeypatch.setattr(context.faiss_manager, "clone_to_gpu", lambda: False)
+    context.faiss_manager.gpu_disabled_reason = None
 
     # Act - call twice
     ready1, limits1, error1 = context.ensure_faiss_ready()

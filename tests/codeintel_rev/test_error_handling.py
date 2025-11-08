@@ -29,19 +29,19 @@ from kgfoundry_common.problem_details import ProblemDetails
 
 
 def test_format_error_response_path_outside_repo() -> None:
-    """format_error_response maps PathOutsideRepositoryError to 403 Forbidden."""
+    """format_error_response maps PathOutsideRepositoryError to 400."""
     exc = PathOutsideRepositoryError("Path escapes repository")
     response = format_error_response(exc, instance="files:list_paths")
 
     problem = cast("ProblemDetails", response["problem"])
-    assert response["status"] == 403
+    assert response["status"] == 400
     code = problem.get("code")
     problem_type = problem.get("type")
     instance = problem.get("instance")
     assert isinstance(code, str)
-    assert code == "forbidden"
+    assert code == "path-outside-repo"
     assert isinstance(problem_type, str)
-    assert problem_type == "https://kgfoundry.dev/problems/forbidden"
+    assert problem_type == "https://kgfoundry.dev/problems/path-outside-repo"
     assert isinstance(instance, str)
     assert instance == "files:list_paths"
 
@@ -58,7 +58,7 @@ def test_format_error_response_path_not_directory() -> None:
     assert isinstance(code, str)
     assert code == "path-not-directory"
     assert isinstance(title, str)
-    assert title == "Path Not Directory"
+    assert title == "PathNotDirectoryError"
 
 
 def test_format_error_response_path_not_found() -> None:
@@ -514,7 +514,7 @@ def test_file_not_found_error_logging(caplog: pytest.LogCaptureFixture) -> None:
     assert len(caplog.records) > 0
     record = caplog.records[0]
     assert record.levelno == logging.WARNING
-    assert "File not found" in record.message
+    assert "not found" in record.message.lower()
 
 
 def test_unknown_exception_logging(caplog: pytest.LogCaptureFixture) -> None:

@@ -7,6 +7,7 @@ thread exhaustion or performance degradation.
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -16,6 +17,11 @@ from codeintel_rev.app.config_context import ApplicationContext, ResolvedPaths
 from codeintel_rev.app.middleware import session_id_var
 from codeintel_rev.mcp_server.adapters import files as files_adapter
 from codeintel_rev.mcp_server.adapters import history as history_adapter
+
+pytestmark = pytest.mark.skipif(
+    not os.getenv("RUN_BENCHMARKS"),
+    reason="Load tests skipped by default. Set RUN_BENCHMARKS=1 to enable.",
+)
 
 
 @pytest.fixture
@@ -32,8 +38,6 @@ def mock_context(tmp_path: Path) -> Mock:
     Mock
         Mock ApplicationContext with repo_root and GitClient.
     """
-    from codeintel_rev.io.git_client import AsyncGitClient, GitClient
-
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
 
@@ -53,10 +57,47 @@ def mock_context(tmp_path: Path) -> Mock:
 
     context = Mock(spec=ApplicationContext)
     context.paths = paths
-    context.git_client = GitClient(repo_path=repo_root)
-    context.async_git_client = AsyncGitClient(context.git_client)
+    context.git_client = Mock()
+    context.async_git_client = _AsyncGitClientStub()
 
     return context
+
+
+class _AsyncGitClientStub:
+    """Async Git client stub returning deterministic blame results."""
+
+    async def blame_range(
+        self,
+        *,
+        path: str,
+        start_line: int,
+        end_line: int,
+    ) -> list[dict]:
+        del path
+        return [
+            {
+                "line": line,
+                "commit": "stub",
+                "author": "LoadTest",
+                "date": "2024-01-01T00:00:00Z",
+                "message": f"Line {line}",
+            }
+            for line in range(start_line, end_line + 1)
+        ]
+
+    async def file_history(self, *, path: str, limit: int) -> list[dict]:
+        del path
+        return [
+            {
+                "sha": f"{i:04x}",
+                "full_sha": f"{i:08x}",
+                "author": "LoadTest",
+                "email": "load@example.com",
+                "date": "2024-01-01T00:00:00Z",
+                "message": f"Commit {i}",
+            }
+            for i in range(limit)
+        ]
 
 
 @pytest.mark.load

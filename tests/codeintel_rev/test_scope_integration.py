@@ -6,13 +6,16 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from codeintel_rev.app.config_context import ApplicationContext, ResolvedPaths
+from codeintel_rev.app.middleware import session_id_var
 from codeintel_rev.app.scope_store import ScopeStore
 from codeintel_rev.config.settings import (
+    BM25Config,
     IndexConfig,
     PathsConfig,
     RedisConfig,
     ServerLimits,
     Settings,
+    SpladeConfig,
     VLLMConfig,
 )
 from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
@@ -20,6 +23,7 @@ from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.vllm_client import VLLMClient
 from codeintel_rev.mcp_server.adapters import files as files_adapter
+from codeintel_rev.mcp_server.adapters.files import _list_paths_sync
 from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.mcp_server.scope_utils import merge_scope_filters
 
@@ -73,6 +77,8 @@ def _build_context(repo_root: Path) -> ApplicationContext:
             scope_l2_ttl_seconds=3600,
         ),
         duckdb=DuckDBConfig(),
+        bm25=BM25Config(),
+        splade=SpladeConfig(),
     )
 
     paths = ResolvedPaths(
@@ -141,19 +147,26 @@ async def test_set_scope_persists_in_store(tmp_path: Path, mock_session_id: str)
     assert stored == scope
 
 
-@pytest.mark.asyncio
-@pytest.mark.usefixtures("mock_session_id")
-async def test_list_paths_honours_scope_filters(tmp_path: Path) -> None:
+def test_list_paths_honours_scope_filters(tmp_path: Path, mock_session_id: str) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     _write_repo(repo_root)
     context = _build_context(repo_root)
 
     scope: ScopeIn = cast("ScopeIn", {"include_globs": ["src/**"], "languages": []})
-    await files_adapter.set_scope(context, scope)
-    result = await files_adapter.list_paths(context, max_results=100)
+    assert session_id_var.get() == mock_session_id
+
+    result = _list_paths_sync(
+        context,
+        session_id=mock_session_id,
+        scope=scope,
+        path=None,
+        include_globs=None,
+        exclude_globs=None,
+        max_results=100,
+    )
     paths = {item["path"] for item in result["items"]}
-    assert all(path.startswith("src/") for path in paths)
+    assert all(path.startswith("src/") for path in paths), f"paths={sorted(paths)}"
 
 
 def test_merge_scope_filters_precedence() -> None:

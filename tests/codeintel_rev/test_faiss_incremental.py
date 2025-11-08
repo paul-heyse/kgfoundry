@@ -11,10 +11,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import faiss
 import numpy as np
 import pytest
 from codeintel_rev.io.faiss_manager import FAISSManager
+from tests.conftest import HAS_FAISS_SUPPORT
+
+if not HAS_FAISS_SUPPORT:  # pragma: no cover - dependency-gated
+    pytestmark = pytest.mark.skip(
+        reason="FAISS bindings unavailable on this host",
+    )
+else:
+    import faiss
 
 # Use modern numpy random generator
 _rng = np.random.default_rng(42)

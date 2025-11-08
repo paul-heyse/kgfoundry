@@ -715,6 +715,11 @@ async def test_semantic_search_embedding_error() -> None:
             return_value="test-session-embedding-error",
         ),
         patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+        patch.object(
+            context.vllm_client,
+            "embed_single",
+            side_effect=RuntimeError("vLLM service unavailable"),
+        ),
         pytest.raises(EmbeddingError, match="vLLM service unavailable"),
     ):
         await semantic_search(cast("ApplicationContext", context), "query", limit=10)
@@ -743,6 +748,11 @@ async def test_semantic_search_faiss_search_error() -> None:
             return_value="test-session-search-error",
         ),
         patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+        patch.object(
+            faiss_manager,
+            "search",
+            side_effect=RuntimeError("FAISS search failed"),
+        ),
         pytest.raises(VectorSearchError, match="FAISS search failed"),
     ):
         await semantic_search(cast("ApplicationContext", context), "query", limit=10)

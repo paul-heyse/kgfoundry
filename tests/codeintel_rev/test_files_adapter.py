@@ -20,8 +20,6 @@ from codeintel_rev.io.path_utils import PathOutsideRepositoryError
 from codeintel_rev.mcp_server.adapters.files import list_paths, open_file
 from codeintel_rev.mcp_server.schemas import ScopeIn
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture
 def mock_context(tmp_path: Path) -> Mock:
@@ -65,6 +63,7 @@ def mock_context(tmp_path: Path) -> Mock:
     return context
 
 
+@pytest.mark.asyncio
 async def test_list_paths_with_scope_globs(mock_context: Mock) -> None:
     """Test that list_paths applies scope glob filters.
 
@@ -97,6 +96,7 @@ async def test_list_paths_with_scope_globs(mock_context: Mock) -> None:
         assert not any(path.endswith(".md") for path in paths_list if path)
 
 
+@pytest.mark.asyncio
 async def test_list_paths_with_scope_language(mock_context: Mock) -> None:
     """Test that list_paths applies scope language filters.
 
@@ -124,10 +124,40 @@ async def test_list_paths_with_scope_language(mock_context: Mock) -> None:
         # All returned files should be Python files
         paths_list = [item.get("path", "") for item in items]
         assert all(path.endswith(".py") for path in paths_list if path)
-        # Should not include TypeScript files
-        assert not any(path.endswith(".ts") for path in paths_list if path)
+    # Should not include TypeScript files
+    assert not any(path.endswith(".ts") for path in paths_list if path)
 
 
+@pytest.mark.asyncio
+async def test_list_paths_explicit_languages_override_scope(mock_context: Mock) -> None:
+    """Explicit languages parameter overrides scoped languages."""
+    scope: ScopeIn = {"languages": ["python"]}
+
+    # Mock session scope retrieval but override languages via parameter
+    with (
+        patch(
+            "codeintel_rev.mcp_server.adapters.files.get_session_id",
+            return_value="test-session-lang-override",
+        ),
+        patch("codeintel_rev.mcp_server.adapters.files.get_effective_scope", return_value=scope),
+    ):
+        result = await list_paths(
+            mock_context,
+            path=None,
+            max_results=100,
+            languages=["typescript"],
+        )
+
+    assert "items" in result
+    items = result["items"]
+    assert isinstance(items, list)
+    assert items
+    paths_list = [item.get("path", "") for item in items]
+    assert all(path.endswith(".ts") for path in paths_list if path)
+    assert "src/app.ts" in paths_list
+
+
+@pytest.mark.asyncio
 async def test_list_paths_excludes_default_directories(mock_context: Mock) -> None:
     """Default exclusion globs filter VCS, virtualenv, and cache paths."""
     repo_root = mock_context.paths.repo_root
@@ -253,6 +283,7 @@ def test_open_file_exception_context(mock_context: Mock) -> None:
 # ==================== list_paths Error Tests ====================
 
 
+@pytest.mark.asyncio
 async def test_list_paths_path_not_found(mock_context: Mock) -> None:
     """Test list_paths raises PathNotFoundError for nonexistent paths."""
     with (
@@ -266,6 +297,7 @@ async def test_list_paths_path_not_found(mock_context: Mock) -> None:
         await list_paths(mock_context, path="nonexistent")
 
 
+@pytest.mark.asyncio
 async def test_list_paths_path_outside_repository(mock_context: Mock) -> None:
     """Test list_paths raises PathOutsideRepositoryError for paths outside repo."""
     with (
@@ -279,6 +311,7 @@ async def test_list_paths_path_outside_repository(mock_context: Mock) -> None:
         await list_paths(mock_context, path="../../etc")
 
 
+@pytest.mark.asyncio
 async def test_list_paths_path_is_file(mock_context: Mock) -> None:
     """Test list_paths raises PathNotDirectoryError when path is a file, not directory."""
     with (
