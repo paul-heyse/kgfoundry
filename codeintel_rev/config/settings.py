@@ -218,12 +218,16 @@ class ServerLimits(msgspec.Struct, frozen=True):
         QPS limit to handle traffic spikes. Defaults to 20 queries, which allows
         a 2-second burst at 10 QPS. Set higher (40-60) if you expect more variable
         traffic patterns.
+    semantic_overfetch_multiplier : int
+        Multiplier applied to FAISS search fan-out when scope filters are active.
+        Defaults to 2 (fetch twice the requested limit to compensate for filtering).
     """
 
     max_results: int = 1000
     query_timeout_s: float = 30.0
     rate_limit_qps: float = 10.0
     rate_limit_burst: int = 20
+    semantic_overfetch_multiplier: int = 2
 
 
 class Settings(msgspec.Struct, frozen=True):
@@ -378,6 +382,7 @@ def load_settings() -> Settings:
         query_timeout_s=float(os.environ.get("QUERY_TIMEOUT_S", "30.0")),
         rate_limit_qps=float(os.environ.get("RATE_LIMIT_QPS", "10.0")),
         rate_limit_burst=int(os.environ.get("RATE_LIMIT_BURST", "20")),
+        semantic_overfetch_multiplier=int(os.environ.get("SEMANTIC_OVERFETCH_MULTIPLIER", "2")),
     )
 
     return Settings(vllm=vllm, paths=paths, index=index, limits=limits)

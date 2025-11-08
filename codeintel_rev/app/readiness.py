@@ -43,12 +43,14 @@ codeintel_rev.app.main : FastAPI application with /readyz endpoint
 from __future__ import annotations
 
 import asyncio
+import shutil
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
+import duckdb
 import httpx
 
 from kgfoundry_common.logging import get_logger
@@ -259,12 +261,8 @@ class ReadinessProbe:
             optional=False,
         )
 
-        # Check 4: DuckDB catalog exists
-        results["duckdb_catalog"] = self._check_file(
-            paths.duckdb_path,
-            description="DuckDB catalog",
-            optional=False,
-        )
+        # Check 4: DuckDB catalog exists (and is materialized when configured)
+        results["duckdb_catalog"] = self._check_duckdb_catalog(paths.duckdb_path)
 
         # Check 5: SCIP index exists (optional - may be regenerated)
         results["scip_index"] = self._check_file(
@@ -275,6 +273,9 @@ class ReadinessProbe:
 
         # Check 6: vLLM service reachable
         results["vllm_service"] = self._check_vllm_connection()
+
+        # Check 7: Search tooling available (ripgrep preferred, grep fallback)
+        results["search_cli"] = self._check_search_tools()
 
         return results
 
@@ -366,6 +367,111 @@ class ReadinessProbe:
         if optional:
             return CheckResult(healthy=True, detail=detail)
         return CheckResult(healthy=False, detail=detail)
+
+    def _check_duckdb_catalog(self, path: Path) -> CheckResult:
+        """Validate DuckDB catalog presence and optional materialization state.
+
+        Returns
+        -------
+        CheckResult
+            Healthy status and diagnostic detail when validation fails.
+        """
+        file_result = self._check_file(path, description="DuckDB catalog", optional=False)
+        if not file_result.healthy:
+            return file_result
+
+        if not self._context.settings.index.duckdb_materialize:
+            return file_result
+
+        try:
+            conn = duckdb.connect(str(path))
+        except duckdb.Error as exc:
+            return CheckResult(healthy=False, detail=f"Unable to open DuckDB catalog: {exc}")
+
+        detail: str | None = None
+        try:
+            if not self._duckdb_table_exists(conn):
+                detail = (
+                    "DuckDB materialization enabled but chunks_materialized table missing. "
+                    "Re-run the indexing pipeline to refresh the catalog."
+                )
+            elif not self._duckdb_index_exists(conn):
+                detail = (
+                    "DuckDB materialization enabled but idx_chunks_materialized_uri index missing. "
+                    "Re-run the indexing pipeline to rebuild indexes."
+                )
+        except duckdb.Error as exc:
+            detail = f"DuckDB catalog validation failed: {exc}"
+        finally:
+            conn.close()
+
+        if detail is not None:
+            return CheckResult(healthy=False, detail=detail)
+        return CheckResult(healthy=True)
+
+    @staticmethod
+    def _duckdb_table_exists(conn: duckdb.DuckDBPyConnection) -> bool:
+        """Return True when `chunks_materialized` table exists.
+
+        Returns
+        -------
+        bool
+            ``True`` when the materialized table exists, ``False`` otherwise.
+        """
+        return (
+            conn.execute(
+                """
+                SELECT COUNT(*)
+                FROM information_schema.tables
+                WHERE table_schema = 'main'
+                  AND table_name = 'chunks_materialized'
+                """
+            ).fetchone()[0]
+            > 0
+        )
+
+    @staticmethod
+    def _duckdb_index_exists(conn: duckdb.DuckDBPyConnection) -> bool:
+        """Return True when `idx_chunks_materialized_uri` index exists.
+
+        Returns
+        -------
+        bool
+            ``True`` when the index exists, ``False`` otherwise.
+        """
+        return (
+            conn.execute(
+                """
+                SELECT COUNT(*) FROM pragma_show_indexes()
+                WHERE name = 'idx_chunks_materialized_uri'
+                """
+            ).fetchone()[0]
+            > 0
+        )
+
+    @staticmethod
+    def _check_search_tools() -> CheckResult:
+        """Ensure either ripgrep or grep is available for text search.
+
+        Returns
+        -------
+        CheckResult
+            Healthy status if ripgrep or grep is available, otherwise error detail.
+        """
+        rg_path = shutil.which("rg")
+        grep_path = shutil.which("grep")
+
+        if rg_path:
+            return CheckResult(healthy=True)
+
+        if grep_path:
+            detail = f"ripgrep (rg) not found; using grep fallback at {grep_path}"
+            return CheckResult(healthy=True, detail=detail)
+
+        return CheckResult(
+            healthy=False,
+            detail="Search tooling unavailable: install ripgrep (rg) or provide grep on PATH.",
+        )
 
     def _check_vllm_connection(self) -> CheckResult:
         """Verify vLLM service is reachable with a lightweight health check.

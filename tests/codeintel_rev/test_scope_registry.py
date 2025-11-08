@@ -60,9 +60,7 @@ class GateableRLock:
 
 
 @pytest.mark.timeout(5)
-def test_gauge_stays_consistent_during_overlapping_operations(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_gauge_stays_consistent_during_overlapping_operations(monkeypatch: pytest.MonkeyPatch) -> None:
     """Gauge reflects cleared state when set/clear overlap."""
     gauge = GaugeProbe()
     monkeypatch.setattr(
@@ -108,3 +106,39 @@ def test_gauge_stays_consistent_during_overlapping_operations(
 
     assert registry.get_session_count() == 0
     assert gauge.value == 0
+
+
+def test_set_scope_prevents_external_mutation(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Scope copies are immutable from the caller's perspective."""
+    gauge = GaugeProbe()
+    monkeypatch.setattr(
+        "codeintel_rev.app.scope_registry._active_sessions_gauge",
+        gauge,
+    )
+
+    registry = ScopeRegistry()
+    scope: dict[str, list[str]] = {"languages": ["python"]}
+    registry.set_scope("session", scope)  # type: ignore[arg-type]
+
+    scope["languages"].append("rust")
+
+    stored = registry.get_scope("session")
+    assert stored is not None
+    assert stored.get("languages") == ["python"]  # type: ignore[union-attr]
+    assert gauge.value == 1
+
+
+def test_set_scope_updates_gauge_on_overwrite(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Gauge reflects session count even when overwriting existing scopes."""
+    gauge = GaugeProbe()
+    monkeypatch.setattr(
+        "codeintel_rev.app.scope_registry._active_sessions_gauge",
+        gauge,
+    )
+
+    registry = ScopeRegistry()
+    registry.set_scope("session", {"languages": ["python"]})
+    assert gauge.value == 1
+
+    registry.set_scope("session", {"languages": ["typescript"]})
+    assert gauge.value == 1
