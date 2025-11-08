@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import sys
+import types
 from pathlib import Path
 from typing import Any
 
@@ -174,6 +176,47 @@ def test_manifest_missing_required_fields(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="Manifest file has unexpected structure"):
         IndexManifest.from_file(path)
+
+
+@pytest.mark.asyncio
+async def test_gpu_secondary_clone_reuses_cloner_options(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """GPU cloning shares cloner options across primary and secondary indexes."""
+
+    vec_dim = 8
+    primary = _build_flat_index(vec_dim, 4)
+    secondary = faiss_module.IndexFlatIP(vec_dim)
+
+    settings = IndexConfig(vec_dim=vec_dim, use_cuvs=True)
+    manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
+    manager._primary_cpu = primary
+    manager._secondary_cpu = secondary
+
+    torch_stub = types.ModuleType("torch")
+    torch_stub.cuda = types.SimpleNamespace(is_available=lambda: True)
+    monkeypatch.setitem(sys.modules, "torch", torch_stub)
+
+    captured: list[Any] = []
+
+    def fake_index_cpu_to_gpu(
+        resources: Any, device: int, index: Any, options: Any | None = None
+    ) -> object:
+        captured.append(options)
+        return object()
+
+    monkeypatch.setattr(
+        faiss_module,
+        "index_cpu_to_gpu",
+        fake_index_cpu_to_gpu,
+        raising=False,
+    )
+
+    await manager._try_gpu_clone(faiss_module)
+
+    assert len(captured) == 2
+    assert captured[0] is captured[1]
+    assert getattr(captured[0], "use_cuvs", False) is True
 
 
 @pytest.mark.asyncio
