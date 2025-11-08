@@ -332,7 +332,7 @@ class HybridSearchEngine:
         )
 
     def _resolve_path(self, value: str) -> Path:
-        candidate = Path(value)
+        candidate = Path(value).expanduser()
         if candidate.is_absolute():
             return candidate
         return (self._paths.repo_root / candidate).resolve()
