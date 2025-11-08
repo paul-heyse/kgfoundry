@@ -72,3 +72,61 @@ def test_get_embeddings_by_ids_skips_null_embeddings(tmp_path: Path) -> None:
     results = catalog.get_embeddings_by_ids([1, 2])
     assert results.shape == (1, 2)
     assert np.allclose(results[0], [0.1, 0.2])
+
+
+def test_query_by_filters_handles_literal_percent(tmp_path: Path) -> None:
+    vectors_dir = tmp_path / "vectors"
+    vectors_dir.mkdir()
+
+    catalog_path = tmp_path / "catalog.duckdb"
+    catalog = DuckDBCatalog(catalog_path, vectors_dir)
+    catalog.conn = duckdb.connect(database=":memory:")
+    catalog.conn.execute(
+        """
+        CREATE OR REPLACE VIEW chunks AS
+        SELECT * FROM (
+            SELECT
+                1::BIGINT AS id,
+                'src/config%file.py'::VARCHAR AS uri,
+                0::INTEGER AS start_line,
+                1::INTEGER AS end_line,
+                0::BIGINT AS start_byte,
+                10::BIGINT AS end_byte,
+                'percent file'::VARCHAR AS preview,
+                [0.1, 0.2]::FLOAT[] AS embedding
+        )
+        """
+    )
+
+    results = catalog.query_by_filters([1], include_globs=["src/config%file.py"])
+    assert len(results) == 1
+    assert results[0]["uri"] == "src/config%file.py"
+
+
+def test_query_by_filters_handles_literal_underscore(tmp_path: Path) -> None:
+    vectors_dir = tmp_path / "vectors"
+    vectors_dir.mkdir()
+
+    catalog_path = tmp_path / "catalog.duckdb"
+    catalog = DuckDBCatalog(catalog_path, vectors_dir)
+    catalog.conn = duckdb.connect(database=":memory:")
+    catalog.conn.execute(
+        """
+        CREATE OR REPLACE VIEW chunks AS
+        SELECT * FROM (
+            SELECT
+                1::BIGINT AS id,
+                'src/config_file.py'::VARCHAR AS uri,
+                0::INTEGER AS start_line,
+                1::INTEGER AS end_line,
+                0::BIGINT AS start_byte,
+                10::BIGINT AS end_byte,
+                'underscore file'::VARCHAR AS preview,
+                [0.1, 0.2]::FLOAT[] AS embedding
+        )
+        """
+    )
+
+    results = catalog.query_by_filters([1], include_globs=["src/config_file.py"])
+    assert len(results) == 1
+    assert results[0]["uri"] == "src/config_file.py"

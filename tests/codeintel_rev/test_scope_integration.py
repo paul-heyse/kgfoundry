@@ -14,6 +14,7 @@ import asyncio
 import time
 from collections.abc import Generator
 from pathlib import Path
+from typing import cast
 from unittest.mock import Mock, patch
 
 import numpy as np
@@ -560,11 +561,12 @@ class TestSetScopeToSemanticSearch:
             filtered: list[dict] = []
             for chunk in test_chunks:
                 chunk_id = chunk.get("id")
-                chunk_uri = chunk.get("uri", "")
+                chunk_uri_raw = chunk.get("uri", "")
+                chunk_uri = str(chunk_uri_raw) if chunk_uri_raw else ""
                 if chunk_id not in ids:
                     continue
                 if exclude_globs and any(
-                    fnmatch.fnmatch(chunk_uri, pattern) for pattern in exclude_globs
+                    fnmatch.fnmatch(chunk_uri, cast(str, pattern)) for pattern in exclude_globs
                 ):
                     continue
                 filtered.append(chunk)

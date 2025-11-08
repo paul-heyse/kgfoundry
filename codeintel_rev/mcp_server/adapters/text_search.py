@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -189,15 +190,17 @@ def search_text(  # noqa: PLR0913 - context parameter required for dependency in
         },
     )
 
-    cmd = _build_ripgrep_command(
+    params = RipgrepCommandParams(
         query=query,
         regex=regex,
         case_sensitive=case_sensitive,
-        paths=effective_paths,
         include_globs=effective_include_globs,
         exclude_globs=effective_exclude_globs,
+        paths=effective_paths,
         max_results=max_results,
     )
+
+    cmd = _build_ripgrep_command(params)
 
     with _observe("text_search") as observation:
         try:
@@ -373,61 +376,53 @@ def _error_response(error: KgFoundryError, *, operation: str) -> dict:
     }
 
 
-def _build_ripgrep_command(
-    *,
-    query: str,
-    regex: bool,
-    case_sensitive: bool,
-    include_globs: Sequence[str] | None,
-    exclude_globs: Sequence[str] | None,
-    paths: Sequence[str] | None,
-    max_results: int,
-) -> list[str]:
+@dataclass(slots=True, frozen=True)
+class RipgrepCommandParams:
+    """Parameter bundle for constructing ripgrep commands."""
+
+    query: str
+    regex: bool
+    case_sensitive: bool
+    include_globs: Sequence[str] | None
+    exclude_globs: Sequence[str] | None
+    paths: Sequence[str] | None
+    max_results: int
+
+
+def _build_ripgrep_command(params: RipgrepCommandParams) -> list[str]:
     """Assemble the ripgrep command arguments.
 
     Parameters
     ----------
-    query : str
-        Search query string.
-    regex : bool
-        Whether query is a regex pattern.
-    case_sensitive : bool
-        Whether search is case-sensitive.
-    include_globs : Sequence[str] | None
-        Glob patterns forwarded via ``--iglob``.
-    exclude_globs : Sequence[str] | None
-        Glob patterns forwarded via ``--iglob !pattern``.
-    paths : Sequence[str] | None
-        Paths to search in (relative to repo root).
-    max_results : int
-        Maximum number of results to return.
+    params : RipgrepCommandParams
+        Parameter bundle describing ripgrep invocation.
 
     Returns
     -------
     list[str]
         Argument vector for ripgrep invocation.
     """
-    command = ["rg", "--json", "--max-count", str(max_results)]
+    command = ["rg", "--json", "--max-count", str(params.max_results)]
 
-    if not case_sensitive:
+    if not params.case_sensitive:
         command.append("--ignore-case")
 
-    if not regex:
+    if not params.regex:
         command.append("--fixed-strings")
 
-    if include_globs:
-        for pattern in include_globs:
+    if params.include_globs:
+        for pattern in params.include_globs:
             command.extend(["--iglob", pattern])
 
-    if exclude_globs:
-        for pattern in exclude_globs:
+    if params.exclude_globs:
+        for pattern in params.exclude_globs:
             command.extend(["--iglob", f"!{pattern}"])
 
     command.append("--")
-    command.append(query)
+    command.append(params.query)
 
-    if paths:
-        command.extend(str(Path(path)) for path in paths)
+    if params.paths:
+        command.extend(str(Path(path)) for path in params.paths)
     else:
         command.append(".")
 

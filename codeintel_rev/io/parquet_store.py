@@ -6,6 +6,7 @@ for efficient vector storage and querying via DuckDB.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -26,8 +27,6 @@ def get_chunks_schema(vec_dim: int) -> pa.Schema:
     ----------
     vec_dim : int
         Embedding dimension.
-    preview_max_chars : int
-        Maximum number of characters to persist in the preview column.
 
     Returns
     -------
@@ -48,13 +47,21 @@ def get_chunks_schema(vec_dim: int) -> pa.Schema:
     )
 
 
+@dataclass(slots=True, frozen=True)
+class ParquetWriteOptions:
+    """Configuration for Parquet persistence."""
+
+    start_id: int = 0
+    vec_dim: int = 2560
+    preview_max_chars: int = 240
+
+
 def write_chunks_parquet(
     output_path: Path,
     chunks: Sequence[Chunk],
     embeddings: np.ndarray,
-    start_id: int = 0,
-    vec_dim: int = 2560,
-    preview_max_chars: int = 240,
+    *,
+    options: ParquetWriteOptions | None = None,
 ) -> None:
     """Write chunks and embeddings to Parquet.
 
@@ -66,33 +73,36 @@ def write_chunks_parquet(
         Chunk metadata.
     embeddings : np.ndarray
         Embeddings array of shape (len(chunks), vec_dim).
-    start_id : int
-        Starting ID for chunks.
-    vec_dim : int
-        Embedding dimension.
+    options : ParquetWriteOptions, optional
+        Configuration for chunk identifiers, embedding dimension, and preview
+        truncation length. Defaults to :class:`ParquetWriteOptions`.
 
     Raises
     ------
     ValueError
         If chunks and embeddings length mismatch.
     """
+    if options is None:
+        options = ParquetWriteOptions()
+
     if len(chunks) != len(embeddings):
         msg = f"Chunks ({len(chunks)}) and embeddings ({len(embeddings)}) length mismatch"
         raise ValueError(msg)
 
     # Prepare data
-    ids = list(range(start_id, start_id + len(chunks)))
+    ids = list(range(options.start_id, options.start_id + len(chunks)))
     uris = [c.uri for c in chunks]
     start_lines = [c.start_line for c in chunks]
     end_lines = [c.end_line for c in chunks]
     start_bytes = [c.start_byte for c in chunks]
     end_bytes = [c.end_byte for c in chunks]
-    previews = [c.text[:preview_max_chars] for c in chunks]
+    previews = [c.text[: options.preview_max_chars] for c in chunks]
 
     # Convert embeddings to FixedSizeList
     embeddings_flat = embeddings.astype(np.float32).ravel()
     embedding_array = pa.FixedSizeListArray.from_arrays(
-        pa.array(embeddings_flat, type=pa.float32()), vec_dim
+        pa.array(embeddings_flat, type=pa.float32()),
+        options.vec_dim,
     )
 
     # Create table
@@ -107,7 +117,7 @@ def write_chunks_parquet(
             "preview": previews,
             "embedding": embedding_array,
         },
-        schema=get_chunks_schema(vec_dim),
+        schema=get_chunks_schema(options.vec_dim),
     )
 
     # Write with compression
@@ -168,6 +178,7 @@ def extract_embeddings(table: pa.Table) -> np.ndarray:
 
 
 __all__ = [
+    "ParquetWriteOptions",
     "extract_embeddings",
     "get_chunks_schema",
     "read_chunks_parquet",

@@ -619,6 +619,10 @@ def gpu_warmup_session() -> None:
     """
     import warnings
 
+    if os.getenv("SKIP_GPU_WARMUP", "0") == "1":
+        print("[gpu-warmup] skipping GPU warm-up (SKIP_GPU_WARMUP=1)")
+        return
+
     require_gpu = os.getenv("REQUIRE_GPU", "0") == "1"
 
     torch_ok, torch_msg = _torch_smoke()

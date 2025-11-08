@@ -36,7 +36,7 @@ from codeintel_rev.indexing.scip_reader import (
 )
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.faiss_manager import FAISSManager
-from codeintel_rev.io.parquet_store import write_chunks_parquet
+from codeintel_rev.io.parquet_store import ParquetWriteOptions, write_chunks_parquet
 from codeintel_rev.io.vllm_client import VLLMClient
 
 logging.basicConfig(level=logging.INFO)
@@ -295,9 +295,11 @@ def _write_parquet(
         output_path=output_path,
         chunks=chunks,
         embeddings=embeddings,
-        start_id=0,
-        vec_dim=vec_dim,
-        preview_max_chars=preview_max_chars,
+        options=ParquetWriteOptions(
+            start_id=0,
+            vec_dim=vec_dim,
+            preview_max_chars=preview_max_chars,
+        ),
     )
     logger.info("Wrote Parquet dataset to %s", output_path)
     return output_path
@@ -481,6 +483,8 @@ def _initialize_duckdb(paths: PipelinePaths, *, materialize: bool) -> int:
     ----------
     paths : PipelinePaths
         Pipeline paths configuration.
+    materialize : bool
+        Whether to materialize Parquet data into a DuckDB table with indexes.
 
     Returns
     -------
