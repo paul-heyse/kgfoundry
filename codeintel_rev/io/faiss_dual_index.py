@@ -309,10 +309,12 @@ class FAISSDualIndexManager:
                 )
             else:
                 try:
-                    self._secondary_gpu = faiss_module.index_cpu_to_gpu(
+                    cloner_options = self._build_gpu_cloner_options(faiss_module)
+                    self._secondary_gpu = self._clone_index_to_gpu(
+                        faiss_module,
                         self._gpu_resources,
-                        0,
                         self._secondary_cpu,
+                        cloner_options,
                     )
                 except (AttributeError, RuntimeError) as exc:
                     self._secondary_gpu = None
@@ -461,19 +463,19 @@ class FAISSDualIndexManager:
 
         try:
             gpu_resources = faiss_module.StandardGpuResources()
-            cloner_options = faiss_module.GpuClonerOptions()
-            cloner_options.use_cuvs = bool(self._settings.use_cuvs)
+            cloner_options = self._build_gpu_cloner_options(faiss_module)
 
-            primary_gpu = faiss_module.index_cpu_to_gpu(
+            primary_gpu = self._clone_index_to_gpu(
+                faiss_module,
                 gpu_resources,
-                0,
                 self._primary_cpu,
                 cloner_options,
             )
-            secondary_gpu = faiss_module.index_cpu_to_gpu(
+            secondary_gpu = self._clone_index_to_gpu(
+                faiss_module,
                 gpu_resources,
-                0,
                 self._secondary_cpu,
+                cloner_options,
             )
         except (AttributeError, RuntimeError) as exc:
             self._gpu_disabled_reason = f"GPU clone failed: {exc}"
@@ -487,8 +489,65 @@ class FAISSDualIndexManager:
         self._gpu_disabled_reason = None
         LOGGER.info(
             "faiss_gpu_clone_success",
-            extra={"use_cuvs": bool(self._settings.use_cuvs)},
+            extra={"use_cuvs": bool(getattr(cloner_options, "use_cuvs", False))},
         )
+
+    def _build_gpu_cloner_options(
+        self, faiss_module: ModuleType
+    ) -> faiss.GpuClonerOptions:
+        cloner_options = faiss_module.GpuClonerOptions()
+        requested = bool(self._settings.use_cuvs)
+        if hasattr(cloner_options, "use_cuvs"):
+            try:
+                cloner_options.use_cuvs = requested
+            except AttributeError as exc:
+                LOGGER.warning(
+                    "faiss_gpu_cuvs_unavailable",
+                    extra={"error": str(exc)},
+                )
+                cloner_options.use_cuvs = False
+        elif requested:
+            LOGGER.warning(
+                "faiss_gpu_cuvs_unavailable",
+                extra={"error": "GpuClonerOptions.use_cuvs missing"},
+            )
+        return cloner_options
+
+    def _clone_index_to_gpu(
+        self,
+        faiss_module: ModuleType,
+        gpu_resources: faiss.StandardGpuResources,
+        cpu_index: faiss.Index,
+        cloner_options: faiss.GpuClonerOptions,
+    ) -> faiss.Index:
+        try:
+            return faiss_module.index_cpu_to_gpu(
+                gpu_resources,
+                0,
+                cpu_index,
+                cloner_options,
+            )
+        except (AttributeError, RuntimeError) as exc:
+            if bool(self._settings.use_cuvs) and hasattr(cloner_options, "use_cuvs"):
+                try:
+                    cloner_options.use_cuvs = False
+                except AttributeError:
+                    LOGGER.warning(
+                        "faiss_gpu_clone_cuvs_reset_failed",
+                        extra={"error": str(exc)},
+                    )
+                else:
+                    LOGGER.warning(
+                        "faiss_gpu_clone_cuvs_fallback",
+                        extra={"error": str(exc)},
+                    )
+                    return faiss_module.index_cpu_to_gpu(
+                        gpu_resources,
+                        0,
+                        cpu_index,
+                        cloner_options,
+                    )
+            raise
 
     def _select_primary_index(self) -> faiss.Index:
         if self._primary_cpu is None:
