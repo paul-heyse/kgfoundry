@@ -6,7 +6,7 @@
   },
   "$id": "https://kgfoundry.dev/schemas/kgfoundry_common.models.LinkAssertion.json#",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Describe LinkAssertion.\n\n<!-- auto:docstring-builder v1 -->\n\nthe behaviour it provides to callers. Callers interact with\nvalidated data through this model.\n\nParameters\n----------\nid : Id\n    Describe ``id``.\nchunk_id : Id\n    Describe ``chunk_id``.\nconcept_id : Id\n    Describe ``concept_id``.\nscore : float\n    Describe ``score``.\ndecision : Literal['link', 'reject', 'uncertain']\n    Describe ``decision``.\nevidence_span : str | NoneType, optional\n    Describe ``evidence_span``.\n    Defaults to ``None``.\nfeatures : dict[str, float], optional\n    Describe ``features``.\n    Defaults to ``<factory>``.\nrun_id : str\n    Describe ``run_id``.",
+  "description": "Link assertion model for knowledge graph connections.\n\nEncodes a connection between a document chunk and a knowledge graph concept with scoring\nmetadata. Inline docstrings enumerate alias usage.",
   "examples": [
     {
       "chunk_id": null,

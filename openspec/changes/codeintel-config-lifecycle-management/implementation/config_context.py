@@ -221,12 +221,6 @@ class ApplicationContext:
     faiss_manager : FAISSManager
         FAISS index manager that handles CPU and GPU indexes. GPU resources are
         lazily initialized on first search or optionally pre-loaded at startup.
-    _faiss_lock : Lock
-        Thread lock for coordinating FAISS index loading (internal use only).
-    _faiss_loaded : bool
-        Flag indicating whether CPU index has been loaded (internal use only).
-    _faiss_gpu_attempted : bool
-        Flag indicating whether GPU clone has been attempted (internal use only).
 
     Examples
     --------

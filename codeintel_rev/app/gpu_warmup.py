@@ -7,6 +7,13 @@ GPU is reachable and functional before expensive operations begin.
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING, cast
+
+from kgfoundry_common.typing import gate_import
+
+if TYPE_CHECKING:
+    import faiss as _faiss
+    import torch as _torch
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +31,7 @@ def _check_cuda_availability() -> tuple[bool, str]:
         (is_available, status_message)
     """
     try:
-        import torch  # noqa: PLC0415 - Lazy import for optional dependency
+        torch = cast("_torch", gate_import("torch", "CUDA availability checks for warmup"))
 
         cuda_available = torch.cuda.is_available()
         if cuda_available:
@@ -57,7 +64,7 @@ def _check_faiss_gpu_support() -> tuple[bool, str]:
         (is_available, status_message)
     """
     try:
-        import faiss  # noqa: PLC0415 - Lazy import for optional dependency
+        faiss = cast("_faiss", gate_import("faiss", "FAISS GPU capability checks"))
 
         required_attrs = ("StandardGpuResources", "GpuClonerOptions", "index_cpu_to_gpu")
         faiss_gpu_available = all(hasattr(faiss, attr) for attr in required_attrs)
@@ -83,7 +90,7 @@ def _test_torch_gpu_operations() -> tuple[bool, str]:
         (test_passed, status_message)
     """
     try:
-        import torch  # noqa: PLC0415 - Lazy import for optional dependency
+        torch = cast("_torch", gate_import("torch", "Torch GPU smoke test"))
 
         if not torch.cuda.is_available():
             return False, "CUDA not available for torch test"
@@ -111,7 +118,7 @@ def _test_faiss_gpu_resources() -> tuple[bool, str]:
         (test_passed, status_message)
     """
     try:
-        import faiss  # noqa: PLC0415 - Lazy import for optional dependency
+        faiss = cast("_faiss", gate_import("faiss", "FAISS GPU resource smoke test"))
 
         # Check if FAISS GPU symbols are available first
         if not all(hasattr(faiss, attr) for attr in ("StandardGpuResources",)):

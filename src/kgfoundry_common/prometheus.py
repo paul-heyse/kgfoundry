@@ -27,7 +27,7 @@ Fallback behaviour (no Prometheus import required):
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, NoReturn, Protocol, cast, overload
+from typing import TYPE_CHECKING, NoReturn, Protocol, TypedDict, cast, overload
 
 from kgfoundry_common.navmap_loader import load_nav_metadata
 from kgfoundry_common.sequence_guards import first_or_error
@@ -129,6 +129,17 @@ else:  # pragma: no cover - runtime fallback when dependency missing
             del value
 
     CollectorRegistry = object
+
+
+class _CounterCallKwargs(TypedDict, total=False):
+    registry: "CollectorRegistry"
+    unit: str
+
+
+class _HistogramCallKwargs(TypedDict, total=False):
+    registry: "CollectorRegistry"
+    unit: str
+    buckets: "tuple[float, ...]"
 
 
 # [nav:anchor CounterLike]
@@ -465,13 +476,20 @@ def build_counter(
     if constructor is None:
         return _NoopCounter()
     try:
-        return constructor(
+        # prom-client prior to 0.20 does not support keyword arguments for
+        # :func:`Counter`. To stay compatible we continue to pass labelnames
+        # positionally while treating ``registry``/``unit`` as keyword-only.
+        args: tuple[str, str, Sequence[str]] = (
             name,
             documentation,
             _labels_or_default(labelnames),
-            registry=registry,
-            unit=unit,
         )
+        kwargs: _CounterCallKwargs = {}
+        if registry is not None:
+            kwargs["registry"] = registry
+        if unit is not None:
+            kwargs["unit"] = unit
+        return constructor(*args, **kwargs)
     except ValueError:  # pragma: no cover - only hit when duplicates exist
         existing = _existing_collector(name, registry)
         if existing is None:
@@ -640,13 +658,13 @@ def build_histogram(*args: object, **kwargs: object) -> HistogramLike:
 
     params = _coerce_histogram_params(*args, **kwargs)
     label_tuple = _labels_or_default(params.labelnames)
-    call_kwargs: dict[str, object] = {}
+    call_kwargs: _HistogramCallKwargs = {}
     if params.registry is not None:
         call_kwargs["registry"] = params.registry
     if params.unit is not None:
         call_kwargs["unit"] = params.unit
     if params.buckets is not None:
-        call_kwargs["buckets"] = tuple(params.buckets)
+        call_kwargs["buckets"] = tuple(float(value) for value in params.buckets)
 
     try:
         return constructor(

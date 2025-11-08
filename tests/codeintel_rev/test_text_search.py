@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from codeintel_rev.mcp_server.adapters import text_search
+from kgfoundry_common.errors import VectorSearchError
 from kgfoundry_common.subprocess_utils import SubprocessError
 
 RG_FAILURE_CODE = 2
@@ -33,10 +34,13 @@ def _build_match_line(path: Path) -> str:
     )
 
 
-def test_search_text_flag_prefixed_query(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.asyncio
+async def test_search_text_flag_prefixed_query(
+    mock_application_context, mock_session_id: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Queries beginning with a dash should be passed after the `--` sentinel."""
     captured_commands: list[list[str]] = []
-    repo_root = Path.cwd()
+    repo_root = mock_application_context.paths.repo_root
     target_path = repo_root / "pyproject.toml"
 
     def fake_run_subprocess(
@@ -48,7 +52,8 @@ def test_search_text_flag_prefixed_query(monkeypatch: pytest.MonkeyPatch) -> Non
 
     monkeypatch.setattr(text_search, "run_subprocess", fake_run_subprocess)
 
-    result = text_search.search_text(
+    result = await text_search.search_text(
+        mock_application_context,
         "-def",
         regex=False,
         case_sensitive=False,
@@ -70,7 +75,10 @@ def test_search_text_flag_prefixed_query(monkeypatch: pytest.MonkeyPatch) -> Non
     )
 
 
-def test_search_text_surfaces_ripgrep_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.asyncio
+async def test_search_text_surfaces_ripgrep_failure(
+    mock_application_context, mock_session_id: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Return-code > 1 from ripgrep should surface an error message."""
 
     def fake_run_subprocess(
@@ -82,18 +90,17 @@ def test_search_text_surfaces_ripgrep_failure(monkeypatch: pytest.MonkeyPatch) -
 
     monkeypatch.setattr(text_search, "run_subprocess", fake_run_subprocess)
 
-    result = text_search.search_text("pattern")
+    with pytest.raises(VectorSearchError) as excinfo:
+        await text_search.search_text(mock_application_context, "pattern")
 
-    _expect(condition=result["matches"] == [], message="Expected no matches on failure")
-    _expect(condition=result["total"] == 0, message="Expected total to be zero on failure")
-    _expect(
-        condition=result.get("error") == "rg failed",
-        message="Expected error message to surface",
-    )
-    _expect(condition="problem" in result, message="Expected Problem Details payload")
+    error = str(excinfo.value)
+    _expect(condition="rg failed" in error, message="Expected error message to surface")
 
 
-def test_search_text_falls_back_to_grep(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.asyncio
+async def test_search_text_falls_back_to_grep(
+    mock_application_context, mock_session_id: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Missing ripgrep binary should trigger the grep fallback."""
     captured_commands: list[list[str]] = []
 
@@ -105,12 +112,12 @@ def test_search_text_falls_back_to_grep(monkeypatch: pytest.MonkeyPatch) -> None
         if cmd[0] == "rg":
             error_message = "rg missing"
             raise SubprocessError(error_message, returncode=127, stderr=error_message)
-        repo_root = Path.cwd()
+        repo_root = mock_application_context.paths.repo_root
         return f"{repo_root}/README.md:1:example"
 
     monkeypatch.setattr(text_search, "run_subprocess", fake_run_subprocess)
 
-    result = text_search.search_text("example", max_results=1)
+    result = await text_search.search_text(mock_application_context, "example", max_results=1)
 
     _expect(
         condition=len(captured_commands) == EXPECTED_SUBPROCESS_INVOCATIONS,
@@ -120,8 +127,9 @@ def test_search_text_falls_back_to_grep(monkeypatch: pytest.MonkeyPatch) -> None
     _expect(condition=result["matches"], message="Fallback grep should produce matches")
 
 
-def test_search_text_fallback_normalizes_relative_paths(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.asyncio
+async def test_search_text_fallback_normalizes_relative_paths(
+    mock_application_context, mock_session_id: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Relative grep results should be normalized to repo-relative paths."""
 
@@ -141,7 +149,7 @@ def test_search_text_fallback_normalizes_relative_paths(
 
     monkeypatch.setattr(text_search, "run_subprocess", fake_run_subprocess)
 
-    result = text_search.search_text("example", max_results=5)
+    result = await text_search.search_text(mock_application_context, "example", max_results=5)
 
     expected_match_count = 2
     _expect(

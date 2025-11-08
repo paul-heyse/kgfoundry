@@ -2,7 +2,7 @@
   "$defs": {
     "SearchResult": {
       "additionalProperties": false,
-      "description": "Describe SearchResult.\n\n<!-- auto:docstring-builder v1 -->\n\nthe behaviour it provides to callers. Callers interact with\nvalidated data through this model.\n\nParameters\n----------\ndoc_id : str\n    Describe ``doc_id``.\nchunk_id : str\n    Describe ``chunk_id``.\ntitle : str\n    Describe ``title``.\nsection : str\n    Describe ``section``.\nscore : float\n    Describe ``score``.\nsignals : dict[str, float], optional\n    Describe ``signals``.\n    Defaults to ``<factory>``.\nspans : dict[str, int], optional\n    Describe ``spans``.\n    Defaults to ``<factory>``.\nconcepts : list[dict[str, str]], optional\n    Describe ``concepts``.\n    Defaults to ``<factory>``.\n\nExamples\n--------\n>>> from pathlib import Path\n>>> from kgfoundry_common.schema_helpers import assert_model_roundtrip\n>>> example_path = (\n...     Path(__file__).parent.parent.parent\n...     / \"schema\"\n...     / \"examples\"\n...     / \"search_api\"\n...     / \"search_result.v1.json\"\n... )\n>>> assert_model_roundtrip(SearchResult, example_path)",
+      "description": "Search result model combining identifiers, score, and auxiliary signals.\n\nAttributes\n----------\nmodel_config : ClassVar[object]\n    Pydantic configuration forbidding extra fields.\ndoc_id : str\n    Document identifier.\nchunk_id : str\n    Chunk identifier.\ntitle : str\n    Document title.\nsection : str\n    Section label.\nscore : float\n    Relevance score.\nsignals : dict[str, float]\n    Signal scores (dense, sparse, kg).\nspans : dict[str, int]\n    Character spans associated with the result.\nconcepts : list[dict[str, str]]\n    Linked concept metadata.\n\nExamples\n--------\n>>> from pathlib import Path\n>>> from kgfoundry_common.schema_helpers import assert_model_roundtrip\n>>> example_path = (\n...     Path(__file__).parent.parent.parent\n...     / \"schema\"\n...     / \"examples\"\n...     / \"search_api\"\n...     / \"search_result.v1.json\"\n... )\n>>> assert_model_roundtrip(SearchResult, example_path)",
       "properties": {
         "chunk_id": {
           "title": "Chunk Id",
@@ -63,7 +63,7 @@
   "$id": "https://kgfoundry.dev/schemas/kgfoundry.search_api.schemas.SearchResponse.json#",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "Search API response containing results.\n\n<!-- auto:docstring-builder v1 -->\n\nResponse envelope for search API endpoints.\n\nParameters\n----------\n**data : Any\n    Describe ``data``.",
+  "description": "Search API response envelope containing ordered results.",
   "examples": [
     {
       "results": null

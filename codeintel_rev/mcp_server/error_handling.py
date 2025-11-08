@@ -175,7 +175,7 @@ def convert_exception_to_envelope(
 
     Parameters
     ----------
-    exc : Exception
+    exc : BaseException
         Exception to convert. Can be any exception type - KgFoundryError
         subclasses are handled specially, builtin exceptions (FileNotFoundError,
         ValueError, etc.) are mapped to standard Problem Details, unknown

@@ -10,14 +10,20 @@ from __future__ import annotations
 import importlib
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
-import faiss
 import numpy as np
 
 from kgfoundry_common.logging import get_logger
+from kgfoundry_common.typing import gate_import
+
+if TYPE_CHECKING:
+    import faiss as _faiss
 
 LOGGER = get_logger(__name__)
 logger = LOGGER  # Alias for compatibility
+
+faiss = cast("_faiss", gate_import("faiss", "FAISS manager operations"))
 
 
 def _has_faiss_gpu_support() -> bool:
@@ -121,14 +127,14 @@ class FAISSManager:
         self.vec_dim = vec_dim
         self.nlist = nlist
         self.use_cuvs = use_cuvs
-        self.cpu_index: faiss.Index | None = None
-        self.gpu_index: faiss.Index | None = None
-        self.gpu_resources: faiss.StandardGpuResources | None = None
+        self.cpu_index: _faiss.Index | None = None
+        self.gpu_index: _faiss.Index | None = None
+        self.gpu_resources: _faiss.StandardGpuResources | None = None
         self.gpu_disabled_reason: str | None = None
 
         # Secondary index for incremental updates (dual-index architecture)
-        self.secondary_index: faiss.Index | None = None
-        self.secondary_gpu_index: faiss.Index | None = None
+        self.secondary_index: _faiss.Index | None = None
+        self.secondary_gpu_index: _faiss.Index | None = None
         self.incremental_ids: set[int] = set()
         # Secondary index path: same directory as primary, with .secondary suffix
         self.secondary_index_path = (
@@ -997,7 +1003,7 @@ class FAISSManager:
             ),
         )
 
-    def _extract_all_vectors(self, index: faiss.Index) -> tuple[np.ndarray, np.ndarray]:
+    def _extract_all_vectors(self, index: _faiss.Index) -> tuple[np.ndarray, np.ndarray]:
         """Extract all vectors and IDs from a FAISS index.
 
         Reconstructs vectors from the index and retrieves their associated IDs.
@@ -1006,7 +1012,7 @@ class FAISSManager:
 
         Parameters
         ----------
-        index : faiss.Index
+        index : _faiss.Index
             FAISS index to extract vectors from. Must support `reconstruct()` and
             have an `id_map` attribute (IndexIDMap2 wrapper).
 
@@ -1076,12 +1082,12 @@ class FAISSManager:
             msg = "Failed to load cuVS shared libraries"
             raise RuntimeError(msg) from exc
 
-    def _require_cpu_index(self) -> faiss.Index:
+    def _require_cpu_index(self) -> _faiss.Index:
         """Return the CPU index if initialized.
 
         Returns
         -------
-        faiss.Index
+        _faiss.Index
             Initialized CPU FAISS index.
 
         Raises
@@ -1094,12 +1100,12 @@ class FAISSManager:
             raise RuntimeError(msg)
         return self.cpu_index
 
-    def _active_index(self) -> faiss.Index:
+    def _active_index(self) -> _faiss.Index:
         """Return the best available search index.
 
         Returns
         -------
-        faiss.Index
+        _faiss.Index
             GPU-backed index when available, otherwise the CPU index.
 
         Raises

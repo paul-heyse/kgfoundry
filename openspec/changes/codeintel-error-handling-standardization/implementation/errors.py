@@ -150,13 +150,9 @@ class InvalidLineRangeError(FileOperationError):
     ----------
     message : str
         Human-readable error message explaining constraint violation.
-
-    Examples
-    --------
-        - "start_line must be a positive integer"
-        - "end_line must be a positive integer"
-        - "start_line must be less than or equal to end_line"
-
+        Examples: "start_line must be a positive integer",
+        "end_line must be a positive integer",
+        "start_line must be less than or equal to end_line".
     path : str
         File path being accessed.
     line_range : tuple[int | None, int | None] | None, optional

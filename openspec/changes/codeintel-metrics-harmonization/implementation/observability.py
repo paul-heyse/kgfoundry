@@ -145,11 +145,12 @@ def observe_duration(
         recorder. Call ``mark_success()`` or ``mark_error()`` on the yielded
         object to record completion status.
 
-    Raises
-    ------
-    Exception
+    Notes
+    -----
+    Exception Propagation:
         Any exception raised within the context manager is propagated after
-        metrics are recorded (if enabled).
+        metrics are recorded (if enabled). The function itself does not raise
+        exceptions, but exceptions from the wrapped operation propagate through.
 
     Examples
     --------

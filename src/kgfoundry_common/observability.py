@@ -110,7 +110,7 @@ class MetricsProvider:
         self.operation_duration_seconds = build_histogram(
             "kgfoundry_operation_duration_seconds",
             "Operation duration in seconds for each component/operation pair.",
-            ("component", "operation", "status"),
+            labelnames=("component", "operation", "status"),
             registry=resolved_registry,
         )
 
@@ -176,19 +176,19 @@ class MetricsRegistry:
         self.requests_total = build_counter(
             f"{metric_prefix}_requests_total",
             "Total number of processed operations.",
-            labels,
+            labelnames=labels,
             registry=resolved_registry,
         )
         self.request_errors_total = build_counter(
             f"{metric_prefix}_request_errors_total",
             "Total number of failed operations.",
-            labels,
+            labelnames=labels,
             registry=resolved_registry,
         )
         self.request_duration_seconds = build_histogram(
             f"{metric_prefix}_request_duration_seconds",
             "Operation latency in seconds.",
-            ("operation",),
+            labelnames=("operation",),
             registry=resolved_registry,
         )
 

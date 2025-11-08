@@ -21,6 +21,13 @@ import argparse
 import os
 import sys
 import traceback
+from typing import TYPE_CHECKING, cast
+
+from kgfoundry_common.typing import gate_import
+
+if TYPE_CHECKING:
+    import faiss as _faiss
+    import torch as _torch
 
 
 def check_torch(device_index: int = 0) -> tuple[bool, dict[str, object]]:
@@ -38,8 +45,8 @@ def check_torch(device_index: int = 0) -> tuple[bool, dict[str, object]]:
     """
     info: dict[str, object] = {}
     try:
-        import torch  # noqa: PLC0415 - Lazy import for optional dependency
-    except (ImportError, ModuleNotFoundError) as exc:
+        torch = cast("_torch", gate_import("torch", "GPU diagnostics (torch)"))
+    except ImportError as exc:
         return False, {"error": f"torch import failed: {exc}"}
 
     info["torch_import_ok"] = True
@@ -92,9 +99,9 @@ def check_faiss() -> tuple[bool, dict[str, object]]:
     """
     info: dict[str, object] = {}
     try:
-        import faiss  # noqa: PLC0415 - Lazy import for optional dependency
-        import numpy as np  # noqa: PLC0415 - Lazy import for optional dependency
-    except (ImportError, ModuleNotFoundError) as exc:
+        faiss = cast("_faiss", gate_import("faiss", "GPU diagnostics (faiss)"))
+        import numpy as np  # noqa: PLC0415 - numpy is a required dependency
+    except ImportError as exc:
         return False, {"error": f"faiss import failed: {exc}"}
 
     info["faiss_import_ok"] = True

@@ -317,9 +317,10 @@ def handle_adapter_errors(
 
     Returns
     -------
-    Callable
+    Callable[[F], F]
         Decorator function that wraps the adapter call in try/except and
-        converts exceptions to error envelopes.
+        converts exceptions to error envelopes. Preserves the function type
+        signature ``F``.
 
     Notes
     -----

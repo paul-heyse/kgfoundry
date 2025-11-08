@@ -75,6 +75,7 @@ The configuration lifecycle follows this sequence during application startup:
 | `VLLM_BATCH_SIZE` | Batch size for embedding requests | `64` | `128` |
 | `VLLM_TIMEOUT_S` | HTTP request timeout in seconds | `120.0` | `180.0` |
 | `DUCKDB_LOG_QUERIES` | Emit debug logs for every DuckDB SQL statement (`0` = disabled, `1` = enabled) | `0` | `1` |
+| `DUCKDB_POOL_SIZE` | Size of optional DuckDB connection pool (`0` disables pooling) | `0` | `16` |
 | `DATA_DIR` | Base directory for data storage | `data` | `data` |
 | `VECTORS_DIR` | Directory containing Parquet files | `data/vectors` | `data/vectors` |
 | `SCIP_INDEX` | Path to SCIP index file | `index.scip` | `index.scip.json` |
@@ -89,6 +90,10 @@ The configuration lifecycle follows this sequence during application startup:
 | `SEMANTIC_OVERFETCH_MULTIPLIER` | FAISS fan-out multiplier when scope filters active | `2` | `3` |
 
 > **GPU warm-up tip:** On CPU-only workstations, export `SKIP_GPU_WARMUP=1` before running pytest to bypass the FAISS GPU smoke test. Drop the variable on CUDA-capable hosts so the warm-up coverage runs.
+
+### DuckDB Thread Safety & Pooling
+
+DuckDB connections are managed by `DuckDBManager`, which enforces **per-request connections** so no worker shares stateful `duckdb.DuckDBPyConnection` instances. When `DUCKDB_POOL_SIZE > 0`, the manager reuses connections via a bounded LIFO pool, reducing connection churn while keeping concurrency capped. Leave pooling disabled (`DUCKDB_POOL_SIZE=0`) for most workloads; enable a small pool (8–32) only when sustained parallel queries cause measurable connection overhead.
 
 ## Configuration Best Practices
 

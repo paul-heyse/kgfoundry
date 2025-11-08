@@ -615,7 +615,18 @@ export DUCKDB_MEMORY_LIMIT=8GB
 
 # Enable parallel query execution
 export DUCKDB_THREADS=8
+
+# Enable bounded connection pool (reuse connections under high concurrency)
+export DUCKDB_POOL_SIZE=16
 ```
+
+DuckDB access is handled by `DuckDBManager`, which ensures:
+- **Thread safety**: every request obtains its own connection; no shared global connection objects.
+- **Connection hygiene**: pragmas (`PRAGMA enable_object_cache`, `SET threads`) are applied on every new connection.
+- **Optional pooling**: when `DUCKDB_POOL_SIZE` is set, connections are stored in a LIFO pool to reduce open/close churn while keeping concurrency bounded.
+- **Structured logging**: enable `DUCKDB_LOG_QUERIES=1` during debugging to trace SQL statements.
+
+For workloads with bursty concurrency, start with a small pool (e.g., 8–16 connections) and monitor CPU utilization. Leaving pooling disabled (`DUCKDB_POOL_SIZE=0`) falls back to per-request connections, which is sufficient for most deployments.
 
 ## Troubleshooting
 

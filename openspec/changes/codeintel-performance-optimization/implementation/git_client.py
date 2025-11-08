@@ -71,8 +71,6 @@ class GitClient:
     repo_path : Path
         Path to repository root directory. GitPython will search parent
         directories for .git if repo_path is a subdirectory.
-    _repo : git.Repo | None
-        Cached GitPython Repo instance (lazy-initialized on first property access).
 
     Examples
     --------
@@ -400,13 +398,6 @@ class AsyncGitClient:
     """
 
     def __init__(self, git_client: GitClient) -> None:
-        """Initialize async wrapper with sync client.
-
-        Parameters
-        ----------
-        git_client : GitClient
-            Synchronous GitClient to wrap with async interface.
-        """
         self._sync_client = git_client
 
     async def blame_range(self, path: str, start_line: int, end_line: int) -> list[GitBlameEntry]:

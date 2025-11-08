@@ -9,7 +9,11 @@ from codeintel_rev.mcp_server.common.observability import observe_duration
 from prometheus_client import CollectorRegistry
 
 from kgfoundry_common.observability import MetricsProvider
-from kgfoundry_common.prometheus import HistogramLike
+from kgfoundry_common.prometheus import HAVE_PROMETHEUS, HistogramLike
+
+pytestmark = pytest.mark.skipif(
+    not HAVE_PROMETHEUS, reason="Prometheus client not installed; metrics tests bypassed."
+)
 
 
 def _get_sample_value(
@@ -44,7 +48,7 @@ def test_observe_duration_records_success(prometheus_registry: CollectorRegistry
     )
     runs_total = _get_sample_value(
         prometheus_registry,
-        "kgfoundry_runs_total_total",
+        "kgfoundry_runs_total",
         {"component": component, "status": "success"},
     )
 
@@ -67,10 +71,13 @@ def test_observe_duration_records_error_on_exception(
     operation = "text_search"
     failure_message = "failure during operation"
 
-    with pytest.raises(RuntimeError, match=failure_message), observe_duration(
-        operation,
-        component,
-        metrics=provider,
+    with (
+        pytest.raises(RuntimeError, match=failure_message),
+        observe_duration(
+            operation,
+            component,
+            metrics=provider,
+        ),
     ):
         raise RuntimeError(failure_message)
 
@@ -81,7 +88,7 @@ def test_observe_duration_records_error_on_exception(
     )
     runs_total = _get_sample_value(
         prometheus_registry,
-        "kgfoundry_runs_total_total",
+        "kgfoundry_runs_total",
         {"component": component, "status": "error"},
     )
 
@@ -126,7 +133,7 @@ def test_observe_duration_noop_when_histogram_labels_disabled(
     )
     runs_total = _get_sample_value(
         prometheus_registry,
-        "kgfoundry_runs_total_total",
+        "kgfoundry_runs_total",
         {"component": component, "status": "success"},
     )
 
@@ -162,7 +169,7 @@ def test_observe_duration_noop_when_base_observer_raises_value_error(
     )
     runs_total = _get_sample_value(
         prometheus_registry,
-        "kgfoundry_runs_total_total",
+        "kgfoundry_runs_total",
         {"component": component, "status": "success"},
     )
 

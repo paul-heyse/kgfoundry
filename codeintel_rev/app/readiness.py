@@ -424,17 +424,15 @@ class ReadinessProbe:
         bool
             ``True`` when the materialized table exists, ``False`` otherwise.
         """
-        return (
-            conn.execute(
-                """
-                SELECT COUNT(*)
-                FROM information_schema.tables
-                WHERE table_schema = 'main'
-                  AND table_name = 'chunks_materialized'
-                """
-            ).fetchone()[0]
-            > 0
-        )
+        row = conn.execute(
+            """
+            SELECT COUNT(*)
+            FROM information_schema.tables
+            WHERE table_schema = 'main'
+              AND table_name = 'chunks_materialized'
+            """
+        ).fetchone()
+        return bool(row and row[0])
 
     @staticmethod
     def _duckdb_index_exists(conn: duckdb.DuckDBPyConnection) -> bool:
@@ -450,16 +448,14 @@ class ReadinessProbe:
         bool
             ``True`` when the index exists, ``False`` otherwise.
         """
-        return (
-            conn.execute(
-                """
-                SELECT COUNT(*) FROM duckdb_indexes
-                WHERE table_name = 'chunks_materialized'
-                  AND index_name = 'idx_chunks_materialized_uri'
-                """
-            ).fetchone()[0]
-            > 0
-        )
+        row = conn.execute(
+            """
+            SELECT COUNT(*) FROM duckdb_indexes
+            WHERE table_name = 'chunks_materialized'
+              AND index_name = 'idx_chunks_materialized_uri'
+            """
+        ).fetchone()
+        return bool(row and row[0])
 
     @staticmethod
     def _check_search_tools() -> CheckResult:

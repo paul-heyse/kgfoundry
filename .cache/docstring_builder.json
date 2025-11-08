@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "schemaId": "https://kgfoundry.dev/schema/tools/docstring-cache.json",
-  "generatedAt": "2025-11-08T12:43:21.812896+00:00",
+  "generatedAt": "2025-11-08T14:57:18.929951+00:00",
   "entries": {
     "/home/paul/kgfoundry/src/docling/__init__.py": {
       "mtime": 1762323633.33046,
@@ -248,7 +248,7 @@
       "config_hash": "914bd6aab31dd9fc63253f16e96d3bca0f7d6636ab97758397fa3732c71318dc"
     },
     "/home/paul/kgfoundry/src/kgfoundry_common/errors/codes.py": {
-      "mtime": 1762604332.7152488,
+      "mtime": 1762613463.8460388,
       "config_hash": "914bd6aab31dd9fc63253f16e96d3bca0f7d6636ab97758397fa3732c71318dc"
     },
     "/home/paul/kgfoundry/src/kgfoundry_common/errors/exceptions.py": {

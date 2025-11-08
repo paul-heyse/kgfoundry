@@ -193,7 +193,7 @@ class TestGitClientBlameRange:
 class TestGitClientFileHistory:
     """Test GitClient.file_history method."""
 
-    @pytest.mark.usefixtures("_mock_commit")
+    @pytest.mark.usefixtures("mock_commit")
     def test_file_history_happy_path(self, git_client: GitClient, mock_repo: Mock) -> None:
         """file_history should return commit list."""
         # Create multiple mock commits

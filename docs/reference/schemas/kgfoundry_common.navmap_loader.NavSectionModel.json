@@ -1,0 +1,56 @@
+{
+  "$id": "https://kgfoundry.dev/schemas/kgfoundry_common.navmap_loader.NavSectionModel.json#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Section grouping symbols for navigation.",
+  "examples": [
+    {
+      "description": {},
+      "id": null,
+      "symbols": null,
+      "title": {}
+    }
+  ],
+  "properties": {
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "symbols": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Symbols",
+      "type": "array"
+    },
+    "title": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Title"
+    }
+  },
+  "required": [
+    "id",
+    "symbols"
+  ],
+  "title": "NavSectionModel",
+  "type": "object"
+}

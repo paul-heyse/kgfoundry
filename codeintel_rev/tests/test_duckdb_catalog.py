@@ -28,18 +28,16 @@ def _write_chunks_parquet(path: Path) -> None:
 def _table_exists(db_path: Path, table_name: str) -> bool:
     connection = duckdb.connect(str(db_path))
     try:
-        return (
-            connection.execute(
-                """
-                SELECT COUNT(*)
-                FROM information_schema.tables
-                WHERE table_schema = 'main'
-                  AND table_name = ?
-                """,
-                [table_name],
-            ).fetchone()[0]
-            > 0
-        )
+        row = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM information_schema.tables
+            WHERE table_schema = 'main'
+              AND table_name = ?
+            """,
+            [table_name],
+        ).fetchone()
+        return bool(row and row[0])
     finally:
         connection.close()
 
@@ -47,13 +45,11 @@ def _table_exists(db_path: Path, table_name: str) -> bool:
 def _index_exists(db_path: Path, index_name: str) -> bool:
     connection = duckdb.connect(str(db_path))
     try:
-        return (
-            connection.execute(
-                "SELECT COUNT(*) FROM pragma_show_indexes() WHERE name = ?",
-                [index_name],
-            ).fetchone()[0]
-            > 0
-        )
+        row = connection.execute(
+            "SELECT COUNT(*) FROM pragma_show_indexes() WHERE name = ?",
+            [index_name],
+        ).fetchone()
+        return bool(row and row[0])
     finally:
         connection.close()
 
@@ -179,7 +175,8 @@ def test_open_materialize_creates_table_and_index(tmp_path: Path) -> None:
 
     connection = duckdb.connect(str(catalog_path))
     try:
-        row_count = connection.execute("SELECT COUNT(*) FROM chunks_materialized").fetchone()[0]
+        row = connection.execute("SELECT COUNT(*) FROM chunks_materialized").fetchone()
+        row_count = row[0] if row else 0
     finally:
         connection.close()
 

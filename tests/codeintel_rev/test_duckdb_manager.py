@@ -85,3 +85,37 @@ def test_query_builder_preserve_order() -> None:
     assert "ORDER BY ids.position" in sql
     assert "c.uri LIKE $include_0" in sql
     assert params["ids"] == [3, 1]
+
+
+def test_connection_pool_reuses_connections(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Connection pool limits concurrent connections and reuses them."""
+    db_path = tmp_path / "pooled.duckdb"
+    with duckdb.connect(str(db_path)) as conn:
+        conn.execute("CREATE TABLE numbers(value INTEGER)")
+        conn.execute("INSERT INTO numbers VALUES (1)")
+
+    real_connect = duckdb.connect
+    created: int = 0
+
+    def _instrumented_connect(path: str) -> duckdb.DuckDBPyConnection:
+        nonlocal created
+        created += 1
+        return real_connect(path)
+
+    monkeypatch.setattr(
+        "codeintel_rev.io.duckdb_manager.duckdb.connect",
+        _instrumented_connect,
+    )
+
+    manager = DuckDBManager(db_path, DuckDBConfig(pool_size=2))
+
+    for _ in range(10):
+        with manager.connection() as connection:
+            assert connection.execute("SELECT value FROM numbers").fetchone() == (1,)
+
+    manager.close()
+
+    assert created <= 2
+    assert manager.connections_created <= 2

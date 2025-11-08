@@ -61,6 +61,28 @@ async def search_text(  # noqa: PLR0913 - context parameter required for depende
     Applies session scope path filters if set via `set_scope`. Explicit parameters
     override session scope following the precedence rules documented above.
 
+    Parameters
+    ----------
+    context : ApplicationContext
+        Application context containing repo root and settings.
+    query : str
+        Search query string (regex pattern if ``regex=True``).
+    regex : bool, optional
+        Treat query as a regular expression. Defaults to ``False``.
+    case_sensitive : bool, optional
+        Perform case-sensitive search. Defaults to ``False``.
+    paths : Sequence[str] | None, optional
+        Specific file paths to search within. If provided, suppresses scope
+        include globs unless explicitly overridden. Defaults to ``None``.
+    include_globs : Sequence[str] | None, optional
+        Glob patterns for paths to include in the search. Overrides session scope
+        if provided. Defaults to ``None``.
+    exclude_globs : Sequence[str] | None, optional
+        Glob patterns for paths to exclude from the search. Overrides session scope
+        if provided. Defaults to ``None``.
+    max_results : int, optional
+        Maximum number of results to return. Defaults to ``50``.
+
     Returns
     -------
     dict
@@ -265,7 +287,10 @@ def _fallback_grep(
             continue
 
         try:
-            path = str(Path(parts[0]).relative_to(repo_root))
+            raw_path = Path(parts[0])
+            if not raw_path.is_absolute():
+                raw_path = (repo_root / raw_path).resolve()
+            path = str(raw_path.relative_to(repo_root))
             line_number = int(parts[1])
             preview = parts[2].strip()[:200]
 

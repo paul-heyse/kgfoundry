@@ -6,7 +6,7 @@
   },
   "$id": "https://kgfoundry.dev/schemas/kgfoundry_common.models.Chunk.json#",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "Describe Chunk.\n\n<!-- auto:docstring-builder v1 -->\n\nthe behaviour it provides to callers. Callers interact with\nvalidated data through this model.\n\nParameters\n----------\nid : Id\n    Describe ``id``.\ndoc_id : Id\n    Describe ``doc_id``.\nsection : str | NoneType\n    Describe ``section``.\nstart_char : int\n    Describe ``start_char``.\nend_char : int\n    Describe ``end_char``.\ntokens : int\n    Describe ``tokens``.\ndoctags_span : dict[str, int]\n    Describe ``doctags_span``.",
+  "description": "Document chunk model for text segmentation.\n\nRepresents a contiguous span of text with doctag mappings. Attribute docstrings note alias\nbehaviour explicitly.",
   "examples": [
     {
       "doc_id": null,

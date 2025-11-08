@@ -134,12 +134,10 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
     FastMCP tool access). Session IDs enable stateful scope management across
     multiple MCP tool calls within the same session.
 
-    Attributes
-    ----------
-    None (stateless middleware).
-
     Notes
     -----
+    This middleware is stateless and does not maintain any instance attributes.
+
     Middleware Order:
     - SessionScopeMiddleware should be registered early in the middleware stack
       (before tool handlers) to ensure session ID is available.

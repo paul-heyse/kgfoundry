@@ -441,6 +441,12 @@ def load_settings() -> Settings:
     )
 
     duckdb_defaults = DuckDBConfig()
+    duckdb_pool_env = os.environ.get("DUCKDB_POOL_SIZE")
+    duckdb_pool_size = (
+        None
+        if duckdb_pool_env is None or not duckdb_pool_env.strip() or duckdb_pool_env.strip() == "0"
+        else int(duckdb_pool_env)
+    )
     duckdb_config = DuckDBConfig(
         threads=int(os.environ.get("DUCKDB_THREADS", str(duckdb_defaults.threads))),
         enable_object_cache=os.environ.get("DUCKDB_OBJECT_CACHE", "1").lower()
@@ -455,6 +461,7 @@ def load_settings() -> Settings:
             "true",
             "yes",
         },
+        pool_size=duckdb_pool_size,
     )
 
     return Settings(

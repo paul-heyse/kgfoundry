@@ -168,6 +168,13 @@ def test_dual_index_search(tmp_index_path: Path) -> None:
 def _setup_primary_index(manager: FAISSManager, vec_dim: int) -> tuple[np.ndarray, np.ndarray]:
     """Set up primary index with test vectors.
 
+    Parameters
+    ----------
+    manager : FAISSManager
+        FAISS manager instance to configure.
+    vec_dim : int
+        Vector dimension for test vectors.
+
     Returns
     -------
     tuple[np.ndarray, np.ndarray]
@@ -184,6 +191,15 @@ def _add_duplicate_to_secondary(
     manager: FAISSManager, primary_vectors: np.ndarray, primary_ids: np.ndarray
 ) -> tuple[int, np.ndarray]:
     """Add duplicate vector to secondary index.
+
+    Parameters
+    ----------
+    manager : FAISSManager
+        FAISS manager instance.
+    primary_vectors : np.ndarray
+        Primary index vectors.
+    primary_ids : np.ndarray
+        Primary index IDs.
 
     Returns
     -------
@@ -209,6 +225,15 @@ def _verify_duplicate_in_results(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Verify duplicate ID appears in both search results and return indices.
 
+    Parameters
+    ----------
+    duplicate_id : int
+        ID of the duplicate vector to verify.
+    primary_ids_result : np.ndarray
+        Primary index search result IDs.
+    secondary_ids_result : np.ndarray
+        Secondary index search result IDs.
+
     Returns
     -------
     tuple[np.ndarray, np.ndarray]
@@ -228,6 +253,13 @@ def _perform_dual_search(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Perform search on both primary and secondary indexes.
 
+    Parameters
+    ----------
+    manager : FAISSManager
+        FAISS manager instance.
+    query : np.ndarray
+        Query vector for search.
+
     Returns
     -------
     tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
@@ -242,6 +274,15 @@ def _verify_merged_search_deduplication(
     manager: FAISSManager, query: np.ndarray, _duplicate_id: int
 ) -> tuple[np.ndarray, np.ndarray]:
     """Verify merged search deduplicates and return merged results.
+
+    Parameters
+    ----------
+    manager : FAISSManager
+        FAISS manager instance.
+    query : np.ndarray
+        Query vector for search.
+    _duplicate_id : int
+        ID of duplicate vector (unused, kept for test clarity).
 
     Returns
     -------
@@ -258,6 +299,13 @@ def _setup_test_indexes_with_duplicate(
     manager: FAISSManager, vec_dim: int
 ) -> tuple[int, np.ndarray]:
     """Set up primary and secondary indexes with a duplicate vector.
+
+    Parameters
+    ----------
+    manager : FAISSManager
+        FAISS manager instance to configure.
+    vec_dim : int
+        Vector dimension for test vectors.
 
     Returns
     -------

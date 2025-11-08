@@ -93,22 +93,21 @@ async def test_semantic_search_observes_duration(
 
 
 class StubDuckDBCatalog:
-    """Stub DuckDB catalog for testing."""
+    """Stub DuckDB catalog for testing.
+
+    Parameters
+    ----------
+    _db_path : Any
+        Database path (unused in stub).
+    _vectors_dir : Any
+        Vectors directory (unused in stub).
+    chunks : list[dict[str, Any]] | None, optional
+        List of chunks to return. If None, uses default chunk.
+    """
 
     def __init__(
         self, _db_path: Any, _vectors_dir: Any, *, chunks: list[dict[str, Any]] | None = None
     ) -> None:
-        """Initialize stub catalog.
-
-        Parameters
-        ----------
-        _db_path : Any
-            Database path (unused in stub).
-        _vectors_dir : Any
-            Vectors directory (unused in stub).
-        chunks : list[dict[str, Any]] | None, optional
-            List of chunks to return. If None, uses default chunk.
-        """
         if chunks is None:
             self._chunks = [
                 {
@@ -128,7 +127,7 @@ class StubDuckDBCatalog:
 
         Returns
         -------
-        StubDuckDBCatalog
+        Self
             Self instance.
         """
         return self
@@ -245,10 +244,16 @@ class StubDuckDBCatalog:
 
 
 class StubVLLMClient:
-    """Stub vLLM client for testing."""
+    """Stub vLLM client for testing.
+
+    Parameters
+    ----------
+    _config : Any
+        Configuration (unused in stub).
+    """
 
     def __init__(self, _config: Any) -> None:
-        """Initialize stub vLLM client."""
+        pass
 
     def embed_single(self, query: str) -> np.ndarray:
         """Return mock embedding vector.
@@ -268,18 +273,17 @@ class StubVLLMClient:
 
 
 class _BaseStubFAISSManager:
-    """Base stub FAISS manager for testing."""
+    """Base stub FAISS manager for testing.
+
+    Parameters
+    ----------
+    should_fail_gpu : bool
+        Whether GPU cloning should fail.
+    search_ids : list[int] | None, optional
+        List of chunk IDs to return from search. If None, returns [123].
+    """
 
     def __init__(self, *, should_fail_gpu: bool, search_ids: list[int] | None = None) -> None:
-        """Initialize stub FAISS manager.
-
-        Parameters
-        ----------
-        should_fail_gpu : bool
-            Whether GPU cloning should fail.
-        search_ids : list[int] | None, optional
-            List of chunk IDs to return from search. If None, returns [123].
-        """
         self.should_fail_gpu = should_fail_gpu
         self.gpu_disabled_reason: str | None = None
         self.clone_invocations = 0
@@ -345,12 +349,21 @@ class StubContextConfig:
     limits: list[str] | None = None
     error: str | None = None
     max_results: int = 5
+    semantic_overfetch_multiplier: int = 2
     catalog_chunks: list[dict[str, Any]] | None = None
     faiss_nprobe: int = 128
 
 
 class StubContext:
-    """Stub ApplicationContext for semantic adapter tests."""
+    """Stub ApplicationContext for semantic adapter tests.
+
+    Parameters
+    ----------
+    faiss_manager : _BaseStubFAISSManager
+        FAISS manager stub.
+    config : StubContextConfig | None, optional
+        Configuration for stub context. Defaults to None (uses defaults).
+    """
 
     def __init__(
         self,
@@ -358,21 +371,15 @@ class StubContext:
         faiss_manager: _BaseStubFAISSManager,
         config: StubContextConfig | None = None,
     ) -> None:
-        """Initialize stub context.
-
-        Parameters
-        ----------
-        faiss_manager : _BaseStubFAISSManager
-            FAISS manager stub.
-        config : StubContextConfig | None, optional
-            Configuration for stub context. Defaults to None (uses defaults).
-        """
         if config is None:
             config = StubContextConfig()
         self.faiss_manager = faiss_manager
         self.vllm_client = StubVLLMClient(SimpleNamespace())
         self.settings = SimpleNamespace(
-            limits=SimpleNamespace(max_results=config.max_results),
+            limits=SimpleNamespace(
+                max_results=config.max_results,
+                semantic_overfetch_multiplier=config.semantic_overfetch_multiplier,
+            ),
             vllm=SimpleNamespace(base_url="http://localhost"),
             index=SimpleNamespace(faiss_nprobe=config.faiss_nprobe),
         )

@@ -6,6 +6,8 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from queue import Empty, Full, LifoQueue
+from threading import Lock
 
 import duckdb
 
@@ -29,11 +31,16 @@ class DuckDBConfig:
     log_queries : bool
         Emit debug-level logs for every executed SQL statement. Disabled by
         default to avoid noise in production environments.
+    pool_size : int | None
+        Maximum number of DuckDB connections to keep in the optional connection
+        pool. ``None`` or ``0`` disables pooling (default). When enabled,
+        connections are reused across requests up to the configured limit.
     """
 
     threads: int = 4
     enable_object_cache: bool = True
     log_queries: bool = False
+    pool_size: int | None = None
 
 
 class DuckDBManager:
@@ -43,13 +50,21 @@ class DuckDBManager:
     ----------
     db_path : Path
         Path to the DuckDB catalog database file.
-    config : DuckDBConfig
+    config : DuckDBConfig | None, optional
         Connection configuration controlling threading and caching pragmas.
+        If ``None``, uses default configuration. Defaults to ``None``.
     """
 
     def __init__(self, db_path: Path, config: DuckDBConfig | None = None) -> None:
         self._db_path = db_path
         self._config = config or DuckDBConfig()
+        pool_size = self._config.pool_size or 0
+        self._pool_size = max(pool_size, 0)
+        self._pool: LifoQueue[duckdb.DuckDBPyConnection] | None = (
+            LifoQueue(maxsize=self._pool_size) if self._pool_size else None
+        )
+        self._pool_lock: Lock | None = Lock() if self._pool_size else None
+        self._connections_created = 0
 
     @contextmanager
     def connection(self) -> Iterator[duckdb.DuckDBPyConnection]:
@@ -60,20 +75,86 @@ class DuckDBManager:
         duckdb.DuckDBPyConnection
             Connection configured with the requested pragmas. The connection is
             automatically closed when the context manager exits.
+
+        Notes
+        -----
+        When ``DuckDBConfig.pool_size`` is greater than zero, connections are
+        taken from and returned to an in-process pool, ensuring bounded
+        concurrency without reopening the database file for every request.
         """
-        conn = duckdb.connect(str(self._db_path))
+        conn = self._acquire_connection()
         try:
-            if self._config.enable_object_cache:
-                conn.execute("PRAGMA enable_object_cache = true")
-            conn.execute(f"SET threads = {self._config.threads}")
             yield conn
         finally:
-            conn.close()
+            self._release_connection(conn)
 
     @property
     def config(self) -> DuckDBConfig:
         """Return the active DuckDB configuration."""
         return self._config
+
+    @property
+    def connections_created(self) -> int:
+        """Return the number of pooled connections created."""
+        if self._pool_lock is not None:
+            with self._pool_lock:
+                return self._connections_created
+        return self._connections_created
+
+    def close(self) -> None:
+        """Close all pooled connections and reset pool counters."""
+        if self._pool is None:
+            return
+        while True:
+            try:
+                conn = self._pool.get_nowait()
+            except Empty:
+                break
+            conn.close()
+        pool_lock = self._pool_lock
+        if pool_lock is not None:
+            with pool_lock:
+                self._connections_created = 0
+
+    def _create_connection(self) -> duckdb.DuckDBPyConnection:
+        conn = duckdb.connect(str(self._db_path))
+        if self._config.enable_object_cache:
+            conn.execute("PRAGMA enable_object_cache = true")
+        conn.execute(f"SET threads = {self._config.threads}")
+        return conn
+
+    def _acquire_connection(self) -> duckdb.DuckDBPyConnection:
+        if self._pool is None:
+            return self._create_connection()
+        try:
+            return self._pool.get_nowait()
+        except Empty:
+            pass
+
+        pool_lock = self._pool_lock
+        if pool_lock is None:
+            return self._create_connection()
+        with pool_lock:
+            if self._connections_created < self._pool_size:
+                conn = self._create_connection()
+                self._connections_created += 1
+                return conn
+
+        # Pool exhausted, block until one is returned.
+        return self._pool.get()
+
+    def _release_connection(self, conn: duckdb.DuckDBPyConnection) -> None:
+        if self._pool is None:
+            conn.close()
+            return
+        try:
+            self._pool.put_nowait(conn)
+        except Full:
+            conn.close()
+            pool_lock = self._pool_lock
+            if pool_lock is not None:
+                with pool_lock:
+                    self._connections_created = max(self._connections_created - 1, 0)
 
 
 @dataclass(slots=True, frozen=True)
@@ -189,6 +270,17 @@ class DuckDBQueryBuilder:
         languages: Sequence[str],
     ) -> list[str]:
         """Build WHERE clauses and populate params based on filters.
+
+        Parameters
+        ----------
+        params : dict[str, list[int] | list[str] | str]
+            Dictionary to populate with parameter values for SQL placeholders.
+        include_globs : Sequence[str]
+            Glob patterns for paths to include in the query.
+        exclude_globs : Sequence[str]
+            Glob patterns for paths to exclude from the query.
+        languages : Sequence[str]
+            Language codes to filter by.
 
         Returns
         -------

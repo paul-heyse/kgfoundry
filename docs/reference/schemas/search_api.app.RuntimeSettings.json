@@ -181,7 +181,7 @@
   "$id": "https://kgfoundry.dev/schemas/search_api.app.RuntimeSettings.json#",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "Aggregate runtime configuration loaded from environment variables.",
+  "description": "Aggregate runtime configuration loaded from environment variables.\n\nInitialises settings with fail-fast validation. Settings are loaded from\nenvironment variables with the KGFOUNDRY_ prefix and validated according\nto the nested configuration schemas.\n\nParameters\n----------\n**overrides : object\n    Settings overrides to apply during initialization.\n\nAttributes\n----------\nmodel_config : ClassVar[SettingsConfigDict]\n    Pydantic model configuration dictionary (class variable).\nsearch : SearchConfig\n    Search service configuration.\nobservability : ObservabilityConfig\n    Observability configuration.\nsparse_embedding : SparseEmbeddingConfig\n    Sparse embedding configuration.\nfaiss : FaissConfig\n    FAISS index configuration.\n\nRaises\n------\nSettingsError\n    If settings validation fails.",
   "examples": [
     {
       "faiss": null,

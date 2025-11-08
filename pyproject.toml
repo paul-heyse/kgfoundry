@@ -493,6 +493,11 @@ dependencies = [
     "cyclopts>=5.0.0a1",
     "pytest-benchmark>=5.2.2",
     "fastapi-healthz>=1.2.7",
+    "faiss-cpu>=1.12.0",
+    "torch @ https://download.pytorch.org/whl/cpu/torch-2.9.0%2Bcpu-cp313-cp313t-manylinux_2_28_x86_64.whl#sha256=528fd338311f31c9fb18038cafd00e6eae0bf5ad5577521701acb62510753d18",
+    "torchvision @ https://download.pytorch.org/whl/cpu/torchvision-0.24.0%2Bcpu-cp313-cp313t-manylinux_2_28_x86_64.whl#sha256=b8bbac1a0aedb4c14c25474cc1d40da3f85372156b1048671ec1ef5901886b3a",
+    "torchaudio @ https://download.pytorch.org/whl/cpu/torchaudio-2.9.0%2Bcpu-cp313-cp313-manylinux_2_28_x86_64.whl#sha256=20c0585786f69a182687ee6c3ab76c0ca8e5bf7b209015022e74ee67cda38af4",
+    "plotly>=6.4.0",
 ]
 
 [project.scripts]

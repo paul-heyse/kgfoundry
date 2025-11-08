@@ -64,6 +64,9 @@ class DuckDBCatalog:
         table (``chunks_materialized``) with a secondary index on ``uri``. When
         ``False`` (default), the catalog exposes Parquet files through a view for
         zero-copy queries.
+    manager : DuckDBManager | None, optional
+        DuckDB connection manager instance. If ``None``, creates a new manager
+        with default configuration. Defaults to ``None``.
     log_queries : bool | None, optional
         Enable debug logging of executed SQL statements when ``True``. Defaults to
         ``None`` which inherits the global logging configuration.

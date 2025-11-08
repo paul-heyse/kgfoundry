@@ -18,6 +18,11 @@ from codeintel_rev.config.settings import IndexConfig, Settings, VLLMConfig, loa
 def mock_context(tmp_path: Path) -> ApplicationContext:
     """Create a mock ApplicationContext for testing.
 
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory path provided by pytest fixture.
+
     Returns
     -------
     ApplicationContext
@@ -54,9 +59,9 @@ def _materialized_index_config(index: IndexConfig, *, enabled: bool) -> IndexCon
 
     Parameters
     ----------
-    index :
+    index : IndexConfig
         Baseline index configuration to copy.
-    enabled :
+    enabled : bool
         Flag indicating whether duckdb materialization should be enabled.
 
     Returns

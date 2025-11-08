@@ -16,7 +16,7 @@ import logging
 import os
 import sys
 from collections.abc import Callable
-from importlib import import_module
+from importlib import import_module, metadata
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import ModuleType
@@ -64,6 +64,15 @@ def _modules_available(modules: Iterable[str]) -> bool:
     return all(importlib.util.find_spec(module) is not None for module in modules)
 
 
+def _has_distribution(dist_name: str) -> bool:
+    """Return True when the given package distribution is installed."""
+    try:
+        metadata.version(dist_name)
+    except metadata.PackageNotFoundError:
+        return False
+    return True
+
+
 def _compute_has_gpu_stack() -> bool:
     if not _modules_available(GPU_CORE_MODULES):
         return False
@@ -87,6 +96,10 @@ def _compute_has_gpu_stack() -> bool:
 
 
 HAS_GPU_STACK = _compute_has_gpu_stack()
+HAS_FAISS_SUPPORT = _modules_available(("faiss",)) or _has_distribution("faiss-cpu")
+# Expose GPU stack availability for tooling and test gating.
+# HAS_FAISS_SUPPORT indicates FAISS is available (either GPU or CPU build).
+
 # Expose GPU stack availability for tooling and test gating.
 
 pytest_plugins: tuple[str, ...] = ()

@@ -1,0 +1,119 @@
+{
+  "$id": "https://kgfoundry.dev/schemas/kgfoundry_common.navmap_loader.NavModuleMeta.json#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Module-level metadata derived from registry interfaces or sidecars.",
+  "examples": [
+    {
+      "augment": {},
+      "binary": {},
+      "extras": null,
+      "owner": {},
+      "protocol": {},
+      "since": {},
+      "spec": {},
+      "stability": {},
+      "tags": []
+    }
+  ],
+  "properties": {
+    "augment": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Augment"
+    },
+    "binary": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Binary"
+    },
+    "extras": {
+      "additionalProperties": true,
+      "title": "Extras",
+      "type": "object"
+    },
+    "owner": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Owner"
+    },
+    "protocol": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Protocol"
+    },
+    "since": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Since"
+    },
+    "spec": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Spec"
+    },
+    "stability": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stability"
+    },
+    "tags": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    }
+  },
+  "title": "NavModuleMeta",
+  "type": "object"
+}

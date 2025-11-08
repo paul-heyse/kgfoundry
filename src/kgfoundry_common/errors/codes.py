@@ -99,6 +99,14 @@ class ErrorCode(StrEnum):
         Git operation failed.
     INVALID_PARAMETER
         Invalid parameter value provided.
+    PATH_OUTSIDE_REPOSITORY
+        Path is outside the repository root.
+    PATH_NOT_DIRECTORY
+        Path does not refer to a directory.
+    PATH_NOT_FOUND
+        Path does not exist.
+    NOT_IMPLEMENTED
+        Feature is not implemented.
     ONTOLOGY_PARSE_ERROR
         Ontology parsing failed.
     LINKER_CALIBRATION_ERROR

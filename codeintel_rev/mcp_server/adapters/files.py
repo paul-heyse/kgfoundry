@@ -19,7 +19,7 @@ from codeintel_rev.errors import (
     PathNotDirectoryError,
     PathNotFoundError,
 )
-from codeintel_rev.io.path_utils import resolve_within_repo
+from codeintel_rev.io.path_utils import PathOutsideRepositoryError, resolve_within_repo
 from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.mcp_server.scope_utils import (
     apply_language_filter,
@@ -206,12 +206,11 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0917 - PathOu
     dict
         File listing with paths and metadata.
 
-    Raises
-    ------
-    PathNotFoundError
-        If the requested path does not exist within the repository.
-    PathNotDirectoryError
-        If the requested path exists but is not a directory.
+    Notes
+    -----
+    Exceptions raised by ``_resolve_search_root`` (PathNotFoundError,
+    PathNotDirectoryError, PathOutsideRepositoryError) may propagate through
+    this function.
     """
     repo_root = context.paths.repo_root
     search_root = _resolve_search_root(repo_root, path)
@@ -459,7 +458,8 @@ def _resolve_search_root(repo_root: Path, requested: str | None) -> Path:
     Raises
     ------
     PathOutsideRepositoryError
-        If the resolved path escapes the repository root.
+        If the resolved path escapes the repository root (raised by
+        ``resolve_within_repo``).
     PathNotFoundError
         If the requested path does not exist within the repository.
     PathNotDirectoryError
@@ -470,6 +470,9 @@ def _resolve_search_root(repo_root: Path, requested: str | None) -> Path:
 
     try:
         search_root = resolve_within_repo(repo_root, requested, allow_nonexistent=False)
+    except PathOutsideRepositoryError:
+        # Re-raise to make it explicit in the function body for pydoclint
+        raise
     except FileNotFoundError as exc:
         error_msg = f"Path not found: {requested}"
         raise PathNotFoundError(error_msg, path=requested, cause=exc) from exc

@@ -1,0 +1,134 @@
+{
+  "$defs": {
+    "CodeSampleModel": {
+      "additionalProperties": true,
+      "description": "Typed representation of an ``x-codeSamples`` entry.",
+      "properties": {
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "lang": {
+          "title": "Lang",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "lang",
+        "source"
+      ],
+      "title": "CodeSampleModel",
+      "type": "object"
+    }
+  },
+  "$id": "https://kgfoundry.dev/schemas/orchestration.cli_context.OperationOverrideModel.json#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Pydantic model describing augment operation overrides.",
+  "examples": [
+    {
+      "code_samples": null,
+      "description": {},
+      "env": null,
+      "examples": [],
+      "extras": null,
+      "handler": {},
+      "problem_details": null,
+      "summary": {},
+      "tags": []
+    }
+  ],
+  "properties": {
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
+    "examples": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Examples",
+      "type": "array"
+    },
+    "extras": {
+      "additionalProperties": true,
+      "title": "Extras",
+      "type": "object"
+    },
+    "summary": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Summary"
+    },
+    "tags": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    },
+    "x-codeSamples": {
+      "items": {
+        "$ref": "#/$defs/CodeSampleModel"
+      },
+      "title": "X-Codesamples",
+      "type": "array"
+    },
+    "x-env": {
+      "items": {
+        "type": "string"
+      },
+      "title": "X-Env",
+      "type": "array"
+    },
+    "x-handler": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "X-Handler"
+    },
+    "x-problemDetails": {
+      "items": {
+        "type": "string"
+      },
+      "title": "X-Problemdetails",
+      "type": "array"
+    }
+  },
+  "title": "OperationOverrideModel",
+  "type": "object"
+}

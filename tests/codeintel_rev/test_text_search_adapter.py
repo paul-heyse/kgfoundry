@@ -22,6 +22,11 @@ from kgfoundry_common.subprocess_utils import SubprocessError, SubprocessTimeout
 def mock_context(tmp_path: Path) -> Mock:
     """Create a mock ApplicationContext for testing.
 
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory path provided by pytest fixture.
+
     Returns
     -------
     Mock
@@ -77,6 +82,25 @@ def _run_search(  # noqa: PLR0913
     max_results: int = 50,
 ) -> dict:
     """Execute the async search_text helper synchronously for tests.
+
+    Parameters
+    ----------
+    context : Mock
+        Mock ApplicationContext instance.
+    query : str
+        Search query string.
+    regex : bool, optional
+        Treat query as regular expression. Defaults to ``False``.
+    case_sensitive : bool, optional
+        Perform case-sensitive search. Defaults to ``False``.
+    paths : Sequence[str] | None, optional
+        Specific file paths to search. Defaults to ``None``.
+    include_globs : Sequence[str] | None, optional
+        Glob patterns to include. Defaults to ``None``.
+    exclude_globs : Sequence[str] | None, optional
+        Glob patterns to exclude. Defaults to ``None``.
+    max_results : int, optional
+        Maximum number of results. Defaults to ``50``.
 
     Returns
     -------

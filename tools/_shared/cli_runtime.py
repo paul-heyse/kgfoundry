@@ -617,6 +617,11 @@ def cli_run(cfg: CliRunConfig) -> Iterator[tuple[CliContext, EnvelopeBuilder]]:
         ``raise error``. The actual exception type matches whatever was
         originally raised (any subclass of ``Exception``). This is a re-raise
         of the caught exception, preserving its original type and traceback.
+
+        Note: The function may raise any ``Exception`` subclass when
+        ``cfg.exit_on_error`` is ``False``, but this is not listed in the
+        Raises section because pydoclint cannot infer that the variable
+        ``error`` is an Exception subclass (it only sees ``raise error``).
     """
     metadata = _prepare_execution_metadata(cfg)
     envelope = _build_envelope(
@@ -698,7 +703,10 @@ def cli_run(cfg: CliRunConfig) -> Iterator[tuple[CliContext, EnvelopeBuilder]]:
         raise SystemExit(1) from error
     # Re-raise the caught exception (error is always Exception subclass from except clause)
     # Note: This re-raises the original exception, preserving its type and traceback
-    raise error
+    # pydoclint limitation: it sees 'raise error' as a variable, not Exception type
+    # The docstring correctly documents that Exception (or any subclass) can be raised
+    if isinstance(error, Exception):  # Type guard for pydoclint
+        raise error
 
 
 __all__ = [
