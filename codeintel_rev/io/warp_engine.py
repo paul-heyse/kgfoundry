@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -13,6 +13,8 @@ if TYPE_CHECKING:
     from types import ModuleType
 
 LOGGER = get_logger(__name__)
+
+WarpExecutorFactory = Callable[[str, str], object]
 
 
 class WarpUnavailableError(RuntimeError):
@@ -69,18 +71,15 @@ class WarpEngine:
         normalized: list[tuple[int, float]] = []
         for item in results:
             if isinstance(item, dict):
-                normalized.append(
-                    (
-                        int(item.get("doc_id")),
-                        float(item.get("score", 0.0)),
-                    )
-                )
+                doc_id_value = _safe_int(item.get("doc_id"))
+                score_value = _safe_float(item.get("score", 0.0))
+                normalized.append((doc_id_value, score_value))
             else:
                 doc_id, score = item
-                normalized.append((int(doc_id), float(score)))
+                normalized.append((_safe_int(doc_id), _safe_float(score)))
         return normalized
 
-    def _load_executor_cls(self) -> type[object]:
+    def _load_executor_cls(self) -> WarpExecutorFactory:
         """Import the WARP executor class via ``gate_import``.
 
         Returns
@@ -98,7 +97,7 @@ class WarpEngine:
         if executor_cls is None:
             msg = "xtr_warp.executor does not expose WarpExecutor"
             raise WarpUnavailableError(msg)
-        return executor_cls
+        return cast("WarpExecutorFactory", executor_cls)
 
     @staticmethod
     def _import_warp_executor_module() -> ModuleType:
@@ -123,8 +122,8 @@ class WarpEngine:
             return self._executor
         try:
             self._executor = self._executor_cls(  # type: ignore[call-arg]
-                index_dir=str(self.index_dir),
-                device=self.device,
+                str(self.index_dir),
+                self.device,
             )
         except Exception as exc:
             msg = f"Failed to initialize WARP executor: {exc}"
@@ -134,3 +133,35 @@ class WarpEngine:
             extra={"index_dir": str(self.index_dir), "device": self.device},
         )
         return self._executor
+
+
+def _safe_int(value: object | None, default: int = 0) -> int:
+    """Convert an object to ``int`` safely, falling back to the provided default.
+
+    Returns
+    -------
+    int
+        Integer representation of ``value`` or the fallback default.
+    """
+    if isinstance(value, (int, float, str)):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+    return default
+
+
+def _safe_float(value: object | None, default: float = 0.0) -> float:
+    """Convert an object to ``float`` safely, falling back to the provided default.
+
+    Returns
+    -------
+    float
+        Float representation of ``value`` or the fallback default.
+    """
+    if isinstance(value, (int, float, str)):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+    return default

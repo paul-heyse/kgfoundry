@@ -30,7 +30,9 @@ class Run:
 
     _instance = None
 
-    os.environ["TOKENIZERS_PARALLELISM"] = "true"  # NOTE: If a deadlock arises, switch to false!!
+    os.environ["TOKENIZERS_PARALLELISM"] = (
+        "true"  # NOTE: If a deadlock arises, switch to false!!
+    )
 
     def __new__(cls) -> Self:
         """Create or return singleton instance.
@@ -100,7 +102,9 @@ class Run:
         self.stack.pop()
 
     @contextmanager
-    def context(self, runconfig: RunConfig, *, inherit_config: bool = True) -> Iterator[None]:
+    def context(
+        self, runconfig: RunConfig, *, inherit_config: bool = True
+    ) -> Iterator[None]:
         """Context manager for temporary configuration.
 
         Pushes new configuration onto stack, optionally inheriting from

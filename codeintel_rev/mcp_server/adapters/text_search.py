@@ -10,10 +10,10 @@ import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, cast
 
 from codeintel_rev.app.middleware import get_session_id
-from codeintel_rev.mcp_server.common.observability import observe_duration
+from codeintel_rev.mcp_server.common.observability import Observation, observe_duration
 from codeintel_rev.mcp_server.schemas import Match, ScopeIn
 from codeintel_rev.mcp_server.scope_utils import (
     get_effective_scope,
@@ -43,7 +43,14 @@ class TextSearchOptions:
     """Parameters controlling ripgrep execution."""
 
     _ALLOWED_KEYS = frozenset(
-        {"regex", "case_sensitive", "paths", "include_globs", "exclude_globs", "max_results"}
+        {
+            "regex",
+            "case_sensitive",
+            "paths",
+            "include_globs",
+            "exclude_globs",
+            "max_results",
+        }
     )
 
     query: str
@@ -55,7 +62,9 @@ class TextSearchOptions:
     max_results: int = 50
 
     @classmethod
-    def from_overrides(cls, query: str, overrides: Mapping[str, object]) -> TextSearchOptions:
+    def from_overrides(
+        cls, query: str, overrides: Mapping[str, object]
+    ) -> TextSearchOptions:
         """Build search options from keyword overrides.
 
         Constructs a TextSearchOptions instance from a query string and a mapping
@@ -85,17 +94,117 @@ class TextSearchOptions:
         if unexpected:
             msg = f"Unexpected search_text keyword(s): {sorted(unexpected)}"
             raise TypeError(msg)
-        return cls(query=query, **{k: overrides[k] for k in overrides})
+        regex_value = (
+            _bool_override(overrides, "regex") if "regex" in overrides else cls.regex
+        )
+        case_sensitive_value = (
+            _bool_override(overrides, "case_sensitive")
+            if "case_sensitive" in overrides
+            else cls.case_sensitive
+        )
+        max_results_value = (
+            _int_override(overrides, "max_results")
+            if "max_results" in overrides
+            else cls.max_results
+        )
+        return cls(
+            query=query,
+            regex=regex_value,
+            case_sensitive=case_sensitive_value,
+            paths=_sequence_override(overrides, "paths"),
+            include_globs=_sequence_override(overrides, "include_globs"),
+            exclude_globs=_sequence_override(overrides, "exclude_globs"),
+            max_results=max_results_value,
+        )
 
 
-class Observation(Protocol):
-    """Interface describing the observation helpers used for metrics recording."""
+def _bool_override(overrides: Mapping[str, object], key: str) -> bool:
+    """Return a boolean override for the given key.
 
-    def mark_success(self) -> None:
-        """Mark the current operation as successful."""
+    Parameters
+    ----------
+    overrides : Mapping[str, object]
+        Override dictionary provided by the adapter call.
+    key : str
+        Lookup key corresponding to a TextSearchOptions boolean field.
 
-    def mark_error(self) -> None:
-        """Mark the current operation as failed."""
+    Returns
+    -------
+    bool
+        Boolean override value retrieved from the overrides mapping.
+
+    Raises
+    ------
+    TypeError
+        If the override is present but not a boolean.
+    """
+    value = overrides[key]
+    if not isinstance(value, bool):
+        msg = f"{key} must be a boolean"
+        raise TypeError(msg)
+    return value
+
+
+def _sequence_override(
+    overrides: Mapping[str, object], key: str
+) -> Sequence[str] | None:
+    """Return a sequence override if the value is a valid sequence of strings.
+
+    Parameters
+    ----------
+    overrides : Mapping[str, object]
+        Override dictionary provided by the adapter call.
+    key : str
+        Lookup key corresponding to a sequence field in TextSearchOptions.
+
+    Returns
+    -------
+    Sequence[str] | None
+        Sequence override if present, otherwise ``None``.
+
+    Raises
+    ------
+    TypeError
+        If the override is present but not a sequence of strings.
+    """
+    if key not in overrides:
+        return None
+    value = overrides[key]
+    if (
+        isinstance(value, Sequence)
+        and not isinstance(value, (str, bytes))
+        and all(isinstance(item, str) for item in value)
+    ):
+        return cast("Sequence[str]", value)
+    msg = f"{key} must be a sequence of strings"
+    raise TypeError(msg)
+
+
+def _int_override(overrides: Mapping[str, object], key: str) -> int:
+    """Return an integer override for the given key.
+
+    Parameters
+    ----------
+    overrides : Mapping[str, object]
+        Override dictionary provided by the adapter call.
+    key : str
+        Lookup key corresponding to the ``max_results`` parameter.
+
+    Returns
+    -------
+    int
+        Integer override value retrieved from the overrides mapping.
+
+    Raises
+    ------
+    TypeError
+        If the override is present but not an integer.
+    """
+    value = overrides[key]
+    if not isinstance(value, int):
+        msg = f"{key} must be an int"
+        raise TypeError(msg)
+    return value
 
 
 async def search_text(
@@ -192,16 +301,24 @@ def _search_text_sync(
             "query": query,
             "explicit_paths": list(options.paths) if options.paths else None,
             "explicit_include_globs": (
-                list(options.include_globs) if options.include_globs is not None else None
+                list(options.include_globs)
+                if options.include_globs is not None
+                else None
             ),
             "explicit_exclude_globs": (
-                list(options.exclude_globs) if options.exclude_globs is not None else None
+                list(options.exclude_globs)
+                if options.exclude_globs is not None
+                else None
             ),
             "scope_include_globs": (
-                cast("Sequence[str] | None", scope.get("include_globs")) if scope else None
+                cast("Sequence[str] | None", scope.get("include_globs"))
+                if scope
+                else None
             ),
             "scope_exclude_globs": (
-                cast("Sequence[str] | None", scope.get("exclude_globs")) if scope else None
+                cast("Sequence[str] | None", scope.get("exclude_globs"))
+                if scope
+                else None
             ),
             "effective_paths": effective_paths,
             "effective_include_globs": effective_include_globs,

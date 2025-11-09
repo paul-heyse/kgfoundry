@@ -54,7 +54,10 @@ class ResidualEmbeddings:
                 f"residuals.size(0) ({residuals.size(0)})"
             )
             raise ValueError(msg)
-        if codes.dim() != EXPECTED_CODES_DIM or residuals.dim() != EXPECTED_RESIDUALS_DIM:
+        if (
+            codes.dim() != EXPECTED_CODES_DIM
+            or residuals.dim() != EXPECTED_RESIDUALS_DIM
+        ):
             msg = (
                 "codes must be 1-dimensional and residuals must be "
                 f"2-dimensional, got codes.size()={codes.size()}, "
@@ -108,7 +111,9 @@ class ResidualEmbeddings:
         dim, nbits = get_dim_and_nbits(index_path)
         if load_index_with_mmap:
             return cls._load_chunks_with_mmap(index_path, chunk_idxs)
-        return cls._load_chunks_streaming(index_path, chunk_idxs, num_embeddings, dim, nbits)
+        return cls._load_chunks_streaming(
+            index_path, chunk_idxs, num_embeddings, dim, nbits
+        )
 
     @classmethod
     def _load_chunks_with_mmap(
@@ -129,7 +134,9 @@ class ResidualEmbeddings:
         codes_path = index_path_obj / "0.codes.pt"
 
         codes_size = get_codes_size(index_path, 0)
-        storage = torch.IntStorage.from_file(filename=codes_path, shared=True, size=codes_size + 80)
+        storage = torch.IntStorage.from_file(
+            filename=codes_path, shared=True, size=codes_size + 80
+        )
         codes = torch.IntTensor(storage)[80:]
 
         residuals_size, codes_size, packed_dim = get_residuals_size(index_path, 0)
@@ -215,7 +222,9 @@ class ResidualEmbeddings:
         return torch.load(codes_path, map_location="cpu")
 
     @classmethod
-    def load_residuals(cls, index_path: str | pathlib.Path, chunk_idx: int) -> torch.Tensor:
+    def load_residuals(
+        cls, index_path: str | pathlib.Path, chunk_idx: int
+    ) -> torch.Tensor:
         """Load residuals tensor from chunk.
 
         Parameters
@@ -312,13 +321,17 @@ def get_codes_size(index_path: str | pathlib.Path, chunk_idx: int) -> int:
         Number of embeddings in chunk.
     """
     # NOTE: Ideally load this using ColBERTConfig.load_from_index!
-    with (pathlib.Path(index_path) / f"{chunk_idx}.metadata.json").open(encoding="utf-8") as f:
+    with (pathlib.Path(index_path) / f"{chunk_idx}.metadata.json").open(
+        encoding="utf-8"
+    ) as f:
         metadata = ujson.load(f)
 
     return metadata["num_embeddings"]
 
 
-def get_residuals_size(index_path: str | pathlib.Path, chunk_idx: int) -> tuple[int, int, int]:
+def get_residuals_size(
+    index_path: str | pathlib.Path, chunk_idx: int
+) -> tuple[int, int, int]:
     """Get residuals size information for chunk.
 
     Parameters

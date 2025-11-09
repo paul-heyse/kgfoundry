@@ -256,7 +256,9 @@ def _chunk_repository(
         )
         chunks.extend(file_chunks)
 
-    logger.info("Chunked %s files into %s chunks", len(definitions_by_file), len(chunks))
+    logger.info(
+        "Chunked %s files into %s chunks", len(definitions_by_file), len(chunks)
+    )
     return chunks
 
 
@@ -354,7 +356,9 @@ def _build_faiss_index(
         raise RuntimeError(msg)
 
     n_vectors = len(embeddings)
-    logger.info("Building FAISS index for %s vectors (adaptive type selection)", n_vectors)
+    logger.info(
+        "Building FAISS index for %s vectors (adaptive type selection)", n_vectors
+    )
 
     faiss_mgr = FAISSManager(
         index_path=paths.faiss_index,
@@ -470,7 +474,9 @@ def _update_faiss_index_incremental(
     new_indices = np.where(new_mask)[0]
 
     if len(new_indices) == 0:
-        logger.info("All %s chunks already indexed; no incremental update needed", len(chunks))
+        logger.info(
+            "All %s chunks already indexed; no incremental update needed", len(chunks)
+        )
         return
 
     new_chunks = [chunks[i] for i in new_indices]
@@ -526,7 +532,9 @@ def _initialize_duckdb(paths: PipelinePaths, *, materialize: bool) -> int:
     return count
 
 
-def _write_symbols(paths: PipelinePaths, index: SCIPIndex, chunks: Sequence[Chunk]) -> None:
+def _write_symbols(
+    paths: PipelinePaths, index: SCIPIndex, chunks: Sequence[Chunk]
+) -> None:
     """Derive symbol tables and persist them into DuckDB."""
     manager = DuckDBManager(paths.duckdb_path)
     sym = SymbolCatalog(manager)
@@ -534,7 +542,9 @@ def _write_symbols(paths: PipelinePaths, index: SCIPIndex, chunks: Sequence[Chun
 
     by_file: dict[str, list[tuple[int, int, int]]] = {}
     for chunk_id, chunk in enumerate(chunks):
-        by_file.setdefault(chunk.uri, []).append((chunk_id, chunk.start_line, chunk.end_line))
+        by_file.setdefault(chunk.uri, []).append(
+            (chunk_id, chunk.start_line, chunk.end_line)
+        )
 
     def _chunk_for(uri: str, line: int) -> int:
         for cid, start, end in by_file.get(uri, []):

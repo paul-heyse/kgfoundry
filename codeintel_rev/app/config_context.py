@@ -304,9 +304,13 @@ class ApplicationContext:
     _faiss_lock: Lock = field(default_factory=Lock, init=False)
     _faiss_loaded: bool = field(default=False, init=False)
     _faiss_gpu_attempted: bool = field(default=False, init=False)
-    _hybrid_engine: HybridSearchEngine | None = field(default=None, init=False, repr=False)
+    _hybrid_engine: HybridSearchEngine | None = field(
+        default=None, init=False, repr=False
+    )
     _hybrid_lock: Lock = field(default_factory=Lock, init=False, repr=False)
-    _coderank_faiss_manager: FAISSManager | None = field(default=None, init=False, repr=False)
+    _coderank_faiss_manager: FAISSManager | None = field(
+        default=None, init=False, repr=False
+    )
     _coderank_faiss_lock: Lock = field(default_factory=Lock, init=False, repr=False)
 
     @classmethod

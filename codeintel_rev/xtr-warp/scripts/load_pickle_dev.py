@@ -30,7 +30,9 @@ if __name__ == "__main__":
     # SECURITY: Only load pickle files from trusted, local paths
     # In production, this should be replaced with JSON or other safe formats
     with pickle_path.open("rb") as f:
-        ivf_list = pickle_module.load(f)  # Development/testing only; hardcoded trusted path
+        ivf_list = pickle_module.load(
+            f
+        )  # Development/testing only; hardcoded trusted path
 
     if len(ivf_list) != max(ivf_list.keys()) + 1:
         max_keys = max(ivf_list.keys()) + 1

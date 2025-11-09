@@ -18,12 +18,36 @@ if TYPE_CHECKING:
 class SupportsCodeRankSettings(Protocol):
     """Protocol describing the minimal settings required by the embedder."""
 
-    model_id: str
-    device: str
-    trust_remote_code: bool
-    query_prefix: str
-    normalize: bool
-    batch_size: int
+    @property
+    def model_id(self) -> str:
+        """CodeRank model identifier."""
+        ...
+
+    @property
+    def device(self) -> str:
+        """Target device for inference."""
+        ...
+
+    @property
+    def trust_remote_code(self) -> bool:
+        """Whether to trust remote code when loading the model."""
+        ...
+
+    @property
+    def query_prefix(self) -> str:
+        """Instruction prefix required by the model."""
+        ...
+
+    @property
+    def normalize(self) -> bool:
+        """Whether embeddings should be normalized."""
+        ...
+
+    @property
+    def batch_size(self) -> int:
+        """Batch size used when encoding queries."""
+        ...
+
 
 LOGGER = get_logger(__name__)
 

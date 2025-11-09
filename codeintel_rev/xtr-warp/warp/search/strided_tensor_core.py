@@ -55,7 +55,9 @@ class StridedTensorCore:
         self.inner_dims = self.tensor.size()[1:]
         self.use_gpu = use_gpu
 
-        self.lengths = lengths.long() if torch.is_tensor(lengths) else torch.LongTensor(lengths)
+        self.lengths = (
+            lengths.long() if torch.is_tensor(lengths) else torch.LongTensor(lengths)
+        )
 
         self.strides = [
             *_select_strides(self.lengths, [0.5, 0.75, 0.9, 0.95]),
@@ -76,7 +78,8 @@ class StridedTensorCore:
             self.tensor = torch.cat((self.tensor, padding))
 
         self.views = {
-            stride: create_view(self.tensor, stride, self.inner_dims) for stride in self.strides
+            stride: create_view(self.tensor, stride, self.inner_dims)
+            for stride in self.strides
         }
 
     @classmethod
@@ -150,7 +153,10 @@ class StridedTensorCore:
 
     def as_packed_tensor(
         self, *, return_offsets: bool = False
-    ) -> tuple[torch.Tensor, torch.Tensor] | tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> (
+        tuple[torch.Tensor, torch.Tensor]
+        | tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+    ):
         """Convert to packed tensor format.
 
         Parameters
@@ -191,7 +197,9 @@ class StridedTensorCore:
         else:
             view = create_view(self.tensor, self.max_stride, self.inner_dims)
             view = view[self.offsets[:-1]]
-            mask = create_mask(self.lengths, self.max_stride, like=view, use_gpu=self.use_gpu)
+            mask = create_mask(
+                self.lengths, self.max_stride, like=view, use_gpu=self.use_gpu
+            )
 
         return view, mask
 
@@ -223,7 +231,9 @@ def _get_quantiles(lengths: torch.Tensor, quantiles: list[float]) -> list[int]:
     )
 
 
-def create_view(tensor: torch.Tensor, stride: int, inner_dims: tuple[int, ...]) -> torch.Tensor:
+def create_view(
+    tensor: torch.Tensor, stride: int, inner_dims: tuple[int, ...]
+) -> torch.Tensor:
     """Create strided view of tensor for efficient sequence access.
 
     Parameters

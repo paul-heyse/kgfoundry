@@ -513,7 +513,9 @@ def save_ranking(
     return lists
 
 
-def groupby_first_item[T_co](lst: Sequence[Sequence[T_co]]) -> defaultdict[T_co, list[T_co]]:
+def groupby_first_item[T_co](
+    lst: Sequence[Sequence[T_co]],
+) -> defaultdict[T_co, list[T_co]]:
     """Group sequences by their first item.
 
     Parameters

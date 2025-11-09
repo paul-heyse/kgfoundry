@@ -111,7 +111,9 @@ class DuckDBCatalog:
         self._embedding_dim_cache: int | None = None
         self._init_lock = Lock()
         self._views_ready = False
-        self._log_queries = log_queries if log_queries is not None else manager.config.log_queries
+        self._log_queries = (
+            log_queries if log_queries is not None else manager.config.log_queries
+        )
 
     def open(self) -> None:
         """Ensure catalog views are initialized."""
@@ -199,13 +201,13 @@ class DuckDBCatalog:
                 self._log_query(sql, None)
                 conn.execute(sql)
 
-            view_sql = "CREATE OR REPLACE VIEW chunks AS SELECT * FROM chunks_materialized"
+            view_sql = (
+                "CREATE OR REPLACE VIEW chunks AS SELECT * FROM chunks_materialized"
+            )
             self._log_query(view_sql, None)
             conn.execute(view_sql)
 
-            index_sql = (
-                "CREATE INDEX IF NOT EXISTS idx_chunks_materialized_uri ON chunks_materialized(uri)"
-            )
+            index_sql = "CREATE INDEX IF NOT EXISTS idx_chunks_materialized_uri ON chunks_materialized(uri)"
             self._log_query(index_sql, None)
             conn.execute(index_sql)
             LOGGER.info(
@@ -406,7 +408,9 @@ class DuckDBCatalog:
         )
 
         if languages and not spec.language_extensions:
-            self._observe_scope_filter_duration(start_time, include_globs, exclude_globs, languages)
+            self._observe_scope_filter_duration(
+                start_time, include_globs, exclude_globs, languages
+            )
             return []
 
         options = DuckDBQueryOptions(
@@ -434,7 +438,9 @@ class DuckDBCatalog:
         )
         results = self._apply_language_filters(results, spec.language_extensions)
 
-        self._observe_scope_filter_duration(start_time, include_globs, exclude_globs, languages)
+        self._observe_scope_filter_duration(
+            start_time, include_globs, exclude_globs, languages
+        )
         return results
 
     def _build_scope_filter_spec(
@@ -490,8 +496,12 @@ class DuckDBCatalog:
 
         return _ScopeFilterSpec(
             chunk_ids=chunk_ids,
-            simple_include_globs=tuple(simple_include_globs) if simple_include_globs else None,
-            simple_exclude_globs=tuple(simple_exclude_globs) if simple_exclude_globs else None,
+            simple_include_globs=(
+                tuple(simple_include_globs) if simple_include_globs else None
+            ),
+            simple_exclude_globs=(
+                tuple(simple_exclude_globs) if simple_exclude_globs else None
+            ),
             complex_include_patterns=tuple(complex_include_patterns),
             complex_exclude_patterns=tuple(complex_exclude_patterns),
             language_extensions=frozenset(language_extensions),
@@ -598,9 +608,13 @@ class DuckDBCatalog:
     ) -> None:
         """Record how long scope filtering took for observability."""
         duration = perf_counter() - start_time
-        filter_type = self._determine_filter_type(include_globs, exclude_globs, languages)
+        filter_type = self._determine_filter_type(
+            include_globs, exclude_globs, languages
+        )
         with suppress(ValueError):
-            _scope_filter_duration_seconds.labels(filter_type=filter_type).observe(duration)
+            _scope_filter_duration_seconds.labels(filter_type=filter_type).observe(
+                duration
+            )
 
     @staticmethod
     def _determine_filter_type(

@@ -97,7 +97,8 @@ class IndexScorer(IndexLoader, CandidateGeneration):
                 str(pathlib.Path(__file__).parent.resolve() / "filter_pids.cpp"),
             ],
             extra_cflags=["-O3"],
-            verbose=os.getenv("COLBERT_LOAD_TORCH_EXTENSION_VERBOSE", "False") == "True",
+            verbose=os.getenv("COLBERT_LOAD_TORCH_EXTENSION_VERBOSE", "False")
+            == "True",
         )
         cls.filter_pids = filter_pids_cpp.filter_pids_cpp
 
@@ -108,10 +109,13 @@ class IndexScorer(IndexLoader, CandidateGeneration):
         decompress_residuals_cpp = load(
             name="decompress_residuals_cpp",
             sources=[
-                str(pathlib.Path(__file__).parent.resolve() / "decompress_residuals.cpp"),
+                str(
+                    pathlib.Path(__file__).parent.resolve() / "decompress_residuals.cpp"
+                ),
             ],
             extra_cflags=["-O3"],
-            verbose=os.getenv("COLBERT_LOAD_TORCH_EXTENSION_VERBOSE", "False") == "True",
+            verbose=os.getenv("COLBERT_LOAD_TORCH_EXTENSION_VERBOSE", "False")
+            == "True",
         )
         cls.decompress_residuals = decompress_residuals_cpp.decompress_residuals_cpp
 
@@ -166,7 +170,9 @@ class IndexScorer(IndexLoader, CandidateGeneration):
         """
         return self.embeddings_strided.lookup_pids(passage_ids, out_device)
 
-    def retrieve(self, config: ColBERTConfig, q: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def retrieve(
+        self, config: ColBERTConfig, q: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Retrieve candidate passage IDs for queries.
 
         Generates candidates using query embeddings truncated to query_maxlen.
@@ -183,7 +189,9 @@ class IndexScorer(IndexLoader, CandidateGeneration):
         tuple[torch.Tensor, torch.Tensor]
             Tuple of (passage_ids, centroid_scores).
         """
-        q = q[:, : config.query_maxlen]  # NOTE: Candidate generation uses only the query tokens
+        q = q[
+            :, : config.query_maxlen
+        ]  # NOTE: Candidate generation uses only the query tokens
         pids, centroid_scores = self.generate_candidates(config, q)
 
         return pids, centroid_scores
@@ -273,7 +281,9 @@ class IndexScorer(IndexLoader, CandidateGeneration):
                 if len(pids) == 0:
                     return [], []
 
-            scores, pids = self.score_pids(config, q, pids, centroid_scores, tracker=tracker)
+            scores, pids = self.score_pids(
+                config, q, pids, centroid_scores, tracker=tracker
+            )
 
             tracker.begin("Sorting")
             scores_sorter = scores.sort(descending=True)
@@ -389,19 +399,29 @@ class IndexScorer(IndexLoader, CandidateGeneration):
             pids_ = pids[i * batch_size : (i + 1) * batch_size]
             codes_packed, codes_lengths = self.embeddings_strided.lookup_codes(pids_)
             idx_ = idx[codes_packed.long()]
-            pruned_codes_strided = StridedTensor(idx_, codes_lengths, use_gpu=self.use_gpu)
-            pruned_codes_padded, pruned_codes_mask = pruned_codes_strided.as_padded_tensor()
+            pruned_codes_strided = StridedTensor(
+                idx_, codes_lengths, use_gpu=self.use_gpu
+            )
+            pruned_codes_padded, pruned_codes_mask = (
+                pruned_codes_strided.as_padded_tensor()
+            )
             pruned_codes_lengths = (pruned_codes_padded * pruned_codes_mask).sum(dim=1)
             codes_packed_ = codes_packed[idx_]
             approx_scores_ = centroid_scores[codes_packed_.long()]
             if approx_scores_.shape[0] == 0:
-                approx_scores.append(torch.zeros((len(pids_),), dtype=approx_scores_.dtype).cuda())
+                approx_scores.append(
+                    torch.zeros((len(pids_),), dtype=approx_scores_.dtype).cuda()
+                )
                 continue
             approx_scores_strided = StridedTensor(
                 approx_scores_, pruned_codes_lengths, use_gpu=self.use_gpu
             )
-            approx_scores_padded, approx_scores_mask = approx_scores_strided.as_padded_tensor()
-            approx_scores_ = colbert_score_reduce(approx_scores_padded, approx_scores_mask, config)
+            approx_scores_padded, approx_scores_mask = (
+                approx_scores_strided.as_padded_tensor()
+            )
+            approx_scores_ = colbert_score_reduce(
+                approx_scores_padded, approx_scores_mask, config
+            )
             approx_scores.append(approx_scores_)
         return torch.cat(approx_scores, dim=0)
 
@@ -411,8 +431,12 @@ class IndexScorer(IndexLoader, CandidateGeneration):
         codes_lengths: torch.Tensor,
         config: ColBERTConfig,
     ) -> torch.Tensor:
-        approx_scores_strided = StridedTensor(approx_scores, codes_lengths, use_gpu=self.use_gpu)
-        approx_scores_padded, approx_scores_mask = approx_scores_strided.as_padded_tensor()
+        approx_scores_strided = StridedTensor(
+            approx_scores, codes_lengths, use_gpu=self.use_gpu
+        )
+        approx_scores_padded, approx_scores_mask = (
+            approx_scores_strided.as_padded_tensor()
+        )
         return colbert_score_reduce(approx_scores_padded, approx_scores_mask, config)
 
     def _filter_cpu_pids(
@@ -432,7 +456,9 @@ class IndexScorer(IndexLoader, CandidateGeneration):
             config.ndocs,
         )
 
-    def _decompress_residuals(self, pids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def _decompress_residuals(
+        self, pids: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         if self.use_gpu:
             return self.lookup_pids(pids)
 
@@ -449,7 +475,9 @@ class IndexScorer(IndexLoader, CandidateGeneration):
             self.codec.dim,
             self.codec.nbits,
         )
-        d_packed = torch.nn.functional.normalize(d_packed.to(torch.float32), p=2, dim=-1)
+        d_packed = torch.nn.functional.normalize(
+            d_packed.to(torch.float32), p=2, dim=-1
+        )
         d_mask = self.doclens[pids.long()]
         return d_packed, d_mask
 

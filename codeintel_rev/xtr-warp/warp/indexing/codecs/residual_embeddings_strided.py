@@ -67,7 +67,9 @@ class ResidualEmbeddingsStrided:
         self.use_gpu = self.codec.use_gpu
 
         self.codes_strided = StridedTensor(self.codes, doclens, use_gpu=self.use_gpu)
-        self.residuals_strided = StridedTensor(self.residuals, doclens, use_gpu=self.use_gpu)
+        self.residuals_strided = StridedTensor(
+            self.residuals, doclens, use_gpu=self.use_gpu
+        )
 
     def lookup_pids(
         self,
@@ -91,8 +93,12 @@ class ResidualEmbeddingsStrided:
         tuple[torch.Tensor, torch.Tensor]
             Tuple of (decompressed_embeddings, codes_lengths).
         """
-        codes_packed, codes_lengths = self.codes_strided.lookup(passage_ids)  # .as_packed_tensor()
-        residuals_packed, _ = self.residuals_strided.lookup(passage_ids)  # .as_packed_tensor()
+        codes_packed, codes_lengths = self.codes_strided.lookup(
+            passage_ids
+        )  # .as_packed_tensor()
+        residuals_packed, _ = self.residuals_strided.lookup(
+            passage_ids
+        )  # .as_packed_tensor()
 
         embeddings_packed = self.codec.decompress(
             residual_embeddings.ResidualEmbeddings(codes_packed, residuals_packed)

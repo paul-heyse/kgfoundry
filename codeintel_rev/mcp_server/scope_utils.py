@@ -227,7 +227,9 @@ def merge_scope_filters(
         result.update(scope)
 
     # Override with explicit params (filter out None values)
-    result.update({key: value for key, value in explicit_params.items() if value is not None})
+    result.update(
+        {key: value for key, value in explicit_params.items() if value is not None}
+    )
 
     return result
 

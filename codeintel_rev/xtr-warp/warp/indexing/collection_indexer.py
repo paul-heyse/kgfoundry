@@ -175,7 +175,9 @@ class CollectionIndexer:
                 Run().print_main(f"#> avg_doclen_est = {self.avg_doclen_est}")
             return
 
-        self.num_chunks = int(np.ceil(len(self.collection) / self.collection.get_chunksize()))
+        self.num_chunks = int(
+            np.ceil(len(self.collection) / self.collection.get_chunksize())
+        )
 
         # Saves sampled passages and embeddings for training k-means centroids later
         sampled_pids = self._sample_pids()
@@ -184,11 +186,15 @@ class CollectionIndexer:
         # Select the number of partitions
         num_passages = len(self.collection)
         self.num_embeddings_est = num_passages * avg_doclen_est
-        self.num_partitions = int(2 ** np.floor(np.log2(16 * np.sqrt(self.num_embeddings_est))))
+        self.num_partitions = int(
+            2 ** np.floor(np.log2(16 * np.sqrt(self.num_embeddings_est)))
+        )
 
         if self.verbose > 0:
             Run().print_main(f"Creating {self.num_partitions:,} partitions.")
-            Run().print_main(f"*Estimated* {int(self.num_embeddings_est):,} embeddings.")
+            Run().print_main(
+                f"*Estimated* {int(self.num_embeddings_est):,} embeddings."
+            )
 
         self._save_plan()
 
@@ -378,14 +384,18 @@ class CollectionIndexer:
 
         heldout_fraction = 0.05
         heldout_size = int(min(heldout_fraction * sample.size(0), 50_000))
-        sample, sample_heldout = sample.split([sample.size(0) - heldout_size, heldout_size], dim=0)
+        sample, sample_heldout = sample.split(
+            [sample.size(0) - heldout_size, heldout_size], dim=0
+        )
 
         print_memory_stats(f"***4*** \t RANK:{self.rank}")
 
         return sample, sample_heldout
 
     def _train_kmeans(
-        self, sample: torch.Tensor, shared_lists: list[mp.managers.SyncManager.list[object]]
+        self,
+        sample: torch.Tensor,
+        shared_lists: list[mp.managers.SyncManager.list[object]],
     ) -> torch.Tensor:
         if self.use_gpu:
             torch.cuda.empty_cache()
@@ -420,7 +430,9 @@ class CollectionIndexer:
     def _compute_avg_residual(
         self, centroids: torch.Tensor, heldout: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, float]:
-        compressor = ResidualCodec(config=self.config, centroids=centroids, avg_residual=None)
+        compressor = ResidualCodec(
+            config=self.config, centroids=centroids, avg_residual=None
+        )
 
         heldout_reconstruct = compressor.compress_into_codes(
             heldout, out_device="cuda" if self.use_gpu else "cpu"
@@ -476,7 +488,9 @@ class CollectionIndexer:
         """
         with self.saver.thread():
             batches = self.collection.enumerate_batches(rank=self.rank)
-            for chunk_idx, offset, passages in tqdm.tqdm(batches, disable=self.rank > 0):
+            for chunk_idx, offset, passages in tqdm.tqdm(
+                batches, disable=self.rank > 0
+            ):
                 if self.config.resume and self.saver.check_chunk_exists(chunk_idx):
                     if self.verbose > VERBOSE_DEBUG_LEVEL:
                         Run().print_main(
@@ -594,7 +608,9 @@ class CollectionIndexer:
 
         for chunk_idx in tqdm.tqdm(range(self.num_chunks)):
             offset = self.embedding_offsets[chunk_idx]
-            chunk_codes = ResidualCodec.Embeddings.load_codes(self.config.index_path_, chunk_idx)
+            chunk_codes = ResidualCodec.Embeddings.load_codes(
+                self.config.index_path_, chunk_idx
+            )
 
             codes[offset : offset + chunk_codes.size(0)] = chunk_codes
 

@@ -160,7 +160,9 @@ class WARPRunConfig:
         beir_collection_path = os.environ["BEIR_COLLECTION_PATH"]
         lotte_collection_path = os.environ["LOTTE_COLLECTION_PATH"]
         if self.collection == "beir":
-            return f"{beir_collection_path}/{self.dataset}/questions.{self.datasplit}.tsv"
+            return (
+                f"{beir_collection_path}/{self.dataset}/questions.{self.datasplit}.tsv"
+            )
         if self.collection == "lotte":
             return (
                 f"{lotte_collection_path}/{self.dataset}/{self.datasplit}/"

@@ -307,14 +307,18 @@ class ReadinessProbe:
                 path.mkdir(parents=True, exist_ok=True)
             exists = path.is_dir()
         except OSError as exc:
-            return CheckResult(healthy=False, detail=f"Cannot access directory {path}: {exc}")
+            return CheckResult(
+                healthy=False, detail=f"Cannot access directory {path}: {exc}"
+            )
 
         if not exists:
             return CheckResult(healthy=False, detail=f"Directory missing: {path}")
         return CheckResult(healthy=True)
 
     @staticmethod
-    def check_file(path: Path, *, description: str, optional: bool = False) -> CheckResult:
+    def check_file(
+        path: Path, *, description: str, optional: bool = False
+    ) -> CheckResult:
         """Validate existence of a filesystem resource.
 
         Parameters
@@ -377,7 +381,9 @@ class ReadinessProbe:
         CheckResult
             Healthy status and diagnostic detail when validation fails.
         """
-        file_result = self.check_file(path, description="DuckDB catalog", optional=False)
+        file_result = self.check_file(
+            path, description="DuckDB catalog", optional=False
+        )
         if not file_result.healthy:
             return file_result
 
@@ -387,7 +393,9 @@ class ReadinessProbe:
         try:
             conn = duckdb.connect(str(path))
         except duckdb.Error as exc:
-            return CheckResult(healthy=False, detail=f"Unable to open DuckDB catalog: {exc}")
+            return CheckResult(
+                healthy=False, detail=f"Unable to open DuckDB catalog: {exc}"
+            )
 
         detail: str | None = None
         try:

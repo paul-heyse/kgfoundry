@@ -43,7 +43,9 @@ class Indexer:
         self.checkpoint = checkpoint
         self.checkpoint_config = ColBERTConfig.load_from_checkpoint(checkpoint)
 
-        self.config = ColBERTConfig.from_existing(self.checkpoint_config, config, Run().config)
+        self.config = ColBERTConfig.from_existing(
+            self.checkpoint_config, config, Run().config
+        )
         self.configure(checkpoint=checkpoint)
 
     def configure(self, **kw_args: object) -> None:
@@ -162,7 +164,9 @@ class Indexer:
             )
             raise ValueError(msg)
 
-        self.configure(collection=collection, index_name=name, resume=overwrite == "resume")
+        self.configure(
+            collection=collection, index_name=name, resume=overwrite == "resume"
+        )
         # Note: The bsize value set here is ignored internally. Users are
         # encouraged to supply their own batch size for indexing by using the
         # index_bsize parameter in the ColBERTConfig.
@@ -199,4 +203,6 @@ class Indexer:
         shared_queues = [manager.Queue(maxsize=1) for _ in range(self.config.nranks)]
 
         # Encodes collection into index using the CollectionIndexer class
-        launcher.launch(self.config, collection, shared_lists, shared_queues, self.verbose)
+        launcher.launch(
+            self.config, collection, shared_lists, shared_queues, self.verbose
+        )

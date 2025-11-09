@@ -660,7 +660,9 @@ def load_settings() -> Settings:
         splade_dir=os.environ.get("SPLADE_DIR", "data/splade"),
         duckdb_path=os.environ.get("DUCKDB_PATH", "data/catalog.duckdb"),
         scip_index=os.environ.get("SCIP_INDEX", "index.scip"),
-        coderank_vectors_dir=os.environ.get("CODERANK_VECTORS_DIR", "data/coderank_vectors"),
+        coderank_vectors_dir=os.environ.get(
+            "CODERANK_VECTORS_DIR", "data/coderank_vectors"
+        ),
         coderank_faiss_index=os.environ.get(
             "CODERANK_FAISS_INDEX", "data/faiss/coderank.ivfpq.faiss"
         ),
@@ -681,11 +683,14 @@ def load_settings() -> Settings:
         in {"1", "true", "yes"},
         hybrid_top_k_per_channel=int(os.environ.get("HYBRID_TOP_K_PER_CHANNEL", "50")),
         use_cuvs=os.environ.get("USE_CUVS", "1").lower() in {"1", "true", "yes"},
-        faiss_preload=os.environ.get("FAISS_PRELOAD", "0").lower() in {"1", "true", "yes"},
+        faiss_preload=os.environ.get("FAISS_PRELOAD", "0").lower()
+        in {"1", "true", "yes"},
         duckdb_materialize=os.environ.get("DUCKDB_MATERIALIZE", "0").lower()
         in {"1", "true", "yes"},
         preview_max_chars=int(os.environ.get("PREVIEW_MAX_CHARS", "240")),
-        compaction_threshold=float(os.environ.get("FAISS_COMPACTION_THRESHOLD", "0.05")),
+        compaction_threshold=float(
+            os.environ.get("FAISS_COMPACTION_THRESHOLD", "0.05")
+        ),
     )
 
     limits = ServerLimits(
@@ -693,18 +698,26 @@ def load_settings() -> Settings:
         query_timeout_s=float(os.environ.get("QUERY_TIMEOUT_S", "30.0")),
         rate_limit_qps=float(os.environ.get("RATE_LIMIT_QPS", "10.0")),
         rate_limit_burst=int(os.environ.get("RATE_LIMIT_BURST", "20")),
-        semantic_overfetch_multiplier=int(os.environ.get("SEMANTIC_OVERFETCH_MULTIPLIER", "2")),
+        semantic_overfetch_multiplier=int(
+            os.environ.get("SEMANTIC_OVERFETCH_MULTIPLIER", "2")
+        ),
     )
 
     redis_defaults = RedisConfig()
     redis = RedisConfig(
         url=os.environ.get("REDIS_URL", redis_defaults.url),
-        scope_l1_size=int(os.environ.get("REDIS_SCOPE_L1_SIZE", str(redis_defaults.scope_l1_size))),
+        scope_l1_size=int(
+            os.environ.get("REDIS_SCOPE_L1_SIZE", str(redis_defaults.scope_l1_size))
+        ),
         scope_l1_ttl_seconds=float(
-            os.environ.get("REDIS_SCOPE_L1_TTL_SECONDS", str(redis_defaults.scope_l1_ttl_seconds))
+            os.environ.get(
+                "REDIS_SCOPE_L1_TTL_SECONDS", str(redis_defaults.scope_l1_ttl_seconds)
+            )
         ),
         scope_l2_ttl_seconds=int(
-            os.environ.get("REDIS_SCOPE_L2_TTL_SECONDS", str(redis_defaults.scope_l2_ttl_seconds))
+            os.environ.get(
+                "REDIS_SCOPE_L2_TTL_SECONDS", str(redis_defaults.scope_l2_ttl_seconds)
+            )
         ),
     )
 
@@ -712,7 +725,9 @@ def load_settings() -> Settings:
     duckdb_pool_env = os.environ.get("DUCKDB_POOL_SIZE")
     duckdb_pool_size = (
         None
-        if duckdb_pool_env is None or not duckdb_pool_env.strip() or duckdb_pool_env.strip() == "0"
+        if duckdb_pool_env is None
+        or not duckdb_pool_env.strip()
+        or duckdb_pool_env.strip() == "0"
         else int(duckdb_pool_env)
     )
     duckdb_config = DuckDBConfig(
@@ -764,7 +779,8 @@ def load_settings() -> Settings:
             in {"1", "true", "yes"},
             device=os.environ.get("CODERANK_DEVICE", "cpu"),
             batch_size=int(os.environ.get("CODERANK_BATCH", "128")),
-            normalize=os.environ.get("CODERANK_NORMALIZE", "1").lower() in {"1", "true", "yes"},
+            normalize=os.environ.get("CODERANK_NORMALIZE", "1").lower()
+            in {"1", "true", "yes"},
             query_prefix=os.environ.get(
                 "CODERANK_QUERY_PREFIX",
                 "Represent this query for searching relevant code: ",
@@ -783,7 +799,8 @@ def load_settings() -> Settings:
             max_new_tokens=int(os.environ.get("CODERANK_LLM_MAX_NEW_TOKENS", "256")),
             temperature=float(os.environ.get("CODERANK_LLM_TEMPERATURE", "0.0")),
             top_p=float(os.environ.get("CODERANK_LLM_TOP_P", "1.0")),
-            enabled=os.environ.get("CODERANK_LLM_ENABLED", "0").lower() in {"1", "true", "yes"},
+            enabled=os.environ.get("CODERANK_LLM_ENABLED", "0").lower()
+            in {"1", "true", "yes"},
         ),
     )
 

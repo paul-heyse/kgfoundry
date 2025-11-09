@@ -11,7 +11,7 @@ from kgfoundry_common.logging import get_logger
 from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
-    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from transformers import AutoModelForCausalLM, PreTrainedTokenizerBase
 
 LOGGER = get_logger(__name__)
 
@@ -34,7 +34,9 @@ class CodeRankListwiseReranker:
     """Listwise reranking helper built on CodeRankLLM."""
 
     _CACHE_LOCK: ClassVar[threading.Lock] = threading.Lock()
-    _CACHE: ClassVar[dict[tuple[str, str], tuple[AutoTokenizer, AutoModelForCausalLM]]] = {}
+    _CACHE: ClassVar[
+        dict[tuple[str, str], tuple[PreTrainedTokenizerBase, AutoModelForCausalLM]]
+    ] = {}
 
     def __init__(
         self,
@@ -89,10 +91,12 @@ class CodeRankListwiseReranker:
             # Keep original IDs for any candidates missing from model output
             missing = [cid for cid, _ in candidates if cid not in ordered_ids]
             return ordered_ids + missing
-        LOGGER.warning("CodeRankLLM returned no JSON list; falling back to original order.")
+        LOGGER.warning(
+            "CodeRankLLM returned no JSON list; falling back to original order."
+        )
         return [cid for cid, _ in candidates]
 
-    def _ensure_model(self) -> tuple[AutoTokenizer, AutoModelForCausalLM]:
+    def _ensure_model(self) -> tuple[PreTrainedTokenizerBase, AutoModelForCausalLM]:
         cache_key = (self.model_id, self.device)
         with self._CACHE_LOCK:
             cached = self._CACHE.get(cache_key)
@@ -107,11 +111,13 @@ class CodeRankListwiseReranker:
             if tokenizer_cls is None or model_cls is None:
                 msg = "transformers missing AutoTokenizer/AutoModelForCausalLM"
                 raise RuntimeError(msg)
-            tokenizer = tokenizer_cls.from_pretrained(self.model_id)
+            tokenizer = cast(
+                "PreTrainedTokenizerBase", tokenizer_cls.from_pretrained(self.model_id)
+            )
             model = model_cls.from_pretrained(self.model_id)
             model.to(self.device)
             model.eval()
-            pair = (cast("AutoTokenizer", tokenizer), cast("AutoModelForCausalLM", model))
+            pair = (tokenizer, cast("AutoModelForCausalLM", model))
             self._CACHE[cache_key] = pair
             LOGGER.info(
                 "Loaded CodeRankLLM",
@@ -125,7 +131,9 @@ class CodeRankListwiseReranker:
             f"Chunk ID: {cid}\nCode:\n{(snippet or '')[:_MAX_PREVIEW_CHARS]}"
             for cid, snippet in candidates
         )
-        return _PROMPT_TEMPLATE.format(query=query.strip(), candidates=formatted_candidates)
+        return _PROMPT_TEMPLATE.format(
+            query=query.strip(), candidates=formatted_candidates
+        )
 
     @staticmethod
     def _parse_rankings(text: str, valid_ids: set[int]) -> list[int]:
@@ -138,7 +146,9 @@ class CodeRankListwiseReranker:
         try:
             parsed = json.loads(json_payload)
         except json.JSONDecodeError:
-            LOGGER.warning("Failed to parse CodeRankLLM JSON output.", extra={"output": snippet})
+            LOGGER.warning(
+                "Failed to parse CodeRankLLM JSON output.", extra={"output": snippet}
+            )
             return []
         if not isinstance(parsed, list):
             return []

@@ -26,7 +26,9 @@ if USE_CORE_ML:
     from warp.engine.runtime.coreml_model import XTRCoreMLConfig
 
 DEFAULT_K_VALUE = 1000
-QUANTIZATION_TYPES = "|".join(["NONE", "PREPROCESS", "DYN_QUANTIZED_QINT8", "QUANTIZED_QATTENTION"])
+QUANTIZATION_TYPES = "|".join(
+    ["NONE", "PREPROCESS", "DYN_QUANTIZED_QINT8", "QUANTIZED_QATTENTION"]
+)
 
 
 def _cast_str(value: object) -> str:
@@ -108,7 +110,8 @@ class RuntimeArgs:
         t_prime = _cast_int(config.get("t_prime"))
         bound = _cast_int(config.get("bound"))
         document_top_k = (
-            _cast_int(config.get("document_top_k"), default=DEFAULT_K_VALUE) or DEFAULT_K_VALUE
+            _cast_int(config.get("document_top_k"), default=DEFAULT_K_VALUE)
+            or DEFAULT_K_VALUE
         )
         num_threads = _cast_int(config.get("num_threads"), default=1) or 1
         runtime_value = config.get("runtime")

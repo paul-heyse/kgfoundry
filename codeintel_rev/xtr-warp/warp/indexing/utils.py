@@ -86,6 +86,8 @@ def optimize_ivf(
     if verbose > 1:
         print_message(f"#> Saved optimized IVF to {optimized_ivf_path}")
         if pathlib.Path(original_ivf_path).exists():
-            print_message(f'#> Original IVF at path "{original_ivf_path}" can now be removed')
+            print_message(
+                f'#> Original IVF at path "{original_ivf_path}" can now be removed'
+            )
 
     return ivf, ivf_lengths

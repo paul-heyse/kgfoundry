@@ -104,7 +104,9 @@ class IndexSaver:
         """
         # NOTE: Verify that the chunk has the right amount of data?
 
-        doclens_path = pathlib.Path(self.config.index_path_) / f"doclens.{chunk_idx}.json"
+        doclens_path = (
+            pathlib.Path(self.config.index_path_) / f"doclens.{chunk_idx}.json"
+        )
         if not doclens_path.exists():
             return False
 

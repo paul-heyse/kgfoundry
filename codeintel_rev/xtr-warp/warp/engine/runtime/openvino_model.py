@@ -71,9 +71,13 @@ class XTROpenVinoModel:
         openvino_dir = os.environ["OPENVINO_MODEL_DIR"]
         XTROpenVinoModel._quantize_model_if_not_exists(openvino_dir, config)
 
-        self.tokenizer = XTRTokenizer(AutoTokenizer.from_pretrained("google/xtr-base-en"))
+        self.tokenizer = XTRTokenizer(
+            AutoTokenizer.from_pretrained("google/xtr-base-en")
+        )
         self.linear = XTRLinear().to(self.device)
-        self.linear.load_state_dict(torch.load(XTROpenVinoModel._hf_download_to_dense()))
+        self.linear.load_state_dict(
+            torch.load(XTROpenVinoModel._hf_download_to_dense())
+        )
 
         core = ov.Core()
         model_path = pathlib.Path(openvino_dir) / OPENVINO_MODEL_FILENAME
@@ -94,10 +98,14 @@ class XTROpenVinoModel:
         str
             Path to downloaded pytorch_model.bin file.
         """
-        return hf_hub_download(repo_id="google/xtr-base-en", filename="2_Dense/pytorch_model.bin")
+        return hf_hub_download(
+            repo_id="google/xtr-base-en", filename="2_Dense/pytorch_model.bin"
+        )
 
     @staticmethod
-    def _quantize_model_if_not_exists(root_dir: str, _config: XTROpenVinoConfig) -> None:
+    def _quantize_model_if_not_exists(
+        root_dir: str, _config: XTROpenVinoConfig
+    ) -> None:
         """Create OpenVINO model if it doesn't exist.
 
         Converts HuggingFace XTR model to OpenVINO format and saves to disk.
@@ -128,7 +136,9 @@ class XTROpenVinoModel:
         """
         return torch.device("cpu")
 
-    def __call__(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+    def __call__(
+        self, input_ids: torch.Tensor, attention_mask: torch.Tensor
+    ) -> torch.Tensor:
         """Run inference on input tensors.
 
         Parameters

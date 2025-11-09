@@ -11,7 +11,7 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, SupportsIndex, cast
 
 from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.errors import (
@@ -99,7 +99,9 @@ async def set_scope(context: ApplicationContext, scope: ScopeIn) -> dict:
     return {"effective_scope": scope, "session_id": session_id, "status": "ok"}
 
 
-async def list_paths(context: ApplicationContext, *args: object, **kwargs: object) -> dict:
+async def list_paths(
+    context: ApplicationContext, *args: object, **kwargs: object
+) -> dict:
     """List files in repository (async with threadpool offload).
 
     Applies session scope filters (include_globs, exclude_globs, languages) if
@@ -177,8 +179,8 @@ async def list_paths(context: ApplicationContext, *args: object, **kwargs: objec
     """
     session_id = get_session_id()
     scope = await get_effective_scope(context, session_id)
-    path, include_globs, exclude_globs, languages, max_results = _normalize_list_paths_arguments(
-        args, kwargs
+    path, include_globs, exclude_globs, languages, max_results = (
+        _normalize_list_paths_arguments(args, kwargs)
     )
     filters = FileListFilters(
         include_globs=include_globs,
@@ -211,7 +213,10 @@ def _normalize_list_paths_arguments(
     include_globs = kwargs.pop("include_globs", positions[1])
     exclude_globs = kwargs.pop("exclude_globs", positions[2])
     languages = kwargs.pop("languages", positions[3])
-    max_value = kwargs.pop("max_results", kwargs.pop("max", positions[4]))
+    max_value = cast(
+        "SupportsIndex | str | None",
+        kwargs.pop("max_results", kwargs.pop("max", positions[4])),
+    )
 
     max_results = 1000 if max_value is None else int(max_value)
 
@@ -474,11 +479,15 @@ def _create_file_entry(
     relative_file = _relative_path_str(file_path, repo_root)
     if relative_file is None:
         return None
-    if _matches_any(relative_file, excludes) or _matches_any(f"./{relative_file}", excludes):
+    if _matches_any(relative_file, excludes) or _matches_any(
+        f"./{relative_file}", excludes
+    ):
         return None
     if not _matches_any(relative_file, includes):
         return None
-    if language_extensions and not _matches_language(relative_file, language_extensions):
+    if language_extensions and not _matches_language(
+        relative_file, language_extensions
+    ):
         return None
 
     stat_result = _safe_stat(file_path)
@@ -687,7 +696,9 @@ def _collect_language_extensions(languages: Sequence[str]) -> set[str]:
     """
     extensions: set[str] = set()
     for language in languages:
-        extensions.update(ext.lower() for ext in LANGUAGE_EXTENSIONS.get(language.lower(), []))
+        extensions.update(
+            ext.lower() for ext in LANGUAGE_EXTENSIONS.get(language.lower(), [])
+        )
     return extensions
 
 

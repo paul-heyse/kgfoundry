@@ -326,7 +326,9 @@ class HybridSearchEngine:
             limit=limit,
         )
         active_channels = [channel for channel, hits in runs.items() if hits]
-        filtered_contributions = {doc.doc_id: contributions.get(doc.doc_id, []) for doc in docs}
+        filtered_contributions = {
+            doc.doc_id: contributions.get(doc.doc_id, []) for doc in docs
+        }
         return HybridSearchResult(
             docs=docs,
             contributions=filtered_contributions,
@@ -457,7 +459,9 @@ class HybridSearchEngine:
                 provider = self._create_bm25_provider()
             except (RuntimeError, OSError, ValueError, ImportError) as exc:
                 self._bm25_error = f"BM25 initialization failed: {exc}"
-                LOGGER.warning("Failed to initialize BM25 search provider", exc_info=exc)
+                LOGGER.warning(
+                    "Failed to initialize BM25 search provider", exc_info=exc
+                )
                 return None
             self._bm25_provider = provider
             return provider
@@ -474,7 +478,9 @@ class HybridSearchEngine:
                 provider = self._create_splade_provider()
             except (RuntimeError, OSError, ValueError, ImportError) as exc:
                 self._splade_error = f"SPLADE initialization failed: {exc}"
-                LOGGER.warning("Failed to initialize SPLADE search provider", exc_info=exc)
+                LOGGER.warning(
+                    "Failed to initialize SPLADE search provider", exc_info=exc
+                )
                 return None
             self._splade_provider = provider
             return provider

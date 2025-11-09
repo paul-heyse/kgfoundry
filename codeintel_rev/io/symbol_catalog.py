@@ -71,7 +71,9 @@ class SymbolCatalog:
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_symbol_defs_name ON symbol_defs(display_name)"
             )
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_symbol_defs_uri ON symbol_defs(uri)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_symbol_defs_uri ON symbol_defs(uri)"
+            )
 
             conn.execute(
                 """
@@ -88,7 +90,9 @@ class SymbolCatalog:
                   chunk_id INTEGER
                 )"""
             )
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_occ_sym ON symbol_occurrences(symbol)")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_occ_sym ON symbol_occurrences(symbol)"
+            )
             conn.execute(
                 "CREATE INDEX IF NOT EXISTS idx_occ_uri_pos ON symbol_occurrences(uri, start_line)"
             )
@@ -134,7 +138,9 @@ class SymbolCatalog:
                     "CREATE TEMP TABLE _defs AS SELECT * FROM (SELECT ''::TEXT AS symbol) WHERE 1=0"
                 )
                 conn.register("_tmp_defs", rows)
-                conn.execute("INSERT OR REPLACE INTO symbol_defs SELECT * FROM _tmp_defs")
+                conn.execute(
+                    "INSERT OR REPLACE INTO symbol_defs SELECT * FROM _tmp_defs"
+                )
             except Exception:
                 conn.execute("ROLLBACK")
                 raise
@@ -157,6 +163,9 @@ class SymbolCatalog:
         with self._manager.connection() as conn:
             conn.register(
                 "_tmp_pairs",
-                [{"chunk_id": chunk_id, "symbol": symbol} for chunk_id, symbol in pairs],
+                [
+                    {"chunk_id": chunk_id, "symbol": symbol}
+                    for chunk_id, symbol in pairs
+                ],
             )
             conn.execute("INSERT INTO chunk_symbols SELECT * FROM _tmp_pairs")

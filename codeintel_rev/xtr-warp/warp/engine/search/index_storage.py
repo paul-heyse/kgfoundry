@@ -63,12 +63,16 @@ class IndexLoaderWARP:
 
         print_message("#> Loading buckets...")
         index_path_obj = pathlib.Path(self.index_path)
-        bucket_weights = torch.from_numpy(np.load(index_path_obj / "bucket_weights.npy"))
+        bucket_weights = torch.from_numpy(
+            np.load(index_path_obj / "bucket_weights.npy")
+        )
         self.bucket_weights = bucket_weights
 
         self._load_codec()
         print_message("#> Loading repacked residuals...")
-        self.residuals_compacted = torch.load(index_path_obj / "residuals.repacked.compacted.pt")
+        self.residuals_compacted = torch.load(
+            index_path_obj / "residuals.repacked.compacted.pt"
+        )
 
     def _load_codec(self) -> torch.Tensor:
         print_message("#> Loading codec...")
@@ -182,7 +186,9 @@ class IndexScorerWARP(IndexLoaderWARP):
             self.t_prime = TPrimePolicy(value=opts.t_prime)
         elif num_centroids <= 2**16:
             (num_embeddings, _) = self.residuals_compacted.shape
-            self.t_prime = TPrimePolicy(value=int(np.sqrt(8 * num_embeddings) / 1000) * 1000)
+            self.t_prime = TPrimePolicy(
+                value=int(np.sqrt(8 * num_embeddings) / 1000) * 1000
+            )
         else:
             self.t_prime = T_PRIME_MAX
 
@@ -237,7 +243,10 @@ class IndexScorerWARP(IndexLoaderWARP):
         cls.warp_select_centroids_cpp = load(
             name="warp_select_centroids_cpp",
             sources=[
-                str(pathlib.Path(__file__).parent.resolve() / "warp_select_centroids.cpp"),
+                str(
+                    pathlib.Path(__file__).parent.resolve()
+                    / "warp_select_centroids.cpp"
+                ),
             ],
             extra_cflags=cflags,
             verbose=os.getenv("WARP_LOAD_TORCH_EXTENSION_VERBOSE", "False") == "True",
@@ -251,13 +260,19 @@ class IndexScorerWARP(IndexLoaderWARP):
         decompress_centroids_cpp = load(
             name="decompress_centroids_cpp",
             sources=[
-                str(pathlib.Path(__file__).parent.resolve() / "decompress_centroids.cpp"),
+                str(
+                    pathlib.Path(__file__).parent.resolve() / "decompress_centroids.cpp"
+                ),
             ],
             extra_cflags=cflags,
             verbose=os.getenv("WARP_LOAD_TORCH_EXTENSION_VERBOSE", "False") == "True",
         )
-        cls.decompress_centroids_cpp[2] = decompress_centroids_cpp.decompress_centroids_2_cpp
-        cls.decompress_centroids_cpp[4] = decompress_centroids_cpp.decompress_centroids_4_cpp
+        cls.decompress_centroids_cpp[2] = (
+            decompress_centroids_cpp.decompress_centroids_2_cpp
+        )
+        cls.decompress_centroids_cpp[4] = (
+            decompress_centroids_cpp.decompress_centroids_4_cpp
+        )
 
         print_message(
             "Loading merge_candidate_scores_cpp extension "
@@ -266,7 +281,10 @@ class IndexScorerWARP(IndexLoaderWARP):
         cls.merge_candidate_scores_cpp = load(
             name="merge_candidate_scores_cpp",
             sources=[
-                str(pathlib.Path(__file__).parent.resolve() / "merge_candidate_scores.cpp"),
+                str(
+                    pathlib.Path(__file__).parent.resolve()
+                    / "merge_candidate_scores.cpp"
+                ),
             ],
             extra_cflags=cflags,
             verbose=os.getenv("WARP_LOAD_TORCH_EXTENSION_VERBOSE", "False") == "True",

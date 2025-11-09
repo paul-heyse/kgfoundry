@@ -110,7 +110,9 @@ class Searcher:
         Verbosity level.
     """
 
-    def __init__(self, index: str, *, options: SearcherInitOptions | None = None) -> None:
+    def __init__(
+        self, index: str, *, options: SearcherInitOptions | None = None
+    ) -> None:
         opts = options or SearcherInitOptions()
         self.verbose = opts.verbose
         if self.verbose > 1:
@@ -193,7 +195,9 @@ class Searcher:
         """
         self.config.configure(**kw_args)
 
-    def encode(self, text: TextQueries, *, full_length_search: bool = False) -> torch.Tensor:
+    def encode(
+        self, text: TextQueries, *, full_length_search: bool = False
+    ) -> torch.Tensor:
         """Encode text queries into dense embeddings.
 
         Parameters
@@ -363,9 +367,13 @@ class Searcher:
 
     def _configure_search_parameters(self, k: int) -> None:
         if k <= SMALL_K_THRESHOLD:
-            self._apply_search_defaults(ncells=1, centroid_score_threshold=0.5, ndocs=256)
+            self._apply_search_defaults(
+                ncells=1, centroid_score_threshold=0.5, ndocs=256
+            )
         elif k <= MEDIUM_K_THRESHOLD:
-            self._apply_search_defaults(ncells=2, centroid_score_threshold=0.45, ndocs=1024)
+            self._apply_search_defaults(
+                ncells=2, centroid_score_threshold=0.45, ndocs=1024
+            )
         else:
             self._apply_search_defaults(
                 ncells=4, centroid_score_threshold=0.4, ndocs=max(k * 4, 4096)

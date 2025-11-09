@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.observability import MetricsProvider
@@ -40,7 +40,7 @@ from kgfoundry_common.observability import (
 if TYPE_CHECKING:
     from kgfoundry_common.observability import DurationObservation
 
-__all__ = ["observe_duration"]
+__all__ = ["observe_duration", "Observation"]
 
 
 LOGGER = get_logger(__name__)
@@ -79,13 +79,23 @@ class _NoopObservation:
         """Mark the observation as successful without recording metrics."""
 
 
+class Observation(Protocol):
+    """Protocol describing the helpers provided by metrics observations."""
+
+    def mark_error(self) -> None:
+        """Mark the observation as failed."""
+
+    def mark_success(self) -> None:
+        """Mark the observation as successful."""
+
+
 @contextmanager
 def observe_duration(
     operation: str,
     component: str,
     *,
     metrics: MetricsProvider | None = None,
-) -> Iterator[DurationObservation | _NoopObservation]:
+) -> Iterator[Observation]:
     """Yield a metrics observation with graceful degradation.
 
     Parameters
@@ -101,9 +111,8 @@ def observe_duration(
 
     Yields
     ------
-    DurationObservation | _NoopObservation
-        Observation object supporting ``mark_success`` and ``mark_error``. A
-        no-op observation is yielded when metrics are disabled.
+    Observation
+        Observation object supporting ``mark_success`` and ``mark_error``.
 
     Notes
     -----
@@ -124,7 +133,9 @@ def observe_duration(
         return
 
     try:
-        with _base_observe_duration(provider, operation, component=component) as observation:
+        with _base_observe_duration(
+            provider, operation, component=component
+        ) as observation:
             yield observation
             return
     except ValueError as exc:

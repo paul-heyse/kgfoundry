@@ -186,7 +186,9 @@ class Checkpoint(ColBERT):
 
         self.amp_manager = MixedPrecisionManager(activated=True)
 
-    def query(self, *args: object, to_cpu: bool = False, **kw_args: object) -> torch.Tensor:
+    def query(
+        self, *args: object, to_cpu: bool = False, **kw_args: object
+    ) -> torch.Tensor:
         """Encode query tokens into embeddings.
 
         Processes tokenized query input through ColBERT model with mixed precision.
@@ -358,7 +360,9 @@ class Checkpoint(ColBERT):
             raise ValueError(msg)
 
         if bsize:
-            text_batches, reverse_indices = self.doc_tokenizer.tensorize(docs, bsize=bsize)
+            text_batches, reverse_indices = self.doc_tokenizer.tensorize(
+                docs, bsize=bsize
+            )
             return self._doc_from_text_batched(
                 text_batches=text_batches,
                 reverse_indices=reverse_indices,
@@ -384,7 +388,9 @@ class Checkpoint(ColBERT):
         returned_text = self._prepare_returned_text(
             options.return_tokens, text_batches, reverse_indices
         )
-        keep_dims_for_doc = "return_mask" if options.keep_dims == "flatten" else options.keep_dims
+        keep_dims_for_doc = (
+            "return_mask" if options.keep_dims == "flatten" else options.keep_dims
+        )
         batches = [
             self.doc(
                 input_ids,
@@ -392,7 +398,9 @@ class Checkpoint(ColBERT):
                 keep_dims=keep_dims_for_doc,
                 to_cpu=options.to_cpu,
             )
-            for input_ids, attention_mask in tqdm(text_batches, disable=not options.showprogress)
+            for input_ids, attention_mask in tqdm(
+                text_batches, disable=not options.showprogress
+            )
         ]
         return self._finalize_batched_documents(
             keep_dims=options.keep_dims,
@@ -527,7 +535,9 @@ def _stack_3d_tensors(groups: list[torch.Tensor]) -> torch.Tensor:
     maxlen = max(x.size(1) for x in groups)
     hdim = groups[0].size(2)
 
-    output = torch.zeros(bsize, maxlen, hdim, device=groups[0].device, dtype=groups[0].dtype)
+    output = torch.zeros(
+        bsize, maxlen, hdim, device=groups[0].device, dtype=groups[0].dtype
+    )
 
     offset = 0
     for x in groups:

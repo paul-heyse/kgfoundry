@@ -39,7 +39,9 @@ def weighted_rrf(
         for rank, (doc_id, raw_score) in enumerate(hits, start=1):
             rr = weight * (1.0 / (k + rank))
             scores[doc_id] = scores.get(doc_id, 0.0) + rr
-            contributions.setdefault(doc_id, []).append((channel, rank, float(raw_score)))
+            contributions.setdefault(doc_id, []).append(
+                (channel, rank, float(raw_score))
+            )
     ordered = sorted(scores.items(), key=lambda item: item[1], reverse=True)
     fused_ids = [doc_id for doc_id, _ in ordered[:top_k]]
     fused_contrib = {doc_id: contributions.get(doc_id, []) for doc_id in fused_ids}

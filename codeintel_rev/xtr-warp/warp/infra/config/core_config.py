@@ -97,7 +97,9 @@ class CoreConfig:
             setattr(self, field.name, field.default.val)
             self.assigned[field.name] = True
 
-    def configure(self, *, ignore_unrecognized: bool = True, **kw_args: object) -> set[str]:
+    def configure(
+        self, *, ignore_unrecognized: bool = True, **kw_args: object
+    ) -> set[str]:
         """Configure multiple attributes from keyword arguments.
 
         Sets multiple configuration attributes at once, returning set of
@@ -122,11 +124,15 @@ class CoreConfig:
         ignored = set()
 
         for key, value in kw_args.items():
-            self.set(key, value, ignore_unrecognized=ignore_unrecognized) or ignored.update({key})
+            self.set(
+                key, value, ignore_unrecognized=ignore_unrecognized
+            ) or ignored.update({key})
 
         return ignored
 
-    def set(self, key: str, value: object, *, ignore_unrecognized: bool = False) -> bool | None:
+    def set(
+        self, key: str, value: object, *, ignore_unrecognized: bool = False
+    ) -> bool | None:
         """Set a single configuration attribute.
 
         Sets attribute value and marks it as assigned. Raises exception

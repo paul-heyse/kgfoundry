@@ -50,7 +50,9 @@ class CollectionEncoder:
         self.checkpoint = checkpoint
         self.use_gpu = self.config.total_visible_gpus > 0
 
-    def encode_passages(self, passages: list[str]) -> tuple[torch.Tensor | None, list[int] | None]:
+    def encode_passages(
+        self, passages: list[str]
+    ) -> tuple[torch.Tensor | None, list[int] | None]:
         """Encode a list of passages into dense embeddings.
 
         Processes passages in batches to manage memory, especially on GPU.

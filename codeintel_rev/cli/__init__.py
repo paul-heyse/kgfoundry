@@ -12,7 +12,9 @@ app = typer.Typer(
     add_completion=False,
 )
 app.add_typer(bm25.app, name="bm25", help="BM25 corpus and index management commands.")
-app.add_typer(splade.app, name="splade", help="SPLADE model and impact index management commands.")
+app.add_typer(
+    splade.app, name="splade", help="SPLADE model and impact index management commands."
+)
 
 
 def main() -> None:

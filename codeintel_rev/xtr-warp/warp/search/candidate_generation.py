@@ -36,7 +36,9 @@ class CandidateGeneration:
         """
         self.use_gpu = use_gpu
 
-    def get_cells(self, q: torch.Tensor, ncells: int) -> tuple[torch.Tensor, torch.Tensor]:
+    def get_cells(
+        self, q: torch.Tensor, ncells: int
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         """Get top-k centroid cells for query embeddings.
 
         Computes query-centroid similarity scores and returns top-k cell
@@ -58,7 +60,9 @@ class CandidateGeneration:
         if ncells == 1:
             cells = scores.argmax(dim=0, keepdim=True).permute(1, 0)
         else:
-            cells = scores.topk(ncells, dim=0, sorted=False).indices.permute(1, 0)  # (32, ncells)
+            cells = scores.topk(ncells, dim=0, sorted=False).indices.permute(
+                1, 0
+            )  # (32, ncells)
         cells = cells.flatten().contiguous()  # (32 * ncells,)
         cells = cells.unique(sorted=False)
         return cells, scores
@@ -118,7 +122,9 @@ class CandidateGeneration:
             pids = pids.cuda()
         return pids, scores
 
-    def generate_candidate_scores(self, q: torch.Tensor, eids: torch.Tensor) -> torch.Tensor:
+    def generate_candidate_scores(
+        self, q: torch.Tensor, eids: torch.Tensor
+    ) -> torch.Tensor:
         """Generate similarity scores for query-embedding pairs.
 
         Computes dot product scores between query and candidate embeddings.

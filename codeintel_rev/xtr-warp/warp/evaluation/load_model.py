@@ -11,7 +11,9 @@ from warp.parameters import DEVICE
 from warp.utils.utils import load_checkpoint, print_message
 
 
-def load_model(args: object, *, do_print: bool = True) -> tuple[ColBERT, dict[str, object]]:
+def load_model(
+    args: object, *, do_print: bool = True
+) -> tuple[ColBERT, dict[str, object]]:
     """Load ColBERT model from checkpoint.
 
     Creates a ColBERT model with bert-base-uncased base, loads checkpoint,

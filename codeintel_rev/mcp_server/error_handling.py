@@ -121,9 +121,15 @@ EXCEPTION_TO_ERROR_CODE: dict[type[BaseException], ProblemMapping] = {
     PathNotDirectoryError: ProblemMapping(
         "path-not-directory", "Path Not Directory", HTTPStatus.BAD_REQUEST
     ),
-    PathNotFoundError: ProblemMapping("path-not-found", "Path Not Found", HTTPStatus.NOT_FOUND),
-    FileNotFoundError: ProblemMapping("path-not-found", "Path Not Found", HTTPStatus.NOT_FOUND),
-    ValueError: ProblemMapping("invalid-parameter", "Invalid Parameter", HTTPStatus.BAD_REQUEST),
+    PathNotFoundError: ProblemMapping(
+        "path-not-found", "Path Not Found", HTTPStatus.NOT_FOUND
+    ),
+    FileNotFoundError: ProblemMapping(
+        "path-not-found", "Path Not Found", HTTPStatus.NOT_FOUND
+    ),
+    ValueError: ProblemMapping(
+        "invalid-parameter", "Invalid Parameter", HTTPStatus.BAD_REQUEST
+    ),
     NotImplementedError: ProblemMapping(
         "not-implemented", "Not Implemented", HTTPStatus.NOT_IMPLEMENTED
     ),
@@ -298,7 +304,9 @@ def convert_exception_to_envelope(
             operation=operation,
             error_code=kg_exc.code.value,
         ) as adapter:
-            adapter.log(kg_exc.log_level, kg_exc.message, extra={"context": kg_exc.context})
+            adapter.log(
+                kg_exc.log_level, kg_exc.message, extra={"context": kg_exc.context}
+            )
     elif isinstance(exc, PathNotDirectoryError):
         LOGGER.warning(
             "Path not directory",

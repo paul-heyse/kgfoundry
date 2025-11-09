@@ -13,12 +13,16 @@ from codeintel_rev.io.coderank_embedder import CodeRankEmbedder
 from codeintel_rev.io.rerank_coderankllm import CodeRankListwiseReranker
 from codeintel_rev.io.rrf import weighted_rrf
 from codeintel_rev.io.warp_engine import WarpEngine, WarpUnavailableError
-from codeintel_rev.mcp_server.common.observability import observe_duration
-from codeintel_rev.mcp_server.schemas import AnswerEnvelope, Finding, MethodInfo, ScopeIn
+from codeintel_rev.mcp_server.common.observability import Observation, observe_duration
+from codeintel_rev.mcp_server.schemas import (
+    AnswerEnvelope,
+    Finding,
+    MethodInfo,
+    ScopeIn,
+)
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
 from kgfoundry_common.logging import get_logger
-from kgfoundry_common.observability import DurationObservation
 
 if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
@@ -49,7 +53,9 @@ class SemanticProRuntimeOptions:
     explain: bool = True
 
 
-def build_runtime_options(options: SemanticProOptions | None) -> SemanticProRuntimeOptions:
+def build_runtime_options(
+    options: SemanticProOptions | None,
+) -> SemanticProRuntimeOptions:
     """Normalize user-supplied options into an immutable dataclass.
 
     Returns
@@ -108,7 +114,9 @@ def _semantic_search_pro_sync(
 
     start_time = perf_counter()
     with observe_duration("semantic_search_pro", COMPONENT_NAME) as observation:
-        effective_limit, limit_notes = _clamp_limit(limit, context.settings.limits.max_results)
+        effective_limit, limit_notes = _clamp_limit(
+            limit, context.settings.limits.max_results
+        )
         coderank_hits = _run_coderank_stage(
             context=context,
             query=query,
@@ -218,7 +226,7 @@ def _run_coderank_stage(
     context: ApplicationContext,
     query: str,
     fanout: int,
-    observation: DurationObservation,
+    observation: Observation,
 ) -> list[tuple[int, float]]:
     if not context.paths.coderank_faiss_index.exists():
         observation.mark_error()
@@ -371,7 +379,10 @@ def _maybe_rerank(
     )
 
     payload = [
-        (int(record.get("id", -1)), (record.get("content") or record.get("preview") or ""))
+        (
+            int(record.get("id", -1)),
+            (record.get("content") or record.get("preview") or ""),
+        )
         for record in records
     ]
     payload = [(cid, text) for cid, text in payload if cid >= 0]
@@ -389,7 +400,9 @@ def _maybe_rerank(
 
     by_id = {int(record["id"]): record for record in records if "id" in record}
     reordered = [by_id[cid] for cid in ordered_ids if cid in by_id]
-    remaining = [record for record in records if int(record.get("id", -1)) not in ordered_ids]
+    remaining = [
+        record for record in records if int(record.get("id", -1)) not in ordered_ids
+    ]
     return reordered + remaining
 
 
@@ -406,7 +419,9 @@ def _build_findings(
         if chunk_id < 0:
             continue
         uri = str(record.get("uri", ""))
-        preview = (record.get("content") or record.get("preview") or "")[:SNIPPET_PREVIEW_CHARS]
+        preview = (record.get("content") or record.get("preview") or "")[
+            :SNIPPET_PREVIEW_CHARS
+        ]
         title = Path(uri).name or uri
         finding: Finding = {
             "type": "usage",
@@ -424,7 +439,8 @@ def _build_findings(
         }
         if explain and chunk_id in contribution_map:
             parts = [
-                f"{channel} rank={rank}" for channel, rank, _score in contribution_map[chunk_id]
+                f"{channel} rank={rank}"
+                for channel, rank, _score in contribution_map[chunk_id]
             ]
             finding["why"] = f"Fusion weights: {', '.join(parts)}"
         findings.append(finding)
@@ -454,15 +470,15 @@ def _assemble_extras(
     method: MethodInfo,
     limits: list[str],
     scope: ScopeIn | None,
-) -> dict[str, object]:
+) -> AnswerEnvelope:
     """Assemble response metadata extras.
 
     Returns
     -------
-    dict[str, object]
+    AnswerEnvelope
         Extras dictionary containing method metadata and optional scope/limits.
     """
-    extras: dict[str, object] = {"method": method}
+    extras: AnswerEnvelope = {"method": method}
     if limits:
         extras["limits"] = limits
     if scope:
@@ -474,7 +490,7 @@ def _make_envelope(
     *,
     answer: str,
     findings: list[Finding],
-    extras: dict[str, object],
+    extras: AnswerEnvelope,
 ) -> AnswerEnvelope:
     envelope: AnswerEnvelope = {
         "answer": answer,
@@ -491,7 +507,9 @@ def _clamp_limit(requested: int, max_results: int) -> tuple[int, list[str]]:
     if requested <= 0:
         notes.append("Requested limit <= 0; defaulting to 1.")
     if requested > max_results:
-        notes.append(f"Requested limit {requested} exceeds max_results {max_results}; truncating.")
+        notes.append(
+            f"Requested limit {requested} exceeds max_results {max_results}; truncating."
+        )
     effective = requested
     if effective <= 0:
         effective = 1

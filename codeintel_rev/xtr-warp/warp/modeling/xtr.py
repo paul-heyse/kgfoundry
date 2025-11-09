@@ -160,7 +160,9 @@ class XTR(torch.nn.Module):
         """
         return DEVICE
 
-    def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self, input_ids: torch.Tensor, attention_mask: torch.Tensor
+    ) -> torch.Tensor:
         """Forward pass through XTR model.
 
         Encodes input, projects to embedding dimension, applies masking,
@@ -231,7 +233,9 @@ class XTRDocumentEncodingOptions:
     _ALLOWED_KEYS = frozenset({"keep_dims", "to_cpu", "showprogress", "return_tokens"})
 
     @classmethod
-    def from_overrides(cls, overrides: Mapping[str, object]) -> XTRDocumentEncodingOptions:
+    def from_overrides(
+        cls, overrides: Mapping[str, object]
+    ) -> XTRDocumentEncodingOptions:
         """Build encoding options from keyword overrides.
 
         Constructs an XTRDocumentEncodingOptions instance from a mapping of keyword
@@ -277,7 +281,9 @@ class XTRCheckpoint:
         Maximum query length (default: QUERY_MAXLEN).
     """
 
-    def __init__(self, xtr: XTR, config: ColBERTConfig, query_maxlen: int = QUERY_MAXLEN) -> None:
+    def __init__(
+        self, xtr: XTR, config: ColBERTConfig, query_maxlen: int = QUERY_MAXLEN
+    ) -> None:
         """Initialize XTRCheckpoint.
 
         Parameters
@@ -364,7 +370,9 @@ class XTRCheckpoint:
             msg = "return_tokens must be False"
             raise ValueError(msg)
         if self.config.doc_maxlen != DOC_MAXLEN:
-            msg = f"config.doc_maxlen must be {DOC_MAXLEN}, got {self.config.doc_maxlen}"
+            msg = (
+                f"config.doc_maxlen must be {DOC_MAXLEN}, got {self.config.doc_maxlen}"
+            )
             raise ValueError(msg)
         if bsize is None:
             msg = "bsize must be provided"
@@ -394,7 +402,9 @@ class XTRCheckpoint:
         int
             Total number of tokens across all batches.
         """
-        return sum(int(torch.sum(attention_mask).item()) for _, attention_mask in text_batches)
+        return sum(
+            int(torch.sum(attention_mask).item()) for _, attention_mask in text_batches
+        )
 
     @staticmethod
     def _collect_batch_lengths(
@@ -443,7 +453,9 @@ class XTRCheckpoint:
         ValueError
             If the total number of tokens processed does not match the expected tensor size.
         """
-        flatten_embeddings = torch.zeros((total_length, TOKEN_EMBED_DIM), dtype=torch.float32)
+        flatten_embeddings = torch.zeros(
+            (total_length, TOKEN_EMBED_DIM), dtype=torch.float32
+        )
         num_tokens = 0
         for batch_embeds, batch_length in zip(batches, batch_lengths, strict=False):
             for embeddings, length in zip(batch_embeds, batch_length, strict=False):
@@ -575,7 +587,9 @@ class XTRCheckpoint:
                 )
 
         with torch.no_grad():
-            encodings = self.xtr(input_ids.to(self.xtr.device), attention_mask.to(self.xtr.device))
+            encodings = self.xtr(
+                input_ids.to(self.xtr.device), attention_mask.to(self.xtr.device)
+            )
 
         if to_cpu:
             encodings = encodings.cpu()

@@ -73,10 +73,14 @@ class XTRTorchScriptModel:
         torchscript_dir = os.environ["TORCHSCRIPT_MODEL_DIR"]
         XTRTorchScriptModel._create_model_if_not_exists(torchscript_dir, config)
 
-        self.model = torch.jit.load(str(pathlib.Path(torchscript_dir) / config.filename))
+        self.model = torch.jit.load(
+            str(pathlib.Path(torchscript_dir) / config.filename)
+        )
         self.model.eval()
 
-        self.tokenizer = XTRTokenizer(AutoTokenizer.from_pretrained("google/xtr-base-en"))
+        self.tokenizer = XTRTokenizer(
+            AutoTokenizer.from_pretrained("google/xtr-base-en")
+        )
 
         if config.num_threads != torch.torch.get_num_threads():
             msg = (
@@ -86,7 +90,9 @@ class XTRTorchScriptModel:
             raise ValueError(msg)
 
     @staticmethod
-    def _create_model_if_not_exists(root_dir: str, config: XTRTorchScriptConfig) -> None:
+    def _create_model_if_not_exists(
+        root_dir: str, config: XTRTorchScriptConfig
+    ) -> None:
         """Create TorchScript model if it doesn't exist.
 
         Converts PyTorch XTR model to TorchScript format and saves to disk.
@@ -104,12 +110,12 @@ class XTRTorchScriptModel:
 
             device = torch.device("cpu")
             input_dim = (config.batch_size, QUERY_MAXLEN)
-            attention_mask = torch.randint(low=1, high=1000, size=input_dim, dtype=torch.int64).to(
-                device
-            )
-            input_ids = torch.randint(low=1, high=1000, size=input_dim, dtype=torch.int64).to(
-                device
-            )
+            attention_mask = torch.randint(
+                low=1, high=1000, size=input_dim, dtype=torch.int64
+            ).to(device)
+            input_ids = torch.randint(
+                low=1, high=1000, size=input_dim, dtype=torch.int64
+            ).to(device)
             base_model.eval()
 
             traced_model = torch.jit.trace(base_model, (input_ids, attention_mask))
@@ -126,7 +132,9 @@ class XTRTorchScriptModel:
         """
         return torch.device("cpu")
 
-    def __call__(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+    def __call__(
+        self, input_ids: torch.Tensor, attention_mask: torch.Tensor
+    ) -> torch.Tensor:
         """Run inference on input tensors.
 
         Parameters

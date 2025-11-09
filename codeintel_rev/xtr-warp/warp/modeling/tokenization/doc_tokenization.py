@@ -50,7 +50,10 @@ class DocTokenizer:
         self.sep_token, self.sep_token_id = self.tok.sep_token, self.tok.sep_token_id
 
     def tokenize(
-        self, batch_text: list[str] | tuple[str, ...], *, add_special_tokens: bool = False
+        self,
+        batch_text: list[str] | tuple[str, ...],
+        *,
+        add_special_tokens: bool = False,
     ) -> list[list[str]]:
         """Tokenize batch of document texts.
 
@@ -75,7 +78,10 @@ class DocTokenizer:
             msg = f"batch_text must be list or tuple, got {type(batch_text).__name__}"
             raise TypeError(msg)
 
-        tokens = [self.tok.tokenize(x, add_special_tokens=False).to(DEVICE) for x in batch_text]
+        tokens = [
+            self.tok.tokenize(x, add_special_tokens=False).to(DEVICE)
+            for x in batch_text
+        ]
 
         if not add_special_tokens:
             return tokens
@@ -84,7 +90,10 @@ class DocTokenizer:
         return [prefix + lst + suffix for lst in tokens]
 
     def encode(
-        self, batch_text: list[str] | tuple[str, ...], *, add_special_tokens: bool = False
+        self,
+        batch_text: list[str] | tuple[str, ...],
+        *,
+        add_special_tokens: bool = False,
     ) -> list[list[int]]:
         """Encode batch of document texts to token IDs.
 
@@ -114,7 +123,9 @@ class DocTokenizer:
         if not add_special_tokens:
             return ids
 
-        prefix, suffix = [self.cls_token_id, self.D_marker_token_id], [self.sep_token_id]
+        prefix, suffix = [self.cls_token_id, self.D_marker_token_id], [
+            self.sep_token_id
+        ]
         return [prefix + lst + suffix for lst in ids]
 
     def tensorize(

@@ -19,7 +19,7 @@ import numpy as np
 from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.vllm_client import VLLMClient
-from codeintel_rev.mcp_server.common.observability import observe_duration
+from codeintel_rev.mcp_server.common.observability import Observation, observe_duration
 from codeintel_rev.mcp_server.schemas import (
     AnswerEnvelope,
     Finding,
@@ -29,7 +29,6 @@ from codeintel_rev.mcp_server.schemas import (
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
 from kgfoundry_common.logging import get_logger
-from kgfoundry_common.observability import DurationObservation
 
 if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
@@ -206,9 +205,11 @@ def _semantic_search_sync(
                 "session_id": session_id,
                 "query": query,
                 "has_scope": scope is not None,
-                "scope_languages": cast("Sequence[str] | None", scope.get("languages"))
-                if scope
-                else None,
+                "scope_languages": (
+                    cast("Sequence[str] | None", scope.get("languages"))
+                    if scope
+                    else None
+                ),
                 "scope_include_globs": scope.get("include_globs") if scope else None,
             },
         )
@@ -258,7 +259,9 @@ def _semantic_search_sync(
 
         hybrid_result = _resolve_hybrid_results(
             context,
-            _HybridSearchState(query, result_ids, result_scores, budget.effective_limit),
+            _HybridSearchState(
+                query, result_ids, result_scores, budget.effective_limit
+            ),
             limits_metadata,
             ("semantic", "faiss"),
         )
@@ -300,7 +303,10 @@ def _semantic_search_sync(
 
         answer_message = (
             f"Found {len(findings)} hybrid results for: {query}"
-            if any(channel in {"bm25", "splade"} for channel in hybrid_result.retrieval_channels)
+            if any(
+                channel in {"bm25", "splade"}
+                for channel in hybrid_result.retrieval_channels
+            )
             else f"Found {len(findings)} semantically similar code chunks for: {query}"
         )
 
@@ -312,7 +318,9 @@ def _semantic_search_sync(
         )
 
 
-def _clamp_result_limit(requested_limit: int, max_results: int) -> tuple[int, list[str]]:
+def _clamp_result_limit(
+    requested_limit: int, max_results: int
+) -> tuple[int, list[str]]:
     """Enforce bounds on requested limit with explanatory metadata.
 
     Parameters
@@ -330,7 +338,9 @@ def _clamp_result_limit(requested_limit: int, max_results: int) -> tuple[int, li
     """
     messages: list[str] = []
     if requested_limit <= 0:
-        messages.append(f"Requested limit {requested_limit} is not positive; using minimum of 1.")
+        messages.append(
+            f"Requested limit {requested_limit} is not positive; using minimum of 1."
+        )
     if requested_limit > max_results:
         messages.append(
             f"Requested limit {requested_limit} exceeds max_results {max_results}; "
@@ -344,7 +354,7 @@ def _clamp_result_limit(requested_limit: int, max_results: int) -> tuple[int, li
 def _build_search_budget(
     context: ApplicationContext,
     requested_limit: int,
-    observation: DurationObservation,
+    observation: Observation,
 ) -> _SearchBudget:
     """Combine limit clamping and FAISS readiness metadata for a search.
 
@@ -354,7 +364,7 @@ def _build_search_budget(
         Application context providing settings and FAISS manager.
     requested_limit : int
         Requested result limit from client.
-    observation : DurationObservation
+    observation : Observation
         Observation block used to mark errors.
 
     Returns
@@ -518,15 +528,21 @@ def _resolve_hybrid_results(
         try:
             chunk_id_int = int(doc.doc_id)
         except ValueError:
-            limits_metadata.append(f"Hybrid result skipped (non-numeric chunk id): {doc.doc_id}")
+            limits_metadata.append(
+                f"Hybrid result skipped (non-numeric chunk id): {doc.doc_id}"
+            )
             continue
 
         fused_ids.append(chunk_id_int)
         fused_scores.append(float(doc.score))
-        fused_contributions[chunk_id_int] = hybrid_result.contributions.get(doc.doc_id, [])
+        fused_contributions[chunk_id_int] = hybrid_result.contributions.get(
+            doc.doc_id, []
+        )
 
     if fused_ids:
-        channels_out = list(dict.fromkeys(["semantic", "faiss", *hybrid_result.channels]))
+        channels_out = list(
+            dict.fromkeys(["semantic", "faiss", *hybrid_result.channels])
+        )
         return _build_hybrid_result(
             fused_ids,
             fused_scores,
@@ -583,7 +599,7 @@ def _build_hybrid_result(
 def _embed_query_or_raise(
     client: VLLMClient,
     query: str,
-    observation: DurationObservation,
+    observation: Observation,
     vllm_url: str,
 ) -> np.ndarray:
     """Embed text or raise with a structured embedding error.
@@ -594,7 +610,7 @@ def _embed_query_or_raise(
         vLLM client used to emit the embedding.
     query : str
         Query text to embed.
-    observation : DurationObservation
+    observation : Observation
         Duration observation used for marking failure.
     vllm_url : str
         URL used for diagnostics in error contexts.
@@ -625,7 +641,7 @@ def _run_faiss_search_or_raise(
     query_vector: np.ndarray,
     limit: int,
     nprobe: int,
-    observation: DurationObservation,
+    observation: Observation,
 ) -> tuple[list[int], list[float]]:
     """Perform FAISS search and raise when the index search fails.
 
@@ -639,7 +655,7 @@ def _run_faiss_search_or_raise(
         Requested fan-out.
     nprobe : int
         Number of IVF cells to probe.
-    observation : DurationObservation
+    observation : Observation
         Observation block used to mark errors.
 
     Returns
@@ -671,7 +687,7 @@ def _run_faiss_search_or_raise(
 
 def _ensure_hydration_success(
     hydrate_exc: Exception | None,
-    observation: DurationObservation,
+    observation: Observation,
     context: ApplicationContext,
 ) -> None:
     """Stop execution when DuckDB hydration fails.
@@ -680,7 +696,7 @@ def _ensure_hydration_success(
     ----------
     hydrate_exc : Exception | None
         Exception returned from ``_hydrate_findings``.
-    observation : DurationObservation
+    observation : Observation
         Observation used to mark the duration as failed.
     context : ApplicationContext
         Context for building error metadata.
@@ -773,7 +789,9 @@ def _annotate_hybrid_contributions(
         finding["why"] = f"Hybrid RRF (k={rrf_k}): " + ", ".join(parts)
 
 
-def _embed_query(client: VLLMClient, query: str) -> tuple[np.ndarray | None, str | None]:
+def _embed_query(
+    client: VLLMClient, query: str
+) -> tuple[np.ndarray | None, str | None]:
     """Embed query text and return a normalized vector and error message.
 
     Parameters
@@ -916,7 +934,9 @@ def _hydrate_findings(
                 )
             else:
                 records = catalog.query_by_ids(valid_ids)
-            chunk_by_id = {int(record["id"]): record for record in records if "id" in record}
+            chunk_by_id = {
+                int(record["id"]): record for record in records if "id" in record
+            }
 
             for chunk_id, score in zip(chunk_ids, scores, strict=True):
                 if chunk_id < 0:

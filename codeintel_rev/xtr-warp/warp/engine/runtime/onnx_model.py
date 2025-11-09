@@ -128,7 +128,9 @@ class XTROnnxModel:
             sess_opts,
         )
 
-        self.tokenizer = XTRTokenizer(AutoTokenizer.from_pretrained("google/xtr-base-en"))
+        self.tokenizer = XTRTokenizer(
+            AutoTokenizer.from_pretrained("google/xtr-base-en")
+        )
 
     @property
     def device(self) -> torch.device:
@@ -141,7 +143,9 @@ class XTROnnxModel:
         """
         return torch.device("cpu")
 
-    def __call__(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+    def __call__(
+        self, input_ids: torch.Tensor, attention_mask: torch.Tensor
+    ) -> torch.Tensor:
         """Run inference on input tensors.
 
         Parameters
@@ -191,12 +195,12 @@ class XTROnnxModel:
             base_model = build_xtr_model()
             device = torch.device("cpu")
             input_dim = (config.batch_size, QUERY_MAXLEN)
-            attention_mask = torch.randint(low=1, high=1000, size=input_dim, dtype=torch.int64).to(
-                device
-            )
-            input_ids = torch.randint(low=1, high=1000, size=input_dim, dtype=torch.int64).to(
-                device
-            )
+            attention_mask = torch.randint(
+                low=1, high=1000, size=input_dim, dtype=torch.int64
+            ).to(device)
+            input_ids = torch.randint(
+                low=1, high=1000, size=input_dim, dtype=torch.int64
+            ).to(device)
 
             base_model.eval()
             with torch.no_grad():
@@ -221,7 +225,9 @@ class XTROnnxModel:
 
         if not preprocessed_model_path.exists():
             ort_quantization.shape_inference.quant_pre_process(
-                str(base_model_path), str(preprocessed_model_path), skip_symbolic_shape=False
+                str(base_model_path),
+                str(preprocessed_model_path),
+                skip_symbolic_shape=False,
             )
 
         model_path = pathlib.Path(root_dir) / config.filename
@@ -232,7 +238,9 @@ class XTROnnxModel:
             return
 
         if config.quantization == XTROnnxQuantization.DYN_QUANTIZED_QINT8:
-            quantize_dynamic(preprocessed_model_path, model_path, weight_type=QuantType.QInt8)
+            quantize_dynamic(
+                preprocessed_model_path, model_path, weight_type=QuantType.QInt8
+            )
             return
 
         if config.quantization == XTROnnxQuantization.QUANTIZED_QATTENTION:

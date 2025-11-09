@@ -45,7 +45,9 @@ class WARPSearcher:
 
     def __init__(self, config: WARPRunConfig) -> None:
         self.config = config
-        with Run().context(RunConfig(nranks=config.nranks, experiment=config.experiment_name)):
+        with Run().context(
+            RunConfig(nranks=config.nranks, experiment=config.experiment_name)
+        ):
             searcher_options = SearcherInitOptions(
                 config=config,
                 index_root=config.index_root,
@@ -53,11 +55,15 @@ class WARPSearcher:
             )
             self.searcher = Searcher(index=config.index_name, options=searcher_options)
 
-        collection_map_path = pathlib.Path(config.collection_path).parent / "collection_map.json"
+        collection_map_path = (
+            pathlib.Path(config.collection_path).parent / "collection_map.json"
+        )
         if pathlib.Path(collection_map_path).exists():
             with pathlib.Path(collection_map_path).open(encoding="utf-8") as file:
                 collection_map = json.load(file)
-                collection_map = {int(key): value for key, value in collection_map.items()}
+                collection_map = {
+                    int(key): value for key, value in collection_map.items()
+                }
             self.collection_map = collection_map
         else:
             self.collection_map = None
@@ -95,8 +101,12 @@ class WARPSearcher:
         if batched and self.config.onnx is not None:
             batched = False
         if batched:
-            return self._search_all_batched(queries, k, tracker, show_progress=show_progress)
-        return self._search_all_unbatched(queries, k, tracker, show_progress=show_progress)
+            return self._search_all_batched(
+                queries, k, tracker, show_progress=show_progress
+            )
+        return self._search_all_unbatched(
+            queries, k, tracker, show_progress=show_progress
+        )
 
     def _search_all_batched(
         self,
@@ -130,9 +140,13 @@ class WARPSearcher:
         for qid, qtext in tqdm(queries, disable=not show_progress):
             tracker.next_iteration()
             options = SearchOptions(tracker=tracker)
-            results += WARPRankingItem(qid=qid, results=self.search(qtext, k=k, options=options))
+            results += WARPRankingItem(
+                qid=qid, results=self.search(qtext, k=k, options=options)
+            )
             tracker.end_iteration()
-        return results.finalize(self, queries.provenance(source="Searcher::search", k=k))
+        return results.finalize(
+            self, queries.provenance(source="Searcher::search", k=k)
+        )
 
     def search(
         self,

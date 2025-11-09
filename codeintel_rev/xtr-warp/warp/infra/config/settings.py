@@ -92,7 +92,9 @@ class RunSettings:
         value = list(map(int, value))
         value = sorted(set(value))
 
-        if not all(device_idx in range(self.total_visible_gpus) for device_idx in value):
+        if not all(
+            device_idx in range(self.total_visible_gpus) for device_idx in value
+        ):
             msg = f"All device indices must be in range(0, {self.total_visible_gpus}), got {value}"
             raise ValueError(msg)
 
@@ -110,7 +112,9 @@ class RunSettings:
         str
             Index root directory path.
         """
-        return self.index_root or str(pathlib.Path(self.root) / self.experiment / "indexes")
+        return self.index_root or str(
+            pathlib.Path(self.root) / self.experiment / "indexes"
+        )
 
     @property
     def script_name_(self) -> str:
@@ -173,7 +177,9 @@ class RunSettings:
         str
             Experiment output directory path.
         """
-        return str(pathlib.Path(self.root) / self.experiment / self.script_name_ / self.name)
+        return str(
+            pathlib.Path(self.root) / self.experiment / self.script_name_ / self.name
+        )
 
     @property
     def device_(self) -> torch.device:
