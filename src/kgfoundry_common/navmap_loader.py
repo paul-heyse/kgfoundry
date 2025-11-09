@@ -7,7 +7,7 @@ import importlib
 import importlib.util
 import json
 import sys
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
 from contextlib import suppress
 from functools import cache
 from importlib import import_module
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 JsonValue = str | int | float | bool | dict[str, "JsonValue"] | list["JsonValue"] | None
-type NavMetadataIterator = Iterator[tuple[str, JsonValue]]
+type NavMetadataIterator = Generator[tuple[str, JsonValue]]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CLI_AUGMENT_PATH = REPO_ROOT / "openapi" / "_augment_cli.yaml"
@@ -279,7 +279,7 @@ class NavMetadataModel(BaseModel):
         """
         return self.as_mapping()[key]
 
-    def __iter__(self) -> Iterator[tuple[str, JsonValue]]:
+    def __iter__(self) -> NavMetadataIterator:
         """Iterate over flattened key-value pairs for dictionary compatibility.
 
         This method enables dictionary-like iteration over navigation metadata,

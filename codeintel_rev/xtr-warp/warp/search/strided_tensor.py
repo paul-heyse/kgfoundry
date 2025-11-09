@@ -13,8 +13,8 @@ import torch
 from torch.utils.cpp_extension import load
 from warp.search.strided_tensor_core import (
     StridedTensorCore,
-    _create_mask,
-    _create_view,
+    create_mask,
+    create_view,
 )
 from warp.utils.utils import flatten, print_message
 
@@ -132,8 +132,8 @@ class StridedTensor(StridedTensorCore):
         )
         packed_tensor = torch.cat((packed_tensor, padding))
 
-        view = _create_view(packed_tensor, stride, inner_dims)[offsets]
-        mask = _create_mask(lengths, stride, like=view)
+        view = create_view(packed_tensor, stride, inner_dims)[offsets]
+        mask = create_mask(lengths, stride, like=view)
 
         return view, mask
 
@@ -209,7 +209,7 @@ class StridedTensor(StridedTensorCore):
             if self.use_gpu:
                 tensor = tensor.cuda()
 
-            mask = _create_mask(lengths, stride, use_gpu=self.use_gpu)
+            mask = create_mask(lengths, stride, use_gpu=self.use_gpu)
 
             if output == "padded":
                 return tensor, mask
@@ -364,7 +364,7 @@ class StridedTensor(StridedTensorCore):
         if self.use_gpu:
             tensor = tensor.cuda()
 
-        mask = _create_mask(lengths, stride, use_gpu=self.use_gpu)
+        mask = create_mask(lengths, stride, use_gpu=self.use_gpu)
 
         return tensor, lengths, mask
 

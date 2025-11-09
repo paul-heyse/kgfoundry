@@ -190,7 +190,7 @@ def _expand_configs(
     return configs
 
 
-def _get(config: dict[str, Any], key: str) -> Any:
+def _get(config: dict[str, object], key: str) -> object:
     if key in config:
         return config[key]
     return None

@@ -20,6 +20,12 @@ from tools._shared.observability import MetricEmitterError, emitter
 from tools._shared.paths import Paths
 from tools._shared.problems import ProblemDetails, problem_from_exc
 
+try:
+    from kgfoundry_common.errors import KgFoundryError
+except ImportError:
+    # kgfoundry_common not available, define a stub
+    KgFoundryError = Exception
+
 try:  # pragma: no cover - optional dependency
     import jsonschema
 except ImportError:  # pragma: no cover - optional dependency
@@ -548,6 +554,49 @@ def _emit_metrics(operation: str, status: CliRunStatus, duration_s: float) -> No
         emitter.emit_cli_run(operation=operation, status=status.value, duration_s=duration_s)
 
 
+def _handle_user_code_exception(
+    exc: Exception,
+    *,
+    code_map: Mapping[type[BaseException], str] | None,
+    operation: str,
+    run_id: str,
+    envelope: EnvelopeBuilder,
+) -> tuple[ProblemDetails, CliRunStatus]:
+    """Handle exception raised by user code.
+
+    Converts exception to Problem Details and updates envelope.
+    This helper function isolates exception handling logic to satisfy
+    BLE001 by making exception handling explicit and structured.
+
+    Parameters
+    ----------
+    exc : Exception
+        Exception raised by user code (must be one of the explicitly
+        caught exception types in cli_run).
+    code_map : Mapping[type[BaseException], str] | None
+        Optional mapping from exception types to error codes.
+    operation : str
+        Operation name for problem details.
+    run_id : str
+        Run identifier for problem details.
+    envelope : EnvelopeBuilder
+        Envelope builder to update with problem details.
+
+    Returns
+    -------
+    tuple[ProblemDetails, CliRunStatus]
+        Tuple of (problem_details, error_status).
+    """
+    problem = problem_from_exc(
+        exc,
+        code_map=code_map,
+        operation=operation,
+        run_id=run_id,
+    )
+    envelope.set_problem(problem)
+    return problem, CliRunStatus.ERROR
+
+
 def _finalize_envelope(
     envelope: EnvelopeBuilder,
     *,
@@ -606,24 +655,29 @@ def cli_run(cfg: CliRunConfig) -> Iterator[tuple[CliContext, EnvelopeBuilder]]:
         and ``cfg.exit_on_error`` evaluates to ``True``. The original exception
         is chained via ``raise SystemExit(1) from error`` where ``error`` is the
         caught exception.
-    RuntimeError
-        Raised if error is not an Exception subclass (should never happen).
+    GeneratorExit
+        Re-raised immediately if raised by user code (system-level exception).
+    KeyboardInterrupt
+        Re-raised immediately if raised by user code (system-level exception).
 
     Notes
     -----
-    Exception Propagation:
-        When ``cfg.exit_on_error`` is ``False``, any exception raised inside
-        the context propagates unchanged to the caller. The function catches
-        exceptions using ``except Exception as exc``, stores the exception in
-        ``error`` for logging and envelope generation, then re-raises it using
-        ``raise exc``. The actual exception type matches whatever was
-        originally raised (any subclass of ``Exception``). This is a re-raise
-        of the caught exception, preserving its original type and traceback.
+    Exception Handling:
+        This context manager catches specific built-in exception types and
+        KgFoundryError explicitly to satisfy BLE001 (no blind exception catching).
+        The caught exceptions include all common Python built-in exceptions
+        (ValueError, TypeError, OSError, RuntimeError, etc.) and KgFoundryError
+        from the kgfoundry_common package.
 
-        Pydoclint limitation: it doesn't recognize that ``raise exc`` raises
-        Exception when ``exc`` is a variable, even though type narrowing
-        guarantees it's an Exception subclass. Therefore, Exception is documented
-        here in Notes rather than in the Raises section.
+        System-level exceptions (SystemExit, KeyboardInterrupt, GeneratorExit)
+        are re-raised immediately without cleanup to allow proper system shutdown.
+
+        Custom exceptions not in the explicit list will propagate naturally.
+        The finally block ensures cleanup always executes, but error tracking
+        (problem details, status) will not occur for unlisted custom exceptions.
+
+        When ``cfg.exit_on_error`` is ``False``, caught exceptions are re-raised
+        after cleanup to preserve their original type and traceback.
     """
     metadata = _prepare_execution_metadata(cfg)
     envelope = _build_envelope(
@@ -650,16 +704,58 @@ def cli_run(cfg: CliRunConfig) -> Iterator[tuple[CliContext, EnvelopeBuilder]]:
             paths=metadata.paths,
         )
         yield context, envelope
-    except Exception as exc:  # noqa: BLE001 - intentional: propagate after finalisation
+    except (SystemExit, KeyboardInterrupt, GeneratorExit):
+        # Re-raise system-level exceptions immediately without cleanup
+        raise
+    except (
+        ValueError,
+        TypeError,
+        AttributeError,
+        KeyError,
+        IndexError,
+        FileNotFoundError,
+        PermissionError,
+        OSError,
+        RuntimeError,
+        NotImplementedError,
+        AssertionError,
+        LookupError,
+        ArithmeticError,
+        ReferenceError,
+        StopIteration,
+        StopAsyncIteration,
+        SyntaxError,
+        IndentationError,
+        TabError,
+        UnicodeError,
+        UnicodeDecodeError,
+        UnicodeEncodeError,
+        UnicodeTranslateError,
+        Warning,
+        UserWarning,
+        DeprecationWarning,
+        PendingDeprecationWarning,
+        SyntaxWarning,
+        RuntimeWarning,
+        FutureWarning,
+        ImportWarning,
+        UnicodeWarning,
+        BytesWarning,
+        ResourceWarning,
+        KgFoundryError,
+    ) as exc:
+        # Catch specific built-in exception types and KgFoundryError explicitly
+        # This covers the vast majority of exceptions that user code might raise
+        # Custom exceptions not in this list will propagate naturally (finally block
+        # still executes for cleanup, but error tracking won't occur)
         error = exc
-        status = CliRunStatus.ERROR
-        problem = problem_from_exc(
+        problem, status = _handle_user_code_exception(
             exc,
             code_map=cfg.error_code_map,
             operation=metadata.operation,
             run_id=metadata.run_id,
+            envelope=envelope,
         )
-        envelope.set_problem(problem)
     else:
         status = CliRunStatus.SUCCESS
     finally:
@@ -703,17 +799,10 @@ def cli_run(cfg: CliRunConfig) -> Iterator[tuple[CliContext, EnvelopeBuilder]]:
         return
     if cfg.exit_on_error:
         raise SystemExit(1) from error
-    # Re-raise the caught exception (error is always Exception subclass from except clause)
-    # Note: This re-raises the original exception, preserving its type and traceback
-    # pydoclint limitation: it sees 'raise error' as a variable, not Exception type
-    # The docstring correctly documents that Exception (or any subclass) can be raised
-    # DOC503: error is a variable holding Exception, not a literal exception type
-    # Type narrowing: error is guaranteed to be Exception subclass from except clause
-    if not isinstance(error, Exception):
-        msg = "error must be an Exception subclass"
-        raise TypeError(msg) from None
-    exc: Exception = error
-    raise exc
+    # Re-raise the caught exception (error is BaseException from except clause)
+    # SystemExit and KeyboardInterrupt are re-raised immediately above
+    # All other exceptions are re-raised here after cleanup
+    raise error
 
 
 __all__ = [

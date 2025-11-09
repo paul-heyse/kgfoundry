@@ -97,7 +97,7 @@ class XTROpenVinoModel:
         return hf_hub_download(repo_id="google/xtr-base-en", filename="2_Dense/pytorch_model.bin")
 
     @staticmethod
-    def _quantize_model_if_not_exists(root_dir: str, config: XTROpenVinoConfig) -> None:
+    def _quantize_model_if_not_exists(root_dir: str, _config: XTROpenVinoConfig) -> None:
         """Create OpenVINO model if it doesn't exist.
 
         Converts HuggingFace XTR model to OpenVINO format and saves to disk.

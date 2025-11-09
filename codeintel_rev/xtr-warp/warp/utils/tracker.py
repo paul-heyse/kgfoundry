@@ -7,6 +7,7 @@ and profiling execution steps.
 from __future__ import annotations
 
 import time
+from types import TracebackType
 from typing import Any, Never, Self
 
 import matplotlib.pyplot as plt
@@ -47,7 +48,7 @@ class ExecutionTrackerIteration:
         self,
         exception_type: type[BaseException] | None,
         exception_value: BaseException | None,
-        exception_traceback: Any | None,
+        exception_traceback: TracebackType | None,
     ) -> None:
         """End iteration tracking."""
         self._tracker.end_iteration()

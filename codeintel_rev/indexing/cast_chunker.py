@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from bisect import bisect_right
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -347,7 +347,9 @@ def chunk_file(
     path: Path,
     text: str,
     definitions: list[SymbolDef],
+    *,
     options: ChunkOptions | None = None,
+    budget: int | None = None,
 ) -> list[Chunk]:
     """Chunk file using SCIP symbol boundaries.
 
@@ -364,6 +366,8 @@ def chunk_file(
         List of SCIP symbol definitions extracted from the file.
     options : ChunkOptions | None, optional
         Chunk generation configuration. If None, uses default options.
+    budget : int | None, optional
+        Override for the character budget applied during chunk assembly.
 
     Returns
     -------
@@ -374,6 +378,8 @@ def chunk_file(
         return []
 
     opts = options or ChunkOptions()
+    if budget is not None and budget != opts.budget:
+        opts = replace(opts, budget=budget)
     chunk_language = opts.language if opts.language is not None else definitions[0].language
 
     uri = str(path)

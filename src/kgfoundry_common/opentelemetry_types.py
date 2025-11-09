@@ -87,13 +87,7 @@ class TracerProviderProtocol(Protocol):
         attributes: Attributes | None = None,
     ) -> TracerProtocol:
         """Return a tracer configured for the given instrumentation metadata."""
-        del (
-            self,
-            instrumenting_module_name,
-            instrumenting_library_version,
-            schema_url,
-            attributes,
-        )
+        del self, instrumenting_module_name, instrumenting_library_version, schema_url, attributes
         raise NotImplementedError
 
     def add_span_processor(self, processor: SpanProcessorProtocol) -> None:

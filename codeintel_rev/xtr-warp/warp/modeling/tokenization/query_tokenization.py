@@ -9,7 +9,7 @@ from __future__ import annotations
 import torch
 from warp.infra import ColBERTConfig
 from warp.modeling.hf_colbert import class_factory
-from warp.modeling.tokenization.utils import _split_into_batches
+from warp.modeling.tokenization.utils import split_into_batches
 from warp.parameters import DEVICE
 
 
@@ -158,9 +158,9 @@ class QueryTokenizer:
 
         Returns
         -------
-        tuple[torch.Tensor, torch.Tensor] | tuple[list, torch.Tensor]
+        tuple[torch.Tensor, torch.Tensor] | list[tuple[torch.Tensor, torch.Tensor]]
             If bsize=None: (input_ids, attention_mask).
-            If bsize specified: (batches, reverse_indices) for restoring order.
+            If bsize specified: list of (input_ids, attention_mask) tuples with reverse_indices.
 
         Raises
         ------
@@ -243,7 +243,7 @@ class QueryTokenizer:
                 raise ValueError(msg)
 
         if bsize:
-            return _split_into_batches(ids, mask, bsize)
+            return split_into_batches(ids, mask, bsize)
 
         if self.used is False:
             self.used = True

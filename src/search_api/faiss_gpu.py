@@ -10,24 +10,21 @@ missing GPU extras and fall back to CPU behaviour automatically.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from kgfoundry_common.navmap_loader import load_nav_metadata
 from kgfoundry_common.sequence_guards import (
     first_or_error,
     first_or_error_multi_device,
 )
-
-if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
-
-    from search_api.types import (
-        FaissIndexProtocol,
-        FaissModuleProtocol,
-        GpuClonerOptionsProtocol,
-        GpuResourcesProtocol,
-    )
+from search_api.types import (
+    FaissIndexProtocol,
+    FaissModuleProtocol,
+    GpuClonerOptionsProtocol,
+    GpuResourcesProtocol,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -128,11 +125,7 @@ def clone_index_to_gpu(index: FaissIndexProtocol, context: GpuContext) -> FaissI
             )
             if multi_clone_raw is not None:
                 multi_clone = cast(
-                    (
-                        "Callable[[GpuResourcesProtocol, Sequence[int], "
-                        "FaissIndexProtocol, GpuClonerOptionsProtocol | None], "
-                        "list[FaissIndexProtocol]]"
-                    ),
+                    "Callable[[GpuResourcesProtocol, Sequence[int], FaissIndexProtocol, GpuClonerOptionsProtocol | None], list[FaissIndexProtocol]]",
                     multi_clone_raw,
                 )
                 gpu_indices = multi_clone(context.resources, list(devices), index, options)
@@ -147,10 +140,7 @@ def clone_index_to_gpu(index: FaissIndexProtocol, context: GpuContext) -> FaissI
 
         if options is not None:
             clone = cast(
-                (
-                    "Callable[[GpuResourcesProtocol, int, FaissIndexProtocol, "
-                    "GpuClonerOptionsProtocol], FaissIndexProtocol]"
-                ),
+                "Callable[[GpuResourcesProtocol, int, FaissIndexProtocol, GpuClonerOptionsProtocol], FaissIndexProtocol]",
                 clone_raw,
             )
             return clone(

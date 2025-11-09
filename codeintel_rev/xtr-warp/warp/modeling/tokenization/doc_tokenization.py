@@ -9,7 +9,10 @@ from __future__ import annotations
 import torch
 from warp.infra import ColBERTConfig
 from warp.modeling.hf_colbert import class_factory
-from warp.modeling.tokenization.utils import _sort_by_length, _split_into_batches
+from warp.modeling.tokenization.utils import (
+    sort_by_length,
+    split_into_batches,
+)
 from warp.parameters import DEVICE
 
 
@@ -164,8 +167,8 @@ class DocTokenizer:
         ids[:, 1] = self.D_marker_token_id
 
         if bsize:
-            ids, mask, reverse_indices = _sort_by_length(ids, mask, bsize)
-            batches = _split_into_batches(ids, mask, bsize)
+            ids, mask, reverse_indices = sort_by_length(ids, mask, bsize)
+            batches = split_into_batches(ids, mask, bsize)
             return batches, reverse_indices
 
         return ids, mask

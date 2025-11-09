@@ -12,14 +12,13 @@ import socket
 import sys
 import time
 from pathlib import Path
-from typing import Any
 
 import git
 import ujson
 from warp.utils.utils import Dotdict
 
 
-def get_metadata_only() -> Any:
+def get_metadata_only() -> dict[str, object]:
     """Collect system and Git metadata without command-line arguments.
 
     Gathers hostname, Git branch/hash/commit datetime, current datetime,
@@ -54,7 +53,7 @@ def get_metadata_only() -> Any:
     return args
 
 
-def get_metadata(args: Any) -> dict[str, Any]:
+def get_metadata(args: object) -> dict[str, object]:
     """Collect system, Git, and argument metadata for experiment tracking.
 
     Extends the provided arguments dictionary with system metadata including
@@ -130,7 +129,7 @@ def format_metadata(metadata: dict[str, Any]) -> str:
     return ujson.dumps(metadata, indent=4)
 
 
-def save_metadata(path: str | Path, args: Any) -> dict[str, Any]:
+def save_metadata(path: str | Path, args: object) -> dict[str, object]:
     """Collect metadata and save it to a JSON file.
 
     Gathers metadata from arguments and system, formats it as JSON,

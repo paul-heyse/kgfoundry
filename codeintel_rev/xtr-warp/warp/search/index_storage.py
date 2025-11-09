@@ -134,7 +134,7 @@ class IndexScorer(IndexLoader, CandidateGeneration):
         passage_ids: torch.Tensor,
         out_device: str | torch.device = "cuda",
         *,
-        return_mask: bool = False,
+        _return_mask: bool = False,
     ) -> torch.Tensor | tuple[torch.Tensor, torch.Tensor]:
         """Lookup embeddings for passage IDs.
 

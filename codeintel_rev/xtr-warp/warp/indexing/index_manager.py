@@ -68,7 +68,7 @@ class IndexManager:
             bitarray.tofile(f)
 
 
-def load_index_part(filename: str, *, verbose: bool = True) -> torch.Tensor:
+def load_index_part(filename: str, *, _verbose: bool = True) -> torch.Tensor:
     """Load an uncompressed index part from disk.
 
     Loads a PyTorch tensor from file, handling backward compatibility

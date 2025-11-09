@@ -6,7 +6,6 @@ for encoding queries and documents with automatic tokenization and mixed precisi
 
 from __future__ import annotations
 
-from typing import Any
 
 import torch
 from tqdm import tqdm
@@ -142,7 +141,7 @@ class Checkpoint(ColBERT):
 
         self.amp_manager = MixedPrecisionManager(activated=True)
 
-    def query(self, *args: Any, to_cpu: bool = False, **kw_args: Any) -> torch.Tensor:
+    def query(self, *args: object, to_cpu: bool = False, **kw_args: object) -> torch.Tensor:
         """Encode query tokens into embeddings.
 
         Processes tokenized query input through ColBERT model with mixed precision.
@@ -168,9 +167,9 @@ class Checkpoint(ColBERT):
 
     def doc(
         self,
-        *args: Any,
+        *args: Any,  # noqa: ANN401
         to_cpu: bool = False,
-        **kw_args: Any,
+        **kw_args: Any,  # noqa: ANN401
     ) -> torch.Tensor | tuple[torch.Tensor, ...]:
         """Encode document tokens into embeddings.
 
@@ -253,8 +252,8 @@ class Checkpoint(ColBERT):
         self,
         docs: list[str],
         bsize: int | None = None,
-        keep_dims: bool | str = True,
         *,
+        keep_dims: bool | str = True,
         to_cpu: bool = False,
         showprogress: bool = False,
         return_tokens: bool = False,

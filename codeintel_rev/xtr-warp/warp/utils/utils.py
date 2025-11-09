@@ -11,7 +11,11 @@ import itertools
 import pathlib
 from collections import OrderedDict, defaultdict
 from collections.abc import Iterator, Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar
+
+if TYPE_CHECKING:
+    from torch.nn import Module
+    from torch.optim import Optimizer
 
 import torch
 import tqdm
@@ -19,8 +23,11 @@ import tqdm
 # Minimum width threshold for zip_first optimization
 MIN_WIDTH_FOR_ZIP_FIRST = 100
 
+# Type variables for generic functions
+T = TypeVar("T")
 
-def print_message(*s: Any, condition: bool = True, pad: bool = False) -> str:
+
+def print_message(*s: object, condition: bool = True, pad: bool = False) -> str:
     """Print timestamped message.
 
     Parameters
@@ -63,7 +70,7 @@ def timestamp(*, daydir: bool = False) -> str:
     return datetime.datetime.now(tz=datetime.UTC).strftime(format_str)
 
 
-def file_tqdm(file: Any) -> Iterator[str]:
+def file_tqdm(file: object) -> Iterator[str]:
     """Iterate file with progress bar.
 
     Parameters
@@ -86,7 +93,7 @@ def file_tqdm(file: Any) -> Iterator[str]:
         pbar.close()
 
 
-def torch_load_dnn(path: str) -> Any:
+def torch_load_dnn(path: str) -> dict[str, object]:
     """Load PyTorch model from file or URL.
 
     Parameters
@@ -111,9 +118,9 @@ def save_checkpoint(
     path: str | pathlib.Path,
     epoch_idx: int,
     mb_idx: int,
-    model: Any,
-    optimizer: Any,
-    arguments: dict[str, Any] | None = None,
+    model: Module,
+    optimizer: Optimizer,
+    arguments: dict[str, object] | None = None,
 ) -> None:
     """Save training checkpoint to disk.
 
@@ -150,12 +157,12 @@ def save_checkpoint(
 
 def load_checkpoint(
     path: str | pathlib.Path,
-    model: Any,
-    checkpoint: dict[str, Any] | None = None,
-    optimizer: Any | None = None,
+    model: Module,
+    checkpoint: dict[str, object] | None = None,
+    optimizer: Optimizer | None = None,
     *,
     do_print: bool = True,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Load training checkpoint from disk.
 
     Loads checkpoint, updates model and optionally optimizer state dicts,
@@ -569,7 +576,7 @@ def process_grouped_by_first_item(
     return groups
 
 
-def grouper(iterable: Sequence[Any], n: int, fillvalue: Any = None) -> Iterator[tuple[Any, ...]]:
+def grouper(iterable: Sequence[T], n: int, fillvalue: T | None = None) -> Iterator[tuple[T | None, ...]]:
     """Collect data into fixed-length chunks or blocks.
 
     Example: grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
@@ -614,24 +621,24 @@ def lengths2offsets(lengths: Sequence[int]) -> Iterator[tuple[int, int]]:
 
 
 # see https://stackoverflow.com/a/45187287
-class NullContextManager:
+class NullContextManager(Generic[T]):
     """No-op context manager.
 
     Provides context manager interface that does nothing.
     Useful for conditional context managers.
     """
 
-    def __init__(self, dummy_resource: Any = None) -> None:
+    def __init__(self, dummy_resource: T | None = None) -> None:
         """Initialize NullContextManager.
 
         Parameters
         ----------
-        dummy_resource : Any
+        dummy_resource : T | None
             Resource to return from __enter__ (default: None).
         """
         self.dummy_resource = dummy_resource
 
-    def __enter__(self) -> Any:
+    def __enter__(self) -> T | None:
         """Enter context (no-op).
 
         Returns
@@ -651,7 +658,7 @@ class NullContextManager:
         """
 
 
-def load_batch_backgrounds(args: Any, qids: Sequence[str | int]) -> list[str] | None:
+def load_batch_backgrounds(args: object, qids: Sequence[str | int]) -> list[str] | None:
     """Load background contexts for query IDs.
 
     Parameters

@@ -6,14 +6,13 @@ for evaluation purposes.
 
 from __future__ import annotations
 
-from typing import Any
 
 from warp.modeling.colbert import ColBERT
 from warp.parameters import DEVICE
 from warp.utils.utils import load_checkpoint, print_message
 
 
-def load_model(args: Any, *, do_print: bool = True) -> tuple[ColBERT, dict[str, Any]]:
+def load_model(args: object, *, do_print: bool = True) -> tuple[ColBERT, dict[str, object]]:
     """Load ColBERT model from checkpoint.
 
     Creates a ColBERT model with bert-base-uncased base, loads checkpoint,

@@ -76,7 +76,7 @@ class StridedTensorCore:
             self.tensor = torch.cat((self.tensor, padding))
 
         self.views = {
-            stride: _create_view(self.tensor, stride, self.inner_dims) for stride in self.strides
+            stride: create_view(self.tensor, stride, self.inner_dims) for stride in self.strides
         }
 
     @classmethod
@@ -182,16 +182,16 @@ class StridedTensorCore:
             Tuple of (padded_tensor, mask).
         """
         if self.use_gpu:
-            view = _create_view(self.tensor.cuda(), self.max_stride, self.inner_dims)[
+            view = create_view(self.tensor.cuda(), self.max_stride, self.inner_dims)[
                 self.offsets[:-1]
             ]
-            mask = _create_mask(
+            mask = create_mask(
                 self.lengths.cuda(), self.max_stride, like=view, use_gpu=self.use_gpu
             )
         else:
-            view = _create_view(self.tensor, self.max_stride, self.inner_dims)
+            view = create_view(self.tensor, self.max_stride, self.inner_dims)
             view = view[self.offsets[:-1]]
-            mask = _create_mask(self.lengths, self.max_stride, like=view, use_gpu=self.use_gpu)
+            mask = create_mask(self.lengths, self.max_stride, like=view, use_gpu=self.use_gpu)
 
         return view, mask
 
@@ -223,7 +223,23 @@ def _get_quantiles(lengths: torch.Tensor, quantiles: list[float]) -> list[int]:
     )
 
 
-def _create_view(tensor: torch.Tensor, stride: int, inner_dims: tuple[int, ...]) -> torch.Tensor:
+def create_view(tensor: torch.Tensor, stride: int, inner_dims: tuple[int, ...]) -> torch.Tensor:
+    """Create strided view of tensor for efficient sequence access.
+
+    Parameters
+    ----------
+    tensor : torch.Tensor
+        Input tensor to create view from.
+    stride : int
+        Stride length for the view.
+    inner_dims : tuple[int, ...]
+        Inner dimensions of the tensor.
+
+    Returns
+    -------
+    torch.Tensor
+        Strided view tensor.
+    """
     outdim = tensor.size(0) - stride + 1
     size = (outdim, stride, *inner_dims)
 
@@ -233,13 +249,31 @@ def _create_view(tensor: torch.Tensor, stride: int, inner_dims: tuple[int, ...])
     return torch.as_strided(tensor, size=size, stride=multidim_stride)
 
 
-def _create_mask(
+def create_mask(
     lengths: torch.Tensor,
     stride: int,
     like: torch.Tensor | None = None,
     *,
     use_gpu: bool = True,
 ) -> torch.Tensor:
+    """Create attention mask for variable-length sequences.
+
+    Parameters
+    ----------
+    lengths : torch.Tensor
+        Length of each sequence.
+    stride : int
+        Maximum stride length.
+    like : torch.Tensor | None
+        Optional tensor to match dimensions (default: None).
+    use_gpu : bool
+        Whether to use GPU acceleration (default: True).
+
+    Returns
+    -------
+    torch.Tensor
+        Attention mask tensor.
+    """
     if use_gpu:
         mask = torch.arange(stride).cuda() + 1
         mask = mask.unsqueeze(0) <= lengths.cuda().unsqueeze(-1)

@@ -6,14 +6,40 @@ splitting sequences into batches.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Protocol
 
 import torch
 
 
+class Tokenizer(Protocol):
+    """Protocol for tokenizer objects with tensorize method."""
+
+    def tensorize(
+        self, batch_text: list[str] | tuple[str, ...], bsize: int | None = None
+    ) -> (
+        tuple[torch.Tensor, torch.Tensor]
+        | tuple[list[tuple[torch.Tensor, torch.Tensor]], torch.Tensor]
+    ):
+        """Tensorize text into token IDs and masks.
+
+        Parameters
+        ----------
+        batch_text : list[str] | tuple[str, ...]
+            Batch of texts to tokenize.
+        bsize : int | None
+            Optional batch size for splitting.
+
+        Returns
+        -------
+        tuple[torch.Tensor, torch.Tensor] | tuple[list[tuple[torch.Tensor, torch.Tensor]], torch.Tensor]
+            Token IDs and attention masks, optionally batched.
+        """
+        ...
+
+
 def tensorize_triples(
-    query_tokenizer: Any,
-    doc_tokenizer: Any,
+    query_tokenizer: Tokenizer,
+    doc_tokenizer: Tokenizer,
     queries: list[str],
     passages: list[str],
     scores: list[float] | torch.Tensor,
@@ -63,8 +89,8 @@ def tensorize_triples(
     q_ids, q_mask = query_tokenizer.tensorize(queries)
     d_ids, d_mask = doc_tokenizer.tensorize(passages)
 
-    query_batches = _split_into_batches(q_ids, q_mask, bsize)
-    doc_batches = _split_into_batches(d_ids, d_mask, bsize * nway)
+    query_batches = split_into_batches(q_ids, q_mask, bsize)
+    doc_batches = split_into_batches(d_ids, d_mask, bsize * nway)
 
     if len(scores):
         score_batches = _split_into_batches2(scores, bsize * nway)
@@ -78,7 +104,7 @@ def tensorize_triples(
     return batches
 
 
-def _sort_by_length(
+def sort_by_length(
     ids: torch.Tensor, mask: torch.Tensor, bsize: int
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Sort sequences by length for efficient batching.
@@ -109,7 +135,7 @@ def _sort_by_length(
     return ids[indices], mask[indices], reverse_indices
 
 
-def _split_into_batches(
+def split_into_batches(
     ids: torch.Tensor, mask: torch.Tensor, bsize: int
 ) -> list[tuple[torch.Tensor, torch.Tensor]]:
     """Split token IDs and masks into batches.

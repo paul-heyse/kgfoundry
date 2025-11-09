@@ -151,7 +151,7 @@ class Searcher:
 
         print_memory_stats()
 
-    def configure(self, **kw_args: Any) -> None:
+    def configure(self, **kw_args: Any) -> None:  # noqa: ANN401
         """Update search configuration parameters.
 
         Parameters

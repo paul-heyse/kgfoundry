@@ -8,7 +8,12 @@ including TorchScript, ONNX, OpenVINO, and CoreML.
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from warp.engine.runtime.onnx_model import XTROnnxConfig
+    from warp.engine.runtime.openvino_model import XTROpenVinoConfig
+    from warp.engine.runtime.torchscript_model import XTRTorchScriptConfig
 
 from warp.engine.config import USE_CORE_ML, WARPRunConfig
 from warp.engine.runtime.onnx_model import XTROnnxConfig, XTROnnxQuantization
@@ -22,7 +27,9 @@ DEFAULT_K_VALUE = 1000
 QUANTIZATION_TYPES = "|".join(["NONE", "PREPROCESS", "DYN_QUANTIZED_QINT8", "QUANTIZED_QATTENTION"])
 
 
-def _make_runtime(runtime: str | None, num_threads: int = 1) -> Any:
+def _make_runtime(
+    runtime: str | None, num_threads: int = 1
+) -> XTROnnxConfig | XTROpenVinoConfig | XTRTorchScriptConfig | None:
     if runtime is None:
         return runtime
 

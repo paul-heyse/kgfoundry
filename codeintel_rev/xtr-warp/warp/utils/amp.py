@@ -6,9 +6,14 @@ precision (AMP) training with gradient scaling and clipping.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 import torch
+from torch.optim import lr_scheduler
+
+if TYPE_CHECKING:
+    from torch.nn import Module
+
 from warp.utils.utils import NullContextManager
 
 
@@ -37,7 +42,7 @@ class MixedPrecisionManager:
         if self.activated:
             self.scaler = torch.cuda.amp.GradScaler()
 
-    def context(self) -> Any:
+    def context(self) -> torch.cuda.amp.autocast | NullContextManager:
         """Get autocast context manager.
 
         Returns
@@ -62,9 +67,9 @@ class MixedPrecisionManager:
 
     def step(
         self,
-        colbert: Any,
+        colbert: Module,
         optimizer: torch.optim.Optimizer,
-        scheduler: Any | None = None,
+        scheduler: lr_scheduler.LRScheduler | None = None,
     ) -> None:
         """Perform optimizer step with gradient clipping and scaling.
 

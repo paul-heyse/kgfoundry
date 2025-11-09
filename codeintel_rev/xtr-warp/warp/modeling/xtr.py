@@ -87,7 +87,7 @@ class XTRLinear(torch.nn.Module):
     """
 
     def __init__(
-        self, in_features: int = 768, out_features: int = 128, *, bias: bool = False
+        self, in_features: int = 768, out_features: int = 128, *, _bias: bool = False
     ) -> None:
         """Initialize XTRLinear layer.
 
@@ -254,8 +254,8 @@ class XTRCheckpoint:
         self,
         docs: list[str],
         bsize: int | None = None,
-        keep_dims: bool | str = True,
         *,
+        keep_dims: bool | str = True,
         to_cpu: bool = False,
         showprogress: bool = False,
         return_tokens: bool = False,

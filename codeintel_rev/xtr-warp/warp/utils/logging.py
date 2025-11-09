@@ -10,7 +10,10 @@ import pathlib
 import sys
 import traceback
 from types import TracebackType
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from warp.infra.run import Run
 
 from warp.utils.utils import create_directory, print_message
 
@@ -29,7 +32,7 @@ class Logger:
         Run manager instance with path and experiment info.
     """
 
-    def __init__(self, rank: int, run: Any) -> None:
+    def __init__(self, rank: int, run: Run) -> None:
         """Initialize Logger with rank and run manager.
 
         Parameters
@@ -66,7 +69,7 @@ class Logger:
         if not self.is_main:
             return
 
-    def _log_args(self, _args: Any) -> None:
+    def _log_args(self, _args: object) -> None:
         if not self.is_main:
             return
 
@@ -108,7 +111,7 @@ class Logger:
         with pathlib.Path(path).open("w", encoding="utf-8") as f:
             f.write(content)
 
-    def warn(self, *args: Any) -> None:
+    def warn(self, *args: object) -> None:
         """Log warning message.
 
         Prints warning and appends to warnings.txt file.
@@ -125,7 +128,7 @@ class Logger:
         ) as output_metadata:
             output_metadata.write(msg + "\n\n\n")
 
-    def info_all(self, *args: Any) -> None:
+    def info_all(self, *args: object) -> None:
         """Log info message from all ranks.
 
         Parameters
@@ -135,7 +138,7 @@ class Logger:
         """
         print_message("[" + str(self.rank) + "]", "\t", *args)
 
-    def info(self, *args: Any) -> None:
+    def info(self, *args: object) -> None:
         """Log info message from main rank only.
 
         Parameters

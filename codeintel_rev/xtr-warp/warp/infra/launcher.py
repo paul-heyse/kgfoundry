@@ -21,6 +21,11 @@ from warp.infra.run import Run
 from warp.utils import distributed
 from warp.utils.utils import print_message
 
+try:
+    import psutil
+except ImportError:
+    psutil = None
+
 
 class Launcher:
     """Manages launching of warp tasks in distributed or single-process mode."""
@@ -50,7 +55,7 @@ class Launcher:
         self.run_config = RunConfig.from_existing(Run().config, run_config)
         self.nranks = self.run_config.nranks
 
-    def launch(self, custom_config: BaseConfig & RunSettings, *args: Any) -> Any:  # noqa: ANN401
+    def launch(self, custom_config: BaseConfig & RunSettings, *args: object) -> object:
         """Launch the callee function in distributed mode across multiple processes.
 
         Parameters
@@ -128,7 +133,7 @@ class Launcher:
 
         return return_values
 
-    def launch_without_fork(self, custom_config: BaseConfig & RunSettings, *args: Any) -> Any:  # noqa: ANN401
+    def launch_without_fork(self, custom_config: BaseConfig & RunSettings, *args: object) -> object:
         """Launch the callee function in single-process mode without forking.
 
         Parameters
@@ -189,7 +194,7 @@ def set_seed(seed: int) -> None:
     torch.cuda.manual_seed_all(seed)
 
 
-def run_process_without_mp(callee: Callable[..., Any], config: RunConfig, *args: Any) -> Any:  # noqa: ANN401
+def run_process_without_mp(callee: Callable[..., object], config: RunConfig, *args: object) -> object:
     """Run the callee function in single-process mode without multiprocessing.
 
     Parameters
@@ -216,11 +221,11 @@ def run_process_without_mp(callee: Callable[..., Any], config: RunConfig, *args:
 
 
 def setup_new_process(
-    callee: Callable[..., Any],
+    callee: Callable[..., object],
     port: str,
-    return_value_queue: mp.Queue[tuple[int, Any]],
+    return_value_queue: mp.Queue[tuple[int, object]],
     config: RunConfig,
-    *args: Any,  # noqa: ANN401
+    *args: object,
 ) -> None:
     """Set up and run a new process for distributed execution.
 
@@ -281,7 +286,8 @@ def print_memory_stats(message: str = "") -> None:
     """
     return  # NOTE: Add this back before release.
 
-    import psutil  # Remove before releases? Or at least make optional with try/except.
+    if psutil is None:
+        return  # psutil not available
 
     global_info = psutil.virtual_memory()
     total, available, used, free = (

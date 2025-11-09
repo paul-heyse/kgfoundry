@@ -46,7 +46,7 @@ class ParallelIndexLoaderWARP:
     def __init__(
         self,
         index_path: str,
-        config: ColBERTConfig,
+        _config: ColBERTConfig,
         *,
         use_gpu: bool = True,
         load_index_with_mmap: bool = False,
@@ -313,7 +313,7 @@ class ParallelIndexScorerWARP(ParallelIndexLoaderWARP):
 
     def rank(
         self,
-        config: ColBERTConfig,
+        _config: ColBERTConfig,
         q: torch.Tensor,
         k: int = 100,
         filter_fn: None = None,

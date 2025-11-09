@@ -10,7 +10,7 @@ import os
 import pathlib
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Self
+from typing import IO, Self
 
 from warp.infra.config import RunConfig
 from warp.utils.utils import create_directory, print_message
@@ -66,7 +66,7 @@ class Run:
         """
         return self.stack[-1]
 
-    def __getattr__(self, name: str) -> Any:  # noqa: ANN401
+    def __getattr__(self, name: str) -> object:  # Dynamic attribute access
         """Delegate attribute access to current config.
 
         Parameters
@@ -128,7 +128,7 @@ class Run:
         finally:
             self.__pop()
 
-    def open(self, path: str, mode: str = "r") -> Any:  # noqa: ANN401
+    def open(self, path: str, mode: str = "r") -> IO[str] | IO[bytes]:
         """Open file relative to experiment path.
 
         Creates directories as needed. Validates overwrite setting for
@@ -166,7 +166,7 @@ class Run:
 
         return pathlib.Path(path).open(mode=mode)
 
-    def print(self, *args: Any) -> None:
+    def print(self, *args: object) -> None:
         """Print message with rank prefix.
 
         Parameters
@@ -176,7 +176,7 @@ class Run:
         """
         print_message("[" + str(self.rank) + "]", "\t\t", *args)
 
-    def print_main(self, *args: Any) -> None:
+    def print_main(self, *args: object) -> None:
         """Print message only on rank 0.
 
         Parameters
