@@ -45,15 +45,13 @@
 3) **Validate quality gates locally**
   ```bash
   uv run ruff format && uv run ruff check --fix
+  uv run fixit fix -a .
   uv run pyright --warnings --pythonversion=3.13
   uv run pyrefly check
   uv run vulture src tools stubs --min-confidence 90
   SKIP_GPU_WARMUP=1 uv run pytest -q    # unset on CUDA-capable hosts
-  uv run pip-audit
   # If OpenAPI changed: lint spec (e.g., spectral lint openapi.yaml)
-  make artifacts && git diff --exit-code    # docs/nav/catalog/schemas in sync
-  python tools/check_new_suppressions.py src    # verify no untracked suppressions
-  python tools/check_imports.py      # verify architectural boundaries
+
   ```
 
 ### Quality checks (zero-error mandate)
@@ -144,7 +142,7 @@ For all code blocks that you make edits to, please check for pyright, pyrefly, a
 
 * Examples are **copy-ready** and runnable; public API shows minimal, idiomatic usage.
 * Cross-link code to spec and schema files; keep the **Agent Portal** links working (editor/GitHub).
-* **Verify:** `make artifacts` regenerates docs/catalog/navmap; tree is clean.
+
 
 ##### 14) Versioning & deprecation policy
 
@@ -192,8 +190,6 @@ Read these first when editing configs or debugging local vs CI drift:
 - **Dead code scanning:** `pyproject.toml` → `[tool.vulture]`, `.github/workflows/ci-vulture.yml`, `vulture_whitelist.py`
 - **Types:** `pyrefly.toml` (single source), `pyrightconfig.jsonc` (strict pyright)
 - **Tests:** `pytest.ini` (markers, doctest/xdoctest config)
-- **Docs / Artifacts:** `tools/docs/build_artifacts.py`, `make artifacts`, outputs under `docs/_build/**`, `site/_build/**`
-- **Nav & Catalog:** `tools/navmap/*`, `docs/_build/` navigation artifacts
 - **CI:** `.github/workflows/ci.yaml` (job order: precommit → lint → types → tests → docs; OS matrix; caches; artifacts)
 - **Pre‑commit:** `.pre-commit-config.yaml` (runs the same gates locally)
 
@@ -340,7 +336,7 @@ Per-file ignores are defined in `pyproject.toml` for:
   - Raises (type + condition)
   - Examples
   - Notes (performance, side‑effects)
-- **Loop:** code → `make artifacts` (scaffold/validate) → refine docs → `make artifacts` → commit
+
 
 ---
 
@@ -417,7 +413,7 @@ Example `PATH_MAP`:
 3. Implement **typed** public API; write pure logic first, I/O later.
 4. Add **parametrized tests** (happy paths, edges, negative cases).
 5. Run quality gates (format → lint → pyright → pyrefly → pytest).
-6. `make artifacts` and commit regenerated docs/nav/catalog.
+
 
 **Done when:** all gates green; PR includes design note, schemas, and runnable examples.
 
@@ -444,7 +440,6 @@ Example `PATH_MAP`:
 - **Public API:** list symbols & **typed** signatures that changed/added.
 - **Data Contracts:** link to JSON Schema/OpenAPI diff (if any).
 - **Test Plan:** commands + what they prove.
-- **Docs:** where examples changed; screenshots/links to artifacts (docs site, portal).
 - **Impact:** migration notes / deprecations.
 
 **Checklist (paste outputs):**
@@ -453,7 +448,6 @@ Example `PATH_MAP`:
 [ ] uv run pyright --warnings --pythonversion=3.13
 [ ] uv run pyrefly check
 [ ] SKIP_GPU_WARMUP=1 uv run pytest -q
-[ ] make artifacts && git diff --exit-code
 [ ] python tools/check_new_suppressions.py src
 [ ] python tools/check_imports.py
 [ ] uv run pip-audit
@@ -480,9 +474,6 @@ uv run pyrefly check
 # Tests (incl. doctests/xdoctest via pytest.ini)
 SKIP_GPU_WARMUP=1 uv run pytest -q
 
-# Artifacts (docstrings, navmap, schemas, portal)
-make artifacts
-git diff --exit-code
 
 # Architectural boundaries & suppression guard
 python tools/check_new_suppressions.py src

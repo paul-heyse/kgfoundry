@@ -1,0 +1,16 @@
+{
+  "type": "https://kgfoundry.dev/problems/xtr-index-missing",
+  "title": "XTRIndexUnavailableError",
+  "status": 503,
+  "detail": "XTR artifacts missing at data/xtr; Stage-B late-interaction was skipped.",
+  "code": "xtr-index-missing",
+  "instance": "/mcp/tools/search:semantic_pro",
+  "errors": {
+    "xtr_dir": "data/xtr",
+    "required_files": [
+      "tokens.f16",
+      "index.meta.json"
+    ],
+    "suggested_action": "Run `python -m codeintel_rev.cli.xtr build` and redeploy."
+  }
+}

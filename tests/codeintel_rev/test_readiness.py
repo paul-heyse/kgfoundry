@@ -43,6 +43,7 @@ def mock_context(tmp_path: Path) -> ApplicationContext:
     (repo_root / "data" / "catalog.duckdb").touch()
     (repo_root / "data" / "coderank_vectors").mkdir()
     (repo_root / "data" / "faiss" / "coderank.faiss").touch()
+    (repo_root / "data" / "xtr").mkdir()
     (repo_root / "indexes").mkdir()
     (repo_root / "indexes" / "warp_xtr").mkdir()
     (repo_root / "index.scip").touch()
@@ -57,6 +58,7 @@ def mock_context(tmp_path: Path) -> ApplicationContext:
         coderank_vectors_dir=repo_root / "data" / "coderank_vectors",
         coderank_faiss_index=repo_root / "data" / "faiss" / "coderank.faiss",
         warp_index_dir=repo_root / "indexes" / "warp_xtr",
+        xtr_dir=repo_root / "data" / "xtr",
     )
 
     settings = load_settings()
@@ -190,6 +192,7 @@ async def test_readiness_probe_materialize_reports_missing_table(
         splade=existing_settings.splade,
         coderank=existing_settings.coderank,
         warp=existing_settings.warp,
+        xtr=existing_settings.xtr,
         coderank_llm=existing_settings.coderank_llm,
     )
     probe = ReadinessProbe(_context_with_settings(mock_context, new_settings))
@@ -220,6 +223,7 @@ async def test_readiness_probe_materialize_validates_index(
         splade=existing_settings.splade,
         coderank=existing_settings.coderank,
         warp=existing_settings.warp,
+        xtr=existing_settings.xtr,
         coderank_llm=existing_settings.coderank_llm,
     )
     context = _context_with_settings(mock_context, new_settings)
@@ -417,6 +421,7 @@ def test_readiness_probe_check_vllm_invalid_url(
         splade=mock_context.settings.splade,
         coderank=mock_context.settings.coderank,
         warp=mock_context.settings.warp,
+        xtr=mock_context.settings.xtr,
         coderank_llm=mock_context.settings.coderank_llm,
     )
     context = _context_with_settings(mock_context, new_settings)
@@ -446,6 +451,7 @@ def test_readiness_probe_check_vllm_success(mock_context: ApplicationContext) ->
         splade=mock_context.settings.splade,
         coderank=mock_context.settings.coderank,
         warp=mock_context.settings.warp,
+        xtr=mock_context.settings.xtr,
         coderank_llm=mock_context.settings.coderank_llm,
     )
     context = _context_with_settings(mock_context, new_settings)
@@ -482,6 +488,7 @@ def test_readiness_probe_check_vllm_http_error(
         splade=mock_context.settings.splade,
         coderank=mock_context.settings.coderank,
         warp=mock_context.settings.warp,
+        xtr=mock_context.settings.xtr,
         coderank_llm=mock_context.settings.coderank_llm,
     )
     context = _context_with_settings(mock_context, new_settings)

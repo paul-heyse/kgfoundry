@@ -31,9 +31,7 @@ def _check_cuda_availability() -> tuple[bool, str]:
         (is_available, status_message)
     """
     try:
-        torch = cast(
-            "_torch", gate_import("torch", "CUDA availability checks for warmup")
-        )
+        torch = cast("_torch", gate_import("torch", "CUDA availability checks for warmup"))
 
         cuda_available = torch.cuda.is_available()
         if not cuda_available:
@@ -145,9 +143,7 @@ def _test_faiss_gpu_resources() -> tuple[bool, str]:
     except ImportError:
         return False, "FAISS not installed"
     except (RuntimeError, AttributeError, OSError) as exc:
-        logger.warning(
-            "FAISS GPU resource initialization failed: %s", exc, exc_info=True
-        )
+        logger.warning("FAISS GPU resource initialization failed: %s", exc, exc_info=True)
         return False, f"FAISS GPU init error: {exc}"
 
 
@@ -224,9 +220,7 @@ def warmup_gpu() -> dict[str, bool | str]:
 
     if checks_passed == _TOTAL_GPU_CHECKS:
         results["overall_status"] = "ready"
-        results["details"] = (
-            f"GPU warmup complete - all {_TOTAL_GPU_CHECKS} checks passed"
-        )
+        results["details"] = f"GPU warmup complete - all {_TOTAL_GPU_CHECKS} checks passed"
     elif checks_passed >= _MIN_CHECKS_FOR_DEGRADED:
         results["overall_status"] = "degraded"
         results["details"] = (

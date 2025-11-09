@@ -87,9 +87,7 @@ class MixedPrecisionManager:
         """
         if self.activated:
             self.scaler.unscale_(optimizer)
-            torch.nn.utils.clip_grad_norm_(
-                colbert.parameters(), 2.0, error_if_nonfinite=False
-            )
+            torch.nn.utils.clip_grad_norm_(colbert.parameters(), 2.0, error_if_nonfinite=False)
 
             self.scaler.step(optimizer)
             self.scaler.update()

@@ -93,8 +93,7 @@ def load_doclens(
     doclens_filenames = [doclens_filenames[i] for i in sorted(doclens_filenames.keys())]
 
     all_doclens = [
-        ujson.load(filename_path.open(encoding="utf-8"))
-        for filename_path in doclens_filenames
+        ujson.load(filename_path.open(encoding="utf-8")) for filename_path in doclens_filenames
     ]
 
     if flatten:

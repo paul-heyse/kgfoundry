@@ -206,9 +206,7 @@ def _semantic_search_sync(
                 "query": query,
                 "has_scope": scope is not None,
                 "scope_languages": (
-                    cast("Sequence[str] | None", scope.get("languages"))
-                    if scope
-                    else None
+                    cast("Sequence[str] | None", scope.get("languages")) if scope else None
                 ),
                 "scope_include_globs": scope.get("include_globs") if scope else None,
             },
@@ -259,9 +257,7 @@ def _semantic_search_sync(
 
         hybrid_result = _resolve_hybrid_results(
             context,
-            _HybridSearchState(
-                query, result_ids, result_scores, budget.effective_limit
-            ),
+            _HybridSearchState(query, result_ids, result_scores, budget.effective_limit),
             limits_metadata,
             ("semantic", "faiss"),
         )
@@ -303,10 +299,7 @@ def _semantic_search_sync(
 
         answer_message = (
             f"Found {len(findings)} hybrid results for: {query}"
-            if any(
-                channel in {"bm25", "splade"}
-                for channel in hybrid_result.retrieval_channels
-            )
+            if any(channel in {"bm25", "splade"} for channel in hybrid_result.retrieval_channels)
             else f"Found {len(findings)} semantically similar code chunks for: {query}"
         )
 
@@ -318,9 +311,7 @@ def _semantic_search_sync(
         )
 
 
-def _clamp_result_limit(
-    requested_limit: int, max_results: int
-) -> tuple[int, list[str]]:
+def _clamp_result_limit(requested_limit: int, max_results: int) -> tuple[int, list[str]]:
     """Enforce bounds on requested limit with explanatory metadata.
 
     Parameters
@@ -338,9 +329,7 @@ def _clamp_result_limit(
     """
     messages: list[str] = []
     if requested_limit <= 0:
-        messages.append(
-            f"Requested limit {requested_limit} is not positive; using minimum of 1."
-        )
+        messages.append(f"Requested limit {requested_limit} is not positive; using minimum of 1.")
     if requested_limit > max_results:
         messages.append(
             f"Requested limit {requested_limit} exceeds max_results {max_results}; "
@@ -512,10 +501,12 @@ def _resolve_hybrid_results(
             channels_out,
         )
 
+    semantic_hits = list(
+        zip(state.result_ids, state.result_scores, strict=False),
+    )
     hybrid_result = hybrid_engine.search(
         query=state.query,
-        semantic_ids=state.result_ids,
-        semantic_scores=state.result_scores,
+        semantic_hits=semantic_hits,
         limit=state.effective_limit,
     )
     if hybrid_result.warnings:
@@ -528,21 +519,15 @@ def _resolve_hybrid_results(
         try:
             chunk_id_int = int(doc.doc_id)
         except ValueError:
-            limits_metadata.append(
-                f"Hybrid result skipped (non-numeric chunk id): {doc.doc_id}"
-            )
+            limits_metadata.append(f"Hybrid result skipped (non-numeric chunk id): {doc.doc_id}")
             continue
 
         fused_ids.append(chunk_id_int)
         fused_scores.append(float(doc.score))
-        fused_contributions[chunk_id_int] = hybrid_result.contributions.get(
-            doc.doc_id, []
-        )
+        fused_contributions[chunk_id_int] = hybrid_result.contributions.get(doc.doc_id, [])
 
     if fused_ids:
-        channels_out = list(
-            dict.fromkeys(["semantic", "faiss", *hybrid_result.channels])
-        )
+        channels_out = list(dict.fromkeys(["semantic", "faiss", *hybrid_result.channels]))
         return _build_hybrid_result(
             fused_ids,
             fused_scores,
@@ -789,9 +774,7 @@ def _annotate_hybrid_contributions(
         finding["why"] = f"Hybrid RRF (k={rrf_k}): " + ", ".join(parts)
 
 
-def _embed_query(
-    client: VLLMClient, query: str
-) -> tuple[np.ndarray | None, str | None]:
+def _embed_query(client: VLLMClient, query: str) -> tuple[np.ndarray | None, str | None]:
     """Embed query text and return a normalized vector and error message.
 
     Parameters
@@ -934,9 +917,7 @@ def _hydrate_findings(
                 )
             else:
                 records = catalog.query_by_ids(valid_ids)
-            chunk_by_id = {
-                int(record["id"]): record for record in records if "id" in record
-            }
+            chunk_by_id = {int(record["id"]): record for record in records if "id" in record}
 
             for chunk_id, score in zip(chunk_ids, scores, strict=True):
                 if chunk_id < 0:

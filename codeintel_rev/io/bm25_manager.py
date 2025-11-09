@@ -75,9 +75,7 @@ class BM25BuildOptions(msgspec.Struct, frozen=True):
 class BM25IndexManager:
     """Manage BM25 corpus preparation and Lucene index builds."""
 
-    def __init__(
-        self, settings: Settings, *, logger_: logging.Logger | None = None
-    ) -> None:
+    def __init__(self, settings: Settings, *, logger_: logging.Logger | None = None) -> None:
         self._settings = settings
         self._logger = logger_ or logging.getLogger(__name__)
         self._repo_root = Path(settings.paths.repo_root).expanduser().resolve()
@@ -128,9 +126,7 @@ class BM25IndexManager:
             If ``overwrite`` is ``False`` and the output directory already contains documents.
         """
         try:
-            source_path = resolve_within_repo(
-                self._repo_root, source, allow_nonexistent=False
-            )
+            source_path = resolve_within_repo(self._repo_root, source, allow_nonexistent=False)
         except FileNotFoundError as exc:  # pragma: no cover - exercised in tests
             msg = f"Corpus source {source} does not exist"
             raise FileNotFoundError(msg) from exc
@@ -174,9 +170,7 @@ class BM25IndexManager:
                 digest.update(contents.encode("utf-8"))
                 digest.update(b"\x1e")
 
-                with (json_dir / f"{doc_id_str}.json").open(
-                    "w", encoding="utf-8"
-                ) as out_handle:
+                with (json_dir / f"{doc_id_str}.json").open("w", encoding="utf-8") as out_handle:
                     json.dump(
                         {"id": doc_id_str, "contents": contents},
                         out_handle,
@@ -256,9 +250,7 @@ class BM25IndexManager:
 
         corpus_metadata_path = resolved_json_dir / CORPUS_METADATA_FILENAME
         corpus_metadata = (
-            _read_corpus_metadata(corpus_metadata_path)
-            if corpus_metadata_path.exists()
-            else None
+            _read_corpus_metadata(corpus_metadata_path) if corpus_metadata_path.exists() else None
         )
 
         cmd = [

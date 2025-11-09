@@ -135,15 +135,15 @@ def _resolve_standard_transformer_classes(
     elif model_object_mapping.get(name_or_path) is not None:
         model_class_object = model_object_mapping[name_or_path]
     else:
-        msg = f"Could not find a model class for model type {model_type} in the transformers library"
+        msg = (
+            f"Could not find a model class for model type {model_type} in the transformers library"
+        )
         raise ValueError(msg)
 
     return model_class_object, pretrained_class_object
 
 
-def _resolve_custom_transformer_classes(
-    name_or_path: str, config: AutoConfig
-) -> tuple[type, type]:
+def _resolve_custom_transformer_classes(name_or_path: str, config: AutoConfig) -> tuple[type, type]:
     """Return the model/pretrained pair defined in ``config.auto_map``.
 
     Parameters
@@ -175,9 +175,7 @@ def _resolve_custom_transformer_classes(
 
     model_class_object = get_class_from_dynamic_module(model_class, name_or_path)
     pretrained_class = model_class.replace("Model", "PreTrainedModel")
-    pretrained_class_object = get_class_from_dynamic_module(
-        pretrained_class, name_or_path
-    )
+    pretrained_class_object = get_class_from_dynamic_module(pretrained_class, name_or_path)
 
     return model_class_object, pretrained_class_object
 
@@ -209,12 +207,12 @@ def class_factory(name_or_path: str) -> type:
     loaded_config = AutoConfig.from_pretrained(name_or_path, trust_remote_code=True)
 
     if getattr(loaded_config, "auto_map", None) is None:
-        model_class_object, pretrained_class_object = (
-            _resolve_standard_transformer_classes(name_or_path, loaded_config)
+        model_class_object, pretrained_class_object = _resolve_standard_transformer_classes(
+            name_or_path, loaded_config
         )
     else:
-        model_class_object, pretrained_class_object = (
-            _resolve_custom_transformer_classes(name_or_path, loaded_config)
+        model_class_object, pretrained_class_object = _resolve_custom_transformer_classes(
+            name_or_path, loaded_config
         )
 
     class HFColBERT(pretrained_class_object):
@@ -245,9 +243,7 @@ def class_factory(name_or_path: str) -> type:
             return getattr(self, base_model_prefix)
 
         @classmethod
-        def from_pretrained(
-            cls, name_or_path: str, colbert_config: ColBERTConfig
-        ) -> type:
+        def from_pretrained(cls, name_or_path: str, colbert_config: ColBERTConfig) -> type:
             if name_or_path.endswith(".dnn"):
                 dnn = torch_load_dnn(name_or_path)
                 base = dnn.get("arguments", {}).get("model", "bert-base-uncased")

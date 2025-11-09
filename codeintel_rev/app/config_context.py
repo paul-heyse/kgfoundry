@@ -49,7 +49,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import redis.asyncio as redis_asyncio
 
@@ -61,6 +61,7 @@ from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.hybrid_search import HybridSearchEngine
 from codeintel_rev.io.vllm_client import VLLMClient
+from codeintel_rev.io.xtr_manager import XTRIndex
 from kgfoundry_common.errors import ConfigurationError
 from kgfoundry_common.logging import get_logger
 
@@ -100,6 +101,8 @@ class ResolvedPaths:
         Path to the CodeRank FAISS index used for Stage-A retrieval.
     warp_index_dir : Path
         Directory containing WARP/XTR index artifacts.
+    xtr_dir : Path
+        Directory containing XTR token-level artifacts (memmaps + metadata).
 
     Examples
     --------
@@ -122,6 +125,7 @@ class ResolvedPaths:
     coderank_vectors_dir: Path
     coderank_faiss_index: Path
     warp_index_dir: Path
+    xtr_dir: Path
 
 
 def resolve_application_paths(settings: Settings) -> ResolvedPaths:
@@ -213,7 +217,23 @@ def resolve_application_paths(settings: Settings) -> ResolvedPaths:
         coderank_vectors_dir=_resolve(settings.paths.coderank_vectors_dir),
         coderank_faiss_index=_resolve(settings.paths.coderank_faiss_index),
         warp_index_dir=_resolve(settings.paths.warp_index_dir),
+        xtr_dir=_resolve(settings.paths.xtr_dir),
     )
+
+
+@dataclass(slots=True)
+class _ContextRuntimeState:
+    """Mutable runtime state backing the frozen ApplicationContext."""
+
+    hybrid_engine: HybridSearchEngine | None = None
+    hybrid_lock: Lock = field(default_factory=Lock)
+    coderank_faiss_manager: FAISSManager | None = None
+    coderank_faiss_lock: Lock = field(default_factory=Lock)
+    xtr_index: XTRIndex | None = None
+    xtr_lock: Lock = field(default_factory=Lock)
+    faiss_lock: Lock = field(default_factory=Lock)
+    faiss_loaded: bool = False
+    faiss_gpu_attempted: bool = False
 
 
 @dataclass(slots=True, frozen=True)
@@ -282,11 +302,6 @@ class ApplicationContext:
     state (connection pools, loaded indexes) but their configuration cannot be
     changed after initialization.
 
-    Internal attributes (not part of public API):
-    - ``_faiss_lock``: Thread lock for coordinating FAISS index loading
-    - ``_faiss_loaded``: Flag indicating whether CPU index has been loaded
-    - ``_faiss_gpu_attempted``: Flag indicating whether GPU clone has been attempted
-
     See Also
     --------
     resolve_application_paths : Creates ResolvedPaths from Settings
@@ -301,17 +316,7 @@ class ApplicationContext:
     duckdb_manager: DuckDBManager
     git_client: GitClient
     async_git_client: AsyncGitClient
-    _faiss_lock: Lock = field(default_factory=Lock, init=False)
-    _faiss_loaded: bool = field(default=False, init=False)
-    _faiss_gpu_attempted: bool = field(default=False, init=False)
-    _hybrid_engine: HybridSearchEngine | None = field(
-        default=None, init=False, repr=False
-    )
-    _hybrid_lock: Lock = field(default_factory=Lock, init=False, repr=False)
-    _coderank_faiss_manager: FAISSManager | None = field(
-        default=None, init=False, repr=False
-    )
-    _coderank_faiss_lock: Lock = field(default_factory=Lock, init=False, repr=False)
+    _runtime: _ContextRuntimeState = field(default_factory=_ContextRuntimeState, init=False, repr=False)
 
     @classmethod
     def create(cls) -> ApplicationContext:
@@ -416,12 +421,13 @@ class ApplicationContext:
         HybridSearchEngine
             Shared hybrid retrieval engine configured for the current settings.
         """
-        if self._hybrid_engine is not None:
-            return self._hybrid_engine
-        with self._hybrid_lock:
-            if self._hybrid_engine is None:
-                self._hybrid_engine = HybridSearchEngine(self.settings, self.paths)
-            return self._hybrid_engine
+        runtime = self._runtime
+        if runtime.hybrid_engine is not None:
+            return runtime.hybrid_engine
+        with runtime.hybrid_lock:
+            if runtime.hybrid_engine is None:
+                runtime.hybrid_engine = HybridSearchEngine(self.settings, self.paths)
+            return runtime.hybrid_engine
 
     def get_coderank_faiss_manager(self, vec_dim: int) -> FAISSManager:
         """Return a lazily loaded FAISS manager for CodeRank search.
@@ -444,8 +450,9 @@ class ApplicationContext:
         if vec_dim <= 0:
             msg = "vec_dim must be positive for CodeRank FAISS manager."
             raise ValueError(msg)
-        with self._coderank_faiss_lock:
-            if self._coderank_faiss_manager is None:
+        runtime = self._runtime
+        with runtime.coderank_faiss_lock:
+            if runtime.coderank_faiss_manager is None:
                 manager = FAISSManager(
                     index_path=self.paths.coderank_faiss_index,
                     vec_dim=vec_dim,
@@ -453,15 +460,43 @@ class ApplicationContext:
                     use_cuvs=self.settings.index.use_cuvs,
                 )
                 manager.load_cpu_index()
-                self._coderank_faiss_manager = manager
-            elif self._coderank_faiss_manager.vec_dim != vec_dim:
-                existing_dim = self._coderank_faiss_manager.vec_dim
+                runtime.coderank_faiss_manager = manager
+            elif runtime.coderank_faiss_manager.vec_dim != vec_dim:
+                existing_dim = runtime.coderank_faiss_manager.vec_dim
                 msg = (
                     "Existing CodeRank index dimension "
                     f"{existing_dim} does not match requested {vec_dim}."
                 )
                 raise ValueError(msg)
-            return self._coderank_faiss_manager
+            return cast(FAISSManager, runtime.coderank_faiss_manager)
+
+    def get_xtr_index(self) -> XTRIndex | None:
+        """Return the lazily initialized XTR token index when enabled.
+
+        Returns
+        -------
+        XTRIndex | None
+            Ready XTR index instance or ``None`` when disabled/unavailable.
+        """
+        if not self.settings.xtr.enable:
+            return None
+        runtime = self._runtime
+        with runtime.xtr_lock:
+            if runtime.xtr_index is None:
+                try:
+                    index = XTRIndex(root=self.paths.xtr_dir, config=self.settings.xtr)
+                    index.open()
+                    runtime.xtr_index = index
+                except (OSError, RuntimeError, ValueError) as exc:  # pragma: no cover
+                    LOGGER.warning(
+                        "Failed to initialize XTR index; continuing without late interaction",
+                        extra={"xtr_dir": str(self.paths.xtr_dir)},
+                        exc_info=exc,
+                    )
+                    return None
+        if runtime.xtr_index and runtime.xtr_index.ready:
+            return runtime.xtr_index
+        return None
 
     def ensure_faiss_ready(self) -> tuple[bool, list[str], str | None]:
         """Load FAISS index (once) and attempt GPU clone.
@@ -506,20 +541,21 @@ class ApplicationContext:
         CPU index automatically.
         """
         limits: list[str] = []
+        runtime = self._runtime
 
         if not self.paths.faiss_index.exists():
             return False, limits, f"FAISS index not found at {self.paths.faiss_index}"
 
-        with self._faiss_lock:
-            if not self._faiss_loaded:
+        with runtime.faiss_lock:
+            if not runtime.faiss_loaded:
                 try:
                     self.faiss_manager.load_cpu_index()
                 except (FileNotFoundError, RuntimeError) as exc:
                     return False, limits, f"FAISS index load failed: {exc}"
-                self._faiss_loaded = True
+                runtime.faiss_loaded = True
 
-            if self.faiss_manager.gpu_index is None and not self._faiss_gpu_attempted:
-                self._faiss_gpu_attempted = True
+            if self.faiss_manager.gpu_index is None and not runtime.faiss_gpu_attempted:
+                runtime.faiss_gpu_attempted = True
                 try:
                     gpu_enabled = self.faiss_manager.clone_to_gpu()
                 except RuntimeError as exc:

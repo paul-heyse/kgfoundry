@@ -62,9 +62,7 @@ class TextSearchOptions:
     max_results: int = 50
 
     @classmethod
-    def from_overrides(
-        cls, query: str, overrides: Mapping[str, object]
-    ) -> TextSearchOptions:
+    def from_overrides(cls, query: str, overrides: Mapping[str, object]) -> TextSearchOptions:
         """Build search options from keyword overrides.
 
         Constructs a TextSearchOptions instance from a query string and a mapping
@@ -94,9 +92,7 @@ class TextSearchOptions:
         if unexpected:
             msg = f"Unexpected search_text keyword(s): {sorted(unexpected)}"
             raise TypeError(msg)
-        regex_value = (
-            _bool_override(overrides, "regex") if "regex" in overrides else cls.regex
-        )
+        regex_value = _bool_override(overrides, "regex") if "regex" in overrides else cls.regex
         case_sensitive_value = (
             _bool_override(overrides, "case_sensitive")
             if "case_sensitive" in overrides
@@ -145,9 +141,7 @@ def _bool_override(overrides: Mapping[str, object], key: str) -> bool:
     return value
 
 
-def _sequence_override(
-    overrides: Mapping[str, object], key: str
-) -> Sequence[str] | None:
+def _sequence_override(overrides: Mapping[str, object], key: str) -> Sequence[str] | None:
     """Return a sequence override if the value is a valid sequence of strings.
 
     Parameters
@@ -301,24 +295,16 @@ def _search_text_sync(
             "query": query,
             "explicit_paths": list(options.paths) if options.paths else None,
             "explicit_include_globs": (
-                list(options.include_globs)
-                if options.include_globs is not None
-                else None
+                list(options.include_globs) if options.include_globs is not None else None
             ),
             "explicit_exclude_globs": (
-                list(options.exclude_globs)
-                if options.exclude_globs is not None
-                else None
+                list(options.exclude_globs) if options.exclude_globs is not None else None
             ),
             "scope_include_globs": (
-                cast("Sequence[str] | None", scope.get("include_globs"))
-                if scope
-                else None
+                cast("Sequence[str] | None", scope.get("include_globs")) if scope else None
             ),
             "scope_exclude_globs": (
-                cast("Sequence[str] | None", scope.get("exclude_globs"))
-                if scope
-                else None
+                cast("Sequence[str] | None", scope.get("exclude_globs")) if scope else None
             ),
             "effective_paths": effective_paths,
             "effective_include_globs": effective_include_globs,

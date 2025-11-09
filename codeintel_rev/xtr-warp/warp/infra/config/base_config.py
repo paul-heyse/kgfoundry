@@ -60,9 +60,7 @@ class BaseConfig(CoreConfig):
         return cls(**kw_args)
 
     @classmethod
-    def from_deprecated_args(
-        cls, args: dict[str, object]
-    ) -> tuple[BaseConfig, set[str]]:
+    def from_deprecated_args(cls, args: dict[str, object]) -> tuple[BaseConfig, set[str]]:
         """Create config from deprecated argument dictionary.
 
         Loads config from old-style argument dict, ignoring unrecognized keys.
@@ -147,9 +145,7 @@ class BaseConfig(CoreConfig):
 
             return loaded_config
 
-        return (
-            None  # can happen if checkpoint_path is something like 'bert-base-uncased'
-        )
+        return None  # can happen if checkpoint_path is something like 'bert-base-uncased'
 
     @classmethod
     def load_from_index(cls, index_path: str | pathlib.Path) -> BaseConfig:

@@ -67,6 +67,8 @@ def test_encode_codes_requires_input(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(ValueError, match="code snippet"):
         embedder.encode_codes([])
+
+
 @dataclass
 class _EmbedderSettings:
     model_id: str

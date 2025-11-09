@@ -53,9 +53,7 @@ def _escape_text(value: str) -> str:
     return value.replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
 
 
-def _dump_collection(
-    corpus: dict[str, dict[str, str]], path: pathlib.Path
-) -> dict[int, str]:
+def _dump_collection(corpus: dict[str, dict[str, str]], path: pathlib.Path) -> dict[int, str]:
     """Write corpus lines to ``path`` and return the index mapping.
 
     Parameters
@@ -97,9 +95,7 @@ def _write_json(path: pathlib.Path, payload: object) -> None:
         json.dump(payload, file)
 
 
-def extract_collection_beir(
-    dataset: str, input_path: str, output_path: str, split: str
-) -> None:
+def extract_collection_beir(dataset: str, input_path: str, output_path: str, split: str) -> None:
     """Extract and format a BEIR dataset collection for XTR/WARP processing.
 
     Downloads the dataset if not present, loads corpus/queries/qrels, and writes
@@ -139,6 +135,4 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output")
 
     args = parser.parse_args()
-    extract_collection_beir(
-        args.dataset, args.input, args.output or args.input, split=args.split
-    )
+    extract_collection_beir(args.dataset, args.input, args.output or args.input, split=args.split)

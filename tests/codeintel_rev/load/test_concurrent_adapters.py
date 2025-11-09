@@ -56,6 +56,7 @@ def mock_context(tmp_path: Path) -> Mock:
         coderank_vectors_dir=repo_root / "data" / "coderank_vectors",
         coderank_faiss_index=repo_root / "data" / "faiss" / "coderank.faiss",
         warp_index_dir=repo_root / "indexes" / "warp_xtr",
+        xtr_dir=repo_root / "data" / "xtr",
     )
 
     context = Mock(spec=ApplicationContext)

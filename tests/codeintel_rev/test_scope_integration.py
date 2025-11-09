@@ -20,6 +20,7 @@ from codeintel_rev.config.settings import (
     SpladeConfig,
     VLLMConfig,
     WarpConfig,
+    XTRConfig,
 )
 from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
@@ -71,6 +72,7 @@ def _build_context(repo_root: Path) -> ApplicationContext:
             coderank_vectors_dir="data/coderank_vectors",
             coderank_faiss_index="data/faiss/coderank.faiss",
             warp_index_dir="indexes/warp_xtr",
+            xtr_dir="data/xtr",
         ),
         index=IndexConfig(vec_dim=2560, chunk_budget=2200, faiss_nlist=8192, use_cuvs=True),
         vllm=VLLMConfig(base_url="http://localhost:8001/v1", batch_size=32),
@@ -86,6 +88,7 @@ def _build_context(repo_root: Path) -> ApplicationContext:
         splade=SpladeConfig(),
         coderank=CodeRankConfig(),
         warp=WarpConfig(),
+        xtr=XTRConfig(),
         coderank_llm=CodeRankLLMConfig(),
     )
 
@@ -99,6 +102,7 @@ def _build_context(repo_root: Path) -> ApplicationContext:
         coderank_vectors_dir=repo_root / "data" / "coderank_vectors",
         coderank_faiss_index=repo_root / "data" / "faiss" / "coderank.faiss",
         warp_index_dir=repo_root / "indexes" / "warp_xtr",
+        xtr_dir=repo_root / "data" / "xtr",
     )
 
     paths.data_dir.mkdir(parents=True, exist_ok=True)
@@ -108,6 +112,7 @@ def _build_context(repo_root: Path) -> ApplicationContext:
     paths.coderank_vectors_dir.mkdir(parents=True, exist_ok=True)
     paths.coderank_faiss_index.parent.mkdir(parents=True, exist_ok=True)
     paths.warp_index_dir.mkdir(parents=True, exist_ok=True)
+    paths.xtr_dir.mkdir(parents=True, exist_ok=True)
 
     scope_store = ScopeStore(
         _FakeRedis(),

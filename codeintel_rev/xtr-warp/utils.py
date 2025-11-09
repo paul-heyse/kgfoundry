@@ -48,12 +48,7 @@ def parse_warp_run_config(
     WARPRunConfig | None
         Configured WARP run config, or None if validation fails.
     """
-    if (
-        collection not in {"lotte", "beir"}
-        or dataset is None
-        or split is None
-        or nbits is None
-    ):
+    if collection not in {"lotte", "beir"} or dataset is None or split is None or nbits is None:
         return None
     if collection == "lotte" and type_ is None:
         return None
@@ -68,9 +63,7 @@ def parse_warp_run_config(
     )
 
 
-def get_warp_run_config(
-    parser: argparse.ArgumentParser, args: argparse.Namespace
-) -> WARPRunConfig:
+def get_warp_run_config(parser: argparse.ArgumentParser, args: argparse.Namespace) -> WARPRunConfig:
     """Get and validate WARP run configuration from parsed arguments.
 
     Parses configuration from command-line arguments and validates it.

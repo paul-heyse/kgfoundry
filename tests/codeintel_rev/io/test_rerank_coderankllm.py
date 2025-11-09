@@ -43,7 +43,9 @@ class _FakeModel:
         return [[0]]
 
 
-def _patch_gate(monkeypatch: pytest.MonkeyPatch, tokenizer: _FakeTokenizer, model: _FakeModel) -> None:
+def _patch_gate(
+    monkeypatch: pytest.MonkeyPatch, tokenizer: _FakeTokenizer, model: _FakeModel
+) -> None:
     class _Factory:
         def __init__(self, instance: object) -> None:
             self._instance = instance

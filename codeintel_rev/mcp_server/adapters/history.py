@@ -184,9 +184,7 @@ async def file_history(
     )
 
     try:
-        commits = await context.async_git_client.file_history(
-            path=relative_path, limit=limit
-        )
+        commits = await context.async_git_client.file_history(path=relative_path, limit=limit)
     except git.exc.GitCommandError as exc:
         error_msg = "Git log failed"
         raise GitOperationError(

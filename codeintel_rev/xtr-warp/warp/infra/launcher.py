@@ -130,9 +130,7 @@ class Launcher:
 
         return return_values
 
-    def launch_without_fork(
-        self, custom_config: BaseConfig & RunSettings, *args: object
-    ) -> object:
+    def launch_without_fork(self, custom_config: BaseConfig & RunSettings, *args: object) -> object:
         """Launch the callee function in single-process mode without forking.
 
         Parameters
@@ -169,10 +167,7 @@ class Launcher:
         if self.nranks != 1:
             msg = f"nranks must be 1 for launch_without_fork, got {self.nranks}"
             raise ValueError(msg)
-        if not (
-            custom_config.avoid_fork_if_possible
-            or self.run_config.avoid_fork_if_possible
-        ):
+        if not (custom_config.avoid_fork_if_possible or self.run_config.avoid_fork_if_possible):
             msg = "avoid_fork_if_possible must be True in either custom_config or run_config"
             raise ValueError(msg)
 
@@ -225,9 +220,7 @@ def run_process_without_mp(
         Return value from the callee function.
     """
     set_seed(12345)
-    os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(
-        map(str, config.gpus_[: config.nranks])
-    )
+    os.environ["CUDA_VISIBLE_DEVICES"] = ",".join(map(str, config.gpus_[: config.nranks]))
 
     with Run().context(config, inherit_config=False):
         return_val = callee(config, *args)
@@ -329,8 +322,6 @@ def print_memory_stats(message: str = "") -> None:
     VMS: {vms / gib:,.1f}
     USS: {uss / gib:,.1f}
     SHARED: {shared / gib:,.1f}
-    """.strip().replace(
-        "\n", "\t"
-    )
+    """.strip().replace("\n", "\t")
 
     print_message(summary, pad=True)

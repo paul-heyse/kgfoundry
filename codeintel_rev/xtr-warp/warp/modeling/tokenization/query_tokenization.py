@@ -43,9 +43,7 @@ class QueryTokenizer:
 
         self.config = config
         self.query_maxlen = config.query_maxlen
-        self.background_maxlen = (
-            512 - self.query_maxlen + 1
-        )  # NOTE: Make this configurable
+        self.background_maxlen = 512 - self.query_maxlen + 1  # NOTE: Make this configurable
 
         self.Q_marker_token, self.Q_marker_token_id = (
             config.query_token,
@@ -96,10 +94,7 @@ class QueryTokenizer:
 
         prefix, suffix = [self.cls_token, self.Q_marker_token], [self.sep_token]
         return [
-            prefix
-            + lst
-            + suffix
-            + [self.mask_token] * (self.query_maxlen - (len(lst) + 3))
+            prefix + lst + suffix + [self.mask_token] * (self.query_maxlen - (len(lst) + 3))
             for lst in tokens
         ]
 
@@ -137,14 +132,9 @@ class QueryTokenizer:
         if not add_special_tokens:
             return ids
 
-        prefix, suffix = [self.cls_token_id, self.Q_marker_token_id], [
-            self.sep_token_id
-        ]
+        prefix, suffix = [self.cls_token_id, self.Q_marker_token_id], [self.sep_token_id]
         return [
-            prefix
-            + lst
-            + suffix
-            + [self.mask_token_id] * (self.query_maxlen - (len(lst) + 3))
+            prefix + lst + suffix + [self.mask_token_id] * (self.query_maxlen - (len(lst) + 3))
             for lst in ids
         ]
 
@@ -187,9 +177,7 @@ class QueryTokenizer:
         type validation or parameter validation fails.
         """
         batch_list = self._prepare_batch_list(batch_text)
-        max_length = self._determine_max_length(
-            batch_list, full_length_search=full_length_search
-        )
+        max_length = self._determine_max_length(batch_list, full_length_search=full_length_search)
         ids, mask = self._tokenize_with_padding(batch_list, max_length)
         ids, mask = self._append_context_if_needed(ids, mask, context, batch_list)
         mask = self._apply_mask_attention(ids, mask)
@@ -207,17 +195,13 @@ class QueryTokenizer:
             raise TypeError(msg)
         return [". " + text for text in batch_text]
 
-    def _determine_max_length(
-        self, batch_list: list[str], *, full_length_search: bool
-    ) -> int:
+    def _determine_max_length(self, batch_list: list[str], *, full_length_search: bool) -> int:
         if not full_length_search:
             return self.query_maxlen
         if len(batch_list) != 1:
             msg = "full_length_search is only available for single inference (list with 1 element)"
             raise ValueError(msg)
-        un_truncated_ids = self.tok(batch_list, add_special_tokens=False).to(DEVICE)[
-            "input_ids"
-        ]
+        un_truncated_ids = self.tok(batch_list, add_special_tokens=False).to(DEVICE)["input_ids"]
         max_length_in_batch = max(len(ids) for ids in un_truncated_ids)
         return self.max_len(max_length_in_batch)
 
@@ -260,9 +244,7 @@ class QueryTokenizer:
         mask_2 = obj_2["attention_mask"][:, 1:]
         return torch.cat((ids, ids_2), dim=-1), torch.cat((mask, mask_2), dim=-1)
 
-    def _apply_mask_attention(
-        self, ids: torch.Tensor, mask: torch.Tensor
-    ) -> torch.Tensor:
+    def _apply_mask_attention(self, ids: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         if not self.config.attend_to_mask_tokens:
             return mask
         mask[ids == self.mask_token_id] = 1

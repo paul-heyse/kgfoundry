@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Protocol
+from typing import Protocol
 
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.observability import MetricsProvider
@@ -37,10 +37,7 @@ from kgfoundry_common.observability import (
     observe_duration as _base_observe_duration,
 )
 
-if TYPE_CHECKING:
-    from kgfoundry_common.observability import DurationObservation
-
-__all__ = ["observe_duration", "Observation"]
+__all__ = ["Observation", "observe_duration"]
 
 
 LOGGER = get_logger(__name__)
@@ -133,9 +130,7 @@ def observe_duration(
         return
 
     try:
-        with _base_observe_duration(
-            provider, operation, component=component
-        ) as observation:
+        with _base_observe_duration(provider, operation, component=component) as observation:
             yield observation
             return
     except ValueError as exc:

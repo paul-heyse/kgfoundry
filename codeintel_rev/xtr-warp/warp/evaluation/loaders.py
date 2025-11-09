@@ -108,9 +108,7 @@ def load_qrels(
 
 def load_top_k(
     top_k_path: str | pathlib.Path,
-) -> tuple[
-    OrderedDict[int, str], OrderedDict[int, list[str]], OrderedDict[int, list[int]]
-]:
+) -> tuple[OrderedDict[int, str], OrderedDict[int, list[str]], OrderedDict[int, list[int]]]:
     r"""Load top-k documents per query from TSV file.
 
     Loads queries, documents, and passage IDs from tab-separated file
@@ -161,9 +159,7 @@ def load_top_k(
     ks = [len(top_k_pids[qid]) for qid in top_k_pids]
 
     print_message("#> max(ks) =", max(ks), ", avg(ks) =", round(sum(ks) / len(ks), 2))
-    print_message(
-        "#> Loaded the top-k per query for", len(queries), "unique queries.\n"
-    )
+    print_message("#> Loaded the top-k per query for", len(queries), "unique queries.\n")
 
     return queries, top_k_docs, top_k_pids
 
@@ -225,8 +221,7 @@ def _validate_top_k_data(
         msg = "top_k_pids contains duplicate PIDs for some queries"
         raise ValueError(msg)
     if not all(
-        len(top_k_positives[qid]) == len(set(top_k_positives[qid]))
-        for qid in top_k_positives
+        len(top_k_positives[qid]) == len(set(top_k_positives[qid])) for qid in top_k_positives
     ):
         msg = "top_k_positives contains duplicate PIDs for some queries"
         raise ValueError(msg)
@@ -280,8 +275,7 @@ def _normalize_top_k_positives(
         raise ValueError(msg)
 
     avg_positive = round(
-        sum(len(top_k_positives_sets[qid]) for qid in top_k_positives_sets)
-        / len(top_k_pids),
+        sum(len(top_k_positives_sets[qid]) for qid in top_k_positives_sets) / len(top_k_pids),
         2,
     )
 
@@ -352,9 +346,7 @@ def load_top_k_pids(
     ks = [len(top_k_pids[qid]) for qid in top_k_pids]
 
     print_message("#> max(ks) =", max(ks), ", avg(ks) =", round(sum(ks) / len(ks), 2))
-    print_message(
-        "#> Loaded the top-k per query for", len(top_k_pids), "unique queries.\n"
-    )
+    print_message("#> Loaded the top-k per query for", len(top_k_pids), "unique queries.\n")
 
     top_k_positives_normalized = _normalize_top_k_positives(top_k_pids, top_k_positives)
 
@@ -399,9 +391,7 @@ def load_collection(collection_path: str | pathlib.Path) -> list[str]:
                 pass
 
             pid, passage, *rest = line.strip("\n\r ").split("\t")
-            passage = (
-                passage.replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t")
-            )
+            passage = passage.replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t")
 
             if pid != "id" and int(pid) != line_idx:
                 msg = f"pid={pid}, line_idx={line_idx}"

@@ -88,9 +88,7 @@ def write_chunks_parquet(
         options = ParquetWriteOptions()
 
     if len(chunks) != len(embeddings):
-        msg = (
-            f"Chunks ({len(chunks)}) and embeddings ({len(embeddings)}) length mismatch"
-        )
+        msg = f"Chunks ({len(chunks)}) and embeddings ({len(embeddings)}) length mismatch"
         raise ValueError(msg)
 
     # Prepare data

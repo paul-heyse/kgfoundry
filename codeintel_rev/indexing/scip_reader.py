@@ -221,9 +221,7 @@ def parse_scip_json(json_path: Path) -> SCIPIndex:
 
     documents = []
     for doc_data in data.get("documents", []):
-        relative_path = doc_data.get("relativePath") or doc_data.get(
-            "relative_path", ""
-        )
+        relative_path = doc_data.get("relativePath") or doc_data.get("relative_path", "")
         language = doc_data.get("language", "")
 
         occurrences = []
@@ -257,9 +255,7 @@ def parse_scip_json(json_path: Path) -> SCIPIndex:
                         role_val |= 1
                 roles = role_val
 
-            occurrences.append(
-                Occurrence(symbol=symbol, range=range_tuple, roles=roles)
-            )
+            occurrences.append(Occurrence(symbol=symbol, range=range_tuple, roles=roles))
 
         if relative_path:
             documents.append(
@@ -353,15 +349,11 @@ def get_top_level_definitions(definitions: list[SymbolDef]) -> list[SymbolDef]:
 
     top_level = []
     for i, def1 in enumerate(definitions):
-        is_nested = any(
-            contains(def2, def1) for j, def2 in enumerate(definitions) if i != j
-        )
+        is_nested = any(contains(def2, def1) for j, def2 in enumerate(definitions) if i != j)
         if not is_nested:
             top_level.append(def1)
 
-    return sorted(
-        top_level, key=lambda d: (d.range.start_line, d.range.start_character)
-    )
+    return sorted(top_level, key=lambda d: (d.range.start_line, d.range.start_character))
 
 
 __all__ = [

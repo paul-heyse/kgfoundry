@@ -20,8 +20,6 @@ def index(config: WARPRunConfig) -> None:
     config : WARPRunConfig
         Configuration specifying collection path, index name, and experiment name.
     """
-    with Run().context(
-        RunConfig(nranks=config.nranks, experiment=config.experiment_name)
-    ):
+    with Run().context(RunConfig(nranks=config.nranks, experiment=config.experiment_name)):
         indexer = Indexer(checkpoint="google/xtr-base-en", config=config.colbert())
         indexer.index(name=config.index_name, collection=config.collection_path)

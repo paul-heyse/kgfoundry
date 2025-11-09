@@ -32,9 +32,7 @@ class _RunManager:
         self._logger = None
         self.start_time = time.time()
 
-    def init(
-        self, rank: int, root: str | pathlib.Path, experiment: str, name: str
-    ) -> None:
+    def init(self, rank: int, root: str | pathlib.Path, experiment: str, name: str) -> None:
         if "/" in experiment:
             msg = f"experiment must not contain '/', got {experiment!r}"
             raise ValueError(msg)
@@ -46,10 +44,7 @@ class _RunManager:
         self.experiment = experiment
         self.name = name
         self.path = str(
-            pathlib.Path(self.experiments_root)
-            / self.experiment
-            / self.script
-            / self.name
+            pathlib.Path(self.experiments_root) / self.experiment / self.script / self.name
         )
 
         if rank < 1:
@@ -82,11 +77,7 @@ class _RunManager:
 
     @staticmethod
     def _get_script_name() -> str:
-        return (
-            pathlib.Path(__main__.__file__).name
-            if "__file__" in dir(__main__)
-            else "none"
-        )
+        return pathlib.Path(__main__.__file__).name if "__file__" in dir(__main__) else "none"
 
     @contextmanager
     def context(self, *, consider_failed_if_interrupted: bool = True) -> Iterator[None]:
@@ -117,9 +108,7 @@ class _RunManager:
 
             logs_path_obj = pathlib.Path(self._logger.logs_path)
             self.log_new_artifact(str(logs_path_obj / "elapsed.txt"), total_seconds)
-            self.log_new_artifact(
-                str(logs_path_obj / "name.original.txt"), original_name
-            )
+            self.log_new_artifact(str(logs_path_obj / "name.original.txt"), original_name)
             self.log_new_artifact(str(logs_path_obj / "name.txt"), name)
 
             self._logger.log_all_artifacts()

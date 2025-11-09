@@ -81,9 +81,7 @@ class IndexLoader:
 
         index_path_obj = pathlib.Path(self.index_path)
         for chunk_idx in tqdm.tqdm(range(self.num_chunks)):
-            with (index_path_obj / f"doclens.{chunk_idx}.json").open(
-                encoding="utf-8"
-            ) as f:
+            with (index_path_obj / f"doclens.{chunk_idx}.json").open(encoding="utf-8") as f:
                 chunk_doclens = ujson.load(f)
                 doclens.extend(chunk_doclens)
 

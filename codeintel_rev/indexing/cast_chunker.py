@@ -144,9 +144,7 @@ def line_starts(text: str) -> LineIndex:
             char_starts.append(index + 1)
             byte_starts.append(byte_offset)
 
-    return LineIndex(
-        char_starts=char_starts, byte_starts=byte_starts, char_to_byte=char_to_byte
-    )
+    return LineIndex(char_starts=char_starts, byte_starts=byte_starts, char_to_byte=char_to_byte)
 
 
 def _line_index_from_byte(starts: Sequence[int], byte_offset: int) -> int:
@@ -298,9 +296,7 @@ class _ChunkAccumulator:
         if end_byte <= start_byte:
             return
         start_line = _line_index_from_byte(self.line_index.byte_starts, start_byte)
-        end_line = _line_index_from_byte(
-            self.line_index.byte_starts, max(end_byte - 1, 0)
-        )
+        end_line = _line_index_from_byte(self.line_index.byte_starts, max(end_byte - 1, 0))
         chunk_text = self.encoded[start_byte:end_byte].decode("utf-8")
         self.chunks.append(
             Chunk(
@@ -384,9 +380,7 @@ def chunk_file(
     opts = options or ChunkOptions()
     if budget is not None and budget != opts.budget:
         opts = replace(opts, budget=budget)
-    chunk_language = (
-        opts.language if opts.language is not None else definitions[0].language
-    )
+    chunk_language = opts.language if opts.language is not None else definitions[0].language
 
     uri = str(path)
     line_index = line_starts(text)
@@ -489,12 +483,7 @@ def _apply_call_site_overlap(
         begin, end = chunk.start_line, chunk.end_line
         seen: set[str] = set()
         for sym, sl, _sc, _el, _ec in options.file_occurrences:
-            if (
-                sl < begin
-                or sl > end
-                or sym not in options.def_chunk_lookup
-                or sym in seen
-            ):
+            if sl < begin or sl > end or sym not in options.def_chunk_lookup or sym in seen:
                 continue
             seen.add(sym)
             callee_chunk_id = options.def_chunk_lookup[sym]

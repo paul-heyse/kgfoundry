@@ -53,6 +53,7 @@ def mock_context(tmp_path: Path) -> Mock:
         coderank_vectors_dir=repo_root / "data" / "coderank_vectors",
         coderank_faiss_index=repo_root / "data" / "faiss" / "coderank.faiss",
         warp_index_dir=repo_root / "indexes" / "warp_xtr",
+        xtr_dir=repo_root / "data" / "xtr",
     )
     context.paths = paths
 
@@ -74,7 +75,13 @@ def _build_match(path: Path) -> str:
 
 
 def _run_search(context: Mock, options: TextSearchOptions) -> dict:
-    """Execute :func:`search_text` synchronously for the provided options."""
+    """Execute :func:`search_text` synchronously for the provided options.
+
+    Returns
+    -------
+    dict
+        Search result payload.
+    """
     return asyncio.run(search_text(context, options.query, options=options))
 
 
@@ -249,8 +256,8 @@ def test_search_text_timeout_error(mock_context: Mock) -> None:
             "Search timeout", command=["rg"], timeout_seconds=30
         )
 
+        options = TextSearchOptions(query="query", max_results=5)
         with pytest.raises(VectorSearchError, match="Search timeout"):
-            options = TextSearchOptions(query="query", max_results=5)
             _run_search(mock_context, options)
 
 
@@ -273,8 +280,8 @@ def test_search_text_subprocess_error(mock_context: Mock) -> None:
             "Command failed", returncode=2, stderr="Error message"
         )
 
+        options = TextSearchOptions(query="query", max_results=5)
         with pytest.raises(VectorSearchError, match="Error message"):
-            options = TextSearchOptions(query="query", max_results=5)
             _run_search(mock_context, options)
 
 
@@ -295,6 +302,6 @@ def test_search_text_value_error(mock_context: Mock) -> None:
     ):
         mock_run.side_effect = ValueError("Invalid query")
 
+        options = TextSearchOptions(query="query", max_results=5)
         with pytest.raises(VectorSearchError, match="Invalid query"):
-            options = TextSearchOptions(query="query", max_results=5)
             _run_search(mock_context, options)

@@ -98,8 +98,7 @@ class _StrideBatch:
                 str(pathlib.Path(__file__).parent.resolve() / "segmented_lookup.cpp"),
             ],
             extra_cflags=["-O3"],
-            verbose=os.getenv("COLBERT_LOAD_TORCH_EXTENSION_VERBOSE", "False")
-            == "True",
+            verbose=os.getenv("COLBERT_LOAD_TORCH_EXTENSION_VERBOSE", "False") == "True",
         )
         cls.segmented_lookup = segmented_lookup_cpp.segmented_lookup_cpp
 
@@ -376,9 +375,7 @@ class _StrideBatch:
             is_shorter = lengths2 <= stride
             if not is_shorter.any():
                 continue
-            batches.append(
-                self._build_stride_batch(stride, lengths, offsets, order, is_shorter)
-            )
+            batches.append(self._build_stride_batch(stride, lengths, offsets, order, is_shorter))
             lengths2[is_shorter] = sentinel
 
         sentinel_tensor = torch.tensor([sentinel], device=order.device)
@@ -413,9 +410,7 @@ class _StrideBatch:
         order: torch.Tensor,
         mask: torch.Tensor,
     ) -> _StrideBatch:
-        tensor_, lengths_, mask_ = self._lookup_with_stride(
-            stride, lengths[mask], offsets[mask]
-        )
+        tensor_, lengths_, mask_ = self._lookup_with_stride(stride, lengths[mask], offsets[mask])
         order_subset = order[mask]
         return _StrideBatch(order_subset, tensor_, lengths_, mask_)
 

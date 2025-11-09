@@ -230,10 +230,28 @@ class MethodInfo(TypedDict, total=False):
         Human-readable description of search coverage. Explains what was searched
         and any limitations (e.g., "Searched 1.2M chunks across Python files",
         "Limited to main branch", "Index incomplete - missing recent commits").
+    stages : list[StageInfo]
+        Optional stage-level timing data for observability.
+    notes : list[str]
+        Optional free-form notes about retrieval decisions (e.g., gating reasons).
+    explainability : dict[str, list[dict[str, object]]]
+        Optional structured explainability payload keyed by channel.
     """
 
     retrieval: list[str]
     coverage: str
+    stages: list["StageInfo"]
+    notes: list[str]
+    explainability: dict[str, list[dict[str, object]]]
+
+
+class StageInfo(TypedDict, total=False):
+    """Timing metadata for an individual retrieval stage."""
+
+    name: str
+    duration_ms: float
+    budget_ms: int | None
+    exceeded_budget: bool
 
 
 class AnswerEnvelope(TypedDict, total=False):

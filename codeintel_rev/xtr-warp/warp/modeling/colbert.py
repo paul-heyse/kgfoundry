@@ -94,8 +94,7 @@ class ColBERT(BaseColBERT):
                 str(pathlib.Path(__file__).parent.resolve() / "segmented_maxsim.cpp"),
             ],
             extra_cflags=["-O3"],
-            verbose=os.getenv("COLBERT_LOAD_TORCH_EXTENSION_VERBOSE", "False")
-            == "True",
+            verbose=os.getenv("COLBERT_LOAD_TORCH_EXTENSION_VERBOSE", "False") == "True",
         )
         cls.segmented_maxsim = segmented_maxsim_cpp.segmented_maxsim_cpp
 
@@ -161,33 +160,23 @@ class ColBERT(BaseColBERT):
             0, 1
         )  # query-major unsqueeze
 
-        scores = colbert_score_reduce(
-            scores, d_mask.repeat(q.size(0), 1, 1), self.colbert_config
-        )
+        scores = colbert_score_reduce(scores, d_mask.repeat(q.size(0), 1, 1), self.colbert_config)
 
         nway = self.colbert_config.nway
         all_except_self_negatives = [
             list(range(qidx * d.size(0), qidx * d.size(0) + nway * qidx + 1))
-            + list(
-                range(
-                    qidx * d.size(0) + nway * (qidx + 1), qidx * d.size(0) + d.size(0)
-                )
-            )
+            + list(range(qidx * d.size(0) + nway * (qidx + 1), qidx * d.size(0) + d.size(0)))
             for qidx in range(q.size(0))
         ]
 
         scores = scores[flatten(all_except_self_negatives)]
         scores = scores.view(q.size(0), -1)  # d.size(0) - self.colbert_config.nway + 1)
 
-        labels = torch.arange(0, q.size(0), device=scores.device) * (
-            self.colbert_config.nway
-        )
+        labels = torch.arange(0, q.size(0), device=scores.device) * (self.colbert_config.nway)
 
         return torch.nn.CrossEntropyLoss()(scores, labels)
 
-    def query(
-        self, input_ids: torch.Tensor, attention_mask: torch.Tensor
-    ) -> torch.Tensor:
+    def query(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
         """Encode query tokens into normalized embeddings.
 
         Processes query tokens through BERT and linear projection, applies
@@ -205,16 +194,12 @@ class ColBERT(BaseColBERT):
         torch.Tensor
             Normalized query embeddings (batch_size x seq_len x dim).
         """
-        input_ids, attention_mask = input_ids.to(self.device), attention_mask.to(
-            self.device
-        )
+        input_ids, attention_mask = input_ids.to(self.device), attention_mask.to(self.device)
         q = self.bert(input_ids, attention_mask=attention_mask)[0]
         q = self.linear(q)
 
         mask = (
-            torch.tensor(self.mask(input_ids, skiplist=[]), device=self.device)
-            .unsqueeze(2)
-            .float()
+            torch.tensor(self.mask(input_ids, skiplist=[]), device=self.device).unsqueeze(2).float()
         )
         q *= mask
 
@@ -259,15 +244,11 @@ class ColBERT(BaseColBERT):
             msg = f"keep_dims must be True, False, or 'return_mask', got {keep_dims!r}"
             raise ValueError(msg)
 
-        input_ids, attention_mask = input_ids.to(self.device), attention_mask.to(
-            self.device
-        )
+        input_ids, attention_mask = input_ids.to(self.device), attention_mask.to(self.device)
         d = self.bert(input_ids, attention_mask=attention_mask)[0]
         d = self.linear(d)
         mask = (
-            torch.tensor(
-                self.mask(input_ids, skiplist=self.skiplist), device=self.device
-            )
+            torch.tensor(self.mask(input_ids, skiplist=self.skiplist), device=self.device)
             .unsqueeze(2)
             .float()
         )
@@ -284,9 +265,7 @@ class ColBERT(BaseColBERT):
 
         return d
 
-    def score(
-        self, q: torch.Tensor, d_padded: torch.Tensor, d_mask: torch.Tensor
-    ) -> torch.Tensor:
+    def score(self, q: torch.Tensor, d_padded: torch.Tensor, d_mask: torch.Tensor) -> torch.Tensor:
         """Compute ColBERT scores between queries and documents.
 
         Computes similarity scores using cosine or L2 similarity with maxsim

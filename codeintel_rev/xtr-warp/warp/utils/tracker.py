@@ -157,16 +157,12 @@ class ExecutionTracker:
         """
         tok = time.time()
         if self._current_steps[-1] != name:
-            msg = (
-                f"Current step ({self._current_steps[-1]!r}) must equal name ({name!r})"
-            )
+            msg = f"Current step ({self._current_steps[-1]!r}) must equal name ({name!r})"
             raise ValueError(msg)
         self._time_per_step[name] += tok - self._time
         self._time = None
 
-    def summary(
-        self, steps: list[str] | None = None
-    ) -> tuple[float, list[tuple[str, float]]]:
+    def summary(self, steps: list[str] | None = None) -> tuple[float, list[tuple[str, float]]]:
         """Get timing summary for steps.
 
         Parameters
@@ -182,9 +178,7 @@ class ExecutionTracker:
         if steps is None:
             steps = self._steps
         iteration_time = self._iter_time / self._num_iterations
-        breakdown = [
-            (step, self._time_per_step[step] / self._num_iterations) for step in steps
-        ]
+        breakdown = [(step, self._time_per_step[step] / self._num_iterations) for step in steps]
         return iteration_time, breakdown
 
     def as_dict(self) -> dict[str, object]:
@@ -246,9 +240,7 @@ class ExecutionTracker:
             raise KeyError(msg)
         return self._time_per_step[key] / self._num_iterations
 
-    def display(
-        self, steps: list[str] | None = None, bound: float | None = None
-    ) -> None:
+    def display(self, steps: list[str] | None = None, bound: float | None = None) -> None:
         """Display timing visualization.
 
         Shows horizontal bar chart of step durations.

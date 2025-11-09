@@ -331,10 +331,7 @@ def _cast_to_int_tuple(value: object) -> tuple[int | None, ...]:
     if value is None:
         return (None,)
     if isinstance(value, Sequence):
-        return tuple(
-            int(v) if v is not None and isinstance(v, (int, str)) else None
-            for v in value
-        )
+        return tuple(int(v) if v is not None and isinstance(v, (int, str)) else None for v in value)
     if isinstance(value, (int, str)):
         return (int(value),)
     return (None,)
@@ -378,9 +375,7 @@ def _cast_to_bool_tuple(value: object) -> tuple[bool | None, ...]:
     if value is None:
         return (None,)
     if isinstance(value, Sequence):
-        return tuple(
-            bool(v) if v is not None and isinstance(v, bool) else None for v in value
-        )
+        return tuple(bool(v) if v is not None and isinstance(v, bool) else None for v in value)
     if isinstance(value, bool):
         return (value,)
     return (None,)
@@ -587,9 +582,7 @@ class ExpansionArgs:
         bound_raw = configs.get("bound")
         bound_val: int | None = bound_raw if isinstance(bound_raw, int) else None
         return cls(
-            datasets=_filter_non_none(
-                datasets_tuple, name="datasets", expected_type=str
-            ),
+            datasets=_filter_non_none(datasets_tuple, name="datasets", expected_type=str),
             nbits=_filter_non_none(nbits_tuple, name="nbits", expected_type=int),
             nprobes=_cast_to_int_tuple(configs.get("nprobe")),
             t_primes=_cast_to_int_tuple(configs.get("t_prime")),
@@ -602,9 +595,7 @@ class ExpansionArgs:
         )
 
 
-def _make_config(
-    spec: ExperimentSpec, *, fused_ext: bool | None = None
-) -> ExperimentConfigDict:
+def _make_config(spec: ExperimentSpec, *, fused_ext: bool | None = None) -> ExperimentConfigDict:
     """Create experiment configuration dictionary from validated spec.
 
     Parameters
@@ -701,8 +692,7 @@ def _expand_configs(params: ExpansionArgs) -> list[ExperimentConfigDict]:
                 num_threads=threads,
             )
             configs.extend(
-                _make_config(spec, fused_ext=fused_ext)
-                for fused_ext in params.fused_exts
+                _make_config(spec, fused_ext=fused_ext) for fused_ext in params.fused_exts
             )
     return configs
 
@@ -759,9 +749,7 @@ def _write_results(results_file: str, data: list[ExperimentResultDict]) -> None:
 class ExecutionContext:
     """Context required for running experiment configurations."""
 
-    callback: Callable[
-        [ExperimentConfigDict, ExperimentParamsDict], ExperimentResultDict
-    ]
+    callback: Callable[[ExperimentConfigDict, ExperimentParamsDict], ExperimentResultDict]
     type_: str
     params: ExperimentParamsDict
     results_file: str
@@ -917,8 +905,7 @@ def _execute_configs_parallel(
         redirect_stdout(io.StringIO()) as rd_stdout,
     ):
         futures = {
-            executor.submit(context.callback, config, context.params): config
-            for config in configs
+            executor.submit(context.callback, config, context.params): config for config in configs
         }
         for future in as_completed(futures.keys()):
             result = future.result()
@@ -962,9 +949,7 @@ def _execute_configs_sequential(
         _write_results(results_file=context.results_file, data=results)
 
 
-def execute_configs(
-    configs: list[ExperimentConfigDict], context: ExecutionContext
-) -> None:
+def execute_configs(configs: list[ExperimentConfigDict], context: ExecutionContext) -> None:
     """Execute experiment configurations in parallel or sequential mode.
 
     Dispatches configuration execution based on the experiment type and whether
@@ -1147,13 +1132,9 @@ def _parse_subprocess_result(result_dict: dict[str, object]) -> ExperimentResult
         Parsed result dictionary.
     """
     result: ExperimentResultDict = {}
-    if "index_size_bytes" in result_dict and isinstance(
-        result_dict["index_size_bytes"], int
-    ):
+    if "index_size_bytes" in result_dict and isinstance(result_dict["index_size_bytes"], int):
         result["index_size_bytes"] = result_dict["index_size_bytes"]
-    if "index_size_gib" in result_dict and isinstance(
-        result_dict["index_size_gib"], (int, float)
-    ):
+    if "index_size_gib" in result_dict and isinstance(result_dict["index_size_gib"], (int, float)):
         result["index_size_gib"] = float(result_dict["index_size_gib"])
     if "metrics" in result_dict:
         result["metrics"] = result_dict["metrics"]
@@ -1301,9 +1282,7 @@ def _strip_provenance(
     return stripped
 
 
-def check_execution(
-    filename: str, configs: list[ExperimentConfigDict], result_file: str
-) -> None:
+def check_execution(filename: str, configs: list[ExperimentConfigDict], result_file: str) -> None:
     """Verify that execution results match expected configurations.
 
     Compares the configurations used for execution with the provenance

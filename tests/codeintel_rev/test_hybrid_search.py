@@ -49,8 +49,7 @@ def test_hybrid_search_engine_rrf_fuses_channels(monkeypatch: pytest.MonkeyPatch
 
     result = engine.search(
         "hybrid query",
-        semantic_ids=[101, 102],
-        semantic_scores=[0.5, 0.4],
+        semantic_hits=[(101, 0.5), (102, 0.4)],
         limit=3,
     )
 
@@ -86,11 +85,36 @@ def test_hybrid_search_engine_respects_channel_flags(
 
     result = engine.search(
         "query",
-        semantic_ids=[42],
-        semantic_scores=[0.1],
+        semantic_hits=[(42, 0.1)],
         limit=1,
     )
 
     assert [doc.doc_id for doc in result.docs] == ["42"]
     assert result.channels == ["semantic"]
     assert result.warnings == []
+
+
+def test_hybrid_search_engine_accepts_extra_channels(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    monkeypatch.setenv("HYBRID_ENABLE_BM25", "0")
+    monkeypatch.setenv("HYBRID_ENABLE_SPLADE", "0")
+    monkeypatch.setenv("BM25_INDEX_DIR", str(tmp_path / "bm25"))
+    monkeypatch.setenv("SPLADE_INDEX_DIR", str(tmp_path / "splade"))
+    monkeypatch.setenv("SPLADE_MODEL_DIR", str(tmp_path / "splade-model"))
+    monkeypatch.setenv("SPLADE_ONNX_DIR", str(tmp_path / "splade-onnx"))
+    settings = load_settings()
+    paths = resolve_application_paths(settings)
+    engine = HybridSearchEngine(settings, paths)
+
+    result = engine.search(
+        "query",
+        semantic_hits=[(1, 0.3), (2, 0.2)],
+        limit=2,
+        extra_channels={"warp": [ChannelHit(doc_id="999", score=5.0)]},
+        weights={"semantic": 1.0, "warp": 2.0},
+    )
+
+    assert result.channels == ["semantic", "warp"]
+    assert result.docs[0].doc_id == "999"
+    assert ("warp", 1, 5.0) in result.contributions["999"]

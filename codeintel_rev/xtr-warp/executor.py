@@ -26,9 +26,7 @@ from utility.index_sizes import bytes_to_gib, safe_index_size
 from utility.runner_utils import make_run_config
 
 
-def index_size(
-    config: ExperimentConfigDict, params: ExperimentParamsDict
-) -> ExperimentResultDict:
+def index_size(config: ExperimentConfigDict, params: ExperimentParamsDict) -> ExperimentResultDict:
     """Calculate the size of an index for a given configuration.
 
     Computes the index size in bytes and converts it to GiB. This function
@@ -69,9 +67,7 @@ def index_size(
     }
 
 
-def latency(
-    config: ExperimentConfigDict, params: ExperimentParamsDict
-) -> ExperimentResultDict:
+def latency(config: ExperimentConfigDict, params: ExperimentParamsDict) -> ExperimentResultDict:
     """Measure latency metrics across multiple runs.
 
     Executes the latency runner script multiple times (default: 3) and collects
@@ -106,8 +102,7 @@ def latency(
         msg = f"num_runs must be > 0, got {num_runs}"
         raise ValueError(msg)
     results = [
-        spawn_and_execute("utility/latency_runner.py", config, params)
-        for _ in range(num_runs)
+        spawn_and_execute("utility/latency_runner.py", config, params) for _ in range(num_runs)
     ]
     metrics_val = results[0].get("metrics")
     if metrics_val is None:
@@ -131,9 +126,7 @@ def latency(
     }
 
 
-def metrics(
-    config: ExperimentConfigDict, params: ExperimentParamsDict
-) -> ExperimentResultDict:
+def metrics(config: ExperimentConfigDict, params: ExperimentParamsDict) -> ExperimentResultDict:
     """Collect performance metrics for a single experiment run.
 
     Executes the latency runner script once and extracts metrics, statistics,
@@ -170,9 +163,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--overwrite", action="store_true")
     args = parser.parse_args()
 
-    MAX_WORKERS = (
-        args.workers if args.workers is not None else psutil.cpu_count(logical=False)
-    )
+    MAX_WORKERS = args.workers if args.workers is not None else psutil.cpu_count(logical=False)
     if MAX_WORKERS is None:
         MAX_WORKERS = 1
     OVERWRITE = args.overwrite

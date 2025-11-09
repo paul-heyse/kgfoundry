@@ -92,15 +92,11 @@ class XTRCoreMLModel:
         model_path = Path(coreml_dir) / config.filename
 
         root_directory = Path(model_path)
-        sum(f.stat().st_size for f in root_directory.glob("**/*") if f.is_file()) / (
-            1024 * 1024
-        )
+        sum(f.stat().st_size for f in root_directory.glob("**/*") if f.is_file()) / (1024 * 1024)
 
         self.model = ct.models.MLModel(model_path)
 
-        self.tokenizer = XTRTokenizer(
-            AutoTokenizer.from_pretrained("google/xtr-base-en")
-        )
+        self.tokenizer = XTRTokenizer(AutoTokenizer.from_pretrained("google/xtr-base-en"))
 
     @property
     def device(self) -> torch.device:
@@ -113,9 +109,7 @@ class XTRCoreMLModel:
         """
         return torch.device("cpu")
 
-    def __call__(
-        self, input_ids: torch.Tensor, attention_mask: torch.Tensor
-    ) -> torch.Tensor:
+    def __call__(self, input_ids: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
         """Run inference on input tensors.
 
         Parameters
@@ -160,22 +154,18 @@ class XTRCoreMLModel:
 
             input_dim = (config.batch_size, QUERY_MAXLEN)
             device = torch.device("cpu")
-            input_ids = torch.randint(
-                low=1, high=1000, size=input_dim, dtype=torch.int32
-            ).to(device)
-            attention_mask = torch.randint(
-                low=0, high=1, size=input_dim, dtype=torch.int32
-            ).to(device)
+            input_ids = torch.randint(low=1, high=1000, size=input_dim, dtype=torch.int32).to(
+                device
+            )
+            attention_mask = torch.randint(low=0, high=1, size=input_dim, dtype=torch.int32).to(
+                device
+            )
 
             traced_model = torch.jit.trace(base_model, (input_ids, attention_mask))
             traced_model(input_ids, attention_mask)
 
-            ct_input_ids_input = ct.TensorType(
-                shape=ct.Shape(shape=(1, 32)), dtype=np.int32
-            )
-            ct_attention_mask_input = ct.TensorType(
-                shape=ct.Shape(shape=(1, 32)), dtype=np.int32
-            )
+            ct_input_ids_input = ct.TensorType(shape=ct.Shape(shape=(1, 32)), dtype=np.int32)
+            ct_attention_mask_input = ct.TensorType(shape=ct.Shape(shape=(1, 32)), dtype=np.int32)
 
             ct_model = ct.convert(
                 traced_model,

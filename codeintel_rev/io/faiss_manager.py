@@ -196,9 +196,7 @@ class FAISSManager:
             cpu_index.train(vectors)
             LOGGER.info(
                 "Using IVFFlat for medium corpus",
-                extra=_log_extra(
-                    n_vectors=n_vectors, nlist=nlist, index_type="ivf_flat"
-                ),
+                extra=_log_extra(n_vectors=n_vectors, nlist=nlist, index_type="ivf_flat"),
             )
         else:
             # Large corpus: use IVF-PQ with dynamic nlist
@@ -206,9 +204,7 @@ class FAISSManager:
             nlist = max(nlist, 1024)  # Minimum 1024 clusters for PQ
 
             index_string = f"OPQ64,IVF{nlist},PQ64"
-            cpu_index = faiss.index_factory(
-                self.vec_dim, index_string, faiss.METRIC_INNER_PRODUCT
-            )
+            cpu_index = faiss.index_factory(self.vec_dim, index_string, faiss.METRIC_INNER_PRODUCT)
             cpu_index.train(vectors)
             LOGGER.info(
                 "Using IVF-PQ for large corpus",
@@ -278,16 +274,12 @@ class FAISSManager:
             # IVFFlat: quantizer (nlist vectors) + inverted lists (n_vectors * 8 bytes overhead)
             nlist = min(int(np.sqrt(n_vectors)), n_vectors // 39)
             nlist = max(nlist, 100)
-            cpu_mem = (nlist * vec_size) + (
-                n_vectors * 8
-            )  # 8 bytes overhead per vector
+            cpu_mem = (nlist * vec_size) + (n_vectors * 8)  # 8 bytes overhead per vector
         else:
             # IVF-PQ: quantizer (nlist vectors) + PQ codes (n_vectors * 64 bytes)
             nlist = int(np.sqrt(n_vectors))
             nlist = max(nlist, 1024)
-            cpu_mem = (nlist * vec_size) + (
-                n_vectors * 64
-            )  # 64 bytes per vector for PQ
+            cpu_mem = (nlist * vec_size) + (n_vectors * 64)  # 64 bytes per vector for PQ
 
         # GPU has ~20% overhead for memory management and buffers
         gpu_mem = int(cpu_mem * 1.2)
@@ -434,9 +426,7 @@ class FAISSManager:
         return contains
 
     @staticmethod
-    def _build_existing_ids_set(
-        cpu_index: _faiss.Index, id_map_obj: object
-    ) -> set[int]:
+    def _build_existing_ids_set(cpu_index: _faiss.Index, id_map_obj: object) -> set[int]:
         try:
             n_total = cpu_index.ntotal
         except AttributeError:
@@ -644,9 +634,7 @@ class FAISSManager:
         self.gpu_disabled_reason = None
 
         if not _FAISS_GPU_AVAILABLE:
-            self.gpu_disabled_reason = (
-                "FAISS GPU symbols unavailable - running in CPU mode"
-            )
+            self.gpu_disabled_reason = "FAISS GPU symbols unavailable - running in CPU mode"
             LOGGER.info(
                 "Skipping GPU clone; FAISS GPU symbols unavailable",
                 extra=_log_extra(reason=self.gpu_disabled_reason, device=device),
@@ -674,9 +662,7 @@ class FAISSManager:
                 else:
                     co.use_cuvs = True
 
-            self.gpu_index = faiss.index_cpu_to_gpu(
-                self.gpu_resources, device, cpu_index, co
-            )
+            self.gpu_index = faiss.index_cpu_to_gpu(self.gpu_resources, device, cpu_index, co)
         except (RuntimeError, ValueError, OSError, AttributeError) as exc:
             self.gpu_resources = None
             self.gpu_index = None
@@ -822,9 +808,7 @@ class FAISSManager:
         # Search primary index
         return index.search(query_norm, k)
 
-    def search_secondary(
-        self, query: np.ndarray, k: int
-    ) -> tuple[np.ndarray, np.ndarray]:
+    def search_secondary(self, query: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
         """Search the secondary index (flat, no training required).
 
         This method is public for testing and advanced use cases where
@@ -987,9 +971,7 @@ class FAISSManager:
             extra=_log_extra(secondary_vectors=len(self.incremental_ids)),
         )
         primary_vectors, primary_ids = self._extract_all_vectors(cpu_index)
-        secondary_vectors, secondary_ids = self._extract_all_vectors(
-            self.secondary_index
-        )
+        secondary_vectors, secondary_ids = self._extract_all_vectors(self.secondary_index)
 
         # Combine vectors and IDs
         all_vectors = np.vstack([primary_vectors, secondary_vectors])
@@ -1023,9 +1005,7 @@ class FAISSManager:
             ),
         )
 
-    def _extract_all_vectors(
-        self, index: _faiss.Index
-    ) -> tuple[np.ndarray, np.ndarray]:
+    def _extract_all_vectors(self, index: _faiss.Index) -> tuple[np.ndarray, np.ndarray]:
         """Extract all vectors and IDs from a FAISS index.
 
         Reconstructs vectors from the index and retrieves their associated IDs.
@@ -1057,9 +1037,7 @@ class FAISSManager:
         """
         n_vectors = index.ntotal
         if n_vectors == 0:
-            return np.empty((0, self.vec_dim), dtype=np.float32), np.empty(
-                0, dtype=np.int64
-            )
+            return np.empty((0, self.vec_dim), dtype=np.float32), np.empty(0, dtype=np.int64)
 
         vectors = np.empty((n_vectors, self.vec_dim), dtype=np.float32)
         ids = np.empty(n_vectors, dtype=np.int64)

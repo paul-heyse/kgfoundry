@@ -1,0 +1,13 @@
+{
+  "type": "https://kgfoundry.dev/problems/warp-executor-unavailable",
+  "title": "WarpUnavailableError",
+  "status": 502,
+  "detail": "WARP executor could not start on device cuda:0; Stage-B fell back to XTR.",
+  "code": "warp-executor-unavailable",
+  "instance": "/mcp/tools/search:semantic_pro",
+  "errors": {
+    "index_dir": "indexes/warp_xtr",
+    "device": "cuda:0",
+    "suggested_action": "Verify GPU drivers and rebuild the WARP artifacts with matching CUDA."
+  }
+}

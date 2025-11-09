@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.mcp_server.adapters import semantic_pro
+from codeintel_rev.retrieval.types import HybridResultDoc, HybridSearchResult
 
 from kgfoundry_common.errors import VectorSearchError
 
@@ -57,15 +58,51 @@ class _FakeCatalog:
         return self.query_by_ids(ids)
 
 
+class _FakeHybridEngine:
+    def search(
+        self,
+        query: str,
+        *,
+        semantic_hits,
+        limit: int,
+        extra_channels=None,
+        weights: object | None = None,
+    ) -> HybridSearchResult:
+        assert query
+        _ = weights
+        docs = [
+            HybridResultDoc(doc_id=str(cid), score=float(score)) for cid, score in semantic_hits
+        ]
+        contributions = {
+            str(cid): [("semantic", idx + 1, float(score))]
+            for idx, (cid, score) in enumerate(semantic_hits)
+        }
+        channels = ["semantic"]
+        if extra_channels and extra_channels.get("warp"):
+            warp_hit = extra_channels["warp"][0]
+            docs.insert(0, HybridResultDoc(doc_id=warp_hit.doc_id, score=float(warp_hit.score)))
+            contributions.setdefault(warp_hit.doc_id, []).append(("warp", 1, float(warp_hit.score)))
+            channels.append("warp")
+        return HybridSearchResult(
+            docs=docs[:limit],
+            contributions=contributions,
+            channels=channels,
+            warnings=[],
+        )
+
+
 class _FakeContext:
     def __init__(self, tmp_path: Path) -> None:
         coderank_index = tmp_path / "coderank.faiss"
         coderank_index.write_bytes(b"index")
+        (tmp_path / "xtr").mkdir(exist_ok=True)
         self.paths = SimpleNamespace(
             coderank_faiss_index=coderank_index,
             warp_index_dir=tmp_path / "warp",
+            xtr_dir=tmp_path / "xtr",
         )
         self._catalog = _FakeCatalog()
+        self._hybrid = _FakeHybridEngine()
         self.settings = SimpleNamespace(
             coderank=SimpleNamespace(
                 model_id="stub",
@@ -74,10 +111,25 @@ class _FakeContext:
                 query_prefix="prefix: ",
                 normalize=True,
                 batch_size=8,
+                top_k=10,
+                budget_ms=1000,
+                min_stage2_margin=0.05,
+                min_stage2_candidates=1,
             ),
             limits=SimpleNamespace(max_results=10, semantic_overfetch_multiplier=2),
-            index=SimpleNamespace(rrf_k=60, faiss_nprobe=16),
+            index=SimpleNamespace(
+                rrf_k=60, faiss_nprobe=16, rrf_weights={"semantic": 1.0, "warp": 1.0}
+            ),
             warp=SimpleNamespace(enabled=False, device="cpu", top_k=50),
+            xtr=SimpleNamespace(
+                enable=False,
+                candidate_k=50,
+                dtype="float16",
+                dim=2,
+                max_query_tokens=32,
+                device="cpu",
+                model_id="stub",
+            ),
             coderank_llm=SimpleNamespace(
                 enabled=False,
                 model_id="stub",
@@ -85,6 +137,7 @@ class _FakeContext:
                 max_new_tokens=16,
                 temperature=0.0,
                 top_p=1.0,
+                budget_ms=500,
             ),
         )
 
@@ -98,6 +151,12 @@ class _FakeContext:
             yield self._catalog
 
         return _catalog_cm()
+
+    def get_hybrid_engine(self) -> _FakeHybridEngine:
+        return self._hybrid
+
+    def get_xtr_index(self) -> None:
+        return None
 
 
 @pytest.fixture(autouse=True)
@@ -147,7 +206,11 @@ def test_semantic_pro_produces_findings(tmp_path: Path) -> None:
     assert "why" in first
     assert "method" in envelope
     method = envelope["method"]
-    assert method.get("retrieval") == ["coderank"]
+    assert method.get("retrieval") == ["semantic"]
+    assert method.get("stages")
+    notes = method.get("notes")
+    assert notes
+    assert "WARP disabled via request option." in notes[0]
 
 
 def test_semantic_pro_requires_coderank_enabled(tmp_path: Path) -> None:
@@ -161,3 +224,24 @@ def test_semantic_pro_requires_coderank_enabled(tmp_path: Path) -> None:
                 options={"use_coderank": False},
             )
         )
+
+
+def test_merge_explainability_into_findings() -> None:
+    finding: semantic_pro.Finding = {
+        "chunk_id": 1,
+        "type": "usage",
+        "title": "main.py",
+        "location": {
+            "uri": "file://main.py",
+            "start_line": 1,
+            "start_column": 0,
+            "end_line": 1,
+            "end_column": 0,
+        },
+        "snippet": "",
+        "score": 0.5,
+        "why": "",
+    }
+    explainability = [(1, {"token_matches": [{"q_index": 0, "doc_index": 2, "similarity": 0.9}]})]
+    semantic_pro.merge_explainability_into_findings([finding], explainability)
+    assert "XTR alignments" in finding["why"]

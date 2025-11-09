@@ -91,9 +91,7 @@ class CodeRankListwiseReranker:
             # Keep original IDs for any candidates missing from model output
             missing = [cid for cid, _ in candidates if cid not in ordered_ids]
             return ordered_ids + missing
-        LOGGER.warning(
-            "CodeRankLLM returned no JSON list; falling back to original order."
-        )
+        LOGGER.warning("CodeRankLLM returned no JSON list; falling back to original order.")
         return [cid for cid, _ in candidates]
 
     def _ensure_model(self) -> tuple[PreTrainedTokenizerBase, AutoModelForCausalLM]:
@@ -131,9 +129,7 @@ class CodeRankListwiseReranker:
             f"Chunk ID: {cid}\nCode:\n{(snippet or '')[:_MAX_PREVIEW_CHARS]}"
             for cid, snippet in candidates
         )
-        return _PROMPT_TEMPLATE.format(
-            query=query.strip(), candidates=formatted_candidates
-        )
+        return _PROMPT_TEMPLATE.format(query=query.strip(), candidates=formatted_candidates)
 
     @staticmethod
     def _parse_rankings(text: str, valid_ids: set[int]) -> list[int]:
@@ -146,9 +142,7 @@ class CodeRankListwiseReranker:
         try:
             parsed = json.loads(json_payload)
         except json.JSONDecodeError:
-            LOGGER.warning(
-                "Failed to parse CodeRankLLM JSON output.", extra={"output": snippet}
-            )
+            LOGGER.warning("Failed to parse CodeRankLLM JSON output.", extra={"output": snippet})
             return []
         if not isinstance(parsed, list):
             return []

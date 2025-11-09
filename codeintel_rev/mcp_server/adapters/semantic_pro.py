@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.io.coderank_embedder import CodeRankEmbedder
+from codeintel_rev.io.hybrid_search import ChannelHit
 from codeintel_rev.io.rerank_coderankllm import CodeRankListwiseReranker
-from codeintel_rev.io.rrf import weighted_rrf
 from codeintel_rev.io.warp_engine import WarpEngine, WarpUnavailableError
 from codeintel_rev.mcp_server.common.observability import Observation, observe_duration
 from codeintel_rev.mcp_server.schemas import (
@@ -19,8 +20,16 @@ from codeintel_rev.mcp_server.schemas import (
     Finding,
     MethodInfo,
     ScopeIn,
+    StageInfo,
 )
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
+from codeintel_rev.retrieval.gating import StageGateConfig, should_run_secondary_stage
+from codeintel_rev.retrieval.telemetry import StageTiming, track_stage
+from codeintel_rev.retrieval.types import (
+    HybridResultDoc,
+    HybridSearchResult,
+    StageSignals,
+)
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
 from kgfoundry_common.logging import get_logger
 
@@ -58,10 +67,50 @@ def build_runtime_options(
 ) -> SemanticProRuntimeOptions:
     """Normalize user-supplied options into an immutable dataclass.
 
+    Extended Summary
+    ----------------
+    This function converts user-facing TypedDict options into an internal immutable
+    dataclass representation with defaults applied. It serves as the boundary between
+    the MCP server's request schema and the internal retrieval pipeline, ensuring
+    type safety and providing sensible defaults for optional configuration. The
+    function is called once per semantic_pro request to prepare runtime options
+    for the two-stage retrieval pipeline (CodeRank → optional WARP → optional reranker).
+
+    Parameters
+    ----------
+    options : SemanticProOptions | None
+        User-supplied options dictionary. May be ``None`` to use all defaults.
+        Keys include: ``use_coderank`` (default True), ``use_warp`` (default True),
+        ``use_reranker`` (default False), ``stage_weights`` (default empty dict),
+        ``explain`` (default True). Missing keys are filled with defaults.
+
     Returns
     -------
     SemanticProRuntimeOptions
-        Normalized runtime options with defaults applied.
+        Immutable dataclass instance with normalized options. All fields have
+        defaults applied, ensuring the returned value is always valid for pipeline
+        execution.
+
+    Notes
+    -----
+    Time complexity O(1). No I/O or side effects. The function performs a shallow
+    copy of stage_weights to ensure immutability of the returned dataclass.
+
+    Examples
+    --------
+    >>> opts = build_runtime_options(None)
+    >>> opts.use_coderank
+    True
+    >>> opts.use_warp
+    True
+    >>> opts.use_reranker
+    False
+    >>> user_opts = {"use_warp": False, "use_reranker": True}
+    >>> opts = build_runtime_options(user_opts)
+    >>> opts.use_warp
+    False
+    >>> opts.use_reranker
+    True
     """
     if options is None:
         return SemanticProRuntimeOptions()
@@ -81,13 +130,79 @@ async def semantic_search_pro(
     limit: int,
     options: SemanticProOptions | None = None,
 ) -> AnswerEnvelope:
-    """Async wrapper that executes the two-stage retrieval pipeline.
+    """Execute the two-stage semantic search pipeline (CodeRank → optional WARP → optional reranker).
+
+    Extended Summary
+    ----------------
+    This async function orchestrates the semantic_pro retrieval pipeline, which combines
+    CodeRank dense vector search with optional WARP late-interaction reranking and optional
+    CodeRankLLM listwise reranking. The function normalizes options, resolves scope filters,
+    executes stages conditionally based on gating logic and user preferences, fuses results
+    using weighted RRF, hydrates metadata from DuckDB, and assembles the final AnswerEnvelope
+    with findings, explanations, and telemetry. It is the primary entry point for semantic
+    code search in the MCP server, providing high-quality ranked results with explainability
+    and performance budgets.
+
+    Parameters
+    ----------
+    context : ApplicationContext
+        Application context containing settings, paths, and initialized components
+        (FAISS managers, embedders, catalog). Must have valid CodeRank FAISS index
+        and catalog configured.
+    query : str
+        Natural language search query. Will be embedded using CodeRank embedder
+        and optionally processed by WARP for late-interaction scoring.
+    limit : int
+        Maximum number of results to return. Will be clamped to the configured
+        max_results limit. Must be positive.
+    options : SemanticProOptions | None, optional
+        User-supplied pipeline options. Controls which stages run (use_coderank,
+        use_warp, use_reranker), fusion weights (stage_weights), and whether to
+        include explanations (explain). Defaults to None (all defaults applied).
 
     Returns
     -------
     AnswerEnvelope
-        Search results with metadata and optional explanations.
+        Search results envelope containing:
+        - ``answer``: Human-readable summary string
+        - ``findings``: List of Finding objects with location, snippet, score, and optional why
+        - ``method``: Retrieval metadata including channels used, coverage, and stage timings
+        - ``limits``: Optional list of warnings about budget overruns or limit clamping
+        - ``scope``: Optional scope filters that were applied
+        - ``query_kind``: Always "semantic_pro"
+        - ``confidence``: Float between 0.0 and 1.0
+
+    Raises
+    ------
+    VectorSearchError
+        If limit is not positive, CodeRank FAISS index is missing, search fails,
+        or DuckDB hydration fails. All errors include Problem Details context.
+
+    Notes
+    -----
+    Time complexity dominated by I/O: embedding (O(1) queries), FAISS search (O(k log n)
+    where k is fanout and n is index size), WARP reranking (O(m * d) where m is candidates
+    and d is sequence length), fusion (O(n * c) where n is hits and c is channels), DuckDB
+    hydration (O(r) where r is result count), optional reranking (O(r * model_latency)).
+    The function performs extensive I/O (FAISS, DuckDB, optional GPU models) and is not
+    thread-safe (uses context managers and shared state). Performance budgets are tracked
+    per stage and violations are reported in the limits field. The function uses asyncio
+    to offload synchronous work to a thread pool. Note that EmbeddingError may be propagated
+    from downstream functions (e.g., CodeRank embedder failures) but is wrapped as VectorSearchError
+    at the API boundary.
+
+    Examples
+    --------
+    >>> # Minimal example (requires ApplicationContext setup)
+    >>> # from codeintel_rev.app.config_context import ApplicationContext
+    >>> # context = ApplicationContext(...)
+    >>> # results = await semantic_search_pro(context, query="vector store", limit=10)
+    >>> # assert results["query_kind"] == "semantic_pro"
+    >>> # assert len(results["findings"]) <= 10
     """
+    if limit <= 0:
+        msg = f"limit must be positive, got {limit}"
+        raise VectorSearchError(msg)
     runtime_options = build_runtime_options(options)
     session_id = get_session_id()
     scope = await get_effective_scope(context, session_id)
@@ -113,11 +228,15 @@ def _semantic_search_pro_sync(
         raise VectorSearchError(msg)
 
     start_time = perf_counter()
+    stage_timings: list[StageTiming] = []
+    limits: list[str] = []
     with observe_duration("semantic_search_pro", COMPONENT_NAME) as observation:
-        effective_limit, limit_notes = _clamp_limit(
-            limit, context.settings.limits.max_results
+        effective_limit = _clamp_limit(
+            limit,
+            context.settings.limits.max_results,
+            limits,
         )
-        coderank_hits = _run_coderank_stage(
+        coderank_hits, coderank_stage = _timed_coderank_stage(
             context=context,
             query=query,
             fanout=max(
@@ -126,44 +245,48 @@ def _semantic_search_pro_sync(
             ),
             observation=observation,
         )
+        stage_timings.append(coderank_stage)
 
-        warp_notes: list[str] = []
-        warp_hits: list[tuple[int, float]] = []
-        channels_used: list[str] = ["coderank"]
-        if coderank_hits and options.use_warp and context.settings.warp.enabled:
-            warp_hits, warp_notes = _run_warp_stage(
-                context=context,
-                query=query,
-                candidates=coderank_hits,
-            )
-            if warp_hits:
-                channels_used.append("warp")
-        elif options.use_warp and not context.settings.warp.enabled:
-            warp_notes.append("WARP disabled via configuration flag.")
+        warp_outcome = _maybe_run_warp(
+            context=context,
+            query=query,
+            candidates=coderank_hits,
+            options=options,
+            coderank_stage=coderank_stage,
+        )
+        if warp_outcome.timing is not None:
+            stage_timings.append(warp_outcome.timing)
 
-        ordered_ids, contribution_map, score_map = _fuse_channels(
+        fusion_request = FusionRequest(
+            query=query,
             coderank_hits=coderank_hits,
-            warp_hits=warp_hits,
-            weights=_merge_stage_weights(options.stage_weights),
-            rrf_k=context.settings.index.rrf_k,
-            fusion_limit=max(
-                effective_limit,
-                effective_limit * context.settings.limits.semantic_overfetch_multiplier,
-            ),
+            warp_hits=warp_outcome.hits,
+            effective_limit=effective_limit,
+            weights=_merge_rrf_weights(context.settings.index.rrf_weights, options.stage_weights),
+        )
+        fused = _run_fusion_stage(
+            context=context,
+            request=fusion_request,
+            stage_timings=stage_timings,
         )
 
-        if not ordered_ids:
+        if not fused.docs:
             observation.mark_success()
             method = _build_method(
-                findings_count=0,
-                requested_limit=limit,
-                effective_limit=effective_limit,
-                start_time=start_time,
-                channels=channels_used,
+                MethodContext(
+                    findings_count=0,
+                    requested_limit=limit,
+                    effective_limit=effective_limit,
+                    start_time=start_time,
+                    channels=fused.channels,
+                    stages=tuple(stage_timings),
+                    notes=tuple(warp_outcome.notes),
+                    explainability=_build_method_explainability(warp_outcome.explainability),
+                )
             )
             extras = _assemble_extras(
                 method=method,
-                limits=limit_notes + warp_notes,
+                limits=limits + fused.warnings,
                 scope=scope,
             )
             return _make_envelope(
@@ -172,45 +295,62 @@ def _semantic_search_pro_sync(
                 extras=extras,
             )
 
-        ordered_ids = _dedupe_preserve_order(ordered_ids)
+        ordered_ids = _dedupe_preserve_order([_safe_int(doc.doc_id) for doc in fused.docs])
         try:
-            records = _hydrate_records(
-                context=context,
-                chunk_ids=ordered_ids[
-                    : min(len(ordered_ids), max(effective_limit * 2, effective_limit))
-                ],
-                scope=scope,
-            )
+            with track_stage("duckdb_hydration") as hydration_timer:
+                records = _hydrate_records(
+                    context=context,
+                    chunk_ids=ordered_ids[
+                        : min(
+                            len(ordered_ids),
+                            max(effective_limit * 2, effective_limit),
+                        )
+                    ],
+                    scope=scope,
+                )
+            stage_timings.append(hydration_timer.snapshot())
         except (RuntimeError, OSError) as exc:
             observation.mark_error()
             msg = "DuckDB hydration failed"
             raise VectorSearchError(msg, cause=exc) from exc
 
-        records = _maybe_rerank(
-            query=query,
-            records=records,
-            context=context,
-            enabled=options.use_reranker,
-        )
+        if options.use_reranker and context.settings.coderank_llm.enabled:
+            with track_stage(
+                "coderank_llm",
+                budget_ms=context.settings.coderank_llm.budget_ms,
+            ) as rerank_timer:
+                records = _maybe_rerank(
+                    query=query,
+                    records=records,
+                    context=context,
+                    enabled=True,
+                )
+            stage_timings.append(rerank_timer.snapshot())
 
         findings = _build_findings(
             records=records[:effective_limit],
-            score_map=score_map,
-            contribution_map=contribution_map,
+            docs=fused.docs,
+            contribution_map=fused.contributions,
             explain=options.explain,
         )
+        merge_explainability_into_findings(findings, warp_outcome.explainability)
         observation.mark_success()
-
+        _append_budget_notes(stage_timings, limits)
         method = _build_method(
-            findings_count=len(findings),
-            requested_limit=limit,
-            effective_limit=effective_limit,
-            start_time=start_time,
-            channels=channels_used,
+            MethodContext(
+                findings_count=len(findings),
+                requested_limit=limit,
+                effective_limit=effective_limit,
+                start_time=start_time,
+                channels=fused.channels,
+                stages=tuple(stage_timings),
+                notes=tuple(warp_outcome.notes),
+                explainability=_build_method_explainability(warp_outcome.explainability),
+            )
         )
         extras = _assemble_extras(
             method=method,
-            limits=limit_notes + warp_notes,
+            limits=limits + fused.warnings,
             scope=scope,
         )
 
@@ -276,14 +416,182 @@ def _run_coderank_stage(
     return hits
 
 
+def _timed_coderank_stage(
+    *,
+    context: ApplicationContext,
+    query: str,
+    fanout: int,
+    observation: Observation,
+) -> tuple[list[tuple[int, float]], StageTiming]:
+    with track_stage(
+        "coderank_ann",
+        budget_ms=context.settings.coderank.budget_ms,
+    ) as timer:
+        hits = _run_coderank_stage(
+            context=context,
+            query=query,
+            fanout=fanout,
+            observation=observation,
+        )
+    return hits, timer.snapshot()
+
+
+def _maybe_run_warp(
+    *,
+    context: ApplicationContext,
+    query: str,
+    candidates: list[tuple[int, float]],
+    options: SemanticProRuntimeOptions,
+    coderank_stage: StageTiming,
+) -> WarpOutcome:
+    notes: list[str] = []
+    if not candidates:
+        notes.append("No CodeRank candidates; skipping WARP.")
+        return WarpOutcome(hits=[], notes=notes, timing=None, explainability=())
+    if not options.use_warp:
+        notes.append("WARP disabled via request option.")
+        return WarpOutcome(hits=[], notes=notes, timing=None, explainability=())
+
+    stage_available = context.settings.warp.enabled or context.settings.xtr.enable
+    if not stage_available:
+        notes.append("WARP/XTR disabled via configuration flag.")
+        return WarpOutcome(hits=[], notes=notes, timing=None, explainability=())
+
+    signals = StageSignals(
+        candidate_count=len(candidates),
+        elapsed_ms=coderank_stage.duration_ms,
+        best_score=candidates[0][1] if candidates else None,
+        second_best_score=candidates[1][1] if len(candidates) > 1 else None,
+    )
+    gate_config = StageGateConfig(
+        min_candidates=context.settings.coderank.min_stage2_candidates,
+        margin_threshold=context.settings.coderank.min_stage2_margin,
+        budget_ms=context.settings.coderank.budget_ms,
+    )
+    decision = should_run_secondary_stage(signals, gate_config)
+    if not decision.should_run:
+        notes.append(f"Stage-B gating: {decision.reason}")
+        notes.extend(decision.notes)
+        return WarpOutcome(hits=[], notes=notes, timing=None, explainability=())
+
+    with track_stage(
+        "warp_late_interaction",
+        budget_ms=context.settings.warp.budget_ms,
+    ) as warp_timer:
+        hits, warp_notes, explain_payload = _run_warp_stage(
+            context=context,
+            query=query,
+            candidates=candidates,
+            explain=options.explain,
+        )
+    notes.extend(warp_notes)
+    return WarpOutcome(
+        hits=hits,
+        notes=notes,
+        timing=warp_timer.snapshot(),
+        explainability=tuple(explain_payload),
+    )
+
+
+def _run_fusion_stage(
+    *,
+    context: ApplicationContext,
+    request: FusionRequest,
+    stage_timings: list[StageTiming],
+) -> HybridSearchResult:
+    engine = context.get_hybrid_engine()
+    total_limit = max(
+        request.effective_limit,
+        request.effective_limit * context.settings.limits.semantic_overfetch_multiplier,
+    )
+    with track_stage("fusion_rrf") as fusion_timer:
+        fused = engine.search(
+            request.query,
+            semantic_hits=request.coderank_hits,
+            limit=total_limit,
+            extra_channels=_build_extra_channels(request.warp_hits),
+            weights=request.weights,
+        )
+    stage_timings.append(fusion_timer.snapshot())
+    return fused
+
+
+def _build_extra_channels(
+    warp_hits: list[tuple[int, float]],
+) -> dict[str, list[ChannelHit]] | None:
+    if not warp_hits:
+        return None
+    return {
+        "warp": [ChannelHit(doc_id=str(doc_id), score=float(score)) for doc_id, score in warp_hits]
+    }
+
+
+def _append_budget_notes(stage_timings: Sequence[StageTiming], limits: list[str]) -> None:
+    for timing in stage_timings:
+        if timing.budget_ms is None:
+            continue
+        if timing.exceeded_budget:
+            limits.append(
+                f"{timing.name} exceeded budget ({timing.duration_ms:.1f}ms > {timing.budget_ms}ms)"
+            )
+
+
+def _safe_int(value: str) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError) as exc:
+        msg = f"Expected numeric chunk id, received {value!r}"
+        raise VectorSearchError(msg) from exc
+
+
+def _merge_rrf_weights(
+    defaults: Mapping[str, float],
+    overrides: Mapping[str, float],
+) -> dict[str, float]:
+    weights = dict(defaults or {})
+    for channel, raw_value in overrides.items():
+        try:
+            weights[channel] = float(raw_value)
+        except (TypeError, ValueError):
+            LOGGER.warning(
+                "Ignoring non-numeric stage weight override",
+                extra={"channel": channel, "value": raw_value},
+            )
+    return weights
+
+
 def _run_warp_stage(
     *,
     context: ApplicationContext,
     query: str,
     candidates: list[tuple[int, float]],
-) -> tuple[list[tuple[int, float]], list[str]]:
+    explain: bool,
+) -> tuple[list[tuple[int, float]], list[str], list[tuple[int, dict[str, Any]]]]:
     notes: list[str] = []
+    warp_hits, warp_notes = _warp_executor_hits(context, query, candidates)
+    notes.extend(warp_notes)
+    if warp_hits is not None:
+        return warp_hits, notes, []
+
+    xtr_hits, xtr_notes, explain_payload = _xtr_rescore_hits(
+        context=context,
+        query=query,
+        candidates=candidates,
+        explain=explain,
+    )
+    notes.extend(xtr_notes)
+    return xtr_hits, notes, explain_payload
+
+
+def _warp_executor_hits(
+    context: ApplicationContext,
+    query: str,
+    candidates: list[tuple[int, float]],
+) -> tuple[list[tuple[int, float]] | None, list[str]]:
     cfg = context.settings.warp
+    notes: list[str] = []
+    if not cfg.enabled:
+        return None, notes
     try:
         warp_engine = WarpEngine(
             index_dir=context.paths.warp_index_dir,
@@ -291,7 +599,7 @@ def _run_warp_stage(
         )
     except WarpUnavailableError as exc:
         notes.append(str(exc))
-        return [], notes
+        return None, notes
 
     try:
         hits = warp_engine.rerank(
@@ -301,38 +609,51 @@ def _run_warp_stage(
         )
     except WarpUnavailableError as exc:
         notes.append(str(exc))
-        hits = []
+        return None, notes
+
+    notes.append(f"WARP executor rescored {len(hits)} candidates.")
     return hits, notes
 
 
-def _fuse_channels(
+def _xtr_rescore_hits(
     *,
-    coderank_hits: list[tuple[int, float]],
-    warp_hits: list[tuple[int, float]],
-    weights: dict[str, float],
-    rrf_k: int,
-    fusion_limit: int,
-) -> tuple[list[int], dict[int, list[tuple[str, int, float]]], dict[int, float]]:
-    fusion_limit = max(1, fusion_limit)
+    context: ApplicationContext,
+    query: str,
+    candidates: list[tuple[int, float]],
+    explain: bool,
+) -> tuple[list[tuple[int, float]], list[str], list[tuple[int, dict[str, Any]]]]:
+    notes: list[str] = []
+    explain_payload: list[tuple[int, dict[str, Any]]] = []
+    if not context.settings.xtr.enable:
+        notes.append("XTR disabled via configuration flag.")
+        return [], notes, explain_payload
 
-    if coderank_hits and warp_hits:
-        channel_map = {"coderank": coderank_hits, "warp": warp_hits}
-        fused_ids, contrib_map, score_map = weighted_rrf(
-            channel_map,
-            weights=weights,
-            k=rrf_k,
-            top_k=min(fusion_limit, len(coderank_hits)),
-        )
-        return fused_ids, contrib_map, score_map
+    xtr_index = context.get_xtr_index()
+    if xtr_index is None or not xtr_index.ready:
+        notes.append("XTR index unavailable; skipping late interaction.")
+        return [], notes, explain_payload
 
-    contrib_map: dict[int, list[tuple[str, int, float]]] = {}
-    score_map: dict[int, float] = {}
-    ordered = coderank_hits[:fusion_limit]
-    ordered_ids = [cid for cid, _ in ordered]
-    for rank, (cid, score) in enumerate(ordered, start=1):
-        contrib_map.setdefault(cid, []).append(("coderank", rank, score))
-        score_map[cid] = score
-    return ordered_ids, contrib_map, score_map
+    candidate_ids = [cid for cid, _ in candidates][: context.settings.xtr.candidate_k]
+    if not candidate_ids:
+        notes.append("Insufficient candidates for XTR rescoring.")
+        return [], notes, explain_payload
+
+    try:
+        query_vecs = xtr_index.encode_query_tokens(query)
+    except (RuntimeError, ValueError, OSError) as exc:  # pragma: no cover
+        notes.append(f"XTR encoding failed: {exc}")
+        LOGGER.warning("XTR encoding failed", exc_info=exc)
+        return [], notes, explain_payload
+
+    rescored = xtr_index.score_candidates(
+        query_vecs,
+        candidate_ids,
+        explain=explain,
+    )
+    hits = [(chunk_id, score) for chunk_id, score, _payload in rescored]
+    explain_payload = [(chunk_id, payload) for chunk_id, _score, payload in rescored if payload]
+    notes.append(f"XTR rescored {len(hits)} candidates.")
+    return hits, notes, explain_payload
 
 
 def _hydrate_records(
@@ -400,28 +721,25 @@ def _maybe_rerank(
 
     by_id = {int(record["id"]): record for record in records if "id" in record}
     reordered = [by_id[cid] for cid in ordered_ids if cid in by_id]
-    remaining = [
-        record for record in records if int(record.get("id", -1)) not in ordered_ids
-    ]
+    remaining = [record for record in records if int(record.get("id", -1)) not in ordered_ids]
     return reordered + remaining
 
 
 def _build_findings(
     *,
     records: list[dict],
-    score_map: dict[int, float],
-    contribution_map: dict[int, list[tuple[str, int, float]]],
+    docs: Sequence[HybridResultDoc],
+    contribution_map: Mapping[str, list[tuple[str, int, float]]],
     explain: bool,
 ) -> list[Finding]:
+    score_map = {_safe_int(doc.doc_id): float(doc.score) for doc in docs}
     findings: list[Finding] = []
     for record in records:
         chunk_id = int(record.get("id", -1))
         if chunk_id < 0:
             continue
         uri = str(record.get("uri", ""))
-        preview = (record.get("content") or record.get("preview") or "")[
-            :SNIPPET_PREVIEW_CHARS
-        ]
+        preview = (record.get("content") or record.get("preview") or "")[:SNIPPET_PREVIEW_CHARS]
         title = Path(uri).name or uri
         finding: Finding = {
             "type": "usage",
@@ -437,32 +755,164 @@ def _build_findings(
             "score": float(score_map.get(chunk_id, 0.0)),
             "chunk_id": chunk_id,
         }
-        if explain and chunk_id in contribution_map:
+        doc_key = str(chunk_id)
+        if explain and doc_key in contribution_map:
             parts = [
-                f"{channel} rank={rank}"
-                for channel, rank, _score in contribution_map[chunk_id]
+                f"{channel} rank={rank}" for channel, rank, _score in contribution_map[doc_key]
             ]
             finding["why"] = f"Fusion weights: {', '.join(parts)}"
         findings.append(finding)
     return findings
 
 
-def _build_method(
+def merge_explainability_into_findings(
+    findings: list[Finding],
+    explainability: Sequence[tuple[int, dict[str, Any]]],
+) -> None:
+    """Append token-level explainability snippets to existing findings.
+
+    Extended Summary
+    ----------------
+    This function enriches Finding objects with token-level alignment information
+    from XTR/WARP explainability data. It matches explainability entries to findings
+    by chunk_id, extracts token match summaries, and appends formatted alignment
+    strings to the "why" field. The function mutates findings in-place, adding
+    XTR alignment details (query token index → document token index with similarity
+    scores) to help users understand why specific code chunks were retrieved.
+    This is called after findings are built but before the final AnswerEnvelope
+    is assembled.
+
+    Parameters
+    ----------
+    findings : list[Finding]
+        List of Finding dictionaries to enrich. Each finding should have a "chunk_id"
+        field for matching. Findings without matching explainability entries are
+        left unchanged. Mutated in-place.
+    explainability : Sequence[tuple[int, dict[str, Any]]]
+        Explainability data as (chunk_id, payload) tuples. Each payload should
+        contain a "token_matches" key with alignment information. Empty sequences
+        result in no modifications.
+
+    Notes
+    -----
+    Time complexity O(n * m) where n is len(findings) and m is len(explainability)
+    due to lookup construction and matching. Space complexity O(m) for the lookup
+    dictionary. The function mutates findings in-place and has no return value.
+    Thread-safe if findings list is not modified concurrently.
+
+    Examples
+    --------
+    >>> findings = [{"chunk_id": 1, "why": "Fusion weights: coderank rank=1"}]
+    >>> explain = [(1, {"token_matches": [{"q_index": 0, "doc_index": 5, "similarity": 0.8}]})]
+    >>> merge_explainability_into_findings(findings, explain)
+    >>> "XTR alignments" in findings[0]["why"]
+    True
+    """
+    if not explainability:
+        return
+    lookup = dict(explainability)
+    for finding in findings:
+        chunk_id = finding.get("chunk_id")
+        if chunk_id is None:
+            continue
+        payload = lookup.get(chunk_id)
+        if not payload:
+            continue
+        matches = payload.get("token_matches")
+        if not matches:
+            continue
+        summary = ", ".join(
+            f"q{match['q_index']}→d{match['doc_index']}={match['similarity']:.2f}"
+            for match in matches
+        )
+        addition = f"XTR alignments: {summary}"
+        previous = finding.get("why")
+        finding["why"] = f"{previous}; {addition}" if previous else addition
+
+
+def _build_method_explainability(
+    explainability: Sequence[tuple[int, dict[str, Any]]],
     *,
-    findings_count: int,
-    requested_limit: int,
-    effective_limit: int,
-    start_time: float,
-    channels: list[str],
-) -> MethodInfo:
-    elapsed_ms = int((perf_counter() - start_time) * 1000)
-    coverage = f"{findings_count}/{effective_limit} results in {elapsed_ms}ms"
-    if requested_limit != effective_limit:
-        coverage = f"{coverage} (requested {requested_limit})"
-    return {
-        "retrieval": list(dict.fromkeys(channels)),
+    limit: int = 5,
+) -> dict[str, list[dict[str, Any]]] | None:
+    """Build explainability payload for MethodInfo.
+
+    Extended Summary
+    ----------------
+    This helper function converts raw explainability tuples (chunk_id, payload) into
+    a structured dictionary format suitable for inclusion in MethodInfo. It filters
+    entries to include only those with token matches, limits the number of entries
+    to prevent payload bloat, and organizes them by channel (currently "warp").
+    The function is called after the retrieval pipeline completes to package
+    token-level alignment data for observability.
+
+    Parameters
+    ----------
+    explainability : Sequence[tuple[int, dict[str, Any]]]
+        Raw explainability data as (chunk_id, payload) tuples. Each payload should
+        contain a "token_matches" key with alignment information. Empty sequences
+        result in None return.
+    limit : int, optional
+        Maximum number of explainability entries to include in the result. Defaults
+        to 5 to keep payload sizes manageable. Higher values provide more detail but
+        increase response size.
+
+    Returns
+    -------
+    dict[str, list[dict[str, Any]]] | None
+        Structured explainability data keyed by channel name (e.g., "warp"). Each
+        entry contains chunk_id and token_matches. Returns None if no valid entries
+        are found or if explainability is empty.
+
+    Notes
+    -----
+    Time complexity O(n) where n is min(len(explainability), limit). Space complexity
+    O(n) for the result dictionary. No I/O or side effects. Thread-safe.
+
+    Examples
+    --------
+    >>> explain = [(1, {"token_matches": [{"q_index": 0, "doc_index": 5, "similarity": 0.8}]})]
+    >>> result = _build_method_explainability(explain, limit=5)
+    >>> result is not None and "warp" in result
+    True
+    >>> result = _build_method_explainability([], limit=5)
+    >>> result is None
+    True
+    """
+    if not explainability:
+        return None
+    entries: list[dict[str, Any]] = []
+    for chunk_id, payload in explainability[:limit]:
+        token_matches = list(payload.get("token_matches", []))
+        if not token_matches:
+            continue
+        entries.append(
+            {
+                "chunk_id": chunk_id,
+                "token_matches": token_matches,
+            }
+        )
+    if not entries:
+        return None
+    return {"warp": entries}
+
+
+def _build_method(context: MethodContext) -> MethodInfo:
+    elapsed_ms = int((perf_counter() - context.start_time) * 1000)
+    coverage = f"{context.findings_count}/{context.effective_limit} results in {elapsed_ms}ms"
+    if context.requested_limit != context.effective_limit:
+        coverage = f"{coverage} (requested {context.requested_limit})"
+    method: MethodInfo = {
+        "retrieval": list(dict.fromkeys(context.channels)),
         "coverage": coverage,
     }
+    if context.stages:
+        method["stages"] = [cast("StageInfo", stage.as_payload()) for stage in context.stages]
+    if context.notes:
+        method["notes"] = list(context.notes)
+    if context.explainability:
+        method["explainability"] = context.explainability
+    return method
 
 
 def _assemble_extras(
@@ -471,12 +921,55 @@ def _assemble_extras(
     limits: list[str],
     scope: ScopeIn | None,
 ) -> AnswerEnvelope:
-    """Assemble response metadata extras.
+    """Assemble response metadata extras dictionary.
+
+    Extended Summary
+    ----------------
+    This helper function constructs the extras dictionary for an AnswerEnvelope,
+    combining method metadata (retrieval channels, coverage, stage timings) with
+    optional limits warnings and scope filters. It is called after the retrieval
+    pipeline completes to package telemetry and configuration context into the
+    response. The function ensures that only non-empty optional fields are included,
+    keeping the response payload minimal.
+
+    Parameters
+    ----------
+    method : MethodInfo
+        Method metadata dictionary containing retrieval channels, coverage string,
+        and optional stage timings. This is produced by _build_method() and describes
+        how the search was executed.
+    limits : list[str]
+        List of warning messages about budget overruns, limit clamping, or other
+        operational constraints. Empty list means no warnings. Non-empty lists are
+        included in the extras as the "limits" field.
+    scope : ScopeIn | None
+        Scope filters that were applied during search (include_globs, exclude_globs,
+        languages). None means no scope filtering was applied. Non-None values are
+        included in the extras as the "scope" field.
 
     Returns
     -------
     AnswerEnvelope
-        Extras dictionary containing method metadata and optional scope/limits.
+        Dictionary containing the method field (always present) and optionally
+        limits and scope fields if they are non-empty/non-None. This dictionary
+        is merged into the final AnswerEnvelope by _make_envelope().
+
+    Notes
+    -----
+    Time complexity O(1). No I/O or side effects. The function performs shallow
+    dictionary construction only. Thread-safe.
+
+    Examples
+    --------
+    >>> method = {"retrieval": ["coderank"], "coverage": "5/10 results in 42ms"}
+    >>> extras = _assemble_extras(method=method, limits=[], scope=None)
+    >>> extras["method"] == method
+    True
+    >>> "limits" in extras
+    False
+    >>> extras = _assemble_extras(method=method, limits=["Budget exceeded"], scope=None)
+    >>> extras["limits"] == ["Budget exceeded"]
+    True
     """
     extras: AnswerEnvelope = {"method": method}
     if limits:
@@ -502,32 +995,15 @@ def _make_envelope(
     return envelope
 
 
-def _clamp_limit(requested: int, max_results: int) -> tuple[int, list[str]]:
-    notes: list[str] = []
+def _clamp_limit(requested: int, max_results: int, notes: list[str]) -> int:
     if requested <= 0:
         notes.append("Requested limit <= 0; defaulting to 1.")
     if requested > max_results:
-        notes.append(
-            f"Requested limit {requested} exceeds max_results {max_results}; truncating."
-        )
+        notes.append(f"Requested limit {requested} exceeds max_results {max_results}; truncating.")
     effective = requested
     if effective <= 0:
         effective = 1
-    effective = min(effective, max_results)
-    return effective, notes
-
-
-def _merge_stage_weights(stage_weights: dict[str, float]) -> dict[str, float]:
-    weights = {"coderank": 1.0, "warp": 1.0}
-    for channel, raw in stage_weights.items():
-        try:
-            weights[channel] = float(raw)
-        except (TypeError, ValueError):
-            LOGGER.warning(
-                "Ignoring non-numeric stage weight",
-                extra={"channel": channel, "value": raw},
-            )
-    return weights
+    return min(effective, max_results)
 
 
 def _dedupe_preserve_order(ids: list[int]) -> list[int]:
@@ -539,3 +1015,38 @@ def _dedupe_preserve_order(ids: list[int]) -> list[int]:
         seen.add(chunk_id)
         ordered.append(chunk_id)
     return ordered
+
+
+@dataclass(slots=True, frozen=True)
+class WarpOutcome:
+    """Container describing the results of the optional WARP stage."""
+
+    hits: list[tuple[int, float]]
+    notes: list[str]
+    timing: StageTiming | None
+    explainability: tuple[tuple[int, dict[str, Any]], ...]
+
+
+@dataclass(slots=True, frozen=True)
+class FusionRequest:
+    """Inputs required to execute the fusion stage."""
+
+    query: str
+    coderank_hits: Sequence[tuple[int, float]]
+    warp_hits: list[tuple[int, float]]
+    effective_limit: int
+    weights: Mapping[str, float]
+
+
+@dataclass(slots=True, frozen=True)
+class MethodContext:
+    """Inputs required to build the MethodInfo payload."""
+
+    findings_count: int
+    requested_limit: int
+    effective_limit: int
+    start_time: float
+    channels: list[str]
+    stages: Sequence[StageTiming] | None
+    notes: tuple[str, ...] | None = None
+    explainability: dict[str, list[dict[str, Any]]] | None = None

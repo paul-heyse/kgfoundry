@@ -204,9 +204,7 @@ class LRUCache[KeyT: Hashable, ValueT]:
         """
         with self._lock:
             self._purge_expired_entries()
-            return OrderedDict(
-                (key, record.value) for key, record in self._store.items()
-            )
+            return OrderedDict((key, record.value) for key, record in self._store.items())
 
     def _enforce_size(self) -> None:
         while len(self._store) > self._maxsize:
@@ -218,9 +216,7 @@ class LRUCache[KeyT: Hashable, ValueT]:
 
         now = self._now()
         expired_keys = [
-            key
-            for key, record in self._store.items()
-            if self._has_expired(record.inserted_at, now)
+            key for key, record in self._store.items() if self._has_expired(record.inserted_at, now)
         ]
         for key in expired_keys:
             self._store.pop(key, None)
@@ -348,9 +344,7 @@ class ScopeStore:
             raise ValueError(msg)
 
         self._redis = redis_client
-        self._l1: LRUCache[str, ScopeIn] = LRUCache(
-            maxsize=l1_maxsize, ttl_seconds=l1_ttl_seconds
-        )
+        self._l1: LRUCache[str, ScopeIn] = LRUCache(maxsize=l1_maxsize, ttl_seconds=l1_ttl_seconds)
         self._flight: AsyncSingleFlight[str, ScopeIn | None] = AsyncSingleFlight()
         self._metrics = ScopeStoreMetrics()
         self._l2_ttl_seconds = l2_ttl_seconds
@@ -390,9 +384,7 @@ class ScopeStore:
             return cached
 
         self._metrics.record_l1_miss()
-        return await self._flight.do(
-            session_id, lambda: self._fetch_from_l2(session_id)
-        )
+        return await self._flight.do(session_id, lambda: self._fetch_from_l2(session_id))
 
     async def set(self, session_id: str, scope: ScopeIn) -> None:
         """

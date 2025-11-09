@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
 from importlib import import_module
 from pathlib import Path
 from threading import Lock
 from typing import TYPE_CHECKING
 
+from codeintel_rev.retrieval.fusion import fuse_weighted_rrf
+from codeintel_rev.retrieval.types import (
+    ChannelHit,
+    HybridResultDoc,
+    HybridSearchResult,
+)
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -16,32 +21,6 @@ if TYPE_CHECKING:
     from codeintel_rev.config.settings import Settings, SpladeConfig
 
 LOGGER = get_logger(__name__)
-
-
-@dataclass(frozen=True)
-class ChannelHit:
-    """Single channel result used for Reciprocal Rank Fusion."""
-
-    doc_id: str
-    score: float
-
-
-@dataclass(frozen=True)
-class HybridResultDoc:
-    """Fused result produced by the hybrid engine."""
-
-    doc_id: str
-    score: float
-
-
-@dataclass(frozen=True)
-class HybridSearchResult:
-    """Hybrid search output with fused documents and contribution metadata."""
-
-    docs: Sequence[HybridResultDoc]
-    contributions: dict[str, list[tuple[str, int, float]]]
-    channels: list[str]
-    warnings: list[str]
 
 
 class BM25SearchProvider:
@@ -262,9 +241,10 @@ class HybridSearchEngine:
         self,
         query: str,
         *,
-        semantic_ids: Sequence[int],
-        semantic_scores: Sequence[float],
+        semantic_hits: Sequence[tuple[int, float]],
         limit: int,
+        extra_channels: Mapping[str, Sequence[ChannelHit]] | None = None,
+        weights: Mapping[str, float] | None = None,
     ) -> HybridSearchResult:
         """Fuse dense and sparse retrieval results for ``query``.
 
@@ -286,19 +266,18 @@ class HybridSearchEngine:
             which perform keyword-based or learned sparse matching. The semantic
             channel uses pre-computed embeddings, so the query text is only used
             for sparse channels.
-        semantic_ids : Sequence[int]
-            Document IDs from semantic/FAISS retrieval. These are the top results
-            from dense vector similarity search, typically pre-filtered and ranked
-            by cosine similarity or inner product scores.
-        semantic_scores : Sequence[float]
-            Relevance scores corresponding to semantic_ids. Must have the same length
-            as semantic_ids. Scores are typically cosine similarity or inner product
-            values from FAISS search. Used for RRF ranking (order matters more than
-            absolute values).
+        semantic_hits : Sequence[tuple[int, float]]
+            Ordered dense results expressed as ``(doc_id, score)`` pairs.
         limit : int
             Maximum number of final results to return after RRF fusion. The fusion
             process ranks all documents from all channels, then returns the top
             'limit' documents. Must be a positive integer.
+        extra_channels : Mapping[str, Sequence[ChannelHit]] | None
+            Optional externally supplied channels (e.g., WARP). Each entry is
+            merged into the RRF runs prior to fusion.
+        weights : Mapping[str, float] | None
+            Optional per-channel weights applied during fusion. Defaults to
+            equal weighting.
 
         Returns
         -------
@@ -311,7 +290,12 @@ class HybridSearchEngine:
             - warnings: Any warnings generated during channel retrieval (e.g., index
               unavailable, encoding failures)
         """
-        runs, warnings = self._gather_channel_hits(query, semantic_ids, semantic_scores)
+        runs, warnings = self._gather_channel_hits(query, semantic_hits)
+        if extra_channels:
+            for name, hits in extra_channels.items():
+                if not hits:
+                    continue
+                runs[name] = list(hits)
         if not runs:
             return HybridSearchResult(
                 docs=[],
@@ -320,18 +304,23 @@ class HybridSearchEngine:
                 warnings=warnings,
             )
 
-        docs, contributions = _rrf_fuse(
-            runs,
-            k=self._settings.index.rrf_k,
-            limit=limit,
-        )
+        if weights:
+            docs, contributions = fuse_weighted_rrf(
+                runs,
+                weights=weights,
+                k=self._settings.index.rrf_k,
+                limit=limit,
+            )
+        else:
+            docs, contributions = _rrf_fuse(
+                runs,
+                k=self._settings.index.rrf_k,
+                limit=limit,
+            )
         active_channels = [channel for channel, hits in runs.items() if hits]
-        filtered_contributions = {
-            doc.doc_id: contributions.get(doc.doc_id, []) for doc in docs
-        }
         return HybridSearchResult(
             docs=docs,
-            contributions=filtered_contributions,
+            contributions={doc.doc_id: contributions.get(doc.doc_id, []) for doc in docs},
             channels=active_channels,
             warnings=warnings,
         )
@@ -339,8 +328,7 @@ class HybridSearchEngine:
     def _gather_channel_hits(
         self,
         query: str,
-        semantic_ids: Sequence[int],
-        semantic_scores: Sequence[float],
+        semantic_hits: Sequence[tuple[int, float]],
     ) -> tuple[dict[str, list[ChannelHit]], list[str]]:
         """Collect per-channel search hits and warnings for ``query``.
 
@@ -360,14 +348,8 @@ class HybridSearchEngine:
             Search query string. Used for sparse retrieval channels (BM25, SPLADE).
             The semantic channel uses pre-computed results, so query is only
             relevant for sparse channels.
-        semantic_ids : Sequence[int]
-            Document IDs from semantic/FAISS retrieval. These are converted to
-            ChannelHit objects for the "semantic" channel. Must have same length
-            as semantic_scores.
-        semantic_scores : Sequence[float]
-            Relevance scores from semantic retrieval, corresponding to semantic_ids.
-            Used to create ChannelHit objects with appropriate scores. Must have
-            same length as semantic_ids.
+        semantic_hits : Sequence[tuple[int, float]]
+            Dense retrieval hits expressed as ``(doc_id, score)`` pairs.
 
         Returns
         -------
@@ -382,9 +364,9 @@ class HybridSearchEngine:
         runs: dict[str, list[ChannelHit]] = {}
         warnings: list[str] = []
 
-        semantic_hits = self._build_semantic_hits(semantic_ids, semantic_scores)
-        if semantic_hits:
-            runs["semantic"] = semantic_hits
+        semantic_channel_hits = self._build_semantic_channel_hits(semantic_hits)
+        if semantic_channel_hits:
+            runs["semantic"] = semantic_channel_hits
 
         if self._settings.index.enable_bm25_channel:
             self._maybe_add_bm25_hits(query, runs, warnings)
@@ -459,9 +441,7 @@ class HybridSearchEngine:
                 provider = self._create_bm25_provider()
             except (RuntimeError, OSError, ValueError, ImportError) as exc:
                 self._bm25_error = f"BM25 initialization failed: {exc}"
-                LOGGER.warning(
-                    "Failed to initialize BM25 search provider", exc_info=exc
-                )
+                LOGGER.warning("Failed to initialize BM25 search provider", exc_info=exc)
                 return None
             self._bm25_provider = provider
             return provider
@@ -478,9 +458,7 @@ class HybridSearchEngine:
                 provider = self._create_splade_provider()
             except (RuntimeError, OSError, ValueError, ImportError) as exc:
                 self._splade_error = f"SPLADE initialization failed: {exc}"
-                LOGGER.warning(
-                    "Failed to initialize SPLADE search provider", exc_info=exc
-                )
+                LOGGER.warning("Failed to initialize SPLADE search provider", exc_info=exc)
                 return None
             self._splade_provider = provider
             return provider
@@ -521,20 +499,15 @@ class HybridSearchEngine:
             return candidate
         return (self._paths.repo_root / candidate).resolve()
 
-    def _build_semantic_hits(
-        self,
-        ids: Sequence[int],
-        scores: Sequence[float],
-    ) -> list[ChannelHit]:
-        top_k = min(len(ids), self._settings.index.hybrid_top_k_per_channel) or len(ids)
-        hits: list[ChannelHit] = []
-        for chunk_id, score in zip(ids[:top_k], scores[:top_k], strict=True):
-            hits.append(ChannelHit(doc_id=str(chunk_id), score=float(score)))
-        return hits
+    def _build_semantic_channel_hits(self, hits: Sequence[tuple[int, float]]) -> list[ChannelHit]:
+        top_k = min(len(hits), self._settings.index.hybrid_top_k_per_channel) or len(hits)
+        return [
+            ChannelHit(doc_id=str(chunk_id), score=float(score)) for chunk_id, score in hits[:top_k]
+        ]
 
 
 def _rrf_fuse(
-    runs: dict[str, list[ChannelHit]],
+    runs: Mapping[str, Sequence[ChannelHit]],
     *,
     k: int,
     limit: int,

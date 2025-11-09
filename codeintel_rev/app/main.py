@@ -119,9 +119,7 @@ async def lifespan(
                 gpu_status["details"],
             )
         else:
-            LOGGER.info(
-                "GPU warmup indicates GPU unavailable - continuing with CPU-only mode"
-            )
+            LOGGER.info("GPU warmup indicates GPU unavailable - continuing with CPU-only mode")
 
         # Phase 3: Initialize readiness probe
         readiness = ReadinessProbe(context)
@@ -133,9 +131,7 @@ async def lifespan(
             LOGGER.info("Pre-loading FAISS index during startup")
             preload_success = await asyncio.to_thread(_preload_faiss_index, context)
             if not preload_success:
-                LOGGER.warning(
-                    "FAISS index pre-load failed; will lazy-load on first search"
-                )
+                LOGGER.warning("FAISS index pre-load failed; will lazy-load on first search")
 
         LOGGER.info("Application initialization complete")
 

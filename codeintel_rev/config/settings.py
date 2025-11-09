@@ -6,12 +6,21 @@ All configuration loaded from environment variables with sensible defaults.
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
+from typing import Literal
 
 import msgspec
 
 from codeintel_rev.io.duckdb_manager import DuckDBConfig
+
+DEFAULT_RRF_WEIGHTS: dict[str, float] = {
+    "semantic": 1.0,
+    "bm25": 1.0,
+    "splade": 1.0,
+    "warp": 1.1,
+}
 
 
 class CodeRankConfig(msgspec.Struct, frozen=True):
@@ -31,6 +40,14 @@ class CodeRankConfig(msgspec.Struct, frozen=True):
         When ``True`` (default), normalize embeddings for cosine similarity.
     query_prefix : str
         Instruction prefix required by the CodeRank model card for queries.
+    top_k : int
+        Maximum number of candidates to retrieve during Stage-A.
+    budget_ms : int
+        Soft latency budget for CodeRank embedding + ANN search.
+    min_stage2_margin : float
+        Score margin threshold that skips Stage-B when confidence is high.
+    min_stage2_candidates : int
+        Minimum candidate count required to invoke Stage-B.
     """
 
     model_id: str = "nomic-ai/CodeRankEmbed"
@@ -39,6 +56,10 @@ class CodeRankConfig(msgspec.Struct, frozen=True):
     batch_size: int = 128
     normalize: bool = True
     query_prefix: str = "Represent this query for searching relevant code: "
+    top_k: int = 200
+    budget_ms: int = 120
+    min_stage2_margin: float = 0.1
+    min_stage2_candidates: int = 40
 
 
 class WarpConfig(msgspec.Struct, frozen=True):
@@ -56,6 +77,8 @@ class WarpConfig(msgspec.Struct, frozen=True):
         Candidate fan-out requested from the WARP executor.
     enabled : bool
         Gate to enable/disable WARP at runtime (defaults to ``False``).
+    budget_ms : int
+        Soft latency budget for the WARP reranking stage.
     """
 
     index_dir: str = "indexes/warp_xtr"
@@ -63,6 +86,19 @@ class WarpConfig(msgspec.Struct, frozen=True):
     device: str = "cpu"
     top_k: int = 200
     enabled: bool = False
+    budget_ms: int = 180
+
+
+class XTRConfig(msgspec.Struct, frozen=True):
+    """Configuration for XTR token storage and scoring."""
+
+    model_id: str = "nomic-ai/CodeRankEmbed"
+    device: str = "cuda"
+    max_query_tokens: int = 256
+    candidate_k: int = 200
+    dim: int = 768
+    dtype: Literal["float16", "float32"] = "float16"
+    enable: bool = False
 
 
 class CodeRankLLMConfig(msgspec.Struct, frozen=True):
@@ -74,6 +110,7 @@ class CodeRankLLMConfig(msgspec.Struct, frozen=True):
     temperature: float = 0.0
     top_p: float = 1.0
     enabled: bool = False
+    budget_ms: int = 300
 
 
 class VLLMConfig(msgspec.Struct, frozen=True):
@@ -233,6 +270,8 @@ class PathsConfig(msgspec.Struct, frozen=True):
         Path to the CodeRank FAISS index file used for Stage-A retrieval.
     warp_index_dir : str
         Directory containing WARP/XTR index artifacts.
+    xtr_dir : str
+        Directory containing XTR token-level artifacts (memmaps + metadata).
     """
 
     repo_root: str
@@ -246,6 +285,7 @@ class PathsConfig(msgspec.Struct, frozen=True):
     coderank_vectors_dir: str = "data/coderank_vectors"
     coderank_faiss_index: str = "data/faiss/coderank.ivfpq.faiss"
     warp_index_dir: str = "indexes/warp_xtr"
+    xtr_dir: str = "data/xtr"
 
 
 class IndexConfig(msgspec.Struct, frozen=True):
@@ -328,6 +368,8 @@ class IndexConfig(msgspec.Struct, frozen=True):
     compaction_threshold : float
         Fraction of primary index size that the secondary index can reach before a
         compaction is recommended. Defaults to 0.05 (5%).
+    rrf_weights : dict[str, float]
+        Default per-channel weights applied during weighted RRF fusion.
     """
 
     vec_dim: int = 2560
@@ -345,6 +387,9 @@ class IndexConfig(msgspec.Struct, frozen=True):
     duckdb_materialize: bool = False
     preview_max_chars: int = 240
     compaction_threshold: float = 0.05
+    rrf_weights: dict[str, float] = msgspec.field(
+        default_factory=lambda: {"semantic": 1.0, "bm25": 1.0, "splade": 1.0, "warp": 1.1}
+    )
 
 
 class ServerLimits(msgspec.Struct, frozen=True):
@@ -453,6 +498,8 @@ class Settings(msgspec.Struct, frozen=True):
         Dense CodeRank retriever configuration.
     warp : WarpConfig
         WARP/XTR late-interaction configuration.
+    xtr : XTRConfig
+        Token-level index and scoring configuration.
     coderank_llm : CodeRankLLMConfig
         CodeRank listwise reranker configuration.
     """
@@ -467,6 +514,7 @@ class Settings(msgspec.Struct, frozen=True):
     splade: SpladeConfig
     coderank: CodeRankConfig
     warp: WarpConfig
+    xtr: XTRConfig
     coderank_llm: CodeRankLLMConfig
 
 
@@ -628,6 +676,22 @@ def load_settings() -> Settings:
         Candidate fan-out requested from WARP (default: 200).
     WARP_ENABLED : str, optional
         Enable WARP channel ("1"/"true" to enable, default disabled).
+    XTR_DIR : str, optional
+        Directory containing XTR token artifacts (default: "data/xtr").
+    XTR_MODEL_ID : str, optional
+        Encoder checkpoint for XTR tokens (default: "nomic-ai/CodeRankEmbed").
+    XTR_DEVICE : str, optional
+        Device for XTR query encoding ("cuda" default).
+    XTR_MAX_QUERY_TOKENS : int, optional
+        Maximum number of query tokens processed (default: 256).
+    XTR_CANDIDATE_K : int, optional
+        Number of Stage-A candidates to rescore (default: 200).
+    XTR_DIM : int, optional
+        Token embedding dimensionality (default: 768).
+    XTR_DTYPE : str, optional
+        Token storage dtype ("float16" default).
+    XTR_ENABLE : str, optional
+        Enable XTR rescoring ("1"/"true" to enable, default disabled).
     CODERANK_LLM_MODEL_ID : str, optional
         Identifier for the CodeRank listwise reranker (default: "nomic-ai/CodeRankLLM").
     CODERANK_LLM_DEVICE : str, optional
@@ -660,14 +724,23 @@ def load_settings() -> Settings:
         splade_dir=os.environ.get("SPLADE_DIR", "data/splade"),
         duckdb_path=os.environ.get("DUCKDB_PATH", "data/catalog.duckdb"),
         scip_index=os.environ.get("SCIP_INDEX", "index.scip"),
-        coderank_vectors_dir=os.environ.get(
-            "CODERANK_VECTORS_DIR", "data/coderank_vectors"
-        ),
+        coderank_vectors_dir=os.environ.get("CODERANK_VECTORS_DIR", "data/coderank_vectors"),
         coderank_faiss_index=os.environ.get(
             "CODERANK_FAISS_INDEX", "data/faiss/coderank.ivfpq.faiss"
         ),
         warp_index_dir=os.environ.get("WARP_INDEX_DIR", "indexes/warp_xtr"),
+        xtr_dir=os.environ.get("XTR_DIR", "data/xtr"),
     )
+
+    rrf_weights_env = os.environ.get("RRF_WEIGHTS_JSON")
+    rrf_weights = DEFAULT_RRF_WEIGHTS
+    if rrf_weights_env:
+        try:
+            parsed = json.loads(rrf_weights_env)
+            if isinstance(parsed, dict):
+                rrf_weights = {str(channel): float(weight) for channel, weight in parsed.items()}
+        except (json.JSONDecodeError, TypeError, ValueError):
+            rrf_weights = DEFAULT_RRF_WEIGHTS
 
     index = IndexConfig(
         vec_dim=int(os.environ.get("VEC_DIM", "2560")),
@@ -683,14 +756,12 @@ def load_settings() -> Settings:
         in {"1", "true", "yes"},
         hybrid_top_k_per_channel=int(os.environ.get("HYBRID_TOP_K_PER_CHANNEL", "50")),
         use_cuvs=os.environ.get("USE_CUVS", "1").lower() in {"1", "true", "yes"},
-        faiss_preload=os.environ.get("FAISS_PRELOAD", "0").lower()
-        in {"1", "true", "yes"},
+        faiss_preload=os.environ.get("FAISS_PRELOAD", "0").lower() in {"1", "true", "yes"},
         duckdb_materialize=os.environ.get("DUCKDB_MATERIALIZE", "0").lower()
         in {"1", "true", "yes"},
         preview_max_chars=int(os.environ.get("PREVIEW_MAX_CHARS", "240")),
-        compaction_threshold=float(
-            os.environ.get("FAISS_COMPACTION_THRESHOLD", "0.05")
-        ),
+        compaction_threshold=float(os.environ.get("FAISS_COMPACTION_THRESHOLD", "0.05")),
+        rrf_weights=rrf_weights,
     )
 
     limits = ServerLimits(
@@ -698,26 +769,18 @@ def load_settings() -> Settings:
         query_timeout_s=float(os.environ.get("QUERY_TIMEOUT_S", "30.0")),
         rate_limit_qps=float(os.environ.get("RATE_LIMIT_QPS", "10.0")),
         rate_limit_burst=int(os.environ.get("RATE_LIMIT_BURST", "20")),
-        semantic_overfetch_multiplier=int(
-            os.environ.get("SEMANTIC_OVERFETCH_MULTIPLIER", "2")
-        ),
+        semantic_overfetch_multiplier=int(os.environ.get("SEMANTIC_OVERFETCH_MULTIPLIER", "2")),
     )
 
     redis_defaults = RedisConfig()
     redis = RedisConfig(
         url=os.environ.get("REDIS_URL", redis_defaults.url),
-        scope_l1_size=int(
-            os.environ.get("REDIS_SCOPE_L1_SIZE", str(redis_defaults.scope_l1_size))
-        ),
+        scope_l1_size=int(os.environ.get("REDIS_SCOPE_L1_SIZE", str(redis_defaults.scope_l1_size))),
         scope_l1_ttl_seconds=float(
-            os.environ.get(
-                "REDIS_SCOPE_L1_TTL_SECONDS", str(redis_defaults.scope_l1_ttl_seconds)
-            )
+            os.environ.get("REDIS_SCOPE_L1_TTL_SECONDS", str(redis_defaults.scope_l1_ttl_seconds))
         ),
         scope_l2_ttl_seconds=int(
-            os.environ.get(
-                "REDIS_SCOPE_L2_TTL_SECONDS", str(redis_defaults.scope_l2_ttl_seconds)
-            )
+            os.environ.get("REDIS_SCOPE_L2_TTL_SECONDS", str(redis_defaults.scope_l2_ttl_seconds))
         ),
     )
 
@@ -725,9 +788,7 @@ def load_settings() -> Settings:
     duckdb_pool_env = os.environ.get("DUCKDB_POOL_SIZE")
     duckdb_pool_size = (
         None
-        if duckdb_pool_env is None
-        or not duckdb_pool_env.strip()
-        or duckdb_pool_env.strip() == "0"
+        if duckdb_pool_env is None or not duckdb_pool_env.strip() or duckdb_pool_env.strip() == "0"
         else int(duckdb_pool_env)
     )
     duckdb_config = DuckDBConfig(
@@ -746,6 +807,8 @@ def load_settings() -> Settings:
         },
         pool_size=duckdb_pool_size,
     )
+
+    xtr_dtype_env = (os.environ.get("XTR_DTYPE") or "float16").lower()
 
     return Settings(
         vllm=vllm,
@@ -779,12 +842,15 @@ def load_settings() -> Settings:
             in {"1", "true", "yes"},
             device=os.environ.get("CODERANK_DEVICE", "cpu"),
             batch_size=int(os.environ.get("CODERANK_BATCH", "128")),
-            normalize=os.environ.get("CODERANK_NORMALIZE", "1").lower()
-            in {"1", "true", "yes"},
+            normalize=os.environ.get("CODERANK_NORMALIZE", "1").lower() in {"1", "true", "yes"},
             query_prefix=os.environ.get(
                 "CODERANK_QUERY_PREFIX",
                 "Represent this query for searching relevant code: ",
             ),
+            top_k=int(os.environ.get("CODERANK_TOP_K", "200")),
+            budget_ms=int(os.environ.get("CODERANK_BUDGET_MS", "120")),
+            min_stage2_margin=float(os.environ.get("CODERANK_MARGIN_THRESHOLD", "0.1")),
+            min_stage2_candidates=int(os.environ.get("CODERANK_MIN_STAGE2", "40")),
         ),
         warp=WarpConfig(
             index_dir=os.environ.get("WARP_INDEX_DIR", "indexes/warp_xtr"),
@@ -792,6 +858,16 @@ def load_settings() -> Settings:
             device=os.environ.get("WARP_DEVICE", "cpu"),
             top_k=int(os.environ.get("WARP_TOP_K", "200")),
             enabled=os.environ.get("WARP_ENABLED", "0").lower() in {"1", "true", "yes"},
+            budget_ms=int(os.environ.get("WARP_BUDGET_MS", "180")),
+        ),
+        xtr=XTRConfig(
+            model_id=os.environ.get("XTR_MODEL_ID", "nomic-ai/CodeRankEmbed"),
+            device=os.environ.get("XTR_DEVICE", "cuda"),
+            max_query_tokens=int(os.environ.get("XTR_MAX_QUERY_TOKENS", "256")),
+            candidate_k=int(os.environ.get("XTR_CANDIDATE_K", "200")),
+            dim=int(os.environ.get("XTR_DIM", "768")),
+            dtype="float32" if xtr_dtype_env == "float32" else "float16",
+            enable=os.environ.get("XTR_ENABLE", "0").lower() in {"1", "true", "yes"},
         ),
         coderank_llm=CodeRankLLMConfig(
             model_id=os.environ.get("CODERANK_LLM_MODEL_ID", "nomic-ai/CodeRankLLM"),
@@ -799,8 +875,8 @@ def load_settings() -> Settings:
             max_new_tokens=int(os.environ.get("CODERANK_LLM_MAX_NEW_TOKENS", "256")),
             temperature=float(os.environ.get("CODERANK_LLM_TEMPERATURE", "0.0")),
             top_p=float(os.environ.get("CODERANK_LLM_TOP_P", "1.0")),
-            enabled=os.environ.get("CODERANK_LLM_ENABLED", "0").lower()
-            in {"1", "true", "yes"},
+            enabled=os.environ.get("CODERANK_LLM_ENABLED", "0").lower() in {"1", "true", "yes"},
+            budget_ms=int(os.environ.get("CODERANK_LLM_BUDGET_MS", "300")),
         ),
     )
 
@@ -817,5 +893,6 @@ __all__ = [
     "SpladeConfig",
     "VLLMConfig",
     "WarpConfig",
+    "XTRConfig",
     "load_settings",
 ]

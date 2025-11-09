@@ -125,9 +125,7 @@ class ResidualCodec:
         """
         if torch.is_tensor(bucket_cutoffs) and self.use_gpu:
             bucket_cutoffs = bucket_cutoffs.cuda()
-            bucket_weights = (
-                bucket_weights.cuda() if bucket_weights is not None else None
-            )
+            bucket_weights = bucket_weights.cuda() if bucket_weights is not None else None
 
         if self.use_gpu:
             reversed_bit_map_cuda = reversed_bit_map.cuda()
@@ -186,9 +184,7 @@ class ResidualCodec:
         keys_per_byte = 8 // self.nbits
         if self.bucket_weights is not None:
             decompression_lookup_table = torch.tensor(
-                list(
-                    product(list(range(len(self.bucket_weights))), repeat=keys_per_byte)
-                )
+                list(product(list(range(len(self.bucket_weights))), repeat=keys_per_byte))
             ).to(torch.uint8)
         else:
             decompression_lookup_table = None
@@ -222,15 +218,10 @@ class ResidualCodec:
         decompress_residuals_cpp = load(
             name="decompress_residuals_cpp",
             sources=[
-                str(
-                    pathlib.Path(__file__).parent.resolve() / "decompress_residuals.cpp"
-                ),
-                str(
-                    pathlib.Path(__file__).parent.resolve() / "decompress_residuals.cu"
-                ),
+                str(pathlib.Path(__file__).parent.resolve() / "decompress_residuals.cpp"),
+                str(pathlib.Path(__file__).parent.resolve() / "decompress_residuals.cu"),
             ],
-            verbose=os.getenv("COLBERT_LOAD_TORCH_EXTENSION_VERBOSE", "False")
-            == "True",
+            verbose=os.getenv("COLBERT_LOAD_TORCH_EXTENSION_VERBOSE", "False") == "True",
         )
         cls.decompress_residuals = decompress_residuals_cpp.decompress_residuals_cpp
 
@@ -244,8 +235,7 @@ class ResidualCodec:
                 str(pathlib.Path(__file__).parent.resolve() / "packbits.cpp"),
                 str(pathlib.Path(__file__).parent.resolve() / "packbits.cu"),
             ],
-            verbose=os.getenv("COLBERT_LOAD_TORCH_EXTENSION_VERBOSE", "False")
-            == "True",
+            verbose=os.getenv("COLBERT_LOAD_TORCH_EXTENSION_VERBOSE", "False") == "True",
         )
         cls.packbits = packbits_cpp.packbits_cpp
 
@@ -282,9 +272,7 @@ class ResidualCodec:
         try:
             centroids = torch.load(centroids_path, map_location="cpu")
             avg_residual = torch.load(avgresidual_path, map_location="cpu")
-            bucket_cutoffs, bucket_weights = torch.load(
-                buckets_path, map_location="cpu"
-            )
+            bucket_cutoffs, bucket_weights = torch.load(buckets_path, map_location="cpu")
         except FileNotFoundError as e:
             msg = f"Required codec file not found: {e.filename}"
             raise FileNotFoundError(msg) from e
@@ -397,9 +385,7 @@ class ResidualCodec:
         ValueError
             If dim is not divisible by 8 or (nbits * 8).
         """
-        residuals = torch.bucketize(residuals.float(), self.bucket_cutoffs).to(
-            dtype=torch.uint8
-        )
+        residuals = torch.bucketize(residuals.float(), self.bucket_cutoffs).to(dtype=torch.uint8)
         residuals = residuals.unsqueeze(-1).expand(
             *residuals.size(), self.nbits
         )  # add a new nbits-wide dim
@@ -448,11 +434,7 @@ class ResidualCodec:
         bsize = (1 << 29) // self.centroids.size(0)
         for batch in embs.split(bsize):
             if self.use_gpu:
-                indices = (
-                    (self.centroids @ batch.T.cuda())
-                    .max(dim=0)
-                    .indices.to(device=out_device)
-                )
+                indices = (self.centroids @ batch.T.cuda()).max(dim=0).indices.to(device=out_device)
             else:
                 indices = (
                     (self.centroids @ batch.T.cpu().float())
@@ -463,9 +445,7 @@ class ResidualCodec:
 
         return torch.cat(codes)
 
-    def lookup_centroids(
-        self, codes: torch.Tensor, out_device: str | torch.device
-    ) -> torch.Tensor:
+    def lookup_centroids(self, codes: torch.Tensor, out_device: str | torch.device) -> torch.Tensor:
         """Lookup centroid vectors for given codes.
 
         Retrieves centroid embeddings corresponding to code indices.
@@ -489,9 +469,7 @@ class ResidualCodec:
 
         for batch in codes.split(1 << 20):
             if self.use_gpu:
-                centroids.append(
-                    self.centroids[batch.cuda().long()].to(device=out_device)
-                )
+                centroids.append(self.centroids[batch.cuda().long()].to(device=out_device))
             else:
                 centroids.append(self.centroids[batch.long()].to(device=out_device))
 
@@ -547,9 +525,7 @@ class ResidualCodec:
             if self.use_gpu:
                 d_ = torch.nn.functional.normalize(centroids_, p=2, dim=-1)
             else:
-                d_ = torch.nn.functional.normalize(
-                    centroids_.to(torch.float32), p=2, dim=-1
-                )
+                d_ = torch.nn.functional.normalize(centroids_.to(torch.float32), p=2, dim=-1)
             d.append(d_)
 
         return torch.cat(d)

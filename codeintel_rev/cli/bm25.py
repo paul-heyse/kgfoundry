@@ -72,9 +72,7 @@ def prepare_corpus(
         overwrite: bool,
     ) -> None:
         manager = _create_bm25_manager()
-        summary = manager.prepare_corpus(
-            source, output_dir=output_dir, overwrite=overwrite
-        )
+        summary = manager.prepare_corpus(source, output_dir=output_dir, overwrite=overwrite)
 
         metadata_path = Path(summary.corpus_metadata_path)
         _add_metadata_artifact(env, metadata_path)

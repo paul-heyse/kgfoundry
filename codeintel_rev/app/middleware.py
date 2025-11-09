@@ -55,7 +55,7 @@ import contextvars
 import uuid
 from typing import TYPE_CHECKING
 
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, DispatchFunction
 from starlette.types import ASGIApp
 
 from kgfoundry_common.logging import get_logger
@@ -182,8 +182,8 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
     >>> session_id = response.json()["session_id"]  # Use for subsequent requests
     """
 
-    def __init__(self, app: ASGIApp, **kwargs: object) -> None:
-        super().__init__(app, **kwargs)
+    def __init__(self, app: ASGIApp, dispatch: DispatchFunction | None = None) -> None:
+        super().__init__(app, dispatch)
         self._logger = LOGGER
 
     async def dispatch(  # Required instance method for BaseHTTPMiddleware

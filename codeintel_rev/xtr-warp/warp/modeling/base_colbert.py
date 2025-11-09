@@ -38,9 +38,7 @@ class BaseColBERT(torch.nn.Module):
         HuggingFace tokenizer.
     """
 
-    def __init__(
-        self, name_or_path: str, colbert_config: ColBERTConfig | None = None
-    ) -> None:
+    def __init__(self, name_or_path: str, colbert_config: ColBERTConfig | None = None) -> None:
         super().__init__()
 
         self.colbert_config = ColBERTConfig.from_existing(
@@ -51,12 +49,12 @@ class BaseColBERT(torch.nn.Module):
         try:
             hf_colbert = class_factory(self.name)
         except (ImportError, AttributeError, TypeError):
-            self.name = "bert-base-uncased"  # NOTE: Double check that this is appropriate here in all cases
+            self.name = (
+                "bert-base-uncased"  # NOTE: Double check that this is appropriate here in all cases
+            )
             hf_colbert = class_factory(self.name)
 
-        self.model = hf_colbert.from_pretrained(
-            name_or_path, colbert_config=self.colbert_config
-        )
+        self.model = hf_colbert.from_pretrained(name_or_path, colbert_config=self.colbert_config)
         self.model.to(DEVICE)
         self.raw_tokenizer = AutoTokenizer.from_pretrained(name_or_path)
 
@@ -123,9 +121,7 @@ class BaseColBERT(torch.nn.Module):
             If path ends with .dnn (reserved for deprecated format).
         """
         if path.endswith(".dnn"):
-            msg = (
-                f"{path}: We reserve *.dnn names for the deprecated checkpoint format."
-            )
+            msg = f"{path}: We reserve *.dnn names for the deprecated checkpoint format."
             raise ValueError(msg)
 
         self.model.save_pretrained(path)

@@ -111,9 +111,7 @@ class ConversionContext:
     num_partitions: int
 
 
-def _build_conversion_context(
-    index_path: str, destination_path: str | None
-) -> ConversionContext:
+def _build_conversion_context(index_path: str, destination_path: str | None) -> ConversionContext:
     """Create conversion context by loading the plan and validating paths.
 
     Parameters
@@ -174,13 +172,9 @@ def _load_and_save_metadata(
     dim = ctx.dim
     centroids = torch.load(index_path_obj / "centroids.pt", map_location="cpu")
     if centroids.shape != (num_partitions, dim):
-        msg = (
-            f"centroids.shape must be ({num_partitions}, {dim}), got {centroids.shape}"
-        )
+        msg = f"centroids.shape must be ({num_partitions}, {dim}), got {centroids.shape}"
         raise ValueError(msg)
-    bucket_cutoffs, bucket_weights = torch.load(
-        index_path_obj / "buckets.pt", map_location="cpu"
-    )
+    bucket_cutoffs, bucket_weights = torch.load(index_path_obj / "buckets.pt", map_location="cpu")
     np.save(
         destination_path_obj / "bucket_cutoffs.npy",
         bucket_cutoffs.float().numpy(force=True),
@@ -257,9 +251,7 @@ def _compact_residuals_and_codes(
     tensor_offsets = torch.zeros((centroid_sizes.shape[0],), dtype=torch.int64)
     tensor_offsets[1:] = torch.cumsum(centroid_sizes[:-1], dim=0)
 
-    tensor_compacted_residuals = torch.zeros(
-        (num_residuals, residual_dim), dtype=torch.uint8
-    )
+    tensor_compacted_residuals = torch.zeros((num_residuals, residual_dim), dtype=torch.uint8)
     tensor_compacted_codes = torch.zeros((num_residuals,), dtype=torch.int32)
 
     passage_id = 0
@@ -278,8 +270,7 @@ def _compact_residuals_and_codes(
             raise ValueError(msg)
 
         passage_ids = (
-            torch.repeat_interleave(torch.arange(doclens.shape[0]), doclens).int()
-            + passage_id
+            torch.repeat_interleave(torch.arange(doclens.shape[0]), doclens).int() + passage_id
         )
 
         tensor_idx, tensor_offsets = segmented_index_cumsum(codes, tensor_offsets)
@@ -357,14 +348,11 @@ def _repack_residuals(
         If nbits is not 2 or 4.
     """
     residuals_repacked_compacted = reversed_bit_map[tensor_compacted_residuals.long()]
-    residuals_repacked_compacted_d = decompression_lookup_table[
-        residuals_repacked_compacted.long()
-    ]
+    residuals_repacked_compacted_d = decompression_lookup_table[residuals_repacked_compacted.long()]
     # NOTE This could easily be generalized to arbitrary powers of two.
     if nbits == NBITS_4:
         residuals_repacked_compacted_df = (
-            2**4 * residuals_repacked_compacted_d[:, :, 0]
-            + residuals_repacked_compacted_d[:, :, 1]
+            2**4 * residuals_repacked_compacted_d[:, :, 0] + residuals_repacked_compacted_d[:, :, 1]
         )
     elif nbits == NBITS_2:
         residuals_repacked_compacted_df = (
@@ -378,9 +366,7 @@ def _repack_residuals(
     return residuals_repacked_compacted_df
 
 
-def _build_decompression_lookup(
-    bucket_weights: torch.Tensor, keys_per_byte: int
-) -> torch.Tensor:
+def _build_decompression_lookup(bucket_weights: torch.Tensor, keys_per_byte: int) -> torch.Tensor:
     """Build decompression lookup table from bucket weights.
 
     Parameters
@@ -395,9 +381,9 @@ def _build_decompression_lookup(
     torch.Tensor
         Lookup table tensor of shape (num_combinations, keys_per_byte) with uint8 dtype.
     """
-    return torch.tensor(
-        list(product(list(range(len(bucket_weights))), repeat=keys_per_byte))
-    ).to(torch.uint8)
+    return torch.tensor(list(product(list(range(len(bucket_weights))), repeat=keys_per_byte))).to(
+        torch.uint8
+    )
 
 
 def _validate_nbits(nbits: int) -> None:
@@ -412,9 +398,7 @@ def convert_index(index_path: str, destination_path: str | None = None) -> None:
     _bucket_cutoffs, bucket_weights = _load_and_save_metadata(ctx)
     # Note: IVF (Inverted File) structure is loaded implicitly during metadata processing
 
-    centroid_sizes = _compute_centroid_sizes(
-        ctx.index_path_obj, ctx.num_chunks, ctx.num_partitions
-    )
+    centroid_sizes = _compute_centroid_sizes(ctx.index_path_obj, ctx.num_chunks, ctx.num_partitions)
     residual_dim = (ctx.dim * ctx.nbits) // 8
 
     tensor_compacted_residuals, tensor_compacted_codes = _compact_residuals_and_codes(
@@ -428,9 +412,7 @@ def convert_index(index_path: str, destination_path: str | None = None) -> None:
 
     reversed_bit_map = _build_reversed_bit_map(ctx.nbits)
     keys_per_byte = 8 // ctx.nbits
-    decompression_lookup_table = _build_decompression_lookup(
-        bucket_weights, keys_per_byte
-    )
+    decompression_lookup_table = _build_decompression_lookup(bucket_weights, keys_per_byte)
     _validate_nbits(ctx.nbits)
 
     residuals_repacked_compacted_df = _repack_residuals(

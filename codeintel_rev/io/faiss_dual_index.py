@@ -101,9 +101,7 @@ class FAISSDualIndexManager:
         self._gpu_enabled: bool = False
         self._gpu_disabled_reason: str | None = None
 
-    def set_test_indexes(
-        self, primary: faiss.Index | None, secondary: faiss.Index | None
-    ) -> None:
+    def set_test_indexes(self, primary: faiss.Index | None, secondary: faiss.Index | None) -> None:
         """Set CPU indexes for testing purposes.
 
         This method allows tests to inject CPU indexes directly, bypassing
@@ -225,9 +223,7 @@ class FAISSDualIndexManager:
 
         primary_index = self._select_primary_index()
         secondary_index = self._select_secondary_index()
-        nprobe_effective = (
-            nprobe if nprobe is not None else int(self._settings.faiss_nprobe)
-        )
+        nprobe_effective = nprobe if nprobe is not None else int(self._settings.faiss_nprobe)
 
         query = np.asarray(query_vec, dtype=np.float32)
         if query.ndim == 1:
@@ -315,18 +311,14 @@ class FAISSDualIndexManager:
         self._secondary_cpu.add_with_ids(vectors32, ids)
 
         secondary_path = self._index_dir / "secondary.faiss"
-        await asyncio.to_thread(
-            faiss_module.write_index, self._secondary_cpu, str(secondary_path)
-        )
+        await asyncio.to_thread(faiss_module.write_index, self._secondary_cpu, str(secondary_path))
 
         if self._gpu_enabled:
             if self._gpu_resources is None:
                 self._gpu_enabled = False
                 self._secondary_gpu = None
                 self._primary_gpu = None
-                self._gpu_disabled_reason = (
-                    "GPU resources unavailable during incremental add"
-                )
+                self._gpu_disabled_reason = "GPU resources unavailable during incremental add"
                 LOGGER.warning(
                     "faiss_gpu_incremental_disabled",
                     extra={"reason": self._gpu_disabled_reason},
@@ -414,9 +406,7 @@ class FAISSDualIndexManager:
             return None, reason
 
         try:
-            primary_cpu = await asyncio.to_thread(
-                faiss_module.read_index, str(primary_path)
-            )
+            primary_cpu = await asyncio.to_thread(faiss_module.read_index, str(primary_path))
         except RuntimeError as exc:
             reason = f"Failed to load primary index: {exc}"
             LOGGER.exception(
@@ -427,9 +417,7 @@ class FAISSDualIndexManager:
 
         primary_dim = getattr(primary_cpu, "d", None)
         if primary_dim != self._vec_dim:
-            reason = (
-                f"Dimension mismatch: index={primary_dim}, expected={self._vec_dim}"
-            )
+            reason = f"Dimension mismatch: index={primary_dim}, expected={self._vec_dim}"
             LOGGER.error(
                 "faiss_dimension_mismatch",
                 extra={
@@ -446,9 +434,7 @@ class FAISSDualIndexManager:
         secondary_path = self._index_dir / "secondary.faiss"
         if secondary_path.exists():
             try:
-                return await asyncio.to_thread(
-                    faiss_module.read_index, str(secondary_path)
-                )
+                return await asyncio.to_thread(faiss_module.read_index, str(secondary_path))
             except RuntimeError as exc:
                 LOGGER.exception(
                     "faiss_secondary_load_failed",
@@ -532,9 +518,7 @@ class FAISSDualIndexManager:
             extra={"use_cuvs": bool(getattr(cloner_options, "use_cuvs", False))},
         )
 
-    def _build_gpu_cloner_options(
-        self, faiss_module: ModuleType
-    ) -> faiss.GpuClonerOptions:
+    def _build_gpu_cloner_options(self, faiss_module: ModuleType) -> faiss.GpuClonerOptions:
         cloner_options = faiss_module.GpuClonerOptions()
         requested = bool(self._settings.use_cuvs)
         if hasattr(cloner_options, "use_cuvs"):

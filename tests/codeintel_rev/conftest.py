@@ -27,6 +27,7 @@ from codeintel_rev.config.settings import (
     SpladeConfig,
     VLLMConfig,
     WarpConfig,
+    XTRConfig,
 )
 from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
@@ -101,6 +102,7 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
             coderank_vectors_dir="data/coderank_vectors",
             coderank_faiss_index="data/faiss/coderank.faiss",
             warp_index_dir="indexes/warp_xtr",
+            xtr_dir="data/xtr",
         ),
         index=IndexConfig(
             vec_dim=2560,
@@ -124,6 +126,7 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
         splade=SpladeConfig(),
         coderank=CodeRankConfig(),
         warp=WarpConfig(),
+        xtr=XTRConfig(),
         coderank_llm=CodeRankLLMConfig(),
     )
 
@@ -137,12 +140,14 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
         coderank_vectors_dir=repo_root / "data" / "coderank_vectors",
         coderank_faiss_index=repo_root / "data" / "faiss" / "coderank.faiss",
         warp_index_dir=repo_root / "indexes" / "warp_xtr",
+        xtr_dir=repo_root / "data" / "xtr",
     )
 
     paths.data_dir.mkdir(parents=True, exist_ok=True)
     paths.vectors_dir.mkdir(parents=True, exist_ok=True)
     paths.faiss_index.parent.mkdir(parents=True, exist_ok=True)
     paths.duckdb_path.parent.mkdir(parents=True, exist_ok=True)
+    paths.xtr_dir.mkdir(parents=True, exist_ok=True)
 
     vllm_client = MagicMock(spec=VLLMClient)
     faiss_manager = MagicMock(spec=FAISSManager)

@@ -25,3 +25,18 @@ def test_weighted_rrf_combines_channels() -> None:
 def test_weighted_rrf_rejects_invalid_topk() -> None:
     with pytest.raises(ValueError, match="top_k"):
         weighted_rrf({"coderank": []}, weights={"coderank": 1.0}, k=60, top_k=0)
+
+
+def test_weighted_rrf_applies_minmax_normalization() -> None:
+    _, contributions, _scores = weighted_rrf(
+        {"coderank": [(1, 10.0), (2, 11.0)]},
+        weights={"coderank": 1.0},
+        k=60,
+        top_k=2,
+        normalize="minmax",
+    )
+    coderank_entries = {
+        doc_id: contribs[0][2] for doc_id, contribs in contributions.items()
+    }
+    assert coderank_entries[1] == 0.0
+    assert coderank_entries[2] == 1.0

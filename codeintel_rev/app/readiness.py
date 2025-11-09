@@ -273,6 +273,9 @@ class ReadinessProbe:
         # Check 7: Search tooling available (ripgrep preferred, grep fallback)
         results["search_cli"] = self._check_search_tools()
 
+        # Check 8: XTR artifacts (optional late-interaction)
+        results["xtr_artifacts"] = self._check_xtr_artifacts()
+
         return results
 
     @staticmethod
@@ -307,18 +310,14 @@ class ReadinessProbe:
                 path.mkdir(parents=True, exist_ok=True)
             exists = path.is_dir()
         except OSError as exc:
-            return CheckResult(
-                healthy=False, detail=f"Cannot access directory {path}: {exc}"
-            )
+            return CheckResult(healthy=False, detail=f"Cannot access directory {path}: {exc}")
 
         if not exists:
             return CheckResult(healthy=False, detail=f"Directory missing: {path}")
         return CheckResult(healthy=True)
 
     @staticmethod
-    def check_file(
-        path: Path, *, description: str, optional: bool = False
-    ) -> CheckResult:
+    def check_file(path: Path, *, description: str, optional: bool = False) -> CheckResult:
         """Validate existence of a filesystem resource.
 
         Parameters
@@ -381,9 +380,7 @@ class ReadinessProbe:
         CheckResult
             Healthy status and diagnostic detail when validation fails.
         """
-        file_result = self.check_file(
-            path, description="DuckDB catalog", optional=False
-        )
+        file_result = self.check_file(path, description="DuckDB catalog", optional=False)
         if not file_result.healthy:
             return file_result
 
@@ -393,9 +390,7 @@ class ReadinessProbe:
         try:
             conn = duckdb.connect(str(path))
         except duckdb.Error as exc:
-            return CheckResult(
-                healthy=False, detail=f"Unable to open DuckDB catalog: {exc}"
-            )
+            return CheckResult(healthy=False, detail=f"Unable to open DuckDB catalog: {exc}")
 
         detail: str | None = None
         try:
@@ -417,6 +412,28 @@ class ReadinessProbe:
         if detail is not None:
             return CheckResult(healthy=False, detail=detail)
         return CheckResult(healthy=True)
+
+    def _check_xtr_artifacts(self) -> CheckResult:
+        """Verify that XTR token artifacts are present when enabled.
+
+        Returns
+        -------
+        CheckResult
+            Healthy status describing artifact availability.
+        """
+        cfg = self._context.settings.xtr
+        xtr_dir = self._context.paths.xtr_dir
+        token_name = "tokens.f32" if cfg.dtype == "float32" else "tokens.f16"
+        token_path = xtr_dir / token_name
+        meta_path = xtr_dir / "index.meta.json"
+        expected = [token_path, meta_path]
+        missing = [path for path in expected if not path.exists()]
+        if not missing:
+            return CheckResult(healthy=True)
+        detail = f"Missing XTR artifacts: {', '.join(str(path) for path in missing)}"
+        if cfg.enable:
+            return CheckResult(healthy=False, detail=detail)
+        return CheckResult(healthy=True, detail=detail)
 
     @staticmethod
     def _duckdb_table_exists(conn: duckdb.DuckDBPyConnection) -> bool:

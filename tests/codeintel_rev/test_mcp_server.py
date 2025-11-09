@@ -79,6 +79,7 @@ def mock_context(test_repo: Path) -> ApplicationContext:
         coderank_vectors_dir=test_repo / "data" / "coderank_vectors",
         coderank_faiss_index=test_repo / "data" / "faiss" / "coderank.faiss",
         warp_index_dir=test_repo / "indexes" / "warp_xtr",
+        xtr_dir=test_repo / "data" / "xtr",
     )
 
     # Create minimal mock context

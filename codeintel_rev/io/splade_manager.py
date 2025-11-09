@@ -239,10 +239,7 @@ def _require_sparse_encoder() -> type:
 
 
 def _require_export_helpers() -> tuple[_OptimizerFunction, _QuantizerFunction]:
-    if (
-        export_optimized_onnx_model is None
-        or export_dynamic_quantized_onnx_model is None
-    ):
+    if export_optimized_onnx_model is None or export_dynamic_quantized_onnx_model is None:
         msg = (
             "SPLADE export helpers are unavailable. Upgrade sentence-transformers to a "
             "version providing export_optimized_onnx_model and "
@@ -347,9 +344,7 @@ def _percentile_value(sorted_values: Sequence[float], percentile: float) -> floa
     return lower_value + (upper_value - lower_value) * interpolation
 
 
-def _quantize_tokens(
-    pairs: Sequence[tuple[str, float]], quantization: int
-) -> dict[str, int]:
+def _quantize_tokens(pairs: Sequence[tuple[str, float]], quantization: int) -> dict[str, int]:
     vector: dict[str, int] = {}
     for token, weight in pairs:
         if weight <= 0:
@@ -454,10 +449,7 @@ def _flush_batch(
             msg = "Shard handle unexpectedly missing during encoding."
             raise RuntimeError(msg)
         handle.write(
-            json.dumps(
-                {"id": doc_id, "contents": "", "vector": vector}, ensure_ascii=False
-            )
-            + "\n"
+            json.dumps({"id": doc_id, "contents": "", "vector": vector}, ensure_ascii=False) + "\n"
         )
         state.doc_count += 1
         if state.doc_count % state.shard_size == 0:
@@ -763,25 +755,19 @@ def _persist_export_metadata(
         provider=ctx.provider,
         optimized=ctx.options.optimize,
         quantized=quantized,
-        quantization_config=(
-            ctx.options.quantization_config if ctx.options.quantize else None
-        ),
+        quantization_config=(ctx.options.quantization_config if ctx.options.quantize else None),
         exported_at=datetime.now(UTC).isoformat(),
         generator=GENERATOR_NAME,
     )
     metadata_path = ctx.onnx_dir / ARTIFACT_METADATA_FILENAME
     _write_struct(metadata_path, metadata)
-    return SpladeExportSummary(
-        onnx_file=str(ctx.target_path), metadata_path=str(metadata_path)
-    )
+    return SpladeExportSummary(onnx_file=str(ctx.target_path), metadata_path=str(metadata_path))
 
 
 class SpladeArtifactsManager:
     """Manage SPLADE model exports and ONNX artifacts."""
 
-    def __init__(
-        self, settings: Settings, *, logger_: logging.Logger | None = None
-    ) -> None:
+    def __init__(self, settings: Settings, *, logger_: logging.Logger | None = None) -> None:
         self._settings = settings
         self._logger = logger_ or logging.getLogger(__name__)
         self._repo_root = Path(settings.paths.repo_root).expanduser().resolve()
@@ -809,9 +795,7 @@ class SpladeArtifactsManager:
         """
         return resolve_within_repo(self._repo_root, self._config.onnx_dir)
 
-    def export_onnx(
-        self, options: SpladeExportOptions | None = None
-    ) -> SpladeExportSummary:
+    def export_onnx(self, options: SpladeExportOptions | None = None) -> SpladeExportSummary:
         """Export SPLADE ONNX artifacts and record metadata.
 
         Parameters
@@ -841,9 +825,7 @@ class SpladeArtifactsManager:
             },
         )
 
-        encoder = sparse_encoder_cls(
-            model_id, backend="onnx", model_kwargs={"provider": provider}
-        )
+        encoder = sparse_encoder_cls(model_id, backend="onnx", model_kwargs={"provider": provider})
         encoder.save_pretrained(str(model_dir))
         ctx = _ExportContext(
             model_id=model_id,
@@ -867,9 +849,7 @@ class SpladeArtifactsManager:
 class SpladeEncoderService:
     """Encode corpora into SPLADE JsonVectorCollection shards."""
 
-    def __init__(
-        self, settings: Settings, *, logger_: logging.Logger | None = None
-    ) -> None:
+    def __init__(self, settings: Settings, *, logger_: logging.Logger | None = None) -> None:
         self._settings = settings
         self._logger = logger_ or logging.getLogger(__name__)
         self._repo_root = Path(settings.paths.repo_root).expanduser().resolve()
@@ -984,9 +964,7 @@ class SpladeEncoderService:
         )
         return encoder, selected_relative
 
-    def _build_encoder(
-        self, *, provider: str, onnx_file: str | None
-    ) -> _SparseEncoderProtocol:
+    def _build_encoder(self, *, provider: str, onnx_file: str | None) -> _SparseEncoderProtocol:
         encoder, _ = self._initialise_encoder(provider=provider, onnx_file=onnx_file)
         return encoder
 
@@ -1016,9 +994,7 @@ class SpladeEncoderService:
         """
         opts = options or SpladeEncodeOptions()
 
-        source_path = resolve_within_repo(
-            self._repo_root, source, allow_nonexistent=False
-        )
+        source_path = resolve_within_repo(self._repo_root, source, allow_nonexistent=False)
         vectors_dir = self._resolve_vectors_dir(opts.output_dir)
         batch_size = opts.batch_size or self._config.batch_size
         provider = opts.provider or self._config.provider
@@ -1090,9 +1066,7 @@ class SpladeEncoderService:
             Raised when the query list is empty or the benchmark configuration is invalid.
         """
         normalised = [
-            query.strip()
-            for query in queries
-            if isinstance(query, str) and query.strip()
+            query.strip() for query in queries if isinstance(query, str) and query.strip()
         ]
         if not normalised:
             msg = "At least one non-empty query must be provided for benchmarking."
@@ -1156,9 +1130,7 @@ class SpladeEncoderService:
 class SpladeIndexManager:
     """Build SPLADE Lucene impact indexes from vector collections."""
 
-    def __init__(
-        self, settings: Settings, *, logger_: logging.Logger | None = None
-    ) -> None:
+    def __init__(self, settings: Settings, *, logger_: logging.Logger | None = None) -> None:
         self._settings = settings
         self._logger = logger_ or logging.getLogger(__name__)
         self._repo_root = Path(settings.paths.repo_root).expanduser().resolve()
@@ -1186,9 +1158,7 @@ class SpladeIndexManager:
         """
         return resolve_within_repo(self._repo_root, self._config.index_dir)
 
-    def build_index(
-        self, options: SpladeBuildOptions | None = None
-    ) -> SpladeIndexMetadata:
+    def build_index(self, options: SpladeBuildOptions | None = None) -> SpladeIndexMetadata:
         """Invoke Pyserini to build a SPLADE Lucene impact index.
 
         Parameters
@@ -1224,9 +1194,7 @@ class SpladeIndexManager:
         if index_dir.exists() and options.overwrite:
             shutil.rmtree(index_dir)
         elif index_dir.exists():
-            msg = (
-                f"Index directory {index_dir} already exists and overwrite is disabled."
-            )
+            msg = f"Index directory {index_dir} already exists and overwrite is disabled."
             raise FileExistsError(msg)
 
         env_overrides = os.environ.copy()
@@ -1269,9 +1237,7 @@ class SpladeIndexManager:
         corpus_digest = None
         doc_count: int | None = None
         if metadata_path.exists():
-            metadata = msgspec.json.decode(
-                metadata_path.read_bytes(), type=SpladeEncodingMetadata
-            )
+            metadata = msgspec.json.decode(metadata_path.read_bytes(), type=SpladeEncodingMetadata)
             doc_count = metadata.doc_count
             corpus_digest = metadata.source_path
         pyserini_version = _detect_pyserini_version()
