@@ -162,6 +162,130 @@ def load_top_k(
     return queries, top_k_docs, top_k_pids
 
 
+def _parse_top_k_line(line: str) -> tuple[int, int, list[str]]:
+    """Parse a single line from top-k TSV file.
+
+    Parameters
+    ----------
+    line : str
+        TSV line to parse.
+
+    Returns
+    -------
+    tuple[int, int, list[str]]
+        Tuple of (qid, pid, rest_fields).
+
+    Raises
+    ------
+    ValueError
+        If rest fields count is invalid or label value is invalid.
+    """
+    qid, pid, *rest = line.strip().split("\t")
+    qid, pid = int(qid), int(pid)
+
+    if len(rest) not in {1, 2, 3}:
+        msg = f"Expected 1-3 rest fields, got {len(rest)}"
+        raise ValueError(msg)
+
+    if len(rest) > 1:
+        *_, label = rest
+        label = int(label)
+        if label not in {0, 1}:
+            msg = f"label must be 0 or 1, got {label}"
+            raise ValueError(msg)
+
+    return qid, pid, rest
+
+
+def _validate_top_k_data(
+    top_k_pids: defaultdict[int, list[int]], top_k_positives: defaultdict[int, list[int]]
+) -> None:
+    """Validate top-k data for duplicates and consistency.
+
+    Parameters
+    ----------
+    top_k_pids : defaultdict[int, list[int]]
+        Top-k passage IDs per query.
+    top_k_positives : defaultdict[int, list[int]]
+        Positive passage IDs per query.
+
+    Raises
+    ------
+    ValueError
+        If duplicate PIDs are found in top_k_pids or top_k_positives.
+    """
+    if not all(len(top_k_pids[qid]) == len(set(top_k_pids[qid])) for qid in top_k_pids):
+        msg = "top_k_pids contains duplicate PIDs for some queries"
+        raise ValueError(msg)
+    if not all(
+        len(top_k_positives[qid]) == len(set(top_k_positives[qid])) for qid in top_k_positives
+    ):
+        msg = "top_k_positives contains duplicate PIDs for some queries"
+        raise ValueError(msg)
+
+
+def _normalize_top_k_positives(
+    top_k_pids: defaultdict[int, list[int]],
+    top_k_positives: defaultdict[int, list[int]],
+) -> dict[int, set[int]] | None:
+    """Normalize top-k positives and ensure consistency with top_k_pids.
+
+    Parameters
+    ----------
+    top_k_pids : defaultdict[int, list[int]]
+        Top-k passage IDs per query.
+    top_k_positives : defaultdict[int, list[int]]
+        Positive passage IDs per query.
+
+    Returns
+    -------
+    dict[int, set[int]] | None
+        Normalized positives as sets, or None if empty.
+
+    Raises
+    ------
+    ValueError
+        If length mismatches between top_k_pids and top_k_positives.
+    """
+    if len(top_k_positives) == 0:
+        return None
+
+    if len(top_k_pids) < len(top_k_positives):
+        msg = (
+            f"len(top_k_pids) ({len(top_k_pids)}) must be >= "
+            f"len(top_k_positives) ({len(top_k_positives)})"
+        )
+        raise ValueError(msg)
+
+    # Make them sets for fast lookups later
+    top_k_positives_sets = {qid: set(top_k_positives[qid]) for qid in top_k_positives}
+
+    # Fill missing queries with empty sets
+    for qid in set.difference(set(top_k_pids.keys()), set(top_k_positives_sets.keys())):
+        top_k_positives_sets[qid] = set()
+
+    if len(top_k_pids) != len(top_k_positives_sets):
+        msg = (
+            f"len(top_k_pids) ({len(top_k_pids)}) must equal "
+            f"len(top_k_positives_sets) ({len(top_k_positives_sets)})"
+        )
+        raise ValueError(msg)
+
+    avg_positive = round(
+        sum(len(top_k_positives_sets[qid]) for qid in top_k_positives_sets) / len(top_k_pids), 2
+    )
+
+    print_message(
+        "#> Concurrently got annotations for",
+        len(top_k_positives_sets),
+        "unique queries with",
+        avg_positive,
+        "positives per query on average.\n",
+    )
+
+    return top_k_positives_sets
+
+
 def load_top_k_pids(
     top_k_path: str | pathlib.Path, qrels: OrderedDict[int, list[int]] | None
 ) -> tuple[
@@ -203,82 +327,32 @@ def load_top_k_pids(
             if line_idx and line_idx % (10 * 1000 * 1000) == 0:
                 pass
 
-            qid, pid, *rest = line.strip().split("\t")
-            qid, pid = int(qid), int(pid)
-
+            qid, pid, rest = _parse_top_k_line(line)
             top_k_pids[qid].append(pid)
-
-            if len(rest) not in {1, 2, 3}:
-                msg = f"Expected 1-3 rest fields, got {len(rest)}"
-                raise ValueError(msg)
 
             if len(rest) > 1:
                 *_, label = rest
                 label = int(label)
-                if label not in {0, 1}:
-                    msg = f"label must be 0 or 1, got {label}"
-                    raise ValueError(msg)
-
                 if label >= 1:
                     top_k_positives[qid].append(pid)
 
-    if not all(len(top_k_pids[qid]) == len(set(top_k_pids[qid])) for qid in top_k_pids):
-        msg = "top_k_pids contains duplicate PIDs for some queries"
-        raise ValueError(msg)
-    if not all(
-        len(top_k_positives[qid]) == len(set(top_k_positives[qid])) for qid in top_k_positives
-    ):
-        msg = "top_k_positives contains duplicate PIDs for some queries"
-        raise ValueError(msg)
-
-    # Make them sets for fast lookups later
-    top_k_positives = {qid: set(top_k_positives[qid]) for qid in top_k_positives}
+    _validate_top_k_data(top_k_pids, top_k_positives)
 
     ks = [len(top_k_pids[qid]) for qid in top_k_pids]
 
     print_message("#> max(ks) =", max(ks), ", avg(ks) =", round(sum(ks) / len(ks), 2))
     print_message("#> Loaded the top-k per query for", len(top_k_pids), "unique queries.\n")
 
-    if len(top_k_positives) == 0:
-        top_k_positives = None
-    else:
-        if len(top_k_pids) < len(top_k_positives):
-            msg = (
-                f"len(top_k_pids) ({len(top_k_pids)}) must be >= "
-                f"len(top_k_positives) ({len(top_k_positives)})"
-            )
-            raise ValueError(msg)
+    top_k_positives_normalized = _normalize_top_k_positives(top_k_pids, top_k_positives)
 
-        for qid in set.difference(set(top_k_pids.keys()), set(top_k_positives.keys())):
-            top_k_positives[qid] = []
-
-        if len(top_k_pids) != len(top_k_positives):
-            msg = (
-                f"len(top_k_pids) ({len(top_k_pids)}) must equal "
-                f"len(top_k_positives) ({len(top_k_positives)})"
-            )
-            raise ValueError(msg)
-
-        avg_positive = round(
-            sum(len(top_k_positives[qid]) for qid in top_k_positives) / len(top_k_pids), 2
-        )
-
-        print_message(
-            "#> Concurrently got annotations for",
-            len(top_k_positives),
-            "unique queries with",
-            avg_positive,
-            "positives per query on average.\n",
-        )
-
-    if qrels is not None and top_k_positives is not None:
+    if qrels is not None and top_k_positives_normalized is not None:
         msg = "Cannot have both qrels and an annotated top-K file!"
         raise ValueError(msg)
 
-    if top_k_positives is None:
-        top_k_positives = qrels
+    if top_k_positives_normalized is None:
+        top_k_positives_normalized = qrels
 
-    return top_k_pids, top_k_positives
+    return top_k_pids, top_k_positives_normalized
 
 
 def load_collection(collection_path: str | pathlib.Path) -> list[str]:

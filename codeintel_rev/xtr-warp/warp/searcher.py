@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pathlib
 from collections.abc import Callable
+from dataclasses import dataclass
 
 import torch
 from tqdm import tqdm
@@ -30,6 +31,25 @@ SMALL_K_THRESHOLD = 10
 MEDIUM_K_THRESHOLD = 100
 
 TextQueries = str | list[str] | dict[int, str] | Queries
+
+
+@dataclass(frozen=True)
+class SearchOptions:
+    """Optional parameters for a single query search."""
+
+    filter_fn: Callable[[int], bool] | None = None
+    pids: list[int] | None = None
+    tracker: Tracker = DEFAULT_NOP_TRACKER
+    full_length_search: bool = False
+
+
+@dataclass(frozen=True)
+class BatchSearchOptions(SearchOptions):
+    """Optional parameters for batched search_all."""
+
+    k: int = 10
+    qid_to_pids: dict[str, list[int]] | None = None
+    show_progress: bool = True
 
 
 class Searcher:
@@ -186,12 +206,9 @@ class Searcher:
     def search(
         self,
         text: str,
-        k: int = 10,
-        filter_fn: Callable[[int], bool] | None = None,
-        pids: list[int] | None = None,
-        tracker: Tracker = DEFAULT_NOP_TRACKER,
         *,
-        full_length_search: bool = False,
+        k: int = 10,
+        options: SearchOptions | None = None,
     ) -> tuple[list[int], list[int], list[float]]:
         """Search for top-k documents matching a single query.
 
@@ -201,34 +218,36 @@ class Searcher:
             Query text string.
         k : int
             Number of results to return (default: 10).
-        filter_fn : Callable[[int], bool] | None
-            Optional filter function for passage IDs.
-        full_length_search : bool
-            Whether to use full query length (default: False).
-        pids : list[int] | None
-            Optional list of passage IDs to restrict search to.
-        tracker : Tracker
-            Execution tracker for timing (default: NOPTracker).
+        options : SearchOptions | None
+            Optional search parameters configuration. If provided, may contain:
+            - filter_fn: Optional filter function for passage IDs
+            - full_length_search: Whether to use full query length
+            - pids: Optional list of passage IDs to restrict search to
+            - tracker: Execution tracker for timing
 
         Returns
         -------
         tuple[list[int], list[int], list[float]]
             Tuple of (passage_ids, ranks, scores) for top-k results.
         """
+        opts = options or SearchOptions()
+        tracker = opts.tracker
         tracker.begin("Query Encoding")
-        q = self.encode(text, full_length_search=full_length_search)
+        q = self.encode(text, full_length_search=opts.full_length_search)
         tracker.end("Query Encoding")
-        return self.dense_search(q, k, filter_fn=filter_fn, pids=pids, tracker=tracker)
+        return self.dense_search(
+            q,
+            k,
+            filter_fn=opts.filter_fn,
+            pids=opts.pids,
+            tracker=tracker,
+        )
 
     def search_all(
         self,
         queries: TextQueries,
-        k: int = 10,
-        filter_fn: Callable[[int], bool] | None = None,
-        qid_to_pids: dict[str, list[int]] | None = None,
         *,
-        full_length_search: bool = False,
-        show_progress: bool = True,
+        options: BatchSearchOptions | None = None,
     ) -> Ranking:
         """Search for top-k documents matching multiple queries.
 
@@ -236,59 +255,36 @@ class Searcher:
         ----------
         queries : TextQueries
             Queries to search - can be string, list, dict, or Queries object.
-        k : int
-            Number of results per query (default: 10).
-        filter_fn : Callable[[int], bool] | None
-            Optional filter function for passage IDs.
-        full_length_search : bool
-            Whether to use full query length (default: False).
-        qid_to_pids : dict[str, list[int]] | None
-            Optional mapping from query IDs to allowed passage ID lists.
-        show_progress : bool
-            Whether to show progress bar (default: True).
+        options : BatchSearchOptions | None
+            Optional search parameters configuration.
 
         Returns
         -------
         Ranking
             Ranking object containing results for all queries with provenance.
         """
+        opts = options or BatchSearchOptions()
         queries = Queries.cast(queries)
         queries_ = list(queries.values())
 
-        q = self.encode(queries_, full_length_search=full_length_search)
+        q = self.encode(queries_, full_length_search=opts.full_length_search)
 
-        return self._search_all_q(
-            queries,
-            q,
-            k,
-            filter_fn=filter_fn,
-            qid_to_pids=qid_to_pids,
-            show_progress=show_progress,
-        )
+        return self._search_all_q(queries, q, opts)
 
-    def _search_all_q(
-        self,
-        queries: Queries,
-        q: torch.Tensor,
-        k: int,
-        filter_fn: Callable[[int], bool] | None = None,
-        qid_to_pids: dict[str, list[int]] | None = None,
-        *,
-        show_progress: bool = True,
-    ) -> Ranking:
+    def _search_all_q(self, queries: Queries, q: torch.Tensor, options: BatchSearchOptions) -> Ranking:
+        show_progress = options.show_progress
         qids = list(queries.keys())
-
-        if qid_to_pids is None:
-            qid_to_pids = dict.fromkeys(qids)
+        qid_to_pids = options.qid_to_pids or dict.fromkeys(qids)
 
         all_scored_pids = [
             list(
                 zip(
                     *self.dense_search(
                         q[query_idx : query_idx + 1],
-                        k,
-                        filter_fn=filter_fn,
-                        pids=qid_to_pids[qid],
+                        options.k,
+                        filter_fn=options.filter_fn,
+                        pids=qid_to_pids.get(qid),
+                        tracker=options.tracker,
                     ),
                     strict=False,
                 )
@@ -337,27 +333,7 @@ class Searcher:
         tuple[list[int], list[int], list[float]]
             Tuple of (passage_ids, ranks, scores) for top-k results.
         """
-        if k <= SMALL_K_THRESHOLD:
-            if self.config.ncells is None:
-                self.configure(ncells=1)
-            if self.config.centroid_score_threshold is None:
-                self.configure(centroid_score_threshold=0.5)
-            if self.config.ndocs is None:
-                self.configure(ndocs=256)
-        elif k <= MEDIUM_K_THRESHOLD:
-            if self.config.ncells is None:
-                self.configure(ncells=2)
-            if self.config.centroid_score_threshold is None:
-                self.configure(centroid_score_threshold=0.45)
-            if self.config.ndocs is None:
-                self.configure(ndocs=1024)
-        else:
-            if self.config.ncells is None:
-                self.configure(ncells=4)
-            if self.config.centroid_score_threshold is None:
-                self.configure(centroid_score_threshold=0.4)
-            if self.config.ndocs is None:
-                self.configure(ndocs=max(k * 4, 4096))
+        self._configure_search_parameters(k)
 
         if self.warp_engine:
             pids, scores = self.ranker.rank(
@@ -369,3 +345,23 @@ class Searcher:
             )
 
         return pids[:k], list(range(1, k + 1)), scores[:k]
+
+    def _configure_search_parameters(self, k: int) -> None:
+        if k <= SMALL_K_THRESHOLD:
+            self._apply_search_defaults(ncells=1, centroid_score_threshold=0.5, ndocs=256)
+        elif k <= MEDIUM_K_THRESHOLD:
+            self._apply_search_defaults(ncells=2, centroid_score_threshold=0.45, ndocs=1024)
+        else:
+            self._apply_search_defaults(
+                ncells=4, centroid_score_threshold=0.4, ndocs=max(k * 4, 4096)
+            )
+
+    def _apply_search_defaults(
+        self, *, ncells: int, centroid_score_threshold: float, ndocs: int
+    ) -> None:
+        if self.config.ncells is None:
+            self.configure(ncells=ncells)
+        if self.config.centroid_score_threshold is None:
+            self.configure(centroid_score_threshold=centroid_score_threshold)
+        if self.config.ndocs is None:
+            self.configure(ndocs=ndocs)

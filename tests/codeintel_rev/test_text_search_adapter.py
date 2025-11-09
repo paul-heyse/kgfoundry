@@ -70,7 +70,7 @@ def _build_match(path: Path) -> str:
     )
 
 
-def _run_search(  # noqa: PLR0913
+def _run_search(
     context: Mock,
     query: str,
     *,

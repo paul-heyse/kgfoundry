@@ -189,8 +189,7 @@ async def test_gpu_secondary_clone_reuses_cloner_options(
 
     settings = IndexConfig(vec_dim=vec_dim, use_cuvs=True)
     manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
-    manager._primary_cpu = primary  # noqa: SLF001 - test seeds private state
-    manager._secondary_cpu = secondary  # noqa: SLF001 - test seeds private state
+    manager.set_test_indexes(primary, secondary)
 
     class TorchStub(types.ModuleType):
         """Minimal torch stub exposing the cuda helper used by FAISS."""
@@ -219,7 +218,7 @@ async def test_gpu_secondary_clone_reuses_cloner_options(
         raising=False,
     )
 
-    await manager._try_gpu_clone(  # noqa: SLF001
+    await manager.try_gpu_clone(
         faiss_module
     )
 

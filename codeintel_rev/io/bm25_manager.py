@@ -7,12 +7,7 @@ import json
 import logging
 import shutil
 import sys
-from datetime import datetime, timezone
-
-try:
-    from datetime import UTC
-except ImportError:  # pragma: no cover - compatibility for Python < 3.11
-    UTC = timezone.utc  # noqa: UP017
+from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
 from typing import TYPE_CHECKING

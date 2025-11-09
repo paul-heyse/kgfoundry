@@ -480,7 +480,7 @@ class HybridSearchEngine:
             return provider
 
     def _create_bm25_provider(self) -> BM25SearchProvider:
-        index_dir = self._resolve_path(self._settings.bm25.index_dir)
+        index_dir = self.resolve_path(self._settings.bm25.index_dir)
         return BM25SearchProvider(
             index_dir=index_dir,
             k1=self._settings.index.bm25_k1,
@@ -491,12 +491,25 @@ class HybridSearchEngine:
         splade = self._settings.splade
         return SpladeSearchProvider(
             splade,
-            model_dir=self._resolve_path(splade.model_dir),
-            onnx_dir=self._resolve_path(splade.onnx_dir),
-            index_dir=self._resolve_path(splade.index_dir),
+            model_dir=self.resolve_path(splade.model_dir),
+            onnx_dir=self.resolve_path(splade.onnx_dir),
+            index_dir=self.resolve_path(splade.index_dir),
         )
 
-    def _resolve_path(self, value: str) -> Path:
+    def resolve_path(self, value: str) -> Path:
+        """Resolve a path string to an absolute Path.
+
+        Parameters
+        ----------
+        value : str
+            Path string that may be absolute, relative, or use ~ expansion.
+
+        Returns
+        -------
+        Path
+            Absolute resolved path. If input is absolute, returns as-is.
+            If relative, resolves relative to repository root.
+        """
         candidate = Path(value).expanduser()
         if candidate.is_absolute():
             return candidate

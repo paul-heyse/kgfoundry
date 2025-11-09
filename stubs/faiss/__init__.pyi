@@ -62,12 +62,12 @@ class StandardGpuResources:
     def __init__(self) -> None: ...
 
 class GpuClonerOptions:
-    useFloat16: bool  # noqa: N815
-    useFloat16CoarseQuantizer: bool  # noqa: N815
-    useFloat16LookupTables: bool  # noqa: N815
-    usePrecomputed: bool  # noqa: N815
-    reserveVecs: int  # noqa: N815
-    indicesOptions: int  # noqa: N815
+    useFloat16: bool
+    useFloat16CoarseQuantizer: bool
+    useFloat16LookupTables: bool
+    usePrecomputed: bool
+    reserveVecs: int
+    indicesOptions: int
     use_cuvs: bool
 
     def __init__(self) -> None: ...
@@ -75,7 +75,7 @@ class GpuClonerOptions:
 class GpuIndexFlatIP(Index): ...
 
 def get_num_gpus() -> int: ...
-def normalize_L2(vectors: Float32Array, /) -> None: ...  # noqa: N802
+def normalize_L2(vectors: Float32Array, /) -> None: ...
 def estimate_memory(index: Index) -> float: ...
 def write_index(index: Index, path: str | PathLike[str], /) -> None: ...
 def read_index(path: str | PathLike[str], /) -> Index: ...

@@ -145,7 +145,7 @@ class GitClient:
                     "Invalid Git repository",
                     extra={"repo_path": str(self.repo_path), "error": str(exc)},
                 )
-                raise exc  # noqa: TRY201
+                raise
         return self._repo
 
     def blame_range(self, path: str, start_line: int, end_line: int) -> list[GitBlameEntry]:
@@ -232,7 +232,7 @@ class GitClient:
                 raise FileNotFoundError(msg) from exc
             # Other Git errors (permission denied, etc.)
             LOGGER.exception("Git blame failed", extra={"path": path, "error": str(exc)})
-            raise exc  # noqa: TRY201
+            raise
 
         entries: list[GitBlameEntry] = []
         for commit, line_nums in blame_iter:
@@ -339,7 +339,7 @@ class GitClient:
                 raise FileNotFoundError(msg) from exc
             # Other Git errors
             LOGGER.exception("Git log failed", extra={"path": path, "error": str(exc)})
-            raise exc  # noqa: TRY201
+            raise
 
         commits: list[dict] = []
         for commit in commits_iter:
@@ -434,8 +434,8 @@ class AsyncGitClient:
             return await asyncio.to_thread(
                 self._sync_client.blame_range, path, start_line, end_line
             )
-        except (FileNotFoundError, git.exc.GitCommandError) as exc:
-            raise exc  # noqa: TRY201
+        except (FileNotFoundError, git.exc.GitCommandError):
+            raise
 
     async def file_history(self, path: str, limit: int = 50) -> list[dict]:
         """Async version of file_history (runs in threadpool).
@@ -463,8 +463,8 @@ class AsyncGitClient:
         """
         try:
             return await asyncio.to_thread(self._sync_client.file_history, path, limit)
-        except (FileNotFoundError, git.exc.GitCommandError) as exc:
-            raise exc  # noqa: TRY201
+        except (FileNotFoundError, git.exc.GitCommandError):
+            raise
 
 
 __all__ = ["AsyncGitClient", "GitClient"]

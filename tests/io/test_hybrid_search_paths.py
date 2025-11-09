@@ -31,7 +31,7 @@ def test_resolve_path_absolute() -> None:
 
     absolute = "/var/lib/search-index"
 
-    resolved = engine._resolve_path(  # noqa: SLF001
+    resolved = engine.resolve_path(
         absolute
     )
 
@@ -44,7 +44,7 @@ def test_resolve_path_relative() -> None:
 
     relative = "indices/bm25"
 
-    resolved = engine._resolve_path(  # noqa: SLF001
+    resolved = engine.resolve_path(
         relative
     )
 
@@ -57,7 +57,7 @@ def test_resolve_path_expands_user_home(monkeypatch: pytest.MonkeyPatch, tmp_pat
     fake_home = tmp_path / "fake-home"
     monkeypatch.setenv("HOME", str(fake_home))
 
-    resolved = engine._resolve_path(  # noqa: SLF001
+    resolved = engine.resolve_path(
         "~/.cache/splade"
     )
 

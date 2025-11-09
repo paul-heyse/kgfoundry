@@ -173,7 +173,7 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
     >>> session_id = response.json()["session_id"]  # Use for subsequent requests
     """
 
-    async def dispatch(  # noqa: PLR6301
+    async def dispatch(
         self, request: Request, call_next: Callable[[Request], Response]
     ) -> Response:
         """Process request and inject session ID.

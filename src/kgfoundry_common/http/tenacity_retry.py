@@ -22,7 +22,16 @@ from kgfoundry_common.http.errors import HttpStatusError
 from kgfoundry_common.http.policy import RetryPolicyDoc
 from kgfoundry_common.http.types import RetryStrategy
 
-_RANDOM_SEED: int | None = None
+
+def _get_random_seed() -> int | None:
+    """Get random seed using function attribute pattern.
+
+    Returns
+    -------
+    int | None
+        Random seed value or None if not set.
+    """
+    return getattr(_get_random_seed, "_seed", None)
 
 
 def _set_random_seed(seed: int | None) -> None:
@@ -33,8 +42,7 @@ def _set_random_seed(seed: int | None) -> None:
     seed : int | None
         Random seed value, or None to use system random.
     """
-    global _RANDOM_SEED  # noqa: PLW0603
-    _RANDOM_SEED = seed
+    _get_random_seed._seed = seed  # type: ignore[attr-defined]
 
 
 @dataclass(frozen=True)
@@ -125,11 +133,16 @@ def _rand() -> float:
     Notes
     -----
     This uses standard random for jitter, not cryptographic randomness.
+    Jitter does not require cryptographic security - it's only for spreading
+    retry attempts to avoid thundering herd problems.
     """
-    if _RANDOM_SEED is not None:
-        rng = random.Random(_RANDOM_SEED)  # noqa: S311
+    seed = _get_random_seed()
+    if seed is not None:
+        # Use seeded random for deterministic testing
+        rng = random.Random(seed)  # noqa: S311  # Jitter doesn't need cryptographic randomness
         return rng.random()
-    return random.random()  # noqa: S311
+    # Use module-level random for jitter (non-cryptographic use case)
+    return random.random()  # noqa: S311  # Jitter doesn't need cryptographic randomness
 
 
 def _status_in_sets(status: int, sets: tuple[tuple[int, int] | int, ...]) -> bool:
@@ -225,11 +238,16 @@ class TenacityRetryStrategy(RetryStrategy[object]):
         object
             Result of function execution.
 
-        Raises
-        ------
-        Exception
-            Final exception if all retries are exhausted.
-        """  # noqa: DOC502
+        Notes
+        -----
+        This method may raise any exception that the retried function raises.
+        The tenacity Retrying instance will re-raise the final exception after
+        all retries are exhausted. The actual exception type depends on the
+        function being retried, so we cannot document a specific exception type
+        in the Raises section. This is a known limitation of static analysis
+        when dealing with third-party retry libraries that propagate exceptions
+        from user-provided functions.
+        """
         retry = retry_if_exception(_should_retry_exception(method="*UNKNOWN*", policy=self.policy))
         # note: we'll substitute actual method per-request (see client below)
         stopper = stop_after_attempt(self.policy.stop_after_attempt)
@@ -275,7 +293,7 @@ class TenacityRetryStrategy(RetryStrategy[object]):
 
         # Wrap as a tiny strategy that uses this Retrying instance:
         class _MethodStrategy(RetryStrategy[object]):
-            def run(self, fn: Callable[[], object]) -> object:  # noqa: PLR6301
+            def run(self, fn: Callable[[], object]) -> object:
                 return r(fn)
 
         return _MethodStrategy()

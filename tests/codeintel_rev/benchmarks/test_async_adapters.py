@@ -68,7 +68,7 @@ class _InMemoryScopeStore:
 
     async def get(
         self,
-        session_id: str,  # noqa: ARG002
+        _session_id: str,  # Unused but required by interface
     ) -> dict | None:
         return None
 

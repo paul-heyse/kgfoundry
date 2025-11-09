@@ -410,7 +410,7 @@ def load_policy() -> ObservabilityPolicy:
                 "Failed to parse observability policy YAML: %s", exc
             )
             return policy
-        raise exc  # noqa: TRY201
+        raise
 
     if overrides_raw is None:
         return policy

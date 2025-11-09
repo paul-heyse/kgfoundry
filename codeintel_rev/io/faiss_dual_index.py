@@ -101,6 +101,24 @@ class FAISSDualIndexManager:
         self._gpu_enabled: bool = False
         self._gpu_disabled_reason: str | None = None
 
+    def set_test_indexes(
+        self, primary: faiss.Index | None, secondary: faiss.Index | None
+    ) -> None:
+        """Set CPU indexes for testing purposes.
+
+        This method allows tests to inject CPU indexes directly, bypassing
+        the normal loading mechanism. It is public for testing purposes only.
+
+        Parameters
+        ----------
+        primary : faiss.Index | None
+            Primary CPU index to set.
+        secondary : faiss.Index | None
+            Secondary CPU index to set.
+        """
+        self._primary_cpu = primary
+        self._secondary_cpu = secondary
+
     @property
     def gpu_enabled(self) -> bool:
         """Return ``True`` when GPU acceleration is enabled."""
@@ -154,7 +172,7 @@ class FAISSDualIndexManager:
         self._secondary_cpu = await self._load_secondary_index(faiss_module)
         self._load_manifest()
         self._reset_gpu_state()
-        await self._try_gpu_clone(faiss_module)
+        await self.try_gpu_clone(faiss_module)
 
         LOGGER.info(
             "faiss_ready",
@@ -442,7 +460,17 @@ class FAISSDualIndexManager:
             )
             self._manifest = None
 
-    async def _try_gpu_clone(self, faiss_module: ModuleType) -> None:
+    async def try_gpu_clone(self, faiss_module: ModuleType) -> None:
+        """Attempt to clone CPU indexes to GPU for acceleration.
+
+        This method is public for testing purposes. It attempts to clone
+        both primary and secondary CPU indexes to GPU if CUDA is available.
+
+        Parameters
+        ----------
+        faiss_module : ModuleType
+            FAISS module instance to use for GPU operations.
+        """
         if self._primary_cpu is None or self._secondary_cpu is None:
             return
 

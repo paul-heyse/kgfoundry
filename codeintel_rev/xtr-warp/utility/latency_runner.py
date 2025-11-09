@@ -41,8 +41,10 @@ if __name__ == "__main__":
 
     from utility.runner_utils import make_run_config
     from warp.data.queries import WARPQueries
-    from warp.engine.searcher import WARPSearcher
-    from warp.utils.tracker import ExecutionTracker
+from warp.engine.searcher import WARPSearcher
+from warp.utils.tracker import ExecutionTracker
+
+from warp.searcher import BatchSearchOptions
 
     run_config = make_run_config(config)
 
@@ -58,7 +60,8 @@ if __name__ == "__main__":
     tracker = ExecutionTracker(name="XTR/WARP", steps=steps)
 
     k = config["document_top_k"]
-    rankings = searcher.search_all(queries, k=k, batched=False, tracker=tracker, show_progress=True)
+    options = BatchSearchOptions(k=k, tracker=tracker, show_progress=True)
+    rankings = searcher.search_all(queries, batched=False, options=options)
     metrics = rankings.evaluate(queries.qrels, k=k)
 
     ranker = searcher.searcher.ranker

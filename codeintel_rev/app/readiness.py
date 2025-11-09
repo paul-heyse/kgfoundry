@@ -244,14 +244,14 @@ class ReadinessProbe:
         paths = self._context.paths
 
         # Check 1: Repository root exists
-        results["repo_root"] = self._check_directory(paths.repo_root)
+        results["repo_root"] = self.check_directory(paths.repo_root)
 
         # Check 2: Data directories exist (create if missing)
-        results["data_dir"] = self._check_directory(paths.data_dir, create=True)
-        results["vectors_dir"] = self._check_directory(paths.vectors_dir, create=True)
+        results["data_dir"] = self.check_directory(paths.data_dir, create=True)
+        results["vectors_dir"] = self.check_directory(paths.vectors_dir, create=True)
 
         # Check 3: FAISS index exists
-        results["faiss_index"] = self._check_file(
+        results["faiss_index"] = self.check_file(
             paths.faiss_index,
             description="FAISS index",
             optional=False,
@@ -261,14 +261,14 @@ class ReadinessProbe:
         results["duckdb_catalog"] = self._check_duckdb_catalog(paths.duckdb_path)
 
         # Check 5: SCIP index exists (optional - may be regenerated)
-        results["scip_index"] = self._check_file(
+        results["scip_index"] = self.check_file(
             paths.scip_index,
             description="SCIP index",
             optional=True,
         )
 
         # Check 6: vLLM service reachable
-        results["vllm_service"] = self._check_vllm_connection()
+        results["vllm_service"] = self.check_vllm_connection()
 
         # Check 7: Search tooling available (ripgrep preferred, grep fallback)
         results["search_cli"] = self._check_search_tools()
@@ -276,7 +276,7 @@ class ReadinessProbe:
         return results
 
     @staticmethod
-    def _check_directory(path: Path, *, create: bool = False) -> CheckResult:
+    def check_directory(path: Path, *, create: bool = False) -> CheckResult:
         """Ensure a directory exists (creating it if requested).
 
         Parameters
@@ -294,11 +294,11 @@ class ReadinessProbe:
 
         Examples
         --------
-        >>> result = ReadinessProbe._check_directory(Path("/tmp/test"))
+        >>> result = ReadinessProbe.check_directory(Path("/tmp/test"))
         >>> result.healthy
         True
 
-        >>> result = ReadinessProbe._check_directory(Path("/nonexistent"), create=True)
+        >>> result = ReadinessProbe.check_directory(Path("/nonexistent"), create=True)
         >>> result.healthy
         True  # Directory was created
         """
@@ -314,7 +314,7 @@ class ReadinessProbe:
         return CheckResult(healthy=True)
 
     @staticmethod
-    def _check_file(path: Path, *, description: str, optional: bool = False) -> CheckResult:
+    def check_file(path: Path, *, description: str, optional: bool = False) -> CheckResult:
         """Validate existence of a filesystem resource.
 
         Parameters
@@ -334,13 +334,13 @@ class ReadinessProbe:
 
         Examples
         --------
-        >>> result = ReadinessProbe._check_file(
+        >>> result = ReadinessProbe.check_file(
         ...     Path("/tmp/test.txt"), description="test file", optional=False
         ... )
         >>> result.healthy
         False  # File doesn't exist
 
-        >>> result = ReadinessProbe._check_file(
+        >>> result = ReadinessProbe.check_file(
         ...     Path("/tmp/test.txt"), description="test file", optional=True
         ... )
         >>> result.healthy
@@ -377,7 +377,7 @@ class ReadinessProbe:
         CheckResult
             Healthy status and diagnostic detail when validation fails.
         """
-        file_result = self._check_file(path, description="DuckDB catalog", optional=False)
+        file_result = self.check_file(path, description="DuckDB catalog", optional=False)
         if not file_result.healthy:
             return file_result
 
@@ -481,7 +481,7 @@ class ReadinessProbe:
             detail="Search tooling unavailable: install ripgrep (rg) or provide grep on PATH.",
         )
 
-    def _check_vllm_connection(self) -> CheckResult:
+    def check_vllm_connection(self) -> CheckResult:
         """Verify vLLM service is reachable with a lightweight health check.
 
         Performs a two-phase check:
@@ -495,7 +495,7 @@ class ReadinessProbe:
 
         Examples
         --------
-        >>> result = readiness._check_vllm_connection()
+        >>> result = readiness.check_vllm_connection()
         >>> if result.healthy:
         ...     # vLLM is reachable
         ...     pass

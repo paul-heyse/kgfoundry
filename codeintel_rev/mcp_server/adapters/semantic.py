@@ -29,6 +29,7 @@ from codeintel_rev.mcp_server.schemas import (
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
 from kgfoundry_common.logging import get_logger
+from kgfoundry_common.observability import DurationObservation
 
 if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
@@ -47,7 +48,7 @@ class _ScopeFilterFlags:
     has_languages: bool
 
     @classmethod
-    def from_scope(cls, scope: ScopeIn | None) -> "_ScopeFilterFlags":
+    def from_scope(cls, scope: ScopeIn | None) -> _ScopeFilterFlags:
         """Create flags from an optional ``ScopeIn`` dictionary.
 
         Parameters
@@ -70,8 +71,55 @@ class _ScopeFilterFlags:
     @property
     def has_filters(self) -> bool:
         """Return ``True`` when any of the scope filters are active."""
-
         return self.has_include_globs or self.has_exclude_globs or self.has_languages
+
+
+@dataclass(frozen=True)
+class _FaissFanout:
+    """FAISS fan-out plan produced for a semantic search request."""
+
+    faiss_k: int
+    faiss_k_target: int
+
+
+@dataclass(frozen=True)
+class _HybridSearchState:
+    """Encapsulate the outputs of FAISS prior to hybrid re-ranking."""
+
+    query: str
+    result_ids: Sequence[int]
+    result_scores: Sequence[float]
+    effective_limit: int
+
+
+@dataclass(frozen=True)
+class _HybridResult:
+    """Hydration payload returned after hybrid re-ranking."""
+
+    hydration_ids: list[int]
+    hydration_scores: list[float]
+    contribution_map: dict[int, list[tuple[str, int, float]]] | None
+    retrieval_channels: list[str]
+
+
+@dataclass(frozen=True)
+class _SearchBudget:
+    """Typed representation of the effective limit and metadata."""
+
+    effective_limit: int
+    max_results: int
+    limits_metadata: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _MethodContext:
+    """Inputs required to build method metadata."""
+
+    findings_count: int
+    requested_limit: int
+    effective_limit: int
+    start_time: float
+    retrieval_channels: Sequence[str]
 
 
 async def semantic_search(
@@ -150,10 +198,6 @@ def _semantic_search_sync(
 ) -> AnswerEnvelope:
     start_time = perf_counter()
     with observe_duration("semantic_search", COMPONENT_NAME) as observation:
-        scope_languages = cast("Sequence[str] | None", scope.get("languages")) if scope else None
-        scope_include_globs = (
-            cast("Sequence[str] | None", scope.get("include_globs")) if scope else None
-        )
         scope_flags = _ScopeFilterFlags.from_scope(scope)
 
         LOGGER.debug(
@@ -162,51 +206,35 @@ def _semantic_search_sync(
                 "session_id": session_id,
                 "query": query,
                 "has_scope": scope is not None,
-                "scope_languages": scope_languages,
-                "scope_include_globs": scope_include_globs,
+                "scope_languages": cast("Sequence[str] | None", scope.get("languages"))
+                if scope
+                else None,
+                "scope_include_globs": scope.get("include_globs") if scope else None,
             },
         )
 
-        requested_limit = limit
-        max_results = max(1, context.settings.limits.max_results)
-        effective_limit, truncation_messages = _clamp_result_limit(requested_limit, max_results)
-
-        ready, faiss_limits, faiss_error = context.ensure_faiss_ready()
-        limits_metadata = [*faiss_limits, *truncation_messages]
-        if not ready:
-            observation.mark_error()
-            raise VectorSearchError(
-                faiss_error or "Semantic search not available - index not built",
-                context={"faiss_index": str(context.paths.faiss_index)},
-            )
-
-        embedding, embed_error = _embed_query(context.vllm_client, query)
-        if embedding is None or embed_error is not None:
-            observation.mark_error()
-            raise EmbeddingError(
-                embed_error or "Embedding service unavailable",
-                context={"vllm_url": context.settings.vllm.base_url},
-            )
+        budget = _build_search_budget(context, limit, observation)
+        limits_metadata = [*budget.limits_metadata]
 
         multiplier = max(1, context.settings.limits.semantic_overfetch_multiplier)
-        faiss_k, faiss_k_target = _calculate_faiss_fanout(
-            effective_limit,
-            max_results,
+        fanout = _calculate_faiss_fanout(
+            budget.effective_limit,
+            budget.max_results,
             multiplier,
             scope_flags,
         )
-        if faiss_k < faiss_k_target:
+        if fanout.faiss_k < fanout.faiss_k_target:
             limits_metadata.append(
-                f"FAISS fan-out clamped to {faiss_k} (max_results={max_results})."
+                f"FAISS fan-out clamped to {fanout.faiss_k} (max_results={budget.max_results})."
             )
 
         LOGGER.debug(
             "Computed FAISS fan-out",
             extra={
-                "requested_limit": requested_limit,
-                "effective_limit": effective_limit,
-                "faiss_k": faiss_k,
-                "faiss_k_target": faiss_k_target,
+                "requested_limit": limit,
+                "effective_limit": budget.effective_limit,
+                "faiss_k": fanout.faiss_k,
+                "faiss_k_target": fanout.faiss_k_target,
                 "multiplier": multiplier,
                 "has_scope_filters": scope_flags.has_filters,
                 "has_include_globs": scope_flags.has_include_globs,
@@ -215,99 +243,66 @@ def _semantic_search_sync(
             },
         )
 
-        result_ids, result_scores, search_exc = _run_faiss_search(
-            context.faiss_manager,
-            embedding,
-            faiss_k,
-            nprobe=context.settings.index.faiss_nprobe,
-        )
-        if search_exc is not None:
-            observation.mark_error()
-            raise VectorSearchError(
-                str(search_exc),
-                cause=search_exc,
-                context={"faiss_index": str(context.paths.faiss_index)},
-            )
-
-        retrieval_channels: list[str] = ["semantic", "faiss"]
-        (
-            hydration_ids,
-            hydration_scores,
-            contribution_map,
-            retrieval_channels,
-        ) = _resolve_hybrid_results(
+        result_ids, result_scores = _run_faiss_search_or_raise(
             context,
-            query,
-            result_ids,
-            result_scores,
-            effective_limit,
-            limits_metadata,
-            retrieval_channels,
+            _embed_query_or_raise(
+                context.vllm_client,
+                query,
+                observation,
+                context.settings.vllm.base_url,
+            ),
+            fanout.faiss_k,
+            context.settings.index.faiss_nprobe,
+            observation,
         )
 
-        hydration_ids = hydration_ids[:effective_limit]
-        hydration_scores = hydration_scores[: len(hydration_ids)]
+        hybrid_result = _resolve_hybrid_results(
+            context,
+            _HybridSearchState(query, result_ids, result_scores, budget.effective_limit),
+            limits_metadata,
+            ("semantic", "faiss"),
+        )
 
         findings, hydrate_exc = _hydrate_findings(
             context,
-            hydration_ids,
-            hydration_scores,
+            hybrid_result.hydration_ids,
+            hybrid_result.hydration_scores,
             scope=scope,
         )
-        if hydrate_exc is not None:
-            observation.mark_error()
-            raise VectorSearchError(
-                str(hydrate_exc),
-                cause=hydrate_exc,
-                context={
-                    "duckdb_path": str(context.paths.duckdb_path),
-                    "vectors_dir": str(context.paths.vectors_dir),
-                },
-            )
+        _ensure_hydration_success(hydrate_exc, observation, context)
 
         observation.mark_success()
 
-        if scope and scope_flags.has_filters and len(findings) < effective_limit:
-            LOGGER.warning(
-                "Scope filtering reduced results below requested limit",
-                extra={
-                    "requested_limit": effective_limit,
-                    "actual_count": len(findings),
-                    "faiss_results": len(result_ids),
-                    "has_include_globs": scope_flags.has_include_globs,
-                    "has_exclude_globs": scope_flags.has_exclude_globs,
-                    "has_languages": scope_flags.has_languages,
-                },
-            )
-
-        if contribution_map:
-            for finding in findings:
-                chunk_id_value = finding.get("chunk_id")
-                if chunk_id_value is None:
-                    continue
-                contributions = contribution_map.get(int(chunk_id_value))
-                if not contributions:
-                    continue
-                parts = [f"{channel} rank={rank}" for channel, rank, _ in contributions]
-                finding["why"] = f"Hybrid RRF (k={context.settings.index.rrf_k}): " + ", ".join(
-                    parts
-                )
-
-        method_metadata = _build_method(
+        _warn_scope_filter_reduction(
+            scope,
+            scope_flags,
             len(findings),
-            requested_limit,
-            effective_limit,
-            start_time,
-            retrieval_channels,
+            budget.effective_limit,
+            len(result_ids),
         )
-        extras = _success_extras(limits_metadata, method_metadata)
-        if scope:
-            extras["scope"] = scope
+        _annotate_hybrid_contributions(
+            findings,
+            hybrid_result.contribution_map,
+            context.settings.index.rrf_k,
+        )
 
-        hybrid_enabled = any(channel in {"bm25", "splade"} for channel in retrieval_channels)
+        extras = _build_response_extras(
+            _MethodContext(
+                len(findings),
+                limit,
+                budget.effective_limit,
+                start_time,
+                hybrid_result.retrieval_channels,
+            ),
+            limits_metadata,
+            scope,
+        )
+
         answer_message = (
             f"Found {len(findings)} hybrid results for: {query}"
-            if hybrid_enabled
+            if any(
+                channel in {"bm25", "splade"} for channel in hybrid_result.retrieval_channels
+            )
             else f"Found {len(findings)} semantically similar code chunks for: {query}"
         )
 
@@ -317,6 +312,451 @@ def _semantic_search_sync(
             confidence=0.85 if findings else 0.0,
             extras=extras,
         )
+
+
+def _clamp_result_limit(requested_limit: int, max_results: int) -> tuple[int, list[str]]:
+    """Enforce bounds on requested limit with explanatory metadata.
+
+    Parameters
+    ----------
+    requested_limit : int
+        Client supplied limit from the API call.
+    max_results : int
+        Globally configured maximum number of results.
+
+    Returns
+    -------
+    tuple[int, list[str]]
+        Adjusted limit and zero or more informational messages describing why
+        truncation occurred.
+    """
+    messages: list[str] = []
+    if requested_limit <= 0:
+        messages.append(f"Requested limit {requested_limit} is not positive; using minimum of 1.")
+    if requested_limit > max_results:
+        messages.append(
+            f"Requested limit {requested_limit} exceeds max_results {max_results}; "
+            f"truncating to {max_results}."
+        )
+
+    effective_limit = max(1, min(requested_limit, max_results))
+    return effective_limit, messages
+
+
+def _build_search_budget(
+    context: ApplicationContext,
+    requested_limit: int,
+    observation: DurationObservation,
+) -> _SearchBudget:
+    """Combine limit clamping and FAISS readiness metadata for a search.
+
+    Parameters
+    ----------
+    context : ApplicationContext
+        Application context providing settings and FAISS manager.
+    requested_limit : int
+        Requested result limit from client.
+    observation : DurationObservation
+        Observation block used to mark errors.
+
+    Returns
+    -------
+    _SearchBudget
+        Search budget containing effective limit, max results, and limits metadata.
+
+    Raises
+    ------
+    VectorSearchError
+        If FAISS index is not ready or unavailable.
+    """
+    max_results = max(1, context.settings.limits.max_results)
+    effective_limit, clamp_messages = _clamp_result_limit(requested_limit, max_results)
+
+    ready, faiss_limits, faiss_error = context.ensure_faiss_ready()
+    if not ready:
+        observation.mark_error()
+        raise VectorSearchError(
+            faiss_error or "Semantic search not available - index not built",
+            context={"faiss_index": str(context.paths.faiss_index)},
+        )
+
+    limits_metadata = (*faiss_limits, *clamp_messages)
+    return _SearchBudget(effective_limit, max_results, limits_metadata)
+
+
+def _calculate_faiss_fanout(
+    effective_limit: int,
+    max_results: int,
+    multiplier: int,
+    scope_flags: _ScopeFilterFlags,
+) -> _FaissFanout:
+    """Compute FAISS fan-out (k) and the target expansion for filtering.
+
+    Parameters
+    ----------
+    effective_limit : int
+        Limit after applying clamping rules.
+    max_results : int
+        System-wide cap on FAISS results.
+    multiplier : int
+        Semantic over-fetch multiplier configured in settings.
+    scope_flags : _ScopeFilterFlags
+        Flags describing whether scope filters are active.
+
+    Returns
+    -------
+    _FaissFanout
+        Fan-out plan containing both the actual FAISS ``k`` and the unclamped
+        ``k`` target prior to ``max_results`` enforcement.
+    """
+    faiss_k_target = effective_limit
+    if scope_flags.has_filters:
+        faiss_k_target = effective_limit * multiplier
+        faiss_k_target += _overfetch_bonus(effective_limit, scope_flags)
+
+    faiss_k = max(
+        effective_limit,
+        min(max_results, faiss_k_target),
+    )
+    return _FaissFanout(faiss_k, faiss_k_target)
+
+
+def _overfetch_bonus(effective_limit: int, scope_flags: _ScopeFilterFlags) -> int:
+    """Determine additional fan-out when scope filters may drop results.
+
+    Returns
+    -------
+    int
+        Additional results to fetch beyond effective_limit to account for filtering.
+    """
+    if scope_flags.has_include_globs and scope_flags.has_languages:
+        return effective_limit
+    if scope_flags.has_include_globs or scope_flags.has_languages:
+        return max(1, effective_limit // 2)
+    return 0
+
+
+def _resolve_hybrid_results(
+    context: ApplicationContext,
+    state: _HybridSearchState,
+    limits_metadata: list[str],
+    retrieval_channels: Sequence[str],
+) -> _HybridResult:
+    """Join hybrid retrieval results with the FAISS output when available.
+
+    Parameters
+    ----------
+    context : ApplicationContext
+        Application context that can provide the hybrid search engine.
+    state : _HybridSearchState
+        FAISS search state carrying IDs, scores, query text, and applied limit.
+    limits_metadata : list[str]
+        Mutable metadata bucket for reporting search limitations.
+    retrieval_channels : Sequence[str]
+        Base retrieval channels (semantic + FAISS).
+
+    Returns
+    -------
+    _HybridResult
+        Hydration IDs, scores, optional hybrid contributions, and the final list of
+        retrieval channels that contributed to the answer.
+    """
+    hydration_ids = list(state.result_ids)
+    hydration_scores = list(state.result_scores)
+    contribution_map: dict[int, list[tuple[str, int, float]]] | None = None
+    channels_out = list(retrieval_channels)
+
+    try:
+        hybrid_engine = context.get_hybrid_engine()
+    except RuntimeError as exc:  # pragma: no cover - defensive
+        limits_metadata.append(f"Hybrid search unavailable: {exc}")
+        LOGGER.warning("Hybrid engine unavailable", exc_info=exc)
+        return _build_hybrid_result(
+            hydration_ids,
+            hydration_scores,
+            state.effective_limit,
+            contribution_map,
+            channels_out,
+        )
+
+    if hybrid_engine is None:
+        return _build_hybrid_result(
+            hydration_ids,
+            hydration_scores,
+            state.effective_limit,
+            contribution_map,
+            channels_out,
+        )
+
+    hybrid_result = hybrid_engine.search(
+        query=state.query,
+        semantic_ids=state.result_ids,
+        semantic_scores=state.result_scores,
+        limit=state.effective_limit,
+    )
+    if hybrid_result.warnings:
+        limits_metadata.extend(hybrid_result.warnings)
+
+    fused_ids: list[int] = []
+    fused_scores: list[float] = []
+    fused_contributions: dict[int, list[tuple[str, int, float]]] = {}
+    for doc in hybrid_result.docs:
+        try:
+            chunk_id_int = int(doc.doc_id)
+        except ValueError:
+            limits_metadata.append(f"Hybrid result skipped (non-numeric chunk id): {doc.doc_id}")
+            continue
+
+        fused_ids.append(chunk_id_int)
+        fused_scores.append(float(doc.score))
+        fused_contributions[chunk_id_int] = hybrid_result.contributions.get(doc.doc_id, [])
+
+    if fused_ids:
+        channels_out = list(dict.fromkeys(["semantic", "faiss", *hybrid_result.channels]))
+        return _build_hybrid_result(
+            fused_ids,
+            fused_scores,
+            state.effective_limit,
+            fused_contributions,
+            channels_out,
+        )
+    return _build_hybrid_result(
+        hydration_ids,
+        hydration_scores,
+        state.effective_limit,
+        contribution_map,
+        channels_out,
+    )
+
+
+def _build_hybrid_result(
+    hydration_ids: list[int],
+    hydration_scores: list[float],
+    limit: int,
+    contribution_map: dict[int, list[tuple[str, int, float]]] | None,
+    retrieval_channels: Sequence[str],
+) -> _HybridResult:
+    """Trim FAISS/hybrid candidates to the effective limit.
+
+    Parameters
+    ----------
+    hydration_ids : list[int]
+        Candidate IDs to trim.
+    hydration_scores : list[float]
+        Candidate scores corresponding to IDs.
+    limit : int
+        Maximum number of results to return.
+    contribution_map : dict[int, list[tuple[str, int, float]]] | None
+        Optional contribution map for hybrid results.
+    retrieval_channels : Sequence[str]
+        List of retrieval channels used.
+
+    Returns
+    -------
+    _HybridResult
+        Trimmed result with IDs, scores, contribution map, and channels.
+    """
+    trimmed_ids = hydration_ids[:limit]
+    trimmed_scores = hydration_scores[: len(trimmed_ids)]
+    return _HybridResult(
+        trimmed_ids,
+        trimmed_scores,
+        contribution_map,
+        list(retrieval_channels),
+    )
+
+
+def _embed_query_or_raise(
+    client: VLLMClient,
+    query: str,
+    observation: DurationObservation,
+    vllm_url: str,
+) -> np.ndarray:
+    """Embed text or raise with a structured embedding error.
+
+    Parameters
+    ----------
+    client : VLLMClient
+        vLLM client used to emit the embedding.
+    query : str
+        Query text to embed.
+    observation : DurationObservation
+        Duration observation used for marking failure.
+    vllm_url : str
+        URL used for diagnostics in error contexts.
+
+    Returns
+    -------
+    np.ndarray
+        Normalized query vector with shape (1, dim).
+
+    Raises
+    ------
+    EmbeddingError
+        If embedding fails or service is unavailable.
+    """
+    embedding, embed_error = _embed_query(client, query)
+    if embedding is None or embed_error is not None:
+        observation.mark_error()
+        raise EmbeddingError(
+            embed_error or "Embedding service unavailable",
+            context={"vllm_url": vllm_url},
+        )
+
+    return embedding
+
+
+def _run_faiss_search_or_raise(
+    context: ApplicationContext,
+    query_vector: np.ndarray,
+    limit: int,
+    nprobe: int,
+    observation: DurationObservation,
+) -> tuple[list[int], list[float]]:
+    """Perform FAISS search and raise when the index search fails.
+
+    Parameters
+    ----------
+    context : ApplicationContext
+        Application context providing the FAISS manager and metadata.
+    query_vector : np.ndarray
+        Query vector produced by the embedding service.
+    limit : int
+        Requested fan-out.
+    nprobe : int
+        Number of IVF cells to probe.
+    observation : DurationObservation
+        Observation block used to mark errors.
+
+    Returns
+    -------
+    tuple[list[int], list[float]]
+        Chunk identifiers and their similarity scores.
+
+    Raises
+    ------
+    VectorSearchError
+        If FAISS search fails.
+    """
+    result_ids, result_scores, search_exc = _run_faiss_search(
+        context.faiss_manager,
+        query_vector,
+        limit,
+        nprobe=nprobe,
+    )
+    if search_exc is not None:
+        observation.mark_error()
+        raise VectorSearchError(
+            str(search_exc),
+            cause=search_exc,
+            context={"faiss_index": str(context.paths.faiss_index)},
+        )
+
+    return result_ids, result_scores
+
+
+def _ensure_hydration_success(
+    hydrate_exc: Exception | None,
+    observation: DurationObservation,
+    context: ApplicationContext,
+) -> None:
+    """Stop execution when DuckDB hydration fails.
+
+    Parameters
+    ----------
+    hydrate_exc : Exception | None
+        Exception returned from ``_hydrate_findings``.
+    observation : DurationObservation
+        Observation used to mark the duration as failed.
+    context : ApplicationContext
+        Context for building error metadata.
+
+    Raises
+    ------
+    VectorSearchError
+        If hydration fails.
+    """
+    if hydrate_exc is None:
+        return
+
+    observation.mark_error()
+    raise VectorSearchError(
+        str(hydrate_exc),
+        cause=hydrate_exc,
+        context={
+            "duckdb_path": str(context.paths.duckdb_path),
+            "vectors_dir": str(context.paths.vectors_dir),
+        },
+    )
+
+
+def _warn_scope_filter_reduction(
+    scope: ScopeIn | None,
+    scope_flags: _ScopeFilterFlags,
+    findings_count: int,
+    effective_limit: int,
+    faiss_result_count: int,
+) -> None:
+    """Log when scope filtering reduces the result set below the requested limit.
+
+    Parameters
+    ----------
+    scope : ScopeIn | None
+        Applied scope configuration.
+    scope_flags : _ScopeFilterFlags
+        Flags describing the active scope filters.
+    findings_count : int
+        Number of findings returned to the client.
+    effective_limit : int
+        Limit applied after clamping.
+    faiss_result_count : int
+        Number of results returned from FAISS prior to filtering.
+    """
+    if not (scope and scope_flags.has_filters and findings_count < effective_limit):
+        return
+
+    LOGGER.warning(
+        "Scope filtering reduced results below requested limit",
+        extra={
+            "requested_limit": effective_limit,
+            "actual_count": findings_count,
+            "faiss_results": faiss_result_count,
+            "has_include_globs": scope_flags.has_include_globs,
+            "has_exclude_globs": scope_flags.has_exclude_globs,
+            "has_languages": scope_flags.has_languages,
+        },
+    )
+
+
+def _annotate_hybrid_contributions(
+    findings: list[Finding],
+    contribution_map: dict[int, list[tuple[str, int, float]]] | None,
+    rrf_k: int,
+) -> None:
+    """Attach hybrid contribution narratives to findings when available.
+
+    Parameters
+    ----------
+    findings : list[Finding]
+        Findings returned to the client.
+    contribution_map : dict[int, list[tuple[str, int, float]]] | None
+        Contribution information keyed by chunk id.
+    rrf_k : int
+        Reciprocal rank fusion parameter used for the narrative.
+    """
+    if not contribution_map:
+        return
+
+    for finding in findings:
+        chunk_id_value = finding.get("chunk_id")
+        if chunk_id_value is None:
+            continue
+        contributions = contribution_map.get(int(chunk_id_value))
+        if not contributions:
+            continue
+
+        parts = [f"{channel} rank={rank}" for channel, rank, _ in contributions]
+        finding["why"] = f"Hybrid RRF (k={rrf_k}): " + ", ".join(parts)
 
 
 def _embed_query(client: VLLMClient, query: str) -> tuple[np.ndarray | None, str | None]:
@@ -601,6 +1041,40 @@ def _success_extras(
     extras: dict[str, object] = {"method": method}
     if limits:
         extras["limits"] = list(limits)
+    return extras
+
+
+def _build_response_extras(
+    context: _MethodContext,
+    limits: Sequence[str],
+    scope: ScopeIn | None,
+) -> dict[str, object]:
+    """Build extras payload including method metadata and optional scope.
+
+    Parameters
+    ----------
+    context : _MethodContext
+        Context values required to build method metadata.
+    limits : Sequence[str]
+        Search limitations or warnings.
+    scope : ScopeIn | None
+        Optional scope configuration to include in extras.
+
+    Returns
+    -------
+    dict[str, object]
+        Extras payload dictionary containing method metadata and optional scope.
+    """
+    method_metadata = _build_method(
+        context.findings_count,
+        context.requested_limit,
+        context.effective_limit,
+        context.start_time,
+        context.retrieval_channels,
+    )
+    extras = _success_extras(limits, method_metadata)
+    if scope:
+        extras["scope"] = scope
     return extras
 
 

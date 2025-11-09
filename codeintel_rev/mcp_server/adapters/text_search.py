@@ -48,7 +48,7 @@ class Observation(Protocol):
         """Mark the current operation as failed."""
 
 
-async def search_text(  # noqa: PLR0913 - context parameter required for dependency injection
+async def search_text(
     context: ApplicationContext,
     query: str,
     *,
@@ -108,7 +108,7 @@ async def search_text(  # noqa: PLR0913 - context parameter required for depende
     )
 
 
-def _search_text_sync(  # noqa: PLR0913
+def _search_text_sync(
     context: ApplicationContext,
     session_id: str,
     scope: ScopeIn | None,

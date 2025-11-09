@@ -179,8 +179,10 @@ class PathlibTransformer(cst.CSTTransformer):
         """
         return self._transform_with(original_node, updated_node)
 
-    leave_Call = leave_call  # noqa: N815 - LibCST requires CamelCase visitor names
-    leave_With = leave_with  # noqa: N815 - LibCST requires CamelCase visitor names
+    # LibCST visitor pattern requires these aliases to match AST node names
+    # These are public API methods that must match the visitor interface
+    leave_Call = leave_call  # noqa: N815  # Required by LibCST visitor pattern
+    leave_With = leave_with  # noqa: N815  # Required by LibCST visitor pattern
 
     def _transform_makedirs(self, node: cst.Call) -> cst.BaseExpression | None:
         if not (

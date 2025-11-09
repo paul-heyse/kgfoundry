@@ -355,7 +355,7 @@ def convert_exception_to_envelope(
             },
         )
     elif status >= HTTPStatus.INTERNAL_SERVER_ERROR:
-        LOGGER.exception(  # noqa: LOG004 - intentional exception logging outside handler
+        LOGGER.error(
             "Unexpected error",
             extra={
                 "component": COMPONENT_NAME,

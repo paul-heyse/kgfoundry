@@ -25,7 +25,29 @@ __all__ = ["get_service_context", "reset_service_context"]
 # Protect lazy initialization so concurrent callers do not instantiate the
 # ApplicationContext multiple times.
 _CONTEXT_LOCK = Lock()
-_CACHED_CONTEXT: ApplicationContext | None = None
+
+
+def _get_cached_context() -> ApplicationContext | None:
+    """Get cached context using function attribute pattern.
+
+    Returns
+    -------
+    ApplicationContext | None
+        Cached context instance or None if not yet initialized.
+    """
+    return getattr(_get_cached_context, "_cached", None)
+
+
+def _set_cached_context(context: ApplicationContext | None) -> None:
+    """Set cached context using function attribute pattern.
+
+    Parameters
+    ----------
+    context : ApplicationContext | None
+        Context instance to cache, or None to clear cache.
+    """
+    # Function attribute pattern for thread-safe caching without global state
+    _get_cached_context._cached = context  # type: ignore[attr-defined]  # noqa: SLF001  # Function attribute pattern
 
 
 def get_service_context() -> ApplicationContext:
@@ -42,12 +64,14 @@ def get_service_context() -> ApplicationContext:
         Cached application context instance with settings, resolved paths,
         and long-lived clients (FAISS manager, vLLM client, DuckDB catalog).
     """
-    global _CACHED_CONTEXT  # noqa: PLW0603 - module-level cache protected by lock
-    if _CACHED_CONTEXT is None:
+    cached = _get_cached_context()
+    if cached is None:
         with _CONTEXT_LOCK:
-            if _CACHED_CONTEXT is None:
-                _CACHED_CONTEXT = ApplicationContext.create()
-    return _CACHED_CONTEXT
+            cached = _get_cached_context()
+            if cached is None:
+                cached = ApplicationContext.create()
+                _set_cached_context(cached)
+    return cached
 
 
 def reset_service_context() -> None:
@@ -57,6 +81,5 @@ def reset_service_context() -> None:
     between runs. The next call to :func:`get_service_context` will recreate the
     context from the latest configuration.
     """
-    global _CACHED_CONTEXT  # noqa: PLW0603 - module-level cache protected by lock
     with _CONTEXT_LOCK:
-        _CACHED_CONTEXT = None
+        _set_cached_context(None)

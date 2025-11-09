@@ -16,7 +16,7 @@ from warp.search.strided_tensor_core import (
     create_mask,
     create_view,
 )
-from warp.utils.utils import flatten, print_message
+from warp.utils.utils import print_message
 
 
 class StridedTensor(StridedTensorCore):
@@ -375,6 +375,3 @@ if __name__ == "__main__":
     Note: Pickle loading functionality has been moved to scripts/load_pickle_dev.py
     to avoid security warnings in the main codebase. Use that script for pickle operations.
     """
-    print("Development/testing entry point.")
-    print("For pickle loading, use scripts/load_pickle_dev.py instead.")
-    print("This __main__ block is kept for compatibility but does not execute pickle operations.")

@@ -714,16 +714,16 @@ class FAISSManager:
         This ensures incremental updates are immediately searchable without
         rebuilding the primary index.
 
-        Raises RuntimeError (propagated from `_search_primary()` and
-        `_search_secondary()`) if no index is available or if search fails
+        Raises RuntimeError (propagated from `search_primary()` and
+        `search_secondary()`) if no index is available or if search fails
         (e.g., dimension mismatch, invalid nprobe value).
         """
         # Search primary index
-        primary_dists, primary_ids = self._search_primary(query, k, nprobe)
+        primary_dists, primary_ids = self.search_primary(query, k, nprobe)
 
         # Search secondary index if it exists
         if self.secondary_index is not None:
-            secondary_dists, secondary_ids = self._search_secondary(query, k)
+            secondary_dists, secondary_ids = self.search_secondary(query, k)
             # Merge results by score
             merged_dists, merged_ids = self._merge_results(
                 primary_dists, primary_ids, secondary_dists, secondary_ids, k
@@ -741,10 +741,13 @@ class FAISSManager:
         # No secondary index - return primary results only
         return primary_dists, primary_ids
 
-    def _search_primary(
+    def search_primary(
         self, query: np.ndarray, k: int, nprobe: int
     ) -> tuple[np.ndarray, np.ndarray]:
         """Search the primary index (adaptive type: Flat/IVFFlat/IVF-PQ).
+
+        This method is public for testing and advanced use cases where
+        separate primary/secondary search results are needed.
 
         Parameters
         ----------
@@ -793,8 +796,11 @@ class FAISSManager:
         # Search primary index
         return index.search(query_norm, k)
 
-    def _search_secondary(self, query: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
+    def search_secondary(self, query: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
         """Search the secondary index (flat, no training required).
+
+        This method is public for testing and advanced use cases where
+        separate primary/secondary search results are needed.
 
         Parameters
         ----------

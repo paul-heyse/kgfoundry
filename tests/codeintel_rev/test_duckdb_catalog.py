@@ -23,6 +23,38 @@ from codeintel_rev.io.duckdb_manager import DuckDBQueryOptions
 ALL_CHUNK_IDS = list(range(1, 12))
 
 
+def _safe_sql_path(path: Path, base_path: Path) -> str:
+    """Safely construct SQL path literal for DuckDB read_parquet().
+
+    Validates that the path is within the base directory to prevent path traversal,
+    then escapes single quotes for safe use in SQL string literals.
+
+    Parameters
+    ----------
+    path : Path
+        Path to validate and escape.
+    base_path : Path
+        Base directory that path must be within.
+
+    Returns
+    -------
+    str
+        Escaped path string safe for use in SQL string literal.
+
+    Raises
+    ------
+    ValueError
+        If path is outside base_path directory.
+    """
+    validated = path.resolve()
+    base_resolved = base_path.resolve()
+    if not str(validated).startswith(str(base_resolved)):
+        msg = f"Path {validated} is outside base directory {base_resolved}"
+        raise ValueError(msg)
+    # Escape single quotes for SQL string literal
+    return str(validated).replace("'", "''")
+
+
 def _write_chunks_parquet(path: Path) -> None:
     connection = duckdb.connect(database=":memory:")
     connection.execute("CREATE TABLE tmp (id INTEGER, uri VARCHAR, text VARCHAR)")
@@ -630,10 +662,12 @@ def test_query_by_uri_supports_unlimited_results(tmp_path: Path) -> None:
 
     db_path = tmp_path / "catalog.duckdb"
     catalog = DuckDBCatalog(db_path, vectors_dir)
-    parquet_expr = str(parquet_path).replace("'", "''")
+    # DuckDB's read_parquet() requires a string literal, not a parameter
+    # Path is validated and escaped via helper function to prevent SQL injection
+    safe_path = _safe_sql_path(parquet_path, tmp_path)
     with duckdb.connect(str(db_path)) as connection:
         connection.execute(
-            f"CREATE OR REPLACE VIEW chunks AS SELECT * FROM read_parquet('{parquet_expr}')"  # noqa: S608
+            f"CREATE OR REPLACE VIEW chunks AS SELECT * FROM read_parquet('{safe_path}')"
         )
 
     limited = catalog.query_by_uri("example.py", limit=1)

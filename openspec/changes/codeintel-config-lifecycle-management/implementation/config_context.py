@@ -315,8 +315,8 @@ class ApplicationContext:
         settings = load_settings()
         try:
             paths = resolve_application_paths(settings)
-        except ConfigurationError as exc:
-            raise exc  # noqa: TRY201
+        except ConfigurationError:
+            raise
 
         vllm_client = VLLMClient(settings.vllm)
         faiss_manager = FAISSManager(

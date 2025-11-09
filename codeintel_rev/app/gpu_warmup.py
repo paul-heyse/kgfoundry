@@ -45,11 +45,12 @@ def _check_cuda_availability() -> tuple[bool, str]:
                 device_name,
             )
             return True, f"CUDA available ({device_count} devices)"
-        logger.warning("CUDA not available via PyTorch")
-        return (
-            False,
-            "CUDA not available",
-        )
+        else:
+            logger.warning("CUDA not available via PyTorch")
+            return (
+                False,
+                "CUDA not available",
+            )
     except ImportError:
         logger.warning("PyTorch not available - skipping CUDA check")
         return False, "PyTorch not installed"
@@ -110,10 +111,7 @@ def _test_torch_gpu_operations() -> tuple[bool, str]:
         _ = torch.matmul(test_tensor, test_tensor.T)
         torch.cuda.synchronize()  # Wait for GPU operations to complete
         logger.info("Torch GPU operations test passed")
-        return (
-            True,
-            "Torch GPU operations test passed",
-        )
+        return True, "Torch GPU operations test passed"
     except ImportError:
         return False, "PyTorch not installed"
     except (RuntimeError, OSError, AttributeError) as exc:
@@ -138,10 +136,7 @@ def _test_faiss_gpu_resources() -> tuple[bool, str]:
         # Initialize GPU resources (this is lightweight)
         _ = faiss.StandardGpuResources()
         logger.info("FAISS GPU resource initialization test passed")
-        return (
-            True,
-            "FAISS GPU resource initialization test passed",
-        )
+        return True, "FAISS GPU resource initialization test passed"
     except ImportError:
         return False, "FAISS not installed"
     except (RuntimeError, AttributeError, OSError) as exc:

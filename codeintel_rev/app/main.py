@@ -142,9 +142,9 @@ async def lifespan(
             extra={"error_code": exc.code.value, "context": exc.context},
         )
         raise
-    except Exception as exc:
+    except Exception:
         LOGGER.exception("Unexpected error during application startup")
-        raise exc  # noqa: TRY201
+        raise
 
     try:
         yield

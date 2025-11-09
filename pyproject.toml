@@ -736,6 +736,7 @@ runtime-evaluated-base-classes = [
 "tests/**" = [
     "S404",  # subprocess module is safe in tests with fixed arguments
     "S603",  # subprocess.Popen with list args and shell=False is safe in tests
+    "S608",  # SQL injection warnings in tests - paths validated via _safe_sql_path helper
     "PLC0415",  # Late imports acceptable in test fixtures for module state setup
     "D100",
     "D101",
@@ -769,7 +770,7 @@ runtime-evaluated-base-classes = [
 "tests/kgfoundry_common/**" = []
 "tests/test_namespace_proxy.py" = ["PLC2701", "TID251", "TRY003", "EM101"]  # Tests of internal _namespace_proxy module
 "tests/docs/test_griffe_facade.py" = ["PLC2701"]  # Tests of docs._types and docs._scripts facades; imports from private modules expected
-"**/*.pyi" = ["PIE790"]  # Stub files require ... literals
+"**/*.pyi" = ["PIE790", "N815", "N802"]  # Stub files require ... literals and match external API naming
 "src/kgfoundry/tooling_bridge.py" = ["PLC2701", "TID251"]
 "docs/_types/**" = ["PLC2701"]  # docs._types is a special module namespace for typed facades
 # DOC502 false positives: ruff doesn't recognize `raise exc` as explicitly raising Exception

@@ -261,7 +261,7 @@ def write_diagram(operations: Sequence[OperationEntry]) -> None:
     _write_diagram(list(operations))
 
 
-def _update_cli_index_entry(*, enabled: bool) -> None:
+def update_cli_index_entry(*, enabled: bool) -> None:
     """Ensure the diagrams index links to the CLI diagram when available."""
     entry_token = CLI_INDEX_ENTRY.strip()
     entry_line = CLI_INDEX_ENTRY if CLI_INDEX_ENTRY.endswith("\n") else f"{CLI_INDEX_ENTRY}\n"
@@ -324,7 +324,7 @@ def main() -> None:
         diagram_written = True
     elif operations == []:
         LOGGER.info("No CLI operations discovered in configuration")
-    _update_cli_index_entry(enabled=diagram_written)
+    update_cli_index_entry(enabled=diagram_written)
 
 
 if __name__ == "__main__":  # pragma: no cover - executed by mkdocs

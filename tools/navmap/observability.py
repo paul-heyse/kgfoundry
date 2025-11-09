@@ -247,9 +247,9 @@ def record_operation_metrics(
 
     try:
         yield
-    except Exception as exc:
+    except Exception:
         final_status = "error"
-        raise exc  # noqa: TRY201
+        raise
     finally:
         duration = time.monotonic() - start_time
 

@@ -63,6 +63,87 @@ class ResidualCodec:
 
     Embeddings = ResidualEmbeddings
 
+    def _build_reversed_bit_map(self, nbits: int) -> torch.Tensor:
+        """Build reversed bit map for residual repacking.
+
+        We reverse the residual bits because arange_bits as currently constructed
+        produces results with the reverse of the expected endianness.
+
+        Parameters
+        ----------
+        nbits : int
+            Number of bits per residual component.
+
+        Returns
+        -------
+        torch.Tensor
+            Reversed bit map tensor (256,).
+        """
+        reversed_bit_map = []
+        mask = (1 << nbits) - 1
+        for i in range(256):
+            # The reversed byte
+            z = 0
+            for j in range(8, 0, -nbits):
+                # Extract a subsequence of length n bits
+                x = (i >> (j - nbits)) & mask
+
+                # Reverse the endianness of each bit subsequence (e.g. 10 -> 01)
+                y = 0
+                for k in range(nbits - 1, -1, -1):
+                    y += ((x >> (nbits - k - 1)) & 1) * (2**k)
+
+                # Set the corresponding bits in the output byte
+                z |= y
+                if j > nbits:
+                    z <<= nbits
+            reversed_bit_map.append(z)
+        return torch.tensor(reversed_bit_map).to(torch.uint8)
+
+    def _setup_gpu_resources(
+        self,
+        bucket_cutoffs: torch.Tensor | None,
+        bucket_weights: torch.Tensor | None,
+        reversed_bit_map: torch.Tensor,
+        decompression_lookup_table: torch.Tensor | None,
+    ) -> tuple[torch.Tensor | None, torch.Tensor | None]:
+        """Set up GPU resources for codec.
+
+        Parameters
+        ----------
+        bucket_cutoffs : torch.Tensor | None
+            Bucket cutoffs tensor.
+        bucket_weights : torch.Tensor | None
+            Bucket weights tensor.
+        reversed_bit_map : torch.Tensor
+            Reversed bit map tensor.
+        decompression_lookup_table : torch.Tensor | None
+            Decompression lookup table tensor.
+
+        Returns
+        -------
+        tuple[torch.Tensor | None, torch.Tensor | None]
+            Tuple of (bucket_cutoffs, bucket_weights) moved to GPU if needed.
+        """
+        if torch.is_tensor(bucket_cutoffs) and self.use_gpu:
+            bucket_cutoffs = bucket_cutoffs.cuda()
+            bucket_weights = bucket_weights.cuda() if bucket_weights is not None else None
+
+        if self.use_gpu:
+            reversed_bit_map_cuda = reversed_bit_map.cuda()
+            if decompression_lookup_table is not None:
+                decompression_lookup_table_cuda = decompression_lookup_table.cuda()
+            else:
+                decompression_lookup_table_cuda = None
+        else:
+            reversed_bit_map_cuda = reversed_bit_map
+            decompression_lookup_table_cuda = decompression_lookup_table
+
+        self.reversed_bit_map = reversed_bit_map_cuda
+        self.decompression_lookup_table = decompression_lookup_table_cuda
+
+        return bucket_cutoffs, bucket_weights
+
     def __init__(
         self,
         config: ColBERTConfig,
@@ -85,9 +166,9 @@ class ResidualCodec:
         if torch.is_tensor(self.avg_residual) and self.use_gpu:
             self.avg_residual = self.avg_residual.cuda()
 
-        if torch.is_tensor(bucket_cutoffs) and self.use_gpu:
-            bucket_cutoffs = bucket_cutoffs.cuda()
-            bucket_weights = bucket_weights.cuda()
+        bucket_cutoffs, bucket_weights = self._setup_gpu_resources(
+            bucket_cutoffs, bucket_weights, self._build_reversed_bit_map(self.nbits), None
+        )
 
         self.bucket_cutoffs = bucket_cutoffs
         self.bucket_weights = bucket_weights
@@ -100,43 +181,19 @@ class ResidualCodec:
 
         self.rank = config.rank
 
-        # We reverse the residual bits because arange_bits as
-        # currently constructed produces results with the reverse
-        # of the expected endianness
-        self.reversed_bit_map = []
-        mask = (1 << self.nbits) - 1
-        for i in range(256):
-            # The reversed byte
-            z = 0
-            for j in range(8, 0, -self.nbits):
-                # Extract a subsequence of length n bits
-                x = (i >> (j - self.nbits)) & mask
-
-                # Reverse the endianness of each bit subsequence (e.g. 10 -> 01)
-                y = 0
-                for k in range(self.nbits - 1, -1, -1):
-                    y += ((x >> (self.nbits - k - 1)) & 1) * (2**k)
-
-                # Set the corresponding bits in the output byte
-                z |= y
-                if j > self.nbits:
-                    z <<= self.nbits
-            self.reversed_bit_map.append(z)
-        self.reversed_bit_map = torch.tensor(self.reversed_bit_map).to(torch.uint8)
-
         # A table of all possible lookup orders into bucket_weights
         # given n bits per lookup
         keys_per_byte = 8 // self.nbits
         if self.bucket_weights is not None:
-            self.decompression_lookup_table = torch.tensor(
+            decompression_lookup_table = torch.tensor(
                 list(product(list(range(len(self.bucket_weights))), repeat=keys_per_byte))
             ).to(torch.uint8)
         else:
-            self.decompression_lookup_table = None
-        if self.use_gpu:
-            self.reversed_bit_map = self.reversed_bit_map.cuda()
-            if self.decompression_lookup_table is not None:
-                self.decompression_lookup_table = self.decompression_lookup_table.cuda()
+            decompression_lookup_table = None
+
+        _, _ = self._setup_gpu_resources(
+            bucket_cutoffs, bucket_weights, self.reversed_bit_map, decompression_lookup_table
+        )
 
     @classmethod
     def try_load_torch_extensions(cls, *, use_gpu: bool) -> None:

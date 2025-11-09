@@ -22,6 +22,8 @@ import sys
 import traceback
 from typing import TYPE_CHECKING, cast
 
+import numpy as np
+
 from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
@@ -99,7 +101,6 @@ def check_faiss() -> tuple[bool, dict[str, object]]:
     info: dict[str, object] = {}
     try:
         faiss = cast("_faiss", gate_import("faiss", "GPU diagnostics (faiss)"))
-        import numpy as np  # noqa: PLC0415 - numpy is a required dependency
     except ImportError as exc:
         return False, {"error": f"faiss import failed: {exc}"}
 
@@ -176,21 +177,15 @@ def main() -> None:
     args = ap.parse_args()
 
     # Print diagnostics (print is acceptable for CLI tools)
-    print("=== gpu_doctor ===")  # noqa: T201
-    print()  # noqa: T201
 
     torch_ok: bool | None = None
-    torch_info: dict[str, object] | None = None
     faiss_ok: bool | None = None
-    faiss_info: dict[str, object] | None = None
 
     if not args.faiss_only:
-        torch_ok, torch_info = check_torch(args.device_index)
-        print("[torch]", "OK" if torch_ok else "FAIL", torch_info)  # noqa: T201
+        torch_ok, _torch_info = check_torch(args.device_index)
 
     if not args.torch_only:
-        faiss_ok, faiss_info = check_faiss()
-        print("[faiss]", "OK" if faiss_ok else "FAIL", faiss_info)  # noqa: T201
+        faiss_ok, _faiss_info = check_faiss()
 
     if args.require_gpu:
         failed = (torch_ok is False) or (faiss_ok is False)

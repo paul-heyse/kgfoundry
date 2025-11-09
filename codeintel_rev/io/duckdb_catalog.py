@@ -6,12 +6,13 @@ chunk retrieval and joins.
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager, suppress
+from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 from time import perf_counter
-from typing import TYPE_CHECKING, Self
+from typing import Self
 
 import duckdb
 import numpy as np
@@ -21,11 +22,12 @@ from codeintel_rev.io.duckdb_manager import (
     DuckDBQueryBuilder,
     DuckDBQueryOptions,
 )
+from codeintel_rev.mcp_server.scope_utils import (
+    LANGUAGE_EXTENSIONS,
+    path_matches_glob,
+)
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.prometheus import build_histogram
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
 
 LOGGER = get_logger(__name__)
 
@@ -47,9 +49,26 @@ SELECT
     CAST(NULL AS VARCHAR) AS preview,
     CAST(NULL AS VARCHAR) AS content,
     CAST(NULL AS VARCHAR) AS lang,
-    CAST(NULL AS FLOAT[]) AS embedding
+            CAST(NULL AS FLOAT[]) AS embedding
 WHERE 1 = 0
 """
+
+
+@dataclass(frozen=True)
+class _ScopeFilterSpec:
+    """Structured scope filter metadata used during scoped queries."""
+
+    chunk_ids: tuple[int, ...]
+    simple_include_globs: tuple[str, ...] | None
+    simple_exclude_globs: tuple[str, ...] | None
+    complex_include_patterns: tuple[str, ...]
+    complex_exclude_patterns: tuple[str, ...]
+    language_extensions: frozenset[str]
+
+    @property
+    def has_complex_globs(self) -> bool:
+        """Return ``True`` when complex include/exclude patterns exist."""
+        return bool(self.complex_include_patterns or self.complex_exclude_patterns)
 
 
 class DuckDBCatalog:
@@ -286,7 +305,7 @@ class DuckDBCatalog:
             cols = [desc[0] for desc in relation.description]
         return [dict(zip(cols, row, strict=True)) for row in rows]
 
-    def query_by_filters(  # noqa: C901, PLR0912, PLR0915, PLR0914 - complex filtering logic with SQL generation and post-processing
+    def query_by_filters(
         self,
         ids: Sequence[int],
         *,
@@ -378,57 +397,27 @@ class DuckDBCatalog:
         if not ids:
             return []
 
-        # Measure filtering duration
         start_time = perf_counter()
-
-        # Import LANGUAGE_EXTENSIONS here to avoid circular dependency
-        from codeintel_rev.mcp_server.scope_utils import (  # noqa: PLC0415 - import inside function to avoid circular dependency
-            LANGUAGE_EXTENSIONS,
-            path_matches_glob,
+        spec = self._build_scope_filter_spec(
+            ids,
+            include_globs=include_globs,
+            exclude_globs=exclude_globs,
+            languages=languages,
         )
 
-        # Build base query with ID filtering
-        chunk_ids = list(ids)
-
-        simple_include_globs: list[str] = []
-        complex_include_patterns: list[str] = []
-        simple_exclude_globs: list[str] = []
-        complex_exclude_patterns: list[str] = []
-
-        if include_globs:
-            for pattern in include_globs:
-                if self._is_simple_glob(pattern):
-                    simple_include_globs.append(pattern)
-                else:
-                    complex_include_patterns.append(pattern)
-
-        if exclude_globs:
-            for pattern in exclude_globs:
-                if self._is_simple_glob(pattern):
-                    simple_exclude_globs.append(pattern)
-                else:
-                    complex_exclude_patterns.append(pattern)
-
-        language_extensions: set[str] = set()
-        if languages:
-            for lang in languages:
-                extensions = LANGUAGE_EXTENSIONS.get(lang.lower(), [])
-                language_extensions.update(ext.lower() for ext in extensions)
-            if not language_extensions:
-                duration = perf_counter() - start_time
-                with suppress(ValueError):
-                    _scope_filter_duration_seconds.labels(filter_type="language").observe(duration)
-                return []
+        if languages and not spec.language_extensions:
+            self._observe_scope_filter_duration(start_time, include_globs, exclude_globs, languages)
+            return []
 
         options = DuckDBQueryOptions(
-            include_globs=tuple(simple_include_globs) if simple_include_globs else None,
-            exclude_globs=tuple(simple_exclude_globs) if simple_exclude_globs else None,
+            include_globs=spec.simple_include_globs,
+            exclude_globs=spec.simple_exclude_globs,
             select_columns=("c.*",),
             preserve_order=True,
         )
 
         sql, sql_params = self._query_builder.build_filter_query(
-            chunk_ids=chunk_ids,
+            chunk_ids=spec.chunk_ids,
             options=options,
         )
 
@@ -438,53 +427,168 @@ class DuckDBCatalog:
             cols = [desc[0] for desc in relation.description]
         results = [dict(zip(cols, row, strict=True)) for row in rows]
 
-        # Post-filter complex globs using Python fnmatch
-        if complex_include_patterns or complex_exclude_patterns:
-            filtered_results: list[dict] = []
-            for chunk in results:
-                uri = chunk.get("uri", "")
-                if not isinstance(uri, str):
-                    continue
+        results = self._apply_complex_glob_filters(
+            results,
+            spec.complex_include_patterns,
+            spec.complex_exclude_patterns,
+        )
+        results = self._apply_language_filters(results, spec.language_extensions)
 
-                # Check complex include patterns
-                if complex_include_patterns and not any(
-                    path_matches_glob(uri, pattern) for pattern in complex_include_patterns
-                ):
-                    continue  # Doesn't match any include pattern
+        self._observe_scope_filter_duration(start_time, include_globs, exclude_globs, languages)
+        return results
 
-                # Check complex exclude patterns
-                if complex_exclude_patterns and any(
-                    path_matches_glob(uri, pattern) for pattern in complex_exclude_patterns
-                ):
-                    continue  # Matches an exclude pattern
+    def _build_scope_filter_spec(
+        self,
+        ids: Sequence[int],
+        *,
+        include_globs: list[str] | None,
+        exclude_globs: list[str] | None,
+        languages: list[str] | None,
+    ) -> _ScopeFilterSpec:
+        """Categorize scope filters and language extensions for later processing.
 
+        Parameters
+        ----------
+        ids : Sequence[int]
+            Chunk identifiers provided by FAISS.
+        include_globs : list[str] | None
+            Glob patterns to include via SQL LIKE.
+        exclude_globs : list[str] | None
+            Glob patterns to exclude via SQL LIKE.
+        languages : list[str] | None
+            Language names for extension-based filtering.
+
+        Returns
+        -------
+        _ScopeFilterSpec
+            Structured metadata describing how to materialize the query.
+        """
+        simple_include_globs: list[str] = []
+        complex_include_patterns: list[str] = []
+        simple_exclude_globs: list[str] = []
+        complex_exclude_patterns: list[str] = []
+
+        for patterns, target_simple, target_complex in (
+            (include_globs, simple_include_globs, complex_include_patterns),
+            (exclude_globs, simple_exclude_globs, complex_exclude_patterns),
+        ):
+            if not patterns:
+                continue
+            for pattern in patterns:
+                if self._is_simple_glob(pattern):
+                    target_simple.append(pattern)
+                else:
+                    target_complex.append(pattern)
+
+        language_extensions: set[str] = set()
+        if languages:
+            for lang in languages:
+                extensions = LANGUAGE_EXTENSIONS.get(lang.lower(), [])
+                language_extensions.update(ext.lower() for ext in extensions)
+
+        chunk_ids = tuple(int(chunk_id) for chunk_id in ids)
+
+        return _ScopeFilterSpec(
+            chunk_ids=chunk_ids,
+            simple_include_globs=tuple(simple_include_globs) if simple_include_globs else None,
+            simple_exclude_globs=tuple(simple_exclude_globs) if simple_exclude_globs else None,
+            complex_include_patterns=tuple(complex_include_patterns),
+            complex_exclude_patterns=tuple(complex_exclude_patterns),
+            language_extensions=frozenset(language_extensions),
+        )
+
+    @staticmethod
+    def _apply_complex_glob_filters(
+        results: list[dict],
+        include_patterns: tuple[str, ...],
+        exclude_patterns: tuple[str, ...],
+    ) -> list[dict]:
+        """Run Python filtering for complex glob patterns not expressible in SQL.
+
+        Returns
+        -------
+        list[dict]
+            Filtered results matching include/exclude glob patterns.
+        """
+        if not include_patterns and not exclude_patterns:
+            return results
+
+        filtered_results: list[dict] = []
+        for chunk in results:
+            uri = chunk.get("uri", "")
+            if not isinstance(uri, str):
+                continue
+
+            if include_patterns and not any(
+                path_matches_glob(uri, pattern) for pattern in include_patterns
+            ):
+                continue
+
+            if exclude_patterns and any(
+                path_matches_glob(uri, pattern) for pattern in exclude_patterns
+            ):
+                continue
+
+            filtered_results.append(chunk)
+
+        return filtered_results
+
+    @staticmethod
+    def _apply_language_filters(
+        results: list[dict],
+        language_extensions: frozenset[str],
+    ) -> list[dict]:
+        """Filter results by normalized file extensions.
+
+        Returns
+        -------
+        list[dict]
+            Filtered results matching language extensions.
+        """
+        if not language_extensions:
+            return results
+
+        filtered_results: list[dict] = []
+        for chunk in results:
+            uri = chunk.get("uri", "")
+            if not isinstance(uri, str):
+                continue
+            uri_lower = uri.lower()
+            if any(uri_lower.endswith(ext) for ext in language_extensions):
                 filtered_results.append(chunk)
-            results = filtered_results
+        return filtered_results
 
-        # Post-filter languages when requested extensions were found
-        if language_extensions:
-            filtered_results = []
-            for chunk in results:
-                uri = chunk.get("uri", "")
-                if not isinstance(uri, str):
-                    continue
-                uri_lower = uri.lower()
-                if any(uri_lower.endswith(ext) for ext in language_extensions):
-                    filtered_results.append(chunk)
-            results = filtered_results
-
-        # Record filtering duration
+    def _observe_scope_filter_duration(
+        self,
+        start_time: float,
+        include_globs: list[str] | None,
+        exclude_globs: list[str] | None,
+        languages: list[str] | None,
+    ) -> None:
+        """Record how long scope filtering took for observability."""
         duration = perf_counter() - start_time
-        filter_type = "none"
-        if include_globs or exclude_globs:
-            filter_type = "combined" if languages else "glob"
-        elif languages:
-            filter_type = "language"
-        # Record metric (may fail in test environments without Prometheus registry)
+        filter_type = self._determine_filter_type(include_globs, exclude_globs, languages)
         with suppress(ValueError):
             _scope_filter_duration_seconds.labels(filter_type=filter_type).observe(duration)
 
-        return results
+    @staticmethod
+    def _determine_filter_type(
+        include_globs: list[str] | None,
+        exclude_globs: list[str] | None,
+        languages: list[str] | None,
+    ) -> str:
+        """Format the filter type label used for Prometheus metrics.
+
+        Returns
+        -------
+        str
+            Filter type label: "combined", "glob", "language", or "none".
+        """
+        if include_globs or exclude_globs:
+            return "combined" if languages else "glob"
+        if languages:
+            return "language"
+        return "none"
 
     @staticmethod
     def _is_simple_glob(pattern: str) -> bool:

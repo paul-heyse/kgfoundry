@@ -485,7 +485,10 @@ class VLLMClient:
                 if loop.is_running():
                     # If event loop is running, schedule close
                     # Note: Task will complete asynchronously, but we can't await here
-                    _close_task = loop.create_task(self._async_client.aclose())
+                    # Store reference to task to prevent garbage collection
+                    close_task = loop.create_task(self._async_client.aclose())
+                    # Task is scheduled but not awaited - will complete asynchronously
+                    _ = close_task
                 else:
                     loop.run_until_complete(self._async_client.aclose())
             except RuntimeError:

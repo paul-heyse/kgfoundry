@@ -17,6 +17,7 @@ from warp.data.queries import WARPQueries
 from warp.data.ranking import WARPRanking, WARPRankingItem, WARPRankingItems
 from warp.engine.config import WARPRunConfig
 from warp.infra import Run, RunConfig
+from warp.searcher import BatchSearchOptions, SearchOptions
 from warp.utils.tracker import DEFAULT_NOP_TRACKER, NOPTracker
 
 
@@ -109,9 +110,8 @@ class WARPSearcher:
             k = self.config.k
         if isinstance(queries, WARPQueries):
             queries = queries.queries
-        ranking = self.searcher.search_all(
-            queries, k=k, tracker=tracker, show_progress=show_progress
-        )
+        options = BatchSearchOptions(k=k, tracker=tracker, show_progress=show_progress)
+        ranking = self.searcher.search_all(queries, options=options)
         if self.collection_map is not None:
             ranking.apply_collection_map(self.collection_map)
         return WARPRanking(ranking)
@@ -129,7 +129,8 @@ class WARPSearcher:
         results = WARPRankingItems()
         for qid, qtext in tqdm(queries, disable=not show_progress):
             tracker.next_iteration()
-            results += WARPRankingItem(qid=qid, results=self.search(qtext, k=k, tracker=tracker))
+            options = SearchOptions(tracker=tracker)
+            results += WARPRankingItem(qid=qid, results=self.search(qtext, k=k, options=options))
             tracker.end_iteration()
         return results.finalize(self, queries.provenance(source="Searcher::search", k=k))
 
