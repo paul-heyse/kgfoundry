@@ -10,6 +10,7 @@ Examples
 >>> logger = get_logger(__name__)
 >>> logger.info("Operation started", extra={"operation": "search", "status": "started"})
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -974,7 +975,9 @@ class _WithFieldsContext(AbstractContextManager[LoggerAdapter]):
             Logger adapter with structured fields injected.
         """
         base_logger = (
-            self._logger.logger if isinstance(self._logger, LoggerAdapter) else self._logger
+            self._logger.logger
+            if isinstance(self._logger, LoggerAdapter)
+            else self._logger
         )
         correlation_id = self._fields.get("correlation_id")
         if isinstance(correlation_id, str):

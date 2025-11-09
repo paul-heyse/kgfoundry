@@ -32,7 +32,13 @@ from kgfoundry_common.logging import (
 if TYPE_CHECKING:
     import logging
 
-__all__ = ["LogValue", "LoggerAdapter", "StructuredLoggerAdapter", "get_logger", "with_fields"]
+__all__ = [
+    "LogValue",
+    "LoggerAdapter",
+    "StructuredLoggerAdapter",
+    "get_logger",
+    "with_fields",
+]
 
 # Type alias for log values (same as Any, but more explicit)
 type LogValue = Any
@@ -65,7 +71,9 @@ def get_logger(name: str) -> LoggerAdapter:
     return _get_logger_base(name)
 
 
-def with_fields(logger: logging.Logger | LoggerAdapter, **fields: LogValue) -> LoggerAdapter:
+def with_fields(
+    logger: logging.Logger | LoggerAdapter, **fields: LogValue
+) -> LoggerAdapter:
     """Return a structured adapter bound to ``fields``.
 
     This function wraps the logger with a LoggerAdapter that merges the

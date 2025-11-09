@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import tempfile
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast
 
@@ -19,7 +19,11 @@ from tools.docstring_builder.builder_types import DocstringBuildResult, ExitStat
 from tools.docstring_builder.cache import DocstringBuilderCache
 from tools.docstring_builder.config import BuilderConfig, ConfigSelection
 from tools.docstring_builder.config_models import CachePolicy, DocstringBuildConfig
-from tools.docstring_builder.orchestrator import run_build, run_docstring_builder, run_legacy
+from tools.docstring_builder.orchestrator import (
+    run_build,
+    run_docstring_builder,
+    run_legacy,
+)
 
 
 class _AnyCallable(Protocol):
@@ -75,14 +79,18 @@ def _install_stubbed_pipeline(
 ) -> tuple[_PipelineCapture, DocstringBuildResult, BuilderConfig]:
     capture = _PipelineCapture()
     builder_config = BuilderConfig()
-    config_selection = ConfigSelection(path=Path("docstring_builder.toml"), source="default")
+    config_selection = ConfigSelection(
+        path=Path("docstring_builder.toml"), source="default"
+    )
 
     monkeypatch.setattr(
         orchestrator_module,
         "load_builder_config",
         lambda _override=None: (builder_config, config_selection),
     )
-    monkeypatch.setattr(orchestrator_module, "select_files", lambda *_: [Path("src/module.py")])
+    monkeypatch.setattr(
+        orchestrator_module, "select_files", lambda *_: [Path("src/module.py")]
+    )
 
     result = DocstringBuildResult(
         exit_status=ExitStatus.SUCCESS,
@@ -98,12 +106,16 @@ def _install_stubbed_pipeline(
     def fake_run_pipeline(
         invocation: orchestrator_module._PipelineInvocation,
     ) -> DocstringBuildResult:
-        capture.files = list(invocation.files)
-        capture.request = invocation.request
-        capture.config = invocation.config
-        capture.selection = invocation.selection
-        capture.cache = invocation.cache
-        capture.plugins_enabled = invocation.plugins_enabled
+        nonlocal capture
+        capture = replace(
+            capture,
+            files=list(invocation.files),
+            request=invocation.request,
+            config=invocation.config,
+            selection=invocation.selection,
+            cache=invocation.cache,
+            plugins_enabled=invocation.plugins_enabled,
+        )
         return result
 
     monkeypatch.setattr(orchestrator_module, "_run_pipeline", fake_run_pipeline)
@@ -129,7 +141,9 @@ class TestRunBuild:
         tmp_path: Path,
     ) -> None:
         """run_build() should execute the pipeline and return its result."""
-        capture, expected_result, _builder_config = _install_stubbed_pipeline(monkeypatch)
+        capture, expected_result, _builder_config = _install_stubbed_pipeline(
+            monkeypatch
+        )
         cache = RecordingCache(tmp_path / "cache.json")
 
         actual = run_build(config=DocstringBuildConfig(), cache=cache)
@@ -203,7 +217,9 @@ class TestRunBuild:
     ) -> None:
         """run_build() should raise TimeoutError when execution exceeds limit."""
         builder_config = BuilderConfig()
-        config_selection = ConfigSelection(path=Path("docstring_builder.toml"), source="default")
+        config_selection = ConfigSelection(
+            path=Path("docstring_builder.toml"), source="default"
+        )
 
         monkeypatch.setattr(
             orchestrator_module,
@@ -258,7 +274,9 @@ class TestRunLegacy:
     def test_run_legacy_warning_message_guides_migration(self) -> None:
         """Verify deprecation message guides users to new API."""
         with (
-            pytest.warns(DeprecationWarning, match="Use run_build\\(config=.*\\) instead"),
+            pytest.warns(
+                DeprecationWarning, match="Use run_build\\(config=.*\\) instead"
+            ),
             pytest.raises(NotImplementedError),
         ):
             run_legacy()

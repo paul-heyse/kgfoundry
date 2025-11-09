@@ -105,13 +105,17 @@ def multi_device_guard_fixture() -> MultiDeviceGuard:
 class TestFirstOrError:
     """Tests for first_or_error guard function."""
 
-    def test_valid_sequence_returns_first_element(self, sequence_guard: SequenceGuard) -> None:
+    def test_valid_sequence_returns_first_element(
+        self, sequence_guard: SequenceGuard
+    ) -> None:
         """Verify first_or_error returns first element for non-empty sequence."""
         devices = [0, 1, 2]
         result = sequence_guard(devices, context="test_devices")
         assert result == 0
 
-    def test_valid_tuple_returns_first_element(self, sequence_guard: SequenceGuard) -> None:
+    def test_valid_tuple_returns_first_element(
+        self, sequence_guard: SequenceGuard
+    ) -> None:
         """Verify first_or_error works with tuples."""
         devices = (10, 20, 30)
         result = sequence_guard(devices, context="test_tuple")
@@ -123,7 +127,9 @@ class TestFirstOrError:
         result = sequence_guard(devices, context="single_element")
         assert result == 42
 
-    def test_empty_list_raises_vector_search_error(self, sequence_guard: SequenceGuard) -> None:
+    def test_empty_list_raises_vector_search_error(
+        self, sequence_guard: SequenceGuard
+    ) -> None:
         """Verify empty list raises VectorSearchError with Problem Details."""
         with pytest.raises(VectorSearchError) as exc_info:
             sequence_guard([], context="empty_devices")
@@ -132,7 +138,9 @@ class TestFirstOrError:
         assert "empty" in str(error).lower()
         assert "sequence is empty" in str(error)
 
-    def test_empty_tuple_raises_vector_search_error(self, sequence_guard: SequenceGuard) -> None:
+    def test_empty_tuple_raises_vector_search_error(
+        self, sequence_guard: SequenceGuard
+    ) -> None:
         """Verify empty tuple raises VectorSearchError."""
         with pytest.raises(VectorSearchError) as exc_info:
             sequence_guard((), context="gpu_devices")
@@ -155,7 +163,9 @@ class TestFirstOrError:
         with pytest.raises(VectorSearchError):
             sequence_guard(empty_seq, context="various_sequences")
 
-    def test_error_includes_context_information(self, sequence_guard: SequenceGuard) -> None:
+    def test_error_includes_context_information(
+        self, sequence_guard: SequenceGuard
+    ) -> None:
         """Verify error message includes provided context."""
         context_str = "my_special_context"
         with pytest.raises(VectorSearchError) as exc_info:
@@ -196,13 +206,17 @@ class TestFirstOrError:
 class TestFirstOrErrorMultiDevice:
     """Tests for first_or_error_multi_device specialized variant."""
 
-    def test_valid_devices_returns_first(self, multi_device_guard: MultiDeviceGuard) -> None:
+    def test_valid_devices_returns_first(
+        self, multi_device_guard: MultiDeviceGuard
+    ) -> None:
         """Verify multi-device variant returns first element."""
         gpu_indices = [0, 1, 2]
         result = multi_device_guard(gpu_indices)
         assert result == 0
 
-    def test_empty_devices_raises_error(self, multi_device_guard: MultiDeviceGuard) -> None:
+    def test_empty_devices_raises_error(
+        self, multi_device_guard: MultiDeviceGuard
+    ) -> None:
         """Verify empty device list raises VectorSearchError."""
         with pytest.raises(VectorSearchError) as exc_info:
             multi_device_guard([])
@@ -211,7 +225,9 @@ class TestFirstOrErrorMultiDevice:
         assert "FAISS GPU cloning failed" in str(error)
         assert "empty" in str(error).lower()
 
-    def test_custom_context_parameter(self, multi_device_guard: MultiDeviceGuard) -> None:
+    def test_custom_context_parameter(
+        self, multi_device_guard: MultiDeviceGuard
+    ) -> None:
         """Verify custom context is used in error message."""
         custom_context = "my_gpu_list"
         with pytest.raises(VectorSearchError) as exc_info:
@@ -225,7 +241,9 @@ class TestFirstOrErrorMultiDevice:
         result = multi_device_guard([42])
         assert result == 42
 
-    def test_error_mentions_gpu_context(self, multi_device_guard: MultiDeviceGuard) -> None:
+    def test_error_mentions_gpu_context(
+        self, multi_device_guard: MultiDeviceGuard
+    ) -> None:
         """Verify error specifically mentions GPU/FAISS context."""
         with pytest.raises(VectorSearchError) as exc_info:
             multi_device_guard([])
@@ -257,7 +275,9 @@ class TestFirstOrErrorMultiDevice:
 class TestErrorObservability:
     """Tests for observability aspects of guards (logs, metrics)."""
 
-    def test_error_is_vector_search_error_type(self, sequence_guard: SequenceGuard) -> None:
+    def test_error_is_vector_search_error_type(
+        self, sequence_guard: SequenceGuard
+    ) -> None:
         """Verify guard raises the correct exception type."""
         with pytest.raises(VectorSearchError):
             sequence_guard([], context="test")
@@ -265,7 +285,9 @@ class TestErrorObservability:
         # Guard should raise VectorSearchError, not generic IndexError or ValueError
         # This is verified by the pytest.raises above
 
-    def test_preserves_exception_cause_chain(self, sequence_guard: SequenceGuard) -> None:
+    def test_preserves_exception_cause_chain(
+        self, sequence_guard: SequenceGuard
+    ) -> None:
         """Verify exception cause chain is clean (raised from None)."""
         with pytest.raises(VectorSearchError) as exc_info:
             sequence_guard([], context="test")

@@ -41,7 +41,9 @@ def _get_underlying_index(cpu_index: Any) -> Any:
     Any
         Underlying FAISS index instance.
     """
-    assert hasattr(cpu_index, "index"), "Expected FAISS index wrapper to expose `index` attribute"
+    assert hasattr(
+        cpu_index, "index"
+    ), "Expected FAISS index wrapper to expose `index` attribute"
     index_map = cast("faiss.IndexIDMap2", cpu_index)
     return index_map.index
 
@@ -80,7 +82,9 @@ def tmp_index_path(tmp_path: Path) -> Path:
         (10000, "ivf_flat"),  # Medium corpus: 5K-50K
     ],
 )
-def test_adaptive_index_selection(tmp_index_path: Path, n_vectors: int, expected_type: str) -> None:
+def test_adaptive_index_selection(
+    tmp_index_path: Path, n_vectors: int, expected_type: str
+) -> None:
     """Test that index type is selected based on corpus size.
 
     Uses reduced dimensions (256) for fast unit test execution.
@@ -144,22 +148,28 @@ def test_adaptive_index_selection(tmp_index_path: Path, n_vectors: int, expected
     if expected_type == "flat":
         # Flat index: should have metric_type (METRIC_INNER_PRODUCT = 0) and no nlist
         # IndexFlatIP is a simple flat index with inner product metric
-        assert has_metric_type, f"Expected flat index with metric_type, got {underlying_type_name}"
-        assert not has_nlist, f"Expected flat index without nlist, got {underlying_type_name}"
+        assert (
+            has_metric_type
+        ), f"Expected flat index with metric_type, got {underlying_type_name}"
+        assert (
+            not has_nlist
+        ), f"Expected flat index without nlist, got {underlying_type_name}"
         if metric_type is not None:
-            assert metric_type == faiss_module.METRIC_INNER_PRODUCT, (
-                f"Expected METRIC_INNER_PRODUCT, got {metric_type}"
-            )
+            assert (
+                metric_type == faiss_module.METRIC_INNER_PRODUCT
+            ), f"Expected METRIC_INNER_PRODUCT, got {metric_type}"
     elif expected_type == "ivf_flat":
         # IVFFlat: should have both metric_type and nlist
-        assert has_nlist, f"Expected IVFFlat index with nlist, got {underlying_type_name}"
-        assert has_metric_type, (
-            f"Expected IVFFlat index with metric_type, got {underlying_type_name}"
-        )
+        assert (
+            has_nlist
+        ), f"Expected IVFFlat index with nlist, got {underlying_type_name}"
+        assert (
+            has_metric_type
+        ), f"Expected IVFFlat index with metric_type, got {underlying_type_name}"
         if metric_type is not None:
-            assert metric_type == faiss_module.METRIC_INNER_PRODUCT, (
-                f"Expected METRIC_INNER_PRODUCT, got {metric_type}"
-            )
+            assert (
+                metric_type == faiss_module.METRIC_INNER_PRODUCT
+            ), f"Expected METRIC_INNER_PRODUCT, got {metric_type}"
     else:
         # Should not reach here - large corpus tests are separate
         msg = f"Unexpected type {expected_type} in parametrized test"
@@ -191,9 +201,9 @@ def test_small_corpus_flat_index(tmp_index_path: Path) -> None:
     assert isinstance(cpu_index, faiss_module.IndexIDMap2)
     underlying = _get_underlying_index(cpu_index)
     # Check by type name since isinstance may not work with dynamic types
-    assert "FlatIP" in type(underlying).__name__, (
-        f"Expected FlatIP, got {type(underlying).__name__}"
-    )
+    assert (
+        "FlatIP" in type(underlying).__name__
+    ), f"Expected FlatIP, got {type(underlying).__name__}"
 
 
 def test_small_corpus_search_returns_results(tmp_index_path: Path) -> None:
@@ -243,9 +253,9 @@ def test_medium_corpus_ivf_flat_nlist(tmp_index_path: Path) -> None:
     assert isinstance(cpu_index, FAISS_MODULE.IndexIDMap2)
     underlying = _get_underlying_index(cpu_index)
     # Check by type name since isinstance may not work with dynamic types
-    assert "IVFFlat" in type(underlying).__name__, (
-        f"Expected IVFFlat, got {type(underlying).__name__}"
-    )
+    assert (
+        "IVFFlat" in type(underlying).__name__
+    ), f"Expected IVFFlat, got {type(underlying).__name__}"
 
     # Verify nlist is calculated correctly
     expected_nlist = min(int(np.sqrt(n_vectors)), n_vectors // 39)
@@ -307,7 +317,10 @@ def test_memory_estimation_small_corpus(tmp_index_path: Path) -> None:
     expected_cpu = n_vectors * vec_dim * 4
     assert estimates["cpu_index_bytes"] == expected_cpu
     assert estimates["gpu_index_bytes"] == int(expected_cpu * 1.2)
-    assert estimates["total_bytes"] == estimates["cpu_index_bytes"] + estimates["gpu_index_bytes"]
+    assert (
+        estimates["total_bytes"]
+        == estimates["cpu_index_bytes"] + estimates["gpu_index_bytes"]
+    )
 
 
 def test_memory_estimation_medium_corpus(tmp_index_path: Path) -> None:

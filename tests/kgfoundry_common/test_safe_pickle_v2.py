@@ -23,7 +23,9 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 
     from _pytest.logging import LogCaptureFixture
 
-    def fixture(*args: object, **kwargs: object) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def fixture(
+        *args: object, **kwargs: object
+    ) -> Callable[[Callable[P, R]], Callable[P, R]]:
         """Create a pytest fixture.
 
         Parameters
@@ -123,7 +125,9 @@ class TestSignedPickleWrapper:
         tampered_data = tampered_data[:50] + b"TAMPERED" + tampered_data[58:]
 
         tampered_buffer = io.BytesIO(tampered_data)
-        with pytest.raises(UnsafeSerializationError, match="signature verification failed"):
+        with pytest.raises(
+            UnsafeSerializationError, match="signature verification failed"
+        ):
             wrapper.load(tampered_buffer)
 
     def test_signature_verification_fails_on_truncation(
@@ -155,10 +159,14 @@ class TestSignedPickleWrapper:
         wrapper1.dump(data, buffer)
 
         buffer.seek(0)
-        with pytest.raises(UnsafeSerializationError, match="signature verification failed"):
+        with pytest.raises(
+            UnsafeSerializationError, match="signature verification failed"
+        ):
             wrapper2.load(buffer)
 
-    def test_disallowed_type_rejected_on_dump(self, wrapper: SignedPickleWrapper) -> None:
+    def test_disallowed_type_rejected_on_dump(
+        self, wrapper: SignedPickleWrapper
+    ) -> None:
         """Test that disallowed types are rejected during dump."""
 
         class CustomClass:
@@ -197,7 +205,9 @@ class TestSignedPickleWrapper:
         with caplog.at_level("WARNING"):
             SignedPickleWrapper(short_key)
 
-        assert any("Signing key < 32 bytes" in record.getMessage() for record in caplog.records)
+        assert any(
+            "Signing key < 32 bytes" in record.getMessage() for record in caplog.records
+        )
 
     def test_nested_container_depth_limit(self, wrapper: SignedPickleWrapper) -> None:
         """Test that deeply nested structures are rejected."""

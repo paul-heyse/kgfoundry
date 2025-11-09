@@ -46,11 +46,14 @@ def _check_cuda_availability() -> tuple[bool, str]:
             )
             return True, f"CUDA available ({device_count} devices)"
         logger.warning("CUDA not available via PyTorch")
-        return False, "CUDA not available"  # noqa: TRY300 - Return is inside if/else, not after try/except
+        return (
+            False,
+            "CUDA not available",
+        )
     except ImportError:
         logger.warning("PyTorch not available - skipping CUDA check")
         return False, "PyTorch not installed"
-    except Exception as exc:  # noqa: BLE001 - Need to catch all exceptions during warmup
+    except Exception as exc:
         logger.warning("CUDA availability check failed: %s", exc, exc_info=True)
         return False, f"CUDA check error: {exc}"
 
@@ -66,17 +69,24 @@ def _check_faiss_gpu_support() -> tuple[bool, str]:
     try:
         faiss = cast("_faiss", gate_import("faiss", "FAISS GPU capability checks"))
 
-        required_attrs = ("StandardGpuResources", "GpuClonerOptions", "index_cpu_to_gpu")
+        required_attrs = (
+            "StandardGpuResources",
+            "GpuClonerOptions",
+            "index_cpu_to_gpu",
+        )
         faiss_gpu_available = all(hasattr(faiss, attr) for attr in required_attrs)
         if faiss_gpu_available:
             logger.info("FAISS GPU symbols available")
             return True, "FAISS GPU symbols available"
         logger.warning("FAISS GPU symbols not available")
-        return False, "FAISS GPU symbols not available"  # noqa: TRY300 - Return is inside if/else, not after try/except
+        return (
+            False,
+            "FAISS GPU symbols not available",
+        )
     except ImportError:
         logger.warning("FAISS not available - skipping GPU check")
         return False, "FAISS not installed"
-    except Exception as exc:  # noqa: BLE001 - Need to catch all exceptions during warmup
+    except Exception as exc:
         logger.warning("FAISS GPU check failed: %s", exc, exc_info=True)
         return False, f"FAISS GPU check error: {exc}"
 
@@ -101,10 +111,13 @@ def _test_torch_gpu_operations() -> tuple[bool, str]:
         _ = torch.matmul(test_tensor, test_tensor.T)
         torch.cuda.synchronize()  # Wait for GPU operations to complete
         logger.info("Torch GPU operations test passed")
-        return True, "Torch GPU operations test passed"  # noqa: TRY300 - Return is after successful operation, not after try/except
+        return (
+            True,
+            "Torch GPU operations test passed",
+        )
     except ImportError:
         return False, "PyTorch not installed"
-    except Exception as exc:  # noqa: BLE001 - Need to catch all exceptions during warmup
+    except Exception as exc:
         logger.warning("Torch GPU operations test failed: %s", exc, exc_info=True)
         return False, f"Torch GPU test error: {exc}"
 
@@ -127,10 +140,13 @@ def _test_faiss_gpu_resources() -> tuple[bool, str]:
         # Initialize GPU resources (this is lightweight)
         _ = faiss.StandardGpuResources()
         logger.info("FAISS GPU resource initialization test passed")
-        return True, "FAISS GPU resource initialization test passed"  # noqa: TRY300 - Return is after successful operation, not after try/except
+        return (
+            True,
+            "FAISS GPU resource initialization test passed",
+        )
     except ImportError:
         return False, "FAISS not installed"
-    except Exception as exc:  # noqa: BLE001 - Need to catch all exceptions during warmup
+    except Exception as exc:
         logger.warning("FAISS GPU resource initialization failed: %s", exc, exc_info=True)
         return False, f"FAISS GPU init error: {exc}"
 

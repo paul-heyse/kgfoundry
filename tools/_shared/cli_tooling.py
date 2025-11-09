@@ -181,7 +181,9 @@ def load_augment_config(path: Path, *, reader: Reader | None = None) -> AugmentC
         raise CLIConfigError(_remap_problem(exc.problem, instance=instance)) from exc
 
 
-def load_registry_context(path: Path, *, reader: Reader | None = None) -> RegistryContext:
+def load_registry_context(
+    path: Path, *, reader: Reader | None = None
+) -> RegistryContext:
     """Load CLI registry metadata from ``path``.
 
     Parameters
@@ -343,7 +345,9 @@ def _build_cli_problem(
             extensions=extras,
         )
     )
-    LOGGER.error(detail, extra={**({} if extras is None else dict(extras)), "status": "error"})
+    LOGGER.error(
+        detail, extra={**({} if extras is None else dict(extras)), "status": "error"}
+    )
     return problem
 
 

@@ -232,7 +232,9 @@ class TestGitClientIntegration:
         commits = client.file_history("test.py", limit=10)
 
         # Verify order (newest first)
-        dates = [datetime.fromisoformat(c["date"].replace("Z", "+00:00")) for c in commits]
+        dates = [
+            datetime.fromisoformat(c["date"].replace("Z", "+00:00")) for c in commits
+        ]
         assert dates == sorted(dates, reverse=True)
 
     def test_file_history_respects_limit(self, git_repo: Path) -> None:

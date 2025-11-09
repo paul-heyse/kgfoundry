@@ -240,7 +240,7 @@ class LegacyPluginAdapter(DocstringBuilderPlugin[DocstringPayload, DocstringPayl
         self.name = resolved_name
 
     @classmethod
-    def create(cls, plugin: LegacyPluginProtocol, /, cls) -> _AnyLegacyAdapter:
+    def create(cls, plugin: LegacyPluginProtocol) -> _AnyLegacyAdapter:
         """Return a typed adapter for the legacy ``plugin`` instance.
 
         Parameters
@@ -261,9 +261,7 @@ class LegacyPluginAdapter(DocstringBuilderPlugin[DocstringPayload, DocstringPayl
         return cls.wrap_formatter(adapter)
 
     @classmethod
-    def wrap_harvester(
-        cls, adapter: LegacyPluginAdapter, /, cls
-    ) -> _LegacyHarvesterAdapter:
+    def wrap_harvester(cls, adapter: LegacyPluginAdapter) -> _LegacyHarvesterAdapter:
         """Wrap ``adapter`` as a harvester plugin.
 
         Parameters
@@ -288,7 +286,7 @@ class LegacyPluginAdapter(DocstringBuilderPlugin[DocstringPayload, DocstringPayl
 
     @classmethod
     def wrap_transformer(
-        cls, adapter: LegacyPluginAdapter, /, cls
+        cls, adapter: LegacyPluginAdapter
     ) -> _LegacyTransformerAdapter:
         """Wrap ``adapter`` as a transformer plugin.
 
@@ -313,9 +311,7 @@ class LegacyPluginAdapter(DocstringBuilderPlugin[DocstringPayload, DocstringPayl
         return _LegacyTransformerAdapter(adapter)
 
     @classmethod
-    def wrap_formatter(
-        cls, adapter: LegacyPluginAdapter, /, cls
-    ) -> _LegacyFormatterAdapter:
+    def wrap_formatter(cls, adapter: LegacyPluginAdapter) -> _LegacyFormatterAdapter:
         """Wrap ``adapter`` as a formatter plugin.
 
         Parameters

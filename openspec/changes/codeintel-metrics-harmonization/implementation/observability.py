@@ -200,7 +200,9 @@ def observe_duration(
 
     # Attempt to use real observation with fallback to noop
     try:
-        with kgfoundry_observe_duration(provider, operation, component=component) as observation:
+        with kgfoundry_observe_duration(
+            provider, operation, component=component
+        ) as observation:
             yield observation
             return
     except ValueError as exc:

@@ -34,7 +34,9 @@ TOOLS_ROOT = Path(__file__).resolve().parent
 REPO_ROOT = TOOLS_ROOT.parent
 
 DOMAIN_PATTERNS = (r"^kgfoundry\.tools\._shared(\..+)?$",)
-ADAPTER_PATTERNS = (r"^kgfoundry\.tools\.(?:docstring_builder|docs|navmap|codemods)(\..+)?$",)
+ADAPTER_PATTERNS = (
+    r"^kgfoundry\.tools\.(?:docstring_builder|docs|navmap|codemods)(\..+)?$",
+)
 CLI_PATTERNS = (
     r"^kgfoundry\.tools\.(?!(?:_shared|docs|docstring_builder|navmap|codemods)$)[^.]+$",
     r"^kgfoundry\.tools\..*\.cli(\..+)?$",
@@ -98,7 +100,9 @@ def _match_modules(modules: Iterable[str], patterns: Sequence[str]) -> set[str]:
         Set of matching module names.
     """
     regexes = [re.compile(pattern) for pattern in patterns]
-    return {module for module in modules if any(regex.match(module) for regex in regexes)}
+    return {
+        module for module in modules if any(regex.match(module) for regex in regexes)
+    }
 
 
 def _build_layered_architecture(
@@ -123,10 +127,14 @@ def _build_layered_architecture(
     cli_candidates.update(module for module in modules if module in CLI_SUPPORT_MODULES)
 
     adapter_candidates = _match_modules(modules, ADAPTER_PATTERNS)
-    adapter_candidates.update(module for module in modules if module in ADAPTER_SUPPORT_MODULES)
+    adapter_candidates.update(
+        module for module in modules if module in ADAPTER_SUPPORT_MODULES
+    )
 
     adapter_modules = sorted(adapter_candidates - set(domain_modules) - cli_candidates)
-    adapter_modules = [module for module in adapter_modules if module not in ADAPTER_BASE_PACKAGES]
+    adapter_modules = [
+        module for module in adapter_modules if module not in ADAPTER_BASE_PACKAGES
+    ]
     io_modules = sorted(cli_candidates - set(domain_modules) - set(adapter_modules))
 
     architecture = new_layered_architecture()
@@ -150,8 +158,8 @@ def _load_tooling_architecture(
         str(project_root),
         str(project_root / "tools"),
     )
-    architecture, domain_modules, adapter_modules, io_modules = _build_layered_architecture(
-        tuple(evaluable.modules)
+    architecture, domain_modules, adapter_modules, io_modules = (
+        _build_layered_architecture(tuple(evaluable.modules))
     )
     return architecture, domain_modules, adapter_modules, io_modules, evaluable
 
@@ -171,7 +179,9 @@ def _collect_violations(
     violations: list[str] = []
     for edges in dependencies.values():
         for importer, importee in edges:
-            violations.append(f'{message}: "{importer.identifier}" imports "{importee.identifier}"')
+            violations.append(
+                f'{message}: "{importer.identifier}" imports "{importee.identifier}"'
+            )
     return violations
 
 
@@ -188,8 +198,8 @@ def enforce_tooling_layers(root: Path | None = None) -> ArchitectureResult:
     ArchitectureResult
         Architecture check result with violations.
     """
-    _, domain_modules, adapter_modules, io_modules, evaluable = _load_tooling_architecture(
-        root=root
+    _, domain_modules, adapter_modules, io_modules, evaluable = (
+        _load_tooling_architecture(root=root)
     )
 
     violations: list[str] = []

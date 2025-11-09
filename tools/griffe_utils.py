@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import importlib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import cast
 
 GriffeLoaderType = type[object]
@@ -33,7 +33,7 @@ class _GriffeCache:
     instance: GriffeAPI | None = None
 
 
-_GRIFFE_CACHE = _GriffeCache()
+_GRIFFE_CACHE: list[_GriffeCache] = [_GriffeCache()]
 
 
 def resolve_griffe() -> GriffeAPI:
@@ -51,8 +51,9 @@ def resolve_griffe() -> GriffeAPI:
     GriffeAPI
         Griffe API instance with loader and symbol types.
     """
-    if _GRIFFE_CACHE.instance is not None:
-        return _GRIFFE_CACHE.instance
+    cached = _GRIFFE_CACHE[0].instance
+    if cached is not None:
+        return cached
 
     griffe_module = importlib.import_module("griffe")
     try:
@@ -80,12 +81,15 @@ def resolve_griffe() -> GriffeAPI:
     module_cls = cast("type", module_attr)
     object_cls = cast("type", object_attr)
 
-    _GRIFFE_CACHE.instance = GriffeAPI(
-        package=griffe_module,
-        object_type=object_cls,
-        loader_type=loader_cls,
-        class_type=class_cls,
-        function_type=function_cls,
-        module_type=module_cls,
+    _GRIFFE_CACHE[0] = replace(
+        _GRIFFE_CACHE[0],
+        instance=GriffeAPI(
+            package=griffe_module,
+            object_type=object_cls,
+            loader_type=loader_cls,
+            class_type=class_cls,
+            function_type=function_cls,
+            module_type=module_cls,
+        ),
     )
-    return _GRIFFE_CACHE.instance
+    return cast("GriffeAPI", _GRIFFE_CACHE[0].instance)

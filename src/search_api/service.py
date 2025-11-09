@@ -4,6 +4,7 @@ This module provides typed service-layer functions for search operations, includ
 fusion, knowledge graph boosting, and result deduplication. All functions include structured logging
 and metrics.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -34,7 +35,9 @@ logger = get_logger(__name__)
 
 
 # [nav:anchor rrf_fuse]
-def rrf_fuse(rankers: list[list[tuple[str, float]]], k_rrf: int = 60) -> dict[str, float]:
+def rrf_fuse(
+    rankers: list[list[tuple[str, float]]], k_rrf: int = 60
+) -> dict[str, float]:
     """Fuse multiple ranked lists using Reciprocal Rank Fusion (RRF).
 
     Combines multiple ranked lists into a single ranked list using RRF scoring.
@@ -61,7 +64,9 @@ def rrf_fuse(rankers: list[list[tuple[str, float]]], k_rrf: int = 60) -> dict[st
     >>> "doc1" in fused and "doc2" in fused
     True
     """
-    with with_fields(logger, operation="rrf_fuse", k_rrf=k_rrf, num_rankers=len(rankers)):
+    with with_fields(
+        logger, operation="rrf_fuse", k_rrf=k_rrf, num_rankers=len(rankers)
+    ):
         scores: dict[str, float] = {}
         for ranked in rankers:
             for rank, (item_id, _score) in enumerate(ranked, start=1):

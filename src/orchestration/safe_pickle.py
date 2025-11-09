@@ -8,6 +8,7 @@ Notes
 This is a temporary serialization format pending full FAISS integration.
 Production systems should use structured formats like Protocol Buffers or MessagePack.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations

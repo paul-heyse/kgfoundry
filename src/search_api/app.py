@@ -24,6 +24,7 @@ See Also
 - `schema/models/search_request.v1.json` - SearchRequest JSON Schema
 - `schema/models/search_result.v1.json` - SearchResult JSON Schema
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -102,7 +103,9 @@ DEPENDENCY_TIMEOUT_SECONDS = 5.0
 
 AuthorizationHeader = Annotated[str | None, Header(default=None)]
 
-API_KEYS: set[str] = set()  # NOTE: load from env SEARCH_API_KEYS when secrets wiring is ready
+API_KEYS: set[str] = (
+    set()
+)  # NOTE: load from env SEARCH_API_KEYS when secrets wiring is ready
 
 # [nav:anchor app]
 app = FastAPI(title="kgfoundry Search API", version="0.2.0")
@@ -289,7 +292,9 @@ class ResponseValidationMiddleware(BaseHTTPMiddleware):
                 cause=exc,
                 context={
                     "schema_path": str(self.schema_path),
-                    "validation_path": "/".join(str(part) for part in error_details.path),
+                    "validation_path": "/".join(
+                        str(part) for part in error_details.path
+                    ),
                 },
             )
             problem_response = JSONResponse(
@@ -478,7 +483,9 @@ def search(req: SearchRequest, _: AuthDependency = None) -> SearchResponse:
             bm25_hits: list[tuple[str, float]] = []
             if bm25:
                 try:
-                    bm25_hits = bm25.search(req.query, k=settings.search.sparse_candidates)
+                    bm25_hits = bm25.search(
+                        req.query, k=settings.search.sparse_candidates
+                    )
                 except (RuntimeError, ValueError, AttributeError, OSError) as exc:
                     log_adapter.warning(
                         "BM25 search failed, falling back to empty results: %s",
@@ -489,7 +496,9 @@ def search(req: SearchRequest, _: AuthDependency = None) -> SearchResponse:
                     bm25_hits = []
             try:
                 splade_hits = (
-                    splade.search(req.query, k=settings.search.sparse_candidates) if splade else []
+                    splade.search(req.query, k=settings.search.sparse_candidates)
+                    if splade
+                    else []
                 )
             except (RuntimeError, ValueError, AttributeError, OSError) as exc:
                 log_adapter.warning(
@@ -501,7 +510,9 @@ def search(req: SearchRequest, _: AuthDependency = None) -> SearchResponse:
                 splade_hits = []
 
             # RRF fusion
-            fused = rrf_fuse([dense_hits, bm25_hits, splade_hits], k_rrf=settings.search.rrf_k)
+            fused = rrf_fuse(
+                [dense_hits, bm25_hits, splade_hits], k_rrf=settings.search.rrf_k
+            )
             # KG boosts
             boosted = apply_kg_boosts(
                 fused,
@@ -539,7 +550,9 @@ def search(req: SearchRequest, _: AuthDependency = None) -> SearchResponse:
                         score=float(score),
                         signals={
                             "rrf": float(fused.get(chunk_id, 0.0)),
-                            "kg_boost": float(boosted[chunk_id] - fused.get(chunk_id, 0.0)),
+                            "kg_boost": float(
+                                boosted[chunk_id] - fused.get(chunk_id, 0.0)
+                            ),
                         },
                         spans={"start_char": 0, "end_char": 50},
                         concepts=[
@@ -554,7 +567,8 @@ def search(req: SearchRequest, _: AuthDependency = None) -> SearchResponse:
                 )
 
             log_adapter.info(
-                "Search completed", extra={"status": "success", "result_count": len(results)}
+                "Search completed",
+                extra={"status": "success", "result_count": len(results)},
             )
             obs.success()
 
@@ -630,7 +644,8 @@ def graph_concepts(
             ][:limit]
 
             log_adapter.info(
-                "Graph concepts retrieved", extra={"status": "success", "count": len(concepts)}
+                "Graph concepts retrieved",
+                extra={"status": "success", "count": len(concepts)},
             )
         except (RuntimeError, ValueError, AttributeError, OSError) as exc:
             error_msg = f"Graph concepts operation failed: {exc}"

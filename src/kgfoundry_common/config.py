@@ -10,6 +10,7 @@ Examples
 >>> settings.log_level  # doctest: +SKIP
 'INFO'
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -17,7 +18,16 @@ from __future__ import annotations
 import base64
 from collections.abc import Mapping
 from functools import lru_cache
-from typing import TYPE_CHECKING, ClassVar, Final, Literal, Self, TypedDict, Unpack, cast
+from typing import (
+    TYPE_CHECKING,
+    ClassVar,
+    Final,
+    Literal,
+    Self,
+    TypedDict,
+    Unpack,
+    cast,
+)
 
 from pydantic import AliasChoices, Field, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict

@@ -31,7 +31,9 @@ class _StubArtifactsManager:
         self.tmp_path = tmp_path
         self.calls: list[SpladeExportOptions] = []
 
-    def export_onnx(self, options: SpladeExportOptions | None = None) -> SpladeExportSummary:
+    def export_onnx(
+        self, options: SpladeExportOptions | None = None
+    ) -> SpladeExportSummary:
         opts = options or SpladeExportOptions()
         self.calls.append(opts)
         onnx_dir = self.tmp_path / "models" / "splade-v3" / "onnx"
@@ -39,7 +41,9 @@ class _StubArtifactsManager:
         onnx_file = onnx_dir / (opts.file_name or "model_qint8.onnx")
         onnx_file.write_text("stub", encoding="utf-8")
         metadata_path = onnx_dir / "artifacts.json"
-        metadata_path.write_text(json.dumps({"onnx_file": str(onnx_file)}), encoding="utf-8")
+        metadata_path.write_text(
+            json.dumps({"onnx_file": str(onnx_file)}), encoding="utf-8"
+        )
         return SpladeExportSummary(
             onnx_file=str(onnx_file),
             metadata_path=str(metadata_path),
@@ -62,7 +66,9 @@ class _StubEncoderService:
         self.calls.append((source, options))
         opts = options or SpladeEncodeOptions()
         target_dir = (
-            Path(opts.output_dir) if opts.output_dir is not None else self.tmp_path / "vectors"
+            Path(opts.output_dir)
+            if opts.output_dir is not None
+            else self.tmp_path / "vectors"
         )
         vectors_dir = target_dir.resolve()
         vectors_dir.mkdir(parents=True, exist_ok=True)
@@ -104,7 +110,9 @@ class _StubIndexManager:
         self.tmp_path = tmp_path
         self.calls: list[SpladeBuildOptions | None] = []
 
-    def build_index(self, options: SpladeBuildOptions | None = None) -> SpladeIndexMetadata:
+    def build_index(
+        self, options: SpladeBuildOptions | None = None
+    ) -> SpladeIndexMetadata:
         self.calls.append(options)
         index_dir = (self.tmp_path / "indexes" / "splade").resolve()
         index_dir.mkdir(parents=True, exist_ok=True)

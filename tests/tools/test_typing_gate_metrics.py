@@ -63,7 +63,7 @@ class TestTypingGateMetrics:
     def test_record_check_without_violations(self) -> None:
         """Verify recording a clean check increments checks_total only."""
         metrics = TypingGateMetrics()
-        metrics.record_check("clean_file.py", None)
+        metrics = metrics.record_check("clean_file.py", None)
         assert metrics.checks_total == 1
         assert metrics.violations_total == 0
 
@@ -72,9 +72,13 @@ class TestTypingGateMetrics:
         metrics = TypingGateMetrics()
         violations: list[dict[str, object]] = [
             {"violation_type": "heavy_import", "module_name": "numpy", "lineno": 10},
-            {"violation_type": "private_module", "module_name": "docs._types", "lineno": 20},
+            {
+                "violation_type": "private_module",
+                "module_name": "docs._types",
+                "lineno": 20,
+            },
         ]
-        metrics.record_check("bad_file.py", violations)
+        metrics = metrics.record_check("bad_file.py", violations)
         assert metrics.checks_total == 1
         assert metrics.violations_total == 2
         assert len(metrics.violations) == 2
@@ -82,19 +86,21 @@ class TestTypingGateMetrics:
     def test_multiple_checks_accumulation(self) -> None:
         """Verify metrics accumulate across multiple checks."""
         metrics = TypingGateMetrics()
-        metrics.record_check("file1.py", None)
-        metrics.record_check(
-            "file2.py", [{"violation_type": "heavy_import", "module_name": "numpy", "lineno": 5}]
+        metrics = metrics.record_check("file1.py", None)
+        metrics = metrics.record_check(
+            "file2.py",
+            [{"violation_type": "heavy_import", "module_name": "numpy", "lineno": 5}],
         )
-        metrics.record_check("file3.py", None)
+        metrics = metrics.record_check("file3.py", None)
         assert metrics.checks_total == 3
         assert metrics.violations_total == 1
 
     def test_snapshot_generation(self) -> None:
         """Verify snapshot contains all required fields."""
         metrics = TypingGateMetrics()
-        metrics.record_check(
-            "file.py", [{"violation_type": "heavy_import", "module_name": "numpy", "lineno": 10}]
+        metrics = metrics.record_check(
+            "file.py",
+            [{"violation_type": "heavy_import", "module_name": "numpy", "lineno": 10}],
         )
 
         snapshot = metrics.to_snapshot()
@@ -107,9 +113,10 @@ class TestTypingGateMetrics:
     def test_snapshot_summary_compliance_rate(self) -> None:
         """Verify snapshot includes compliance rate."""
         metrics = TypingGateMetrics()
-        metrics.record_check("file1.py", None)  # Clean
-        metrics.record_check(
-            "file2.py", [{"violation_type": "heavy_import", "module_name": "numpy", "lineno": 5}]
+        metrics = metrics.record_check("file1.py", None)  # Clean
+        metrics = metrics.record_check(
+            "file2.py",
+            [{"violation_type": "heavy_import", "module_name": "numpy", "lineno": 5}],
         )
 
         snapshot = metrics.to_snapshot()
@@ -120,15 +127,26 @@ class TestTypingGateMetrics:
     def test_snapshot_summary_files_with_violations(self) -> None:
         """Verify snapshot counts unique files with violations."""
         metrics = TypingGateMetrics()
-        metrics.record_check(
+        metrics = metrics.record_check(
             "file1.py",
             [
                 {"violation_type": "heavy_import", "module_name": "numpy", "lineno": 5},
-                {"violation_type": "private_module", "module_name": "docs._types", "lineno": 10},
+                {
+                    "violation_type": "private_module",
+                    "module_name": "docs._types",
+                    "lineno": 10,
+                },
             ],
         )
-        metrics.record_check(
-            "file2.py", [{"violation_type": "heavy_import", "module_name": "fastapi", "lineno": 15}]
+        metrics = metrics.record_check(
+            "file2.py",
+            [
+                {
+                    "violation_type": "heavy_import",
+                    "module_name": "fastapi",
+                    "lineno": 15,
+                }
+            ],
         )
 
         snapshot = metrics.to_snapshot()
@@ -138,12 +156,20 @@ class TestTypingGateMetrics:
     def test_snapshot_summary_violation_types(self) -> None:
         """Verify snapshot lists all violation types found."""
         metrics = TypingGateMetrics()
-        metrics.record_check(
+        metrics = metrics.record_check(
             "file.py",
             [
                 {"violation_type": "heavy_import", "module_name": "numpy", "lineno": 5},
-                {"violation_type": "private_module", "module_name": "docs._types", "lineno": 10},
-                {"violation_type": "deprecated_shim", "module_name": "resolve_numpy", "lineno": 15},
+                {
+                    "violation_type": "private_module",
+                    "module_name": "docs._types",
+                    "lineno": 10,
+                },
+                {
+                    "violation_type": "deprecated_shim",
+                    "module_name": "resolve_numpy",
+                    "lineno": 15,
+                },
             ],
         )
 
@@ -157,9 +183,10 @@ class TestTypingGateMetrics:
     def test_prometheus_counters_format(self) -> None:
         """Verify Prometheus counter format is correct."""
         metrics = TypingGateMetrics()
-        metrics.record_check("file1.py", None)
-        metrics.record_check(
-            "file2.py", [{"violation_type": "heavy_import", "module_name": "numpy", "lineno": 5}]
+        metrics = metrics.record_check("file1.py", None)
+        metrics = metrics.record_check(
+            "file2.py",
+            [{"violation_type": "heavy_import", "module_name": "numpy", "lineno": 5}],
         )
 
         prometheus_output = metrics.emit_prometheus_counters()
@@ -171,8 +198,9 @@ class TestTypingGateMetrics:
     def test_structured_logs_format(self) -> None:
         """Verify structured logs are valid JSON."""
         metrics = TypingGateMetrics()
-        metrics.record_check(
-            "file.py", [{"violation_type": "heavy_import", "module_name": "numpy", "lineno": 5}]
+        metrics = metrics.record_check(
+            "file.py",
+            [{"violation_type": "heavy_import", "module_name": "numpy", "lineno": 5}],
         )
 
         logs = metrics.emit_structured_logs()
@@ -187,7 +215,7 @@ class TestTypingGateMetrics:
     def test_structured_logs_summary_event(self) -> None:
         """Verify first log contains summary event."""
         metrics = TypingGateMetrics()
-        metrics.record_check("file.py", None)
+        metrics = metrics.record_check("file.py", None)
 
         logs = metrics.emit_structured_logs()
         summary_log = cast("dict[str, object]", json.loads(logs[0]))
@@ -198,8 +226,9 @@ class TestTypingGateMetrics:
     def test_structured_logs_violation_events(self) -> None:
         """Verify violation logs contain correct data."""
         metrics = TypingGateMetrics()
-        metrics.record_check(
-            "file.py", [{"violation_type": "heavy_import", "module_name": "numpy", "lineno": 5}]
+        metrics = metrics.record_check(
+            "file.py",
+            [{"violation_type": "heavy_import", "module_name": "numpy", "lineno": 5}],
         )
 
         logs = metrics.emit_structured_logs()
@@ -213,20 +242,22 @@ class TestTypingGateMetrics:
     def test_write_snapshot_creates_file(self, tmp_path: Path) -> None:
         """Verify write_snapshot creates the JSON file."""
         metrics = TypingGateMetrics()
-        metrics.record_check("file.py", None)
+        metrics = metrics.record_check("file.py", None)
 
         output_path = tmp_path / "metrics.json"
         metrics.write_snapshot(output_path)
 
         assert output_path.exists()
-        content = cast("dict[str, object]", json.loads(output_path.read_text(encoding="utf-8")))
+        content = cast(
+            "dict[str, object]", json.loads(output_path.read_text(encoding="utf-8"))
+        )
         assert cast("int", content["checks_total"]) == 1
         assert cast("int", content["violations_total"]) == 0
 
     def test_write_snapshot_creates_parent_directories(self, tmp_path: Path) -> None:
         """Verify write_snapshot creates parent directories if needed."""
         metrics = TypingGateMetrics()
-        metrics.record_check("file.py", None)
+        metrics = metrics.record_check("file.py", None)
 
         output_path = tmp_path / "deep" / "nested" / "path" / "metrics.json"
         metrics.write_snapshot(output_path)
@@ -237,8 +268,8 @@ class TestTypingGateMetrics:
     def test_compliance_rate_100_percent(self) -> None:
         """Verify compliance rate is 100% when no violations."""
         metrics = TypingGateMetrics()
-        metrics.record_check("file1.py", None)
-        metrics.record_check("file2.py", None)
+        metrics = metrics.record_check("file1.py", None)
+        metrics = metrics.record_check("file2.py", None)
         snapshot = metrics.to_snapshot()
         summary = cast("dict[str, object]", snapshot["summary"])
         assert cast("float", summary["compliance_rate"]) == 100.0
@@ -246,12 +277,19 @@ class TestTypingGateMetrics:
     def test_compliance_rate_zero_percent(self) -> None:
         """Verify compliance rate is 0% when all checks have violations."""
         metrics = TypingGateMetrics()
-        metrics.record_check(
-            "file1.py", [{"violation_type": "heavy_import", "module_name": "numpy", "lineno": 5}]
+        metrics = metrics.record_check(
+            "file1.py",
+            [{"violation_type": "heavy_import", "module_name": "numpy", "lineno": 5}],
         )
-        metrics.record_check(
+        metrics = metrics.record_check(
             "file2.py",
-            [{"violation_type": "private_module", "module_name": "docs._types", "lineno": 10}],
+            [
+                {
+                    "violation_type": "private_module",
+                    "module_name": "docs._types",
+                    "lineno": 10,
+                }
+            ],
         )
         snapshot = metrics.to_snapshot()
         summary = cast("dict[str, object]", snapshot["summary"])

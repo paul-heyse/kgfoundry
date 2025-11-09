@@ -9,6 +9,7 @@ Examples
 >>> with observe_duration(provider, "search", component="search_api") as observer:
 ...     observer.success()
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -62,6 +63,13 @@ __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
 LOGGER = get_logger(__name__)
 StatusLiteral = Literal["success", "error"]
+_SET_FROZEN_ATTR = object.__setattr__
+
+
+def _thaw(target: object, **updates: object) -> None:
+    """Assign ``updates`` to ``target`` bypassing frozen dataclass guards."""
+    for name, value in updates.items():
+        _SET_FROZEN_ATTR(target, name, value)
 
 
 @dataclass(slots=True, frozen=True)
@@ -99,19 +107,24 @@ class MetricsProvider:
     _registry: CollectorRegistry | None = field(default=None, repr=False)
 
     def __init__(self, registry: CollectorRegistry | None = None) -> None:
-        resolved_registry = cast("CollectorRegistry | None", registry or get_default_registry())
-        self._registry = resolved_registry
-        self.runs_total = build_counter(
-            "kgfoundry_runs_total",
-            "Total number of operations executed by a component.",
-            ("component", "status"),
-            registry=resolved_registry,
+        resolved_registry = cast(
+            "CollectorRegistry | None", registry or get_default_registry()
         )
-        self.operation_duration_seconds = build_histogram(
-            "kgfoundry_operation_duration_seconds",
-            "Operation duration in seconds for each component/operation pair.",
-            labelnames=("component", "operation", "status"),
-            registry=resolved_registry,
+        _thaw(
+            self,
+            _registry=resolved_registry,
+            runs_total=build_counter(
+                "kgfoundry_runs_total",
+                "Total number of operations executed by a component.",
+                ("component", "status"),
+                registry=resolved_registry,
+            ),
+            operation_duration_seconds=build_histogram(
+                "kgfoundry_operation_duration_seconds",
+                "Operation duration in seconds for each component/operation pair.",
+                labelnames=("component", "operation", "status"),
+                registry=resolved_registry,
+            ),
         )
 
     @property
@@ -129,8 +142,8 @@ class MetricsProvider:
             Cached metrics provider instance.
         """
         if _OBS_CACHE.provider is None:
-            _OBS_CACHE.provider = MetricsProvider()
-        return _OBS_CACHE.provider
+            _thaw(_OBS_CACHE, provider=MetricsProvider())
+        return cast("MetricsProvider", _OBS_CACHE.provider)
 
 
 @dataclass(slots=True, frozen=True)
@@ -169,27 +182,32 @@ class MetricsRegistry:
         namespace: str = "kgfoundry",
         registry: CollectorRegistry | None = None,
     ) -> None:
-        resolved_registry = cast("CollectorRegistry | None", registry or get_default_registry())
+        resolved_registry = cast(
+            "CollectorRegistry | None", registry or get_default_registry()
+        )
         metric_prefix = namespace.replace("-", "_")
         labels = ("operation", "status")
-        self._registry = resolved_registry
-        self.requests_total = build_counter(
-            f"{metric_prefix}_requests_total",
-            "Total number of processed operations.",
-            labelnames=labels,
-            registry=resolved_registry,
-        )
-        self.request_errors_total = build_counter(
-            f"{metric_prefix}_request_errors_total",
-            "Total number of failed operations.",
-            labelnames=labels,
-            registry=resolved_registry,
-        )
-        self.request_duration_seconds = build_histogram(
-            f"{metric_prefix}_request_duration_seconds",
-            "Operation latency in seconds.",
-            labelnames=("operation",),
-            registry=resolved_registry,
+        _thaw(
+            self,
+            _registry=resolved_registry,
+            requests_total=build_counter(
+                f"{metric_prefix}_requests_total",
+                "Total number of processed operations.",
+                labelnames=labels,
+                registry=resolved_registry,
+            ),
+            request_errors_total=build_counter(
+                f"{metric_prefix}_request_errors_total",
+                "Total number of failed operations.",
+                labelnames=labels,
+                registry=resolved_registry,
+            ),
+            request_duration_seconds=build_histogram(
+                f"{metric_prefix}_request_duration_seconds",
+                "Operation latency in seconds.",
+                labelnames=("operation",),
+                registry=resolved_registry,
+            ),
         )
 
     @property
@@ -208,8 +226,8 @@ def get_metrics_registry() -> MetricsRegistry:
         Process-wide metrics registry instance.
     """
     if _OBS_CACHE.registry is None:
-        _OBS_CACHE.registry = MetricsRegistry()
-    return _OBS_CACHE.registry
+        _thaw(_OBS_CACHE, registry=MetricsRegistry())
+    return cast("MetricsRegistry", _OBS_CACHE.registry)
 
 
 @dataclass(slots=True, frozen=True)
@@ -225,11 +243,11 @@ class DurationObservation:
 
     def mark_success(self) -> None:
         """Mark the operation as successful."""
-        self.status = "success"
+        _thaw(self, status="success")
 
     def mark_error(self) -> None:
         """Mark the operation as failed."""
-        self.status = "error"
+        _thaw(self, status="error")
 
     def success(self) -> None:  # pragma: no cover - backward compatibility alias
         """Alias for :meth:`mark_success` to preserve caller compatibility."""
@@ -367,7 +385,9 @@ def record_operation(
         duration = time.monotonic() - start
         registry.requests_total.labels(operation=operation, status=status).inc()
         if status == "error":
-            registry.request_errors_total.labels(operation=operation, status=status).inc()
+            registry.request_errors_total.labels(
+                operation=operation, status=status
+            ).inc()
         registry.request_duration_seconds.labels(operation=operation).observe(duration)
         extra = {"duration_ms": duration * 1000}
         with with_fields(

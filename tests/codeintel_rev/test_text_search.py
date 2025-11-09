@@ -88,7 +88,9 @@ async def test_search_text_surfaces_ripgrep_failure(
     ) -> str:
         _ = cmd, timeout, cwd
         error_message = "rg failed"
-        raise SubprocessError(error_message, returncode=RG_FAILURE_CODE, stderr=error_message)
+        raise SubprocessError(
+            error_message, returncode=RG_FAILURE_CODE, stderr=error_message
+        )
 
     monkeypatch.setattr(text_search, "run_subprocess", fake_run_subprocess)
 
@@ -120,13 +122,18 @@ async def test_search_text_falls_back_to_grep(
 
     monkeypatch.setattr(text_search, "run_subprocess", fake_run_subprocess)
 
-    result = await text_search.search_text(mock_application_context, "example", max_results=1)
+    result = await text_search.search_text(
+        mock_application_context, "example", max_results=1
+    )
 
     _expect(
         condition=len(captured_commands) == EXPECTED_SUBPROCESS_INVOCATIONS,
         message="Expected two subprocess invocations",
     )
-    _expect(condition=captured_commands[1][0] == "grep", message="Fallback should invoke grep")
+    _expect(
+        condition=captured_commands[1][0] == "grep",
+        message="Fallback should invoke grep",
+    )
     _expect(condition=result["matches"], message="Fallback grep should produce matches")
 
 
@@ -153,7 +160,9 @@ async def test_search_text_fallback_normalizes_relative_paths(
 
     monkeypatch.setattr(text_search, "run_subprocess", fake_run_subprocess)
 
-    result = await text_search.search_text(mock_application_context, "example", max_results=5)
+    result = await text_search.search_text(
+        mock_application_context, "example", max_results=5
+    )
 
     expected_match_count = 2
     _expect(

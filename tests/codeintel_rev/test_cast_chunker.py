@@ -33,7 +33,6 @@ def test_chunk_with_mid_line_bounds_uses_correct_line_indices() -> None:
 
 def test_chunk_bytes_align_with_multibyte_characters() -> None:
     """Byte offsets should round-trip slice the original UTF-8 data."""
-
     text = "intro = 1\náéíóú = 2\n目标 = 3\n"
     encoded = text.encode("utf-8")
 
@@ -56,11 +55,11 @@ def test_chunk_bytes_align_with_multibyte_characters() -> None:
     assert len(chunks) == 1
     chunk = chunks[0]
 
-    expected_start = len("intro = 1\náéíóú = 2\n".encode("utf-8"))
-    expected_end = expected_start + len("目标 = 3".encode("utf-8"))
+    expected_start = len("intro = 1\náéíóú = 2\n".encode())
+    expected_end = expected_start + len("目标 = 3".encode())
 
     assert chunk.start_byte == expected_start
     assert chunk.end_byte == expected_end
 
-    round_trip = encoded[chunk.start_byte:chunk.end_byte].decode("utf-8")
+    round_trip = encoded[chunk.start_byte : chunk.end_byte].decode("utf-8")
     assert round_trip == chunk.text

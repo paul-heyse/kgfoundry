@@ -396,7 +396,9 @@ def handle_adapter_errors(
         def wrapper(*args: object, **kwargs: object) -> dict:
             try:
                 return func(*args, **kwargs)  # type: ignore[return-value]
-            except BaseException as exc:  # noqa: BLE001 - defensive catch ensures Problem Details emission
+            except (
+                BaseException
+            ) as exc:
                 return convert_exception_to_envelope(exc, operation, empty_result)
 
         return cast("F", wrapper)

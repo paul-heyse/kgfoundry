@@ -12,7 +12,7 @@ Usage:
     from tools.lint.typing_gate_metrics import TypingGateMetrics
 
     metrics = TypingGateMetrics()
-    metrics.record_check(filepath, num_violations)
+    metrics = metrics.record_check(filepath, num_violations)
     snapshot = metrics.to_snapshot()
     metrics.write_snapshot(path)
 """
@@ -20,7 +20,7 @@ Usage:
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, cast
 
@@ -64,7 +64,7 @@ class TypingGateMetrics:
 
     def record_check(
         self, filepath: str, violations: Sequence[dict[str, object]] | None = None
-    ) -> None:
+    ) -> TypingGateMetrics:
         """Record a typing gate check.
 
         Parameters
@@ -73,19 +73,31 @@ class TypingGateMetrics:
             Path to the file checked.
         violations : Sequence[dict[str, object]] | None, optional
             List of violations found in the file (default: None).
+
+        Returns
+        -------
+        TypingGateMetrics
+            New metrics snapshot with the recorded check.
         """
-        self.checks_total += 1
+        new_violations = list(self.violations)
+        violation_increment = 0
         if violations:
-            self.violations_total += len(violations)
-            for v in violations:
-                self.violations.append(
-                    ViolationRecord(
-                        filepath=filepath,
-                        violation_type=cast("str", v.get("violation_type", "unknown")),
-                        module_name=cast("str", v.get("module_name", "unknown")),
-                        lineno=cast("int", v.get("lineno", 0)),
-                    )
+            violation_increment = len(violations)
+            new_violations.extend(
+                ViolationRecord(
+                    filepath=filepath,
+                    violation_type=cast("str", v.get("violation_type", "unknown")),
+                    module_name=cast("str", v.get("module_name", "unknown")),
+                    lineno=cast("int", v.get("lineno", 0)),
                 )
+                for v in violations
+            )
+        return replace(
+            self,
+            checks_total=self.checks_total + 1,
+            violations_total=self.violations_total + violation_increment,
+            violations=new_violations,
+        )
 
     def to_snapshot(self) -> dict[str, object]:
         """Convert metrics to a snapshot dictionary.

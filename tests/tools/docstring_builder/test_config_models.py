@@ -69,17 +69,23 @@ class TestDocstringBuildConfig:
 
     def test_timeout_must_be_positive(self) -> None:
         """Verify negative timeout raises ConfigurationError."""
-        with pytest.raises(ConfigurationError, match="timeout_seconds must be positive"):
+        with pytest.raises(
+            ConfigurationError, match="timeout_seconds must be positive"
+        ):
             DocstringBuildConfig(timeout_seconds=-1)
 
     def test_timeout_zero_invalid(self) -> None:
         """Verify zero timeout raises ConfigurationError."""
-        with pytest.raises(ConfigurationError, match="timeout_seconds must be positive"):
+        with pytest.raises(
+            ConfigurationError, match="timeout_seconds must be positive"
+        ):
             DocstringBuildConfig(timeout_seconds=0)
 
     def test_emit_diff_requires_plugins(self) -> None:
         """Verify emit_diff=True requires enable_plugins=True."""
-        with pytest.raises(ConfigurationError, match="emit_diff requires enable_plugins=True"):
+        with pytest.raises(
+            ConfigurationError, match="emit_diff requires enable_plugins=True"
+        ):
             DocstringBuildConfig(emit_diff=True, enable_plugins=False)
 
     def test_emit_diff_allowed_with_plugins(self) -> None:
@@ -131,12 +137,16 @@ class TestFileProcessConfig:
 
     def test_max_errors_must_be_positive(self) -> None:
         """Verify non-positive max_errors_per_file raises ConfigurationError."""
-        with pytest.raises(ConfigurationError, match="max_errors_per_file must be positive"):
+        with pytest.raises(
+            ConfigurationError, match="max_errors_per_file must be positive"
+        ):
             FileProcessConfig(max_errors_per_file=-1)
 
     def test_max_errors_zero_invalid(self) -> None:
         """Verify zero max_errors_per_file raises ConfigurationError."""
-        with pytest.raises(ConfigurationError, match="max_errors_per_file must be positive"):
+        with pytest.raises(
+            ConfigurationError, match="max_errors_per_file must be positive"
+        ):
             FileProcessConfig(max_errors_per_file=0)
 
     def test_config_is_frozen(self) -> None:
@@ -174,7 +184,9 @@ class TestDocstringApplyConfig:
 
     def test_atomic_writes_requires_write_changes(self) -> None:
         """Verify atomic_writes=True requires write_changes=True."""
-        with pytest.raises(ConfigurationError, match="atomic_writes requires write_changes=True"):
+        with pytest.raises(
+            ConfigurationError, match="atomic_writes requires write_changes=True"
+        ):
             DocstringApplyConfig(atomic_writes=True, write_changes=False)
 
     def test_atomic_writes_allowed_when_writing(self) -> None:
@@ -204,10 +216,14 @@ class TestConfigurationErrorContext:
 
     def test_build_config_error_includes_context(self) -> None:
         """Verify ConfigurationError includes context on validation failure."""
-        with pytest.raises(ConfigurationError, match="timeout_seconds must be positive"):
+        with pytest.raises(
+            ConfigurationError, match="timeout_seconds must be positive"
+        ):
             DocstringBuildConfig(timeout_seconds=-1)
 
     def test_conflict_error_includes_conflicting_fields(self) -> None:
         """Verify conflict errors identify the conflicting fields."""
-        with pytest.raises(ConfigurationError, match="emit_diff requires enable_plugins=True"):
+        with pytest.raises(
+            ConfigurationError, match="emit_diff requires enable_plugins=True"
+        ):
             DocstringBuildConfig(emit_diff=True, enable_plugins=False)

@@ -14,7 +14,11 @@ from tools.docstring_builder.paths import (
     REPO_ROOT,
     SCHEMA_DIFF_PATH,
 )
-from tools.drift_preview import DocstringDriftEntry, write_docstring_drift, write_html_diff
+from tools.drift_preview import (
+    DocstringDriftEntry,
+    write_docstring_drift,
+    write_html_diff,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -66,7 +70,11 @@ class DiffManager:
         docfacts_text: str | None,
     ) -> None:
         """Write a baseline diff for DocFacts when necessary."""
-        if not self.options.baseline or not docfacts_text or DOCFACTS_DIFF_PATH.exists():
+        if (
+            not self.options.baseline
+            or not docfacts_text
+            or DOCFACTS_DIFF_PATH.exists()
+        ):
             return
         baseline_docfacts = read_baseline_version(self.options.baseline, DOCFACTS_PATH)
         if baseline_docfacts is None or baseline_docfacts == docfacts_text:

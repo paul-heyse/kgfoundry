@@ -138,11 +138,15 @@ def _run_step(name: str, command: list[str], message: str) -> int:
         if result.returncode != 0:
             if result.stdout:
                 log_adapter.error(
-                    "[artifacts] %s stdout captured", name, extra={"stdout": result.stdout}
+                    "[artifacts] %s stdout captured",
+                    name,
+                    extra={"stdout": result.stdout},
                 )
             if result.stderr:
                 log_adapter.error(
-                    "[artifacts] %s stderr captured", name, extra={"stderr": result.stderr}
+                    "[artifacts] %s stderr captured",
+                    name,
+                    extra={"stderr": result.stderr},
                 )
             code = STEP_ERROR_CODES.get(name, "KGF-DOC-BLD-105")
             log_adapter.error(

@@ -328,119 +328,111 @@ class FAISSManager:
         # Add with IDs
         cpu_index.add_with_ids(vectors_norm, ids.astype(np.int64))
 
-    def update_index(self, new_vectors: np.ndarray, new_ids: np.ndarray) -> None:  # noqa: C901 - complex incremental indexing logic
+    def update_index(self, new_vectors: np.ndarray, new_ids: np.ndarray) -> None:
         """Add new vectors to secondary index for fast incremental updates.
 
         Adds vectors to a secondary flat index (IndexFlatIP) which requires no
         training and provides instant updates. This enables fast incremental
         indexing without rebuilding the primary index.
-
-        The secondary index is automatically created on first call. Vectors are
-        L2-normalized automatically for cosine similarity. Duplicate IDs are
-        skipped to prevent conflicts, including IDs that already exist in the
-        primary index.
-
-        Parameters
-        ----------
-        new_vectors : np.ndarray
-            New vectors to add, shape (n, vec_dim) where n is the number of vectors
-            and vec_dim matches the index dimension. Dtype should be float32.
-        new_ids : np.ndarray
-            Unique IDs for each vector, shape (n,). IDs are stored as int64 in
-            FAISS. These should correspond to chunk IDs from the indexing pipeline.
-
-        Notes
-        -----
-        The secondary index uses a flat structure (IndexFlatIP) for simplicity
-        and speed. No training is required, making updates instant (seconds).
-        The secondary index is automatically searched alongside the primary index
-        when using `search()`, with results merged by score.
-
-        For optimal performance, periodically merge the secondary index into the
-        primary using `merge_indexes()` and rebuild the primary index.
-
-        Examples
-        --------
-        >>> manager = FAISSManager(index_path=Path("index.faiss"), vec_dim=2560)
-        >>> manager.build_index(initial_vectors)  # Build primary index
-        >>> # Later, add new vectors incrementally
-        >>> manager.update_index(new_vectors, new_ids)
-        >>> # Search automatically uses both indexes
-        >>> distances, ids = manager.search(query_vector)
         """
-        # Initialize secondary index if it doesn't exist
-        if self.secondary_index is None:
-            flat_index = faiss.IndexFlatIP(self.vec_dim)
-            self.secondary_index = faiss.IndexIDMap2(flat_index)
+        self._ensure_secondary_index()
+        primary_contains = self._build_primary_contains()
+        unique_indices = self._collect_unique_indices(new_ids, primary_contains)
+
+        if not unique_indices:
             LOGGER.info(
-                "Created secondary flat index for incremental updates",
-                extra=_log_extra(event="secondary_index_created"),
+                "All vectors already indexed in secondary index",
+                extra=_log_extra(total=len(new_ids)),
             )
+            return
 
-        def _build_primary_contains() -> Callable[[int], bool]:  # noqa: C901, PLR0911 - complex FAISS API compatibility layer
+        unique_vectors = new_vectors[unique_indices]
+        unique_ids = new_ids[unique_indices]
+
+        vectors_norm = unique_vectors.copy()
+        faiss.normalize_L2(vectors_norm)
+
+        self.secondary_index.add_with_ids(vectors_norm, unique_ids.astype(np.int64))
+        self.incremental_ids.update(unique_ids.tolist())
+
+        skipped = len(new_ids) - len(unique_ids)
+        self._log_secondary_added(
+            added=len(unique_ids),
+            total_secondary_vectors=len(self.incremental_ids),
+            skipped_duplicates=skipped,
+        )
+
+    def _ensure_secondary_index(self) -> None:
+        if self.secondary_index is not None:
+            return
+        flat_index = faiss.IndexFlatIP(self.vec_dim)
+        self.secondary_index = faiss.IndexIDMap2(flat_index)
+        LOGGER.info(
+            "Created secondary flat index for incremental updates",
+            extra=_log_extra(event="secondary_index_created"),
+        )
+
+    def _build_primary_contains(self) -> Callable[[int], bool]:
+        try:
+            cpu_index = self._require_cpu_index()
+        except RuntimeError:
+            return lambda _id: False
+
+        id_map_obj = getattr(cpu_index, "id_map", None)
+        if id_map_obj is None:
+            return lambda _id: False
+
+        for attr, builder in (
+            ("contains", self._wrap_bool_contains),
+            ("search", self._wrap_index_contains),
+            ("find", self._wrap_index_contains),
+        ):
+            raw = getattr(id_map_obj, attr, None)
+            if callable(raw):
+                return builder(raw)
+
+        existing_ids = self._build_existing_ids_set(cpu_index, id_map_obj)
+        return lambda id_val: int(id_val) in existing_ids
+
+    @staticmethod
+    def _wrap_bool_contains(raw: Callable[[int], bool]) -> Callable[[int], bool]:
+        def contains(id_val: int) -> bool:
             try:
-                cpu_index = self._require_cpu_index()
-            except RuntimeError:
-                return lambda _id: False
+                return bool(raw(int(id_val)))
+            except (TypeError, ValueError):
+                return False
 
-            id_map_obj = getattr(cpu_index, "id_map", None)
-            if id_map_obj is None:
-                return lambda _id: False
+        return contains
 
-            contains_raw = getattr(id_map_obj, "contains", None)
-            if callable(contains_raw):
-                contains_callable = cast("Callable[[int], bool]", contains_raw)
-
-                def _contains(id_val: int) -> bool:
-                    try:
-                        return bool(contains_callable(int(id_val)))
-                    except (TypeError, ValueError):
-                        return False
-
-                return _contains
-
-            search_raw = getattr(id_map_obj, "search", None)
-            if callable(search_raw):
-                search_callable = cast("Callable[[int], int]", search_raw)
-
-                def _contains(id_val: int) -> bool:
-                    try:
-                        return search_callable(int(id_val)) >= 0
-                    except (TypeError, ValueError):
-                        return False
-
-                return _contains
-
-            find_raw = getattr(id_map_obj, "find", None)
-            if callable(find_raw):
-                find_callable = cast("Callable[[int], int]", find_raw)
-
-                def _contains(id_val: int) -> bool:
-                    try:
-                        return find_callable(int(id_val)) >= 0
-                    except (TypeError, ValueError):
-                        return False
-
-                return _contains
-
+    @staticmethod
+    def _wrap_index_contains(raw: Callable[[int], int]) -> Callable[[int], bool]:
+        def contains(id_val: int) -> bool:
             try:
-                n_total = cpu_index.ntotal
-            except AttributeError:
-                return lambda _id: False
+                return raw(int(id_val)) >= 0
+            except (TypeError, ValueError):
+                return False
 
-            try:
-                at_raw = getattr(id_map_obj, "at", None)
-                if not callable(at_raw):
-                    return lambda _id: False
-                at_callable = cast("Callable[[int], int]", at_raw)
-                existing_ids = {int(at_callable(idx)) for idx in range(n_total)}
-            except (AttributeError, TypeError, ValueError):
-                return lambda _id: False
+        return contains
 
-            return lambda id_val: int(id_val) in existing_ids
+    @staticmethod
+    def _build_existing_ids_set(cpu_index: _faiss.Index, id_map_obj: object) -> set[int]:
+        try:
+            n_total = cpu_index.ntotal
+        except AttributeError:
+            return set()
 
-        primary_contains = _build_primary_contains()
+        try:
+            at_raw = getattr(id_map_obj, "at", None)
+            if not callable(at_raw):
+                return set()
+            at_callable = cast("Callable[[int], int]", at_raw)
+            return {int(at_callable(idx)) for idx in range(n_total)}
+        except (AttributeError, TypeError, ValueError):
+            return set()
 
+    def _collect_unique_indices(
+        self, new_ids: np.ndarray, primary_contains: Callable[[int], bool]
+    ) -> list[int]:
         unique_indices: list[int] = []
         seen_in_batch: set[int] = set()
 
@@ -455,33 +447,21 @@ class FAISSManager:
                 continue
             unique_indices.append(offset)
 
-        if len(unique_indices) == 0:
-            LOGGER.info(
-                "All vectors already indexed in secondary index",
-                extra=_log_extra(total=len(new_ids)),
-            )
-            return
+        return unique_indices
 
-        # Filter to unique vectors and IDs
-        unique_vectors = new_vectors[unique_indices]
-        unique_ids = new_ids[unique_indices]
-
-        # Normalize vectors
-        vectors_norm = unique_vectors.copy()
-        faiss.normalize_L2(vectors_norm)
-
-        # Add to secondary index
-        self.secondary_index.add_with_ids(vectors_norm, unique_ids.astype(np.int64))
-
-        # Track incremental IDs
-        self.incremental_ids.update(unique_ids.tolist())
-
+    @staticmethod
+    def _log_secondary_added(
+        *,
+        added: int,
+        total_secondary_vectors: int,
+        skipped_duplicates: int,
+    ) -> None:
         LOGGER.info(
             "Added vectors to secondary index",
             extra=_log_extra(
-                added=len(unique_ids),
-                total_secondary_vectors=len(self.incremental_ids),
-                skipped_duplicates=len(new_ids) - len(unique_ids),
+                added=added,
+                total_secondary_vectors=total_secondary_vectors,
+                skipped_duplicates=skipped_duplicates,
             ),
         )
 
@@ -1033,6 +1013,10 @@ class FAISSManager:
             If the index does not support vector reconstruction or ID mapping.
             This can occur with certain index types or if the index is not wrapped
             with IndexIDMap2.
+        TypeError
+            If the index's ``id_map`` interface is invalid (missing ``at`` or not callable).
+        TypeError
+            If the index's id_map interface is invalid or missing required methods.
         """
         n_vectors = index.ntotal
         if n_vectors == 0:
@@ -1050,7 +1034,7 @@ class FAISSManager:
         id_map_obj = getattr(index, "id_map", None)
         if not callable(getattr(id_map_obj, "at", None)):
             msg = f"Index type {type(index).__name__} has invalid id_map interface."
-            raise RuntimeError(msg)
+            raise TypeError(msg)
         at_callable = cast("Callable[[int], int]", id_map_obj.at)
 
         for i in range(n_vectors):

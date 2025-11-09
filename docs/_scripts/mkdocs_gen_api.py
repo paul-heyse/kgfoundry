@@ -111,7 +111,9 @@ def generate_api_reference(
     for package in packages:
         module = cast("DocumentableNode", loader.load(package))
         pages.append(_render_node(module, target))
-        pages.extend(_render_node(member, target) for member in _documentable_members(module))
+        pages.extend(
+            _render_node(member, target) for member in _documentable_members(module)
+        )
 
     return pages
 

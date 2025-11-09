@@ -84,7 +84,9 @@ class NavmapMetrics:
 
     def __init__(self, registry: CollectorRegistry | None = None) -> None:
         resolved = (
-            registry if registry is not None else cast("CollectorRegistry", get_default_registry())
+            registry
+            if registry is not None
+            else cast("CollectorRegistry", get_default_registry())
         )
         self.registry = resolved
 
@@ -153,6 +155,7 @@ class _NavmapMetricsCache:
 
 
 _METRICS_CACHE = _NavmapMetricsCache()
+_SET_NAVMAP_ATTR = object.__setattr__
 
 
 def get_metrics_registry() -> NavmapMetrics:
@@ -169,8 +172,8 @@ def get_metrics_registry() -> NavmapMetrics:
     >>> metrics.build_runs_total.labels(status="success").inc()
     """
     if _METRICS_CACHE.registry is None:
-        _METRICS_CACHE.registry = NavmapMetrics()
-    return _METRICS_CACHE.registry
+        _SET_NAVMAP_ATTR(_METRICS_CACHE, "registry", NavmapMetrics())
+    return cast("NavmapMetrics", _METRICS_CACHE.registry)
 
 
 def get_correlation_id() -> str:
@@ -260,10 +263,14 @@ def record_operation_metrics(
             metrics.check_duration_seconds.labels(status=final_status).observe(duration)
         elif operation == "repair":
             metrics.repair_runs_total.labels(status=final_status).inc()
-            metrics.repair_duration_seconds.labels(status=final_status).observe(duration)
+            metrics.repair_duration_seconds.labels(status=final_status).observe(
+                duration
+            )
         elif operation == "migrate":
             metrics.migrate_runs_total.labels(status=final_status).inc()
-            metrics.migrate_duration_seconds.labels(status=final_status).observe(duration)
+            metrics.migrate_duration_seconds.labels(status=final_status).observe(
+                duration
+            )
 
         with_fields(
             log_adapter,

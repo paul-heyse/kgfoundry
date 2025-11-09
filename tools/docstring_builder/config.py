@@ -76,7 +76,9 @@ class BuilderConfig:
             "render_signature": self.render_signature,
             "builder_cache_version": _CACHE_VERSION,
         }
-        blob = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        blob = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
         return hashlib.sha256(blob).hexdigest()
 
 
@@ -106,20 +108,28 @@ def _as_list(value: object) -> list[str]:
 def _package_settings_from(data: Mapping[str, object]) -> PackageSettings:
     packages_value = data.get("packages")
     packages_mapping = (
-        cast("Mapping[str, object]", packages_value) if isinstance(packages_value, Mapping) else {}
+        cast("Mapping[str, object]", packages_value)
+        if isinstance(packages_value, Mapping)
+        else {}
     )
     summary_verbs_raw = packages_mapping.get("summary_verbs")
     if isinstance(summary_verbs_raw, Mapping):
-        summary_verbs = {str(key): str(value) for key, value in summary_verbs_raw.items()}
+        summary_verbs = {
+            str(key): str(value) for key, value in summary_verbs_raw.items()
+        }
     else:
         summary_verbs = {}
-    opt_out_values = _as_list(packages_mapping.get("opt_out")) if packages_mapping else []
+    opt_out_values = (
+        _as_list(packages_mapping.get("opt_out")) if packages_mapping else []
+    )
     return PackageSettings(
         summary_verbs=summary_verbs, opt_out={str(item) for item in opt_out_values}
     )
 
 
-def _bool_option(data: Mapping[str, object], key: str, *, default: bool = False) -> bool:
+def _bool_option(
+    data: Mapping[str, object], key: str, *, default: bool = False
+) -> bool:
     raw_value = data.get(key, default)
     return bool(raw_value)
 
@@ -140,7 +150,9 @@ def load_config(path: Path | None = None) -> BuilderConfig:
     config_path = path or DEFAULT_CONFIG_PATH
     data = _load_toml(config_path)
 
-    include = [str(pattern) for pattern in _as_list(data.get("include")) or ["src/**/*.py"]]
+    include = [
+        str(pattern) for pattern in _as_list(data.get("include")) or ["src/**/*.py"]
+    ]
     exclude = [
         str(pattern)
         for pattern in _as_list(data.get("exclude"))
@@ -168,7 +180,9 @@ def load_config(path: Path | None = None) -> BuilderConfig:
         render_signature=render_signature,
     )
 
-    LOGGER.debug("Loaded docstring builder config: include=%s exclude=%s", include, exclude)
+    LOGGER.debug(
+        "Loaded docstring builder config: include=%s exclude=%s", include, exclude
+    )
     return config
 
 

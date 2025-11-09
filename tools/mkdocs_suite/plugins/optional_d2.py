@@ -79,7 +79,9 @@ class OptionalD2Plugin(BasePlugin[LegacyConfig]):
         """
         errors, warnings = super().load_config(options, config_file_path)
         if D2Plugin is None:
-            message = "mkdocs-d2-plugin is not installed; skipping D2 diagram rendering."
+            message = (
+                "mkdocs-d2-plugin is not installed; skipping D2 diagram rendering."
+            )
             self._warn_once(message)
             cast("list[object]", warnings).append(message)
             self._delegate = None
@@ -96,7 +98,9 @@ class OptionalD2Plugin(BasePlugin[LegacyConfig]):
             return errors, warnings
 
         delegate = D2Plugin()
-        delegate_errors, delegate_warnings = delegate.load_config(options, config_file_path)
+        delegate_errors, delegate_warnings = delegate.load_config(
+            options, config_file_path
+        )
         errors.extend(delegate_errors)
         warnings.extend(delegate_warnings)
         self._delegate = delegate

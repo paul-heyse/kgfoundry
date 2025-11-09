@@ -19,7 +19,12 @@ from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.vllm_client import VLLMClient
 from codeintel_rev.mcp_server.common.observability import observe_duration
-from codeintel_rev.mcp_server.schemas import AnswerEnvelope, Finding, MethodInfo, ScopeIn
+from codeintel_rev.mcp_server.schemas import (
+    AnswerEnvelope,
+    Finding,
+    MethodInfo,
+    ScopeIn,
+)
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
 from kgfoundry_common.logging import get_logger
@@ -241,14 +246,14 @@ def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914, PLR0912
                     continue
                 fused_ids.append(chunk_id_int)
                 fused_scores.append(float(doc.score))
-                fused_contributions[chunk_id_int] = hybrid_result.contributions.get(
-                    doc.doc_id, []
-                )
+                fused_contributions[chunk_id_int] = hybrid_result.contributions.get(doc.doc_id, [])
             if fused_ids:
                 hydration_ids = fused_ids
                 hydration_scores = fused_scores
                 contribution_map = fused_contributions
-                retrieval_channels = list(dict.fromkeys(["semantic", "faiss", *hybrid_result.channels]))
+                retrieval_channels = list(
+                    dict.fromkeys(["semantic", "faiss", *hybrid_result.channels])
+                )
 
         hydration_ids = hydration_ids[:effective_limit]
         hydration_scores = hydration_scores[: len(hydration_ids)]
@@ -296,8 +301,8 @@ def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914, PLR0912
                 if not contributions:
                     continue
                 parts = [f"{channel} rank={rank}" for channel, rank, _ in contributions]
-                finding["why"] = (
-                    f"Hybrid RRF (k={context.settings.index.rrf_k}): " + ", ".join(parts)
+                finding["why"] = f"Hybrid RRF (k={context.settings.index.rrf_k}): " + ", ".join(
+                    parts
                 )
 
         method_metadata = _build_method(

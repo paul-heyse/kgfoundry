@@ -12,7 +12,8 @@ from kgfoundry_common.observability import MetricsProvider
 from kgfoundry_common.prometheus import HAVE_PROMETHEUS, HistogramLike
 
 pytestmark = pytest.mark.skipif(
-    not HAVE_PROMETHEUS, reason="Prometheus client not installed; metrics tests bypassed."
+    not HAVE_PROMETHEUS,
+    reason="Prometheus client not installed; metrics tests bypassed.",
 )
 
 
@@ -32,7 +33,9 @@ def _get_sample_value(
     return registry.get_sample_value(metric, labels)
 
 
-def test_observe_duration_records_success(prometheus_registry: CollectorRegistry) -> None:
+def test_observe_duration_records_success(
+    prometheus_registry: CollectorRegistry,
+) -> None:
     """Successful observations increment the success counters and histograms."""
     provider = MetricsProvider(registry=prometheus_registry)
     component = "codeintel_mcp"

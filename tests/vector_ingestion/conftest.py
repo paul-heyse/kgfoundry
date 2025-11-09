@@ -47,7 +47,9 @@ def _vector_schema_path() -> Path:
     return _VECTOR_SCHEMA_PATH
 
 
-vector_schema_path: Callable[[], Path] = pytest.fixture(scope="session")(_vector_schema_path)
+vector_schema_path: Callable[[], Path] = pytest.fixture(scope="session")(
+    _vector_schema_path
+)
 
 
 def _vector_schema(vector_schema_path: Path) -> dict[str, JsonValue]:
@@ -71,7 +73,9 @@ vector_schema: Callable[[Path], dict[str, JsonValue]] = pytest.fixture(scope="se
 )
 
 
-def _vector_validator(vector_schema: dict[str, JsonValue]) -> Draft202012ValidatorProtocol:
+def _vector_validator(
+    vector_schema: dict[str, JsonValue],
+) -> Draft202012ValidatorProtocol:
     """Provide a cached JSON Schema validator for vector payloads.
 
     Parameters
@@ -87,9 +91,9 @@ def _vector_validator(vector_schema: dict[str, JsonValue]) -> Draft202012Validat
     return create_draft202012_validator(vector_schema)
 
 
-vector_validator: Callable[[dict[str, JsonValue]], Draft202012ValidatorProtocol] = pytest.fixture(
-    scope="session"
-)(_vector_validator)
+vector_validator: Callable[[dict[str, JsonValue]], Draft202012ValidatorProtocol] = (
+    pytest.fixture(scope="session")(_vector_validator)
+)
 
 
 def _canonical_vector_payload() -> VectorPayload:
@@ -106,7 +110,9 @@ def _canonical_vector_payload() -> VectorPayload:
     ]
 
 
-canonical_vector_payload: Callable[[], VectorPayload] = pytest.fixture(_canonical_vector_payload)
+canonical_vector_payload: Callable[[], VectorPayload] = pytest.fixture(
+    _canonical_vector_payload
+)
 
 
 def _inconsistent_dimension_payload() -> VectorPayload:
@@ -157,7 +163,9 @@ def _canonical_vector_matrix(canonical_vector_payload: VectorPayload) -> VectorM
     VectorMatrix
         NumPy array matrix representation.
     """
-    vectors = [cast("Sequence[float]", record["vector"]) for record in canonical_vector_payload]
+    vectors = [
+        cast("Sequence[float]", record["vector"]) for record in canonical_vector_payload
+    ]
     return np.asarray(vectors, dtype=np.float32)
 
 

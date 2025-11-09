@@ -5,9 +5,9 @@ from __future__ import annotations
 import ast
 import os
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, cast, overload
+from typing import TYPE_CHECKING, cast
 
 import libcst as cst
 
@@ -38,11 +38,19 @@ def _escape_docstring(text: str, indent: str) -> str:
         return f"{lines[0]}\n"
     summary, *rest = lines
     indented_rest = [
-        f"{indent}{line}" if line else ""  # Preserve blank lines without trailing spaces
+        (
+            f"{indent}{line}" if line else ""
+        )  # Preserve blank lines without trailing spaces
         for line in rest
     ]
     joined = "\n".join([summary, *indented_rest])
     return f"{joined}\n"
+
+
+def _thaw(instance: object, **updates: object) -> None:
+    """Mutate frozen dataclass instances safely."""
+    for name, value in updates.items():
+        _SETATTR(instance, name, value)
 
 
 @dataclass(slots=True, frozen=True)
@@ -50,10 +58,7 @@ class _DocstringTransformer(cst.CSTTransformer):
     module_name: str
     edits: Mapping[str, DocstringEdit]
     changed: bool = False
-
-    def __post_init__(self) -> None:
-        """Initialize namespace after dataclass initialization."""
-        self.namespace: list[str] = []
+    namespace: list[str] = field(default_factory=list, init=False, repr=False)
 
     def _qualify(self, name: str) -> str:
         if self.namespace:
@@ -62,18 +67,12 @@ class _DocstringTransformer(cst.CSTTransformer):
             pieces = [self.module_name, name]
         return ".".join(piece for piece in pieces if piece)
 
-    @overload
-    def _inject_docstring(self, node: cst.FunctionDef, qname: str) -> cst.FunctionDef: ...
-
-    @overload
-    def _inject_docstring(self, node: cst.ClassDef, qname: str) -> cst.ClassDef: ...
-
     def _inject_docstring(
         self, node: cst.FunctionDef | cst.ClassDef, qname: str
-    ) -> cst.FunctionDef | cst.ClassDef:
+    ) -> tuple[cst.ClassDef | cst.FunctionDef, bool]:
         edit = self.edits.get(qname)
         if not edit:
-            return node
+            return node, False
         indent_level = max(len(self.namespace), 1)
         desired = _escape_docstring(edit.text, " " * 4 * indent_level)
         literal = cst.SimpleString(f'"""{desired}"""')
@@ -81,9 +80,13 @@ class _DocstringTransformer(cst.CSTTransformer):
         docstring_stmt = cst.SimpleStatementLine(body=(expr,))
 
         body = node.body
-        original_statements = cast("Sequence[cst.BaseStatement | BaseSmallStatement]", body.body)
+        original_statements = cast(
+            "Sequence[cst.BaseStatement | BaseSmallStatement]", body.body
+        )
 
-        def _as_statement(item: cst.BaseStatement | BaseSmallStatement) -> cst.BaseStatement:
+        def _as_statement(
+            item: cst.BaseStatement | BaseSmallStatement,
+        ) -> cst.BaseStatement:
             if isinstance(item, cst.BaseStatement):
                 return item
             return cst.SimpleStatementLine(body=(item,))
@@ -92,7 +95,9 @@ class _DocstringTransformer(cst.CSTTransformer):
             _as_statement(stmt) for stmt in original_statements
         ]
 
-        if existing_statements and isinstance(existing_statements[0], cst.SimpleStatementLine):
+        if existing_statements and isinstance(
+            existing_statements[0], cst.SimpleStatementLine
+        ):
             first = existing_statements[0]
             if (
                 first.body
@@ -101,7 +106,7 @@ class _DocstringTransformer(cst.CSTTransformer):
             ):
                 current_value = cast("str", ast.literal_eval(first.body[0].value.value))
                 if current_value == desired:
-                    return node
+                    return node, False
                 new_statements: list[cst.BaseStatement] = [
                     docstring_stmt,
                     *existing_statements[1:],
@@ -112,12 +117,11 @@ class _DocstringTransformer(cst.CSTTransformer):
             new_statements = [docstring_stmt, *existing_statements]
 
         if new_statements == existing_statements:
-            return node
-        self.changed = True
+            return node, False
         new_body = body.with_changes(
             body=cast("tuple[cst.BaseStatement, ...]", tuple(new_statements))
         )
-        return node.with_changes(body=new_body)
+        return node.with_changes(body=new_body), True
 
     def visit_classdef(self, node: cst.ClassDef) -> bool:
         """Visit class definition and track namespace.
@@ -154,8 +158,10 @@ class _DocstringTransformer(cst.CSTTransformer):
         """
         qname = self._qualify(updated_node.name.value)
         self.namespace.pop()
-        transformed = self._inject_docstring(updated_node, qname)
-        return cast("BaseStatement", transformed)
+        transformed_node, changed = self._inject_docstring(updated_node, qname)
+        if changed:
+            _thaw(self, changed=True)
+        return cast("BaseStatement", transformed_node)
 
     def visit_functiondef(self, node: cst.FunctionDef) -> bool:
         """Visit function definition and track namespace.
@@ -192,8 +198,10 @@ class _DocstringTransformer(cst.CSTTransformer):
         """
         qname = self._qualify(updated_node.name.value)
         self.namespace.pop()
-        transformed = self._inject_docstring(updated_node, qname)
-        return cast("BaseStatement", transformed)
+        transformed_node, changed = self._inject_docstring(updated_node, qname)
+        if changed:
+            _thaw(self, changed=True)
+        return cast("BaseStatement", transformed_node)
 
 
 def _atomic_write(target: Path, content: str, *, encoding: str = "utf-8") -> None:
@@ -292,3 +300,4 @@ def apply_edits(
 
 
 __all__ = ["apply_edits"]
+_SETATTR = object.__setattr__

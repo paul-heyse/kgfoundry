@@ -109,8 +109,10 @@ class BM25IndexManager:
         ----------
         source : str | Path
             Path to the JSONL corpus containing ``{"id": "...", "contents": ...}`` rows.
-        output_dir : str | Path, optional
-            Override the configured JsonCollection directory.
+        output_dir : str | Path | None, optional
+            Override the configured JsonCollection directory. If None, uses the
+            default corpus directory from configuration. The directory will be
+            created if it doesn't exist. Defaults to None.
         overwrite : bool, optional
             When ``True`` (default) existing documents in the output directory are removed.
 
@@ -175,7 +177,9 @@ class BM25IndexManager:
 
                 with (json_dir / f"{doc_id_str}.json").open("w", encoding="utf-8") as out_handle:
                     json.dump(
-                        {"id": doc_id_str, "contents": contents}, out_handle, ensure_ascii=False
+                        {"id": doc_id_str, "contents": contents},
+                        out_handle,
+                        ensure_ascii=False,
                     )
                 doc_count += 1
 
@@ -313,12 +317,33 @@ def _write_struct(path: Path, data: msgspec.Struct) -> None:
 
 
 def _read_corpus_metadata(path: Path) -> BM25CorpusMetadata:
-    """Read corpus metadata from JSON.
+    """Read corpus metadata from JSON file.
+
+    This helper function deserializes BM25 corpus metadata from a JSON file
+    created during corpus preparation. The metadata contains information about
+    document count, source path, content digest, preparation timestamp, and
+    generator identifier.
+
+    Parameters
+    ----------
+    path : Path
+        File path to the JSON metadata file. The file must exist and contain
+        valid BM25CorpusMetadata JSON serialized data.
 
     Returns
     -------
     BM25CorpusMetadata
-        Decoded metadata structure.
+        Decoded metadata structure containing corpus statistics and provenance
+        information. Includes document count, source path, SHA-256 digest of
+        corpus content, ISO 8601 timestamp, and generator name.
+
+    Notes
+    -----
+    Exception Propagation:
+        This function may propagate exceptions from underlying operations:
+        - FileNotFoundError: If the metadata file does not exist (from path.read_bytes())
+        - msgspec.DecodeError: If the file contains invalid JSON or data that doesn't
+          match the BM25CorpusMetadata schema (from msgspec.json.decode())
     """
     return msgspec.json.decode(path.read_bytes(), type=BM25CorpusMetadata)
 
@@ -330,17 +355,49 @@ def _parse_corpus_line(
     seen_ids: set[str],
     source_path: Path,
 ) -> tuple[str, str] | None:
-    """Parse and validate a JSONL line.
+    """Parse and validate a JSONL line from the corpus source.
+
+    This function parses a single line from a JSONL corpus file, validates that
+    it contains required fields (id and contents/text), checks for duplicate
+    document IDs, and returns the parsed document identifier and content. Empty
+    lines are skipped by returning None.
+
+    The function maintains a set of seen document IDs to detect duplicates within
+    the corpus, which is important for ensuring corpus integrity and preventing
+    indexing errors.
+
+    Parameters
+    ----------
+    raw_line : str
+        Raw line from the JSONL file, including any trailing whitespace or
+        newline characters. Will be stripped before parsing.
+    line_number : int
+        One-based line number in the source file. Used for error messages to
+        help identify problematic lines during corpus preparation.
+    seen_ids : set[str]
+        Set of document IDs that have been encountered in previous lines. This
+        set is mutated by adding the current document ID if parsing succeeds.
+        Used to detect duplicate document IDs within the corpus.
+    source_path : Path
+        Path to the source JSONL file. Used in error messages to provide context
+        about which file contains the problematic line.
 
     Returns
     -------
     tuple[str, str] | None
-        A ``(doc_id, contents)`` tuple, or ``None`` when the line should be skipped.
+        Tuple of (doc_id, contents) if the line was successfully parsed and
+        validated. Returns None if the line is empty (after stripping) or should
+        be skipped for any reason.
 
     Raises
     ------
     ValueError
-        If the line is malformed or violates corpus invariants.
+        Raised in the following cases:
+        - Line contains invalid JSON (JSONDecodeError)
+        - Document object is missing the 'id' field
+        - Document ID has already been seen (duplicate)
+        - Document is missing both 'contents' and 'text' fields, or the content
+          field is empty or not a string
     """
     stripped_line = raw_line.strip()
     if not stripped_line:
@@ -390,12 +447,25 @@ def _detect_pyserini_version() -> str:
 
 
 def _directory_size(path: Path) -> int:
-    """Compute total size in bytes for files beneath ``path``.
+    """Compute total size in bytes for all files beneath a directory.
+
+    This utility function recursively traverses a directory tree and sums the
+    sizes of all regular files found. It's used to calculate index sizes for
+    metadata purposes. Symbolic links are followed, but directories themselves
+    don't contribute to the size.
+
+    Parameters
+    ----------
+    path : Path
+        Root directory path to measure. The function recursively traverses all
+        subdirectories and sums file sizes. The path must exist and be a directory.
 
     Returns
     -------
     int
-        Total size in bytes for all files contained within ``path``.
+        Total size in bytes for all regular files contained within the directory
+        tree. Returns 0 if the directory is empty or contains no files. The
+        size is calculated using file system stat information (st_size).
     """
     total = 0
     for child in path.rglob("*"):

@@ -29,7 +29,8 @@ def _load_serve_module_with_stubs() -> types.ModuleType:
         tools_stub.__path__ = []
 
     shared_stub = cast(
-        "Any", sys.modules.setdefault("tools._shared", types.ModuleType("tools._shared"))
+        "Any",
+        sys.modules.setdefault("tools._shared", types.ModuleType("tools._shared")),
     )
     if not hasattr(shared_stub, "__path__"):
         shared_stub.__path__ = []
@@ -37,7 +38,9 @@ def _load_serve_module_with_stubs() -> types.ModuleType:
     if "tools._shared.logging" not in sys.modules:
         logging_stub = cast("Any", types.ModuleType("tools._shared.logging"))
 
-        def _get_logger_stub(*_args: object, **_kwargs: object) -> types.SimpleNamespace:
+        def _get_logger_stub(
+            *_args: object, **_kwargs: object
+        ) -> types.SimpleNamespace:
             return types.SimpleNamespace(
                 info=lambda *_a, **_k: None,
                 exception=lambda *_a, **_k: None,
@@ -64,8 +67,12 @@ def _load_serve_module_with_stubs() -> types.ModuleType:
         proc_stub.run_tool = _run_tool_stub
         sys.modules["tools._shared.proc"] = proc_stub
 
-    serve_path = Path(__file__).resolve().parents[2] / "tools" / "mkdocs_suite" / "serve.py"
-    spec = importlib.util.spec_from_file_location("tests.tools.mkdocs_serve", serve_path)
+    serve_path = (
+        Path(__file__).resolve().parents[2] / "tools" / "mkdocs_suite" / "serve.py"
+    )
+    spec = importlib.util.spec_from_file_location(
+        "tests.tools.mkdocs_serve", serve_path
+    )
     if spec is None or spec.loader is None:
         msg = "Unable to load tools.mkdocs_suite.serve for testing"
         raise RuntimeError(msg)
@@ -78,7 +85,9 @@ def _load_serve_module_with_stubs() -> types.ModuleType:
 serve = _load_serve_module()
 
 
-def _iter_candidate_ports(host: str, family: int, start: int, count: int = 50) -> Iterator[int]:
+def _iter_candidate_ports(
+    host: str, family: int, start: int, count: int = 50
+) -> Iterator[int]:
     for port in range(start, min(start + count, 65535) + 1):
         try:
             addrinfos = socket.getaddrinfo(

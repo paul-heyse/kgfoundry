@@ -1,4 +1,5 @@
 """Typed DuckDB helper utilities for parameterized queries and logging."""
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -278,7 +279,9 @@ def execute(
     """
     opts = _coerce_options(options, operation="duckdb.execute")
     require_flag = (
-        params is not None if opts.require_parameterized is None else opts.require_parameterized
+        params is not None
+        if opts.require_parameterized is None
+        else opts.require_parameterized
     )
     _ensure_parameterized(sql, require_parameterized=require_flag)
 
@@ -297,7 +300,9 @@ def execute(
         start = time.perf_counter()
         try:
             _set_timeout(conn, opts.timeout_s)
-            relation = conn.execute(sql) if params is None else conn.execute(sql, params)
+            relation = (
+                conn.execute(sql) if params is None else conn.execute(sql, params)
+            )
         except duckdb.Error as exc:
             observer.error()
             log.exception(
@@ -316,7 +321,10 @@ def execute(
             if duration >= opts.slow_query_threshold_s:
                 log.warning(
                     "Slow DuckDB query",
-                    extra={"duration_ms": round(duration * 1000, 2), "params": query_params},
+                    extra={
+                        "duration_ms": round(duration * 1000, 2),
+                        "params": query_params,
+                    },
                 )
             else:
                 log.debug(

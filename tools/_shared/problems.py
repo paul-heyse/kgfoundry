@@ -52,7 +52,12 @@ def problem_from_exc(
     detail = str(exc) or None
     instance = f"urn:kgf:op:{operation}:run:{run_id}" if operation and run_id else None
     return ProblemDetails(
-        type=type_uri, title=title, detail=detail, status=500, instance=instance, code=code
+        type=type_uri,
+        title=title,
+        detail=detail,
+        status=500,
+        instance=instance,
+        code=code,
     )
 
 

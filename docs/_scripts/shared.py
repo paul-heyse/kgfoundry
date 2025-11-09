@@ -139,7 +139,9 @@ def load_settings() -> DocsSettings:
     link_mode_raw = os.environ.get("DOCS_LINK_MODE", "both").lower()
     link_mode = _LINK_MODE_MAP.get(link_mode_raw)
     if link_mode is None:
-        LOGGER.warning("Unsupported DOCS_LINK_MODE '%s'; defaulting to 'both'", link_mode_raw)
+        LOGGER.warning(
+            "Unsupported DOCS_LINK_MODE '%s'; defaulting to 'both'", link_mode_raw
+        )
         link_mode = "both"
 
     docs_build_dir = env.root / "docs" / "_build"
@@ -333,7 +335,9 @@ def safe_json_serialize(
 
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        temp_path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        temp_path.write_text(
+            json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
         temp_path.replace(path)
     except (OSError, json.JSONDecodeError) as exc:  # pragma: no cover - I/O error
         dest_logger.warning(

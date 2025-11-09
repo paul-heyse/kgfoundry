@@ -13,7 +13,9 @@ from download import cli
 def test_harvest_emits_envelope(tmp_path: Path, monkeypatch) -> None:
     """The harvest command should write a structured CLI envelope on success."""
     monkeypatch.setattr(cli, "CLI_ENVELOPE_DIR", tmp_path)
-    expected_path = tmp_path / f"{cli.CLI_SETTINGS.bin_name}-{cli.CLI_COMMAND}-harvest.json"
+    expected_path = (
+        tmp_path / f"{cli.CLI_SETTINGS.bin_name}-{cli.CLI_COMMAND}-harvest.json"
+    )
 
     runner = CliRunner()
     result = runner.invoke(

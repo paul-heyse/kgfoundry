@@ -103,7 +103,9 @@ class TestSymbolIndexValidation:
         broken.pop(field_name, None)
         broken_payload = cast("JsonPayload", [broken])
         with pytest.raises(ToolExecutionError):
-            validate_against_schema(broken_payload, SYMBOL_SCHEMA, artifact="symbols.json")
+            validate_against_schema(
+                broken_payload, SYMBOL_SCHEMA, artifact="symbols.json"
+            )
 
 
 class TestSymbolDeltaValidation:
@@ -119,7 +121,9 @@ class TestSymbolDeltaValidation:
         payload = _load(DELTA_EXAMPLE)
         artifacts = symbol_delta_from_json(payload)
         reserialized = symbol_delta_to_payload(artifacts)
-        validate_against_schema(reserialized, DELTA_SCHEMA, artifact="symbols.delta.json")
+        validate_against_schema(
+            reserialized, DELTA_SCHEMA, artifact="symbols.delta.json"
+        )
 
     def test_symbol_delta_rejects_non_object_payload(self) -> None:
         """Test that non-object payloads are rejected."""
@@ -149,7 +153,9 @@ class TestReverseLookupValidation:
         """Test that reverse lookup payloads must be JSON objects."""
         invalid_payload = cast("JsonPayload", ["not", "a", "mapping"])
         with pytest.raises(ToolExecutionError):
-            validate_against_schema(invalid_payload, REVERSE_SCHEMA, artifact="by_file.json")
+            validate_against_schema(
+                invalid_payload, REVERSE_SCHEMA, artifact="by_file.json"
+            )
 
     def test_reverse_lookup_rejects_non_string_values(self) -> None:
         """Test that reverse lookup entries must be arrays of strings."""
@@ -206,7 +212,11 @@ class PayloadFactory:
                 elif wrong_type_field == "tested_by":
                     row_dict[wrong_type_field] = "not-a-list"  # Should be array
                 elif wrong_type_field == "source_link":
-                    row_dict[wrong_type_field] = ["not", "a", "dict"]  # Should be object
+                    row_dict[wrong_type_field] = [
+                        "not",
+                        "a",
+                        "dict",
+                    ]  # Should be object
             if extra_field:
                 row_dict["_unknown_field"] = "should-not-be-here"
             result.append(row_dict)
@@ -266,7 +276,9 @@ class TestValidateArtifactsHelpers:
 
         assert result == {"pkg/module.py": ("pkg.symbol",)}
 
-    def test_validate_by_module_lookup_rejects_bad_entries(self, tmp_path: Path) -> None:
+    def test_validate_by_module_lookup_rejects_bad_entries(
+        self, tmp_path: Path
+    ) -> None:
         """Validate helper raises when payload contains invalid entries."""
         payload = {"pkg": ["valid", 42]}
         path = tmp_path / "by_module.json"
@@ -344,7 +356,9 @@ class TestValidateArtifactsHelpers:
         payload = PayloadFactory.malformed_symbol_delta(wrong_type_field="added")
         with pytest.raises(ToolExecutionError):
             validate_against_schema(
-                cast("JsonPayload", payload), DELTA_SCHEMA, artifact="symbols.delta.json"
+                cast("JsonPayload", payload),
+                DELTA_SCHEMA,
+                artifact="symbols.delta.json",
             )
 
     def test_symbol_delta_wrong_type_changed(self) -> None:
@@ -352,7 +366,9 @@ class TestValidateArtifactsHelpers:
         payload = PayloadFactory.malformed_symbol_delta(wrong_type_field="changed")
         with pytest.raises(ToolExecutionError):
             validate_against_schema(
-                cast("JsonPayload", payload), DELTA_SCHEMA, artifact="symbols.delta.json"
+                cast("JsonPayload", payload),
+                DELTA_SCHEMA,
+                artifact="symbols.delta.json",
             )
 
     def test_artifact_validation_error_surfaces_problem_details(self) -> None:
@@ -393,9 +409,9 @@ class TestByteIdenticalRoundTrip:
         # Normalize whitespace and compare
         original_normalized = json.dumps(original_payload, sort_keys=True, indent=2)
         reserialized_normalized = json.dumps(reserialized, sort_keys=True, indent=2)
-        assert original_normalized == reserialized_normalized, (
-            "Symbol index round-trip is not byte-identical"
-        )
+        assert (
+            original_normalized == reserialized_normalized
+        ), "Symbol index round-trip is not byte-identical"
 
     def test_symbol_delta_round_trip_byte_identical(self) -> None:
         """Test that symbol delta round-trip produces byte-identical JSON.
@@ -414,9 +430,9 @@ class TestByteIdenticalRoundTrip:
         # Normalize whitespace and compare
         original_normalized = json.dumps(original_payload, sort_keys=True, indent=2)
         reserialized_normalized = json.dumps(reserialized, sort_keys=True, indent=2)
-        assert original_normalized == reserialized_normalized, (
-            "Symbol delta round-trip is not byte-identical"
-        )
+        assert (
+            original_normalized == reserialized_normalized
+        ), "Symbol delta round-trip is not byte-identical"
 
     def test_symbol_index_validation_preserves_ordering(self) -> None:
         """Test that codec preserves field ordering from schema examples."""
@@ -437,5 +453,7 @@ class TestByteIdenticalRoundTrip:
         # Both should pass schema validation
         validate_against_schema(payload, DELTA_SCHEMA, artifact="symbols.delta.json")
         validate_against_schema(
-            cast("JsonPayload", reserialized), DELTA_SCHEMA, artifact="symbols.delta.json"
+            cast("JsonPayload", reserialized),
+            DELTA_SCHEMA,
+            artifact="symbols.delta.json",
         )

@@ -1,4 +1,5 @@
 """Expose ``search_api.faiss_adapter`` inside the ``kgfoundry`` namespace."""
+
 # [nav:section public-api]
 
 from __future__ import annotations

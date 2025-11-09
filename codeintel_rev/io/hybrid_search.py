@@ -45,16 +45,41 @@ class HybridSearchResult:
 
 
 class BM25SearchProvider:
-    """Thin wrapper around Pyserini's LuceneSearcher."""
+    """Thin wrapper around Pyserini's LuceneSearcher for BM25 retrieval.
+
+    This class provides a simple interface to Pyserini's Lucene-based BM25 search
+    implementation. BM25 (Best Matching 25) is a probabilistic ranking function
+    that scores documents based on term frequency, inverse document frequency,
+    and document length normalization. It's particularly effective for keyword
+    and exact-match queries in code search scenarios.
+
+    The provider initializes a Lucene searcher with the specified BM25 parameters
+    (k1 and b) which control term frequency saturation and length normalization
+    respectively. The searcher is thread-safe and can be reused for multiple
+    queries.
+
+    Parameters
+    ----------
+    index_dir : Path
+        Directory path containing the Lucene BM25 index. The index must be created
+        using Pyserini's indexing tools and contain document vectors suitable for
+        BM25 retrieval.
+    k1 : float
+        BM25 term frequency saturation parameter. Controls how quickly term
+        frequency saturates. Typical values range from 1.2 to 2.0. Higher values
+        give more weight to term frequency.
+    b : float
+        BM25 length normalization parameter. Controls the degree of document length
+        normalization. Values range from 0.0 (no normalization) to 1.0 (full
+        normalization). Typical value is 0.75.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the BM25 index directory does not exist or is not accessible.
+    """
 
     def __init__(self, index_dir: Path, *, k1: float, b: float) -> None:
-        """Initialize the Lucene searcher for BM25 queries.
-
-        Raises
-        ------
-        FileNotFoundError
-            If the BM25 index directory does not exist.
-        """
         if not index_dir.exists():
             msg = f"BM25 index not found: {index_dir}"
             raise FileNotFoundError(msg)
@@ -67,17 +92,70 @@ class BM25SearchProvider:
     def search(self, query: str, top_k: int) -> list[ChannelHit]:
         """Return top-k BM25 hits for ``query``.
 
+        Executes a BM25 search query against the Lucene index and returns the
+        top-k most relevant documents. The search uses the configured BM25
+        parameters (k1, b) set during initialization. Results are ranked by
+        BM25 relevance score in descending order.
+
+        Parameters
+        ----------
+        query : str
+            Search query string. Can contain multiple terms separated by spaces.
+            BM25 will score documents based on term frequency and inverse document
+            frequency for each term in the query.
+        top_k : int
+            Maximum number of results to return. The searcher will return the
+            top-k highest-scoring documents. Must be a positive integer.
+
         Returns
         -------
         list[ChannelHit]
-            Ranked BM25 results.
+            List of ranked BM25 results, ordered by relevance score (highest first).
+            Each ChannelHit contains a document ID and BM25 score. Returns empty
+            list if no documents match the query or if top_k is 0.
         """
         hits = self._searcher.search(query, k=top_k)
         return [ChannelHit(doc_id=hit.docid, score=float(hit.score)) for hit in hits]
 
 
 class SpladeSearchProvider:
-    """SPLADE query encoder and Lucene impact searcher."""
+    """SPLADE query encoder and Lucene impact searcher for learned sparse retrieval.
+
+    This class combines a SPLADE (Sparse Lexical and Expansion) query encoder
+    with a Lucene impact searcher to perform learned sparse retrieval. SPLADE
+    learns to expand queries with relevant terms and assign importance weights,
+    creating sparse representations that are more effective than traditional
+    keyword matching while maintaining the efficiency of sparse retrieval.
+
+    The provider initializes a SPLADE encoder model (typically loaded from ONNX
+    format for efficiency) and a Lucene impact searcher that uses learned term
+    weights for ranking. The encoder expands queries into weighted term vectors,
+    which are then converted to bag-of-words representations for Lucene search.
+
+    Parameters
+    ----------
+    config : SpladeConfig
+        SPLADE configuration containing model settings, quantization parameters,
+        and maximum term limits. Used to configure encoder behavior and search
+        parameters.
+    model_dir : Path
+        Directory containing the SPLADE model files. The model directory should
+        contain the encoder weights and tokenizer configuration.
+    onnx_dir : Path
+        Directory containing ONNX-exported model files. If an ONNX file exists
+        (specified in config.onnx_file), it will be used instead of the PyTorch
+        model for faster inference. Falls back to PyTorch model if ONNX not found.
+    index_dir : Path
+        Directory path containing the Lucene impact index. The index must be
+        created using Pyserini's indexing tools with SPLADE-encoded document
+        vectors. Each document should have term weights matching the SPLADE
+        encoding scheme.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the SPLADE impact index directory does not exist or is not accessible.
+    """
 
     def __init__(
         self,
@@ -87,13 +165,6 @@ class SpladeSearchProvider:
         onnx_dir: Path,
         index_dir: Path,
     ) -> None:
-        """Prepare SPLADE encoder and Lucene impact searcher.
-
-        Raises
-        ------
-        FileNotFoundError
-            If the SPLADE impact index directory does not exist.
-        """
         if not index_dir.exists():
             msg = f"SPLADE impact index not found: {index_dir}"
             raise FileNotFoundError(msg)
@@ -122,10 +193,30 @@ class SpladeSearchProvider:
     def search(self, query: str, top_k: int) -> list[ChannelHit]:
         """Return SPLADE impact hits for ``query``.
 
+        Encodes the query using the SPLADE encoder to generate a sparse term
+        vector with learned importance weights. The vector is decoded into a
+        bag-of-words representation with term repetitions based on quantized
+        weights, then searched against the Lucene impact index. Results are
+        ranked by learned relevance scores.
+
+        Parameters
+        ----------
+        query : str
+            Search query string to encode and search. The SPLADE encoder will
+            expand this query with relevant terms and assign importance weights
+            based on learned patterns from training data.
+        top_k : int
+            Maximum number of results to return. The searcher returns the top-k
+            highest-scoring documents based on learned SPLADE relevance. Must be
+            a positive integer.
+
         Returns
         -------
         list[ChannelHit]
-            Ranked SPLADE results.
+            List of ranked SPLADE results, ordered by learned relevance score
+            (highest first). Each ChannelHit contains a document ID and SPLADE
+            impact score. Returns empty list if encoding fails, no terms are
+            generated, or top_k is 0.
         """
         embeddings = self._encoder.encode_query([query])
         decoded = self._encoder.decode(embeddings, top_k=None)
@@ -177,10 +268,48 @@ class HybridSearchEngine:
     ) -> HybridSearchResult:
         """Fuse dense and sparse retrieval results for ``query``.
 
+        This method combines results from multiple retrieval channels (semantic/FAISS,
+        BM25, SPLADE) using Reciprocal Rank Fusion (RRF) to produce a unified ranked
+        list. RRF is a rank aggregation technique that combines multiple ranked lists
+        without requiring score normalization, making it ideal for fusing different
+        retrieval modalities with incompatible score ranges.
+
+        The method gathers hits from all enabled channels (semantic is always included,
+        BM25 and SPLADE are optional based on settings), then applies RRF fusion to
+        produce the final ranked results. Channel contributions are tracked for
+        transparency and debugging.
+
+        Parameters
+        ----------
+        query : str
+            Search query string. Used for sparse retrieval channels (BM25, SPLADE)
+            which perform keyword-based or learned sparse matching. The semantic
+            channel uses pre-computed embeddings, so the query text is only used
+            for sparse channels.
+        semantic_ids : Sequence[int]
+            Document IDs from semantic/FAISS retrieval. These are the top results
+            from dense vector similarity search, typically pre-filtered and ranked
+            by cosine similarity or inner product scores.
+        semantic_scores : Sequence[float]
+            Relevance scores corresponding to semantic_ids. Must have the same length
+            as semantic_ids. Scores are typically cosine similarity or inner product
+            values from FAISS search. Used for RRF ranking (order matters more than
+            absolute values).
+        limit : int
+            Maximum number of final results to return after RRF fusion. The fusion
+            process ranks all documents from all channels, then returns the top
+            'limit' documents. Must be a positive integer.
+
         Returns
         -------
         HybridSearchResult
-            Fused retrieval output with channel metadata.
+            Fused retrieval output containing:
+            - docs: Final ranked list of documents (top 'limit' after RRF fusion)
+            - contributions: Per-document breakdown of which channels contributed
+              each document (useful for understanding fusion behavior)
+            - channels: List of active channel identifiers that contributed results
+            - warnings: Any warnings generated during channel retrieval (e.g., index
+              unavailable, encoding failures)
         """
         runs, warnings = self._gather_channel_hits(query, semantic_ids, semantic_scores)
         if not runs:
@@ -213,10 +342,40 @@ class HybridSearchEngine:
     ) -> tuple[dict[str, list[ChannelHit]], list[str]]:
         """Collect per-channel search hits and warnings for ``query``.
 
+        This internal method coordinates retrieval across all enabled channels,
+        collecting results from semantic (FAISS), BM25, and SPLADE channels.
+        Each channel is queried independently, and errors are captured as warnings
+        rather than exceptions to ensure robust multi-channel retrieval.
+
+        The semantic channel is always included (converting IDs and scores to
+        ChannelHit objects). BM25 and SPLADE channels are conditionally enabled
+        based on settings and availability. Channel initialization errors are
+        captured as warnings and included in the return value.
+
+        Parameters
+        ----------
+        query : str
+            Search query string. Used for sparse retrieval channels (BM25, SPLADE).
+            The semantic channel uses pre-computed results, so query is only
+            relevant for sparse channels.
+        semantic_ids : Sequence[int]
+            Document IDs from semantic/FAISS retrieval. These are converted to
+            ChannelHit objects for the "semantic" channel. Must have same length
+            as semantic_scores.
+        semantic_scores : Sequence[float]
+            Relevance scores from semantic retrieval, corresponding to semantic_ids.
+            Used to create ChannelHit objects with appropriate scores. Must have
+            same length as semantic_ids.
+
         Returns
         -------
         tuple[dict[str, list[ChannelHit]], list[str]]
-            Mapping of channel identifiers to hits and accumulated warnings.
+            Tuple containing:
+            - Dictionary mapping channel identifiers ("semantic", "bm25", "splade")
+              to lists of ChannelHit objects. Only channels that successfully
+              returned results are included.
+            - List of warning messages accumulated during channel retrieval. Includes
+              initialization errors, search failures, and availability issues.
         """
         runs: dict[str, list[ChannelHit]] = {}
         warnings: list[str] = []
@@ -247,7 +406,10 @@ class HybridSearchEngine:
 
         try:
             hits = provider.search(query, self._settings.index.hybrid_top_k_per_channel)
-        except (RuntimeError, ValueError) as exc:  # pragma: no cover - defensive logging
+        except (
+            RuntimeError,
+            ValueError,
+        ) as exc:  # pragma: no cover - defensive logging
             msg = f"BM25 channel unavailable: {exc}"
             warnings.append(msg)
             LOGGER.warning(msg, exc_info=exc)
@@ -271,7 +433,10 @@ class HybridSearchEngine:
 
         try:
             hits = provider.search(query, self._settings.index.hybrid_top_k_per_channel)
-        except (RuntimeError, ValueError) as exc:  # pragma: no cover - defensive logging
+        except (
+            RuntimeError,
+            ValueError,
+        ) as exc:  # pragma: no cover - defensive logging
             msg = f"SPLADE channel unavailable: {exc}"
             warnings.append(msg)
             LOGGER.warning(msg, exc_info=exc)

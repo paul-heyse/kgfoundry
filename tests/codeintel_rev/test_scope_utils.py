@@ -30,7 +30,9 @@ class TestGetEffectiveScope:
         """Test that valid session ID with scope returns scope."""
         # Arrange
         session_id = "test-session-123"
-        scope: ScopeIn = cast("ScopeIn", {"languages": ["python"], "include_globs": ["**/*.py"]})
+        scope: ScopeIn = cast(
+            "ScopeIn", {"languages": ["python"], "include_globs": ["**/*.py"]}
+        )
         await mock_application_context.scope_store.set(session_id, scope)
 
         # Act
@@ -54,7 +56,9 @@ class TestGetEffectiveScope:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_none_session_id(self, mock_application_context: ApplicationContext) -> None:
+    async def test_none_session_id(
+        self, mock_application_context: ApplicationContext
+    ) -> None:
         """Test that None session ID returns None."""
         # Act
         result = await get_effective_scope(mock_application_context, None)
@@ -69,7 +73,9 @@ class TestMergeScopeFilters:
     def test_scope_only(self) -> None:
         """Test that scope only returns scope fields."""
         # Arrange
-        scope: ScopeIn = cast("ScopeIn", {"languages": ["python"], "include_globs": ["**/*.py"]})
+        scope: ScopeIn = cast(
+            "ScopeIn", {"languages": ["python"], "include_globs": ["**/*.py"]}
+        )
         explicit_params = {}
 
         # Act
@@ -93,7 +99,9 @@ class TestMergeScopeFilters:
     def test_params_override_scope(self) -> None:
         """Test that explicit params override scope."""
         # Arrange
-        scope: ScopeIn = cast("ScopeIn", {"languages": ["python"], "include_globs": ["**/*.py"]})
+        scope: ScopeIn = cast(
+            "ScopeIn", {"languages": ["python"], "include_globs": ["**/*.py"]}
+        )
         explicit_params = {"include_globs": ["src/**"]}
 
         # Act
@@ -118,7 +126,9 @@ class TestMergeScopeFilters:
     def test_none_params_filtered_out(self) -> None:
         """Test that None values in explicit params are filtered out."""
         # Arrange
-        scope: ScopeIn = cast("ScopeIn", {"languages": ["python"], "include_globs": ["**/*.py"]})
+        scope: ScopeIn = cast(
+            "ScopeIn", {"languages": ["python"], "include_globs": ["**/*.py"]}
+        )
         explicit_params = {"include_globs": None, "exclude_globs": None}
 
         # Act

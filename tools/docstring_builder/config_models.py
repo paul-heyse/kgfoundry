@@ -117,7 +117,10 @@ class DocstringBuildConfig:
             msg = "timeout_seconds must be positive"
             raise ConfigurationError(
                 msg,
-                context={"timeout_seconds": self.timeout_seconds, "field": "timeout_seconds"},
+                context={
+                    "timeout_seconds": self.timeout_seconds,
+                    "field": "timeout_seconds",
+                },
             )
 
         # Emit diff requires plugins to be enabled

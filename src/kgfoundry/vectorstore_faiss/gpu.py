@@ -1,4 +1,5 @@
 """Expose ``vectorstore_faiss.gpu`` inside the ``kgfoundry`` namespace."""
+
 # [nav:section public-api]
 
 from __future__ import annotations

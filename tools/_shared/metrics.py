@@ -39,6 +39,13 @@ if TYPE_CHECKING:
     )
 
 LOGGER = get_logger(__name__)
+_SET_FROZEN_ATTR = object.__setattr__
+
+
+def _thaw(instance: object, **updates: object) -> None:
+    """Mutate attributes on a frozen dataclass instance."""
+    for name, value in updates.items():
+        _SET_FROZEN_ATTR(instance, name, value)
 
 
 TOOL_RUNS_TOTAL: CounterLike = build_counter(
@@ -78,14 +85,18 @@ class ToolRunObservation:
 
     def __post_init__(self) -> None:
         """Derive convenience fields after dataclass initialisation."""
-        self.tool = Path(self.command[0]).name if self.command else "<unknown>"
+        tool_name = Path(self.command[0]).name if self.command else "<unknown>"
+        _thaw(self, tool=tool_name)
 
     def success(self, returncode: int) -> None:
         """Record successful completion with ``returncode``."""
-        self.status = "success"
-        self.returncode = returncode
-        self.failure_reason = None
-        self.timed_out = False
+        _thaw(
+            self,
+            status="success",
+            returncode=returncode,
+            failure_reason=None,
+            timed_out=False,
+        )
 
     def failure(
         self,
@@ -95,10 +106,13 @@ class ToolRunObservation:
         timed_out: bool = False,
     ) -> None:
         """Record failed completion with context metadata."""
-        self.status = "error"
-        self.failure_reason = reason
-        self.returncode = returncode
-        self.timed_out = timed_out
+        _thaw(
+            self,
+            status="error",
+            failure_reason=reason,
+            returncode=returncode,
+            timed_out=timed_out,
+        )
 
     def duration_seconds(self) -> float:
         """Return the elapsed duration in seconds.
@@ -188,7 +202,8 @@ def observe_tool_run(
 
     span_context = (
         start_span(
-            span_name, attributes={k: v for k, v in span_attributes.items() if v is not None}
+            span_name,
+            attributes={k: v for k, v in span_attributes.items() if v is not None},
         )
         if observation.tracing_enabled
         else nullcontext()
@@ -215,7 +230,9 @@ def _record(
     status = observation.status
     if observation.metrics_enabled:
         TOOL_RUNS_TOTAL.labels(tool=observation.tool, status=status).inc()
-        TOOL_DURATION_SECONDS.labels(tool=observation.tool, status=status).observe(duration)
+        TOOL_DURATION_SECONDS.labels(tool=observation.tool, status=status).observe(
+            duration
+        )
     extra: dict[str, object] = {
         "duration_ms": duration * 1000,
         "tool": observation.tool,

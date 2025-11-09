@@ -47,8 +47,18 @@ class TestIndexBM25Idempotency:
         """
         chunks_file = temp_index_dir / "chunks.json"
         chunks_data = [
-            {"chunk_id": "c1", "title": "Doc 1", "section": "Intro", "text": "Hello world"},
-            {"chunk_id": "c2", "title": "Doc 2", "section": "Body", "text": "More content"},
+            {
+                "chunk_id": "c1",
+                "title": "Doc 1",
+                "section": "Intro",
+                "text": "Hello world",
+            },
+            {
+                "chunk_id": "c2",
+                "title": "Doc 2",
+                "section": "Body",
+                "text": "More content",
+            },
         ]
         chunks_file.write_text(json.dumps(chunks_data))
 
@@ -210,13 +220,16 @@ class TestIndexingErrorHandling:
         assert exc_info.value.exit_code == 1
         assert messages, "Expected Problem Details payload to be emitted"
 
-        json_messages = [msg for msg, err in messages if err and msg.strip().startswith("{")]
+        json_messages = [
+            msg for msg, err in messages if err and msg.strip().startswith("{")
+        ]
         assert json_messages, "Expected structured Problem Details output"
         problem_raw: object = json.loads(json_messages[-1])
         assert isinstance(problem_raw, dict)
         problem = cast("dict[str, object]", problem_raw)
         assert (
-            problem.get("type") == "https://kgfoundry.dev/problems/vector-ingestion/invalid-payload"
+            problem.get("type")
+            == "https://kgfoundry.dev/problems/vector-ingestion/invalid-payload"
         )
         assert problem.get("status") == 422
         assert problem.get("vector_path") == str(vectors_file)

@@ -7,6 +7,7 @@ The NamespaceRegistry provides a typed, lazy-loading mechanism for resolving
 module exports without relying on dynamic Any types. Symbols are explicitly
 registered with type-aware loaders, enabling full type-checking support.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations

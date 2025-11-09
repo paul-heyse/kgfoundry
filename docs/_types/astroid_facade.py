@@ -68,7 +68,9 @@ class AstroidBuilderFactory(Protocol):
 def _coerce_class(module: ModuleType, attribute: str, kind: str) -> type[object]:
     candidate_obj = getattr(module, attribute, _MISSING)
     if candidate_obj is _MISSING or not inspect.isclass(candidate_obj):
-        message = f"Module '{module.__name__}' attribute '{attribute}' is not a {kind} class"
+        message = (
+            f"Module '{module.__name__}' attribute '{attribute}' is not a {kind} class"
+        )
         raise TypeError(message)
     return cast("type[object]", candidate_obj)
 

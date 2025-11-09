@@ -40,7 +40,11 @@ from tools._shared.proc import (
     set_process_runner,
 )
 from tools._shared.schema import get_schema_path, validate_tools_payload
-from tools._shared.settings import SettingsError, ToolRuntimeSettings, get_runtime_settings
+from tools._shared.settings import (
+    SettingsError,
+    ToolRuntimeSettings,
+    get_runtime_settings,
+)
 from tools._shared.validation import (
     ValidationError,
     require_directory,

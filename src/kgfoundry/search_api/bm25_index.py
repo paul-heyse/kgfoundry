@@ -1,4 +1,5 @@
 """Expose ``search_api.bm25_index`` inside the ``kgfoundry`` namespace."""
+
 # [nav:section public-api]
 
 from __future__ import annotations

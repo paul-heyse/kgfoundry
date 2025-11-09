@@ -492,9 +492,7 @@ class FAISSDualIndexManager:
             extra={"use_cuvs": bool(getattr(cloner_options, "use_cuvs", False))},
         )
 
-    def _build_gpu_cloner_options(
-        self, faiss_module: ModuleType
-    ) -> faiss.GpuClonerOptions:
+    def _build_gpu_cloner_options(self, faiss_module: ModuleType) -> faiss.GpuClonerOptions:
         cloner_options = faiss_module.GpuClonerOptions()
         requested = bool(self._settings.use_cuvs)
         if hasattr(cloner_options, "use_cuvs"):

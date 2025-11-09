@@ -13,6 +13,7 @@ Examples
 >>> write_text(base / "file.txt", "content")
 >>> content = read_text(base / "file.txt")
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations

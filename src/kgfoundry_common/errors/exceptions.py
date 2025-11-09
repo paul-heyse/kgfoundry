@@ -13,6 +13,7 @@ Examples
 ...     assert e.http_status == 503
 ...     details = e.to_problem_details(instance="/api/download")
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -88,9 +89,7 @@ def _coerce_error_config(
     if config is not None:
         if legacy_kwargs:
             unexpected = ", ".join(sorted(legacy_kwargs))
-            message = (
-                f"KgFoundryError received both 'config' and legacy keyword arguments: {unexpected}"
-            )
+            message = f"KgFoundryError received both 'config' and legacy keyword arguments: {unexpected}"
             raise TypeError(message)
         return config
 
@@ -1053,7 +1052,9 @@ class RetryExhaustedError(KgFoundryError):
             detail=self.message,
             instance=instance or "urn:kgfoundry:error",
             code=self.code.value,
-            extensions=cast("Mapping[str, JsonValue] | None", extensions if extensions else None),
+            extensions=cast(
+                "Mapping[str, JsonValue] | None", extensions if extensions else None
+            ),
         )
 
 

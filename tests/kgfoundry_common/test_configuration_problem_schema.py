@@ -135,7 +135,9 @@ class TestConfigurationProblemSchema:
         problem_dict = _as_problem_dict(problem)
 
         # Verify structure matches sample
-        assert problem_dict["type"] == "https://kgfoundry.dev/problems/configuration-error"
+        assert (
+            problem_dict["type"] == "https://kgfoundry.dev/problems/configuration-error"
+        )
         assert problem_dict["title"] == "Configuration Error"
         assert problem_dict["status"] == 500
         assert problem_dict["instance"] == "urn:config:validation"

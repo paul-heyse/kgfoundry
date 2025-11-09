@@ -70,7 +70,9 @@ def _get_first_metric_samples(registry: CollectorRegistry) -> list[Sample]:
 class TestCounterMetrics:
     """Verify counter metrics increment correctly."""
 
-    def test_counter_increment_success(self, prometheus_registry: CollectorRegistry) -> None:
+    def test_counter_increment_success(
+        self, prometheus_registry: CollectorRegistry
+    ) -> None:
         """Verify success counter increments on operation.
 
         Parameters
@@ -100,7 +102,9 @@ class TestCounterMetrics:
         assert len(success_total) == 1
         assert success_total[0].value == 2.0
 
-    def test_counter_increment_failure(self, prometheus_registry: CollectorRegistry) -> None:
+    def test_counter_increment_failure(
+        self, prometheus_registry: CollectorRegistry
+    ) -> None:
         """Verify error counter increments on failure.
 
         Parameters
@@ -185,7 +189,9 @@ class TestCounterMetrics:
 class TestHistogramMetrics:
     """Verify histogram metrics record durations."""
 
-    def test_histogram_observe_duration(self, prometheus_registry: CollectorRegistry) -> None:
+    def test_histogram_observe_duration(
+        self, prometheus_registry: CollectorRegistry
+    ) -> None:
         """Verify histogram observes operation durations.
 
         Parameters
@@ -210,7 +216,9 @@ class TestHistogramMetrics:
         assert len(count_samples) >= 1
         assert count_samples[0].value == 3.0
 
-    def test_histogram_by_operation_type(self, prometheus_registry: CollectorRegistry) -> None:
+    def test_histogram_by_operation_type(
+        self, prometheus_registry: CollectorRegistry
+    ) -> None:
         """Verify histogram can bucket by operation type.
 
         Parameters
@@ -323,7 +331,8 @@ class TestMetricsOnErrorPaths:
         error_total = [
             s
             for s in samples
-            if s.labels.get("error_type") == "ValueError" and s.name == "operations_failed_total"
+            if s.labels.get("error_type") == "ValueError"
+            and s.name == "operations_failed_total"
         ]
         assert len(error_total) == 1
         assert error_total[0].value == 1.0
@@ -416,9 +425,14 @@ class TestMetricsIntegration:
         assert len(metrics) == 2  # Counter and Histogram are separate metrics
 
         # Find samples - filter by sample name, not metric name
-        counter_samples = [s for m in metrics for s in m.samples if s.name == "operations_total"]
+        counter_samples = [
+            s for m in metrics for s in m.samples if s.name == "operations_total"
+        ]
         histogram_samples = [
-            s for m in metrics for s in m.samples if "operation_duration_seconds" in s.name
+            s
+            for m in metrics
+            for s in m.samples
+            if "operation_duration_seconds" in s.name
         ]
 
         assert len(counter_samples) >= 1

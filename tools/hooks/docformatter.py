@@ -61,7 +61,9 @@ def main() -> int:
     >>> result  # doctest: +ELLIPSIS
     """
     try:
-        repo_result = run_tool(["git", "rev-parse", "--show-toplevel"], timeout=10.0, check=True)
+        repo_result = run_tool(
+            ["git", "rev-parse", "--show-toplevel"], timeout=10.0, check=True
+        )
         repo = repo_result.stdout.strip()
     except ToolExecutionError as exc:
         LOGGER.exception("Failed to resolve git repository root")

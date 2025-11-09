@@ -302,7 +302,9 @@ def _collect_symbols(
     include_inherited : bool
         Whether inherited members should be traversed in addition to declared ones.
     """
-    identifier = getattr(obj, "path", None) or getattr(obj, "name", None) or str(id(obj))
+    identifier = (
+        getattr(obj, "path", None) or getattr(obj, "name", None) or str(id(obj))
+    )
     if identifier in seen:
         return
     seen.add(identifier)
@@ -324,10 +326,14 @@ def _collect_symbols(
     lineno = cast("int | None", lineno_attr) if isinstance(lineno_attr, int) else None
 
     endlineno_attr = _safe_attr(obj, "endlineno")
-    endlineno = cast("int | None", endlineno_attr) if isinstance(endlineno_attr, int) else None
+    endlineno = (
+        cast("int | None", endlineno_attr) if isinstance(endlineno_attr, int) else None
+    )
 
     doc_attr = _safe_attr(obj, "docstring")
-    doc = cast("Docstring | None", doc_attr) if isinstance(doc_attr, Docstring) else None
+    doc = (
+        cast("Docstring | None", doc_attr) if isinstance(doc_attr, Docstring) else None
+    )
 
     out.append(
         Symbol(
@@ -345,7 +351,9 @@ def _collect_symbols(
 
     members = {} if is_alias else getattr(obj, "members", {})
     for member in members.values():
-        _collect_symbols(member, repo_root, out, seen, include_inherited=include_inherited)
+        _collect_symbols(
+            member, repo_root, out, seen, include_inherited=include_inherited
+        )
 
     if include_inherited and not is_alias:
         inherited_members = getattr(obj, "inherited_members", {})
@@ -468,7 +476,9 @@ def parse_args() -> argparse.Namespace:
     argparse.Namespace
         Namespace containing parsed command-line options.
     """
-    parser = argparse.ArgumentParser(description="Generate a navmap JSON using Griffe's API model.")
+    parser = argparse.ArgumentParser(
+        description="Generate a navmap JSON using Griffe's API model."
+    )
     parser.set_defaults(include_inherited=True)
     parser.add_argument(
         "-p",

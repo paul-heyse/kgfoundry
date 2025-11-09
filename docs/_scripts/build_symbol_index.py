@@ -28,7 +28,11 @@ from tools._shared.proc import ToolExecutionError
 
 from docs._scripts import cli_context, shared
 from docs._scripts.validation import validate_against_schema
-from kgfoundry_common.errors import DeserializationError, SchemaValidationError, SerializationError
+from kgfoundry_common.errors import (
+    DeserializationError,
+    SchemaValidationError,
+    SerializationError,
+)
 from kgfoundry_common.optional_deps import OptionalDependencyError, safe_import_griffe
 
 if TYPE_CHECKING:
@@ -241,7 +245,9 @@ class GriffeNode(Protocol):
     is_property: bool | None
 
 
-def safe_getattr(obj: object, name: str, default: object | None = None) -> object | None:
+def safe_getattr(
+    obj: object, name: str, default: object | None = None
+) -> object | None:
     """Return ``getattr`` with defensive error handling.
 
     This function safely retrieves attributes from objects, catching common
@@ -438,7 +444,9 @@ def _record_module_defaults(
     module_meta: dict[str, dict[str, JsonValue]],
     symbol_meta: dict[str, dict[str, JsonValue]],
 ) -> dict[str, JsonValue]:
-    defaults = _clean_meta(cast("Mapping[str, JsonValue] | None", payload.get("module_meta")))
+    defaults = _clean_meta(
+        cast("Mapping[str, JsonValue] | None", payload.get("module_meta"))
+    )
     module_meta[module_name] = defaults
     if defaults:
         symbol_meta.setdefault(module_name, dict(defaults))
@@ -508,7 +516,9 @@ def _navmap_from_payload(data: Mapping[str, JsonValue]) -> NavLookup:
             sections,
         )
 
-    return NavLookup(symbol_meta=symbol_meta, module_meta=module_meta, sections=sections)
+    return NavLookup(
+        symbol_meta=symbol_meta, module_meta=module_meta, sections=sections
+    )
 
 
 def load_nav_lookup() -> NavLookup:
@@ -523,7 +533,9 @@ def load_nav_lookup() -> NavLookup:
         if not candidate.exists():
             continue
         try:
-            payload = cast("JsonPayload", json.loads(candidate.read_text(encoding="utf-8")))
+            payload = cast(
+                "JsonPayload", json.loads(candidate.read_text(encoding="utf-8"))
+            )
         except json.JSONDecodeError as exc:
             BASE_LOGGER.warning(
                 "Failed to parse navmap candidate",
@@ -976,10 +988,12 @@ def _handle_tool_error(
         status="error",
         subcommand=_CLI_SUBCOMMAND,
     )
-    failure_builder.add_error(status="error", message=context.message, problem=problem)
-    failure_builder.set_problem(problem)
+    failure_builder = failure_builder.add_error(
+        status="error", message=context.message, problem=problem
+    )
+    failure_builder = failure_builder.set_problem(problem)
     for path in (SYMBOLS_PATH, BY_FILE_PATH, BY_MODULE_PATH):
-        failure_builder.add_file(
+        failure_builder = failure_builder.add_file(
             path=str(path),
             status="error",
             message="Artifact not updated due to failure",
@@ -1025,10 +1039,12 @@ def _handle_keyboard_interrupt(
         status="error",
         subcommand=_CLI_SUBCOMMAND,
     )
-    failure_builder.add_error(status="error", message=context.message, problem=problem)
-    failure_builder.set_problem(problem)
+    failure_builder = failure_builder.add_error(
+        status="error", message=context.message, problem=problem
+    )
+    failure_builder = failure_builder.set_problem(problem)
     for path in (SYMBOLS_PATH, BY_FILE_PATH, BY_MODULE_PATH):
-        failure_builder.add_file(
+        failure_builder = failure_builder.add_file(
             path=str(path),
             status="error",
             message="Artifact not updated due to failure",
@@ -1079,10 +1095,12 @@ def _handle_unexpected_error(
         status="error",
         subcommand=_CLI_SUBCOMMAND,
     )
-    failure_builder.add_error(status="error", message=context.message, problem=problem)
-    failure_builder.set_problem(problem)
+    failure_builder = failure_builder.add_error(
+        status="error", message=context.message, problem=problem
+    )
+    failure_builder = failure_builder.set_problem(problem)
     for path in (SYMBOLS_PATH, BY_FILE_PATH, BY_MODULE_PATH):
-        failure_builder.add_file(
+        failure_builder = failure_builder.add_file(
             path=str(path),
             status="error",
             message="Artifact not updated due to failure",
@@ -1172,7 +1190,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ToolExecutionError as exc:
         return _handle_tool_error(exc, packages, logger=logger, start_time=start)
     except KeyboardInterrupt as exc:
-        return _handle_keyboard_interrupt(exc, packages, logger=logger, start_time=start)
+        return _handle_keyboard_interrupt(
+            exc, packages, logger=logger, start_time=start
+        )
     except (
         DeserializationError,
         SerializationError,
@@ -1185,7 +1205,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     duration = time.monotonic() - start
     for name, path, wrote in artifact_results:
-        builder.add_file(
+        builder = builder.add_file(
             path=str(path),
             status="success" if wrote else "skipped",
             message=f"{name} updated" if wrote else f"{name} unchanged",

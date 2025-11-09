@@ -66,9 +66,7 @@ def _read_manifest(path: Path) -> Mapping[str, object]:
 def _ensure_supported_version(manifest: Mapping[str, object]) -> None:
     version = manifest.get("version")
     if version != MANIFEST_VERSION:
-        message = (
-            f"Gallery manifest version {version!r} is unsupported; expected {MANIFEST_VERSION}"
-        )
+        message = f"Gallery manifest version {version!r} is unsupported; expected {MANIFEST_VERSION}"
         raise GalleryManifestError(message)
 
 

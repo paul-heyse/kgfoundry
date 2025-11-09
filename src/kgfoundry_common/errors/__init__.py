@@ -12,6 +12,7 @@ Examples
 ...     details = e.to_problem_details(instance="/api/search")
 ...     assert details["type"] == "https://kgfoundry.dev/problems/runtime-error"
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -99,7 +100,9 @@ class FastAPIProtocol(Protocol):
         name: str | None = None,
     ) -> None:
         """Register an exception handler."""
-        _protocol_stub("add_exception_handler", self, exception_class, handler, name=name)
+        _protocol_stub(
+            "add_exception_handler", self, exception_class, handler, name=name
+        )
 
 
 class ProblemDetailsResponse(Protocol):

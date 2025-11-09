@@ -6,11 +6,13 @@ import datetime as _dt
 import os
 import tomllib
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import TYPE_CHECKING, cast
 
-from tools.docstring_builder.plugins.dataclass_fields import collect_dataclass_field_names
+from tools.docstring_builder.plugins.dataclass_fields import (
+    collect_dataclass_field_names,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -249,7 +251,9 @@ def _normalized_key(key: str) -> str:
     return key.strip().replace("-", "_").lower()
 
 
-def _apply_mapping(settings: PolicySettings, mapping: Mapping[str, object]) -> None:
+def _apply_mapping(
+    settings: PolicySettings, mapping: Mapping[str, object]
+) -> PolicySettings:
     """Apply configuration mapping to policy settings.
 
     Parameters
@@ -259,33 +263,43 @@ def _apply_mapping(settings: PolicySettings, mapping: Mapping[str, object]) -> N
     mapping : Mapping[str, object]
         Configuration key-value pairs.
 
+    Returns
+    -------
+    PolicySettings
+        Updated policy settings.
+
     Raises
     ------
     PolicyConfigurationError
         If configuration values are invalid or keys are unknown.
     """
+    updated = settings
     for raw_key, value in sorted(mapping.items(), key=lambda item: str(item[0])):
         key = _normalized_key(str(raw_key))
         if key == "coverage_threshold":
-            settings.coverage_threshold = float(str(value))
+            updated = replace(updated, coverage_threshold=float(str(value)))
             continue
         if key in {"coverage_action", "coverage"}:
-            settings.coverage_action = PolicyAction.parse(str(value))
+            updated = replace(updated, coverage_action=PolicyAction.parse(str(value)))
             continue
         alias = _ACTION_KEY_ALIASES.get(key)
         if alias:
-            setattr(settings, alias, PolicyAction.parse(str(value)))
+            updated = replace(updated, **{alias: PolicyAction.parse(str(value))})
             continue
         if key == "exceptions":
             if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
-                settings.exceptions = _parse_exceptions(
-                    cast("Iterable[Mapping[str, object]]", value)
+                updated = replace(
+                    updated,
+                    exceptions=_parse_exceptions(
+                        cast("Iterable[Mapping[str, object]]", value)
+                    ),
                 )
                 continue
             message = "Policy exceptions must be an iterable of mappings"
             raise PolicyConfigurationError(message)
         message = f"Unknown policy key: {raw_key}"
         raise PolicyConfigurationError(message)
+    return updated
 
 
 def _parse_override_pairs(raw: str) -> dict[str, str]:
@@ -318,7 +332,9 @@ def _parse_override_pairs(raw: str) -> dict[str, str]:
     return overrides
 
 
-def _apply_overrides(settings: PolicySettings, overrides: Mapping[str, str]) -> None:
+def _apply_overrides(
+    settings: PolicySettings, overrides: Mapping[str, str]
+) -> PolicySettings:
     """Apply override values to policy settings.
 
     Parameters
@@ -328,25 +344,32 @@ def _apply_overrides(settings: PolicySettings, overrides: Mapping[str, str]) -> 
     overrides : Mapping[str, str]
         Override key-value pairs.
 
+    Returns
+    -------
+    PolicySettings
+        Updated policy settings.
+
     Raises
     ------
     PolicyConfigurationError
         If override values are invalid or keys are unknown.
     """
+    updated = settings
     for raw_key, raw_value in overrides.items():
         key = _normalized_key(raw_key)
         if key in {"coverage", "coverage_threshold"}:
-            settings.coverage_threshold = float(raw_value)
+            updated = replace(updated, coverage_threshold=float(raw_value))
             continue
         if key == "coverage_action":
-            settings.coverage_action = PolicyAction.parse(raw_value)
+            updated = replace(updated, coverage_action=PolicyAction.parse(raw_value))
             continue
         alias = _ACTION_KEY_ALIASES.get(key)
         if alias:
-            setattr(settings, alias, PolicyAction.parse(raw_value))
+            updated = replace(updated, **{alias: PolicyAction.parse(raw_value)})
             continue
         message = f"Unknown policy override: {raw_key}"
         raise PolicyConfigurationError(message)
+    return updated
 
 
 def load_policy_settings(
@@ -372,13 +395,13 @@ def load_policy_settings(
         Loaded policy settings with precedence applied.
     """
     settings = PolicySettings()
-    _apply_mapping(settings, _read_pyproject_policy(repo_root))
+    settings = _apply_mapping(settings, _read_pyproject_policy(repo_root))
     env_mapping: Mapping[str, str] = env or os.environ
     env_raw = env_mapping.get("KGFOUNDRY_DOCSTRINGS_POLICY", "")
     if env_raw:
-        _apply_overrides(settings, _parse_override_pairs(env_raw))
+        settings = _apply_overrides(settings, _parse_override_pairs(env_raw))
     if cli_overrides:
-        _apply_overrides(settings, cli_overrides)
+        settings = _apply_overrides(settings, cli_overrides)
     return settings
 
 
@@ -468,7 +491,9 @@ class PolicyEngine:
                 f" ({exception.justification or 'no justification provided'})"
             )
         message = f"{symbol}: {detail}"
-        violation = PolicyViolation(rule=rule, symbol=symbol, action=action, message=message)
+        violation = PolicyViolation(
+            rule=rule, symbol=symbol, action=action, message=message
+        )
         self.violations.append(violation)
         return violation.fatal
 
@@ -500,11 +525,13 @@ class PolicyEngine:
         PolicyReport
             Policy report with coverage, threshold, and violations.
         """
-        coverage = 1.0 if self.total_symbols == 0 else self.documented_symbols / self.total_symbols
+        coverage = (
+            1.0
+            if self.total_symbols == 0
+            else self.documented_symbols / self.total_symbols
+        )
         if coverage + 1e-9 < self.settings.coverage_threshold:
-            shortfall = (
-                f"coverage {coverage:.1%} below threshold {self.settings.coverage_threshold:.1%}"
-            )
+            shortfall = f"coverage {coverage:.1%} below threshold {self.settings.coverage_threshold:.1%}"
             self._register_violation("coverage", "<aggregate>", shortfall)
         return PolicyReport(
             coverage=coverage,

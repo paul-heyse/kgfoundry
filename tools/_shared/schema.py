@@ -125,7 +125,9 @@ def validate_tools_payload(payload: Mapping[str, object], schema_name: str) -> N
     validate_payload(payload, schema_path)
 
 
-def validate_struct_payload(payload: Mapping[str, object], model: type[msgspec.Struct]) -> None:
+def validate_struct_payload(
+    payload: Mapping[str, object], model: type[msgspec.Struct]
+) -> None:
     """Validate ``payload`` against a msgspec struct ``model``.
 
     Parameters

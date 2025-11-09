@@ -7,7 +7,7 @@ import importlib
 import importlib.util
 import json
 import sys
-from collections.abc import Callable, Generator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import suppress
 from functools import cache
 from importlib import import_module
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 JsonValue = str | int | float | bool | dict[str, "JsonValue"] | list["JsonValue"] | None
-type NavMetadataIterator = Generator[tuple[str, JsonValue]]
+type NavMetadataIterator = Iterator[tuple[str, JsonValue]]
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CLI_AUGMENT_PATH = REPO_ROOT / "openapi" / "_augment_cli.yaml"
@@ -142,7 +142,14 @@ class NavSymbolModel(BaseModel):
         if not isinstance(value, Mapping):
             return value
         data = dict(value)
-        known = {"summary", "description", "handler", "tags", "problem_details", "extras"}
+        known = {
+            "summary",
+            "description",
+            "handler",
+            "tags",
+            "problem_details",
+            "extras",
+        }
         extras = {key: data.pop(key) for key in list(data.keys()) if key not in known}
         data.setdefault("extras", {}).update(extras)
         return data
@@ -237,7 +244,15 @@ class NavMetadataModel(BaseModel):
         if not isinstance(value, Mapping):
             return value
         data = dict(value)
-        known = {"title", "synopsis", "exports", "sections", "module_meta", "symbols", "extras"}
+        known = {
+            "title",
+            "synopsis",
+            "exports",
+            "sections",
+            "module_meta",
+            "symbols",
+            "extras",
+        }
         extras = {key: data.pop(key) for key in list(data.keys()) if key not in known}
         data.setdefault("extras", {}).update(extras)
         return data
@@ -264,7 +279,7 @@ class NavMetadataModel(BaseModel):
         """
         return self.as_mapping()[key]
 
-    def __iter__(self) -> NavMetadataIterator:
+    def __iter__(self) -> Iterator[tuple[str, JsonValue]]:
         """Iterate over flattened key-value pairs for dictionary compatibility.
 
         This method enables dictionary-like iteration over navigation metadata,
@@ -277,14 +292,14 @@ class NavMetadataModel(BaseModel):
         tuple[str, JsonValue]
             Key and value pairs for navigation metadata entries. Keys include
             standard fields (title, exports, sections, etc.) and any additional
-            fields from the extras dictionary. The iterator type aligns with
-            Pydantic's ``TupleGenerator`` alias.
+            fields from the extras dictionary. Each tuple represents a key-value
+            pair from the flattened metadata.
 
         Notes
         -----
         This method implements the iterator protocol using ``yield from`` to
         delegate to the underlying mapping's items. The function is a generator
-        (uses ``yield from``) and returns an iterator object that can be used
+        (uses ``yield from``) and returns a generator object that can be used
         in for-loops, dict constructors, and other iteration contexts.
 
         Examples
@@ -382,7 +397,8 @@ def _load_cli_tooling_metadata() -> ToolingMetadataModel | None:
         return None
     load_tooling_callable = cast("Callable[..., ToolingMetadataModel]", load_tooling)
     augment_error = cast(
-        "type[BaseException]", getattr(tools_module, "AugmentRegistryError", RuntimeError)
+        "type[BaseException]",
+        getattr(tools_module, "AugmentRegistryError", RuntimeError),
     )
     if not CLI_AUGMENT_PATH.is_file() or not CLI_REGISTRY_PATH.is_file():
         return None
@@ -391,7 +407,13 @@ def _load_cli_tooling_metadata() -> ToolingMetadataModel | None:
             augment_path=CLI_AUGMENT_PATH,
             registry_path=CLI_REGISTRY_PATH,
         )
-    except (augment_error, FileNotFoundError, json.JSONDecodeError, OSError, ValueError):
+    except (
+        augment_error,
+        FileNotFoundError,
+        json.JSONDecodeError,
+        OSError,
+        ValueError,
+    ):
         return None
 
 

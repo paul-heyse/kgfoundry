@@ -42,7 +42,9 @@ class Paths:
 
         docs_data = repo_root / "docs" / "_data"
         cli_out_root = docs_data / "cli"
-        return Paths(repo_root=repo_root, docs_data=docs_data, cli_out_root=cli_out_root)
+        return Paths(
+            repo_root=repo_root, docs_data=docs_data, cli_out_root=cli_out_root
+        )
 
     def cli_envelope_dir(self, route: list[str]) -> Path:
         """Return the directory path used to store CLI envelope artifacts.

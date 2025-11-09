@@ -70,7 +70,9 @@ class TestConfigurationErrorProbleDetails:
         assert "instance" in problem_dict
 
         # Verify Problem Details specific to configuration errors
-        assert problem_dict["type"] == "https://kgfoundry.dev/problems/configuration-error"
+        assert (
+            problem_dict["type"] == "https://kgfoundry.dev/problems/configuration-error"
+        )
         assert problem_dict["code"] == "configuration-error"
 
     def test_configuration_error_invalid_field_produces_problem_details(self) -> None:

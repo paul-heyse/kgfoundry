@@ -126,7 +126,9 @@ def cmd_export(a):
     if base.exists():
         info(f"Base ONNX: {base}")
     else:
-        warn("ONNX export expected but not found; upgrade sentence-transformers if needed.")
+        warn(
+            "ONNX export expected but not found; upgrade sentence-transformers if needed."
+        )
 
     # Optimize (O3) & quantize (int8)
     if a.optimize:
@@ -252,7 +254,9 @@ def cmd_encode(a):
         batch_ids.clear()
         batch_texts.clear()
 
-    info(f"Encoding with ONNX: model_dir={a.model_dir}, file={a.onnx_file}, provider={a.provider}")
+    info(
+        f"Encoding with ONNX: model_dir={a.model_dir}, file={a.onnx_file}, provider={a.provider}"
+    )
     for obj in tqdm(stream_jsonl(src), desc="encode-docs"):
         docid = str(obj["id"])
         text = obj.get("contents") or obj.get("text") or ""
@@ -269,7 +273,9 @@ def cmd_encode(a):
 def cmd_index_splade(a):
     """Build Lucene impact index from JsonVectorCollection."""
     # Helpful when SPLADE expands queries a lot:
-    os.environ.setdefault("JAVA_TOOL_OPTIONS", f"-Dorg.apache.lucene.maxClauseCount={a.max_clause}")
+    os.environ.setdefault(
+        "JAVA_TOOL_OPTIONS", f"-Dorg.apache.lucene.maxClauseCount={a.max_clause}"
+    )
     cmd = [
         sys.executable,
         "-m",
@@ -436,7 +442,9 @@ def cmd_tune_bm25(a):
                 a.qrels,
                 str(run_path),
             ]
-            out = subprocess.run(cmd, check=False, capture_output=True, text=True).stdout
+            out = subprocess.run(
+                cmd, check=False, capture_output=True, text=True
+            ).stdout
             score = None
             for line in out.splitlines():
                 parts = line.split()
@@ -502,7 +510,9 @@ def cmd_train(a):
     trainer.train()
     model.save_pretrained(a.out_dir)
     info(f"✅ Saved finetuned model to {a.out_dir}")
-    info("Tip: re-run `export` with --model-id set to this directory to create optimized ONNX.")
+    info(
+        "Tip: re-run `export` with --model-id set to this directory to create optimized ONNX."
+    )
 
 
 def cmd_bench(a):
@@ -534,11 +544,14 @@ def cmd_bench(a):
 
 def build_cli():
     p = argparse.ArgumentParser(
-        prog="playbook.py", description="SPLADE-v3 (ONNX) + BM25 with Pyserini — unified playbook"
+        prog="playbook.py",
+        description="SPLADE-v3 (ONNX) + BM25 with Pyserini — unified playbook",
     )
     s = p.add_subparsers(dest="cmd", required=True)
 
-    sp = s.add_parser("export", help="Export SPLADE-v3 to ONNX, optionally optimize/quantize.")
+    sp = s.add_parser(
+        "export", help="Export SPLADE-v3 to ONNX, optionally optimize/quantize."
+    )
     sp.add_argument("--model-id", default="naver/splade-v3")
     sp.add_argument("--out-dir", default="models/splade-v3")
     sp.add_argument("--optimize", action="store_true")
@@ -556,7 +569,9 @@ def build_cli():
     sp.add_argument("--threads", type=int, default=8)
     sp.set_defaults(func=cmd_index_bm25)
 
-    sp = s.add_parser("encode", help="Encode corpus -> SPLADE JsonVectorCollection with ONNX.")
+    sp = s.add_parser(
+        "encode", help="Encode corpus -> SPLADE JsonVectorCollection with ONNX."
+    )
     sp.add_argument("--corpus", default="data/corpus.jsonl")
     sp.add_argument("--model-dir", default="models/splade-v3")
     sp.add_argument("--onnx-file", default="onnx/model_qint8.onnx")
@@ -590,7 +605,9 @@ def build_cli():
     sp.add_argument("--rrf-k", type=int, default=60)
     sp.set_defaults(func=cmd_search)
 
-    sp = s.add_parser("search-batch", help="Batch search from topics TSV -> TREC run file.")
+    sp = s.add_parser(
+        "search-batch", help="Batch search from topics TSV -> TREC run file."
+    )
     sp.add_argument("--mode", choices=["bm25", "splade", "hybrid"], required=True)
     sp.add_argument("--topics", required=True, help="TSV with qid\\tquery")
     sp.add_argument("--output", required=True, help="Output TREC run path")
@@ -626,7 +643,9 @@ def build_cli():
     sp.set_defaults(func=cmd_tune_bm25)
 
     sp = s.add_parser("train", help="(Optional) Finetune SPLADE on triples JSONL.")
-    sp.add_argument("--train-file", required=True, help='Lines: {"query","positive","negative"}')
+    sp.add_argument(
+        "--train-file", required=True, help='Lines: {"query","positive","negative"}'
+    )
     sp.add_argument("--base-model", default="naver/splade-v3")
     sp.add_argument("--out-dir", default="models/splade-finetuned")
     sp.add_argument("--epochs", type=int, default=1)

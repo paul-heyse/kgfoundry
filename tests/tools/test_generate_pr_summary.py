@@ -10,7 +10,9 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_collect_artifact_snapshot_detects_numbered_codemod_logs(tmp_path: Path) -> None:
+def test_collect_artifact_snapshot_detects_numbered_codemod_logs(
+    tmp_path: Path,
+) -> None:
     """Snapshot should include all codemod log files with numeric suffixes."""
     (tmp_path / "codemod.log").write_text("root run\n")
     (tmp_path / "codemod_r1.log").write_text("run 1\n")

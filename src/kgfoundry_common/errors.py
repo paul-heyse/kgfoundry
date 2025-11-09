@@ -4,6 +4,7 @@ This module maintains backward compatibility by re-exporting exceptions
 from the new structured error hierarchy. New code should import directly
 from kgfoundry_common.errors.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations

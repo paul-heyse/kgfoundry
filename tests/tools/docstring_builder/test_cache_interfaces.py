@@ -22,7 +22,9 @@ if TYPE_CHECKING:
 _BuilderCacheClass = cast(
     "BuilderCacheType", load_attribute("tools.docstring_builder.cache", "BuilderCache")
 )
-BuilderCacheClass = _BuilderCacheClass  # Runtime class, use "BuilderCache" in type annotations
+BuilderCacheClass = (
+    _BuilderCacheClass  # Runtime class, use "BuilderCache" in type annotations
+)
 
 
 class TestCacheProtocol:

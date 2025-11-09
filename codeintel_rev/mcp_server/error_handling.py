@@ -472,7 +472,7 @@ def handle_adapter_errors(
                 except (KeyboardInterrupt, SystemExit):
                     # Re-raise system-level exceptions - these should propagate
                     raise
-                except BaseException as exc:  # noqa: BLE001 - defensive catch ensures Problem Details emission
+                except BaseException as exc:
                     # Catch all other exceptions (including Exception subclasses)
                     # to ensure Problem Details are always emitted at the boundary.
                     # This is a boundary handler that MUST catch all exceptions to
@@ -488,7 +488,7 @@ def handle_adapter_errors(
             except (KeyboardInterrupt, SystemExit):
                 # Re-raise system-level exceptions - these should propagate
                 raise
-            except BaseException as exc:  # noqa: BLE001 - defensive catch ensures Problem Details emission
+            except BaseException as exc:
                 # Catch all other exceptions (including Exception subclasses)
                 # to ensure Problem Details are always emitted at the boundary.
                 # This is a boundary handler that MUST catch all exceptions to

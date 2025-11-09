@@ -46,7 +46,9 @@ def test_coerce_vector_batch_rejects_inconsistent_dimensions(
     inconsistent_dimension_payload: list[dict[str, object]],
 ) -> None:
     """Ragged vectors should trigger a `VectorValidationError`."""
-    with pytest.raises(VectorValidationError, match="differs from the expected dimension"):
+    with pytest.raises(
+        VectorValidationError, match="differs from the expected dimension"
+    ):
         coerce_vector_batch(inconsistent_dimension_payload)
 
 
@@ -62,7 +64,9 @@ def test_coerce_vector_batch_requires_mapping() -> None:
     """Vector records must be mapping objects with `key`/`vector` entries."""
     records: Iterable[object] = [[0.1, 0.2, 0.3]]
 
-    with pytest.raises(VectorValidationError, match="Record 0 is missing a non-empty 'key' string"):
+    with pytest.raises(
+        VectorValidationError, match="Record 0 is missing a non-empty 'key' string"
+    ):
         coerce_vector_batch(cast("Iterable[Mapping[str, object]]", records))
 
 
@@ -96,7 +100,9 @@ def test_assert_vector_matrix_invalid_inputs() -> None:
     with pytest.raises(VectorValidationError, match="must be two-dimensional"):
         assert_vector_matrix([1.0, 2.0, 3.0])
 
-    with pytest.raises(VectorValidationError, match="dimensionality must be greater than zero"):
+    with pytest.raises(
+        VectorValidationError, match="dimensionality must be greater than zero"
+    ):
         assert_vector_matrix(np.zeros((1, 0), dtype=np.float32))
 
 

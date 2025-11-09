@@ -3,6 +3,7 @@
 This module provides shared type definitions without any dependencies, avoiding circular imports
 across the package.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations

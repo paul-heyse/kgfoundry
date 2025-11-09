@@ -1,4 +1,5 @@
 """Expose ``embeddings_sparse.splade`` inside the ``kgfoundry`` namespace."""
+
 # [nav:section public-api]
 
 from __future__ import annotations

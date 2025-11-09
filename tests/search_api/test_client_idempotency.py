@@ -198,7 +198,9 @@ class TestHttpPostIdempotency:
             )
 
             for _ in range(3):
-                result = client.post(json=body, headers={"Idempotency-Key": idempotency_key})
+                result = client.post(
+                    json=body, headers={"Idempotency-Key": idempotency_key}
+                )
                 payload = result.json()
                 assert isinstance(payload, dict)
                 assert payload.get("id") == "created_001"
@@ -286,7 +288,11 @@ class TestTransientErrorRetries:
         payload2 = result2.json()
         assert isinstance(payload1, dict)
         assert isinstance(payload2, dict)
-        assert payload1.get("correlation_id") == payload2.get("correlation_id") == "req-error-1"
+        assert (
+            payload1.get("correlation_id")
+            == payload2.get("correlation_id")
+            == "req-error-1"
+        )
         assert caplog is not None
 
     def test_status_codes_retry_policy(self) -> None:
@@ -335,7 +341,9 @@ class TestCorrelationIdPropagation:
         client = StubHttpClient(
             get_responses=[
                 StubResponse(500, {"type": "error", "correlation_id": correlation_id}),
-                StubResponse(200, {"status": "success", "correlation_id": correlation_id}),
+                StubResponse(
+                    200, {"status": "success", "correlation_id": correlation_id}
+                ),
             ]
         )
 
@@ -346,7 +354,11 @@ class TestCorrelationIdPropagation:
         payload2 = result2.json()
         assert isinstance(payload1, dict)
         assert isinstance(payload2, dict)
-        assert payload1.get("correlation_id") == payload2.get("correlation_id") == correlation_id
+        assert (
+            payload1.get("correlation_id")
+            == payload2.get("correlation_id")
+            == correlation_id
+        )
 
 
 __all__ = [

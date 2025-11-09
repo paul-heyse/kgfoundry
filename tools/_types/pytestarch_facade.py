@@ -35,7 +35,9 @@ class IdentifierProtocol(Protocol):
     identifier: str
 
 
-ModuleDependencies = Mapping[str, Sequence[tuple[IdentifierProtocol, IdentifierProtocol]]]
+ModuleDependencies = Mapping[
+    str, Sequence[tuple[IdentifierProtocol, IdentifierProtocol]]
+]
 
 
 @runtime_checkable
@@ -59,7 +61,9 @@ class LayeredArchitectureProtocol(Protocol):
         """Return a new builder stage representing ``name``."""
         ...
 
-    def containing_modules(self, modules: typing.Iterable[str]) -> LayeredArchitectureProtocol:
+    def containing_modules(
+        self, modules: typing.Iterable[str]
+    ) -> LayeredArchitectureProtocol:
         """Restrict the current layer to ``modules``."""
         ...
 
@@ -171,12 +175,16 @@ def get_module_name_filter_cls() -> type[ModuleNameFilterProtocol]:
     module = _import("pytestarch.eval_structure.evaluable_architecture")
     candidate_obj = getattr(module, "ModuleNameFilter", _MISSING)
     if candidate_obj is _MISSING or not inspect.isclass(candidate_obj):
-        message = "pytestarch evaluable architecture module is missing ModuleNameFilter class"
+        message = (
+            "pytestarch evaluable architecture module is missing ModuleNameFilter class"
+        )
         raise TypeError(message)
     return cast("type[ModuleNameFilterProtocol]", candidate_obj)
 
 
-def get_layered_architecture_factory() -> typing.Callable[..., LayeredArchitectureProtocol]:
+def get_layered_architecture_factory() -> (
+    typing.Callable[..., LayeredArchitectureProtocol]
+):
     """Return a callable that instantiates the layered architecture builder.
 
     Returns
@@ -200,7 +208,9 @@ def get_module_name_filter_factory() -> typing.Callable[..., ModuleNameFilterPro
     return cast("typing.Callable[..., ModuleNameFilterProtocol]", cls)
 
 
-def get_evaluable_architecture_fn() -> typing.Callable[..., EvaluableArchitectureProtocol]:
+def get_evaluable_architecture_fn() -> (
+    typing.Callable[..., EvaluableArchitectureProtocol]
+):
     """Return the pytestarch entry-point for evaluable architectures.
 
     Returns
@@ -221,9 +231,9 @@ def get_evaluable_architecture_fn() -> typing.Callable[..., EvaluableArchitectur
     return typed_module.get_evaluable_architecture
 
 
-def get_evaluable_architecture_for_module_objects_fn() -> typing.Callable[
-    ..., EvaluableArchitectureProtocol
-]:
+def get_evaluable_architecture_for_module_objects_fn() -> (
+    typing.Callable[..., EvaluableArchitectureProtocol]
+):
     """Return the evaluable-architecture factory for module objects.
 
     Returns
@@ -238,7 +248,9 @@ def get_evaluable_architecture_for_module_objects_fn() -> typing.Callable[
     """
     module = _import("pytestarch.pytestarch")
     if not hasattr(module, "get_evaluable_architecture_for_module_objects"):
-        message = "pytestarch module is missing get_evaluable_architecture_for_module_objects"
+        message = (
+            "pytestarch module is missing get_evaluable_architecture_for_module_objects"
+        )
         raise AttributeError(message)
     typed_module = cast("_PytestarchModule", module)
     return typed_module.get_evaluable_architecture_for_module_objects

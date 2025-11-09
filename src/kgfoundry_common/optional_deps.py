@@ -15,6 +15,7 @@ Examples
 ... except ArtifactDependencyError as e:
 ...     print(f"Griffe unavailable: {e.problem_details()}")
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations

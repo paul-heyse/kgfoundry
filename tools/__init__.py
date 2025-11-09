@@ -108,7 +108,14 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, MutableMapping
     from types import ModuleType
 
-    from tools import codemods, docs, docstring_builder, gen_readmes, generate_pr_summary, navmap
+    from tools import (
+        codemods,
+        docs,
+        docstring_builder,
+        gen_readmes,
+        generate_pr_summary,
+        navmap,
+    )
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 

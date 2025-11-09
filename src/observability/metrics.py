@@ -12,6 +12,7 @@ Examples
 >>> from observability.metrics import faiss_search_latency_ms
 >>> faiss_search_latency_ms.observe(12.5)
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations

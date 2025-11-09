@@ -21,4 +21,7 @@ def test_schema_command_writes_cli_envelope(monkeypatch, tmp_path) -> None:
     payload = json.loads(envelope_path.read_text(encoding="utf-8"))
 
     assert payload["status"] == "success"
-    assert any(Path(entry["path"]).resolve() == output_target for entry in payload.get("files", []))
+    assert any(
+        Path(entry["path"]).resolve() == output_target
+        for entry in payload.get("files", [])
+    )

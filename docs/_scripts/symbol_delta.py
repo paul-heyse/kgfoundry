@@ -29,7 +29,11 @@ from docs.types.artifacts import (
     symbol_delta_to_payload,
 )
 from docs.types.artifacts import SymbolDeltaPayload as TypedSymbolDeltaPayload
-from kgfoundry_common.errors import DeserializationError, SchemaValidationError, SerializationError
+from kgfoundry_common.errors import (
+    DeserializationError,
+    SchemaValidationError,
+    SerializationError,
+)
 
 if TYPE_CHECKING:
     from tools import (
@@ -47,7 +51,9 @@ SCHEMA_DIR = ENV.root / "schema" / "docs"
 SYMBOL_DELTA_SCHEMA = SCHEMA_DIR / "symbol-delta.schema.json"
 
 BASE_LOGGER = get_logger(__name__)
-DELTA_LOG = shared.make_logger("symbol_delta", artifact="symbols.delta.json", logger=BASE_LOGGER)
+DELTA_LOG = shared.make_logger(
+    "symbol_delta", artifact="symbols.delta.json", logger=BASE_LOGGER
+)
 
 GIT_TIMEOUT_SECONDS = 30.0
 TRACKED_KEYS = {
@@ -611,7 +617,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
         return 1
 
-    with observe_tool_run(["docs-symbol-delta"], cwd=ENV.root, timeout=None) as observation:
+    with observe_tool_run(
+        ["docs-symbol-delta"], cwd=ENV.root, timeout=None
+    ) as observation:
         try:
             head_rows = _load_symbol_rows(SYMBOLS_PATH)
             base_rows, base_sha = _load_base_snapshot(args.base)

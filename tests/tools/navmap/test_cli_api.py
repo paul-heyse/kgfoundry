@@ -140,7 +140,9 @@ class TestProblemDetailsIntegration:
     def test_invalid_root_handled_gracefully(self) -> None:
         """Verify invalid root directory is handled gracefully."""
         options = NavmapRepairOptions(apply=False)
-        results = repair_all_with_config(root=Path("/nonexistent/path/xyz"), options=options)
+        results = repair_all_with_config(
+            root=Path("/nonexistent/path/xyz"), options=options
+        )
         assert isinstance(results, list)
 
     def test_config_errors_raise_configuration_error(self) -> None:

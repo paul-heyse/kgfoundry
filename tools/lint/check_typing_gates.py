@@ -130,7 +130,9 @@ class TypeGateVisitor(ast.NodeVisitor):
             return
 
         # Check for private module imports
-        if node.module.startswith("docs._types") or node.module.startswith("docs._cache"):
+        if node.module.startswith("docs._types") or node.module.startswith(
+            "docs._cache"
+        ):
             suggestion = self._suggest_private_module_fix(node.module)
             violation = TypeGateViolation(
                 filepath=str(self.filepath),
@@ -306,7 +308,9 @@ class TypeGateVisitor(ast.NodeVisitor):
         )
 
 
-def check_file(filepath: Path, logger: LoggerAdapter | None = None) -> list[TypeGateViolation]:
+def check_file(
+    filepath: Path, logger: LoggerAdapter | None = None
+) -> list[TypeGateViolation]:
     """Check a single Python file for typing gate violations.
 
     Parameters
@@ -403,7 +407,10 @@ def format_violations(
 
     if list_output:
         # Format for codemod: filepath:lineno:violation_type:module_name
-        lines = [f"{v.filepath}:{v.lineno}:{v.violation_type}:{v.module_name}" for v in violations]
+        lines = [
+            f"{v.filepath}:{v.lineno}:{v.violation_type}:{v.module_name}"
+            for v in violations
+        ]
         return "\n".join(lines)
 
     if not violations:

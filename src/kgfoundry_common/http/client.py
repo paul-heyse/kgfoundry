@@ -49,7 +49,9 @@ class HttpClient:
         Defaults to None.
     """
 
-    def __init__(self, settings: HttpSettings, retry_strategy: RetryStrategy | None = None) -> None:
+    def __init__(
+        self, settings: HttpSettings, retry_strategy: RetryStrategy | None = None
+    ) -> None:
         self.s = settings
         self.retry_strategy = retry_strategy  # may be None for single-attempt
         # TODO(@http-client): # noqa: TD003, FIX002 Initialize underlying HTTP client (httpx, requests, etc.)

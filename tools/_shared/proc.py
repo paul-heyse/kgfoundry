@@ -7,7 +7,7 @@ function without modification.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 from tools._shared.process import ProcessRunner, ToolExecutionError, ToolRunResult
@@ -22,7 +22,7 @@ class _ProcessRunnerState:
     runner: ProcessRunner
 
 
-_PROCESS_STATE = _ProcessRunnerState(ProcessRunner())
+_PROCESS_STATE: list[_ProcessRunnerState] = [_ProcessRunnerState(ProcessRunner())]
 
 
 def get_process_runner() -> ProcessRunner:
@@ -33,7 +33,7 @@ def get_process_runner() -> ProcessRunner:
     ProcessRunner
         Global process runner instance.
     """
-    return _PROCESS_STATE.runner
+    return _PROCESS_STATE[0].runner
 
 
 def set_process_runner(runner: ProcessRunner) -> None:
@@ -42,7 +42,7 @@ def set_process_runner(runner: ProcessRunner) -> None:
     Intended for advanced scenarios (e.g. tests) where dependency injection is required. Callers
     should restore the previous runner when finished.
     """
-    _PROCESS_STATE.runner = runner
+    _PROCESS_STATE[0] = replace(_PROCESS_STATE[0], runner=runner)
 
 
 def run_tool(
@@ -78,7 +78,7 @@ def run_tool(
     This function calls :meth:`ProcessRunner.run` which may raise
     :exc:`ToolExecutionError`. See :class:`ProcessRunner` for details.
     """
-    return _PROCESS_STATE.runner.run(
+    return _PROCESS_STATE[0].runner.run(
         command,
         cwd=cwd,
         env=env,

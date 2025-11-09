@@ -73,7 +73,10 @@ from tools.docstring_builder.paths import (
     REQUIRED_PYTHON_MAJOR,
     REQUIRED_PYTHON_MINOR,
 )
-from tools.docstring_builder.policy import PolicyConfigurationError, load_policy_settings
+from tools.docstring_builder.policy import (
+    PolicyConfigurationError,
+    load_policy_settings,
+)
 from tools.stubs.drift_check import run as run_stub_drift
 
 if TYPE_CHECKING:
@@ -151,7 +154,8 @@ def _normalize_error_status(value: str) -> CliErrorStatus:
 def _apply_pipeline_result(
     builder: CliEnvelopeBuilder,
     result: DocstringBuildResult,
-) -> None:
+) -> CliEnvelopeBuilder:
+    current = builder
     for file_report in result.file_reports:
         path = str(file_report.get("path", "<unknown>"))
         message = file_report.get("message") or file_report.get("preview")
@@ -161,7 +165,7 @@ def _apply_pipeline_result(
             problem = cast("ProblemDetailsDict", dict(problem_raw))
         else:
             problem = None
-        builder.add_file(
+        current = current.add_file(
             path=path,
             status=_map_file_status(file_report),
             message=str(message) if message else None,
@@ -174,20 +178,23 @@ def _apply_pipeline_result(
             problem = cast("ProblemDetailsDict", dict(problem_raw))
         else:
             problem = None
-        builder.add_error(
+        current = current.add_error(
             status=_normalize_error_status(status),
             message=str(error.get("message", "")),
             file=str(error.get("file", "")) or None,
             problem=problem,
         )
     if result.manifest_path is not None:
-        builder.add_file(
+        current = current.add_file(
             path=str(result.manifest_path),
             status="success",
             message="Manifest written",
         )
     if result.problem_details is not None:
-        builder.set_problem(cast("ProblemDetailsDict", dict(result.problem_details)))
+        current = current.set_problem(
+            cast("ProblemDetailsDict", dict(result.problem_details))
+        )
+    return current
 
 
 def _resolve_duration(duration: float, result: DocstringBuildResult | None) -> float:
@@ -198,17 +205,20 @@ def _resolve_duration(duration: float, result: DocstringBuildResult | None) -> f
     return duration
 
 
-def _apply_additional_annotations(builder: CliEnvelopeBuilder, args: argparse.Namespace) -> None:
+def _apply_additional_annotations(
+    builder: CliEnvelopeBuilder, args: argparse.Namespace
+) -> CliEnvelopeBuilder:
+    current = builder
     output_paths = getattr(args, "cli_output_paths", None)
     if output_paths:
         for path_obj in output_paths:
-            builder.add_file(
+            current = current.add_file(
                 path=str(path_obj),
                 status="success",
             )
     summary = getattr(args, "cli_summary", None)
     if isinstance(summary, Mapping) and summary:
-        builder.add_file(
+        current = current.add_file(
             path="<summary>",
             status="success",
             message=json.dumps(summary, sort_keys=True),
@@ -216,13 +226,16 @@ def _apply_additional_annotations(builder: CliEnvelopeBuilder, args: argparse.Na
     doctor_issues = getattr(args, "cli_doctor_issues", None)
     if isinstance(doctor_issues, Sequence):
         for issue in doctor_issues:
-            builder.add_error(
+            current = current.add_error(
                 status="config",
                 message=str(issue),
             )
     additional_problem = getattr(args, "cli_problem", None)
     if isinstance(additional_problem, Mapping):
-        builder.set_problem(cast("ProblemDetailsDict", dict(additional_problem)))
+        current = current.set_problem(
+            cast("ProblemDetailsDict", dict(additional_problem))
+        )
+    return current
 
 
 def _build_cli_envelope_from_args(
@@ -238,30 +251,36 @@ def _build_cli_envelope_from_args(
         status=status,
         subcommand=subcommand,
     )
-    result = cast("DocstringBuildResult | None", getattr(args, "docbuilder_result", None))
+    result = cast(
+        "DocstringBuildResult | None", getattr(args, "docbuilder_result", None)
+    )
     if result is not None:
-        _apply_pipeline_result(builder, result)
+        builder = _apply_pipeline_result(builder, result)
         duration = _resolve_duration(duration, result)
-    _apply_additional_annotations(builder, args)
+    builder = _apply_additional_annotations(builder, args)
     return builder.finish(duration_seconds=duration)
 
 
-def _build_config_error_envelope(subcommand: str, problem: ProblemDetailsDict) -> CliEnvelope:
+def _build_config_error_envelope(
+    subcommand: str, problem: ProblemDetailsDict
+) -> CliEnvelope:
     builder = CliEnvelopeBuilder.create(
         command=CLI_COMMAND,
         status="config",
         subcommand=subcommand,
     )
     detail = str(problem.get("detail", "CLI configuration failed."))
-    builder.add_error(
+    builder = builder.add_error(
         status="config",
         message=detail,
     )
-    builder.set_problem(problem)
+    builder = builder.set_problem(problem)
     return builder.finish()
 
 
-def _build_unexpected_failure_envelope(subcommand: str, exc: BaseException) -> CliEnvelope:
+def _build_unexpected_failure_envelope(
+    subcommand: str, exc: BaseException
+) -> CliEnvelope:
     detail = f"{type(exc).__name__}: {exc}"
     problem = build_problem_details(
         ProblemDetailsParams(
@@ -277,11 +296,11 @@ def _build_unexpected_failure_envelope(subcommand: str, exc: BaseException) -> C
         status="error",
         subcommand=subcommand,
     )
-    builder.add_error(
+    builder = builder.add_error(
         status="error",
         message=detail,
     )
-    builder.set_problem(problem)
+    builder = builder.set_problem(problem)
     return builder.finish()
 
 
@@ -329,9 +348,15 @@ class _NormalizedCliOptions:
 
 
 CLI_ARGUMENT_DEFINITIONS: tuple[tuple[tuple[str, ...], dict[str, Any]], ...] = (
-    (("--config",), {"dest": "config_path", "help": "Override the path to docstring_builder.toml"}),
+    (
+        ("--config",),
+        {"dest": "config_path", "help": "Override the path to docstring_builder.toml"},
+    ),
     (("--module",), {"default": "", "help": "Restrict to module prefix"}),
-    (("--since",), {"default": "", "help": "Only consider files changed since revision"}),
+    (
+        ("--since",),
+        {"default": "", "help": "Only consider files changed since revision"},
+    ),
     (("--force",), {"action": "store_true", "help": "Ignore cache entries"}),
     (("--diff",), {"action": "store_true", "help": "Show diffs in check mode"}),
     (
@@ -377,10 +402,19 @@ CLI_ARGUMENT_DEFINITIONS: tuple[tuple[tuple[str, ...], dict[str, Any]], ...] = (
     ),
     (
         ("--baseline",),
-        {"default": "", "help": "Reference git revision or path for baseline comparisons"},
+        {
+            "default": "",
+            "help": "Reference git revision or path for baseline comparisons",
+        },
     ),
-    (("--jobs",), {"type": int, "default": 1, "help": "Number of worker threads for processing"}),
-    (("--skip-docfacts",), {"action": "store_true", "help": "Skip DocFacts reconciliation"}),
+    (
+        ("--jobs",),
+        {"type": int, "default": 1, "help": "Number of worker threads for processing"},
+    ),
+    (
+        ("--skip-docfacts",),
+        {"action": "store_true", "help": "Skip DocFacts reconciliation"},
+    ),
     (
         ("--json-output",),
         {
@@ -391,11 +425,19 @@ CLI_ARGUMENT_DEFINITIONS: tuple[tuple[tuple[str, ...], dict[str, Any]], ...] = (
     ),
     (
         ("--update",),
-        {"dest": "flag_update", "action": "store_true", "help": "Legacy flag: run in update mode"},
+        {
+            "dest": "flag_update",
+            "action": "store_true",
+            "help": "Legacy flag: run in update mode",
+        },
     ),
     (
         ("--check",),
-        {"dest": "flag_check", "action": "store_true", "help": "Legacy flag: run in check mode"},
+        {
+            "dest": "flag_check",
+            "action": "store_true",
+            "help": "Legacy flag: run in check mode",
+        },
     ),
     (
         ("--harvest",),
@@ -759,7 +801,9 @@ def _check_optional_dependencies(modules: Sequence[str]) -> list[str]:
         return None
 
     return [
-        message for module_name in modules if (message := _module_issue(module_name)) is not None
+        message
+        for module_name in modules
+        if (message := _module_issue(module_name)) is not None
     ]
 
 
@@ -774,7 +818,9 @@ def _check_writable_directories(directories: Sequence[Path]) -> list[str]:
             return f"Directory {directory} is not writeable: {exc}."
         return None
 
-    return [message for directory in directories if (message := _directory_issue(directory))]
+    return [
+        message for directory in directories if (message := _directory_issue(directory))
+    ]
 
 
 def _extract_precommit_hook_names(config_path: Path) -> list[str]:
@@ -814,7 +860,9 @@ def _evaluate_precommit_hooks(config_path: Path) -> list[str]:
         and docs_artifacts_idx is not None
         and doc_builder_idx > docs_artifacts_idx
     ):
-        issues.append("'docstring-builder (check)' must run before 'docs: regenerate artifacts'.")
+        issues.append(
+            "'docstring-builder (check)' must run before 'docs: regenerate artifacts'."
+        )
     if (
         docs_artifacts_idx is not None
         and navmap_idx is not None
@@ -822,7 +870,9 @@ def _evaluate_precommit_hooks(config_path: Path) -> list[str]:
     ):
         issues.append("'navmap-check' should run after 'docs: regenerate artifacts'.")
     if pyrefly_idx is None:
-        issues.append("Add 'pyrefly-check' to pre-commit to validate dependency typing.")
+        issues.append(
+            "Add 'pyrefly-check' to pre-commit to validate dependency typing."
+        )
     return issues
 
 
@@ -889,7 +939,9 @@ def _collect_doctor_checks(args: argparse.Namespace) -> tuple[list[str], int]:
     issues.extend(_check_stub_packages(("stubs/libcst", "stubs/mkdocs_gen_files")))
     issues.extend(_check_optional_dependencies(("griffe", "libcst")))
     issues.extend(
-        _check_writable_directories((REPO_ROOT / "docs" / "_build", REPO_ROOT / ".cache"))
+        _check_writable_directories(
+            (REPO_ROOT / "docs" / "_build", REPO_ROOT / ".cache")
+        )
     )
     issues.extend(_evaluate_precommit_hooks(REPO_ROOT / ".pre-commit-config.yaml"))
     issues.extend(_load_policy_settings_with_logging())
@@ -925,7 +977,8 @@ LEGACY_COMMAND_HANDLERS: dict[str, CommandHandler] = {
 
 def _invoke_handler(args: argparse.Namespace, handler: CommandHandler) -> int:
     subcommand = cast(
-        "str", getattr(args, "invoked_subcommand", None) or getattr(args, "subcommand", "")
+        "str",
+        getattr(args, "invoked_subcommand", None) or getattr(args, "subcommand", ""),
     )
     operation_id = _operation_id_for_subcommand(subcommand)
     correlation_id = str(uuid4())
@@ -937,7 +990,9 @@ def _invoke_handler(args: argparse.Namespace, handler: CommandHandler) -> int:
     if operation_id:
         logger_fields["operation_id"] = operation_id
     operation_logger = with_fields(LOGGER, **logger_fields)
-    operation_logger.info("Starting docstring builder command", extra={"status": "start"})
+    operation_logger.info(
+        "Starting docstring builder command", extra={"status": "start"}
+    )
 
     try:
         context = _load_cli_context()
@@ -1057,7 +1112,9 @@ def _register_subcommand(
     help_text = str(spec.get("help_text", ""))
     handler = cast("CommandHandler", spec["handler"])
     include_paths = bool(spec.get("include_paths"))
-    configure = cast("Callable[[argparse.ArgumentParser], None] | None", spec.get("configure"))
+    configure = cast(
+        "Callable[[argparse.ArgumentParser], None] | None", spec.get("configure")
+    )
 
     subparser = subparsers.add_parser(name, help=help_text)
     if include_paths:

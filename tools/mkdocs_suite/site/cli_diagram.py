@@ -38,7 +38,9 @@ def collect_operations(
     list[OperationEntry]
         Materialised list of CLI operation metadata tuples.
     """
-    return _impl.collect_operations(context, interface_id=interface_id, click_cmd=click_cmd)
+    return _impl.collect_operations(
+        context, interface_id=interface_id, click_cmd=click_cmd
+    )
 
 
 def write_diagram(operations: Sequence[OperationEntry]) -> None:

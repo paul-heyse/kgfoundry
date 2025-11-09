@@ -25,8 +25,13 @@ from pathlib import Path
 
 import numpy as np
 
-from codeintel_rev.config.settings import IndexConfig, Settings, VLLMConfig, load_settings
-from codeintel_rev.indexing.cast_chunker import Chunk, chunk_file
+from codeintel_rev.config.settings import (
+    IndexConfig,
+    Settings,
+    VLLMConfig,
+    load_settings,
+)
+from codeintel_rev.indexing.cast_chunker import Chunk, ChunkOptions, chunk_file
 from codeintel_rev.indexing.scip_reader import (
     SCIPIndex,
     SymbolDef,
@@ -35,8 +40,14 @@ from codeintel_rev.indexing.scip_reader import (
     parse_scip_json,
 )
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.parquet_store import ParquetWriteOptions, write_chunks_parquet
+from codeintel_rev.io.symbol_catalog import (  # new
+    SymbolCatalog,
+    SymbolDefRow,
+    SymbolOccurrenceRow,
+)
 from codeintel_rev.io.vllm_client import VLLMClient
 
 logging.basicConfig(level=logging.INFO)
@@ -104,6 +115,7 @@ def main() -> None:
         paths,
         materialize=settings.index.duckdb_materialize,
     )
+    _write_symbols(paths, scip_index, chunks)
 
     mode_str = "incremental" if args.incremental else "full rebuild"
     logger.info(
@@ -239,8 +251,7 @@ def _chunk_repository(
             full_path,
             text,
             top_level_defs,
-            budget=budget,
-            language=file_language,
+            options=ChunkOptions(budget=budget, language=file_language),
         )
         chunks.extend(file_chunks)
 
@@ -429,7 +440,8 @@ def _update_faiss_index_incremental(
     try:
         faiss_mgr.load_secondary_index()
         logger.info(
-            "Loaded existing secondary index with %s vectors", len(faiss_mgr.incremental_ids)
+            "Loaded existing secondary index with %s vectors",
+            len(faiss_mgr.incremental_ids),
         )
     except FileNotFoundError:
         logger.info("No existing secondary index found; will create new one")
@@ -511,6 +523,75 @@ def _initialize_duckdb(paths: PipelinePaths, *, materialize: bool) -> int:
         materialize,
     )
     return count
+
+
+def _write_symbols(paths: PipelinePaths, index: SCIPIndex, chunks: Sequence[Chunk]) -> None:
+    """Derive symbol tables and persist them into DuckDB."""
+    manager = DuckDBManager(paths.duckdb_path)
+    sym = SymbolCatalog(manager)
+    sym.ensure_schema()
+
+    by_file: dict[str, list[tuple[int, int, int]]] = {}
+    for chunk_id, chunk in enumerate(chunks):
+        by_file.setdefault(chunk.uri, []).append((chunk_id, chunk.start_line, chunk.end_line))
+
+    def _chunk_for(uri: str, line: int) -> int:
+        for cid, start, end in by_file.get(uri, []):
+            if start <= line <= end:
+                return cid
+        return -1
+
+    occ_rows: list[SymbolOccurrenceRow] = []
+    def_rows: dict[str, SymbolDefRow] = {}
+    chunk_pairs: list[tuple[int, str]] = []
+
+    for doc in index.documents:
+        uri = str((paths.repo_root / doc.relative_path).resolve())
+        lang = doc.language or ""
+        for occ in doc.occurrences:
+            sl, sc, el, ec = occ.range
+            chunk_id = _chunk_for(uri, sl)
+            roles = int(occ.roles or 0)
+            occ_rows.append(
+                SymbolOccurrenceRow(
+                    symbol=occ.symbol,
+                    uri=uri,
+                    start_line=sl,
+                    start_col=sc,
+                    end_line=el,
+                    end_col=ec,
+                    roles=roles,
+                    kind=None,
+                    language=lang,
+                    chunk_id=chunk_id,
+                )
+            )
+            if roles & 1:
+                display_name = occ.symbol.split("#")[-1].split(".")[-1]
+                def_rows.setdefault(
+                    occ.symbol,
+                    SymbolDefRow(
+                        symbol=occ.symbol,
+                        display_name=display_name,
+                        kind="symbol",
+                        language=lang,
+                        uri=uri,
+                        start_line=sl,
+                        start_col=sc,
+                        end_line=el,
+                        end_col=ec,
+                        chunk_id=chunk_id,
+                        docstring=None,
+                        signature=None,
+                    ),
+                )
+
+    for chunk_id, chunk in enumerate(chunks):
+        chunk_pairs.extend((chunk_id, symbol) for symbol in chunk.symbols)
+
+    sym.bulk_insert_occurrences(occ_rows)
+    sym.upsert_symbol_defs(list(def_rows.values()))
+    sym.bulk_insert_chunk_symbols(chunk_pairs)
 
 
 if __name__ == "__main__":

@@ -114,7 +114,9 @@ def has_required_parameters(func: InspectableCallable) -> bool:
 
         # Check if this parameter is required
         is_required = (
-            not param.has_default and not param.is_var_positional and not param.is_var_keyword
+            not param.has_default
+            and not param.is_var_positional
+            and not param.is_var_keyword
         )
 
         if is_required:

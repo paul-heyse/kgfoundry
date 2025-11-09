@@ -24,7 +24,8 @@ if TYPE_CHECKING:
 # Use string literals in casts to avoid runtime import of Callable
 # Type checker will validate these via TYPE_CHECKING imports above
 NamespaceRegistry = cast(
-    "NamespaceRegistryType", load_attribute("kgfoundry._namespace_proxy", "NamespaceRegistry")
+    "NamespaceRegistryType",
+    load_attribute("kgfoundry._namespace_proxy", "NamespaceRegistry"),
 )
 namespace_exports = cast(
     "Callable[[ModuleType], list[str]]",

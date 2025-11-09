@@ -130,7 +130,9 @@ def test_search_text_uses_observe_duration(mock_context: Mock) -> None:
     calls: list[tuple[str, str]] = []
 
     @contextmanager
-    def fake_observe(operation: str, component: str, **_kwargs: object) -> Iterator[Mock]:
+    def fake_observe(
+        operation: str, component: str, **_kwargs: object
+    ) -> Iterator[Mock]:
         calls.append((operation, component))
         yield observation
 
@@ -175,9 +177,12 @@ def test_search_text_scope_include_and_exclude(mock_context: Mock) -> None:
             return_value="session-123",
         ),
         patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope", return_value=scope
+            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
+            return_value=scope,
         ),
-        patch("codeintel_rev.mcp_server.adapters.text_search.run_subprocess") as mock_run,
+        patch(
+            "codeintel_rev.mcp_server.adapters.text_search.run_subprocess"
+        ) as mock_run,
     ):
         mock_run.return_value = _build_match(repo_root / "src" / "main.py")
 
@@ -207,9 +212,12 @@ def test_search_text_explicit_paths_override_scope(mock_context: Mock) -> None:
             return_value="session-456",
         ),
         patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope", return_value=scope
+            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
+            return_value=scope,
         ),
-        patch("codeintel_rev.mcp_server.adapters.text_search.run_subprocess") as mock_run,
+        patch(
+            "codeintel_rev.mcp_server.adapters.text_search.run_subprocess"
+        ) as mock_run,
     ):
         mock_run.return_value = _build_match(repo_root / "tests" / "test_main.py")
 
@@ -237,11 +245,16 @@ def test_search_text_explicit_globs_override_scope(mock_context: Mock) -> None:
             return_value="session-789",
         ),
         patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope", return_value=scope
+            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
+            return_value=scope,
         ),
-        patch("codeintel_rev.mcp_server.adapters.text_search.run_subprocess") as mock_run,
+        patch(
+            "codeintel_rev.mcp_server.adapters.text_search.run_subprocess"
+        ) as mock_run,
     ):
-        mock_run.return_value = _build_match(repo_root / "tests" / "integration" / "case.py")
+        mock_run.return_value = _build_match(
+            repo_root / "tests" / "integration" / "case.py"
+        )
 
         result = _run_search(
             mock_context,
@@ -273,9 +286,12 @@ def test_search_text_timeout_error(mock_context: Mock) -> None:
             return_value="session-timeout",
         ),
         patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope", return_value=scope
+            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
+            return_value=scope,
         ),
-        patch("codeintel_rev.mcp_server.adapters.text_search.run_subprocess") as mock_run,
+        patch(
+            "codeintel_rev.mcp_server.adapters.text_search.run_subprocess"
+        ) as mock_run,
     ):
         mock_run.side_effect = SubprocessTimeoutError(
             "Search timeout", command=["rg"], timeout_seconds=30
@@ -295,9 +311,12 @@ def test_search_text_subprocess_error(mock_context: Mock) -> None:
             return_value="session-error",
         ),
         patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope", return_value=scope
+            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
+            return_value=scope,
         ),
-        patch("codeintel_rev.mcp_server.adapters.text_search.run_subprocess") as mock_run,
+        patch(
+            "codeintel_rev.mcp_server.adapters.text_search.run_subprocess"
+        ) as mock_run,
     ):
         mock_run.side_effect = SubprocessError(
             "Command failed", returncode=2, stderr="Error message"
@@ -317,9 +336,12 @@ def test_search_text_value_error(mock_context: Mock) -> None:
             return_value="session-value-error",
         ),
         patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope", return_value=scope
+            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
+            return_value=scope,
         ),
-        patch("codeintel_rev.mcp_server.adapters.text_search.run_subprocess") as mock_run,
+        patch(
+            "codeintel_rev.mcp_server.adapters.text_search.run_subprocess"
+        ) as mock_run,
     ):
         mock_run.side_effect = ValueError("Invalid query")
 

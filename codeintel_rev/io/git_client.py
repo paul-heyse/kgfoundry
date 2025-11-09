@@ -41,9 +41,9 @@ GitPython documentation : https://gitpython.readthedocs.io/
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import git
 import git.exc
@@ -54,6 +54,9 @@ if TYPE_CHECKING:
     from codeintel_rev.mcp_server.schemas import GitBlameEntry
 
 LOGGER = get_logger(__name__)
+
+
+_SET_GITCLIENT_ATTR = object.__setattr__
 
 
 @dataclass(slots=True, frozen=True)
@@ -135,10 +138,14 @@ class GitClient:
         """
         if self._repo is None:
             try:
-                self._repo = git.Repo(self.repo_path, search_parent_directories=True)
+                repo = git.Repo(self.repo_path, search_parent_directories=True)
+                _SET_GITCLIENT_ATTR(self, "_repo", repo)
                 LOGGER.debug(
                     "Initialized Git repository",
-                    extra={"repo_path": str(self.repo_path), "git_dir": str(self._repo.git_dir)},
+                    extra={
+                        "repo_path": str(self.repo_path),
+                        "git_dir": str(repo.git_dir),
+                    },
                 )
             except git.exc.InvalidGitRepositoryError:
                 LOGGER.exception(
@@ -146,7 +153,24 @@ class GitClient:
                     extra={"repo_path": str(self.repo_path)},
                 )
                 raise
-        return self._repo
+        return cast("git.Repo", self._repo)
+
+    def with_cached_repo(self, repo: git.Repo) -> GitClient:
+        """Return a clone of this client with a cached repository.
+
+        Parameters
+        ----------
+        repo : git.Repo
+            Repository instance to seed the cache with.
+
+        Returns
+        -------
+        GitClient
+            Clone of this client with ``repo`` cached.
+        """
+        clone = replace(self)
+        _SET_GITCLIENT_ATTR(clone, "_repo", repo)
+        return clone
 
     def blame_range(
         self,

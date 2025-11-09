@@ -16,7 +16,9 @@ from codeintel_rev.io.faiss_dual_index import FAISSDualIndexManager, IndexManife
 from tests.conftest import FAISS_MODULE, HAS_FAISS_SUPPORT
 
 if not HAS_FAISS_SUPPORT:  # pragma: no cover - gated on FAISS availability
-    pytest.skip("FAISS bindings unavailable; skipping dual-index tests", allow_module_level=True)
+    pytest.skip(
+        "FAISS bindings unavailable; skipping dual-index tests", allow_module_level=True
+    )
 
 assert FAISS_MODULE is not None
 faiss_module: Any = FAISS_MODULE
@@ -183,24 +185,31 @@ async def test_gpu_secondary_clone_reuses_cloner_options(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """GPU cloning shares cloner options across primary and secondary indexes."""
-
     vec_dim = 8
     primary = _build_flat_index(vec_dim, 4)
     secondary = faiss_module.IndexFlatIP(vec_dim)
 
     settings = IndexConfig(vec_dim=vec_dim, use_cuvs=True)
     manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
-    manager._primary_cpu = primary
-    manager._secondary_cpu = secondary
+    manager._primary_cpu = primary  # noqa: SLF001 - test seeds private state
+    manager._secondary_cpu = secondary  # noqa: SLF001 - test seeds private state
 
-    torch_stub = types.ModuleType("torch")
-    torch_stub.cuda = types.SimpleNamespace(is_available=lambda: True)
+    class TorchStub(types.ModuleType):
+        """Minimal torch stub exposing the cuda helper used by FAISS."""
+
+        cuda: types.SimpleNamespace
+
+        def __init__(self) -> None:
+            super().__init__("torch")
+            self.cuda = types.SimpleNamespace(is_available=lambda: True)
+
+    torch_stub = TorchStub()
     monkeypatch.setitem(sys.modules, "torch", torch_stub)
 
     captured: list[Any] = []
 
     def fake_index_cpu_to_gpu(
-        resources: Any, device: int, index: Any, options: Any | None = None
+        _resources: Any, _device: int, _index: Any, options: Any | None = None
     ) -> object:
         captured.append(options)
         return object()
@@ -212,7 +221,9 @@ async def test_gpu_secondary_clone_reuses_cloner_options(
         raising=False,
     )
 
-    await manager._try_gpu_clone(faiss_module)
+    await manager._try_gpu_clone(
+        faiss_module
+    )
 
     assert len(captured) == 2
     assert captured[0] is captured[1]

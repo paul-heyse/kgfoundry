@@ -161,7 +161,9 @@ class SchemaProblemDetailsParams:
     extensions: Mapping[str, JsonValue] | None = None
 
 
-def build_schema_problem_details(params: SchemaProblemDetailsParams) -> ProblemDetailsDict:
+def build_schema_problem_details(
+    params: SchemaProblemDetailsParams,
+) -> ProblemDetailsDict:
     """Return Problem Details payload describing a schema validation failure.
 
     Parameters

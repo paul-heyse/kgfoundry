@@ -29,7 +29,9 @@ def test_index_bm25_emits_success_envelope(
     monkeypatch.setattr(orchestration_cli, "CLI_ENVELOPE_DIR", tmp_path)
 
     def fake_build(
-        config: orchestration_cli.BM25BuildConfig, *, logger: orchestration_cli.LoggerAdapter
+        config: orchestration_cli.BM25BuildConfig,
+        *,
+        logger: orchestration_cli.LoggerAdapter,
     ) -> tuple[str, int]:
         assert isinstance(config, orchestration_cli.BM25BuildConfig)
         assert isinstance(logger, orchestration_cli.LoggerAdapter)
@@ -57,7 +59,9 @@ def test_index_bm25_emits_success_envelope(
     envelope = _read_envelope(envelope_path)
     assert envelope["status"] == "success"
     files = cast("list[dict[str, object]]", envelope["files"])
-    assert any(cast("str", entry.get("path", "")).endswith("bm25_index") for entry in files)
+    assert any(
+        cast("str", entry.get("path", "")).endswith("bm25_index") for entry in files
+    )
 
 
 def test_index_faiss_records_validation_failure(
@@ -91,6 +95,9 @@ def test_index_faiss_records_validation_failure(
     envelope = _read_envelope(envelope_path)
     assert envelope["status"] == "violation"
     problem = cast("dict[str, object]", envelope["problem"])
-    assert problem["type"] == "https://kgfoundry.dev/problems/vector-ingestion/invalid-payload"
+    assert (
+        problem["type"]
+        == "https://kgfoundry.dev/problems/vector-ingestion/invalid-payload"
+    )
     assert problem["vector_path"] == str(vectors_file)
     assert problem["errors"] == ["row 1: missing vector"]

@@ -58,7 +58,9 @@ def _preload_faiss_index(context: ApplicationContext) -> bool:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:  # Complex initialization sequence required
+async def lifespan(
+    app: FastAPI,
+) -> AsyncIterator[None]:  # Complex initialization sequence required
     """Application lifespan manager with explicit configuration initialization.
 
     This function runs during FastAPI startup and shutdown, managing the
@@ -113,7 +115,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:  # Complex initializati
             LOGGER.info("GPU warmup successful - GPU acceleration available")
         elif gpu_status["overall_status"] == "degraded":
             LOGGER.warning(
-                "GPU warmup partial - some GPU features unavailable: %s", gpu_status["details"]
+                "GPU warmup partial - some GPU features unavailable: %s",
+                gpu_status["details"],
             )
         else:
             LOGGER.info("GPU warmup indicates GPU unavailable - continuing with CPU-only mode")

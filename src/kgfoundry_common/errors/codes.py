@@ -11,6 +11,7 @@ Examples
 >>> type_uri = get_type_uri(code)
 >>> assert type_uri == "https://kgfoundry.dev/problems/download-failed"
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations

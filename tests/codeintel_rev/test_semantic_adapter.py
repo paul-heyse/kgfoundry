@@ -3,7 +3,7 @@ from __future__ import annotations
 import types
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Self, cast
@@ -28,26 +28,45 @@ class _ObservationRecord:
     success: bool = False
     error: bool = False
 
-    def mark_success(self) -> None:
-        self.success = True
+    def mark_success(self) -> _ObservationRecord:
+        return _replace_observation(self, success=True)
 
-    def mark_error(self) -> None:
-        self.error = True
+    def mark_error(self) -> _ObservationRecord:
+        return _replace_observation(self, error=True)
 
 
 OBSERVATION_RECORDS: list[_ObservationRecord] = []
+_OBSERVATION_INDEX: dict[int, int] = {}
+
+
+def _replace_observation(
+    record: _ObservationRecord, **updates: object
+) -> _ObservationRecord:
+    index = _OBSERVATION_INDEX.get(id(record))
+    if index is None:
+        return record
+    updated = replace(record, **updates)
+    OBSERVATION_RECORDS[index] = updated
+    return updated
 
 
 @pytest.fixture(autouse=True)
 def _patch_observe_duration(monkeypatch: pytest.MonkeyPatch) -> None:
     """Patch observe_duration so tests do not touch real metrics."""
     OBSERVATION_RECORDS.clear()
+    _OBSERVATION_INDEX.clear()
 
     @contextmanager
-    def _fake_observe(operation: str, component: str, **_: object) -> Iterator[_ObservationRecord]:
+    def _fake_observe(
+        operation: str, component: str, **_: object
+    ) -> Iterator[_ObservationRecord]:
         record = _ObservationRecord(operation=operation, component=component)
         OBSERVATION_RECORDS.append(record)
-        yield record
+        _OBSERVATION_INDEX[id(record)] = len(OBSERVATION_RECORDS) - 1
+        try:
+            yield record
+        finally:
+            _OBSERVATION_INDEX.pop(id(record), None)
 
     monkeypatch.setattr(
         "codeintel_rev.mcp_server.adapters.semantic.observe_duration",
@@ -81,9 +100,14 @@ async def test_semantic_search_observes_duration(
             "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
             return_value="session-observe",
         ),
-        patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
+            return_value=None,
+        ),
     ):
-        result = await semantic_search(cast("ApplicationContext", context), "hello world", limit=1)
+        result = await semantic_search(
+            cast("ApplicationContext", context), "hello world", limit=1
+        )
 
     assert result.get("findings")
     assert observe_duration_calls
@@ -107,7 +131,11 @@ class StubDuckDBCatalog:
     """
 
     def __init__(
-        self, _db_path: Any, _vectors_dir: Any, *, chunks: list[dict[str, Any]] | None = None
+        self,
+        _db_path: Any,
+        _vectors_dir: Any,
+        *,
+        chunks: list[dict[str, Any]] | None = None,
     ) -> None:
         if chunks is None:
             self._chunks = [
@@ -203,7 +231,9 @@ class StubDuckDBCatalog:
         """
         import fnmatch
 
-        filtered = [dict(chunk) for chunk in self._chunks if chunk.get("id") in chunk_ids]
+        filtered = [
+            dict(chunk) for chunk in self._chunks if chunk.get("id") in chunk_ids
+        ]
 
         # Apply language filter
         if languages:
@@ -229,7 +259,9 @@ class StubDuckDBCatalog:
                 chunk
                 for chunk in filtered
                 if isinstance(chunk.get("uri"), str)
-                and any(fnmatch.fnmatch(chunk["uri"], pattern) for pattern in include_globs)
+                and any(
+                    fnmatch.fnmatch(chunk["uri"], pattern) for pattern in include_globs
+                )
             ]
 
         # Apply exclude globs
@@ -238,7 +270,9 @@ class StubDuckDBCatalog:
                 chunk
                 for chunk in filtered
                 if isinstance(chunk.get("uri"), str)
-                and not any(fnmatch.fnmatch(chunk["uri"], pattern) for pattern in exclude_globs)
+                and not any(
+                    fnmatch.fnmatch(chunk["uri"], pattern) for pattern in exclude_globs
+                )
             ]
 
         return filtered
@@ -284,7 +318,9 @@ class _BaseStubFAISSManager:
         List of chunk IDs to return from search. If None, returns [123].
     """
 
-    def __init__(self, *, should_fail_gpu: bool, search_ids: list[int] | None = None) -> None:
+    def __init__(
+        self, *, should_fail_gpu: bool, search_ids: list[int] | None = None
+    ) -> None:
         self.should_fail_gpu = should_fail_gpu
         self.gpu_disabled_reason: str | None = None
         self.clone_invocations = 0
@@ -306,7 +342,9 @@ class _BaseStubFAISSManager:
         """
         self.clone_invocations += 1
         if self.should_fail_gpu:
-            self.gpu_disabled_reason = "FAISS GPU disabled - using CPU: simulated failure"
+            self.gpu_disabled_reason = (
+                "FAISS GPU disabled - using CPU: simulated failure"
+            )
             return False
         self.gpu_disabled_reason = None
         return True
@@ -475,11 +513,16 @@ async def test_semantic_search_gpu_success() -> None:
             "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
             return_value="test-session-123",
         ),
-        patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
+            return_value=None,
+        ),
     ):
         # Cast StubContext to ApplicationContext for type checking
         # StubContext implements the necessary interface for testing
-        result = await semantic_search(cast("ApplicationContext", context), "hello", limit=1)
+        result = await semantic_search(
+            cast("ApplicationContext", context), "hello", limit=1
+        )
 
     assert "limits" not in result
     findings = result.get("findings")
@@ -505,9 +548,14 @@ async def test_semantic_search_gpu_fallback() -> None:
             "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
             return_value="test-session-123",
         ),
-        patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
+            return_value=None,
+        ),
     ):
-        result = await semantic_search(cast("ApplicationContext", context), "hello", limit=1)
+        result = await semantic_search(
+            cast("ApplicationContext", context), "hello", limit=1
+        )
 
     limits = result.get("limits")
     assert limits == ["FAISS GPU disabled - using CPU: simulated failure"]
@@ -533,9 +581,14 @@ async def test_semantic_search_limit_truncates_to_max_results() -> None:
             "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
             return_value="test-session-123",
         ),
-        patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
+            return_value=None,
+        ),
     ):
-        result = await semantic_search(cast("ApplicationContext", context), "hello", limit=10)
+        result = await semantic_search(
+            cast("ApplicationContext", context), "hello", limit=10
+        )
 
     assert faiss_manager.last_k == 3
     limits = result.get("limits")
@@ -563,9 +616,14 @@ async def test_semantic_search_limit_enforces_minimum() -> None:
             "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
             return_value="test-session-123",
         ),
-        patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
+            return_value=None,
+        ),
     ):
-        result = await semantic_search(cast("ApplicationContext", context), "hello", limit=0)
+        result = await semantic_search(
+            cast("ApplicationContext", context), "hello", limit=0
+        )
 
     assert faiss_manager.last_k == 1
     limits = result.get("limits")
@@ -592,7 +650,10 @@ async def test_semantic_search_respects_configured_nprobe() -> None:
             "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
             return_value="test-session-123",
         ),
-        patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
+            return_value=None,
+        ),
     ):
         await semantic_search(cast("ApplicationContext", context), "hello", limit=1)
 
@@ -632,7 +693,9 @@ async def test_semantic_search_with_scope_filters() -> None:
     ]
 
     # FAISS returns all three chunk IDs
-    faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False, search_ids=[123, 456, 789])
+    faiss_manager = _BaseStubFAISSManager(
+        should_fail_gpu=False, search_ids=[123, 456, 789]
+    )
 
     context = StubContext(
         faiss_manager=faiss_manager,
@@ -647,9 +710,14 @@ async def test_semantic_search_with_scope_filters() -> None:
             "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
             return_value="test-session-123",
         ),
-        patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=scope),
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
+            return_value=scope,
+        ),
     ):
-        result = await semantic_search(cast("ApplicationContext", context), "function", limit=10)
+        result = await semantic_search(
+            cast("ApplicationContext", context), "function", limit=10
+        )
 
     findings = result.get("findings")
     assert findings is not None
@@ -705,9 +773,14 @@ async def test_semantic_search_no_scope() -> None:
             "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
             return_value="test-session-123",
         ),
-        patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
+            return_value=None,
+        ),
     ):
-        result = await semantic_search(cast("ApplicationContext", context), "function", limit=10)
+        result = await semantic_search(
+            cast("ApplicationContext", context), "function", limit=10
+        )
 
     findings = result.get("findings")
     assert findings is not None
@@ -769,9 +842,14 @@ async def test_semantic_search_hybrid_merges_channels() -> None:
             "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
             return_value="hybrid-session",
         ),
-        patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
+            return_value=None,
+        ),
     ):
-        result = await semantic_search(cast("ApplicationContext", context), "hybrid query", limit=2)
+        result = await semantic_search(
+            cast("ApplicationContext", context), "hybrid query", limit=2
+        )
 
     answer = result.get("answer")
     assert answer is not None
@@ -803,7 +881,9 @@ async def test_semantic_search_faiss_not_ready() -> None:
     faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
     context = StubContext(
         faiss_manager=faiss_manager,
-        config=StubContextConfig(limits=[], error="Index not built", catalog_chunks=None),
+        config=StubContextConfig(
+            limits=[], error="Index not built", catalog_chunks=None
+        ),
     )
 
     with (
@@ -811,7 +891,10 @@ async def test_semantic_search_faiss_not_ready() -> None:
             "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
             return_value="test-session-error",
         ),
-        patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
+            return_value=None,
+        ),
         pytest.raises(VectorSearchError, match="Index not built"),
     ):
         await semantic_search(cast("ApplicationContext", context), "query", limit=10)
@@ -830,7 +913,10 @@ async def test_semantic_search_embedding_error() -> None:
             "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
             return_value="test-session-embedding-error",
         ),
-        patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
+            return_value=None,
+        ),
         patch.object(
             context.vllm_client,
             "embed_single",
@@ -854,7 +940,10 @@ async def test_semantic_search_faiss_search_error() -> None:
             "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
             return_value="test-session-search-error",
         ),
-        patch("codeintel_rev.mcp_server.adapters.semantic.get_effective_scope", return_value=None),
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
+            return_value=None,
+        ),
         patch.object(
             faiss_manager,
             "search",

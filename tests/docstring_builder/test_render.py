@@ -19,7 +19,9 @@ def test_render_signature_includes_none_default() -> None:
     )
     schema = DocstringSchema(summary="Summarize value.", parameters=[parameter])
 
-    docstring = render_docstring(schema, marker="<!-- marker -->", include_signature=True)
+    docstring = render_docstring(
+        schema, marker="<!-- marker -->", include_signature=True
+    )
 
     assert "= None" in docstring
 
@@ -61,7 +63,9 @@ def test_render_signature_includes_empty_string_default() -> None:
     )
     schema = DocstringSchema(summary="Return a title.", parameters=[parameter])
 
-    rendered = render_docstring(schema=schema, marker="[generated]", include_signature=True)
+    rendered = render_docstring(
+        schema=schema, marker="[generated]", include_signature=True
+    )
 
     assert '= ""' in rendered
 

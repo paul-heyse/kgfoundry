@@ -573,8 +573,9 @@ gpu = [
     "torchvision",
     "torchaudio",
     "apache-tvm-ffi",
-    "flashinfer-python==0.4.1",
-    "flashinfer-cubin==0.4.1",
+    "flashinfer-python",
+    "flashinfer-cubin",
+    "flashinfer-jit-cache",
     "compressed-tensors",
     "accelerate",
     "easyocr",
@@ -912,6 +913,9 @@ torch = [       { index = "pytorch-cu130" } ]
 torchvision = [ { index = "pytorch-cu130" } ]
 torchaudio = [  { index = "pytorch-cu130" } ]
 
+flashinfer-python = [  { index = "flashinfer-nightly" } ]
+flashinfer-cubin = [  { index = "flashinfer-nightly" } ]
+flashinfer-jit-cache = [  { index = "flashinfer-nightly-cu130" } ]
 
 
 # Define named indexes uv can use.
@@ -942,6 +946,16 @@ name = "pytorch-cu130"
 url  = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
+[[tool.uv.index]]
+name = "flashinfer-nightly"
+url  = "https://flashinfer.ai/whl/nightly/"
+explicit = true
+
+[[tool.uv.index]]
+name = "flashinfer-nightly-cu130"
+url  = "https://flashinfer.ai/whl/nightly/cu130"
+explicit = true
+
 
 [tool.uv]
 # Allow pre-releases in resolution so uv can select dev/nightly builds of vLLM.
@@ -949,7 +963,10 @@ explicit = true
 prerelease = "allow"
 
 override-dependencies = [
-  "xformers @ file:///home/paul/wheelhouse/xformers-0.0.33+5d4b92a5.d20251029-*.whl"
+  "xformers @ file:///home/paul/wheelhouse/xformers-0.0.33+5d4b92a5.d20251029-*.whl",
+  "flashinfer-python",
+  "flashinfer-cubin",
+  "flashinfer-jit-cache",
 ]
 
 

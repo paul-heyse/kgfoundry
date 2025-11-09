@@ -10,6 +10,7 @@ See Also
 - `schema/models/search_request.v1.json` - Request schema
 - `schema/models/search_result.v1.json` - Response schema
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations

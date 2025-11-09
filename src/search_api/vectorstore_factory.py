@@ -18,6 +18,7 @@ Examples
 ...     factory = FaissVectorstoreFactory(settings)
 ...     adapter = factory.build_adapter()
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -82,7 +83,9 @@ def _ingestion_extra(
 def _observe_metrics(operation: str, status: str, duration_seconds: float) -> None:
     labels = {"stage": _METRIC_STAGE_LABEL, "operation": operation, "status": status}
     _BUILD_COUNTER.labels(**labels).inc()
-    _BUILD_DURATION.labels(stage=_METRIC_STAGE_LABEL, operation=operation).observe(duration_seconds)
+    _BUILD_DURATION.labels(stage=_METRIC_STAGE_LABEL, operation=operation).observe(
+        duration_seconds
+    )
 
 
 @dataclass(frozen=True, slots=True)

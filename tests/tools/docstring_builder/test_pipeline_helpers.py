@@ -8,7 +8,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 from tools.docstring_builder.builder_types import ExitStatus
-from tools.docstring_builder.failure_summary import FailureSummaryRenderer, RunSummarySnapshot
+from tools.docstring_builder.failure_summary import (
+    FailureSummaryRenderer,
+    RunSummarySnapshot,
+)
 from tools.docstring_builder.metrics import MetricsRecorder
 from tools.docstring_builder.models import RunStatus
 from tools.docstring_builder.paths import OBSERVABILITY_PATH
@@ -99,8 +102,12 @@ class TestFailureSummaryRenderer:
             observability_path=OBSERVABILITY_PATH,
         )
         errors = [
-            ErrorEnvelope(file="foo.py", status=RunStatus.VIOLATION, message="drift detected"),
-            ErrorEnvelope(file="bar.py", status=RunStatus.ERROR, message="harvest failed"),
+            ErrorEnvelope(
+                file="foo.py", status=RunStatus.VIOLATION, message="drift detected"
+            ),
+            ErrorEnvelope(
+                file="bar.py", status=RunStatus.ERROR, message="harvest failed"
+            ),
         ]
         renderer.render(summary, errors)
         messages = _captured_messages(caplog)
@@ -117,7 +124,9 @@ class TestFailureSummaryRenderer:
             observability_path=OBSERVABILITY_PATH,
         )
         errors = [
-            ErrorEnvelope(file=f"file_{i}.py", status=RunStatus.VIOLATION, message=f"error {i}")
+            ErrorEnvelope(
+                file=f"file_{i}.py", status=RunStatus.VIOLATION, message=f"error {i}"
+            )
             for i in range(10)
         ]
         renderer.render(summary, errors)

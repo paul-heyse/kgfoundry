@@ -7,8 +7,15 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 from tools.docstring_builder.harvest import parameter_display_name
-from tools.docstring_builder.overrides import extended_summary as overrides_extended_summary
-from tools.docstring_builder.schema import DocstringSchema, ParameterDoc, RaiseDoc, ReturnDoc
+from tools.docstring_builder.overrides import (
+    extended_summary as overrides_extended_summary,
+)
+from tools.docstring_builder.schema import (
+    DocstringSchema,
+    ParameterDoc,
+    RaiseDoc,
+    ReturnDoc,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -32,14 +39,14 @@ def _summary_for(symbol: SymbolHarvest, config: BuilderConfig) -> str:
     return f"{verb.capitalize()} {target}."
 
 
-def _infer_optional(
-    parameter: ParameterDoc, raw_annotation: str | None, default: str | None
-) -> bool:
-    if default is not None and default != "...":
-        return True
-    if raw_annotation and ("Optional" in raw_annotation or "None" in raw_annotation):
-        return True
-    return parameter.optional
+def _infer_optional(raw_annotation: str | None, default: str | None) -> bool:
+    return bool(
+        (default is not None and default != "...")
+        or (
+            raw_annotation
+            and ("Optional" in raw_annotation or "None" in raw_annotation)
+        )
+    )
 
 
 def _describe_parameter(name: str, default: str | None, annotation: str | None) -> str:
@@ -81,16 +88,16 @@ def _build_parameters(symbol: SymbolHarvest) -> list[ParameterDoc]:
         annotation = parameter.annotation
         display = parameter_display_name(parameter)
         description = _describe_parameter(parameter.name, parameter.default, annotation)
+        optional = _infer_optional(annotation, parameter.default)
         doc = ParameterDoc(
             name=parameter.name,
             annotation=annotation,
             description=description,
-            optional=False,
+            optional=optional,
             default=parameter.default,
             display_name=display,
             kind=parameter.kind.name.lower(),
         )
-        doc.optional = _infer_optional(doc, annotation, parameter.default)
         docs.append(doc)
     return docs
 
@@ -100,7 +107,11 @@ def _build_returns(symbol: SymbolHarvest) -> list[ReturnDoc]:
         return []
     kind: Literal["returns", "yields"] = "yields" if symbol.is_generator else "returns"
     description = "TODO: describe return value."
-    return [ReturnDoc(annotation=symbol.return_annotation, description=description, kind=kind)]
+    return [
+        ReturnDoc(
+            annotation=symbol.return_annotation, description=description, kind=kind
+        )
+    ]
 
 
 def _walk_raises(node: ast.AST) -> Iterable[tuple[str, str | None]]:
@@ -139,7 +150,11 @@ def _exception_reason(node: ast.AST) -> str | None:
 def _stringify_expression(node: ast.AST) -> str | None:
     try:
         return ast.unparse(node)
-    except (AttributeError, ValueError, TypeError):  # pragma: no cover - ast.unparse guard
+    except (
+        AttributeError,
+        ValueError,
+        TypeError,
+    ):  # pragma: no cover - ast.unparse guard
         return None
 
 
@@ -174,7 +189,9 @@ def _ast_index(result: HarvestResult) -> dict[str, ast.AST]:
             self.namespace: list[str] = []
 
         def _qualify(self, name: str) -> str:
-            return ".".join(part for part in [result.module, *self.namespace, name] if part)
+            return ".".join(
+                part for part in [result.module, *self.namespace, name] if part
+            )
 
         def visit_ClassDef(self, node: ast.ClassDef) -> None:
             """Visit class definition and index it.
@@ -222,7 +239,9 @@ def _ast_index(result: HarvestResult) -> dict[str, ast.AST]:
     return index
 
 
-def build_semantic_schemas(result: HarvestResult, config: BuilderConfig) -> list[SemanticResult]:
+def build_semantic_schemas(
+    result: HarvestResult, config: BuilderConfig
+) -> list[SemanticResult]:
     """Generate docstring schemas for the harvested symbols in a file.
 
     Parameters
@@ -252,7 +271,9 @@ def build_semantic_schemas(result: HarvestResult, config: BuilderConfig) -> list
         if symbol.is_generator:
             notes.append("This callable yields values instead of returning once.")
         simple_name = symbol.qname.split(".")[-1]
-        extended = overrides_extended_summary(symbol.kind, simple_name, symbol.module, ast_node)
+        extended = overrides_extended_summary(
+            symbol.kind, simple_name, symbol.module, ast_node
+        )
         schema = DocstringSchema(
             summary=_summary_for(symbol, config),
             extended=extended,

@@ -87,9 +87,9 @@ class DocToolError(RuntimeError):
         status_label: str,
     ) -> None:
         super().__init__(message)
-        self.problem = problem
-        self.exit_code = exit_code
-        self.status_label = status_label
+        object.__setattr__(self, "problem", problem)
+        object.__setattr__(self, "exit_code", exit_code)
+        object.__setattr__(self, "status_label", status_label)
 
 
 @dataclass(slots=True, frozen=True)
@@ -239,18 +239,22 @@ class DocMetrics:
     _histogram: HistogramLike = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._counter = _docs_operation_counter()
-        self._histogram = _docs_operation_duration()
+        object.__setattr__(self, "_counter", _docs_operation_counter())
+        object.__setattr__(self, "_histogram", _docs_operation_duration())
 
     def observe_success(self, duration_seconds: float) -> None:
         """Record a successful run."""
         self._counter.labels(operation=self.operation, status="success").inc()
-        self._histogram.labels(operation=self.operation, status="success").observe(duration_seconds)
+        self._histogram.labels(operation=self.operation, status="success").observe(
+            duration_seconds
+        )
 
     def observe_failure(self, status: str, duration_seconds: float) -> None:
         """Record a failed run for ``status`` label."""
         self._counter.labels(operation=self.operation, status=status).inc()
-        self._histogram.labels(operation=self.operation, status=status).observe(duration_seconds)
+        self._histogram.labels(operation=self.operation, status=status).observe(
+            duration_seconds
+        )
 
 
 @dataclass(slots=True, frozen=True)

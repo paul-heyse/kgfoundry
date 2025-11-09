@@ -15,7 +15,10 @@ from typing import TYPE_CHECKING, Protocol, cast
 from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.mcp_server.common.observability import observe_duration
 from codeintel_rev.mcp_server.schemas import Match, ScopeIn
-from codeintel_rev.mcp_server.scope_utils import get_effective_scope, merge_scope_filters
+from codeintel_rev.mcp_server.scope_utils import (
+    get_effective_scope,
+    merge_scope_filters,
+)
 from kgfoundry_common.errors import VectorSearchError
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.subprocess_utils import (
@@ -123,8 +126,8 @@ def _search_text_sync(  # noqa: PLR0913
     merged_filters = merge_scope_filters(
         scope,
         {
-            "include_globs": list(include_globs) if include_globs is not None else include_globs,
-            "exclude_globs": list(exclude_globs) if exclude_globs is not None else exclude_globs,
+            "include_globs": (list(include_globs) if include_globs is not None else include_globs),
+            "exclude_globs": (list(exclude_globs) if exclude_globs is not None else exclude_globs),
         },
     )
 
@@ -149,8 +152,8 @@ def _search_text_sync(  # noqa: PLR0913
             "session_id": session_id,
             "query": query,
             "explicit_paths": list(paths) if paths else None,
-            "explicit_include_globs": list(include_globs) if include_globs is not None else None,
-            "explicit_exclude_globs": list(exclude_globs) if exclude_globs is not None else None,
+            "explicit_include_globs": (list(include_globs) if include_globs is not None else None),
+            "explicit_exclude_globs": (list(exclude_globs) if exclude_globs is not None else None),
             "scope_include_globs": scope_include_globs_raw,
             "scope_exclude_globs": scope_exclude_globs_raw,
             "effective_paths": effective_paths,

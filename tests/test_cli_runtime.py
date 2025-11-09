@@ -16,7 +16,9 @@ def _stub_paths(tmp_path: Path) -> Paths:
 
 def test_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(Paths, "discover", staticmethod(lambda: _stub_paths(tmp_path)))
-    cfg = CliRunConfig.from_route("demo", "ok", write_envelope_on="always", exit_on_error=False)
+    cfg = CliRunConfig.from_route(
+        "demo", "ok", write_envelope_on="always", exit_on_error=False
+    )
     with cli_run(cfg) as (context, envelope):
         assert context.operation == "demo.ok"
         envelope.set_result(summary="ok")
@@ -32,7 +34,9 @@ def test_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(Paths, "discover", staticmethod(lambda: _stub_paths(tmp_path)))
-    cfg = CliRunConfig.from_route("demo", "fail", write_envelope_on="always", exit_on_error=False)
+    cfg = CliRunConfig.from_route(
+        "demo", "fail", write_envelope_on="always", exit_on_error=False
+    )
 
     def _invoke_failure() -> None:
         with cli_run(cfg) as (context, _):

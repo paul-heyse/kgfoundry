@@ -31,6 +31,7 @@ Create a validation configuration:
 ...     fail_on_warnings=False,
 ... )
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations

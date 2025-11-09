@@ -83,7 +83,10 @@ class TestDeprecationPath:
         """Verify each call to run_legacy emits a warning (not suppressed)."""
         warning_count = 0
         for _ in range(3):
-            with pytest.warns(DeprecationWarning, match=r".*"), pytest.raises(NotImplementedError):
+            with (
+                pytest.warns(DeprecationWarning, match=r".*"),
+                pytest.raises(NotImplementedError),
+            ):
                 run_legacy()
             warning_count += 1
 

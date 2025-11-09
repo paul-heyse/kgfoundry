@@ -4,6 +4,7 @@ This module hides optional GPU initialisation and cloning logic behind a small t
 rest of the search stack can import a single, well-typed facade. The helpers are resilient to
 missing GPU extras and fall back to CPU behaviour automatically.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -80,7 +81,9 @@ def detect_gpu_context(
     if standard_gpu_resources_raw is None:
         return None
 
-    resources_ctor = cast("Callable[[], GpuResourcesProtocol]", standard_gpu_resources_raw)
+    resources_ctor = cast(
+        "Callable[[], GpuResourcesProtocol]", standard_gpu_resources_raw
+    )
     resources = resources_ctor()
 
     options_ctor_raw = cast("object | None", getattr(module, "GpuClonerOptions", None))
@@ -93,11 +96,15 @@ def detect_gpu_context(
 
     devices = tuple(int(device) for device in device_ids) if device_ids else (0,)
 
-    return GpuContext(module=module, resources=resources, options=options, device_ids=devices)
+    return GpuContext(
+        module=module, resources=resources, options=options, device_ids=devices
+    )
 
 
 # [nav:anchor clone_index_to_gpu]
-def clone_index_to_gpu(index: FaissIndexProtocol, context: GpuContext) -> FaissIndexProtocol:
+def clone_index_to_gpu(
+    index: FaissIndexProtocol, context: GpuContext
+) -> FaissIndexProtocol:
     """Clone ``index`` onto GPU hardware described by ``context``.
 
     If GPU helpers are unavailable or cloning fails, the original CPU index is returned. All
@@ -130,7 +137,9 @@ def clone_index_to_gpu(index: FaissIndexProtocol, context: GpuContext) -> FaissI
                     "Callable[[GpuResourcesProtocol, Sequence[int], FaissIndexProtocol, GpuClonerOptionsProtocol | None], list[FaissIndexProtocol]]",
                     multi_clone_raw,
                 )
-                gpu_indices = multi_clone(context.resources, list(devices), index, options)
+                gpu_indices = multi_clone(
+                    context.resources, list(devices), index, options
+                )
                 if gpu_indices:
                     return first_or_error_multi_device(
                         gpu_indices, context="gpu_indices_from_multi_clone"
@@ -161,7 +170,11 @@ def clone_index_to_gpu(index: FaissIndexProtocol, context: GpuContext) -> FaissI
             first_or_error(devices, context="device_ids_no_options"),
             index,
         )
-    except (RuntimeError, OSError, ValueError) as exc:  # pragma: no cover - defensive fallback
+    except (
+        RuntimeError,
+        OSError,
+        ValueError,
+    ) as exc:  # pragma: no cover - defensive fallback
         logger.debug("FAISS GPU cloning failed: %s", exc, exc_info=True)
         return index
 
@@ -206,4 +219,6 @@ def configure_search_parameters(
         AttributeError,
         ValueError,
     ) as exc:  # pragma: no cover - defensive fallback
-        logger.debug("Unable to configure FAISS parameter 'nprobe': %s", exc, exc_info=True)
+        logger.debug(
+            "Unable to configure FAISS parameter 'nprobe': %s", exc, exc_info=True
+        )

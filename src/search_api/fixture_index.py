@@ -4,6 +4,7 @@ This module bundles fixture index logic for the kgfoundry stack. It groups relat
 downstream packages can import a single cohesive namespace. Refer to the functions and classes below
 for implementation specifics.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -117,7 +118,9 @@ class FixtureIndex:
         "/data/catalog/catalog.duckdb".
     """
 
-    def __init__(self, root: str = "/data", db_path: str = "/data/catalog/catalog.duckdb") -> None:
+    def __init__(
+        self, root: str = "/data", db_path: str = "/data/catalog/catalog.duckdb"
+    ) -> None:
         self.root = Path(root)
         self.db_path = db_path
         self.docs: list[FixtureDoc] = []
@@ -261,7 +264,9 @@ class FixtureIndex:
             """
             return item[1]
 
-        ranked: list[tuple[int, float]] = sorted(enumerate(scores), key=key_func, reverse=True)
+        ranked: list[tuple[int, float]] = sorted(
+            enumerate(scores), key=key_func, reverse=True
+        )
         return [(index, score) for index, score in ranked[:k] if score > 0.0]
 
     def doc(self, index: int) -> FixtureDoc:

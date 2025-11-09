@@ -190,7 +190,9 @@ def validate_symbol_index(path: Path) -> SymbolIndexArtifacts:
         raise ArtifactValidationError(message, artifact_name="symbols.json")
 
     try:
-        raw_data: JsonPayload = cast("JsonPayload", json.loads(path.read_text(encoding="utf-8")))
+        raw_data: JsonPayload = cast(
+            "JsonPayload", json.loads(path.read_text(encoding="utf-8"))
+        )
         artifacts = symbol_index_from_json(raw_data)
     except (ValueError, TypeError, json.JSONDecodeError) as e:
         message = f"Failed to parse symbol index: {e}"
@@ -209,7 +211,9 @@ def validate_symbol_index(path: Path) -> SymbolIndexArtifacts:
     schema = _resolve_schema("symbol-index.schema.json")
     schema = _schema_path("symbol-index.schema.json")
     try:
-        validate_against_schema(symbol_index_to_payload(artifacts), schema, artifact="symbols.json")
+        validate_against_schema(
+            symbol_index_to_payload(artifacts), schema, artifact="symbols.json"
+        )
     except ToolExecutionError as e:
         raise ArtifactValidationError(
             str(e),
@@ -243,11 +247,15 @@ def validate_symbol_delta(path: Path) -> SymbolDeltaPayload:
         raise ArtifactValidationError(message, artifact_name="symbols.delta.json")
 
     try:
-        raw_data: JsonPayload = cast("JsonPayload", json.loads(path.read_text(encoding="utf-8")))
+        raw_data: JsonPayload = cast(
+            "JsonPayload", json.loads(path.read_text(encoding="utf-8"))
+        )
         payload = symbol_delta_from_json(raw_data)
     except (ValueError, TypeError, json.JSONDecodeError) as e:
         message = f"Failed to parse symbol delta: {e}"
-        raise ArtifactValidationError(message, artifact_name="symbols.delta.json") from e
+        raise ArtifactValidationError(
+            message, artifact_name="symbols.delta.json"
+        ) from e
     except (
         CoreArtifactValidationError,
         CoreArtifactDeserializationError,
@@ -456,9 +464,12 @@ def _parse_problem_from_stream(stderr: str) -> ProblemDetailsDict | None:
             candidate = json.loads(text)
         except json.JSONDecodeError:
             continue
-        if isinstance(candidate, dict) and {"type", "title", "status", "detail"}.issubset(
-            candidate.keys()
-        ):
+        if isinstance(candidate, dict) and {
+            "type",
+            "title",
+            "status",
+            "detail",
+        }.issubset(candidate.keys()):
             return cast("ProblemDetailsDict", candidate)
     return None
 
@@ -478,7 +489,9 @@ def _prepare_failure_context(
     error_code = "KGF-DOC-VAL-001"
     error_message = "Documentation artifact validation failed"
 
-    formatted = format_error_message(error_code, error_message, details=combined_details)
+    formatted = format_error_message(
+        error_code, error_message, details=combined_details
+    )
 
     extras: dict[str, object] = {
         "command": " ".join(command),
@@ -555,9 +568,11 @@ def run_validator(args: Sequence[str] | None = None) -> int:
             status="error",
             subcommand=VALIDATE_SUBCOMMAND,
         )
-        failure_builder.add_error(status="error", message=formatted, problem=problem)
-        failure_builder.set_problem(problem)
-        failure_builder.add_file(
+        failure_builder = failure_builder.add_error(
+            status="error", message=formatted, problem=problem
+        )
+        failure_builder = failure_builder.set_problem(problem)
+        failure_builder = failure_builder.add_file(
             path=str(docs_build_dir),
             status="error",
             message="Artifact validation failed",
@@ -577,7 +592,7 @@ def run_validator(args: Sequence[str] | None = None) -> int:
         raise SystemExit(exc.returncode if exc.returncode is not None else 1) from exc
 
     duration = result.duration_seconds
-    builder.add_file(
+    builder = builder.add_file(
         path=str(docs_build_dir),
         status="success",
         message="Documentation artifacts validated",

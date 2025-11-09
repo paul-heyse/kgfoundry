@@ -1,4 +1,5 @@
 """Public helpers for kgfoundry namespace bridge packages."""
+
 # [nav:section public-api]
 
 from __future__ import annotations

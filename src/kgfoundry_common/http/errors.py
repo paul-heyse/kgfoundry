@@ -31,7 +31,10 @@ class HttpStatusError(HttpError):
     """
 
     def __init__(
-        self, status: int, body_excerpt: str | None = None, headers: dict[str, str] | None = None
+        self,
+        status: int,
+        body_excerpt: str | None = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         super().__init__(f"HTTP {status}: {body_excerpt or ''}")
         self.status = status

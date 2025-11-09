@@ -16,7 +16,11 @@ from tools.docstring_builder.builder_types import (
 from tools.docstring_builder.metrics import MetricsRecorder
 from tools.docstring_builder.orchestrator import load_builder_config
 from tools.docstring_builder.pipeline import PipelineConfig, PipelineRunner
-from tools.docstring_builder.pipeline_types import DocfactsResult, FileOutcome, ProcessingOptions
+from tools.docstring_builder.pipeline_types import (
+    DocfactsResult,
+    FileOutcome,
+    ProcessingOptions,
+)
 from tools.docstring_builder.policy import PolicyReport
 
 if TYPE_CHECKING:
@@ -65,7 +69,9 @@ def _problem_details_stub(
 
 
 class _StubPolicyEngine:
-    def record(self, _semantics: Sequence[SemanticResult]) -> None:  # pragma: no cover - no-op
+    def record(
+        self, _semantics: Sequence[SemanticResult]
+    ) -> None:  # pragma: no cover - no-op
         return
 
     def finalize(self) -> PolicyReport:
@@ -100,7 +106,9 @@ class _StubDiffManager:
     def finalize_docstring_drift(self) -> None:  # pragma: no cover - no-op
         return
 
-    def record_docfacts_baseline_diff(self, payload_text: str | None) -> None:  # pragma: no cover
+    def record_docfacts_baseline_diff(
+        self, payload_text: str | None
+    ) -> None:  # pragma: no cover
         self.recorded_docfacts.append(payload_text)
 
     def collect_diff_links(self) -> dict[str, str]:  # pragma: no cover - deterministic
@@ -216,7 +224,9 @@ def make_pipeline_config(
 
     config, _ = load_builder_config(None)
 
-    chosen_diff_manager = overrides.diff_manager or cast("DiffManager", _StubDiffManager())
+    chosen_diff_manager = overrides.diff_manager or cast(
+        "DiffManager", _StubDiffManager()
+    )
 
     return PipelineConfig(
         request=request,
@@ -326,7 +336,9 @@ def test_pipeline_runner_records_docfacts_baseline_payload(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    request = DocstringBuildRequest(command="update", subcommand="update", json_output=True)
+    request = DocstringBuildRequest(
+        command="update", subcommand="update", json_output=True
+    )
     outcome = FileOutcome(
         status=ExitStatus.SUCCESS,
         docfacts=_empty_docfacts(),
@@ -361,7 +373,9 @@ def test_pipeline_runner_records_docfacts_baseline_payload(
         observability_path,
     )
     monkeypatch.setattr("tools.docstring_builder.pipeline.DOCFACTS_PATH", docfacts_path)
-    monkeypatch.setattr("tools.docstring_builder.pipeline.DOCFACTS_DIFF_PATH", docfacts_diff_path)
+    monkeypatch.setattr(
+        "tools.docstring_builder.pipeline.DOCFACTS_DIFF_PATH", docfacts_diff_path
+    )
 
     runner = PipelineRunner(config)
     result = runner.run([dummy_path])

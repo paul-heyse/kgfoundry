@@ -38,6 +38,7 @@ postponed annotations (PEP 563) eliminate eager evaluation.
 JSON Schema 2020-12 examples and validation helpers are exported here for
 cross-package use; see `kgfoundry_common.jsonschema_utils` for validators.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations

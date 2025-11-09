@@ -10,7 +10,10 @@ from tools.mkdocs_suite.plugins import optional_d2
 
 def test_logger_uses_null_handler() -> None:
     """Ensure the optional D2 plugin logger installs a ``NullHandler``."""
-    assert any(isinstance(handler, logging.NullHandler) for handler in optional_d2.LOGGER.handlers)
+    assert any(
+        isinstance(handler, logging.NullHandler)
+        for handler in optional_d2.LOGGER.handlers
+    )
 
 
 def test_missing_dependency_warning_requires_handler(

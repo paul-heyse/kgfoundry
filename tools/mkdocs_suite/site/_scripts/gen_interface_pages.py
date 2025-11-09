@@ -103,7 +103,9 @@ def _collect_nav_interfaces() -> list[dict[str, object]]:
             try:
                 data = json.load(handle)
             except json.JSONDecodeError as error:
-                LOGGER.warning("Failed to decode nav metadata from %s: %s", nav_path, error)
+                LOGGER.warning(
+                    "Failed to decode nav metadata from %s: %s", nav_path, error
+                )
                 continue
         interfaces = data.get("interfaces") or []
         if not isinstance(interfaces, list):
@@ -269,9 +271,13 @@ def _write_interface_table(
             or (interface_model.description if interface_model else None)
             or "—"
         )
-        spec_candidate = record.get("spec") or (interface_model.spec if interface_model else None)
+        spec_candidate = record.get("spec") or (
+            interface_model.spec if interface_model else None
+        )
         spec_cell = _spec_link({"spec": spec_candidate})
-        owner_value = record.get("owner") or (interface_model.owner if interface_model else None)
+        owner_value = record.get("owner") or (
+            interface_model.owner if interface_model else None
+        )
         if isinstance(owner_value, list):
             owner_value = ", ".join(str(item) for item in owner_value)
         stability_value = (
@@ -287,7 +293,9 @@ def _write_interface_table(
         row = "| {id} | {type} | {module} | {owner} | {stability} | {spec} | {desc} | {problems} |".format(
             id=_escape_table_text(identifier_value),
             type=_escape_table_text(
-                record.get("type") or (interface_model.type if interface_model else "—") or "—"
+                record.get("type")
+                or (interface_model.type if interface_model else "—")
+                or "—"
             ),
             module=_module_doc_link(module_path),
             owner=_escape_table_text(owner_value or "—"),
@@ -327,13 +335,17 @@ def write_interface_table(
     return _write_interface_table(handle, interfaces, registry)
 
 
-def _write_optional_list(handle: mkdocs_gen_files.files, label: str, values: list[str]) -> None:
+def _write_optional_list(
+    handle: mkdocs_gen_files.files, label: str, values: list[str]
+) -> None:
     """Write a bullet list line when values are present."""
     if values:
         handle.write(f"  - {label}: {', '.join(values)}\n")
 
 
-def _write_optional_line(handle: mkdocs_gen_files.files, label: str, value: object) -> None:
+def _write_optional_line(
+    handle: mkdocs_gen_files.files, label: str, value: object
+) -> None:
     """Write a bullet list line when ``value`` is truthy."""
     if value:
         handle.write(f"  - {label}: `{value}`\n")
@@ -414,7 +426,9 @@ def _write_interface_details(
         module_doc = _module_doc_link(module_value)
         handle.write(f"* **Module:** {module_doc}\n")
         module_source = (
-            _code_link_for_module(module_value) if isinstance(module_value, str) else None
+            _code_link_for_module(module_value)
+            if isinstance(module_value, str)
+            else None
         )
         if module_source:
             handle.write(f"* **Source:** [{module_value}]({module_source})\n")
@@ -444,7 +458,9 @@ def _write_interface_details(
             else nav_meta.get("spec")
         )
         operations = interface_model.operations if interface_model else None
-        _operations_block(handle, operations, spec_path if isinstance(spec_path, str) else None)
+        _operations_block(
+            handle, operations, spec_path if isinstance(spec_path, str) else None
+        )
         handle.write("\n")
 
 

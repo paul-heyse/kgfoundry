@@ -41,7 +41,9 @@ SRC = REPO / "src"
 
 try:
     from tools.navmap.build_navmap import collect_module_info
-except ModuleNotFoundError as exc:  # pragma: no cover - clearer guidance for packaging installs
+except (
+    ModuleNotFoundError
+) as exc:  # pragma: no cover - clearer guidance for packaging installs
     message = (
         "tools.navmap.repair_navmaps requires the tooling optional extra. "
         "Install with `pip install kgfoundry[tools]` (or `pip install -e .[tools]` in development) "
@@ -316,7 +318,9 @@ def repair_module(
     exports = _normalize_exports((info.navmap_dict or {}).get("exports"), info.exports)
     messages: list[str] = []
 
-    insertions, anchor_messages = _collect_anchor_insertions(info, exports, _definition_lines(tree))
+    insertions, anchor_messages = _collect_anchor_insertions(
+        info, exports, _definition_lines(tree)
+    )
     messages.extend(anchor_messages)
 
     section_insertion = _public_api_insertion(info, tree)
@@ -328,7 +332,9 @@ def repair_module(
 
     changed = _apply_insertions(lines, insertions)
 
-    nav_changed, nav_messages = _sync_navmap_literal(info, tree, original_text, lines, exports)
+    nav_changed, nav_messages = _sync_navmap_literal(
+        info, tree, original_text, lines, exports
+    )
     changed = changed or nav_changed
     messages.extend(nav_messages)
 
@@ -437,24 +443,24 @@ def _build_json_envelope(
         for msg in messages:
             if ": " in msg:
                 file_path, detail = msg.split(": ", 1)
-                builder.add_file(
+                builder = builder.add_file(
                     path=file_path,
                     status="violation",
                     message=detail,
                 )
-                builder.add_error(
+                builder = builder.add_error(
                     status="violation",
                     message=detail,
                     file=file_path,
                 )
             else:
-                builder.add_error(
+                builder = builder.add_error(
                     status="violation",
                     message=msg,
                 )
 
         if not execution.apply_changes:
-            builder.set_problem(
+            builder = builder.set_problem(
                 build_problem_details(
                     ProblemDetailsParams(
                         type="https://kgfoundry.dev/problems/navmap-repair-needed",
@@ -464,7 +470,10 @@ def _build_json_envelope(
                             f"Found {len(messages)} issue(s) requiring repair. Re-run with --apply to write fixes."
                         ),
                         instance="urn:navmap:repair:issues-detected",
-                        extensions={"issue_count": len(messages), "apply_required": True},
+                        extensions={
+                            "issue_count": len(messages),
+                            "apply_required": True,
+                        },
                     )
                 )
             )
@@ -490,11 +499,11 @@ def _build_error_envelope(exc: Exception, duration: float) -> CliEnvelope:
     builder = CliEnvelopeBuilder.create(
         command="repair_navmaps", status="error", subcommand="repair"
     )
-    builder.add_error(
+    builder = builder.add_error(
         status="error",
         message=str(exc),
     )
-    builder.set_problem(
+    builder = builder.set_problem(
         build_problem_details(
             ProblemDetailsParams(
                 type="https://kgfoundry.dev/problems/navmap-repair-error",
@@ -814,7 +823,9 @@ def _collect_anchor_insertions(
             continue
         line_no = definition_lines.get(name)
         if not line_no:
-            messages.append(f"{info.path}: unable to locate definition for '{name}' to add anchor")
+            messages.append(
+                f"{info.path}: unable to locate definition for '{name}' to add anchor"
+            )
             continue
         insertions.append((line_no - 1, f"# [nav:anchor {name}]"))
         messages.append(f"{info.path}: inserted [nav:anchor {name}] at line {line_no}")

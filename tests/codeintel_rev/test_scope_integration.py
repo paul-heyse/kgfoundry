@@ -66,7 +66,9 @@ def _build_context(repo_root: Path) -> ApplicationContext:
             duckdb_path="data/catalog.duckdb",
             scip_index="index.scip.json",
         ),
-        index=IndexConfig(vec_dim=2560, chunk_budget=2200, faiss_nlist=8192, use_cuvs=True),
+        index=IndexConfig(
+            vec_dim=2560, chunk_budget=2200, faiss_nlist=8192, use_cuvs=True
+        ),
         vllm=VLLMConfig(base_url="http://localhost:8001/v1", batch_size=32),
         limits=ServerLimits(),
         redis=RedisConfig(
@@ -129,17 +131,23 @@ def _write_repo(repo_root: Path) -> None:
 
     (repo_root / "src" / "main.py").write_text("def main():\n    return 42\n")
     (repo_root / "src" / "util.py").write_text("def util():\n    return None\n")
-    (repo_root / "tests" / "test_main.py").write_text("def test_main():\n    assert True\n")
+    (repo_root / "tests" / "test_main.py").write_text(
+        "def test_main():\n    assert True\n"
+    )
     (repo_root / "docs" / "README.md").write_text("# Documentation\n")
 
 
 @pytest.mark.asyncio
-async def test_set_scope_persists_in_store(tmp_path: Path, mock_session_id: str) -> None:
+async def test_set_scope_persists_in_store(
+    tmp_path: Path, mock_session_id: str
+) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     context = _build_context(repo_root)
 
-    scope: ScopeIn = cast("ScopeIn", {"include_globs": ["src/**"], "languages": ["python"]})
+    scope: ScopeIn = cast(
+        "ScopeIn", {"include_globs": ["src/**"], "languages": ["python"]}
+    )
     await files_adapter.set_scope(context, scope)
 
     stored = await context.scope_store.get(mock_session_id)
@@ -147,7 +155,9 @@ async def test_set_scope_persists_in_store(tmp_path: Path, mock_session_id: str)
 
 
 @pytest.mark.asyncio
-async def test_list_paths_honours_scope_filters(tmp_path: Path, mock_session_id: str) -> None:
+async def test_list_paths_honours_scope_filters(
+    tmp_path: Path, mock_session_id: str
+) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     _write_repo(repo_root)
@@ -166,7 +176,11 @@ async def test_list_paths_honours_scope_filters(tmp_path: Path, mock_session_id:
 def test_merge_scope_filters_precedence() -> None:
     scope: ScopeIn = cast(
         "ScopeIn",
-        {"include_globs": ["src/**"], "exclude_globs": ["**/tests/**"], "languages": ["python"]},
+        {
+            "include_globs": ["src/**"],
+            "exclude_globs": ["**/tests/**"],
+            "languages": ["python"],
+        },
     )
     explicit = {"include_globs": ["docs/**"], "languages": ["markdown"]}
     merged = merge_scope_filters(scope, explicit)

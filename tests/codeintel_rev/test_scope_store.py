@@ -207,7 +207,9 @@ async def test_async_single_flight_coalesces_calls() -> None:
         await asyncio.sleep(0.01)
         return 42
 
-    results = await asyncio.gather(*[flight.do("scope", expensive_call) for _ in range(10)])
+    results = await asyncio.gather(
+        *[flight.do("scope", expensive_call) for _ in range(10)]
+    )
 
     assert all(result == 42 for result in results)
     assert call_count == 1
@@ -226,7 +228,9 @@ async def test_async_single_flight_propagates_exceptions_and_allows_retry() -> N
         raise RuntimeError(message)
 
     with pytest.raises(RuntimeError):
-        await asyncio.gather(flight.do("scope", failing_call), flight.do("scope", failing_call))
+        await asyncio.gather(
+            flight.do("scope", failing_call), flight.do("scope", failing_call)
+        )
 
     assert call_count == 1
 

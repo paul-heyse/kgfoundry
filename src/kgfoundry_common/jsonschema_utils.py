@@ -6,6 +6,7 @@ untyped entry points (e.g. :class:`Draft202012Validator`,
 :func:`jsonschema.validate`), so we wrap them with Protocol-based casts and
 re-export the typed surfaces for internal use.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -36,7 +37,9 @@ class ValidationErrorProtocol(Protocol):
 class Draft202012ValidatorProtocol(Protocol):
     """Typed facade for :class:`jsonschema.validators.Draft202012Validator`."""
 
-    def __init__(self, schema: Mapping[str, object], *args: object, **kwargs: object) -> None: ...
+    def __init__(
+        self, schema: Mapping[str, object], *args: object, **kwargs: object
+    ) -> None: ...
 
     @classmethod
     def check_schema(cls, schema: Mapping[str, object]) -> None:

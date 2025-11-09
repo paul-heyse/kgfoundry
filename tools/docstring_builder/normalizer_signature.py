@@ -92,7 +92,9 @@ def resolve_callable(symbol: SymbolHarvest) -> Callable[..., object]:
         try:
             obj = getattr(obj, attr)
         except AttributeError as exc:
-            message = f"Attribute {attr!r} missing on {obj!r} while resolving {symbol.qname}"
+            message = (
+                f"Attribute {attr!r} missing on {obj!r} while resolving {symbol.qname}"
+            )
             raise SymbolResolutionError(message) from exc
 
     if not callable(obj):

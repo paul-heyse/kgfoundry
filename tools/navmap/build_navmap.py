@@ -29,7 +29,12 @@ from tools import (
     validate_tools_payload,
     with_fields,
 )
-from tools._shared.cli import CliEnvelope, CliEnvelopeBuilder, CliErrorStatus, render_cli_envelope
+from tools._shared.cli import (
+    CliEnvelope,
+    CliEnvelopeBuilder,
+    CliErrorStatus,
+    render_cli_envelope,
+)
 from tools._shared.logging import LoggerAdapter
 from tools._shared.problem_details import (
     ProblemDetailsDict,
@@ -90,7 +95,9 @@ def _envelope_path(subcommand: str) -> Path:
     return CLI_ENVELOPE_DIR / filename
 
 
-def _emit_envelope(envelope: CliEnvelope, *, logger: LoggerAdapter, subcommand: str) -> Path:
+def _emit_envelope(
+    envelope: CliEnvelope, *, logger: LoggerAdapter, subcommand: str
+) -> Path:
     path = _envelope_path(subcommand)
     CLI_ENVELOPE_DIR.mkdir(parents=True, exist_ok=True)
     rendered = render_cli_envelope(envelope)
@@ -144,8 +151,10 @@ def _record_failure(
         status=error_status if error_status in {"config", "violation"} else "error",
         subcommand=SUBCOMMAND_BUILD,
     )
-    failure_builder.add_error(status=error_status, message=detail, problem=problem)
-    failure_builder.set_problem(problem)
+    failure_builder = failure_builder.add_error(
+        status=error_status, message=detail, problem=problem
+    )
+    failure_builder = failure_builder.set_problem(problem)
     envelope = failure_builder.finish(duration_seconds=context.elapsed())
     path = _emit_envelope(envelope, logger=context.logger, subcommand=SUBCOMMAND_BUILD)
     log_extra = {
@@ -217,7 +226,12 @@ class AllDictTemplate:
 
 NavPrimitive = str | int | float | bool | None
 type NavTree = (
-    NavPrimitive | list[NavTree] | dict[str, NavTree] | set[str] | AllDictTemplate | AllPlaceholder
+    NavPrimitive
+    | list[NavTree]
+    | dict[str, NavTree]
+    | set[str]
+    | AllDictTemplate
+    | AllPlaceholder
 )
 type ResolvedNavValue = (
     NavPrimitive | list[ResolvedNavValue] | dict[str, ResolvedNavValue] | set[str]
@@ -484,7 +498,9 @@ def _expand_all_dict_template(
     return expanded
 
 
-def _expand_list(values: Sequence[NavTree], exports: Sequence[str]) -> list[ResolvedNavValue]:
+def _expand_list(
+    values: Sequence[NavTree], exports: Sequence[str]
+) -> list[ResolvedNavValue]:
     """Expand placeholder-aware lists while flattening nested sequences.
 
     Parameters
@@ -509,7 +525,9 @@ def _expand_list(values: Sequence[NavTree], exports: Sequence[str]) -> list[Reso
     return expanded
 
 
-def _expand_dict(values: dict[str, NavTree], exports: Sequence[str]) -> dict[str, ResolvedNavValue]:
+def _expand_dict(
+    values: dict[str, NavTree], exports: Sequence[str]
+) -> dict[str, ResolvedNavValue]:
     """Expand placeholders within dictionary values.
 
     Parameters
@@ -524,7 +542,10 @@ def _expand_dict(values: dict[str, NavTree], exports: Sequence[str]) -> dict[str
     dict[str, ResolvedNavValue]
         Dictionary with expanded values.
     """
-    return {key: _replace_placeholders(sub_value, exports) for key, sub_value in values.items()}
+    return {
+        key: _replace_placeholders(sub_value, exports)
+        for key, sub_value in values.items()
+    }
 
 
 def _expand_set(values: set[str], exports: Sequence[str]) -> set[str]:
@@ -850,7 +871,9 @@ def _process_assign_targets(
     tuple[list[str], dict[str, NavTree] | None]
         Updated exports and navmap literal tuple.
     """
-    target_names = [target.id for target in node.targets if isinstance(target, ast.Name)]
+    target_names = [
+        target.id for target in node.targets if isinstance(target, ast.Name)
+    ]
     if "__all__" in target_names:
         extracted = _maybe_extract_exports(node.value)
         if extracted is not None:
@@ -895,7 +918,9 @@ def _process_ann_assign(
     return exports, nav_literal
 
 
-def _gather_module_literals(module: ast.Module) -> tuple[list[str], dict[str, NavTree] | None]:
+def _gather_module_literals(
+    module: ast.Module,
+) -> tuple[list[str], dict[str, NavTree] | None]:
     """Return literal ``__all__`` and ``__navmap__`` values declared in ``module``.
 
     Parameters
@@ -1012,7 +1037,9 @@ def _resolve_navmap(
         return {}, exports
     nav_exports = nav_map.get("exports")
     if isinstance(nav_exports, list):
-        exports = _dedupe_exports([item for item in nav_exports if isinstance(item, str)])
+        exports = _dedupe_exports(
+            [item for item in nav_exports if isinstance(item, str)]
+        )
     return nav_map, exports
 
 
@@ -1072,7 +1099,10 @@ def _load_runtime_navmap(
             continue
         try:
             nav_data = json.loads(candidate.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:  # pragma: no cover - filesystem noise
+        except (
+            OSError,
+            json.JSONDecodeError,
+        ) as exc:  # pragma: no cover - filesystem noise
             LOGGER.warning("Failed to read nav sidecar %s: %s", candidate, exc)
             continue
         if not isinstance(nav_data, dict):
@@ -1081,7 +1111,9 @@ def _load_runtime_navmap(
         nav_copy: dict[str, ResolvedNavValue] = copy.deepcopy(nav_data)
         nav_exports = nav_copy.get("exports")
         if isinstance(nav_exports, list):
-            exports = _dedupe_exports([item for item in nav_exports if isinstance(item, str)])
+            exports = _dedupe_exports(
+                [item for item in nav_exports if isinstance(item, str)]
+            )
             nav_copy["exports"] = cast("ResolvedNavValue", list(exports))
         elif exports:
             nav_copy["exports"] = cast("ResolvedNavValue", list(exports))
@@ -1180,7 +1212,9 @@ def _collect_module(py: Path) -> ModuleInfo | None:
     # Stable, deduped exports
     raw_exports = navmap_dict.get("exports")
     if isinstance(raw_exports, list):
-        nav_exports = _dedupe_exports([item for item in raw_exports if isinstance(item, str)])
+        nav_exports = _dedupe_exports(
+            [item for item in raw_exports if isinstance(item, str)]
+        )
     else:
         nav_exports = _dedupe_exports(exports)
     exports = nav_exports
@@ -1250,7 +1284,9 @@ def _module_meta_fields(navmap: dict[str, ResolvedNavValue]) -> ModuleMetaDict:
     return module_meta
 
 
-def _symbol_meta_fields(navmap: dict[str, ResolvedNavValue]) -> dict[str, SymbolMetaDict]:
+def _symbol_meta_fields(
+    navmap: dict[str, ResolvedNavValue],
+) -> dict[str, SymbolMetaDict]:
     """Extract per-symbol metadata declarations from navmap.
 
     Parameters
@@ -1350,7 +1386,10 @@ def _apply_symbol_defaults(
         Updated symbol metadata dictionary with defaults applied.
     """
     if symbols_meta:
-        return {name: _merge_symbol_meta(module_meta, meta) for name, meta in symbols_meta.items()}
+        return {
+            name: _merge_symbol_meta(module_meta, meta)
+            for name, meta in symbols_meta.items()
+        }
     return {export: _merge_symbol_meta(module_meta, None) for export in exports}
 
 
@@ -1586,13 +1625,13 @@ def _run_build(write_path: Path | None) -> int:
     try:
         _ = build_index(json_path=write_path)
         destination = write_path or INDEX_PATH
-        builder.add_file(
+        builder = builder.add_file(
             path=str(destination),
             status="success",
             message="Navmap JSON generated",
         )
         if NAVMAP_DIFF_PATH.exists():
-            builder.add_file(
+            builder = builder.add_file(
                 path=str(NAVMAP_DIFF_PATH),
                 status="success",
                 message="Navmap drift report",
@@ -1614,7 +1653,11 @@ def _run_build(write_path: Path | None) -> int:
             error_status="config",
             exc=exc,
         )
-    except (RuntimeError, ValueError, OSError) as exc:  # pragma: no cover - defensive catch
+    except (
+        RuntimeError,
+        ValueError,
+        OSError,
+    ) as exc:  # pragma: no cover - defensive catch
         return _record_failure(
             context,
             detail=str(exc),

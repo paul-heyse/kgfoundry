@@ -10,6 +10,7 @@ Examples
 >>> app = FastAPI()
 >>> register_problem_details_handler(app)
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations

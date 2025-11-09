@@ -227,7 +227,11 @@ def _generate_schema_entries(snapshot: ArtifactSnapshot) -> list[str]:
         List of markdown entry strings.
     """
     entries = [
-        "- ✅ Schema directory exists" if snapshot.schema_dir else "- ⚪ Schema directory missing"
+        (
+            "- ✅ Schema directory exists"
+            if snapshot.schema_dir
+            else "- ⚪ Schema directory missing"
+        )
     ]
     if snapshot.schema_dir:
         entries.append("- Run `jsonschema validate` to verify schemas")
@@ -313,7 +317,9 @@ class SummaryGenerator:
         lines: list[str] = ["# Quality Gates Summary", ""]
         artifact_snapshot = snapshot or collect_artifact_snapshot()
 
-        _append_section(lines, "## 📊 Test Results", self._test_strategy(artifact_snapshot))
+        _append_section(
+            lines, "## 📊 Test Results", self._test_strategy(artifact_snapshot)
+        )
         _append_section(
             lines,
             "## 📚 Documentation & Artifacts",
@@ -324,7 +330,9 @@ class SummaryGenerator:
             "## 🔍 Schema Validation",
             self._schema_strategy(artifact_snapshot),
         )
-        _append_section(lines, "## 📦 Build Artifacts", self._build_strategy(artifact_snapshot))
+        _append_section(
+            lines, "## 📦 Build Artifacts", self._build_strategy(artifact_snapshot)
+        )
 
         lines.append("## ✅ Quality Gates")
         lines.append("")

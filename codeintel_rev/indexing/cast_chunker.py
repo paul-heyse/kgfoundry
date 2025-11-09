@@ -76,6 +76,7 @@ class Chunk:
     symbols: tuple[str, ...]
     language: str
 
+
 @dataclass(frozen=True)
 class LineIndex:
     """Line start bookkeeping for both character and byte positions."""
@@ -87,26 +88,50 @@ class LineIndex:
     @property
     def text_length(self) -> int:
         """Return the decoded text length in characters."""
-
         return len(self.char_to_byte) - 1
 
 
-def _utf8_length(ch: str) -> int:
-    """Return the UTF-8 encoded length for ``ch``."""
+_ONE_BYTE_MAX = 0x7F
+_TWO_BYTE_MAX = 0x7FF
+_THREE_BYTE_MAX = 0xFFFF
 
+
+def _utf8_length(ch: str) -> int:
+    """Return the UTF-8 encoded length for ``ch``.
+
+    Parameters
+    ----------
+    ch : str
+        Single character to measure.
+
+    Returns
+    -------
+    int
+        Number of bytes required to encode the character in UTF-8 (1-4).
+    """
     code_point = ord(ch)
-    if code_point <= 0x7F:
+    if code_point <= _ONE_BYTE_MAX:
         return 1
-    if code_point <= 0x7FF:
+    if code_point <= _TWO_BYTE_MAX:
         return 2
-    if code_point <= 0xFFFF:
+    if code_point <= _THREE_BYTE_MAX:
         return 3
     return 4
 
 
 def line_starts(text: str) -> LineIndex:
-    """Compute character and byte offsets for each line start."""
+    """Compute character and byte offsets for each line start.
 
+    Parameters
+    ----------
+    text : str
+        Input text to index.
+
+    Returns
+    -------
+    LineIndex
+        Index containing character starts, byte starts, and character-to-byte mapping.
+    """
     char_starts = [0]
     byte_starts = [0]
     char_to_byte = [0]
@@ -141,9 +166,25 @@ def _line_index_from_byte(starts: Sequence[int], byte_offset: int) -> int:
     if index < 0:
         return 0
     return min(index, len(starts) - 1)
-def _char_index_for_line(line_index: LineIndex, line: int, character: int) -> int:
-    """Map a line/character pair to an absolute character index."""
 
+
+def _char_index_for_line(line_index: LineIndex, line: int, character: int) -> int:
+    """Map a line/character pair to an absolute character index.
+
+    Parameters
+    ----------
+    line_index : LineIndex
+        Line index containing character start positions.
+    line : int
+        Zero-based line number.
+    character : int
+        Zero-based character offset within the line.
+
+    Returns
+    -------
+    int
+        Absolute character index in the text, clamped to valid range.
+    """
     if line >= len(line_index.char_starts):
         return line_index.text_length
 
@@ -155,8 +196,22 @@ def _char_index_for_line(line_index: LineIndex, line: int, character: int) -> in
 
 
 def range_to_bytes(text: str, line_index: LineIndex, rng: Range) -> tuple[int, int]:
-    """Convert line/character range to byte offsets."""
+    """Convert line/character range to byte offsets.
 
+    Parameters
+    ----------
+    text : str
+        Source text (unused, retained for backward compatibility).
+    line_index : LineIndex
+        Line index for character-to-byte conversion.
+    rng : Range
+        Range with start and end line/character positions.
+
+    Returns
+    -------
+    tuple[int, int]
+        Tuple of (start_byte, end_byte) offsets.
+    """
     del text  # Parameters retained for backward compatibility.
 
     start_char = _char_index_for_line(line_index, rng.start_line, rng.start_character)
@@ -167,7 +222,7 @@ def range_to_bytes(text: str, line_index: LineIndex, rng: Range) -> tuple[int, i
     return start_byte, end_byte
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _ChunkAccumulator:
     """Accumulate SCIP symbol ranges into budgeted chunks."""
 
@@ -292,34 +347,34 @@ def chunk_file(
     path: Path,
     text: str,
     definitions: list[SymbolDef],
-    budget: int = 2200,
-    language: str | None = None,
+    options: ChunkOptions | None = None,
 ) -> list[Chunk]:
     """Chunk file using SCIP symbol boundaries.
 
-    Greedily packs top-level symbols up to budget; splits large symbols on
-    blank lines.
+    Greedily packs top-level symbols up to a budget while optionally adding
+    related-symbol overlap snippets for better context.
 
     Parameters
     ----------
     path : Path
-        File path.
+        File path for the source code being chunked.
     text : str
-        File content.
+        Complete file content as a string.
     definitions : list[SymbolDef]
-        Symbol definitions for this file (should be top-level only).
-    budget : int
-        Target chunk size in characters.
+        List of SCIP symbol definitions extracted from the file.
+    options : ChunkOptions | None, optional
+        Chunk generation configuration. If None, uses default options.
 
     Returns
     -------
-        list[Chunk]
-            Generated chunks.
+    list[Chunk]
+        List of generated chunks in source order.
     """
     if not definitions:
         return []
 
-    chunk_language = language if language is not None else definitions[0].language
+    opts = options or ChunkOptions()
+    chunk_language = opts.language if opts.language is not None else definitions[0].language
 
     uri = str(path)
     line_index = line_starts(text)
@@ -329,7 +384,7 @@ def chunk_file(
         text=text,
         encoded=encoded,
         line_index=line_index,
-        budget=budget,
+        budget=opts.budget,
         language=chunk_language,
     )
 
@@ -337,8 +392,12 @@ def chunk_file(
         (
             (
                 sym_def,
-                _char_index_for_line(line_index, sym_def.range.start_line, sym_def.range.start_character),
-                _char_index_for_line(line_index, sym_def.range.end_line, sym_def.range.end_character),
+                _char_index_for_line(
+                    line_index, sym_def.range.start_line, sym_def.range.start_character
+                ),
+                _char_index_for_line(
+                    line_index, sym_def.range.end_line, sym_def.range.end_character
+                ),
             )
             for sym_def in definitions
         ),
@@ -348,7 +407,106 @@ def chunk_file(
     for sym_def, start, end in symbols_with_positions:
         accumulator.add_symbol(sym_def, start, end)
 
-    return accumulator.finalize()
+    chunks = accumulator.finalize()
+
+    if opts.overlap is not None:
+        chunks = _apply_call_site_overlap(
+            chunks=chunks,
+            encoded=encoded,
+            byte_starts=line_index.byte_starts,
+            options=opts.overlap,
+        )
+
+    return chunks
+
+
+@dataclass(frozen=True)
+class ChunkOverlapOptions:
+    """Configuration for adding call-site overlap snippets."""
+
+    file_occurrences: list[tuple[str, int, int, int, int]]
+    def_chunk_lookup: dict[str, int]
+    max_related: int = 8
+    overlap_lines: int = 8
+
+
+@dataclass(frozen=True)
+class ChunkOptions:
+    """Chunk generation configuration."""
+
+    budget: int = 2200
+    language: str | None = None
+    overlap: ChunkOverlapOptions | None = None
+
+
+def _apply_call_site_overlap(
+    *,
+    chunks: list[Chunk],
+    encoded: bytes,
+    byte_starts: list[int],
+    options: ChunkOverlapOptions,
+) -> list[Chunk]:
+    """Add call-site overlap snippets to chunks.
+
+    Parameters
+    ----------
+    chunks : list[Chunk]
+        Initial chunks to enhance with overlap snippets.
+    encoded : bytes
+        UTF-8 encoded file content.
+    byte_starts : list[int]
+        Byte offsets for each line start.
+    options : ChunkOverlapOptions
+        Overlap configuration including file occurrences and chunk lookup.
+
+    Returns
+    -------
+    list[Chunk]
+        Modified chunks with call-site overlap snippets added.
+    """
+
+    def _slice_lines(beg_line: int, end_line: int) -> str:
+        bounded_start = min(max(beg_line, 0), len(byte_starts) - 1)
+        bounded_end = min(max(end_line, 0), len(byte_starts) - 1)
+        start_byte = byte_starts[bounded_start]
+        end_byte = byte_starts[bounded_end]
+        return encoded[start_byte:end_byte].decode("utf-8", errors="ignore")
+
+    mutable = list(chunks)
+    for idx, chunk in enumerate(mutable):
+        begin, end = chunk.start_line, chunk.end_line
+        seen: set[str] = set()
+        for sym, sl, _sc, _el, _ec in options.file_occurrences:
+            if sl < begin or sl > end or sym not in options.def_chunk_lookup or sym in seen:
+                continue
+            seen.add(sym)
+            callee_chunk_id = options.def_chunk_lookup[sym]
+            if callee_chunk_id == idx:
+                continue
+            callee = chunks[callee_chunk_id]
+            footer = (
+                "\n\n# related: "
+                + sym
+                + "\n"
+                + _slice_lines(
+                    max(callee.start_line - options.overlap_lines, 0),
+                    min(callee.end_line + options.overlap_lines, callee.end_line + 1),
+                )
+            )
+            mutable[idx] = Chunk(
+                uri=chunk.uri,
+                start_byte=chunk.start_byte,
+                end_byte=chunk.end_byte,
+                start_line=chunk.start_line,
+                end_line=chunk.end_line,
+                text=chunk.text + "\n" + footer,
+                symbols=tuple(sorted(set(chunk.symbols) | {sym})),
+                language=chunk.language,
+            )
+            if len(seen) >= options.max_related:
+                break
+
+    return mutable
 
 
 __all__ = [

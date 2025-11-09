@@ -58,7 +58,10 @@ def write_manifest(ctx: ManifestContext) -> Path:
         Path to the written manifest file.
     """
     invoked = str(
-        ctx.request.invoked_subcommand or ctx.request.subcommand or ctx.request.command or ""
+        ctx.request.invoked_subcommand
+        or ctx.request.subcommand
+        or ctx.request.command
+        or ""
     )
     manifest_payload: dict[str, object] = {
         "generated_at": datetime.datetime.now(datetime.UTC).isoformat(),

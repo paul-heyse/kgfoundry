@@ -183,7 +183,9 @@ class _SymbolCollector(ast.NodeVisitor):
         self.symbols: list[_CollectedSymbol] = []
 
     def _qualify(self, name: str) -> str:
-        return ".".join(part for part in [self.module_name, *self.namespace, name] if part)
+        return ".".join(
+            part for part in [self.module_name, *self.namespace, name] if part
+        )
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         """Visit class definition and collect symbol.
@@ -338,7 +340,9 @@ def parameters_for(node: ast.AST) -> list[DocstringIRParameter]:
             params.append(_make_parameter(arg, default_value, kind=kind))
 
     handle_parameters(arguments.posonlyargs, [], kind="positional_only")
-    handle_parameters(arguments.args, list(arguments.defaults), kind="positional_or_keyword")
+    handle_parameters(
+        arguments.args, list(arguments.defaults), kind="positional_or_keyword"
+    )
     if arguments.vararg is not None:
         params.append(
             _make_parameter(
@@ -347,7 +351,9 @@ def parameters_for(node: ast.AST) -> list[DocstringIRParameter]:
                 kind="var_positional",
             )
         )
-    handle_parameters(arguments.kwonlyargs, list(arguments.kw_defaults), kind="keyword_only")
+    handle_parameters(
+        arguments.kwonlyargs, list(arguments.kw_defaults), kind="keyword_only"
+    )
     if arguments.kwarg is not None:
         params.append(
             _make_parameter(
@@ -429,7 +435,9 @@ def _wrap_text(text: str) -> list[str]:
             wrapped.append("")
             continue
         wrapped.append(
-            textwrap.fill(paragraph, width=88, break_long_words=False, break_on_hyphens=False)
+            textwrap.fill(
+                paragraph, width=88, break_long_words=False, break_on_hyphens=False
+            )
         )
     while wrapped and not wrapped[-1]:
         wrapped.pop()
@@ -438,8 +446,12 @@ def _wrap_text(text: str) -> list[str]:
 
 def _format_parameter_entry(param: DocstringIRParameter) -> tuple[str, str]:
     annotation = param.annotation or "Any"
-    optional_suffix = ", optional" if param.optional and not _is_variadic_parameter(param) else ""
-    default_suffix = f", by default {param.default}" if param.default not in {None, "..."} else ""
+    optional_suffix = (
+        ", optional" if param.optional and not _is_variadic_parameter(param) else ""
+    )
+    default_suffix = (
+        f", by default {param.default}" if param.default not in {None, "..."} else ""
+    )
     header = f"{param.display_name} : {annotation}{optional_suffix}{default_suffix}"
     body = f"    Description for ``{param.name}``."
     return header, body
@@ -539,7 +551,9 @@ def build_examples(context: _ExampleContext) -> list[str]:
             call_parts.append("...")
     call_parts.extend(trailing_parts)
     call_fragment = ", ".join(call_parts)
-    invocation = f"{context.name}({call_fragment})" if call_fragment else f"{context.name}()"
+    invocation = (
+        f"{context.name}({call_fragment})" if call_fragment else f"{context.name}()"
+    )
 
     if context.is_async:
         lines.append(f">>> result = {invocation}")
@@ -640,7 +654,9 @@ def detect_raises(node: ast.AST) -> list[str]:
     return raises
 
 
-def extended_summary(kind: str, name: str, module: str, node: ast.AST | None = None) -> str:
+def extended_summary(
+    kind: str, name: str, module: str, node: ast.AST | None = None
+) -> str:
     """Return the extended summary paragraph for the symbol.
 
     Parameters
@@ -887,7 +903,9 @@ def process_file(file_path: Path) -> bool:
     if not edits:
         return False
 
-    result = HarvestResult(module=module_name, filepath=file_path, symbols=[], cst_index={})
+    result = HarvestResult(
+        module=module_name, filepath=file_path, symbols=[], cst_index={}
+    )
     changed, _ = apply_edits(result, edits)
     if changed:
         _ensure_trailing_blank_lines(file_path)

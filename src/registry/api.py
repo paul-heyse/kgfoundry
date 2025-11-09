@@ -4,6 +4,7 @@ This module bundles api logic for the kgfoundry stack. It groups related helpers
 packages can import a single cohesive namespace. Refer to the functions and classes below for
 implementation specifics.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -115,7 +116,9 @@ class Registry(Protocol):
         """
         ...
 
-    def close_run(self, run_id: str, *, success: bool, notes: str | None = None) -> None:
+    def close_run(
+        self, run_id: str, *, success: bool, notes: str | None = None
+    ) -> None:
         """Close a pipeline run and record completion status.
 
         Updates the run's finished_at timestamp and records completion status
@@ -162,7 +165,9 @@ class Registry(Protocol):
         """
         ...
 
-    def emit_event(self, event_name: str, subject_id: str, payload: Mapping[str, object]) -> None:
+    def emit_event(
+        self, event_name: str, subject_id: str, payload: Mapping[str, object]
+    ) -> None:
         """Emit a pipeline event to the registry.
 
         Records an event in the pipeline_events table with a unique event ID,
@@ -180,7 +185,9 @@ class Registry(Protocol):
         """
         ...
 
-    def incident(self, event: str, subject_id: str, error_class: str, message: str) -> None:
+    def incident(
+        self, event: str, subject_id: str, error_class: str, message: str
+    ) -> None:
         """Record an incident emitted by registry clients.
 
         Inserts an incident record into the incidents table for tracking

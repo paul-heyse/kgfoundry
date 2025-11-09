@@ -18,7 +18,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 import traceback
 from typing import TYPE_CHECKING, cast
@@ -178,7 +177,6 @@ def main() -> None:
 
     # Print diagnostics (print is acceptable for CLI tools)
     print("=== gpu_doctor ===")  # noqa: T201
-    print("CUDA_VISIBLE_DEVICES =", os.environ.get("CUDA_VISIBLE_DEVICES", "<unset>"))  # noqa: T201
     print()  # noqa: T201
 
     torch_ok: bool | None = None

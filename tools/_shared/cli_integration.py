@@ -11,7 +11,11 @@ import click
 
 from tools._shared.cli_runtime import CliContext, CliRunConfig, EnvelopeBuilder, cli_run
 
-_SUMMARY_ENV_KEYS: tuple[str, ...] = ("PYTHONPATH", "VIRTUAL_ENV", "CUDA_VISIBLE_DEVICES")
+_SUMMARY_ENV_KEYS: tuple[str, ...] = (
+    "PYTHONPATH",
+    "VIRTUAL_ENV",
+    "CUDA_VISIBLE_DEVICES",
+)
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -46,7 +50,9 @@ def cli_operation(
     *,
     echo_args: bool = True,
     echo_env: bool = False,
-) -> Callable[[Callable[Concatenate[CliContext, EnvelopeBuilder, P], R]], Callable[P, R]]:
+) -> Callable[
+    [Callable[Concatenate[CliContext, EnvelopeBuilder, P], R]], Callable[P, R]
+]:
     """Wrap a Typer/Click command so it executes within :func:`cli_run`.
 
     Parameters
@@ -64,15 +70,19 @@ def cli_operation(
         :func:`cli_run`.
     """
 
-    def deco(fn: Callable[Concatenate[CliContext, EnvelopeBuilder, P], R]) -> Callable[P, R]:
+    def deco(
+        fn: Callable[Concatenate[CliContext, EnvelopeBuilder, P], R],
+    ) -> Callable[P, R]:
         @functools.wraps(fn)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             route = current_route()
             cfg = CliRunConfig(
                 command_path=route,
-                args_summary=[f"{key}={value}" for key, value in kwargs.items()]
-                if echo_args
-                else None,
+                args_summary=(
+                    [f"{key}={value}" for key, value in kwargs.items()]
+                    if echo_args
+                    else None
+                ),
                 env_summary=_collect_env_summary() if echo_env else None,
             )
             with cli_run(cfg) as (ctx, env):

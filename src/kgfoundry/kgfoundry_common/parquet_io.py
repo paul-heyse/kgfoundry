@@ -1,4 +1,5 @@
 """Expose ``kgfoundry_common.parquet_io`` inside the ``kgfoundry`` namespace."""
+
 # [nav:section public-api]
 
 from __future__ import annotations

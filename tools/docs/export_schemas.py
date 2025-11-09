@@ -166,7 +166,9 @@ def is_pydantic_model(obj: object) -> bool:
     base_model = _load_pydantic_base_model()
     if base_model is None:
         return False
-    return inspect.isclass(obj) and issubclass(obj, base_model) and obj is not base_model
+    return (
+        inspect.isclass(obj) and issubclass(obj, base_model) and obj is not base_model
+    )
 
 
 def is_pandera_model(obj: object) -> bool:
@@ -231,7 +233,9 @@ def _load_pydantic_base_model() -> type[Any] | None:
     return base_model
 
 
-def _nav_versions(module_name: str, class_name: str, nav: dict[str, Any]) -> dict[str, Any] | None:
+def _nav_versions(
+    module_name: str, class_name: str, nav: dict[str, Any]
+) -> dict[str, Any] | None:
     """Find navmap version metadata.
 
     Parameters
@@ -381,7 +385,9 @@ def _apply_headers(
     schema["$id"] = f"{base_url.rstrip('/')}/{module_name}.{class_name}.json#"
 
 
-def _inject_examples(schema: dict[str, object], example: Mapping[str, object] | None) -> None:
+def _inject_examples(
+    schema: dict[str, object], example: Mapping[str, object] | None
+) -> None:
     """Inject examples.
 
     Parameters
@@ -401,7 +407,9 @@ def _inject_examples(schema: dict[str, object], example: Mapping[str, object] | 
         schema["examples"] = ex
 
 
-def _inject_versions(schema: dict[str, object], versions: Mapping[str, object] | None) -> None:
+def _inject_versions(
+    schema: dict[str, object], versions: Mapping[str, object] | None
+) -> None:
     """Inject versions.
 
     Parameters
@@ -416,7 +424,9 @@ def _inject_versions(schema: dict[str, object], versions: Mapping[str, object] |
         schema.update(versions)
 
 
-def _preserve_versions(schema: dict[str, object], previous: Mapping[str, object] | None) -> None:
+def _preserve_versions(
+    schema: dict[str, object], previous: Mapping[str, object] | None
+) -> None:
     """Carry forward version metadata when no navigation data is available."""
     if previous is None:
         return
@@ -430,7 +440,9 @@ def _preserve_versions(schema: dict[str, object], previous: Mapping[str, object]
 # --------------------------- drift summarizer ---------------------------
 
 
-def _diff_summary(old: Mapping[str, object], new: Mapping[str, object]) -> dict[str, object]:
+def _diff_summary(
+    old: Mapping[str, object], new: Mapping[str, object]
+) -> dict[str, object]:
     """Summarize differences: top-level keys +/-; property changes (top 10).
 
     Parameters
@@ -539,7 +551,10 @@ def _export_one_pydantic(
     _apply_headers(schema, module_name, name, cfg.base_url)
     _inject_versions(schema, _nav_versions(module_name, name, nav))
     _inject_examples(schema, _example_for_pydantic(model_cls))
-    return (OUT / f"{module_name}.{name}.json", cast("dict[str, object]", _sorted(schema)))
+    return (
+        OUT / f"{module_name}.{name}.json",
+        cast("dict[str, object]", _sorted(schema)),
+    )
 
 
 def _export_one_pandera(
@@ -581,7 +596,10 @@ def _export_one_pandera(
     _apply_headers(schema, module_name, name, cfg.base_url)
     _inject_versions(schema, _nav_versions(module_name, name, nav))
     _inject_examples(schema, _example_for_pandera(model_cls))
-    return (OUT / f"{module_name}.{name}.json", cast("dict[str, object]", _sorted(schema)))
+    return (
+        OUT / f"{module_name}.{name}.json",
+        cast("dict[str, object]", _sorted(schema)),
+    )
 
 
 def _iter_models() -> Iterator[tuple[str, str, type[object]]]:
@@ -630,7 +648,9 @@ def _parse_args(argv: Sequence[str] | None) -> Cfg:
         help="Base URL for $id (default: env SCHEMA_BASE_URL or https://kgfoundry.dev/schemas)",
     )
     parser.add_argument(
-        "--by-alias", action="store_true", help="Generate Pydantic schemas using field aliases"
+        "--by-alias",
+        action="store_true",
+        help="Generate Pydantic schemas using field aliases",
     )
     parser.add_argument(
         "--check-drift",
@@ -668,7 +688,9 @@ def _load_existing_schema(path: Path) -> dict[str, object] | None:
     return loaded if isinstance(loaded, dict) else None
 
 
-def _schemas_match(previous: Mapping[str, object] | None, current: Mapping[str, object]) -> bool:
+def _schemas_match(
+    previous: Mapping[str, object] | None, current: Mapping[str, object]
+) -> bool:
     """Return ``True`` when two schema mappings represent the same data.
 
     Parameters
@@ -817,7 +839,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if drift_summaries:
         DRIFT_OUT.parent.mkdir(parents=True, exist_ok=True)
-        DRIFT_OUT.write_text(json.dumps(drift_summaries, indent=2) + "\n", encoding="utf-8")
+        DRIFT_OUT.write_text(
+            json.dumps(drift_summaries, indent=2) + "\n", encoding="utf-8"
+        )
 
     if cfg.check_drift and changed:
         LOGGER.warning("[schemas] drift detected; see docs/_build/schema_drift.json")

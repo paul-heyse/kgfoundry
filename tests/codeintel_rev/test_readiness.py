@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
+from typing import cast
 from unittest.mock import Mock, patch
 
 import duckdb
@@ -11,7 +12,12 @@ import httpx
 import pytest
 from codeintel_rev.app.config_context import ApplicationContext, ResolvedPaths
 from codeintel_rev.app.readiness import CheckResult, ReadinessProbe
-from codeintel_rev.config.settings import IndexConfig, Settings, VLLMConfig, load_settings
+from codeintel_rev.config.settings import (
+    IndexConfig,
+    Settings,
+    VLLMConfig,
+    load_settings,
+)
 
 
 @pytest.fixture
@@ -92,6 +98,16 @@ def _reset_duckdb_catalog(db_path: Path) -> None:
         pass
 
 
+def _context_with_settings(
+    context: ApplicationContext,
+    settings: Settings,
+) -> ApplicationContext:
+    clone = Mock(spec=ApplicationContext)
+    clone.paths = context.paths
+    clone.settings = settings
+    return cast("ApplicationContext", clone)
+
+
 def test_check_result_as_payload_healthy() -> None:
     """Test CheckResult.as_payload() for healthy result."""
     # Arrange
@@ -156,7 +172,7 @@ async def test_readiness_probe_materialize_reports_missing_table(
     """Readiness should fail when materialization enabled but table missing."""
     existing_settings = mock_context.settings
     _reset_duckdb_catalog(mock_context.paths.duckdb_path)
-    mock_context.settings = Settings(
+    new_settings = Settings(
         vllm=existing_settings.vllm,
         paths=existing_settings.paths,
         index=_materialized_index_config(existing_settings.index, enabled=True),
@@ -166,7 +182,7 @@ async def test_readiness_probe_materialize_reports_missing_table(
         bm25=existing_settings.bm25,
         splade=existing_settings.splade,
     )
-    probe = ReadinessProbe(mock_context)
+    probe = ReadinessProbe(_context_with_settings(mock_context, new_settings))
 
     results = await probe.refresh()
     duckdb_result = results["duckdb_catalog"]
@@ -183,7 +199,7 @@ async def test_readiness_probe_materialize_validates_index(
     """Readiness passes when materialized table and index exist."""
     existing_settings = mock_context.settings
     _reset_duckdb_catalog(mock_context.paths.duckdb_path)
-    mock_context.settings = Settings(
+    new_settings = Settings(
         vllm=existing_settings.vllm,
         paths=existing_settings.paths,
         index=_materialized_index_config(existing_settings.index, enabled=True),
@@ -193,8 +209,9 @@ async def test_readiness_probe_materialize_validates_index(
         bm25=existing_settings.bm25,
         splade=existing_settings.splade,
     )
+    context = _context_with_settings(mock_context, new_settings)
 
-    with duckdb.connect(str(mock_context.paths.duckdb_path)) as connection:
+    with duckdb.connect(str(context.paths.duckdb_path)) as connection:
         connection.execute("DROP VIEW IF EXISTS chunks")
         connection.execute("DROP TABLE IF EXISTS chunks_materialized")
         connection.execute(
@@ -212,9 +229,11 @@ async def test_readiness_probe_materialize_validates_index(
             """
         )
         connection.execute("CREATE VIEW chunks AS SELECT * FROM chunks_materialized")
-        connection.execute("CREATE INDEX idx_chunks_materialized_uri ON chunks_materialized(uri)")
+        connection.execute(
+            "CREATE INDEX idx_chunks_materialized_uri ON chunks_materialized(uri)"
+        )
 
-    probe = ReadinessProbe(mock_context)
+    probe = ReadinessProbe(context)
     results = await probe.refresh()
 
     assert results["duckdb_catalog"].healthy is True
@@ -237,7 +256,9 @@ async def test_readiness_probe_missing_faiss(mock_context: ApplicationContext) -
 
 
 @pytest.mark.asyncio
-async def test_readiness_probe_vllm_unreachable(mock_context: ApplicationContext) -> None:
+async def test_readiness_probe_vllm_unreachable(
+    mock_context: ApplicationContext,
+) -> None:
     """Test ReadinessProbe when vLLM service is unreachable."""
     # Arrange
     probe = ReadinessProbe(mock_context)
@@ -302,7 +323,9 @@ def test_readiness_probe_check_directory_exists() -> None:
         path = Path(tmpdir)
 
         # Act
-        result = ReadinessProbe._check_directory(path)  # noqa: SLF001 - intentional test access to private method
+        result = ReadinessProbe._check_directory(
+            path
+        )
 
         # Assert
         assert result.healthy is True
@@ -316,7 +339,9 @@ def test_readiness_probe_check_directory_create() -> None:
         new_dir = Path(tmpdir) / "new_subdir"
 
         # Act
-        result = ReadinessProbe._check_directory(new_dir, create=True)  # noqa: SLF001 - intentional test access to private method
+        result = ReadinessProbe._check_directory(
+            new_dir, create=True
+        )
 
         # Assert
         assert result.healthy is True
@@ -332,7 +357,9 @@ def test_readiness_probe_check_file_exists() -> None:
 
     try:
         # Act
-        result = ReadinessProbe._check_file(path, description="test file")  # noqa: SLF001 - intentional test access to private method
+        result = ReadinessProbe._check_file(
+            path, description="test file"
+        )
 
         # Assert
         assert result.healthy is True
@@ -346,7 +373,9 @@ def test_readiness_probe_check_file_optional() -> None:
     path = Path("/nonexistent/file.txt")
 
     # Act
-    result = ReadinessProbe._check_file(path, description="test file", optional=True)  # noqa: SLF001 - intentional test access to private method
+    result = ReadinessProbe._check_file(
+        path, description="test file", optional=True
+    )
 
     # Assert
     assert result.healthy is True  # Optional files don't fail readiness
@@ -360,7 +389,9 @@ def test_readiness_probe_check_file_required() -> None:
     path = Path("/nonexistent/file.txt")
 
     # Act
-    result = ReadinessProbe._check_file(path, description="test file", optional=False)  # noqa: SLF001 - intentional test access to private method
+    result = ReadinessProbe._check_file(
+        path, description="test file", optional=False
+    )
 
     # Assert
     assert result.healthy is False
@@ -368,7 +399,9 @@ def test_readiness_probe_check_file_required() -> None:
     assert "not found" in result.detail.lower()
 
 
-def test_readiness_probe_check_vllm_invalid_url(mock_context: ApplicationContext) -> None:
+def test_readiness_probe_check_vllm_invalid_url(
+    mock_context: ApplicationContext,
+) -> None:
     """Test _check_vllm_connection() with invalid URL."""
     # Arrange - create new settings with invalid URL
     invalid_vllm = VLLMConfig(base_url="not-a-valid-url")
@@ -382,11 +415,13 @@ def test_readiness_probe_check_vllm_invalid_url(mock_context: ApplicationContext
         bm25=mock_context.settings.bm25,
         splade=mock_context.settings.splade,
     )
-    mock_context.settings = new_settings
-    probe = ReadinessProbe(mock_context)
+    context = _context_with_settings(mock_context, new_settings)
+    probe = ReadinessProbe(context)
 
     # Act
-    result = probe._check_vllm_connection()  # noqa: SLF001 - intentional test access to private method
+    result = (
+        probe._check_vllm_connection()
+    )
 
     # Assert
     assert result.healthy is False
@@ -408,8 +443,8 @@ def test_readiness_probe_check_vllm_success(mock_context: ApplicationContext) ->
         bm25=mock_context.settings.bm25,
         splade=mock_context.settings.splade,
     )
-    mock_context.settings = new_settings
-    probe = ReadinessProbe(mock_context)
+    context = _context_with_settings(mock_context, new_settings)
+    probe = ReadinessProbe(context)
 
     # Act - mock successful HTTP response
     with patch("httpx.Client") as mock_client:
@@ -419,13 +454,17 @@ def test_readiness_probe_check_vllm_success(mock_context: ApplicationContext) ->
         mock_instance.get.return_value = mock_response
         mock_client.return_value.__enter__.return_value = mock_instance
 
-        result = probe._check_vllm_connection()  # noqa: SLF001 - intentional test access to private method  # noqa: SLF001 - intentional test access to private method
+        result = (
+            probe._check_vllm_connection()
+        )
 
     # Assert
     assert result.healthy is True
 
 
-def test_readiness_probe_check_vllm_http_error(mock_context: ApplicationContext) -> None:
+def test_readiness_probe_check_vllm_http_error(
+    mock_context: ApplicationContext,
+) -> None:
     """Test _check_vllm_connection() with HTTP error."""
     # Arrange - create new settings with valid URL
     valid_vllm = VLLMConfig(base_url="http://localhost:8001/v1")
@@ -439,8 +478,8 @@ def test_readiness_probe_check_vllm_http_error(mock_context: ApplicationContext)
         bm25=mock_context.settings.bm25,
         splade=mock_context.settings.splade,
     )
-    mock_context.settings = new_settings
-    probe = ReadinessProbe(mock_context)
+    context = _context_with_settings(mock_context, new_settings)
+    probe = ReadinessProbe(context)
 
     # Act - mock HTTP error
     with patch("httpx.Client") as mock_client:
@@ -448,7 +487,9 @@ def test_readiness_probe_check_vllm_http_error(mock_context: ApplicationContext)
         mock_instance.get.side_effect = httpx.HTTPError("Connection refused")
         mock_client.return_value.__enter__.return_value = mock_instance
 
-        result = probe._check_vllm_connection()  # noqa: SLF001 - intentional test access to private method  # noqa: SLF001 - intentional test access to private method
+        result = (
+            probe._check_vllm_connection()
+        )
 
     # Assert
     assert result.healthy is False

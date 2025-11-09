@@ -381,14 +381,20 @@ if doc_common is not None and ENABLE_SITECUSTOMIZE:
         doc_common_local, "DocstringYields", None
     )
 
-    if doc_cls is not None and attr_cls is not None and ensure_docstring_attrs(doc_cls, attr_cls):
+    if (
+        doc_cls is not None
+        and attr_cls is not None
+        and ensure_docstring_attrs(doc_cls, attr_cls)
+    ):
         logger.debug("Docstring.attrs shim installed")
 
     if doc_cls is not None and yields_cls is not None:
         added_yield, added_many = ensure_docstring_yields(doc_cls, yields_cls)
         if added_yield or added_many:
             logger.debug(
-                "Docstring yields shim installed (single=%s many=%s)", added_yield, added_many
+                "Docstring yields shim installed (single=%s many=%s)",
+                added_yield,
+                added_many,
             )
 
     if doc_cls is not None and ensure_docstring_size(doc_cls):

@@ -49,7 +49,8 @@ class TestImportLinterTypingContract:
             if exc.problem is not None:
                 problem_type = exc.problem.get("type")
                 if isinstance(problem_type, str) and (
-                    "missing" in problem_type.lower() or "executable" in problem_type.lower()
+                    "missing" in problem_type.lower()
+                    or "executable" in problem_type.lower()
                 ):
                     pytest.skip("import-linter not found in PATH")
             raise
@@ -109,7 +110,9 @@ class TestImportLinterTypingContract:
 
     def test_config_file_exists_and_is_valid(self) -> None:
         """Verify import-linter typing config file exists and is readable."""
-        config_path = Path(__file__).parent.parent.parent / "tools/lint/importlinter.typing.ini"
+        config_path = (
+            Path(__file__).parent.parent.parent / "tools/lint/importlinter.typing.ini"
+        )
         assert config_path.exists(), f"Config file not found: {config_path}"
 
         content = config_path.read_text(encoding="utf-8")
@@ -119,7 +122,9 @@ class TestImportLinterTypingContract:
 
     def test_config_specifies_forbidden_modules(self) -> None:
         """Verify config file lists all forbidden private modules."""
-        config_path = Path(__file__).parent.parent.parent / "tools/lint/importlinter.typing.ini"
+        config_path = (
+            Path(__file__).parent.parent.parent / "tools/lint/importlinter.typing.ini"
+        )
         content = config_path.read_text(encoding="utf-8")
 
         # Verify forbidden modules are declared
@@ -129,7 +134,9 @@ class TestImportLinterTypingContract:
 
     def test_config_specifies_source_modules(self) -> None:
         """Verify config file specifies which modules are checked."""
-        config_path = Path(__file__).parent.parent.parent / "tools/lint/importlinter.typing.ini"
+        config_path = (
+            Path(__file__).parent.parent.parent / "tools/lint/importlinter.typing.ini"
+        )
         content = config_path.read_text(encoding="utf-8")
 
         # Verify source modules are declared
@@ -139,7 +146,9 @@ class TestImportLinterTypingContract:
 
     def test_config_specifies_allowed_exceptions(self) -> None:
         """Verify config file allows facade modules to import from private modules."""
-        config_path = Path(__file__).parent.parent.parent / "tools/lint/importlinter.typing.ini"
+        config_path = (
+            Path(__file__).parent.parent.parent / "tools/lint/importlinter.typing.ini"
+        )
         content = config_path.read_text(encoding="utf-8")
 
         # Verify ignore_imports (allowlist) is present

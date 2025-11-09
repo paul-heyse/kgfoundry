@@ -35,7 +35,10 @@ _benchmark_gate = pytest.mark.skipif(
 )
 
 if not HAS_FAISS_SUPPORT:  # pragma: no cover - dependency-gated
-    pytestmark = [_benchmark_gate, pytest.mark.skip(reason="FAISS bindings unavailable")]
+    pytestmark = [
+        _benchmark_gate,
+        pytest.mark.skip(reason="FAISS bindings unavailable"),
+    ]
 else:
     assert FAISS_MODULE is not None
     pytestmark = [_benchmark_gate]
@@ -49,7 +52,9 @@ def _get_underlying_index(cpu_index: Any) -> Any:
     Any
         Underlying FAISS index instance.
     """
-    assert hasattr(cpu_index, "index"), "Expected FAISS index wrapper to expose `index` attribute"
+    assert hasattr(
+        cpu_index, "index"
+    ), "Expected FAISS index wrapper to expose `index` attribute"
     index_map = cast("faiss.IndexIDMap2", cpu_index)
     return index_map.index
 
@@ -233,7 +238,9 @@ def test_training_time_scaling(benchmark, tmp_index_path: Path) -> None:
 
         # Training should complete within target time
         avg_time = result.stats.mean
-        assert avg_time < max_time, f"Training took {avg_time:.2f}s (target: <{max_time}s)"
+        assert (
+            avg_time < max_time
+        ), f"Training took {avg_time:.2f}s (target: <{max_time}s)"
 
         print(f"\nCorpus size: {n_vectors} vectors")
         print(f"  Training time: {avg_time:.2f}s (target: <{max_time}s)")

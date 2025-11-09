@@ -177,7 +177,9 @@ def _resolve_relative(parts: Sequence[str], root: Path) -> Path:
     return root.joinpath(*parts)
 
 
-def _resolve_module_candidate(relative: Path, repo_root: Path) -> tuple[Path | None, Path]:
+def _resolve_module_candidate(
+    relative: Path, repo_root: Path
+) -> tuple[Path | None, Path]:
     """Resolve a module candidate path and return both resolved and fallback.
 
     Parameters
@@ -273,7 +275,9 @@ def dependents_for(path: Path) -> set[Path]:
     return dependents
 
 
-def matches_patterns(path: Path, patterns: Iterable[str], *, repo_root: Path = REPO_ROOT) -> bool:
+def matches_patterns(
+    path: Path, patterns: Iterable[str], *, repo_root: Path = REPO_ROOT
+) -> bool:
     """Return ``True`` when ``path`` matches any ``patterns`` relative to ``repo_root``.
 
     Parameters
@@ -297,7 +301,9 @@ def matches_patterns(path: Path, patterns: Iterable[str], *, repo_root: Path = R
     return any(rel.match(pattern) for pattern in patterns)
 
 
-def should_ignore(path: Path, config: BuilderConfig, *, repo_root: Path = REPO_ROOT) -> bool:
+def should_ignore(
+    path: Path, config: BuilderConfig, *, repo_root: Path = REPO_ROOT
+) -> bool:
     """Return ``True`` when ``path`` should be ignored according to ``config``.
 
     Parameters
@@ -318,7 +324,9 @@ def should_ignore(path: Path, config: BuilderConfig, *, repo_root: Path = REPO_R
     patterns = resolve_ignore_patterns(config)
     for pattern in patterns:
         if rel.match(pattern):
-            LOGGER.debug("Skipping %s because it matches ignore pattern %s", rel, pattern)
+            LOGGER.debug(
+                "Skipping %s because it matches ignore pattern %s", rel, pattern
+            )
             return True
     return False
 
@@ -578,7 +586,9 @@ def hash_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def read_baseline_version(baseline: str, path: Path, *, repo_root: Path = REPO_ROOT) -> str | None:
+def read_baseline_version(
+    baseline: str, path: Path, *, repo_root: Path = REPO_ROOT
+) -> str | None:
     """Return the file contents for ``path`` from ``baseline`` when available.
 
     Parameters

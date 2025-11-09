@@ -115,7 +115,9 @@ def _prepare_failure_context(
             error_code = "KGF-DOC-ENV-002"
             error_message = "DocFacts schema not found"
 
-    formatted = format_error_message(error_code, error_message, details=combined_details)
+    formatted = format_error_message(
+        error_code, error_message, details=combined_details
+    )
 
     extras: dict[str, object] = {
         "command": " ".join(command),
@@ -136,7 +138,9 @@ def _prepare_failure_context(
         problem = _build_failure_problem(formatted, status=500, extras=extras)
     else:
         # Copy to avoid mutating the original Problem Details payload.
-        merged_problem: dict[str, Any] = {str(key): value for key, value in problem.items()}
+        merged_problem: dict[str, Any] = {
+            str(key): value for key, value in problem.items()
+        }
         existing_extensions = {}
         extensions_raw = merged_problem.get("extensions")
         if isinstance(extensions_raw, Mapping):
@@ -162,7 +166,13 @@ def run_builder(extra_args: Sequence[str] | None = None) -> None:
         If docstring builder execution fails.
     """
     args = list(extra_args or [])
-    cmd = [sys.executable, "-m", "tools.docstring_builder.cli", UPDATE_SUBCOMMAND, *args]
+    cmd = [
+        sys.executable,
+        "-m",
+        "tools.docstring_builder.cli",
+        UPDATE_SUBCOMMAND,
+        *args,
+    ]
     correlation_id = uuid4().hex
     logger = with_fields(
         LOGGER,
@@ -186,15 +196,17 @@ def run_builder(extra_args: Sequence[str] | None = None) -> None:
             status="error",
             subcommand=UPDATE_SUBCOMMAND,
         )
-        failure_builder.add_error(status="error", message=formatted, problem=problem)
-        failure_builder.set_problem(problem)
-        failure_builder.add_file(
+        failure_builder = failure_builder.add_error(
+            status="error", message=formatted, problem=problem
+        )
+        failure_builder = failure_builder.set_problem(problem)
+        failure_builder = failure_builder.add_file(
             path=str(DOCFACTS),
             status="error",
             message="DocFacts artifact not updated",
         )
         if exc.stderr.strip():
-            failure_builder.add_file(
+            failure_builder = failure_builder.add_file(
                 path="<stderr>",
                 status="error",
                 message=exc.stderr.strip(),
@@ -218,13 +230,13 @@ def run_builder(extra_args: Sequence[str] | None = None) -> None:
         subcommand=UPDATE_SUBCOMMAND,
     )
     if DOCFACTS.exists():
-        builder.add_file(
+        builder = builder.add_file(
             path=str(DOCFACTS),
             status="success",
             message="DocFacts artifact synchronized",
         )
     else:
-        builder.add_file(
+        builder = builder.add_file(
             path=str(DOCFACTS),
             status="skipped",
             message="DocFacts artifact not produced",

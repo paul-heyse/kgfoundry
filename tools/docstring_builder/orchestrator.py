@@ -50,7 +50,7 @@ import warnings
 from collections.abc import Iterable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as _FuturesTimeoutError
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from importlib import import_module
 from typing import TYPE_CHECKING, NoReturn, Protocol, cast
 
@@ -148,6 +148,7 @@ if TYPE_CHECKING:
         ) -> DocstringBuildResult:
             """Legacy callback signature accepting variadic arguments."""
             ...
+
 else:  # pragma: no cover - runtime fallback preserves import laziness
     PipelineContextBuilderType = type[object]
     LegacyBuilderSignature = type[object]
@@ -356,8 +357,12 @@ def _load_docfacts_from_disk() -> dict[str, DocFact]:
     payload_items: Iterable[Mapping[str, object]]
     if isinstance(raw, Mapping):
         entries_field: object = raw.get("entries", [])
-        if isinstance(entries_field, Sequence) and not isinstance(entries_field, (str, bytes)):
-            payload_items = [item for item in entries_field if isinstance(item, Mapping)]
+        if isinstance(entries_field, Sequence) and not isinstance(
+            entries_field, (str, bytes)
+        ):
+            payload_items = [
+                item for item in entries_field if isinstance(item, Mapping)
+            ]
         else:
             payload_items = []
     elif isinstance(raw, list):  # pragma: no cover - legacy fallback
@@ -825,7 +830,11 @@ def _run_pipeline(invocation: _PipelineInvocation) -> DocstringBuildResult:
     if invocation.request.command == "update":
         dependencies.cache.write()
 
-    if not files_list and invocation.request.command == "check" and invocation.request.diff:
+    if (
+        not files_list
+        and invocation.request.command == "check"
+        and invocation.request.diff
+    ):
         DOCSTRINGS_DIFF_PATH.unlink(missing_ok=True)
         DOCFACTS_DIFF_PATH.unlink(missing_ok=True)
 
@@ -853,11 +862,11 @@ def run_docstring_builder(
     """
     config, config_selection = load_builder_config(config_override)
     if request.llm_summary:
-        config.llm_summary_mode = "apply"
+        config = replace(config, llm_summary_mode="apply")
     elif request.llm_dry_run:
-        config.llm_summary_mode = "dry-run"
+        config = replace(config, llm_summary_mode="dry-run")
     if request.normalize_sections:
-        config.normalize_sections = True
+        config = replace(config, normalize_sections=True)
     try:
         selection = SelectionCriteria(
             module=optional_str(request.module),
@@ -909,9 +918,9 @@ def run_build(
         Raised when the build exceeds ``config.timeout_seconds``.
     """
     builder_config, config_selection = load_builder_config(None)
-    builder_config.dynamic_probes = config.dynamic_probes
+    builder_config = replace(builder_config, dynamic_probes=config.dynamic_probes)
     if config.normalize_sections:
-        builder_config.normalize_sections = True
+        builder_config = replace(builder_config, normalize_sections=True)
 
     command = "check" if config.emit_diff else "update"
     request = DocstringBuildRequest(
@@ -1014,7 +1023,10 @@ def run_legacy(
         _LOGGER.debug(
             "Legacy API called with %d keyword argument(s)",
             len(kwargs),
-            extra={"legacy_kwargs_count": len(kwargs), "legacy_kwargs_keys": list(kwargs.keys())},
+            extra={
+                "legacy_kwargs_count": len(kwargs),
+                "legacy_kwargs_keys": list(kwargs.keys()),
+            },
         )
 
     # This is a placeholder that would delegate to run_docstring_builder

@@ -189,7 +189,8 @@ def navmap_document_from_index(
             for section in section_models
         ]
         symbol_meta: dict[str, SymbolMetaDocument] = {
-            symbol: _symbol_meta_to_document(meta) for symbol, meta in entry.meta.items()
+            symbol: _symbol_meta_to_document(meta)
+            for symbol, meta in entry.meta.items()
         }
         module_meta_doc = _module_meta_to_document(entry.module_meta)
         exports: list[str] = entry.exports.copy()

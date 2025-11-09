@@ -90,13 +90,18 @@ def _inspect_module(spec: ModuleSpec) -> DriftResult:
         module = importlib.import_module(spec.name)
     except ModuleNotFoundError as exc:  # pragma: no cover - import guard
         return DriftResult(
-            module=spec.name, missing=sorted(spec.expected), unexpected=[], error=str(exc)
+            module=spec.name,
+            missing=sorted(spec.expected),
+            unexpected=[],
+            error=str(exc),
         )
 
     public = {attr for attr in dir(module) if not attr.startswith("_")}
     missing = sorted(name for name in spec.expected if name not in public)
     monitor = spec.monitor or spec.expected
-    unexpected = sorted(name for name in public if name in monitor and name not in spec.expected)
+    unexpected = sorted(
+        name for name in public if name in monitor and name not in spec.expected
+    )
     return DriftResult(module=spec.name, missing=missing, unexpected=unexpected)
 
 

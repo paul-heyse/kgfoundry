@@ -96,7 +96,9 @@ class DocfactsCoordinator:
         """
         provenance = self.build_provenance(self.config)
         document = build_docfacts_document(docfacts, provenance, DOCFACTS_VERSION)
-        payload = build_docfacts_document_payload(cast("DocfactsDocumentLike", document))
+        payload = build_docfacts_document_payload(
+            cast("DocfactsDocumentLike", document)
+        )
         if self.check_mode:
             return self._check_payload(payload)
         return self._update_payload(document, payload)
@@ -121,7 +123,9 @@ class DocfactsCoordinator:
             existing_text = DOCFACTS_PATH.read_text(encoding="utf-8")
             existing_raw: object = json.loads(existing_text)
         except json.JSONDecodeError:  # pragma: no cover - defensive guard
-            self.logger.exception("DocFacts payload at %s is not valid JSON", DOCFACTS_PATH)
+            self.logger.exception(
+                "DocFacts payload at %s is not valid JSON", DOCFACTS_PATH
+            )
             return DocfactsResult(status="config", message="docfacts invalid json")
         if not isinstance(existing_raw, Mapping):
             self.logger.error("DocFacts payload at %s is not a mapping", DOCFACTS_PATH)
@@ -137,7 +141,9 @@ class DocfactsCoordinator:
             "DocfactsDocumentPayload",
             json.loads(json.dumps(payload)),
         )
-        provenance_existing = _coerce_provenance_payload(existing_payload.get("provenance"))
+        provenance_existing = _coerce_provenance_payload(
+            existing_payload.get("provenance")
+        )
         comparison_provenance = comparison_payload["provenance"]
         if provenance_existing is not None:
             commit_hash = comparison_provenance.get("commitHash", "")
@@ -160,7 +166,9 @@ class DocfactsCoordinator:
             self.logger.error(
                 "DocFacts drift detected; run update mode to refresh (see %s)", diff_rel
             )
-            return DocfactsResult(status="violation", message="docfacts drift", diff_path=diff_rel)
+            return DocfactsResult(
+                status="violation", message="docfacts drift", diff_path=diff_rel
+            )
         DOCFACTS_DIFF_PATH.unlink(missing_ok=True)
         return DocfactsResult(status="success")
 

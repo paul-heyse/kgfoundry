@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from importlib import import_module
 from typing import TYPE_CHECKING, Protocol, cast
 
@@ -37,7 +37,9 @@ try:  # pragma: no cover - optional dependency at runtime
 except ModuleNotFoundError:  # pragma: no cover - defensive guard for optional import
     _PARSER_SYNTAX_ERRORS: tuple[type[BaseException], ...] = ()
 else:
-    _PARSER_SYNTAX_ERRORS = cast("tuple[type[BaseException], ...]", (_ParserSyntaxError,))
+    _PARSER_SYNTAX_ERRORS = cast(
+        "tuple[type[BaseException], ...]", (_ParserSyntaxError,)
+    )
 
 _HARVEST_ERRORS: tuple[type[BaseException], ...] = (
     *_PARSER_SYNTAX_ERRORS,
@@ -134,8 +136,7 @@ class FileProcessor:
         )
 
         if self._use_cache(file_path):
-            ctx.skipped = True
-            ctx.message = "cache fresh"
+            ctx = replace(ctx, skipped=True, message="cache fresh")
             return FileOutcome(
                 status=ExitStatus.SUCCESS,
                 docfacts=ctx.docfacts,
@@ -161,7 +162,7 @@ class FileProcessor:
 
         # Handle harvest-only command
         if command == "harvest":
-            ctx.docfacts = build_docfacts(semantics)
+            ctx = replace(ctx, docfacts=build_docfacts(semantics))
             return FileOutcome(
                 status=ExitStatus.SUCCESS,
                 docfacts=ctx.docfacts,
@@ -177,7 +178,7 @@ class FileProcessor:
         if not semantics:
             if is_update:
                 self.cache.update(file_path, self.config.config_hash)
-            ctx.message = "no managed symbols"
+            ctx = replace(ctx, message="no managed symbols")
             return FileOutcome(
                 status=ExitStatus.SUCCESS,
                 docfacts=ctx.docfacts,
@@ -190,11 +191,11 @@ class FileProcessor:
             )
 
         # Process edits for update/check/fmt
-        ctx.docfacts = build_docfacts(semantics)
+        ctx = replace(ctx, docfacts=build_docfacts(semantics))
         if not edits:
             if is_update:
                 self.cache.update(file_path, self.config.config_hash)
-            ctx.message = "no edits needed"
+            ctx = replace(ctx, message="no edits needed")
             return FileOutcome(
                 status=ExitStatus.SUCCESS,
                 docfacts=ctx.docfacts,
@@ -213,11 +214,12 @@ class FileProcessor:
             if should_write
             else DocstringApplyConfig(write_changes=False, atomic_writes=False)
         )
-        ctx.changed, ctx.preview = self._apply_edits(
+        changed, preview = self._apply_edits(
             result,
             edits,
             apply_config=apply_config,
         )
+        ctx = replace(ctx, changed=changed, preview=preview)
         if is_update:
             self.cache.update(file_path, self.config.config_hash)
 
@@ -225,7 +227,7 @@ class FileProcessor:
         status = ExitStatus.SUCCESS
         if command == "check" and not self.options.baseline and ctx.changed:
             status = ExitStatus.VIOLATION
-            ctx.message = "docstring mismatch"
+            ctx = replace(ctx, message="docstring mismatch")
 
         return FileOutcome(
             status=status,
@@ -266,7 +268,9 @@ class FileProcessor:
             relative = file_path.relative_to(REPO_ROOT)
             message = f"missing dependency: {exc}"
             if self._can_ignore_missing(file_path):
-                self.logger.info("Skipping %s due to missing dependency: %s", relative, exc)
+                self.logger.info(
+                    "Skipping %s due to missing dependency: %s", relative, exc
+                )
                 result = FileOutcome(
                     status=ExitStatus.SUCCESS,
                     docfacts=[],

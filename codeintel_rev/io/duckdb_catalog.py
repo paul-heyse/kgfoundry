@@ -548,6 +548,27 @@ class DuckDBCatalog:
             return None
         return results[0]
 
+    def get_symbols_for_chunk(self, chunk_id: int) -> list[str]:
+        """Return all symbols associated with a chunk.
+
+        Parameters
+        ----------
+        chunk_id : int
+            Chunk ID to query symbols for.
+
+        Returns
+        -------
+        list[str]
+            List of symbol identifiers associated with the chunk. Returns empty
+            list if chunk has no symbols or chunk_id doesn't exist.
+        """
+        with self.connection() as conn:
+            relation = conn.execute(
+                "SELECT symbol FROM chunk_symbols WHERE chunk_id = ?", [chunk_id]
+            )
+            rows = relation.fetchall()
+        return [row[0] for row in rows]
+
     def query_by_uri(self, uri: str, limit: int = 100) -> list[dict]:
         """Query chunks by file URI/path.
 

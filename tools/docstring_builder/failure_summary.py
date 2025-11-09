@@ -30,7 +30,9 @@ class FailureSummaryRenderer:
 
     logger: LoggerLike
 
-    def render(self, summary: RunSummarySnapshot, errors: Sequence[ErrorEnvelope]) -> None:
+    def render(
+        self, summary: RunSummarySnapshot, errors: Sequence[ErrorEnvelope]
+    ) -> None:
         """Render a structured summary when the run does not succeed."""
         if not errors:
             return

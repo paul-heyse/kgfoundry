@@ -4,6 +4,7 @@ This module bundles splade index logic for the kgfoundry stack. It groups relate
 downstream packages can import a single cohesive namespace. Refer to the functions and classes below
 for implementation specifics.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -237,7 +238,9 @@ class SpladeIndex:
             """
             return item[1]
 
-        ranked: list[tuple[int, float]] = sorted(enumerate(scores), key=key_func, reverse=True)
+        ranked: list[tuple[int, float]] = sorted(
+            enumerate(scores), key=key_func, reverse=True
+        )
         return [(idx, value) for idx, value in ranked[:k] if value > 0.0]
 
     def doc(self, index: int) -> SpladeDoc:

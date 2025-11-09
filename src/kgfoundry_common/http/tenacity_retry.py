@@ -155,7 +155,9 @@ def _status_in_sets(status: int, sets: tuple[tuple[int, int] | int, ...]) -> boo
     return False
 
 
-def _should_retry_exception(method: str, policy: RetryPolicyDoc) -> Callable[[BaseException], bool]:
+def _should_retry_exception(
+    method: str, policy: RetryPolicyDoc
+) -> Callable[[BaseException], bool]:
     """Create predicate function for retry decision based on exception.
 
     Parameters
@@ -179,7 +181,11 @@ def _should_retry_exception(method: str, policy: RetryPolicyDoc) -> Callable[[Ba
         if method.upper() not in allowed_methods:
             return False
         # idempotency guard for non-idempotent methods
-        if policy.require_idempotency_key and method.upper() not in {"GET", "HEAD", "OPTIONS"}:
+        if policy.require_idempotency_key and method.upper() not in {
+            "GET",
+            "HEAD",
+            "OPTIONS",
+        }:
             # Tenacity has no access to headers; enforce earlier in client (see below)
             return False
         # Exception-based rule
@@ -226,7 +232,9 @@ class TenacityRetryStrategy(RetryStrategy[object]):
         Exception
             Final exception if all retries are exhausted.
         """  # noqa: DOC502
-        retry = retry_if_exception(_should_retry_exception(method="*UNKNOWN*", policy=self.policy))
+        retry = retry_if_exception(
+            _should_retry_exception(method="*UNKNOWN*", policy=self.policy)
+        )
         # note: we'll substitute actual method per-request (see client below)
         stopper = stop_after_attempt(self.policy.stop_after_attempt)
         if self.policy.stop_after_delay_s:
@@ -256,7 +264,9 @@ class TenacityRetryStrategy(RetryStrategy[object]):
             New retry strategy instance for the method.
         """
         # clone with method-specific predicate
-        pred = retry_if_exception(_should_retry_exception(method=method, policy=self.policy))
+        pred = retry_if_exception(
+            _should_retry_exception(method=method, policy=self.policy)
+        )
         stopper = stop_after_attempt(self.policy.stop_after_attempt)
         if self.policy.stop_after_delay_s:
             stopper |= stop_after_delay(self.policy.stop_after_delay_s)

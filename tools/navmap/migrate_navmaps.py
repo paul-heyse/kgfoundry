@@ -98,7 +98,9 @@ def _parse_args(argv: list[str] | None = None) -> MigrateArgs:
     namespace = parser.parse_args(argv)
     return MigrateArgs(
         output=cast("Path", namespace.output),
-        write_config=NavmapWriteConfig(indent=None if cast("bool", namespace.compact) else 2),
+        write_config=NavmapWriteConfig(
+            indent=None if cast("bool", namespace.compact) else 2
+        ),
     )
 
 

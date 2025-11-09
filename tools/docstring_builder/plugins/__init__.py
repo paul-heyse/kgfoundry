@@ -23,7 +23,10 @@ from tools.docstring_builder.models import (
     DocstringBuilderError,
     PluginExecutionError,
 )
-from tools.docstring_builder.plugins._inspection import get_signature, has_required_parameters
+from tools.docstring_builder.plugins._inspection import (
+    get_signature,
+    has_required_parameters,
+)
 from tools.docstring_builder.plugins.base import (
     DocstringBuilderPlugin,
     DocstringPayload,
@@ -61,7 +64,9 @@ PayloadT = TypeVar("PayloadT")
 ResultT = TypeVar("ResultT")
 
 type PluginInstance = DocstringBuilderPlugin[t.Any, t.Any] | LegacyPluginProtocol
-type PluginFactoryCandidateT = PluginFactory[PluginInstance] | Callable[[], PluginInstance]
+type PluginFactoryCandidateT = PluginFactory[PluginInstance] | Callable[
+    [], PluginInstance
+]
 type RegisteredPlugin = HarvesterPlugin | TransformerPlugin | FormatterPlugin | LegacyPluginAdapter
 
 
@@ -118,7 +123,9 @@ class PluginManager:
     config: BuilderConfig
     repo_root: Path
     harvesters: list[HarvesterPlugin] = field(default_factory=_empty_harvester_list)
-    transformers: list[TransformerPlugin] = field(default_factory=_empty_transformer_list)
+    transformers: list[TransformerPlugin] = field(
+        default_factory=_empty_transformer_list
+    )
     formatters: list[FormatterPlugin] = field(default_factory=_empty_formatter_list)
     available: list[str] = field(default_factory=_empty_str_list)
     disabled: list[str] = field(default_factory=_empty_str_list)
@@ -127,7 +134,9 @@ class PluginManager:
     _lock: threading.RLock = field(default_factory=threading.RLock, init=False)
 
     def _context(self, file_path: Path | None = None) -> PluginContext:
-        return PluginContext(config=self.config, repo_root=self.repo_root, file_path=file_path)
+        return PluginContext(
+            config=self.config, repo_root=self.repo_root, file_path=file_path
+        )
 
     def start(self) -> None:
         """Invoke ``on_start`` for all registered plugins."""
@@ -183,7 +192,9 @@ class PluginManager:
         processed: list[SemanticResult] = []
         for entry in semantics:
             with self._lock:
-                processed.append(_run_transformer_pipeline(self.transformers, context, entry))
+                processed.append(
+                    _run_transformer_pipeline(self.transformers, context, entry)
+                )
         return processed
 
     def apply_formatters(
@@ -207,7 +218,9 @@ class PluginManager:
         processed: list[DocstringEdit] = []
         for entry in edits:
             with self._lock:
-                processed.append(_run_formatter_pipeline(self.formatters, context, entry))
+                processed.append(
+                    _run_formatter_pipeline(self.formatters, context, entry)
+                )
         return processed
 
     def enabled_plugins(self) -> list[str]:
@@ -484,7 +497,9 @@ def _is_abstract_class(candidate: object) -> bool:
     if not inspect.isclass(candidate):
         return False
     type_candidate = cast("type[object]", candidate)
-    abstract_methods: object | None = getattr(type_candidate, "__abstractmethods__", None)
+    abstract_methods: object | None = getattr(
+        type_candidate, "__abstractmethods__", None
+    )
     return bool(abstract_methods)
 
 
@@ -676,7 +691,9 @@ def _ensure_plugin_instance(obj: object) -> RegisteredPlugin:
     if _is_legacy_plugin(obj):
         try:
             return LegacyPluginAdapter.create(obj)
-        except _PLUGIN_CONFIGURATION_ERRORS as exc:  # pragma: no cover - defensive guard
+        except (
+            _PLUGIN_CONFIGURATION_ERRORS
+        ) as exc:  # pragma: no cover - defensive guard
             message = f"Legacy plugin {name!r} is misconfigured"
             raise PluginConfigurationError(message) from exc
     message = f"Plugin {name!r} must define apply() or run()"
@@ -724,7 +741,9 @@ def _load_entry_points() -> list[object]:
         try:
             candidate: object = entry_point.load()
             loaded.append(candidate)
-        except _PLUGIN_CONFIGURATION_ERRORS as exc:  # pragma: no cover - best effort guard
+        except (
+            _PLUGIN_CONFIGURATION_ERRORS
+        ) as exc:  # pragma: no cover - best effort guard
             message = f"Failed to load plugin entry point {entry_point.name!r}"
             raise PluginConfigurationError(message) from exc
     return loaded
@@ -799,8 +818,12 @@ def load_plugins(
         message = f"Unknown plugin(s): {missing}"
         raise PluginConfigurationError(message)
 
-    manager = PluginManager(config=config, repo_root=repo_root)
-    manager.available = sorted(discovered)
+    available_plugins = sorted(discovered)
+    manager = PluginManager(
+        config=config,
+        repo_root=repo_root,
+        available=available_plugins,
+    )
 
     for name in manager.available:
         if only_set and name not in only_set:

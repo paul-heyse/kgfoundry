@@ -92,7 +92,9 @@ class DocstringBuilderMetrics:
 
     def __init__(self, registry: CollectorRegistry | None = None) -> None:
         resolved_registry = (
-            registry if registry is not None else cast("CollectorRegistry", get_default_registry())
+            registry
+            if registry is not None
+            else cast("CollectorRegistry", get_default_registry())
         )
         self.registry = resolved_registry
 
@@ -146,7 +148,13 @@ class _DocstringBuilderMetricsCache:
     registry: DocstringBuilderMetrics | None = None
 
 
+_SET_CACHE_ATTR = object.__setattr__
 _METRICS_CACHE = _DocstringBuilderMetricsCache()
+
+
+def _set_cache_value(cache: _DocstringBuilderMetricsCache, **updates: object) -> None:
+    for name, value in updates.items():
+        _SET_CACHE_ATTR(cache, name, value)
 
 
 def get_metrics_registry() -> DocstringBuilderMetrics:
@@ -163,8 +171,8 @@ def get_metrics_registry() -> DocstringBuilderMetrics:
     >>> metrics.runs_total.labels(status="success").inc()
     """
     if _METRICS_CACHE.registry is None:
-        _METRICS_CACHE.registry = DocstringBuilderMetrics()
-    return _METRICS_CACHE.registry
+        _set_cache_value(_METRICS_CACHE, registry=DocstringBuilderMetrics())
+    return cast("DocstringBuilderMetrics", _METRICS_CACHE.registry)
 
 
 def get_correlation_id() -> str:
@@ -244,17 +252,23 @@ def record_operation_metrics(
         duration = time.monotonic() - start_time
 
         if operation == "harvest":
-            metrics.harvest_duration_seconds.labels(status=final_status).observe(duration)
+            metrics.harvest_duration_seconds.labels(status=final_status).observe(
+                duration
+            )
         elif operation == "policy":
-            metrics.policy_duration_seconds.labels(status=final_status).observe(duration)
+            metrics.policy_duration_seconds.labels(status=final_status).observe(
+                duration
+            )
         elif operation == "render":
-            metrics.render_duration_seconds.labels(status=final_status).observe(duration)
+            metrics.render_duration_seconds.labels(status=final_status).observe(
+                duration
+            )
         elif operation == "cli":
             # CLI status is determined by the command, not the operation
             # This is a simplified version; CLI should pass command explicitly
-            metrics.cli_duration_seconds.labels(command="unknown", status=final_status).observe(
-                duration
-            )
+            metrics.cli_duration_seconds.labels(
+                command="unknown", status=final_status
+            ).observe(duration)
 
         with_fields(
             log_adapter,

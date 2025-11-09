@@ -28,7 +28,9 @@ class TestConfigurationErrorHandling:
         problem = build_configuration_problem(error)
         problem_dict = cast("dict[str, object]", problem)
 
-        assert problem_dict["type"] == "https://kgfoundry.dev/problems/configuration-error"
+        assert (
+            problem_dict["type"] == "https://kgfoundry.dev/problems/configuration-error"
+        )
         assert problem_dict["status"] == 500
         assert problem_dict["code"] == "configuration-error"
         assert "extensions" in problem_dict
@@ -101,6 +103,9 @@ class TestConfigurationErrorIntegration:
         for error in errors:
             problem = build_configuration_problem(error)
             problem_dict = cast("dict[str, object]", problem)
-            assert problem_dict["type"] == "https://kgfoundry.dev/problems/configuration-error"
+            assert (
+                problem_dict["type"]
+                == "https://kgfoundry.dev/problems/configuration-error"
+            )
             assert problem_dict["status"] == 500
             assert problem_dict["code"] == "configuration-error"

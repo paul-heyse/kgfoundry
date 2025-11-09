@@ -19,7 +19,9 @@ RegistryContext = cli_tooling.RegistryContext
 
 
 @contextlib.contextmanager
-def _capture_write(buffers: dict[str, io.StringIO], path: str, mode: str) -> Iterator[io.StringIO]:
+def _capture_write(
+    buffers: dict[str, io.StringIO], path: str, mode: str
+) -> Iterator[io.StringIO]:
     if "w" in mode:
         buffer = io.StringIO()
         buffers[path] = buffer
@@ -37,7 +39,9 @@ def _capture_write(buffers: dict[str, io.StringIO], path: str, mode: str) -> Ite
 def test_write_diagram_emits_single_node_for_multi_tag_operations(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    gen_cli_module = importlib.import_module("tools.mkdocs_suite.docs._scripts.gen_cli_diagram")
+    gen_cli_module = importlib.import_module(
+        "tools.mkdocs_suite.docs._scripts.gen_cli_diagram"
+    )
 
     class DummyOperationContext:
         def build_operation(
@@ -56,7 +60,9 @@ def test_write_diagram_emits_single_node_for_multi_tag_operations(
     class DummyCLIConfig:
         bin_name: ClassVar[str] = "kgf"
         interface_id: ClassVar[str] = "tools-cli"
-        interface_meta: ClassVar[dict[str, str]] = {"entrypoint": "tests.fixtures.cli:app"}
+        interface_meta: ClassVar[dict[str, str]] = {
+            "entrypoint": "tests.fixtures.cli:app"
+        }
 
         @property
         def operation_context(self) -> DummyOperationContext:
@@ -82,7 +88,9 @@ def test_write_diagram_emits_single_node_for_multi_tag_operations(
         cli_config=DummyCLIConfig(),
     )
 
-    def fake_walk_commands(_command: object, _tokens: list[str]) -> list[tuple[list[str], object]]:
+    def fake_walk_commands(
+        _command: object, _tokens: list[str]
+    ) -> list[tuple[list[str], object]]:
         return [(["run"], object())]
 
     monkeypatch.setattr(gen_cli_module, "walk_commands", fake_walk_commands)
@@ -113,7 +121,9 @@ def test_write_diagram_emits_single_node_for_multi_tag_operations(
 def test_write_diagram_escapes_special_characters(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    gen_cli_module = importlib.import_module("tools.mkdocs_suite.docs._scripts.gen_cli_diagram")
+    gen_cli_module = importlib.import_module(
+        "tools.mkdocs_suite.docs._scripts.gen_cli_diagram"
+    )
 
     operations = [
         (
@@ -147,8 +157,12 @@ def test_write_diagram_escapes_special_characters(
     ) in output
 
 
-def test_collect_operations_surface_loader_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    gen_cli_module = importlib.import_module("tools.mkdocs_suite.docs._scripts.gen_cli_diagram")
+def test_collect_operations_surface_loader_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    gen_cli_module = importlib.import_module(
+        "tools.mkdocs_suite.docs._scripts.gen_cli_diagram"
+    )
 
     error_cls = gen_cli_module.CLIConfigError
 
@@ -172,7 +186,9 @@ def test_collect_operations_surface_loader_error(monkeypatch: pytest.MonkeyPatch
 def test_ensure_cli_index_entry_preserves_existing_content(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    gen_cli_module = importlib.import_module("tools.mkdocs_suite.docs._scripts.gen_cli_diagram")
+    gen_cli_module = importlib.import_module(
+        "tools.mkdocs_suite.docs._scripts.gen_cli_diagram"
+    )
 
     existing_content = "- [Existing Diagram](./existing.d2)\n"
     buffers: dict[str, io.StringIO] = {
@@ -213,11 +229,11 @@ def test_ensure_cli_index_entry_preserves_existing_content(
 def test_update_cli_index_entry_preserves_double_newline(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    gen_cli_module = importlib.import_module("tools.mkdocs_suite.docs._scripts.gen_cli_diagram")
-
-    original_content = (
-        "# Diagrams\n\nIntroductory text about diagrams.\n\n- [Existing Diagram](./existing.d2)\n\n"
+    gen_cli_module = importlib.import_module(
+        "tools.mkdocs_suite.docs._scripts.gen_cli_diagram"
     )
+
+    original_content = "# Diagrams\n\nIntroductory text about diagrams.\n\n- [Existing Diagram](./existing.d2)\n\n"
     buffers: dict[str, io.StringIO] = {
         gen_cli_module.DIAGRAM_INDEX_PATH: io.StringIO(original_content)
     }
@@ -229,7 +245,9 @@ def test_update_cli_index_entry_preserves_double_newline(
 
     monkeypatch.setattr(gen_cli_module.mkdocs_gen_files, "open", fake_open)
 
-    gen_cli_module._update_cli_index_entry(enabled=True)  # noqa: SLF001 - intentional test access to private function
+    gen_cli_module._update_cli_index_entry(
+        enabled=True
+    )
     updated_content = buffers[gen_cli_module.DIAGRAM_INDEX_PATH].getvalue()
 
     assert (
@@ -239,7 +257,9 @@ def test_update_cli_index_entry_preserves_double_newline(
     assert updated_content.endswith("\n\n")
     assert gen_cli_module.CLI_INDEX_ENTRY.strip() in updated_content
 
-    gen_cli_module._update_cli_index_entry(enabled=False)  # noqa: SLF001 - intentional test access to private function
+    gen_cli_module._update_cli_index_entry(
+        enabled=False
+    )
     reverted_content = buffers[gen_cli_module.DIAGRAM_INDEX_PATH].getvalue()
 
     assert reverted_content == original_content
@@ -248,13 +268,17 @@ def test_update_cli_index_entry_preserves_double_newline(
 def test_main_skips_diagram_when_dependency_missing(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    gen_cli_module = importlib.import_module("tools.mkdocs_suite.docs._scripts.gen_cli_diagram")
+    gen_cli_module = importlib.import_module(
+        "tools.mkdocs_suite.docs._scripts.gen_cli_diagram"
+    )
 
     def missing_dependency_loader(*_: object, **__: object) -> None:
         message = "missing_cli_dependency"
         raise ModuleNotFoundError(message)
 
-    monkeypatch.setattr(gen_cli_module, "load_cli_tooling_context", missing_dependency_loader)
+    monkeypatch.setattr(
+        gen_cli_module, "load_cli_tooling_context", missing_dependency_loader
+    )
 
     buffers: dict[str, io.StringIO] = {}
 

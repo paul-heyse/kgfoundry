@@ -260,6 +260,26 @@ def _write_struct(target: Path, payload: msgspec.Struct) -> None:
 
 
 def _directory_size(path: Path) -> int:
+    """Compute total size in bytes for all files beneath a directory.
+
+    This utility function recursively traverses a directory tree and sums the
+    sizes of all regular files found. It's used to calculate index sizes for
+    metadata purposes. Symbolic links are followed, but directories themselves
+    don't contribute to the size.
+
+    Parameters
+    ----------
+    path : Path
+        Root directory path to measure. The function recursively traverses all
+        subdirectories and sums file sizes. The path must exist and be a directory.
+
+    Returns
+    -------
+    int
+        Total size in bytes for all regular files contained within the directory
+        tree. Returns 0 if the directory is empty or contains no files. The
+        size is calculated using file system stat information (st_size).
+    """
     total = 0
     for child in path.rglob("*"):
         if child.is_file():
@@ -347,10 +367,28 @@ def _iter_corpus(path: Path) -> Iterable[dict[str, object]]:
 def _open_writer(vectors_dir: Path, index: int) -> tuple[Path, TextIO]:
     """Create a shard writer for the given shard index.
 
+    This helper function creates a new JSONL shard file for writing encoded
+    vectors. Shard files are named with zero-padded indices (e.g., part-00000.jsonl,
+    part-00001.jsonl) to ensure proper ordering and easy identification. The file
+    is opened in write mode with UTF-8 encoding.
+
+    Parameters
+    ----------
+    vectors_dir : Path
+        Directory where shard files are stored. The directory should already
+        exist (created by the caller). Shard files are written directly to this
+        directory.
+    index : int
+        Zero-based shard index. Used to generate the shard filename with zero
+        padding (5 digits). Must be non-negative.
+
     Returns
     -------
     tuple[Path, TextIO]
-        The shard path and an open text handle ready for writing.
+        Tuple containing:
+        - Path to the created shard file (e.g., vectors_dir/part-00000.jsonl)
+        - Open text file handle in write mode, UTF-8 encoded, ready for writing
+          JSONL records. The caller is responsible for closing the handle.
     """
     shard_path = vectors_dir / f"part-{index:05d}.jsonl"
     return shard_path, shard_path.open("w", encoding="utf-8")
@@ -363,10 +401,35 @@ def _flush_batch(
 ) -> None:
     """Encode and persist the current batch of documents.
 
+    This function processes a batch of documents by encoding them using the
+    SPLADE encoder, decoding the sparse vectors into token-weight pairs, quantizing
+    the weights, and writing the results to JSONL shard files. The batch is
+    cleared after processing.
+
+    The function handles shard file management automatically, creating new shard
+    files when needed based on the configured shard size. Documents are written
+    in JSONL format with document ID, empty contents (for compatibility), and
+    the quantized sparse vector.
+
+    Parameters
+    ----------
+    encoder : _SparseEncoderProtocol
+        SPLADE encoder instance used to encode document texts into sparse vectors.
+        The encoder must support encode_document() and decode() methods.
+    batch : list[tuple[str, str]]
+        List of (document_id, text) tuples to encode. Each tuple represents one
+        document from the corpus. The batch is cleared after processing.
+    state : _ShardState
+        Mutable state object tracking shard file handles, document counts, shard
+        indices, and encoding parameters. The state is updated as documents are
+        written and shard files are rotated.
+
     Raises
     ------
     RuntimeError
-        If a shard handle unexpectedly becomes unavailable.
+        If a shard file handle unexpectedly becomes None during writing. This
+        should not occur in normal operation and indicates a programming error
+        or resource management issue.
     """
     if not batch:
         return
@@ -407,10 +470,40 @@ def _persist_encoding_metadata(
 ) -> SpladeEncodingSummary:
     """Write metadata for an encoding run and return the summary.
 
+    This function creates and persists metadata about a SPLADE encoding operation,
+    including document counts, shard information, encoding parameters, and
+    provenance data. The metadata is written as JSON to a standard location
+    within the vectors directory and can be used later to verify corpus integrity
+    and understand encoding configuration.
+
+    Parameters
+    ----------
+    state : _ShardState
+        Encoding state object containing accumulated statistics: document count,
+        shard count, quantization parameter, and other encoding metadata. The
+        state reflects the final state after all documents have been encoded.
+    vectors_dir : Path
+        Directory where encoded vector shards are stored. The metadata file will
+        be written to this directory with a standard filename.
+    source_path : Path
+        Path to the original JSONL corpus file that was encoded. Stored in
+        metadata for provenance tracking and corpus identification.
+    batch_size : int
+        Batch size used during encoding. This parameter affects encoding
+        throughput and memory usage. Stored in metadata for reproducibility.
+    provider : str
+        ONNX runtime provider used for encoding (e.g., "cpu", "cuda", "tensorrt").
+        Affects encoding performance and hardware requirements. Stored for
+        reproducibility and performance analysis.
+
     Returns
     -------
     SpladeEncodingSummary
-        Summary describing the encoded corpus.
+        Summary object containing:
+        - doc_count: Total number of documents encoded
+        - vectors_dir: Directory path where shards are stored
+        - metadata_path: Path to the written metadata JSON file
+        - shard_count: Number of shard files created
     """
     metadata = SpladeEncodingMetadata(
         doc_count=state.doc_count,
@@ -443,10 +536,51 @@ def _encode_records(
 ) -> None:
     """Stream records from disk, validate them, and flush in batches.
 
+    This function orchestrates the encoding process by reading JSONL records from
+    a corpus file, validating that each record has required fields (id and
+    contents/text), accumulating records into batches, and flushing batches when
+    they reach the configured size. The final batch is flushed even if it's
+    smaller than the batch size.
+
+    The function handles streaming large corpora efficiently by processing records
+    one at a time and batching encoding operations. This minimizes memory usage
+    while maintaining good throughput through batch encoding.
+
+    Parameters
+    ----------
+    encoder : _SparseEncoderProtocol
+        SPLADE encoder instance used to encode document texts. The encoder
+        processes batches of texts and returns sparse vector representations.
+    state : _ShardState
+        Mutable encoding state tracking shard files, document counts, and encoding
+        parameters. Updated as batches are flushed and documents are written.
+    batch : list[tuple[str, str]]
+        Accumulator list for batching documents. Documents are added to this list
+        until it reaches batch_size, then the batch is flushed. The list is
+        cleared after each flush. Must be empty initially.
+    batch_size : int
+        Maximum number of documents to accumulate before flushing. Larger batches
+        improve encoding throughput but increase memory usage. Must be positive.
+    source_path : Path
+        Path to the JSONL corpus file to encode. The file is read line-by-line
+        and each line is parsed as JSON. The file must exist and be readable.
+
     Raises
     ------
     TypeError
-        If corpus entries are missing identifiers or text fields.
+        Raised when corpus entries violate type requirements:
+        - Document 'id' field is missing or not a string
+        - Document is missing both 'contents' and 'text' fields, or the content
+          field is not a string
+
+    Notes
+    -----
+    Exception Propagation:
+        This function may propagate exceptions from underlying operations:
+        - FileNotFoundError: If the source_path does not exist (from file operations
+          in _iter_corpus)
+        - json.JSONDecodeError: If a line in the corpus file contains invalid JSON
+          (from json.loads() in _iter_corpus)
     """
     for record in _iter_corpus(source_path):
         doc_id = record.get("id")
@@ -470,10 +604,33 @@ def _optimize_export(
 ) -> Path:
     """Run graph optimization if requested and return the base ONNX path.
 
+    This function conditionally applies ONNX graph optimizations to improve
+    inference performance. If optimization is enabled in the export context,
+    it runs the optimizer with O3 optimization level (aggressive optimizations)
+    and returns the path to the optimized model. Otherwise, returns the path
+    to the original unoptimized model.
+
+    Graph optimization can significantly improve inference latency and reduce
+    model size by applying transformations like constant folding, operator fusion,
+    and dead code elimination. However, optimization may increase export time.
+
+    Parameters
+    ----------
+    encoder : _SparseEncoderProtocol
+        SPLADE encoder model to optimize. The encoder must support the optimization
+        interface provided by sentence-transformers export helpers.
+    ctx : _ExportContext
+        Export context containing export options, directory paths, model
+        identifier, and provider information. The ctx.options.optimize flag
+        determines whether optimization is performed.
+
     Returns
     -------
     Path
-        Path to the base ONNX artifact (optimized or original).
+        Path to the ONNX model file to use as the base for further processing
+        (quantization, etc.). If optimization was performed and successful,
+        returns the optimized model path (model_O3.onnx). Otherwise, returns
+        the original model path (model.onnx).
     """
     base_onnx = ctx.onnx_dir / "model.onnx"
     if not ctx.options.optimize:
@@ -499,10 +656,39 @@ def _quantize_export(
 ) -> bool:
     """Apply dynamic quantization and ensure the target ONNX exists.
 
+    This function conditionally applies dynamic quantization to the ONNX model
+    to reduce model size and potentially improve inference speed. If quantization
+    is enabled, it uses the configured quantization settings to produce a
+    quantized model. If quantization is disabled or fails, it ensures the target
+    path exists by copying the base model if needed.
+
+    Dynamic quantization converts floating-point weights to lower precision
+    (typically INT8) while maintaining model accuracy. This reduces model size
+    and can improve inference speed on certain hardware, but may slightly
+    degrade accuracy.
+
+    Parameters
+    ----------
+    encoder : _SparseEncoderProtocol
+        SPLADE encoder model to quantize. The encoder must support the quantization
+        interface provided by sentence-transformers export helpers.
+    ctx : _ExportContext
+        Export context containing quantization options, target path, model
+        directories, and provider information. The ctx.options.quantize flag
+        determines whether quantization is performed, and ctx.options.quantization_config
+        specifies quantization parameters.
+    base_onnx : Path
+        Path to the base ONNX model file (optimized or original). This is the
+        input for quantization. If quantization is disabled, this file is copied
+        to the target path.
+
     Returns
     -------
     bool
-        ``True`` if a quantized artifact was produced; otherwise ``False``.
+        True if a quantized artifact was successfully produced and exists at
+        the target path. False if quantization was disabled, failed, or the
+        base model was copied instead. Used by callers to determine which model
+        file was actually created.
     """
     target_path = ctx.target_path
     options = ctx.options
@@ -535,10 +721,31 @@ def _persist_export_metadata(
 ) -> SpladeExportSummary:
     """Write export metadata and return the resulting summary.
 
+    This function creates and persists metadata about a SPLADE ONNX export
+    operation, including model identifier, export paths, provider information,
+    optimization and quantization status, and export timestamp. The metadata
+    is written as JSON to a standard location and can be used to verify exports
+    and understand export configuration.
+
+    Parameters
+    ----------
+    ctx : _ExportContext
+        Export context containing all export information: model identifier,
+        directory paths, provider, target file path, and export options
+        (optimization, quantization settings). Used to populate metadata fields.
+    quantized : bool
+        Flag indicating whether the exported model is quantized. Determines
+        which quantization configuration (if any) is stored in metadata. True
+        if dynamic quantization was successfully applied, False otherwise.
+
     Returns
     -------
     SpladeExportSummary
-        Summary describing the exported ONNX artifact.
+        Summary object containing:
+        - onnx_file: Path to the exported ONNX model file (relative or absolute)
+        - metadata_path: Path to the written metadata JSON file
+        The summary can be used to locate the exported artifacts and verify
+        export completion.
     """
     metadata = SpladeArtifactMetadata(
         model_id=ctx.model_id,
@@ -611,7 +818,11 @@ class SpladeArtifactsManager:
 
         self._logger.info(
             "Exporting SPLADE model",
-            extra={"model_id": model_id, "model_dir": str(model_dir), "provider": provider},
+            extra={
+                "model_id": model_id,
+                "model_dir": str(model_dir),
+                "provider": provider,
+            },
         )
 
         encoder = sparse_encoder_cls(model_id, backend="onnx", model_kwargs={"provider": provider})
@@ -658,10 +869,25 @@ class SpladeEncoderService:
     def _resolve_vectors_dir(self, override: str | Path | None) -> Path:
         """Resolve the vectors directory override or fall back to the configured path.
 
+        This method resolves the output directory for encoded vectors, either
+        using an explicit override path or falling back to the configured default.
+        The directory is created if it doesn't exist, ensuring it's ready for
+        writing shard files.
+
+        Parameters
+        ----------
+        override : str | Path | None, optional
+            Optional override path for the vectors directory. If provided, this
+            path is resolved relative to the repository root and used instead of
+            the configured default. If None, uses the configured vectors_dir
+            from settings. Defaults to None.
+
         Returns
         -------
         Path
             Absolute path to the directory where encoded vectors will be written.
+            The directory is guaranteed to exist (created if necessary). The path
+            is resolved relative to the repository root and normalized.
         """
         if override is None:
             resolved = self.vectors_dir
@@ -678,10 +904,39 @@ class SpladeEncoderService:
     ) -> tuple[_SparseEncoderProtocol, str | None]:
         """Instantiate a SparseEncoder and return the resolved ONNX artifact (if any).
 
+        This method initializes a SPLADE sparse encoder instance, searching for
+        ONNX model files in a priority order: explicit onnx_file parameter,
+        configured default ONNX file, or falls back to PyTorch model if no ONNX
+        file is found. The encoder is configured with the specified provider
+        (CPU, CUDA, etc.) for inference.
+
+        The method searches multiple candidate paths to find an available ONNX
+        model, preferring explicitly specified files over defaults. If an ONNX
+        file is found, it's used for faster inference. Otherwise, the encoder
+        falls back to the PyTorch model.
+
+        Parameters
+        ----------
+        provider : str
+            ONNX runtime provider to use for inference (e.g., "cpu", "cuda",
+            "tensorrt"). The provider determines which hardware/backend is used
+            for model execution. Must be a valid provider name supported by the
+            ONNX runtime.
+        onnx_file : str | None, optional
+            Optional explicit ONNX filename to use. If provided, this file is
+            searched first in the ONNX directory. If not found or None, falls
+            back to the configured default ONNX filename. Defaults to None.
+
         Returns
         -------
         tuple[_SparseEncoderProtocol, str | None]
-            The encoder instance and the relative ONNX path used (``None`` when no artifact exists).
+            Tuple containing:
+            - Encoder instance ready for encoding operations. The encoder is
+              configured with the found ONNX model (if available) or PyTorch
+              model, using the specified provider.
+            - Relative path to the ONNX file used (relative to model_dir), or
+              None if no ONNX file was found and PyTorch model was used instead.
+              This path can be stored in metadata for reproducibility.
         """
         sparse_encoder_cls = _require_sparse_encoder()
         model_dir = resolve_within_repo(self._repo_root, self._config.model_dir)

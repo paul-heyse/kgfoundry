@@ -312,7 +312,9 @@ def build_docfacts(entries: Iterable[SemanticResult]) -> list[DocFact]:
 
 
 def build_docfacts_document(
-    entries: Iterable[DocFact], provenance: DocfactsProvenance, version: str | None = None
+    entries: Iterable[DocFact],
+    provenance: DocfactsProvenance,
+    version: str | None = None,
 ) -> DocfactsDocument:
     """Create a :class:`DocfactsDocument` from the provided entries.
 

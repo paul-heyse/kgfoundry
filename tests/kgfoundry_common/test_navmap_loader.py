@@ -4,7 +4,11 @@ from collections.abc import Iterable, Iterator
 
 import pytest
 
-from kgfoundry_common.navmap_loader import NavMetadataModel, clear_navmap_caches, load_nav_metadata
+from kgfoundry_common.navmap_loader import (
+    NavMetadataModel,
+    clear_navmap_caches,
+    load_nav_metadata,
+)
 
 
 @pytest.fixture(autouse=True)

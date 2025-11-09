@@ -30,7 +30,10 @@ _benchmark_gate = pytest.mark.skipif(
 )
 
 if not HAS_FAISS_SUPPORT:  # pragma: no cover - dependency-gated
-    pytestmark = [_benchmark_gate, pytest.mark.skip(reason="FAISS bindings unavailable")]
+    pytestmark = [
+        _benchmark_gate,
+        pytest.mark.skip(reason="FAISS bindings unavailable"),
+    ]
 else:
     pytestmark = [_benchmark_gate]
 
@@ -194,10 +197,13 @@ def test_merge_indexes_performance(benchmark, tmp_index_path: Path) -> None:
     manager.add_vectors(primary_vectors, np.arange(primary_size, dtype=np.int64))
     manager.save_cpu_index()
 
-    secondary_vectors = _rng.normal(0.5, 0.15, (secondary_size, vec_dim)).astype(np.float32)
+    secondary_vectors = _rng.normal(0.5, 0.15, (secondary_size, vec_dim)).astype(
+        np.float32
+    )
     secondary_vectors = np.clip(secondary_vectors, 0.0, 1.0)
     manager.update_index(
-        secondary_vectors, np.arange(primary_size, primary_size + secondary_size, dtype=np.int64)
+        secondary_vectors,
+        np.arange(primary_size, primary_size + secondary_size, dtype=np.int64),
     )
 
     def merge_indexes() -> None:
@@ -242,10 +248,13 @@ def test_dual_index_search_performance(benchmark, tmp_index_path: Path) -> None:
     manager.build_index(primary_vectors)
     manager.add_vectors(primary_vectors, np.arange(primary_size, dtype=np.int64))
 
-    secondary_vectors = _rng.normal(0.5, 0.15, (secondary_size, vec_dim)).astype(np.float32)
+    secondary_vectors = _rng.normal(0.5, 0.15, (secondary_size, vec_dim)).astype(
+        np.float32
+    )
     secondary_vectors = np.clip(secondary_vectors, 0.0, 1.0)
     manager.update_index(
-        secondary_vectors, np.arange(primary_size, primary_size + secondary_size, dtype=np.int64)
+        secondary_vectors,
+        np.arange(primary_size, primary_size + secondary_size, dtype=np.int64),
     )
 
     # Create query vector

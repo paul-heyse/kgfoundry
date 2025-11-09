@@ -1,4 +1,5 @@
 """FAISS adapter with typed GPU fallbacks and DuckDB integration."""
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -107,7 +108,10 @@ def _load_libcuvs() -> LoadLibraryFn | None:
     for name in module_names:
         try:
             module = importlib.import_module(name)
-        except (ImportError, ModuleNotFoundError):  # pragma: no cover - optional dependency
+        except (
+            ImportError,
+            ModuleNotFoundError,
+        ):  # pragma: no cover - optional dependency
             continue
         except (RuntimeError, OSError):  # pragma: no cover - optional dependency
             logger.debug("Failed to import %s: runtime error", name)
@@ -233,9 +237,7 @@ class FaissAdapter:
         if config is None or not legacy_options:
             return
         unexpected = ", ".join(sorted(legacy_options))
-        message = (
-            f"FaissAdapter received both 'config' and individual keyword options: {unexpected}"
-        )
+        message = f"FaissAdapter received both 'config' and individual keyword options: {unexpected}"
         raise TypeError(message)
 
     @classmethod
@@ -248,10 +250,14 @@ class FaissAdapter:
         raise TypeError(message)
 
     @classmethod
-    def _config_from_legacy_options(cls, legacy_options: dict[str, object]) -> FaissAdapterConfig:
+    def _config_from_legacy_options(
+        cls, legacy_options: dict[str, object]
+    ) -> FaissAdapterConfig:
         base = FaissAdapterConfig()
         options = {
-            field: legacy_options[field] for field in cls._CONFIG_FIELDS if field in legacy_options
+            field: legacy_options[field]
+            for field in cls._CONFIG_FIELDS
+            if field in legacy_options
         }
         factory = cls._coerce_str(options.get("factory", base.factory), "factory")
         metric = cls._coerce_str(options.get("metric", base.metric), "metric")
@@ -409,7 +415,10 @@ class FaissAdapter:
                     ValueError,
                 ) as exc:  # pragma: no cover - defensive fallback
                     logger.warning(
-                        "Failed to load FAISS index from %s: %s", index_path, exc, exc_info=True
+                        "Failed to load FAISS index from %s: %s",
+                        index_path,
+                        exc,
+                        exc_info=True,
                     )
                 else:
                     configure_search_parameters(
@@ -458,7 +467,9 @@ class FaissAdapter:
             msg = "k must be positive"
             raise ValueError(msg)
 
-        query_array = cast("FloatMatrix", np.asarray(query, dtype=np.float32).reshape(1, -1))
+        query_array = cast(
+            "FloatMatrix", np.asarray(query, dtype=np.float32).reshape(1, -1)
+        )
         normalized_query = normalize_l2(query_array, axis=1)
 
         module = faiss
@@ -575,7 +586,9 @@ class FaissAdapter:
         indices = topk_indices(scores, limit)
         index_list = cast("list[int]", indices.tolist())
         return [
-            (idmap_list[idx], float(score_list[idx])) for idx in index_list if idx < len(idmap_list)
+            (idmap_list[idx], float(score_list[idx]))
+            for idx in index_list
+            if idx < len(idmap_list)
         ]
 
     def _resolve_metric(self, module: FaissModuleProtocol) -> int:

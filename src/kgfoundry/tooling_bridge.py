@@ -8,6 +8,7 @@ supported way to expose third-party modules (for example, ``search_client`` or
 Install the ``kgfoundry[tools]`` optional extra to ensure the tooling package is
 available in the current environment before importing this module.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations

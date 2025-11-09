@@ -9,7 +9,9 @@ from typing import cast
 
 import pytest
 
-operation_links = importlib.import_module("tools.mkdocs_suite.docs._scripts._operation_links")
+operation_links = importlib.import_module(
+    "tools.mkdocs_suite.docs._scripts._operation_links"
+)
 build_operation_href = cast(
     "Callable[[object, str], str | None]",
     operation_links.build_operation_href,

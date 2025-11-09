@@ -5,6 +5,7 @@ codebase relies on.  We define lightweight ``Protocol`` interfaces that mirror
 the runtime behaviour we exercise and provide helpers for loading the optional
 dependency safely at runtime without leaking ``Any`` into the type graph.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -54,7 +55,9 @@ class TraceAPIProtocol(Protocol):
 class SpanProcessorProtocol(Protocol):
     """Span processor lifecycle hooks invoked by the tests."""
 
-    def on_start(self, span: SpanProtocol, parent_context: object | None = None) -> None:
+    def on_start(
+        self, span: SpanProtocol, parent_context: object | None = None
+    ) -> None:
         """Observe ``span`` immediately after creation."""
         del self, span, parent_context
         raise NotImplementedError
@@ -86,7 +89,13 @@ class TracerProviderProtocol(Protocol):
         attributes: Attributes | None = None,
     ) -> TracerProtocol:
         """Return a tracer configured for the given instrumentation metadata."""
-        del self, instrumenting_module_name, instrumenting_library_version, schema_url, attributes
+        del (
+            self,
+            instrumenting_module_name,
+            instrumenting_library_version,
+            schema_url,
+            attributes,
+        )
         raise NotImplementedError
 
     def add_span_processor(self, processor: SpanProcessorProtocol) -> None:
@@ -210,7 +219,9 @@ def load_in_memory_span_exporter_cls() -> Callable[[], SpanExporterProtocol] | N
         Factory function for creating InMemorySpanExporter instances, or None if not available.
     """
     try:
-        exporter_module = import_module("opentelemetry.sdk.trace.export.in_memory_span_exporter")
+        exporter_module = import_module(
+            "opentelemetry.sdk.trace.export.in_memory_span_exporter"
+        )
     except ImportError:
         return None
 

@@ -119,15 +119,19 @@ def load_policy(path: Path, schema_path: Path | None = None) -> RetryPolicyDoc:
         name=obj["name"],
         description=obj.get("description"),
         methods=tuple(m.upper() for m in obj["methods"]),
-        retry_status=tuple(_parse_status_entry(s) for s in obj["retry_on"].get("status", [])),
+        retry_status=tuple(
+            _parse_status_entry(s) for s in obj["retry_on"].get("status", [])
+        ),
         retry_exceptions=tuple(obj["retry_on"].get("exceptions", [])),
         give_up_status=tuple(obj.get("give_up_on_status", [])),
         respect_retry_after=bool(obj.get("respect_retry_after", False)),
         require_idempotency_key=bool(obj.get("require_idempotency_key", False)),
         stop_after_attempt=int(obj["stop"]["after_attempt"]),
-        stop_after_delay_s=float(obj["stop"].get("after_delay_s"))
-        if obj["stop"].get("after_delay_s") is not None
-        else None,
+        stop_after_delay_s=(
+            float(obj["stop"].get("after_delay_s"))
+            if obj["stop"].get("after_delay_s") is not None
+            else None
+        ),
         wait_kind=obj["wait"]["kind"],
         wait_initial_s=float(obj["wait"]["initial_s"]),
         wait_max_s=float(obj["wait"]["max_s"]),

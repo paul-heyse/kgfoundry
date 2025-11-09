@@ -4,6 +4,7 @@ This module bundles exceptions logic for the kgfoundry stack. It groups related 
 downstream packages can import a single cohesive namespace. Refer to the functions and classes below
 for implementation specifics.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -20,7 +21,9 @@ __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
 # [nav:anchor DownloadError]
 DownloadError = _DownloadError
-DownloadError.__doc__ = "Compatibility alias for :class:`kgfoundry_common.errors.DownloadError`."
+DownloadError.__doc__ = (
+    "Compatibility alias for :class:`kgfoundry_common.errors.DownloadError`."
+)
 
 
 # [nav:anchor UnsupportedMIMEError]

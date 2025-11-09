@@ -375,10 +375,43 @@ def bench(
 ) -> None:
     """Benchmark SPLADE query encoding latency.
 
+    This command measures the performance of SPLADE query encoding by running
+    multiple iterations of encoding operations and reporting statistical metrics
+    (mean, p50, p95 latency). It supports benchmarking single queries or batches
+    of queries from a file, with configurable warmup and measurement iterations
+    to ensure accurate performance measurements.
+
+    The benchmark initializes the SPLADE encoder service, performs warmup runs
+    to stabilize performance (accounting for JIT compilation, cache warming, etc.),
+    then executes measurement runs and calculates latency statistics. Results are
+    displayed to stdout and logged with structured metadata.
+
+    Parameters
+    ----------
+    query : str | None, optional
+        Single query string to benchmark. If provided, this query is included in
+        the benchmark set. Can be combined with queries_file to benchmark multiple
+        queries. Defaults to None (no single query).
+    queries_file : Path | None, optional
+        Path to a text file containing one query per line. All non-empty lines
+        are read and included in the benchmark. Can be combined with query to
+        benchmark both. Defaults to None (no file queries).
+    warmup : int, optional
+        Number of warmup iterations to perform before measurement. Warmup runs
+        help stabilize performance by allowing JIT compilation, cache warming,
+        and other one-time optimizations to complete. Defaults to the value from
+        WARMUP_OPTION constant.
+    runs : int, optional
+        Number of measurement iterations to perform after warmup. These runs
+        are used to calculate latency statistics (mean, p50, p95). More runs
+        provide more accurate statistics but take longer. Defaults to the value
+        from RUNS_OPTION constant.
+
     Raises
     ------
     typer.BadParameter
-        If no queries are provided or the queries file is invalid.
+        If no queries are provided (both query and queries_file are None/empty)
+        or if the queries_file path exists but is invalid/unreadable.
     """
     query_values: list[str] = []
     if query:

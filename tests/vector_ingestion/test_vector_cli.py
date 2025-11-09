@@ -73,7 +73,9 @@ def _parse_problem(stderr: str) -> dict[str, object]:
         If Problem Details JSON not found in stderr.
     """
     lines = [line for line in stderr.splitlines() if line.strip()]
-    json_line = next((line for line in reversed(lines) if line.strip().startswith("{")), "")
+    json_line = next(
+        (line for line in reversed(lines) if line.strip().startswith("{")), ""
+    )
     if not json_line:
         msg = f"Expected Problem Details JSON, got: {stderr!r}"
         raise AssertionError(msg)
@@ -111,7 +113,9 @@ def test_index_faiss_cli_success(
     assert "FAISS index vectors stored" in result.stdout
     assert index_path.exists(), "Expected index artifact to be created"
 
-    build_records = _filter_index_records(caplog.records, message="Building FAISS index")
+    build_records = _filter_index_records(
+        caplog.records, message="Building FAISS index"
+    )
     assert build_records, "Expected structured build log with operation metadata"
     build_record = build_records[-1]
     vectors = cast("int | None", getattr(build_record, "vectors", None))
@@ -154,12 +158,17 @@ def test_index_faiss_cli_problem_details(
 
     stderr_text = result.stderr if result.stderr_bytes is not None else result.output
     problem = _parse_problem(stderr_text)
-    assert problem.get("type") == "https://kgfoundry.dev/problems/vector-ingestion/invalid-payload"
+    assert (
+        problem.get("type")
+        == "https://kgfoundry.dev/problems/vector-ingestion/invalid-payload"
+    )
     assert problem.get("status") == 422
     validation_errors = cast("list[str]", problem.get("errors", []))
     assert validation_errors, "Expected validation error details"
 
     failure_records = _filter_index_records(caplog.records, level="ERROR")
     assert failure_records, "Expected error log with correlation metadata"
-    failure_correlation = cast("str | None", getattr(failure_records[-1], "correlation_id", None))
+    failure_correlation = cast(
+        "str | None", getattr(failure_records[-1], "correlation_id", None)
+    )
     assert failure_correlation == "12345678123456781234567812345678"

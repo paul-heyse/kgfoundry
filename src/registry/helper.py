@@ -4,6 +4,7 @@ This module bundles helper logic for the kgfoundry stack. It groups related help
 packages can import a single cohesive namespace. Refer to the functions and classes below for
 implementation specifics.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -120,7 +121,9 @@ class DuckDBRegistryHelper:
             )
         return run_id
 
-    def close_run(self, run_id: str, *, success: bool, notes: str | None = None) -> None:
+    def close_run(
+        self, run_id: str, *, success: bool, notes: str | None = None
+    ) -> None:
         """Close a pipeline run and record completion status.
 
         Updates the run's finished_at timestamp and emits a RunClosed event
@@ -322,7 +325,9 @@ class DuckDBRegistryHelper:
                     operation="registry.helper.register_doctags",
                 )
 
-    def emit_event(self, event_name: str, subject_id: str, payload: Mapping[str, object]) -> None:
+    def emit_event(
+        self, event_name: str, subject_id: str, payload: Mapping[str, object]
+    ) -> None:
         """Emit a pipeline event to the registry.
 
         Records an event in the pipeline_events table with a unique event ID,

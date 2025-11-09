@@ -72,7 +72,9 @@ class DummyVLLMClient:
         return
 
 
-def test_service_context_resolves_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:  # noqa: C901
+def test_service_context_resolves_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Relative configuration paths resolve against ``REPO_ROOT``."""
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -125,9 +127,13 @@ def test_service_context_resolves_paths(tmp_path: Path, monkeypatch: pytest.Monk
         if not isinstance(catalog, RecordingDuckDBCatalog):
             pytest.fail("Expected RecordingDuckDBCatalog")
         if catalog.db_path != expected_duckdb_path:
-            pytest.fail(f"Expected db_path {expected_duckdb_path}, got {catalog.db_path}")
+            pytest.fail(
+                f"Expected db_path {expected_duckdb_path}, got {catalog.db_path}"
+            )
         if catalog.vectors_dir != expected_vectors_dir:
-            pytest.fail(f"Expected vectors_dir {expected_vectors_dir}, got {catalog.vectors_dir}")
+            pytest.fail(
+                f"Expected vectors_dir {expected_vectors_dir}, got {catalog.vectors_dir}"
+            )
         if catalog.open_called is not True:
             pytest.fail("Expected open_called to be True")
 

@@ -12,7 +12,12 @@ resolution-markers = [
 prerelease-mode = "allow"
 
 [manifest]
-overrides = [{ name = "xformers", index = "file:///home/paul/kgfoundry/.wheelhouse" }]
+overrides = [
+    { name = "flashinfer-cubin", index = "https://flashinfer.ai/whl/nightly/" },
+    { name = "flashinfer-jit-cache", index = "https://flashinfer.ai/whl/nightly/cu130" },
+    { name = "flashinfer-python", index = "https://flashinfer.ai/whl/nightly/" },
+    { name = "xformers", index = "file:///home/paul/kgfoundry/.wheelhouse" },
+]
 
 [[package]]
 name = "accelerate"
@@ -220,17 +225,25 @@ wheels = [
 
 [[package]]
 name = "apache-tvm-ffi"
-version = "0.1.0b15"
+version = "0.1.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e4/9c/84eb3181227de38b7551436bdd20cb0ee9960ddf7692081a74dca7aa5cdc/apache_tvm_ffi-0.1.0b15.tar.gz", hash = "sha256:df3607e23a4b81b621f25fa531270a57b28a096cdc3d1a8cc402d09b84a75c2f", size = 1186540, upload-time = "2025-10-03T20:48:11.437Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d8/e8/7db1ca6db40877d190a8538cc378f740aae247c6fe063815898607c2d2ca/apache_tvm_ffi-0.1.1.tar.gz", hash = "sha256:728ce3f4ae02b89a7147b718f7f670afac3c6d1f96df38d488757274643709fc", size = 1259223, upload-time = "2025-11-04T02:43:38.154Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6b/6e/aa03033d3913d1100f6dc50d7d66a4c2c81ffa2d508e7feafdd1623cea3b/apache_tvm_ffi-0.1.0b15-cp312-abi3-macosx_11_0_arm64.whl", hash = "sha256:25b2ac0a29af8c3f17cbf21c905070e079872a26fa4ef7f52c38f8009b6f249a", size = 1458532, upload-time = "2025-10-03T20:47:57.904Z" },
-    { url = "https://files.pythonhosted.org/packages/01/c1/57b43e2f1b24893ce5a6fdcf30ce5a32fa0fdc6dc225131776cded289697/apache_tvm_ffi-0.1.0b15-cp312-abi3-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:eaf17da2c5e9ce90457350ddb50d2fd00f87bc3d3fa3859525b2364b92a8752d", size = 1563856, upload-time = "2025-10-03T20:47:59.508Z" },
-    { url = "https://files.pythonhosted.org/packages/23/75/6e1fb0ed64a459945bfb1bfe5afe11aed8a6710379873c36470735477000/apache_tvm_ffi-0.1.0b15-cp312-abi3-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:461c8399f13f264d9cfeba1f182cec4a1cf6f2657ce9c5e2467171e41ba3c087", size = 1631865, upload-time = "2025-10-03T20:48:01.041Z" },
-    { url = "https://files.pythonhosted.org/packages/14/be/f1c02b51e8a10baee426594750bd5541ca24bf695def898997ef7e6fdf8e/apache_tvm_ffi-0.1.0b15-cp312-abi3-win_amd64.whl", hash = "sha256:0297b106fa9ca0ccb146a724337876e4b208374641a7c0a54261885a83cad339", size = 1471606, upload-time = "2025-10-03T20:48:02.793Z" },
+    { url = "https://files.pythonhosted.org/packages/d1/1e/f8d16dbe2303d1e7348037b4207d6c1093c554573484c97c8f3cde61a060/apache_tvm_ffi-0.1.1-cp312-abi3-macosx_11_0_arm64.whl", hash = "sha256:f2c0164a5c6286f9c333ddedeb448b855cbc1225688d0a4c9aeab006ddfa1180", size = 1701072, upload-time = "2025-11-04T02:42:57.28Z" },
+    { url = "https://files.pythonhosted.org/packages/3d/47/f7a55e9b5b741f901ed9101a3ef46fd250f2c1519a6479e055432ff4f308/apache_tvm_ffi-0.1.1-cp312-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:33cc35738e0c44f2a67e550457b6b7dc7de9109ca64422a9e7063b1ba43c336e", size = 1854467, upload-time = "2025-11-04T02:43:00.158Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/db/f3adbe1e2d092fbb18908971a25ceb5496669ec65d01a28b7dd57f471ae0/apache_tvm_ffi-0.1.1-cp312-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:e9db6484259120b1bdc600f736084ee3d574775b1f4a3e8fef110323e3a9d2b6", size = 1930968, upload-time = "2025-11-04T02:43:01.96Z" },
+    { url = "https://files.pythonhosted.org/packages/3b/da/7f678675ccc8af1c7d313322f3875e2c829f1faaa58c0d982431beeb3b3e/apache_tvm_ffi-0.1.1-cp312-abi3-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:c7bd812058ce9046cb69fd7b3e18538d1d0eefa1719822a1441b00bb841f7af4", size = 1811173, upload-time = "2025-11-04T02:43:03.404Z" },
+    { url = "https://files.pythonhosted.org/packages/e1/11/c8b3b7d69ceebd219dcb06f5e4a3997edea3bc2e0bbdd8f57ae65bba4f2f/apache_tvm_ffi-0.1.1-cp312-abi3-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:807def3039fb336a228c120ca8c32eb794bdfd2d7aff218c8611f287ad913736", size = 1922690, upload-time = "2025-11-04T02:43:04.846Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/0b/f816735d761049e53eb388264238655f58fcb42a31e0d1848a4fb6a6556b/apache_tvm_ffi-0.1.1-cp312-abi3-win_amd64.whl", hash = "sha256:624b4430ca3949f85fffd9ef498ebaf1155ff0ac659fc764eec6c6fd66ec7986", size = 1690969, upload-time = "2025-11-04T02:43:06.581Z" },
+    { url = "https://files.pythonhosted.org/packages/12/aa/df81df8f8b39d3c41fbac41b1e6661d192d9987a3ef317fabcefecf727a6/apache_tvm_ffi-0.1.1-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:c93d9de81c1ba9560fcc696cf84d777f88016eb53f05ee2d6288ddcb95a5e72f", size = 1732582, upload-time = "2025-11-04T02:43:08.042Z" },
+    { url = "https://files.pythonhosted.org/packages/a8/55/861090532e4accd855e119f0e67e0e482b42abb866c9505edd8956148ebc/apache_tvm_ffi-0.1.1-cp314-cp314t-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:f9e0227179a0ce83384132b34757fd05f492270f1c031eae615870a5641b5039", size = 1870196, upload-time = "2025-11-04T02:43:09.911Z" },
+    { url = "https://files.pythonhosted.org/packages/2a/c6/470493934559e371ad699e1764649176efc5e022267c6dd0a565217177ad/apache_tvm_ffi-0.1.1-cp314-cp314t-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:78e75e193d675b9639e6fd0c33c60c3a4259d4c9f848f60baa6a3194df7e1fea", size = 1941999, upload-time = "2025-11-04T02:43:11.467Z" },
+    { url = "https://files.pythonhosted.org/packages/85/b8/84eba0d266c9b10beae59a6863ef5c68044e20a6f12d46a42116e80db774/apache_tvm_ffi-0.1.1-cp314-cp314t-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:49792622720421525a18e378d848411731d32fcb05a00b6e54b84d05ff46cc22", size = 1823965, upload-time = "2025-11-04T02:43:12.941Z" },
+    { url = "https://files.pythonhosted.org/packages/64/73/ca73a43260a1374b1f34d0e6fcf6f8af16f66867a89dfd562b26184af1bd/apache_tvm_ffi-0.1.1-cp314-cp314t-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:039293086d44e7f601bf8231e369198afe7ad38986330969ddb1a5fc7622976b", size = 1933779, upload-time = "2025-11-04T02:43:14.543Z" },
+    { url = "https://files.pythonhosted.org/packages/5b/91/687c3b9ff3313addeebc1188ac50b299a82944ef1784b91890fc6f250ebd/apache_tvm_ffi-0.1.1-cp314-cp314t-win_amd64.whl", hash = "sha256:3f6cbd214bee2e52719d5264f05a2685c955ae7b096980f0361d917a5a9f47a6", size = 1751905, upload-time = "2025-11-04T02:43:16.286Z" },
 ]
 
 [[package]]
@@ -1938,16 +1951,25 @@ wheels = [
 
 [[package]]
 name = "flashinfer-cubin"
-version = "0.4.1"
-source = { registry = "https://pypi.org/simple" }
+version = "0.5.2.dev20251108"
+source = { registry = "https://flashinfer.ai/whl/nightly/" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/34/0d/449810b23c4dcfd2dd623a2380cf4a1dc025fdb1bf768d7d8ec2aa100305/flashinfer_cubin-0.4.1-py3-none-any.whl", hash = "sha256:fd39b542a281b1a75bf6d954b89402de0f5b6acd7d198e9541e938cdb1f838a9", size = 92004872, upload-time = "2025-10-16T00:35:33.864Z" },
+    { url = "https://github.com/flashinfer-ai/flashinfer/releases/download/nightly-v0.5.2-20251108/flashinfer_cubin-0.5.2.dev20251108-py3-none-any.whl", hash = "sha256:fde2e92d60cc9f0a7b0ff225642a83d0b1537c7f73df36dfe9b66975ff0b20c0" },
+]
+
+[[package]]
+name = "flashinfer-jit-cache"
+version = "0.5.2.dev20251108+cu130"
+source = { registry = "https://flashinfer.ai/whl/nightly/cu130" }
+wheels = [
+    { url = "https://github.com/flashinfer-ai/flashinfer/releases/download/nightly-v0.5.2-20251108/flashinfer_jit_cache-0.5.2.dev20251108+cu130-cp39-abi3-manylinux_2_28_aarch64.whl", hash = "sha256:08b1b9d54ec07455a54ac362791a8b46dbd4eb68574b928e58236ba355dac111" },
+    { url = "https://github.com/flashinfer-ai/flashinfer/releases/download/nightly-v0.5.2-20251108/flashinfer_jit_cache-0.5.2.dev20251108+cu130-cp39-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:f0cbd0326cfdf95e2a20495d21287dc5f90239a08bfbd89ca79ec2fdc9025d79" },
 ]
 
 [[package]]
 name = "flashinfer-python"
-version = "0.4.1"
-source = { registry = "https://pypi.org/simple" }
+version = "0.5.2.dev20251108"
+source = { registry = "https://flashinfer.ai/whl/nightly/" }
 dependencies = [
     { name = "apache-tvm-ffi" },
     { name = "click" },
@@ -1963,7 +1985,9 @@ dependencies = [
     { name = "torch" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/64/cf/f82142abd7c819fb84a53f18fe1ac9e7cf1af8790b93c06dbf430001473b/flashinfer_python-0.4.1.tar.gz", hash = "sha256:fd120f05139d2c75b09c039009eec58ad1278c95bcf16466b90d480042b13a39", size = 4551078, upload-time = "2025-10-14T12:34:41.516Z" }
+wheels = [
+    { url = "https://github.com/flashinfer-ai/flashinfer/releases/download/nightly-v0.5.2-20251108/flashinfer_python-0.5.2.dev20251108-py3-none-any.whl", hash = "sha256:8dab5d3e1e3a7f413914f824b1cfea588e365f6c800faab4343ae04f20166265" },
+]
 
 [[package]]
 name = "flask"
@@ -3559,6 +3583,7 @@ gpu = [
     { name = "easyocr" },
     { name = "faiss", marker = "python_full_version < '3.14' and platform_machine == 'x86_64' and sys_platform == 'linux'" },
     { name = "flashinfer-cubin" },
+    { name = "flashinfer-jit-cache" },
     { name = "flashinfer-python" },
     { name = "huggingface-hub" },
     { name = "keybert" },
@@ -3661,8 +3686,9 @@ requires-dist = [
     { name = "fastmcp", specifier = ">=2.10.6" },
     { name = "filelock", specifier = ">=3.20.0" },
     { name = "fixit", specifier = ">=2.2.0" },
-    { name = "flashinfer-cubin", marker = "extra == 'gpu'", specifier = "==0.4.1" },
-    { name = "flashinfer-python", marker = "extra == 'gpu'", specifier = "==0.4.1" },
+    { name = "flashinfer-cubin", marker = "extra == 'gpu'", index = "https://flashinfer.ai/whl/nightly/" },
+    { name = "flashinfer-jit-cache", marker = "extra == 'gpu'", index = "https://flashinfer.ai/whl/nightly/cu130" },
+    { name = "flashinfer-python", marker = "extra == 'gpu'", index = "https://flashinfer.ai/whl/nightly/" },
     { name = "gitpython", specifier = ">=3.1.43" },
     { name = "graphviz", specifier = ">=0.21" },
     { name = "griffe" },

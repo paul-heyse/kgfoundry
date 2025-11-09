@@ -40,7 +40,9 @@ class TestPostponedAnnotations:
             "tools.typing",
             pytest.param(
                 "docs.typing",
-                marks=pytest.mark.skipif(condition=True, reason="docs.typing may not be installed"),
+                marks=pytest.mark.skipif(
+                    condition=True, reason="docs.typing may not be installed"
+                ),
             ),
         ],
     )
@@ -52,12 +54,14 @@ class TestPostponedAnnotations:
             pytest.skip(f"{module_name} not in Python path")
 
         source_file = module.__file__
-        assert source_file is not None, f"{module_name} module has no __file__ attribute"
+        assert (
+            source_file is not None
+        ), f"{module_name} module has no __file__ attribute"
 
         content = Path(source_file).read_text(encoding="utf-8")
-        assert "from __future__ import annotations" in content, (
-            f"{module_name} missing postponed annotations directive"
-        )
+        assert (
+            "from __future__ import annotations" in content
+        ), f"{module_name} missing postponed annotations directive"
 
 
 class TestTypingFacadeModules:
@@ -96,7 +100,9 @@ class TestTypingFacadeModules:
         if tools_gate_import is None or common_gate_import is None:
             pytest.fail("gate_import not found in modules")
         typed_tools = _require_callable(tools_gate_import, "tools.typing.gate_import")
-        typed_common = _require_callable(common_gate_import, "kgfoundry_common.typing.gate_import")
+        typed_common = _require_callable(
+            common_gate_import, "kgfoundry_common.typing.gate_import"
+        )
         assert typed_tools is typed_common
 
     def test_docs_typing_re_exports_facade(self) -> None:
@@ -206,6 +212,8 @@ class TestCLIEntryPointImportClean:
         try:
             module = load_module(module_name)
             assert module is not None, f"{module_name} failed to load"
-            assert hasattr(module, "__file__"), f"{module_name} has no __file__ attribute"
+            assert hasattr(
+                module, "__file__"
+            ), f"{module_name} has no __file__ attribute"
         except ImportError as e:
             pytest.fail(f"Failed to import {module_name}: {e}")

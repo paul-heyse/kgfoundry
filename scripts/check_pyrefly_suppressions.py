@@ -42,7 +42,9 @@ class _ParsedArgs(argparse.Namespace):
 
 # Pattern to match unmanaged suppressions: type: ignore or pyrefly: ignore
 # without a ticket reference (e.g., "# type: ignore[error-code] - ticket #123")
-SUPPRESSION_PATTERN = re.compile(r"#\s*(?:type:\s*ignore|pyrefly:\s*ignore)(?:\[[\w,-]+\])?")
+SUPPRESSION_PATTERN = re.compile(
+    r"#\s*(?:type:\s*ignore|pyrefly:\s*ignore)(?:\[[\w,-]+\])?"
+)
 # Pattern to detect a ticket reference in a comment
 TICKET_PATTERN = re.compile(r"(?:ticket|issue|#\d+|GH-\d+|TODO)", re.IGNORECASE)
 

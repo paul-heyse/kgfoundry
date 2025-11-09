@@ -63,6 +63,9 @@ if TYPE_CHECKING:
         errors: list[CliErrorEntry] = field(default_factory=list)
         problem: ProblemDetailsDict | UnsetType = UNSET
 
+    def _replace_envelope(envelope: CliEnvelope, **updates: object) -> CliEnvelope:
+        return dataclass_replace(envelope, **updates)
+
 else:
     problem_details_module = gate_import(
         "tools._shared.problem_details",
@@ -118,6 +121,9 @@ else:
         errors: list[CliErrorEntry] = msgspec.field(default_factory=_default_errors)
         problem: ProblemDetailsDict | UnsetType = UNSET
 
+    def _replace_envelope(envelope: CliEnvelope, **updates: object) -> CliEnvelope:
+        return cast("CliEnvelope", structs.replace(envelope, **updates))
+
 
 def new_cli_envelope(
     *, command: str, status: CliStatus, subcommand: str = ""
@@ -170,9 +176,12 @@ def render_cli_envelope(envelope: CliEnvelope, *, indent: int = 2) -> str:
     return json.dumps(payload, indent=indent)
 
 
+_SET_BUILDER_ATTR = object.__setattr__
+
+
 @dataclass(slots=True, frozen=True)
 class CliEnvelopeBuilder:
-    """Mutable builder for assembling CLI envelopes."""
+    """Fluent builder for assembling CLI envelopes."""
 
     envelope: CliEnvelope
 
@@ -200,6 +209,10 @@ class CliEnvelopeBuilder:
             new_cli_envelope(command=command, status=status, subcommand=subcommand)
         )
 
+    def _swap(self, *, update: CliEnvelope) -> CliEnvelopeBuilder:
+        _SET_BUILDER_ATTR(self, "envelope", update)
+        return self
+
     def add_file(
         self,
         *,
@@ -207,16 +220,45 @@ class CliEnvelopeBuilder:
         status: CliFileStatus,
         message: str | None = None,
         problem: ProblemDetailsDict | None = None,
-    ) -> None:
-        """Append a file-level result entry to the envelope."""
-        self.envelope.files.append(
-            CliFileResult(
-                path=path,
-                status=status,
-                message=(message if message is not None else UNSET),
-                problem=problem if problem is not None else UNSET,
-            )
+    ) -> CliEnvelopeBuilder:
+        """Append a file-level result entry to the envelope.
+
+        This method adds a file processing result to the envelope's files list,
+        recording the file path, processing status, optional message, and any
+        associated problem details. File entries are used to track individual
+        file processing outcomes in batch operations.
+
+        Parameters
+        ----------
+        path : str
+            File path that was processed. This is the identifier for the file
+            entry and should be a relative or absolute path string.
+        status : CliFileStatus
+            Processing status for the file. Must be one of: "success", "skipped",
+            "error", or "violation". Determines how the file result is categorized.
+        message : str | None, optional
+            Optional human-readable message describing the file processing outcome.
+            Provides additional context about why a file succeeded, was skipped,
+            or failed. If None, no message is included. Defaults to None.
+        problem : ProblemDetailsDict | None, optional
+            Optional Problem Details dictionary associated with file processing
+            failures or violations. Follows RFC 9457 format. If None, no problem
+            details are attached. Defaults to None.
+
+        Returns
+        -------
+        CliEnvelopeBuilder
+            Builder instance for fluent chaining. Allows method calls to be
+            chained together for building complex envelopes.
+        """
+        file_entry = CliFileResult(
+            path=path,
+            status=status,
+            message=(message if message is not None else UNSET),
+            problem=problem if problem is not None else UNSET,
         )
+        updated_files = [*self.envelope.files, file_entry]
+        return self._swap(update=_replace_envelope(self.envelope, files=updated_files))
 
     def add_error(
         self,
@@ -225,29 +267,76 @@ class CliEnvelopeBuilder:
         message: str,
         file: str | None = None,
         problem: ProblemDetailsDict | None = None,
-    ) -> None:
-        """Record a build error with optional file attribution."""
-        self.envelope.errors.append(
-            CliErrorEntry(
-                status=status,
-                message=message,
-                file=(file if file is not None else UNSET),
-                problem=problem if problem is not None else UNSET,
-            )
+    ) -> CliEnvelopeBuilder:
+        """Record a build error with optional file attribution.
+
+        This method adds an error-level entry to the envelope's errors list,
+        recording error status, message, optional file attribution, and any
+        associated problem details. Error entries represent non-file-specific
+        failures or violations that occurred during CLI execution.
+
+        Parameters
+        ----------
+        status : CliErrorStatus
+            Error status category. Must be one of: "error", "violation", or
+            "config". Determines how the error is categorized and affects
+            overall envelope status.
+        message : str
+            Human-readable error message describing what went wrong. This is
+            the primary error description and should be clear and actionable.
+        file : str | None, optional
+            Optional file path associated with the error. Used when an error
+            is related to a specific file but doesn't warrant a file-level
+            entry. If None, the error is considered global. Defaults to None.
+        problem : ProblemDetailsDict | None, optional
+            Optional Problem Details dictionary providing structured error
+            information following RFC 9457 format. Includes error codes,
+            types, and additional context. If None, no problem details are
+            attached. Defaults to None.
+
+        Returns
+        -------
+        CliEnvelopeBuilder
+            Builder instance for fluent chaining. Allows method calls to be
+            chained together for building complex envelopes.
+        """
+        error_entry = CliErrorEntry(
+            status=status,
+            message=message,
+            file=(file if file is not None else UNSET),
+            problem=problem if problem is not None else UNSET,
+        )
+        updated_errors = [*self.envelope.errors, error_entry]
+        return self._swap(
+            update=_replace_envelope(self.envelope, errors=updated_errors)
         )
 
-    def set_problem(self, problem: ProblemDetailsDict | None) -> None:
-        """Attach a Problem Details payload to the envelope."""
+    def set_problem(self, problem: ProblemDetailsDict | None) -> CliEnvelopeBuilder:
+        """Attach a Problem Details payload to the envelope.
+
+        This method sets the top-level problem details for the envelope, which
+        represents the primary error or failure that occurred during CLI execution.
+        Problem details follow RFC 9457 format and provide structured error
+        information including error codes, types, titles, and details.
+
+        Parameters
+        ----------
+        problem : ProblemDetailsDict | None
+            Problem Details dictionary following RFC 9457 format, or None to
+            clear any existing problem details. When set, this becomes the
+            primary error payload for the envelope. If None, the problem field
+            is removed from the envelope.
+
+        Returns
+        -------
+        CliEnvelopeBuilder
+            Builder instance for fluent chaining. Allows method calls to be
+            chained together for building complex envelopes.
+        """
         replacement: ProblemDetailsDict | UnsetType = (
             problem if problem is not None else UNSET
         )
-        if TYPE_CHECKING:
-            self.envelope = dataclass_replace(self.envelope, problem=replacement)
-        else:
-            self.envelope = cast(
-                "CliEnvelope",
-                structs.replace(self.envelope, problem=replacement),
-            )
+        return self._swap(update=_replace_envelope(self.envelope, problem=replacement))
 
     def finish(self, *, duration_seconds: float | None = None) -> CliEnvelope:
         """Finalize the envelope, validating it before returning.
@@ -267,22 +356,14 @@ class CliEnvelopeBuilder:
         This function calls ``validate_cli_envelope`` which may raise validation
         errors. See :func:`validate_cli_envelope` for details.
         """
+        envelope = self.envelope
         if duration_seconds is not None:
-            if TYPE_CHECKING:
-                self.envelope = dataclass_replace(
-                    self.envelope,
-                    duration_seconds=float(duration_seconds),
-                )
-            else:
-                self.envelope = cast(
-                    "CliEnvelope",
-                    structs.replace(
-                        self.envelope,
-                        duration_seconds=float(duration_seconds),
-                    ),
-                )
-        validate_cli_envelope(self.envelope)
-        return self.envelope
+            envelope = _replace_envelope(
+                envelope,
+                duration_seconds=float(duration_seconds),
+            )
+        validate_cli_envelope(envelope)
+        return envelope
 
 
 __all__ = [

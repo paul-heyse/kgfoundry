@@ -11,6 +11,7 @@ Examples
 >>> example_path = Path("schema/examples/models/doc.v1.json")
 >>> assert_model_roundtrip(Doc, example_path)
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations

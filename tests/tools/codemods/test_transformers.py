@@ -107,7 +107,9 @@ def test_dataclass_field_plugin_caches_metadata(tmp_path: Path) -> None:
     file_path.write_text(initial_source, encoding="utf-8")
 
     plugin = DataclassFieldDocPlugin()
-    context = PluginContext(config=BuilderConfig(), repo_root=tmp_path, file_path=file_path)
+    context = PluginContext(
+        config=BuilderConfig(), repo_root=tmp_path, file_path=file_path
+    )
     initial_result = _build_dataclass_semantic_result(
         file_path,
         [
@@ -119,7 +121,9 @@ def test_dataclass_field_plugin_caches_metadata(tmp_path: Path) -> None:
     plugin.on_start(context)
     updated = plugin.apply(context, initial_result)
 
-    name_doc = next((param for param in updated.schema.parameters if param.name == "name"), None)
+    name_doc = next(
+        (param for param in updated.schema.parameters if param.name == "name"), None
+    )
     assert isinstance(name_doc, ParameterDoc)
     assert "Configure the name" in name_doc.description
 

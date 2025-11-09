@@ -7,7 +7,10 @@ import argparse
 import sys
 from typing import TYPE_CHECKING, cast
 
-if __package__ in {None, ""}:  # pragma: no cover - invoked via script entry instead of module
+if __package__ in {
+    None,
+    "",
+}:  # pragma: no cover - invoked via script entry instead of module
     message = (
         "Run this command via `python -m tools.check_imports` or install kgfoundry[tools] "
         "so the tooling package is importable."
@@ -29,7 +32,7 @@ def _build_envelope(result: architecture.ArchitectureResult) -> CliEnvelope:
     builder = CliEnvelopeBuilder.create(command="check_imports", status=status)
     if not result.is_success:
         for violation in result.violations:
-            builder.add_error(status="violation", message=violation)
+            builder = builder.add_error(status="violation", message=violation)
     return builder.finish()
 
 

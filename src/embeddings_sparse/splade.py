@@ -4,6 +4,7 @@ This module bundles splade logic for the kgfoundry stack. It groups related help
 packages can import a single cohesive namespace. Refer to the functions and classes below for
 implementation specifics.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -76,7 +77,9 @@ def _decode_signing_key() -> bytes | None:
     try:
         settings = load_config()
     except ValueError as exc:
-        logger.warning("Configuration invalid; proceeding without signing key", exc_info=exc)
+        logger.warning(
+            "Configuration invalid; proceeding without signing key", exc_info=exc
+        )
         return None
 
     encoded_key = settings.signing_key
@@ -87,7 +90,8 @@ def _decode_signing_key() -> bytes | None:
         return base64.b64decode(encoded_key)
     except binascii.Error as exc:
         logger.warning(
-            "Signing key is not valid base64; ignoring secure pickle signature", exc_info=exc
+            "Signing key is not valid base64; ignoring secure pickle signature",
+            exc_info=exc,
         )
         return None
 
@@ -164,9 +168,7 @@ def _load_legacy_metadata(legacy_path: Path) -> dict[str, JsonValue]:
                     payload = _load_unsigned_payload(handle, legacy_path)
                 else:
                     if not isinstance(payload_obj, dict):
-                        msg = (
-                            f"Invalid signed legacy payload: expected dict, got {type(payload_obj)}"
-                        )
+                        msg = f"Invalid signed legacy payload: expected dict, got {type(payload_obj)}"
                         raise DeserializationError(msg)
                     payload = cast("dict[str, JsonValue]", payload_obj)
             else:
@@ -375,11 +377,17 @@ class PureImpactIndex:
         """
         Path(self.index_dir).mkdir(parents=True, exist_ok=True)
         df: defaultdict[str, int] = defaultdict(int)
-        postings: defaultdict[str, defaultdict[str, float]] = defaultdict(_default_float_dict)
+        postings: defaultdict[str, defaultdict[str, float]] = defaultdict(
+            _default_float_dict
+        )
         doc_count = 0
         for doc_id, fields in docs_iterable:
             text = " ".join(
-                [fields.get("title", ""), fields.get("section", ""), fields.get("body", "")]
+                [
+                    fields.get("title", ""),
+                    fields.get("section", ""),
+                    fields.get("body", ""),
+                ]
             )
             tokens = self._tokenize(text)
             doc_count += 1
@@ -391,7 +399,8 @@ class PureImpactIndex:
         self.df = dict(df)
         self.postings = {
             token: {
-                doc: weight * math.log((doc_count - df[token] + 0.5) / (df[token] + 0.5) + 1.0)
+                doc: weight
+                * math.log((doc_count - df[token] + 0.5) / (df[token] + 0.5) + 1.0)
                 for doc, weight in docs.items()
             }
             for token, docs in postings.items()
@@ -399,7 +408,10 @@ class PureImpactIndex:
         # persist using secure JSON serialization with schema validation
         metadata_path = Path(self.index_dir) / "impact.json"
         schema_path = (
-            Path(__file__).parent.parent.parent / "schema" / "models" / "splade_metadata.v1.json"
+            Path(__file__).parent.parent.parent
+            / "schema"
+            / "models"
+            / "splade_metadata.v1.json"
         )
         payload = {"df": self.df, "N": self.N, "postings": self.postings}
         serialize_json(payload, schema_path, metadata_path)
@@ -427,7 +439,10 @@ class PureImpactIndex:
         """
         metadata_path = Path(self.index_dir) / "impact.json"
         schema_path = (
-            Path(__file__).parent.parent.parent / "schema" / "models" / "splade_metadata.v1.json"
+            Path(__file__).parent.parent.parent
+            / "schema"
+            / "models"
+            / "splade_metadata.v1.json"
         )
         legacy_path = Path(self.index_dir) / "impact.pkl"
 
@@ -437,7 +452,10 @@ class PureImpactIndex:
             except DeserializationError:
                 logger.warning(
                     "Failed to load JSON index, trying legacy pickle",
-                    extra={"metadata_path": str(metadata_path), "legacy_path": str(legacy_path)},
+                    extra={
+                        "metadata_path": str(metadata_path),
+                        "legacy_path": str(legacy_path),
+                    },
                 )
                 if legacy_path.exists():
                     data_dict = _load_legacy_metadata(legacy_path)
@@ -450,7 +468,9 @@ class PureImpactIndex:
                 data_dict = cast("dict[str, JsonValue]", data_raw)
         elif legacy_path.exists():
             data_dict = _load_legacy_metadata(legacy_path)
-            logger.warning("Loaded legacy pickle index. Consider migrating to JSON format.")
+            logger.warning(
+                "Loaded legacy pickle index. Consider migrating to JSON format."
+            )
         else:
             msg = f"Index metadata not found at {metadata_path} or {legacy_path}"
             raise FileNotFoundError(msg)
@@ -471,7 +491,9 @@ class PureImpactIndex:
                 if isinstance(term_postings, dict):
                     # Convert inner dict values to float
                     term_postings_float: dict[str, float] = {
-                        str(doc_id): float(weight) if isinstance(weight, (int, float)) else 0.0
+                        str(doc_id): (
+                            float(weight) if isinstance(weight, (int, float)) else 0.0
+                        )
                         for doc_id, weight in term_postings.items()
                     }
                     postings_converted[str(term)] = term_postings_float
@@ -547,7 +569,9 @@ class LuceneImpactIndex:
     lazy-initialized on first search call to avoid unnecessary index loading.
     """
 
-    def __init__(self, index_dir: str, query_encoder: str = "naver/splade-v3-distilbert") -> None:
+    def __init__(
+        self, index_dir: str, query_encoder: str = "naver/splade-v3-distilbert"
+    ) -> None:
         self.index_dir = index_dir
         self.query_encoder = query_encoder
         self._searcher: LuceneImpactSearcherProtocol | None = None
@@ -563,16 +587,23 @@ class LuceneImpactIndex:
         if self._searcher is not None:
             return
         try:
-            lucene_search_module: ModuleType = importlib.import_module("pyserini.search.lucene")
+            lucene_search_module: ModuleType = importlib.import_module(
+                "pyserini.search.lucene"
+            )
             lucene_impact_searcher_cls = cast(
                 "LuceneImpactSearcherFactory",
                 lucene_search_module.LuceneImpactSearcher,
             )
-        except (ImportError, AttributeError) as exc:  # pragma: no cover - optional dependency
+        except (
+            ImportError,
+            AttributeError,
+        ) as exc:  # pragma: no cover - optional dependency
             message = "Pyserini not available for SPLADE impact search"
             logger.exception("Failed to import LuceneImpactSearcher")
             raise RuntimeError(message) from exc
-        searcher = lucene_impact_searcher_cls(self.index_dir, query_encoder=self.query_encoder)
+        searcher = lucene_impact_searcher_cls(
+            self.index_dir, query_encoder=self.query_encoder
+        )
         self._searcher = searcher
 
     def ensure_available(self) -> None:
@@ -654,7 +685,9 @@ def get_splade(
     degradation when optional dependencies are missing.
     """
     if backend == "lucene":
-        lucene_index = LuceneImpactIndex(index_dir=index_dir, query_encoder=query_encoder)
+        lucene_index = LuceneImpactIndex(
+            index_dir=index_dir, query_encoder=query_encoder
+        )
         try:
             lucene_index.ensure_available()
         except RuntimeError as exc:

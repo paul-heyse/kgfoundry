@@ -25,7 +25,9 @@ MIN_LINES_WITH_UNDERLINE: Final[int] = 2
 BLANK_LINE_INDEX: Final[int] = 2
 
 TITLE_UNDERLINE_PATTERN: Final[Pattern[str]] = re.compile(r"^(?P<char>=)\1*$")
-CUSTOM_LABEL_PATTERN: Final[Pattern[str]] = re.compile(r"(?m)^\.\.\s+_gallery_[\w-]+:\s*$")
+CUSTOM_LABEL_PATTERN: Final[Pattern[str]] = re.compile(
+    r"(?m)^\.\.\s+_gallery_[\w-]+:\s*$"
+)
 TAGS_PATTERN: Final[Pattern[str]] = re.compile(r"(?m)^\.\.\s+tags::\s*")
 CONSTRAINTS_HEADER_PATTERN: Final[Pattern[str]] = re.compile(
     r"(?m)^Constraints\s*\n(?P<rule>[-=~`'^\"]{3,})\s*$",
@@ -264,7 +266,9 @@ def validate_example_file(file_path: Path, *, strict: bool = False) -> list[str]
 
     labels = check_custom_labels(docstring)
     if labels:
-        errors.append("remove custom '.. _gallery_*:' labels (Sphinx-Gallery generates them)")
+        errors.append(
+            "remove custom '.. _gallery_*:' labels (Sphinx-Gallery generates them)"
+        )
 
     if not _has_tags_directive(docstring):
         errors.append("add a '.. tags::' directive describing the example")

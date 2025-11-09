@@ -19,7 +19,6 @@
     "faiss/**",
     "src/kgfoundry.egg-info/**",
     "kgfoundry.egg-info/**",
-    "codeintel/ts_languages/**",
     "src/kgfoundry_common/http/**",
   ],
   "executionEnvironments": [

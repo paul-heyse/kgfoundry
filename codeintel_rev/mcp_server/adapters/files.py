@@ -9,8 +9,9 @@ import asyncio
 import fnmatch
 import os
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.errors import (
@@ -32,6 +33,26 @@ if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
 
 LOGGER = get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class FileListFilters:
+    """Configuration for file listing filters."""
+
+    include_globs: list[str] | None = None
+    exclude_globs: list[str] | None = None
+    languages: list[str] | None = None
+    max_results: int = 1000
+
+
+@dataclass(frozen=True)
+class DirectoryFilters:
+    """Prepared filters used during directory traversal."""
+
+    includes: list[str]
+    excludes: list[str]
+    language_extensions: set[str] | None
+    max_results: int
 
 
 async def set_scope(context: ApplicationContext, scope: ScopeIn) -> dict:
@@ -78,14 +99,7 @@ async def set_scope(context: ApplicationContext, scope: ScopeIn) -> dict:
     return {"effective_scope": scope, "session_id": session_id, "status": "ok"}
 
 
-async def list_paths(
-    context: ApplicationContext,
-    path: str | None = None,
-    include_globs: list[str] | None = None,
-    exclude_globs: list[str] | None = None,
-    languages: list[str] | None = None,
-    max_results: int = 1000,
-) -> dict:
+async def list_paths(context: ApplicationContext, *args: object, **kwargs: object) -> dict:
     """List files in repository (async with threadpool offload).
 
     Applies session scope filters (include_globs, exclude_globs, languages) if
@@ -99,16 +113,22 @@ async def list_paths(
     ----------
     context : ApplicationContext
         Application context containing repo root and settings.
-    path : str | None
-        Starting path relative to repo root (None = root).
-    include_globs : list[str] | None
-        Glob patterns to include (e.g., ["*.py"]). Overrides session scope if provided.
-    exclude_globs : list[str] | None
-        Glob patterns to exclude (e.g., ["__pycache__", "*.pyc"]). Overrides session scope if provided.
-    languages : list[str] | None
-        Programming languages to include (overrides session scope when provided).
-    max_results : int
-        Maximum number of files to return.
+    *args : object
+        Positional arguments (up to 5): path, include_globs, exclude_globs, languages, max_results.
+        Positional arguments are supported for backward compatibility but keyword
+        arguments are preferred.
+    **kwargs : object
+        Keyword arguments accepted:
+        - path : str | None
+            Starting path relative to repo root (None = root).
+        - include_globs : list[str] | None
+            Glob patterns to include (e.g., ["*.py"]). Overrides session scope if provided.
+        - exclude_globs : list[str] | None
+            Glob patterns to exclude (e.g., ["__pycache__", "*.pyc"]). Overrides session scope if provided.
+        - languages : list[str] | None
+            Programming languages to include (overrides session scope when provided).
+        - max_results : int
+            Maximum number of files to return (default: 1000).
 
     Returns
     -------
@@ -153,34 +173,66 @@ async def list_paths(
     exclusion globs (for example ``**/.git/**``) so that large dependency
     folders are pruned without visiting their contents.
     """
+    session_id = get_session_id()
+    scope = await get_effective_scope(context, session_id)
+    path, include_globs, exclude_globs, languages, max_results = _normalize_list_paths_arguments(
+        args, kwargs
+    )
+    filters = FileListFilters(
+        include_globs=include_globs,
+        exclude_globs=exclude_globs,
+        languages=languages,
+        max_results=max_results,
+    )
     LOGGER.debug(
         "Listing paths (async)",
         extra={"path": path, "max_results": max_results},
     )
-    session_id = get_session_id()
-    scope = await get_effective_scope(context, session_id)
     return await asyncio.to_thread(
         _list_paths_sync,
         context,
         session_id,
         scope,
         path,
-        include_globs,
-        exclude_globs,
-        languages,
+        filters,
+    )
+
+
+def _normalize_list_paths_arguments(
+    args: tuple[object, ...],
+    kwargs: dict[str, object],
+) -> tuple[str | None, list[str] | None, list[str] | None, list[str] | None, int]:
+    positions: list[object | None] = list(args[:5])
+    positions.extend([None] * (5 - len(positions)))
+
+    path = kwargs.pop("path", positions[0])
+    include_globs = kwargs.pop("include_globs", positions[1])
+    exclude_globs = kwargs.pop("exclude_globs", positions[2])
+    languages = kwargs.pop("languages", positions[3])
+    max_value = kwargs.pop("max_results", kwargs.pop("max", positions[4]))
+
+    max_results = 1000 if max_value is None else int(max_value)
+
+    if kwargs:
+        unexpected = ", ".join(kwargs.keys())
+        msg = "Unexpected keyword arguments: " + unexpected
+        raise TypeError(msg)
+
+    return (
+        cast("str | None", path),
+        cast("list[str] | None", include_globs),
+        cast("list[str] | None", exclude_globs),
+        cast("list[str] | None", languages),
         max_results,
     )
 
 
-def _list_paths_sync(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0917 - PathOutsideRepositoryError raised by resolve_within_repo; pre-existing complexity
+def _list_paths_sync(
     context: ApplicationContext,
     session_id: str,
     scope: ScopeIn | None,
     path: str | None = None,
-    include_globs: list[str] | None = None,
-    exclude_globs: list[str] | None = None,
-    languages: list[str] | None = None,
-    max_results: int = 1000,
+    filters: FileListFilters | None = None,
 ) -> dict:
     """List files in repository (synchronous implementation).
 
@@ -199,14 +251,8 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0917 - PathOu
         Overridden by explicit ``include_globs`` and ``exclude_globs`` parameters.
     path : str | None
         Starting path relative to repo root (None = root).
-    include_globs : list[str] | None
-        Glob patterns to include (e.g., ["*.py"]). Overrides session scope if provided.
-    exclude_globs : list[str] | None
-        Glob patterns to exclude (e.g., ["__pycache__", "*.pyc"]). Overrides session scope if provided.
-    languages : list[str] | None
-        Programming languages to include. Overrides session scope if provided.
-    max_results : int
-        Maximum number of files to return.
+    filters : FileListFilters
+        Filters for includes, excludes, language restrictions, and max results.
 
     Returns
     -------
@@ -221,16 +267,17 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0917 - PathOu
     """
     repo_root = context.paths.repo_root
     search_root = _resolve_search_root(repo_root, path)
+    filters = filters or FileListFilters()
 
-    if max_results <= 0:
+    if filters.max_results <= 0:
         return {"items": [], "total": 0, "truncated": False}
 
     merged = merge_scope_filters(
         scope,
         {
-            "include_globs": include_globs,
-            "exclude_globs": exclude_globs,
-            "languages": languages,
+            "include_globs": filters.include_globs,
+            "exclude_globs": filters.exclude_globs,
+            "languages": filters.languages,
         },
     )
 
@@ -267,67 +314,17 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0917 - PathOu
             )
             return {"items": [], "total": 0, "truncated": False}
 
-    # Walk directory
-    items: list[dict[str, object]] = []
-    matched_count = 0
-    truncated = False
-    for current_root, dirnames, filenames in os.walk(search_root):
-        try:
-            resolved_root = Path(current_root).resolve()
-        except OSError:
-            continue
-
-        if _relative_path_str(resolved_root, repo_root) is None:
-            continue
-
-        # Prune excluded directories so we do not descend into them.
-        for dir_name in list(dirnames):
-            dir_path = resolved_root / dir_name
-            relative_dir = _relative_path_str(dir_path, repo_root)
-            if relative_dir is None:
-                dirnames.remove(dir_name)
-                continue
-            dir_targets = (
-                relative_dir,
-                f"{relative_dir}/",
-                f"./{relative_dir}",
-                f"./{relative_dir}/",
-            )
-            if any(_matches_any(target, excludes) for target in dir_targets):
-                dirnames.remove(dir_name)
-
-        for file_name in filenames:
-            file_path = resolved_root / file_name
-            relative_file = _relative_path_str(file_path, repo_root)
-            if relative_file is None:
-                continue
-            if _matches_any(relative_file, excludes) or _matches_any(
-                f"./{relative_file}", excludes
-            ):
-                continue
-            if not _matches_any(relative_file, includes):
-                continue
-            if language_extensions and not _matches_language(relative_file, language_extensions):
-                continue
-
-            stat_result = _safe_stat(file_path)
-            if stat_result is None:
-                continue
-
-            matched_count += 1
-            entry = {
-                "path": relative_file,
-                "size": stat_result.st_size,
-                "modified": stat_result.st_mtime,
-            }
-            if len(items) < max_results:
-                items.append(entry)
-            if max_results and len(items) >= max_results:
-                truncated = True
-                break
-
-        if truncated:
-            break
+    directory_filters = DirectoryFilters(
+        includes=includes,
+        excludes=excludes,
+        language_extensions=language_extensions,
+        max_results=filters.max_results,
+    )
+    items, matched_count, truncated = _collect_filtered_paths(
+        search_root=search_root,
+        repo_root=repo_root,
+        filters=directory_filters,
+    )
 
     LOGGER.debug(
         "Listed paths with scope filters",
@@ -345,6 +342,130 @@ def _list_paths_sync(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0917 - PathOu
         "items": items,
         "total": matched_count,
         "truncated": truncated,
+    }
+
+
+def _collect_filtered_paths(
+    *,
+    search_root: Path,
+    repo_root: Path,
+    filters: DirectoryFilters,
+) -> tuple[list[dict[str, object]], int, bool]:
+    """Walk directories and apply include/exclude filters.
+
+    Parameters
+    ----------
+    search_root : Path
+        Directory to start walking from.
+    repo_root : Path
+        Repository root directory.
+    filters : DirectoryFilters
+        Prepared include/exclude/language filters plus max results.
+
+    Returns
+    -------
+    tuple[list[dict[str, object]], int, bool]
+        Tuple containing:
+        - items: List of file entries with path, size, and modified time
+        - matched_count: Total number of files that matched filters
+        - truncated: True if results were truncated due to max_results limit
+    """
+    items: list[dict[str, object]] = []
+    matched_count = 0
+    truncated = False
+
+    for current_root, dirnames, filenames in os.walk(search_root):
+        try:
+            resolved_root = Path(current_root).resolve()
+        except OSError:
+            continue
+
+        if _relative_path_str(resolved_root, repo_root) is None:
+            continue
+
+        _prune_directories(dirnames, resolved_root, repo_root, filters.excludes)
+
+        for file_name in filenames:
+            file_path = resolved_root / file_name
+            entry = _create_file_entry(
+                file_path=file_path,
+                repo_root=repo_root,
+                includes=filters.includes,
+                excludes=filters.excludes,
+                language_extensions=filters.language_extensions,
+            )
+            if entry is None:
+                continue
+
+            matched_count += 1
+            if len(items) < filters.max_results:
+                items.append(entry)
+            if filters.max_results and len(items) >= filters.max_results:
+                truncated = True
+                break
+
+        if truncated:
+            break
+
+    return items, matched_count, truncated
+
+
+def _prune_directories(
+    dirnames: list[str],
+    resolved_root: Path,
+    repo_root: Path,
+    excludes: list[str],
+) -> None:
+    for dir_name in list(dirnames):
+        dir_path = resolved_root / dir_name
+        relative_dir = _relative_path_str(dir_path, repo_root)
+        if relative_dir is None:
+            dirnames.remove(dir_name)
+            continue
+        dir_targets = (
+            relative_dir,
+            f"{relative_dir}/",
+            f"./{relative_dir}",
+            f"./{relative_dir}/",
+        )
+        if any(_matches_any(target, excludes) for target in dir_targets):
+            dirnames.remove(dir_name)
+
+
+def _create_file_entry(
+    *,
+    file_path: Path,
+    repo_root: Path,
+    includes: list[str],
+    excludes: list[str],
+    language_extensions: set[str] | None,
+) -> dict[str, object] | None:
+    """Return a file entry dict when filters accept the file.
+
+    Returns
+    -------
+    dict[str, object] | None
+        Dictionary containing file metadata when filters are satisfied,
+        otherwise ``None``.
+    """
+    relative_file = _relative_path_str(file_path, repo_root)
+    if relative_file is None:
+        return None
+    if _matches_any(relative_file, excludes) or _matches_any(f"./{relative_file}", excludes):
+        return None
+    if not _matches_any(relative_file, includes):
+        return None
+    if language_extensions and not _matches_language(relative_file, language_extensions):
+        return None
+
+    stat_result = _safe_stat(file_path)
+    if stat_result is None:
+        return None
+
+    return {
+        "path": relative_file,
+        "size": stat_result.st_size,
+        "modified": stat_result.st_mtime,
     }
 
 
@@ -529,7 +650,18 @@ def _safe_stat(path: Path) -> os.stat_result | None:
 
 
 def _collect_language_extensions(languages: Sequence[str]) -> set[str]:
-    """Return canonical file extensions for the requested languages."""
+    """Return canonical file extensions for the requested languages.
+
+    Parameters
+    ----------
+    languages : Sequence[str]
+        Language codes to get extensions for (e.g., ["python", "javascript"]).
+
+    Returns
+    -------
+    set[str]
+        Set of file extensions (with leading dots) for the requested languages.
+    """
     extensions: set[str] = set()
     for language in languages:
         extensions.update(ext.lower() for ext in LANGUAGE_EXTENSIONS.get(language.lower(), []))
@@ -537,6 +669,20 @@ def _collect_language_extensions(languages: Sequence[str]) -> set[str]:
 
 
 def _matches_language(path: str, extensions: set[str]) -> bool:
-    """Return True when the path matches one of the requested extensions."""
+    """Return True when the path matches one of the requested extensions.
+
+    Parameters
+    ----------
+    path : str
+        File path to check.
+    extensions : set[str]
+        Set of file extensions (with leading dots) to match against.
+
+    Returns
+    -------
+    bool
+        True if the path ends with one of the extensions (case-insensitive),
+        False otherwise.
+    """
     normalized = path.lower()
     return any(normalized.endswith(ext) for ext in extensions)

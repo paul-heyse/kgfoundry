@@ -1,4 +1,5 @@
 """Utilities for detecting GPU stack availability."""
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -45,7 +46,9 @@ def _modules_available(modules: Iterable[str]) -> bool:
     return all(importlib.util.find_spec(module) is not None for module in modules)
 
 
-def has_gpu_stack(*, allow_without_cuda_env: str = "ALLOW_GPU_TESTS_WITHOUT_CUDA") -> bool:
+def has_gpu_stack(
+    *, allow_without_cuda_env: str = "ALLOW_GPU_TESTS_WITHOUT_CUDA"
+) -> bool:
     """Check if the optional GPU stack is available and CUDA is usable.
 
     Verifies that all core GPU modules can be imported and that CUDA

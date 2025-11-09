@@ -39,7 +39,10 @@ type TyperCommandFactory = Callable[[object], click.core.Command]
 
 try:  # Typer is optional at runtime; degrade gracefully when absent.
     from typer.main import get_command as _raw_get_command
-except (ImportError, AttributeError):  # pragma: no cover - Typer may be unavailable in slim envs
+except (
+    ImportError,
+    AttributeError,
+):  # pragma: no cover - Typer may be unavailable in slim envs
     TYPER_GET_COMMAND: TyperCommandFactory | None = None
 else:
     TYPER_GET_COMMAND = cast("TyperCommandFactory", _raw_get_command)
@@ -193,7 +196,9 @@ def param_schema(param: click.Parameter) -> tuple[dict[str, object], bool, str]:
     return schema, required, example_name
 
 
-def build_example(bin_name: str, tokens: Sequence[str], params: Sequence[click.Parameter]) -> str:
+def build_example(
+    bin_name: str, tokens: Sequence[str], params: Sequence[click.Parameter]
+) -> str:
     """Construct a CLI usage example string for documentation.
 
     Parameters
@@ -277,7 +282,9 @@ def _coerce_mapping_list(value: object) -> list[dict[str, object]]:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
         return []
     return [
-        {str(key): val for key, val in item.items()} for item in value if isinstance(item, Mapping)
+        {str(key): val for key, val in item.items()}
+        for item in value
+        if isinstance(item, Mapping)
     ]
 
 
@@ -320,7 +327,9 @@ def _initial_document(
     interface_meta: RegistryInterfaceModel | None,
 ) -> dict[str, object]:
     tag_entries = [
-        entry for entry in _coerce_mapping_list(augment.payload.get("tags")) if "name" in entry
+        entry
+        for entry in _coerce_mapping_list(augment.payload.get("tags"))
+        if "name" in entry
     ]
     document: dict[str, object] = {
         "openapi": "3.1.0",
@@ -425,8 +434,12 @@ class _OperationDescriptor:
         tokens = list(self.raw_tokens) or [self.command.name or "run"]
         object.__setattr__(self, "tokens", tuple(tokens))
         raw_params = getattr(self.command, "params", ())
-        if isinstance(raw_params, Sequence) and not isinstance(raw_params, (str, bytes)):
-            params = tuple(item for item in raw_params if isinstance(item, click.Parameter))
+        if isinstance(raw_params, Sequence) and not isinstance(
+            raw_params, (str, bytes)
+        ):
+            params = tuple(
+                item for item in raw_params if isinstance(item, click.Parameter)
+            )
         else:
             params = ()
         object.__setattr__(self, "params", params)
@@ -490,7 +503,9 @@ class OperationContext:
             The OpenAPI path, operation payload, and associated tags.
         """
         descriptor = _OperationDescriptor(tuple(tokens), command)
-        override = _augment_lookup(self.augment, descriptor.operation_id, descriptor.tokens)
+        override = _augment_lookup(
+            self.augment, descriptor.operation_id, descriptor.tokens
+        )
         op_meta = _operation_metadata(
             self.interface_meta, descriptor.tokens, descriptor.operation_id
         )
@@ -522,7 +537,10 @@ class OperationContext:
                                     "stdout": {"type": "string"},
                                     "stderr": {"type": "string"},
                                     "exitCode": {"type": "integer"},
-                                    "artifacts": {"type": "array", "items": {"type": "string"}},
+                                    "artifacts": {
+                                        "type": "array",
+                                        "items": {"type": "string"},
+                                    },
                                 },
                                 "required": ["exitCode"],
                             }
@@ -531,7 +549,9 @@ class OperationContext:
                 }
             },
         }
-        problem_details = _collect_problem_details(op_meta, self.interface_meta, override)
+        problem_details = _collect_problem_details(
+            op_meta, self.interface_meta, override
+        )
         if problem_details:
             operation["x-problemDetails"] = problem_details
         interface_extension = _interface_metadata(self.interface_meta)
@@ -590,7 +610,9 @@ def _build_x_cli_block(
     if isinstance(env_values, Sequence) and not isinstance(env_values, (str, bytes)):
         block["x-env"] = [str(value) for value in env_values]
     code_samples = op_meta.get("code_samples")
-    if isinstance(code_samples, Sequence) and not isinstance(code_samples, (str, bytes)):
+    if isinstance(code_samples, Sequence) and not isinstance(
+        code_samples, (str, bytes)
+    ):
         sample_block = cast("list[object]", block.setdefault("x-codeSamples", []))
         sample_block.extend(code_samples)
     examples = _ensure_str_list(op_meta.get("examples"))
@@ -604,14 +626,19 @@ def _build_x_cli_block(
     return block
 
 
-def _augment_document_tags(document: dict[str, object], referenced_tags: set[str]) -> None:
+def _augment_document_tags(
+    document: dict[str, object], referenced_tags: set[str]
+) -> None:
     existing_tags = document.get("tags")
     iterable_tags = (
         existing_tags
-        if isinstance(existing_tags, Sequence) and not isinstance(existing_tags, (str, bytes))
+        if isinstance(existing_tags, Sequence)
+        and not isinstance(existing_tags, (str, bytes))
         else []
     )
-    existing = {entry.get("name") for entry in iterable_tags if isinstance(entry, Mapping)}
+    existing = {
+        entry.get("name") for entry in iterable_tags if isinstance(entry, Mapping)
+    }
     for tag in sorted(referenced_tags):
         if tag not in existing:
             tag_list = cast("list[dict[str, object]]", document.setdefault("tags", []))
@@ -696,7 +723,9 @@ def _build_cli_extension(
     if isinstance(env_values, Sequence) and not isinstance(env_values, (str, bytes)):
         extension["x-env"] = [str(value) for value in env_values]
     code_samples = metadata.get("code_samples") or metadata.get("x-codeSamples")
-    if isinstance(code_samples, Sequence) and not isinstance(code_samples, (str, bytes)):
+    if isinstance(code_samples, Sequence) and not isinstance(
+        code_samples, (str, bytes)
+    ):
         samples = [cast("Mapping[str, object]", item) for item in code_samples]
         extension["x-codeSamples"] = samples
     examples = _coerce_str_list(metadata.get("examples"))
@@ -769,7 +798,9 @@ def _build_registry_operation_entry(
     sanitized_tokens, command_tokens = _operation_tokens(operation_id, op_key)
     path = "/cli/" + "/".join(command_tokens)
 
-    override_model = context.augment.operation_override(operation_id, tokens=sanitized_tokens)
+    override_model = context.augment.operation_override(
+        operation_id, tokens=sanitized_tokens
+    )
     override_payload = (
         override_model.to_payload()
         if override_model is not None
@@ -803,7 +834,8 @@ def _build_registry_operation_entry(
                     metadata=merged_meta,
                 ),
                 problem_details=_coerce_str_list(
-                    merged_meta.get("problem_details") or merged_meta.get("x-problemDetails")
+                    merged_meta.get("problem_details")
+                    or merged_meta.get("x-problemDetails")
                 ),
                 interface_extension=context.interface_extension,
             )
@@ -919,12 +951,18 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         Parsed arguments namespace containing app, bin, title, version,
         augment, out, interface-id, and registry attributes.
     """
-    parser = argparse.ArgumentParser(description="Generate OpenAPI spec for a Typer/Click CLI.")
+    parser = argparse.ArgumentParser(
+        description="Generate OpenAPI spec for a Typer/Click CLI."
+    )
     parser.add_argument(
         "--app", required=True, help="Import path to Typer or Click app (pkg.mod:attr)"
     )
-    parser.add_argument("--bin", default="kgf", help="Binary name displayed in examples")
-    parser.add_argument("--title", default="KGFoundry CLI", help="OpenAPI info.title value")
+    parser.add_argument(
+        "--bin", default="kgf", help="Binary name displayed in examples"
+    )
+    parser.add_argument(
+        "--title", default="KGFoundry CLI", help="OpenAPI info.title value"
+    )
     parser.add_argument("--version", default="0.0.0", help="OpenAPI info.version value")
     parser.add_argument(
         "--augment",

@@ -1,4 +1,5 @@
 """Typed NumPy helpers shared across vector search modules."""
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -136,7 +137,9 @@ def topk_indices(scores: FloatVector, k: int) -> IntVector:
         return cast("IntVector", np.empty(0, dtype=np.int64))
 
     trimmed_k = min(k, total)
-    score_list = cast("list[float]", scores_array.astype(np.float64, copy=False).tolist())
+    score_list = cast(
+        "list[float]", scores_array.astype(np.float64, copy=False).tolist()
+    )
 
     def sort_key(idx: int) -> tuple[float, int]:
         """Return sort key tuple for index ranking.

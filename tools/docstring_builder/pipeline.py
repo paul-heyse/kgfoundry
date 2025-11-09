@@ -209,6 +209,18 @@ class PipelineState:
     diff_previews: list[tuple[Path, str]] = field(default_factory=_new_preview_list)
 
 
+_SET_PIPELINE_ATTR = object.__setattr__
+
+
+def _bump_state(state: PipelineState, field_name: str, amount: int = 1) -> None:
+    _SET_PIPELINE_ATTR(state, field_name, getattr(state, field_name) + amount)
+
+
+def _set_state(state: PipelineState, **updates: object) -> None:
+    for key, value in updates.items():
+        _SET_PIPELINE_ATTR(state, key, value)
+
+
 @dataclass(slots=True, frozen=True)
 class CliResultContext:
     """Context for CLI result building."""
@@ -334,7 +346,7 @@ class PipelineRunner:
         files_list = list(files)
         jobs = self._resolve_jobs(self._cfg.request.jobs)
         state = PipelineState(status_counts=Counter())
-        state.tooling_metadata = tooling_metadata
+        _set_state(state, tooling_metadata=tooling_metadata)
         start = time.perf_counter()
 
         self._process_files(files_list, jobs, state)
@@ -393,20 +405,22 @@ class PipelineRunner:
         """
         return _repo_relative_path(path)
 
-    def _process_files(self, files: Sequence[Path], jobs: int, state: PipelineState) -> None:
+    def _process_files(
+        self, files: Sequence[Path], jobs: int, state: PipelineState
+    ) -> None:
         """Process files using thread pool or serial execution."""
         for file_path, outcome in self._ordered_outcomes(files, jobs):
             state.status_counts[outcome.status] += 1
             if outcome.skipped:
-                state.skipped_count += 1
+                _bump_state(state, "skipped_count")
             else:
-                state.processed_count += 1
+                _bump_state(state, "processed_count")
             if outcome.changed:
-                state.changed_count += 1
+                _bump_state(state, "changed_count")
             if outcome.cache_hit:
-                state.cache_hits += 1
+                _bump_state(state, "cache_hits")
             else:
-                state.cache_misses += 1
+                _bump_state(state, "cache_misses")
 
             if outcome.status is not self._cfg.success_status:
                 state.errors.append(
@@ -491,7 +505,9 @@ class PipelineRunner:
                 if exception is None:
                     outcome = future.result()
                 else:
-                    if isinstance(exception, KeyboardInterrupt):  # pragma: no cover - propagate
+                    if isinstance(
+                        exception, KeyboardInterrupt
+                    ):  # pragma: no cover - propagate
                         # Re-raise KeyboardInterrupt to allow clean shutdown
                         raise KeyboardInterrupt from exception
                     self._cfg.logger.error(
@@ -512,14 +528,17 @@ class PipelineRunner:
 
     def _maybe_reconcile_docfacts(self, state: PipelineState) -> None:
         """Reconcile DocFacts if required."""
-        if self._cfg.options.skip_docfacts or self._cfg.request.command not in {"update", "check"}:
+        if self._cfg.options.skip_docfacts or self._cfg.request.command not in {
+            "update",
+            "check",
+        }:
             return
 
         filtered = self._cfg.filter_docfacts()
         is_check = self._cfg.request.command == "check"
         coordinator = self._cfg.docfacts_coordinator_factory(check_mode=is_check)
         result = coordinator.reconcile(filtered)
-        state.docfacts_checked = True
+        _set_state(state, docfacts_checked=True)
         exit_status = self._map_docfacts_status(result.status)
         state.status_counts[exit_status] += 1
 
@@ -536,10 +555,12 @@ class PipelineRunner:
                 docfacts_payload_text = DOCFACTS_PATH.read_text(encoding="utf-8")
             except FileNotFoundError:
                 docfacts_payload_text = None
-            state.docfacts_payload_text = docfacts_payload_text
+            _set_state(state, docfacts_payload_text=docfacts_payload_text)
             self._cfg.diff_manager.record_docfacts_baseline_diff(docfacts_payload_text)
 
-    def _apply_policy_report(self, policy_report: PolicyReport, state: PipelineState) -> None:
+    def _apply_policy_report(
+        self, policy_report: PolicyReport, state: PipelineState
+    ) -> None:
         """Apply policy violations to error state."""
         for violation in policy_report.violations:
             state.errors.append(
@@ -769,7 +790,9 @@ class PipelineRunner:
                 exit_status,
                 self._cfg.request,
                 f"Docstring builder exited with status {status_label}",
-                instance=(f"urn:cli:docbuilder:{command}:{invoked}" if invoked else None),
+                instance=(
+                    f"urn:cli:docbuilder:{command}:{invoked}" if invoked else None
+                ),
                 errors=errors_payload,
             )
             if cli_result is not None:
@@ -778,7 +801,9 @@ class PipelineRunner:
         if cli_result is not None:
             validate_cli_output(cli_result)
 
-        docfacts_report = self._build_docfacts_report(docfacts_checked=state.docfacts_checked)
+        docfacts_report = self._build_docfacts_report(
+            docfacts_checked=state.docfacts_checked
+        )
         if cli_result is not None and docfacts_report is not None:
             cli_result["docfacts"] = docfacts_report
 
@@ -870,7 +895,9 @@ class PipelineRunner:
         mapping: dict[str, list[str]] = {}
         for path in files:
             key = _repo_relative_path(path)
-            dependents = [_repo_relative_path(dependent) for dependent in dependents_for(path)]
+            dependents = [
+                _repo_relative_path(dependent) for dependent in dependents_for(path)
+            ]
             mapping[key] = dependents
         return mapping
 
@@ -967,7 +994,9 @@ class PipelineRunner:
         if not self._cfg.request.json_output:
             return None
 
-        cli_result = build_cli_result_skeleton(self._cfg.status_from_exit(context.exit_status))
+        cli_result = build_cli_result_skeleton(
+            self._cfg.status_from_exit(context.exit_status)
+        )
         invoked = (
             self._cfg.request.invoked_subcommand
             or self._cfg.request.subcommand
@@ -1014,7 +1043,9 @@ class PipelineRunner:
 
         obs_block: ObservabilityReport = {
             "status": self._cfg.status_from_exit(context.exit_status),
-            "errors": [e.to_report() for e in context.state.errors[:OBSERVABILITY_MAX_ERRORS]],
+            "errors": [
+                e.to_report() for e in context.state.errors[:OBSERVABILITY_MAX_ERRORS]
+            ],
         }
         if context.diff_links:
             obs_block["driftPreviews"] = dict(context.diff_links)

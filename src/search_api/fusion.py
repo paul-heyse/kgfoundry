@@ -4,6 +4,7 @@ This module bundles fusion logic for the kgfoundry stack. It groups related help
 packages can import a single cohesive namespace. Refer to the functions and classes below for
 implementation specifics.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -17,7 +18,9 @@ __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
 
 # [nav:anchor rrf_fuse]
-def rrf_fuse(rankers: list[list[tuple[str, float]]], k_rrf: int = 60) -> dict[str, float]:
+def rrf_fuse(
+    rankers: list[list[tuple[str, float]]], k_rrf: int = 60
+) -> dict[str, float]:
     """Fuse multiple ranked lists using Reciprocal Rank Fusion (RRF).
 
     Combines multiple ranked lists into a single fused ranking by summing

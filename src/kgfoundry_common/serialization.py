@@ -15,6 +15,7 @@ Examples
 >>> loaded = deserialize_json(output_path, schema_path)
 >>> assert loaded == data
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -91,7 +92,9 @@ def _load_schema_by_path_str_impl(schema_path_str: str) -> dict[str, object]:
     try:
         schema_raw: object = json.loads(schema_text)
         if not isinstance(schema_raw, dict):
-            msg = f"Schema must be a JSON object at root, got {type(schema_raw).__name__}"
+            msg = (
+                f"Schema must be a JSON object at root, got {type(schema_raw).__name__}"
+            )
             raise SchemaValidationError(msg)
         schema_obj = cast("dict[str, object]", schema_raw)
     except json.JSONDecodeError as e:

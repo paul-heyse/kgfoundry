@@ -129,7 +129,9 @@ def _run_symbol_index(context: DocToolContext) -> int:
                 detail=str(exc),
                 status=500,
                 instance=context.instance("unexpected-error"),
-                extensions={"packages": cast("JsonValue", [str(pkg) for pkg in packages])},
+                extensions={
+                    "packages": cast("JsonValue", [str(pkg) for pkg in packages])
+                },
             )
         )
         message = "Symbol index build failed"

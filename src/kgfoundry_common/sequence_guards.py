@@ -20,6 +20,7 @@ When sequence is empty, raises a Problem Details error:
 ... except Exception as e:
 ...     assert "empty" in str(e).lower()
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations

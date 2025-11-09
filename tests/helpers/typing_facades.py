@@ -85,7 +85,9 @@ def load_facade_attribute(module_name: str, attribute: str) -> object:
     return attr
 
 
-def load_facade_attribute_typed[T](module_name: str, attribute: str, expected_type: type[T]) -> T:
+def load_facade_attribute_typed[T](
+    module_name: str, attribute: str, expected_type: type[T]
+) -> T:
     """Load an attribute from a façade module with runtime type checking.
 
     Parameters
@@ -117,9 +119,7 @@ def load_facade_attribute_typed[T](module_name: str, attribute: str, expected_ty
     """
     value = load_facade_attribute(module_name, attribute)
     if not isinstance(value, expected_type):
-        message = (
-            f"{module_name}.{attribute} expected {expected_type!r} but received {type(value)!r}"
-        )
+        message = f"{module_name}.{attribute} expected {expected_type!r} but received {type(value)!r}"
         raise TypeError(message)
     assert isinstance(value, expected_type)
     return value

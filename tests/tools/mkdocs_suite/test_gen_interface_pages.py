@@ -45,7 +45,9 @@ def fixture_temporary_repo(tmp_path: Path) -> Path:
 
 
 def test_collect_nav_interfaces_skips_malformed_json(
-    temporary_repo: Path, caplog: pytest.LogCaptureFixture, monkeypatch: pytest.MonkeyPatch
+    temporary_repo: Path,
+    caplog: pytest.LogCaptureFixture,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Malformed nav files should be ignored without raising errors."""
     caplog.set_level(logging.WARNING)
@@ -55,7 +57,9 @@ def test_collect_nav_interfaces_skips_malformed_json(
     interfaces = module.collect_nav_interfaces()
 
     assert any("invalid/_nav.json" in record.message for record in caplog.records)
-    assert interfaces == [{"id": "valid-interface", "module": "valid", "_nav_module_path": "valid"}]
+    assert interfaces == [
+        {"id": "valid-interface", "module": "valid", "_nav_module_path": "valid"}
+    ]
 
 
 class _DummyFile(io.StringIO):

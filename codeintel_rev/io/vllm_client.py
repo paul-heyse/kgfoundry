@@ -291,18 +291,34 @@ class VLLMClient:
     ) -> np.ndarray:
         """Embed texts in batches.
 
+        This method processes multiple texts efficiently by splitting them into
+        batches and sending each batch to the vLLM embedding service. Batching
+        improves throughput by amortizing HTTP request overhead and allowing
+        the service to process multiple texts in parallel.
+
+        The method handles empty input gracefully, returning an empty array with
+        the correct shape. Batch size can be customized per call or defaults to
+        the client's configured batch size. Results are concatenated into a single
+        array maintaining the input order.
+
         Parameters
         ----------
         texts : Sequence[str]
-            Texts to embed.
-        batch_size : int | None
-            Batch size; defaults to config.batch_size.
+            Sequence of texts to embed. Can be any sequence type (list, tuple, etc.).
+            Each text should be a code chunk or query string suitable for the
+            embedding model. Empty sequence returns empty array.
+        batch_size : int | None, optional
+            Number of texts to process per batch. If None, uses the client's
+            configured batch_size from config. Larger batches improve throughput
+            but increase memory usage. Defaults to None (use config.batch_size).
 
-    Returns
-    -------
-    np.ndarray
-        Embeddings array of shape (len(texts), vec_dim). Returns an empty array
-        of shape ``(0, self.config.embedding_dim)`` when ``texts`` is empty.
+        Returns
+        -------
+        np.ndarray
+            Embeddings array of shape (len(texts), vec_dim) where vec_dim is the
+            model's embedding dimension (e.g., 2560). Dtype is float32 for memory
+            efficiency. Returns an empty array of shape (0, self.config.embedding_dim)
+            when texts is empty. The order matches the input texts.
         """
         if not texts:
             return np.empty((0, self.config.embedding_dim), dtype=np.float32)
@@ -469,7 +485,7 @@ class VLLMClient:
                 if loop.is_running():
                     # If event loop is running, schedule close
                     # Note: Task will complete asynchronously, but we can't await here
-                    _close_task = loop.create_task(self._async_client.aclose())  # noqa: RUF006 - intentionally not awaited
+                    _close_task = loop.create_task(self._async_client.aclose())
                 else:
                     loop.run_until_complete(self._async_client.aclose())
             except RuntimeError:

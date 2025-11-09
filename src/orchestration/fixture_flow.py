@@ -4,6 +4,7 @@ This module bundles fixture flow logic for the kgfoundry stack. It groups relate
 downstream packages can import a single cohesive namespace. Refer to the functions and classes below
 for implementation specifics.
 """
+
 # [nav:section public-api]
 
 from __future__ import annotations
@@ -119,7 +120,11 @@ def _t_write_fixture_dense_impl(dense_root: str) -> tuple[str, int]:
     writer = ParquetVectorWriter(dense_root)
     vector = [0.0] * 2560
     out_root = writer.write_dense(
-        "Qwen3-Embedding-4B", "fixture", 2560, [("urn:chunk:fixture:0-28", vector, 1.0)], shard=0
+        "Qwen3-Embedding-4B",
+        "fixture",
+        2560,
+        [("urn:chunk:fixture:0-28", vector, 1.0)],
+        shard=0,
     )
     return out_root, 1
 
@@ -188,8 +193,12 @@ def _t_register_in_duckdb_impl(
         Dictionary with "runs" key containing list of run IDs.
     """
     registry = DuckDBRegistryHelper(db_path)
-    dense_run = registry.new_run("dense_embed", "Qwen3-Embedding-4B", "main", {"dim": 2560})
-    sparse_run = registry.new_run("splade_encode", "SPLADE-v3-distilbert", "main", {"topk": 256})
+    dense_run = registry.new_run(
+        "dense_embed", "Qwen3-Embedding-4B", "main", {"dim": 2560}
+    )
+    sparse_run = registry.new_run(
+        "splade_encode", "SPLADE-v3-distilbert", "main", {"topk": 256}
+    )
 
     ds_chunks = registry.begin_dataset("chunks", dense_run)
     registry.commit_dataset(ds_chunks, chunks_info[0], rows=chunks_info[1])

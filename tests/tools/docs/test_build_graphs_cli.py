@@ -25,7 +25,9 @@ def _cli_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     return envelope_dir
 
 
-def test_main_emits_success_envelope(monkeypatch: pytest.MonkeyPatch, cli_paths: Path) -> None:
+def test_main_emits_success_envelope(
+    monkeypatch: pytest.MonkeyPatch, cli_paths: Path
+) -> None:
     monkeypatch.setattr(build_graphs, "_validate_runtime_dependencies", lambda: None)
     monkeypatch.setattr(build_graphs, "_resolve_packages", lambda _args: ["pkg1"])
     monkeypatch.setattr(
@@ -60,7 +62,9 @@ def test_main_emits_success_envelope(monkeypatch: pytest.MonkeyPatch, cli_paths:
     assert any(entry.get("path") == str(build_graphs.OUT) for entry in files)
 
 
-def test_main_records_validation_failure(monkeypatch: pytest.MonkeyPatch, cli_paths: Path) -> None:
+def test_main_records_validation_failure(
+    monkeypatch: pytest.MonkeyPatch, cli_paths: Path
+) -> None:
     monkeypatch.setattr(build_graphs, "_validate_runtime_dependencies", lambda: None)
     monkeypatch.setattr(build_graphs, "_resolve_packages", lambda _args: ["pkg1"])
 

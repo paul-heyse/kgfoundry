@@ -67,6 +67,11 @@ class ScopeIn(TypedDict, total=False):
         Programming languages to include (e.g., ["python", "typescript"]).
         Only files of these languages are searched. Empty list or omitted means
         all languages.
+    kinds : list[str]
+        Symbol kinds to include (e.g., ["function", "class", "method"]).
+        Results are scoped to these symbol categories when provided.
+    symbols : list[str]
+        Specific SCIP symbol identifiers to focus on regardless of location.
     """
 
     repos: list[str]
@@ -75,6 +80,8 @@ class ScopeIn(TypedDict, total=False):
     include_globs: list[str]
     exclude_globs: list[str]
     languages: list[str]
+    kinds: list[str]
+    symbols: list[str]
 
 
 class Match(TypedDict):

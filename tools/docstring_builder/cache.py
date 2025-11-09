@@ -17,7 +17,9 @@ from tools._shared.schema import validate_tools_payload
 logger = logging.getLogger(__name__)
 
 DOCSTRING_CACHE_SCHEMA: Final[str] = "docstring_cache.json"
-DOCSTRING_CACHE_SCHEMA_ID: Final[str] = "https://kgfoundry.dev/schema/tools/docstring-cache.json"
+DOCSTRING_CACHE_SCHEMA_ID: Final[str] = (
+    "https://kgfoundry.dev/schema/tools/docstring-cache.json"
+)
 DOCSTRING_CACHE_VERSION: Final[str] = "1.0.0"
 
 
@@ -59,12 +61,16 @@ class CacheDocument(BaseModel):
 
     schema_version: str = Field(DOCSTRING_CACHE_VERSION, alias="schemaVersion")
     schema_id: str = Field(DOCSTRING_CACHE_SCHEMA_ID, alias="schemaId")
-    generated_at: str = Field(default_factory=_default_generated_at, alias="generatedAt")
+    generated_at: str = Field(
+        default_factory=_default_generated_at, alias="generatedAt"
+    )
     entries: dict[str, CacheEntry] = Field(default_factory=_default_entries)
 
 
 CacheDocumentType: type[CacheDocument] = CacheDocument
-_CACHE_DOCUMENT_ADAPTER: Final[TypeAdapter[CacheDocument]] = TypeAdapter(CacheDocumentType)
+_CACHE_DOCUMENT_ADAPTER: Final[TypeAdapter[CacheDocument]] = TypeAdapter(
+    CacheDocumentType
+)
 
 
 class _CacheDocumentInit(TypedDict, total=False):
@@ -312,7 +318,9 @@ class BuilderCache:
     def _load_legacy_payload(self, raw_payload: str) -> None:
         """Load and normalise legacy cache payloads without schema metadata."""
         try:
-            legacy_entries = cast("dict[str, dict[str, object]]", json.loads(raw_payload))
+            legacy_entries = cast(
+                "dict[str, dict[str, object]]", json.loads(raw_payload)
+            )
         except json.JSONDecodeError as exc:
             self._handle_load_error("Invalid cache payload", exc)
             return
@@ -321,10 +329,14 @@ class BuilderCache:
         for key, value in legacy_entries.items():
             mtime_val = value.get("mtime")
             config_hash_val = value.get("config_hash")
-            if not isinstance(mtime_val, (int, float)) or not isinstance(config_hash_val, str):
+            if not isinstance(mtime_val, (int, float)) or not isinstance(
+                config_hash_val, str
+            ):
                 self._handle_load_error("Legacy cache entry schema mismatch")
                 return
-            entries[key] = CacheEntry(mtime=float(mtime_val), config_hash=config_hash_val)
+            entries[key] = CacheEntry(
+                mtime=float(mtime_val), config_hash=config_hash_val
+            )
 
         payload_dict: dict[str, object] = {
             "schemaVersion": DOCSTRING_CACHE_VERSION,

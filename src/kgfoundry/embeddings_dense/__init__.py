@@ -1,4 +1,5 @@
 """Namespace bridge that exposes the embeddings_dense package under kgfoundry."""
+
 # [nav:section public-api]
 
 from __future__ import annotations
