@@ -374,7 +374,13 @@ class Checkpoint(ColBERT):
         reverse_indices: torch.Tensor,
         options: DocumentEncodingOptions,
     ) -> torch.Tensor | tuple[torch.Tensor, ...] | tuple[torch.Tensor, list[int], ...]:
-        """Process batched document inputs using the configured options."""
+        """Process batched document inputs using the configured options.
+
+        Returns
+        -------
+        torch.Tensor | tuple[torch.Tensor, ...] | tuple[torch.Tensor, list[int], ...]
+            Processed document embeddings with shape determined by options.keep_dims.
+        """
         returned_text = self._prepare_returned_text(
             options.return_tokens, text_batches, reverse_indices
         )
@@ -411,6 +417,7 @@ class Checkpoint(ColBERT):
 
     def _finalize_batched_documents(
         self,
+        *,
         keep_dims: bool | str,
         batches: list[tuple[torch.Tensor, torch.Tensor]],
         reverse_indices: torch.Tensor,

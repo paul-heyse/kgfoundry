@@ -36,6 +36,12 @@ Typed Prometheus helpers with graceful fallbacks.
 
 ::: kgfoundry_common.prometheus.HistogramParams
 
+### kgfoundry_common.prometheus._CounterCallKwargs
+
+::: kgfoundry_common.prometheus._CounterCallKwargs
+
+*Bases:* TypedDict
+
 ### kgfoundry_common.prometheus._CounterConstructor
 
 ::: kgfoundry_common.prometheus._CounterConstructor
@@ -47,6 +53,12 @@ Typed Prometheus helpers with graceful fallbacks.
 ::: kgfoundry_common.prometheus._GaugeConstructor
 
 *Bases:* Protocol
+
+### kgfoundry_common.prometheus._HistogramCallKwargs
+
+::: kgfoundry_common.prometheus._HistogramCallKwargs
+
+*Bases:* TypedDict
 
 ### kgfoundry_common.prometheus._HistogramConstructor
 
@@ -116,7 +128,7 @@ Typed Prometheus helpers with graceful fallbacks.
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `collections.abc.Sequence`, `dataclasses.dataclass`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.sequence_guards.first_or_error`, `prometheus_client`, `prometheus_client.Counter`, `prometheus_client.Gauge`, `prometheus_client.Histogram`, `prometheus_client.REGISTRY`, `prometheus_client.registry.CollectorRegistry`, `typing.NoReturn`, `typing.Protocol`, `typing.TYPE_CHECKING`, `typing.cast`, `typing.overload`
+**Imports:** `__future__.annotations`, `collections.abc.Sequence`, `dataclasses.dataclass`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.sequence_guards.first_or_error`, `prometheus_client`, `prometheus_client.Counter`, `prometheus_client.Gauge`, `prometheus_client.Histogram`, `prometheus_client.REGISTRY`, `prometheus_client.registry.CollectorRegistry`, `typing.NoReturn`, `typing.Protocol`, `typing.TYPE_CHECKING`, `typing.TypedDict`, `typing.cast`, `typing.overload`
 
 ## Autorefs Examples
 
@@ -139,10 +151,15 @@ classDiagram
     class HistogramLike
     Protocol <|-- HistogramLike
     class HistogramParams
+    class _CounterCallKwargs
+    class TypedDict
+    TypedDict <|-- _CounterCallKwargs
     class _CounterConstructor
     Protocol <|-- _CounterConstructor
     class _GaugeConstructor
     Protocol <|-- _GaugeConstructor
+    class _HistogramCallKwargs
+    TypedDict <|-- _HistogramCallKwargs
     class _HistogramConstructor
     Protocol <|-- _HistogramConstructor
     class _NoopCounter
@@ -186,6 +203,8 @@ direction: right
 "kgfoundry_common.prometheus" -> "typing.Protocol"
 "typing.TYPE_CHECKING": "typing.TYPE_CHECKING"
 "kgfoundry_common.prometheus" -> "typing.TYPE_CHECKING"
+"typing.TypedDict": "typing.TypedDict"
+"kgfoundry_common.prometheus" -> "typing.TypedDict"
 "typing.cast": "typing.cast"
 "kgfoundry_common.prometheus" -> "typing.cast"
 "typing.overload": "typing.overload"

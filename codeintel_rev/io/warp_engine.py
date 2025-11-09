@@ -100,7 +100,8 @@ class WarpEngine:
             raise WarpUnavailableError(msg)
         return executor_cls
 
-    def _import_warp_executor_module(self) -> ModuleType:
+    @staticmethod
+    def _import_warp_executor_module() -> ModuleType:
         purpose = "WARP/XTR reranking (install `xtr-warp` and build the index)"
         module = gate_import("xtr_warp.executor", purpose)
         return cast("ModuleType", module)

@@ -42,7 +42,6 @@
       "search_api.types.FaissModuleProtocol",
       "search_api.types.GpuClonerOptionsProtocol",
       "search_api.types.GpuResourcesProtocol",
-      "typing.TYPE_CHECKING",
       "typing.cast"
     ]
   }

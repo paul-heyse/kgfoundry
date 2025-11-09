@@ -162,27 +162,19 @@ class QueryTokenizer:
             If bsize=None: (input_ids, attention_mask).
             If bsize specified: list of (input_ids, attention_mask) tuples with reverse_indices.
 
-        Raises
-        ------
-        TypeError
-            If batch_text is not list or tuple.
-            This exception is raised indirectly by _prepare_batch_list when type validation fails.
-        ValueError
-            If full_length_search=True with batch size > 1, or if context
-            length doesn't match batch_text length.
-            This exception is raised indirectly by _determine_max_length or
-            _append_context_if_needed when validation fails.
+        Notes
+        -----
+        This method may raise TypeError if batch_text is not list or tuple. It may raise
+        ValueError if full_length_search=True with batch size > 1, or if context length
+        doesn't match batch_text length. These exceptions are raised indirectly by
+        _prepare_batch_list, _determine_max_length, or _append_context_if_needed when
+        type validation or parameter validation fails.
         """
-        try:
-            batch_list = self._prepare_batch_list(batch_text)
-            max_length = self._determine_max_length(
-                batch_list, full_length_search=full_length_search
-            )
-            ids, mask = self._tokenize_with_padding(batch_list, max_length)
-            ids, mask = self._append_context_if_needed(ids, mask, context, batch_list)
-            mask = self._apply_mask_attention(ids, mask)
-        except (TypeError, ValueError) as exc:
-            raise exc
+        batch_list = self._prepare_batch_list(batch_text)
+        max_length = self._determine_max_length(batch_list, full_length_search=full_length_search)
+        ids, mask = self._tokenize_with_padding(batch_list, max_length)
+        ids, mask = self._append_context_if_needed(ids, mask, context, batch_list)
+        mask = self._apply_mask_attention(ids, mask)
 
         if bsize:
             return split_into_batches(ids, mask, bsize)

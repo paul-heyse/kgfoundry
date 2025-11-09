@@ -492,22 +492,18 @@ class ExperimentSpec:
         ExperimentSpec
             Self (for method chaining).
 
-        Raises
-        ------
-        ValueError
-            If any parameter is invalid or out of range.
-            This exception is raised indirectly by _validate_collection_and_dataset,
-            _validate_numeric_parameters, or _validate_optional_int when validation fails.
+        Notes
+        -----
+        This method may raise ValueError if any parameter is invalid or out of range.
+        The exception is raised indirectly by _validate_collection_and_dataset,
+        _validate_numeric_parameters, or _validate_optional_int when validation fails.
         """
-        try:
-            self._validate_collection_and_dataset()
-            self._validate_numeric_parameters()
-            _validate_optional_int(self.nprobe, "nprobe")
-            _validate_optional_int(self.t_prime, "t_prime")
-            _validate_optional_int(self.document_top_k, "document_top_k")
-            _validate_optional_int(self.bound, "bound")
-        except ValueError as exc:
-            raise exc
+        self._validate_collection_and_dataset()
+        self._validate_numeric_parameters()
+        _validate_optional_int(self.nprobe, "nprobe")
+        _validate_optional_int(self.t_prime, "t_prime")
+        _validate_optional_int(self.document_top_k, "document_top_k")
+        _validate_optional_int(self.bound, "bound")
         return self
 
 
@@ -663,44 +659,41 @@ def _expand_configs(params: ExpansionArgs) -> list[ExperimentConfigDict]:
         If dataset identifiers are not formatted as '<collection>.<dataset>'.
     """
     configs: list[ExperimentConfigDict] = []
-    try:
-        for collection_dataset in params.datasets:
-            if "." not in collection_dataset:
-                msg = "dataset identifiers must be formatted as '<collection>.<dataset>'"
-                raise ValueError(msg)
-            collection, dataset = collection_dataset.split(".", 1)
-            for (
-                nbit,
-                nprobe,
-                t_prime,
-                document_top_k,
-                runtime,
-                threads,
-            ) in product(
-                params.nbits,
-                params.nprobes,
-                params.t_primes,
-                params.document_top_ks,
-                params.runtimes,
-                params.num_threads,
-            ):
-                spec = ExperimentSpec(
-                    collection=collection,
-                    dataset=dataset,
-                    nbits=nbit,
-                    nprobe=nprobe,
-                    t_prime=t_prime,
-                    document_top_k=document_top_k,
-                    runtime=runtime,
-                    split=params.split,
-                    bound=params.bound,
-                    num_threads=threads,
-                )
-                configs.extend(
-                    _make_config(spec, fused_ext=fused_ext) for fused_ext in params.fused_exts
-                )
-    except ValueError as exc:
-        raise exc
+    for collection_dataset in params.datasets:
+        if "." not in collection_dataset:
+            msg = "dataset identifiers must be formatted as '<collection>.<dataset>'"
+            raise ValueError(msg)
+        collection, dataset = collection_dataset.split(".", 1)
+        for (
+            nbit,
+            nprobe,
+            t_prime,
+            document_top_k,
+            runtime,
+            threads,
+        ) in product(
+            params.nbits,
+            params.nprobes,
+            params.t_primes,
+            params.document_top_ks,
+            params.runtimes,
+            params.num_threads,
+        ):
+            spec = ExperimentSpec(
+                collection=collection,
+                dataset=dataset,
+                nbits=nbit,
+                nprobe=nprobe,
+                t_prime=t_prime,
+                document_top_k=document_top_k,
+                runtime=runtime,
+                split=params.split,
+                bound=params.bound,
+                num_threads=threads,
+            )
+            configs.extend(
+                _make_config(spec, fused_ext=fused_ext) for fused_ext in params.fused_exts
+            )
     return configs
 
 
@@ -721,19 +714,19 @@ def _expand_configs_file(configuration_file: dict[str, object]) -> list[Experime
     ------
     TypeError
         If configuration_file does not contain 'configurations' key with dict value.
-    ValueError
-        If dataset identifiers are not formatted as '<collection>.<dataset>'.
-        This exception is raised indirectly by _expand_configs when validation fails.
+
+    Notes
+    -----
+    This function may raise ValueError if dataset identifiers are not formatted as
+    '<collection>.<dataset>'. The exception is raised indirectly by _expand_configs
+    when validation fails.
     """
-    try:
-        configs_raw = configuration_file.get("configurations")
-        if not isinstance(configs_raw, dict):
-            msg = "configuration_file must contain 'configurations' key with dict value"
-            raise TypeError(msg)
-        params = ExpansionArgs.from_raw(configs_raw)
-        return _expand_configs(params)
-    except (TypeError, ValueError) as exc:
-        raise exc
+    configs_raw = configuration_file.get("configurations")
+    if not isinstance(configs_raw, dict):
+        msg = "configuration_file must contain 'configurations' key with dict value"
+        raise TypeError(msg)
+    params = ExpansionArgs.from_raw(configs_raw)
+    return _expand_configs(params)
 
 
 def _write_results(results_file: str, data: list[ExperimentResultDict]) -> None:
@@ -986,18 +979,16 @@ def read_subprocess_inputs() -> tuple[ExperimentConfigDict, ExperimentParamsDict
     tuple[ExperimentConfigDict, ExperimentParamsDict]
         Tuple containing (config, params) dictionaries parsed from JSON input.
 
-    Raises
-    ------
-    TypeError
-        If input is not a valid JSON object or required keys have wrong types.
-        This exception is raised indirectly by _parse_subprocess_payload,
-        _parse_config_from_raw, or _parse_params_from_raw when parsing fails.
+    Notes
+    -----
+    This function may raise TypeError if input is not a valid JSON object or required
+    keys have wrong types. It may also raise ValueError if JSON parsing fails or
+    required keys are missing. These exceptions are raised indirectly by
+    _parse_subprocess_payload, _parse_config_from_raw, or _parse_params_from_raw
+    when parsing or validation fails.
     """
-    try:
-        config_raw, params_raw = _parse_subprocess_payload()
-        return _parse_config_from_raw(config_raw), _parse_params_from_raw(params_raw)
-    except (TypeError, ValueError) as exc:
-        raise exc
+    config_raw, params_raw = _parse_subprocess_payload()
+    return _parse_config_from_raw(config_raw), _parse_params_from_raw(params_raw)
 
 
 def publish_subprocess_results(results: ExperimentResultDict) -> None:
@@ -1186,38 +1177,38 @@ def spawn_and_execute(
 
     Raises
     ------
-    ValueError
-        If the script path is outside the project directory or invalid.
-        This exception is raised indirectly by _validate_script_path when path validation fails.
-    TypeError
-        If subprocess output is not a valid JSON object.
-        This exception is raised indirectly by _parse_subprocess_result when JSON parsing fails.
     RuntimeError
         If the script doesn't output "#> Done" marker or execution fails.
-        This exception is raised indirectly by _parse_subprocess_result when execution verification fails.
-    """
-    try:
-        project_root = pathlib.Path.cwd().resolve()
-        script_path = _validate_script_path(script, project_root)
-        python_exe_path = _find_python_executable()
+    TypeError
+        If subprocess output is not a valid JSON object.
 
-        process = _run_secured_subprocess(
-            python_exe_path=python_exe_path,
-            script_path=script_path,
-            input_data=json.dumps({"config": config, "params": params}),
-            project_root=project_root,
-        )
-        response = process.stdout.strip().split("\n")
-        if response[-1] != "#> Done":
-            msg = f"Expected process to end with '#> Done', got {response[-1]!r}"
-            raise RuntimeError(msg)
-        result_raw: object = json.loads(response[-2])
-        if not isinstance(result_raw, dict):
-            msg = "Subprocess output must be a JSON object"
-            raise TypeError(msg)
-        return _parse_subprocess_result(result_raw)
-    except (ValueError, TypeError, RuntimeError) as exc:
-        raise exc
+    Notes
+    -----
+    This function may also raise ValueError if the script path is outside the project
+    directory or invalid. The ValueError exception is raised indirectly by
+    _validate_script_path when path validation fails. The TypeError and RuntimeError
+    exceptions are raised directly by this function when JSON parsing or execution
+    verification fails.
+    """
+    project_root = pathlib.Path.cwd().resolve()
+    script_path = _validate_script_path(script, project_root)
+    python_exe_path = _find_python_executable()
+
+    process = _run_secured_subprocess(
+        python_exe_path=python_exe_path,
+        script_path=script_path,
+        input_data=json.dumps({"config": config, "params": params}),
+        project_root=project_root,
+    )
+    response = process.stdout.strip().split("\n")
+    if response[-1] != "#> Done":
+        msg = f"Expected process to end with '#> Done', got {response[-1]!r}"
+        raise RuntimeError(msg)
+    result_raw: object = json.loads(response[-2])
+    if not isinstance(result_raw, dict):
+        msg = "Subprocess output must be a JSON object"
+        raise TypeError(msg)
+    return _parse_subprocess_result(result_raw)
 
 
 def _strip_provenance_fields(provenance: dict[str, object]) -> ExperimentConfigDict:

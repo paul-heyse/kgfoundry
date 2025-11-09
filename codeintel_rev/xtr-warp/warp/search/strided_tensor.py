@@ -205,10 +205,11 @@ class _StrideBatch:
             Tuple of (sequences, lengths). Sequences are packed or padded
             depending on output format.
 
-        Raises
-        ------
-        ValueError
-            If output format is invalid or pids.dim() is not 1.
+        Notes
+        -----
+        This method may raise ValueError if output format is invalid or pids.dim() is not 1.
+        The exception is raised indirectly by _prepare_lookup or _ensure_packed_output
+        when validation fails.
         """
         pids, lengths, offsets = self._prepare_lookup(pids)
 
@@ -221,7 +222,13 @@ class _StrideBatch:
     def _lookup_gpu(
         self, lengths: torch.Tensor, offsets: torch.Tensor, output: str
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Perform lookup using GPU-accelerated views."""
+        """Perform lookup using GPU-accelerated views.
+
+        Returns
+        -------
+        tuple[torch.Tensor, torch.Tensor]
+            Tuple of (tensor, mask) or (packed_tensor, lengths) depending on output mode.
+        """
         stride = lengths.max().item()
         stride = next(s for s in self.strides if stride <= s)
         tensor = self.views[stride][offsets]
@@ -238,7 +245,13 @@ class _StrideBatch:
 
     @staticmethod
     def _ensure_packed_output(output: str) -> None:
-        """Validate that the output mode is 'packed' when required."""
+        """Validate that the output mode is 'packed' when required.
+
+        Raises
+        ------
+        ValueError
+            If output is not 'packed'.
+        """
         if output != "packed":
             msg = f"output must be 'packed' at this point, got {output!r}"
             raise ValueError(msg)
@@ -264,10 +277,11 @@ class _StrideBatch:
             Tuple of (sequences, lengths). Sequences are packed or padded
             depending on output format.
 
-        Raises
-        ------
-        ValueError
-            If output format is invalid.
+        Notes
+        -----
+        This method may raise ValueError if output format is invalid. The exception is
+        raised indirectly by lookup_packed_unordered or _ensure_packed_output when
+        validation fails.
         """
         permute_idxs, batches = self.lookup_packed_unordered(pids)
         unordered_lengths = torch.cat([batch.lengths for batch in batches])
@@ -289,7 +303,13 @@ class _StrideBatch:
         batches: list[_StrideBatch],
         permute_idxs: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Assemble the staggered tensor layout and reorder it."""
+        """Assemble the staggered tensor layout and reorder it.
+
+        Returns
+        -------
+        tuple[torch.Tensor, torch.Tensor]
+            Reordered (output_tensor, output_mask) tensors.
+        """
         output_tensor = torch.empty(
             permute_idxs.size(0),
             self.max_stride,
@@ -331,8 +351,18 @@ class _StrideBatch:
         Returns
         -------
         tuple[torch.Tensor, list[_StrideBatch]]
-            Tuple of (permute_indices, batches grouped by stride).
+            Tuple of (permutation_indices, stride_batches).
 
+        Raises
+        ------
+        ValueError
+            If stride grouping validation fails (lengths2 not all close to sentinel).
+
+        Notes
+        -----
+        This method may also raise ValueError indirectly through _prepare_lookup when
+        input validation fails. The exception is raised directly when stride grouping
+        validation fails.
         """
         pids, lengths, offsets = self._prepare_lookup(pids)
 

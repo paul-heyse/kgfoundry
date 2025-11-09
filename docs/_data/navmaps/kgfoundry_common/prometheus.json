@@ -37,6 +37,7 @@
       "typing.NoReturn",
       "typing.Protocol",
       "typing.TYPE_CHECKING",
+      "typing.TypedDict",
       "typing.cast",
       "typing.overload"
     ]

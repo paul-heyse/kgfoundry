@@ -32,7 +32,7 @@ FastAPI service exposing search endpoints, aggregation helpers, and Problem Deta
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `collections.abc.Callable`, `collections.abc.Sequence`, `dataclasses.dataclass`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.sequence_guards.first_or_error`, `kgfoundry_common.sequence_guards.first_or_error_multi_device`, `logging`, `search_api.types.FaissIndexProtocol`, `search_api.types.FaissModuleProtocol`, `search_api.types.GpuClonerOptionsProtocol`, `search_api.types.GpuResourcesProtocol`, `typing.TYPE_CHECKING`, `typing.cast`
+**Imports:** `__future__.annotations`, `collections.abc.Callable`, `collections.abc.Sequence`, `dataclasses.dataclass`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.sequence_guards.first_or_error`, `kgfoundry_common.sequence_guards.first_or_error_multi_device`, `logging`, `search_api.types.FaissIndexProtocol`, `search_api.types.FaissModuleProtocol`, `search_api.types.GpuClonerOptionsProtocol`, `search_api.types.GpuResourcesProtocol`, `typing.cast`
 
 ## Autorefs Examples
 
@@ -77,8 +77,6 @@ direction: right
 "search_api.faiss_gpu" -> "search_api.types.GpuClonerOptionsProtocol"
 "search_api.types.GpuResourcesProtocol": "search_api.types.GpuResourcesProtocol"
 "search_api.faiss_gpu" -> "search_api.types.GpuResourcesProtocol"
-"typing.TYPE_CHECKING": "typing.TYPE_CHECKING"
-"search_api.faiss_gpu" -> "typing.TYPE_CHECKING"
 "typing.cast": "typing.cast"
 "search_api.faiss_gpu" -> "typing.cast"
 "search_api": "search_api" { link: "https://github.com/paul-heyse/kgfoundry/blob/main/src/search_api/__init__.py" }

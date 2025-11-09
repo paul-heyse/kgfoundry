@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 from codeintel_rev.app import config_context
@@ -104,7 +105,8 @@ def test_service_context_resolves_paths(tmp_path: Path, monkeypatch: pytest.Monk
     _assert_faiss_manager(context.faiss_manager, expected_faiss_path)
     _assert_faiss_ready(context)
 
-    with context.open_catalog() as catalog:
+    with context.open_catalog() as catalog_obj:
+        catalog = cast("RecordingDuckDBCatalog", catalog_obj)
         _assert_catalog(catalog, expected_duckdb_path, expected_vectors_dir)
 
     assert catalog.closed is True
@@ -117,7 +119,7 @@ def _assert_faiss_manager(manager: object, expected_path: Path) -> None:
     assert manager.index_path == expected_path
 
 
-def _assert_faiss_ready(context: service_context.ServiceContext) -> None:
+def _assert_faiss_ready(context: Any) -> None:
     ready, limits, error = context.ensure_faiss_ready()
     assert ready is True
     assert limits == []

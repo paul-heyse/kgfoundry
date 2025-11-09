@@ -98,21 +98,17 @@ class ResidualEmbeddings:
         ResidualEmbeddings
             Loaded embeddings instance.
 
-        Raises
-        ------
-        ValueError
-            If load_index_with_mmap=True and len(chunk_idxs) != 1.
-            This exception is raised indirectly by _load_chunks_with_mmap or
-            _load_chunks_without_mmap when validation fails.
+        Notes
+        -----
+        This method may raise ValueError if load_index_with_mmap=True and
+        len(chunk_idxs) != 1. The exception is raised indirectly by
+        _load_chunks_with_mmap or _load_chunks_without_mmap when validation fails.
         """
         num_embeddings += 512  # pad for access with strides
         dim, nbits = get_dim_and_nbits(index_path)
-        try:
-            if load_index_with_mmap:
-                return cls._load_chunks_with_mmap(index_path, chunk_idxs)
-            return cls._load_chunks_streaming(index_path, chunk_idxs, num_embeddings, dim, nbits)
-        except ValueError as exc:
-            raise exc
+        if load_index_with_mmap:
+            return cls._load_chunks_with_mmap(index_path, chunk_idxs)
+        return cls._load_chunks_streaming(index_path, chunk_idxs, num_embeddings, dim, nbits)
 
     @classmethod
     def _load_chunks_with_mmap(

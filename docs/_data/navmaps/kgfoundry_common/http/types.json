@@ -1,5 +1,5 @@
 {
-  "title": "kgfoundry_common.http",
+  "title": "kgfoundry_common.http.types",
   "exports": [],
   "sections": [
     {
@@ -20,15 +20,13 @@
     "extras": {}
   },
   "symbols": {},
-  "synopsis": "HTTP client with retry strategy support.",
+  "synopsis": "Type definitions for HTTP client retry strategies.",
   "relationships": {
     "imports": [
       "__future__.annotations",
-      "kgfoundry_common.http.client.HttpClient",
-      "kgfoundry_common.http.client.HttpSettings",
-      "kgfoundry_common.http.policy.PolicyRegistry",
-      "kgfoundry_common.http.tenacity_retry.TenacityRetryStrategy",
-      "pathlib.Path"
+      "collections.abc.Callable",
+      "typing.Protocol",
+      "typing.TypeVar"
     ]
   }
 }

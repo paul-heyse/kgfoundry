@@ -18,19 +18,35 @@ GPU-aware FAISS index helpers backed by the shared search API facade.
 
 ::: vectorstore_faiss.gpu.FaissGpuIndex
 
+### vectorstore_faiss.gpu._FaissGpuIndexState
+
+::: vectorstore_faiss.gpu._FaissGpuIndexState
+
+### vectorstore_faiss.gpu._get_gpu_state
+
+::: vectorstore_faiss.gpu._get_gpu_state
+
+### vectorstore_faiss.gpu._set_gpu_state
+
+::: vectorstore_faiss.gpu._set_gpu_state
+
 ## Relationships
 
-**Imports:** `__future__.annotations`, `collections.abc.Sequence`, `dataclasses.dataclass`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.numpy_typing.FloatMatrix`, `kgfoundry_common.numpy_typing.FloatVector`, `kgfoundry_common.numpy_typing.IntVector`, `kgfoundry_common.numpy_typing.normalize_l2`, `logging`, `numpy`, `numpy.typing`, `search_api.faiss_gpu.GpuContext`, `search_api.faiss_gpu.clone_index_to_gpu`, `search_api.faiss_gpu.configure_search_parameters`, `search_api.faiss_gpu.detect_gpu_context`, `search_api.types.FaissIndexProtocol`, `search_api.types.FaissModuleProtocol`, `typing.TYPE_CHECKING`, `typing.cast`
+**Imports:** `__future__.annotations`, `collections.abc.Sequence`, `dataclasses.dataclass`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.numpy_typing.FloatMatrix`, `kgfoundry_common.numpy_typing.FloatVector`, `kgfoundry_common.numpy_typing.IntVector`, `kgfoundry_common.numpy_typing.normalize_l2`, `logging`, `numpy`, `numpy.typing`, `search_api.faiss_gpu.GpuContext`, `search_api.faiss_gpu.clone_index_to_gpu`, `search_api.faiss_gpu.configure_search_parameters`, `search_api.faiss_gpu.detect_gpu_context`, `search_api.types.FaissIndexProtocol`, `search_api.types.FaissModuleProtocol`, `typing.TYPE_CHECKING`, `typing.cast`, `weakref.WeakKeyDictionary`
 
 ## Autorefs Examples
 
 - [vectorstore_faiss.gpu.FaissGpuIndex][]
+- [vectorstore_faiss.gpu._FaissGpuIndexState][]
+- [vectorstore_faiss.gpu._get_gpu_state][]
+- [vectorstore_faiss.gpu._set_gpu_state][]
 
 ## Inheritance
 
 ```mermaid
 classDiagram
     class FaissGpuIndex
+    class _FaissGpuIndexState
 ```
 
 ## Neighborhood
@@ -76,6 +92,8 @@ direction: right
 "vectorstore_faiss.gpu" -> "typing.TYPE_CHECKING"
 "typing.cast": "typing.cast"
 "vectorstore_faiss.gpu" -> "typing.cast"
+"weakref.WeakKeyDictionary": "weakref.WeakKeyDictionary"
+"vectorstore_faiss.gpu" -> "weakref.WeakKeyDictionary"
 "vectorstore_faiss": "vectorstore_faiss" { link: "https://github.com/paul-heyse/kgfoundry/blob/main/src/vectorstore_faiss/__init__.py" }
 "vectorstore_faiss" -> "vectorstore_faiss.gpu" { style: dashed }
 ```

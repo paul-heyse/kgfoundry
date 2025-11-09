@@ -41,7 +41,8 @@
       "search_api.types.FaissIndexProtocol",
       "search_api.types.FaissModuleProtocol",
       "typing.TYPE_CHECKING",
-      "typing.cast"
+      "typing.cast",
+      "weakref.WeakKeyDictionary"
     ]
   }
 }

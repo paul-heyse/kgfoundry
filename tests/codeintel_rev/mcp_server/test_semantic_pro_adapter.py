@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import asyncio
-from contextlib import contextmanager
+from collections.abc import Iterator
+from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
 from types import SimpleNamespace
-from typing import ContextManager, Iterator
+from typing import cast
 
 import numpy as np
 import pytest
+from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.mcp_server.adapters import semantic_pro
+
 from kgfoundry_common.errors import VectorSearchError
 
 
@@ -89,7 +92,7 @@ class _FakeContext:
         assert vec_dim == 2
         return _FakeFaissManager()
 
-    def open_catalog(self) -> ContextManager[_FakeCatalog]:
+    def open_catalog(self) -> AbstractContextManager[_FakeCatalog]:
         @contextmanager
         def _catalog_cm() -> Iterator[_FakeCatalog]:
             yield self._catalog
@@ -112,7 +115,7 @@ def _stub_observer(monkeypatch: pytest.MonkeyPatch) -> None:
         yield obs
 
     async def _fake_scope(*_: object, **__: object) -> None:
-        return None
+        await asyncio.sleep(0)
 
     monkeypatch.setattr(semantic_pro, "observe_duration", _observer)
     monkeypatch.setattr(semantic_pro, "CodeRankEmbedder", _FakeEmbedder)
@@ -121,7 +124,7 @@ def _stub_observer(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_semantic_pro_produces_findings(tmp_path: Path) -> None:
-    context = _FakeContext(tmp_path)
+    context = cast("ApplicationContext", _FakeContext(tmp_path))
     envelope = asyncio.run(
         semantic_pro.semantic_search_pro(
             context=context,
@@ -136,14 +139,19 @@ def test_semantic_pro_produces_findings(tmp_path: Path) -> None:
         )
     )
 
-    assert envelope["findings"], "expected at least one finding"
-    assert envelope["findings"][0]["chunk_id"] == 101
-    assert "why" in envelope["findings"][0]
-    assert envelope["method"]["retrieval"] == ["coderank"]
+    assert "findings" in envelope
+    findings = envelope["findings"]
+    assert findings, "expected at least one finding"
+    first = findings[0]
+    assert first.get("chunk_id") == 101
+    assert "why" in first
+    assert "method" in envelope
+    method = envelope["method"]
+    assert method.get("retrieval") == ["coderank"]
 
 
 def test_semantic_pro_requires_coderank_enabled(tmp_path: Path) -> None:
-    context = _FakeContext(tmp_path)
+    context = cast("ApplicationContext", _FakeContext(tmp_path))
     with pytest.raises(VectorSearchError):
         asyncio.run(
             semantic_pro.semantic_search_pro(

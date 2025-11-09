@@ -50,7 +50,13 @@ class SemanticProRuntimeOptions:
 
 
 def build_runtime_options(options: SemanticProOptions | None) -> SemanticProRuntimeOptions:
-    """Normalize user-supplied options into an immutable dataclass."""
+    """Normalize user-supplied options into an immutable dataclass.
+
+    Returns
+    -------
+    SemanticProRuntimeOptions
+        Normalized runtime options with defaults applied.
+    """
     if options is None:
         return SemanticProRuntimeOptions()
     return SemanticProRuntimeOptions(
@@ -140,12 +146,15 @@ def _semantic_search_pro_sync(
 
         if not ordered_ids:
             observation.mark_success()
-            extras = _build_envelope_extras(
+            method = _build_method(
                 findings_count=0,
-                requested=limit,
-                effective=effective_limit,
+                requested_limit=limit,
+                effective_limit=effective_limit,
                 start_time=start_time,
                 channels=channels_used,
+            )
+            extras = _assemble_extras(
+                method=method,
                 limits=limit_notes + warp_notes,
                 scope=scope,
             )
@@ -155,12 +164,13 @@ def _semantic_search_pro_sync(
                 extras=extras,
             )
 
-        deduped_ids = _dedupe_preserve_order(ordered_ids)
-        hydration_limit = min(len(deduped_ids), max(effective_limit * 2, effective_limit))
+        ordered_ids = _dedupe_preserve_order(ordered_ids)
         try:
-            chunk_records = _hydrate_records(
+            records = _hydrate_records(
                 context=context,
-                chunk_ids=deduped_ids[:hydration_limit],
+                chunk_ids=ordered_ids[
+                    : min(len(ordered_ids), max(effective_limit * 2, effective_limit))
+                ],
                 scope=scope,
             )
         except (RuntimeError, OSError) as exc:
@@ -168,27 +178,30 @@ def _semantic_search_pro_sync(
             msg = "DuckDB hydration failed"
             raise VectorSearchError(msg, cause=exc) from exc
 
-        reranked_records = _maybe_rerank(
+        records = _maybe_rerank(
             query=query,
-            records=chunk_records,
+            records=records,
             context=context,
             enabled=options.use_reranker,
         )
 
         findings = _build_findings(
-            records=reranked_records[:effective_limit],
+            records=records[:effective_limit],
             score_map=score_map,
             contribution_map=contribution_map,
             explain=options.explain,
         )
         observation.mark_success()
 
-        extras = _build_envelope_extras(
+        method = _build_method(
             findings_count=len(findings),
-            requested=limit,
-            effective=effective_limit,
+            requested_limit=limit,
+            effective_limit=effective_limit,
             start_time=start_time,
             channels=channels_used,
+        )
+        extras = _assemble_extras(
+            method=method,
             limits=limit_notes + warp_notes,
             scope=scope,
         )
@@ -216,14 +229,7 @@ def _run_coderank_stage(
         )
 
     cfg = context.settings.coderank
-    embedder = CodeRankEmbedder(
-        model_id=cfg.model_id,
-        device=cfg.device,
-        trust_remote_code=cfg.trust_remote_code,
-        query_prefix=cfg.query_prefix,
-        normalize=cfg.normalize,
-        batch_size=cfg.batch_size,
-    )
+    embedder = CodeRankEmbedder(settings=cfg)
     try:
         query_vec = embedder.encode_queries([query])
     except Exception as exc:
@@ -425,31 +431,6 @@ def _build_findings(
     return findings
 
 
-def _build_envelope_extras(
-    *,
-    findings_count: int,
-    requested: int,
-    effective: int,
-    start_time: float,
-    channels: list[str],
-    limits: list[str],
-    scope: ScopeIn | None,
-) -> dict[str, object]:
-    method = _build_method(
-        findings_count=findings_count,
-        requested_limit=requested,
-        effective_limit=effective,
-        start_time=start_time,
-        channels=channels,
-    )
-    extras: dict[str, object] = {"method": method}
-    if limits:
-        extras["limits"] = limits
-    if scope:
-        extras["scope"] = scope
-    return extras
-
-
 def _build_method(
     *,
     findings_count: int,
@@ -466,6 +447,27 @@ def _build_method(
         "retrieval": list(dict.fromkeys(channels)),
         "coverage": coverage,
     }
+
+
+def _assemble_extras(
+    *,
+    method: MethodInfo,
+    limits: list[str],
+    scope: ScopeIn | None,
+) -> dict[str, object]:
+    """Assemble response metadata extras.
+
+    Returns
+    -------
+    dict[str, object]
+        Extras dictionary containing method metadata and optional scope/limits.
+    """
+    extras: dict[str, object] = {"method": method}
+    if limits:
+        extras["limits"] = limits
+    if scope:
+        extras["scope"] = scope
+    return extras
 
 
 def _make_envelope(

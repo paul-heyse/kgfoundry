@@ -44,9 +44,16 @@ class _FakeModel:
 
 
 def _patch_gate(monkeypatch: pytest.MonkeyPatch, tokenizer: _FakeTokenizer, model: _FakeModel) -> None:
+    class _Factory:
+        def __init__(self, instance: object) -> None:
+            self._instance = instance
+
+        def from_pretrained(self, *_args: object, **__kwargs: object) -> object:
+            return self._instance
+
     module = SimpleNamespace(
-        AutoTokenizer=lambda *args, **kwargs: tokenizer,
-        AutoModelForCausalLM=lambda *args, **kwargs: model,
+        AutoTokenizer=_Factory(tokenizer),
+        AutoModelForCausalLM=_Factory(model),
     )
 
     def _gate_import(*_: object, **__: object) -> SimpleNamespace:

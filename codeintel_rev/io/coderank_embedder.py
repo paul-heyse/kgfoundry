@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar, Protocol, cast
 
 import numpy as np
 
@@ -13,6 +13,17 @@ from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
     from sentence_transformers import SentenceTransformer
+
+
+class SupportsCodeRankSettings(Protocol):
+    """Protocol describing the minimal settings required by the embedder."""
+
+    model_id: str
+    device: str
+    trust_remote_code: bool
+    query_prefix: str
+    normalize: bool
+    batch_size: int
 
 LOGGER = get_logger(__name__)
 
@@ -28,22 +39,14 @@ class CodeRankEmbedder:
     _MODEL_CACHE: ClassVar[dict[tuple[str, str], SentenceTransformer]] = {}
     _CACHE_LOCK: ClassVar[threading.Lock] = threading.Lock()
 
-    def __init__(
-        self,
-        *,
-        model_id: str,
-        device: str,
-        trust_remote_code: bool,
-        query_prefix: str,
-        normalize: bool,
-        batch_size: int,
-    ) -> None:
-        self.model_id = model_id
-        self.device = device
-        self.trust_remote_code = trust_remote_code
-        self.query_prefix = query_prefix
-        self.normalize = normalize
-        self.batch_size = batch_size
+    def __init__(self, *, settings: SupportsCodeRankSettings) -> None:
+        """Initialize the embedder with CodeRank runtime settings."""
+        self.model_id = settings.model_id
+        self.device = settings.device
+        self.trust_remote_code = settings.trust_remote_code
+        self.query_prefix = settings.query_prefix
+        self.normalize = settings.normalize
+        self.batch_size = settings.batch_size
 
     def encode_queries(self, queries: Iterable[str]) -> np.ndarray:
         """Return CodeRank embeddings for ``queries`` with prefix applied.

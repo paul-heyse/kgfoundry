@@ -1,11 +1,29 @@
 {
+  "title": "kgfoundry_common.http.errors",
   "exports": [],
-  "symbols": {},
   "sections": [
     {
       "id": "public-api",
       "title": "Public API",
       "symbols": []
     }
-  ]
+  ],
+  "module_meta": {
+    "owner": null,
+    "stability": null,
+    "since": null,
+    "spec": null,
+    "augment": null,
+    "binary": null,
+    "protocol": null,
+    "tags": [],
+    "extras": {}
+  },
+  "symbols": {},
+  "synopsis": "HTTP client exception classes.",
+  "relationships": {
+    "imports": [
+      "__future__.annotations"
+    ]
+  }
 }

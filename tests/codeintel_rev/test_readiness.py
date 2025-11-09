@@ -41,6 +41,10 @@ def mock_context(tmp_path: Path) -> ApplicationContext:
     (repo_root / "data" / "faiss").mkdir()
     (repo_root / "data" / "faiss" / "code.ivfpq.faiss").touch()
     (repo_root / "data" / "catalog.duckdb").touch()
+    (repo_root / "data" / "coderank_vectors").mkdir()
+    (repo_root / "data" / "faiss" / "coderank.faiss").touch()
+    (repo_root / "indexes").mkdir()
+    (repo_root / "indexes" / "warp_xtr").mkdir()
     (repo_root / "index.scip").touch()
 
     paths = ResolvedPaths(
@@ -50,6 +54,9 @@ def mock_context(tmp_path: Path) -> ApplicationContext:
         faiss_index=repo_root / "data" / "faiss" / "code.ivfpq.faiss",
         duckdb_path=repo_root / "data" / "catalog.duckdb",
         scip_index=repo_root / "index.scip",
+        coderank_vectors_dir=repo_root / "data" / "coderank_vectors",
+        coderank_faiss_index=repo_root / "data" / "faiss" / "coderank.faiss",
+        warp_index_dir=repo_root / "indexes" / "warp_xtr",
     )
 
     settings = load_settings()
@@ -181,6 +188,9 @@ async def test_readiness_probe_materialize_reports_missing_table(
         duckdb=existing_settings.duckdb,
         bm25=existing_settings.bm25,
         splade=existing_settings.splade,
+        coderank=existing_settings.coderank,
+        warp=existing_settings.warp,
+        coderank_llm=existing_settings.coderank_llm,
     )
     probe = ReadinessProbe(_context_with_settings(mock_context, new_settings))
 
@@ -208,6 +218,9 @@ async def test_readiness_probe_materialize_validates_index(
         duckdb=existing_settings.duckdb,
         bm25=existing_settings.bm25,
         splade=existing_settings.splade,
+        coderank=existing_settings.coderank,
+        warp=existing_settings.warp,
+        coderank_llm=existing_settings.coderank_llm,
     )
     context = _context_with_settings(mock_context, new_settings)
 
@@ -402,6 +415,9 @@ def test_readiness_probe_check_vllm_invalid_url(
         duckdb=mock_context.settings.duckdb,
         bm25=mock_context.settings.bm25,
         splade=mock_context.settings.splade,
+        coderank=mock_context.settings.coderank,
+        warp=mock_context.settings.warp,
+        coderank_llm=mock_context.settings.coderank_llm,
     )
     context = _context_with_settings(mock_context, new_settings)
     probe = ReadinessProbe(context)
@@ -428,6 +444,9 @@ def test_readiness_probe_check_vllm_success(mock_context: ApplicationContext) ->
         duckdb=mock_context.settings.duckdb,
         bm25=mock_context.settings.bm25,
         splade=mock_context.settings.splade,
+        coderank=mock_context.settings.coderank,
+        warp=mock_context.settings.warp,
+        coderank_llm=mock_context.settings.coderank_llm,
     )
     context = _context_with_settings(mock_context, new_settings)
     probe = ReadinessProbe(context)
@@ -461,6 +480,9 @@ def test_readiness_probe_check_vllm_http_error(
         duckdb=mock_context.settings.duckdb,
         bm25=mock_context.settings.bm25,
         splade=mock_context.settings.splade,
+        coderank=mock_context.settings.coderank,
+        warp=mock_context.settings.warp,
+        coderank_llm=mock_context.settings.coderank_llm,
     )
     context = _context_with_settings(mock_context, new_settings)
     probe = ReadinessProbe(context)

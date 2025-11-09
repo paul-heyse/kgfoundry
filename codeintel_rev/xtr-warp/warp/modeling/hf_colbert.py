@@ -197,13 +197,12 @@ def class_factory(name_or_path: str) -> type:
     type
         HF_ColBERT class dynamically subclassed from appropriate base.
 
-    Raises
-    ------
-    ValueError
-        If pretrained or model class cannot be found, or if custom model
-        doesn't have AutoModel in auto_map or model class doesn't end with "Model".
-        This exception is raised indirectly by _resolve_standard_transformer_classes
-        or _resolve_custom_transformer_classes.
+    Notes
+    -----
+    This function may raise ValueError if pretrained or model class cannot be found,
+    or if custom model doesn't have AutoModel in auto_map or model class doesn't end
+    with "Model". The exception is raised indirectly by _resolve_standard_transformer_classes
+    or _resolve_custom_transformer_classes when class resolution fails.
     """
     loaded_config = AutoConfig.from_pretrained(name_or_path, trust_remote_code=True)
 

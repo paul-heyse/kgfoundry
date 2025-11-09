@@ -17,6 +17,8 @@ from codeintel_rev.app.middleware import session_id_var
 from codeintel_rev.app.scope_store import ScopeStore
 from codeintel_rev.config.settings import (
     BM25Config,
+    CodeRankConfig,
+    CodeRankLLMConfig,
     IndexConfig,
     PathsConfig,
     RedisConfig,
@@ -24,6 +26,7 @@ from codeintel_rev.config.settings import (
     Settings,
     SpladeConfig,
     VLLMConfig,
+    WarpConfig,
 )
 from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
@@ -95,6 +98,9 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
             faiss_index="data/faiss/index.faiss",
             duckdb_path="data/catalog.duckdb",
             scip_index="index.scip.json",
+            coderank_vectors_dir="data/coderank_vectors",
+            coderank_faiss_index="data/faiss/coderank.faiss",
+            warp_index_dir="indexes/warp_xtr",
         ),
         index=IndexConfig(
             vec_dim=2560,
@@ -116,6 +122,9 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
         duckdb=DuckDBConfig(),
         bm25=BM25Config(),
         splade=SpladeConfig(),
+        coderank=CodeRankConfig(),
+        warp=WarpConfig(),
+        coderank_llm=CodeRankLLMConfig(),
     )
 
     paths = ResolvedPaths(
@@ -125,6 +134,9 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
         faiss_index=repo_root / "data" / "faiss" / "index.faiss",
         duckdb_path=repo_root / "data" / "catalog.duckdb",
         scip_index=repo_root / "index.scip.json",
+        coderank_vectors_dir=repo_root / "data" / "coderank_vectors",
+        coderank_faiss_index=repo_root / "data" / "faiss" / "coderank.faiss",
+        warp_index_dir=repo_root / "indexes" / "warp_xtr",
     )
 
     paths.data_dir.mkdir(parents=True, exist_ok=True)

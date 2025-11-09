@@ -29,7 +29,8 @@ if not HAS_FAISS_SUPPORT:  # pragma: no cover - dependency-gated
     )
 
 # Narrow FAISS module to concrete type for static checking
-assert FAISS_MODULE is not None
+if FAISS_MODULE is None:  # pragma: no cover - dependency-gated
+    pytest.skip("FAISS bindings unavailable on this host", allow_module_level=True)
 faiss_module: Any = FAISS_MODULE
 
 

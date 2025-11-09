@@ -76,6 +76,9 @@ def mock_context(test_repo: Path) -> ApplicationContext:
         faiss_index=test_repo / "data" / "faiss" / "code.ivfpq.faiss",
         duckdb_path=test_repo / "data" / "catalog.duckdb",
         scip_index=test_repo / "index.scip",
+        coderank_vectors_dir=test_repo / "data" / "coderank_vectors",
+        coderank_faiss_index=test_repo / "data" / "faiss" / "coderank.faiss",
+        warp_index_dir=test_repo / "indexes" / "warp_xtr",
     )
 
     # Create minimal mock context

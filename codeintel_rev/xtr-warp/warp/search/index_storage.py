@@ -318,16 +318,13 @@ class IndexScorer(IndexLoader, CandidateGeneration):
         tuple[torch.Tensor, torch.Tensor]
             Tuple of (scores, pids).
 
-        Raises
-        ------
-        ValueError
-            If filtered_pids dtype or device doesn't match pids, or if
-            approx_scores is not on CUDA device when required.
-            This exception is raised indirectly by internal validation helpers
-            or tensor operations when device/dtype mismatches occur.
-
         Notes
         -----
+        This function may raise ValueError if filtered_pids dtype or device doesn't match
+        pids, or if approx_scores is not on CUDA device when required. The exception is
+        raised indirectly by internal validation helpers or tensor operations when
+        device/dtype mismatches occur.
+
         Consider removing batching for simplification.
         """
         # NOTE: Remove batching?

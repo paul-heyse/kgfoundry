@@ -1,5 +1,7 @@
 # kgfoundry_common.http.policy
 
+Retry policy configuration and loading.
+
 [View source on GitHub](https://github.com/paul-heyse/kgfoundry/blob/main/src/kgfoundry_common/http/policy.py)
 
 ## Hierarchy
@@ -30,7 +32,7 @@
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `dataclasses.dataclass`, `json`, `pathlib.Path`, `yaml`
+**Imports:** `__future__.annotations`, `dataclasses.dataclass`, `json`, `jsonschema`, `pathlib.Path`, `yaml`
 
 ## Autorefs Examples
 
@@ -58,6 +60,8 @@ direction: right
 "kgfoundry_common.http.policy" -> "dataclasses.dataclass"
 "json": "json"
 "kgfoundry_common.http.policy" -> "json"
+"jsonschema": "jsonschema"
+"kgfoundry_common.http.policy" -> "jsonschema"
 "pathlib.Path": "pathlib.Path"
 "kgfoundry_common.http.policy" -> "pathlib.Path"
 "yaml": "yaml"

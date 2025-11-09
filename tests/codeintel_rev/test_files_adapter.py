@@ -57,6 +57,9 @@ def mock_context(tmp_path: Path) -> Mock:
         faiss_index=repo_root / "data" / "faiss" / "code.ivfpq.faiss",
         duckdb_path=repo_root / "data" / "catalog.duckdb",
         scip_index=repo_root / "index.scip",
+        coderank_vectors_dir=repo_root / "data" / "coderank_vectors",
+        coderank_faiss_index=repo_root / "data" / "faiss" / "coderank.faiss",
+        warp_index_dir=repo_root / "indexes" / "warp_xtr",
     )
     context.paths = paths
 

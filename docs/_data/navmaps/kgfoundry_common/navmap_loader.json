@@ -25,6 +25,7 @@
     "imports": [
       "__future__.annotations",
       "collections.abc.Callable",
+      "collections.abc.Generator",
       "collections.abc.Mapping",
       "collections.abc.Sequence",
       "contextlib.suppress",
@@ -37,7 +38,6 @@
       "pydantic.BaseModel",
       "pydantic.ConfigDict",
       "pydantic.Field",
-      "pydantic.main.TupleGenerator",
       "pydantic.model_validator",
       "sys",
       "tools.AugmentMetadataModel",

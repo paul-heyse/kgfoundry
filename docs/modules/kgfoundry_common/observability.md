@@ -38,6 +38,10 @@ Prometheus metrics and OpenTelemetry tracing helpers
 
 ::: kgfoundry_common.observability._finalise_observation
 
+### kgfoundry_common.observability._thaw
+
+::: kgfoundry_common.observability._thaw
+
 ### kgfoundry_common.observability.get_metrics_registry
 
 ::: kgfoundry_common.observability.get_metrics_registry
@@ -64,8 +68,8 @@ Prometheus metrics and OpenTelemetry tracing helpers
 - [kgfoundry_common.observability.MetricsProvider][]
 - [kgfoundry_common.observability.MetricsRegistry][]
 - [kgfoundry_common.observability._finalise_observation][]
+- [kgfoundry_common.observability._thaw][]
 - [kgfoundry_common.observability.get_metrics_registry][]
-- [kgfoundry_common.observability.observe_duration][]
 
 ## Inheritance
 

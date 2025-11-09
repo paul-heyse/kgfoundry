@@ -1,5 +1,5 @@
 {
-  "title": "kgfoundry_common.http.tenacity_retry",
+  "title": "kgfoundry_common.http.client",
   "exports": [],
   "sections": [
     {
@@ -20,21 +20,16 @@
     "extras": {}
   },
   "symbols": {},
-  "synopsis": "Tenacity-based retry strategy implementation.",
+  "synopsis": "HTTP client with retry strategy support.",
   "relationships": {
     "imports": [
       "__future__.annotations",
       "collections.abc.Callable",
+      "collections.abc.Mapping",
       "dataclasses.dataclass",
-      "kgfoundry_common.http.errors.HttpStatusError",
-      "kgfoundry_common.http.policy.RetryPolicyDoc",
-      "kgfoundry_common.http.types.RetryStrategy",
-      "random",
-      "tenacity.Retrying",
-      "tenacity.retry_if_exception",
-      "tenacity.stop_after_attempt",
-      "tenacity.stop_after_delay",
-      "tenacity.wait.wait_base"
+      "dataclasses.replace",
+      "kgfoundry_common.http.tenacity_retry.TenacityRetryStrategy",
+      "kgfoundry_common.http.types.RetryStrategy"
     ]
   }
 }

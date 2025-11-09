@@ -1,6 +1,6 @@
 {
+  "title": "kgfoundry_common.http.policy",
   "exports": [],
-  "symbols": {},
   "sections": [
     {
       "id": "public-api",
@@ -8,11 +8,25 @@
       "symbols": []
     }
   ],
+  "module_meta": {
+    "owner": null,
+    "stability": null,
+    "since": null,
+    "spec": null,
+    "augment": null,
+    "binary": null,
+    "protocol": null,
+    "tags": [],
+    "extras": {}
+  },
+  "symbols": {},
+  "synopsis": "Retry policy configuration and loading.",
   "relationships": {
     "imports": [
       "__future__.annotations",
       "dataclasses.dataclass",
       "json",
+      "jsonschema",
       "pathlib.Path",
       "yaml"
     ]

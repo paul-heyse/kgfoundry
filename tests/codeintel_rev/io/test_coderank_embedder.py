@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from types import SimpleNamespace
 
 import numpy as np
@@ -17,9 +18,10 @@ class _FakeModel:
 
 
 def _patch_gate(monkeypatch: pytest.MonkeyPatch, fake_model: _FakeModel) -> None:
-    module = SimpleNamespace(
-        SentenceTransformer=lambda *args, **kwargs: fake_model,
-    )
+    def _build_model(*_: object, **__: object) -> _FakeModel:
+        return fake_model
+
+    module = SimpleNamespace(SentenceTransformer=_build_model)
 
     def _gate_import(*_: object, **__: object) -> SimpleNamespace:
         return module
@@ -34,7 +36,7 @@ def test_encode_queries_applies_instruction_prefix(monkeypatch: pytest.MonkeyPat
     fake_model = _FakeModel()
     _patch_gate(monkeypatch, fake_model)
 
-    settings = SimpleNamespace(
+    settings = _EmbedderSettings(
         model_id="stub_queries",
         device="cpu",
         trust_remote_code=True,
@@ -53,7 +55,7 @@ def test_encode_queries_applies_instruction_prefix(monkeypatch: pytest.MonkeyPat
 def test_encode_codes_requires_input(monkeypatch: pytest.MonkeyPatch) -> None:
     fake_model = _FakeModel()
     _patch_gate(monkeypatch, fake_model)
-    settings = SimpleNamespace(
+    settings = _EmbedderSettings(
         model_id="stub_codes",
         device="cpu",
         trust_remote_code=True,
@@ -65,3 +67,11 @@ def test_encode_codes_requires_input(monkeypatch: pytest.MonkeyPatch) -> None:
 
     with pytest.raises(ValueError, match="code snippet"):
         embedder.encode_codes([])
+@dataclass
+class _EmbedderSettings:
+    model_id: str
+    device: str
+    trust_remote_code: bool
+    query_prefix: str
+    normalize: bool
+    batch_size: int
