@@ -711,7 +711,7 @@ def cli_run(cfg: CliRunConfig) -> Iterator[tuple[CliContext, EnvelopeBuilder]]:
     # Type narrowing: error is guaranteed to be Exception subclass from except clause
     if not isinstance(error, Exception):
         msg = "error must be an Exception subclass"
-        raise RuntimeError(msg) from None
+        raise TypeError(msg) from None
     exc: Exception = error
     raise exc
 

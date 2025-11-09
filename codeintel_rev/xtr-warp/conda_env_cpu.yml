@@ -1,0 +1,32 @@
+name: warp
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.8
+  - gxx
+  - faiss-cpu
+  - pip=21.0
+  - pytorch-cpu=1.13
+  - pip:
+    - bitarray
+    - datasets
+    - gitpython
+    - ninja
+    - scipy
+    - tqdm
+    - transformers
+    - ujson
+    - flask
+    - python-dotenv
+    - onnxruntime
+    - onnxruntime_tools
+    - coremltools
+    - beir
+    - tabulate
+    - openvino
+    - matplotlib
+    - jsonlines
+    - optimum
+    - optimum-intel

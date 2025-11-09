@@ -94,17 +94,50 @@ def test_catalog(tmp_path: Path) -> DuckDBCatalog:
             """
             CREATE TABLE chunks AS
             SELECT * FROM VALUES
-                (1::BIGINT, 'src/main.py'::VARCHAR, 1::INTEGER, 10::INTEGER, 0::BIGINT, 100::BIGINT, 'def main():'::VARCHAR, [0.1, 0.2]::FLOAT[]),
-                (2::BIGINT, 'src/utils.py'::VARCHAR, 5::INTEGER, 15::INTEGER, 50::BIGINT, 150::BIGINT, 'def helper():'::VARCHAR, [0.3, 0.4]::FLOAT[]),
-                (3::BIGINT, 'tests/test_main.py'::VARCHAR, 1::INTEGER, 5::INTEGER, 0::BIGINT, 50::BIGINT, 'def test_main():'::VARCHAR, [0.5, 0.6]::FLOAT[]),
-                (4::BIGINT, 'tests/test_utils.py'::VARCHAR, 1::INTEGER, 5::INTEGER, 0::BIGINT, 50::BIGINT, 'def test_helper():'::VARCHAR, [0.7, 0.8]::FLOAT[]),
-                (5::BIGINT, 'src/app.ts'::VARCHAR, 1::INTEGER, 20::INTEGER, 0::BIGINT, 200::BIGINT, 'function app() {'::VARCHAR, [0.9, 1.0]::FLOAT[]),
-                (6::BIGINT, 'src/components/Button.tsx'::VARCHAR, 1::INTEGER, 30::INTEGER, 0::BIGINT, 300::BIGINT, 'export const Button'::VARCHAR, [1.1, 1.2]::FLOAT[]),
-                (7::BIGINT, 'docs/README.md'::VARCHAR, 1::INTEGER, 50::INTEGER, 0::BIGINT, 500::BIGINT, '# Documentation'::VARCHAR, [1.3, 1.4]::FLOAT[]),
-                (8::BIGINT, 'src/nested/deep/file.py'::VARCHAR, 1::INTEGER, 5::INTEGER, 0::BIGINT, 50::BIGINT, 'deep code'::VARCHAR, [1.5, 1.6]::FLOAT[]),
-                (9::BIGINT, 'lib/legacy.py'::VARCHAR, 1::INTEGER, 10::INTEGER, 0::BIGINT, 100::BIGINT, 'old code'::VARCHAR, [1.7, 1.8]::FLOAT[]),
-                (10::BIGINT, 'src/config.json'::VARCHAR, 1::INTEGER, 5::INTEGER, 0::BIGINT, 50::BIGINT, '{"key": "value"}'::VARCHAR, [1.9, 2.0]::FLOAT[]),
-                (11::BIGINT, 'main.py'::VARCHAR, 1::INTEGER, 20::INTEGER, 0::BIGINT, 200::BIGINT, 'def entry():'::VARCHAR, [2.1, 2.2]::FLOAT[])
+                (
+                    1::BIGINT, 'src/main.py'::VARCHAR, 1::INTEGER, 10::INTEGER,
+                    0::BIGINT, 100::BIGINT, 'def main():'::VARCHAR, [0.1, 0.2]::FLOAT[]
+                ),
+                (
+                    2::BIGINT, 'src/utils.py'::VARCHAR, 5::INTEGER, 15::INTEGER,
+                    50::BIGINT, 150::BIGINT, 'def helper():'::VARCHAR, [0.3, 0.4]::FLOAT[]
+                ),
+                (
+                    3::BIGINT, 'tests/test_main.py'::VARCHAR, 1::INTEGER, 5::INTEGER,
+                    0::BIGINT, 50::BIGINT, 'def test_main():'::VARCHAR, [0.5, 0.6]::FLOAT[]
+                ),
+                (
+                    4::BIGINT, 'tests/test_utils.py'::VARCHAR, 1::INTEGER, 5::INTEGER,
+                    0::BIGINT, 50::BIGINT, 'def test_helper():'::VARCHAR, [0.7, 0.8]::FLOAT[]
+                ),
+                (
+                    5::BIGINT, 'src/app.ts'::VARCHAR, 1::INTEGER, 20::INTEGER,
+                    0::BIGINT, 200::BIGINT, 'function app() {'::VARCHAR, [0.9, 1.0]::FLOAT[]
+                ),
+                (
+                    6::BIGINT, 'src/components/Button.tsx'::VARCHAR, 1::INTEGER, 30::INTEGER,
+                    0::BIGINT, 300::BIGINT, 'export const Button'::VARCHAR, [1.1, 1.2]::FLOAT[]
+                ),
+                (
+                    7::BIGINT, 'docs/README.md'::VARCHAR, 1::INTEGER, 50::INTEGER,
+                    0::BIGINT, 500::BIGINT, '# Documentation'::VARCHAR, [1.3, 1.4]::FLOAT[]
+                ),
+                (
+                    8::BIGINT, 'src/nested/deep/file.py'::VARCHAR, 1::INTEGER, 5::INTEGER,
+                    0::BIGINT, 50::BIGINT, 'deep code'::VARCHAR, [1.5, 1.6]::FLOAT[]
+                ),
+                (
+                    9::BIGINT, 'lib/legacy.py'::VARCHAR, 1::INTEGER, 10::INTEGER,
+                    0::BIGINT, 100::BIGINT, 'old code'::VARCHAR, [1.7, 1.8]::FLOAT[]
+                ),
+                (
+                    10::BIGINT, 'src/config.json'::VARCHAR, 1::INTEGER, 5::INTEGER,
+                    0::BIGINT, 50::BIGINT, '{"key": "value"}'::VARCHAR, [1.9, 2.0]::FLOAT[]
+                ),
+                (
+                    11::BIGINT, 'main.py'::VARCHAR, 1::INTEGER, 20::INTEGER,
+                    0::BIGINT, 200::BIGINT, 'def entry():'::VARCHAR, [2.1, 2.2]::FLOAT[]
+                )
             AS t(id, uri, start_line, end_line, start_byte, end_byte, preview, embedding)
             """
         )

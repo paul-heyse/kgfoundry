@@ -186,7 +186,9 @@ def benchmark_catalog(tmp_path_factory) -> DuckDBCatalog:
 
             connection.executemany(
                 """
-                INSERT INTO chunks (id, uri, start_line, end_line, start_byte, end_byte, preview, embedding)
+                INSERT INTO chunks (
+                    id, uri, start_line, end_line, start_byte, end_byte, preview, embedding
+                )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 batch_data,

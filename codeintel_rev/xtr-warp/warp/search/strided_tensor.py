@@ -1,0 +1,415 @@
+"""Strided tensor for efficient variable-length sequence lookups.
+
+This module provides StridedTensor, a wrapper around StridedTensorCore
+with GPU-accelerated lookup extensions for efficient passage-level access.
+"""
+
+from __future__ import annotations
+
+import os
+import pathlib
+
+import torch
+from torch.utils.cpp_extension import load
+from warp.search.strided_tensor_core import (
+    StridedTensorCore,
+    _create_mask,
+    _create_view,
+)
+from warp.utils.utils import flatten, print_message
+
+
+class StridedTensor(StridedTensorCore):
+    """Strided tensor with GPU-accelerated lookup extensions.
+
+    Extends StridedTensorCore with CUDA extensions for faster segmented
+    lookups. Supports packed and padded output formats.
+
+    Parameters
+    ----------
+    packed_tensor : torch.Tensor
+        Packed tensor containing all sequences.
+    lengths : torch.Tensor | list[int]
+        Length of each sequence.
+    dim : int | None
+        Inner dimension size (default: None, inferred from tensor).
+    use_gpu : bool
+        Whether to use GPU acceleration (default: True).
+    """
+
+    def __init__(
+        self,
+        packed_tensor: torch.Tensor,
+        lengths: torch.Tensor | list[int],
+        dim: int | None = None,
+        *,
+        use_gpu: bool = True,
+    ) -> None:
+        """Initialize StridedTensor with packed data and lengths.
+
+        Parameters
+        ----------
+        packed_tensor : torch.Tensor
+            Packed tensor containing all sequences.
+        lengths : torch.Tensor | list[int]
+            Length of each sequence.
+        dim : int | None
+            Inner dimension size (default: None, inferred from tensor).
+        use_gpu : bool
+            Whether to use GPU acceleration (default: True).
+        """
+        super().__init__(packed_tensor, lengths, dim=dim, use_gpu=use_gpu)
+
+        StridedTensor.try_load_torch_extensions(use_gpu=use_gpu)
+
+    @classmethod
+    def try_load_torch_extensions(cls, *, use_gpu: bool) -> None:
+        """Load CUDA extensions for GPU-accelerated lookups.
+
+        Loads segmented_lookup_cpp extension if GPU is available and extensions
+        haven't been loaded yet.
+
+        Parameters
+        ----------
+        use_gpu : bool
+            Whether to attempt loading GPU extensions.
+        """
+        if hasattr(cls, "loaded_extensions") or use_gpu:
+            return
+
+        print_message(
+            "Loading segmented_lookup_cpp extension "
+            "(set COLBERT_LOAD_TORCH_EXTENSION_VERBOSE=True for more info)..."
+        )
+        segmented_lookup_cpp = load(
+            name="segmented_lookup_cpp",
+            sources=[
+                str(pathlib.Path(__file__).parent.resolve() / "segmented_lookup.cpp"),
+            ],
+            extra_cflags=["-O3"],
+            verbose=os.getenv("COLBERT_LOAD_TORCH_EXTENSION_VERBOSE", "False") == "True",
+        )
+        cls.segmented_lookup = segmented_lookup_cpp.segmented_lookup_cpp
+
+        cls.loaded_extensions = True
+
+    @classmethod
+    def pad_packed(
+        cls, packed_tensor: torch.Tensor, lengths: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Pad packed tensor to uniform length (unimplemented).
+
+        This method is currently unimplemented and raises AssertionError.
+
+        Parameters
+        ----------
+        packed_tensor : torch.Tensor
+            Packed tensor to pad.
+        lengths : torch.Tensor
+            Sequence lengths.
+
+        Returns
+        -------
+        tuple[torch.Tensor, torch.Tensor]
+            Tuple of (padded_tensor, mask). Not implemented.
+
+        Raises
+        ------
+        AssertionError
+            Always raised, as this method is not implemented.
+        """
+        msg = "This seems to be incorrect but I can't see why. Is it the inner_dims in the views?"
+        raise AssertionError(msg)
+
+        packed_tensor, lengths = packed_tensor.cuda().contiguous(), lengths.cuda()
+
+        inner_dims = packed_tensor.size()[1:]
+        stride = lengths.max().item()
+        offsets = torch.cumsum(lengths, dim=0) - lengths[0]
+
+        padding = torch.zeros(
+            stride, *inner_dims, device=packed_tensor.device, dtype=packed_tensor.dtype
+        )
+        packed_tensor = torch.cat((packed_tensor, padding))
+
+        view = _create_view(packed_tensor, stride, inner_dims)[offsets]
+        mask = _create_mask(lengths, stride, like=view)
+
+        return view, mask
+
+    def _prepare_lookup(
+        self, pids: torch.Tensor | list[int]
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Prepare passage IDs for lookup.
+
+        Normalizes pids to 1D tensor and extracts corresponding lengths
+        and offsets.
+
+        Parameters
+        ----------
+        pids : torch.Tensor | list[int]
+            Passage IDs to lookup.
+
+        Returns
+        -------
+        tuple[torch.Tensor, torch.Tensor, torch.Tensor]
+            Tuple of (normalized_pids, lengths, offsets).
+
+        Raises
+        ------
+        ValueError
+            If pids.dim() is not 1 after conversion.
+        """
+        if isinstance(pids, list):
+            pids = torch.tensor(pids)
+
+        if pids.dim() != 1:
+            msg = f"pids.dim() must be 1, got {pids.dim()}"
+            raise ValueError(msg)
+
+        pids = pids.long().cpu()
+        lengths = self.lengths[pids]
+        offsets = self.offsets[pids]
+
+        return pids, lengths, offsets
+
+    def lookup(
+        self, pids: torch.Tensor | list[int], output: str = "packed"
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Lookup sequences for given passage IDs.
+
+        Retrieves sequences from strided tensor, supporting packed or
+        padded output formats. Uses GPU extensions if available.
+
+        Parameters
+        ----------
+        pids : torch.Tensor | list[int]
+            Passage IDs to lookup.
+        output : str
+            Output format: "packed" or "padded" (default: "packed").
+
+        Returns
+        -------
+        tuple[torch.Tensor, torch.Tensor]
+            Tuple of (sequences, lengths). Sequences are packed or padded
+            depending on output format.
+
+        Raises
+        ------
+        ValueError
+            If output format is invalid or pids.dim() is not 1.
+        """
+        pids, lengths, offsets = self._prepare_lookup(pids)
+
+        if self.use_gpu:
+            stride = lengths.max().item()
+            stride = next(s for s in self.strides if stride <= s)
+
+            tensor = self.views[stride][offsets]
+            if self.use_gpu:
+                tensor = tensor.cuda()
+
+            mask = _create_mask(lengths, stride, use_gpu=self.use_gpu)
+
+            if output == "padded":
+                return tensor, mask
+
+            if output != "packed":
+                msg = f"output must be 'packed' at this point, got {output!r}"
+                raise ValueError(msg)
+
+            tensor = tensor[mask]
+        else:
+            tensor = StridedTensor.segmented_lookup(self.tensor, pids, lengths, offsets)
+
+        return tensor, lengths
+
+    def lookup_staggered(
+        self, pids: torch.Tensor | list[int], output: str = "packed"
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Lookup sequences with staggered padding for efficient batching.
+
+        Retrieves sequences and pads them to maximum stride length, then
+        reorders to match input order. Supports packed or padded output.
+
+        Parameters
+        ----------
+        pids : torch.Tensor | list[int]
+            Passage IDs to lookup.
+        output : str
+            Output format: "packed" or "padded" (default: "packed").
+
+        Returns
+        -------
+        tuple[torch.Tensor, torch.Tensor]
+            Tuple of (sequences, lengths). Sequences are packed or padded
+            depending on output format.
+
+        Raises
+        ------
+        ValueError
+            If output format is invalid.
+        """
+        permute_idxs, unordered_tensors, unordered_lengths, unordered_masks = (
+            self.lookup_packed_unordered(pids)
+        )
+
+        output_tensor = torch.empty(
+            permute_idxs.size(0),
+            self.max_stride,
+            *self.inner_dims,
+            dtype=unordered_tensors[0].dtype,
+            device=unordered_tensors[0].device,
+        )
+
+        output_mask = torch.zeros(
+            permute_idxs.size(0),
+            self.max_stride,
+            dtype=unordered_masks[0].dtype,
+            device=unordered_masks[0].device,
+        )
+
+        offset = 0
+        for tensor, mask in zip(unordered_tensors, unordered_masks, strict=False):
+            endpos = offset + tensor.size(0)
+            output_tensor[offset:endpos, : tensor.size(1)] = tensor
+            output_mask[offset:endpos, : mask.size(1)] = mask
+            offset = endpos
+
+        output_mask = output_mask[permute_idxs]
+        output_tensor = output_tensor[permute_idxs]
+
+        if output == "padded":
+            return output_tensor, output_mask
+
+        if output != "packed":
+            msg = f"output must be 'packed' at this point, got {output!r}"
+            raise ValueError(msg)
+
+        output_tensor = output_tensor[output_mask]
+
+        return output_tensor, unordered_lengths[permute_idxs]
+
+    def lookup_packed_unordered(
+        self, pids: torch.Tensor | list[int]
+    ) -> tuple[torch.Tensor, list[torch.Tensor], torch.Tensor, list[torch.Tensor]]:
+        """Lookup sequences without preserving input order.
+
+        Retrieves sequences grouped by stride length for efficient processing.
+        Returns permutation indices to restore original order.
+
+        Parameters
+        ----------
+        pids : torch.Tensor | list[int]
+            Passage IDs to lookup.
+
+        Returns
+        -------
+        tuple[torch.Tensor, list[torch.Tensor], torch.Tensor, list[torch.Tensor]]
+            Tuple of (permute_indices, unordered_tensors, unordered_lengths,
+            unordered_masks). Tensors are grouped by stride length.
+
+        Raises
+        ------
+        ValueError
+            If output format is not 'packed' when required.
+        """
+        pids, lengths, offsets = self._prepare_lookup(pids)
+
+        lengths2 = lengths.clone()
+        sentinel = self.strides[-1] + 1
+        order = torch.arange(pids.size(0), device="cuda" if self.use_gpu else "cpu")
+
+        all_orders = []
+        all_tensors = []
+        all_lengths = []
+        all_masks = []
+
+        for stride in self.strides:
+            is_shorter = lengths2 <= stride
+
+            if is_shorter.sum() == 0:
+                continue
+
+            order_ = order[is_shorter]
+            tensor_, lengths_, mask_ = self._lookup_with_stride(
+                stride, lengths[is_shorter], offsets[is_shorter]
+            )
+
+            all_orders.append(order_)
+            all_tensors.append(tensor_)
+            all_lengths.append(lengths_)
+            all_masks.append(mask_)
+
+            lengths2[is_shorter] = sentinel
+
+        if not lengths2.allclose(
+            torch.tensor([sentinel], device="cuda" if self.use_gpu else "cpu")
+        ):
+            msg = f"lengths2 must all be close to sentinel ({sentinel})"
+            raise ValueError(msg)
+
+        all_orders = torch.cat(all_orders)
+        permute_idxs = torch.sort(all_orders).indices
+
+        return permute_idxs, all_tensors, torch.cat(all_lengths), all_masks
+
+    def _lookup_with_stride(
+        self,
+        stride: int,
+        lengths: torch.Tensor,
+        offsets: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        tensor = self.views[stride][offsets]
+        if self.use_gpu:
+            tensor = tensor.cuda()
+
+        mask = _create_mask(lengths, stride, use_gpu=self.use_gpu)
+
+        return tensor, lengths, mask
+
+
+if __name__ == "__main__":
+    import os
+    import pickle
+
+    index_path = "/future/u/okhattab/root/unit/indexes/2021/08/residual.NQ-micro"
+    with (pathlib.Path(index_path) / "centroid_idx_to_embedding_ids.pickle").open("rb") as f:
+        ivf_list = pickle.load(f)
+
+    if len(ivf_list) != max(ivf_list.keys()) + 1:
+        max_keys = max(ivf_list.keys()) + 1
+        msg = f"len(ivf_list) ({len(ivf_list)}) must equal max(ivf_list.keys()) + 1 ({max_keys})"
+        raise ValueError(msg)
+    ivf_list = [ivf_list[i] for i in range(len(ivf_list))]
+
+    for x in ivf_list:
+        if type(x) is not list:
+            msg = f"All elements in ivf_list must be lists, got {type(x).__name__}"
+            raise TypeError(msg)
+        if len(x) > 0 and type(x[0]) is not int:
+            msg = f"First element of each list must be int, got {type(x[0]).__name__}"
+            raise TypeError(msg)
+
+    ncentroids = len(ivf_list)
+
+    ivf = StridedTensor.from_nested_list(ivf_list)
+
+    import time
+
+    torch.cuda.synchronize()
+    t = time.time()
+
+    N = 100
+    for _ in range(N):
+        probed_centroids = torch.randint(0, ncentroids, size=(32, 8)).flatten()
+        emb_ids, emb_ids_lengths = ivf.lookup(probed_centroids).as_packed_tensor()
+
+    torch.cuda.synchronize()
+
+    slow_result = flatten([ivf_list[idx] for idx in probed_centroids.flatten().tolist()])
+
+    for a, b in zip(slow_result, emb_ids.flatten().tolist(), strict=False):
+        if a != b:
+            msg = f"Mismatch: {a} != {b}"
+            raise ValueError(msg)
