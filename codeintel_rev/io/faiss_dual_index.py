@@ -101,9 +101,7 @@ class FAISSDualIndexManager:
         self._gpu_enabled: bool = False
         self._gpu_disabled_reason: str | None = None
 
-    def set_test_indexes(
-        self, primary: faiss.Index | None, secondary: faiss.Index | None
-    ) -> None:
+    def set_test_indexes(self, primary: faiss.Index | None, secondary: faiss.Index | None) -> None:
         """Set CPU indexes for testing purposes.
 
         This method allows tests to inject CPU indexes directly, bypassing

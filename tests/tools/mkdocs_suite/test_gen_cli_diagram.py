@@ -231,9 +231,7 @@ def test_update_cli_index_entry_preserves_double_newline(
 
     monkeypatch.setattr(gen_cli_module.mkdocs_gen_files, "open", fake_open)
 
-    gen_cli_module.update_cli_index_entry(
-        enabled=True
-    )
+    gen_cli_module.update_cli_index_entry(enabled=True)
     updated_content = buffers[gen_cli_module.DIAGRAM_INDEX_PATH].getvalue()
 
     assert (
@@ -243,9 +241,7 @@ def test_update_cli_index_entry_preserves_double_newline(
     assert updated_content.endswith("\n\n")
     assert gen_cli_module.CLI_INDEX_ENTRY.strip() in updated_content
 
-    gen_cli_module.update_cli_index_entry(
-        enabled=False
-    )
+    gen_cli_module.update_cli_index_entry(enabled=False)
     reverted_content = buffers[gen_cli_module.DIAGRAM_INDEX_PATH].getvalue()
 
     assert reverted_content == original_content

@@ -56,6 +56,7 @@ import uuid
 from typing import TYPE_CHECKING
 
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp
 
 from kgfoundry_common.logging import get_logger
 
@@ -137,6 +138,13 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
 
     This middleware is stateless and does not maintain any instance attributes.
 
+    Parameters
+    ----------
+    app : ASGIApp
+        ASGI application to wrap with middleware.
+    **kwargs : object
+        Additional keyword arguments passed to base class (BaseHTTPMiddleware).
+
     Notes
     -----
     Middleware Order:
@@ -174,6 +182,10 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
     >>> session_id = response.json()["session_id"]  # Use for subsequent requests
     """
 
+    def __init__(self, app: ASGIApp, **kwargs: object) -> None:
+        super().__init__(app, **kwargs)
+        self._logger = LOGGER
+
     async def dispatch(  # Required instance method for BaseHTTPMiddleware
         self,
         request: Request,
@@ -206,12 +218,12 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
         session_id = request.headers.get("X-Session-ID")
         if session_id is None:
             session_id = str(uuid.uuid4())
-            LOGGER.debug(
+            self._logger.debug(
                 "Generated session ID for request",
                 extra={"session_id": session_id, "path": request.url.path},
             )
         else:
-            LOGGER.debug(
+            self._logger.debug(
                 "Using client-provided session ID",
                 extra={"session_id": session_id, "path": request.url.path},
             )

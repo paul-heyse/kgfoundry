@@ -321,9 +321,7 @@ def test_readiness_probe_check_directory_exists() -> None:
         path = Path(tmpdir)
 
         # Act
-        result = ReadinessProbe.check_directory(
-            path
-        )
+        result = ReadinessProbe.check_directory(path)
 
         # Assert
         assert result.healthy is True
@@ -337,9 +335,7 @@ def test_readiness_probe_check_directory_create() -> None:
         new_dir = Path(tmpdir) / "new_subdir"
 
         # Act
-        result = ReadinessProbe.check_directory(
-            new_dir, create=True
-        )
+        result = ReadinessProbe.check_directory(new_dir, create=True)
 
         # Assert
         assert result.healthy is True
@@ -355,9 +351,7 @@ def test_readiness_probe_check_file_exists() -> None:
 
     try:
         # Act
-        result = ReadinessProbe.check_file(
-            path, description="test file"
-        )
+        result = ReadinessProbe.check_file(path, description="test file")
 
         # Assert
         assert result.healthy is True
@@ -371,9 +365,7 @@ def test_readiness_probe_check_file_optional() -> None:
     path = Path("/nonexistent/file.txt")
 
     # Act
-    result = ReadinessProbe.check_file(
-        path, description="test file", optional=True
-    )
+    result = ReadinessProbe.check_file(path, description="test file", optional=True)
 
     # Assert
     assert result.healthy is True  # Optional files don't fail readiness
@@ -387,9 +379,7 @@ def test_readiness_probe_check_file_required() -> None:
     path = Path("/nonexistent/file.txt")
 
     # Act
-    result = ReadinessProbe.check_file(
-        path, description="test file", optional=False
-    )
+    result = ReadinessProbe.check_file(path, description="test file", optional=False)
 
     # Assert
     assert result.healthy is False

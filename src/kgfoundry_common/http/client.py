@@ -43,21 +43,20 @@ class HttpClient:
     Parameters
     ----------
     settings : HttpSettings
-        Client configuration settings.
+        Client configuration settings including base URL, timeouts, and other
+        HTTP client configuration options.
     retry_strategy : RetryStrategy | None, optional
-        Retry strategy to use. If None, requests will be single-attempt.
-        Defaults to None.
+        Retry strategy to use for handling transient failures. If None, requests
+        will be attempted only once without retries. Defaults to None.
+
+    Notes
+    -----
+    The underlying HTTP client (httpx, requests, etc.) is not yet initialized.
+    This is a placeholder implementation that raises NotImplementedError when
+    requests are made. See the `request` method for implementation status.
     """
 
     def __init__(self, settings: HttpSettings, retry_strategy: RetryStrategy | None = None) -> None:
-        """Initialize HTTP client.
-
-        Notes
-        -----
-        The underlying HTTP client (httpx, requests, etc.) is not yet initialized.
-        This is a placeholder implementation that raises NotImplementedError when
-        requests are made. See the `request` method for implementation status.
-        """
         self.s = settings
         self.retry_strategy = retry_strategy  # may be None for single-attempt
 
@@ -114,14 +113,14 @@ class HttpClient:
         Returns
         -------
         object
-            HTTP response object.
+            HTTP response object. The actual type depends on the underlying HTTP
+            library implementation (e.g., httpx.Response, requests.Response).
 
-        Raises
-        ------
-        NotImplementedError
-            Raised by the _attempt() function when HTTP request implementation
-            is not yet complete. This exception is raised indirectly through
-            the retry strategy execution.
+        Notes
+        -----
+        This method currently raises NotImplementedError as the HTTP request
+        implementation is incomplete. The exception is raised by the `_attempt()`
+        function and propagated through the retry strategy execution.
         """
         method = method.upper()
         url = self._build_url(url)
@@ -144,12 +143,15 @@ class HttpClient:
             Raises
             ------
             NotImplementedError
-                HTTP request implementation is not yet complete.
+                HTTP request implementation is not yet complete. This is raised
+                as a placeholder until the actual HTTP client integration is implemented.
 
             Notes
             -----
             This method currently raises NotImplementedError as the HTTP request
             implementation is incomplete. When implemented, it should:
+            - Return an HTTP response object from the underlying HTTP library
+              (e.g., httpx.Response, requests.Response)
             - Use HttpRateLimitedError and HttpStatusError from kgfoundry_common.http.errors
             - Integrate with httpx or requests library
             - Handle params, json_body, data, and timeout_s parameters

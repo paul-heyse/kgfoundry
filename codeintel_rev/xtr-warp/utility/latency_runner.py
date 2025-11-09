@@ -41,10 +41,9 @@ if __name__ == "__main__":
 
     from utility.runner_utils import make_run_config
     from warp.data.queries import WARPQueries
-from warp.engine.searcher import WARPSearcher
-from warp.utils.tracker import ExecutionTracker
-
-from warp.searcher import BatchSearchOptions
+    from warp.engine.searcher import WARPSearcher
+    from warp.searcher import BatchSearchOptions
+    from warp.utils.tracker import ExecutionTracker
 
     run_config = make_run_config(config)
 

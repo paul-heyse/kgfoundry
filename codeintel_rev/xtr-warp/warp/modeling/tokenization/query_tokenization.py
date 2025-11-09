@@ -170,89 +170,96 @@ class QueryTokenizer:
             If full_length_search=True with batch size > 1, or if context
             length doesn't match batch_text length.
         """
+        batch_list = self._prepare_batch_list(batch_text)
+        max_length = self._determine_max_length(batch_list, full_length_search)
+        ids, mask = self._tokenize_with_padding(batch_list, max_length)
+        ids, mask = self._append_context_if_needed(ids, mask, context, batch_list)
+        mask = self._apply_mask_attention(ids, mask)
+
+        if bsize:
+            return split_into_batches(ids, mask, bsize)
+
+        self._record_first_use(context)
+        return ids, mask
+
+    @staticmethod
+    def _prepare_batch_list(batch_text: list[str] | tuple[str, ...]) -> list[str]:
         if type(batch_text) not in {list, tuple}:
             msg = f"batch_text must be list or tuple, got {type(batch_text).__name__}"
             raise TypeError(msg)
+        return [". " + text for text in batch_text]
 
-        # add placehold for the [Q] marker
-        batch_text = [". " + x for x in batch_text]
-
-        # Full length search is only available for single inference (for now)
-        # Batched full length search requires far deeper changes to the code base
-        if full_length_search and not (isinstance(batch_text, list) and len(batch_text) == 1):
+    def _determine_max_length(self, batch_list: list[str], full_length_search: bool) -> int:
+        if not full_length_search:
+            return self.query_maxlen
+        if len(batch_list) != 1:
             msg = "full_length_search is only available for single inference (list with 1 element)"
-            raise ValueError(msg)
+            raise ValueError(
+                msg
+            )
+        un_truncated_ids = self.tok(batch_list, add_special_tokens=False).to(DEVICE)["input_ids"]
+        max_length_in_batch = max(len(ids) for ids in un_truncated_ids)
+        return self.max_len(max_length_in_batch)
 
-        if full_length_search:
-            # Tokenize each string in the batch
-            un_truncated_ids = self.tok(batch_text, add_special_tokens=False).to(DEVICE)[
-                "input_ids"
-            ]
-            # Get the longest length in the batch
-            max_length_in_batch = max(len(x) for x in un_truncated_ids)
-            # Set the max length
-            max_length = self.max_len(max_length_in_batch)
-        else:
-            # Max length is the default max length from the config
-            max_length = self.query_maxlen
-
+    def _tokenize_with_padding(self, batch_list: list[str], max_length: int) -> tuple[torch.Tensor, torch.Tensor]:
         obj = self.tok(
-            batch_text,
+            batch_list,
             padding="max_length",
             truncation=True,
             return_tensors="pt",
             max_length=max_length,
         ).to(DEVICE)
-
         ids, mask = obj["input_ids"], obj["attention_mask"]
-
-        # postprocess for the [Q] marker and the [MASK] augmentation
         ids[:, 1] = self.Q_marker_token_id
         ids[ids == self.pad_token_id] = self.mask_token_id
-
-        if context is not None:
-            if len(context) != len(batch_text):
-                msg = (
-                    f"len(context) ({len(context)}) must equal len(batch_text) ({len(batch_text)})"
-                )
-                raise ValueError(msg)
-
-            obj_2 = self.tok(
-                context,
-                padding="longest",
-                truncation=True,
-                return_tensors="pt",
-                max_length=self.background_maxlen,
-            ).to(DEVICE)
-
-            ids_2, mask_2 = (
-                obj_2["input_ids"][:, 1:],
-                obj_2["attention_mask"][:, 1:],
-            )  # Skip the first [SEP]
-
-            ids = torch.cat((ids, ids_2), dim=-1)
-            mask = torch.cat((mask, mask_2), dim=-1)
-
-        if self.config.attend_to_mask_tokens:
-            mask[ids == self.mask_token_id] = 1
-            if mask.sum().item() != mask.size(0) * mask.size(1):
-                msg = (
-                    f"mask.sum() ({mask.sum().item()}) must equal "
-                    f"mask.size(0) * mask.size(1) ({mask.size(0) * mask.size(1)})"
-                )
-                raise ValueError(msg)
-
-        if bsize:
-            return split_into_batches(ids, mask, bsize)
-
-        if self.used is False:
-            self.used = True
-
-            (context is None) or context[0]
-            if self.verbose > 1:
-                pass
-
         return ids, mask
+
+    def _append_context_if_needed(
+        self,
+        ids: torch.Tensor,
+        mask: torch.Tensor,
+        context: list[str] | None,
+        batch_list: list[str],
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        if context is None:
+            return ids, mask
+        if len(context) != len(batch_list):
+            msg = (
+                f"len(context) ({len(context)}) must equal len(batch_text) ({len(batch_list)})"
+            )
+            raise ValueError(msg)
+
+        obj_2 = self.tok(
+            context,
+            padding="longest",
+            truncation=True,
+            return_tensors="pt",
+            max_length=self.background_maxlen,
+        ).to(DEVICE)
+        ids_2 = obj_2["input_ids"][:, 1:]
+        mask_2 = obj_2["attention_mask"][:, 1:]
+        return torch.cat((ids, ids_2), dim=-1), torch.cat((mask, mask_2), dim=-1)
+
+    def _apply_mask_attention(self, ids: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        if not self.config.attend_to_mask_tokens:
+            return mask
+        mask[ids == self.mask_token_id] = 1
+        expected = mask.size(0) * mask.size(1)
+        total = int(mask.sum().item())
+        if total != expected:
+            msg = f"mask.sum() ({total}) must equal mask.size(0) * mask.size(1) ({expected})"
+            raise ValueError(
+                msg
+            )
+        return mask
+
+    def _record_first_use(self, context: list[str] | None) -> None:
+        if self.used:
+            return
+        self.used = True
+        (context is None) or context[0]
+        if self.verbose > 1:
+            pass
 
     # Ensure that query_maxlen <= length <= 500 tokens
     def max_len(self, length: int) -> int:

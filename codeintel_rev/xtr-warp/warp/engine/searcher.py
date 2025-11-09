@@ -46,12 +46,12 @@ class WARPSearcher:
     def __init__(self, config: WARPRunConfig) -> None:
         self.config = config
         with Run().context(RunConfig(nranks=config.nranks, experiment=config.experiment_name)):
-            self.searcher = Searcher(
-                index=config.index_name,
+            searcher_options = SearcherInitOptions(
                 config=config,
                 index_root=config.index_root,
                 warp_engine=True,
             )
+            self.searcher = Searcher(index=config.index_name, options=searcher_options)
 
         collection_map_path = pathlib.Path(config.collection_path).parent / "collection_map.json"
         if pathlib.Path(collection_map_path).exists():

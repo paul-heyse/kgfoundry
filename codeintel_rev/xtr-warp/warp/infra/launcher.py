@@ -76,13 +76,13 @@ class Launcher:
         """
         if not isinstance(custom_config, BaseConfig):
             msg = (
-                f"custom_config must be an instance of BaseConfig, "
+                "custom_config must be an instance of BaseConfig, "
                 f"got {type(custom_config).__name__}"
             )
             raise TypeError(msg)
         if not isinstance(custom_config, RunSettings):
             msg = (
-                f"custom_config must be an instance of RunSettings, "
+                "custom_config must be an instance of RunSettings, "
                 f"got {type(custom_config).__name__}"
             )
             raise TypeError(msg)
@@ -154,13 +154,13 @@ class Launcher:
         """
         if not isinstance(custom_config, BaseConfig):
             msg = (
-                f"custom_config must be an instance of BaseConfig, "
+                "custom_config must be an instance of BaseConfig, "
                 f"got {type(custom_config).__name__}"
             )
             raise TypeError(msg)
         if not isinstance(custom_config, RunSettings):
             msg = (
-                f"custom_config must be an instance of RunSettings, "
+                "custom_config must be an instance of RunSettings, "
                 f"got {type(custom_config).__name__}"
             )
             raise TypeError(msg)

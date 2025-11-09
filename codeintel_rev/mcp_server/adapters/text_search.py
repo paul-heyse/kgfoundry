@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast
@@ -38,6 +38,58 @@ COMPONENT_NAME = "codeintel_mcp"
 LOGGER = get_logger(__name__)
 
 
+@dataclass(frozen=True)
+class TextSearchOptions:
+    """Parameters controlling ripgrep execution."""
+
+    _ALLOWED_KEYS = frozenset(
+        {"regex", "case_sensitive", "paths", "include_globs", "exclude_globs", "max_results"}
+    )
+
+    query: str
+    regex: bool = False
+    case_sensitive: bool = False
+    paths: Sequence[str] | None = None
+    include_globs: Sequence[str] | None = None
+    exclude_globs: Sequence[str] | None = None
+    max_results: int = 50
+
+    @classmethod
+    def from_overrides(
+        cls, query: str, overrides: Mapping[str, object]
+    ) -> TextSearchOptions:
+        """Build search options from keyword overrides.
+
+        Constructs a TextSearchOptions instance from a query string and a mapping
+        of keyword arguments. Validates that all override keys are allowed options.
+
+        Parameters
+        ----------
+        query : str
+            Search query string (regex pattern if regex=True).
+        overrides : Mapping[str, object]
+            Dictionary of keyword arguments corresponding to TextSearchOptions fields.
+            Valid keys are: regex, case_sensitive, paths, include_globs, exclude_globs,
+            max_results.
+
+        Returns
+        -------
+        TextSearchOptions
+            Configured search options instance with query and overrides applied.
+
+        Raises
+        ------
+        TypeError
+            If any keys in overrides are not recognized as valid TextSearchOptions
+            fields. This prevents typos and ensures type safety.
+        """
+        unexpected = set(overrides) - cls._ALLOWED_KEYS
+        if unexpected:
+            msg = f"Unexpected search_text keyword(s): {sorted(unexpected)}"
+            raise TypeError(msg)
+        return cls(query=query, **{k: overrides[k] for k in overrides})
+
+
 class Observation(Protocol):
     """Interface describing the observation helpers used for metrics recording."""
 
@@ -52,12 +104,8 @@ async def search_text(
     context: ApplicationContext,
     query: str,
     *,
-    regex: bool = False,
-    case_sensitive: bool = False,
-    paths: Sequence[str] | None = None,
-    include_globs: Sequence[str] | None = None,
-    exclude_globs: Sequence[str] | None = None,
-    max_results: int = 50,
+    options: TextSearchOptions | None = None,
+    **overrides: object,
 ) -> dict:
     """Fast text search using ripgrep (async wrapper).
 
@@ -70,41 +118,37 @@ async def search_text(
         Application context containing repo root and settings.
     query : str
         Search query string (regex pattern if ``regex=True``).
-    regex : bool, optional
-        Treat query as a regular expression. Defaults to ``False``.
-    case_sensitive : bool, optional
-        Perform case-sensitive search. Defaults to ``False``.
-    paths : Sequence[str] | None, optional
-        Specific file paths to search within. If provided, suppresses scope
-        include globs unless explicitly overridden. Defaults to ``None``.
-    include_globs : Sequence[str] | None, optional
-        Glob patterns for paths to include in the search. Overrides session scope
-        if provided. Defaults to ``None``.
-    exclude_globs : Sequence[str] | None, optional
-        Glob patterns for paths to exclude from the search. Overrides session scope
-        if provided. Defaults to ``None``.
-    max_results : int, optional
-        Maximum number of results to return. Defaults to ``50``.
+    options : TextSearchOptions | None, optional
+        Explicit search configuration. When ``None``, keyword overrides are permitted.
+    **overrides : object
+        Backward-compatible keyword overrides corresponding to
+        ``TextSearchOptions`` fields (``regex``, ``case_sensitive``, ``paths``,
+        ``include_globs``, ``exclude_globs``, ``max_results``).
 
     Returns
     -------
     dict
         Search results containing matched paths and metadata.
+
+    Raises
+    ------
+    TypeError
+        If both ``options`` and keyword ``overrides`` are provided simultaneously.
+        Only one method of providing search options is allowed per call.
     """
     session_id = get_session_id()
     scope = await get_effective_scope(context, session_id)
+    if options is None:
+        options = TextSearchOptions.from_overrides(query, overrides)
+    elif overrides:
+        msg = "Cannot pass keyword overrides when options is provided"
+        raise TypeError(msg)
     return await asyncio.to_thread(
         _search_text_sync,
         context,
         session_id,
         scope,
-        query=query,
-        regex=regex,
-        case_sensitive=case_sensitive,
-        paths=paths,
-        include_globs=include_globs,
-        exclude_globs=exclude_globs,
-        max_results=max_results,
+        options,
     )
 
 
@@ -112,50 +156,47 @@ def _search_text_sync(
     context: ApplicationContext,
     session_id: str,
     scope: ScopeIn | None,
-    *,
-    query: str,
-    regex: bool,
-    case_sensitive: bool,
-    paths: Sequence[str] | None,
-    include_globs: Sequence[str] | None,
-    exclude_globs: Sequence[str] | None,
-    max_results: int,
+    options: TextSearchOptions,
 ) -> dict:
     repo_root = context.paths.repo_root
+
+    query = options.query
+    max_results = options.max_results
 
     merged_filters = merge_scope_filters(
         scope,
         {
-            "include_globs": (list(include_globs) if include_globs is not None else include_globs),
-            "exclude_globs": (list(exclude_globs) if exclude_globs is not None else exclude_globs),
+            "include_globs": (
+                list(options.include_globs) if options.include_globs is not None else options.include_globs
+            ),
+            "exclude_globs": (
+                list(options.exclude_globs) if options.exclude_globs is not None else options.exclude_globs
+            ),
         },
     )
 
-    effective_paths = list(paths) if paths else None
+    effective_paths = list(options.paths) if options.paths else None
     # Explicit paths suppress scope-provided include globs unless explicitly overridden
-    if effective_paths and include_globs is None:
+    if effective_paths and options.include_globs is None:
         effective_include_globs: Sequence[str] | None = None
     else:
         effective_include_globs = merged_filters.get("include_globs")
     effective_exclude_globs = merged_filters.get("exclude_globs")
-
-    scope_include_globs_raw = (
-        cast("Sequence[str] | None", scope.get("include_globs")) if scope else None
-    )
-    scope_exclude_globs_raw = (
-        cast("Sequence[str] | None", scope.get("exclude_globs")) if scope else None
-    )
 
     LOGGER.debug(
         "Searching text with scope filters",
         extra={
             "session_id": session_id,
             "query": query,
-            "explicit_paths": list(paths) if paths else None,
-            "explicit_include_globs": (list(include_globs) if include_globs is not None else None),
-            "explicit_exclude_globs": (list(exclude_globs) if exclude_globs is not None else None),
-            "scope_include_globs": scope_include_globs_raw,
-            "scope_exclude_globs": scope_exclude_globs_raw,
+            "explicit_paths": list(options.paths) if options.paths else None,
+            "explicit_include_globs": (list(options.include_globs) if options.include_globs is not None else None),
+            "explicit_exclude_globs": (list(options.exclude_globs) if options.exclude_globs is not None else None),
+            "scope_include_globs": (
+                cast("Sequence[str] | None", scope.get("include_globs")) if scope else None
+            ),
+            "scope_exclude_globs": (
+                cast("Sequence[str] | None", scope.get("exclude_globs")) if scope else None
+            ),
             "effective_paths": effective_paths,
             "effective_include_globs": effective_include_globs,
             "effective_exclude_globs": effective_exclude_globs,
@@ -164,12 +205,12 @@ def _search_text_sync(
 
     params = RipgrepCommandParams(
         query=query,
-        regex=regex,
-        case_sensitive=case_sensitive,
+        regex=options.regex,
+        case_sensitive=options.case_sensitive,
         include_globs=effective_include_globs,
         exclude_globs=effective_exclude_globs,
         paths=effective_paths,
-        max_results=max_results,
+        max_results=options.max_results,
     )
 
     cmd = _build_ripgrep_command(params)
@@ -192,7 +233,7 @@ def _search_text_sync(
                     observation=observation,
                     repo_root=repo_root,
                     query=query,
-                    case_sensitive=case_sensitive,
+                    case_sensitive=options.case_sensitive,
                     max_results=max_results,
                 )
             else:

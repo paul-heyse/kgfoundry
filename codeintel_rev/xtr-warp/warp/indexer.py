@@ -156,8 +156,8 @@ class Indexer:
         """
         if overwrite not in {True, False, "reuse", "resume", "force_silent_overwrite"}:
             msg = (
-                f"overwrite must be one of "
-                f"{{True, False, 'reuse', 'resume', 'force_silent_overwrite'}}, "
+                "overwrite must be one of "
+                "{True, False, 'reuse', 'resume', 'force_silent_overwrite'}, "
                 f"got {overwrite!r}"
             )
             raise ValueError(msg)

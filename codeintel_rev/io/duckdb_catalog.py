@@ -505,10 +505,27 @@ class DuckDBCatalog:
     ) -> list[dict]:
         """Run Python filtering for complex glob patterns not expressible in SQL.
 
+        This method filters results by applying include and exclude glob patterns
+        to the URI field of each result dictionary. Patterns that cannot be
+        efficiently expressed in SQL (e.g., complex wildcards, multiple patterns)
+        are handled here using Python's path matching logic.
+
+        Parameters
+        ----------
+        results : list[dict]
+            List of result dictionaries, each containing at least a "uri" key.
+        include_patterns : tuple[str, ...]
+            Glob patterns that URIs must match to be included. Empty tuple means
+            no inclusion filter is applied.
+        exclude_patterns : tuple[str, ...]
+            Glob patterns that URIs must not match to be included. Empty tuple
+            means no exclusion filter is applied.
+
         Returns
         -------
         list[dict]
-            Filtered results matching include/exclude glob patterns.
+            Filtered results matching include/exclude glob patterns. Results
+            matching exclude patterns or not matching include patterns are removed.
         """
         if not include_patterns and not exclude_patterns:
             return results
@@ -540,10 +557,24 @@ class DuckDBCatalog:
     ) -> list[dict]:
         """Filter results by normalized file extensions.
 
+        This method filters results to include only those whose URI ends with
+        one of the specified language extensions. Extensions are matched
+        case-insensitively against the lowercase URI.
+
+        Parameters
+        ----------
+        results : list[dict]
+            List of result dictionaries, each containing at least a "uri" key.
+        language_extensions : frozenset[str]
+            Set of normalized file extensions (e.g., {".py", ".js", ".ts"}).
+            Extensions should include the leading dot. Empty set means no
+            language filter is applied.
+
         Returns
         -------
         list[dict]
-            Filtered results matching language extensions.
+            Filtered results matching language extensions. Only results whose
+            URI ends with one of the specified extensions are included.
         """
         if not language_extensions:
             return results
@@ -579,10 +610,25 @@ class DuckDBCatalog:
     ) -> str:
         """Format the filter type label used for Prometheus metrics.
 
+        Determines the type of scope filtering being applied based on the
+        presence of glob patterns and language filters. Used to label metrics
+        for observability.
+
+        Parameters
+        ----------
+        include_globs : list[str] | None
+            List of include glob patterns, or None if not specified.
+        exclude_globs : list[str] | None
+            List of exclude glob patterns, or None if not specified.
+        languages : list[str] | None
+            List of language filters, or None if not specified.
+
         Returns
         -------
         str
-            Filter type label: "combined", "glob", "language", or "none".
+            Filter type label: "combined" (both globs and languages),
+            "glob" (only glob patterns), "language" (only language filters),
+            or "none" (no filters).
         """
         if include_globs or exclude_globs:
             return "combined" if languages else "glob"

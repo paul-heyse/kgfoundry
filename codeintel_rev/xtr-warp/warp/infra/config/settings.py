@@ -152,7 +152,7 @@ class RunSettings:
 
             if len(script_name) == 0:
                 msg = (
-                    f"script_name must be non-empty, got "
+                    "script_name must be non-empty, got "
                     f"script_name={script_name!r}, script_path={script_path!r}, "
                     f"cwd={cwd!r}"
                 )

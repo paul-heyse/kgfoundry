@@ -92,6 +92,65 @@ def find_class_names(model_type: str, class_type: str) -> str | None:
     return None
 
 
+def _resolve_standard_transformer_classes(
+    name_or_path: str, config: AutoConfig
+) -> tuple[type, type]:
+    """Return the pretrained/model pair for standard HuggingFace types."""
+    model_type = config.model_type
+    pretrained_class = find_class_names(model_type, "pretrainedmodel")
+    if pretrained_class is not None:
+        pretrained_class_object = getattr(transformers, pretrained_class)
+    elif model_type == "xlm-roberta":
+        pretrained_class_object = XLMRobertaPreTrainedModel
+    elif base_class_mapping.get(name_or_path) is not None:
+        pretrained_class_object = base_class_mapping[name_or_path]
+    else:
+        msg = (
+            "Could not find a pretrained class for model type "
+            f"{model_type} in the transformers library"
+        )
+        raise ValueError(
+            msg
+        )
+
+    model_class = find_class_names(model_type, "model")
+    if model_class is not None:
+        model_class_object = getattr(transformers, model_class)
+    elif model_object_mapping.get(name_or_path) is not None:
+        model_class_object = model_object_mapping[name_or_path]
+    else:
+        msg = (
+            "Could not find a model class for model type "
+            f"{model_type} in the transformers library"
+        )
+        raise ValueError(
+            msg
+        )
+
+    return model_class_object, pretrained_class_object
+
+
+def _resolve_custom_transformer_classes(
+    name_or_path: str, config: AutoConfig
+) -> tuple[type, type]:
+    """Return the model/pretrained pair defined in ``config.auto_map``."""
+    auto_map = getattr(config, "auto_map", {})
+    if "AutoModel" not in auto_map:
+        msg = "The custom model should have AutoModel in config.auto_map"
+        raise ValueError(msg)
+
+    model_class = auto_map["AutoModel"]
+    if not model_class.endswith("Model"):
+        msg = f"model_class must end with 'Model', got {model_class!r}"
+        raise ValueError(msg)
+
+    model_class_object = get_class_from_dynamic_module(model_class, name_or_path)
+    pretrained_class = model_class.replace("Model", "PreTrainedModel")
+    pretrained_class_object = get_class_from_dynamic_module(pretrained_class, name_or_path)
+
+    return model_class_object, pretrained_class_object
+
+
 def class_factory(name_or_path: str) -> type:
     """Create ColBERT model class from HuggingFace model name or path.
 
@@ -118,44 +177,13 @@ def class_factory(name_or_path: str) -> type:
     loaded_config = AutoConfig.from_pretrained(name_or_path, trust_remote_code=True)
 
     if getattr(loaded_config, "auto_map", None) is None:
-        model_type = loaded_config.model_type
-        pretrained_class = find_class_names(model_type, "pretrainedmodel")
-        model_class = find_class_names(model_type, "model")
-
-        if pretrained_class is not None:
-            pretrained_class_object = getattr(transformers, pretrained_class)
-        elif model_type == "xlm-roberta":
-            pretrained_class_object = XLMRobertaPreTrainedModel
-        elif base_class_mapping.get(name_or_path) is not None:
-            pretrained_class_object = base_class_mapping.get(name_or_path)
-        else:
-            msg = (
-                f"Could not find correct pretrained class for the model type "
-                f"{model_type} in transformers library"
-            )
-            raise ValueError(msg)
-
-        if model_class is not None:
-            model_class_object = getattr(transformers, model_class)
-        elif model_object_mapping.get(name_or_path) is not None:
-            model_class_object = model_object_mapping.get(name_or_path)
-        else:
-            msg = (
-                f"Could not find correct model class for the model type "
-                f"{model_type} in transformers library"
-            )
-            raise ValueError(msg)
+        model_class_object, pretrained_class_object = _resolve_standard_transformer_classes(
+            name_or_path, loaded_config
+        )
     else:
-        if "AutoModel" not in loaded_config.auto_map:
-            msg = "The custom model should have AutoModel class in the config.automap"
-            raise ValueError(msg)
-        model_class = loaded_config.auto_map["AutoModel"]
-        if not model_class.endswith("Model"):
-            msg = f"model_class must end with 'Model', got {model_class!r}"
-            raise ValueError(msg)
-        pretrained_class = model_class.replace("Model", "PreTrainedModel")
-        model_class_object = get_class_from_dynamic_module(model_class, name_or_path)
-        pretrained_class_object = get_class_from_dynamic_module(pretrained_class, name_or_path)
+        model_class_object, pretrained_class_object = _resolve_custom_transformer_classes(
+            name_or_path, loaded_config
+        )
 
     class HFColBERT(pretrained_class_object):
         """Shallow wrapper around HuggingFace transformers.

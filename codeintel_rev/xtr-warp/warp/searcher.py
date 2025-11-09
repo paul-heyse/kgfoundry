@@ -16,7 +16,10 @@ from tqdm import tqdm
 from warp.data import Collection, Queries, Ranking
 from warp.engine.config import WARPRunConfig
 from warp.engine.search.index_storage import IndexScorerWARP
-from warp.engine.search.parallel.parallel_index_storage import ParallelIndexScorerWARP
+from warp.engine.search.parallel.parallel_index_storage import (
+    ParallelIndexScorerOptions,
+    ParallelIndexScorerWARP,
+)
 from warp.infra.config import ColBERTConfig
 from warp.infra.launcher import print_memory_stats
 from warp.infra.provenance import Provenance
@@ -24,6 +27,16 @@ from warp.infra.run import Run
 from warp.modeling.checkpoint import Checkpoint
 from warp.search.index_storage import IndexScorer
 from warp.utils.tracker import DEFAULT_NOP_TRACKER, Tracker
+
+
+@dataclass(frozen=True)
+class SearcherInitOptions:
+    checkpoint: str | None = None
+    collection: str | Collection | None = None
+    config: ColBERTConfig | WARPRunConfig | None = None
+    index_root: str | None = None
+    verbose: int = 3
+    warp_engine: bool = False
 
 # Batch size and search thresholds
 DEFAULT_BATCH_SIZE = 128
@@ -94,40 +107,31 @@ class Searcher:
         Verbosity level.
     """
 
-    def __init__(
-        self,
-        index: str,
-        checkpoint: str | None = None,
-        collection: str | Collection | None = None,
-        config: ColBERTConfig | WARPRunConfig | None = None,
-        index_root: str | None = None,
-        verbose: int = 3,
-        *,
-        warp_engine: bool = False,
-    ) -> None:
-        self.verbose = verbose
+    def __init__(self, index: str, *, options: SearcherInitOptions | None = None) -> None:
+        opts = options or SearcherInitOptions()
+        self.verbose = opts.verbose
         if self.verbose > 1:
             print_memory_stats()
-
         warp_config = None
-        if isinstance(config, WARPRunConfig):
-            warp_config = config
-            config = warp_config.colbert()
+        colbert_config = opts.config
+        if isinstance(colbert_config, WARPRunConfig):
+            warp_config = colbert_config
+            colbert_config = warp_config.colbert()
 
-        initial_config = ColBERTConfig.from_existing(config, Run().config)
+        initial_config = ColBERTConfig.from_existing(colbert_config, Run().config)
 
         default_index_root = initial_config.index_root_
-        index_root = index_root if index_root else default_index_root
+        index_root = opts.index_root if opts.index_root else default_index_root
         self.index = str(pathlib.Path(index_root) / index)
         self.index_config = ColBERTConfig.load_from_index(self.index)
 
-        self.checkpoint = checkpoint or self.index_config.checkpoint
+        self.checkpoint = opts.checkpoint or self.index_config.checkpoint
         self.checkpoint_config = ColBERTConfig.load_from_checkpoint(self.checkpoint)
         self.config = ColBERTConfig.from_existing(
             self.checkpoint_config, self.index_config, initial_config
         )
 
-        self.collection = Collection.cast(collection or self.config.collection)
+        self.collection = Collection.cast(opts.collection or self.config.collection)
         self.configure(checkpoint=self.checkpoint, collection=self.collection)
 
         self.checkpoint = Checkpoint(
@@ -144,26 +148,32 @@ class Searcher:
             msg = "Memory-mapped index can only be used with CPU!"
             raise ValueError(msg)
 
-        self.warp_engine = warp_engine
-        if warp_engine:
+        self.warp_engine = opts.warp_engine
+        if opts.warp_engine:
             if torch.get_num_threads() == 1:
-                self.ranker = IndexScorerWARP(
-                    self.index,
-                    self.config,
+                scorer_options = IndexScorerOptions(
                     t_prime=warp_config.t_prime,
                     bound=warp_config.bound,
                     use_gpu=use_gpu,
                     load_index_with_mmap=load_index_with_mmap,
                 )
-            else:
-                self.ranker = ParallelIndexScorerWARP(
+                self.ranker = IndexScorerWARP(
                     self.index,
                     self.config,
+                    options=scorer_options,
+                )
+            else:
+                parallel_options = ParallelIndexScorerOptions(
                     t_prime=warp_config.t_prime,
                     bound=warp_config.bound,
                     use_gpu=use_gpu,
                     load_index_with_mmap=load_index_with_mmap,
                     fused_decompression_merge=warp_config.fused_ext,
+                )
+                self.ranker = ParallelIndexScorerWARP(
+                    self.index,
+                    self.config,
+                    options=parallel_options,
                 )
         else:
             self.ranker = IndexScorer(self.index, use_gpu, load_index_with_mmap)
@@ -271,7 +281,9 @@ class Searcher:
 
         return self._search_all_q(queries, q, opts)
 
-    def _search_all_q(self, queries: Queries, q: torch.Tensor, options: BatchSearchOptions) -> Ranking:
+    def _search_all_q(
+        self, queries: Queries, q: torch.Tensor, options: BatchSearchOptions
+    ) -> Ranking:
         show_progress = options.show_progress
         qids = list(queries.keys())
         qid_to_pids = options.qid_to_pids or dict.fromkeys(qids)
@@ -298,7 +310,7 @@ class Searcher:
         provenance.source = "Searcher::search_all"
         provenance.queries = queries.provenance()
         provenance.config = self.config.export()
-        provenance.k = k
+        provenance.k = options.k
 
         return Ranking(data=data, provenance=provenance)
 

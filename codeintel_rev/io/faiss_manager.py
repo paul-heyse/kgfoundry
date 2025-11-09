@@ -1020,9 +1020,8 @@ class FAISSManager:
             This can occur with certain index types or if the index is not wrapped
             with IndexIDMap2.
         TypeError
-            If the index's ``id_map`` interface is invalid (missing ``at`` or not callable).
-        TypeError
-            If the index's id_map interface is invalid or missing required methods.
+            If the index's ``id_map`` interface is invalid (missing ``at`` or not callable),
+            or if the id_map interface is missing required methods.
         """
         n_vectors = index.ntotal
         if n_vectors == 0:

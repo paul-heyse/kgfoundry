@@ -98,10 +98,30 @@ _CONFIG_NULLABLE_INT_KEYS = frozenset({"nprobe", "t_prime", "document_top_k", "b
 _CONFIG_BOOLEAN_KEYS = frozenset({"fused_ext"})
 _MISSING = object()
 
+
+def _validate_optional_int(value: int | None, name: str) -> None:
+    """Validate an optional integer parameter.
+
+    Parameters
+    ----------
+    value : int | None
+        Value to validate.
+    name : str
+        Parameter name for error messages.
+
+    Raises
+    ------
+    ValueError
+        If value is not None or int.
+    """
+    if value is not None and not isinstance(value, int):
+        msg = f"{name} must be None or int, got {type(value).__name__}"
+        raise ValueError(msg)
 _RESULT_INT_KEYS = frozenset({"index_size_bytes"})
 _RESULT_NUMBER_KEYS = frozenset({"index_size_gib"})
 _RESULT_OBJECT_KEYS = frozenset({"metrics", "statistics", "tracker"})
 _RESULT_PROVENANCE_KEY = "provenance"
+
 
 def _sanitize_config_value(key: str, value: object) -> object:
     """Return typed value for ``key``, or sentinel for invalid inputs.
@@ -459,25 +479,6 @@ class ExperimentSpec:
             msg = f"split must be 'dev' or 'test', got {self.split!r}"
             raise ValueError(msg)
 
-    def _validate_optional_int(self, value: int | None, name: str) -> None:
-        """Validate an optional integer parameter.
-
-        Parameters
-        ----------
-        value : int | None
-            Value to validate.
-        name : str
-            Parameter name for error messages.
-
-        Raises
-        ------
-        ValueError
-            If value is not None or int.
-        """
-        if value is not None and not isinstance(value, int):
-            msg = f"{name} must be None or int, got {type(value).__name__}"
-            raise ValueError(msg)
-
     def validate(self) -> ExperimentSpec:
         """Validate experiment specification parameters.
 
@@ -497,10 +498,10 @@ class ExperimentSpec:
         try:
             self._validate_collection_and_dataset()
             self._validate_numeric_parameters()
-            self._validate_optional_int(self.nprobe, "nprobe")
-            self._validate_optional_int(self.t_prime, "t_prime")
-            self._validate_optional_int(self.document_top_k, "document_top_k")
-            self._validate_optional_int(self.bound, "bound")
+            _validate_optional_int(self.nprobe, "nprobe")
+            _validate_optional_int(self.t_prime, "t_prime")
+            _validate_optional_int(self.document_top_k, "document_top_k")
+            _validate_optional_int(self.bound, "bound")
         except ValueError:
             raise
         return self
@@ -1220,34 +1221,24 @@ def _strip_provenance_fields(provenance: dict[str, object]) -> ExperimentConfigD
         Extracted configuration dictionary.
     """
     stripped: ExperimentConfigDict = {}
-    # Assign string fields
-    for str_key in _CONFIG_STRING_KEYS:
-        if str_key in provenance:
-            value = provenance[str_key]
-            sanitized = _sanitize_config_value(str_key, value)
-            if sanitized is not _MISSING:
-                stripped[str_key] = cast("str", sanitized)
-    # Assign int fields (required)
-    for int_key in _CONFIG_INT_KEYS:
-        if int_key in provenance:
-            value = provenance[int_key]
-            sanitized = _sanitize_config_value(int_key, value)
-            if sanitized is not _MISSING:
-                stripped[int_key] = cast("int", sanitized)
-    # Assign optional int fields
-    for opt_int_key in _CONFIG_NULLABLE_INT_KEYS:
-        if opt_int_key in provenance:
-            value = provenance[opt_int_key]
-            sanitized = _sanitize_config_value(opt_int_key, value)
-            if sanitized is not _MISSING:
-                stripped[opt_int_key] = cast("int | None", sanitized)
-    # Assign bool field
-    if "fused_ext" in provenance:
-        value = provenance["fused_ext"]
-        sanitized = _sanitize_config_value("fused_ext", value)
-        if sanitized is not _MISSING:
-            stripped["fused_ext"] = cast("bool", sanitized)
+    _assign_config_fields(stripped, provenance, _CONFIG_STRING_KEYS)
+    _assign_config_fields(stripped, provenance, _CONFIG_INT_KEYS)
+    _assign_config_fields(stripped, provenance, _CONFIG_NULLABLE_INT_KEYS)
+    _assign_config_fields(stripped, provenance, _CONFIG_BOOLEAN_KEYS)
     return stripped
+
+
+def _assign_config_fields(
+    stripped: ExperimentConfigDict, provenance: dict[str, object], keys: frozenset[str]
+) -> None:
+    """Copy sanitized values for the provided keys into ``stripped``."""
+    for key in keys:
+        if key not in provenance:
+            continue
+        sanitized = _sanitize_config_value(key, provenance[key])
+        if sanitized is _MISSING:
+            continue
+        stripped[key] = _cast_config_value(key, sanitized)
 
 
 def _strip_provenance(

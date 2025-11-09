@@ -31,9 +31,7 @@ def test_resolve_path_absolute() -> None:
 
     absolute = "/var/lib/search-index"
 
-    resolved = engine.resolve_path(
-        absolute
-    )
+    resolved = engine.resolve_path(absolute)
 
     assert resolved == Path(absolute)
 
@@ -44,9 +42,7 @@ def test_resolve_path_relative() -> None:
 
     relative = "indices/bm25"
 
-    resolved = engine.resolve_path(
-        relative
-    )
+    resolved = engine.resolve_path(relative)
 
     assert resolved == (repo_root / relative).resolve()
 
@@ -57,8 +53,6 @@ def test_resolve_path_expands_user_home(monkeypatch: pytest.MonkeyPatch, tmp_pat
     fake_home = tmp_path / "fake-home"
     monkeypatch.setenv("HOME", str(fake_home))
 
-    resolved = engine.resolve_path(
-        "~/.cache/splade"
-    )
+    resolved = engine.resolve_path("~/.cache/splade")
 
     assert resolved == fake_home / ".cache/splade"

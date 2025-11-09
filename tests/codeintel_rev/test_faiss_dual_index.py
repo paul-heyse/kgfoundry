@@ -218,9 +218,7 @@ async def test_gpu_secondary_clone_reuses_cloner_options(
         raising=False,
     )
 
-    await manager.try_gpu_clone(
-        faiss_module
-    )
+    await manager.try_gpu_clone(faiss_module)
 
     assert len(captured) == 2
     assert captured[0] is captured[1]

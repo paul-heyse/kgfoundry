@@ -56,52 +56,33 @@ def tensorize_triples(
 
     Tokenizes queries and passages, then organizes them into batches
     along with scores.
-
-    Parameters
-    ----------
-    query_tokenizer : Tokenizer
-        Tokenizer for queries.
-    doc_tokenizer : Tokenizer
-        Tokenizer for documents.
-    queries : list[str]
-        List of query texts.
-    passages : list[str]
-        List of passage texts.
-    scores : list[float] | torch.Tensor
-        List of scores for passages.
-    bsize : int | None
-        Batch size for queries (None for no batching).
-    nway : int
-        Number of passages per query.
-
-    Returns
-    -------
-    list[
-        tuple[
-            tuple[torch.Tensor, torch.Tensor],
-            tuple[torch.Tensor, torch.Tensor],
-            list[float] | torch.Tensor,
-        ]
-    ]
-        List of batches, each containing (query_ids, query_mask),
-        (doc_ids, doc_mask), and scores.
     """
     q_ids, q_mask = query_tokenizer.tensorize(queries)
     d_ids, d_mask = doc_tokenizer.tensorize(passages)
 
     query_batches = split_into_batches(q_ids, q_mask, bsize)
     doc_batches = split_into_batches(d_ids, d_mask, bsize * nway)
+    score_batches = _build_score_batches(scores, bsize * nway, len(doc_batches))
 
-    if len(scores):
-        score_batches = _split_into_batches2(scores, bsize * nway)
-    else:
-        score_batches = [[] for _ in doc_batches]
-
-    batches = []
+    batches: list[
+        tuple[
+            tuple[torch.Tensor, torch.Tensor],
+            tuple[torch.Tensor, torch.Tensor],
+            list[float] | torch.Tensor,
+        ]
+    ] = []
     for q_batch, d_batch, s_batch in zip(query_batches, doc_batches, score_batches, strict=False):
         batches.append((q_batch, d_batch, s_batch))
 
     return batches
+
+
+def _build_score_batches(
+    scores: list[float] | torch.Tensor, batch_size: int, num_batches: int
+) -> list[list[float] | torch.Tensor]:
+    if len(scores):
+        return _split_into_batches2(scores, batch_size)
+    return [[] for _ in range(num_batches)]
 
 
 def sort_by_length(

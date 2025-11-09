@@ -56,7 +56,7 @@ class ResidualEmbeddings:
             raise ValueError(msg)
         if codes.dim() != EXPECTED_CODES_DIM or residuals.dim() != EXPECTED_RESIDUALS_DIM:
             msg = (
-                f"codes must be 1-dimensional and residuals must be "
+                "codes must be 1-dimensional and residuals must be "
                 f"2-dimensional, got codes.size()={codes.size()}, "
                 f"residuals.size()={residuals.size()}"
             )
@@ -105,58 +105,77 @@ class ResidualEmbeddings:
         """
         num_embeddings += 512  # pad for access with strides
 
+        num_embeddings += 512
         dim, nbits = get_dim_and_nbits(index_path)
-
         if load_index_with_mmap:
-            if len(chunk_idxs) != 1:
-                msg = (
-                    "Index must only have 1 chunk to load with memory mapping!"
-                    "Use the colbert/utils/coalesce.py to prepare index for memory mapping."
-                )
-                raise ValueError(msg)
+            return cls._load_chunks_with_mmap(index_path, chunk_idxs)
+        return cls._load_chunks_streaming(index_path, chunk_idxs, num_embeddings, dim, nbits)
 
-            print_message("#> Loading codes and residuals with memory mapping...")
-
-            index_path_obj = pathlib.Path(index_path)
-            residuals_path = index_path_obj / "0.residuals.pt"
-            codes_path = index_path_obj / "0.codes.pt"
-
-            codes_size = get_codes_size(index_path, 0)
-            storage = torch.IntStorage.from_file(
-                filename=codes_path, shared=True, size=codes_size + 80
+    @classmethod
+    def _load_chunks_with_mmap(
+        cls,
+        index_path: str | pathlib.Path,
+        chunk_idxs: Sequence[int],
+    ) -> ResidualEmbeddings:
+        if len(chunk_idxs) != 1:
+            msg = (
+                "Index must only have 1 chunk to load with memory mapping!"
+                "Use the colbert/utils/coalesce.py to prepare index for memory mapping."
             )
-            # Trim the header, which is 320 bytes, or 80x 32-byte ints
-            codes = torch.IntTensor(storage)[80:]
+            raise ValueError(msg)
 
-            residuals_size, codes_size, packed_dim = get_residuals_size(index_path, 0)
-            storage = torch.ByteStorage.from_file(
-                filename=residuals_path, shared=True, size=residuals_size + 320
-            )
-            ret = torch.ByteTensor(storage)
-            # Trim to 320-byte header
-            ret = ret[320:]
-            ret = torch.reshape(ret, (codes_size, packed_dim))
-            residuals = ret
-        else:
-            print_message("#> Loading codes and residuals...")
+        print_message("#> Loading codes and residuals with memory mapping...")
+        index_path_obj = pathlib.Path(index_path)
+        residuals_path = index_path_obj / "0.residuals.pt"
+        codes_path = index_path_obj / "0.codes.pt"
 
-            codes = torch.empty(num_embeddings, dtype=torch.int32)
-            residuals = torch.empty(num_embeddings, dim // 8 * nbits, dtype=torch.uint8)
+        codes_size = get_codes_size(index_path, 0)
+        storage = torch.IntStorage.from_file(
+            filename=codes_path, shared=True, size=codes_size + 80
+        )
+        codes = torch.IntTensor(storage)[80:]
 
-            codes_offset = 0
-
-            for chunk_idx in tqdm.tqdm(chunk_idxs):
-                chunk = cls.load(index_path, chunk_idx)
-
-                codes_endpos = codes_offset + chunk.codes.size(0)
-
-                # Copy the values over to the allocated space
-                codes[codes_offset:codes_endpos] = chunk.codes
-                residuals[codes_offset:codes_endpos] = chunk.residuals
-
-                codes_offset = codes_endpos
+        residuals_size, codes_size, packed_dim = get_residuals_size(index_path, 0)
+        storage = torch.ByteStorage.from_file(
+            filename=residuals_path, shared=True, size=residuals_size + 320
+        )
+        residuals = torch.ByteTensor(storage)
+        residuals = residuals[320:]
+        residuals = torch.reshape(residuals, (codes_size, packed_dim))
 
         return cls(codes, residuals)
+
+    @classmethod
+    def _load_chunks_streaming(
+        cls,
+        index_path: str | pathlib.Path,
+        chunk_idxs: Sequence[int],
+        num_embeddings: int,
+        dim: int,
+        nbits: int,
+    ) -> ResidualEmbeddings:
+        print_message("#> Loading codes and residuals...")
+        codes = torch.empty(num_embeddings, dtype=torch.int32)
+        residuals = torch.empty(num_embeddings, dim // 8 * nbits, dtype=torch.uint8)
+
+        cls._populate_chunk_storage(index_path, chunk_idxs, codes, residuals)
+        return cls(codes, residuals)
+
+    @classmethod
+    def _populate_chunk_storage(
+        cls,
+        index_path: str | pathlib.Path,
+        chunk_idxs: Sequence[int],
+        codes: torch.Tensor,
+        residuals: torch.Tensor,
+    ) -> None:
+        codes_offset = 0
+        for chunk_idx in tqdm.tqdm(chunk_idxs):
+            chunk = cls.load(index_path, chunk_idx)
+            codes_endpos = codes_offset + chunk.codes.size(0)
+            codes[codes_offset:codes_endpos] = chunk.codes
+            residuals[codes_offset:codes_endpos] = chunk.residuals
+            codes_offset = codes_endpos
 
     @classmethod
     def load(cls, index_path: str | pathlib.Path, chunk_idx: int) -> ResidualEmbeddings:

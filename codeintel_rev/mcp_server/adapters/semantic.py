@@ -300,9 +300,7 @@ def _semantic_search_sync(
 
         answer_message = (
             f"Found {len(findings)} hybrid results for: {query}"
-            if any(
-                channel in {"bm25", "splade"} for channel in hybrid_result.retrieval_channels
-            )
+            if any(channel in {"bm25", "splade"} for channel in hybrid_result.retrieval_channels)
             else f"Found {len(findings)} semantically similar code chunks for: {query}"
         )
 
@@ -424,10 +422,26 @@ def _calculate_faiss_fanout(
 def _overfetch_bonus(effective_limit: int, scope_flags: _ScopeFilterFlags) -> int:
     """Determine additional fan-out when scope filters may drop results.
 
+    Calculates an over-fetch bonus to compensate for results that may be filtered
+    out by scope filters (include/exclude globs, language filters). The bonus
+    is higher when multiple filter types are active, as more results are likely
+    to be filtered out.
+
+    Parameters
+    ----------
+    effective_limit : int
+        Base number of results requested by the user.
+    scope_flags : _ScopeFilterFlags
+        Flags indicating which types of scope filters are active (include globs,
+        exclude globs, language filters).
+
     Returns
     -------
     int
         Additional results to fetch beyond effective_limit to account for filtering.
+        Returns effective_limit when both glob and language filters are active,
+        effective_limit // 2 when only one type is active, or 0 when no filters
+        are active.
     """
     if scope_flags.has_include_globs and scope_flags.has_languages:
         return effective_limit

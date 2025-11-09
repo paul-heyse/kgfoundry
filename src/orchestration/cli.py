@@ -661,8 +661,7 @@ def index_faiss(
             path=str(Path(index_path)),
             status="success",
             message=(
-                f"Stored {metadata['vector_count']} vectors "
-                f"(dimension={metadata['dimension']})"
+                f"Stored {metadata['vector_count']} vectors (dimension={metadata['dimension']})"
             ),
         )
         builder = builder.add_file(

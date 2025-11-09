@@ -291,7 +291,7 @@ class ColBERT(BaseColBERT):
         if self.colbert_config.similarity == "l2":
             if self.colbert_config.interaction != "colbert":
                 msg = (
-                    f"interaction must be 'colbert' when similarity is 'l2', "
+                    "interaction must be 'colbert' when similarity is 'l2', "
                     f"got {self.colbert_config.interaction!r}"
                 )
                 raise ValueError(msg)
@@ -371,7 +371,7 @@ def colbert_score_reduce(
     if config.interaction == "flipr":
         if config.query_maxlen != FLIPR_QUERY_MAXLEN:
             msg = (
-                f"query_maxlen must be 64 for flipr interaction (for now), "
+                "query_maxlen must be 64 for flipr interaction (for now), "
                 f"got {config.query_maxlen}"
             )
             raise ValueError(msg)

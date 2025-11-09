@@ -275,12 +275,8 @@ def _perform_dual_search(
     tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
         Primary distances, primary IDs, secondary distances, secondary IDs.
     """
-    primary_dists, primary_ids_result = manager.search_primary(
-        query, k=3, nprobe=128
-    )
-    secondary_dists, secondary_ids_result = manager.search_secondary(
-        query, k=3
-    )
+    primary_dists, primary_ids_result = manager.search_primary(query, k=3, nprobe=128)
+    secondary_dists, secondary_ids_result = manager.search_secondary(query, k=3)
     return primary_dists, primary_ids_result, secondary_dists, secondary_ids_result
 
 

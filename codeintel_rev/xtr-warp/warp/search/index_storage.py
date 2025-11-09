@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import pathlib
 from collections.abc import Callable
+from dataclasses import dataclass
 from math import ceil
 
 import torch
@@ -25,6 +26,14 @@ from warp.search.index_loader import IndexLoader
 from warp.search.strided_tensor import StridedTensor
 from warp.utils.tracker import DEFAULT_NOP_TRACKER, Tracker
 from warp.utils.utils import print_message
+
+
+@dataclass(frozen=True)
+class ScoreBatch:
+    q: torch.Tensor
+    d_packed: torch.Tensor
+    d_mask: torch.Tensor
+    pids: torch.Tensor
 
 
 class IndexScorer(IndexLoader, CandidateGeneration):
@@ -319,7 +328,6 @@ class IndexScorer(IndexLoader, CandidateGeneration):
         """
         # NOTE: Remove batching?
         batch_size = 2**20
-
         if self.use_gpu:
             centroid_scores = centroid_scores.cuda()
 
@@ -327,104 +335,156 @@ class IndexScorer(IndexLoader, CandidateGeneration):
 
         tracker.begin("Filtering")
         if self.use_gpu:
-            approx_scores = []
-
-            # Filter docs using pruned centroid scores
-            for i in range(ceil(len(pids) / batch_size)):
-                pids_ = pids[i * batch_size : (i + 1) * batch_size]
-                codes_packed, codes_lengths = self.embeddings_strided.lookup_codes(pids_)
-                idx_ = idx[codes_packed.long()]
-                pruned_codes_strided = StridedTensor(idx_, codes_lengths, use_gpu=self.use_gpu)
-                pruned_codes_padded, pruned_codes_mask = pruned_codes_strided.as_padded_tensor()
-                pruned_codes_lengths = (pruned_codes_padded * pruned_codes_mask).sum(dim=1)
-                codes_packed_ = codes_packed[idx_]
-                approx_scores_ = centroid_scores[codes_packed_.long()]
-                if approx_scores_.shape[0] == 0:
-                    approx_scores.append(
-                        torch.zeros((len(pids_),), dtype=approx_scores_.dtype).cuda()
-                    )
-                    continue
-                approx_scores_strided = StridedTensor(
-                    approx_scores_, pruned_codes_lengths, use_gpu=self.use_gpu
-                )
-                approx_scores_padded, approx_scores_mask = approx_scores_strided.as_padded_tensor()
-                approx_scores_ = colbert_score_reduce(
-                    approx_scores_padded, approx_scores_mask, config
-                )
-                approx_scores.append(approx_scores_)
-            approx_scores = torch.cat(approx_scores, dim=0)
-            if not approx_scores.is_cuda:
-                msg = f"approx_scores must be on CUDA device, got {approx_scores.device}"
-                raise ValueError(msg)
-            if config.ndocs < len(approx_scores):
-                pids = pids[torch.topk(approx_scores, k=config.ndocs).indices]
-
-            # Filter docs using full centroid scores
-            codes_packed, codes_lengths = self.embeddings_strided.lookup_codes(pids)
-            approx_scores = centroid_scores[codes_packed.long()]
-            approx_scores_strided = StridedTensor(
-                approx_scores, codes_lengths, use_gpu=self.use_gpu
+            pids = self._filter_gpu_pids(
+                config, pids, centroid_scores, idx, batch_size
             )
-            approx_scores_padded, approx_scores_mask = approx_scores_strided.as_padded_tensor()
-            approx_scores = colbert_score_reduce(approx_scores_padded, approx_scores_mask, config)
-            if config.ndocs // 4 < len(approx_scores):
-                pids = pids[torch.topk(approx_scores, k=(config.ndocs // 4)).indices]
         else:
-            pids = IndexScorer.filter_pids(
-                pids,
-                centroid_scores,
-                self.embeddings.codes,
-                self.doclens,
-                self.offsets,
-                idx,
-                config.ndocs,
-            )
+            pids = self._filter_cpu_pids(config, pids, centroid_scores, idx)
         tracker.end("Filtering")
 
         tracker.begin("Decompress Residuals")
-        # Rank final list of docs using full approximate embeddings (including residuals)
-        if self.use_gpu:
-            d_packed, d_mask = self.lookup_pids(pids)
-        else:
-            d_packed = IndexScorer.decompress_residuals(
-                pids,
-                self.doclens,
-                self.offsets,
-                self.codec.bucket_weights,
-                self.codec.reversed_bit_map,
-                self.codec.decompression_lookup_table,
-                self.embeddings.residuals,
-                self.embeddings.codes,
-                self.codec.centroids,
-                self.codec.dim,
-                self.codec.nbits,
-            )
-            d_packed = torch.nn.functional.normalize(d_packed.to(torch.float32), p=2, dim=-1)
-            d_mask = self.doclens[pids.long()]
+        d_packed, d_mask = self._decompress_residuals(pids)
         tracker.end("Decompress Residuals")
 
+        batch = ScoreBatch(q=q, d_packed=d_packed, d_mask=d_mask, pids=pids)
         if q.size(0) == 1:
-            tracker.begin("Scoring")
-            scores = colbert_score_packed(q, d_packed, d_mask, config)
-            # NOTE As every score would be divided by this const. nothing changes
-            #      throught the approx. stages.
-            if config.checkpoint == "google/xtr-base-en":
-                query_len = q.count_nonzero(dim=1)[0, 0]
-                scores /= query_len
-            tracker.end("Scoring")
-            return scores, pids
+            return self._score_single_query(batch, config, tracker)
 
+        return self._score_multi_query(batch, config, tracker)
+
+    def _filter_gpu_pids(
+        self,
+        config: ColBERTConfig,
+        pids: torch.Tensor,
+        centroid_scores: torch.Tensor,
+        idx: torch.Tensor,
+        batch_size: int,
+    ) -> torch.Tensor:
+        approx_scores = self._compute_gpu_pruned_scores(
+            pids, idx, centroid_scores, batch_size, config
+        )
+        if not approx_scores.is_cuda:
+            msg = f"approx_scores must be on CUDA device, got {approx_scores.device}"
+            raise ValueError(msg)
+        if config.ndocs < len(approx_scores):
+            pids = pids[torch.topk(approx_scores, k=config.ndocs).indices]
+
+        codes_packed, codes_lengths = self.embeddings_strided.lookup_codes(pids)
+        approx_scores = centroid_scores[codes_packed.long()]
+        approx_scores = self._score_pruned_codes(approx_scores, codes_lengths, config)
+        ndocs_cutoff = config.ndocs // 4
+        if ndocs_cutoff < len(approx_scores):
+            pids = pids[torch.topk(approx_scores, k=ndocs_cutoff).indices]
+        return pids
+
+    def _compute_gpu_pruned_scores(
+        self,
+        pids: torch.Tensor,
+        idx: torch.Tensor,
+        centroid_scores: torch.Tensor,
+        batch_size: int,
+        config: ColBERTConfig,
+    ) -> torch.Tensor:
+        approx_scores: list[torch.Tensor] = []
+        for i in range(ceil(len(pids) / batch_size)):
+            pids_ = pids[i * batch_size : (i + 1) * batch_size]
+            codes_packed, codes_lengths = self.embeddings_strided.lookup_codes(pids_)
+            idx_ = idx[codes_packed.long()]
+            pruned_codes_strided = StridedTensor(idx_, codes_lengths, use_gpu=self.use_gpu)
+            pruned_codes_padded, pruned_codes_mask = pruned_codes_strided.as_padded_tensor()
+            pruned_codes_lengths = (pruned_codes_padded * pruned_codes_mask).sum(dim=1)
+            codes_packed_ = codes_packed[idx_]
+            approx_scores_ = centroid_scores[codes_packed_.long()]
+            if approx_scores_.shape[0] == 0:
+                approx_scores.append(
+                    torch.zeros((len(pids_),), dtype=approx_scores_.dtype).cuda()
+                )
+                continue
+            approx_scores_strided = StridedTensor(
+                approx_scores_, pruned_codes_lengths, use_gpu=self.use_gpu
+            )
+            approx_scores_padded, approx_scores_mask = approx_scores_strided.as_padded_tensor()
+            approx_scores_ = colbert_score_reduce(
+                approx_scores_padded, approx_scores_mask, config
+            )
+            approx_scores.append(approx_scores_)
+        return torch.cat(approx_scores, dim=0)
+
+    def _score_pruned_codes(
+        self,
+        approx_scores: torch.Tensor,
+        codes_lengths: torch.Tensor,
+        config: ColBERTConfig,
+    ) -> torch.Tensor:
+        approx_scores_strided = StridedTensor(
+            approx_scores, codes_lengths, use_gpu=self.use_gpu
+        )
+        approx_scores_padded, approx_scores_mask = approx_scores_strided.as_padded_tensor()
+        return colbert_score_reduce(approx_scores_padded, approx_scores_mask, config)
+
+    def _filter_cpu_pids(
+        self,
+        config: ColBERTConfig,
+        pids: torch.Tensor,
+        centroid_scores: torch.Tensor,
+        idx: torch.Tensor,
+    ) -> torch.Tensor:
+        return IndexScorer.filter_pids(
+            pids,
+            centroid_scores,
+            self.embeddings.codes,
+            self.doclens,
+            self.offsets,
+            idx,
+            config.ndocs,
+        )
+
+    def _decompress_residuals(
+        self, pids: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        if self.use_gpu:
+            return self.lookup_pids(pids)
+
+        d_packed = IndexScorer.decompress_residuals(
+            pids,
+            self.doclens,
+            self.offsets,
+            self.codec.bucket_weights,
+            self.codec.reversed_bit_map,
+            self.codec.decompression_lookup_table,
+            self.embeddings.residuals,
+            self.embeddings.codes,
+            self.codec.centroids,
+            self.codec.dim,
+            self.codec.nbits,
+        )
+        d_packed = torch.nn.functional.normalize(d_packed.to(torch.float32), p=2, dim=-1)
+        d_mask = self.doclens[pids.long()]
+        return d_packed, d_mask
+
+    def _score_single_query(
+        self, batch: ScoreBatch, config: ColBERTConfig, tracker: Tracker
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         tracker.begin("Scoring")
-        d_strided = StridedTensor(d_packed, d_mask, use_gpu=self.use_gpu)
+        scores = colbert_score_packed(batch.q, batch.d_packed, batch.d_mask, config)
+        scores = self._normalize_scores(scores, batch.q, config)
+        tracker.end("Scoring")
+        return scores, batch.pids
+
+    def _score_multi_query(
+        self, batch: ScoreBatch, config: ColBERTConfig, tracker: Tracker
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        tracker.begin("Scoring")
+        d_strided = StridedTensor(batch.d_packed, batch.d_mask, use_gpu=self.use_gpu)
         d_padded, d_lengths = d_strided.as_padded_tensor()
+        scores = colbert_score(batch.q, d_padded, d_lengths, config)
+        scores = self._normalize_scores(scores, batch.q, config)
+        tracker.end("Scoring")
+        return scores, batch.pids
 
-        scores = colbert_score(q, d_padded, d_lengths, config)
-
-        # NOTE As every score would be divided by this const. nothing changes
-        #      throught the approx. stages.
+    @staticmethod
+    def _normalize_scores(scores: torch.Tensor, q: torch.Tensor, config: ColBERTConfig) -> torch.Tensor:
         if config.checkpoint == "google/xtr-base-en":
             query_len = q.count_nonzero(dim=1)[0, 0]
             scores /= query_len
-        tracker.end("Scoring")
-
-        return scores, pids
+        return scores

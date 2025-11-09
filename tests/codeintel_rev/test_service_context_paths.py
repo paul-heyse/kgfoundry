@@ -101,37 +101,35 @@ def test_service_context_resolves_paths(tmp_path: Path, monkeypatch: pytest.Monk
 
     context = service_context.get_service_context()
 
-    if not isinstance(context.faiss_manager, RecordingFAISSManager):
-        pytest.fail("Expected RecordingFAISSManager")
-    if context.faiss_manager.index_path != expected_faiss_path:
-        pytest.fail(
-            f"Expected index_path {expected_faiss_path}, got {context.faiss_manager.index_path}"
-        )
-
-    ready, limits, error = context.ensure_faiss_ready()
-
-    if ready is not True:
-        pytest.fail("Expected ready to be True")
-    if limits != []:
-        pytest.fail(f"Expected empty limits, got {limits}")
-    if error is not None:
-        pytest.fail(f"Expected no error, got {error}")
-    if context.faiss_manager.load_calls != 1:
-        pytest.fail(f"Expected 1 load call, got {context.faiss_manager.load_calls}")
-    if context.faiss_manager.clone_calls != 1:
-        pytest.fail(f"Expected 1 clone call, got {context.faiss_manager.clone_calls}")
+    _assert_faiss_manager(context.faiss_manager, expected_faiss_path)
+    _assert_faiss_ready(context)
 
     with context.open_catalog() as catalog:
-        if not isinstance(catalog, RecordingDuckDBCatalog):
-            pytest.fail("Expected RecordingDuckDBCatalog")
-        if catalog.db_path != expected_duckdb_path:
-            pytest.fail(f"Expected db_path {expected_duckdb_path}, got {catalog.db_path}")
-        if catalog.vectors_dir != expected_vectors_dir:
-            pytest.fail(f"Expected vectors_dir {expected_vectors_dir}, got {catalog.vectors_dir}")
-        if catalog.open_called is not True:
-            pytest.fail("Expected open_called to be True")
+        _assert_catalog(catalog, expected_duckdb_path, expected_vectors_dir)
 
-    if catalog.closed is not True:
-        pytest.fail("Expected catalog to be closed")
+    assert catalog.closed is True
 
     service_context.reset_service_context()
+
+
+def _assert_faiss_manager(manager: object, expected_path: Path) -> None:
+    assert isinstance(manager, RecordingFAISSManager)
+    assert manager.index_path == expected_path
+
+
+def _assert_faiss_ready(context: service_context.ServiceContext) -> None:
+    ready, limits, error = context.ensure_faiss_ready()
+    assert ready is True
+    assert limits == []
+    assert error is None
+    assert context.faiss_manager.load_calls == 1
+    assert context.faiss_manager.clone_calls == 1
+
+
+def _assert_catalog(
+    catalog: RecordingDuckDBCatalog, expected_db: Path, expected_vectors: Path
+) -> None:
+    assert isinstance(catalog, RecordingDuckDBCatalog)
+    assert catalog.db_path == expected_db
+    assert catalog.vectors_dir == expected_vectors
+    assert catalog.open_called is True

@@ -31,7 +31,7 @@ def _get_random_seed() -> int | None:
     int | None
         Random seed value or None if not set.
     """
-    return getattr(_get_random_seed, "_seed", None)
+    return getattr(_get_random_seed, "_seed", None)  # Function attribute pattern
 
 
 def _set_random_seed(seed: int | None) -> None:
@@ -42,7 +42,7 @@ def _set_random_seed(seed: int | None) -> None:
     seed : int | None
         Random seed value, or None to use system random.
     """
-    _get_random_seed._seed = seed  # type: ignore[attr-defined]
+    _get_random_seed._seed = seed  # type: ignore[attr-defined]  # noqa: SLF001  # Function attribute pattern
 
 
 @dataclass(frozen=True)

@@ -53,9 +53,7 @@ def _escape_text(value: str) -> str:
     return value.replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
 
 
-def _dump_collection(
-    corpus: dict[str, dict[str, str]], path: pathlib.Path
-) -> dict[int, str]:
+def _dump_collection(corpus: dict[str, dict[str, str]], path: pathlib.Path) -> dict[int, str]:
     """Write corpus lines to ``path`` and return the index mapping.
 
     Parameters

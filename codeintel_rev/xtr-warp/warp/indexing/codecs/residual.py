@@ -21,6 +21,41 @@ from warp.infra.config import ColBERTConfig
 from warp.utils.utils import print_message
 
 
+def _build_reversed_bit_map(nbits: int) -> torch.Tensor:
+    """Build reversed bit map for residual repacking.
+
+    Parameters
+    ----------
+    nbits : int
+        Number of bits per residual component.
+
+    Returns
+    -------
+    torch.Tensor
+        Reversed bit map tensor (256,) in uint8.
+    """
+    reversed_bit_map = []
+    mask = (1 << nbits) - 1
+    for i in range(256):
+        # The reversed byte
+        z = 0
+        for j in range(8, 0, -nbits):
+            # Extract a subsequence of length n bits
+            x = (i >> (j - nbits)) & mask
+
+            # Reverse the endianness of each bit subsequence (e.g. 10 -> 01)
+            y = 0
+            for k in range(nbits - 1, -1, -1):
+                y += ((x >> (nbits - k - 1)) & 1) * (2**k)
+
+            # Set the corresponding bits in the output byte
+            z |= y
+            if j > nbits:
+                z <<= nbits
+        reversed_bit_map.append(z)
+    return torch.tensor(reversed_bit_map).to(torch.uint8)
+
+
 class ResidualCodec:
     """Compresses embeddings using product quantization with residual encoding.
 
@@ -62,43 +97,6 @@ class ResidualCodec:
     """
 
     Embeddings = ResidualEmbeddings
-
-    def _build_reversed_bit_map(self, nbits: int) -> torch.Tensor:
-        """Build reversed bit map for residual repacking.
-
-        We reverse the residual bits because arange_bits as currently constructed
-        produces results with the reverse of the expected endianness.
-
-        Parameters
-        ----------
-        nbits : int
-            Number of bits per residual component.
-
-        Returns
-        -------
-        torch.Tensor
-            Reversed bit map tensor (256,).
-        """
-        reversed_bit_map = []
-        mask = (1 << nbits) - 1
-        for i in range(256):
-            # The reversed byte
-            z = 0
-            for j in range(8, 0, -nbits):
-                # Extract a subsequence of length n bits
-                x = (i >> (j - nbits)) & mask
-
-                # Reverse the endianness of each bit subsequence (e.g. 10 -> 01)
-                y = 0
-                for k in range(nbits - 1, -1, -1):
-                    y += ((x >> (nbits - k - 1)) & 1) * (2**k)
-
-                # Set the corresponding bits in the output byte
-                z |= y
-                if j > nbits:
-                    z <<= nbits
-            reversed_bit_map.append(z)
-        return torch.tensor(reversed_bit_map).to(torch.uint8)
 
     def _setup_gpu_resources(
         self,
@@ -167,7 +165,7 @@ class ResidualCodec:
             self.avg_residual = self.avg_residual.cuda()
 
         bucket_cutoffs, bucket_weights = self._setup_gpu_resources(
-            bucket_cutoffs, bucket_weights, self._build_reversed_bit_map(self.nbits), None
+            bucket_cutoffs, bucket_weights, _build_reversed_bit_map(self.nbits), None
         )
 
         self.bucket_cutoffs = bucket_cutoffs

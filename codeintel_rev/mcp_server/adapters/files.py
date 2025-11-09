@@ -253,8 +253,9 @@ def _list_paths_sync(
         Overridden by explicit ``include_globs`` and ``exclude_globs`` parameters.
     path : str | None
         Starting path relative to repo root (None = root).
-    filters : FileListFilters
+    filters : FileListFilters | None
         Filters for includes, excludes, language restrictions, and max results.
+        If None, default filters are used (no restrictions).
 
     Returns
     -------
@@ -444,11 +445,31 @@ def _create_file_entry(
 ) -> dict[str, object] | None:
     """Return a file entry dict when filters accept the file.
 
+    Checks if a file path matches the provided include/exclude patterns and
+    language extensions. Returns a dictionary with file metadata if the file
+    passes all filters, otherwise returns None.
+
+    Parameters
+    ----------
+    file_path : Path
+        Absolute path to the file being checked.
+    repo_root : Path
+        Root directory of the repository, used to compute relative paths.
+    includes : list[str]
+        List of glob patterns that the file path must match to be included.
+        Empty list means no inclusion filter is applied.
+    excludes : list[str]
+        List of glob patterns that the file path must not match to be included.
+        Empty list means no exclusion filter is applied.
+    language_extensions : set[str] | None
+        Set of file extensions (with leading dot) that the file must have.
+        If None, no language filter is applied.
+
     Returns
     -------
     dict[str, object] | None
-        Dictionary containing file metadata when filters are satisfied,
-        otherwise ``None``.
+        Dictionary containing file metadata (path, relative_path, etc.) when
+        filters are satisfied, otherwise ``None``.
     """
     relative_file = _relative_path_str(file_path, repo_root)
     if relative_file is None:

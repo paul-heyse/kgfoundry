@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import os
 import pathlib
+from dataclasses import dataclass
 
 import numpy as np
 import torch
 from torch.utils.cpp_extension import load
 from warp.engine.constants import T_PRIME_MAX, TPrimePolicy
+from warp.engine.search.index_storage import IndexScorerOptions
 from warp.infra.config.config import ColBERTConfig
 from warp.utils.tracker import DEFAULT_NOP_TRACKER, NOPTracker
 from warp.utils.utils import print_message
@@ -113,6 +115,27 @@ class ParallelIndexLoaderWARP:
         return residuals_compacted
 
 
+@dataclass(frozen=True)
+class ParallelIndexScorerOptions(IndexScorerOptions):
+    fused_decompression_merge: bool = True
+
+
+@dataclass(frozen=True)
+class ParallelCandidateBatch:
+    capacities: torch.Tensor
+    sizes: torch.Tensor
+    pids: torch.Tensor
+    scores: torch.Tensor
+
+
+@dataclass(frozen=True)
+class MergeParams:
+    nprobe: int
+    num_tokens: int
+    mse_estimates: torch.Tensor
+    k: int
+
+
 class ParallelIndexScorerWARP(ParallelIndexLoaderWARP):
     """Parallel WARP-specific index scorer.
 
@@ -148,26 +171,23 @@ class ParallelIndexScorerWARP(ParallelIndexLoaderWARP):
         self,
         index_path: str,
         config: ColBERTConfig,
-        t_prime: int | None = None,
-        bound: int = 128,
         *,
-        use_gpu: bool = False,
-        load_index_with_mmap: bool = False,
-        fused_decompression_merge: bool = True,
+        options: ParallelIndexScorerOptions | None = None,
     ) -> None:
-        if use_gpu:
+        opts = options or ParallelIndexScorerOptions()
+        if opts.use_gpu:
             msg = "use_gpu must be False for ParallelIndexScorerWARP"
             raise ValueError(msg)
-        if load_index_with_mmap:
+        if opts.load_index_with_mmap:
             msg = "load_index_with_mmap must be False for ParallelIndexScorerWARP"
             raise ValueError(msg)
 
         super().__init__(
             index_path=index_path,
             config=config,
-            use_gpu=use_gpu,
-            load_index_with_mmap=load_index_with_mmap,
-            fused_decompression_merge=fused_decompression_merge,
+            use_gpu=opts.use_gpu,
+            load_index_with_mmap=opts.load_index_with_mmap,
+            fused_decompression_merge=opts.fused_decompression_merge,
         )
 
         num_threads = torch.get_num_threads()
@@ -175,7 +195,7 @@ class ParallelIndexScorerWARP(ParallelIndexLoaderWARP):
             msg = "num_threads must be > 1 for parallel execution"
             raise ValueError(msg)
 
-        ParallelIndexScorerWARP.try_load_torch_extensions(use_gpu=use_gpu)
+        ParallelIndexScorerWARP.try_load_torch_extensions(use_gpu=opts.use_gpu)
 
         if config.ncells is None:
             msg = "config.ncells must be set"
@@ -183,8 +203,8 @@ class ParallelIndexScorerWARP(ParallelIndexLoaderWARP):
         self.nprobe = config.ncells
 
         (num_centroids, _) = self.centroids.shape
-        if t_prime is not None:
-            self.t_prime = TPrimePolicy(value=t_prime)
+        if opts.t_prime is not None:
+            self.t_prime = TPrimePolicy(value=opts.t_prime)
         elif num_centroids <= 2**16:
             (num_embeddings, _) = self.residuals_compacted.shape
             self.t_prime = TPrimePolicy(value=int(np.sqrt(8 * num_embeddings) / 1000) * 1000)
@@ -200,7 +220,7 @@ class ParallelIndexScorerWARP(ParallelIndexLoaderWARP):
             tuple(torch.arange(num_centroids, dtype=torch.int32) for _ in range(num_threads))
         ).contiguous()
 
-        self.bound = bound or 128
+        self.bound = opts.bound or 128
 
     @classmethod
     def try_load_torch_extensions(cls, *, use_gpu: bool) -> None:
@@ -375,14 +395,14 @@ class ParallelIndexScorerWARP(ParallelIndexLoaderWARP):
                 tracker.end("Decompression")
 
                 tracker.begin("Build Matrix")
+                params = MergeParams(
+                    nprobe=self.nprobe,
+                    num_tokens=num_tokens,
+                    mse_estimates=mse_estimates,
+                    k=k,
+                )
                 pids, scores = self._fused_decompress_merge_scores(
-                    q.squeeze(0),
-                    cells,
-                    centroid_scores,
-                    self.nprobe,
-                    num_tokens,
-                    mse_estimates,
-                    k,
+                    q.squeeze(0), cells, centroid_scores, params
                 )
                 tracker.end("Build Matrix")
             else:
@@ -395,15 +415,19 @@ class ParallelIndexScorerWARP(ParallelIndexLoaderWARP):
                 tracker.end("Decompression")
 
                 tracker.begin("Build Matrix")
-                pids, scores = self._merge_candidate_scores(
-                    capacities,
-                    candidate_sizes,
-                    candidate_pids,
-                    candidate_scores,
-                    mse_estimates,
-                    k,
-                    num_tokens,
+                candidate_batch = ParallelCandidateBatch(
+                    capacities=capacities,
+                    sizes=candidate_sizes,
+                    pids=candidate_pids,
+                    scores=candidate_scores,
                 )
+                params = MergeParams(
+                    nprobe=self.nprobe,
+                    num_tokens=num_tokens,
+                    mse_estimates=mse_estimates,
+                    k=k,
+                )
+                pids, scores = self._merge_candidate_scores(candidate_batch, params)
                 tracker.end("Build Matrix")
 
             return pids, scores
@@ -441,7 +465,7 @@ class ParallelIndexScorerWARP(ParallelIndexLoaderWARP):
         centroid_scores: torch.Tensor,
         nprobe: int,
         num_tokens: int,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> ParallelCandidateBatch:
         centroid_ids = centroid_ids.long()
         begins = self.offsets_compacted[centroid_ids]
         ends = self.offsets_compacted[centroid_ids + 1]
@@ -459,27 +483,22 @@ class ParallelIndexScorerWARP(ParallelIndexLoaderWARP):
             nprobe,
             num_tokens,
         )
-        return capacities, sizes, pids, scores
+        return ParallelCandidateBatch(
+            capacities=capacities, sizes=sizes, pids=pids, scores=scores
+        )
 
     def _merge_candidate_scores(
-        self,
-        capacities: torch.Tensor,
-        candidate_sizes: torch.Tensor,
-        candidate_pids: torch.Tensor,
-        candidate_scores: torch.Tensor,
-        mse_estimates: torch.Tensor,
-        k: int,
-        num_tokens: int,
+        self, batch: ParallelCandidateBatch, params: MergeParams
     ) -> tuple[list[int], list[float]]:
         pids, scores = ParallelIndexScorerWARP.merge_candidate_scores_cpp(
-            capacities,
-            candidate_sizes,
-            candidate_pids,
-            candidate_scores,
-            mse_estimates,
+            batch.capacities,
+            batch.sizes,
+            batch.pids,
+            batch.scores,
+            params.mse_estimates,
             self.nprobe,
-            k,
-            num_tokens,
+            params.k,
+            params.num_tokens,
         )
         return pids.tolist(), scores.tolist()
 
@@ -488,10 +507,7 @@ class ParallelIndexScorerWARP(ParallelIndexLoaderWARP):
         q: torch.Tensor,
         centroid_ids: torch.Tensor,
         centroid_scores: torch.Tensor,
-        nprobe: int,
-        num_tokens: int,
-        mse_estimates: torch.Tensor,
-        k: int,
+        params: MergeParams,
     ) -> tuple[list[int], list[float]]:
         centroid_ids = centroid_ids.long()
         begins = self.offsets_compacted[centroid_ids]
@@ -507,9 +523,9 @@ class ParallelIndexScorerWARP(ParallelIndexLoaderWARP):
             self.residuals_compacted,
             self.bucket_weights,
             q,
-            nprobe,
-            num_tokens,
-            mse_estimates,
-            k,
+            params.nprobe,
+            params.num_tokens,
+            params.mse_estimates,
+            params.k,
         )
         return pids.tolist(), scores.tolist()

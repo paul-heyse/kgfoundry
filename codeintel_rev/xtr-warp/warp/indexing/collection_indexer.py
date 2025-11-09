@@ -552,7 +552,7 @@ class CollectionIndexer:
 
                 if chunk_metadata["passage_offset"] != passage_offset:
                     msg = (
-                        f"chunk_metadata['passage_offset'] "
+                        "chunk_metadata['passage_offset'] "
                         f"({chunk_metadata['passage_offset']}) must equal "
                         f"passage_offset ({passage_offset}) for chunk_idx={chunk_idx}"
                     )

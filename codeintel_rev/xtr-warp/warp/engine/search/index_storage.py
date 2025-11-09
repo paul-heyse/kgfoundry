@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+from dataclasses import dataclass
 
 import numpy as np
 import torch
@@ -109,6 +110,16 @@ class IndexLoaderWARP:
         return residuals_compacted
 
 
+@dataclass(frozen=True)
+class IndexScorerOptions:
+    """Runtime controls for the WARP index scorer."""
+
+    t_prime: int | None = None
+    bound: int = 128
+    use_gpu: bool = False
+    load_index_with_mmap: bool = False
+
+
 class IndexScorerWARP(IndexLoaderWARP):
     """WARP-specific index scorer.
 
@@ -141,27 +152,25 @@ class IndexScorerWARP(IndexLoaderWARP):
         self,
         index_path: str,
         config: ColBERTConfig,
-        t_prime: int | None = None,
-        bound: int = 128,
         *,
-        use_gpu: bool = False,
-        load_index_with_mmap: bool = False,
+        options: IndexScorerOptions | None = None,
     ) -> None:
-        if use_gpu:
+        opts = options or IndexScorerOptions()
+        if opts.use_gpu:
             msg = "use_gpu must be False for IndexScorerWARP"
             raise ValueError(msg)
-        if load_index_with_mmap:
+        if opts.load_index_with_mmap:
             msg = "load_index_with_mmap must be False for IndexScorerWARP"
             raise ValueError(msg)
 
         super().__init__(
             index_path=index_path,
             config=config,
-            use_gpu=use_gpu,
-            load_index_with_mmap=load_index_with_mmap,
+            use_gpu=opts.use_gpu,
+            load_index_with_mmap=opts.load_index_with_mmap,
         )
 
-        IndexScorerWARP.try_load_torch_extensions(use_gpu=use_gpu)
+        IndexScorerWARP.try_load_torch_extensions(use_gpu=opts.use_gpu)
 
         if config.ncells is None:
             msg = "config.ncells must be set"
@@ -169,8 +178,8 @@ class IndexScorerWARP(IndexLoaderWARP):
         self.nprobe = config.ncells
 
         (num_centroids, _) = self.centroids.shape
-        if t_prime is not None:
-            self.t_prime = TPrimePolicy(value=t_prime)
+        if opts.t_prime is not None:
+            self.t_prime = TPrimePolicy(value=opts.t_prime)
         elif num_centroids <= 2**16:
             (num_embeddings, _) = self.residuals_compacted.shape
             self.t_prime = TPrimePolicy(value=int(np.sqrt(8 * num_embeddings) / 1000) * 1000)
@@ -182,7 +191,7 @@ class IndexScorerWARP(IndexLoaderWARP):
             raise ValueError(msg)
         self.nbits = config.nbits
 
-        self.bound = bound or 128
+        self.bound = opts.bound or 128
 
     @classmethod
     def try_load_torch_extensions(cls, *, use_gpu: bool) -> None:
@@ -324,17 +333,14 @@ class IndexScorerWARP(IndexLoaderWARP):
             tracker.end("top-k Precompute")
 
             tracker.begin("Decompression")
-            capacities, candidate_sizes, candidate_pids, candidate_scores = (
-                self._decompress_centroids(q.squeeze(0), cells, centroid_scores, self.nprobe)
+            candidate_batch = self._decompress_centroids(
+                q.squeeze(0), cells, centroid_scores, self.nprobe
             )
             tracker.end("Decompression")
 
             tracker.begin("Build Matrix")
             pids, scores = self._merge_candidate_scores(
-                capacities,
-                candidate_sizes,
-                candidate_pids,
-                candidate_scores,
+                candidate_batch,
                 mse_estimates,
                 k,
             )
@@ -362,13 +368,20 @@ class IndexScorerWARP(IndexLoaderWARP):
 
         return cells, scores, mse
 
+    @dataclass(frozen=True)
+    class CandidateBatch:
+        capacities: torch.Tensor
+        sizes: torch.Tensor
+        pids: torch.Tensor
+        scores: torch.Tensor
+
     def _decompress_centroids(
         self,
         q: torch.Tensor,
         centroid_ids: torch.Tensor,
         centroid_scores: torch.Tensor,
         nprobe: int,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> CandidateBatch:
         centroid_ids = centroid_ids.long()
         begins = self.offsets_compacted[centroid_ids]
         ends = self.offsets_compacted[centroid_ids + 1]
@@ -385,22 +398,21 @@ class IndexScorerWARP(IndexLoaderWARP):
             q,
             nprobe,
         )
-        return capacities, sizes, pids, scores
+        return IndexScorerWARP.CandidateBatch(
+            capacities=capacities,
+            sizes=sizes,
+            pids=pids,
+            scores=scores,
+        )
 
     def _merge_candidate_scores(
-        self,
-        capacities: torch.Tensor,
-        candidate_sizes: torch.Tensor,
-        candidate_pids: torch.Tensor,
-        candidate_scores: torch.Tensor,
-        mse_estimates: torch.Tensor,
-        k: int,
+        self, batch: CandidateBatch, mse_estimates: torch.Tensor, k: int
     ) -> tuple[list[int], list[float]]:
         pids, scores = IndexScorerWARP.merge_candidate_scores_cpp(
-            capacities,
-            candidate_sizes,
-            candidate_pids,
-            candidate_scores,
+            batch.capacities,
+            batch.sizes,
+            batch.pids,
+            batch.scores,
             mse_estimates,
             self.nprobe,
             k,
