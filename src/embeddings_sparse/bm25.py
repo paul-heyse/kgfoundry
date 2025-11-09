@@ -281,9 +281,7 @@ class PurePythonBM25:
         """
         Path(self.index_dir).mkdir(parents=True, exist_ok=True)
         df: defaultdict[str, int] = defaultdict(int)
-        postings: defaultdict[str, defaultdict[str, int]] = defaultdict(
-            _default_int_dict
-        )
+        postings: defaultdict[str, defaultdict[str, int]] = defaultdict(_default_int_dict)
         docs: dict[str, BM25Doc] = {}
         lengths: list[int] = []
         for doc_id, fields in docs_iterable:
@@ -293,9 +291,7 @@ class PurePythonBM25:
         self.N = len(docs)
         self.avgdl = (sum(lengths) / self.N) if self.N else 0.0
         self.df = dict(df)
-        self.postings = {
-            term: dict(term_postings) for term, term_postings in postings.items()
-        }
+        self.postings = {term: dict(term_postings) for term, term_postings in postings.items()}
         self.docs = docs
         metadata_path = Path(self.index_dir) / "pure_bm25.json"
         serialize_json(self._metadata_payload(), _BM25_SCHEMA_PATH, metadata_path)
@@ -325,8 +321,7 @@ class PurePythonBM25:
             "k1": float(self.k1),
             "b": float(self.b),
             "field_boosts": {
-                field_name: float(weight)
-                for field_name, weight in self.field_boosts.items()
+                field_name: float(weight) for field_name, weight in self.field_boosts.items()
             },
             "df": {term: int(count) for term, count in self.df.items()},
             "postings": {
@@ -347,18 +342,14 @@ class PurePythonBM25:
             try:
                 return _load_json_metadata(metadata_path, _BM25_SCHEMA_PATH)
             except DeserializationError as exc:
-                logger.warning(
-                    "Failed to load JSON index, trying legacy pickle: %s", exc
-                )
+                logger.warning("Failed to load JSON index, trying legacy pickle: %s", exc)
                 if legacy_path.exists():
                     return self._load_legacy_payload(legacy_path)
                 raise
 
         if legacy_path.exists():
             payload = self._load_legacy_payload(legacy_path)
-            logger.warning(
-                "Loaded legacy pickle index. Consider migrating to JSON format."
-            )
+            logger.warning("Loaded legacy pickle index. Consider migrating to JSON format.")
             return payload
 
         msg = f"Index metadata not found at {metadata_path} or {legacy_path}"
@@ -633,9 +624,7 @@ class LuceneBM25:
             self._searcher = searcher
         return self._searcher
 
-    def _build_lucene_doc(
-        self, doc_id: str, fields: Mapping[str, str]
-    ) -> dict[str, str]:
+    def _build_lucene_doc(self, doc_id: str, fields: Mapping[str, str]) -> dict[str, str]:
         doc: dict[str, str] = {"id": doc_id, "contents": self._compose_contents(fields)}
         for key, value in fields.items():
             doc[key] = str(value)
@@ -645,9 +634,7 @@ class LuceneBM25:
     def _compose_contents(fields: Mapping[str, str]) -> str:
         ordered_fields = ("title", "section", "body")
         parts = [str(fields.get(name, "")) for name in ordered_fields]
-        extras = [
-            str(value) for key, value in fields.items() if key not in ordered_fields
-        ]
+        extras = [str(value) for key, value in fields.items() if key not in ordered_fields]
         text_parts = [part for part in (*parts, *extras) if part]
         return " ".join(text_parts)
 

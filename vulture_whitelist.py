@@ -53,9 +53,7 @@ else:
     kgfoundry_all = tuple(_kgfoundry_all)
 
 # Group the references to make it obvious to Vulture that they're used.
-WHITELIST_SENTINEL: tuple[
-    object | None, object | None, ModuleType | None, Sequence[object]
-] = (
+WHITELIST_SENTINEL: tuple[object | None, object | None, ModuleType | None, Sequence[object]] = (
     root_validator,
     validator,
     click_module,

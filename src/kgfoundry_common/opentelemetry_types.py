@@ -55,9 +55,7 @@ class TraceAPIProtocol(Protocol):
 class SpanProcessorProtocol(Protocol):
     """Span processor lifecycle hooks invoked by the tests."""
 
-    def on_start(
-        self, span: SpanProtocol, parent_context: object | None = None
-    ) -> None:
+    def on_start(self, span: SpanProtocol, parent_context: object | None = None) -> None:
         """Observe ``span`` immediately after creation."""
         del self, span, parent_context
         raise NotImplementedError
@@ -219,9 +217,7 @@ def load_in_memory_span_exporter_cls() -> Callable[[], SpanExporterProtocol] | N
         Factory function for creating InMemorySpanExporter instances, or None if not available.
     """
     try:
-        exporter_module = import_module(
-            "opentelemetry.sdk.trace.export.in_memory_span_exporter"
-        )
+        exporter_module = import_module("opentelemetry.sdk.trace.export.in_memory_span_exporter")
     except ImportError:
         return None
 

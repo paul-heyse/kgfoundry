@@ -115,9 +115,7 @@ def _prepare_failure_context(
             error_code = "KGF-DOC-ENV-002"
             error_message = "DocFacts schema not found"
 
-    formatted = format_error_message(
-        error_code, error_message, details=combined_details
-    )
+    formatted = format_error_message(error_code, error_message, details=combined_details)
 
     extras: dict[str, object] = {
         "command": " ".join(command),
@@ -138,9 +136,7 @@ def _prepare_failure_context(
         problem = _build_failure_problem(formatted, status=500, extras=extras)
     else:
         # Copy to avoid mutating the original Problem Details payload.
-        merged_problem: dict[str, Any] = {
-            str(key): value for key, value in problem.items()
-        }
+        merged_problem: dict[str, Any] = {str(key): value for key, value in problem.items()}
         existing_extensions = {}
         extensions_raw = merged_problem.get("extensions")
         if isinstance(extensions_raw, Mapping):

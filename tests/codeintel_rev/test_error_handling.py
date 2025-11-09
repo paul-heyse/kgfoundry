@@ -133,16 +133,12 @@ def test_format_error_response_unknown_exception() -> None:
             "file-operation-error",
         ),
         (
-            InvalidLineRangeError(
-                "Invalid line range", path="test.py", line_range=(0, 10)
-            ),
+            InvalidLineRangeError("Invalid line range", path="test.py", line_range=(0, 10)),
             400,
             "invalid-parameter",
         ),
         (
-            GitOperationError(
-                "Git command failed", path="test.py", git_command="blame"
-            ),
+            GitOperationError("Git command failed", path="test.py", git_command="blame"),
             500,
             "git-operation-error",
         ),
@@ -284,9 +280,7 @@ def test_exception_conversion_preserves_empty_result() -> None:
 
 def test_exception_conversion_with_context() -> None:
     """Test that exception context is included in Problem Details extensions."""
-    exc = InvalidLineRangeError(
-        "Invalid line range", path="test.py", line_range=(0, 10)
-    )
+    exc = InvalidLineRangeError("Invalid line range", path="test.py", line_range=(0, 10))
     empty_result = {"path": "", "content": "", "lines": 0, "size": 0}
     operation = "files:open_file"
 

@@ -218,9 +218,7 @@ class _ToolExecutionErrorSurface(Protocol):
 
 
 class _ToolExecutionErrorConstructor(Protocol):
-    def __call__(
-        self, message: str, *, command: Sequence[str], **kwargs: object
-    ) -> Exception:
+    def __call__(self, message: str, *, command: Sequence[str], **kwargs: object) -> Exception:
         """Create tool execution error.
 
         Parameters
@@ -258,9 +256,7 @@ def _raise_tool_execution_error(
     *,
     command: Sequence[str],
 ) -> NoReturn:
-    tool_error = cast(
-        "_ToolExecutionErrorConstructor", tools_surface.ToolExecutionError
-    )
+    tool_error = cast("_ToolExecutionErrorConstructor", tools_surface.ToolExecutionError)
     raise tool_error(message, command=list(command))
 
 
@@ -411,12 +407,8 @@ def run_subprocess(
         if _is_timeout_error(tool_error):
             timeout_seconds = int(effective_timeout)
             msg = f"Subprocess exceeded timeout of {timeout_seconds} seconds: {' '.join(cmd)}"
-            logger.exception(
-                msg, extra={"command": " ".join(cmd), "timeout": timeout_seconds}
-            )
-            raise SubprocessTimeoutError(
-                msg, command=cmd, timeout_seconds=timeout_seconds
-            ) from exc
+            logger.exception(msg, extra={"command": " ".join(cmd), "timeout": timeout_seconds})
+            raise SubprocessTimeoutError(msg, command=cmd, timeout_seconds=timeout_seconds) from exc
 
         returncode = tool_error.returncode
         stderr_output = tool_error.stderr or None
@@ -432,17 +424,13 @@ def run_subprocess(
                 "stderr": stderr_output,
             },
         )
-        raise SubprocessError(
-            message, returncode=returncode, stderr=stderr_output
-        ) from exc
+        raise SubprocessError(message, returncode=returncode, stderr=stderr_output) from exc
     except Exception as exc:  # pragma: no cover - defensive fallback
         msg = f"Unexpected error executing subprocess: {exc}"
         logger.exception(msg, extra={"command": " ".join(cmd)})
         raise SubprocessError(msg) from exc
 
-    logger.debug(
-        "Subprocess completed successfully", extra={"returncode": run_result.returncode}
-    )
+    logger.debug("Subprocess completed successfully", extra={"returncode": run_result.returncode})
     return run_result.stdout
 
 

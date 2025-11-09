@@ -56,11 +56,7 @@ def main() -> None:
             props = {}
 
         required_raw = schema.get("required", [])
-        req = (
-            {str(item) for item in required_raw}
-            if isinstance(required_raw, list)
-            else set()
-        )
+        req = {str(item) for item in required_raw} if isinstance(required_raw, list) else set()
         if props:
             lines.append("**Parameters**:\n")
             for key, value in props.items():
@@ -78,11 +74,7 @@ def main() -> None:
         else:
             lines.append("**Parameters**: None\n\n")
     output_path = (
-        Path(__file__).resolve().parents[3]
-        / "docs"
-        / "modules"
-        / "codeintel"
-        / "tools.md"
+        Path(__file__).resolve().parents[3] / "docs" / "modules" / "codeintel" / "tools.md"
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text("\n".join(lines), encoding="utf-8")

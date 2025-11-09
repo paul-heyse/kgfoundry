@@ -104,7 +104,6 @@ def _test_torch_gpu_operations() -> tuple[bool, str]:
 
         if not torch.cuda.is_available():
             return False, "CUDA not available for torch test"
-
         # Create a small tensor on GPU and perform basic operations
         device = torch.device("cuda:0")
         test_tensor = torch.randn(100, 100, device=device)
@@ -136,7 +135,6 @@ def _test_faiss_gpu_resources() -> tuple[bool, str]:
         # Check if FAISS GPU symbols are available first
         if not all(hasattr(faiss, attr) for attr in ("StandardGpuResources",)):
             return False, "FAISS GPU symbols not available"
-
         # Initialize GPU resources (this is lightweight)
         _ = faiss.StandardGpuResources()
         logger.info("FAISS GPU resource initialization test passed")
@@ -168,7 +166,8 @@ def warmup_gpu() -> dict[str, bool | str]:
         - ``faiss_gpu_available``: True if FAISS GPU symbols are available
         - ``torch_gpu_test``: True if basic torch GPU operations succeed
         - ``faiss_gpu_test``: True if FAISS GPU resource initialization succeeds
-        - ``overall_status``: "ready" if all checks pass, "degraded" if some fail, "unavailable" if all fail
+        - ``overall_status``: "ready" if all checks pass, "degraded" if some fail,
+          "unavailable" if all fail
         - ``details``: Human-readable status message
 
     Examples

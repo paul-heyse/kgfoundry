@@ -101,9 +101,7 @@ def rewrite_module(path: Path) -> bool:
         return False
 
     cleaned = clean_docstring(doc_text)
-    new_lines = (
-        ['"""' + cleaned, '"""'] if "\n" in cleaned else ['"""' + cleaned + '"""']
-    )
+    new_lines = ['"""' + cleaned, '"""'] if "\n" in cleaned else ['"""' + cleaned + '"""']
 
     original_lines = path.read_text(encoding="utf-8").splitlines()
     start = doc_expr.lineno - 1

@@ -245,16 +245,12 @@ class DocMetrics:
     def observe_success(self, duration_seconds: float) -> None:
         """Record a successful run."""
         self._counter.labels(operation=self.operation, status="success").inc()
-        self._histogram.labels(operation=self.operation, status="success").observe(
-            duration_seconds
-        )
+        self._histogram.labels(operation=self.operation, status="success").observe(duration_seconds)
 
     def observe_failure(self, status: str, duration_seconds: float) -> None:
         """Record a failed run for ``status`` label."""
         self._counter.labels(operation=self.operation, status=status).inc()
-        self._histogram.labels(operation=self.operation, status=status).observe(
-            duration_seconds
-        )
+        self._histogram.labels(operation=self.operation, status=status).observe(duration_seconds)
 
 
 @dataclass(slots=True, frozen=True)

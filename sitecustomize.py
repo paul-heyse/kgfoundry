@@ -381,11 +381,7 @@ if doc_common is not None and ENABLE_SITECUSTOMIZE:
         doc_common_local, "DocstringYields", None
     )
 
-    if (
-        doc_cls is not None
-        and attr_cls is not None
-        and ensure_docstring_attrs(doc_cls, attr_cls)
-    ):
+    if doc_cls is not None and attr_cls is not None and ensure_docstring_attrs(doc_cls, attr_cls):
         logger.debug("Docstring.attrs shim installed")
 
     if doc_cls is not None and yields_cls is not None:

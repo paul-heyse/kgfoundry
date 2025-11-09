@@ -71,9 +71,7 @@ else:  # pragma: no cover - runtime fallback for doc generation
     VectorArray = np.ndarray
     IndexArray = np.ndarray
 
-with suppress(
-    AttributeError, TypeError
-):  # pragma: no cover - ndarray may forbid updates
+with suppress(AttributeError, TypeError):  # pragma: no cover - ndarray may forbid updates
     VectorArray.__doc__ = (
         "Type alias for float32 vector arrays used in FAISS operations.\n\n"
         "All vectors must be normalized to unit length for inner-product search.\n"
@@ -81,9 +79,7 @@ with suppress(
         "sparse representations."
     )
 
-with suppress(
-    AttributeError, TypeError
-):  # pragma: no cover - ndarray may forbid updates
+with suppress(AttributeError, TypeError):  # pragma: no cover - ndarray may forbid updates
     IndexArray.__doc__ = (
         "Type alias for int64 index arrays used in FAISS search results.\n\n"
         "Index arrays contain row indices into the vector store, typically returned\n"
@@ -143,9 +139,7 @@ class FaissIndexProtocol(Protocol):
         """
         ...
 
-    def search(
-        self, vectors: VectorArray, k: int
-    ) -> tuple[NDArray[np.float32], NDArray[np.int64]]:
+    def search(self, vectors: VectorArray, k: int) -> tuple[NDArray[np.float32], NDArray[np.int64]]:
         """Search for nearest neighbors.
 
         Searches the index for the k nearest neighbors of each query vector.
@@ -257,9 +251,7 @@ class FaissModuleProtocol(Protocol):
     index_flat_ip: Callable[[int], FaissIndexProtocol]
     """Create a flat inner-product index."""
 
-    def index_factory(
-        self, dimension: int, factory_string: str, metric: int
-    ) -> FaissIndexProtocol:
+    def index_factory(self, dimension: int, factory_string: str, metric: int) -> FaissIndexProtocol:
         """Create an index from a factory string.
 
         Constructs a FAISS index using a factory string description. Factory
@@ -584,8 +576,8 @@ class AgentSearchQuery:
     explain: bool = False
     """Whether to include explanation metadata in results.
 
-    When ``True``, results include detailed scoring breakdowns and match highlights for debugging and
-    transparency.
+    When ``True``, results include detailed scoring breakdowns and match
+    highlights for debugging and transparency.
 
     Alias: none; name ``explain``.
     """
@@ -788,9 +780,7 @@ class _FaissModuleAdapter:
         constructor = _legacy_index_flat_ip(self._module)
         return constructor(dimension)
 
-    def index_factory(
-        self, dimension: int, factory_string: str, metric: int
-    ) -> FaissIndexProtocol:
+    def index_factory(self, dimension: int, factory_string: str, metric: int) -> FaissIndexProtocol:
         """Create index from factory string.
 
         Parameters

@@ -24,7 +24,9 @@ def _format_magic_summary(lead: str) -> str:
 
 
 def _format_standard_summary(lead: str) -> str:
-    return f"{lead}. Callers rely on this helper when working with the standard collection protocols."
+    return (
+        f"{lead}. Callers rely on this helper when working with the standard collection protocols."
+    )
 
 
 def _format_pydantic_summary(lead: str) -> str:
@@ -167,8 +169,7 @@ _STANDARD_METHOD_LEADS: dict[str, str] = {
 }
 
 _STANDARD_METHOD_EXTENDED_SUMMARIES: dict[str, str] = {
-    name: _format_standard_summary(lead)
-    for name, lead in _STANDARD_METHOD_LEADS.items()
+    name: _format_standard_summary(lead) for name, lead in _STANDARD_METHOD_LEADS.items()
 }
 
 PYDANTIC_ARTIFACT_SUMMARIES: dict[str, str] = {
@@ -274,18 +275,12 @@ PYDANTIC_ARTIFACT_SUMMARIES: dict[str, str] = {
     "model_construct": _format_pydantic_summary(
         "Construct a model instance without validation for trusted data sources"
     ),
-    "model_serializer": _format_pydantic_summary(
-        "Register a custom serializer for the model"
-    ),
+    "model_serializer": _format_pydantic_summary("Register a custom serializer for the model"),
     "model_json_schema": _format_pydantic_summary(
         "Generate the JSON schema describing the model structure"
     ),
-    "schema": _format_pydantic_summary(
-        "Produce a dictionary describing the model's JSON schema"
-    ),
-    "schema_json": _format_pydantic_summary(
-        "Serialise the model schema into JSON text"
-    ),
+    "schema": _format_pydantic_summary("Produce a dictionary describing the model's JSON schema"),
+    "schema_json": _format_pydantic_summary("Serialise the model schema into JSON text"),
     "dict": _format_pydantic_summary(
         "Serialise the model into a plain dictionary obeying configuration flags"
     ),
@@ -491,9 +486,7 @@ def summarize(name: str, kind: str) -> str:
     return f"Describe the ``{cleaned}`` callable."
 
 
-def extended_summary(
-    kind: str, name: str, module: str, node: object | None = None
-) -> str:
+def extended_summary(kind: str, name: str, module: str, node: object | None = None) -> str:
     """Return the extended summary paragraph for the symbol.
 
     Parameters
@@ -540,9 +533,7 @@ def _function_extended_summary(name: str) -> str | None:
 def _class_extended_summary(node: object | None) -> str:
     if hasattr(node, "bases"):
         for base in getattr(node, "bases", []):
-            target = getattr(base, "id", "") or getattr(
-                getattr(base, "attr", None), "value", ""
-            )
+            target = getattr(base, "id", "") or getattr(getattr(base, "attr", None), "value", "")
             if target == "BaseModel" or getattr(base, "attr", "") == "BaseModel":
                 return (
                     "Describe the Pydantic model and the behaviour it provides to callers. "

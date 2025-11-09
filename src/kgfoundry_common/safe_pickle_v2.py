@@ -433,9 +433,7 @@ class SignedPickleWrapper:
         signature = hmac.new(self.signing_key, payload, hashlib.sha256).digest()
         file.write(signature + payload)
 
-        logger.debug(
-            "Serialized object with HMAC signature", extra={"size": len(payload)}
-        )
+        logger.debug("Serialized object with HMAC signature", extra={"size": len(payload)})
 
     def load(self, file: BinaryIO) -> object:
         """Load and verify object signature.
@@ -464,14 +462,15 @@ class SignedPickleWrapper:
         expected_sig = hmac.new(self.signing_key, payload, hashlib.sha256).digest()
 
         if not hmac.compare_digest(signature, expected_sig):
-            msg = "Deserialization blocked: HMAC signature verification failed; payload may be tampered"
+            msg = (
+                "Deserialization blocked: HMAC signature verification failed; "
+                "payload may be tampered"
+            )
             raise UnsafeSerializationError(msg, reason="signature_mismatch")
 
         result = _load_with_allow_list(io.BytesIO(payload))
 
-        logger.debug(
-            "Deserialized object with verified signature", extra={"size": len(payload)}
-        )
+        logger.debug("Deserialized object with verified signature", extra={"size": len(payload)})
         return result
 
 

@@ -192,9 +192,7 @@ class ScopeRegistry:
         with self._lock:
             entry = self._scopes.get(session_id)
             if entry is None:
-                LOGGER.debug(
-                    "Scope not found for session", extra={"session_id": session_id}
-                )
+                LOGGER.debug("Scope not found for session", extra={"session_id": session_id})
                 return None
 
             scope, _old_timestamp = entry
@@ -242,9 +240,7 @@ class ScopeRegistry:
         with self._lock:
             if session_id in self._scopes:
                 del self._scopes[session_id]
-                LOGGER.info(
-                    "Cleared scope for session", extra={"session_id": session_id}
-                )
+                LOGGER.info("Cleared scope for session", extra={"session_id": session_id})
             else:
                 LOGGER.debug(
                     "Attempted to clear nonexistent session",

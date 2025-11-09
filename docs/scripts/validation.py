@@ -63,9 +63,7 @@ def __dir__() -> list[str]:
     if isinstance(exports_obj, Iterable) and not isinstance(exports_obj, (str, bytes)):
         export_names = [str(name) for name in exports_obj]
     else:
-        export_names = [
-            candidate for candidate in dir(module) if not candidate.startswith("_")
-        ]
+        export_names = [candidate for candidate in dir(module) if not candidate.startswith("_")]
     return sorted(set(export_names))
 
 
@@ -74,9 +72,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing assistance only
     from pathlib import Path
     from typing import Protocol
 
-    JsonPayload = (
-        Mapping[str, object] | Sequence[object] | str | int | float | bool | None
-    )
+    JsonPayload = Mapping[str, object] | Sequence[object] | str | int | float | bool | None
 
     class ValidateAgainstSchema(Protocol):
         """Protocol for schema validation callables."""

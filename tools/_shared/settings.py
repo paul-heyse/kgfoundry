@@ -94,9 +94,7 @@ def load_settings(
     except ValidationError as exc:
         attr_name: object = getattr(settings_factory, "__name__", None)
         settings_name = (
-            attr_name
-            if isinstance(attr_name, str)
-            else settings_factory.__class__.__name__
+            attr_name if isinstance(attr_name, str) else settings_factory.__class__.__name__
         )
 
         raw_errors: Sequence[object] = exc.errors()
@@ -129,9 +127,7 @@ def load_settings(
 class ToolRuntimeSettings(BaseSettings):
     """Repository-wide runtime configuration for tooling helpers."""
 
-    model_config = SettingsConfigDict(
-        env_prefix="TOOLS_", case_sensitive=False, extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_prefix="TOOLS_", case_sensitive=False, extra="ignore")
 
     exec_allowlist: tuple[str, ...] = Field(
         default=(
@@ -202,9 +198,7 @@ class ToolRuntimeSettings(BaseSettings):
             return {}
         if isinstance(value, Mapping):
             return {
-                str(key): str(val).strip().lower()
-                for key, val in value.items()
-                if str(val).strip()
+                str(key): str(val).strip().lower() for key, val in value.items() if str(val).strip()
             }
         if isinstance(value, str):
             entries: dict[str, str] = {}
@@ -217,9 +211,7 @@ class ToolRuntimeSettings(BaseSettings):
                 key, digest = token.split("=", 1)
                 entries[key.strip()] = digest.strip().lower()
             return entries
-        message = (
-            "exec_digests must be a mapping or comma-separated 'key=sha256' string"
-        )
+        message = "exec_digests must be a mapping or comma-separated 'key=sha256' string"
         raise TypeError(message)
 
     def is_allowed(self, executable: Path) -> bool:

@@ -136,7 +136,9 @@ def _resolve_interface_metadata(
         instance="urn:cli-diagram:missing-metadata",
         extras={"interface_id": interface_id},
     )
-    message = "Interface metadata resolution should be unreachable after raising a CLI diagram error."
+    message = (
+        "Interface metadata resolution should be unreachable after raising a CLI diagram error."
+    )
     raise RuntimeError(message)
 
 
@@ -166,10 +168,7 @@ def _write_diagram(
         handle.write('direction: right\nCLI: "CLI" {\n')
         unique_tags = sorted({tag for *_, tags in operations for tag in tags})
         handle.write(
-            "\n".join(
-                f'  "{_escape_d2(tag)}": "{_escape_d2(tag)}" {{}}'
-                for tag in unique_tags
-            )
+            "\n".join(f'  "{_escape_d2(tag)}": "{_escape_d2(tag)}" {{}}' for tag in unique_tags)
         )
         if unique_tags:
             handle.write("\n")
@@ -243,9 +242,7 @@ def collect_operations(
     cli_config = cast("CLIConfig", context.cli_config)
     resolved_interface = interface_id or cli_config.interface_id
     try:
-        command_candidate = click_cmd or _load_click_command(
-            context, resolved_interface
-        )
+        command_candidate = click_cmd or _load_click_command(context, resolved_interface)
     except CLIConfigError:
         raise
     except RECOVERABLE_EXCEPTIONS as exc:
@@ -267,9 +264,7 @@ def write_diagram(operations: Sequence[OperationEntry]) -> None:
 def _update_cli_index_entry(*, enabled: bool) -> None:
     """Ensure the diagrams index links to the CLI diagram when available."""
     entry_token = CLI_INDEX_ENTRY.strip()
-    entry_line = (
-        CLI_INDEX_ENTRY if CLI_INDEX_ENTRY.endswith("\n") else f"{CLI_INDEX_ENTRY}\n"
-    )
+    entry_line = CLI_INDEX_ENTRY if CLI_INDEX_ENTRY.endswith("\n") else f"{CLI_INDEX_ENTRY}\n"
     try:
         with mkdocs_gen_files.open(DIAGRAM_INDEX_PATH, "r") as handle:
             existing_lines = handle.read().splitlines(keepends=True)
@@ -278,11 +273,7 @@ def _update_cli_index_entry(*, enabled: bool) -> None:
 
     filtered_lines = [line for line in existing_lines if line.strip() != entry_token]
     bullet_start = next(
-        (
-            index
-            for index, line in enumerate(filtered_lines)
-            if line.lstrip().startswith("- ")
-        ),
+        (index for index, line in enumerate(filtered_lines) if line.lstrip().startswith("- ")),
         len(filtered_lines),
     )
     prefix_lines = filtered_lines[:bullet_start]
@@ -357,9 +348,7 @@ def _raise_diagram_error(
             extensions=extras,
         )
     )
-    LOGGER.error(
-        detail, extra={**({} if extras is None else dict(extras)), "status": "error"}
-    )
+    LOGGER.error(detail, extra={**({} if extras is None else dict(extras)), "status": "error"})
     raise CLIConfigError(problem)
 
 
@@ -369,9 +358,7 @@ def _build_operations(
 ) -> list[OperationEntry]:
     operations: list[OperationEntry] = []
     for tokens, command_obj in walk_commands(command, []):
-        path, operation, fallback_tags = operation_context.build_operation(
-            tokens, command_obj
-        )
+        path, operation, fallback_tags = operation_context.build_operation(tokens, command_obj)
         operation_id_raw = str(operation.get("operationId") or "").strip()
         operation_id = operation_id_raw or None
         summary = str(operation.get("summary") or "").strip()

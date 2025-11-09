@@ -569,18 +569,14 @@ def _coerce_histogram_params(*args: object, **kwargs: object) -> HistogramParams
 
     if args_list and isinstance(args_list[0], HistogramParams):
         if len(args_list) > 1 or kwargs:
-            _histogram_type_error(
-                "build_histogram() received unexpected extra arguments"
-            )
+            _histogram_type_error("build_histogram() received unexpected extra arguments")
         return args_list[0]
 
     if not args_list:
         _histogram_type_error("build_histogram() missing required argument: 'name'")
 
     if len(args_list) > _MAX_HISTOGRAM_POSITIONAL_ARGS:
-        _histogram_type_error(
-            "build_histogram() received too many positional arguments"
-        )
+        _histogram_type_error("build_histogram() received too many positional arguments")
 
     name = str(
         first_or_error(
@@ -594,9 +590,7 @@ def _coerce_histogram_params(*args: object, **kwargs: object) -> HistogramParams
     else:
         doc = kwargs.pop("documentation", None)
         if doc is None:
-            _histogram_type_error(
-                "build_histogram() missing required argument: 'documentation'"
-            )
+            _histogram_type_error("build_histogram() missing required argument: 'documentation'")
         documentation = str(doc)
 
     labelnames = kwargs.pop("labelnames", None)
@@ -605,9 +599,7 @@ def _coerce_histogram_params(*args: object, **kwargs: object) -> HistogramParams
     unit = kwargs.pop("unit", None)
     if kwargs:
         unexpected = ", ".join(sorted(kwargs))
-        _histogram_type_error(
-            f"build_histogram() got unexpected keyword arguments: {unexpected}"
-        )
+        _histogram_type_error(f"build_histogram() got unexpected keyword arguments: {unexpected}")
 
     return HistogramParams(
         name=name,

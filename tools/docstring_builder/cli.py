@@ -191,9 +191,7 @@ def _apply_pipeline_result(
             message="Manifest written",
         )
     if result.problem_details is not None:
-        current = current.set_problem(
-            cast("ProblemDetailsDict", dict(result.problem_details))
-        )
+        current = current.set_problem(cast("ProblemDetailsDict", dict(result.problem_details)))
     return current
 
 
@@ -232,9 +230,7 @@ def _apply_additional_annotations(
             )
     additional_problem = getattr(args, "cli_problem", None)
     if isinstance(additional_problem, Mapping):
-        current = current.set_problem(
-            cast("ProblemDetailsDict", dict(additional_problem))
-        )
+        current = current.set_problem(cast("ProblemDetailsDict", dict(additional_problem)))
     return current
 
 
@@ -251,9 +247,7 @@ def _build_cli_envelope_from_args(
         status=status,
         subcommand=subcommand,
     )
-    result = cast(
-        "DocstringBuildResult | None", getattr(args, "docbuilder_result", None)
-    )
+    result = cast("DocstringBuildResult | None", getattr(args, "docbuilder_result", None))
     if result is not None:
         builder = _apply_pipeline_result(builder, result)
         duration = _resolve_duration(duration, result)
@@ -261,9 +255,7 @@ def _build_cli_envelope_from_args(
     return builder.finish(duration_seconds=duration)
 
 
-def _build_config_error_envelope(
-    subcommand: str, problem: ProblemDetailsDict
-) -> CliEnvelope:
+def _build_config_error_envelope(subcommand: str, problem: ProblemDetailsDict) -> CliEnvelope:
     builder = CliEnvelopeBuilder.create(
         command=CLI_COMMAND,
         status="config",
@@ -278,9 +270,7 @@ def _build_config_error_envelope(
     return builder.finish()
 
 
-def _build_unexpected_failure_envelope(
-    subcommand: str, exc: BaseException
-) -> CliEnvelope:
+def _build_unexpected_failure_envelope(subcommand: str, exc: BaseException) -> CliEnvelope:
     detail = f"{type(exc).__name__}: {exc}"
     problem = build_problem_details(
         ProblemDetailsParams(
@@ -801,9 +791,7 @@ def _check_optional_dependencies(modules: Sequence[str]) -> list[str]:
         return None
 
     return [
-        message
-        for module_name in modules
-        if (message := _module_issue(module_name)) is not None
+        message for module_name in modules if (message := _module_issue(module_name)) is not None
     ]
 
 
@@ -818,9 +806,7 @@ def _check_writable_directories(directories: Sequence[Path]) -> list[str]:
             return f"Directory {directory} is not writeable: {exc}."
         return None
 
-    return [
-        message for directory in directories if (message := _directory_issue(directory))
-    ]
+    return [message for directory in directories if (message := _directory_issue(directory))]
 
 
 def _extract_precommit_hook_names(config_path: Path) -> list[str]:
@@ -860,9 +846,7 @@ def _evaluate_precommit_hooks(config_path: Path) -> list[str]:
         and docs_artifacts_idx is not None
         and doc_builder_idx > docs_artifacts_idx
     ):
-        issues.append(
-            "'docstring-builder (check)' must run before 'docs: regenerate artifacts'."
-        )
+        issues.append("'docstring-builder (check)' must run before 'docs: regenerate artifacts'.")
     if (
         docs_artifacts_idx is not None
         and navmap_idx is not None
@@ -870,9 +854,7 @@ def _evaluate_precommit_hooks(config_path: Path) -> list[str]:
     ):
         issues.append("'navmap-check' should run after 'docs: regenerate artifacts'.")
     if pyrefly_idx is None:
-        issues.append(
-            "Add 'pyrefly-check' to pre-commit to validate dependency typing."
-        )
+        issues.append("Add 'pyrefly-check' to pre-commit to validate dependency typing.")
     return issues
 
 
@@ -939,9 +921,7 @@ def _collect_doctor_checks(args: argparse.Namespace) -> tuple[list[str], int]:
     issues.extend(_check_stub_packages(("stubs/libcst", "stubs/mkdocs_gen_files")))
     issues.extend(_check_optional_dependencies(("griffe", "libcst")))
     issues.extend(
-        _check_writable_directories(
-            (REPO_ROOT / "docs" / "_build", REPO_ROOT / ".cache")
-        )
+        _check_writable_directories((REPO_ROOT / "docs" / "_build", REPO_ROOT / ".cache"))
     )
     issues.extend(_evaluate_precommit_hooks(REPO_ROOT / ".pre-commit-config.yaml"))
     issues.extend(_load_policy_settings_with_logging())
@@ -990,9 +970,7 @@ def _invoke_handler(args: argparse.Namespace, handler: CommandHandler) -> int:
     if operation_id:
         logger_fields["operation_id"] = operation_id
     operation_logger = with_fields(LOGGER, **logger_fields)
-    operation_logger.info(
-        "Starting docstring builder command", extra={"status": "start"}
-    )
+    operation_logger.info("Starting docstring builder command", extra={"status": "start"})
 
     try:
         context = _load_cli_context()
@@ -1112,9 +1090,7 @@ def _register_subcommand(
     help_text = str(spec.get("help_text", ""))
     handler = cast("CommandHandler", spec["handler"])
     include_paths = bool(spec.get("include_paths"))
-    configure = cast(
-        "Callable[[argparse.ArgumentParser], None] | None", spec.get("configure")
-    )
+    configure = cast("Callable[[argparse.ArgumentParser], None] | None", spec.get("configure"))
 
     subparser = subparsers.add_parser(name, help=help_text)
     if include_paths:

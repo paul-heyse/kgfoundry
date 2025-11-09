@@ -110,7 +110,8 @@ def load_policy(path: Path, schema_path: Path | None = None) -> RetryPolicyDoc:
     -----
     This function may propagate the following exceptions from dependencies:
     - ``FileNotFoundError``: If policy file does not exist (from ``path.read_text()``)
-    - ``jsonschema.ValidationError``: If policy does not match schema (from ``jsonschema.validate()``)
+    - ``jsonschema.ValidationError``: If policy does not match schema
+      (from ``jsonschema.validate()``)
     """
     obj = yaml.safe_load(path.read_text(encoding="utf-8"))
     if schema_path and schema_path.exists():
@@ -119,9 +120,7 @@ def load_policy(path: Path, schema_path: Path | None = None) -> RetryPolicyDoc:
         name=obj["name"],
         description=obj.get("description"),
         methods=tuple(m.upper() for m in obj["methods"]),
-        retry_status=tuple(
-            _parse_status_entry(s) for s in obj["retry_on"].get("status", [])
-        ),
+        retry_status=tuple(_parse_status_entry(s) for s in obj["retry_on"].get("status", [])),
         retry_exceptions=tuple(obj["retry_on"].get("exceptions", [])),
         give_up_status=tuple(obj.get("give_up_on_status", [])),
         respect_retry_after=bool(obj.get("respect_retry_after", False)),

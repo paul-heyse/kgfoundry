@@ -326,9 +326,7 @@ class KGFoundryClient:
         Propagates :class:`requests.HTTPError` when the API responds with a
         non-success status code.
         """
-        filters_payload: dict[str, JsonValue] = (
-            filters.copy() if filters is not None else {}
-        )
+        filters_payload: dict[str, JsonValue] = filters.copy() if filters is not None else {}
         payload: dict[str, JsonValue] = {
             "query": query,
             "k": k,

@@ -114,9 +114,7 @@ class _StubEncoder:
         return [[("solar", 0.4), ("energy", 0.2)] for _ in self._last_texts]
 
 
-def test_export_onnx_writes_metadata(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_export_onnx_writes_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Exporting ONNX artifacts should persist metadata and respect configuration overrides."""
     _bootstrap_repo(tmp_path, monkeypatch)
     settings = load_settings()
@@ -153,9 +151,7 @@ def test_export_onnx_writes_metadata(
     metadata_path = Path(summary.metadata_path)
     assert metadata_path.exists()
 
-    metadata = msgspec.json.decode(
-        metadata_path.read_bytes(), type=SpladeArtifactMetadata
-    )
+    metadata = msgspec.json.decode(metadata_path.read_bytes(), type=SpladeArtifactMetadata)
     assert metadata.model_id == "naver/splade-v3"
     assert metadata.provider == "CPUExecutionProvider"
     assert metadata.quantized
@@ -179,9 +175,7 @@ def test_encode_corpus_writes_vectors(
         for row in rows:
             handle.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-    quantized_file = Path(
-        repo_root / "models" / "splade-v3" / "onnx" / "model_qint8.onnx"
-    )
+    quantized_file = Path(repo_root / "models" / "splade-v3" / "onnx" / "model_qint8.onnx")
     quantized_file.write_text("quantized", encoding="utf-8")
 
     settings = load_settings()
@@ -198,9 +192,7 @@ def test_encode_corpus_writes_vectors(
 
     metadata_path = Path(summary.metadata_path)
     assert metadata_path.exists()
-    metadata = msgspec.json.decode(
-        metadata_path.read_bytes(), type=SpladeEncodingMetadata
-    )
+    metadata = msgspec.json.decode(metadata_path.read_bytes(), type=SpladeEncodingMetadata)
     assert metadata.doc_count == 2
     assert metadata.quantization == 100
 
@@ -211,14 +203,10 @@ def test_encode_corpus_writes_vectors(
     assert content["vector"]["solar"] > 0
 
 
-def test_benchmark_queries_reports_latency(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_benchmark_queries_reports_latency(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Benchmarking should report latency percentiles for SPLADE query encoding."""
     repo_root = _bootstrap_repo(tmp_path, monkeypatch)
-    quantized_file = Path(
-        repo_root / "models" / "splade-v3" / "onnx" / "model_qint8.onnx"
-    )
+    quantized_file = Path(repo_root / "models" / "splade-v3" / "onnx" / "model_qint8.onnx")
     quantized_file.write_text("quantized", encoding="utf-8")
 
     settings = load_settings()
@@ -250,9 +238,7 @@ def test_benchmark_queries_reports_latency(
     assert summary.onnx_file == "onnx/model_qint8.onnx"
 
 
-def test_build_index_persists_metadata(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_build_index_persists_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Index builds should invoke Pyserini via subprocess and record metadata."""
     _bootstrap_repo(tmp_path, monkeypatch)
     settings = load_settings()
@@ -285,9 +271,7 @@ def test_build_index_persists_metadata(
         (index_dir / "segments_1").write_text("stub", encoding="utf-8")
 
     monkeypatch.setattr("codeintel_rev.io.splade_manager.run_subprocess", fake_run)
-    monkeypatch.setattr(
-        "codeintel_rev.io.splade_manager._detect_pyserini_version", lambda: "test"
-    )
+    monkeypatch.setattr("codeintel_rev.io.splade_manager._detect_pyserini_version", lambda: "test")
 
     metadata = manager.build_index(
         SpladeBuildOptions(

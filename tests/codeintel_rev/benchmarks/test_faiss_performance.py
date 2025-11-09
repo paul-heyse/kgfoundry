@@ -52,9 +52,7 @@ def _get_underlying_index(cpu_index: Any) -> Any:
     Any
         Underlying FAISS index instance.
     """
-    assert hasattr(
-        cpu_index, "index"
-    ), "Expected FAISS index wrapper to expose `index` attribute"
+    assert hasattr(cpu_index, "index"), "Expected FAISS index wrapper to expose `index` attribute"
     index_map = cast("faiss.IndexIDMap2", cpu_index)
     return index_map.index
 
@@ -238,9 +236,7 @@ def test_training_time_scaling(benchmark, tmp_index_path: Path) -> None:
 
         # Training should complete within target time
         avg_time = result.stats.mean
-        assert (
-            avg_time < max_time
-        ), f"Training took {avg_time:.2f}s (target: <{max_time}s)"
+        assert avg_time < max_time, f"Training took {avg_time:.2f}s (target: <{max_time}s)"
 
         print(f"\nCorpus size: {n_vectors} vectors")
         print(f"  Training time: {avg_time:.2f}s (target: <{max_time}s)")

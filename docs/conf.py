@@ -206,9 +206,7 @@ def get_project_settings(env: Mapping[str, str] | None = None) -> ProjectSetting
     github_repo = source.get("DOCS_GITHUB_REPO", "your-repo")
     github_sha = source.get("DOCS_GITHUB_SHA")
     if link_mode not in {"editor", "github"}:
-        LOGGER.warning(
-            "Unsupported DOCS_LINK_MODE '%s', defaulting to 'editor'", link_mode
-        )
+        LOGGER.warning("Unsupported DOCS_LINK_MODE '%s', defaulting to 'editor'", link_mode)
         link_mode = "editor"
     if editor not in {"vscode", "pycharm"}:
         LOGGER.warning("Unsupported DOCS_EDITOR '%s', defaulting to 'vscode'", editor)
@@ -316,9 +314,7 @@ def _detect_pkg() -> str:
     candidates: list[str] = []
     if SRC_DIR.exists():
         candidates += [p.parent.name for p in SRC_DIR.glob("*/__init__.py")]
-    candidates += [
-        p.parent.name for p in ROOT.glob("*/__init__.py") if p.parent.name != "docs"
-    ]
+    candidates += [p.parent.name for p in ROOT.glob("*/__init__.py") if p.parent.name != "docs"]
     if not candidates:
         message = "No Python package found under src/ or project root"
         raise RuntimeError(message)
@@ -347,9 +343,7 @@ except ImportError:  # pragma: no cover - fallback when tooling unavailable
         list[str]
             Empty list.
         """
-        LOGGER.debug(
-            "tools.detect_pkg.detect_packages unavailable; returning empty list"
-        )
+        LOGGER.debug("tools.detect_pkg.detect_packages unavailable; returning empty list")
         return []
 
     def detect_primary() -> str:
@@ -360,9 +354,7 @@ except ImportError:  # pragma: no cover - fallback when tooling unavailable
         str
             Fallback package name.
         """
-        LOGGER.debug(
-            "tools.detect_pkg.detect_primary unavailable; returning detected package"
-        )
+        LOGGER.debug("tools.detect_pkg.detect_primary unavailable; returning detected package")
         return PKG
 
 
@@ -443,9 +435,7 @@ def _autoapi_skip_member(*event: object) -> bool | None:
 
 _PACKAGES: list[str] = []
 if os.environ.get("DOCS_PKG"):
-    _PACKAGES = [
-        pkg.strip() for pkg in os.environ["DOCS_PKG"].split(",") if pkg.strip()
-    ]
+    _PACKAGES = [pkg.strip() for pkg in os.environ["DOCS_PKG"].split(",") if pkg.strip()]
 if not _PACKAGES:
     _PACKAGES = detect_packages()
 if not _PACKAGES:
@@ -454,9 +444,7 @@ if not _PACKAGES:
 _apply_auto_docstring_overrides()
 _build_autoapi_doc_overrides()
 
-numpydoc_validation_exclude = sorted(
-    {rf"^{re.escape(name)}$" for name in _AUTOAPI_DOC_OVERRIDES}
-)
+numpydoc_validation_exclude = sorted({rf"^{re.escape(name)}$" for name in _AUTOAPI_DOC_OVERRIDES})
 
 AutoapiEvent = tuple[Sphinx, str, str, object, bool, Mapping[str, object]]
 AUTOAPI_EVENT_ARG_COUNT = 6
@@ -692,9 +680,7 @@ sphinx_gallery_conf = {
 class DocsJSONEncoder(json.JSONEncoder):
     """JSON encoder that can serialize ``functools.lru_cache`` wrappers."""
 
-    def default(
-        self, o: object
-    ) -> object:  # pragma: no cover - exercised in Sphinx build
+    def default(self, o: object) -> object:  # pragma: no cover - exercised in Sphinx build
         """Return a JSON-safe representation for cache wrappers and delegates to super.
 
         Parameters
@@ -982,9 +968,7 @@ class GalleryTagsDirective(Directive):
             Empty list.
         """
         if self.content:
-            LOGGER.debug(
-                "tags directive content ignored", extra={"tags": list(self.content)}
-            )
+            LOGGER.debug("tags directive content ignored", extra={"tags": list(self.content)})
         return []
 
 

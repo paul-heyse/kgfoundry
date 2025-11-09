@@ -278,9 +278,7 @@ class TestQueryByFiltersLanguageFilter:
         assert "main.py" in uris
         assert len(results) == 9  # 7 Python + 2 TypeScript
 
-    def test_language_filter_unknown_language(
-        self, test_catalog: DuckDBCatalog
-    ) -> None:
+    def test_language_filter_unknown_language(self, test_catalog: DuckDBCatalog) -> None:
         """Test filtering by unknown language returns empty."""
         # Note: query_by_filters imports LANGUAGE_EXTENSIONS from scope_utils
         # If language has no extensions, the SQL query filters by empty extension set

@@ -59,9 +59,7 @@ def test_index_bm25_emits_success_envelope(
     envelope = _read_envelope(envelope_path)
     assert envelope["status"] == "success"
     files = cast("list[dict[str, object]]", envelope["files"])
-    assert any(
-        cast("str", entry.get("path", "")).endswith("bm25_index") for entry in files
-    )
+    assert any(cast("str", entry.get("path", "")).endswith("bm25_index") for entry in files)
 
 
 def test_index_faiss_records_validation_failure(
@@ -95,9 +93,6 @@ def test_index_faiss_records_validation_failure(
     envelope = _read_envelope(envelope_path)
     assert envelope["status"] == "violation"
     problem = cast("dict[str, object]", envelope["problem"])
-    assert (
-        problem["type"]
-        == "https://kgfoundry.dev/problems/vector-ingestion/invalid-payload"
-    )
+    assert problem["type"] == "https://kgfoundry.dev/problems/vector-ingestion/invalid-payload"
     assert problem["vector_path"] == str(vectors_file)
     assert problem["errors"] == ["row 1: missing vector"]

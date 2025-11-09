@@ -118,9 +118,7 @@ def test_unknown_key_raises_key_error() -> None:
 def test_version_resolver_fallback() -> None:
     command = _unique_key("version-cli")
     # First package missing, second (kgfoundry) present.
-    key = _register_test_cli(
-        command=command, packages=("nonexistent-package", "kgfoundry")
-    )
+    key = _register_test_cli(command=command, packages=("nonexistent-package", "kgfoundry"))
 
     settings = settings_for(key)
 

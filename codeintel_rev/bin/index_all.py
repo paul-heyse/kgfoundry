@@ -119,7 +119,8 @@ def main() -> None:
 
     mode_str = "incremental" if args.incremental else "full rebuild"
     logger.info(
-        "Indexing pipeline complete (%s); chunks=%s embeddings=%s parquet=%s faiss_index=%s duckdb_rows=%s",
+        "Indexing pipeline complete (%s); chunks=%s embeddings=%s parquet=%s "
+        "faiss_index=%s duckdb_rows=%s",
         mode_str,
         len(chunks),
         len(embeddings),

@@ -101,12 +101,7 @@ class AllDictTemplate:
 
 NavPrimitive = str | int | float | bool | None
 type NavTree = (
-    NavPrimitive
-    | list[NavTree]
-    | dict[str, NavTree]
-    | set[str]
-    | AllDictTemplate
-    | AllPlaceholder
+    NavPrimitive | list[NavTree] | dict[str, NavTree] | set[str] | AllDictTemplate | AllPlaceholder
 )
 type ResolvedNavValue = (
     NavPrimitive | list[ResolvedNavValue] | dict[str, ResolvedNavValue] | set[str]
@@ -406,9 +401,7 @@ def _expand_all_placeholder(exports: Sequence[str]) -> list[ResolvedNavValue]:
     return resolved
 
 
-def _expand_dict_template(
-    template: NavTree, exports: Sequence[str]
-) -> dict[str, ResolvedNavValue]:
+def _expand_dict_template(template: NavTree, exports: Sequence[str]) -> dict[str, ResolvedNavValue]:
     """Expand ``AllDictTemplate`` placeholders.
 
     Parameters
@@ -429,9 +422,7 @@ def _expand_dict_template(
     return expanded
 
 
-def _expand_list(
-    values: Sequence[NavTree], exports: Sequence[str]
-) -> list[ResolvedNavValue]:
+def _expand_list(values: Sequence[NavTree], exports: Sequence[str]) -> list[ResolvedNavValue]:
     """Expand navmap lists, flattening nested lists that arise from placeholders.
 
     Parameters
@@ -456,9 +447,7 @@ def _expand_list(
     return expanded
 
 
-def _expand_dict(
-    values: dict[str, NavTree], exports: Sequence[str]
-) -> dict[str, ResolvedNavValue]:
+def _expand_dict(values: dict[str, NavTree], exports: Sequence[str]) -> dict[str, ResolvedNavValue]:
     """Expand navmap dict values recursively.
 
     Parameters
@@ -473,9 +462,7 @@ def _expand_dict(
     dict[str, ResolvedNavValue]
         Dictionary with expanded values.
     """
-    return {
-        key: _expand_nav_value(sub_value, exports) for key, sub_value in values.items()
-    }
+    return {key: _expand_nav_value(sub_value, exports) for key, sub_value in values.items()}
 
 
 def _expand_set(values: set[str], exports: Sequence[str]) -> set[str]:
@@ -592,9 +579,7 @@ def _extract_navmap_literal(module: ast.Module) -> dict[str, NavTree] | None:
     nav_literal: dict[str, NavTree] | None = None
     for node in module.body:
         if isinstance(node, ast.Assign):
-            targets = [
-                target.id for target in node.targets if isinstance(target, ast.Name)
-            ]
+            targets = [target.id for target in node.targets if isinstance(target, ast.Name)]
             if "__navmap__" in targets:
                 try:
                     candidate = _literal_eval_navmap(node.value)
@@ -744,9 +729,7 @@ def _load_nav_sidecar(py: Path) -> dict[str, ResolvedNavValue]:
         nav_copy = cast("dict[str, ResolvedNavValue]", copy.deepcopy(payload))
         exports = nav_copy.get("exports")
         if isinstance(exports, list):
-            deduped_strings = _dedupe_str_list(
-                [item for item in exports if isinstance(item, str)]
-            )
+            deduped_strings = _dedupe_str_list([item for item in exports if isinstance(item, str)])
             normalized_exports: list[ResolvedNavValue] = [
                 cast("ResolvedNavValue", item) for item in deduped_strings
             ]
@@ -813,9 +796,7 @@ def _definition_anchors(py: Path) -> dict[str, int]:
     return anchors
 
 
-def _has_anchor(
-    symbol: str, anchors_inline: dict[str, int], auto_anchors: dict[str, int]
-) -> bool:
+def _has_anchor(symbol: str, anchors_inline: dict[str, int], auto_anchors: dict[str, int]) -> bool:
     """Return ``True`` when ``symbol`` has either inline or inferred anchors.
 
     Parameters
@@ -950,9 +931,7 @@ def _extract_all_literal(module: ast.Module) -> list[str]:
     for node in module.body:
         value: ast.AST | None = None
         if isinstance(node, ast.Assign):
-            targets = [
-                target.id for target in node.targets if isinstance(target, ast.Name)
-            ]
+            targets = [target.id for target in node.targets if isinstance(target, ast.Name)]
             if "__all__" in targets:
                 value = node.value
         elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
@@ -1103,9 +1082,7 @@ def _validate_sections(
         if not isinstance(symbols_value, list):
             continue
         errors.extend(
-            _validate_section_symbols(
-                py, sid, symbols_value, anchors_inline, auto_anchors
-            )
+            _validate_section_symbols(py, sid, symbols_value, anchors_inline, auto_anchors)
         )
     return errors
 
@@ -1163,9 +1140,7 @@ def _validate_symbol_meta(
         stability = entry.get("stability")
         owner = entry.get("owner")
         if stability not in STABILITY:
-            errors.append(
-                f"{py}: symbol '{name}' missing/invalid stability (got {stability!r})"
-            )
+            errors.append(f"{py}: symbol '{name}' missing/invalid stability (got {stability!r})")
         if not owner:
             errors.append(f"{py}: symbol '{name}' missing owner (e.g., '@team')")
         since = entry.get("since")
@@ -1175,9 +1150,7 @@ def _validate_symbol_meta(
             errors.append(f"{py}: symbol '{name}' since invalid: {error_since}")
         error_deprecated = _validate_pep440(deprecated_in)
         if error_deprecated:
-            errors.append(
-                f"{py}: symbol '{name}' deprecated_in invalid: {error_deprecated}"
-            )
+            errors.append(f"{py}: symbol '{name}' deprecated_in invalid: {error_deprecated}")
         if Version is None or not since or not deprecated_in:
             continue
         try:
@@ -1234,9 +1207,7 @@ def _round_trip_line_errors(
     errors: list[str] = []
     for key, value in mapping.items():
         if value < 1 or value > len(lines) or not pattern.match(lines[value - 1]):
-            errors.append(
-                f"{file_path}: round-trip mismatch for {label} '{key}' at line {value}"
-            )
+            errors.append(f"{file_path}: round-trip mismatch for {label} '{key}' at line {value}")
     return errors
 
 
@@ -1402,9 +1373,7 @@ class _ExecutionContext:
     def elapsed(self) -> float:
         return monotonic() - self.start
 
-    def extensions(
-        self, overrides: Mapping[str, object] | None = None
-    ) -> dict[str, JsonValue]:
+    def extensions(self, overrides: Mapping[str, object] | None = None) -> dict[str, JsonValue]:
         payload: dict[str, JsonValue] = dict(self.base_extras)
         payload.update(_prepare_extensions(overrides))
         return payload
@@ -1416,9 +1385,7 @@ def _envelope_path(subcommand: str) -> Path:
     return CLI_ENVELOPE_DIR / filename
 
 
-def _emit_envelope(
-    envelope: CliEnvelope, *, logger: LoggerAdapter, subcommand: str
-) -> Path:
+def _emit_envelope(envelope: CliEnvelope, *, logger: LoggerAdapter, subcommand: str) -> Path:
     path = _envelope_path(subcommand)
     CLI_ENVELOPE_DIR.mkdir(parents=True, exist_ok=True)
     rendered = render_cli_envelope(envelope)
@@ -1472,9 +1439,7 @@ def _record_failure(
 ) -> int:
     failure_extras = options.extras if options else None
     exc = options.exc if options else None
-    problem = _build_problem(
-        context, detail=detail, status=status, extras=failure_extras
-    )
+    problem = _build_problem(context, detail=detail, status=status, extras=failure_extras)
     builder = CliEnvelopeBuilder.create(
         command=CLI_COMMAND,
         status=_run_status_from_error(error_status),
@@ -1491,15 +1456,9 @@ def _record_failure(
     }
     log_extra.update(context.extensions(failure_extras))
     context.logger.error("Command failed", extra=log_extra, exc_info=exc)
-    if (
-        failure_extras
-        and (errors := failure_extras.get("errors"))
-        and isinstance(errors, list)
-    ):
+    if failure_extras and (errors := failure_extras.get("errors")) and isinstance(errors, list):
         for message in errors[:10]:
-            context.logger.error(
-                "Validation error", extra={"detail": _coerce_json_value(message)}
-            )
+            context.logger.error("Validation error", extra={"detail": _coerce_json_value(message)})
     return 1
 
 
@@ -1549,9 +1508,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         index_path=str(INDEX),
     )
     logger.info("Command started", extra={"status": "start"})
-    context = _ExecutionContext(
-        logger=logger, start=monotonic(), base_extras=base_extras
-    )
+    context = _ExecutionContext(logger=logger, start=monotonic(), base_extras=base_extras)
     builder = CliEnvelopeBuilder.create(
         command=CLI_COMMAND,
         status=cast("CliStatus", "success"),
@@ -1566,9 +1523,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "errors": error_sample,
             "errors_truncated": max(len(errors) - len(error_sample), 0),
         }
-        detail = (
-            error_sample[0] if error_sample else "Navmap validation errors detected."
-        )
+        detail = error_sample[0] if error_sample else "Navmap validation errors detected."
         return _record_failure(
             context,
             detail=detail,
@@ -1620,9 +1575,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "errors": error_sample,
             "errors_truncated": max(len(rt_errs) - len(error_sample), 0),
         }
-        detail = (
-            error_sample[0] if error_sample else "Navmap round-trip validation failed."
-        )
+        detail = error_sample[0] if error_sample else "Navmap round-trip validation failed."
         return _record_failure(
             context,
             detail=detail,

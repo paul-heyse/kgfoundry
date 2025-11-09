@@ -61,9 +61,7 @@ def _resolve_cli_help() -> str:
 
 
 app = typer.Typer(help=_resolve_cli_help(), no_args_is_help=True, add_completion=False)
-download_app = typer.Typer(
-    help=HARVEST_DESCRIPTION, no_args_is_help=True, add_completion=False
-)
+download_app = typer.Typer(help=HARVEST_DESCRIPTION, no_args_is_help=True, add_completion=False)
 app.add_typer(download_app, name=CLI_COMMAND, help=HARVEST_DESCRIPTION)
 
 
@@ -161,9 +159,7 @@ def harvest(
         message = f"[dry-run] would harvest topic={topic!r} years={years!r} max_works={max_works}"
         builder = builder.add_file(path="openalex", status="success", message=message)
         typer.echo(message)
-    except (
-        Exception
-    ) as exc:  # pragma: no cover - defensive catch for future integrations
+    except Exception as exc:  # pragma: no cover - defensive catch for future integrations
         problem = _harvest_problem(str(exc))
         failure_builder = CliEnvelopeBuilder.create(
             command=CLI_COMMAND,

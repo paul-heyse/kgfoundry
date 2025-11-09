@@ -150,9 +150,7 @@ class TestBuildConfigurationProblem:
         problem = build_configuration_problem(error)
         problem_dict = _as_problem_dict(problem)
         assert isinstance(problem, dict)
-        assert (
-            problem_dict["type"] == "https://kgfoundry.dev/problems/configuration-error"
-        )
+        assert problem_dict["type"] == "https://kgfoundry.dev/problems/configuration-error"
         assert problem_dict["title"] == "Configuration Error"
         assert problem_dict["status"] == 500
         detail_value = problem_dict.get("detail", "")
@@ -303,8 +301,5 @@ class TestConfigurationErrorIntegration:
         assert len(problems) == 3
         for problem in problems:
             problem_dict = _as_problem_dict(problem)
-            assert (
-                problem_dict["type"]
-                == "https://kgfoundry.dev/problems/configuration-error"
-            )
+            assert problem_dict["type"] == "https://kgfoundry.dev/problems/configuration-error"
             assert problem_dict["status"] == 500

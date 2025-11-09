@@ -70,9 +70,7 @@ def test_collect_modules_discovers_new_package(
 
     def fake_load(package: str, *_args: object, **_kwargs: object) -> object:
         loaded_packages.append(package)
-        module_path = Path("/virtual") / Path(package.replace(".", "/")).with_suffix(
-            ".py"
-        )
+        module_path = Path("/virtual") / Path(package.replace(".", "/")).with_suffix(".py")
         return _make_stub_module(package, module_path)
 
     monkeypatch.setattr(module, "_load", fake_load)

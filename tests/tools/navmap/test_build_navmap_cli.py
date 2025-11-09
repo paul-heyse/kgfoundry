@@ -21,9 +21,7 @@ def _reset_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
 
 
 @pytest.mark.usefixtures("_reset_paths")
-def test_main_emits_success_envelope(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_main_emits_success_envelope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     destination = tmp_path / "navmap.json"
 
     def fake_build_index(

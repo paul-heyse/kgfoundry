@@ -264,9 +264,7 @@ def coerce_vector_batch(records: Iterable[object]) -> VectorBatch:
         raise VectorValidationError(msg)
 
     matrix_untyped = np.asarray(vectors, dtype=np.float32)
-    matrix_contiguous: VectorMatrix = np.ascontiguousarray(
-        matrix_untyped, dtype=np.float32
-    )
+    matrix_contiguous: VectorMatrix = np.ascontiguousarray(matrix_untyped, dtype=np.float32)
     return VectorBatch(ids=tuple(ids), matrix=matrix_contiguous)
 
 

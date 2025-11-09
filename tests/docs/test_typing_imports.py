@@ -74,9 +74,9 @@ class TestDocsScriptsTypingImports:
 
                 source = py_file.read_text(encoding="utf-8")
 
-                assert (
-                    "from __future__ import annotations" in source
-                ), f"{py_file.name} missing `from __future__ import annotations`"
+                assert "from __future__ import annotations" in source, (
+                    f"{py_file.name} missing `from __future__ import annotations`"
+                )
 
     def test_no_unguarded_heavy_imports_in_scripts(self) -> None:
         """Verify heavy optional dependencies are only imported in TYPE_CHECKING blocks."""
@@ -186,9 +186,9 @@ class TestDocsTypesPublicFacade:
 
             # Each public module should import from corresponding private module
             # e.g., docs/types/artifacts.py imports from docs._types.artifacts
-            assert (
-                "from docs._types" in source
-            ), f"{py_file.name} should re-export from private docs._types module"
+            assert "from docs._types" in source, (
+                f"{py_file.name} should re-export from private docs._types module"
+            )
 
     def test_docs_types_has_all_declaration(self) -> None:
         """Verify all docs/types/*.py have proper __all__ declarations."""
@@ -198,9 +198,7 @@ class TestDocsTypesPublicFacade:
 
             source = py_file.read_text(encoding="utf-8")
 
-            assert (
-                "__all__" in source
-            ), f"{py_file.name} should define __all__ for public API"
+            assert "__all__" in source, f"{py_file.name} should define __all__ for public API"
 
 
 class TestDocstringAndMigrationGuidance:
@@ -211,9 +209,9 @@ class TestDocstringAndMigrationGuidance:
         docs_types_init = DOCS_TYPES / "__init__.py"
         content = docs_types_init.read_text(encoding="utf-8")
 
-        assert (
-            "public facade" in content.lower()
-        ), "docs/types/__init__.py should document it's a public facade"
+        assert "public facade" in content.lower(), (
+            "docs/types/__init__.py should document it's a public facade"
+        )
 
     def test_docs_typing_facade_is_available(self) -> None:
         """Verify docs.typing module exists and provides helpers."""
@@ -264,6 +262,6 @@ def test_no_resolve_numpy_in_docs_scripts() -> None:
             source = py_file.read_text(encoding="utf-8")
 
             for shim in deprecated_shims:
-                assert (
-                    shim not in source
-                ), f"{py_file.name} should not import deprecated {shim}. {error_messages[shim]}"
+                assert shim not in source, (
+                    f"{py_file.name} should not import deprecated {shim}. {error_messages[shim]}"
+                )

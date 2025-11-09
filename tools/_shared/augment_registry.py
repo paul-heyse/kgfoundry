@@ -197,9 +197,7 @@ class OperationOverrideModel(BaseModel):
         if self.env:
             payload["x-env"] = list(self.env)
         if self.code_samples:
-            payload["x-codeSamples"] = [
-                sample.model_dump() for sample in self.code_samples
-            ]
+            payload["x-codeSamples"] = [sample.model_dump() for sample in self.code_samples]
         if self.problem_details:
             payload["x-problemDetails"] = list(self.problem_details)
         payload.update(self.extras)
@@ -274,12 +272,10 @@ class AugmentMetadataModel(BaseModel):
             if key not in {"operations", "x-tagGroups"}
         }
         operations = {
-            key: OperationOverrideModel.model_validate(item)
-            for key, item in operations_map.items()
+            key: OperationOverrideModel.model_validate(item) for key, item in operations_map.items()
         }
         tag_groups = tuple(
-            TagGroupModel.model_validate(item)
-            for item in _coerce_mapping_list(tag_groups_raw)
+            TagGroupModel.model_validate(item) for item in _coerce_mapping_list(tag_groups_raw)
         )
         canonical: dict[str, object] = dict(extras)
         if operations:
@@ -446,8 +442,7 @@ class RegistryInterfaceModel(BaseModel):
         operations_raw = data.get("operations")
         operations_map = _coerce_mapping(operations_raw)
         data["operations"] = {
-            key: RegistryOperationModel.model_validate(item)
-            for key, item in operations_map.items()
+            key: RegistryOperationModel.model_validate(item) for key, item in operations_map.items()
         }
         extras: dict[str, object] = {}
         for key in list(data.keys()):
@@ -518,9 +513,7 @@ class RegistryInterfaceModel(BaseModel):
         if self.problem_details:
             payload["problem_details"] = list(self.problem_details)
         if self.operations:
-            payload["operations"] = {
-                key: op.to_payload(key) for key, op in self.operations.items()
-            }
+            payload["operations"] = {key: op.to_payload(key) for key, op in self.operations.items()}
         payload.update(self.extras)
         return payload
 
@@ -551,8 +544,7 @@ class RegistryMetadataModel(BaseModel):
 
     def to_payload(self) -> dict[str, object]:
         return {
-            identifier: interface.to_payload()
-            for identifier, interface in self.interfaces.items()
+            identifier: interface.to_payload() for identifier, interface in self.interfaces.items()
         }
 
     def get_interface(self, identifier: str) -> Mapping[str, object] | None:
@@ -753,9 +745,7 @@ def _load_augment(resolved: Path, reader: Reader) -> AugmentMetadataModel:
             status=422,
         )
     try:
-        return AugmentMetadataModel.model_validate(
-            {"path": resolved, "payload": payload}
-        )
+        return AugmentMetadataModel.model_validate({"path": resolved, "payload": payload})
     except ValidationError as exc:  # pragma: no cover - exercised in tests
         validation_error = _validation_error("augment", resolved, exc)
         raise validation_error from exc
@@ -779,9 +769,7 @@ def _load_registry(resolved: Path, reader: Reader) -> RegistryMetadataModel:
             status=422,
         )
     try:
-        return RegistryMetadataModel.model_validate(
-            {"path": resolved, "interfaces": interfaces}
-        )
+        return RegistryMetadataModel.model_validate({"path": resolved, "interfaces": interfaces})
     except ValidationError as exc:  # pragma: no cover - exercised in tests
         validation_error = _validation_error("registry", resolved, exc)
         raise validation_error from exc

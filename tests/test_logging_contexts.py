@@ -199,9 +199,7 @@ class TestErrorReportConstructor:
 
     def test_make_error_report_with_required_fields(self) -> None:
         """Helper ensures all required fields are set."""
-        error = make_error_report(
-            file="test.py", status="error", message="Failed to build"
-        )
+        error = make_error_report(file="test.py", status="error", message="Failed to build")
 
         assert error["file"] == "test.py"
         assert error["status"] == "error"
@@ -277,9 +275,7 @@ class TestObservabilityIntegration:
         with CorrelationContext("req-123"):
             assert get_correlation_id() == "req-123"
             # Verify with_fields works in context
-            with_fields_adapter = with_fields(
-                logging.getLogger("test"), correlation_id="req-123"
-            )
+            with_fields_adapter = with_fields(logging.getLogger("test"), correlation_id="req-123")
             assert with_fields_adapter is not None
 
         assert get_correlation_id() is None

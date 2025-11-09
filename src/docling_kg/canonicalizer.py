@@ -42,7 +42,10 @@ def canonicalize_text(blocks: list[str]) -> str:
     def norm(s: str) -> str:
         """Compute norm.
 
-        Carry out the norm operation for the surrounding component. Generated documentation highlights how this helper collaborates with neighbouring utilities. Callers rely on the routine to remain stable across releases.
+        Carry out the norm operation for the surrounding component.
+        Generated documentation highlights how this helper collaborates with
+        neighbouring utilities. Callers rely on the routine to remain stable
+        across releases.
 
         Parameters
         ----------

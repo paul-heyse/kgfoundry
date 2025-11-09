@@ -38,9 +38,7 @@ def _bootstrap_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
     monkeypatch.setenv("REPO_ROOT", str(repo_root))
     monkeypatch.setenv("DATA_DIR", str(data_dir))
-    monkeypatch.setenv(
-        "FAISS_INDEX", str(repo_root / "data" / "faiss" / "code.ivfpq.faiss")
-    )
+    monkeypatch.setenv("FAISS_INDEX", str(repo_root / "data" / "faiss" / "code.ivfpq.faiss"))
     monkeypatch.setenv("DUCKDB_PATH", str(repo_root / "data" / "catalog.duckdb"))
     monkeypatch.setenv("SCIP_INDEX", str(repo_root / "index.scip"))
     monkeypatch.setenv("BM25_JSONL_DIR", str(bm25_json_dir))
@@ -78,9 +76,7 @@ def test_prepare_corpus_creates_json_collection(
 
     output_dir = Path(summary.output_dir)
     assert output_dir.is_dir()
-    doc_files = sorted(
-        p.name for p in output_dir.glob("*.json") if p.name != "metadata.json"
-    )
+    doc_files = sorted(p.name for p in output_dir.glob("*.json") if p.name != "metadata.json")
     assert doc_files == ["doc1.json", "doc2.json"]
     assert (output_dir / "metadata.json").is_file()
 
@@ -114,9 +110,7 @@ def test_prepare_corpus_detects_duplicate_ids(
         manager.prepare_corpus(source_path)
 
 
-def test_build_index_writes_metadata(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_build_index_writes_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Index builds should invoke Pyserini and persist index metadata."""
     repo_root = _bootstrap_repo(tmp_path, monkeypatch)
     source_path = repo_root / "datasets" / "corpus.jsonl"
@@ -135,9 +129,7 @@ def test_build_index_writes_metadata(
 
     monkeypatch.setenv("BM25_THREADS", "2")
     monkeypatch.setattr("codeintel_rev.io.bm25_manager._run_pyserini_index", fake_run)
-    monkeypatch.setattr(
-        "codeintel_rev.io.bm25_manager._detect_pyserini_version", lambda: "test"
-    )
+    monkeypatch.setattr("codeintel_rev.io.bm25_manager._detect_pyserini_version", lambda: "test")
 
     metadata = manager.build_index()
 

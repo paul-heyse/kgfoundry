@@ -669,14 +669,16 @@ def load_nav_metadata(package: str, exports: tuple[str, ...]) -> NavMetadataMode
     package : str
         Fully qualified package name whose metadata should be loaded.
     exports : tuple[str, ...]
-        Public export names exposed via ``__all__``. These drive the default section and symbol lists
+        Public export names exposed via ``__all__``.
+        These drive the default section and symbol lists
         when metadata omits explicit values.
 
     Returns
     -------
     NavMetadataModel
-        Typed navigation metadata. The model implements the mapping protocol so existing callers that
-        expect a dictionary continue to work while new code can rely on typed accessors.
+        Typed navigation metadata. The model implements the mapping protocol
+        so existing callers that expect a dictionary continue to work while
+        new code can rely on typed accessors.
     """
     cli_metadata = _cli_nav_metadata(package, exports)
     if cli_metadata is not None:

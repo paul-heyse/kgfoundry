@@ -107,9 +107,7 @@ class MetricsProvider:
     _registry: CollectorRegistry | None = field(default=None, repr=False)
 
     def __init__(self, registry: CollectorRegistry | None = None) -> None:
-        resolved_registry = cast(
-            "CollectorRegistry | None", registry or get_default_registry()
-        )
+        resolved_registry = cast("CollectorRegistry | None", registry or get_default_registry())
         _thaw(
             self,
             _registry=resolved_registry,
@@ -182,9 +180,7 @@ class MetricsRegistry:
         namespace: str = "kgfoundry",
         registry: CollectorRegistry | None = None,
     ) -> None:
-        resolved_registry = cast(
-            "CollectorRegistry | None", registry or get_default_registry()
-        )
+        resolved_registry = cast("CollectorRegistry | None", registry or get_default_registry())
         metric_prefix = namespace.replace("-", "_")
         labels = ("operation", "status")
         _thaw(
@@ -385,9 +381,7 @@ def record_operation(
         duration = time.monotonic() - start
         registry.requests_total.labels(operation=operation, status=status).inc()
         if status == "error":
-            registry.request_errors_total.labels(
-                operation=operation, status=status
-            ).inc()
+            registry.request_errors_total.labels(operation=operation, status=status).inc()
         registry.request_duration_seconds.labels(operation=operation).observe(duration)
         extra = {"duration_ms": duration * 1000}
         with with_fields(

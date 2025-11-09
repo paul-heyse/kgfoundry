@@ -54,8 +54,7 @@ class TestPluginRegistryError:
         details = error.to_problem_details(instance="/api/plugins/test")
         # Cast to ensure all fields are present
         assert (
-            cast("str", details.get("type"))
-            == "https://kgfoundry.dev/problems/configuration-error"
+            cast("str", details.get("type")) == "https://kgfoundry.dev/problems/configuration-error"
         )
         assert cast("int", details.get("status")) == 500
         assert cast("str", details.get("detail")) == "test error"

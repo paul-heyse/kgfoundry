@@ -130,9 +130,7 @@ class TestBackwardCompatibilityShims:
         with pytest.warns(DeprecationWarning, match=r"resolve_fastapi.*deprecated"):
             resolve_fastapi()
 
-    def test_resolve_faiss_emits_deprecation_warning(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_resolve_faiss_emits_deprecation_warning(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """resolve_faiss() emits a DeprecationWarning."""
         _install_fake_faiss(monkeypatch)
         with pytest.warns(DeprecationWarning, match=r"resolve_faiss.*deprecated"):
@@ -151,22 +149,16 @@ class TestBackwardCompatibilityShims:
         with pytest.warns(DeprecationWarning, match=r"deprecated"):
             fastapi = resolve_fastapi()
         assert isinstance(fastapi, ModuleType), "resolve_fastapi should return a module"
-        assert hasattr(
-            fastapi, "FastAPI"
-        ), "fastapi module should have 'FastAPI' attribute"
+        assert hasattr(fastapi, "FastAPI"), "fastapi module should have 'FastAPI' attribute"
 
-    def test_resolve_faiss_returns_module(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_resolve_faiss_returns_module(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """resolve_faiss() returns the faiss module (despite deprecation)."""
         _install_fake_faiss(monkeypatch)
         with pytest.warns(DeprecationWarning, match=r"deprecated"):
             faiss = resolve_faiss()
         # Just verify we got something that looks like a module
         assert isinstance(faiss, ModuleType), "resolve_faiss should return a module"
-        assert hasattr(
-            faiss, "__name__"
-        ), "faiss module should have '__name__' attribute"
+        assert hasattr(faiss, "__name__"), "faiss module should have '__name__' attribute"
 
 
 class TestTypeAliases:

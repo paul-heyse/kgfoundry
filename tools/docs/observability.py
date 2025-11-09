@@ -99,9 +99,7 @@ class DocumentationMetrics:
 
     def __init__(self, registry: CollectorRegistry | None = None) -> None:
         resolved = (
-            registry
-            if registry is not None
-            else cast("CollectorRegistry", get_default_registry())
+            registry if registry is not None else cast("CollectorRegistry", get_default_registry())
         )
         self.registry = resolved
 
@@ -316,34 +314,22 @@ def record_operation_metrics(
 
         if operation == "catalog":
             metrics.catalog_runs_total.labels(status=final_status).inc()
-            metrics.catalog_duration_seconds.labels(status=final_status).observe(
-                duration
-            )
+            metrics.catalog_duration_seconds.labels(status=final_status).observe(duration)
         elif operation == "graphs":
             metrics.graphs_runs_total.labels(status=final_status).inc()
-            metrics.graphs_duration_seconds.labels(status=final_status).observe(
-                duration
-            )
+            metrics.graphs_duration_seconds.labels(status=final_status).observe(duration)
         elif operation == "test_map":
             metrics.test_map_runs_total.labels(status=final_status).inc()
-            metrics.test_map_duration_seconds.labels(status=final_status).observe(
-                duration
-            )
+            metrics.test_map_duration_seconds.labels(status=final_status).observe(duration)
         elif operation == "schemas":
             metrics.schemas_runs_total.labels(status=final_status).inc()
-            metrics.schemas_duration_seconds.labels(status=final_status).observe(
-                duration
-            )
+            metrics.schemas_duration_seconds.labels(status=final_status).observe(duration)
         elif operation == "portal":
             metrics.portal_runs_total.labels(status=final_status).inc()
-            metrics.portal_duration_seconds.labels(status=final_status).observe(
-                duration
-            )
+            metrics.portal_duration_seconds.labels(status=final_status).observe(duration)
         elif operation == "analytics":
             metrics.analytics_runs_total.labels(status=final_status).inc()
-            metrics.analytics_duration_seconds.labels(status=final_status).observe(
-                duration
-            )
+            metrics.analytics_duration_seconds.labels(status=final_status).observe(duration)
 
         with_fields(
             log_adapter,

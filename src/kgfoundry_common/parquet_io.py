@@ -174,9 +174,7 @@ class ParquetVectorWriter:
         batch. The output file is written to:
         ``root/model={model}/run_id={run_id}/shard={shard:05d}/part-00000.parquet``
         """
-        part_dir = (
-            self.root / f"model={model}" / f"run_id={run_id}" / f"shard={shard:05d}"
-        )
+        part_dir = self.root / f"model={model}" / f"run_id={run_id}" / f"shard={shard:05d}"
         part_dir.mkdir(parents=True, exist_ok=True)
         now = int(dt.datetime.now(dt.UTC).timestamp() * 1000)
         rows = [
@@ -263,9 +261,7 @@ class ParquetVectorWriter:
         length of vocab_ids. Creates a timestamp (milliseconds since epoch) for
         all records in this batch.
         """
-        part_dir = (
-            self.root / f"model={model}" / f"run_id={run_id}" / f"shard={shard:05d}"
-        )
+        part_dir = self.root / f"model={model}" / f"run_id={run_id}" / f"shard={shard:05d}"
         part_dir.mkdir(parents=True, exist_ok=True)
         now = int(dt.datetime.now(dt.UTC).timestamp() * 1000)
         rows = [
@@ -355,9 +351,7 @@ class ParquetChunkWriter:
         )
         return pa.schema(chunk_fields)
 
-    def __init__(
-        self, root: str, model: str = "docling_hybrid", run_id: str = "dev"
-    ) -> None:
+    def __init__(self, root: str, model: str = "docling_hybrid", run_id: str = "dev") -> None:
         self.root = Path(root) / f"model={model}" / f"run_id={run_id}" / "shard=00000"
         self.root.mkdir(parents=True, exist_ok=True)
 

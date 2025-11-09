@@ -141,9 +141,7 @@ def test_app_startup_with_preload_disabled() -> None:
 
 
 @pytest.mark.usefixtures("test_repo")
-@pytest.mark.skipif(
-    not HAS_FAISS_SUPPORT, reason="FAISS bindings unavailable on this host"
-)
+@pytest.mark.skipif(not HAS_FAISS_SUPPORT, reason="FAISS bindings unavailable on this host")
 def test_app_startup_with_preload_enabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

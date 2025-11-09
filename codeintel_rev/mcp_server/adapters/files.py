@@ -122,9 +122,11 @@ async def list_paths(context: ApplicationContext, *args: object, **kwargs: objec
         - path : str | None
             Starting path relative to repo root (None = root).
         - include_globs : list[str] | None
-            Glob patterns to include (e.g., ["*.py"]). Overrides session scope if provided.
+            Glob patterns to include (e.g., ["*.py"]).
+            Overrides session scope if provided.
         - exclude_globs : list[str] | None
-            Glob patterns to exclude (e.g., ["__pycache__", "*.pyc"]). Overrides session scope if provided.
+            Glob patterns to exclude (e.g., ["__pycache__", "*.pyc"]).
+            Overrides session scope if provided.
         - languages : list[str] | None
             Programming languages to include (overrides session scope when provided).
         - max_results : int

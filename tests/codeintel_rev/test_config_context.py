@@ -33,10 +33,7 @@ def test_resolve_application_paths_success(tmp_path: Path) -> None:
     assert paths.repo_root == repo_root.resolve()
     assert paths.data_dir == (repo_root / "data").resolve()
     assert paths.vectors_dir.parent == paths.data_dir
-    assert all(
-        path.is_absolute()
-        for path in [paths.repo_root, paths.data_dir, paths.vectors_dir]
-    )
+    assert all(path.is_absolute() for path in [paths.repo_root, paths.data_dir, paths.vectors_dir])
 
 
 def test_resolve_application_paths_missing_repo_root() -> None:
@@ -84,9 +81,7 @@ def test_resolve_application_paths_relative_conversion(tmp_path: Path) -> None:
     assert paths.scip_index.is_absolute()
 
 
-def test_application_context_create(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_application_context_create(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test ApplicationContext.create() initializes all clients."""
     # Arrange
     repo_root = tmp_path / "repo"
@@ -191,9 +186,7 @@ def test_application_context_ensure_faiss_ready_cached(
     assert error1 == error2
 
 
-def test_application_context_open_catalog(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_application_context_open_catalog(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test open_catalog() context manager."""
     # Arrange
     import duckdb

@@ -144,9 +144,7 @@ class PathlibTransformer(cst.CSTTransformer):
                     self.needs_pathlib_import = True
         return True
 
-    def leave_call(
-        self, original_node: cst.Call, updated_node: cst.Call
-    ) -> cst.BaseExpression:
+    def leave_call(self, original_node: cst.Call, updated_node: cst.Call) -> cst.BaseExpression:
         """Apply call rewrites when exiting a Call node.
 
         Parameters
@@ -209,9 +207,7 @@ class PathlibTransformer(cst.CSTTransformer):
             cst.Arg(cst.Name("True"), keyword=cst.Name("parents")),
         ]
         if exist_ok:
-            mkdir_keywords.append(
-                cst.Arg(cst.Name("True"), keyword=cst.Name("exist_ok"))
-            )
+            mkdir_keywords.append(cst.Arg(cst.Name("True"), keyword=cst.Name("exist_ok")))
 
         return cst.Call(
             func=cst.Attribute(
@@ -225,10 +221,7 @@ class PathlibTransformer(cst.CSTTransformer):
         )
 
     def _transform_path_join(self, node: cst.Call) -> cst.BaseExpression | None:
-        if not (
-            isinstance(node.func, cst.Attribute)
-            and _is_os_path_call(node.func, name="join")
-        ):
+        if not (isinstance(node.func, cst.Attribute) and _is_os_path_call(node.func, name="join")):
             return None
         join_expr = _path_join_expression(node.args)
         if join_expr is None:
@@ -297,9 +290,7 @@ class PathlibTransformer(cst.CSTTransformer):
                 return replacement
         return None
 
-    def _transform_with(
-        self, original_node: cst.With, updated_node: cst.With
-    ) -> cst.With:
+    def _transform_with(self, original_node: cst.With, updated_node: cst.With) -> cst.With:
         """Rewrite ``with`` blocks wrapping ``open(os.path.join(...))`` patterns.
 
         Parameters
@@ -538,9 +529,7 @@ def main() -> int:
         logger.info("Change log written to %s", log_path)
 
     total_changes = sum(len(changes) for changes in all_changes.values())
-    logger.info(
-        "Total transformations: %d in %d file(s)", total_changes, len(all_changes)
-    )
+    logger.info("Total transformations: %d in %d file(s)", total_changes, len(all_changes))
 
     return 0
 

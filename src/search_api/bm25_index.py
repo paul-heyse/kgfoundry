@@ -245,7 +245,8 @@ class BM25Index:
     Notes
     -----
     BM25 scoring formula:
-    :math:`score(D, Q) = \sum_{t \in Q} IDF(t) \cdot \frac{TF(t, D) \cdot (k1 + 1)}{TF(t, D) + k1 \cdot (1 - b + b \cdot \frac{|D|}{avgdl})}`
+    :math:`score(D, Q) = \sum_{t \in Q} IDF(t) \cdot `
+    :math:`\frac{TF(t, D) \cdot (k1 + 1)}{TF(t, D) + k1 \cdot (1 - b + b \cdot \frac{|D|}{avgdl})}`
 
     Where:
     - :math:`TF(t, D)` is the term frequency of term :math:`t` in document :math:`D`
@@ -473,10 +474,7 @@ class BM25Index:
         """
         path_obj = Path(path)
         schema_path = (
-            Path(__file__).parent.parent.parent
-            / "schema"
-            / "models"
-            / "bm25_metadata.v1.json"
+            Path(__file__).parent.parent.parent / "schema" / "models" / "bm25_metadata.v1.json"
         )
         # Convert docs to JSON-serializable format
         docs_data = [
@@ -535,10 +533,7 @@ class BM25Index:
         """
         path_obj = Path(path)
         schema_path = (
-            Path(__file__).parent.parent.parent
-            / "schema"
-            / "models"
-            / "bm25_metadata.v1.json"
+            Path(__file__).parent.parent.parent / "schema" / "models" / "bm25_metadata.v1.json"
         )
         payload = cls._load_payload(path_obj, schema_path)
         return cls._index_from_payload(payload)
@@ -550,9 +545,7 @@ class BM25Index:
         return cast("dict[str, JsonValue]", raw)
 
     @classmethod
-    def _load_payload(
-        cls, metadata_path: Path, schema_path: Path
-    ) -> dict[str, JsonValue]:
+    def _load_payload(cls, metadata_path: Path, schema_path: Path) -> dict[str, JsonValue]:
         try:
             return cls._coerce_payload(deserialize_json(metadata_path, schema_path))
         except DeserializationError:
@@ -614,16 +607,8 @@ class BM25Index:
                     doc_id=str(doc_id) if isinstance(doc_id, str) else "",
                     title=str(title) if isinstance(title, str) else "",
                     section=str(section) if isinstance(section, str) else "",
-                    tf=(
-                        cast("dict[str, float]", tf_value)
-                        if isinstance(tf_value, dict)
-                        else {}
-                    ),
-                    dl=(
-                        float(doc_length)
-                        if isinstance(doc_length, (int, float))
-                        else 0.0
-                    ),
+                    tf=(cast("dict[str, float]", tf_value) if isinstance(tf_value, dict) else {}),
+                    dl=(float(doc_length) if isinstance(doc_length, (int, float)) else 0.0),
                 )
             )
         return docs
@@ -693,9 +678,7 @@ class BM25Index:
                 if tf <= 0.0:
                     continue
                 idf = self._idf(term)
-                denom = tf + self.k1 * (
-                    1.0 - self.b + self.b * (doc.dl / (self.avgdl or 1.0))
-                )
+                denom = tf + self.k1 * (1.0 - self.b + self.b * (doc.dl / (self.avgdl or 1.0)))
                 score += idf * ((tf * (self.k1 + 1.0)) / denom)
             scores[i] = score
 
@@ -715,14 +698,8 @@ class BM25Index:
             """
             return item[1]
 
-        ranked: list[tuple[int, float]] = sorted(
-            enumerate(scores), key=key_func, reverse=True
-        )
-        return [
-            (self.docs[index].chunk_id, score)
-            for index, score in ranked[:k]
-            if score > 0.0
-        ]
+        ranked: list[tuple[int, float]] = sorted(enumerate(scores), key=key_func, reverse=True)
+        return [(self.docs[index].chunk_id, score) for index, score in ranked[:k] if score > 0.0]
 
     def doc(self, index: int) -> BM25Doc:
         """Get document at the specified index.

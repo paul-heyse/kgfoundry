@@ -193,12 +193,8 @@ def _t_register_in_duckdb_impl(
         Dictionary with "runs" key containing list of run IDs.
     """
     registry = DuckDBRegistryHelper(db_path)
-    dense_run = registry.new_run(
-        "dense_embed", "Qwen3-Embedding-4B", "main", {"dim": 2560}
-    )
-    sparse_run = registry.new_run(
-        "splade_encode", "SPLADE-v3-distilbert", "main", {"topk": 256}
-    )
+    dense_run = registry.new_run("dense_embed", "Qwen3-Embedding-4B", "main", {"dim": 2560})
+    sparse_run = registry.new_run("splade_encode", "SPLADE-v3-distilbert", "main", {"topk": 256})
 
     ds_chunks = registry.begin_dataset("chunks", dense_run)
     registry.commit_dataset(ds_chunks, chunks_info[0], rows=chunks_info[1])

@@ -145,9 +145,7 @@ def _parse_parameters(section: _Section) -> dict[str, _ParameterBlock]:
         while i < len(lines) and (lines[i].startswith("    ") or not lines[i].strip()):
             desc.append(lines[i])
             i += 1
-        entries[canonical] = _ParameterBlock(
-            display_name=display_name, description=desc
-        )
+        entries[canonical] = _ParameterBlock(display_name=display_name, description=desc)
     return entries
 
 
@@ -188,9 +186,7 @@ def _merge_default(description: list[str], default: str | None) -> list[str]:
         marker = f"Defaults to ``{default}``."
         if stripped.startswith(f"Optional parameter default ``{default}``."):
             added = True
-            tail = stripped.removeprefix(
-                f"Optional parameter default ``{default}``."
-            ).strip()
+            tail = stripped.removeprefix(f"Optional parameter default ``{default}``.").strip()
             merged.append(f"    Defaults to ``{default}``.")
             if tail:
                 merged.append(f"    {tail}")
@@ -215,9 +211,7 @@ def _build_parameters_content(
     symbol: SymbolHarvest,
 ) -> list[str]:
     blocks: dict[str, _ParameterBlock] = _parse_parameters(section) if section else {}
-    harvested: dict[str, str | None] = {
-        param.name: param.annotation for param in symbol.parameters
-    }
+    harvested: dict[str, str | None] = {param.name: param.annotation for param in symbol.parameters}
     lines: list[str] = []
     for parameter in signature.parameters.values():
         if parameter.name in {"self", "cls"}:
@@ -239,9 +233,7 @@ def _build_parameters_content(
             display_name=display,
             description=[],
         )
-        desc_lines = _ensure_description(
-            block.description, f"Describe ``{parameter.name}``."
-        )
+        desc_lines = _ensure_description(block.description, f"Describe ``{parameter.name}``.")
         if optional and default_text:
             desc_lines = _merge_default(desc_lines, default_text)
         signature_line = f"{display} : {annotation_text}"
@@ -347,14 +339,10 @@ def normalize_docstring(symbol: SymbolHarvest, marker: str) -> str | None:
     parameter_content = _build_parameters_content(
         signature, hints, parameter_section, module_globals, symbol
     )
-    return_content = _build_returns_content(
-        signature, hints, return_section, module_globals
-    )
+    return_content = _build_returns_content(signature, hints, return_section, module_globals)
 
     _update_parameter_section(sections, parameter_section, parameter_content)
-    _update_return_section(
-        sections, return_section, return_content, return_section_title
-    )
+    _update_return_section(sections, return_section, return_content, return_section_title)
 
     updated = _join_sections(sections)
     if marker:

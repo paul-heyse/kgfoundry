@@ -24,9 +24,9 @@ ModuleNameFilter: type[ModuleNameFilterProtocol] = get_module_name_filter_cls()
 get_evaluable_architecture: Callable[..., EvaluableArchitectureProtocol] = (
     get_evaluable_architecture_fn()
 )
-get_evaluable_architecture_for_module_objects: Callable[
-    ..., EvaluableArchitectureProtocol
-] = get_evaluable_architecture_for_module_objects_fn()
+get_evaluable_architecture_for_module_objects: Callable[..., EvaluableArchitectureProtocol] = (
+    get_evaluable_architecture_for_module_objects_fn()
+)
 
 EvaluableArchitecture = EvaluableArchitectureProtocol
 

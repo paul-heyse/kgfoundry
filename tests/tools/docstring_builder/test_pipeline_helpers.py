@@ -102,12 +102,8 @@ class TestFailureSummaryRenderer:
             observability_path=OBSERVABILITY_PATH,
         )
         errors = [
-            ErrorEnvelope(
-                file="foo.py", status=RunStatus.VIOLATION, message="drift detected"
-            ),
-            ErrorEnvelope(
-                file="bar.py", status=RunStatus.ERROR, message="harvest failed"
-            ),
+            ErrorEnvelope(file="foo.py", status=RunStatus.VIOLATION, message="drift detected"),
+            ErrorEnvelope(file="bar.py", status=RunStatus.ERROR, message="harvest failed"),
         ]
         renderer.render(summary, errors)
         messages = _captured_messages(caplog)
@@ -124,9 +120,7 @@ class TestFailureSummaryRenderer:
             observability_path=OBSERVABILITY_PATH,
         )
         errors = [
-            ErrorEnvelope(
-                file=f"file_{i}.py", status=RunStatus.VIOLATION, message=f"error {i}"
-            )
+            ErrorEnvelope(file=f"file_{i}.py", status=RunStatus.VIOLATION, message=f"error {i}")
             for i in range(10)
         ]
         renderer.render(summary, errors)

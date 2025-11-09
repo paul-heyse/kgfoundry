@@ -38,9 +38,7 @@ def _escape_docstring(text: str, indent: str) -> str:
         return f"{lines[0]}\n"
     summary, *rest = lines
     indented_rest = [
-        (
-            f"{indent}{line}" if line else ""
-        )  # Preserve blank lines without trailing spaces
+        (f"{indent}{line}" if line else "")  # Preserve blank lines without trailing spaces
         for line in rest
     ]
     joined = "\n".join([summary, *indented_rest])
@@ -80,9 +78,7 @@ class _DocstringTransformer(cst.CSTTransformer):
         docstring_stmt = cst.SimpleStatementLine(body=(expr,))
 
         body = node.body
-        original_statements = cast(
-            "Sequence[cst.BaseStatement | BaseSmallStatement]", body.body
-        )
+        original_statements = cast("Sequence[cst.BaseStatement | BaseSmallStatement]", body.body)
 
         def _as_statement(
             item: cst.BaseStatement | BaseSmallStatement,
@@ -95,9 +91,7 @@ class _DocstringTransformer(cst.CSTTransformer):
             _as_statement(stmt) for stmt in original_statements
         ]
 
-        if existing_statements and isinstance(
-            existing_statements[0], cst.SimpleStatementLine
-        ):
+        if existing_statements and isinstance(existing_statements[0], cst.SimpleStatementLine):
             first = existing_statements[0]
             if (
                 first.body

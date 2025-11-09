@@ -32,22 +32,16 @@ def faiss_manager(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FAISSManag
             self.useFloat16 = False
             self.use_cuvs = False
 
-    monkeypatch.setattr(
-        faiss_module, "GpuClonerOptions", DummyGpuClonerOptions, raising=False
-    )
+    monkeypatch.setattr(faiss_module, "GpuClonerOptions", DummyGpuClonerOptions, raising=False)
     return manager
 
 
-def test_clone_to_gpu_success(
-    monkeypatch: pytest.MonkeyPatch, faiss_manager: FAISSManager
-) -> None:
+def test_clone_to_gpu_success(monkeypatch: pytest.MonkeyPatch, faiss_manager: FAISSManager) -> None:
     """GPU cloning succeeds when FAISS GPU helpers work."""
     gpu_resources = object()
     gpu_index = _SentinelGpuIndex()
 
-    monkeypatch.setattr(
-        faiss_module, "StandardGpuResources", lambda: gpu_resources, raising=False
-    )
+    monkeypatch.setattr(faiss_module, "StandardGpuResources", lambda: gpu_resources, raising=False)
 
     def fake_index_cpu_to_gpu(
         resources: object, device: int, cpu_index: object, options: object
@@ -58,9 +52,7 @@ def test_clone_to_gpu_success(
         assert isinstance(options, faiss_module.GpuClonerOptions)
         return gpu_index
 
-    monkeypatch.setattr(
-        faiss_module, "index_cpu_to_gpu", fake_index_cpu_to_gpu, raising=False
-    )
+    monkeypatch.setattr(faiss_module, "index_cpu_to_gpu", fake_index_cpu_to_gpu, raising=False)
 
     success = faiss_manager.clone_to_gpu()
 
@@ -79,9 +71,7 @@ def test_clone_to_gpu_falls_back(
         msg = "CUDA unavailable"
         raise RuntimeError(msg)
 
-    monkeypatch.setattr(
-        faiss_module, "StandardGpuResources", failing_resources, raising=False
-    )
+    monkeypatch.setattr(faiss_module, "StandardGpuResources", failing_resources, raising=False)
 
     success = faiss_manager.clone_to_gpu()
 

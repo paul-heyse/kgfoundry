@@ -79,7 +79,9 @@ def main() -> None:
             offenders.append(file_path)
     if offenders:
         joined = "\n".join(str(path) for path in offenders)
-        message = f"Module docstrings must not contain 'NavMap:' sections. Found violations in:\n{joined}"
+        message = (
+            f"Module docstrings must not contain 'NavMap:' sections. Found violations in:\n{joined}"
+        )
         raise SystemExit(message)
 
 

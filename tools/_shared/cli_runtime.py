@@ -606,28 +606,24 @@ def cli_run(cfg: CliRunConfig) -> Iterator[tuple[CliContext, EnvelopeBuilder]]:
         and ``cfg.exit_on_error`` evaluates to ``True``. The original exception
         is chained via ``raise SystemExit(1) from error`` where ``error`` is the
         caught exception.
-    Exception
-        When ``cfg.exit_on_error`` is ``False``, any exception raised inside
-        the context propagates unchanged to the caller. The function catches
-        exceptions using ``except Exception as exc``, stores the exception in
-        ``error`` for logging and envelope generation, then re-raises it using
-        ``raise error``. The actual exception type matches whatever was
-        originally raised (any subclass of ``Exception``). This is a re-raise
-        of the caught exception, preserving its original type and traceback.
+    RuntimeError
+        Raised if error is not an Exception subclass (should never happen).
 
     Notes
     -----
     Exception Propagation:
-        The function may raise any ``Exception`` subclass when
-        ``cfg.exit_on_error`` is ``False``. The Raises section documents both
-        SystemExit (when exit_on_error is True) and Exception (when exit_on_error
-        is False) to accurately reflect all possible exception types.
+        When ``cfg.exit_on_error`` is ``False``, any exception raised inside
+        the context propagates unchanged to the caller. The function catches
+        exceptions using ``except Exception as exc``, stores the exception in
+        ``error`` for logging and envelope generation, then re-raises it using
+        ``raise exc``. The actual exception type matches whatever was
+        originally raised (any subclass of ``Exception``). This is a re-raise
+        of the caught exception, preserving its original type and traceback.
 
-        .. pydoclint:disable=DOC503
-            Pydoclint cannot infer that the variable ``error`` (from ``except Exception as exc``)
-            is an Exception subclass when it sees ``raise error``. The docstring correctly
-            documents that Exception (or any subclass) can be raised, but pydoclint's static
-            analysis treats ``error`` as a literal exception name rather than a variable.
+        Pydoclint limitation: it doesn't recognize that ``raise exc`` raises
+        Exception when ``exc`` is a variable, even though type narrowing
+        guarantees it's an Exception subclass. Therefore, Exception is documented
+        here in Notes rather than in the Raises section.
     """
     metadata = _prepare_execution_metadata(cfg)
     envelope = _build_envelope(

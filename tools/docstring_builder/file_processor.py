@@ -37,9 +37,7 @@ try:  # pragma: no cover - optional dependency at runtime
 except ModuleNotFoundError:  # pragma: no cover - defensive guard for optional import
     _PARSER_SYNTAX_ERRORS: tuple[type[BaseException], ...] = ()
 else:
-    _PARSER_SYNTAX_ERRORS = cast(
-        "tuple[type[BaseException], ...]", (_ParserSyntaxError,)
-    )
+    _PARSER_SYNTAX_ERRORS = cast("tuple[type[BaseException], ...]", (_ParserSyntaxError,))
 
 _HARVEST_ERRORS: tuple[type[BaseException], ...] = (
     *_PARSER_SYNTAX_ERRORS,
@@ -268,9 +266,7 @@ class FileProcessor:
             relative = file_path.relative_to(REPO_ROOT)
             message = f"missing dependency: {exc}"
             if self._can_ignore_missing(file_path):
-                self.logger.info(
-                    "Skipping %s due to missing dependency: %s", relative, exc
-                )
+                self.logger.info("Skipping %s due to missing dependency: %s", relative, exc)
                 result = FileOutcome(
                     status=ExitStatus.SUCCESS,
                     docfacts=[],

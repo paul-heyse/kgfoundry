@@ -25,9 +25,7 @@ def _expect(*, condition: bool, message: str) -> None:
 
 def test_mcp_server_import() -> None:
     """Ensure the MCP server entry points are initialised."""
-    _expect(
-        condition=mcp is not None, message="Expected MCP instance to be initialised"
-    )
+    _expect(condition=mcp is not None, message="Expected MCP instance to be initialised")
     _expect(
         condition=asgi_app is not None,
         message="Expected ASGI application to be initialised",
@@ -61,14 +59,10 @@ async def test_file_operations(mock_application_context) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("mock_session_id")
-async def test_text_search(
-    mock_application_context, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_text_search(mock_application_context, monkeypatch: pytest.MonkeyPatch) -> None:
     """Exercise the text search adapter for basic responses."""
     repo_root = mock_application_context.paths.repo_root
-    (repo_root / "module.py").write_text(
-        "def sample():\n    return 1\n", encoding="utf-8"
-    )
+    (repo_root / "module.py").write_text("def sample():\n    return 1\n", encoding="utf-8")
 
     def _fake_run_subprocess(cmd: list[str], *, cwd: Path | None, timeout: int) -> str:
         """Simulate ripgrep JSON output for deterministic tests.
@@ -93,9 +87,7 @@ async def test_text_search(
 
     monkeypatch.setattr(text_search_adapter, "run_subprocess", _fake_run_subprocess)
 
-    result = await text_search_adapter.search_text(
-        mock_application_context, "def", max_results=3
-    )
+    result = await text_search_adapter.search_text(mock_application_context, "def", max_results=3)
     _expect(
         condition="matches" in result,
         message="Expected 'matches' key in search results",
@@ -144,20 +136,14 @@ async def test_git_history(mock_application_context) -> None:
         }
     ]
 
-    blame = await history_adapter.blame_range(
-        mock_application_context, "README.md", 1, 5
-    )
-    _expect(
-        condition="blame" in blame, message="Expected blame data in blame_range result"
-    )
+    blame = await history_adapter.blame_range(mock_application_context, "README.md", 1, 5)
+    _expect(condition="blame" in blame, message="Expected blame data in blame_range result")
     _expect(
         condition=isinstance(blame.get("blame"), list),
         message="Blame data should be a list",
     )
 
-    history = await history_adapter.file_history(
-        mock_application_context, "README.md", limit=5
-    )
+    history = await history_adapter.file_history(mock_application_context, "README.md", limit=5)
     _expect(
         condition="commits" in history,
         message="Expected commits in file_history result",
@@ -174,9 +160,7 @@ async def test_scope_operations(mock_application_context) -> None:
     """Verify scope configuration round-trips through the adapter."""
     scope_request: ScopeIn = {"repos": ["test"], "languages": ["python"]}
     result = await files_adapter.set_scope(mock_application_context, scope_request)
-    _expect(
-        condition=result.get("status") == "ok", message="Scope status should be 'ok'"
-    )
+    _expect(condition=result.get("status") == "ok", message="Scope status should be 'ok'")
     effective_scope = result.get("effective_scope")
     _expect(
         condition=isinstance(effective_scope, Mapping),
@@ -201,9 +185,7 @@ async def test_path_escape_rejected_by_history_adapter(
 ) -> None:
     """Git adapters should refuse to run commands on escaped paths."""
     with pytest.raises(PathOutsideRepositoryError) as excinfo:
-        await history_adapter.blame_range(
-            mock_application_context, "../etc/passwd", 1, 2
-        )
+        await history_adapter.blame_range(mock_application_context, "../etc/passwd", 1, 2)
 
     _expect(
         condition="escapes repository root" in str(excinfo.value),

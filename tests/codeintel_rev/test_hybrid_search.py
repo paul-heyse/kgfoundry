@@ -31,9 +31,7 @@ def _build_engine(monkeypatch: pytest.MonkeyPatch, tmp_path) -> HybridSearchEngi
     return HybridSearchEngine(settings, paths)
 
 
-def test_hybrid_search_engine_rrf_fuses_channels(
-    monkeypatch: pytest.MonkeyPatch, tmp_path
-) -> None:
+def test_hybrid_search_engine_rrf_fuses_channels(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     engine = _build_engine(monkeypatch, tmp_path)
     stub_bm25 = _StubProvider(
         [

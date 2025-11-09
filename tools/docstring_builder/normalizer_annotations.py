@@ -105,9 +105,7 @@ def _format_union_type(
     args = get_args(annotation)
     if origin is tuple and args and args[-1] is ...:
         tail_args = tuple(args[:-1])
-        inner_list = [
-            format_annotation(arg, module_globals) or "Any" for arg in tail_args
-        ]
+        inner_list = [format_annotation(arg, module_globals) or "Any" for arg in tail_args]
         formatted = "tuple[" + ", ".join(inner_list) + ", ...]"
     elif origin in {list, set, dict, tuple}:
         parts = [format_annotation(arg, module_globals) or "Any" for arg in args]
@@ -227,11 +225,7 @@ def _format_generic_type(
         prefix = qualname
     else:
         module_alias = _module_alias(module_name, module_globals)
-        prefix = (
-            f"{module_alias}.{qualname}"
-            if module_alias
-            else f"{module_name}.{qualname}"
-        )
+        prefix = f"{module_alias}.{qualname}" if module_alias else f"{module_name}.{qualname}"
     args = get_args(annotation)
     if not args:
         return prefix
@@ -256,18 +250,14 @@ def _format_module_attribute(
     return f"{module_name}.{qualname_str}"
 
 
-def _alias_for_type(
-    annotation: object, module_globals: Mapping[str, object]
-) -> str | None:
+def _alias_for_type(annotation: object, module_globals: Mapping[str, object]) -> str | None:
     for name, value in module_globals.items():
         if value is annotation:
             return name
     return None
 
 
-def _module_alias(
-    module_name: str, module_globals: Mapping[str, object] | None
-) -> str | None:
+def _module_alias(module_name: str, module_globals: Mapping[str, object] | None) -> str | None:
     if not module_globals:
         return None
     for name, value in module_globals.items():

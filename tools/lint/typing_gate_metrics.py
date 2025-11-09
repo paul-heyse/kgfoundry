@@ -114,11 +114,7 @@ class TypingGateMetrics:
             "compliance_rate": (
                 100.0
                 if self.checks_total == 0
-                else (
-                    100.0
-                    * (self.checks_total - len(self.violations))
-                    / self.checks_total
-                )
+                else (100.0 * (self.checks_total - len(self.violations)) / self.checks_total)
             ),
             "files_with_violations": len({v.filepath for v in self.violations}),
             "violation_types": list({v.violation_type for v in self.violations}),

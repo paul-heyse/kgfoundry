@@ -32,9 +32,7 @@ class TypingFacadeMigrator(cst.CSTTransformer):
     def __init__(self) -> None:
         self.modified = False
 
-    def _transform_import_from(
-        self, node: cst.ImportFrom
-    ) -> cst.ImportFrom | cst.RemovalSentinel:
+    def _transform_import_from(self, node: cst.ImportFrom) -> cst.ImportFrom | cst.RemovalSentinel:
         """Return an updated import replacing private docs types with facades.
 
         Parameters
@@ -143,11 +141,7 @@ class TypingFacadeMigrator(cst.CSTTransformer):
     @override
     def leave_ImportFrom(
         self, original_node: cst.ImportFrom, updated_node: cst.ImportFrom
-    ) -> (
-        cst.ImportFrom
-        | cst.RemovalSentinel
-        | cst.FlattenSentinel[cst.BaseSmallStatement]
-    ):
+    ) -> cst.ImportFrom | cst.RemovalSentinel | cst.FlattenSentinel[cst.BaseSmallStatement]:
         """Rewrite ``ImportFrom`` statements using docstring façade rules.
 
         Parameters

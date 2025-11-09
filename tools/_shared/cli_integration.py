@@ -50,9 +50,7 @@ def cli_operation(
     *,
     echo_args: bool = True,
     echo_env: bool = False,
-) -> Callable[
-    [Callable[Concatenate[CliContext, EnvelopeBuilder, P], R]], Callable[P, R]
-]:
+) -> Callable[[Callable[Concatenate[CliContext, EnvelopeBuilder, P], R]], Callable[P, R]]:
     """Wrap a Typer/Click command so it executes within :func:`cli_run`.
 
     Parameters
@@ -79,9 +77,7 @@ def cli_operation(
             cfg = CliRunConfig(
                 command_path=route,
                 args_summary=(
-                    [f"{key}={value}" for key, value in kwargs.items()]
-                    if echo_args
-                    else None
+                    [f"{key}={value}" for key, value in kwargs.items()] if echo_args else None
                 ),
                 env_summary=_collect_env_summary() if echo_env else None,
             )

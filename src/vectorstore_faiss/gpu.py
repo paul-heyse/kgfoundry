@@ -169,10 +169,6 @@ class FaissGpuIndex:
         index_matrix_typed: IntVector = np.asarray(index_matrix, dtype=np.int64)
         score_vector: FloatVector = score_matrix_typed[0]
         index_vector: IntVector = index_matrix_typed[0]
-        top_scores = cast(
-            "list[float]", score_vector.astype(np.float32, copy=False).tolist()
-        )
-        top_indices = cast(
-            "list[int]", index_vector.astype(np.int64, copy=False).tolist()
-        )
+        top_scores = cast("list[float]", score_vector.astype(np.float32, copy=False).tolist())
+        top_indices = cast("list[int]", index_vector.astype(np.int64, copy=False).tolist())
         return list(zip(top_indices, top_scores, strict=False))

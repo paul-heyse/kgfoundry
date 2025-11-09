@@ -71,9 +71,7 @@ class _FakeIndex:
         indices = np.zeros((vectors.shape[0], k), dtype=np.int64)
         return distances, indices
 
-    def train(
-        self, vectors: VectorArray
-    ) -> None:  # pragma: no cover - optional protocol method
+    def train(self, vectors: VectorArray) -> None:  # pragma: no cover - optional protocol method
         """Train index on vectors.
 
         Parameters
@@ -167,14 +165,10 @@ class _LegacyFaissModule:
             self.normalize_vectors = vectors
 
         self.IndexFlatIP: Callable[[int], FaissIndexProtocol] = index_flat_ip_impl
-        self.IndexIDMap2: Callable[[FaissIndexProtocol], FaissIndexProtocol] = (
-            index_id_map2_impl
-        )
+        self.IndexIDMap2: Callable[[FaissIndexProtocol], FaissIndexProtocol] = index_id_map2_impl
         self.normalize_L2: Callable[[VectorArray], None] = normalize_l2_impl
 
-    def index_factory(
-        self, dimension: int, factory_string: str, metric: int
-    ) -> FaissIndexProtocol:
+    def index_factory(self, dimension: int, factory_string: str, metric: int) -> FaissIndexProtocol:
         """Create index using factory string.
 
         Parameters
@@ -260,9 +254,7 @@ class _ModernFaissModule:
         self.records.append(("flat", dimension))
         return _FakeIndex("flat")
 
-    def index_factory(
-        self, dimension: int, factory_string: str, metric: int
-    ) -> FaissIndexProtocol:
+    def index_factory(self, dimension: int, factory_string: str, metric: int) -> FaissIndexProtocol:
         """Create index using factory string.
 
         Parameters
@@ -338,9 +330,7 @@ class _ModernFaissModule:
 
 
 @pytest.mark.parametrize("dimension", [5, 128])
-def test_wrap_faiss_module_adapts_legacy_surface(
-    dimension: int, tmp_path: Path
-) -> None:
+def test_wrap_faiss_module_adapts_legacy_surface(dimension: int, tmp_path: Path) -> None:
     """Test that legacy FAISS module is adapted to modern interface.
 
     Parameters

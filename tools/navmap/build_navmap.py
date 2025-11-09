@@ -95,9 +95,7 @@ def _envelope_path(subcommand: str) -> Path:
     return CLI_ENVELOPE_DIR / filename
 
 
-def _emit_envelope(
-    envelope: CliEnvelope, *, logger: LoggerAdapter, subcommand: str
-) -> Path:
+def _emit_envelope(envelope: CliEnvelope, *, logger: LoggerAdapter, subcommand: str) -> Path:
     path = _envelope_path(subcommand)
     CLI_ENVELOPE_DIR.mkdir(parents=True, exist_ok=True)
     rendered = render_cli_envelope(envelope)
@@ -226,12 +224,7 @@ class AllDictTemplate:
 
 NavPrimitive = str | int | float | bool | None
 type NavTree = (
-    NavPrimitive
-    | list[NavTree]
-    | dict[str, NavTree]
-    | set[str]
-    | AllDictTemplate
-    | AllPlaceholder
+    NavPrimitive | list[NavTree] | dict[str, NavTree] | set[str] | AllDictTemplate | AllPlaceholder
 )
 type ResolvedNavValue = (
     NavPrimitive | list[ResolvedNavValue] | dict[str, ResolvedNavValue] | set[str]
@@ -498,9 +491,7 @@ def _expand_all_dict_template(
     return expanded
 
 
-def _expand_list(
-    values: Sequence[NavTree], exports: Sequence[str]
-) -> list[ResolvedNavValue]:
+def _expand_list(values: Sequence[NavTree], exports: Sequence[str]) -> list[ResolvedNavValue]:
     """Expand placeholder-aware lists while flattening nested sequences.
 
     Parameters
@@ -525,9 +516,7 @@ def _expand_list(
     return expanded
 
 
-def _expand_dict(
-    values: dict[str, NavTree], exports: Sequence[str]
-) -> dict[str, ResolvedNavValue]:
+def _expand_dict(values: dict[str, NavTree], exports: Sequence[str]) -> dict[str, ResolvedNavValue]:
     """Expand placeholders within dictionary values.
 
     Parameters
@@ -542,10 +531,7 @@ def _expand_dict(
     dict[str, ResolvedNavValue]
         Dictionary with expanded values.
     """
-    return {
-        key: _replace_placeholders(sub_value, exports)
-        for key, sub_value in values.items()
-    }
+    return {key: _replace_placeholders(sub_value, exports) for key, sub_value in values.items()}
 
 
 def _expand_set(values: set[str], exports: Sequence[str]) -> set[str]:
@@ -871,9 +857,7 @@ def _process_assign_targets(
     tuple[list[str], dict[str, NavTree] | None]
         Updated exports and navmap literal tuple.
     """
-    target_names = [
-        target.id for target in node.targets if isinstance(target, ast.Name)
-    ]
+    target_names = [target.id for target in node.targets if isinstance(target, ast.Name)]
     if "__all__" in target_names:
         extracted = _maybe_extract_exports(node.value)
         if extracted is not None:
@@ -1037,9 +1021,7 @@ def _resolve_navmap(
         return {}, exports
     nav_exports = nav_map.get("exports")
     if isinstance(nav_exports, list):
-        exports = _dedupe_exports(
-            [item for item in nav_exports if isinstance(item, str)]
-        )
+        exports = _dedupe_exports([item for item in nav_exports if isinstance(item, str)])
     return nav_map, exports
 
 
@@ -1111,9 +1093,7 @@ def _load_runtime_navmap(
         nav_copy: dict[str, ResolvedNavValue] = copy.deepcopy(nav_data)
         nav_exports = nav_copy.get("exports")
         if isinstance(nav_exports, list):
-            exports = _dedupe_exports(
-                [item for item in nav_exports if isinstance(item, str)]
-            )
+            exports = _dedupe_exports([item for item in nav_exports if isinstance(item, str)])
             nav_copy["exports"] = cast("ResolvedNavValue", list(exports))
         elif exports:
             nav_copy["exports"] = cast("ResolvedNavValue", list(exports))
@@ -1212,9 +1192,7 @@ def _collect_module(py: Path) -> ModuleInfo | None:
     # Stable, deduped exports
     raw_exports = navmap_dict.get("exports")
     if isinstance(raw_exports, list):
-        nav_exports = _dedupe_exports(
-            [item for item in raw_exports if isinstance(item, str)]
-        )
+        nav_exports = _dedupe_exports([item for item in raw_exports if isinstance(item, str)])
     else:
         nav_exports = _dedupe_exports(exports)
     exports = nav_exports
@@ -1386,10 +1364,7 @@ def _apply_symbol_defaults(
         Updated symbol metadata dictionary with defaults applied.
     """
     if symbols_meta:
-        return {
-            name: _merge_symbol_meta(module_meta, meta)
-            for name, meta in symbols_meta.items()
-        }
+        return {name: _merge_symbol_meta(module_meta, meta) for name, meta in symbols_meta.items()}
     return {export: _merge_symbol_meta(module_meta, None) for export in exports}
 
 

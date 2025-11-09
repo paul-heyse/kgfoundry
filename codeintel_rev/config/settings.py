@@ -463,7 +463,8 @@ def load_settings() -> Settings:
     HYBRID_ENABLE_BM25 : str, optional
         Enable BM25 channel within hybrid retrieval fusion ("1"/"true" to enable, default enabled).
     HYBRID_ENABLE_SPLADE : str, optional
-        Enable SPLADE channel within hybrid retrieval fusion ("1"/"true" to enable, default enabled).
+        Enable SPLADE channel within hybrid retrieval fusion
+        ("1"/"true" to enable, default enabled).
     HYBRID_TOP_K_PER_CHANNEL : int, optional
         Per-channel candidate fan-out gathered prior to RRF fusion (default: 50).
     USE_CUVS : str, optional

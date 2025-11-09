@@ -94,8 +94,7 @@ def build_ir(entry: SemanticResult) -> IRDocstring:
         for ret in schema.returns
     ]
     raises = [
-        IRRaise(exception=exc.exception, description=exc.description)
-        for exc in schema.raises
+        IRRaise(exception=exc.exception, description=exc.description) for exc in schema.raises
     ]
     return IRDocstring(
         symbol_id=symbol.qname,

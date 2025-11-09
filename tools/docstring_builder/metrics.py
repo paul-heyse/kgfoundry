@@ -13,9 +13,7 @@ if TYPE_CHECKING:
 class _Histogram(Protocol):
     """Protocol for Prometheus histogram collectors."""
 
-    def labels(
-        self, **labels: str
-    ) -> _Histogram:  # pragma: no cover - third-party binding
+    def labels(self, **labels: str) -> _Histogram:  # pragma: no cover - third-party binding
         """Return a histogram child with the provided labels."""
         ...
 
@@ -28,9 +26,7 @@ class _Histogram(Protocol):
 class _Counter(Protocol):
     """Protocol for Prometheus counter collectors."""
 
-    def labels(
-        self, **labels: str
-    ) -> _Counter:  # pragma: no cover - third-party binding
+    def labels(self, **labels: str) -> _Counter:  # pragma: no cover - third-party binding
         """Return a counter child with the provided labels."""
         ...
 

@@ -1027,7 +1027,10 @@ class FAISSManager:
 
         # Check if index has id_map (IndexIDMap2 wrapper)
         if not hasattr(index, "id_map"):
-            msg = f"Index type {type(index).__name__} does not support ID mapping. Index must be wrapped with IndexIDMap2."
+            msg = (
+                f"Index type {type(index).__name__} does not support ID mapping. "
+                "Index must be wrapped with IndexIDMap2."
+            )
             raise RuntimeError(msg)
 
         # Extract vectors and IDs

@@ -230,9 +230,7 @@ def _record(
     status = observation.status
     if observation.metrics_enabled:
         TOOL_RUNS_TOTAL.labels(tool=observation.tool, status=status).inc()
-        TOOL_DURATION_SECONDS.labels(tool=observation.tool, status=status).observe(
-            duration
-        )
+        TOOL_DURATION_SECONDS.labels(tool=observation.tool, status=status).observe(duration)
     extra: dict[str, object] = {
         "duration_ms": duration * 1000,
         "tool": observation.tool,

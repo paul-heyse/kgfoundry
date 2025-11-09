@@ -98,9 +98,7 @@ class SuppressionGuardReport:
     @property
     def violations(self) -> Mapping[Path, tuple[SuppressionViolation, ...]]:
         """Expose violations keyed by path for backwards compatibility."""
-        mapping = {
-            file_report.path: file_report.violations for file_report in self.files
-        }
+        mapping = {file_report.path: file_report.violations for file_report in self.files}
         proxy = MappingProxyType(mapping)
         return cast("Mapping[Path, tuple[SuppressionViolation, ...]]", proxy)
 
@@ -176,8 +174,7 @@ class SuppressionGuardReport:
             If violation count mismatch is detected.
         """
         files = tuple(
-            SuppressionGuardFileReport.from_context_entry(entry)
-            for entry in context["files"]
+            SuppressionGuardFileReport.from_context_entry(entry) for entry in context["files"]
         )
 
         report = cls(files=files)
@@ -223,9 +220,7 @@ class SuppressionGuardFileReport:
         }
 
     @classmethod
-    def from_context_entry(
-        cls, entry: SuppressionGuardFileEntry
-    ) -> SuppressionGuardFileReport:
+    def from_context_entry(cls, entry: SuppressionGuardFileEntry) -> SuppressionGuardFileReport:
         """Hydrate a file report from its Problem Details entry.
 
         Parameters
@@ -368,13 +363,9 @@ def check_file(file_path: Path) -> tuple[SuppressionViolation, ...]:
         if TICKET_PATTERN.search(comment):
             continue
 
-        preview = (
-            lines[line_number - 1].strip() if 0 < line_number <= len(lines) else ""
-        )
+        preview = lines[line_number - 1].strip() if 0 < line_number <= len(lines) else ""
         violations.append(
-            SuppressionViolation(
-                path=file_path, line_number=line_number, line_preview=preview
-            )
+            SuppressionViolation(path=file_path, line_number=line_number, line_preview=preview)
         )
 
     return tuple(violations)
@@ -455,9 +446,7 @@ def run_suppression_guard(directories: Sequence[Path]) -> SuppressionGuardReport
     final_report = SuppressionGuardReport.merge(reports)
 
     if not final_report.is_clean:
-        message = (
-            f"Found {final_report.violation_count} suppression(s) without TICKET: tags"
-        )
+        message = f"Found {final_report.violation_count} suppression(s) without TICKET: tags"
         raise ConfigurationError(message, context=final_report.to_context())
 
     return final_report
@@ -563,9 +552,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
 
     LOGGER.error("Fix: Add TICKET: <ticket-id> to each suppression line.")
-    LOGGER.error(
-        "Example: # type-ignore[misc]  # TICKET: ABC-123  # numpy dtype contains Any"
-    )
+    LOGGER.error("Example: # type-ignore[misc]  # TICKET: ABC-123  # numpy dtype contains Any")
     return 1
 
 

@@ -71,9 +71,7 @@ def get_logger(name: str) -> LoggerAdapter:
     return _get_logger_base(name)
 
 
-def with_fields(
-    logger: logging.Logger | LoggerAdapter, **fields: LogValue
-) -> LoggerAdapter:
+def with_fields(logger: logging.Logger | LoggerAdapter, **fields: LogValue) -> LoggerAdapter:
     """Return a structured adapter bound to ``fields``.
 
     This function wraps the logger with a LoggerAdapter that merges the

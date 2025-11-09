@@ -47,9 +47,7 @@ logger = get_logger(__name__)
 MiddlewareFactory = Callable[..., BaseHTTPMiddleware]
 
 
-async def _await_with_timeout[T](
-    coro: t.Awaitable[T], timeout_seconds: float | None
-) -> T:
+async def _await_with_timeout[T](coro: t.Awaitable[T], timeout_seconds: float | None) -> T:
     """Await ``coro`` while respecting ``timeout_seconds`` when provided.
 
     Parameters
@@ -166,9 +164,7 @@ def typed_exception_handler[E: Exception](
             )
             return result
 
-    handler_callable = cast(
-        "Callable[[Request, Exception], t.Awaitable[Response]]", _wrapped
-    )
+    handler_callable = cast("Callable[[Request, Exception], t.Awaitable[Response]]", _wrapped)
     app.add_exception_handler(exception_type, handler_callable)
 
 
@@ -204,9 +200,7 @@ def typed_middleware(
             call_next: Callable[[StarletteRequest], t.Awaitable[Response]],
         ) -> Response:
             correlation_id = get_correlation_id()
-            with with_fields(
-                logger, operation=name, correlation_id=correlation_id
-            ) as log:
+            with with_fields(logger, operation=name, correlation_id=correlation_id) as log:
                 start = time.perf_counter()
                 log.info("middleware.start", extra={"status": "started"})
                 try:
@@ -230,8 +224,6 @@ def typed_middleware(
                 return response
 
     name_attr: object = getattr(middleware_class, "__name__", None)
-    original_name = (
-        name_attr if isinstance(name_attr, str) else middleware_class.__class__.__name__
-    )
+    original_name = name_attr if isinstance(name_attr, str) else middleware_class.__class__.__name__
     _InstrumentedMiddleware.__name__ = original_name
     app.add_middleware(_InstrumentedMiddleware)

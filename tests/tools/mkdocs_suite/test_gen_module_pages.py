@@ -17,9 +17,7 @@ from typing import Any, cast
 import griffe
 import pytest
 
-augment_registry: types.ModuleType = importlib.import_module(
-    "tools._shared.augment_registry"
-)
+augment_registry: types.ModuleType = importlib.import_module("tools._shared.augment_registry")
 
 
 def _make_module(name: str, *, package: bool = False) -> types.ModuleType:
@@ -39,9 +37,7 @@ def _install_mkdocs_gen_files_stub(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _install_tooling_namespace(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(sys.modules, "tools", _make_module("tools", package=True))
-    monkeypatch.setitem(
-        sys.modules, "tools._shared", _make_module("tools._shared", package=True)
-    )
+    monkeypatch.setitem(sys.modules, "tools._shared", _make_module("tools._shared", package=True))
     monkeypatch.setitem(
         sys.modules,
         "tools.mkdocs_suite",
@@ -118,9 +114,7 @@ def _install_kgfoundry_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
     serialization_stub_module = _make_module("kgfoundry_common.serialization")
     serialization_stub = cast("Any", serialization_stub_module)
     serialization_stub.validate_payload = lambda *_args, **_kwargs: None
-    monkeypatch.setitem(
-        sys.modules, "kgfoundry_common.serialization", serialization_stub_module
-    )
+    monkeypatch.setitem(sys.modules, "kgfoundry_common.serialization", serialization_stub_module)
 
     logging_stub_module = _make_module("kgfoundry_common.logging")
     logging_stub = cast("Any", logging_stub_module)
@@ -141,9 +135,7 @@ def _patch_importlib_for_navmap(monkeypatch: pytest.MonkeyPatch) -> None:
     original_spec = importlib.util.spec_from_file_location
 
     class _StubLoader(importlib.machinery.SourceFileLoader):
-        def __init__(
-            self, name: str, initializer: Callable[[types.ModuleType], None]
-        ) -> None:
+        def __init__(self, name: str, initializer: Callable[[types.ModuleType], None]) -> None:
             super().__init__(name, "<stub>")
             self._initializer = initializer
 
@@ -181,9 +173,7 @@ def _patch_importlib_for_navmap(monkeypatch: pytest.MonkeyPatch) -> None:
             raise RuntimeError(message)
         return spec
 
-    monkeypatch.setattr(
-        importlib.util, "spec_from_file_location", _fake_spec_from_file_location
-    )
+    monkeypatch.setattr(importlib.util, "spec_from_file_location", _fake_spec_from_file_location)
 
 
 def _load_gen_module_pages_without_render(module_path: Path) -> types.ModuleType:
@@ -209,9 +199,7 @@ def _load_gen_module_pages_without_render(module_path: Path) -> types.ModuleType
 
     module_name = "gen_module_pages_under_test"
     loader = _PatchedLoader(module_name, str(module_path), compiled)
-    spec = importlib.util.spec_from_file_location(
-        module_name, module_path, loader=loader
-    )
+    spec = importlib.util.spec_from_file_location(module_name, module_path, loader=loader)
     if spec is None or spec.loader is None:
         message = "Unable to construct module spec for gen_module_pages"
         raise RuntimeError(message)
@@ -300,9 +288,7 @@ def test_render_module_pages_warns_and_continues_on_invalid_api_usage(
     monkeypatch.setattr(griffe, "load_extensions", lambda *_args, **_kwargs: [])
 
     # Prevent registry lookups from touching the filesystem during import.
-    monkeypatch.setattr(
-        augment_registry, "load_registry", lambda *_args, **_kwargs: None
-    )
+    monkeypatch.setattr(augment_registry, "load_registry", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(augment_registry, "render_problem_details", lambda _exc: {})
 
     module_name = "tools.mkdocs_suite.docs._scripts.gen_module_pages"
@@ -320,18 +306,14 @@ def test_render_module_pages_warns_and_continues_on_invalid_api_usage(
 
     discovered: dict[str, bool] = {}
 
-    def _stub_discover_extensions(
-        *_args: object, **_kwargs: object
-    ) -> tuple[list[str], None]:
+    def _stub_discover_extensions(*_args: object, **_kwargs: object) -> tuple[list[str], None]:
         discovered["called"] = True
         return [], None
 
     monkeypatch.setattr(module, "_discover_extensions", _stub_discover_extensions)
     monkeypatch.setattr(module, "_collect_modules", lambda *_args, **_kwargs: {})
     monkeypatch.setattr(module, "_render_module_page", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(
-        module, "_nav_metadata_for_module", lambda *_args, **_kwargs: {}
-    )
+    monkeypatch.setattr(module, "_nav_metadata_for_module", lambda *_args, **_kwargs: {})
 
     module.render_module_pages()
 

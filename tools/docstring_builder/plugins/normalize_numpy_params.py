@@ -50,14 +50,8 @@ class NormalizeNumpyParamsPlugin(TransformerPlugin):
         del self
         del context
         schema = payload.schema
-        parameters = [
-            NormalizeNumpyParamsPlugin._normalize_parameter(p)
-            for p in schema.parameters
-        ]
-        returns = [
-            NormalizeNumpyParamsPlugin._normalize_return(entry)
-            for entry in schema.returns
-        ]
+        parameters = [NormalizeNumpyParamsPlugin._normalize_parameter(p) for p in schema.parameters]
+        returns = [NormalizeNumpyParamsPlugin._normalize_return(entry) for entry in schema.returns]
         if parameters == schema.parameters and returns == schema.returns:
             return payload
         updated_schema = replace(schema, parameters=parameters, returns=returns)

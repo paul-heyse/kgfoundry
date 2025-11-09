@@ -68,9 +68,7 @@ def test_update_index_creates_secondary(tmp_index_path: Path) -> None:
     # Generate test vectors
     new_vectors = _rng.normal(0.5, 0.15, (10, vec_dim)).astype(np.float32)
     new_vectors = np.clip(new_vectors, 0.0, 1.0)
-    new_ids = np.array(
-        [100, 101, 102, 103, 104, 105, 106, 107, 108, 109], dtype=np.int64
-    )
+    new_ids = np.array([100, 101, 102, 103, 104, 105, 106, 107, 108, 109], dtype=np.int64)
 
     # Call update_index - should create secondary index
     manager.update_index(new_vectors, new_ids)
@@ -103,9 +101,7 @@ def test_update_index_skips_duplicates(tmp_index_path: Path) -> None:
     # Second batch with duplicates
     vectors2 = _rng.normal(0.5, 0.15, (7, vec_dim)).astype(np.float32)
     vectors2 = np.clip(vectors2, 0.0, 1.0)
-    ids2 = np.array(
-        [12, 13, 14, 15, 16, 17, 18], dtype=np.int64
-    )  # 12, 13, 14 are duplicates
+    ids2 = np.array([12, 13, 14, 15, 16, 17, 18], dtype=np.int64)  # 12, 13, 14 are duplicates
 
     manager.update_index(vectors2, ids2)
 
@@ -179,9 +175,7 @@ def test_dual_index_search(tmp_index_path: Path) -> None:
     assert primary_result_count > 0 or secondary_result_count > 0
 
 
-def _setup_primary_index(
-    manager: FAISSManager, vec_dim: int
-) -> tuple[np.ndarray, np.ndarray]:
+def _setup_primary_index(manager: FAISSManager, vec_dim: int) -> tuple[np.ndarray, np.ndarray]:
     """Set up primary index with test vectors.
 
     Parameters
@@ -196,9 +190,7 @@ def _setup_primary_index(
     tuple[np.ndarray, np.ndarray]
         Primary vectors and IDs.
     """
-    primary_vectors = np.clip(
-        _rng.normal(0.5, 0.15, (3, vec_dim)).astype(np.float32), 0.0, 1.0
-    )
+    primary_vectors = np.clip(_rng.normal(0.5, 0.15, (3, vec_dim)).astype(np.float32), 0.0, 1.0)
     manager.build_index(primary_vectors)
     primary_ids = np.array([1, 2, 3], dtype=np.int64)
     manager.add_vectors(primary_vectors, primary_ids)
@@ -231,9 +223,7 @@ def _add_duplicate_to_secondary(
     duplicate_norm = duplicate_vector.copy()
     faiss_module.normalize_L2(duplicate_norm)
     assert manager.secondary_index is not None
-    manager.secondary_index.add_with_ids(
-        duplicate_norm, np.array([duplicate_id], dtype=np.int64)
-    )
+    manager.secondary_index.add_with_ids(duplicate_norm, np.array([duplicate_id], dtype=np.int64))
     manager.incremental_ids.add(duplicate_id)
     return duplicate_id, duplicate_vector
 
@@ -285,10 +275,10 @@ def _perform_dual_search(
     tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
         Primary distances, primary IDs, secondary distances, secondary IDs.
     """
-    primary_dists, primary_ids_result = manager._search_primary(
+    primary_dists, primary_ids_result = manager._search_primary(  # noqa: SLF001
         query, k=3, nprobe=128
     )
-    secondary_dists, secondary_ids_result = manager._search_secondary(
+    secondary_dists, secondary_ids_result = manager._search_secondary(  # noqa: SLF001
         query, k=3
     )
     return primary_dists, primary_ids_result, secondary_dists, secondary_ids_result
@@ -337,9 +327,7 @@ def _setup_test_indexes_with_duplicate(
         Duplicate ID and vector.
     """
     primary_vectors, primary_ids = _setup_primary_index(manager, vec_dim)
-    unique_secondary = np.clip(
-        _rng.normal(0.5, 0.15, (1, vec_dim)).astype(np.float32), 0.0, 1.0
-    )
+    unique_secondary = np.clip(_rng.normal(0.5, 0.15, (1, vec_dim)).astype(np.float32), 0.0, 1.0)
     manager.update_index(unique_secondary, np.array([101], dtype=np.int64))
     duplicate_id, duplicate_vector = _add_duplicate_to_secondary(
         manager, primary_vectors, primary_ids
@@ -365,14 +353,12 @@ def test_merged_search_results_are_unique(tmp_index_path: Path) -> None:
     manager = FAISSManager(index_path=tmp_index_path, vec_dim=vec_dim)
 
     # Setup indexes with duplicate
-    duplicate_id, duplicate_vector = _setup_test_indexes_with_duplicate(
-        manager, vec_dim
-    )
+    duplicate_id, duplicate_vector = _setup_test_indexes_with_duplicate(manager, vec_dim)
     query = duplicate_vector.copy()
 
     # Search both indexes
-    primary_dists, primary_ids_result, secondary_dists, secondary_ids_result = (
-        _perform_dual_search(manager, query)
+    primary_dists, primary_ids_result, secondary_dists, secondary_ids_result = _perform_dual_search(
+        manager, query
     )
 
     # Verify duplicate in both results and get indices
@@ -381,9 +367,7 @@ def test_merged_search_results_are_unique(tmp_index_path: Path) -> None:
     )
 
     # Verify merged search deduplicates
-    merged_dists, merged_ids = _verify_merged_search_deduplication(
-        manager, query, duplicate_id
-    )
+    merged_dists, merged_ids = _verify_merged_search_deduplication(manager, query, duplicate_id)
 
     # Verify merged distance matches expected
     expected_distance = max(
@@ -494,13 +478,9 @@ def test_incremental_workflow_end_to_end(
     manager.save_cpu_index()
 
     # Step 2: Incremental update (add to secondary)
-    secondary_vectors = _rng.normal(0.5, 0.15, (secondary_size, vec_dim)).astype(
-        np.float32
-    )
+    secondary_vectors = _rng.normal(0.5, 0.15, (secondary_size, vec_dim)).astype(np.float32)
     secondary_vectors = np.clip(secondary_vectors, 0.0, 1.0)
-    secondary_ids = np.arange(
-        primary_size, primary_size + secondary_size, dtype=np.int64
-    )
+    secondary_ids = np.arange(primary_size, primary_size + secondary_size, dtype=np.int64)
     manager.update_index(secondary_vectors, secondary_ids)
 
     # Verify dual-index state

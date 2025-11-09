@@ -37,9 +37,7 @@ class ValidationErrorProtocol(Protocol):
 class Draft202012ValidatorProtocol(Protocol):
     """Typed facade for :class:`jsonschema.validators.Draft202012Validator`."""
 
-    def __init__(
-        self, schema: Mapping[str, object], *args: object, **kwargs: object
-    ) -> None: ...
+    def __init__(self, schema: Mapping[str, object], *args: object, **kwargs: object) -> None: ...
 
     @classmethod
     def check_schema(cls, schema: Mapping[str, object]) -> None:

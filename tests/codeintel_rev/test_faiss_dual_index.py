@@ -16,9 +16,7 @@ from codeintel_rev.io.faiss_dual_index import FAISSDualIndexManager, IndexManife
 from tests.conftest import FAISS_MODULE, HAS_FAISS_SUPPORT
 
 if not HAS_FAISS_SUPPORT:  # pragma: no cover - gated on FAISS availability
-    pytest.skip(
-        "FAISS bindings unavailable; skipping dual-index tests", allow_module_level=True
-    )
+    pytest.skip("FAISS bindings unavailable; skipping dual-index tests", allow_module_level=True)
 
 assert FAISS_MODULE is not None
 faiss_module: Any = FAISS_MODULE
@@ -221,7 +219,7 @@ async def test_gpu_secondary_clone_reuses_cloner_options(
         raising=False,
     )
 
-    await manager._try_gpu_clone(
+    await manager._try_gpu_clone(  # noqa: SLF001
         faiss_module
     )
 

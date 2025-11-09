@@ -24,9 +24,7 @@ for candidate in (str(_REPO_ROOT), str(_SRC_ROOT)):
 _DEFAULT_MKDOCS_PATH = _SUITE_ROOT / "mkdocs.yml"
 
 
-def _construct_python_name(
-    loader: yaml.SafeLoader, _suffix: str, node: Node
-) -> str | None:
+def _construct_python_name(loader: yaml.SafeLoader, _suffix: str, node: Node) -> str | None:
     """Return the raw value for ``!!python/name`` tags used by MkDocs plugins.
 
     ``mkdocs.yml`` relies on ``!!python/name:...`` tags for plugin wiring. The
@@ -58,9 +56,7 @@ def _construct_python_name(
 # ``yaml.safe_load`` internally relies on :class:`yaml.SafeLoader`. Register a
 # permissive constructor ahead of time so loading the MkDocs config succeeds
 # even when optional plugins inject ``!!python/name`` tags.
-yaml.SafeLoader.add_multi_constructor(
-    "tag:yaml.org,2002:python/name:", _construct_python_name
-)
+yaml.SafeLoader.add_multi_constructor("tag:yaml.org,2002:python/name:", _construct_python_name)
 
 
 def _coerce_repo_url(value: object) -> str | None:
@@ -89,11 +85,7 @@ def load_repo_settings(
         ``None``. The branch defaults to ``"main"`` when the MkDocs
         configuration omits a resolvable ``edit_uri``.
     """
-    path = (
-        Path(mkdocs_config_path)
-        if mkdocs_config_path is not None
-        else _DEFAULT_MKDOCS_PATH
-    )
+    path = Path(mkdocs_config_path) if mkdocs_config_path is not None else _DEFAULT_MKDOCS_PATH
     if not path.exists():
         return None, None
 

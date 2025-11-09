@@ -431,9 +431,7 @@ class TestSymbolIndexRoundTrip:
         )
         by_file: dict[str, tuple[str, ...]] = {"pkg/__init__.py": ("pkg.func",)}
         by_module: dict[str, tuple[str, ...]] = {"pkg": ("pkg.func",)}
-        artifacts = SymbolIndexArtifacts(
-            rows=(row,), by_file=by_file, by_module=by_module
-        )
+        artifacts = SymbolIndexArtifacts(rows=(row,), by_file=by_file, by_module=by_module)
 
         # Serialize
         payload_rows: JsonObjectArray = symbol_index_to_payload(artifacts)
@@ -664,9 +662,7 @@ class TestSymbolDeltaRoundTrip:
         assert payload_raw["added"] == ["pkg.new_func"]
         assert payload_raw["removed"] == ["pkg.old_func"]
         changed_entries_value = expect_json_sequence(payload_raw["changed"])
-        changed_entries = [
-            expect_json_mapping(entry) for entry in changed_entries_value
-        ]
+        changed_entries = [expect_json_mapping(entry) for entry in changed_entries_value]
         assert len(changed_entries) == len(changed_entries_value)
         assert len(changed_entries) == 1
 
@@ -724,9 +720,7 @@ class TestArtifactCoercion:
         artifacts = symbol_index_from_json(
             to_json_payload(
                 [
-                    _symbol_payload(
-                        tested_by=cast("JsonValue", ["test1.py", "test2.py"])
-                    ),
+                    _symbol_payload(tested_by=cast("JsonValue", ["test1.py", "test2.py"])),
                 ]
             ),
         )

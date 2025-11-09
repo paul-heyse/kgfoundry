@@ -325,9 +325,7 @@ class _CommandContext:
     def elapsed(self) -> float:
         return time.monotonic() - self.start
 
-    def extensions(
-        self, extras: Mapping[str, object] | None = None
-    ) -> dict[str, JsonValue]:
+    def extensions(self, extras: Mapping[str, object] | None = None) -> dict[str, JsonValue]:
         payload: dict[str, JsonValue] = {
             "operation_id": CLI_OPERATION_ID,
             "correlation_id": self.correlation_id,
@@ -343,9 +341,7 @@ def _envelope_path(subcommand: str) -> Path:
     return CLI_ENVELOPE_DIR / filename
 
 
-def _emit_envelope(
-    envelope: CliEnvelope, *, logger: LoggerAdapter, subcommand: str
-) -> Path:
+def _emit_envelope(envelope: CliEnvelope, *, logger: LoggerAdapter, subcommand: str) -> Path:
     path = _envelope_path(subcommand)
     CLI_ENVELOPE_DIR.mkdir(parents=True, exist_ok=True)
     rendered = render_cli_envelope(envelope)
@@ -399,9 +395,7 @@ def _record_failure(
 ) -> int:
     failure_extras = options.extras if options else None
     exc = options.exc if options else None
-    problem = _build_problem(
-        context, detail=detail, status=status, extras=failure_extras
-    )
+    problem = _build_problem(context, detail=detail, status=status, extras=failure_extras)
     builder = CliEnvelopeBuilder.create(
         command=CLI_COMMAND,
         status=_run_status_from_error(error_status),
@@ -410,9 +404,7 @@ def _record_failure(
     builder = builder.add_error(status=error_status, message=detail, problem=problem)
     builder = builder.set_problem(problem)
     envelope = builder.finish(duration_seconds=context.elapsed())
-    path = _emit_envelope(
-        envelope, logger=context.logger, subcommand=SUBCOMMAND_BUILD_GRAPHS
-    )
+    path = _emit_envelope(envelope, logger=context.logger, subcommand=SUBCOMMAND_BUILD_GRAPHS)
     log_extra: dict[str, JsonValue] = {
         "status": envelope.status,
         "cli_envelope": str(path),
@@ -443,9 +435,7 @@ def _finish_success(context: _CommandContext, summary: Mapping[str, object]) -> 
         message="Subsystem dependency graph",
     )
     envelope = builder.finish(duration_seconds=context.elapsed())
-    path = _emit_envelope(
-        envelope, logger=context.logger, subcommand=SUBCOMMAND_BUILD_GRAPHS
-    )
+    path = _emit_envelope(envelope, logger=context.logger, subcommand=SUBCOMMAND_BUILD_GRAPHS)
     log_extra: dict[str, JsonValue] = {
         "status": envelope.status,
         "cli_envelope": str(path),
@@ -683,9 +673,7 @@ def find_top_packages() -> list[str]:
     if not SRC.exists():
         return []
     return sorted(
-        child.name
-        for child in SRC.iterdir()
-        if child.is_dir() and (child / "__init__.py").exists()
+        child.name for child in SRC.iterdir() if child.is_dir() and (child / "__init__.py").exists()
     )
 
 
@@ -1029,9 +1017,7 @@ def _add_graph_nodes(
         layer = pkg2layer.get(node, "unknown")
         color = LAYER_PALETTE.get(layer, DEFAULT_LAYER_COLOR)
         penwidth = (
-            EDGE_HIGHLIGHT_WIDTH
-            if centrality.get(node, 0.0) >= threshold
-            else EDGE_NORMAL_WIDTH
+            EDGE_HIGHLIGHT_WIDTH if centrality.get(node, 0.0) >= threshold else EDGE_NORMAL_WIDTH
         )
         dot_graph.add_node(
             pydot_module.Node(
@@ -1206,19 +1192,14 @@ def _enumerate_cycles(
                 ],
             )
         components = sorted(
-            (
-                sorted(component)
-                for component in nx.strongly_connected_components(scc_graph)
-            ),
+            (sorted(component) for component in nx.strongly_connected_components(scc_graph)),
             key=len,
             reverse=True,
         )
         summary: list[dict[str, object]] = []
         for members in components[:SCC_SUMMARY_LIMIT]:
             truncated = len(members) > SCC_MEMBER_PREVIEW
-            preview = (
-                members if not truncated else [*members[:SCC_MEMBER_PREVIEW], "..."]
-            )
+            preview = members if not truncated else [*members[:SCC_MEMBER_PREVIEW], "..."]
             summary.append(
                 {
                     "members": preview,
@@ -1431,9 +1412,7 @@ def collapse_to_packages(dot_path: Path) -> DiGraph:
     directed = cast("DiGraph", nx.drawing.nx_pydot.from_pydot(pd_graph).to_directed())
     collapsed: DiGraph = cast("DiGraph", nx.DiGraph())
 
-    module_names = {
-        node: _module_label(node, data) for node, data in directed.nodes(data=True)
-    }
+    module_names = {node: _module_label(node, data) for node, data in directed.nodes(data=True)}
 
     package_nodes = {_pkg_of(name) for name in module_names.values()}
     collapsed.add_nodes_from(sorted(package_nodes))
@@ -1597,9 +1576,7 @@ def enforce_policy(
     GraphPolicyError
         Raised when policy violations are detected.
     """
-    allowed_cycle_set = {
-        tuple(cycle) for cycle in _sequence_of_sequences(allow.get("cycles"))
-    }
+    allowed_cycle_set = {tuple(cycle) for cycle in _sequence_of_sequences(allow.get("cycles"))}
     allowed_edge_set = {
         tuple(edge)
         for edge in _sequence_of_sequences(allow.get("edges"))
@@ -1613,8 +1590,7 @@ def enforce_policy(
     new_violations = [
         record
         for record in violations
-        if (edge := _edge_from_violation(record)) is not None
-        and edge not in allowed_edge_set
+        if (edge := _edge_from_violation(record)) is not None and edge not in allowed_edge_set
     ]
 
     errs = []
@@ -1920,9 +1896,7 @@ def _update_cache(
         LOGGER.info("Cached: %s@%s", pkg, snippet)
 
 
-def build_one_package(
-    pkg: str, config: PackageBuildConfig
-) -> tuple[str, bool, bool, bool]:
+def build_one_package(pkg: str, config: PackageBuildConfig) -> tuple[str, bool, bool, bool]:
     """Compute build one package.
 
     Carry out the build one package operation for the surrounding component. Generated documentation highlights how this helper collaborates with neighbouring utilities. Callers rely on the routine to remain stable across releases.
@@ -2239,9 +2213,7 @@ def _load_allowlist(path: str) -> dict[str, object]:
     """
     file_path = resolve_path(path, strict=False)
     if not file_path.exists():
-        LOGGER.warning(
-            "Allowlist '%s' does not exist; continuing with empty allowlist", file_path
-        )
+        LOGGER.warning("Allowlist '%s' does not exist; continuing with empty allowlist", file_path)
         return {}
     if not file_path.is_file():
         message = f"Allowlist '{file_path}' must be a file"
@@ -2273,9 +2245,7 @@ def _render_summary_markdown(meta: Mapping[str, object]) -> str:
     lines = ["# Subsystem Graph Metadata", ""]
     skipped = bool(meta.get("cycle_enumeration_skipped"))
     lines.append(
-        "*Cycle enumeration skipped:* Yes"
-        if skipped
-        else "*Cycle enumeration skipped:* No"
+        "*Cycle enumeration skipped:* Yes" if skipped else "*Cycle enumeration skipped:* No"
     )
     scc_summary = meta.get("scc_summary")
     if isinstance(scc_summary, Sequence) and scc_summary:
@@ -2325,9 +2295,7 @@ def _write_global_artifacts(
     if analysis.get("scc_summary"):
         meta["scc_summary"] = analysis["scc_summary"]
     write_meta(meta, OUT / "graph_meta.json")
-    (OUT / "subsystems_meta.md").write_text(
-        _render_summary_markdown(meta), encoding="utf-8"
-    )
+    (OUT / "subsystems_meta.md").write_text(_render_summary_markdown(meta), encoding="utf-8")
 
 
 def _log_run_summary(
@@ -2375,9 +2343,7 @@ def _finalize_run(
         "useCache": inputs.use_cache,
         "cacheDir": str(inputs.cache_dir),
         "durationSeconds": duration_s,
-        "cycleEnumerationSkipped": bool(
-            analysis.get("cycle_enumeration_skipped", False)
-        ),
+        "cycleEnumerationSkipped": bool(analysis.get("cycle_enumeration_skipped", False)),
     }
 
 
@@ -2415,9 +2381,7 @@ def _execute(context: _CommandContext) -> dict[str, object]:
     build_start = time.monotonic()
 
     try:
-        results = _build_per_package_graphs(
-            inputs.packages, inputs.config, args.max_workers
-        )
+        results = _build_per_package_graphs(inputs.packages, inputs.config, args.max_workers)
         _report_package_failures(results)
 
         try:

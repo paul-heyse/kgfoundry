@@ -139,7 +139,8 @@ def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914, PLR0912
             )
         if requested_limit > max_results:
             truncation_messages.append(
-                f"Requested limit {requested_limit} exceeds max_results {max_results}; truncating to {max_results}."
+                f"Requested limit {requested_limit} exceeds max_results {max_results}; "
+                f"truncating to {max_results}."
             )
 
         ready, faiss_limits, faiss_error = context.ensure_faiss_ready()

@@ -84,9 +84,7 @@ class NavmapMetrics:
 
     def __init__(self, registry: CollectorRegistry | None = None) -> None:
         resolved = (
-            registry
-            if registry is not None
-            else cast("CollectorRegistry", get_default_registry())
+            registry if registry is not None else cast("CollectorRegistry", get_default_registry())
         )
         self.registry = resolved
 
@@ -263,14 +261,10 @@ def record_operation_metrics(
             metrics.check_duration_seconds.labels(status=final_status).observe(duration)
         elif operation == "repair":
             metrics.repair_runs_total.labels(status=final_status).inc()
-            metrics.repair_duration_seconds.labels(status=final_status).observe(
-                duration
-            )
+            metrics.repair_duration_seconds.labels(status=final_status).observe(duration)
         elif operation == "migrate":
             metrics.migrate_runs_total.labels(status=final_status).inc()
-            metrics.migrate_duration_seconds.labels(status=final_status).observe(
-                duration
-            )
+            metrics.migrate_duration_seconds.labels(status=final_status).observe(duration)
 
         with_fields(
             log_adapter,

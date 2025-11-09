@@ -43,9 +43,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 try:
     from tools.griffe_utils import resolve_griffe
-except (
-    ModuleNotFoundError
-) as exc:  # pragma: no cover - clearer guidance for packaging installs
+except ModuleNotFoundError as exc:  # pragma: no cover - clearer guidance for packaging installs
     message = (
         "tools.gen_readmes requires the tooling optional extra. Install with "
         "`pip install kgfoundry[tools]` or `pip install -e .[tools]` when developing."
@@ -65,7 +63,9 @@ except ImportError:  # pragma: no cover - older Griffe versions
     try:
         _AliasResolutionError = _griffe_exceptions.AliasResolutionError
     except AttributeError as attr_exc:  # pragma: no cover - defensive guard
-        message = "griffe._internal.exceptions missing AliasResolutionError; incompatible griffe version"
+        message = (
+            "griffe._internal.exceptions missing AliasResolutionError; incompatible griffe version"
+        )
         raise ImportError(message) from attr_exc
 else:
     _AliasResolutionError = _griffe_exceptions.AliasResolutionError
@@ -88,9 +88,7 @@ class ReadmeGenerationError(RuntimeError):
         RFC 9457 Problem Details payload.
     """
 
-    def __init__(
-        self, message: str, *, problem: ProblemDetailsDict | None = None
-    ) -> None:
+    def __init__(self, message: str, *, problem: ProblemDetailsDict | None = None) -> None:
         super().__init__(message)
         self.problem = problem
 
@@ -561,9 +559,7 @@ class NavModuleData:
         override = self.overrides.get(qname) or self.overrides.get(symbol)
         section = self.sections.get(symbol)
         defaults = self.defaults.with_section(section)
-        resolved_override = (
-            override.with_section(section) if override is not None else None
-        )
+        resolved_override = override.with_section(section) if override is not None else None
         return NavMatch(
             symbol_meta=resolved_override,
             defaults=defaults,
@@ -672,9 +668,7 @@ class ReadmeConfig:
             Configuration instance.
         """
         packages_arg: str = getattr(namespace, "packages", "")
-        packages = tuple(
-            pkg for pkg in (part.strip() for part in packages_arg.split(",")) if pkg
-        )
+        packages = tuple(pkg for pkg in (part.strip() for part in packages_arg.split(",")) if pkg)
         if not packages:
             packages = tuple(iter_packages())
         link_mode = LinkMode(cast("str", namespace.link_mode))
@@ -750,9 +744,7 @@ def _parse_listed_symbols(payload: Mapping[str, JsonValue]) -> frozenset[str]:
     return frozenset(collected)
 
 
-def _parse_nav_module(
-    identifier: str, payload: Mapping[str, JsonValue]
-) -> NavModuleData:
+def _parse_nav_module(identifier: str, payload: Mapping[str, JsonValue]) -> NavModuleData:
     module_meta = payload.get("module_meta")
     defaults = (
         _symbol_metadata_from_mapping(module_meta)
@@ -800,9 +792,7 @@ def _build_test_catalog(document: JsonObject) -> TestCatalog:
             lines_value = item.get("lines")
             lines: tuple[int, ...] = ()
             if isinstance(lines_value, list):
-                lines = tuple(
-                    number for number in lines_value if isinstance(number, int)
-                )
+                lines = tuple(number for number in lines_value if isinstance(number, int))
             entries.append(TestRecord(file=file_path, lines=lines))
         records[key] = tuple(entries)
     return TestCatalog(records=records)
@@ -1096,9 +1086,7 @@ def bucket_for(node: GriffeObjectLike) -> str:
     return "Other"
 
 
-def render_line(
-    node: GriffeObjectLike, readme_dir: Path, cfg: ReadmeConfig
-) -> str | None:
+def render_line(node: GriffeObjectLike, readme_dir: Path, cfg: ReadmeConfig) -> str | None:
     """Render a Markdown bullet for ``node`` including navigation links.
 
     The output includes GitHub links, optional editor URIs, and badges derived from the NavMap,
@@ -1123,13 +1111,9 @@ def render_line(
 
     link_mode = cfg.link_mode
     open_link = (
-        get_open_link(node, readme_dir)
-        if link_mode in {LinkMode.EDITOR, LinkMode.BOTH}
-        else None
+        get_open_link(node, readme_dir) if link_mode in {LinkMode.EDITOR, LinkMode.BOTH} else None
     )
-    view_link = (
-        get_view_link(node) if link_mode in {LinkMode.GITHUB, LinkMode.BOTH} else None
-    )
+    view_link = get_view_link(node) if link_mode in {LinkMode.GITHUB, LinkMode.BOTH} else None
 
     if link_mode in {LinkMode.EDITOR, LinkMode.BOTH} and node.relative_package_filepath:
         base = SRC if SRC.exists() else ROOT
@@ -1173,9 +1157,7 @@ def write_if_changed(path: Path, content: str) -> bool:
         True if file was written, False if unchanged.
     """
     digest = hashlib.sha256(content.encode("utf-8")).hexdigest()[:12]
-    rendered = (
-        content.rstrip() + f"\n<!-- agent:readme v1 sha:{SHA} content:{digest} -->\n"
-    )
+    rendered = content.rstrip() + f"\n<!-- agent:readme v1 sha:{SHA} content:{digest} -->\n"
     previous = path.read_text(encoding="utf-8") if path.exists() else ""
     if previous == rendered:
         return False
@@ -1206,9 +1188,7 @@ def write_readme(node: GriffeObjectLike, cfg: ReadmeConfig) -> bool:
         name: [] for name in ("Modules", "Classes", "Functions", "Exceptions", "Other")
     }
     children: list[GriffeObjectLike] = [
-        child
-        for child in iter_public_members(node)
-        if child.kind and child.kind.value in KINDS
+        child for child in iter_public_members(node) if child.kind and child.kind.value in KINDS
     ]
 
     for child in sorted(children, key=_child_path):
@@ -1307,18 +1287,14 @@ def _ensure_packages_selected(packages: Sequence[str]) -> None:
 def _warn_missing_inputs() -> None:
     """Emit warnings when auxiliary metadata files are missing."""
     if not NAVMAP_PATH.exists():
-        with_fields(LOGGER, path=str(NAVMAP_PATH)).warning(
-            "NavMap not found; badges will be empty"
-        )
+        with_fields(LOGGER, path=str(NAVMAP_PATH)).warning("NavMap not found; badges will be empty")
     if not TESTMAP_PATH.exists():
         with_fields(LOGGER, path=str(TESTMAP_PATH)).warning(
             "Test map not found; tested-by badges will be empty"
         )
 
 
-def _process_module(
-    module: GriffeObjectLike, cfg: ReadmeConfig, missing_meta: set[str]
-) -> bool:
+def _process_module(module: GriffeObjectLike, cfg: ReadmeConfig, missing_meta: set[str]) -> bool:
     """Render README files for ``module`` and its package members.
 
     Parameters
@@ -1419,9 +1395,7 @@ def main(argv: Sequence[str] | None = None) -> None:
         _ensure_packages_selected(cfg.packages)
         _warn_missing_inputs()
 
-        loader: LoaderInstance = GriffeLoader(
-            search_paths=(str(SRC if SRC.exists() else ROOT),)
-        )
+        loader: LoaderInstance = GriffeLoader(search_paths=(str(SRC if SRC.exists() else ROOT),))
         missing_meta: set[str] = set()
         changed_any = False
         start = time.monotonic()

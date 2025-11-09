@@ -297,14 +297,10 @@ def _coerce_str_tuple(value: object, fallback: tuple[str, ...]) -> tuple[str, ..
     return fallback
 
 
-def _build_metric_policy(
-    data: Mapping[str, object], default: MetricPolicy
-) -> MetricPolicy:
+def _build_metric_policy(data: Mapping[str, object], default: MetricPolicy) -> MetricPolicy:
     return MetricPolicy(
         name_regex=_coerce_str(data.get("name_regex"), default.name_regex),
-        allowed_units=_coerce_str_tuple(
-            data.get("allowed_units"), default.allowed_units
-        ),
+        allowed_units=_coerce_str_tuple(data.get("allowed_units"), default.allowed_units),
         counter_suffix=_coerce_str(data.get("counter_suffix"), default.counter_suffix),
         require_unit_suffix=_coerce_bool(
             data.get("require_unit_suffix"),
@@ -313,9 +309,7 @@ def _build_metric_policy(
     )
 
 
-def _build_labels_policy(
-    data: Mapping[str, object], default: LabelsPolicy
-) -> LabelsPolicy:
+def _build_labels_policy(data: Mapping[str, object], default: LabelsPolicy) -> LabelsPolicy:
     return LabelsPolicy(
         reserved=_coerce_str_tuple(data.get("reserved"), default.reserved),
         high_cardinality_patterns=_coerce_str_tuple(
@@ -334,12 +328,8 @@ def _build_logs_policy(data: Mapping[str, object], default: LogsPolicy) -> LogsP
     )
 
 
-def _build_traces_policy(
-    data: Mapping[str, object], default: TracesPolicy
-) -> TracesPolicy:
-    return TracesPolicy(
-        name_regex=_coerce_str(data.get("name_regex"), default.name_regex)
-    )
+def _build_traces_policy(data: Mapping[str, object], default: TracesPolicy) -> TracesPolicy:
+    return TracesPolicy(name_regex=_coerce_str(data.get("name_regex"), default.name_regex))
 
 
 def _build_policy_from_mapping(data: Mapping[str, object]) -> ObservabilityPolicy:
@@ -355,18 +345,10 @@ def _build_policy_from_mapping(data: Mapping[str, object]) -> ObservabilityPolic
         message = "Policy overrides must include logs and traces mappings"
         raise TypeError(message)
 
-    metric = _build_metric_policy(
-        cast("Mapping[str, object]", metric_data), DEFAULT_POLICY.metric
-    )
-    labels = _build_labels_policy(
-        cast("Mapping[str, object]", labels_data), DEFAULT_POLICY.labels
-    )
-    logs = _build_logs_policy(
-        cast("Mapping[str, object]", logs_data), DEFAULT_POLICY.logs
-    )
-    traces = _build_traces_policy(
-        cast("Mapping[str, object]", traces_data), DEFAULT_POLICY.traces
-    )
+    metric = _build_metric_policy(cast("Mapping[str, object]", metric_data), DEFAULT_POLICY.metric)
+    labels = _build_labels_policy(cast("Mapping[str, object]", labels_data), DEFAULT_POLICY.labels)
+    logs = _build_logs_policy(cast("Mapping[str, object]", logs_data), DEFAULT_POLICY.logs)
+    traces = _build_traces_policy(cast("Mapping[str, object]", traces_data), DEFAULT_POLICY.traces)
     error_taxonomy = _coerce_optional_str(
         data.get("error_taxonomy_json"),
         DEFAULT_POLICY.error_taxonomy_json,
@@ -581,9 +563,7 @@ def _keywords_map(node: ast.Call, text: str) -> dict[str, str]:
         try:
             vsrc = ast.get_source_segment(text, kw.value) or ""
         except (OSError, TypeError, ValueError) as exc:
-            with_fields(LOGGER, keyword=k).debug(
-                "Unable to read source segment: %s", exc
-            )
+            with_fields(LOGGER, keyword=k).debug("Unable to read source segment: %s", exc)
             vsrc = ""
         out[k] = vsrc.strip()
     return out
@@ -646,9 +626,7 @@ def _recommended_aggregation(mtype: str | None) -> str | None:
     if mtype == "counter":
         return "rate(sum by (...) (__metric__[5m]))"
     if mtype == "histogram":
-        return (
-            "histogram_quantile(0.95, sum by (..., le) (rate(__metric___bucket[5m])))"
-        )
+        return "histogram_quantile(0.95, sum by (..., le) (rate(__metric___bucket[5m])))"
     if mtype == "summary":
         return "quantile_over_time(0.95, __metric__[5m])"
     return None
@@ -702,9 +680,7 @@ def _is_structured_logging(call: ast.Call, text: str) -> tuple[list[str], bool]:
         if kw.arg == "extra":
             # try to parse dict keys
             src = ast.get_source_segment(text, kw.value) or ""
-            extra_keys: list[str] = re.findall(
-                r"[\"']([A-Za-z_][A-Za-z0-9_]*)[\"']\s*:", src
-            )
+            extra_keys: list[str] = re.findall(r"[\"']([A-Za-z_][A-Za-z0-9_]*)[\"']\s*:", src)
             keys.extend(extra_keys)
     # detect f-string or % formatting in arg0 with additional args
     unstructured = False
@@ -773,9 +749,7 @@ def _lint_metric(policy: ObservabilityPolicy, row: MetricRow) -> list[LintFindin
                     lineno=row.lineno,
                 )
             )
-        if row.type == "counter" and not row.name.endswith(
-            policy.metric.counter_suffix
-        ):
+        if row.type == "counter" and not row.name.endswith(policy.metric.counter_suffix):
             errs.append(
                 LintFinding(
                     severity="error",
@@ -789,10 +763,7 @@ def _lint_metric(policy: ObservabilityPolicy, row: MetricRow) -> list[LintFindin
             )
     # Reserved labels
     reserved = set(policy.labels.reserved)
-    hc_rx = [
-        re.compile(pat, re.IGNORECASE)
-        for pat in policy.labels.high_cardinality_patterns
-    ]
+    hc_rx = [re.compile(pat, re.IGNORECASE) for pat in policy.labels.high_cardinality_patterns]
     for lab in row.labels or []:
         if lab in reserved:
             errs.append(
@@ -1110,9 +1081,7 @@ def _write_config_summary(
         lines.append("")
     if traces:
         lines.append("## Traces")
-        lines.append(
-            f"Detected {len(traces)} span definition(s); see `docs/_build/traces.json`."
-        )
+        lines.append(f"Detected {len(traces)} span definition(s); see `docs/_build/traces.json`.")
         lines.append("")
 
     CONFIG_MD.write_text("\n".join(lines), encoding="utf-8")

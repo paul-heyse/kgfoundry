@@ -183,7 +183,10 @@ def first_or_error_multi_device[T](
                 "context": context,
                 "operation": operation,
                 "device_count": 0,
-                "remediation": "Ensure GPU resources are available and FAISS is compiled with GPU support",
+                "remediation": (
+                    "Ensure GPU resources are available and FAISS is "
+                    "compiled with GPU support"
+                ),
             },
         )
 

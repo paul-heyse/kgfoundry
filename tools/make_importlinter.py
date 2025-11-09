@@ -58,9 +58,7 @@ def _iter_module_names(package: str, exclude: Iterable[str]) -> list[str]:
     return sorted(modules)
 
 
-def _format_layers_contract(
-    slug: str, title: str, layers: Sequence[Sequence[str]]
-) -> str:
+def _format_layers_contract(slug: str, title: str, layers: Sequence[Sequence[str]]) -> str:
     lines = [
         f"[importlinter:contract:{slug}]",
         f"name = {title}",
@@ -104,9 +102,7 @@ def _build_template(root_package: str) -> str:
     str
         Configuration file content.
     """
-    docbuilder_domain = _iter_module_names(
-        "tools.docstring_builder", DOCBUILDER_EXCLUDES
-    )
+    docbuilder_domain = _iter_module_names("tools.docstring_builder", DOCBUILDER_EXCLUDES)
     docs_domain = _iter_module_names("tools.docs", DOCS_ADAPTERS)
     navmap_domain = _iter_module_names("tools.navmap", NAVMAP_ADAPTERS)
 
@@ -211,11 +207,7 @@ def main(
     """
     detected_root = root_dir or Path(__file__).resolve().parents[1]
     package = root_package or (detect or _import_detect_primary)()
-    destination = (
-        Path(output_path)
-        if output_path is not None
-        else detected_root / ".importlinter"
-    )
+    destination = Path(output_path) if output_path is not None else detected_root / ".importlinter"
     destination.write_text(_build_template(package), encoding="utf-8")
     LOGGER.info("Wrote import-linter configuration to %s", destination)
     if check:

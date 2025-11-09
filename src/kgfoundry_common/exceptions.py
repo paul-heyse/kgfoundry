@@ -21,9 +21,7 @@ __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
 # [nav:anchor DownloadError]
 DownloadError = _DownloadError
-DownloadError.__doc__ = (
-    "Compatibility alias for :class:`kgfoundry_common.errors.DownloadError`."
-)
+DownloadError.__doc__ = "Compatibility alias for :class:`kgfoundry_common.errors.DownloadError`."
 
 
 # [nav:anchor UnsupportedMIMEError]

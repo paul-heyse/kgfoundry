@@ -110,10 +110,7 @@ def _field_from_annassign(node: ast.AnnAssign) -> _FieldInfo | None:
     description: str | None = None
     value = node.value
     if value is not None:
-        if (
-            isinstance(value, ast.Call)
-            and _decorator_name(value.func) in _FIELD_FACTORY_NAMES
-        ):
+        if isinstance(value, ast.Call) and _decorator_name(value.func) in _FIELD_FACTORY_NAMES:
             for keyword in value.keywords:
                 if keyword.arg == "default" and keyword.value is not None:
                     default = _stringify(keyword.value)
@@ -174,9 +171,7 @@ class _DataclassFieldCollector(ast.NodeVisitor):
         node : ast.ClassDef
             ClassDef AST node.
         """
-        qname = ".".join(
-            part for part in [self.module, *self.namespace, node.name] if part
-        )
+        qname = ".".join(part for part in [self.module, *self.namespace, node.name] if part)
         if _has_dataclass_decorator(node.decorator_list):
             collected: list[_FieldInfo] = []
             for statement in node.body:
@@ -279,9 +274,7 @@ class DataclassFieldDocPlugin(TransformerPlugin):
         return collector.fields
 
     @staticmethod
-    def _apply_fields(
-        result: SemanticResult, fields: list[_FieldInfo]
-    ) -> SemanticResult:
+    def _apply_fields(result: SemanticResult, fields: list[_FieldInfo]) -> SemanticResult:
         """Return ``result`` updated with dataclass field documentation.
 
         Parameters
@@ -302,9 +295,7 @@ class DataclassFieldDocPlugin(TransformerPlugin):
 
         def _build_parameter_doc(field: _FieldInfo) -> ParameterDoc:
             current = existing.get(field.name)
-            description = field.description or (
-                current.description if current else None
-            )
+            description = field.description or (current.description if current else None)
             if not description:
                 description = _default_description(field.name, field.default)
             annotation = field.annotation or (current.annotation if current else None)
@@ -330,9 +321,7 @@ class DataclassFieldDocPlugin(TransformerPlugin):
 
         updated = [_build_parameter_doc(field) for field in fields]
         updated.extend(
-            parameter
-            for parameter in schema.parameters
-            if parameter.name not in field_names
+            parameter for parameter in schema.parameters if parameter.name not in field_names
         )
         if updated == schema.parameters:
             return result
@@ -365,10 +354,7 @@ def collect_dataclass_field_names(path: Path, module: str) -> dict[str, list[str
         return {}
     collector = _DataclassFieldCollector(module)
     collector.visit(tree)
-    return {
-        key: [field.name for field in fields]
-        for key, fields in collector.fields.items()
-    }
+    return {key: [field.name for field in fields] for key, fields in collector.fields.items()}
 
 
 __all__ = ["DataclassFieldDocPlugin", "collect_dataclass_field_names"]

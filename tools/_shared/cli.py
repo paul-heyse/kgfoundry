@@ -125,9 +125,7 @@ else:
         return cast("CliEnvelope", structs.replace(envelope, **updates))
 
 
-def new_cli_envelope(
-    *, command: str, status: CliStatus, subcommand: str = ""
-) -> CliEnvelope:
+def new_cli_envelope(*, command: str, status: CliStatus, subcommand: str = "") -> CliEnvelope:
     """Return a freshly initialised CLI envelope.
 
     Parameters
@@ -186,9 +184,7 @@ class CliEnvelopeBuilder:
     envelope: CliEnvelope
 
     @classmethod
-    def create(
-        cls, *, command: str, status: CliStatus, subcommand: str = ""
-    ) -> CliEnvelopeBuilder:
+    def create(cls, *, command: str, status: CliStatus, subcommand: str = "") -> CliEnvelopeBuilder:
         """Instantiate a builder for ``command`` with the provided status.
 
         Parameters
@@ -205,9 +201,7 @@ class CliEnvelopeBuilder:
         CliEnvelopeBuilder
             New builder instance.
         """
-        return cls(
-            new_cli_envelope(command=command, status=status, subcommand=subcommand)
-        )
+        return cls(new_cli_envelope(command=command, status=status, subcommand=subcommand))
 
     def _swap(self, *, update: CliEnvelope) -> CliEnvelopeBuilder:
         _SET_BUILDER_ATTR(self, "envelope", update)
@@ -307,9 +301,7 @@ class CliEnvelopeBuilder:
             problem=problem if problem is not None else UNSET,
         )
         updated_errors = [*self.envelope.errors, error_entry]
-        return self._swap(
-            update=_replace_envelope(self.envelope, errors=updated_errors)
-        )
+        return self._swap(update=_replace_envelope(self.envelope, errors=updated_errors))
 
     def set_problem(self, problem: ProblemDetailsDict | None) -> CliEnvelopeBuilder:
         """Attach a Problem Details payload to the envelope.
@@ -333,9 +325,7 @@ class CliEnvelopeBuilder:
             Builder instance for fluent chaining. Allows method calls to be
             chained together for building complex envelopes.
         """
-        replacement: ProblemDetailsDict | UnsetType = (
-            problem if problem is not None else UNSET
-        )
+        replacement: ProblemDetailsDict | UnsetType = problem if problem is not None else UNSET
         return self._swap(update=_replace_envelope(self.envelope, problem=replacement))
 
     def finish(self, *, duration_seconds: float | None = None) -> CliEnvelope:

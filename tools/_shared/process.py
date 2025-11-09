@@ -57,9 +57,7 @@ class TimeoutExpiredProtocol(Protocol):
 
 _subprocess_module = import_module("sub" + "process")
 TimeoutExpired = cast("type[TimeoutError]", _subprocess_module.TimeoutExpired)
-_run_subprocess = cast(
-    "Callable[..., CompletedProcessProtocol]", _subprocess_module.run
-)
+_run_subprocess = cast("Callable[..., CompletedProcessProtocol]", _subprocess_module.run)
 
 Command = Sequence[str]
 Environment = Mapping[str, str]
@@ -217,9 +215,7 @@ class AllowListEnforcer:
     """Concrete allow-list policy backed by ``ToolRuntimeSettings``."""
 
     settings_loader: Callable[[], ToolRuntimeSettings] = get_runtime_settings
-    digest_verifier: ExecutableDigestVerifier = field(
-        default_factory=ExecutableDigestVerifier
-    )
+    digest_verifier: ExecutableDigestVerifier = field(default_factory=ExecutableDigestVerifier)
 
     def resolve(self, executable: str, command: Command) -> Path:
         """Resolve ``executable`` to an absolute, allow-listed path.
@@ -249,9 +245,7 @@ class AllowListEnforcer:
 
         resolved = shutil.which(executable)
         if resolved is None:
-            detail = (
-                f"Executable '{executable}' could not be resolved to an absolute path"
-            )
+            detail = f"Executable '{executable}' could not be resolved to an absolute path"
             problem = tool_missing_problem_details(
                 command=command, executable=executable, detail=detail
             )
@@ -364,9 +358,7 @@ class ProcessRunner:
     allowlist: AllowListPolicy = field(default_factory=AllowListEnforcer)
     environment: EnvironmentPolicy = field(default_factory=SanitisedEnvironment)
     observer_factory: ObservationFactory = field(default=_default_observer_factory)
-    logger: StructuredLoggerAdapter = field(
-        default_factory=lambda: get_logger(__name__)
-    )
+    logger: StructuredLoggerAdapter = field(default_factory=lambda: get_logger(__name__))
 
     def run(
         self,
@@ -412,9 +404,7 @@ class ProcessRunner:
 
         with self.observer_factory(final_command, cwd, timeout) as observation:
             try:
-                completed = self._spawn(
-                    final_command, cwd=cwd, env=sanitised_env, timeout=timeout
-                )
+                completed = self._spawn(final_command, cwd=cwd, env=sanitised_env, timeout=timeout)
             except TimeoutExpired as exc:
                 observation.failure("timeout", timed_out=True)
                 problem = tool_timeout_problem_details(command=command, timeout=timeout)

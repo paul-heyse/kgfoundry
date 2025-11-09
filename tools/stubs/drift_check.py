@@ -99,9 +99,7 @@ def _inspect_module(spec: ModuleSpec) -> DriftResult:
     public = {attr for attr in dir(module) if not attr.startswith("_")}
     missing = sorted(name for name in spec.expected if name not in public)
     monitor = spec.monitor or spec.expected
-    unexpected = sorted(
-        name for name in public if name in monitor and name not in spec.expected
-    )
+    unexpected = sorted(name for name in public if name in monitor and name not in spec.expected)
     return DriftResult(module=spec.name, missing=missing, unexpected=unexpected)
 
 

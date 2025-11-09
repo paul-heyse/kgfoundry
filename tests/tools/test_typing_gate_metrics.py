@@ -248,9 +248,7 @@ class TestTypingGateMetrics:
         metrics.write_snapshot(output_path)
 
         assert output_path.exists()
-        content = cast(
-            "dict[str, object]", json.loads(output_path.read_text(encoding="utf-8"))
-        )
+        content = cast("dict[str, object]", json.loads(output_path.read_text(encoding="utf-8")))
         assert cast("int", content["checks_total"]) == 1
         assert cast("int", content["violations_total"]) == 0
 

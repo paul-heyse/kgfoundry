@@ -25,9 +25,7 @@ def test_duckdb_manager_configures_pragmas(tmp_path: Path) -> None:
         assert threads_row is not None
         assert int(threads_row[0]) == 2
 
-        cache_row = conn.execute(
-            "SELECT current_setting('enable_object_cache')"
-        ).fetchone()
+        cache_row = conn.execute("SELECT current_setting('enable_object_cache')").fetchone()
         assert cache_row is not None
         assert str(cache_row[0]).lower() in {"true", "1"}
 

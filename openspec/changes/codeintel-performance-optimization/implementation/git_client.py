@@ -148,9 +148,7 @@ class GitClient:
                 raise exc  # noqa: TRY201
         return self._repo
 
-    def blame_range(
-        self, path: str, start_line: int, end_line: int
-    ) -> list[GitBlameEntry]:
+    def blame_range(self, path: str, start_line: int, end_line: int) -> list[GitBlameEntry]:
         """Get Git blame for line range.
 
         Returns blame information for each line in the specified range, showing
@@ -229,15 +227,11 @@ class GitClient:
         except git.exc.GitCommandError as exc:
             # Check if error is "does not exist" (file not found)
             if "does not exist" in str(exc).lower() or "bad file" in str(exc).lower():
-                LOGGER.warning(
-                    "File not found for blame", extra={"path": path, "error": str(exc)}
-                )
+                LOGGER.warning("File not found for blame", extra={"path": path, "error": str(exc)})
                 msg = f"File not found: {path}"
                 raise FileNotFoundError(msg) from exc
             # Other Git errors (permission denied, etc.)
-            LOGGER.exception(
-                "Git blame failed", extra={"path": path, "error": str(exc)}
-            )
+            LOGGER.exception("Git blame failed", extra={"path": path, "error": str(exc)})
             raise exc  # noqa: TRY201
 
         entries: list[GitBlameEntry] = []
@@ -333,9 +327,7 @@ class GitClient:
         """
         try:
             # iter_commits with paths parameter gets commits affecting that file
-            commits_iter = self.repo.iter_commits(
-                rev="HEAD", paths=path, max_count=limit
-            )
+            commits_iter = self.repo.iter_commits(rev="HEAD", paths=path, max_count=limit)
         except git.exc.GitCommandError as exc:
             # Check if error is "does not exist" (file not found)
             if "does not exist" in str(exc).lower() or "bad file" in str(exc).lower():
@@ -412,9 +404,7 @@ class AsyncGitClient:
     def __init__(self, git_client: GitClient) -> None:
         self._sync_client = git_client
 
-    async def blame_range(
-        self, path: str, start_line: int, end_line: int
-    ) -> list[GitBlameEntry]:
+    async def blame_range(self, path: str, start_line: int, end_line: int) -> list[GitBlameEntry]:
         """Async version of blame_range (runs in threadpool).
 
         See GitClient.blame_range for detailed documentation.

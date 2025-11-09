@@ -163,9 +163,7 @@ class DuckDBRegistry:
         )
         return run_id
 
-    def close_run(
-        self, run_id: str, *, success: bool, notes: str | None = None
-    ) -> None:
+    def close_run(self, run_id: str, *, success: bool, notes: str | None = None) -> None:
         """Mark a run as finished and record the completion timestamp.
 
         Updates the run's finished_at timestamp. The success and notes
@@ -262,9 +260,7 @@ class DuckDBRegistry:
                 operation="registry.duckdb.register_doctags",
             )
 
-    def emit_event(
-        self, event_name: str, subject_id: str, payload: Mapping[str, object]
-    ) -> None:
+    def emit_event(self, event_name: str, subject_id: str, payload: Mapping[str, object]) -> None:
         """Persist an arbitrary pipeline event with structured payload.
 
         Records an event in the pipeline_events table with a unique event ID,
@@ -291,9 +287,7 @@ class DuckDBRegistry:
             operation="registry.duckdb.emit_event",
         )
 
-    def incident(
-        self, event: str, subject_id: str, error_class: str, message: str
-    ) -> None:
+    def incident(self, event: str, subject_id: str, error_class: str, message: str) -> None:
         """Record an incident emitted by registry clients.
 
         Inserts an incident record into the incidents table for tracking

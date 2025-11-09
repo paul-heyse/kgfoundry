@@ -80,9 +80,7 @@ class _CommandContext:
     logger: LoggerAdapter
     start: float
 
-    def extensions(
-        self, extras: Mapping[str, object] | None = None
-    ) -> dict[str, JsonValue]:
+    def extensions(self, extras: Mapping[str, object] | None = None) -> dict[str, JsonValue]:
         payload: dict[str, JsonValue] = {
             "operation_id": self.operation_id,
             "correlation_id": self.correlation_id,
@@ -150,9 +148,7 @@ def _start_command(
     operation_id = CLI_OPERATION_IDS.get(subcommand, subcommand)
     operation_alias = subcommand.replace("-", "_")
     correlation_id = uuid4().hex
-    filtered_fields = {
-        key: value for key, value in log_fields.items() if value is not None
-    }
+    filtered_fields = {key: value for key, value in log_fields.items() if value is not None}
     logger = with_fields(
         LOGGER,
         correlation_id=correlation_id,
@@ -228,9 +224,7 @@ def _envelope_path(subcommand: str) -> Path:
     return CLI_ENVELOPE_DIR / filename
 
 
-def _emit_envelope(
-    envelope: CliEnvelope, *, subcommand: str, logger: LoggerAdapter
-) -> Path:
+def _emit_envelope(envelope: CliEnvelope, *, subcommand: str, logger: LoggerAdapter) -> Path:
     path = _envelope_path(subcommand)
     CLI_ENVELOPE_DIR.mkdir(parents=True, exist_ok=True)
     payload = render_cli_envelope(envelope)
@@ -242,13 +236,9 @@ def _emit_envelope(
     return path
 
 
-def _finish_success(
-    context: _CommandContext, builder: CliEnvelopeBuilder
-) -> CliEnvelope:
+def _finish_success(context: _CommandContext, builder: CliEnvelopeBuilder) -> CliEnvelope:
     envelope = builder.finish(duration_seconds=time.monotonic() - context.start)
-    path = _emit_envelope(
-        envelope, subcommand=context.subcommand, logger=context.logger
-    )
+    path = _emit_envelope(envelope, subcommand=context.subcommand, logger=context.logger)
     context.logger.info(
         "Command completed",
         extra={
@@ -268,9 +258,7 @@ def _handle_failure(
     overrides = cast("Mapping[str, str] | None", options.get("overrides"))
     exc = cast("BaseException | None", options.get("exc"))
 
-    cli_error_status: CliErrorStatus = error_status_option or _error_status_from_http(
-        status
-    )
+    cli_error_status: CliErrorStatus = error_status_option or _error_status_from_http(status)
     cli_run_status: CliStatus = _run_status_from_error(cli_error_status)
     problem_payload = _build_cli_problem(
         context,
@@ -282,14 +270,10 @@ def _handle_failure(
     builder = CliEnvelopeBuilder.create(
         command=CLI_COMMAND, status=cli_run_status, subcommand=context.subcommand
     )
-    builder = builder.add_error(
-        status=cli_error_status, message=detail, problem=problem_payload
-    )
+    builder = builder.add_error(status=cli_error_status, message=detail, problem=problem_payload)
     builder = builder.set_problem(problem_payload)
     envelope = builder.finish(duration_seconds=time.monotonic() - context.start)
-    path = _emit_envelope(
-        envelope, subcommand=context.subcommand, logger=context.logger
-    )
+    path = _emit_envelope(envelope, subcommand=context.subcommand, logger=context.logger)
     log_kwargs = {
         "extra": {
             "status": cli_run_status,
@@ -334,9 +318,7 @@ def _load_bm25_documents(
                         extra={"status": "warning", "error": str(exc)},
                     )
                     continue
-                if isinstance(payload, Mapping) and (
-                    document := _extract_bm25_document(payload)
-                ):
+                if isinstance(payload, Mapping) and (document := _extract_bm25_document(payload)):
                     docs.append(document)
     else:
         with path.open("r", encoding="utf-8") as handle:
@@ -347,16 +329,13 @@ def _load_bm25_documents(
         docs.extend(
             document
             for entry in payload
-            if isinstance(entry, Mapping)
-            and (document := _extract_bm25_document(entry))
+            if isinstance(entry, Mapping) and (document := _extract_bm25_document(entry))
         )
     return docs
 
 
 def _get_bm25_index_path(index_dir: Path, backend: str) -> Path:
-    return (
-        index_dir / "pure_bm25.pkl" if backend == "pure" else index_dir / "bm25_index"
-    )
+    return index_dir / "pure_bm25.pkl" if backend == "pure" else index_dir / "bm25_index"
 
 
 def _instantiate_bm25_builder(
@@ -366,9 +345,7 @@ def _instantiate_bm25_builder(
     try:
         builder = cast(
             "_BM25Builder",
-            get_bm25(
-                requested_backend, config.index_dir, k1=0.9, b=0.4, load_existing=False
-            ),
+            get_bm25(requested_backend, config.index_dir, k1=0.9, b=0.4, load_existing=False),
         )
     except RuntimeError as exc:
         if requested_backend != "lucene":
@@ -390,9 +367,7 @@ def _instantiate_bm25_builder(
     return builder, requested_backend
 
 
-def _build_bm25_index(
-    config: BM25BuildConfig, *, logger: LoggerAdapter
-) -> tuple[str, int]:
+def _build_bm25_index(config: BM25BuildConfig, *, logger: LoggerAdapter) -> tuple[str, int]:
     documents = _load_bm25_documents(config.chunks_path, logger=logger)
     builder, backend_used = _instantiate_bm25_builder(config, logger=logger)
     try:
@@ -421,9 +396,7 @@ def _build_bm25_index(
     return backend_used, len(documents)
 
 
-_VECTOR_SCHEMA_PATH = (
-    cli_context.REPO_ROOT / "schema/vector-ingestion/vector-batch.v1.schema.json"
-)
+_VECTOR_SCHEMA_PATH = cli_context.REPO_ROOT / "schema/vector-ingestion/vector-batch.v1.schema.json"
 _VECTOR_SCHEMA_ID = "https://kgfoundry.dev/schema/vector-ingestion/vector-batch.v1.json"
 _VECTOR_PROBLEM_TYPE = "https://kgfoundry.dev/problems/vector-ingestion/invalid-payload"
 _VECTOR_SCHEMA_ERROR_LIMIT = 5
@@ -478,22 +451,12 @@ def _prepare_index_directory(index_path: str) -> None:
 
 
 # Type aliases for CLI parameters to help pydoclint parse Annotated types correctly
-_ChunksParquetArg = Annotated[
-    str, typer.Argument(..., help="Path to Parquet/JSONL with chunks")
-]
+_ChunksParquetArg = Annotated[str, typer.Argument(..., help="Path to Parquet/JSONL with chunks")]
 _BackendOption = Annotated[str, typer.Option(help="lucene|pure", show_default=True)]
-_IndexDirOption = Annotated[
-    str, typer.Option(help="Output index directory", show_default=True)
-]
-_DenseVectorsArg = Annotated[
-    str, typer.Argument(..., help="Path to dense vectors JSON (skeleton)")
-]
-_IndexPathOption = Annotated[
-    str, typer.Option(help="Output FAISS index path", show_default=True)
-]
-_FactoryOption = Annotated[
-    str, typer.Option(help="FAISS factory string", show_default=True)
-]
+_IndexDirOption = Annotated[str, typer.Option(help="Output index directory", show_default=True)]
+_DenseVectorsArg = Annotated[str, typer.Argument(..., help="Path to dense vectors JSON (skeleton)")]
+_IndexPathOption = Annotated[str, typer.Option(help="Output FAISS index path", show_default=True)]
+_FactoryOption = Annotated[str, typer.Option(help="FAISS factory string", show_default=True)]
 _MetricOption = Annotated[
     str, typer.Option(help="Similarity metric ('ip' or 'l2')", show_default=True)
 ]
@@ -535,9 +498,7 @@ def index_bm25(
         path=str(Path(chunks_parquet)), status="success", message="Input dataset"
     )
 
-    config = BM25BuildConfig(
-        chunks_path=chunks_parquet, backend=backend, index_dir=index_dir
-    )
+    config = BM25BuildConfig(chunks_path=chunks_parquet, backend=backend, index_dir=index_dir)
     try:
         _prepare_index_directory(config.index_dir)
         backend_used, doc_count = _build_bm25_index(config, logger=context.logger)
@@ -643,7 +604,8 @@ def index_faiss(
         Path to the dense vector payload (JSON skeleton format). Type alias for
         ``Annotated[str, typer.Argument(...)]`` for CLI argument specification.
     index_path : _IndexPathOption, optional
-        Destination path for the serialized FAISS index. Defaults to './_indices/faiss/shard_000.idx'.
+        Destination path for the serialized FAISS index.
+        Defaults to './_indices/faiss/shard_000.idx'.
         Type alias for ``Annotated[str, typer.Option(...)]`` for CLI option specification.
     factory : _FactoryOption, optional
         FAISS factory string describing index topology. Defaults to 'Flat'. Type alias for
@@ -698,7 +660,10 @@ def index_faiss(
         builder = builder.add_file(
             path=str(Path(index_path)),
             status="success",
-            message=f"Stored {metadata['vector_count']} vectors (dimension={metadata['dimension']})",
+            message=(
+                f"Stored {metadata['vector_count']} vectors "
+                f"(dimension={metadata['dimension']})"
+            ),
         )
         builder = builder.add_file(
             path="<configuration>",
@@ -771,9 +736,7 @@ def api(port: int = typer.Option(8080, help="Port to bind", show_default=True)) 
         downstream tooling.
     """
     context, builder = _start_command(SUBCOMMAND_API, port=port)
-    builder = builder.add_file(
-        path="<api>", status="success", message=f"Configured port {port}"
-    )
+    builder = builder.add_file(path="<api>", status="success", message=f"Configured port {port}")
 
     try:
         uvicorn_module = importlib.import_module("uvicorn")
@@ -808,7 +771,10 @@ def api(port: int = typer.Option(8080, help="Port to bind", show_default=True)) 
 
 def _run_e2e_flow() -> list[str]:
     if _e2e_flow is None:
-        msg = "Prefect is required for the e2e pipeline command. Install it via `pip install -e '.[gpu]'` or add `prefect` manually."
+        msg = (
+            "Prefect is required for the e2e pipeline command. "
+            "Install it via `pip install -e '.[gpu]'` or add `prefect` manually."
+        )
         raise RuntimeError(msg)
     return _e2e_flow()
 
@@ -838,9 +804,7 @@ def e2e() -> None:
         raise typer.Exit(code=1) from exc
 
     for index, stage in enumerate(stages):
-        builder = builder.add_file(
-            path=f"<stage:{index}>", status="success", message=stage
-        )
+        builder = builder.add_file(path=f"<stage:{index}>", status="success", message=stage)
         typer.echo(stage)
 
     _finish_success(context, builder)

@@ -69,9 +69,7 @@ class ModuleExportsCache:
 
         module = self.load_module()
         exports_obj: object | None = getattr(module, "__all__", None)
-        if isinstance(exports_obj, Iterable) and not isinstance(
-            exports_obj, (str, bytes)
-        ):
+        if isinstance(exports_obj, Iterable) and not isinstance(exports_obj, (str, bytes)):
             candidates = cast("Iterable[object]", exports_obj)
             exports = tuple(str(name) for name in candidates)
         else:

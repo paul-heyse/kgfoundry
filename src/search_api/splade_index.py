@@ -238,9 +238,7 @@ class SpladeIndex:
             """
             return item[1]
 
-        ranked: list[tuple[int, float]] = sorted(
-            enumerate(scores), key=key_func, reverse=True
-        )
+        ranked: list[tuple[int, float]] = sorted(enumerate(scores), key=key_func, reverse=True)
         return [(idx, value) for idx, value in ranked[:k] if value > 0.0]
 
     def doc(self, index: int) -> SpladeDoc:

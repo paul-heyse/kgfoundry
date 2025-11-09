@@ -189,9 +189,7 @@ class LegacyPluginProtocol(Protocol):
     stage: PluginStage
     name: str
 
-    def run(
-        self, context: PluginContext, payload: DocstringPayload
-    ) -> DocstringPayload:
+    def run(self, context: PluginContext, payload: DocstringPayload) -> DocstringPayload:
         """Execute the legacy plugin implementation."""
         ...
 
@@ -234,9 +232,7 @@ class LegacyPluginAdapter(DocstringBuilderPlugin[DocstringPayload, DocstringPayl
         self._plugin = plugin
         self._warned = False
         name_attr: object = getattr(plugin, "name", None)
-        resolved_name = (
-            name_attr if isinstance(name_attr, str) else plugin.__class__.__name__
-        )
+        resolved_name = name_attr if isinstance(name_attr, str) else plugin.__class__.__name__
         self.name = resolved_name
 
     @classmethod
@@ -285,9 +281,7 @@ class LegacyPluginAdapter(DocstringBuilderPlugin[DocstringPayload, DocstringPayl
         return _LegacyHarvesterAdapter(adapter)
 
     @classmethod
-    def wrap_transformer(
-        cls, adapter: LegacyPluginAdapter
-    ) -> _LegacyTransformerAdapter:
+    def wrap_transformer(cls, adapter: LegacyPluginAdapter) -> _LegacyTransformerAdapter:
         """Wrap ``adapter`` as a transformer plugin.
 
         Parameters
@@ -348,9 +342,7 @@ class LegacyPluginAdapter(DocstringBuilderPlugin[DocstringPayload, DocstringPayl
             finish_hook = cast("Callable[[PluginContext], object]", hook)
             finish_hook(context)
 
-    def apply(
-        self, context: PluginContext, payload: DocstringPayload
-    ) -> DocstringPayload:
+    def apply(self, context: PluginContext, payload: DocstringPayload) -> DocstringPayload:
         """Delegate to the legacy ``run`` implementation with a warning.
 
         Parameters
@@ -441,7 +433,9 @@ class _LegacyHarvesterAdapter(HarvesterPlugin):
         """
         result = self._adapter.apply(context, payload)
         if not isinstance(result, HarvestResult):
-            message = f"Legacy harvester {self.name!r} returned {type(result)!r}; expected HarvestResult"
+            message = (
+                f"Legacy harvester {self.name!r} returned {type(result)!r}; expected HarvestResult"
+            )
             raise TypeError(message)
         return result
 
@@ -575,7 +569,9 @@ class _LegacyFormatterAdapter(FormatterPlugin):
         """
         result = self._adapter.apply(context, payload)
         if not isinstance(result, DocstringEdit):
-            message = f"Legacy formatter {self.name!r} returned {type(result)!r}; expected DocstringEdit"
+            message = (
+                f"Legacy formatter {self.name!r} returned {type(result)!r}; expected DocstringEdit"
+            )
             raise TypeError(message)
         return result
 

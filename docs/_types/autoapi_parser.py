@@ -30,9 +30,7 @@ class AutoapiParserProtocol(Protocol):
         """Return an AutoAPI document tree for ``node``."""
         _protocol_stub("parse", self, node)
 
-    def _parse_file(
-        self, file_path: str, condition: Callable[[str], bool], /
-    ) -> object:
+    def _parse_file(self, file_path: str, condition: Callable[[str], bool], /) -> object:
         """Parse ``file_path`` when ``condition`` evaluates to ``True``."""
         _protocol_stub("_parse_file", self, file_path, condition)
 

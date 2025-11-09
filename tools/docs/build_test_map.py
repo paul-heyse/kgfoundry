@@ -41,7 +41,9 @@ DOTTED_IDENTIFIER = re.compile(r"[A-Za-z_][\w\.]+")
 JSONPrimitive = str | int | float | bool | None
 type JSONValue = JSONPrimitive | dict[str, JSONValue] | list[JSONValue]
 
-NAVMAP_MISSING_MESSAGE = "navmap.json is missing. Build the documentation navigation map before running this script."
+NAVMAP_MISSING_MESSAGE = (
+    "navmap.json is missing. Build the documentation navigation map before running this script."
+)
 
 
 class NavMapLoadError(RuntimeError):
@@ -309,9 +311,7 @@ def load_public_symbols() -> set[str]:
         for symbol in raw_exports:
             if isinstance(symbol, str):
                 fully_qualified = (
-                    symbol
-                    if symbol.startswith(f"{module_name}.")
-                    else f"{module_name}.{symbol}"
+                    symbol if symbol.startswith(f"{module_name}.") else f"{module_name}.{symbol}"
                 )
                 exports.add(fully_qualified)
     return exports
@@ -447,9 +447,7 @@ def _symbol_tail(symbol: str) -> str:
     return symbol.rsplit(".", 1)[-1]
 
 
-def _match_reason(
-    symbol: str, dotted_tokens: set[str], ast_tokens: set[str]
-) -> str | None:
+def _match_reason(symbol: str, dotted_tokens: set[str], ast_tokens: set[str]) -> str | None:
     """Match reason.
 
     Parameters
@@ -517,9 +515,7 @@ def _context_windows(line_hits: Iterable[int]) -> list[dict[str, int]]:
     list[dict[str, int]]
         List of context window dictionaries with start/end line numbers.
     """
-    return [
-        {"start": max(1, line - WINDOW), "end": line + WINDOW} for line in line_hits
-    ]
+    return [{"start": max(1, line - WINDOW), "end": line + WINDOW} for line in line_hits]
 
 
 def _relative_repo_path(path: Path) -> str:
@@ -635,9 +631,7 @@ def _executed_lines(info: Mapping[str, object]) -> set[int]:
     return {line for line in raw if isinstance(line, int)}
 
 
-def _contexts_for_file(
-    info: Mapping[str, object], rel: str
-) -> dict[tuple[str, int], set[str]]:
+def _contexts_for_file(info: Mapping[str, object], rel: str) -> dict[tuple[str, int], set[str]]:
     """Contexts for file.
 
     Parameters

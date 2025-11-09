@@ -405,9 +405,7 @@ class PipelineRunner:
         """
         return _repo_relative_path(path)
 
-    def _process_files(
-        self, files: Sequence[Path], jobs: int, state: PipelineState
-    ) -> None:
+    def _process_files(self, files: Sequence[Path], jobs: int, state: PipelineState) -> None:
         """Process files using thread pool or serial execution."""
         for file_path, outcome in self._ordered_outcomes(files, jobs):
             state.status_counts[outcome.status] += 1
@@ -505,9 +503,7 @@ class PipelineRunner:
                 if exception is None:
                     outcome = future.result()
                 else:
-                    if isinstance(
-                        exception, KeyboardInterrupt
-                    ):  # pragma: no cover - propagate
+                    if isinstance(exception, KeyboardInterrupt):  # pragma: no cover - propagate
                         # Re-raise KeyboardInterrupt to allow clean shutdown
                         raise KeyboardInterrupt from exception
                     self._cfg.logger.error(
@@ -558,9 +554,7 @@ class PipelineRunner:
             _set_state(state, docfacts_payload_text=docfacts_payload_text)
             self._cfg.diff_manager.record_docfacts_baseline_diff(docfacts_payload_text)
 
-    def _apply_policy_report(
-        self, policy_report: PolicyReport, state: PipelineState
-    ) -> None:
+    def _apply_policy_report(self, policy_report: PolicyReport, state: PipelineState) -> None:
         """Apply policy violations to error state."""
         for violation in policy_report.violations:
             state.errors.append(
@@ -790,9 +784,7 @@ class PipelineRunner:
                 exit_status,
                 self._cfg.request,
                 f"Docstring builder exited with status {status_label}",
-                instance=(
-                    f"urn:cli:docbuilder:{command}:{invoked}" if invoked else None
-                ),
+                instance=(f"urn:cli:docbuilder:{command}:{invoked}" if invoked else None),
                 errors=errors_payload,
             )
             if cli_result is not None:
@@ -801,9 +793,7 @@ class PipelineRunner:
         if cli_result is not None:
             validate_cli_output(cli_result)
 
-        docfacts_report = self._build_docfacts_report(
-            docfacts_checked=state.docfacts_checked
-        )
+        docfacts_report = self._build_docfacts_report(docfacts_checked=state.docfacts_checked)
         if cli_result is not None and docfacts_report is not None:
             cli_result["docfacts"] = docfacts_report
 
@@ -895,9 +885,7 @@ class PipelineRunner:
         mapping: dict[str, list[str]] = {}
         for path in files:
             key = _repo_relative_path(path)
-            dependents = [
-                _repo_relative_path(dependent) for dependent in dependents_for(path)
-            ]
+            dependents = [_repo_relative_path(dependent) for dependent in dependents_for(path)]
             mapping[key] = dependents
         return mapping
 
@@ -994,9 +982,7 @@ class PipelineRunner:
         if not self._cfg.request.json_output:
             return None
 
-        cli_result = build_cli_result_skeleton(
-            self._cfg.status_from_exit(context.exit_status)
-        )
+        cli_result = build_cli_result_skeleton(self._cfg.status_from_exit(context.exit_status))
         invoked = (
             self._cfg.request.invoked_subcommand
             or self._cfg.request.subcommand
@@ -1043,9 +1029,7 @@ class PipelineRunner:
 
         obs_block: ObservabilityReport = {
             "status": self._cfg.status_from_exit(context.exit_status),
-            "errors": [
-                e.to_report() for e in context.state.errors[:OBSERVABILITY_MAX_ERRORS]
-            ],
+            "errors": [e.to_report() for e in context.state.errors[:OBSERVABILITY_MAX_ERRORS]],
         }
         if context.diff_links:
             obs_block["driftPreviews"] = dict(context.diff_links)

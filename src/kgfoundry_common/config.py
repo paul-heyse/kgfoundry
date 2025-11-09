@@ -344,7 +344,10 @@ class AppSettings(BaseSettings):
             raise ValueError(msg) from exc
 
         if len(decoded_key) < _MIN_SIGNING_KEY_BYTES:
-            msg = f"Signing key must be ≥{_MIN_SIGNING_KEY_BYTES} bytes when decoded (got {len(decoded_key)})"
+            msg = (
+                f"Signing key must be ≥{_MIN_SIGNING_KEY_BYTES} bytes when decoded "
+                f"(got {len(decoded_key)})"
+            )
             raise ValueError(msg)
 
         return value

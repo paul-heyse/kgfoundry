@@ -279,9 +279,7 @@ def execute(
     """
     opts = _coerce_options(options, operation="duckdb.execute")
     require_flag = (
-        params is not None
-        if opts.require_parameterized is None
-        else opts.require_parameterized
+        params is not None if opts.require_parameterized is None else opts.require_parameterized
     )
     _ensure_parameterized(sql, require_parameterized=require_flag)
 
@@ -300,9 +298,7 @@ def execute(
         start = time.perf_counter()
         try:
             _set_timeout(conn, opts.timeout_s)
-            relation = (
-                conn.execute(sql) if params is None else conn.execute(sql, params)
-            )
+            relation = conn.execute(sql) if params is None else conn.execute(sql, params)
         except duckdb.Error as exc:
             observer.error()
             log.exception(

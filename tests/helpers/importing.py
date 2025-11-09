@@ -54,9 +54,7 @@ def load_attribute(module_name: str, attribute: str) -> object:
     return attr
 
 
-def load_typed_attribute[T](
-    module_name: str, attribute: str, expected_type: type[T]
-) -> T:
+def load_typed_attribute[T](module_name: str, attribute: str, expected_type: type[T]) -> T:
     """Load attribute and ensure it matches expected_type at runtime.
 
     Parameters

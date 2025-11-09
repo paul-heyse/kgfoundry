@@ -229,9 +229,7 @@ async def test_readiness_probe_materialize_validates_index(
             """
         )
         connection.execute("CREATE VIEW chunks AS SELECT * FROM chunks_materialized")
-        connection.execute(
-            "CREATE INDEX idx_chunks_materialized_uri ON chunks_materialized(uri)"
-        )
+        connection.execute("CREATE INDEX idx_chunks_materialized_uri ON chunks_materialized(uri)")
 
     probe = ReadinessProbe(context)
     results = await probe.refresh()
@@ -323,7 +321,7 @@ def test_readiness_probe_check_directory_exists() -> None:
         path = Path(tmpdir)
 
         # Act
-        result = ReadinessProbe._check_directory(
+        result = ReadinessProbe._check_directory(  # noqa: SLF001
             path
         )
 
@@ -339,7 +337,7 @@ def test_readiness_probe_check_directory_create() -> None:
         new_dir = Path(tmpdir) / "new_subdir"
 
         # Act
-        result = ReadinessProbe._check_directory(
+        result = ReadinessProbe._check_directory(  # noqa: SLF001
             new_dir, create=True
         )
 
@@ -357,7 +355,7 @@ def test_readiness_probe_check_file_exists() -> None:
 
     try:
         # Act
-        result = ReadinessProbe._check_file(
+        result = ReadinessProbe._check_file(  # noqa: SLF001
             path, description="test file"
         )
 
@@ -373,7 +371,7 @@ def test_readiness_probe_check_file_optional() -> None:
     path = Path("/nonexistent/file.txt")
 
     # Act
-    result = ReadinessProbe._check_file(
+    result = ReadinessProbe._check_file(  # noqa: SLF001
         path, description="test file", optional=True
     )
 
@@ -389,7 +387,7 @@ def test_readiness_probe_check_file_required() -> None:
     path = Path("/nonexistent/file.txt")
 
     # Act
-    result = ReadinessProbe._check_file(
+    result = ReadinessProbe._check_file(  # noqa: SLF001
         path, description="test file", optional=False
     )
 
@@ -419,9 +417,7 @@ def test_readiness_probe_check_vllm_invalid_url(
     probe = ReadinessProbe(context)
 
     # Act
-    result = (
-        probe._check_vllm_connection()
-    )
+    result = probe._check_vllm_connection()  # noqa: SLF001
 
     # Assert
     assert result.healthy is False
@@ -454,9 +450,7 @@ def test_readiness_probe_check_vllm_success(mock_context: ApplicationContext) ->
         mock_instance.get.return_value = mock_response
         mock_client.return_value.__enter__.return_value = mock_instance
 
-        result = (
-            probe._check_vllm_connection()
-        )
+        result = probe._check_vllm_connection()  # noqa: SLF001
 
     # Assert
     assert result.healthy is True
@@ -487,9 +481,7 @@ def test_readiness_probe_check_vllm_http_error(
         mock_instance.get.side_effect = httpx.HTTPError("Connection refused")
         mock_client.return_value.__enter__.return_value = mock_instance
 
-        result = (
-            probe._check_vllm_connection()
-        )
+        result = probe._check_vllm_connection()  # noqa: SLF001
 
     # Assert
     assert result.healthy is False

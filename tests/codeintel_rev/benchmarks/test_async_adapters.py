@@ -67,7 +67,8 @@ class _InMemoryScopeStore:
     """Minimal async scope store stub for benchmarks."""
 
     async def get(
-        self, session_id: str  # noqa: ARG002
+        self,
+        session_id: str,  # noqa: ARG002
     ) -> dict | None:
         return None
 
@@ -120,9 +121,7 @@ def test_list_paths_single_request(benchmark, mock_context: Mock) -> None:
     async def run_async() -> dict:
         return await files_adapter.list_paths(mock_context, path="src", max_results=50)
 
-    result = benchmark.pedantic(
-        lambda: asyncio.run(run_async()), rounds=10, iterations=5
-    )
+    result = benchmark.pedantic(lambda: asyncio.run(run_async()), rounds=10, iterations=5)
 
     assert "items" in result
     assert len(result["items"]) > 0
@@ -139,16 +138,12 @@ def test_list_paths_concurrent_100(benchmark, mock_context: Mock) -> None:
 
     async def run_concurrent() -> list[dict]:
         async def list_task() -> dict:
-            return await files_adapter.list_paths(
-                mock_context, path="src", max_results=20
-            )
+            return await files_adapter.list_paths(mock_context, path="src", max_results=20)
 
         tasks = [list_task() for _ in range(num_concurrent)]
         return await asyncio.gather(*tasks)
 
-    results = benchmark.pedantic(
-        lambda: asyncio.run(run_concurrent()), rounds=3, iterations=1
-    )
+    results = benchmark.pedantic(lambda: asyncio.run(run_concurrent()), rounds=3, iterations=1)
 
     assert len(results) == num_concurrent
     assert all("items" in result for result in results)
@@ -175,9 +170,7 @@ def test_blame_range_single_request(benchmark, mock_context: Mock) -> None:
             end_line=5,
         )
 
-    result = benchmark.pedantic(
-        lambda: asyncio.run(run_async()), rounds=10, iterations=5
-    )
+    result = benchmark.pedantic(lambda: asyncio.run(run_async()), rounds=10, iterations=5)
 
     assert "blame" in result or "error" in result
 
@@ -204,9 +197,7 @@ def test_blame_range_concurrent_50(benchmark, mock_context: Mock) -> None:
         tasks = [blame_task(i) for i in range(num_concurrent)]
         return await asyncio.gather(*tasks)
 
-    results = benchmark.pedantic(
-        lambda: asyncio.run(run_concurrent()), rounds=3, iterations=1
-    )
+    results = benchmark.pedantic(lambda: asyncio.run(run_concurrent()), rounds=3, iterations=1)
 
     assert len(results) == num_concurrent
     assert all("blame" in result or "error" in result for result in results)
@@ -227,9 +218,7 @@ def test_mixed_concurrent_benchmark(benchmark, mock_context: Mock) -> None:
 
     async def run_mixed() -> tuple[list[dict], list[dict]]:
         async def list_task() -> dict:
-            return await files_adapter.list_paths(
-                mock_context, path="src", max_results=20
-            )
+            return await files_adapter.list_paths(mock_context, path="src", max_results=20)
 
         async def blame_task(task_id: int) -> dict:
             file_num = task_id % 10

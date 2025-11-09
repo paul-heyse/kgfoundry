@@ -104,9 +104,7 @@ LANGUAGE_EXTENSIONS: dict[str, list[str]] = {
 }
 
 
-def get_effective_scope(
-    context: ApplicationContext, session_id: str | None
-) -> ScopeIn | None:
+def get_effective_scope(context: ApplicationContext, session_id: str | None) -> ScopeIn | None:
     """Retrieve session scope from registry.
 
     Helper function that wraps ScopeRegistry.get_scope with null-safety for
@@ -214,9 +212,7 @@ def merge_scope_filters(scope: ScopeIn | None, explicit_params: dict) -> dict:
         result.update(scope)
 
     # Override with explicit params (filter out None values)
-    result.update(
-        {key: value for key, value in explicit_params.items() if value is not None}
-    )
+    result.update({key: value for key, value in explicit_params.items() if value is not None})
 
     return result
 

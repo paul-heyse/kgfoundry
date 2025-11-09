@@ -61,9 +61,7 @@ class SearchConfig(BaseSettings):
         default="lucene", description="Sparse backend type ('lucene' or 'pure')"
     )
     kg_boosts_direct: float = Field(default=0.08, description="Direct KG boost weight")
-    kg_boosts_one_hop: float = Field(
-        default=0.04, description="One-hop KG boost weight"
-    )
+    kg_boosts_one_hop: float = Field(default=0.04, description="One-hop KG boost weight")
     validate_responses: bool = Field(
         default=False,
         description="Enable response schema validation (dev/staging only)",
@@ -79,28 +77,18 @@ class ObservabilityConfig(BaseSettings):
     log_level: str = Field(
         default="INFO", description="Logging level (DEBUG, INFO, WARNING, ERROR)"
     )
-    metrics_enabled: bool = Field(
-        default=True, description="Enable Prometheus metrics export"
-    )
-    traces_enabled: bool = Field(
-        default=False, description="Enable OpenTelemetry tracing"
-    )
-    metrics_port: int = Field(
-        default=9090, description="Port for Prometheus metrics endpoint"
-    )
+    metrics_enabled: bool = Field(default=True, description="Enable Prometheus metrics export")
+    traces_enabled: bool = Field(default=False, description="Enable OpenTelemetry tracing")
+    metrics_port: int = Field(default=9090, description="Port for Prometheus metrics endpoint")
 
 
 # [nav:anchor SparseEmbeddingConfig]
 class SparseEmbeddingConfig(BaseSettings):
     """Sparse embedding configuration (``KGFOUNDRY_SPARSE_EMBEDDING_*``)."""
 
-    model_config = SettingsConfigDict(
-        env_prefix="KGFOUNDRY_SPARSE_EMBEDDING_", extra="forbid"
-    )
+    model_config = SettingsConfigDict(env_prefix="KGFOUNDRY_SPARSE_EMBEDDING_", extra="forbid")
 
-    bm25_index_dir: str = Field(
-        default="./_indices/bm25", description="BM25 index directory path"
-    )
+    bm25_index_dir: str = Field(default="./_indices/bm25", description="BM25 index directory path")
     bm25_k1: float = Field(default=0.9, description="BM25 k1 parameter")
     bm25_b: float = Field(default=0.4, description="BM25 b parameter")
     splade_index_dir: str = Field(
@@ -178,9 +166,7 @@ class RuntimeSettings(BaseSettings):
         default_factory=SparseEmbeddingConfig,
         description="Sparse embedding configuration",
     )
-    faiss: FaissConfig = Field(
-        default_factory=FaissConfig, description="FAISS index configuration"
-    )
+    faiss: FaissConfig = Field(default_factory=FaissConfig, description="FAISS index configuration")
 
     def __init__(self, **overrides: object) -> None:
         try:

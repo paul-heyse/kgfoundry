@@ -150,9 +150,7 @@ async def test_concurrent_list_paths(mock_context: Mock) -> None:
     assert all(isinstance(result["items"], list) for result in results)
 
     # Verify reasonable performance (should complete in <5 seconds for 100 concurrent)
-    assert (
-        duration < 5.0
-    ), f"100 concurrent requests took {duration:.2f}s (expected <5s)"
+    assert duration < 5.0, f"100 concurrent requests took {duration:.2f}s (expected <5s)"
 
     # Calculate average latency per request
     avg_latency_ms = (duration / num_concurrent) * 1000
@@ -209,9 +207,7 @@ async def test_concurrent_blame_range(mock_context: Mock) -> None:
     assert all("blame" in result or "error" in result for result in results)
 
     # Verify reasonable performance
-    assert (
-        duration < 3.0
-    ), f"50 concurrent blame operations took {duration:.2f}s (expected <3s)"
+    assert duration < 3.0, f"50 concurrent blame operations took {duration:.2f}s (expected <3s)"
 
     avg_latency_ms = (duration / num_concurrent) * 1000
     print("\nLoad test results:")
@@ -245,9 +241,7 @@ async def test_mixed_concurrent_operations(mock_context: Mock) -> None:
             "codeintel_rev.mcp_server.adapters.files.get_effective_scope",
             return_value=None,
         ):
-            return await files_adapter.list_paths(
-                mock_context, path="src", max_results=20
-            )
+            return await files_adapter.list_paths(mock_context, path="src", max_results=20)
 
     async def blame_task(task_id: int) -> dict:
         """Single blame_range task.
@@ -344,9 +338,9 @@ async def test_no_thread_exhaustion(mock_context: Mock) -> None:
     assert all("items" in result for result in results)
 
     # Should complete without hanging (thread exhaustion would cause hangs)
-    assert (
-        duration < 10.0
-    ), f"200 concurrent requests took {duration:.2f}s (thread exhaustion suspected)"
+    assert duration < 10.0, (
+        f"200 concurrent requests took {duration:.2f}s (thread exhaustion suspected)"
+    )
 
     print("\nThread exhaustion test:")
     print(f"  Concurrent requests: {num_concurrent}")

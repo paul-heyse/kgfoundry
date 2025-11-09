@@ -181,9 +181,7 @@ def process(p: Path) -> None:
 class TestAutoFixSuggestions:
     """Test that suggestions are actionable and specific."""
 
-    def test_heavy_import_suggestion_includes_type_checking(
-        self, tmp_path: Path
-    ) -> None:
+    def test_heavy_import_suggestion_includes_type_checking(self, tmp_path: Path) -> None:
         """Verify heavy import suggestion mentions TYPE_CHECKING."""
         test_file = tmp_path / "test.py"
         test_file.write_text("import torch\n", encoding="utf-8")
@@ -204,18 +202,14 @@ class TestAutoFixSuggestions:
     def test_private_module_suggestion_references_facade(self, tmp_path: Path) -> None:
         """Verify private module suggestion references public façade."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            "from docs._types.symbol import Symbol\n", encoding="utf-8"
-        )
+        test_file.write_text("from docs._types.symbol import Symbol\n", encoding="utf-8")
 
         violations = check_file(test_file)
         assert len(violations) == 1
         assert "façade" in violations[0].suggestion.lower()
         assert "docs.types" in violations[0].suggestion
 
-    def test_deprecated_shim_suggestion_references_gate_import(
-        self, tmp_path: Path
-    ) -> None:
+    def test_deprecated_shim_suggestion_references_gate_import(self, tmp_path: Path) -> None:
         """Verify deprecated shim suggestion mentions gate_import."""
         test_file = tmp_path / "test.py"
         test_file.write_text(
@@ -336,9 +330,7 @@ if TYPE_CHECKING:
     def test_faiss_submodule_import(self, tmp_path: Path) -> None:
         """Verify detection of faiss submodule imports."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            "from faiss.swigfaiss import IndexFlat\n", encoding="utf-8"
-        )
+        test_file.write_text("from faiss.swigfaiss import IndexFlat\n", encoding="utf-8")
 
         violations = check_file(test_file)
         assert len(violations) == 1
@@ -366,9 +358,7 @@ from kgfoundry_common.typing import resolve_numpy
     def test_syntactic_errors_are_handled(self, tmp_path: Path) -> None:
         """Verify graceful handling of syntax errors."""
         test_file = tmp_path / "test.py"
-        test_file.write_text(
-            "import numpy\nthis is not valid python\n", encoding="utf-8"
-        )
+        test_file.write_text("import numpy\nthis is not valid python\n", encoding="utf-8")
 
         violations = check_file(test_file)
         # Should return empty list for files with syntax errors

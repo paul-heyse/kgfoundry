@@ -260,15 +260,11 @@ def _module_name(root: Path, file_path: Path) -> str:
 
 def _load_module(module_name: str, search_paths: Sequence[str]) -> GriffeModuleLike:
     loader = GriffeLoaderFactory(search_paths=tuple(search_paths))
-    load_candidate = cast(
-        "Callable[[str], object] | None", getattr(loader, "load_module", None)
-    )
+    load_candidate = cast("Callable[[str], object] | None", getattr(loader, "load_module", None))
     if callable(load_candidate):
         load_fn: Callable[[str], object] = load_candidate
     else:
-        load_fallback = cast(
-            "Callable[[str], object] | None", getattr(loader, "load", None)
-        )
+        load_fallback = cast("Callable[[str], object] | None", getattr(loader, "load", None))
         if not callable(load_fallback):  # pragma: no cover - defensive fallback
             message = "Griffe loader is missing a callable 'load' method"
             raise SymbolResolutionError(message)
@@ -441,9 +437,7 @@ def _collect_symbols(
     prefix_list: list[str] = prefix if prefix is not None else []
     if _is_griffe_class(obj):
         class_obj: GriffeClassLike = obj
-        yield from _collect_class_symbol(
-            class_obj, module_name, file_path, config, prefix_list
-        )
+        yield from _collect_class_symbol(class_obj, module_name, file_path, config, prefix_list)
         return
     if _is_griffe_function(obj):
         function_obj: GriffeFunctionLike = obj
@@ -457,9 +451,7 @@ def _collect_symbols(
         return
     if _is_griffe_module(obj):
         module_obj: GriffeModuleLike = obj
-        yield from _walk_members(
-            module_obj, module_name, file_path, config, prefix_list
-        )
+        yield from _walk_members(module_obj, module_name, file_path, config, prefix_list)
 
 
 def _walk_members(
@@ -576,9 +568,7 @@ def _build_cst_index(module_name: str, file_path: Path) -> dict[str, cst.CSTNode
     return collector.index
 
 
-def harvest_file(
-    file_path: Path, config: BuilderConfig, repo_root: Path
-) -> HarvestResult:
+def harvest_file(file_path: Path, config: BuilderConfig, repo_root: Path) -> HarvestResult:
     """Collect symbol metadata for a single file.
 
     Parameters
@@ -602,9 +592,7 @@ def harvest_file(
     module = _load_module(module_name, search_paths)
     symbols = list(_walk_members(module, module_name, file_path, config))
     index = _build_cst_index(module_name, file_path)
-    return HarvestResult(
-        module=module_name, filepath=file_path, symbols=symbols, cst_index=index
-    )
+    return HarvestResult(module=module_name, filepath=file_path, symbols=symbols, cst_index=index)
 
 
 def iter_target_files(config: BuilderConfig, repo_root: Path) -> Iterator[Path]:

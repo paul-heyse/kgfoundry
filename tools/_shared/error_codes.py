@@ -76,9 +76,7 @@ CANONICAL_ERROR_CODES: Final[dict[str, CanonicalErrorCode]] = {
         domain="documentation",
         category="environment",
         severity="error",
-        remediation=(
-            "Run 'scripts/bootstrap.sh' or 'uv sync --frozen' to install the toolchain."
-        ),
+        remediation=("Run 'scripts/bootstrap.sh' or 'uv sync --frozen' to install the toolchain."),
     ),
     "KGF-DOC-ENV-002": _code(
         "KGF-DOC-ENV-002",

@@ -41,9 +41,7 @@ def _get_underlying_index(cpu_index: Any) -> Any:
     Any
         Underlying FAISS index instance.
     """
-    assert hasattr(
-        cpu_index, "index"
-    ), "Expected FAISS index wrapper to expose `index` attribute"
+    assert hasattr(cpu_index, "index"), "Expected FAISS index wrapper to expose `index` attribute"
     index_map = cast("faiss.IndexIDMap2", cpu_index)
     return index_map.index
 
@@ -264,9 +262,7 @@ def test_dual_index_search_overhead(tmp_index_path: Path) -> None:
     single_time = time.time() - start
 
     # Add secondary index and measure dual-index search
-    secondary_vectors = _rng.normal(0.5, 0.15, (secondary_size, vec_dim)).astype(
-        np.float32
-    )
+    secondary_vectors = _rng.normal(0.5, 0.15, (secondary_size, vec_dim)).astype(np.float32)
     secondary_vectors = np.clip(secondary_vectors, 0.0, 1.0)
     manager.update_index(
         secondary_vectors,
@@ -277,9 +273,7 @@ def test_dual_index_search_overhead(tmp_index_path: Path) -> None:
     _distances2, _ids2 = manager.search(query, k=50)
     dual_time = time.time() - start
 
-    overhead_pct = (
-        ((dual_time - single_time) / single_time) * 100 if single_time > 0 else 0
-    )
+    overhead_pct = ((dual_time - single_time) / single_time) * 100 if single_time > 0 else 0
 
     print("\nDual-index search overhead:")
     print(f"  Single-index: {single_time * 1000:.2f}ms")
@@ -287,6 +281,4 @@ def test_dual_index_search_overhead(tmp_index_path: Path) -> None:
     print(f"  Overhead: {(dual_time - single_time) * 1000:.2f}ms ({overhead_pct:.1f}%)")
 
     # Overhead should be minimal (<50% increase)
-    assert (
-        overhead_pct < 50
-    ), f"Dual-index overhead {overhead_pct:.1f}% exceeds target (50%)"
+    assert overhead_pct < 50, f"Dual-index overhead {overhead_pct:.1f}% exceeds target (50%)"

@@ -251,9 +251,7 @@ def _normalized_key(key: str) -> str:
     return key.strip().replace("-", "_").lower()
 
 
-def _apply_mapping(
-    settings: PolicySettings, mapping: Mapping[str, object]
-) -> PolicySettings:
+def _apply_mapping(settings: PolicySettings, mapping: Mapping[str, object]) -> PolicySettings:
     """Apply configuration mapping to policy settings.
 
     Parameters
@@ -290,9 +288,7 @@ def _apply_mapping(
             if isinstance(value, Iterable) and not isinstance(value, (str, bytes)):
                 updated = replace(
                     updated,
-                    exceptions=_parse_exceptions(
-                        cast("Iterable[Mapping[str, object]]", value)
-                    ),
+                    exceptions=_parse_exceptions(cast("Iterable[Mapping[str, object]]", value)),
                 )
                 continue
             message = "Policy exceptions must be an iterable of mappings"
@@ -332,9 +328,7 @@ def _parse_override_pairs(raw: str) -> dict[str, str]:
     return overrides
 
 
-def _apply_overrides(
-    settings: PolicySettings, overrides: Mapping[str, str]
-) -> PolicySettings:
+def _apply_overrides(settings: PolicySettings, overrides: Mapping[str, str]) -> PolicySettings:
     """Apply override values to policy settings.
 
     Parameters
@@ -491,9 +485,7 @@ class PolicyEngine:
                 f" ({exception.justification or 'no justification provided'})"
             )
         message = f"{symbol}: {detail}"
-        violation = PolicyViolation(
-            rule=rule, symbol=symbol, action=action, message=message
-        )
+        violation = PolicyViolation(rule=rule, symbol=symbol, action=action, message=message)
         self.violations.append(violation)
         return violation.fatal
 
@@ -525,13 +517,11 @@ class PolicyEngine:
         PolicyReport
             Policy report with coverage, threshold, and violations.
         """
-        coverage = (
-            1.0
-            if self.total_symbols == 0
-            else self.documented_symbols / self.total_symbols
-        )
+        coverage = 1.0 if self.total_symbols == 0 else self.documented_symbols / self.total_symbols
         if coverage + 1e-9 < self.settings.coverage_threshold:
-            shortfall = f"coverage {coverage:.1%} below threshold {self.settings.coverage_threshold:.1%}"
+            shortfall = (
+                f"coverage {coverage:.1%} below threshold {self.settings.coverage_threshold:.1%}"
+            )
             self._register_violation("coverage", "<aggregate>", shortfall)
         return PolicyReport(
             coverage=coverage,

@@ -299,9 +299,7 @@ class SymbolIndexRow(FrozenBaseModel):
     source_link: dict[str, str] = Field(
         default_factory=dict, description="Links to source code (GitHub, etc.)"
     )
-    canonical_path: str | None = Field(
-        None, description="Canonical path if this is an alias"
-    )
+    canonical_path: str | None = Field(None, description="Canonical path if this is an alias")
     module: str | None = Field(None, description="Module containing this symbol")
     package: str | None = Field(None, description="Top-level package name")
     file: str | None = Field(None, description="Relative path to source file")
@@ -517,12 +515,8 @@ class SymbolDeltaChange(FrozenBaseModel):
     before: dict[str, JsonValue] = Field(
         default_factory=dict, description="Previous row (serialized)"
     )
-    after: dict[str, JsonValue] = Field(
-        default_factory=dict, description="New row (serialized)"
-    )
-    reasons: tuple[str, ...] = Field(
-        default_factory=tuple, description="Reasons for the change"
-    )
+    after: dict[str, JsonValue] = Field(default_factory=dict, description="New row (serialized)")
+    reasons: tuple[str, ...] = Field(default_factory=tuple, description="Reasons for the change")
 
     @field_validator("path", mode="before")
     @classmethod
@@ -603,12 +597,8 @@ class SymbolDeltaPayload(FrozenBaseModel):
 
     base_sha: str | None = Field(None, description="Baseline git SHA or build ID")
     head_sha: str | None = Field(None, description="Current git SHA or build ID")
-    added: tuple[str, ...] = Field(
-        default_factory=tuple, description="Newly added symbol paths"
-    )
-    removed: tuple[str, ...] = Field(
-        default_factory=tuple, description="Removed symbol paths"
-    )
+    added: tuple[str, ...] = Field(default_factory=tuple, description="Newly added symbol paths")
+    removed: tuple[str, ...] = Field(default_factory=tuple, description="Removed symbol paths")
     changed: tuple[SymbolDeltaChange, ...] = Field(
         default_factory=tuple, description="Changed symbols"
     )
@@ -677,9 +667,7 @@ class SymbolDeltaPayload(FrozenBaseModel):
             raw_entries = cast("list[object] | tuple[object, ...]", v)
             entries = tuple(raw_entries)
             for index, entry in enumerate(entries):
-                coerced = _coerce_delta_change(
-                    entry, artifact="symbol-delta", index=index
-                )
+                coerced = _coerce_delta_change(entry, artifact="symbol-delta", index=index)
                 changes.append(coerced)
             return tuple(changes)
         changed_field = "changed"
@@ -922,9 +910,7 @@ def _coerce_delta_change(
     )
 
 
-def _coerce_delta_changes(
-    value: object, *, artifact: str
-) -> tuple[SymbolDeltaChange, ...]:
+def _coerce_delta_changes(value: object, *, artifact: str) -> tuple[SymbolDeltaChange, ...]:
     """Coerce value to tuple of SymbolDeltaChange.
 
     Parameters
@@ -1023,15 +1009,11 @@ def symbol_index_from_json(raw: JsonPayload) -> SymbolIndexArtifacts:
             path_raw = item.get("path")
             path_field = "path"
             if not isinstance(path_raw, str):
-                _validation_error(
-                    path_field, "a string", artifact="symbol-index", row=i
-                )
+                _validation_error(path_field, "a string", artifact="symbol-index", row=i)
             kind_raw = item.get("kind")
             kind_field = "kind"
             if not isinstance(kind_raw, str):
-                _validation_error(
-                    kind_field, "a string", artifact="symbol-index", row=i
-                )
+                _validation_error(kind_field, "a string", artifact="symbol-index", row=i)
             doc_raw = item.get("doc")
             doc_field = "doc"
             if not isinstance(doc_raw, str):
@@ -1228,12 +1210,8 @@ def symbol_delta_from_json(raw: JsonPayload) -> SymbolDeltaPayload:
         head_sha = _coerce_optional_str(
             raw.get("head_sha"), field="head_sha", artifact="symbol-delta"
         )
-        added = _coerce_str_tuple(
-            raw.get("added"), field="added", artifact="symbol-delta"
-        )
-        removed = _coerce_str_tuple(
-            raw.get("removed"), field="removed", artifact="symbol-delta"
-        )
+        added = _coerce_str_tuple(raw.get("added"), field="added", artifact="symbol-delta")
+        removed = _coerce_str_tuple(raw.get("removed"), field="removed", artifact="symbol-delta")
         changed = _coerce_delta_changes(raw.get("changed"), artifact="symbol-delta")
         return SymbolDeltaPayload(
             base_sha=base_sha,

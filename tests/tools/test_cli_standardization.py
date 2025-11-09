@@ -14,9 +14,7 @@ CLI_SUITES = (
 )
 
 
-@pytest.mark.parametrize(
-    ("module_path", "context_path", "command_name"), list(CLI_SUITES)
-)
+@pytest.mark.parametrize(("module_path", "context_path", "command_name"), list(CLI_SUITES))
 def test_cli_configuration_matches_context(
     module_path: str, context_path: str, command_name: str | None
 ) -> None:
@@ -53,7 +51,4 @@ def test_cli_configuration_matches_context(
 
     if definition is not None:
         assert command_name == module.CLI_COMMAND_NAME
-        assert (
-            expected_operation_ids[module.SUBCOMMAND_BUILD_GRAPHS]
-            == module.CLI_OPERATION_ID
-        )
+        assert expected_operation_ids[module.SUBCOMMAND_BUILD_GRAPHS] == module.CLI_OPERATION_ID

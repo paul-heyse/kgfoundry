@@ -70,11 +70,7 @@ class DiffManager:
         docfacts_text: str | None,
     ) -> None:
         """Write a baseline diff for DocFacts when necessary."""
-        if (
-            not self.options.baseline
-            or not docfacts_text
-            or DOCFACTS_DIFF_PATH.exists()
-        ):
+        if not self.options.baseline or not docfacts_text or DOCFACTS_DIFF_PATH.exists():
             return
         baseline_docfacts = read_baseline_version(self.options.baseline, DOCFACTS_PATH)
         if baseline_docfacts is None or baseline_docfacts == docfacts_text:

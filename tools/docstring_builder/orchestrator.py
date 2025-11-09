@@ -357,12 +357,8 @@ def _load_docfacts_from_disk() -> dict[str, DocFact]:
     payload_items: Iterable[Mapping[str, object]]
     if isinstance(raw, Mapping):
         entries_field: object = raw.get("entries", [])
-        if isinstance(entries_field, Sequence) and not isinstance(
-            entries_field, (str, bytes)
-        ):
-            payload_items = [
-                item for item in entries_field if isinstance(item, Mapping)
-            ]
+        if isinstance(entries_field, Sequence) and not isinstance(entries_field, (str, bytes)):
+            payload_items = [item for item in entries_field if isinstance(item, Mapping)]
         else:
             payload_items = []
     elif isinstance(raw, list):  # pragma: no cover - legacy fallback
@@ -830,11 +826,7 @@ def _run_pipeline(invocation: _PipelineInvocation) -> DocstringBuildResult:
     if invocation.request.command == "update":
         dependencies.cache.write()
 
-    if (
-        not files_list
-        and invocation.request.command == "check"
-        and invocation.request.diff
-    ):
+    if not files_list and invocation.request.command == "check" and invocation.request.diff:
         DOCSTRINGS_DIFF_PATH.unlink(missing_ok=True)
         DOCFACTS_DIFF_PATH.unlink(missing_ok=True)
 

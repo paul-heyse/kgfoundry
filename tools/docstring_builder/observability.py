@@ -92,9 +92,7 @@ class DocstringBuilderMetrics:
 
     def __init__(self, registry: CollectorRegistry | None = None) -> None:
         resolved_registry = (
-            registry
-            if registry is not None
-            else cast("CollectorRegistry", get_default_registry())
+            registry if registry is not None else cast("CollectorRegistry", get_default_registry())
         )
         self.registry = resolved_registry
 
@@ -252,23 +250,17 @@ def record_operation_metrics(
         duration = time.monotonic() - start_time
 
         if operation == "harvest":
-            metrics.harvest_duration_seconds.labels(status=final_status).observe(
-                duration
-            )
+            metrics.harvest_duration_seconds.labels(status=final_status).observe(duration)
         elif operation == "policy":
-            metrics.policy_duration_seconds.labels(status=final_status).observe(
-                duration
-            )
+            metrics.policy_duration_seconds.labels(status=final_status).observe(duration)
         elif operation == "render":
-            metrics.render_duration_seconds.labels(status=final_status).observe(
-                duration
-            )
+            metrics.render_duration_seconds.labels(status=final_status).observe(duration)
         elif operation == "cli":
             # CLI status is determined by the command, not the operation
             # This is a simplified version; CLI should pass command explicitly
-            metrics.cli_duration_seconds.labels(
-                command="unknown", status=final_status
-            ).observe(duration)
+            metrics.cli_duration_seconds.labels(command="unknown", status=final_status).observe(
+                duration
+            )
 
         with_fields(
             log_adapter,

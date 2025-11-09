@@ -21,9 +21,7 @@ def _index_path_fixture(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path
     return index_path
 
 
-def test_main_emits_success_envelope(
-    monkeypatch: pytest.MonkeyPatch, index_path: Path
-) -> None:
+def test_main_emits_success_envelope(monkeypatch: pytest.MonkeyPatch, index_path: Path) -> None:
     def fake_collect() -> list[str]:
         return []
 
@@ -49,9 +47,7 @@ def test_main_emits_success_envelope(
     assert any(entry.get("path") == str(index_path) for entry in files)
 
 
-def test_main_records_validation_failure(
-    monkeypatch: pytest.MonkeyPatch, index_path: Path
-) -> None:
+def test_main_records_validation_failure(monkeypatch: pytest.MonkeyPatch, index_path: Path) -> None:
     def fake_collect() -> list[str]:
         return ["module.py: missing __navmap__"]
 

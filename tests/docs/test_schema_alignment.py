@@ -75,9 +75,7 @@ class TestAlignSchemaFieldsCanonical:
             },
         ],
     )
-    def test_canonical_payloads_align_successfully(
-        self, payload: dict[str, object]
-    ) -> None:
+    def test_canonical_payloads_align_successfully(self, payload: dict[str, object]) -> None:
         """Verify canonical payloads pass alignment without errors."""
         if "path" in payload and "kind" in payload:
             aligned = align_schema_fields(
@@ -94,12 +92,7 @@ class TestAlignSchemaFieldsCanonical:
 
         assert isinstance(aligned, dict)
         assert all(
-            k
-            in (
-                SYMBOL_INDEX_ROW_FIELDS
-                if "path" in payload
-                else SYMBOL_DELTA_PAYLOAD_FIELDS
-            )
+            k in (SYMBOL_INDEX_ROW_FIELDS if "path" in payload else SYMBOL_DELTA_PAYLOAD_FIELDS)
             for k in aligned
         )
 
@@ -197,9 +190,7 @@ class TestAlignSchemaFieldsInvalid:
         error = exc_info.value
         assert error.context is not None
         unknown_fields_value: object = error.context.get("unknown_fields", [])
-        unknown_fields = (
-            unknown_fields_value if isinstance(unknown_fields_value, list) else []
-        )
+        unknown_fields = unknown_fields_value if isinstance(unknown_fields_value, list) else []
         assert sorted(unknown_fields) == ["bad_field_1", "bad_field_2", "bad_field_3"]
 
     def test_error_provides_remediation_guidance(self) -> None:

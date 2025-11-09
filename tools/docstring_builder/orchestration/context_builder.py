@@ -152,9 +152,7 @@ class PipelineContextBuilder:
         """
         correlation_id = get_correlation_id()
         command = self.request.command or "unknown"
-        subcommand = (
-            self.request.invoked_subcommand or self.request.subcommand or command
-        )
+        subcommand = self.request.invoked_subcommand or self.request.subcommand or command
         return with_fields(
             LOGGER,
             correlation_id=correlation_id,
@@ -181,9 +179,7 @@ class PipelineContextBuilder:
                 disable=list(self.request.disable_plugins),
             )
         except PluginConfigurationError:
-            LOGGER.exception(
-                "Plugin configuration error", extra={"operation": "plugin_load"}
-            )
+            LOGGER.exception("Plugin configuration error", extra={"operation": "plugin_load"})
             return _build_error_result(
                 ExitStatus.CONFIG,
                 self.request,
@@ -207,9 +203,7 @@ class PipelineContextBuilder:
             )
             return PolicyEngine(policy_settings)
         except PolicyConfigurationError:
-            LOGGER.exception(
-                "Policy configuration error", extra={"operation": "policy_load"}
-            )
+            LOGGER.exception("Policy configuration error", extra={"operation": "policy_load"})
             return _build_error_result(
                 ExitStatus.CONFIG,
                 self.request,

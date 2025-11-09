@@ -134,9 +134,7 @@ pytest_plugins: tuple[str, ...] = ()
 
 if TYPE_CHECKING:  # pragma: no cover - typing support only
 
-    def fixture(
-        *args: object, **kwargs: object
-    ) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def fixture(*args: object, **kwargs: object) -> Callable[[Callable[P, R]], Callable[P, R]]:
         """Create a pytest fixture.
 
         Parameters
@@ -268,9 +266,7 @@ def caplog_records(caplog: LogCaptureFixture) -> dict[str, list[logging.LogRecor
             Mapping of operation name to log records.
         """
         records_by_op: dict[str, list[logging.LogRecord]] = {}
-        records = [
-            record for record in caplog.records if isinstance(record, logging.LogRecord)
-        ]
+        records = [record for record in caplog.records if isinstance(record, logging.LogRecord)]
         for record in records:
             record_dict = cast("dict[str, object]", record.__dict__)
             op_obj = record_dict.get("operation", "unknown")
@@ -401,9 +397,7 @@ def load_problem_details_example(example_name: str) -> ProblemDetailsDict:
         If example file does not exist.
     """
     example_path = (
-        Path(__file__).parent.parent
-        / "schema/examples/problem_details"
-        / f"{example_name}.json"
+        Path(__file__).parent.parent / "schema/examples/problem_details" / f"{example_name}.json"
     )
     if not example_path.exists():
         msg = f"Problem Details example not found: {example_path}"
@@ -411,9 +405,7 @@ def load_problem_details_example(example_name: str) -> ProblemDetailsDict:
 
     # Lazy import JsonValue after path setup to avoid E402
 
-    return cast(
-        "dict[str, JsonValue]", json.loads(example_path.read_text(encoding="utf-8"))
-    )
+    return cast("dict[str, JsonValue]", json.loads(example_path.read_text(encoding="utf-8")))
 
 
 @fixture
@@ -506,9 +498,7 @@ def metrics_asserter(
             If metric not found or value mismatch.
         """
         # Collect all families and samples
-        families = [
-            cast("MetricFamily", family) for family in prometheus_registry.collect()
-        ]
+        families = [cast("MetricFamily", family) for family in prometheus_registry.collect()]
         for family in families:
             if family.name == name:
                 samples_raw = list(family.samples)
@@ -543,9 +533,7 @@ class _SimpleSpanProcessor:
     def __init__(self, exporter: SpanExporterProtocol) -> None:
         self.exporter = exporter
 
-    def on_start(
-        self, span: SpanProtocol, parent_context: object | None = None
-    ) -> None:
+    def on_start(self, span: SpanProtocol, parent_context: object | None = None) -> None:
         """No-op start hook to satisfy span processor protocol."""
 
     def force_flush(self, timeout_millis: int | None = None) -> bool:

@@ -802,9 +802,7 @@ _DOCFACTS_VALIDATOR: Final[Draft202012ValidatorProtocol] = create_draft202012_va
     _load_docfacts_schema()
 )
 _CLI_VALIDATOR: Final[Draft202012ValidatorProtocol] = create_draft202012_validator(
-    cast(
-        "dict[str, JsonValue]", json.loads(_CLI_SCHEMA_PATH.read_text(encoding="utf-8"))
-    )
+    cast("dict[str, JsonValue]", json.loads(_CLI_SCHEMA_PATH.read_text(encoding="utf-8")))
 )
 
 
@@ -850,9 +848,7 @@ def validate_docfacts_payload(payload: DocfactsDocumentPayload) -> None:
             )
         )
         problem_payload = cast("ProblemDetails", problem)
-        detail_message = str(
-            problem_payload.get("detail", "DocFacts schema validation failed")
-        )
+        detail_message = str(problem_payload.get("detail", "DocFacts schema validation failed"))
         raise SchemaViolationError(detail_message, problem=problem_payload) from exc
 
 
@@ -890,9 +886,7 @@ def validate_cli_output(payload: CliResult) -> None:
             )
         )
         problem_payload = cast("ProblemDetails", problem)
-        detail_message = str(
-            problem_payload.get("detail", "CLI schema validation failed")
-        )
+        detail_message = str(problem_payload.get("detail", "CLI schema validation failed"))
         raise SchemaViolationError(detail_message, problem=problem_payload) from exc
 
 
@@ -946,9 +940,7 @@ def _build_docfacts_entry(fact: DocFactLike) -> DocfactsEntry:
     return {
         "qname": fact.qname,
         "module": fact.module,
-        "kind": (
-            cast("SymbolKind", fact.kind) if fact.kind in _SYMBOL_KINDS else "function"
-        ),
+        "kind": (cast("SymbolKind", fact.kind) if fact.kind in _SYMBOL_KINDS else "function"),
         "filepath": fact.filepath,
         "lineno": fact.lineno,
         "end_lineno": fact.end_lineno,

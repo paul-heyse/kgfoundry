@@ -135,9 +135,7 @@ class StubParityIssueRecord:
             Issue record instance.
         """
         stub_path = Path(entry["stub_path"]).resolve()
-        any_usages = tuple(
-            (usage["line"], usage["preview"]) for usage in entry["any_usages"]
-        )
+        any_usages = tuple((usage["line"], usage["preview"]) for usage in entry["any_usages"])
         return cls(
             module=entry["module"],
             stub_path=stub_path,
@@ -218,16 +216,12 @@ class StubParityReport:
             If issue or error count mismatch is detected.
         """
         issues = tuple(
-            StubParityIssueRecord.from_context_entry(entry)
-            for entry in context["issues"]
+            StubParityIssueRecord.from_context_entry(entry) for entry in context["issues"]
         )
         report = cls(issues=issues)
         expected_issue_count = context["issue_count"]
         expected_error_count = context["error_count"]
-        if (
-            report.issue_count != expected_issue_count
-            or report.error_count != expected_error_count
-        ):
+        if report.issue_count != expected_issue_count or report.error_count != expected_error_count:
             message = (
                 "Stub parity context mismatch: "
                 f"expected counts ({expected_issue_count}, {expected_error_count}), "
@@ -265,11 +259,7 @@ def get_module_exports(module_name: str) -> set[str]:
             result.add(str(item))
         return result
 
-    return {
-        name
-        for name in dir(module)
-        if not name.startswith("_") and not name.startswith("__")
-    }
+    return {name for name in dir(module) if not name.startswith("_") and not name.startswith("__")}
 
 
 def _is_export_name(name: str) -> bool:

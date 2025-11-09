@@ -138,9 +138,7 @@ else:
     if (
         _griffe_navmap_spec is None or _griffe_navmap_spec.loader is None
     ):  # pragma: no cover - defensive guard
-        error_message = (
-            f"Unable to load griffe navmap module from {_griffe_navmap_module_path}"
-        )
+        error_message = f"Unable to load griffe navmap module from {_griffe_navmap_module_path}"
         raise RuntimeError(error_message)
     _griffe_navmap = importlib.util.module_from_spec(_griffe_navmap_spec)
     sys.modules[_griffe_navmap_spec.name] = _griffe_navmap
@@ -455,9 +453,7 @@ def _collect_modules(extensions_bundle: object) -> dict[str, _GriffeModule]:
                     resolve_external=True,
                 )
         except _GriffeError as exc:  # pragma: no cover - degradation for broken modules
-            LOGGER.warning(
-                "Skipping package %s due to Griffe load error: %s", package, exc
-            )
+            LOGGER.warning("Skipping package %s due to Griffe load error: %s", package, exc)
             continue
         if not _is_module(root):  # pragma: no cover - defensive guard
             continue
@@ -601,9 +597,7 @@ def _registry_api_usage(
             if not handler or not operation_id:
                 continue
             href = _operation_href(spec_path, operation_id)
-            mapping[handler].append(
-                OperationLink(operation_id, href, identifier, spec_label)
-            )
+            mapping[handler].append(OperationLink(operation_id, href, identifier, spec_label))
     return mapping
 
 
@@ -682,9 +676,7 @@ def _module_exports(module: _GriffeModule) -> set[str]:
     return names
 
 
-def _register_member(
-    module_path: str, member: object, tables: _RelationshipTables
-) -> None:
+def _register_member(module_path: str, member: object, tables: _RelationshipTables) -> None:
     """Populate relationship tables based on a member from ``module_path``."""
     if _is_alias(member) and member.is_imported:
         target = member.target_path or getattr(member.target, "path", None)
@@ -923,9 +915,7 @@ def _format_module_links(
     return ", ".join(links)
 
 
-def _load_nav_metadata_mapping(
-    module_path: str, exports: Sequence[str]
-) -> dict[str, Any]:
+def _load_nav_metadata_mapping(module_path: str, exports: Sequence[str]) -> dict[str, Any]:
     try:
         raw_meta = load_nav_metadata(module_path, tuple(exports))
     except (ImportError, SyntaxError) as exc:
@@ -976,9 +966,7 @@ def _ensure_synopsis(meta: dict[str, Any], module: _GriffeModule) -> None:
         meta["synopsis"] = first_paragraph
 
 
-def _merge_relationships(
-    meta: dict[str, Any], module_path: str, facts: ModuleFacts
-) -> None:
+def _merge_relationships(meta: dict[str, Any], module_path: str, facts: ModuleFacts) -> None:
     imports = sorted(facts.imports.get(module_path, set()))
     imported_by = sorted(facts.imported_by.get(module_path, set()))
     relationships: dict[str, list[str]] = {}
@@ -1089,9 +1077,7 @@ def _operation_href(spec_path: object, operation_id: str) -> str | None:
     return build_operation_href(spec_path, operation_id)
 
 
-def _write_relationships(
-    fd: mkdocs_gen_files.files, module_path: str, facts: ModuleFacts
-) -> None:
+def _write_relationships(fd: mkdocs_gen_files.files, module_path: str, facts: ModuleFacts) -> None:
     """Write the relationships section for ``module_path``."""
     outgoing = sorted(facts.imports.get(module_path, set()))
     incoming = sorted(facts.imported_by.get(module_path, set()))
@@ -1100,9 +1086,7 @@ def _write_relationships(
         return
     fd.write("## Relationships\n\n")
     if outgoing:
-        out_links = _format_module_links(
-            module_path, outgoing, facts.documented_modules
-        )
+        out_links = _format_module_links(module_path, outgoing, facts.documented_modules)
         fd.write(f"**Imports:** {out_links}\n\n")
     if incoming:
         in_links = _format_module_links(module_path, incoming, facts.documented_modules)
@@ -1117,9 +1101,7 @@ def _write_related_operations(
 ) -> None:
     """Emit related API operations for symbols in ``module_path``."""
     collected: dict[tuple[str, str | None], OperationLink] = {}
-    symbol_paths = facts.classes.get(module_path, []) + facts.functions.get(
-        module_path, []
-    )
+    symbol_paths = facts.classes.get(module_path, []) + facts.functions.get(module_path, [])
     for symbol_path in symbol_paths:
         for operation in facts.api_usage.get(symbol_path, []):
             key = (operation.operation_id, operation.href)
@@ -1146,9 +1128,7 @@ def _write_related_operations(
     fd.write(", ".join(parts) + "\n\n")
 
 
-def _write_contents(
-    fd: mkdocs_gen_files.files, module_path: str, facts: ModuleFacts
-) -> None:
+def _write_contents(fd: mkdocs_gen_files.files, module_path: str, facts: ModuleFacts) -> None:
     """Render the class and function inventory for ``module_path``."""
     classes = facts.classes.get(module_path, [])
     functions = facts.functions.get(module_path, [])
@@ -1258,9 +1238,7 @@ def _mermaid_inheritance(module_path: str, facts: ModuleFacts) -> str:
         return ""
 
     def _alias(name: str, counter: dict[str, int]) -> str:
-        base = (
-            re.sub(r"[^0-9A-Za-z_]", "_", name.rsplit(".", maxsplit=1)[-1]) or "Class"
-        )
+        base = re.sub(r"[^0-9A-Za-z_]", "_", name.rsplit(".", maxsplit=1)[-1]) or "Class"
         if base not in counter:
             counter[base] = 0
             return base
@@ -1401,9 +1379,7 @@ def _write_autorefs_examples(
     facts: ModuleFacts,
 ) -> None:
     """Emit a short autorefs sample list to demonstrate cross-linking."""
-    class_entries = [
-        f"- [{cls}][]" for cls in sorted(facts.classes.get(module_path, []))[:3]
-    ]
+    class_entries = [f"- [{cls}][]" for cls in sorted(facts.classes.get(module_path, []))[:3]]
     function_entries = [
         f"- [{func}][]" for func in sorted(facts.functions.get(module_path, []))[:3]
     ]
@@ -1425,15 +1401,11 @@ def _write_interfaces(
         return
     fd.write("## Interfaces\n\n")
     for entry in rows:
-        identifier, merged, registry_entry = _merge_interface_metadata(
-            entry, registry, module_path
-        )
+        identifier, merged, registry_entry = _merge_interface_metadata(entry, registry, module_path)
         fd.write(f"### `{identifier}`\n\n")
         fd.write(
             "- **Type:** {type}\n".format(
-                type=merged.get("type")
-                or (registry_entry.type if registry_entry else None)
-                or "—"
+                type=merged.get("type") or (registry_entry.type if registry_entry else None) or "—"
             )
         )
         fd.write(
@@ -1455,9 +1427,7 @@ def _write_interfaces(
         )
         if description:
             fd.write(f"- **Description:** {description}\n")
-        spec_candidate = merged.get("spec") or (
-            registry_entry.spec if registry_entry else None
-        )
+        spec_candidate = merged.get("spec") or (registry_entry.spec if registry_entry else None)
         spec_label, spec_href = _spec_href(spec_candidate)
         if spec_href:
             module_doc = _module_doc_path(module_path)

@@ -121,9 +121,7 @@ class DuckDBRegistryHelper:
             )
         return run_id
 
-    def close_run(
-        self, run_id: str, *, success: bool, notes: str | None = None
-    ) -> None:
+    def close_run(self, run_id: str, *, success: bool, notes: str | None = None) -> None:
         """Close a pipeline run and record completion status.
 
         Updates the run's finished_at timestamp and emits a RunClosed event
@@ -311,7 +309,8 @@ class DuckDBRegistryHelper:
                     con,
                     (
                         "INSERT OR REPLACE INTO doctags("
-                        "doc_id, doctags_uri, pages, vlm_model, vlm_revision, avg_logprob, created_at"
+                        "doc_id, doctags_uri, pages, vlm_model, vlm_revision, "
+                        "avg_logprob, created_at"
                         ") VALUES (?, ?, ?, ?, ?, ?, now())"
                     ),
                     [
@@ -325,9 +324,7 @@ class DuckDBRegistryHelper:
                     operation="registry.helper.register_doctags",
                 )
 
-    def emit_event(
-        self, event_name: str, subject_id: str, payload: Mapping[str, object]
-    ) -> None:
+    def emit_event(self, event_name: str, subject_id: str, payload: Mapping[str, object]) -> None:
         """Emit a pipeline event to the registry.
 
         Records an event in the pipeline_events table with a unique event ID,

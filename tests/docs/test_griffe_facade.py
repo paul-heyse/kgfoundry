@@ -123,9 +123,7 @@ class TestGriffeLoaderSignatures:
             "resolve_external",
             "resolve_implicit",
         }
-        assert expected_params.issubset(
-            params
-        ), f"Missing parameters: {expected_params - params}"
+        assert expected_params.issubset(params), f"Missing parameters: {expected_params - params}"
 
     def test_griffe_loader_constructor(self) -> None:
         """Verify GriffeLoader.__init__ accepts expected keyword arguments."""
@@ -139,9 +137,7 @@ class TestGriffeLoaderSignatures:
             "docstring_parser",
             "docstring_options",
         }
-        assert expected_params.issubset(
-            params
-        ), f"Missing parameters: {expected_params - params}"
+        assert expected_params.issubset(params), f"Missing parameters: {expected_params - params}"
 
     def test_griffe_loader_load_method(self) -> None:
         """Verify GriffeLoader.load method signature."""
@@ -154,9 +150,7 @@ class TestGriffeLoaderSignatures:
             "try_relative_path",
             "find_stubs_package",
         }
-        assert expected_params.issubset(
-            params
-        ), f"Missing parameters: {expected_params - params}"
+        assert expected_params.issubset(params), f"Missing parameters: {expected_params - params}"
 
 
 class TestGriffeFacade:

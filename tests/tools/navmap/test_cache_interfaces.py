@@ -21,18 +21,12 @@ if TYPE_CHECKING:
 
 # Load concrete implementations at module level to avoid TC002 violations
 # These are runtime variables, not types - use string literals in type annotations
-_ModuleInfoClass = cast(
-    "ModuleInfoType", load_attribute("tools.navmap.build_navmap", "ModuleInfo")
-)
-ModuleInfoClass = (
-    _ModuleInfoClass  # Runtime class, use "ModuleInfo" in type annotations
-)
+_ModuleInfoClass = cast("ModuleInfoType", load_attribute("tools.navmap.build_navmap", "ModuleInfo"))
+ModuleInfoClass = _ModuleInfoClass  # Runtime class, use "ModuleInfo" in type annotations
 _RepairResultClass = cast(
     "RepairResultType", load_attribute("tools.navmap.repair_navmaps", "RepairResult")
 )
-RepairResultClass = (
-    _RepairResultClass  # Runtime class, use "RepairResult" in type annotations
-)
+RepairResultClass = _RepairResultClass  # Runtime class, use "RepairResult" in type annotations
 
 
 class MockCollectorCache:
@@ -205,14 +199,10 @@ class TestNavmapRepairCacheProtocol:
         """Verify summary returns correct statistics."""
         cache = MockRepairCache()
         cache.record_repair(
-            RepairResultClass(
-                module=Path("a.py"), messages=[], changed=True, applied=True
-            )
+            RepairResultClass(module=Path("a.py"), messages=[], changed=True, applied=True)
         )
         cache.record_repair(
-            RepairResultClass(
-                module=Path("b.py"), messages=[], changed=False, applied=False
-            )
+            RepairResultClass(module=Path("b.py"), messages=[], changed=False, applied=False)
         )
         summary = cache.summary()
         assert summary["total"] == 2
@@ -247,9 +237,7 @@ class TestCacheInterfaceContracts:
         """Verify repair cache can record multiple results."""
         cache = MockRepairCache()
         results = [
-            RepairResultClass(
-                module=Path(f"{i}.py"), messages=[], changed=False, applied=False
-            )
+            RepairResultClass(module=Path(f"{i}.py"), messages=[], changed=False, applied=False)
             for i in range(3)
         ]
         for result in results:

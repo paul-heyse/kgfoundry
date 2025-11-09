@@ -163,12 +163,8 @@ def validate_against_schema(
 
     try:
         validator.validate(payload)
-    except (
-        jsonschema_exceptions.ValidationError
-    ) as exc:  # pragma: no cover - exercised in CLI
-        problem = _problem_for_validation(
-            artifact=artifact, schema_path=schema_path, error=exc
-        )
+    except jsonschema_exceptions.ValidationError as exc:  # pragma: no cover - exercised in CLI
+        problem = _problem_for_validation(artifact=artifact, schema_path=schema_path, error=exc)
         message = f"{artifact} failed schema validation"
         raise ToolExecutionError(
             message,

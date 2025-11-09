@@ -45,13 +45,9 @@ def mock_context(tmp_path: Path) -> Mock:
     (repo_root / "src").mkdir()
     (repo_root / "src" / "main.py").write_text('def main():\n    print("hello")\n')
     (repo_root / "src" / "utils.py").write_text("def helper():\n    pass\n")
-    (repo_root / "src" / "app.ts").write_text(
-        'function app() {\n    console.log("hello");\n}\n'
-    )
+    (repo_root / "src" / "app.ts").write_text('function app() {\n    console.log("hello");\n}\n')
     (repo_root / "tests").mkdir()
-    (repo_root / "tests" / "test_main.py").write_text(
-        "def test_main():\n    assert True\n"
-    )
+    (repo_root / "tests" / "test_main.py").write_text("def test_main():\n    assert True\n")
     (repo_root / "README.md").write_text("# Documentation\n")
 
     paths = ResolvedPaths(
@@ -177,9 +173,7 @@ async def test_list_paths_excludes_default_directories(mock_context: Mock) -> No
     (repo_root / ".git").mkdir()
     (repo_root / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
     (repo_root / ".venv").mkdir()
-    (repo_root / ".venv" / "pyvenv.cfg").write_text(
-        "home=/tmp/python\n", encoding="utf-8"
-    )
+    (repo_root / ".venv" / "pyvenv.cfg").write_text("home=/tmp/python\n", encoding="utf-8")
     (repo_root / "node_modules").mkdir()
     (repo_root / "node_modules" / "pkg").mkdir(parents=True, exist_ok=True)
     (repo_root / "node_modules" / "pkg" / "index.js").write_text(
@@ -263,27 +257,19 @@ def test_open_file_binary_file(mock_context: Mock) -> None:
 
 def test_open_file_invalid_start_line(mock_context: Mock) -> None:
     """Test open_file raises InvalidLineRangeError for invalid start_line."""
-    with pytest.raises(
-        InvalidLineRangeError, match="start_line must be a positive integer"
-    ):
+    with pytest.raises(InvalidLineRangeError, match="start_line must be a positive integer"):
         open_file(mock_context, "README.md", start_line=0)
 
-    with pytest.raises(
-        InvalidLineRangeError, match="start_line must be a positive integer"
-    ):
+    with pytest.raises(InvalidLineRangeError, match="start_line must be a positive integer"):
         open_file(mock_context, "README.md", start_line=-1)
 
 
 def test_open_file_invalid_end_line(mock_context: Mock) -> None:
     """Test open_file raises InvalidLineRangeError for invalid end_line."""
-    with pytest.raises(
-        InvalidLineRangeError, match="end_line must be a positive integer"
-    ):
+    with pytest.raises(InvalidLineRangeError, match="end_line must be a positive integer"):
         open_file(mock_context, "README.md", end_line=0)
 
-    with pytest.raises(
-        InvalidLineRangeError, match="end_line must be a positive integer"
-    ):
+    with pytest.raises(InvalidLineRangeError, match="end_line must be a positive integer"):
         open_file(mock_context, "README.md", end_line=-1)
 
 
