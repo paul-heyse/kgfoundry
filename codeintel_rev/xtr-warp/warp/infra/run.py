@@ -51,7 +51,7 @@ class Run:
             run_config = RunConfig()
             run_config.assign_defaults()
 
-            cls._instance.__append(run_config)
+            cls._instance.append(run_config)
 
         return cls._instance
 
@@ -76,7 +76,7 @@ class Run:
 
         Returns
         -------
-        Any
+        object
             Attribute value from config, or None if not found.
         """
         if hasattr(self.config, name):
@@ -85,7 +85,7 @@ class Run:
         super().__getattr__(name)
         return None
 
-    def __append(self, runconfig: RunConfig) -> None:
+    def append(self, runconfig: RunConfig) -> None:
         """Append configuration to stack.
 
         Parameters
@@ -95,7 +95,7 @@ class Run:
         """
         self.stack.append(runconfig)
 
-    def __pop(self) -> None:
+    def pop(self) -> None:
         """Pop configuration from stack."""
         self.stack.pop()
 
@@ -121,12 +121,12 @@ class Run:
         if inherit_config:
             runconfig = RunConfig.from_existing(self.config, runconfig)
 
-        self.__append(runconfig)
+        self.append(runconfig)
 
         try:
             yield
         finally:
-            self.__pop()
+            self.pop()
 
     def open(self, path: str, mode: str = "r") -> IO[str] | IO[bytes]:
         """Open file relative to experiment path.
@@ -143,7 +143,7 @@ class Run:
 
         Returns
         -------
-        Any
+        IO[str] | IO[bytes]
             Opened file handle.
 
         Raises
@@ -171,7 +171,7 @@ class Run:
 
         Parameters
         ----------
-        *args : Any
+        *args : object
             Arguments to print.
         """
         print_message("[" + str(self.rank) + "]", "\t\t", *args)
@@ -181,7 +181,7 @@ class Run:
 
         Parameters
         ----------
-        *args : Any
+        *args : object
             Arguments to print.
         """
         if self.rank == 0:

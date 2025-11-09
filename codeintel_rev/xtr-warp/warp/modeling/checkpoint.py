@@ -6,7 +6,6 @@ for encoding queries and documents with automatic tokenization and mixed precisi
 
 from __future__ import annotations
 
-
 import torch
 from tqdm import tqdm
 from warp.engine.config import USE_CORE_ML, WARPRunConfig
@@ -149,11 +148,11 @@ class Checkpoint(ColBERT):
 
         Parameters
         ----------
-        *args : Any
+        *args : object
             Positional arguments passed to ColBERT.query().
         to_cpu : bool
             Whether to move output to CPU (default: False).
-        **kw_args : Any
+        **kw_args : object
             Keyword arguments passed to ColBERT.query().
 
         Returns
@@ -167,9 +166,9 @@ class Checkpoint(ColBERT):
 
     def doc(
         self,
-        *args: Any,  # noqa: ANN401
+        *args: object,
         to_cpu: bool = False,
-        **kw_args: Any,  # noqa: ANN401
+        **kw_args: object,
     ) -> torch.Tensor | tuple[torch.Tensor, ...]:
         """Encode document tokens into embeddings.
 
@@ -178,11 +177,11 @@ class Checkpoint(ColBERT):
 
         Parameters
         ----------
-        *args : Any
+        *args : object
             Positional arguments passed to ColBERT.doc().
         to_cpu : bool
             Whether to move output to CPU (default: False).
-        **kw_args : Any
+        **kw_args : object
             Keyword arguments passed to ColBERT.doc().
 
         Returns

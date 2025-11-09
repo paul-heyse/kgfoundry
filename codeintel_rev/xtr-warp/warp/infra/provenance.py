@@ -7,7 +7,6 @@ object creation and serialization time.
 from __future__ import annotations
 
 import inspect
-from typing import Any
 
 
 class Provenance:
@@ -49,7 +48,7 @@ class Provenance:
 
         return output
 
-    def to_dict(self) -> dict[str, Any]:  # for ujson
+    def to_dict(self) -> dict[str, object]:  # for ujson
         """Convert to dictionary with serialization stack trace.
 
         Captures current stack trace and returns dictionary representation
@@ -57,7 +56,7 @@ class Provenance:
 
         Returns
         -------
-        dict[str, Any]
+        dict[str, object]
             Dictionary containing all instance attributes.
         """
         self.serialization_stacktrace = self.stacktrace()

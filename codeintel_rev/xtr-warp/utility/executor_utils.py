@@ -15,10 +15,17 @@ import os
 import pathlib
 import subprocess
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from contextlib import redirect_stdout
-from typing import Any
+from dataclasses import dataclass
+from itertools import product
+from typing import TypeVar, cast
+
+if sys.version_info >= (3, 11):
+    from typing import TypedDict
+else:
+    from typing_extensions import TypedDict
 
 from tqdm import tqdm
 
@@ -32,98 +39,232 @@ LOTTE_DATASETS = [
     "pooled",
 ]
 
+T = TypeVar("T")
 
-def _make_config(
-    collection: str,
-    dataset: str,
-    nbits: int,
-    nprobe: int | None,
-    t_prime: int | None,
-    document_top_k: int | None = None,
-    runtime: str | None = None,
-    split: str = "test",
-    bound: int | None = None,
-    num_threads: int = 1,
+
+# TypedDict definitions for configuration and result dictionaries
+class ExperimentConfigDict(TypedDict, total=False):
+    """Typed dictionary for experiment configuration."""
+
+    collection: str
+    dataset: str
+    nbits: int
+    nprobe: int | None
+    t_prime: int | None
+    document_top_k: int | None
+    runtime: str | None
+    split: str
+    bound: int | None
+    num_threads: int
+    fused_ext: bool
+
+
+class ExperimentParamsDict(TypedDict, total=False):
+    """Typed dictionary for experiment parameters."""
+
+    num_runs: int
+
+
+class ExperimentResultDict(TypedDict, total=False):
+    """Typed dictionary for experiment results."""
+
+    index_size_bytes: int
+    index_size_gib: float
+    metrics: object
+    statistics: object
+    tracker: object
+    _update: dict[str, object]
+    provenance: dict[str, object]
+
+
+def _to_tuple(value: Sequence[T] | T | None) -> tuple[T | None, ...]:
+    if value is None:
+        return (None,)
+    if isinstance(value, Sequence):
+        return tuple(value)
+    return (value,)
+
+
+def _cast_to_int_tuple(value: object) -> tuple[int | None, ...]:
+    """Cast object to tuple of int | None."""
+    if value is None:
+        return (None,)
+    if isinstance(value, Sequence):
+        return tuple(int(v) if v is not None and isinstance(v, (int, str)) else None for v in value)
+    if isinstance(value, (int, str)):
+        return (int(value),)
+    return (None,)
+
+
+def _cast_to_str_tuple(value: object) -> tuple[str | None, ...]:
+    """Cast object to tuple of str | None."""
+    if value is None:
+        return (None,)
+    if isinstance(value, Sequence):
+        return tuple(str(v) if v is not None else None for v in value)
+    if isinstance(value, str):
+        return (value,)
+    return (None,)
+
+
+def _cast_to_bool_tuple(value: object) -> tuple[bool | None, ...]:
+    """Cast object to tuple of bool | None."""
+    if value is None:
+        return (None,)
+    if isinstance(value, Sequence):
+        return tuple(bool(v) if v is not None and isinstance(v, bool) else None for v in value)
+    if isinstance(value, bool):
+        return (value,)
+    return (None,)
+
+
+def _filter_non_none(
+    values: tuple[T | None, ...],
     *,
-    fused_ext: bool | None = None,
-) -> dict[str, Any]:
-    """Create experiment configuration dictionary.
+    name: str,
+    expected_type: type | tuple[type, ...] | None = None,
+) -> tuple[T, ...]:
+    filtered = tuple(value for value in values if value is not None)
+    if not filtered:
+        raise ValueError(f"{name} must include at least one value")
+    if expected_type is not None and not all(
+        isinstance(value, expected_type) for value in filtered
+    ):
+        expected = (
+            expected_type.__name__
+            if isinstance(expected_type, type)
+            else " or ".join(tp.__name__ for tp in expected_type)
+        )
+        raise TypeError(f"{name} entries must be {expected}")
+    return filtered
+
+
+@dataclass(frozen=True)
+class ExperimentSpec:
+    collection: str
+    dataset: str
+    nbits: int
+    nprobe: int | None
+    t_prime: int | None
+    document_top_k: int | None
+    runtime: str | None
+    split: str
+    bound: int | None
+    num_threads: int | None
+
+    def validate(self) -> ExperimentSpec:
+        if self.collection not in {"beir", "lotte"}:
+            raise ValueError(f"collection must be 'beir' or 'lotte', got {self.collection!r}")
+        if self.collection == "beir":
+            if self.dataset not in BEIR_DATASETS:
+                raise ValueError("dataset for beir must be one of the BEIR datasets")
+        elif self.dataset not in LOTTE_DATASETS:
+            raise ValueError("dataset for lotte must be one of the LOTTE datasets")
+        if self.nbits not in {2, 4}:
+            raise ValueError(f"nbits must be 2 or 4, got {self.nbits}")
+        if self.nprobe is not None and not isinstance(self.nprobe, int):
+            raise ValueError(f"nprobe must be None or int, got {type(self.nprobe).__name__}")
+        if self.t_prime is not None and not isinstance(self.t_prime, int):
+            raise ValueError(f"t_prime must be None or int, got {type(self.t_prime).__name__}")
+        if self.document_top_k is not None and not isinstance(self.document_top_k, int):
+            raise ValueError(
+                f"document_top_k must be None or int, got {type(self.document_top_k).__name__}"
+            )
+        if self.split not in {"dev", "test"}:
+            raise ValueError(f"split must be 'dev' or 'test', got {self.split!r}")
+        if self.bound is not None and not isinstance(self.bound, int):
+            raise ValueError(f"bound must be None or int, got {type(self.bound).__name__}")
+        return self
+
+
+@dataclass(frozen=True)
+class ExpansionArgs:
+    datasets: tuple[str, ...]
+    nbits: tuple[int, ...]
+    nprobes: tuple[int | None, ...]
+    t_primes: tuple[int | None, ...]
+    document_top_ks: tuple[int | None, ...]
+    runtimes: tuple[str | None, ...]
+    num_threads: tuple[int | None, ...]
+    fused_exts: tuple[bool | None, ...]
+    split: str
+    bound: int | None
+
+    @classmethod
+    def from_raw(cls, configs: Mapping[str, object]) -> ExpansionArgs:
+        """Build expansion arguments from raw configuration metadata.
+
+        Parameters
+        ----------
+        configs : Mapping[str, object]
+            Raw configuration dictionary.
+
+        Returns
+        -------
+        ExpansionArgs
+            Expansion arguments with properly typed tuples.
+        """
+        fused_exts = configs.get("fused_ext")
+        if fused_exts is None:
+            fused_exts = (None,)
+        datasets_raw = configs.get("datasets")
+        nbits_raw = configs.get("nbits")
+        # Type narrowing: convert object values to proper types
+        datasets_tuple = (
+            cast("tuple[str | None, ...]", _to_tuple(datasets_raw))
+            if datasets_raw is not None
+            else (None,)
+        )
+        nbits_tuple = (
+            cast("tuple[int | None, ...]", _to_tuple(nbits_raw))
+            if nbits_raw is not None
+            else (None,)
+        )
+        bound_raw = configs.get("bound")
+        bound_val: int | None = bound_raw if isinstance(bound_raw, int) else None
+        return cls(
+            datasets=_filter_non_none(datasets_tuple, name="datasets", expected_type=str),
+            nbits=_filter_non_none(nbits_tuple, name="nbits", expected_type=int),
+            nprobes=_cast_to_int_tuple(configs.get("nprobe")),
+            t_primes=_cast_to_int_tuple(configs.get("t_prime")),
+            document_top_ks=_cast_to_int_tuple(configs.get("document_top_k")),
+            runtimes=_cast_to_str_tuple(configs.get("runtime")),
+            num_threads=_cast_to_int_tuple(configs.get("num_threads")),
+            fused_exts=_cast_to_bool_tuple(fused_exts),
+            split=str(configs.get("datasplit") or "test"),
+            bound=bound_val,
+        )
+
+
+def _make_config(spec: ExperimentSpec, *, fused_ext: bool | None = None) -> ExperimentConfigDict:
+    """Create experiment configuration dictionary from validated spec.
 
     Parameters
     ----------
-    collection : str
-        Dataset collection name ("beir" or "lotte").
-    dataset : str
-        Specific dataset identifier.
-    nbits : int
-        Number of quantization bits (2 or 4).
-    nprobe : int | None
-        Number of probes for IVF search.
-    t_prime : int | None
-        T' parameter for search.
-    document_top_k : int | None
-        Top-k documents to retrieve (default: None).
-    runtime : str | None
-        Runtime backend string (default: None).
-    split : str
-        Data split ("dev" or "test", default: "test").
-    bound : int | None
-        Bound parameter (default: None).
-    num_threads : int
-        Number of threads for execution (default: 1).
+    spec : ExperimentSpec
+        Validated experiment specification.
     fused_ext : bool | None
         Whether to use fused extension (default: None, auto-set to True).
 
     Returns
     -------
-    dict[str, Any]
+    ExperimentConfigDict
         Configuration dictionary.
-
-    Raises
-    ------
-    ValueError
-        If collection, dataset, nbits, split, or parameter types are invalid.
     """
-    if collection not in {"beir", "lotte"}:
-        msg = f"collection must be 'beir' or 'lotte', got {collection!r}"
-        raise ValueError(msg)
-    if collection == "beir":
-        if dataset not in BEIR_DATASETS:
-            msg = f"dataset must be one of {BEIR_DATASETS} for beir collection, got {dataset!r}"
-            raise ValueError(msg)
-    elif dataset not in LOTTE_DATASETS:
-        msg = f"dataset must be one of {LOTTE_DATASETS} for lotte collection, got {dataset!r}"
-        raise ValueError(msg)
-    if nbits not in {2, 4}:
-        msg = f"nbits must be 2 or 4, got {nbits}"
-        raise ValueError(msg)
-    if nprobe is not None and not isinstance(nprobe, int):
-        msg = f"nprobe must be None or int, got {type(nprobe).__name__}"
-        raise ValueError(msg)
-    if t_prime is not None and not isinstance(t_prime, int):
-        msg = f"t_prime must be None or int, got {type(t_prime).__name__}"
-        raise ValueError(msg)
-    if document_top_k is not None and not isinstance(document_top_k, int):
-        msg = f"document_top_k must be None or int, got {type(document_top_k).__name__}"
-        raise ValueError(msg)
-    if split not in {"dev", "test"}:
-        msg = f"split must be 'dev' or 'test', got {split!r}"
-        raise ValueError(msg)
-    if bound is not None and not isinstance(bound, int):
-        msg = f"bound must be None or int, got {type(bound).__name__}"
-        raise ValueError(msg)
+    spec = spec.validate()
+    num_threads = spec.num_threads if spec.num_threads is not None else 1
     if fused_ext is None:
         fused_ext = True
-    config = {
-        "collection": collection,
-        "dataset": dataset,
-        "nbits": nbits,
-        "nprobe": nprobe,
-        "t_prime": t_prime,
-        "document_top_k": document_top_k,
-        "runtime": runtime,
-        "split": split,
-        "bound": bound,
+    config: ExperimentConfigDict = {
+        "collection": spec.collection,
+        "dataset": spec.dataset,
+        "nbits": spec.nbits,
+        "nprobe": spec.nprobe,
+        "t_prime": spec.t_prime,
+        "document_top_k": spec.document_top_k,
+        "runtime": spec.runtime,
+        "split": spec.split,
+        "bound": spec.bound,
         "num_threads": num_threads,
     }
     if num_threads != 1:
@@ -131,104 +272,106 @@ def _make_config(
     return config
 
 
-def _expand_configs(
-    datasets: str | Sequence[str],
-    nbits: int | Sequence[int],
-    nprobes: int | Sequence[int | None] | None,
-    t_primes: int | Sequence[int | None] | None,
-    document_top_ks: int | Sequence[int | None] | None = None,
-    runtimes: str | Sequence[str | None] | None = None,
-    split: str = "test",
-    bound: int | None = None,
-    num_threads: int | Sequence[int | None] | None = None,
-    *,
-    fused_exts: bool | Sequence[bool | None] | None = None,
-) -> list[dict[str, Any]]:
-    if num_threads is None:
-        num_threads = 1
-    if not isinstance(nbits, list):
-        nbits = [nbits]
-    if not isinstance(datasets, list):
-        datasets = [datasets]
-    if not isinstance(nprobes, list):
-        nprobes = [nprobes]
-    if not isinstance(t_primes, list):
-        t_primes = [t_primes]
-    if not isinstance(document_top_ks, list):
-        document_top_ks = [document_top_ks]
-    if not isinstance(runtimes, list):
-        runtimes = [runtimes]
-    if not isinstance(num_threads, list):
-        num_threads = [num_threads]
-    if not isinstance(fused_exts, list):
-        fused_exts = [fused_exts]
-    configs = []
-    for collection_dataset in datasets:
-        collection, dataset = collection_dataset.split(".")
-        for nbit in nbits:
-            for nprobe in nprobes:
-                for t_prime in t_primes:
-                    for document_top_k in document_top_ks:
-                        for runtime in runtimes:
-                            for threads in num_threads:
-                                configs.extend(
-                                    _make_config(
-                                        collection=collection,
-                                        dataset=dataset,
-                                        nbits=nbit,
-                                        nprobe=nprobe,
-                                        t_prime=t_prime,
-                                        document_top_k=document_top_k,
-                                        runtime=runtime,
-                                        split=split,
-                                        bound=bound,
-                                        num_threads=threads,
-                                        fused_ext=fused_ext,
-                                    )
-                                    for fused_ext in fused_exts
-                                )
+def _expand_configs(params: ExpansionArgs) -> list[ExperimentConfigDict]:
+    """Construct experiment dictionaries for the provided parameter space.
+
+    Parameters
+    ----------
+    params : ExpansionArgs
+        Expansion arguments containing parameter ranges.
+
+    Returns
+    -------
+    list[ExperimentConfigDict]
+        List of expanded configuration dictionaries.
+    """
+    configs: list[ExperimentConfigDict] = []
+    for collection_dataset in params.datasets:
+        if "." not in collection_dataset:
+            raise ValueError("dataset identifiers must be formatted as '<collection>.<dataset>'")
+        collection, dataset = collection_dataset.split(".", 1)
+        for (
+            nbit,
+            nprobe,
+            t_prime,
+            document_top_k,
+            runtime,
+            threads,
+        ) in product(
+            params.nbits,
+            params.nprobes,
+            params.t_primes,
+            params.document_top_ks,
+            params.runtimes,
+            params.num_threads,
+        ):
+            spec = ExperimentSpec(
+                collection=collection,
+                dataset=dataset,
+                nbits=nbit,
+                nprobe=nprobe,
+                t_prime=t_prime,
+                document_top_k=document_top_k,
+                runtime=runtime,
+                split=params.split,
+                bound=params.bound,
+                num_threads=threads,
+            )
+            for fused_ext in params.fused_exts:
+                configs.append(_make_config(spec, fused_ext=fused_ext))
     return configs
 
 
-def _get(config: dict[str, object], key: str) -> object:
-    if key in config:
-        return config[key]
-    return None
+def _expand_configs_file(configuration_file: dict[str, object]) -> list[ExperimentConfigDict]:
+    """Expand configurations from a configuration file dictionary.
+
+    Parameters
+    ----------
+    configuration_file : dict[str, object]
+        Configuration file dictionary containing "configurations" key.
+
+    Returns
+    -------
+    list[ExperimentConfigDict]
+        List of expanded configuration dictionaries.
+    """
+    configs_raw = configuration_file.get("configurations")
+    if not isinstance(configs_raw, dict):
+        msg = "configuration_file must contain 'configurations' key with dict value"
+        raise ValueError(msg)
+    params = ExpansionArgs.from_raw(configs_raw)
+    return _expand_configs(params)
 
 
-def _expand_configs_file(configuration_file: dict[str, Any]) -> list[dict[str, Any]]:
-    configs = configuration_file["configurations"]
-    return _expand_configs(
-        datasets=_get(configs, "datasets"),
-        nbits=_get(configs, "nbits"),
-        nprobes=_get(configs, "nprobe"),
-        t_primes=_get(configs, "t_prime"),
-        document_top_ks=_get(configs, "document_top_k"),
-        runtimes=_get(configs, "runtime"),
-        split=_get(configs, "datasplit"),
-        bound=_get(configs, "bound"),
-        num_threads=_get(configs, "num_threads"),
-        fused_exts=_get(configs, "fused_ext"),
-    )
-
-
-def _write_results(results_file: str, data: list[dict[str, Any]]) -> None:
+def _write_results(results_file: str, data: list[ExperimentResultDict]) -> None:
     """Write experiment results to a JSON file.
 
     Parameters
     ----------
     results_file : str
         Path to the results file to write.
-    data : list[dict[str, Any]]
+    data : list[ExperimentResultDict]
         List of result dictionaries to serialize to JSON.
     """
     with pathlib.Path(results_file).open("w", encoding="utf-8") as file:
         file.write(json.dumps(data, indent=3))
 
 
+@dataclass(frozen=True)
+class ExecutionContext:
+    """Context required for running experiment configurations."""
+
+    callback: Callable[[ExperimentConfigDict, ExperimentParamsDict], ExperimentResultDict]
+    type_: str
+    params: ExperimentParamsDict
+    results_file: str
+    max_workers: int
+    parallelizable: bool
+
+
 def load_configuration(
     filename: str, *, info: bool = False, overwrite: bool = False
-) -> tuple[str, str, dict[str, Any], list[dict[str, Any]]]:
+) -> tuple[str, str, ExperimentParamsDict, list[ExperimentConfigDict]]:
     """Load experiment configuration from a JSON file.
 
     Reads a configuration file, expands it into multiple configurations,
@@ -246,7 +389,7 @@ def load_configuration(
 
     Returns
     -------
-    tuple[str, str, dict[str, Any], list[dict[str, Any]]]
+    tuple[str, str, ExperimentParamsDict, list[ExperimentConfigDict]]
         Tuple containing:
         - results_file: Path to the results file
         - type_: Experiment type string
@@ -259,10 +402,28 @@ def load_configuration(
         If results file already exists and overwrite=False.
     """
     with pathlib.Path(filename).open("r", encoding="utf-8") as file:
-        config_file = json.loads(file.read())
-    name = config_file["name"]
-    type_ = config_file["type"]
-    params = _get(config_file, "parameters") or {}
+        config_file_raw: object = json.loads(file.read())
+    if not isinstance(config_file_raw, dict):
+        msg = f"Configuration file {filename} must contain a JSON object"
+        raise ValueError(msg)
+    config_file: dict[str, object] = config_file_raw
+    name_raw = config_file.get("name")
+    if not isinstance(name_raw, str):
+        msg = "Configuration file must contain 'name' key with string value"
+        raise ValueError(msg)
+    name = name_raw
+    type_raw = config_file.get("type")
+    if not isinstance(type_raw, str):
+        msg = "Configuration file must contain 'type' key with string value"
+        raise ValueError(msg)
+    type_ = type_raw
+    params_raw = config_file.get("parameters")
+    if isinstance(params_raw, dict):
+        params: ExperimentParamsDict = {}
+        if "num_runs" in params_raw and isinstance(params_raw["num_runs"], int):
+            params["num_runs"] = params_raw["num_runs"]
+    else:
+        params = {}
     configs = _expand_configs_file(config_file)
 
     results_file = pathlib.Path("experiments/results") / f"{name}.json"
@@ -272,8 +433,8 @@ def load_configuration(
             msg = f"Results file {results_file} already exists and overwrite=False"
             raise FileExistsError(msg)
 
-        _write_results(results_file, [])
-    return results_file, type_, params, configs
+        _write_results(str(results_file), [])
+    return str(results_file), type_, params, configs
 
 
 def _init_proc(env_vars: dict[str, str]) -> None:
@@ -281,17 +442,17 @@ def _init_proc(env_vars: dict[str, str]) -> None:
         os.environ[key] = value
 
 
-def _prepare_result(result: dict[str, Any]) -> dict[str, Any]:
+def _prepare_result(result: ExperimentResultDict) -> ExperimentResultDict:
     """Prepare result dictionary by updating provenance from runtime parameters.
 
     Parameters
     ----------
-    result : dict[str, Any]
+    result : ExperimentResultDict
         Result dictionary potentially containing "_update" key.
 
     Returns
     -------
-    dict[str, Any]
+    ExperimentResultDict
         Result dictionary with provenance updated and "_update" removed.
 
     Raises
@@ -302,60 +463,59 @@ def _prepare_result(result: dict[str, Any]) -> dict[str, Any]:
     if "_update" not in result:
         return result
     # NOTE Used to update parameters determined at runtime.
-    result = copy.deepcopy(result)
-    update = result["_update"]
+    result_copy = copy.deepcopy(result)
+    update_raw = result_copy.get("_update")
+    if not isinstance(update_raw, dict):
+        return result_copy
+    update: dict[str, object] = update_raw
+    provenance_raw = result_copy.get("provenance")
+    if not isinstance(provenance_raw, dict):
+        return result_copy
+    provenance: dict[str, object] = provenance_raw
     for key, value in update.items():
-        current = result["provenance"][key]
+        current = provenance.get(key)
         if current is not None and current != value:
             msg = f"Provenance key {key!r} mismatch: current={current!r}, update={value!r}"
             raise ValueError(msg)
-        result["provenance"][key] = value
-    del result["_update"]
-    return result
+        provenance[key] = value
+    result_copy["provenance"] = provenance
+    # Remove _update key
+    result_final: ExperimentResultDict = {}
+    for k, v in result_copy.items():
+        if k != "_update":
+            result_final[k] = v
+    return result_final
 
 
 def _execute_configs_parallel(
-    configs: list[dict[str, Any]],
-    callback: Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]],
-    type_: str,
-    params: dict[str, Any],
-    results_file: str,
-    max_workers: int,
+    configs: list[ExperimentConfigDict], context: ExecutionContext
 ) -> None:
-    """Execute configurations in parallel using ProcessPoolExecutor.
-
-    Parameters
-    ----------
-    configs : list[dict[str, Any]]
-        List of configuration dictionaries to execute.
-    callback : Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]]
-        Function to execute for each configuration.
-    type_ : str
-        Experiment type string.
-    params : dict[str, Any]
-        Parameters dictionary to pass to callback.
-    results_file : str
-        Path to results file for writing.
-    max_workers : int
-        Maximum number of worker processes.
-    """
     env_vars = dict(os.environ)
     progress = tqdm(total=len(configs))
     results = []
+    type_ = context.type_
+    params = context.params
+    results_file = context.results_file
     with (
         ProcessPoolExecutor(
-            max_workers=max_workers, initializer=_init_proc, initargs=(env_vars,)
+            max_workers=context.max_workers,
+            initializer=_init_proc,
+            initargs=(env_vars,),
         ) as executor,
         redirect_stdout(io.StringIO()) as rd_stdout,
     ):
-        futures = {executor.submit(callback, config, params): config for config in configs}
+        futures = {
+            executor.submit(context.callback, config, context.params): config for config in configs
+        }
         for future in as_completed(futures.keys()):
             result = future.result()
             config = futures[future]
 
-            result["provenance"] = config
-            result["provenance"]["type"] = type_
-            result["provenance"]["parameters"] = params
+            # Create provenance dict with type and parameters
+            provenance: dict[str, object] = dict(config)
+            provenance["type"] = type_
+            provenance["parameters"] = params
+            result["provenance"] = provenance
             results.append(_prepare_result(result))
             _write_results(results_file=results_file, data=results)
 
@@ -366,78 +526,37 @@ def _execute_configs_parallel(
 
 
 def _execute_configs_sequential(
-    configs: list[dict[str, Any]],
-    callback: Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]],
-    type_: str,
-    params: dict[str, Any],
-    results_file: str,
+    configs: list[ExperimentConfigDict], context: ExecutionContext
 ) -> None:
     """Execute configurations sequentially.
 
     Parameters
     ----------
-    configs : list[dict[str, Any]]
-        List of configuration dictionaries to execute.
-    callback : Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]]
-        Function to execute for each configuration.
-    type_ : str
-        Experiment type string.
-    params : dict[str, Any]
-        Parameters dictionary to pass to callback.
-    results_file : str
-        Path to results file for writing.
+    configs : list[ExperimentConfigDict]
+        List of configurations to execute.
+    context : ExecutionContext
+        Execution context with callback and parameters.
     """
     results = []
     for config in tqdm(configs):
-        result = callback(config, params)
-        result["provenance"] = config
-        result["provenance"]["type"] = type_
-        result["provenance"]["parameters"] = params
+        result = context.callback(config, context.params)
+        # Create provenance dict with type and parameters
+        provenance: dict[str, object] = dict(config)
+        provenance["type"] = context.type_
+        provenance["parameters"] = context.params
+        result["provenance"] = provenance
         results.append(_prepare_result(result))
-        _write_results(results_file=results_file, data=results)
+        _write_results(results_file=context.results_file, data=results)
 
 
-def execute_configs(
-    exec_info: dict[str, dict[str, Any]],
-    configs: list[dict[str, Any]],
-    results_file: str,
-    type_: str,
-    params: dict[str, Any],
-    max_workers: int,
-) -> None:
-    """Execute experiment configurations in parallel or sequential mode.
-
-    Dispatches configuration execution based on the experiment type and whether
-    it's marked as parallelizable. Parallelizable experiments run concurrently
-    using a process pool, while non-parallelizable ones run sequentially.
-
-    Parameters
-    ----------
-    exec_info : dict[str, dict[str, Any]]
-        Execution information dictionary keyed by experiment type, containing
-        callback functions and parallelizability flags.
-    configs : list[dict[str, Any]]
-        List of configuration dictionaries to execute.
-    results_file : str
-        Path to the results file where outputs will be written.
-    type_ : str
-        Experiment type identifier (must exist in exec_info).
-    params : dict[str, Any]
-        Parameters dictionary passed to each configuration execution.
-    max_workers : int
-        Maximum number of worker processes for parallel execution.
-    """
-    exec_info = exec_info[type_]
-    callback, parallelizable = exec_info["callback"], exec_info["parallelizable"]
-    if parallelizable:
-        _execute_configs_parallel(
-            configs, callback, type_, params, results_file, max_workers=max_workers
-        )
+def execute_configs(configs: list[ExperimentConfigDict], context: ExecutionContext) -> None:
+    if context.parallelizable:
+        _execute_configs_parallel(configs, context)
     else:
-        _execute_configs_sequential(configs, callback, type_, params, results_file)
+        _execute_configs_sequential(configs, context)
 
 
-def read_subprocess_inputs() -> tuple[dict[str, Any], dict[str, Any]]:
+def read_subprocess_inputs() -> tuple[ExperimentConfigDict, ExperimentParamsDict]:
     """Read configuration and parameters from stdin for subprocess execution.
 
     Parses JSON input from stdin containing experiment configuration and
@@ -445,14 +564,68 @@ def read_subprocess_inputs() -> tuple[dict[str, Any], dict[str, Any]]:
 
     Returns
     -------
-    tuple[dict[str, Any], dict[str, Any]]
+    tuple[ExperimentConfigDict, ExperimentParamsDict]
         Tuple containing (config, params) dictionaries parsed from JSON input.
     """
-    data = json.loads(input())
-    return data["config"], data["params"]
+    data_raw: object = json.loads(input())
+    if not isinstance(data_raw, dict):
+        msg = "Subprocess input must be a JSON object"
+        raise ValueError(msg)
+    data: dict[str, object] = data_raw
+    config_raw = data.get("config")
+    params_raw = data.get("params")
+    if not isinstance(config_raw, dict):
+        msg = "Subprocess input must contain 'config' key with dict value"
+        raise ValueError(msg)
+    if not isinstance(params_raw, dict):
+        msg = "Subprocess input must contain 'params' key with dict value"
+        raise ValueError(msg)
+    # Type narrowing: construct ExperimentConfigDict and ExperimentParamsDict
+    config: ExperimentConfigDict = {}
+    for key in (
+        "collection",
+        "dataset",
+        "nbits",
+        "nprobe",
+        "t_prime",
+        "document_top_k",
+        "runtime",
+        "split",
+        "bound",
+        "num_threads",
+        "fused_ext",
+    ):
+        if key in config_raw:
+            value = config_raw[key]
+            # Type narrowing: ensure value matches expected type for this key
+            if (
+                (key in ("collection", "dataset", "runtime", "split") and isinstance(value, str))
+                or (
+                    key
+                    in (
+                        "nbits",
+                        "nprobe",
+                        "t_prime",
+                        "document_top_k",
+                        "bound",
+                        "num_threads",
+                    )
+                    and isinstance(value, int)
+                )
+                or (key == "fused_ext" and isinstance(value, bool))
+            ):
+                config[key] = value
+            elif (
+                key in ("nprobe", "t_prime", "document_top_k", "runtime", "bound") and value is None
+            ):
+                config[key] = None
+    params: ExperimentParamsDict = {}
+    if "num_runs" in params_raw and isinstance(params_raw["num_runs"], int):
+        params["num_runs"] = params_raw["num_runs"]
+    return config, params
 
 
-def publish_subprocess_results(results: dict[str, Any]) -> None:
+def publish_subprocess_results(results: ExperimentResultDict) -> None:
     """Publish subprocess execution results (no-op implementation).
 
     Placeholder function for publishing subprocess results. Currently
@@ -461,14 +634,14 @@ def publish_subprocess_results(results: dict[str, Any]) -> None:
 
     Parameters
     ----------
-    results : dict[str, Any]
+    results : ExperimentResultDict
         Results dictionary from subprocess execution.
     """
 
 
 def spawn_and_execute(
-    script: str, config: dict[str, Any], params: dict[str, Any]
-) -> dict[str, Any]:
+    script: str, config: ExperimentConfigDict, params: ExperimentParamsDict
+) -> ExperimentResultDict:
     """Spawn a subprocess to execute a Python script with configuration.
 
     Runs a Python script as a subprocess, passing configuration and parameters
@@ -479,14 +652,14 @@ def spawn_and_execute(
     ----------
     script : str
         Path to the Python script to execute.
-    config : dict[str, Any]
+    config : ExperimentConfigDict
         Configuration dictionary to pass to the script.
-    params : dict[str, Any]
+    params : ExperimentParamsDict
         Parameters dictionary to pass to the script.
 
     Returns
     -------
-    dict[str, Any]
+    ExperimentResultDict
         Result dictionary parsed from the script's JSON output.
 
     Raises
@@ -501,7 +674,7 @@ def spawn_and_execute(
         stdout=subprocess.PIPE,
         bufsize=1,
         text=True,
-        env={**os.environ, "PYTHONPATH": pathlib.Path.cwd()},
+        env={**os.environ, "PYTHONPATH": str(pathlib.Path.cwd())},
         cwd=pathlib.Path.cwd(),
     )
     response = process.stdout.strip().split("\n")
@@ -510,20 +683,98 @@ def spawn_and_execute(
     if response[-1] != "#> Done":
         msg = f"Expected process to end with '#> Done', got {response[-1]!r}"
         raise RuntimeError(msg)
-    return json.loads(response[-2])
-
-
-def _strip_provenance(config: dict[str, Any], result: dict[str, Any]) -> dict[str, Any]:
-    del result["parameters"]
-    del result["type"]
-    if "document_top_k" not in config:
-        result["document_top_k"] = None
-    if "num_threads" not in config:
-        result["num_threads"] = 1
+    result_raw: object = json.loads(response[-2])
+    if not isinstance(result_raw, dict):
+        msg = "Subprocess output must be a JSON object"
+        raise RuntimeError(msg)
+    # Type narrowing: construct ExperimentResultDict
+    result: ExperimentResultDict = {}
+    result_dict: dict[str, object] = result_raw
+    if "index_size_bytes" in result_dict and isinstance(result_dict["index_size_bytes"], int):
+        result["index_size_bytes"] = result_dict["index_size_bytes"]
+    if "index_size_gib" in result_dict and isinstance(result_dict["index_size_gib"], (int, float)):
+        result["index_size_gib"] = float(result_dict["index_size_gib"])
+    if "metrics" in result_dict:
+        result["metrics"] = result_dict["metrics"]
+    if "statistics" in result_dict:
+        result["statistics"] = result_dict["statistics"]
+    if "tracker" in result_dict:
+        result["tracker"] = result_dict["tracker"]
+    if "_update" in result_dict and isinstance(result_dict["_update"], dict):
+        result["_update"] = result_dict["_update"]
+    if "provenance" in result_dict and isinstance(result_dict["provenance"], dict):
+        result["provenance"] = result_dict["provenance"]
     return result
 
 
-def check_execution(filename: str, configs: list[dict[str, Any]], result_file: str) -> None:
+def _strip_provenance(
+    config: dict[str, object], result: ExperimentResultDict
+) -> ExperimentConfigDict:
+    """Strip provenance fields from result to match config format.
+
+    Parameters
+    ----------
+    config : dict[str, object]
+        Original configuration dictionary.
+    result : ExperimentResultDict
+        Result dictionary with provenance.
+
+    Returns
+    -------
+    ExperimentConfigDict
+        Stripped configuration dictionary.
+    """
+    provenance_raw = result.get("provenance")
+    if not isinstance(provenance_raw, dict):
+        msg = "Result must contain 'provenance' key with dict value"
+        raise ValueError(msg)
+    provenance: dict[str, object] = provenance_raw
+    stripped: ExperimentConfigDict = {}
+    for key in (
+        "collection",
+        "dataset",
+        "nbits",
+        "nprobe",
+        "t_prime",
+        "document_top_k",
+        "runtime",
+        "split",
+        "bound",
+        "num_threads",
+        "fused_ext",
+    ):
+        if key in provenance and key not in ("parameters", "type"):
+            value = provenance[key]
+            # Type narrowing: ensure value matches expected type for this key
+            if (
+                (key in ("collection", "dataset", "runtime", "split") and isinstance(value, str))
+                or (
+                    key
+                    in (
+                        "nbits",
+                        "nprobe",
+                        "t_prime",
+                        "document_top_k",
+                        "bound",
+                        "num_threads",
+                    )
+                    and isinstance(value, int)
+                )
+                or (key == "fused_ext" and isinstance(value, bool))
+            ):
+                stripped[key] = value
+            elif (
+                key in ("nprobe", "t_prime", "document_top_k", "runtime", "bound") and value is None
+            ):
+                stripped[key] = None
+    if "document_top_k" not in config:
+        stripped["document_top_k"] = None
+    if "num_threads" not in config:
+        stripped["num_threads"] = 1
+    return stripped
+
+
+def check_execution(filename: str, configs: list[ExperimentConfigDict], result_file: str) -> None:
     """Verify that execution results match expected configurations.
 
     Compares the configurations used for execution with the provenance
@@ -534,16 +785,40 @@ def check_execution(filename: str, configs: list[dict[str, Any]], result_file: s
     ----------
     filename : str
         Path to the original configuration file.
-    configs : list[dict[str, Any]]
+    configs : list[ExperimentConfigDict]
         List of configuration dictionaries that were executed.
     result_file : str
         Path to the results file containing execution outputs.
     """
     with pathlib.Path(filename).open("r", encoding="utf-8") as file:
-        config_data = json.loads(file.read())
+        config_data_raw: object = json.loads(file.read())
+    if not isinstance(config_data_raw, dict):
+        msg = f"Configuration file {filename} must contain a JSON object"
+        raise ValueError(msg)
+    config_data: dict[str, object] = config_data_raw
     with pathlib.Path(result_file).open("r", encoding="utf-8") as file:
-        results = json.loads(file.read())
-    result_configs = [
-        _strip_provenance(config_data["configurations"], result["provenance"]) for result in results
-    ]
-    [config for config in configs if config not in result_configs]
+        results_raw: object = json.loads(file.read())
+    if not isinstance(results_raw, list):
+        msg = f"Results file {result_file} must contain a JSON array"
+        raise ValueError(msg)
+    results: list[object] = results_raw
+    configs_raw = config_data.get("configurations")
+    if not isinstance(configs_raw, dict):
+        msg = "Configuration file must contain 'configurations' key with dict value"
+        raise ValueError(msg)
+    result_configs: list[ExperimentConfigDict] = []
+    for result_item in results:
+        if not isinstance(result_item, dict):
+            continue
+        result_dict: dict[str, object] = result_item
+        provenance_raw = result_dict.get("provenance")
+        if not isinstance(provenance_raw, dict):
+            continue
+        # Create a minimal ExperimentResultDict with provenance
+        result_with_provenance: ExperimentResultDict = {"provenance": provenance_raw}
+        result_configs.append(_strip_provenance(configs_raw, result_with_provenance))
+    # Check that all configs are in result_configs
+    missing_configs = [config for config in configs if config not in result_configs]
+    if missing_configs:
+        msg = f"Missing configurations in results: {missing_configs}"
+        raise ValueError(msg)

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import contextlib
 import random
-from typing import Any
 
 import torch
 import tqdm
@@ -41,8 +40,8 @@ VERBOSE_DEBUG_LEVEL = 2
 def encode(
     config: ColBERTConfig,
     collection: str | Collection,
-    shared_lists: list[mp.managers.SyncManager.list[Any]],
-    _shared_queues: list[mp.Queue[Any]],
+    shared_lists: list[mp.managers.SyncManager.list[object]],
+    _shared_queues: list[mp.Queue[object]],
     verbose: int = 3,
 ) -> None:
     """Entry point for distributed collection indexing.
@@ -56,9 +55,9 @@ def encode(
         Configuration for indexing.
     collection : str | Collection
         Collection to index (path string or Collection object).
-    shared_lists : list[mp.managers.SyncManager.list[Any]]
+    shared_lists : list[mp.managers.SyncManager.list[object]]
         Shared lists for inter-process communication.
-    _shared_queues : list[mp.Queue[Any]]
+    _shared_queues : list[mp.Queue[object]]
         Shared queues for inter-process communication (unused).
     verbose : int
         Verbosity level (default: 3).
@@ -127,7 +126,7 @@ class CollectionIndexer:
 
         print_memory_stats(f"RANK:{self.rank}")
 
-    def run(self, shared_lists: list[mp.managers.SyncManager.list[Any]]) -> None:
+    def run(self, shared_lists: list[mp.managers.SyncManager.list[object]]) -> None:
         """Execute the complete indexing pipeline.
 
         Runs setup, training, indexing, and finalization phases with
@@ -135,7 +134,7 @@ class CollectionIndexer:
 
         Parameters
         ----------
-        shared_lists : list[mp.managers.SyncManager.list[Any]]
+        shared_lists : list[mp.managers.SyncManager.list[object]]
             Shared lists for inter-process communication during training.
         """
         with torch.inference_mode():
@@ -310,7 +309,7 @@ class CollectionIndexer:
 
                 f.write(ujson.dumps(d, indent=4) + "\n")
 
-    def train(self, shared_lists: list[mp.managers.SyncManager.list[Any]]) -> None:
+    def train(self, shared_lists: list[mp.managers.SyncManager.list[object]]) -> None:
         """Train compression codec from sampled embeddings.
 
         Trains K-means centroids from sampled passages and computes average
@@ -319,7 +318,7 @@ class CollectionIndexer:
 
         Parameters
         ----------
-        shared_lists : list[mp.managers.SyncManager.list[Any]]
+        shared_lists : list[mp.managers.SyncManager.list[object]]
             Shared lists for inter-process communication during K-means training.
         """
         if self.rank > 0:
@@ -386,7 +385,7 @@ class CollectionIndexer:
         return sample, sample_heldout
 
     def _train_kmeans(
-        self, sample: torch.Tensor, shared_lists: list[mp.managers.SyncManager.list[Any]]
+        self, sample: torch.Tensor, shared_lists: list[mp.managers.SyncManager.list[object]]
     ) -> torch.Tensor:
         if self.use_gpu:
             torch.cuda.empty_cache()
@@ -652,7 +651,7 @@ def compute_faiss_kmeans(
     dim: int,
     num_partitions: int,
     kmeans_niters: int,
-    shared_lists: list[mp.managers.SyncManager.list[Any]],
+    shared_lists: list[mp.managers.SyncManager.list[object]],
     return_value_queue: mp.Queue[torch.Tensor] | None = None,
 ) -> torch.Tensor:
     """Compute K-means centroids using FAISS.
@@ -669,7 +668,7 @@ def compute_faiss_kmeans(
         Number of centroids (K) to generate.
     kmeans_niters : int
         Number of K-means iterations.
-    shared_lists : list[mp.managers.SyncManager.list[Any]]
+    shared_lists : list[mp.managers.SyncManager.list[object]]
         Shared lists containing sample embeddings at index [0][0].
     return_value_queue : mp.Queue[torch.Tensor] | None
         Optional queue for returning centroids in subprocess mode.

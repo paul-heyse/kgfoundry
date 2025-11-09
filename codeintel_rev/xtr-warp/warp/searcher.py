@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pathlib
 from collections.abc import Callable
-from typing import Any, Union
+from typing import Union
 
 import torch
 from tqdm import tqdm
@@ -151,12 +151,12 @@ class Searcher:
 
         print_memory_stats()
 
-    def configure(self, **kw_args: Any) -> None:  # noqa: ANN401
+    def configure(self, **kw_args: object) -> None:
         """Update search configuration parameters.
 
         Parameters
         ----------
-        **kw_args : Any
+        **kw_args : object
             Configuration parameters to update.
         """
         self.config.configure(**kw_args)

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import time
 from types import TracebackType
-from typing import Any, Never, Self
+from typing import Never, Self
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -181,12 +181,12 @@ class ExecutionTracker:
         breakdown = [(step, self._time_per_step[step] / self._num_iterations) for step in steps]
         return iteration_time, breakdown
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self) -> dict[str, object]:
         """Convert tracker to dictionary.
 
         Returns
         -------
-        dict[str, Any]
+        dict[str, object]
             Dictionary representation of tracker state.
         """
         return {
@@ -198,12 +198,12 @@ class ExecutionTracker:
         }
 
     @staticmethod
-    def from_dict(data: dict[str, Any]) -> ExecutionTracker:
+    def from_dict(data: dict[str, object]) -> ExecutionTracker:
         """Create tracker from dictionary.
 
         Parameters
         ----------
-        data : dict[str, Any]
+        data : dict[str, object]
             Dictionary with tracker state.
 
         Returns

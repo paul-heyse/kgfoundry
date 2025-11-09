@@ -7,7 +7,16 @@ combine base configuration with runtime, resource, and model settings.
 from dataclasses import dataclass
 
 from warp.infra.config.base_config import BaseConfig
-from warp.infra.config.settings import *
+from warp.infra.config.settings import (
+    DocSettings,
+    IndexingSettings,
+    QuerySettings,
+    ResourceSettings,
+    RunSettings,
+    SearchSettings,
+    TokenizerSettings,
+    TrainingSettings,
+)
 
 
 @dataclass(frozen=True)

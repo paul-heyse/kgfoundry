@@ -64,7 +64,7 @@ class _RunManager:
         distributed.barrier(rank)
 
         self._logger = Logger(rank, self)
-        self._log_args = self._logger._log_args
+        self._log_args = self._logger.log_args
         self.warn = self._logger.warn
         self.info = self._logger.info
         self.info_all = self._logger.info_all
@@ -85,8 +85,8 @@ class _RunManager:
             yield
 
         except KeyboardInterrupt as ex:
-            self._logger._log_exception(ex.__class__, ex, ex.__traceback__)
-            self._logger._log_all_artifacts()
+            self._logger.log_exception(ex.__class__, ex, ex.__traceback__)
+            self._logger.log_all_artifacts()
 
             if consider_failed_if_interrupted:
                 self.exit_status = "KILLED"  # mlflow.entities.RunStatus.KILLED
@@ -94,8 +94,8 @@ class _RunManager:
             sys.exit(128 + 2)
 
         except Exception as ex:
-            self._logger._log_exception(ex.__class__, ex, ex.__traceback__)
-            self._logger._log_all_artifacts()
+            self._logger.log_exception(ex.__class__, ex, ex.__traceback__)
+            self._logger.log_all_artifacts()
 
             self.exit_status = "FAILED"  # mlflow.entities.RunStatus.FAILED
 
@@ -111,7 +111,7 @@ class _RunManager:
             self.log_new_artifact(str(logs_path_obj / "name.original.txt"), original_name)
             self.log_new_artifact(str(logs_path_obj / "name.txt"), name)
 
-            self._logger._log_all_artifacts()
+            self._logger.log_all_artifacts()
 
 
 Run = _RunManager()

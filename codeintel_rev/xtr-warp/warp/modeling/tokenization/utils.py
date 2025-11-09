@@ -59,9 +59,9 @@ def tensorize_triples(
 
     Parameters
     ----------
-    query_tokenizer : Any
+    query_tokenizer : Tokenizer
         Tokenizer for queries.
-    doc_tokenizer : Any
+    doc_tokenizer : Tokenizer
         Tokenizer for documents.
     queries : list[str]
         List of query texts.

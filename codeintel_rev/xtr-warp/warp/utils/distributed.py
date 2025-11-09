@@ -33,13 +33,13 @@ def init(rank: int) -> tuple[int, bool]:
     nranks = max(1, nranks)
     is_distributed = (nranks > 1) or ("WORLD_SIZE" in os.environ)
 
-    if not hasattr(init, "_already_initialized"):
-        init._already_initialized = False
+    if not hasattr(init, "already_initialized"):
+        init.already_initialized = False
 
-    if init._already_initialized:
+    if init.already_initialized:
         return nranks, is_distributed
 
-    init._already_initialized = True
+    init.already_initialized = True
 
     if is_distributed and torch.cuda.is_available():
         num_gpus = torch.cuda.device_count()

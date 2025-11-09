@@ -28,7 +28,7 @@ class Logger:
     ----------
     rank : int
         Process rank (-1 or 0 for main process).
-    run : Any
+    run : Run
         Run manager instance with path and experiment info.
     """
 
@@ -39,7 +39,7 @@ class Logger:
         ----------
         rank : int
             Process rank (-1 or 0 for main process).
-        run : Any
+        run : Run
             Run manager instance with path and experiment info.
         """
         self.rank = rank
@@ -50,12 +50,23 @@ class Logger:
         if self.is_main:
             create_directory(self.logs_path)
 
-    def _log_exception(
+    def log_exception(
         self,
         etype: type[BaseException],
         value: BaseException,
         tb: TracebackType | None,
     ) -> None:
+        """Log exception traceback to file.
+
+        Parameters
+        ----------
+        etype : type[BaseException]
+            Exception type.
+        value : BaseException
+            Exception instance.
+        tb : TracebackType | None
+            Traceback object.
+        """
         if not self.is_main:
             return
 
@@ -65,11 +76,26 @@ class Logger:
 
         self.log_new_artifact(output_path, trace)
 
-    def _log_all_artifacts(self) -> None:
+    def log_all_artifacts(self) -> None:
+        """Log all artifacts (no-op, placeholder for future implementation).
+
+        Currently a placeholder method that does nothing. Intended for
+        future artifact logging functionality.
+        """
         if not self.is_main:
             return
 
-    def _log_args(self, _args: object) -> None:
+    def log_args(self, _args: object) -> None:
+        """Log command-line arguments to file.
+
+        Writes sys.argv to args.txt file in logs directory.
+        Only rank 0 (main process) logs.
+
+        Parameters
+        ----------
+        _args : object
+            Unused parameter (kept for API compatibility).
+        """
         if not self.is_main:
             return
 
@@ -118,7 +144,7 @@ class Logger:
 
         Parameters
         ----------
-        *args : Any
+        *args : object
             Arguments to print.
         """
         msg = print_message("[WARNING]", "\t", *args)
@@ -133,7 +159,7 @@ class Logger:
 
         Parameters
         ----------
-        *args : Any
+        *args : object
             Arguments to print.
         """
         print_message("[" + str(self.rank) + "]", "\t", *args)
@@ -143,7 +169,7 @@ class Logger:
 
         Parameters
         ----------
-        *args : Any
+        *args : object
             Arguments to print.
         """
         if self.is_main:

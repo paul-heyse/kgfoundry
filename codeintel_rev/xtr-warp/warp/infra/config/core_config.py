@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import dataclasses
 from dataclasses import dataclass, fields
-from typing import Any
 
 # Maximum length for list/dict representation in provenance
 MAX_PROVENANCE_LENGTH = 100
@@ -23,11 +22,11 @@ class DefaultVal:
 
     Parameters
     ----------
-    val : Any
+    val : object
         Default value to wrap.
     """
 
-    val: Any
+    val: object
 
     def __hash__(self) -> int:
         """Compute hash based on wrapped value representation.
@@ -98,7 +97,7 @@ class CoreConfig:
             setattr(self, field.name, field.default.val)
             self.assigned[field.name] = True
 
-    def configure(self, *, ignore_unrecognized: bool = True, **kw_args: Any) -> set[str]:  # noqa: ANN401
+    def configure(self, *, ignore_unrecognized: bool = True, **kw_args: object) -> set[str]:
         """Configure multiple attributes from keyword arguments.
 
         Sets multiple configuration attributes at once, returning set of
@@ -108,7 +107,7 @@ class CoreConfig:
         ----------
         ignore_unrecognized : bool
             Whether to ignore unrecognized keys (default: True).
-        **kw_args : Any
+        **kw_args : object
             Keyword arguments mapping attribute names to values.
 
         Returns
@@ -127,7 +126,7 @@ class CoreConfig:
 
         return ignored
 
-    def set(self, key: str, value: Any, *, ignore_unrecognized: bool = False) -> bool | None:  # noqa: ANN401
+    def set(self, key: str, value: object, *, ignore_unrecognized: bool = False) -> bool | None:
         """Set a single configuration attribute.
 
         Sets attribute value and marks it as assigned. Raises exception
@@ -137,7 +136,7 @@ class CoreConfig:
         ----------
         key : str
             Attribute name to set.
-        value : Any
+        value : object
             Value to assign.
         ignore_unrecognized : bool
             Whether to ignore unrecognized keys (default: False).
@@ -170,17 +169,17 @@ class CoreConfig:
         """
 
     @staticmethod
-    def __export_value(v: Any) -> Any:  # noqa: ANN401
+    def __export_value(v: object) -> object:
         """Export value with provenance and truncation for large collections.
 
         Parameters
         ----------
-        v : Any
+        v : object
             Value to export.
 
         Returns
         -------
-        Any
+        object
             Exported value, possibly truncated or with provenance.
         """
         v = v.provenance() if hasattr(v, "provenance") else v
@@ -193,7 +192,7 @@ class CoreConfig:
 
         return v
 
-    def export(self) -> dict[str, Any]:
+    def export(self) -> dict[str, object]:
         """Export configuration as dictionary.
 
         Converts configuration to dictionary format, applying value
@@ -201,7 +200,7 @@ class CoreConfig:
 
         Returns
         -------
-        dict[str, Any]
+        dict[str, object]
             Configuration dictionary.
         """
         d = dataclasses.asdict(self)

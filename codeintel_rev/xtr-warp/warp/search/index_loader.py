@@ -7,7 +7,7 @@ IVF structures, document lengths, and embeddings from disk.
 from __future__ import annotations
 
 import pathlib
-from typing import Any, Never
+from typing import Never
 
 import torch
 import tqdm
@@ -96,14 +96,14 @@ class IndexLoader:
         )
 
     @property
-    def metadata(self) -> dict[str, Any]:
+    def metadata(self) -> dict[str, object]:
         """Get index metadata dictionary.
 
         Loads metadata.json from index directory, caching after first access.
 
         Returns
         -------
-        dict[str, Any]
+        dict[str, object]
             Index metadata dictionary.
         """
         try:

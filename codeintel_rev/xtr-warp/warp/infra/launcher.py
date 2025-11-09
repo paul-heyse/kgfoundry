@@ -7,7 +7,6 @@ import os
 import random
 import time
 from collections.abc import Callable
-from typing import Any
 
 import numpy as np
 import torch
@@ -32,7 +31,7 @@ class Launcher:
 
     def __init__(
         self,
-        callee: Callable[..., Any],
+        callee: Callable[..., object],
         run_config: RunConfig | None = None,
         *,
         return_all: bool = False,
@@ -41,7 +40,7 @@ class Launcher:
 
         Parameters
         ----------
-        callee : Callable[..., Any]
+        callee : Callable[..., object]
             Function to execute when launched.
         run_config : RunConfig, optional
             Configuration for the run. If None, uses existing Run configuration.
@@ -62,12 +61,12 @@ class Launcher:
         ----------
         custom_config : BaseConfig & RunSettings
             Configuration object that must be an instance of both BaseConfig and RunSettings.
-        *args : Any
+        *args : object
             Additional arguments to pass to the callee function.
 
         Returns
         -------
-        Any
+        object
             Return value(s) from the callee function. If return_all is False,
             returns only the first rank's result.
 
@@ -140,12 +139,12 @@ class Launcher:
         ----------
         custom_config : BaseConfig & RunSettings
             Configuration object that must be an instance of both BaseConfig and RunSettings.
-        *args : Any
+        *args : object
             Additional arguments to pass to the callee function.
 
         Returns
         -------
-        Any
+        object
             Return value from the callee function.
 
         Raises
@@ -194,21 +193,23 @@ def set_seed(seed: int) -> None:
     torch.cuda.manual_seed_all(seed)
 
 
-def run_process_without_mp(callee: Callable[..., object], config: RunConfig, *args: object) -> object:
+def run_process_without_mp(
+    callee: Callable[..., object], config: RunConfig, *args: object
+) -> object:
     """Run the callee function in single-process mode without multiprocessing.
 
     Parameters
     ----------
-    callee : Callable[..., Any]
+    callee : Callable[..., object]
         Function to execute.
     config : RunConfig
         Configuration for the run.
-    *args : Any
+    *args : object
         Additional arguments to pass to the callee function.
 
     Returns
     -------
-    Any
+    object
         Return value from the callee function.
     """
     set_seed(12345)
@@ -231,15 +232,15 @@ def setup_new_process(
 
     Parameters
     ----------
-    callee : Callable[..., Any]
+    callee : Callable[..., object]
         Function to execute in this process.
     port : str
         Port number for distributed communication.
-    return_value_queue : mp.Queue[tuple[int, Any]]
+    return_value_queue : mp.Queue[tuple[int, object]]
         Queue to put the return value with rank information.
     config : RunConfig
         Configuration for this process.
-    *args : Any
+    *args : object
         Additional arguments to pass to the callee function.
 
     Raises

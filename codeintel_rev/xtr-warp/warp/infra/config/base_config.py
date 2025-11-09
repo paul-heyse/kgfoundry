@@ -10,12 +10,11 @@ import contextlib
 import dataclasses
 import pathlib
 from dataclasses import dataclass
-from typing import Any
 
 import ujson
 from huggingface_hub import hf_hub_download
 from utility.utils.save_metadata import get_metadata_only
-from warp.infra.config.core_config import *
+from warp.infra.config.core_config import CoreConfig
 from warp.utils.utils import torch_load_dnn
 
 
@@ -61,14 +60,14 @@ class BaseConfig(CoreConfig):
         return cls(**kw_args)
 
     @classmethod
-    def from_deprecated_args(cls, args: dict[str, Any]) -> tuple[BaseConfig, set[str]]:
+    def from_deprecated_args(cls, args: dict[str, object]) -> tuple[BaseConfig, set[str]]:
         """Create config from deprecated argument dictionary.
 
         Loads config from old-style argument dict, ignoring unrecognized keys.
 
         Parameters
         ----------
-        args : dict[str, Any]
+        args : dict[str, object]
             Deprecated argument dictionary.
 
         Returns

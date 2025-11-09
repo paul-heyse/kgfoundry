@@ -27,8 +27,8 @@ def get_metadata_only() -> dict[str, object]:
 
     Returns
     -------
-    Any
-        DotDict object containing metadata fields:
+    dict[str, object]
+        Dictionary containing metadata fields:
         - hostname: System hostname
         - git_branch: Active Git branch name (if available)
         - git_hash: Git commit hash (if available)
@@ -62,14 +62,14 @@ def get_metadata(args: object) -> dict[str, object]:
 
     Parameters
     ----------
-    args : Any
+    args : object
         Arguments object (typically a dotdict) to extend with metadata.
         May contain an input_arguments attribute that will be converted
         to a dictionary.
 
     Returns
     -------
-    dict[str, Any]
+    dict[str, object]
         Dictionary containing all metadata fields:
         - All fields from input args
         - hostname: System hostname
@@ -104,12 +104,12 @@ def get_metadata(args: object) -> dict[str, object]:
 # With that, I think we don't even need (necessarily) to restrict things to input_arguments.
 
 
-def format_metadata(metadata: dict[str, Any]) -> str:
+def format_metadata(metadata: dict[str, object]) -> str:
     """Format metadata dictionary as indented JSON string.
 
     Parameters
     ----------
-    metadata : dict[str, Any]
+    metadata : dict[str, object]
         Metadata dictionary to format.
 
     Returns
@@ -140,12 +140,12 @@ def save_metadata(path: str | Path, args: object) -> dict[str, object]:
     ----------
     path : str | Path
         File path where metadata will be saved (must not exist).
-    args : Any
+    args : object
         Arguments object to collect metadata from.
 
     Returns
     -------
-    dict[str, Any]
+    dict[str, object]
         The metadata dictionary that was saved.
 
     Raises

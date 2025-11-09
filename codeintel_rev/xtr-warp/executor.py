@@ -10,10 +10,13 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import Any
 
 import psutil
 from utility.executor_utils import (
+    ExecutionContext,
+    ExperimentConfigDict,
+    ExperimentParamsDict,
+    ExperimentResultDict,
     check_execution,
     execute_configs,
     load_configuration,
@@ -23,7 +26,7 @@ from utility.index_sizes import bytes_to_gib, safe_index_size
 from utility.runner_utils import make_run_config
 
 
-def index_size(config: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
+def index_size(config: ExperimentConfigDict, params: ExperimentParamsDict) -> ExperimentResultDict:
     """Calculate the size of an index for a given configuration.
 
     Computes the index size in bytes and converts it to GiB. This function
@@ -31,14 +34,14 @@ def index_size(config: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]
 
     Parameters
     ----------
-    config : dict[str, Any]
+    config : ExperimentConfigDict
         Experiment configuration dictionary containing index parameters.
-    params : dict[str, Any]
+    params : ExperimentParamsDict
         Additional parameters (must be empty for this operation).
 
     Returns
     -------
-    dict[str, Any]
+    ExperimentResultDict
         Dictionary containing:
         - index_size_bytes: Size of the index in bytes
         - index_size_gib: Size of the index in GiB
@@ -53,13 +56,16 @@ def index_size(config: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]
         raise ValueError(msg)
     run_config = make_run_config(config)
     index_size_bytes = safe_index_size(run_config)
+    if index_size_bytes is None:
+        msg = "safe_index_size returned None"
+        raise RuntimeError(msg)
     return {
         "index_size_bytes": index_size_bytes,
         "index_size_gib": bytes_to_gib(index_size_bytes),
     }
 
 
-def latency(config: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
+def latency(config: ExperimentConfigDict, params: ExperimentParamsDict) -> ExperimentResultDict:
     """Measure latency metrics across multiple runs.
 
     Executes the latency runner script multiple times (default: 3) and collects
@@ -68,15 +74,15 @@ def latency(config: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
 
     Parameters
     ----------
-    config : dict[str, Any]
+    config : ExperimentConfigDict
         Experiment configuration dictionary.
-    params : dict[str, Any]
+    params : ExperimentParamsDict
         Parameters dictionary. May contain:
         - num_runs: Number of runs to execute (default: 3)
 
     Returns
     -------
-    dict[str, Any]
+    ExperimentResultDict
         Dictionary containing:
         - metrics: Performance metrics from the runs
         - tracker: List of tracker data from each run
@@ -90,28 +96,35 @@ def latency(config: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
         If runs produce inconsistent metrics or update information.
     """
     num_runs = params.get("num_runs", 3)
-    if num_runs <= 0:
+    if num_runs is None or num_runs <= 0:
         msg = f"num_runs must be > 0, got {num_runs}"
         raise ValueError(msg)
     results = [
         spawn_and_execute("utility/latency_runner.py", config, params) for _ in range(num_runs)
     ]
-    metrics = results[0]["metrics"]
-    if not all(x["metrics"] == metrics for x in results):
+    metrics_val = results[0].get("metrics")
+    if metrics_val is None:
+        msg = "First result missing metrics"
+        raise RuntimeError(msg)
+    if not all(x.get("metrics") == metrics_val for x in results):
         msg = "All runs must produce consistent metrics"
         raise RuntimeError(msg)
-    update = results[0]["_update"]
-    if not all(x["_update"] == update for x in results):
+    update_val = results[0].get("_update")
+    if update_val is None:
+        msg = "First result missing _update"
+        raise RuntimeError(msg)
+    if not all(x.get("_update") == update_val for x in results):
         msg = "All runs must produce consistent update information"
         raise RuntimeError(msg)
+    tracker_list = [x.get("tracker") for x in results]
     return {
-        "metrics": metrics,
-        "tracker": [x["tracker"] for x in results],
-        "_update": update,
+        "metrics": metrics_val,
+        "tracker": tracker_list,
+        "_update": update_val,
     }
 
 
-def metrics(config: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
+def metrics(config: ExperimentConfigDict, params: ExperimentParamsDict) -> ExperimentResultDict:
     """Collect performance metrics for a single experiment run.
 
     Executes the latency runner script once and extracts metrics, statistics,
@@ -119,14 +132,14 @@ def metrics(config: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
 
     Parameters
     ----------
-    config : dict[str, Any]
+    config : ExperimentConfigDict
         Experiment configuration dictionary.
-    params : dict[str, Any]
+    params : ExperimentParamsDict
         Parameters dictionary passed to the latency runner.
 
     Returns
     -------
-    dict[str, Any]
+    ExperimentResultDict
         Dictionary containing:
         - metrics: Performance metrics from the run
         - statistics: Statistical summary of the run
@@ -134,9 +147,9 @@ def metrics(config: dict[str, Any], params: dict[str, Any]) -> dict[str, Any]:
     """
     run = spawn_and_execute("utility/latency_runner.py", config, params)
     return {
-        "metrics": run["metrics"],
-        "statistics": run["statistics"],
-        "_update": run["_update"],
+        "metrics": run.get("metrics"),
+        "statistics": run.get("statistics"),
+        "_update": run.get("_update"),
     }
 
 
@@ -148,7 +161,9 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--overwrite", action="store_true")
     args = parser.parse_args()
 
-    MAX_WORKERS = args.workers or psutil.cpu_count(logical=False)
+    MAX_WORKERS = args.workers if args.workers is not None else psutil.cpu_count(logical=False)
+    if MAX_WORKERS is None:
+        MAX_WORKERS = 1
     OVERWRITE = args.overwrite
     results_file, type_, params, configs = load_configuration(
         args.config, info=args.info, overwrite=OVERWRITE
@@ -163,11 +178,13 @@ if __name__ == "__main__":
         "latency": {"callback": latency, "parallelizable": False},
         "metrics": {"callback": metrics, "parallelizable": True},
     }
-    execute_configs(
-        EXEC_INFO,
-        configs,
-        results_file=results_file,
+    profile = EXEC_INFO[type_]
+    context = ExecutionContext(
+        callback=profile["callback"],
         type_=type_,
         params=params,
+        results_file=str(results_file),
         max_workers=MAX_WORKERS,
+        parallelizable=profile["parallelizable"],
     )
+    execute_configs(configs, context)

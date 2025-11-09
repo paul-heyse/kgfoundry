@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from warp.engine.runtime.openvino_model import XTROpenVinoConfig
     from warp.engine.runtime.torchscript_model import XTRTorchScriptConfig
 
+from utility.executor_utils import ExperimentConfigDict
 from warp.engine.config import USE_CORE_ML, WARPRunConfig
 from warp.engine.runtime.onnx_model import XTROnnxConfig, XTROnnxQuantization
 from warp.engine.runtime.openvino_model import XTROpenVinoConfig
@@ -50,7 +51,7 @@ def _make_runtime(
     raise AssertionError
 
 
-def make_run_config(config: dict[str, Any]) -> WARPRunConfig:
+def make_run_config(config: ExperimentConfigDict) -> WARPRunConfig:
     """Create a WARPRunConfig from an experiment configuration dictionary.
 
     Extracts experiment parameters and constructs a WARPRunConfig with
@@ -59,7 +60,7 @@ def make_run_config(config: dict[str, Any]) -> WARPRunConfig:
 
     Parameters
     ----------
-    config : dict[str, Any]
+    config : ExperimentConfigDict
         Configuration dictionary containing:
         - collection: Dataset collection name ("beir" or "lotte")
         - dataset: Specific dataset identifier
@@ -78,23 +79,34 @@ def make_run_config(config: dict[str, Any]) -> WARPRunConfig:
     WARPRunConfig
         Configured WARP run configuration object.
     """
-    collection, dataset, split = (
-        config["collection"],
-        config["dataset"],
-        config["split"],
-    )
-    nbits, nprobe, t_prime, bound = (
-        config["nbits"],
-        config["nprobe"],
-        config["t_prime"],
-        config["bound"],
-    )
-    k = config["document_top_k"] or DEFAULT_K_VALUE
+    collection_raw = config.get("collection")
+    dataset_raw = config.get("dataset")
+    split_raw = config.get("split")
+    collection = str(collection_raw) if collection_raw is not None else ""
+    dataset = str(dataset_raw) if dataset_raw is not None else ""
+    split = str(split_raw) if split_raw is not None else ""
 
-    num_threads = config["num_threads"]
+    nbits_raw = config.get("nbits")
+    nprobe_raw = config.get("nprobe")
+    t_prime_raw = config.get("t_prime")
+    bound_raw = config.get("bound")
+    nbits = int(nbits_raw) if isinstance(nbits_raw, int) else 0
+    nprobe = int(nprobe_raw) if isinstance(nprobe_raw, int) else None
+    t_prime = int(t_prime_raw) if isinstance(t_prime_raw, int) else None
+    bound = int(bound_raw) if isinstance(bound_raw, int) else None
+
+    document_top_k_raw = config.get("document_top_k")
+    k = int(document_top_k_raw) if isinstance(document_top_k_raw, int) else DEFAULT_K_VALUE
+
+    num_threads_raw = config.get("num_threads")
+    num_threads = int(num_threads_raw) if isinstance(num_threads_raw, int) else 1
     fused_ext = True
     if num_threads != 1:
-        fused_ext = config["fused_ext"]
+        fused_ext_raw = config.get("fused_ext")
+        fused_ext = bool(fused_ext_raw) if isinstance(fused_ext_raw, bool) else True
+
+    runtime_raw = config.get("runtime")
+    runtime = str(runtime_raw) if isinstance(runtime_raw, str) else None
     return WARPRunConfig(
         collection=collection,
         dataset=dataset,
@@ -104,7 +116,7 @@ def make_run_config(config: dict[str, Any]) -> WARPRunConfig:
         nprobe=nprobe,
         t_prime=t_prime,
         k=k,
-        runtime=_make_runtime(config["runtime"], num_threads=num_threads),
+        runtime=_make_runtime(runtime, num_threads=num_threads),
         bound=bound,
         fused_ext=fused_ext,
     )

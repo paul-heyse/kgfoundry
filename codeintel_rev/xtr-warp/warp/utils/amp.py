@@ -47,7 +47,7 @@ class MixedPrecisionManager:
 
         Returns
         -------
-        Any
+        torch.cuda.amp.autocast | NullContextManager
             Autocast context if activated, NullContextManager otherwise.
         """
         return torch.cuda.amp.autocast() if self.activated else NullContextManager()
@@ -78,11 +78,11 @@ class MixedPrecisionManager:
 
         Parameters
         ----------
-        colbert : Any
+        colbert : Module
             Model with parameters to clip.
         optimizer : torch.optim.Optimizer
             Optimizer to step.
-        scheduler : Any | None
+        scheduler : lr_scheduler.LRScheduler | None
             Optional learning rate scheduler (default: None).
         """
         if self.activated:

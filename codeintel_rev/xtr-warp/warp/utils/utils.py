@@ -11,7 +11,7 @@ import itertools
 import pathlib
 from collections import OrderedDict, defaultdict
 from collections.abc import Iterator, Sequence
-from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
     from torch.nn import Module
@@ -25,6 +25,7 @@ MIN_WIDTH_FOR_ZIP_FIRST = 100
 
 # Type variables for generic functions
 T = TypeVar("T")
+T_co = TypeVar("T_co", covariant=True)
 
 
 def print_message(*s: object, condition: bool = True, pad: bool = False) -> str:
@@ -32,7 +33,7 @@ def print_message(*s: object, condition: bool = True, pad: bool = False) -> str:
 
     Parameters
     ----------
-    *s : Any
+    *s : object
         Arguments to format as message.
     condition : bool
         Whether to print (default: True).
@@ -75,7 +76,7 @@ def file_tqdm(file: object) -> Iterator[str]:
 
     Parameters
     ----------
-    file : Any
+    file : object
         File-like object with name attribute.
 
     Yields
@@ -103,7 +104,7 @@ def torch_load_dnn(path: str) -> dict[str, object]:
 
     Returns
     -------
-    Any
+    dict[str, object]
         Loaded model state dict.
     """
     if path.startswith(("http:", "https:")):
@@ -114,13 +115,20 @@ def torch_load_dnn(path: str) -> dict[str, object]:
     return dnn
 
 
+@dataclass(frozen=True)
+class CheckpointContext:
+    """Metadata required for checkpoint persistence."""
+
+    epoch_idx: int
+    mb_idx: int
+    arguments: dict[str, object] | None = None
+
+
 def save_checkpoint(
     path: str | pathlib.Path,
-    epoch_idx: int,
-    mb_idx: int,
     model: Module,
     optimizer: Optimizer,
-    arguments: dict[str, object] | None = None,
+    context: CheckpointContext,
 ) -> None:
     """Save training checkpoint to disk.
 
@@ -135,22 +143,22 @@ def save_checkpoint(
         Current epoch index.
     mb_idx : int
         Current minibatch index.
-    model : Any
+    model : Module
         Model to save (extracted from wrapper if needed).
-    optimizer : Any
+    optimizer : Optimizer
         Optimizer to save.
-    arguments : dict[str, Any] | None
+    arguments : dict[str, object] | None
         Optional arguments dictionary (default: None).
     """
     if hasattr(model, "module"):
         model = model.module  # extract model from a distributed/data-parallel wrapper
 
     checkpoint = {}
-    checkpoint["epoch"] = epoch_idx
-    checkpoint["batch"] = mb_idx
+    checkpoint["epoch"] = context.epoch_idx
+    checkpoint["batch"] = context.mb_idx
     checkpoint["model_state_dict"] = model.state_dict()
     checkpoint["optimizer_state_dict"] = optimizer.state_dict()
-    checkpoint["arguments"] = arguments
+    checkpoint["arguments"] = context.arguments
 
     torch.save(checkpoint, path)
 
@@ -172,18 +180,18 @@ def load_checkpoint(
     ----------
     path : str | pathlib.Path
         Path to checkpoint file or URL.
-    model : Any
+    model : Module
         Model to load state into.
-    checkpoint : dict[str, Any] | None
+    checkpoint : dict[str, object] | None
         Pre-loaded checkpoint dict (default: None, loads from path).
-    optimizer : Any | None
+    optimizer : Optimizer | None
         Optional optimizer to load state into (default: None).
     do_print : bool
         Whether to print loading messages (default: True).
 
     Returns
     -------
-    dict[str, Any]
+    dict[str, object]
         Loaded checkpoint dictionary.
     """
     if do_print:
@@ -208,7 +216,7 @@ def load_checkpoint(
     return checkpoint
 
 
-def load_checkpoint_raw(path: str) -> dict[str, Any]:
+def load_checkpoint_raw(path: str) -> dict[str, object]:
     """Load checkpoint from file or URL, removing 'module.' prefix.
 
     Loads checkpoint and removes 'module.' prefix from state dict keys
@@ -221,7 +229,7 @@ def load_checkpoint_raw(path: str) -> dict[str, Any]:
 
     Returns
     -------
-    dict[str, Any]
+    dict[str, object]
         Checkpoint dictionary with cleaned state dict.
     """
     if path.startswith(("http:", "https:")):
@@ -259,35 +267,33 @@ def create_directory(path: str | pathlib.Path) -> None:
         pathlib.Path(path).mkdir(parents=True)
 
 
-
-
-def f7(seq: Sequence[Any]) -> list[Any]:
+def f7[T_co](seq: Sequence[T_co]) -> list[T_co]:
     """Remove duplicates from sequence while preserving order.
 
     Source: https://stackoverflow.com/a/480227/1493011.
 
     Parameters
     ----------
-    seq : Sequence[Any]
+    seq : Sequence[T_co]
         Input sequence.
 
     Returns
     -------
-    list[Any]
+    list[T_co]
         List with duplicates removed, preserving order.
     """
     seen = set()
     return [x for x in seq if not (x in seen or seen.add(x))]
 
 
-def batch(
-    group: Sequence[Any], bsize: int, *, provide_offset: bool = False
-) -> Iterator[tuple[int, Sequence[Any]] | Sequence[Any]]:
+def batch[T_co](
+    group: Sequence[T_co], bsize: int, *, provide_offset: bool = False
+) -> Iterator[tuple[int, Sequence[T_co]] | Sequence[T_co]]:
     """Batch sequence into fixed-size chunks.
 
     Parameters
     ----------
-    group : Sequence[Any]
+    group : Sequence[T_co]
         Sequence to batch.
     bsize : int
         Batch size.
@@ -296,7 +302,7 @@ def batch(
 
     Yields
     ------
-    tuple[int, Sequence[Any]] | Sequence[Any]
+    tuple[int, Sequence[T_co]] | Sequence[T_co]
         Batches, optionally with offset.
     """
     offset = 0
@@ -336,17 +342,17 @@ class DotdictLax(dict):
     __delattr__ = dict.__delitem__
 
 
-def flatten(seq: Sequence[Sequence[Any]]) -> list[Any]:
+def flatten[T_co](seq: Sequence[Sequence[T_co]]) -> list[T_co]:
     """Flatten nested sequence into single list.
 
     Parameters
     ----------
-    seq : Sequence[Sequence[Any]]
+    seq : Sequence[Sequence[T_co]]
         Nested sequence to flatten.
 
     Returns
     -------
-    list[Any]
+    list[T_co]
         Flattened list.
     """
     result = []
@@ -356,11 +362,11 @@ def flatten(seq: Sequence[Sequence[Any]]) -> list[Any]:
     return result
 
 
-def zipstar(
-    seq: Sequence[Sequence[Any]],
+def zipstar[T_co](
+    seq: Sequence[Sequence[T_co]],
     *,
     lazy: bool = False,
-) -> list[list[Any]] | Iterator[tuple[Any, ...]]:
+) -> list[list[T_co]] | Iterator[tuple[T_co, ...]]:
     """Transpose nested sequence (faster than zip(*L)).
 
     Much faster alternative to A, B, C = zip(*[(a, b, c), (a, b, c), ...]).
@@ -368,14 +374,14 @@ def zipstar(
 
     Parameters
     ----------
-    seq : Sequence[Sequence[Any]]
+    seq : Sequence[Sequence[T_co]]
         Nested sequence to transpose.
     lazy : bool
         Whether to return lazy iterator (default: False).
 
     Returns
     -------
-    list[list[Any]] | Iterator[tuple[Any, ...]]
+    list[list[T_co]] | Iterator[tuple[T_co, ...]]
         Transposed sequence as list or iterator.
     """
     if len(seq) == 0:
@@ -391,19 +397,19 @@ def zipstar(
     return seq_zipped if lazy else list(seq_zipped)
 
 
-def zip_first(l1: Sequence[Any], l2: Sequence[Any]) -> list[tuple[Any, Any]]:
+def zip_first(l1: Sequence[T_co], l2: Sequence[T_co]) -> list[tuple[T_co, T_co]]:
     """Zip two sequences, validating length if first is tuple/list.
 
     Parameters
     ----------
-    l1 : Sequence[Any]
+    l1 : Sequence[T_co]
         First sequence.
-    l2 : Sequence[Any]
+    l2 : Sequence[T_co]
         Second sequence.
 
     Returns
     -------
-    list[tuple[Any, Any]]
+    list[tuple[T_co, T_co]]
         Zipped list of tuples.
 
     Raises
@@ -509,17 +515,17 @@ def save_ranking(
     return lists
 
 
-def groupby_first_item(lst: Sequence[Sequence[Any]]) -> defaultdict[Any, list[Any]]:
+def groupby_first_item[T_co](lst: Sequence[Sequence[T_co]]) -> defaultdict[T_co, list[T_co]]:
     """Group sequences by their first item.
 
     Parameters
     ----------
-    lst : Sequence[Sequence[Any]]
+    lst : Sequence[Sequence[T_co]]
         Sequence of sequences to group.
 
     Returns
     -------
-    defaultdict[Any, list[Any]]
+    defaultdict[T_co, list[T_co]]
         Dictionary mapping first items to lists of remaining items.
     """
     groups = defaultdict(list)
@@ -531,9 +537,9 @@ def groupby_first_item(lst: Sequence[Sequence[Any]]) -> defaultdict[Any, list[An
     return groups
 
 
-def process_grouped_by_first_item(
-    lst: Sequence[Sequence[Any]],
-) -> Iterator[tuple[Any, list[Any]]]:
+def process_grouped_by_first_item[T_co](
+    lst: Sequence[Sequence[T_co]],
+) -> Iterator[tuple[T_co, list[T_co]]]:
     """Process sequences grouped by first item.
 
     Requires items in list to already be grouped by first item.
@@ -541,12 +547,12 @@ def process_grouped_by_first_item(
 
     Parameters
     ----------
-    lst : Sequence[Sequence[Any]]
+    lst : Sequence[Sequence[T_co]]
         Sequence of sequences, already grouped by first item.
 
     Yields
     ------
-    tuple[Any, list[Any]]
+    tuple[T_co, list[T_co]]
         Tuple of (first_item, list_of_remaining_items).
 
     Raises
@@ -576,7 +582,9 @@ def process_grouped_by_first_item(
     return groups
 
 
-def grouper(iterable: Sequence[T], n: int, fillvalue: T | None = None) -> Iterator[tuple[T | None, ...]]:
+def grouper(
+    iterable: Sequence[T], n: int, fillvalue: T | None = None
+) -> Iterator[tuple[T | None, ...]]:
     """Collect data into fixed-length chunks or blocks.
 
     Example: grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx
@@ -584,16 +592,16 @@ def grouper(iterable: Sequence[T], n: int, fillvalue: T | None = None) -> Iterat
 
     Parameters
     ----------
-    iterable : Sequence[Any]
+    iterable : Sequence[T]
         Sequence to group.
     n : int
         Chunk size.
-    fillvalue : Any
+    fillvalue : T | None
         Value to fill last chunk if needed (default: None).
 
     Returns
     -------
-    Iterator[tuple[Any, ...]]
+    Iterator[tuple[T | None, ...]]
         Iterator over chunks of size n.
     """
     args = [iter(iterable)] * n
@@ -621,7 +629,7 @@ def lengths2offsets(lengths: Sequence[int]) -> Iterator[tuple[int, int]]:
 
 
 # see https://stackoverflow.com/a/45187287
-class NullContextManager(Generic[T]):
+class NullContextManager[T]:
     """No-op context manager.
 
     Provides context manager interface that does nothing.
@@ -643,7 +651,7 @@ class NullContextManager(Generic[T]):
 
         Returns
         -------
-        Any
+        T | None
             Dummy resource.
         """
         return self.dummy_resource
@@ -653,7 +661,7 @@ class NullContextManager(Generic[T]):
 
         Parameters
         ----------
-        *args : Any
+        *args : object
             Exception info (ignored).
         """
 
@@ -663,7 +671,7 @@ def load_batch_backgrounds(args: object, qids: Sequence[str | int]) -> list[str]
 
     Parameters
     ----------
-    args : Any
+    args : object
         Arguments object with qid2backgrounds, collection, and collectionX.
     qids : Sequence[str | int]
         Query IDs to load backgrounds for.

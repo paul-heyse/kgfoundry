@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import pathlib
 import time
-from typing import Any
 
 import torch.multiprocessing as mp
 from warp.data import Collection
@@ -47,12 +46,12 @@ class Indexer:
         self.config = ColBERTConfig.from_existing(self.checkpoint_config, config, Run().config)
         self.configure(checkpoint=checkpoint)
 
-    def configure(self, **kw_args: Any) -> None:  # noqa: ANN401
+    def configure(self, **kw_args: object) -> None:
         """Update indexing configuration parameters.
 
         Parameters
         ----------
-        **kw_args : Any
+        **kw_args : object
             Configuration parameters to update.
         """
         self.config.configure(**kw_args)

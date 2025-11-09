@@ -6,7 +6,6 @@ for evaluation purposes.
 
 from __future__ import annotations
 
-
 from warp.modeling.colbert import ColBERT
 from warp.parameters import DEVICE
 from warp.utils.utils import load_checkpoint, print_message
@@ -20,7 +19,7 @@ def load_model(args: object, *, do_print: bool = True) -> tuple[ColBERT, dict[st
 
     Parameters
     ----------
-    args : Any
+    args : object
         Arguments object with query_maxlen, doc_maxlen, dim, similarity,
         mask_punctuation, and checkpoint attributes.
     do_print : bool
@@ -28,7 +27,7 @@ def load_model(args: object, *, do_print: bool = True) -> tuple[ColBERT, dict[st
 
     Returns
     -------
-    tuple[ColBERT, dict[str, Any]]
+    tuple[ColBERT, dict[str, object]]
         Tuple of (loaded_model, checkpoint_dict).
     """
     colbert = ColBERT.from_pretrained(
