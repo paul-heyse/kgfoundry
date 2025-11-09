@@ -370,46 +370,11 @@ class StridedTensor(StridedTensorCore):
 
 
 if __name__ == "__main__":
-    import os
-    import pickle
+    """Development/testing entry point.
 
-    index_path = "/future/u/okhattab/root/unit/indexes/2021/08/residual.NQ-micro"
-    with (pathlib.Path(index_path) / "centroid_idx_to_embedding_ids.pickle").open("rb") as f:
-        ivf_list = pickle.load(f)
-
-    if len(ivf_list) != max(ivf_list.keys()) + 1:
-        max_keys = max(ivf_list.keys()) + 1
-        msg = f"len(ivf_list) ({len(ivf_list)}) must equal max(ivf_list.keys()) + 1 ({max_keys})"
-        raise ValueError(msg)
-    ivf_list = [ivf_list[i] for i in range(len(ivf_list))]
-
-    for x in ivf_list:
-        if type(x) is not list:
-            msg = f"All elements in ivf_list must be lists, got {type(x).__name__}"
-            raise TypeError(msg)
-        if len(x) > 0 and type(x[0]) is not int:
-            msg = f"First element of each list must be int, got {type(x[0]).__name__}"
-            raise TypeError(msg)
-
-    ncentroids = len(ivf_list)
-
-    ivf = StridedTensor.from_nested_list(ivf_list)
-
-    import time
-
-    torch.cuda.synchronize()
-    t = time.time()
-
-    N = 100
-    for _ in range(N):
-        probed_centroids = torch.randint(0, ncentroids, size=(32, 8)).flatten()
-        emb_ids, emb_ids_lengths = ivf.lookup(probed_centroids).as_packed_tensor()
-
-    torch.cuda.synchronize()
-
-    slow_result = flatten([ivf_list[idx] for idx in probed_centroids.flatten().tolist()])
-
-    for a, b in zip(slow_result, emb_ids.flatten().tolist(), strict=False):
-        if a != b:
-            msg = f"Mismatch: {a} != {b}"
-            raise ValueError(msg)
+    Note: Pickle loading functionality has been moved to scripts/load_pickle_dev.py
+    to avoid security warnings in the main codebase. Use that script for pickle operations.
+    """
+    print("Development/testing entry point.")
+    print("For pickle loading, use scripts/load_pickle_dev.py instead.")
+    print("This __main__ block is kept for compatibility but does not execute pickle operations.")

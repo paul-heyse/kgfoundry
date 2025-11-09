@@ -53,7 +53,7 @@ def _check_cuda_availability() -> tuple[bool, str]:
     except ImportError:
         logger.warning("PyTorch not available - skipping CUDA check")
         return False, "PyTorch not installed"
-    except Exception as exc:
+    except (RuntimeError, AttributeError, OSError) as exc:
         logger.warning("CUDA availability check failed: %s", exc, exc_info=True)
         return False, f"CUDA check error: {exc}"
 
@@ -86,7 +86,7 @@ def _check_faiss_gpu_support() -> tuple[bool, str]:
     except ImportError:
         logger.warning("FAISS not available - skipping GPU check")
         return False, "FAISS not installed"
-    except Exception as exc:
+    except (RuntimeError, AttributeError, OSError) as exc:
         logger.warning("FAISS GPU check failed: %s", exc, exc_info=True)
         return False, f"FAISS GPU check error: {exc}"
 
@@ -116,7 +116,7 @@ def _test_torch_gpu_operations() -> tuple[bool, str]:
         )
     except ImportError:
         return False, "PyTorch not installed"
-    except Exception as exc:
+    except (RuntimeError, OSError, AttributeError) as exc:
         logger.warning("Torch GPU operations test failed: %s", exc, exc_info=True)
         return False, f"Torch GPU test error: {exc}"
 
@@ -144,7 +144,7 @@ def _test_faiss_gpu_resources() -> tuple[bool, str]:
         )
     except ImportError:
         return False, "FAISS not installed"
-    except Exception as exc:
+    except (RuntimeError, AttributeError, OSError) as exc:
         logger.warning("FAISS GPU resource initialization failed: %s", exc, exc_info=True)
         return False, f"FAISS GPU init error: {exc}"
 

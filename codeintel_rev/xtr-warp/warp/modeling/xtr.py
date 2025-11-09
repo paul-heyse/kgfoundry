@@ -97,8 +97,6 @@ class XTRLinear(torch.nn.Module):
             Input dimension (default: 768).
         out_features : int
             Output dimension (default: 128).
-        bias : bool
-            Whether to use bias (default: False).
         """
         super().__init__()
         self.linear = torch.nn.Linear(in_features, out_features, bias=False)

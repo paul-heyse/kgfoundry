@@ -395,7 +395,7 @@ def colbert_score(
     q: torch.Tensor,
     d_padded: torch.Tensor,
     d_mask: torch.Tensor,
-    config: ColBERTConfig = ColBERTConfig(),
+    config: ColBERTConfig | None = None,
 ) -> torch.Tensor:
     """Compute ColBERT similarity scores between queries and documents.
 
@@ -413,8 +413,8 @@ def colbert_score(
         Padded document embeddings (num_docs x max_seq_len x dim).
     d_mask : torch.Tensor
         Document attention mask (num_docs x max_seq_len).
-    config : ColBERTConfig
-        Configuration for interaction mode (default: ColBERTConfig()).
+    config : ColBERTConfig | None
+        Configuration for interaction mode (default: None, creates new ColBERTConfig).
 
     Returns
     -------
@@ -426,6 +426,8 @@ def colbert_score(
     ValueError
         If tensor dimensions are invalid or Q.size(0) doesn't match D_padded.size(0).
     """
+    if config is None:
+        config = ColBERTConfig()
     use_gpu = config.total_visible_gpus > 0
     if use_gpu:
         q, d_padded, d_mask = q.cuda(), d_padded.cuda(), d_mask.cuda()
@@ -455,7 +457,7 @@ def colbert_score_packed(
     q: torch.Tensor,
     d_packed: torch.Tensor,
     d_lengths: torch.Tensor,
-    config: ColBERTConfig = ColBERTConfig(),
+    config: ColBERTConfig | None = None,
 ) -> torch.Tensor:
     """Compute ColBERT scores for a single query against packed documents.
 
@@ -467,8 +469,8 @@ def colbert_score_packed(
         Packed document tensor.
     d_lengths : torch.Tensor
         Lengths of each document in d_packed.
-    config : ColBERTConfig, optional
-        Configuration object. Defaults to ColBERTConfig().
+    config : ColBERTConfig | None
+        Configuration object (default: None, creates new ColBERTConfig).
 
     Returns
     -------
@@ -480,6 +482,8 @@ def colbert_score_packed(
     ValueError
         If q.dim() is not 2.
     """
+    if config is None:
+        config = ColBERTConfig()
     use_gpu = config.total_visible_gpus > 0
 
     if use_gpu:

@@ -158,9 +158,9 @@ def class_factory(name_or_path: str) -> type:
         pretrained_class_object = get_class_from_dynamic_module(pretrained_class, name_or_path)
 
     class HFColBERT(pretrained_class_object):
-        """
-        Shallow wrapper around HuggingFace transformers. All new parameters
-        should be defined at this level.
+        """Shallow wrapper around HuggingFace transformers.
+
+        All new parameters should be defined at this level.
 
         This makes sure `{from,save}_pretrained` and `init_weights` are applied
         to new parameters correctly.

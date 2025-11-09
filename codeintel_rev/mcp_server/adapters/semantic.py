@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING, cast
@@ -35,6 +36,42 @@ if TYPE_CHECKING:
 SNIPPET_PREVIEW_CHARS = 500
 COMPONENT_NAME = "codeintel_mcp"
 LOGGER = get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class _ScopeFilterFlags:
+    """Aggregated boolean flags describing the active scope filters."""
+
+    has_include_globs: bool
+    has_exclude_globs: bool
+    has_languages: bool
+
+    @classmethod
+    def from_scope(cls, scope: ScopeIn | None) -> "_ScopeFilterFlags":
+        """Create flags from an optional ``ScopeIn`` dictionary.
+
+        Parameters
+        ----------
+        scope : ScopeIn | None
+            Optional scope dictionary containing include_globs, exclude_globs,
+            or languages keys.
+
+        Returns
+        -------
+        _ScopeFilterFlags
+            Flags instance indicating which scope filters are present.
+        """
+        return cls(
+            has_include_globs=bool(scope and scope.get("include_globs")),
+            has_exclude_globs=bool(scope and scope.get("exclude_globs")),
+            has_languages=bool(scope and scope.get("languages")),
+        )
+
+    @property
+    def has_filters(self) -> bool:
+        """Return ``True`` when any of the scope filters are active."""
+
+        return self.has_include_globs or self.has_exclude_globs or self.has_languages
 
 
 async def semantic_search(
@@ -104,7 +141,7 @@ async def semantic_search(
     )
 
 
-def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914, PLR0912
+def _semantic_search_sync(
     context: ApplicationContext,
     query: str,
     limit: int,
@@ -117,6 +154,7 @@ def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914, PLR0912
         scope_include_globs = (
             cast("Sequence[str] | None", scope.get("include_globs")) if scope else None
         )
+        scope_flags = _ScopeFilterFlags.from_scope(scope)
 
         LOGGER.debug(
             "Semantic search with scope",
@@ -131,17 +169,7 @@ def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914, PLR0912
 
         requested_limit = limit
         max_results = max(1, context.settings.limits.max_results)
-        effective_limit = max(1, min(requested_limit, max_results))
-        truncation_messages: list[str] = []
-        if requested_limit <= 0:
-            truncation_messages.append(
-                f"Requested limit {requested_limit} is not positive; using minimum of 1."
-            )
-        if requested_limit > max_results:
-            truncation_messages.append(
-                f"Requested limit {requested_limit} exceeds max_results {max_results}; "
-                f"truncating to {max_results}."
-            )
+        effective_limit, truncation_messages = _clamp_result_limit(requested_limit, max_results)
 
         ready, faiss_limits, faiss_error = context.ensure_faiss_ready()
         limits_metadata = [*faiss_limits, *truncation_messages]
@@ -160,25 +188,12 @@ def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914, PLR0912
                 context={"vllm_url": context.settings.vllm.base_url},
             )
 
-        has_include_globs = bool(scope and scope.get("include_globs"))
-        has_exclude_globs = bool(scope and scope.get("exclude_globs"))
-        has_languages = bool(scope and scope.get("languages"))
-        has_scope_filters = has_include_globs or has_exclude_globs or has_languages
-
         multiplier = max(1, context.settings.limits.semantic_overfetch_multiplier)
-        faiss_k_target = effective_limit
-        if has_scope_filters:
-            faiss_k_target = effective_limit * multiplier
-            additional = 0
-            if has_include_globs and has_languages:
-                additional = effective_limit
-            elif has_include_globs or has_languages:
-                additional = max(1, effective_limit // 2)
-            faiss_k_target += additional
-
-        faiss_k = max(
+        faiss_k, faiss_k_target = _calculate_faiss_fanout(
             effective_limit,
-            min(max_results, faiss_k_target),
+            max_results,
+            multiplier,
+            scope_flags,
         )
         if faiss_k < faiss_k_target:
             limits_metadata.append(
@@ -193,10 +208,10 @@ def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914, PLR0912
                 "faiss_k": faiss_k,
                 "faiss_k_target": faiss_k_target,
                 "multiplier": multiplier,
-                "has_scope_filters": has_scope_filters,
-                "has_include_globs": has_include_globs,
-                "has_exclude_globs": has_exclude_globs,
-                "has_languages": has_languages,
+                "has_scope_filters": scope_flags.has_filters,
+                "has_include_globs": scope_flags.has_include_globs,
+                "has_exclude_globs": scope_flags.has_exclude_globs,
+                "has_languages": scope_flags.has_languages,
             },
         )
 
@@ -215,51 +230,24 @@ def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914, PLR0912
             )
 
         retrieval_channels: list[str] = ["semantic", "faiss"]
-        contribution_map: dict[int, list[tuple[str, int, float]]] | None = None
-        hydration_ids: list[int] = list(result_ids)
-        hydration_scores: list[float] = list(result_scores)
-
-        try:
-            hybrid_engine = context.get_hybrid_engine()
-        except RuntimeError as exc:  # pragma: no cover - defensive
-            limits_metadata.append(f"Hybrid search unavailable: {exc}")
-            LOGGER.warning("Hybrid engine unavailable", exc_info=exc)
-            hybrid_engine = None
-        if hybrid_engine is not None:
-            hybrid_result = hybrid_engine.search(
-                query=query,
-                semantic_ids=result_ids,
-                semantic_scores=result_scores,
-                limit=effective_limit,
-            )
-            if hybrid_result.warnings:
-                limits_metadata.extend(hybrid_result.warnings)
-            fused_ids: list[int] = []
-            fused_scores: list[float] = []
-            fused_contributions: dict[int, list[tuple[str, int, float]]] = {}
-            for doc in hybrid_result.docs:
-                try:
-                    chunk_id_int = int(doc.doc_id)
-                except ValueError:
-                    limits_metadata.append(
-                        f"Hybrid result skipped (non-numeric chunk id): {doc.doc_id}"
-                    )
-                    continue
-                fused_ids.append(chunk_id_int)
-                fused_scores.append(float(doc.score))
-                fused_contributions[chunk_id_int] = hybrid_result.contributions.get(doc.doc_id, [])
-            if fused_ids:
-                hydration_ids = fused_ids
-                hydration_scores = fused_scores
-                contribution_map = fused_contributions
-                retrieval_channels = list(
-                    dict.fromkeys(["semantic", "faiss", *hybrid_result.channels])
-                )
+        (
+            hydration_ids,
+            hydration_scores,
+            contribution_map,
+            retrieval_channels,
+        ) = _resolve_hybrid_results(
+            context,
+            query,
+            result_ids,
+            result_scores,
+            effective_limit,
+            limits_metadata,
+            retrieval_channels,
+        )
 
         hydration_ids = hydration_ids[:effective_limit]
         hydration_scores = hydration_scores[: len(hydration_ids)]
 
-        # Hydrate findings with scope filtering if scope has filters
         findings, hydrate_exc = _hydrate_findings(
             context,
             hydration_ids,
@@ -279,17 +267,16 @@ def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914, PLR0912
 
         observation.mark_success()
 
-        # Log warning if scope filtering reduced results significantly
-        if scope and has_scope_filters and len(findings) < effective_limit:
+        if scope and scope_flags.has_filters and len(findings) < effective_limit:
             LOGGER.warning(
                 "Scope filtering reduced results below requested limit",
                 extra={
                     "requested_limit": effective_limit,
                     "actual_count": len(findings),
                     "faiss_results": len(result_ids),
-                    "has_include_globs": has_include_globs,
-                    "has_exclude_globs": has_exclude_globs,
-                    "has_languages": has_languages,
+                    "has_include_globs": scope_flags.has_include_globs,
+                    "has_exclude_globs": scope_flags.has_exclude_globs,
+                    "has_languages": scope_flags.has_languages,
                 },
             )
 
@@ -314,7 +301,6 @@ def _semantic_search_sync(  # noqa: C901, PLR0915, PLR0914, PLR0912
             retrieval_channels,
         )
         extras = _success_extras(limits_metadata, method_metadata)
-        # Include applied scope in response envelope
         if scope:
             extras["scope"] = scope
 

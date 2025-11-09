@@ -8,6 +8,7 @@ including TorchScript, ONNX, OpenVINO, and CoreML.
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -26,6 +27,109 @@ if USE_CORE_ML:
 
 DEFAULT_K_VALUE = 1000
 QUANTIZATION_TYPES = "|".join(["NONE", "PREPROCESS", "DYN_QUANTIZED_QINT8", "QUANTIZED_QATTENTION"])
+
+
+def _cast_str(value: object) -> str:
+    """Return string representation if value is str, else empty string.
+
+    Parameters
+    ----------
+    value : object
+        Value to convert to string.
+
+    Returns
+    -------
+    str
+        String representation if value is str, otherwise empty string.
+    """
+    return str(value) if isinstance(value, str) else ""
+
+
+def _cast_int(value: object, *, default: int | None = None) -> int | None:
+    """Return ``value`` as int or the provided default.
+
+    Parameters
+    ----------
+    value : object
+        Value to convert to int.
+    default : int | None, optional
+        Default value to return if value is not an int (default: None).
+
+    Returns
+    -------
+    int | None
+        Integer value if value is int, otherwise default value or None.
+    """
+    if isinstance(value, int):
+        return value
+    if default is not None:
+        return default
+    return None
+
+
+@dataclass(frozen=True)
+class RuntimeArgs:
+    """Sanitised experiment arguments used to build a WARPRunConfig."""
+
+    collection: str
+    dataset: str
+    split: str
+    nbits: int
+    nprobe: int | None
+    t_prime: int | None
+    bound: int | None
+    document_top_k: int
+    num_threads: int
+    runtime: str | None
+    fused_ext: bool
+
+    @classmethod
+    def from_config(cls, config: ExperimentConfigDict) -> RuntimeArgs:
+        """Create RuntimeArgs from experiment configuration dictionary.
+
+        Extracts and sanitizes configuration values, applying defaults where
+        necessary. Converts string and integer values with proper type handling.
+
+        Parameters
+        ----------
+        config : ExperimentConfigDict
+            Experiment configuration dictionary.
+
+        Returns
+        -------
+        RuntimeArgs
+            Sanitized runtime arguments for WARPRunConfig construction.
+        """
+        collection = _cast_str(config.get("collection"))
+        dataset = _cast_str(config.get("dataset"))
+        split = _cast_str(config.get("split"))
+        nbits = _cast_int(config.get("nbits"), default=0) or 0
+        nprobe = _cast_int(config.get("nprobe"))
+        t_prime = _cast_int(config.get("t_prime"))
+        bound = _cast_int(config.get("bound"))
+        document_top_k = (
+            _cast_int(config.get("document_top_k"), default=DEFAULT_K_VALUE) or DEFAULT_K_VALUE
+        )
+        num_threads = _cast_int(config.get("num_threads"), default=1) or 1
+        runtime_value = config.get("runtime")
+        runtime = runtime_value if isinstance(runtime_value, str) else None
+        fused_ext_value = config.get("fused_ext")
+        fused_ext = bool(fused_ext_value) if isinstance(fused_ext_value, bool) else True
+        if num_threads == 1:
+            fused_ext = True
+        return cls(
+            collection=collection,
+            dataset=dataset,
+            split=split,
+            nbits=nbits,
+            nprobe=nprobe,
+            t_prime=t_prime,
+            bound=bound,
+            document_top_k=document_top_k,
+            num_threads=num_threads,
+            runtime=runtime,
+            fused_ext=fused_ext,
+        )
 
 
 def _make_runtime(
@@ -79,44 +183,17 @@ def make_run_config(config: ExperimentConfigDict) -> WARPRunConfig:
     WARPRunConfig
         Configured WARP run configuration object.
     """
-    collection_raw = config.get("collection")
-    dataset_raw = config.get("dataset")
-    split_raw = config.get("split")
-    collection = str(collection_raw) if collection_raw is not None else ""
-    dataset = str(dataset_raw) if dataset_raw is not None else ""
-    split = str(split_raw) if split_raw is not None else ""
-
-    nbits_raw = config.get("nbits")
-    nprobe_raw = config.get("nprobe")
-    t_prime_raw = config.get("t_prime")
-    bound_raw = config.get("bound")
-    nbits = int(nbits_raw) if isinstance(nbits_raw, int) else 0
-    nprobe = int(nprobe_raw) if isinstance(nprobe_raw, int) else None
-    t_prime = int(t_prime_raw) if isinstance(t_prime_raw, int) else None
-    bound = int(bound_raw) if isinstance(bound_raw, int) else None
-
-    document_top_k_raw = config.get("document_top_k")
-    k = int(document_top_k_raw) if isinstance(document_top_k_raw, int) else DEFAULT_K_VALUE
-
-    num_threads_raw = config.get("num_threads")
-    num_threads = int(num_threads_raw) if isinstance(num_threads_raw, int) else 1
-    fused_ext = True
-    if num_threads != 1:
-        fused_ext_raw = config.get("fused_ext")
-        fused_ext = bool(fused_ext_raw) if isinstance(fused_ext_raw, bool) else True
-
-    runtime_raw = config.get("runtime")
-    runtime = str(runtime_raw) if isinstance(runtime_raw, str) else None
+    args = RuntimeArgs.from_config(config)
     return WARPRunConfig(
-        collection=collection,
-        dataset=dataset,
-        type_="search" if collection == "lotte" else None,
-        datasplit=split,
-        nbits=nbits,
-        nprobe=nprobe,
-        t_prime=t_prime,
-        k=k,
-        runtime=_make_runtime(runtime, num_threads=num_threads),
-        bound=bound,
-        fused_ext=fused_ext,
+        collection=args.collection,
+        dataset=args.dataset,
+        type_="search" if args.collection == "lotte" else None,
+        datasplit=args.split,
+        nbits=args.nbits,
+        nprobe=args.nprobe,
+        t_prime=args.t_prime,
+        k=args.document_top_k,
+        runtime=_make_runtime(args.runtime, num_threads=args.num_threads),
+        bound=args.bound,
+        fused_ext=args.fused_ext,
     )

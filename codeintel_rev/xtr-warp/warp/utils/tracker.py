@@ -343,5 +343,9 @@ class NOPTracker:
         raise AssertionError
 
 
+# Module-level singleton for NOPTracker (stateless, reusable)
+# Exported as public API for use as default argument
+DEFAULT_NOP_TRACKER = NOPTracker()
+
 # Type alias for tracker protocol
 Tracker = ExecutionTracker | NOPTracker

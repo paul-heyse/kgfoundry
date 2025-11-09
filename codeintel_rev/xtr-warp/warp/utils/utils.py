@@ -11,6 +11,7 @@ import itertools
 import pathlib
 from collections import OrderedDict, defaultdict
 from collections.abc import Iterator, Sequence
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypeVar
 
 if TYPE_CHECKING:
@@ -139,16 +140,12 @@ def save_checkpoint(
     ----------
     path : str | pathlib.Path
         Path to save checkpoint.
-    epoch_idx : int
-        Current epoch index.
-    mb_idx : int
-        Current minibatch index.
     model : Module
         Model to save (extracted from wrapper if needed).
     optimizer : Optimizer
         Optimizer to save.
-    arguments : dict[str, object] | None
-        Optional arguments dictionary (default: None).
+    context : CheckpointContext
+        Metadata describing the epoch, batch index, and optional arguments.
     """
     if hasattr(model, "module"):
         model = model.module  # extract model from a distributed/data-parallel wrapper
@@ -579,7 +576,9 @@ def process_grouped_by_first_item[T_co](
         last_group = first
         started = True
 
-    return groups
+    # Yield the last group
+    if started and last_group is not None:
+        yield (last_group, groups[last_group])
 
 
 def grouper(

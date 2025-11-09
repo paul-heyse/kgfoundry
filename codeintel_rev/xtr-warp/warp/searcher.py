@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import pathlib
 from collections.abc import Callable
-from typing import Union
 
 import torch
 from tqdm import tqdm
@@ -23,14 +22,14 @@ from warp.infra.provenance import Provenance
 from warp.infra.run import Run
 from warp.modeling.checkpoint import Checkpoint
 from warp.search.index_storage import IndexScorer
-from warp.utils.tracker import NOPTracker, Tracker
+from warp.utils.tracker import DEFAULT_NOP_TRACKER, Tracker
 
 # Batch size and search thresholds
 DEFAULT_BATCH_SIZE = 128
 SMALL_K_THRESHOLD = 10
 MEDIUM_K_THRESHOLD = 100
 
-TextQueries = Union[str, list[str], dict[int, str], Queries]
+TextQueries = str | list[str] | dict[int, str] | Queries
 
 
 class Searcher:
@@ -190,7 +189,7 @@ class Searcher:
         k: int = 10,
         filter_fn: Callable[[int], bool] | None = None,
         pids: list[int] | None = None,
-        tracker: Tracker = NOPTracker(),
+        tracker: Tracker = DEFAULT_NOP_TRACKER,
         *,
         full_length_search: bool = False,
     ) -> tuple[list[int], list[int], list[float]]:
@@ -313,7 +312,7 @@ class Searcher:
         k: int = 10,
         filter_fn: Callable[[int], bool] | None = None,
         pids: list[int] | None = None,
-        tracker: Tracker = NOPTracker(),
+        tracker: Tracker = DEFAULT_NOP_TRACKER,
     ) -> tuple[list[int], list[int], list[float]]:
         """Perform dense search using pre-encoded query embeddings.
 

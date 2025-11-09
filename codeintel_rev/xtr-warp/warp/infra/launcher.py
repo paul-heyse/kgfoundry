@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import os
-import random
-import time
+import secrets
 from collections.abc import Callable
 
 import numpy as np
@@ -89,10 +88,9 @@ class Launcher:
             raise TypeError(msg)
 
         return_value_queue = mp.Queue()
-        rng = random.Random(time.time())
-        port = str(
-            12355 + rng.randint(0, 1000)
-        )  # randomize the port to avoid collision on launching several jobs.
+        # Use secrets module for cryptographically secure random port selection
+        # to avoid collisions when launching multiple jobs
+        port = str(12355 + secrets.randbelow(1001))
         all_procs = []
         for new_rank in range(self.nranks):
             new_config = type(custom_config).from_existing(
@@ -182,13 +180,22 @@ class Launcher:
 def set_seed(seed: int) -> None:
     """Set random seeds for reproducibility.
 
+    Sets seeds for NumPy, PyTorch CPU, and PyTorch CUDA random number generators
+    to ensure reproducible results across runs.
+
     Parameters
     ----------
     seed : int
         Seed value to use for random number generators.
+
+    Notes
+    -----
+    Uses modern NumPy Generator API (np.random.default_rng) instead of legacy
+    np.random.seed for better reproducibility and thread-safety.
     """
-    random.seed(seed)
-    np.random.seed(seed)
+    # Initialize NumPy's default random number generator with seed
+    # This replaces the deprecated np.random.seed() and uses the modern Generator API
+    _ = np.random.default_rng(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
 

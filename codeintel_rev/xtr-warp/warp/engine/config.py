@@ -7,7 +7,7 @@ runtime backends, and path resolution.
 
 import os
 from dataclasses import dataclass
-from typing import Literal, Union
+from typing import Literal
 
 from warp.engine.runtime.onnx_model import XTROnnxConfig
 from warp.infra import ColBERTConfig
@@ -18,7 +18,7 @@ USE_CORE_ML = False
 if USE_CORE_ML:
     from warp.engine.runtime.coreml_model import XTRCoreMLConfig
 
-    RuntimeConfig = Union[XTROnnxConfig, XTRCoreMLConfig]
+    RuntimeConfig = XTROnnxConfig | XTRCoreMLConfig
 else:
     RuntimeConfig = XTROnnxConfig
 

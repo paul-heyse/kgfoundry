@@ -23,7 +23,7 @@ from warp.modeling.colbert import (
 from warp.search.candidate_generation import CandidateGeneration
 from warp.search.index_loader import IndexLoader
 from warp.search.strided_tensor import StridedTensor
-from warp.utils.tracker import NOPTracker, Tracker
+from warp.utils.tracker import DEFAULT_NOP_TRACKER, Tracker
 from warp.utils.utils import print_message
 
 
@@ -147,13 +147,11 @@ class IndexScorer(IndexLoader, CandidateGeneration):
             Passage IDs to lookup.
         out_device : str | torch.device
             Device for output tensors (default: "cuda").
-        return_mask : bool
-            Whether to return mask (default: False, ignored).
 
         Returns
         -------
-        torch.Tensor | tuple[torch.Tensor, torch.Tensor]
-            Embeddings tensor or tuple with mask if return_mask=True.
+        torch.Tensor
+            Embeddings tensor.
         """
         return self.embeddings_strided.lookup_pids(passage_ids, out_device)
 
@@ -202,7 +200,7 @@ class IndexScorer(IndexLoader, CandidateGeneration):
         q: torch.Tensor,
         filter_fn: Callable[[torch.Tensor], torch.Tensor] | None = None,
         pids: list[int] | torch.Tensor | None = None,
-        tracker: Tracker = NOPTracker(),
+        tracker: Tracker = DEFAULT_NOP_TRACKER,
     ) -> tuple[list[int], list[float]]:
         """Rank passages for queries.
 
@@ -282,7 +280,7 @@ class IndexScorer(IndexLoader, CandidateGeneration):
         q: torch.Tensor,
         pids: torch.Tensor,
         centroid_scores: torch.Tensor,
-        tracker: Tracker = NOPTracker(),
+        tracker: Tracker = DEFAULT_NOP_TRACKER,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Score query-passage pairs using ColBERT similarity.
 

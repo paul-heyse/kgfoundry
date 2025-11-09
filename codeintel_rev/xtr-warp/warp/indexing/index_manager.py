@@ -78,8 +78,8 @@ def load_index_part(filename: str, *, _verbose: bool = True) -> torch.Tensor:
     ----------
     filename : str
         Path to index part file (.pt format).
-    verbose : bool
-        Whether to print loading messages (default: True).
+    _verbose : bool
+        Whether to print loading messages (default: True, unused).
 
     Returns
     -------

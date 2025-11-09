@@ -17,7 +17,7 @@ from warp.data.queries import WARPQueries
 from warp.data.ranking import WARPRanking, WARPRankingItem, WARPRankingItems
 from warp.engine.config import WARPRunConfig
 from warp.infra import Run, RunConfig
-from warp.utils.tracker import NOPTracker
+from warp.utils.tracker import DEFAULT_NOP_TRACKER, NOPTracker
 
 
 class WARPSearcher:
@@ -65,7 +65,7 @@ class WARPSearcher:
         self,
         queries: WARPQueries | Iterable[tuple[str, str]],
         k: int | None = None,
-        tracker: NOPTracker = NOPTracker(),
+        tracker: NOPTracker = DEFAULT_NOP_TRACKER,
         *,
         batched: bool = True,
         show_progress: bool = True,
@@ -101,7 +101,7 @@ class WARPSearcher:
         self,
         queries: WARPQueries | Iterable[tuple[str, str]],
         k: int | None = None,
-        tracker: NOPTracker = NOPTracker(),
+        tracker: NOPTracker = DEFAULT_NOP_TRACKER,
         *,
         show_progress: bool = True,
     ) -> WARPRanking:
@@ -120,7 +120,7 @@ class WARPSearcher:
         self,
         queries: WARPQueries | Iterable[tuple[str, str]],
         k: int | None = None,
-        tracker: NOPTracker = NOPTracker(),
+        tracker: NOPTracker = DEFAULT_NOP_TRACKER,
         *,
         show_progress: bool = True,
     ) -> WARPRanking:
@@ -137,7 +137,7 @@ class WARPSearcher:
         self,
         query: str,
         k: int | None = None,
-        tracker: NOPTracker = NOPTracker(),
+        tracker: NOPTracker = DEFAULT_NOP_TRACKER,
     ) -> tuple[list[int], list[int], list[float]]:
         """Search for a single query.
 

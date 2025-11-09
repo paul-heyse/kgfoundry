@@ -106,9 +106,7 @@ class IndexLoader:
         dict[str, object]
             Index metadata dictionary.
         """
-        try:
-            self._metadata
-        except AttributeError:
+        if not hasattr(self, "_metadata"):
             index_path_obj = pathlib.Path(self.index_path)
             with (index_path_obj / "metadata.json").open(encoding="utf-8") as f:
                 self._metadata = ujson.load(f)

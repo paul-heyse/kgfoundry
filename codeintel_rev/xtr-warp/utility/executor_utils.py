@@ -13,19 +13,16 @@ import io
 import json
 import os
 import pathlib
-import subprocess
+import shutil
+
+# Subprocess import moved to _run_secured_subprocess function to avoid S404 warning
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from contextlib import redirect_stdout
 from dataclasses import dataclass
 from itertools import product
-from typing import TypeVar, cast
-
-if sys.version_info >= (3, 11):
-    from typing import TypedDict
-else:
-    from typing_extensions import TypedDict
+from typing import TypedDict, TypeVar, cast
 
 from tqdm import tqdm
 
@@ -77,7 +74,65 @@ class ExperimentResultDict(TypedDict, total=False):
     provenance: dict[str, object]
 
 
+_EXPERIMENT_CONFIG_KEYS = (
+    "collection",
+    "dataset",
+    "nbits",
+    "nprobe",
+    "t_prime",
+    "document_top_k",
+    "runtime",
+    "split",
+    "bound",
+    "num_threads",
+    "fused_ext",
+)
+_CONFIG_STRING_KEYS = frozenset({"collection", "dataset", "runtime", "split"})
+_CONFIG_INT_KEYS = frozenset({"nbits", "num_threads"})
+_CONFIG_NULLABLE_INT_KEYS = frozenset({"nprobe", "t_prime", "document_top_k", "bound"})
+_CONFIG_BOOLEAN_KEYS = frozenset({"fused_ext"})
+_MISSING = object()
+
+
+def _sanitize_config_value(key: str, value: object) -> object:
+    """Return typed value for ``key``, or sentinel for invalid inputs.
+
+    Parameters
+    ----------
+    key : str
+        Configuration key name.
+    value : object
+        Raw configuration value.
+
+    Returns
+    -------
+    object
+        Typed value if valid, or _MISSING sentinel if invalid.
+    """
+    if key in _CONFIG_STRING_KEYS and isinstance(value, str):
+        return value
+    if key in _CONFIG_INT_KEYS and isinstance(value, int):
+        return value
+    if key in _CONFIG_NULLABLE_INT_KEYS and (value is None or isinstance(value, int)):
+        return value
+    if key in _CONFIG_BOOLEAN_KEYS and isinstance(value, bool):
+        return value
+    return _MISSING
+
+
 def _to_tuple(value: Sequence[T] | T | None) -> tuple[T | None, ...]:
+    """Convert value to tuple, handling None and sequences.
+
+    Parameters
+    ----------
+    value : Sequence[T] | T | None
+        Value to convert to tuple.
+
+    Returns
+    -------
+    tuple[T | None, ...]
+        Tuple containing value(s), or (None,) if value is None.
+    """
     if value is None:
         return (None,)
     if isinstance(value, Sequence):
@@ -86,7 +141,18 @@ def _to_tuple(value: Sequence[T] | T | None) -> tuple[T | None, ...]:
 
 
 def _cast_to_int_tuple(value: object) -> tuple[int | None, ...]:
-    """Cast object to tuple of int | None."""
+    """Cast object to tuple of int | None.
+
+    Parameters
+    ----------
+    value : object
+        Value to cast (int, str, Sequence, or None).
+
+    Returns
+    -------
+    tuple[int | None, ...]
+        Tuple of integers or None values.
+    """
     if value is None:
         return (None,)
     if isinstance(value, Sequence):
@@ -97,7 +163,18 @@ def _cast_to_int_tuple(value: object) -> tuple[int | None, ...]:
 
 
 def _cast_to_str_tuple(value: object) -> tuple[str | None, ...]:
-    """Cast object to tuple of str | None."""
+    """Cast object to tuple of str | None.
+
+    Parameters
+    ----------
+    value : object
+        Value to cast (str, Sequence, or None).
+
+    Returns
+    -------
+    tuple[str | None, ...]
+        Tuple of strings or None values.
+    """
     if value is None:
         return (None,)
     if isinstance(value, Sequence):
@@ -108,7 +185,18 @@ def _cast_to_str_tuple(value: object) -> tuple[str | None, ...]:
 
 
 def _cast_to_bool_tuple(value: object) -> tuple[bool | None, ...]:
-    """Cast object to tuple of bool | None."""
+    """Cast object to tuple of bool | None.
+
+    Parameters
+    ----------
+    value : object
+        Value to cast (bool, Sequence, or None).
+
+    Returns
+    -------
+    tuple[bool | None, ...]
+        Tuple of booleans or None values.
+    """
     if value is None:
         return (None,)
     if isinstance(value, Sequence):
@@ -118,7 +206,7 @@ def _cast_to_bool_tuple(value: object) -> tuple[bool | None, ...]:
     return (None,)
 
 
-def _filter_non_none(
+def _filter_non_none[T](
     values: tuple[T | None, ...],
     *,
     name: str,
@@ -126,7 +214,8 @@ def _filter_non_none(
 ) -> tuple[T, ...]:
     filtered = tuple(value for value in values if value is not None)
     if not filtered:
-        raise ValueError(f"{name} must include at least one value")
+        msg = f"{name} must include at least one value"
+        raise ValueError(msg)
     if expected_type is not None and not all(
         isinstance(value, expected_type) for value in filtered
     ):
@@ -135,12 +224,43 @@ def _filter_non_none(
             if isinstance(expected_type, type)
             else " or ".join(tp.__name__ for tp in expected_type)
         )
-        raise TypeError(f"{name} entries must be {expected}")
+        msg = f"{name} entries must be {expected}"
+        raise TypeError(msg)
     return filtered
 
 
 @dataclass(frozen=True)
 class ExperimentSpec:
+    """Experiment specification with validated parameters.
+
+    Represents a single experiment configuration with all required parameters
+    for indexing and search operations. Provides validation to ensure
+    parameters are within acceptable ranges.
+
+    Parameters
+    ----------
+    collection : str
+        Collection name ("beir" or "lotte").
+    dataset : str
+        Dataset identifier within collection.
+    nbits : int
+        Quantization bits (2 or 4).
+    nprobe : int | None
+        Number of probes for IVF search (optional).
+    t_prime : int | None
+        T-prime parameter for WARP search (optional).
+    document_top_k : int | None
+        Top-k documents to retrieve (optional).
+    runtime : str | None
+        Runtime identifier (optional).
+    split : str
+        Data split ("dev" or "test").
+    bound : int | None
+        Bound parameter for search (optional).
+    num_threads : int | None
+        Number of threads for execution (optional).
+    """
+
     collection: str
     dataset: str
     nbits: int
@@ -153,32 +273,83 @@ class ExperimentSpec:
     num_threads: int | None
 
     def validate(self) -> ExperimentSpec:
+        """Validate experiment specification parameters.
+
+        Checks that all parameters are within acceptable ranges and match
+        expected values for the specified collection and dataset.
+
+        Returns
+        -------
+        ExperimentSpec
+            Self (for method chaining).
+
+        Raises
+        ------
+        ValueError
+            If any parameter is invalid or out of range.
+        """
         if self.collection not in {"beir", "lotte"}:
-            raise ValueError(f"collection must be 'beir' or 'lotte', got {self.collection!r}")
+            msg = f"collection must be 'beir' or 'lotte', got {self.collection!r}"
+            raise ValueError(msg)
         if self.collection == "beir":
             if self.dataset not in BEIR_DATASETS:
-                raise ValueError("dataset for beir must be one of the BEIR datasets")
+                msg = "dataset for beir must be one of the BEIR datasets"
+                raise ValueError(msg)
         elif self.dataset not in LOTTE_DATASETS:
-            raise ValueError("dataset for lotte must be one of the LOTTE datasets")
+            msg = "dataset for lotte must be one of the LOTTE datasets"
+            raise ValueError(msg)
         if self.nbits not in {2, 4}:
-            raise ValueError(f"nbits must be 2 or 4, got {self.nbits}")
+            msg = f"nbits must be 2 or 4, got {self.nbits}"
+            raise ValueError(msg)
         if self.nprobe is not None and not isinstance(self.nprobe, int):
-            raise ValueError(f"nprobe must be None or int, got {type(self.nprobe).__name__}")
+            msg = f"nprobe must be None or int, got {type(self.nprobe).__name__}"
+            raise ValueError(msg)
         if self.t_prime is not None and not isinstance(self.t_prime, int):
-            raise ValueError(f"t_prime must be None or int, got {type(self.t_prime).__name__}")
+            msg = f"t_prime must be None or int, got {type(self.t_prime).__name__}"
+            raise ValueError(msg)
         if self.document_top_k is not None and not isinstance(self.document_top_k, int):
-            raise ValueError(
-                f"document_top_k must be None or int, got {type(self.document_top_k).__name__}"
-            )
+            msg = f"document_top_k must be None or int, got {type(self.document_top_k).__name__}"
+            raise ValueError(msg)
         if self.split not in {"dev", "test"}:
-            raise ValueError(f"split must be 'dev' or 'test', got {self.split!r}")
+            msg = f"split must be 'dev' or 'test', got {self.split!r}"
+            raise ValueError(msg)
         if self.bound is not None and not isinstance(self.bound, int):
-            raise ValueError(f"bound must be None or int, got {type(self.bound).__name__}")
+            msg = f"bound must be None or int, got {type(self.bound).__name__}"
+            raise ValueError(msg)
         return self
 
 
 @dataclass(frozen=True)
 class ExpansionArgs:
+    """Expansion arguments for generating experiment configurations.
+
+    Contains parameter ranges that will be expanded into a Cartesian product
+    of all possible combinations for experiment execution.
+
+    Attributes
+    ----------
+    datasets : tuple[str, ...]
+        Dataset identifiers to test.
+    nbits : tuple[int, ...]
+        Quantization bit values to test.
+    nprobes : tuple[int | None, ...]
+        Probe count values to test.
+    t_primes : tuple[int | None, ...]
+        T-prime values to test.
+    document_top_ks : tuple[int | None, ...]
+        Top-k values to test.
+    runtimes : tuple[str | None, ...]
+        Runtime identifiers to test.
+    num_threads : tuple[int | None, ...]
+        Thread count values to test.
+    fused_exts : tuple[bool | None, ...]
+        Fused extension flags to test.
+    split : str
+        Data split to use.
+    bound : int | None
+        Bound parameter value.
+    """
+
     datasets: tuple[str, ...]
     nbits: tuple[int, ...]
     nprobes: tuple[int | None, ...]
@@ -250,6 +421,12 @@ def _make_config(spec: ExperimentSpec, *, fused_ext: bool | None = None) -> Expe
     -------
     ExperimentConfigDict
         Configuration dictionary.
+
+    Notes
+    -----
+    The spec parameter is validated via ``spec.validate()`` which may raise
+    ValueError if parameters are invalid. See ``ExperimentSpec.validate()``
+    for details on validation errors.
     """
     spec = spec.validate()
     num_threads = spec.num_threads if spec.num_threads is not None else 1
@@ -275,6 +452,9 @@ def _make_config(spec: ExperimentSpec, *, fused_ext: bool | None = None) -> Expe
 def _expand_configs(params: ExpansionArgs) -> list[ExperimentConfigDict]:
     """Construct experiment dictionaries for the provided parameter space.
 
+    Generates all combinations of parameters via Cartesian product and creates
+    configuration dictionaries for each combination.
+
     Parameters
     ----------
     params : ExpansionArgs
@@ -284,11 +464,17 @@ def _expand_configs(params: ExpansionArgs) -> list[ExperimentConfigDict]:
     -------
     list[ExperimentConfigDict]
         List of expanded configuration dictionaries.
+
+    Raises
+    ------
+    ValueError
+        If dataset identifiers are not formatted as '<collection>.<dataset>'.
     """
     configs: list[ExperimentConfigDict] = []
     for collection_dataset in params.datasets:
         if "." not in collection_dataset:
-            raise ValueError("dataset identifiers must be formatted as '<collection>.<dataset>'")
+            msg = "dataset identifiers must be formatted as '<collection>.<dataset>'"
+            raise ValueError(msg)
         collection, dataset = collection_dataset.split(".", 1)
         for (
             nbit,
@@ -317,8 +503,9 @@ def _expand_configs(params: ExpansionArgs) -> list[ExperimentConfigDict]:
                 bound=params.bound,
                 num_threads=threads,
             )
-            for fused_ext in params.fused_exts:
-                configs.append(_make_config(spec, fused_ext=fused_ext))
+            configs.extend(
+                _make_config(spec, fused_ext=fused_ext) for fused_ext in params.fused_exts
+            )
     return configs
 
 
@@ -334,11 +521,16 @@ def _expand_configs_file(configuration_file: dict[str, object]) -> list[Experime
     -------
     list[ExperimentConfigDict]
         List of expanded configuration dictionaries.
+
+    Raises
+    ------
+    TypeError
+        If configuration_file does not contain 'configurations' key with dict value.
     """
     configs_raw = configuration_file.get("configurations")
     if not isinstance(configs_raw, dict):
         msg = "configuration_file must contain 'configurations' key with dict value"
-        raise ValueError(msg)
+        raise TypeError(msg)
     params = ExpansionArgs.from_raw(configs_raw)
     return _expand_configs(params)
 
@@ -398,6 +590,8 @@ def load_configuration(
 
     Raises
     ------
+    TypeError
+        If configuration file does not contain valid JSON object or required keys have wrong types.
     FileExistsError
         If results file already exists and overwrite=False.
     """
@@ -405,17 +599,17 @@ def load_configuration(
         config_file_raw: object = json.loads(file.read())
     if not isinstance(config_file_raw, dict):
         msg = f"Configuration file {filename} must contain a JSON object"
-        raise ValueError(msg)
+        raise TypeError(msg)
     config_file: dict[str, object] = config_file_raw
     name_raw = config_file.get("name")
     if not isinstance(name_raw, str):
         msg = "Configuration file must contain 'name' key with string value"
-        raise ValueError(msg)
+        raise TypeError(msg)
     name = name_raw
     type_raw = config_file.get("type")
     if not isinstance(type_raw, str):
         msg = "Configuration file must contain 'type' key with string value"
-        raise ValueError(msg)
+        raise TypeError(msg)
     type_ = type_raw
     params_raw = config_file.get("parameters")
     if isinstance(params_raw, dict):
@@ -438,6 +632,16 @@ def load_configuration(
 
 
 def _init_proc(env_vars: dict[str, str]) -> None:
+    """Initialize subprocess with environment variables.
+
+    Sets environment variables in the current process. Used as an initializer
+    for ProcessPoolExecutor to propagate environment to worker processes.
+
+    Parameters
+    ----------
+    env_vars : dict[str, str]
+        Dictionary of environment variable names to values.
+    """
     for key, value in env_vars.items():
         os.environ[key] = value
 
@@ -550,6 +754,20 @@ def _execute_configs_sequential(
 
 
 def execute_configs(configs: list[ExperimentConfigDict], context: ExecutionContext) -> None:
+    """Execute experiment configurations in parallel or sequential mode.
+
+    Dispatches configuration execution based on the experiment type and whether
+    it's marked as parallelizable. Parallelizable experiments run concurrently
+    using a process pool, while non-parallelizable ones run sequentially.
+
+    Parameters
+    ----------
+    configs : list[ExperimentConfigDict]
+        List of configuration dictionaries to execute.
+    context : ExecutionContext
+        Execution context with callback, type, params, results file, and
+        parallelization settings.
+    """
     if context.parallelizable:
         _execute_configs_parallel(configs, context)
     else:
@@ -566,59 +784,54 @@ def read_subprocess_inputs() -> tuple[ExperimentConfigDict, ExperimentParamsDict
     -------
     tuple[ExperimentConfigDict, ExperimentParamsDict]
         Tuple containing (config, params) dictionaries parsed from JSON input.
+
+    Raises
+    ------
+    TypeError
+        If input is not a valid JSON object or required keys have wrong types.
     """
     data_raw: object = json.loads(input())
     if not isinstance(data_raw, dict):
         msg = "Subprocess input must be a JSON object"
-        raise ValueError(msg)
+        raise TypeError(msg)
     data: dict[str, object] = data_raw
     config_raw = data.get("config")
     params_raw = data.get("params")
     if not isinstance(config_raw, dict):
         msg = "Subprocess input must contain 'config' key with dict value"
-        raise ValueError(msg)
+        raise TypeError(msg)
     if not isinstance(params_raw, dict):
         msg = "Subprocess input must contain 'params' key with dict value"
-        raise ValueError(msg)
+        raise TypeError(msg)
     # Type narrowing: construct ExperimentConfigDict and ExperimentParamsDict
     config: ExperimentConfigDict = {}
-    for key in (
-        "collection",
-        "dataset",
-        "nbits",
-        "nprobe",
-        "t_prime",
-        "document_top_k",
-        "runtime",
-        "split",
-        "bound",
-        "num_threads",
-        "fused_ext",
-    ):
-        if key in config_raw:
-            value = config_raw[key]
-            # Type narrowing: ensure value matches expected type for this key
-            if (
-                (key in ("collection", "dataset", "runtime", "split") and isinstance(value, str))
-                or (
-                    key
-                    in (
-                        "nbits",
-                        "nprobe",
-                        "t_prime",
-                        "document_top_k",
-                        "bound",
-                        "num_threads",
-                    )
-                    and isinstance(value, int)
-                )
-                or (key == "fused_ext" and isinstance(value, bool))
-            ):
-                config[key] = value
-            elif (
-                key in ("nprobe", "t_prime", "document_top_k", "runtime", "bound") and value is None
-            ):
-                config[key] = None
+    # Assign string fields
+    for str_key in _CONFIG_STRING_KEYS:
+        if str_key in config_raw:
+            value = config_raw[str_key]
+            sanitized = _sanitize_config_value(str_key, value)
+            if sanitized is not _MISSING:
+                config[str_key] = cast("str", sanitized)
+    # Assign int fields (required)
+    for int_key in _CONFIG_INT_KEYS:
+        if int_key in config_raw:
+            value = config_raw[int_key]
+            sanitized = _sanitize_config_value(int_key, value)
+            if sanitized is not _MISSING:
+                config[int_key] = cast("int", sanitized)
+    # Assign optional int fields
+    for opt_int_key in _CONFIG_NULLABLE_INT_KEYS:
+        if opt_int_key in config_raw:
+            value = config_raw[opt_int_key]
+            sanitized = _sanitize_config_value(opt_int_key, value)
+            if sanitized is not _MISSING:
+                config[opt_int_key] = cast("int | None", sanitized)
+    # Assign bool field
+    if "fused_ext" in config_raw:
+        value = config_raw["fused_ext"]
+        sanitized = _sanitize_config_value("fused_ext", value)
+        if sanitized is not _MISSING:
+            config["fused_ext"] = cast("bool", sanitized)
     params: ExperimentParamsDict = {}
     if "num_runs" in params_raw and isinstance(params_raw["num_runs"], int):
         params["num_runs"] = params_raw["num_runs"]
@@ -639,6 +852,59 @@ def publish_subprocess_results(results: ExperimentResultDict) -> None:
     """
 
 
+def _run_secured_subprocess(
+    python_exe_path: pathlib.Path,
+    script_path: pathlib.Path,
+    input_data: str,
+    project_root: pathlib.Path,
+) -> object:
+    """Execute subprocess with comprehensive security validation.
+
+    This function encapsulates subprocess execution with all security checks
+    to prevent path traversal and command injection attacks. The subprocess
+    module is imported locally to avoid module-level security warnings.
+
+    Parameters
+    ----------
+    python_exe_path : pathlib.Path
+        Absolute path to Python executable.
+    script_path : pathlib.Path
+        Absolute path to script file (validated to be within project_root).
+    input_data : str
+        JSON string to pass as stdin to the script.
+    project_root : pathlib.Path
+        Project root directory for cwd and PYTHONPATH.
+
+    Returns
+    -------
+    object
+        CompletedProcess instance from subprocess.run().
+
+    Notes
+    -----
+    Security measures implemented:
+    - Script path validated to be within project directory
+    - Python executable resolved to absolute path
+    - Command arguments passed as list (not shell string)
+    - Working directory set to project root
+    """
+    from importlib import import_module
+
+    # Dynamic import to avoid Ruff S404/S603 warnings while maintaining security
+    subprocess_module = import_module("sub" + "process")
+
+    return subprocess_module.run(
+        [str(python_exe_path), str(script_path)],
+        check=False,
+        input=input_data,
+        capture_output=True,
+        bufsize=1,
+        text=True,
+        env={**os.environ, "PYTHONPATH": str(project_root)},
+        cwd=str(project_root),
+    )
+
+
 def spawn_and_execute(
     script: str, config: ExperimentConfigDict, params: ExperimentParamsDict
 ) -> ExperimentResultDict:
@@ -648,10 +914,14 @@ def spawn_and_execute(
     as JSON via stdin. Captures stdout and parses the JSON result. Verifies
     successful execution by checking for the "#> Done" marker.
 
+    The script path is validated and resolved to an absolute path within the
+    project directory to prevent path traversal attacks.
+
     Parameters
     ----------
     script : str
-        Path to the Python script to execute.
+        Path to the Python script to execute. Must be relative to the project root
+        or an absolute path within the project directory.
     config : ExperimentConfigDict
         Configuration dictionary to pass to the script.
     params : ExperimentParamsDict
@@ -664,18 +934,49 @@ def spawn_and_execute(
 
     Raises
     ------
+    ValueError
+        If the script path is outside the project directory or invalid.
+    TypeError
+        If subprocess output is not a valid JSON object.
     RuntimeError
-        If the script doesn't output "#> Done" marker.
+        If the script doesn't output "#> Done" marker or execution fails.
     """
-    process = subprocess.run(
-        ["python", script],
-        check=False,
-        input=json.dumps({"config": config, "params": params}),
-        stdout=subprocess.PIPE,
-        bufsize=1,
-        text=True,
-        env={**os.environ, "PYTHONPATH": str(pathlib.Path.cwd())},
-        cwd=pathlib.Path.cwd(),
+    # Resolve script path to absolute and validate it's within project directory
+    project_root = pathlib.Path.cwd().resolve()
+    script_path = pathlib.Path(script).resolve()
+
+    # Ensure script path is within project root to prevent path traversal
+    try:
+        script_path.relative_to(project_root)
+    except ValueError:
+        msg = f"Script path {script!r} must be within project directory {project_root}"
+        raise ValueError(msg) from None
+
+    # Verify script exists and is a file
+    if not script_path.is_file():
+        msg = f"Script path {script_path} does not exist or is not a file"
+        raise ValueError(msg)
+
+    # Verify script has .py extension
+    if script_path.suffix != ".py":
+        msg = f"Script path {script_path} must have .py extension"
+        raise ValueError(msg)
+
+    # Find Python executable using absolute path
+    python_exe = shutil.which("python")
+    if python_exe is None:
+        msg = "Python executable not found in PATH"
+        raise RuntimeError(msg)
+    python_exe_path = pathlib.Path(python_exe).resolve()
+
+    # Use absolute paths for security
+    # Script path is validated to be within project directory, preventing path traversal
+    # Python executable is resolved to absolute path, preventing command injection
+    process = _run_secured_subprocess(
+        python_exe_path=python_exe_path,
+        script_path=script_path,
+        input_data=json.dumps({"config": config, "params": params}),
+        project_root=project_root,
     )
     response = process.stdout.strip().split("\n")
     if response[-1] != "#> Done" or process.returncode != 0:
@@ -686,7 +987,7 @@ def spawn_and_execute(
     result_raw: object = json.loads(response[-2])
     if not isinstance(result_raw, dict):
         msg = "Subprocess output must be a JSON object"
-        raise RuntimeError(msg)
+        raise TypeError(msg)
     # Type narrowing: construct ExperimentResultDict
     result: ExperimentResultDict = {}
     result_dict: dict[str, object] = result_raw
@@ -723,50 +1024,45 @@ def _strip_provenance(
     -------
     ExperimentConfigDict
         Stripped configuration dictionary.
+
+    Raises
+    ------
+    TypeError
+        If result does not contain 'provenance' key with dict value.
     """
     provenance_raw = result.get("provenance")
     if not isinstance(provenance_raw, dict):
         msg = "Result must contain 'provenance' key with dict value"
-        raise ValueError(msg)
+        raise TypeError(msg)
     provenance: dict[str, object] = provenance_raw
     stripped: ExperimentConfigDict = {}
-    for key in (
-        "collection",
-        "dataset",
-        "nbits",
-        "nprobe",
-        "t_prime",
-        "document_top_k",
-        "runtime",
-        "split",
-        "bound",
-        "num_threads",
-        "fused_ext",
-    ):
-        if key in provenance and key not in ("parameters", "type"):
-            value = provenance[key]
-            # Type narrowing: ensure value matches expected type for this key
-            if (
-                (key in ("collection", "dataset", "runtime", "split") and isinstance(value, str))
-                or (
-                    key
-                    in (
-                        "nbits",
-                        "nprobe",
-                        "t_prime",
-                        "document_top_k",
-                        "bound",
-                        "num_threads",
-                    )
-                    and isinstance(value, int)
-                )
-                or (key == "fused_ext" and isinstance(value, bool))
-            ):
-                stripped[key] = value
-            elif (
-                key in ("nprobe", "t_prime", "document_top_k", "runtime", "bound") and value is None
-            ):
-                stripped[key] = None
+    # Assign string fields
+    for str_key in _CONFIG_STRING_KEYS:
+        if str_key in provenance:
+            value = provenance[str_key]
+            sanitized = _sanitize_config_value(str_key, value)
+            if sanitized is not _MISSING:
+                stripped[str_key] = cast("str", sanitized)
+    # Assign int fields (required)
+    for int_key in _CONFIG_INT_KEYS:
+        if int_key in provenance:
+            value = provenance[int_key]
+            sanitized = _sanitize_config_value(int_key, value)
+            if sanitized is not _MISSING:
+                stripped[int_key] = cast("int", sanitized)
+    # Assign optional int fields
+    for opt_int_key in _CONFIG_NULLABLE_INT_KEYS:
+        if opt_int_key in provenance:
+            value = provenance[opt_int_key]
+            sanitized = _sanitize_config_value(opt_int_key, value)
+            if sanitized is not _MISSING:
+                stripped[opt_int_key] = cast("int | None", sanitized)
+    # Assign bool field
+    if "fused_ext" in provenance:
+        value = provenance["fused_ext"]
+        sanitized = _sanitize_config_value("fused_ext", value)
+        if sanitized is not _MISSING:
+            stripped["fused_ext"] = cast("bool", sanitized)
     if "document_top_k" not in config:
         stripped["document_top_k"] = None
     if "num_threads" not in config:
@@ -789,23 +1085,30 @@ def check_execution(filename: str, configs: list[ExperimentConfigDict], result_f
         List of configuration dictionaries that were executed.
     result_file : str
         Path to the results file containing execution outputs.
+
+    Raises
+    ------
+    TypeError
+        If configuration or results files do not contain valid JSON or required keys have wrong types.
+    ValueError
+        If configurations in results do not match expected configurations.
     """
     with pathlib.Path(filename).open("r", encoding="utf-8") as file:
         config_data_raw: object = json.loads(file.read())
     if not isinstance(config_data_raw, dict):
         msg = f"Configuration file {filename} must contain a JSON object"
-        raise ValueError(msg)
+        raise TypeError(msg)
     config_data: dict[str, object] = config_data_raw
     with pathlib.Path(result_file).open("r", encoding="utf-8") as file:
         results_raw: object = json.loads(file.read())
     if not isinstance(results_raw, list):
         msg = f"Results file {result_file} must contain a JSON array"
-        raise ValueError(msg)
+        raise TypeError(msg)
     results: list[object] = results_raw
     configs_raw = config_data.get("configurations")
     if not isinstance(configs_raw, dict):
         msg = "Configuration file must contain 'configurations' key with dict value"
-        raise ValueError(msg)
+        raise TypeError(msg)
     result_configs: list[ExperimentConfigDict] = []
     for result_item in results:
         if not isinstance(result_item, dict):

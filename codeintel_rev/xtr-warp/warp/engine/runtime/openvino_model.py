@@ -106,7 +106,7 @@ class XTROpenVinoModel:
         ----------
         root_dir : str
             Directory to save model.
-        config : XTROpenVinoConfig
+        _config : XTROpenVinoConfig
             Configuration (unused, kept for consistency).
         """
         model_path = pathlib.Path(root_dir) / OPENVINO_MODEL_FILENAME

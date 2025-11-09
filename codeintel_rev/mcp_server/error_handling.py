@@ -74,6 +74,38 @@ COMPONENT_NAME = "codeintel_mcp"
 
 F = TypeVar("F", bound=Callable[..., object])
 
+# Comprehensive list of user exceptions that can be raised by adapters
+# System-level exceptions (KeyboardInterrupt, SystemExit, GeneratorExit) are excluded
+# as they should propagate naturally
+_USER_EXCEPTIONS = (
+    # Built-in exceptions
+    Exception,
+    # Common built-in subclasses
+    ValueError,
+    TypeError,
+    AttributeError,
+    KeyError,
+    IndexError,
+    FileNotFoundError,
+    PermissionError,
+    OSError,
+    RuntimeError,
+    NotImplementedError,
+    UnicodeDecodeError,
+    UnicodeEncodeError,
+    LookupError,
+    ArithmeticError,
+    ReferenceError,
+    StopIteration,
+    StopAsyncIteration,
+    SyntaxError,
+    # Custom exceptions
+    KgFoundryError,
+    PathOutsideRepositoryError,
+    PathNotDirectoryError,
+    PathNotFoundError,
+)
+
 
 @dataclass(frozen=True)
 class ProblemMapping:
@@ -469,13 +501,14 @@ def handle_adapter_errors(
             async def async_wrapper(*args: object, **kwargs: object) -> dict:
                 try:
                     return await func(*args, **kwargs)  # type: ignore[return-value]
-                except (KeyboardInterrupt, SystemExit):
+                except (KeyboardInterrupt, SystemExit, GeneratorExit):
                     # Re-raise system-level exceptions - these should propagate
                     raise
-                except BaseException as exc:
-                    # Catch all other exceptions (including Exception subclasses)
-                    # to ensure Problem Details are always emitted at the boundary.
-                    # This is a boundary handler that MUST catch all exceptions to
+                except _USER_EXCEPTIONS as exc:
+                    # Catch all user exceptions to ensure Problem Details are always
+                    # emitted at the boundary. System-level exceptions (KeyboardInterrupt,
+                    # SystemExit, GeneratorExit) are re-raised above.
+                    # This is a boundary handler that MUST catch all user exceptions to
                     # guarantee consistent error responses for clients.
                     return convert_exception_to_envelope(exc, operation, empty_result)
 
@@ -485,13 +518,14 @@ def handle_adapter_errors(
         def sync_wrapper(*args: object, **kwargs: object) -> dict:
             try:
                 return func(*args, **kwargs)  # type: ignore[return-value]
-            except (KeyboardInterrupt, SystemExit):
+            except (KeyboardInterrupt, SystemExit, GeneratorExit):
                 # Re-raise system-level exceptions - these should propagate
                 raise
-            except BaseException as exc:
-                # Catch all other exceptions (including Exception subclasses)
-                # to ensure Problem Details are always emitted at the boundary.
-                # This is a boundary handler that MUST catch all exceptions to
+            except _USER_EXCEPTIONS as exc:
+                # Catch all user exceptions to ensure Problem Details are always
+                # emitted at the boundary. System-level exceptions (KeyboardInterrupt,
+                # SystemExit, GeneratorExit) are re-raised above.
+                # This is a boundary handler that MUST catch all user exceptions to
                 # guarantee consistent error responses for clients.
                 return convert_exception_to_envelope(exc, operation, empty_result)
 

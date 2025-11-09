@@ -15,6 +15,88 @@ from beir import util
 from beir.datasets.data_loader import GenericDataLoader
 
 
+def _download_collection(dataset: str, input_path: str) -> pathlib.Path:
+    """Ensure the BEIR dataset is downloaded and return its path.
+
+    Parameters
+    ----------
+    dataset : str
+        Name of the BEIR dataset.
+    input_path : str
+        Directory path where datasets are stored.
+
+    Returns
+    -------
+    pathlib.Path
+        Path to the downloaded dataset directory.
+    """
+    dataset_path = pathlib.Path(input_path) / dataset
+    if not dataset_path.exists():
+        url = f"https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{dataset}.zip"
+        util.download_and_unzip(url, input_path)
+    return dataset_path
+
+
+def _escape_text(value: str) -> str:
+    """Escape newline and tab characters for TSV output.
+
+    Parameters
+    ----------
+    value : str
+        Text to escape.
+
+    Returns
+    -------
+    str
+        Escaped text with newlines and tabs replaced with escape sequences.
+    """
+    return value.replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
+
+
+def _dump_collection(
+    corpus: dict[str, dict[str, str]], path: pathlib.Path
+) -> dict[int, str]:
+    """Write corpus lines to ``path`` and return the index mapping.
+
+    Parameters
+    ----------
+    corpus : dict[str, dict[str, str]]
+        Corpus dictionary mapping document IDs to document dictionaries
+        containing "title" and "text" keys.
+    path : pathlib.Path
+        Path to the TSV file where collection lines will be written.
+
+    Returns
+    -------
+    dict[int, str]
+        Dictionary mapping line numbers to document IDs.
+    """
+    mapping: dict[int, str] = {}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as file:
+        for line_num, (doc_id, document) in enumerate(corpus.items()):
+            title = _escape_text(document["title"])
+            text = _escape_text(document["text"])
+            file.write(f"{line_num}\t{title} {text}\n")
+            mapping[line_num] = doc_id
+    return mapping
+
+
+def _write_questions(queries: dict[str, str], path: pathlib.Path) -> None:
+    """Write TSV questions to ``path``."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as file:
+        for query_id, query in queries.items():
+            file.write(f"{query_id}\t{query}\n")
+
+
+def _write_json(path: pathlib.Path, payload: object) -> None:
+    """Write JSON payload to ``path``."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as file:
+        json.dump(payload, file)
+
+
 def extract_collection_beir(dataset: str, input_path: str, output_path: str, split: str) -> None:
     """Extract and format a BEIR dataset collection for XTR/WARP processing.
 
@@ -34,49 +116,17 @@ def extract_collection_beir(dataset: str, input_path: str, output_path: str, spl
     split : str
         Data split to extract (typically "dev" or "test").
     """
-    input_dataset_path = pathlib.Path(input_path) / dataset
-    if not input_dataset_path.exists():
-        url = f"https://public.ukp.informatik.tu-darmstadt.de/thakur/BEIR/datasets/{dataset}.zip"
-        util.download_and_unzip(url, input_path)
+    dataset_path = _download_collection(dataset, input_path)
+    corpus, queries, qrels = GenericDataLoader(str(dataset_path)).load(split=split)
+    output_dir = pathlib.Path(output_path) / dataset
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    input_path = str(input_dataset_path)
-    output_path = str(pathlib.Path(output_path) / dataset)
+    collection_path = output_dir / "collection.tsv"
+    collection_map = _dump_collection(corpus, collection_path)
 
-    corpus, queries, qrels = GenericDataLoader(input_path).load(split=split)
-
-    collection, collection_map = [], {}
-    for line_num, (id_, document) in enumerate(corpus.items()):
-        title, text = document["title"], document["text"]
-
-        # Escape newline characters in the title/text
-        title = title.replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
-        text = text.replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
-
-        # NOTE We are using the "XTR way" of concatenating title and text
-        # https://colab.research.google.com/github/google-deepmind/xtr/blob/main/xtr_evaluation_on_beir_miracl.ipynb
-        collection.append(f"{line_num}\t{title} {text}\n")
-        collection_map[line_num] = id_
-
-    output_path_obj = pathlib.Path(output_path)
-    collection_path = output_path_obj / "collection.tsv"
-    with collection_path.open("w", encoding="utf-8") as file:
-        file.writelines(collection)
-
-    collection_map_path = output_path_obj / "collection_map.json"
-    with collection_map_path.open("w", encoding="utf-8") as file:
-        file.write(json.dumps(collection_map))
-
-    questions = []
-    for id_, query in queries.items():
-        questions.append(f"{id_}\t{query}\n")
-
-    questions_file = output_path_obj / f"questions.{split}.tsv"
-    with questions_file.open("w", encoding="utf-8") as file:
-        file.writelines(questions)
-
-    qrels_file = output_path_obj / f"qrels.{split}.json"
-    with qrels_file.open("w", encoding="utf-8") as file:
-        json.dump(qrels, file)
+    _write_json(output_dir / "collection_map.json", collection_map)
+    _write_questions(queries, output_dir / f"questions.{split}.tsv")
+    _write_json(output_dir / f"qrels.{split}.json", qrels)
 
 
 if __name__ == "__main__":

@@ -50,6 +50,8 @@ def index_size(config: ExperimentConfigDict, params: ExperimentParamsDict) -> Ex
     ------
     ValueError
         If params dictionary is not empty.
+    RuntimeError
+        If safe_index_size returns None.
     """
     if len(params) != 0:
         msg = f"params must be empty for index_size operation, got {len(params)} items"

@@ -396,7 +396,27 @@ def handle_adapter_errors(
         def wrapper(*args: object, **kwargs: object) -> dict:
             try:
                 return func(*args, **kwargs)  # type: ignore[return-value]
-            except BaseException as exc:
+            except (KeyboardInterrupt, SystemExit, GeneratorExit):
+                # Re-raise system-level exceptions - these should propagate
+                raise
+            except (
+                ValueError,
+                TypeError,
+                AttributeError,
+                KeyError,
+                IndexError,
+                FileNotFoundError,
+                PermissionError,
+                OSError,
+                RuntimeError,
+                NotImplementedError,
+                UnicodeDecodeError,
+                LookupError,
+                ArithmeticError,
+                ReferenceError,
+            ) as exc:
+                # Catch all user exceptions to ensure Problem Details are always
+                # emitted at the boundary. System-level exceptions are re-raised above.
                 return convert_exception_to_envelope(exc, operation, empty_result)
 
         return cast("F", wrapper)

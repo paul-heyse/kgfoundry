@@ -14,7 +14,7 @@ import torch
 from torch.utils.cpp_extension import load
 from warp.engine.constants import T_PRIME_MAX, TPrimePolicy
 from warp.infra.config.config import ColBERTConfig
-from warp.utils.tracker import NOPTracker
+from warp.utils.tracker import DEFAULT_NOP_TRACKER, NOPTracker
 from warp.utils.utils import print_message
 
 
@@ -272,7 +272,7 @@ class IndexScorerWARP(IndexLoaderWARP):
         k: int = 100,
         filter_fn: None = None,
         pids: None = None,
-        tracker: NOPTracker = NOPTracker(),
+        tracker: NOPTracker = DEFAULT_NOP_TRACKER,
     ) -> tuple[list[int], list[float]]:
         """Rank passages for queries using WARP scoring.
 
@@ -281,7 +281,7 @@ class IndexScorerWARP(IndexLoaderWARP):
 
         Parameters
         ----------
-        config : ColBERTConfig
+        _config : ColBERTConfig
             Configuration for ranking (unused, kept for compatibility).
         q : torch.Tensor
             Query embeddings (1 x num_queries x dim or num_queries x dim).
