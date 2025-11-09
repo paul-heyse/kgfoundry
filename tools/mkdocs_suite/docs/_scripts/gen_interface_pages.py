@@ -284,17 +284,15 @@ def _write_interface_table(
             or (interface_model.module if interface_model else None)
             or record.get("_nav_module_path")
         )
-        row = "| {id} | {type} | {module} | {owner} | {stability} | {spec} | {desc} | {problems} |".format(
-            id=_escape_table_text(identifier_value),
-            type=_escape_table_text(
-                record.get("type") or (interface_model.type if interface_model else "—") or "—"
-            ),
-            module=_module_doc_link(module_path),
-            owner=_escape_table_text(owner_value or "—"),
-            stability=_escape_table_text(stability_value),
-            spec=spec_cell,
-            desc=_escape_table_text(description_value),
-            problems=_escape_table_text(_problem_details(record, interface_model)),
+        type_value = _escape_table_text(
+            record.get("type") or (interface_model.type if interface_model else "—") or "—"
+        )
+        row = (
+            f"| {_escape_table_text(identifier_value)} | {type_value} | "
+            f"{_module_doc_link(module_path)} | {_escape_table_text(owner_value or '—')} | "
+            f"{_escape_table_text(stability_value)} | {spec_cell} | "
+            f"{_escape_table_text(description_value)} | "
+            f"{_escape_table_text(_problem_details(record, interface_model))} |"
         )
         handle.write(row + "\n")
         if record.get("id"):
@@ -399,13 +397,10 @@ def _write_interface_details(
                 interface_model = None
 
         handle.write(f"## {identifier}\n\n")
-        handle.write(
-            "* **Type:** {type}\n".format(
-                type=nav_meta.get("type")
-                or (interface_model.type if interface_model else None)
-                or "—"
-            )
+        type_value = (
+            nav_meta.get("type") or (interface_model.type if interface_model else None) or "—"
         )
+        handle.write(f"* **Type:** {type_value}\n")
         module_value = (
             nav_meta.get("module")
             or (interface_model.module if interface_model else None)
@@ -418,20 +413,16 @@ def _write_interface_details(
         )
         if module_source:
             handle.write(f"* **Source:** [{module_value}]({module_source})\n")
-        handle.write(
-            "* **Owner:** {owner}\n".format(
-                owner=nav_meta.get("owner")
-                or (interface_model.owner if interface_model else None)
-                or "—"
-            )
+        owner_value = (
+            nav_meta.get("owner") or (interface_model.owner if interface_model else None) or "—"
         )
-        handle.write(
-            "* **Stability:** {stability}\n".format(
-                stability=nav_meta.get("stability")
-                or (interface_model.stability if interface_model else None)
-                or "—"
-            )
+        handle.write(f"* **Owner:** {owner_value}\n")
+        stability_value = (
+            nav_meta.get("stability")
+            or (interface_model.stability if interface_model else None)
+            or "—"
         )
+        handle.write(f"* **Stability:** {stability_value}\n")
         description = nav_meta.get("description") or (
             interface_model.description if interface_model else None
         )

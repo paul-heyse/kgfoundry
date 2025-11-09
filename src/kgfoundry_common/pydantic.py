@@ -35,7 +35,7 @@ if TYPE_CHECKING:
             raise NotImplementedError
 
         @classmethod
-        def model_validate(cls, obj: object, /) -> Self:
+        def model_validate(cls, obj: object) -> Self:
             """Validate ``obj`` using the underlying Pydantic implementation.
 
             Parameters

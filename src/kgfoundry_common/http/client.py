@@ -6,7 +6,8 @@ key requirements.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, replace
 
 from kgfoundry_common.http.tenacity_retry import TenacityRetryStrategy
 from kgfoundry_common.http.types import RetryStrategy
@@ -32,6 +33,29 @@ class HttpSettings:
     base_url: str
     read_timeout_s: float = 30.0
     connect_timeout_s: float = 10.0
+
+
+@dataclass(frozen=True)
+class RequestOptions:
+    """Optional HTTP request parameters."""
+
+    _ALLOWED_KEYS = frozenset({"params", "headers", "json_body", "data", "timeout_s"})
+
+    params: dict[str, str] | None = None
+    headers: dict[str, str] | None = None
+    json_body: dict[str, object] | None = None
+    data: bytes | None = None
+    timeout_s: float | None = None
+
+    def with_overrides(self, overrides: Mapping[str, object]) -> RequestOptions:
+        """Return a new options object with overrides applied."""
+        if not overrides:
+            return self
+        unexpected = set(overrides) - self._ALLOWED_KEYS
+        if unexpected:
+            msg = f"Unexpected request option(s): {sorted(unexpected)}"
+            raise TypeError(msg)
+        return replace(self, **{k: overrides[k] for k in overrides})
 
 
 class HttpClient:
@@ -85,11 +109,8 @@ class HttpClient:
         method: str,
         url: str,
         *,
-        params: dict[str, str] | None = None,
-        headers: dict[str, str] | None = None,
-        json_body: dict[str, object] | None = None,
-        data: bytes | None = None,
-        timeout_s: float | None = None,
+        options: RequestOptions | None = None,
+        **overrides: object,
     ) -> object:
         """Make an HTTP request with retry logic.
 
@@ -99,16 +120,10 @@ class HttpClient:
             HTTP method (GET, POST, etc.).
         url : str
             Request URL (will be combined with base_url if relative).
-        params : dict[str, str] | None, optional
-            Query parameters. Defaults to None.
-        headers : dict[str, str] | None, optional
-            Request headers. Defaults to None.
-        json_body : dict[str, object] | None, optional
-            JSON body data. Defaults to None.
-        data : bytes | None, optional
-            Raw body data. Defaults to None.
-        timeout_s : float | None, optional
-            Request timeout in seconds. Defaults to None (uses settings default).
+        options : RequestOptions | None, optional
+            Base request options. Overrides and defaults are merged.
+        **overrides : Mapping[str, object]
+            Keyword overrides applied on top of ``options`` via :meth:`RequestOptions.with_overrides`.
 
         Returns
         -------
@@ -124,18 +139,52 @@ class HttpClient:
         """
         method = method.upper()
         url = self._build_url(url)
-        headers = self._merge_headers(headers)
-        # Non-idempotent safeguard for policies requiring Idempotency-Key
+        resolved_options = self._resolve_options(options, overrides)
+        headers = self._merge_headers(resolved_options.headers)
+        strategy = self._select_strategy(method, headers)
+        attempt = self._build_attempt(
+            method=method,
+            url=url,
+            options=resolved_options,
+        )
+
+        # Raise NotImplementedError explicitly to satisfy pydoclint DOC502
+        # The exception is raised by _attempt(), but pydoclint cannot track
+        # exceptions through nested function calls
+        if strategy is None:
+            try:
+                return attempt()
+            except NotImplementedError as exc:
+                raise NotImplementedError(str(exc)) from exc
+        try:
+            return strategy.run(attempt)
+        except NotImplementedError as exc:
+            raise NotImplementedError(str(exc)) from exc
+
+    @staticmethod
+    def _resolve_options(
+        options: RequestOptions | None, overrides: Mapping[str, object]
+    ) -> RequestOptions:
+        """Return resolved request options with overrides validated."""
+        base = options or RequestOptions()
+        if overrides:
+            base = base.with_overrides(overrides)
+        return base
+
+    def _select_strategy(self, method: str, headers: dict[str, str]) -> RetryStrategy | None:
+        """Determine which retry strategy applies for this request."""
         if (
             method not in {"GET", "HEAD", "OPTIONS"}
             and isinstance(self.retry_strategy, TenacityRetryStrategy)
             and self.retry_strategy.policy.require_idempotency_key
-            and "Idempotency-Key" not in (headers or {})
+            and "Idempotency-Key" not in headers
         ):
-            # Force single attempt for safety:
-            strategy = None
-        else:
-            strategy = self._policy_strategy_for(method)
+            return None
+        return self._policy_strategy_for(method)
+
+    @staticmethod
+    def _build_attempt(method: str, url: str, options: RequestOptions) -> Callable[[], object]:
+        """Build the callable that performs a single HTTP attempt."""
 
         def _attempt() -> object:
             """Execute a single HTTP request attempt.
@@ -145,33 +194,19 @@ class HttpClient:
             NotImplementedError
                 HTTP request implementation is not yet complete. This is raised
                 as a placeholder until the actual HTTP client integration is implemented.
-
-            Notes
-            -----
-            This method currently raises NotImplementedError as the HTTP request
-            implementation is incomplete. When implemented, it should:
-            - Return an HTTP response object from the underlying HTTP library
-              (e.g., httpx.Response, requests.Response)
-            - Use HttpRateLimitedError and HttpStatusError from kgfoundry_common.http.errors
-            - Integrate with httpx or requests library
-            - Handle params, json_body, data, and timeout_s parameters
             """
-            _ = params, json_body, data, timeout_s  # Placeholder for future use
+            _ = (
+                method,
+                url,
+                options.params,
+                options.json_body,
+                options.data,
+                options.timeout_s,
+            )
             msg = "HTTP request not yet implemented"
             raise NotImplementedError(msg)
 
-        # Raise NotImplementedError explicitly to satisfy pydoclint DOC502
-        # The exception is raised by _attempt(), but pydoclint cannot track
-        # exceptions through nested function calls
-        if strategy is None:
-            try:
-                return _attempt()
-            except NotImplementedError as exc:
-                raise NotImplementedError(str(exc)) from exc
-        try:
-            return strategy.run(_attempt)
-        except NotImplementedError as exc:
-            raise NotImplementedError(str(exc)) from exc
+        return _attempt
 
     def _build_url(self, url: str) -> str:
         """Build full URL from base URL and relative path.

@@ -95,7 +95,25 @@ def find_class_names(model_type: str, class_type: str) -> str | None:
 def _resolve_standard_transformer_classes(
     name_or_path: str, config: AutoConfig
 ) -> tuple[type, type]:
-    """Return the pretrained/model pair for standard HuggingFace types."""
+    """Return the pretrained/model pair for standard HuggingFace types.
+
+    Parameters
+    ----------
+    name_or_path : str
+        HuggingFace model name or path.
+    config : AutoConfig
+        AutoConfig instance for the model.
+
+    Returns
+    -------
+    tuple[type, type]
+        Tuple of (model_class, pretrained_class) types.
+
+    Raises
+    ------
+    ValueError
+        If no pretrained class or model class can be found for the model type.
+    """
     model_type = config.model_type
     pretrained_class = find_class_names(model_type, "pretrainedmodel")
     if pretrained_class is not None:
@@ -109,9 +127,7 @@ def _resolve_standard_transformer_classes(
             "Could not find a pretrained class for model type "
             f"{model_type} in the transformers library"
         )
-        raise ValueError(
-            msg
-        )
+        raise ValueError(msg)
 
     model_class = find_class_names(model_type, "model")
     if model_class is not None:
@@ -120,20 +136,33 @@ def _resolve_standard_transformer_classes(
         model_class_object = model_object_mapping[name_or_path]
     else:
         msg = (
-            "Could not find a model class for model type "
-            f"{model_type} in the transformers library"
+            f"Could not find a model class for model type {model_type} in the transformers library"
         )
-        raise ValueError(
-            msg
-        )
+        raise ValueError(msg)
 
     return model_class_object, pretrained_class_object
 
 
-def _resolve_custom_transformer_classes(
-    name_or_path: str, config: AutoConfig
-) -> tuple[type, type]:
-    """Return the model/pretrained pair defined in ``config.auto_map``."""
+def _resolve_custom_transformer_classes(name_or_path: str, config: AutoConfig) -> tuple[type, type]:
+    """Return the model/pretrained pair defined in ``config.auto_map``.
+
+    Parameters
+    ----------
+    name_or_path : str
+        HuggingFace model name or path.
+    config : AutoConfig
+        AutoConfig instance with auto_map configuration.
+
+    Returns
+    -------
+    tuple[type, type]
+        Tuple of (model_class, pretrained_class) types loaded from dynamic modules.
+
+    Raises
+    ------
+    ValueError
+        If AutoModel is missing from auto_map, or if model_class doesn't end with 'Model'.
+    """
     auto_map = getattr(config, "auto_map", {})
     if "AutoModel" not in auto_map:
         msg = "The custom model should have AutoModel in config.auto_map"
@@ -173,6 +202,8 @@ def class_factory(name_or_path: str) -> type:
     ValueError
         If pretrained or model class cannot be found, or if custom model
         doesn't have AutoModel in auto_map or model class doesn't end with "Model".
+        This exception is raised indirectly by _resolve_standard_transformer_classes
+        or _resolve_custom_transformer_classes.
     """
     loaded_config = AutoConfig.from_pretrained(name_or_path, trust_remote_code=True)
 

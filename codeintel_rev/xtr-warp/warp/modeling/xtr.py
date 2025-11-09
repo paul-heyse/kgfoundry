@@ -6,6 +6,9 @@ for using Google's XTR-base-en model with ColBERT-style encoding.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from dataclasses import dataclass
+
 import torch
 from huggingface_hub import hf_hub_download
 from transformers import AutoModel, AutoTokenizer, logging
@@ -216,6 +219,48 @@ def build_xtr_model() -> XTR:
     return xtr
 
 
+@dataclass(frozen=True)
+class XTRDocumentEncodingOptions:
+    """Options controlling XTR doc encoding."""
+
+    keep_dims: bool | str = "flatten"
+    to_cpu: bool = False
+    showprogress: bool = False
+    return_tokens: bool = False
+
+    _ALLOWED_KEYS = frozenset({"keep_dims", "to_cpu", "showprogress", "return_tokens"})
+
+    @classmethod
+    def from_overrides(cls, overrides: Mapping[str, object]) -> XTRDocumentEncodingOptions:
+        """Build encoding options from keyword overrides.
+
+        Constructs an XTRDocumentEncodingOptions instance from a mapping of keyword
+        arguments. Validates that all override keys are allowed options.
+
+        Parameters
+        ----------
+        overrides : Mapping[str, object]
+            Dictionary of keyword arguments corresponding to XTRDocumentEncodingOptions fields.
+            Valid keys are: keep_dims, to_cpu, showprogress, return_tokens.
+
+        Returns
+        -------
+        XTRDocumentEncodingOptions
+            Configured encoding options instance with overrides applied.
+
+        Raises
+        ------
+        TypeError
+            If any keys in overrides are not recognized as valid XTRDocumentEncodingOptions
+            fields. This prevents typos and ensures type safety.
+        """
+        unexpected = set(overrides) - cls._ALLOWED_KEYS
+        if unexpected:
+            msg = f"Unexpected doc_from_text keyword(s): {sorted(unexpected)}"
+            raise TypeError(msg)
+        return cls(**{k: overrides[k] for k in overrides})
+
+
 class XTRCheckpoint:
     """Checkpoint wrapper for XTR model inference.
 
@@ -253,10 +298,8 @@ class XTRCheckpoint:
         docs: list[str],
         bsize: int | None = None,
         *,
-        keep_dims: bool | str = True,
-        to_cpu: bool = False,
-        showprogress: bool = False,
-        return_tokens: bool = False,
+        options: XTRDocumentEncodingOptions | None = None,
+        **overrides: object,
     ) -> tuple[torch.Tensor, list[int]]:
         """Encode documents from text strings.
 
@@ -269,6 +312,11 @@ class XTRCheckpoint:
             Document texts to encode.
         bsize : int | None
             Batch size (required, cannot be None).
+        options : XTRDocumentEncodingOptions | None
+            Pre-configured encoding options. If None, options are built from overrides.
+        **overrides : object
+            Keyword arguments to override default encoding options. Valid keys are:
+            keep_dims, to_cpu, showprogress, return_tokens. Ignored if options is provided.
         keep_dims : bool | str
             Must be "flatten" (default: True, but only "flatten" supported).
         to_cpu : bool
@@ -285,10 +333,24 @@ class XTRCheckpoint:
 
         Raises
         ------
+        TypeError
+            If options and overrides are both provided, or if any override keys
+            are not recognized as valid XTRDocumentEncodingOptions fields.
         ValueError
             If any parameter constraint is violated or config.doc_maxlen
             doesn't match DOC_MAXLEN.
         """
+        if options is None:
+            options = XTRDocumentEncodingOptions.from_overrides(overrides)
+        elif overrides:
+            msg = "Cannot pass keyword overrides when options is provided"
+            raise TypeError(msg)
+
+        keep_dims = options.keep_dims
+        to_cpu = options.to_cpu
+        showprogress = options.showprogress
+        return_tokens = options.return_tokens
+
         if to_cpu:
             msg = "to_cpu must be False"
             raise ValueError(msg)
@@ -309,33 +371,105 @@ class XTRCheckpoint:
             raise ValueError(msg)
 
         input_ids, attention_mask = self.xtr.tokenizer(docs, self.config.doc_maxlen)
-
         text_batches = self._split_into_batches(input_ids, attention_mask, bsize)
-        total_length = sum(torch.sum(attention_mask) for _, attention_mask in text_batches)
+        total_length = self._total_token_count(text_batches)
+        batch_lengths = self._collect_batch_lengths(text_batches)
+        batches = self._encode_text_batches(text_batches)
+        flatten_embeddings = self._flatten_encoded_batches(
+            batches=batches,
+            batch_lengths=batch_lengths,
+            total_length=total_length,
+        )
+        flattened_lengths = self._flatten_length_list(batch_lengths)
+        return flatten_embeddings, flattened_lengths
 
-        batch_lengths = [torch.sum(attention_mask, dim=1) for _, attention_mask in text_batches]
-        batches = [
+    @staticmethod
+    def _total_token_count(
+        text_batches: list[tuple[torch.Tensor, torch.Tensor]],
+    ) -> int:
+        """Compute total token count across all batches.
+
+        Returns
+        -------
+        int
+            Total number of tokens across all batches.
+        """
+        return sum(int(torch.sum(attention_mask).item()) for _, attention_mask in text_batches)
+
+    @staticmethod
+    def _collect_batch_lengths(
+        text_batches: list[tuple[torch.Tensor, torch.Tensor]],
+    ) -> list[torch.Tensor]:
+        """Collect per-batch token lengths used for flattening.
+
+        Returns
+        -------
+        list[torch.Tensor]
+            List of tensors containing per-document token lengths for each batch.
+        """
+        return [torch.sum(attention_mask, dim=1) for _, attention_mask in text_batches]
+
+    def _encode_text_batches(
+        self, text_batches: list[tuple[torch.Tensor, torch.Tensor]]
+    ) -> list[torch.Tensor]:
+        """Invoke the XTR model on each batch to produce embeddings.
+
+        Returns
+        -------
+        list[torch.Tensor]
+            List of embedding tensors, one per batch.
+        """
+        return [
             self.xtr(input_ids.to(DEVICE), attention_mask.to(DEVICE))
             for input_ids, attention_mask in text_batches
         ]
 
-        flatten_embeddings = torch.zeros((total_length, TOKEN_EMBED_DIM), dtype=torch.float32)
+    @staticmethod
+    def _flatten_encoded_batches(
+        *,
+        batches: list[torch.Tensor],
+        batch_lengths: list[torch.Tensor],
+        total_length: int,
+    ) -> torch.Tensor:
+        """Flatten batched embeddings into a single contiguous tensor.
 
+        Returns
+        -------
+        torch.Tensor
+            Flattened embeddings tensor with shape (total_length, TOKEN_EMBED_DIM).
+
+        Raises
+        ------
+        ValueError
+            If the total number of tokens processed does not match the expected tensor size.
+        """
+        flatten_embeddings = torch.zeros((total_length, TOKEN_EMBED_DIM), dtype=torch.float32)
         num_tokens = 0
         for batch_embeds, batch_length in zip(batches, batch_lengths, strict=False):
-            for _, (embeddings, length) in enumerate(zip(batch_embeds, batch_length, strict=False)):
-                flatten_embeddings[num_tokens : num_tokens + length] = embeddings[
-                    : int(length)
+            for embeddings, length in zip(batch_embeds, batch_length, strict=False):
+                length_value = int(length)
+                flatten_embeddings[num_tokens : num_tokens + length_value] = embeddings[
+                    :length_value
                 ].detach()
-                num_tokens += int(length)
+                num_tokens += length_value
 
-        if num_tokens != flatten_embeddings.shape[0]:
-            msg = (
-                f"num_tokens ({num_tokens}) must equal "
-                f"flatten_embeddings.shape[0] ({flatten_embeddings.shape[0]})"
-            )
+        expected = flatten_embeddings.shape[0]
+        if num_tokens != expected:
+            msg = f"num_tokens ({num_tokens}) must equal flatten_embeddings.shape[0] ({expected})"
             raise ValueError(msg)
-        return flatten_embeddings, [x.item() for y in batch_lengths for x in y]
+
+        return flatten_embeddings
+
+    @staticmethod
+    def _flatten_length_list(batch_lengths: list[torch.Tensor]) -> list[int]:
+        """Convert batched length tensors into a flattened list.
+
+        Returns
+        -------
+        list[int]
+            Flattened list of document lengths.
+        """
+        return [int(length.item()) for lengths in batch_lengths for length in lengths]
 
     @staticmethod
     def _split_into_batches(

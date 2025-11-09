@@ -166,15 +166,23 @@ class QueryTokenizer:
         ------
         TypeError
             If batch_text is not list or tuple.
+            This exception is raised indirectly by _prepare_batch_list when type validation fails.
         ValueError
             If full_length_search=True with batch size > 1, or if context
             length doesn't match batch_text length.
+            This exception is raised indirectly by _determine_max_length or
+            _append_context_if_needed when validation fails.
         """
-        batch_list = self._prepare_batch_list(batch_text)
-        max_length = self._determine_max_length(batch_list, full_length_search)
-        ids, mask = self._tokenize_with_padding(batch_list, max_length)
-        ids, mask = self._append_context_if_needed(ids, mask, context, batch_list)
-        mask = self._apply_mask_attention(ids, mask)
+        try:
+            batch_list = self._prepare_batch_list(batch_text)
+            max_length = self._determine_max_length(
+                batch_list, full_length_search=full_length_search
+            )
+            ids, mask = self._tokenize_with_padding(batch_list, max_length)
+            ids, mask = self._append_context_if_needed(ids, mask, context, batch_list)
+            mask = self._apply_mask_attention(ids, mask)
+        except (TypeError, ValueError) as exc:
+            raise exc
 
         if bsize:
             return split_into_batches(ids, mask, bsize)
@@ -189,19 +197,19 @@ class QueryTokenizer:
             raise TypeError(msg)
         return [". " + text for text in batch_text]
 
-    def _determine_max_length(self, batch_list: list[str], full_length_search: bool) -> int:
+    def _determine_max_length(self, batch_list: list[str], *, full_length_search: bool) -> int:
         if not full_length_search:
             return self.query_maxlen
         if len(batch_list) != 1:
             msg = "full_length_search is only available for single inference (list with 1 element)"
-            raise ValueError(
-                msg
-            )
+            raise ValueError(msg)
         un_truncated_ids = self.tok(batch_list, add_special_tokens=False).to(DEVICE)["input_ids"]
         max_length_in_batch = max(len(ids) for ids in un_truncated_ids)
         return self.max_len(max_length_in_batch)
 
-    def _tokenize_with_padding(self, batch_list: list[str], max_length: int) -> tuple[torch.Tensor, torch.Tensor]:
+    def _tokenize_with_padding(
+        self, batch_list: list[str], max_length: int
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         obj = self.tok(
             batch_list,
             padding="max_length",
@@ -224,9 +232,7 @@ class QueryTokenizer:
         if context is None:
             return ids, mask
         if len(context) != len(batch_list):
-            msg = (
-                f"len(context) ({len(context)}) must equal len(batch_text) ({len(batch_list)})"
-            )
+            msg = f"len(context) ({len(context)}) must equal len(batch_text) ({len(batch_list)})"
             raise ValueError(msg)
 
         obj_2 = self.tok(
@@ -248,9 +254,7 @@ class QueryTokenizer:
         total = int(mask.sum().item())
         if total != expected:
             msg = f"mask.sum() ({total}) must equal mask.size(0) * mask.size(1) ({expected})"
-            raise ValueError(
-                msg
-            )
+            raise ValueError(msg)
         return mask
 
     def _record_first_use(self, context: list[str] | None) -> None:

@@ -13,6 +13,7 @@ from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.mcp_server.adapters import files as files_adapter
 from codeintel_rev.mcp_server.adapters import history as history_adapter
 from codeintel_rev.mcp_server.adapters import semantic as semantic_adapter
+from codeintel_rev.mcp_server.adapters import semantic_pro as semantic_pro_adapter
 from codeintel_rev.mcp_server.adapters import text_search as text_search_adapter
 from codeintel_rev.mcp_server.error_handling import handle_adapter_errors
 from codeintel_rev.mcp_server.schemas import (
@@ -239,6 +240,42 @@ async def semantic_search(
     """
     context = get_context()
     return await semantic_adapter.semantic_search(context, query, limit)
+
+
+@mcp.tool()
+@handle_adapter_errors(
+    operation="search:semantic_pro",
+    empty_result={"findings": [], "answer": "", "confidence": 0.0},
+)
+async def semantic_search_pro(
+    query: str,
+    limit: int = 20,
+    *,
+    options: semantic_pro_adapter.SemanticProOptions | None = None,
+) -> AnswerEnvelope:
+    """Two-stage semantic retrieval with optional late interaction and reranker.
+
+    Parameters
+    ----------
+    query : str
+        Natural language or code query text.
+    limit : int, optional
+        Maximum number of hydrated findings to return (default 20).
+    options : SemanticProOptions | None, optional
+        Optional dictionary of stage toggles and fusion weights.
+
+    Returns
+    -------
+    AnswerEnvelope
+        Structured response with findings and method metadata.
+    """
+    context = get_context()
+    return await semantic_pro_adapter.semantic_search_pro(
+        context,
+        query=query,
+        limit=limit,
+        options=options,
+    )
 
 
 # ==================== Symbols ====================

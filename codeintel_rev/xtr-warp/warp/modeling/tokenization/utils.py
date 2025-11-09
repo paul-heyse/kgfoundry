@@ -6,6 +6,7 @@ splitting sequences into batches.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Protocol
 
 import torch
@@ -37,14 +38,28 @@ class Tokenizer(Protocol):
         ...
 
 
+@dataclass(frozen=True)
+class TokenizerPair:
+    """Query/document tokenizer pair used for triple tensorization."""
+
+    query: Tokenizer
+    doc: Tokenizer
+
+
+@dataclass(frozen=True)
+class TensorizationSamples:
+    """Inputs required to tensorize ColBERT training triples."""
+
+    queries: list[str]
+    passages: list[str]
+    scores: list[float] | torch.Tensor
+    batch_size: int | None
+    nway: int
+
+
 def tensorize_triples(
-    query_tokenizer: Tokenizer,
-    doc_tokenizer: Tokenizer,
-    queries: list[str],
-    passages: list[str],
-    scores: list[float] | torch.Tensor,
-    bsize: int | None,
-    nway: int,
+    tokenizers: TokenizerPair,
+    samples: TensorizationSamples,
 ) -> list[
     tuple[
         tuple[torch.Tensor, torch.Tensor],
@@ -56,25 +71,30 @@ def tensorize_triples(
 
     Tokenizes queries and passages, then organizes them into batches
     along with scores.
+
+    Parameters
+    ----------
+    tokenizers : TokenizerPair
+        Pair of query and document tokenizers.
+    samples : TensorizationSamples
+        Samples containing queries, passages, scores, batch_size, and nway.
+
+    Returns
+    -------
+    list[tuple[tuple[torch.Tensor, torch.Tensor], tuple[torch.Tensor, torch.Tensor], list[float] | torch.Tensor]]
+        List of batches, each containing (query_ids, query_mask), (doc_ids, doc_mask), and scores.
     """
-    q_ids, q_mask = query_tokenizer.tensorize(queries)
-    d_ids, d_mask = doc_tokenizer.tensorize(passages)
+    q_ids, q_mask = tokenizers.query.tensorize(samples.queries)
+    d_ids, d_mask = tokenizers.doc.tensorize(samples.passages)
 
-    query_batches = split_into_batches(q_ids, q_mask, bsize)
-    doc_batches = split_into_batches(d_ids, d_mask, bsize * nway)
-    score_batches = _build_score_batches(scores, bsize * nway, len(doc_batches))
+    batch_size = samples.batch_size
+    query_batches = split_into_batches(q_ids, q_mask, batch_size)
+    doc_batches = split_into_batches(d_ids, d_mask, batch_size * samples.nway)
+    score_batches = _build_score_batches(
+        samples.scores, batch_size * samples.nway, len(doc_batches)
+    )
 
-    batches: list[
-        tuple[
-            tuple[torch.Tensor, torch.Tensor],
-            tuple[torch.Tensor, torch.Tensor],
-            list[float] | torch.Tensor,
-        ]
-    ] = []
-    for q_batch, d_batch, s_batch in zip(query_batches, doc_batches, score_batches, strict=False):
-        batches.append((q_batch, d_batch, s_batch))
-
-    return batches
+    return _merge_batches(query_batches, doc_batches, score_batches)
 
 
 def _build_score_batches(
@@ -83,6 +103,38 @@ def _build_score_batches(
     if len(scores):
         return _split_into_batches2(scores, batch_size)
     return [[] for _ in range(num_batches)]
+
+
+def _merge_batches(
+    query_batches: list[tuple[torch.Tensor, torch.Tensor]],
+    doc_batches: list[tuple[torch.Tensor, torch.Tensor]],
+    score_batches: list[list[float] | torch.Tensor],
+) -> list[
+    tuple[
+        tuple[torch.Tensor, torch.Tensor],
+        tuple[torch.Tensor, torch.Tensor],
+        list[float] | torch.Tensor,
+    ]
+]:
+    """Pair query, document, and score batches into training triples.
+
+    Returns
+    -------
+    list[tuple[tuple[torch.Tensor, torch.Tensor], tuple[torch.Tensor, torch.Tensor], list[float] | torch.Tensor]]
+        List of triples containing (query_batch, doc_batch, score_batch).
+    """
+    merged: list[
+        tuple[
+            tuple[torch.Tensor, torch.Tensor],
+            tuple[torch.Tensor, torch.Tensor],
+            list[float] | torch.Tensor,
+        ]
+    ] = []
+    for query_batch, doc_batch, score_batch in zip(
+        query_batches, doc_batches, score_batches, strict=False
+    ):
+        merged.append((query_batch, doc_batch, score_batch))
+    return merged
 
 
 def sort_by_length(

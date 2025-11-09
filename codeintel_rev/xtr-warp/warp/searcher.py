@@ -15,7 +15,7 @@ import torch
 from tqdm import tqdm
 from warp.data import Collection, Queries, Ranking
 from warp.engine.config import WARPRunConfig
-from warp.engine.search.index_storage import IndexScorerWARP
+from warp.engine.search.index_storage import IndexScorerOptions, IndexScorerWARP
 from warp.engine.search.parallel.parallel_index_storage import (
     ParallelIndexScorerOptions,
     ParallelIndexScorerWARP,
@@ -31,12 +31,15 @@ from warp.utils.tracker import DEFAULT_NOP_TRACKER, Tracker
 
 @dataclass(frozen=True)
 class SearcherInitOptions:
+    """Initialization options for the Searcher class."""
+
     checkpoint: str | None = None
     collection: str | Collection | None = None
     config: ColBERTConfig | WARPRunConfig | None = None
     index_root: str | None = None
     verbose: int = 3
     warp_engine: bool = False
+
 
 # Batch size and search thresholds
 DEFAULT_BATCH_SIZE = 128

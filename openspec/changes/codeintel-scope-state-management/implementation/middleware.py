@@ -173,9 +173,8 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
     >>> session_id = response.json()["session_id"]  # Use for subsequent requests
     """
 
-    async def dispatch(
-        self, request: Request, call_next: Callable[[Request], Response]
-    ) -> Response:
+    @staticmethod
+    async def dispatch(request: Request, call_next: Callable[[Request], Response]) -> Response:
         """Process request and inject session ID.
 
         Extracts X-Session-ID header or generates UUID, stores in request.state
@@ -198,28 +197,33 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
         The middleware is async to support FastAPI's async route handlers.
         Even if adapters are sync functions, FastAPI wraps them in asyncio.to_thread.
         """
-        # Extract session ID from header or generate
+        session_id = SessionScopeMiddleware._fetch_or_generate_session_id(request)
+        SessionScopeMiddleware._persist_session_id(request, session_id)
+        return await call_next(request)
+
+    @staticmethod
+    def _fetch_or_generate_session_id(request: Request) -> str:
+        """Return the session ID extracted from headers or generated."""
         session_id = request.headers.get("X-Session-ID")
+        log_extra = {"path": request.url.path}
         if session_id is None:
             session_id = str(uuid.uuid4())
             LOGGER.debug(
                 "Generated session ID for request",
-                extra={"session_id": session_id, "path": request.url.path},
+                extra={**log_extra, "session_id": session_id},
             )
         else:
             LOGGER.debug(
                 "Using client-provided session ID",
-                extra={"session_id": session_id, "path": request.url.path},
+                extra={**log_extra, "session_id": session_id},
             )
+        return session_id
 
-        # Store in request.state (FastAPI convention)
+    @staticmethod
+    def _persist_session_id(request: Request, session_id: str) -> None:
+        """Store the session ID on the request state and ContextVar."""
         request.state.session_id = session_id
-
-        # Store in ContextVar (for adapter access)
         session_id_var.set(session_id)
-
-        # Invoke next handler
-        return await call_next(request)
 
 
 __all__ = ["SessionScopeMiddleware", "get_session_id", "session_id_var"]

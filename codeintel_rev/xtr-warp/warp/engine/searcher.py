@@ -17,7 +17,7 @@ from warp.data.queries import WARPQueries
 from warp.data.ranking import WARPRanking, WARPRankingItem, WARPRankingItems
 from warp.engine.config import WARPRunConfig
 from warp.infra import Run, RunConfig
-from warp.searcher import BatchSearchOptions, SearchOptions
+from warp.searcher import BatchSearchOptions, SearcherInitOptions, SearchOptions
 from warp.utils.tracker import DEFAULT_NOP_TRACKER, NOPTracker
 
 

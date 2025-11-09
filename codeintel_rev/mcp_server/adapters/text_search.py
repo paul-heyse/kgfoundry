@@ -55,9 +55,7 @@ class TextSearchOptions:
     max_results: int = 50
 
     @classmethod
-    def from_overrides(
-        cls, query: str, overrides: Mapping[str, object]
-    ) -> TextSearchOptions:
+    def from_overrides(cls, query: str, overrides: Mapping[str, object]) -> TextSearchOptions:
         """Build search options from keyword overrides.
 
         Constructs a TextSearchOptions instance from a query string and a mapping
@@ -167,10 +165,14 @@ def _search_text_sync(
         scope,
         {
             "include_globs": (
-                list(options.include_globs) if options.include_globs is not None else options.include_globs
+                list(options.include_globs)
+                if options.include_globs is not None
+                else options.include_globs
             ),
             "exclude_globs": (
-                list(options.exclude_globs) if options.exclude_globs is not None else options.exclude_globs
+                list(options.exclude_globs)
+                if options.exclude_globs is not None
+                else options.exclude_globs
             ),
         },
     )
@@ -189,8 +191,12 @@ def _search_text_sync(
             "session_id": session_id,
             "query": query,
             "explicit_paths": list(options.paths) if options.paths else None,
-            "explicit_include_globs": (list(options.include_globs) if options.include_globs is not None else None),
-            "explicit_exclude_globs": (list(options.exclude_globs) if options.exclude_globs is not None else None),
+            "explicit_include_globs": (
+                list(options.include_globs) if options.include_globs is not None else None
+            ),
+            "explicit_exclude_globs": (
+                list(options.exclude_globs) if options.exclude_globs is not None else None
+            ),
             "scope_include_globs": (
                 cast("Sequence[str] | None", scope.get("include_globs")) if scope else None
             ),

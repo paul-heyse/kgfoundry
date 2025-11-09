@@ -370,6 +370,20 @@ class IndexScorerWARP(IndexLoaderWARP):
 
     @dataclass(frozen=True)
     class CandidateBatch:
+        """Batch of candidate results from centroid decompression.
+
+        Attributes
+        ----------
+        capacities : torch.Tensor
+            Maximum capacity for each centroid cell.
+        sizes : torch.Tensor
+            Actual number of embeddings in each cell.
+        pids : torch.Tensor
+            Passage IDs for each candidate.
+        scores : torch.Tensor
+            Relevance scores for each candidate.
+        """
+
         capacities: torch.Tensor
         sizes: torch.Tensor
         pids: torch.Tensor

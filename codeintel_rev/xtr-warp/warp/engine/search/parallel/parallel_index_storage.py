@@ -117,11 +117,15 @@ class ParallelIndexLoaderWARP:
 
 @dataclass(frozen=True)
 class ParallelIndexScorerOptions(IndexScorerOptions):
+    """Options for parallel WARP index scorer with fused decompression-merge."""
+
     fused_decompression_merge: bool = True
 
 
 @dataclass(frozen=True)
 class ParallelCandidateBatch:
+    """Batch of candidate results for parallel processing."""
+
     capacities: torch.Tensor
     sizes: torch.Tensor
     pids: torch.Tensor
@@ -130,6 +134,8 @@ class ParallelCandidateBatch:
 
 @dataclass(frozen=True)
 class MergeParams:
+    """Parameters for merging candidate scores in parallel processing."""
+
     nprobe: int
     num_tokens: int
     mse_estimates: torch.Tensor
@@ -483,9 +489,7 @@ class ParallelIndexScorerWARP(ParallelIndexLoaderWARP):
             nprobe,
             num_tokens,
         )
-        return ParallelCandidateBatch(
-            capacities=capacities, sizes=sizes, pids=pids, scores=scores
-        )
+        return ParallelCandidateBatch(capacities=capacities, sizes=sizes, pids=pids, scores=scores)
 
     def _merge_candidate_scores(
         self, batch: ParallelCandidateBatch, params: MergeParams

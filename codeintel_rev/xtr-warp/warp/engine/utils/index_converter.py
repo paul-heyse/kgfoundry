@@ -111,10 +111,21 @@ class ConversionContext:
     num_partitions: int
 
 
-def _build_conversion_context(
-    index_path: str, destination_path: str | None
-) -> ConversionContext:
-    """Create conversion context by loading the plan and validating paths."""
+def _build_conversion_context(index_path: str, destination_path: str | None) -> ConversionContext:
+    """Create conversion context by loading the plan and validating paths.
+
+    Parameters
+    ----------
+    index_path : str
+        Path to the source index directory containing plan.json.
+    destination_path : str | None
+        Path to destination directory for converted index. If None, uses index_path.
+
+    Returns
+    -------
+    ConversionContext
+        Context object containing validated paths and configuration from plan.json.
+    """
     index_path_obj = pathlib.Path(index_path)
     destination_path_obj = pathlib.Path(destination_path or index_path)
     destination_path_obj.mkdir(exist_ok=True, parents=True)
@@ -137,7 +148,23 @@ def _build_conversion_context(
 def _load_and_save_metadata(
     ctx: ConversionContext,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Load centroids and buckets, save to destination."""
+    """Load centroids and buckets, save to destination.
+
+    Parameters
+    ----------
+    ctx : ConversionContext
+        Conversion context with source and destination paths.
+
+    Returns
+    -------
+    tuple[torch.Tensor, torch.Tensor]
+        Tuple of (bucket_cutoffs, bucket_weights) tensors.
+
+    Raises
+    ------
+    ValueError
+        If index configuration is invalid or metadata files are missing.
+    """
     # Parameters from context
     index_path_obj = ctx.index_path_obj
     destination_path_obj = ctx.destination_path_obj
@@ -155,6 +182,9 @@ def _load_and_save_metadata(
         destination_path_obj / "centroids.npy",
         centroids.numpy(force=True).astype(np.float32),
     )
+    return bucket_cutoffs, bucket_weights
+
+
 def _compute_centroid_sizes(
     index_path_obj: pathlib.Path, num_chunks: int, num_partitions: int
 ) -> torch.Tensor:
@@ -331,10 +361,23 @@ def _repack_residuals(
 
 
 def _build_decompression_lookup(bucket_weights: torch.Tensor, keys_per_byte: int) -> torch.Tensor:
-    """Build decompression lookup table from bucket weights."""
-    return torch.tensor(
-        list(product(list(range(len(bucket_weights))), repeat=keys_per_byte))
-    ).to(torch.uint8)
+    """Build decompression lookup table from bucket weights.
+
+    Parameters
+    ----------
+    bucket_weights : torch.Tensor
+        Weights for each quantization bucket.
+    keys_per_byte : int
+        Number of keys that can be packed into a single byte (8 // nbits).
+
+    Returns
+    -------
+    torch.Tensor
+        Lookup table tensor of shape (num_combinations, keys_per_byte) with uint8 dtype.
+    """
+    return torch.tensor(list(product(list(range(len(bucket_weights))), repeat=keys_per_byte))).to(
+        torch.uint8
+    )
 
 
 def _validate_nbits(nbits: int) -> None:
@@ -349,9 +392,7 @@ def convert_index(index_path: str, destination_path: str | None = None) -> None:
     _bucket_cutoffs, bucket_weights = _load_and_save_metadata(ctx)
     # Note: IVF (Inverted File) structure is loaded implicitly during metadata processing
 
-    centroid_sizes = _compute_centroid_sizes(
-        ctx.index_path_obj, ctx.num_chunks, ctx.num_partitions
-    )
+    centroid_sizes = _compute_centroid_sizes(ctx.index_path_obj, ctx.num_chunks, ctx.num_partitions)
     residual_dim = (ctx.dim * ctx.nbits) // 8
 
     tensor_compacted_residuals, tensor_compacted_codes = _compact_residuals_and_codes(
@@ -372,4 +413,3 @@ def convert_index(index_path: str, destination_path: str | None = None) -> None:
         tensor_compacted_residuals, reversed_bit_map, decompression_lookup_table, ctx.nbits
     )
     torch.save(residuals_repacked_compacted_df, dst / "residuals.repacked.compacted.pt")
-

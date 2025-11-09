@@ -6,6 +6,9 @@ for encoding queries and documents with automatic tokenization and mixed precisi
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from dataclasses import dataclass
+
 import torch
 from tqdm import tqdm
 from warp.engine.config import USE_CORE_ML, WARPRunConfig
@@ -20,6 +23,49 @@ from warp.modeling.colbert import ColBERT
 from warp.modeling.tokenization import DocTokenizer, QueryTokenizer
 from warp.modeling.xtr import XTRCheckpoint, build_xtr_model
 from warp.utils.amp import MixedPrecisionManager
+
+
+@dataclass(frozen=True)
+class DocumentEncodingOptions:
+    """Options describing document encoding behavior."""
+
+    keep_dims: bool | str = True
+    to_cpu: bool = False
+    showprogress: bool = False
+    return_tokens: bool = False
+
+    _ALLOWED_KEYS = frozenset({"keep_dims", "to_cpu", "showprogress", "return_tokens"})
+
+    @classmethod
+    def from_overrides(cls, overrides: Mapping[str, object]) -> DocumentEncodingOptions:
+        """Build encoding options from keyword overrides.
+
+        Constructs a DocumentEncodingOptions instance from a mapping of keyword
+        arguments. Validates that all override keys are allowed options.
+
+        Parameters
+        ----------
+        overrides : Mapping[str, object]
+            Dictionary of keyword arguments corresponding to DocumentEncodingOptions fields.
+            Valid keys are: keep_dims, to_cpu, showprogress, return_tokens.
+
+        Returns
+        -------
+        DocumentEncodingOptions
+            Configured encoding options instance with overrides applied.
+
+        Raises
+        ------
+        TypeError
+            If any keys in overrides are not recognized as valid DocumentEncodingOptions
+            fields. This prevents typos and ensures type safety.
+        """
+        unexpected = set(overrides) - cls._ALLOWED_KEYS
+        if unexpected:
+            msg = f"Unexpected doc_from_text keyword(s): {sorted(unexpected)}"
+            raise TypeError(msg)
+        return cls(**{k: overrides[k] for k in overrides})
+
 
 if USE_CORE_ML:
     from warp.engine.runtime.coreml_model import XTRCoreMLConfig, XTRCoreMLModel
@@ -252,10 +298,8 @@ class Checkpoint(ColBERT):
         docs: list[str],
         bsize: int | None = None,
         *,
-        keep_dims: bool | str = True,
-        to_cpu: bool = False,
-        showprogress: bool = False,
-        return_tokens: bool = False,
+        options: DocumentEncodingOptions | None = None,
+        **overrides: object,
     ) -> torch.Tensor | tuple[torch.Tensor, ...] | tuple[torch.Tensor, list[int], ...]:
         """Encode document text strings into embeddings.
 
@@ -268,6 +312,11 @@ class Checkpoint(ColBERT):
             Document text strings to encode.
         bsize : int | None
             Batch size for processing (default: None, processes all at once).
+        options : DocumentEncodingOptions | None
+            Pre-configured encoding options. If None, options are built from overrides.
+        **overrides : object
+            Keyword arguments to override default encoding options. Valid keys are:
+            keep_dims, to_cpu, showprogress, return_tokens. Ignored if options is provided.
         keep_dims : bool | str
             Output shape control: True (3D tensor), False (list of tensors),
             "flatten" (2D tensor + doclens) (default: True).
@@ -289,60 +338,104 @@ class Checkpoint(ColBERT):
 
         Raises
         ------
+        TypeError
+            If options and overrides are both provided, or if any override keys
+            are not recognized as valid DocumentEncodingOptions fields.
         ValueError
             If keep_dims is not True, False, or "flatten".
         """
+        if options is None:
+            options = DocumentEncodingOptions.from_overrides(overrides)
+        elif overrides:
+            msg = "Cannot pass keyword overrides when options is provided"
+            raise TypeError(msg)
+
+        keep_dims = options.keep_dims
+        to_cpu = options.to_cpu
+
         if keep_dims not in {True, False, "flatten"}:
             msg = f"keep_dims must be True, False, or 'flatten', got {keep_dims!r}"
             raise ValueError(msg)
 
         if bsize:
             text_batches, reverse_indices = self.doc_tokenizer.tensorize(docs, bsize=bsize)
-
-            returned_text = []
-            if return_tokens:
-                returned_text = [text for batch in text_batches for text in batch[0]]
-                returned_text = [returned_text[idx] for idx in reverse_indices.tolist()]
-                returned_text = [returned_text]
-
-            keep_dims_ = "return_mask" if keep_dims == "flatten" else keep_dims
-            batches = [
-                self.doc(input_ids, attention_mask, keep_dims=keep_dims_, to_cpu=to_cpu)
-                for input_ids, attention_mask in tqdm(text_batches, disable=not showprogress)
-            ]
-
-            if keep_dims is True:
-                d = _stack_3d_tensors(batches)
-                return (d[reverse_indices], *returned_text)
-
-            if keep_dims == "flatten":
-                d, mask = [], []
-
-                for d_, mask_ in batches:
-                    d.append(d_)
-                    mask.append(mask_)
-
-                d, mask = (
-                    torch.cat(d)[reverse_indices],
-                    torch.cat(mask)[reverse_indices],
-                )
-
-                doclens = mask.squeeze(-1).sum(-1).tolist()
-
-                d = d.view(-1, self.colbert_config.dim)
-                d = d[mask.bool().flatten()].cpu()
-
-                return (d, doclens, *returned_text)
-
-            if keep_dims is not False:
-                msg = f"keep_dims must be False at this point, got {keep_dims!r}"
-                raise ValueError(msg)
-
-            d_list = [d for batch in batches for d in batch]
-            return ([d_list[idx] for idx in reverse_indices.tolist()], *returned_text)
+            return self._doc_from_text_batched(
+                text_batches=text_batches,
+                reverse_indices=reverse_indices,
+                options=options,
+            )
 
         input_ids, attention_mask = self.doc_tokenizer.tensorize(docs)
         return self.doc(input_ids, attention_mask, keep_dims=keep_dims, to_cpu=to_cpu)
+
+    def _doc_from_text_batched(
+        self,
+        text_batches: list[tuple[torch.Tensor, torch.Tensor]],
+        reverse_indices: torch.Tensor,
+        options: DocumentEncodingOptions,
+    ) -> torch.Tensor | tuple[torch.Tensor, ...] | tuple[torch.Tensor, list[int], ...]:
+        """Process batched document inputs using the configured options."""
+        returned_text = self._prepare_returned_text(
+            options.return_tokens, text_batches, reverse_indices
+        )
+        keep_dims_for_doc = "return_mask" if options.keep_dims == "flatten" else options.keep_dims
+        batches = [
+            self.doc(
+                input_ids,
+                attention_mask,
+                keep_dims=keep_dims_for_doc,
+                to_cpu=options.to_cpu,
+            )
+            for input_ids, attention_mask in tqdm(text_batches, disable=not options.showprogress)
+        ]
+        return self._finalize_batched_documents(
+            keep_dims=options.keep_dims,
+            batches=batches,
+            reverse_indices=reverse_indices,
+            returned_text=returned_text,
+        )
+
+    @staticmethod
+    def _prepare_returned_text(
+        *,
+        return_tokens: bool,
+        text_batches: list[tuple[torch.Tensor, torch.Tensor]],
+        reverse_indices: torch.Tensor,
+    ) -> list[str]:
+        returned_text: list[str] = []
+        if not return_tokens:
+            return returned_text
+        returned_text = [text for batch in text_batches for text in batch[0]]
+        returned_text = [returned_text[idx] for idx in reverse_indices.tolist()]
+        return [returned_text]
+
+    def _finalize_batched_documents(
+        self,
+        keep_dims: bool | str,
+        batches: list[tuple[torch.Tensor, torch.Tensor]],
+        reverse_indices: torch.Tensor,
+        returned_text: list[str],
+    ) -> tuple[torch.Tensor, ...] | tuple[list[torch.Tensor], ...]:
+        if keep_dims is True:
+            d = _stack_3d_tensors(batches)
+            return (d[reverse_indices], *returned_text)
+
+        if keep_dims == "flatten":
+            d, mask = zip(*batches, strict=True)
+            combined_d = torch.cat(d)[reverse_indices]
+            combined_mask = torch.cat(mask)[reverse_indices]
+            doclens = combined_mask.squeeze(-1).sum(-1).tolist()
+            flattened = combined_d.view(-1, self.colbert_config.dim)
+            flattened = flattened[combined_mask.bool().flatten()].cpu()
+            return (flattened, doclens, *returned_text)
+
+        if keep_dims is not False:
+            msg = f"keep_dims must be False at this point, got {keep_dims!r}"
+            raise ValueError(msg)
+
+        expanded = [elem for batch in batches for elem in batch]
+        ordered = [expanded[idx] for idx in reverse_indices.tolist()]
+        return (*ordered, *returned_text)
 
     def lazy_rank(self, queries: list[str], docs: list[str]) -> None:
         """Lazy ranking placeholder (not implemented).

@@ -17,9 +17,10 @@ _MISSING = object()
 def _protocol_stub(method: str, *args: object) -> NoReturn:
     """Raise ``NotImplementedError`` when a protocol stub executes at runtime."""
     arg_preview = ", ".join(repr(arg) for arg in args)
+    args_str = f"({arg_preview})" if arg_preview else "()"
     message = (
-        "AutoAPI parser implementations must override '{method}'. Received arguments: {args}."
-    ).format(method=method, args=f"({arg_preview})" if arg_preview else "()")
+        f"AutoAPI parser implementations must override '{method}'. Received arguments: {args_str}."
+    )
     raise NotImplementedError(message)
 
 

@@ -30,6 +30,8 @@ from warp.utils.utils import print_message
 
 @dataclass(frozen=True)
 class ScoreBatch:
+    """Batch of query and document embeddings for scoring."""
+
     q: torch.Tensor
     d_packed: torch.Tensor
     d_mask: torch.Tensor
@@ -321,6 +323,8 @@ class IndexScorer(IndexLoader, CandidateGeneration):
         ValueError
             If filtered_pids dtype or device doesn't match pids, or if
             approx_scores is not on CUDA device when required.
+            This exception is raised indirectly by internal validation helpers
+            or tensor operations when device/dtype mismatches occur.
 
         Notes
         -----
@@ -335,9 +339,7 @@ class IndexScorer(IndexLoader, CandidateGeneration):
 
         tracker.begin("Filtering")
         if self.use_gpu:
-            pids = self._filter_gpu_pids(
-                config, pids, centroid_scores, idx, batch_size
-            )
+            pids = self._filter_gpu_pids(config, pids, centroid_scores, idx, batch_size)
         else:
             pids = self._filter_cpu_pids(config, pids, centroid_scores, idx)
         tracker.end("Filtering")
@@ -396,17 +398,13 @@ class IndexScorer(IndexLoader, CandidateGeneration):
             codes_packed_ = codes_packed[idx_]
             approx_scores_ = centroid_scores[codes_packed_.long()]
             if approx_scores_.shape[0] == 0:
-                approx_scores.append(
-                    torch.zeros((len(pids_),), dtype=approx_scores_.dtype).cuda()
-                )
+                approx_scores.append(torch.zeros((len(pids_),), dtype=approx_scores_.dtype).cuda())
                 continue
             approx_scores_strided = StridedTensor(
                 approx_scores_, pruned_codes_lengths, use_gpu=self.use_gpu
             )
             approx_scores_padded, approx_scores_mask = approx_scores_strided.as_padded_tensor()
-            approx_scores_ = colbert_score_reduce(
-                approx_scores_padded, approx_scores_mask, config
-            )
+            approx_scores_ = colbert_score_reduce(approx_scores_padded, approx_scores_mask, config)
             approx_scores.append(approx_scores_)
         return torch.cat(approx_scores, dim=0)
 
@@ -416,9 +414,7 @@ class IndexScorer(IndexLoader, CandidateGeneration):
         codes_lengths: torch.Tensor,
         config: ColBERTConfig,
     ) -> torch.Tensor:
-        approx_scores_strided = StridedTensor(
-            approx_scores, codes_lengths, use_gpu=self.use_gpu
-        )
+        approx_scores_strided = StridedTensor(approx_scores, codes_lengths, use_gpu=self.use_gpu)
         approx_scores_padded, approx_scores_mask = approx_scores_strided.as_padded_tensor()
         return colbert_score_reduce(approx_scores_padded, approx_scores_mask, config)
 
@@ -439,9 +435,7 @@ class IndexScorer(IndexLoader, CandidateGeneration):
             config.ndocs,
         )
 
-    def _decompress_residuals(
-        self, pids: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    def _decompress_residuals(self, pids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         if self.use_gpu:
             return self.lookup_pids(pids)
 
@@ -483,7 +477,9 @@ class IndexScorer(IndexLoader, CandidateGeneration):
         return scores, batch.pids
 
     @staticmethod
-    def _normalize_scores(scores: torch.Tensor, q: torch.Tensor, config: ColBERTConfig) -> torch.Tensor:
+    def _normalize_scores(
+        scores: torch.Tensor, q: torch.Tensor, config: ColBERTConfig
+    ) -> torch.Tensor:
         if config.checkpoint == "google/xtr-base-en":
             query_len = q.count_nonzero(dim=1)[0, 0]
             scores /= query_len

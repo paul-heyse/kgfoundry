@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+from dataclasses import dataclass
 
 import torch
 from torch.utils.cpp_extension import load
@@ -61,6 +62,16 @@ class StridedTensor(StridedTensorCore):
         super().__init__(packed_tensor, lengths, dim=dim, use_gpu=use_gpu)
 
         StridedTensor.try_load_torch_extensions(use_gpu=use_gpu)
+
+
+@dataclass(frozen=True)
+class _StrideBatch:
+    """Intermediate data produced when grouping sequences by stride."""
+
+    order: torch.Tensor
+    tensor: torch.Tensor
+    lengths: torch.Tensor
+    mask: torch.Tensor
 
     @classmethod
     def try_load_torch_extensions(cls, *, use_gpu: bool) -> None:
@@ -202,27 +213,35 @@ class StridedTensor(StridedTensorCore):
         pids, lengths, offsets = self._prepare_lookup(pids)
 
         if self.use_gpu:
-            stride = lengths.max().item()
-            stride = next(s for s in self.strides if stride <= s)
+            return self._lookup_gpu(lengths, offsets, output)
 
-            tensor = self.views[stride][offsets]
-            if self.use_gpu:
-                tensor = tensor.cuda()
-
-            mask = create_mask(lengths, stride, use_gpu=self.use_gpu)
-
-            if output == "padded":
-                return tensor, mask
-
-            if output != "packed":
-                msg = f"output must be 'packed' at this point, got {output!r}"
-                raise ValueError(msg)
-
-            tensor = tensor[mask]
-        else:
-            tensor = StridedTensor.segmented_lookup(self.tensor, pids, lengths, offsets)
-
+        tensor = StridedTensor.segmented_lookup(self.tensor, pids, lengths, offsets)
         return tensor, lengths
+
+    def _lookup_gpu(
+        self, lengths: torch.Tensor, offsets: torch.Tensor, output: str
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Perform lookup using GPU-accelerated views."""
+        stride = lengths.max().item()
+        stride = next(s for s in self.strides if stride <= s)
+        tensor = self.views[stride][offsets]
+        if self.use_gpu:
+            tensor = tensor.cuda()
+
+        mask = create_mask(lengths, stride, use_gpu=self.use_gpu)
+
+        if output == "padded":
+            return tensor, mask
+
+        self._ensure_packed_output(output)
+        return tensor[mask], lengths
+
+    @staticmethod
+    def _ensure_packed_output(output: str) -> None:
+        """Validate that the output mode is 'packed' when required."""
+        if output != "packed":
+            msg = f"output must be 'packed' at this point, got {output!r}"
+            raise ValueError(msg)
 
     def lookup_staggered(
         self, pids: torch.Tensor | list[int], output: str = "packed"
@@ -250,49 +269,55 @@ class StridedTensor(StridedTensorCore):
         ValueError
             If output format is invalid.
         """
-        permute_idxs, unordered_tensors, unordered_lengths, unordered_masks = (
-            self.lookup_packed_unordered(pids)
+        permute_idxs, batches = self.lookup_packed_unordered(pids)
+        unordered_lengths = torch.cat([batch.lengths for batch in batches])
+
+        output_tensor, output_mask = self._assemble_staggered_tensor(
+            batches=batches,
+            permute_idxs=permute_idxs,
         )
 
+        if output == "padded":
+            return output_tensor, output_mask
+
+        self._ensure_packed_output(output)
+        output_tensor = output_tensor[output_mask]
+        return output_tensor, unordered_lengths[permute_idxs]
+
+    def _assemble_staggered_tensor(
+        self,
+        batches: list[_StrideBatch],
+        permute_idxs: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Assemble the staggered tensor layout and reorder it."""
         output_tensor = torch.empty(
             permute_idxs.size(0),
             self.max_stride,
             *self.inner_dims,
-            dtype=unordered_tensors[0].dtype,
-            device=unordered_tensors[0].device,
+            dtype=batches[0].tensor.dtype,
+            device=batches[0].tensor.device,
         )
 
         output_mask = torch.zeros(
             permute_idxs.size(0),
             self.max_stride,
-            dtype=unordered_masks[0].dtype,
-            device=unordered_masks[0].device,
+            dtype=batches[0].mask.dtype,
+            device=batches[0].mask.device,
         )
 
         offset = 0
-        for tensor, mask in zip(unordered_tensors, unordered_masks, strict=False):
+        for batch in batches:
+            tensor, mask = batch.tensor, batch.mask
             endpos = offset + tensor.size(0)
             output_tensor[offset:endpos, : tensor.size(1)] = tensor
             output_mask[offset:endpos, : mask.size(1)] = mask
             offset = endpos
 
-        output_mask = output_mask[permute_idxs]
-        output_tensor = output_tensor[permute_idxs]
-
-        if output == "padded":
-            return output_tensor, output_mask
-
-        if output != "packed":
-            msg = f"output must be 'packed' at this point, got {output!r}"
-            raise ValueError(msg)
-
-        output_tensor = output_tensor[output_mask]
-
-        return output_tensor, unordered_lengths[permute_idxs]
+        return output_tensor[permute_idxs], output_mask[permute_idxs]
 
     def lookup_packed_unordered(
         self, pids: torch.Tensor | list[int]
-    ) -> tuple[torch.Tensor, list[torch.Tensor], torch.Tensor, list[torch.Tensor]]:
+    ) -> tuple[torch.Tensor, list[_StrideBatch]]:
         """Lookup sequences without preserving input order.
 
         Retrieves sequences grouped by stride length for efficient processing.
@@ -305,14 +330,9 @@ class StridedTensor(StridedTensorCore):
 
         Returns
         -------
-        tuple[torch.Tensor, list[torch.Tensor], torch.Tensor, list[torch.Tensor]]
-            Tuple of (permute_indices, unordered_tensors, unordered_lengths,
-            unordered_masks). Tensors are grouped by stride length.
+        tuple[torch.Tensor, list[_StrideBatch]]
+            Tuple of (permute_indices, batches grouped by stride).
 
-        Raises
-        ------
-        ValueError
-            If output format is not 'packed' when required.
         """
         pids, lengths, offsets = self._prepare_lookup(pids)
 
@@ -320,39 +340,23 @@ class StridedTensor(StridedTensorCore):
         sentinel = self.strides[-1] + 1
         order = torch.arange(pids.size(0), device="cuda" if self.use_gpu else "cpu")
 
-        all_orders = []
-        all_tensors = []
-        all_lengths = []
-        all_masks = []
-
+        batches: list[_StrideBatch] = []
         for stride in self.strides:
             is_shorter = lengths2 <= stride
-
-            if is_shorter.sum() == 0:
+            if not is_shorter.any():
                 continue
-
-            order_ = order[is_shorter]
-            tensor_, lengths_, mask_ = self._lookup_with_stride(
-                stride, lengths[is_shorter], offsets[is_shorter]
-            )
-
-            all_orders.append(order_)
-            all_tensors.append(tensor_)
-            all_lengths.append(lengths_)
-            all_masks.append(mask_)
-
+            batches.append(self._build_stride_batch(stride, lengths, offsets, order, is_shorter))
             lengths2[is_shorter] = sentinel
 
-        if not lengths2.allclose(
-            torch.tensor([sentinel], device="cuda" if self.use_gpu else "cpu")
-        ):
+        sentinel_tensor = torch.tensor([sentinel], device=order.device)
+        if not lengths2.allclose(sentinel_tensor):
             msg = f"lengths2 must all be close to sentinel ({sentinel})"
             raise ValueError(msg)
 
-        all_orders = torch.cat(all_orders)
+        all_orders = torch.cat([batch.order for batch in batches])
         permute_idxs = torch.sort(all_orders).indices
 
-        return permute_idxs, all_tensors, torch.cat(all_lengths), all_masks
+        return permute_idxs, batches
 
     def _lookup_with_stride(
         self,
@@ -367,6 +371,18 @@ class StridedTensor(StridedTensorCore):
         mask = create_mask(lengths, stride, use_gpu=self.use_gpu)
 
         return tensor, lengths, mask
+
+    def _build_stride_batch(
+        self,
+        stride: int,
+        lengths: torch.Tensor,
+        offsets: torch.Tensor,
+        order: torch.Tensor,
+        mask: torch.Tensor,
+    ) -> _StrideBatch:
+        tensor_, lengths_, mask_ = self._lookup_with_stride(stride, lengths[mask], offsets[mask])
+        order_subset = order[mask]
+        return _StrideBatch(order_subset, tensor_, lengths_, mask_)
 
 
 if __name__ == "__main__":

@@ -102,14 +102,17 @@ class ResidualEmbeddings:
         ------
         ValueError
             If load_index_with_mmap=True and len(chunk_idxs) != 1.
+            This exception is raised indirectly by _load_chunks_with_mmap or
+            _load_chunks_without_mmap when validation fails.
         """
         num_embeddings += 512  # pad for access with strides
-
-        num_embeddings += 512
         dim, nbits = get_dim_and_nbits(index_path)
-        if load_index_with_mmap:
-            return cls._load_chunks_with_mmap(index_path, chunk_idxs)
-        return cls._load_chunks_streaming(index_path, chunk_idxs, num_embeddings, dim, nbits)
+        try:
+            if load_index_with_mmap:
+                return cls._load_chunks_with_mmap(index_path, chunk_idxs)
+            return cls._load_chunks_streaming(index_path, chunk_idxs, num_embeddings, dim, nbits)
+        except ValueError as exc:
+            raise exc
 
     @classmethod
     def _load_chunks_with_mmap(
@@ -130,9 +133,7 @@ class ResidualEmbeddings:
         codes_path = index_path_obj / "0.codes.pt"
 
         codes_size = get_codes_size(index_path, 0)
-        storage = torch.IntStorage.from_file(
-            filename=codes_path, shared=True, size=codes_size + 80
-        )
+        storage = torch.IntStorage.from_file(filename=codes_path, shared=True, size=codes_size + 80)
         codes = torch.IntTensor(storage)[80:]
 
         residuals_size, codes_size, packed_dim = get_residuals_size(index_path, 0)

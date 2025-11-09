@@ -1403,25 +1403,16 @@ def _write_interfaces(
     for entry in rows:
         identifier, merged, registry_entry = _merge_interface_metadata(entry, registry, module_path)
         fd.write(f"### `{identifier}`\n\n")
-        fd.write(
-            "- **Type:** {type}\n".format(
-                type=merged.get("type") or (registry_entry.type if registry_entry else None) or "—"
-            )
+        type_value = merged.get("type") or (registry_entry.type if registry_entry else None) or "—"
+        fd.write(f"- **Type:** {type_value}\n")
+        owner_value = (
+            merged.get("owner") or (registry_entry.owner if registry_entry else None) or "—"
         )
-        fd.write(
-            "- **Owner:** {owner}\n".format(
-                owner=merged.get("owner")
-                or (registry_entry.owner if registry_entry else None)
-                or "—"
-            )
+        fd.write(f"- **Owner:** {owner_value}\n")
+        stability_value = (
+            merged.get("stability") or (registry_entry.stability if registry_entry else None) or "—"
         )
-        fd.write(
-            "- **Stability:** {stability}\n".format(
-                stability=merged.get("stability")
-                or (registry_entry.stability if registry_entry else None)
-                or "—"
-            )
-        )
+        fd.write(f"- **Stability:** {stability_value}\n")
         description = merged.get("description") or (
             registry_entry.description if registry_entry else None
         )

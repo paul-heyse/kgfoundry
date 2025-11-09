@@ -94,6 +94,12 @@ class ResolvedPaths:
         Absolute path to DuckDB catalog database file.
     scip_index : Path
         Absolute path to SCIP index file (JSON or protobuf format).
+    coderank_vectors_dir : Path
+        Directory storing CodeRank chunk embeddings or shards.
+    coderank_faiss_index : Path
+        Path to the CodeRank FAISS index used for Stage-A retrieval.
+    warp_index_dir : Path
+        Directory containing WARP/XTR index artifacts.
 
     Examples
     --------
@@ -113,6 +119,9 @@ class ResolvedPaths:
     faiss_index: Path
     duckdb_path: Path
     scip_index: Path
+    coderank_vectors_dir: Path
+    coderank_faiss_index: Path
+    warp_index_dir: Path
 
 
 def resolve_application_paths(settings: Settings) -> ResolvedPaths:
@@ -201,6 +210,9 @@ def resolve_application_paths(settings: Settings) -> ResolvedPaths:
         faiss_index=_resolve(settings.paths.faiss_index),
         duckdb_path=_resolve(settings.paths.duckdb_path),
         scip_index=_resolve(settings.paths.scip_index),
+        coderank_vectors_dir=_resolve(settings.paths.coderank_vectors_dir),
+        coderank_faiss_index=_resolve(settings.paths.coderank_faiss_index),
+        warp_index_dir=_resolve(settings.paths.warp_index_dir),
     )
 
 
@@ -294,6 +306,8 @@ class ApplicationContext:
     _faiss_gpu_attempted: bool = field(default=False, init=False)
     _hybrid_engine: HybridSearchEngine | None = field(default=None, init=False, repr=False)
     _hybrid_lock: Lock = field(default_factory=Lock, init=False, repr=False)
+    _coderank_faiss_manager: FAISSManager | None = field(default=None, init=False, repr=False)
+    _coderank_faiss_lock: Lock = field(default_factory=Lock, init=False, repr=False)
 
     @classmethod
     def create(cls) -> ApplicationContext:
@@ -404,6 +418,46 @@ class ApplicationContext:
             if self._hybrid_engine is None:
                 self._hybrid_engine = HybridSearchEngine(self.settings, self.paths)
             return self._hybrid_engine
+
+    def get_coderank_faiss_manager(self, vec_dim: int) -> FAISSManager:
+        """Return a lazily loaded FAISS manager for CodeRank search.
+
+        Parameters
+        ----------
+        vec_dim : int
+            Expected embedding dimension for the CodeRank index.
+
+        Returns
+        -------
+        FAISSManager
+            Configured FAISS manager instance pointing to the CodeRank index.
+
+        Raises
+        ------
+        ValueError
+            If ``vec_dim`` is non-positive or mismatched with the cached index.
+        """
+        if vec_dim <= 0:
+            msg = "vec_dim must be positive for CodeRank FAISS manager."
+            raise ValueError(msg)
+        with self._coderank_faiss_lock:
+            if self._coderank_faiss_manager is None:
+                manager = FAISSManager(
+                    index_path=self.paths.coderank_faiss_index,
+                    vec_dim=vec_dim,
+                    nlist=self.settings.index.faiss_nlist,
+                    use_cuvs=self.settings.index.use_cuvs,
+                )
+                manager.load_cpu_index()
+                self._coderank_faiss_manager = manager
+            elif self._coderank_faiss_manager.vec_dim != vec_dim:
+                existing_dim = self._coderank_faiss_manager.vec_dim
+                msg = (
+                    "Existing CodeRank index dimension "
+                    f"{existing_dim} does not match requested {vec_dim}."
+                )
+                raise ValueError(msg)
+            return self._coderank_faiss_manager
 
     def ensure_faiss_ready(self) -> tuple[bool, list[str], str | None]:
         """Load FAISS index (once) and attempt GPU clone.

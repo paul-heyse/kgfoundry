@@ -47,7 +47,8 @@ def print_message(*s: object, condition: bool = True, pad: bool = False) -> str:
         Formatted message string.
     """
     s = " ".join([str(x) for x in s])
-    msg = "[{}] {}".format(datetime.datetime.now(tz=datetime.UTC).strftime("%b %d, %H:%M:%S"), s)
+    timestamp = datetime.datetime.now(tz=datetime.UTC).strftime("%b %d, %H:%M:%S")
+    msg = f"[{timestamp}] {s}"
 
     if condition:
         msg = msg if not pad else f"\n{msg}\n"

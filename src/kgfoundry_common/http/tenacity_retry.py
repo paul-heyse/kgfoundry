@@ -213,6 +213,14 @@ def _should_retry_exception(method: str, policy: RetryPolicyDoc) -> Callable[[Ba
     return _pred
 
 
+@dataclass(frozen=True)
+class _MethodStrategy(RetryStrategy[object]):
+    retrying: Retrying
+
+    def run(self, fn: Callable[[], object]) -> object:
+        return self.retrying(fn)
+
+
 class TenacityRetryStrategy(RetryStrategy[object]):
     """Retry strategy implementation using tenacity library.
 
@@ -248,21 +256,8 @@ class TenacityRetryStrategy(RetryStrategy[object]):
         when dealing with third-party retry libraries that propagate exceptions
         from user-provided functions.
         """
-        retry = retry_if_exception(_should_retry_exception(method="*UNKNOWN*", policy=self.policy))
-        # note: we'll substitute actual method per-request (see client below)
-        stopper = stop_after_attempt(self.policy.stop_after_attempt)
-        if self.policy.stop_after_delay_s:
-            stopper |= stop_after_delay(self.policy.stop_after_delay_s)
-        waiter = WaitRetryAfterOrJitter(
-            initial=self.policy.wait_initial_s,
-            max_s=self.policy.wait_max_s,
-            jitter=self.policy.wait_jitter,
-            base=self.policy.wait_base,
-            respect_retry_after=self.policy.respect_retry_after,
-        )
-        # We'll set reraise=True so we get the final exception
-        r = Retrying(retry=retry, stop=stopper, wait=waiter, reraise=True)
-        return r(fn)
+        strategy = _MethodStrategy(self._build_retrying("*UNKNOWN*"))
+        return strategy.run(fn)
 
     def for_method(self, method: str) -> RetryStrategy[object]:
         """Create method-specific retry strategy.
@@ -277,8 +272,11 @@ class TenacityRetryStrategy(RetryStrategy[object]):
         RetryStrategy[object]
             New retry strategy instance for the method.
         """
-        # clone with method-specific predicate
-        pred = retry_if_exception(_should_retry_exception(method=method, policy=self.policy))
+        return _MethodStrategy(self._build_retrying(method))
+
+    def _build_retrying(self, method: str) -> Retrying:
+        """Create a configured Tenacity Retrying instance."""
+        predicate = retry_if_exception(_should_retry_exception(method=method, policy=self.policy))
         stopper = stop_after_attempt(self.policy.stop_after_attempt)
         if self.policy.stop_after_delay_s:
             stopper |= stop_after_delay(self.policy.stop_after_delay_s)
@@ -289,11 +287,4 @@ class TenacityRetryStrategy(RetryStrategy[object]):
             base=self.policy.wait_base,
             respect_retry_after=self.policy.respect_retry_after,
         )
-        r = Retrying(retry=pred, stop=stopper, wait=waiter, reraise=True)
-
-        # Wrap as a tiny strategy that uses this Retrying instance:
-        class _MethodStrategy(RetryStrategy[object]):
-            def run(self, fn: Callable[[], object]) -> object:
-                return r(fn)
-
-        return _MethodStrategy()
+        return Retrying(retry=predicate, stop=stopper, wait=waiter, reraise=True)

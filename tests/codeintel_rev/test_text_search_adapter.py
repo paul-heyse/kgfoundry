@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
 from codeintel_rev.app.config_context import ResolvedPaths
-from codeintel_rev.mcp_server.adapters.text_search import search_text
+from codeintel_rev.mcp_server.adapters.text_search import TextSearchOptions, search_text
 from codeintel_rev.mcp_server.schemas import ScopeIn
 
 from kgfoundry_common.errors import VectorSearchError
@@ -70,55 +70,9 @@ def _build_match(path: Path) -> str:
     )
 
 
-def _run_search(
-    context: Mock,
-    query: str,
-    *,
-    regex: bool = False,
-    case_sensitive: bool = False,
-    paths: Sequence[str] | None = None,
-    include_globs: Sequence[str] | None = None,
-    exclude_globs: Sequence[str] | None = None,
-    max_results: int = 50,
-) -> dict:
-    """Execute the async search_text helper synchronously for tests.
-
-    Parameters
-    ----------
-    context : Mock
-        Mock ApplicationContext instance.
-    query : str
-        Search query string.
-    regex : bool, optional
-        Treat query as regular expression. Defaults to ``False``.
-    case_sensitive : bool, optional
-        Perform case-sensitive search. Defaults to ``False``.
-    paths : Sequence[str] | None, optional
-        Specific file paths to search. Defaults to ``None``.
-    include_globs : Sequence[str] | None, optional
-        Glob patterns to include. Defaults to ``None``.
-    exclude_globs : Sequence[str] | None, optional
-        Glob patterns to exclude. Defaults to ``None``.
-    max_results : int, optional
-        Maximum number of results. Defaults to ``50``.
-
-    Returns
-    -------
-    dict
-        Search results emitted by ``search_text``.
-    """
-    return asyncio.run(
-        search_text(
-            context,
-            query,
-            regex=regex,
-            case_sensitive=case_sensitive,
-            paths=paths,
-            include_globs=include_globs,
-            exclude_globs=exclude_globs,
-            max_results=max_results,
-        )
-    )
+def _run_search(context: Mock, options: TextSearchOptions) -> dict:
+    """Execute :func:`search_text` synchronously for the provided options."""
+    return asyncio.run(search_text(context, options.query, options=options))
 
 
 def test_search_text_uses_observe_duration(mock_context: Mock) -> None:
@@ -152,7 +106,8 @@ def test_search_text_uses_observe_duration(mock_context: Mock) -> None:
             return_value="",
         ),
     ):
-        result = _run_search(mock_context, "needle", max_results=5)
+        options = TextSearchOptions(query="needle", max_results=5)
+        result = _run_search(mock_context, options)
 
     assert result["matches"] == []
     assert result["total"] == 0
@@ -182,7 +137,8 @@ def test_search_text_scope_include_and_exclude(mock_context: Mock) -> None:
     ):
         mock_run.return_value = _build_match(repo_root / "src" / "main.py")
 
-        result = _run_search(mock_context, "main", max_results=5)
+        options = TextSearchOptions(query="main", max_results=5)
+        result = _run_search(mock_context, options)
 
         cmd = mock_run.call_args.args[0]
         iglob_values = [cmd[i + 1] for i, arg in enumerate(cmd) if arg == "--iglob"]
@@ -215,7 +171,12 @@ def test_search_text_explicit_paths_override_scope(mock_context: Mock) -> None:
     ):
         mock_run.return_value = _build_match(repo_root / "tests" / "test_main.py")
 
-        result = _run_search(mock_context, "test", paths=["tests/"], max_results=5)
+        options = TextSearchOptions(
+            query="test",
+            paths=["tests/"],
+            max_results=5,
+        )
+        result = _run_search(mock_context, options)
 
         cmd = mock_run.call_args.args[0]
         iglob_values = [cmd[i + 1] for i, arg in enumerate(cmd) if arg == "--iglob"]
@@ -246,13 +207,13 @@ def test_search_text_explicit_globs_override_scope(mock_context: Mock) -> None:
     ):
         mock_run.return_value = _build_match(repo_root / "tests" / "integration" / "case.py")
 
-        result = _run_search(
-            mock_context,
-            "case",
+        options = TextSearchOptions(
+            query="case",
             include_globs=["tests/**/*.py"],
             exclude_globs=["tests/**/fixtures/**"],
             max_results=5,
         )
+        result = _run_search(mock_context, options)
 
         cmd = mock_run.call_args.args[0]
         iglob_values = [cmd[i + 1] for i, arg in enumerate(cmd) if arg == "--iglob"]
@@ -286,7 +247,8 @@ def test_search_text_timeout_error(mock_context: Mock) -> None:
         )
 
         with pytest.raises(VectorSearchError, match="Search timeout"):
-            _run_search(mock_context, "query", max_results=5)
+            options = TextSearchOptions(query="query", max_results=5)
+            _run_search(mock_context, options)
 
 
 def test_search_text_subprocess_error(mock_context: Mock) -> None:
@@ -309,7 +271,8 @@ def test_search_text_subprocess_error(mock_context: Mock) -> None:
         )
 
         with pytest.raises(VectorSearchError, match="Error message"):
-            _run_search(mock_context, "query", max_results=5)
+            options = TextSearchOptions(query="query", max_results=5)
+            _run_search(mock_context, options)
 
 
 def test_search_text_value_error(mock_context: Mock) -> None:
@@ -330,4 +293,5 @@ def test_search_text_value_error(mock_context: Mock) -> None:
         mock_run.side_effect = ValueError("Invalid query")
 
         with pytest.raises(VectorSearchError, match="Invalid query"):
-            _run_search(mock_context, "query", max_results=5)
+            options = TextSearchOptions(query="query", max_results=5)
+            _run_search(mock_context, options)
