@@ -6,10 +6,11 @@ tenacity library for retry logic.
 
 from __future__ import annotations
 
-import random
 from collections.abc import Callable
+from contextvars import ContextVar
 from dataclasses import dataclass
 
+from numpy.random import default_rng
 from tenacity import (
     Retrying,
     retry_if_exception,
@@ -22,27 +23,29 @@ from kgfoundry_common.http.errors import HttpStatusError
 from kgfoundry_common.http.policy import RetryPolicyDoc
 from kgfoundry_common.http.types import RetryStrategy
 
+_RANDOM_SEED: ContextVar[int | None] = ContextVar("_random_seed", default=None)
+
 
 def _get_random_seed() -> int | None:
-    """Get random seed using function attribute pattern.
+    """Return the configured random seed for deterministic jitter tests.
 
     Returns
     -------
     int | None
         Random seed value or None if not set.
     """
-    return getattr(_get_random_seed, "_seed", None)  # Function attribute pattern
+    return _RANDOM_SEED.get()
 
 
 def _set_random_seed(seed: int | None) -> None:
-    """Set random seed for testing.
+    """Set the random seed used for deterministic jitter tests.
 
     Parameters
     ----------
     seed : int | None
         Random seed value, or None to use system random.
     """
-    _get_random_seed._seed = seed  # type: ignore[attr-defined]  # lint-ignore[SLF001] Function attribute pattern
+    _RANDOM_SEED.set(seed)
 
 
 @dataclass(frozen=True)
@@ -137,12 +140,8 @@ def _rand() -> float:
     retry attempts to avoid thundering herd problems.
     """
     seed = _get_random_seed()
-    if seed is not None:
-        # Use seeded random for deterministic testing
-        rng = random.Random(seed)  # lint-ignore[S311] Jitter doesn't need cryptographic randomness
-        return rng.random()
-    # Use module-level random for jitter (non-cryptographic use case)
-    return random.random()  # lint-ignore[S311] Jitter doesn't need cryptographic randomness
+    rng = default_rng(seed) if seed is not None else default_rng()
+    return float(rng.random())
 
 
 def _status_in_sets(status: int, sets: tuple[tuple[int, int] | int, ...]) -> bool:

@@ -35,7 +35,13 @@ def _check_cuda_availability() -> tuple[bool, str]:
     """
     try:
         torch = cast("_torch", gate_import("torch", "CUDA availability checks for warmup"))
-
+    except ImportError:
+        LOGGER.warning("PyTorch not available - skipping CUDA check")
+        return False, "PyTorch not installed"
+    except (RuntimeError, AttributeError, OSError) as exc:
+        LOGGER.warning("CUDA availability check failed: %s", exc, exc_info=True)
+        return False, f"CUDA check error: {exc}"
+    else:
         cuda_available = torch.cuda.is_available()
         if not cuda_available:
             LOGGER.warning("CUDA not available via PyTorch")
@@ -43,7 +49,6 @@ def _check_cuda_availability() -> tuple[bool, str]:
                 False,
                 "CUDA not available",
             )
-        # lint-ignore[RET505] else block required by TRY300 for explicit control flow
         device_count = torch.cuda.device_count()
         current_device = torch.cuda.current_device()
         device_name = torch.cuda.get_device_name(current_device)
@@ -54,12 +59,6 @@ def _check_cuda_availability() -> tuple[bool, str]:
             device_name,
         )
         return True, f"CUDA available ({device_count} devices)"
-    except ImportError:
-        LOGGER.warning("PyTorch not available - skipping CUDA check")
-        return False, "PyTorch not installed"
-    except (RuntimeError, AttributeError, OSError) as exc:
-        LOGGER.warning("CUDA availability check failed: %s", exc, exc_info=True)
-        return False, f"CUDA check error: {exc}"
 
 
 def _check_faiss_gpu_support() -> tuple[bool, str]:
@@ -72,7 +71,13 @@ def _check_faiss_gpu_support() -> tuple[bool, str]:
     """
     try:
         faiss = cast("_faiss", gate_import("faiss", "FAISS GPU capability checks"))
-
+    except ImportError:
+        LOGGER.warning("FAISS not available - skipping GPU check")
+        return False, "FAISS not installed"
+    except (RuntimeError, AttributeError, OSError) as exc:
+        LOGGER.warning("FAISS GPU check failed: %s", exc, exc_info=True)
+        return False, f"FAISS GPU check error: {exc}"
+    else:
         required_attrs = (
             "StandardGpuResources",
             "GpuClonerOptions",
@@ -85,15 +90,8 @@ def _check_faiss_gpu_support() -> tuple[bool, str]:
                 False,
                 "FAISS GPU symbols not available",
             )
-        # lint-ignore[RET505] else block required by TRY300 for explicit control flow
         LOGGER.info("FAISS GPU symbols available")
         return True, "FAISS GPU symbols available"
-    except ImportError:
-        LOGGER.warning("FAISS not available - skipping GPU check")
-        return False, "FAISS not installed"
-    except (RuntimeError, AttributeError, OSError) as exc:
-        LOGGER.warning("FAISS GPU check failed: %s", exc, exc_info=True)
-        return False, f"FAISS GPU check error: {exc}"
 
 
 def _test_torch_gpu_operations() -> tuple[bool, str]:
@@ -106,22 +104,20 @@ def _test_torch_gpu_operations() -> tuple[bool, str]:
     """
     try:
         torch = cast("_torch", gate_import("torch", "Torch GPU smoke test"))
-
+    except ImportError:
+        return False, "PyTorch not installed"
+    except (RuntimeError, OSError, AttributeError) as exc:
+        LOGGER.warning("Torch GPU operations test failed: %s", exc, exc_info=True)
+        return False, f"Torch GPU test error: {exc}"
+    else:
         if not torch.cuda.is_available():
             return False, "CUDA not available for torch test"
-        # lint-ignore[RET505] else block required by TRY300 for explicit control flow
-        # Create a small tensor on GPU and perform basic operations
         device = torch.device("cuda:0")
         test_tensor = torch.randn(100, 100, device=device)
         _ = torch.matmul(test_tensor, test_tensor.T)
         torch.cuda.synchronize()  # Wait for GPU operations to complete
         LOGGER.info("Torch GPU operations test passed")
         return True, "Torch GPU operations test passed"
-    except ImportError:
-        return False, "PyTorch not installed"
-    except (RuntimeError, OSError, AttributeError) as exc:
-        LOGGER.warning("Torch GPU operations test failed: %s", exc, exc_info=True)
-        return False, f"Torch GPU test error: {exc}"
 
 
 def _test_faiss_gpu_resources() -> tuple[bool, str]:
@@ -134,20 +130,17 @@ def _test_faiss_gpu_resources() -> tuple[bool, str]:
     """
     try:
         faiss = cast("_faiss", gate_import("faiss", "FAISS GPU resource smoke test"))
-
-        # Check if FAISS GPU symbols are available first
-        if not all(hasattr(faiss, attr) for attr in ("StandardGpuResources",)):
-            return False, "FAISS GPU symbols not available"
-        # lint-ignore[RET505] else block required by TRY300 for explicit control flow
-        # Initialize GPU resources (this is lightweight)
-        _ = faiss.StandardGpuResources()
-        LOGGER.info("FAISS GPU resource initialization test passed")
-        return True, "FAISS GPU resource initialization test passed"
     except ImportError:
         return False, "FAISS not installed"
     except (RuntimeError, AttributeError, OSError) as exc:
         LOGGER.warning("FAISS GPU resource initialization failed: %s", exc, exc_info=True)
         return False, f"FAISS GPU init error: {exc}"
+    else:
+        if not all(hasattr(faiss, attr) for attr in ("StandardGpuResources",)):
+            return False, "FAISS GPU symbols not available"
+        _ = faiss.StandardGpuResources()
+        LOGGER.info("FAISS GPU resource initialization test passed")
+        return True, "FAISS GPU resource initialization test passed"
 
 
 @lru_cache(maxsize=1)

@@ -12,7 +12,8 @@ Examples
 --------
 Scan the `src/` tree inside the repository and emit both JSON and DOT outputs::
 
-    python tools/repo_scan.py src --repo-root . \
+    python tools/repo_scan.py . --repo-root . \
+        --include-subdir src --include-subdir tests \
         --out-json repo_metrics.json --out-dot import_graph.dot
 
 The JSON payload mirrors the structure documented in the Agent Operating
@@ -33,6 +34,7 @@ import time
 import tokenize
 from collections.abc import Iterable, Iterator
 from dataclasses import asdict, dataclass
+from importlib import util as importlib_util
 from pathlib import Path
 
 from kgfoundry_common.subprocess_utils import SubprocessError, run_subprocess
@@ -63,13 +65,18 @@ GIT_COMMAND_TIMEOUT = 60
 # --------------------------
 
 
-def iter_py_files(root: Path) -> Iterator[Path]:
+def iter_py_files(
+    root: Path,
+    include_subdirs: tuple[str, ...] | None = None,
+) -> Iterator[Path]:
     """Yield Python source files while skipping generated directories.
 
     Parameters
     ----------
     root : Path
         Root directory to traverse recursively.
+    include_subdirs : tuple[str, ...] | None, optional
+        Relative subdirectories that should be scanned; defaults to all.
 
     Yields
     ------
@@ -77,17 +84,25 @@ def iter_py_files(root: Path) -> Iterator[Path]:
         Absolute paths to ``*.py`` files that are not inside ``SKIP_DIRS``.
     """
     root = root.resolve()
+    include_parts = tuple(Path(subdir).parts for subdir in include_subdirs or ())
     for p in root.rglob("*.py"):
         try:
             rel = p.relative_to(root)
         except ValueError:
+            continue
+        if include_parts and not _path_has_prefix(rel, include_parts):
             continue
         if any(part in SKIP_DIRS for part in rel.parts):
             continue
         yield p
 
 
-def module_name_from_path(scan_root: Path, path: Path) -> str:
+def module_name_from_path(
+    scan_root: Path,
+    path: Path,
+    *,
+    strip_prefixes: tuple[str, ...] = (),
+) -> str:
     """Convert a filesystem path under ``scan_root`` into a dotted module path.
 
     Parameters
@@ -96,6 +111,8 @@ def module_name_from_path(scan_root: Path, path: Path) -> str:
         Directory that anchors the module tree.
     path : Path
         Actual file path discovered while scanning.
+    strip_prefixes : tuple[str, ...], optional
+        Optional top-level path components to remove from module names.
 
     Returns
     -------
@@ -104,11 +121,37 @@ def module_name_from_path(scan_root: Path, path: Path) -> str:
     """
     rel = path.resolve().relative_to(scan_root.resolve())
     parts = list(rel.parts)
+    for prefix in strip_prefixes:
+        if parts and parts[0] == prefix:
+            parts = parts[1:]
+            break
     if parts[-1] == "__init__.py":
         parts = parts[:-1]
     else:
         parts[-1] = parts[-1].rsplit(".", 1)[0]
     return ".".join(parts).replace(os.sep, ".")
+
+
+def _path_has_prefix(rel_path: Path, prefixes: tuple[tuple[str, ...], ...]) -> bool:
+    """Return True if ``rel_path`` begins with any of the provided prefixes.
+
+    Parameters
+    ----------
+    rel_path : Path
+        Relative path being evaluated.
+    prefixes : tuple[tuple[str, ...], ...]
+        Collection of prefix tuples to compare against.
+
+    Returns
+    -------
+    bool
+        ``True`` when the path begins with any of the prefixes, otherwise False.
+    """
+    rel_parts = rel_path.parts
+    for prefix in prefixes:
+        if len(rel_parts) >= len(prefix) and rel_parts[: len(prefix)] == prefix:
+            return True
+    return False
 
 
 def safe_parse_ast(path: Path) -> ast.Module | None:
@@ -121,7 +164,7 @@ def safe_parse_ast(path: Path) -> ast.Module | None:
 
     Returns
     -------
-    ast.Module or None
+    ast.Module | None
         Parsed module tree when parsing succeeds; ``None`` when parsing fails.
     """
     try:
@@ -148,7 +191,7 @@ def file_loc(path: Path) -> int:
     try:
         with Path(path).open("rb") as f:
             return sum(1 for _ in f)
-    except Exception:
+    except OSError:
         return 0
 
 
@@ -283,34 +326,59 @@ def collect_imports(modname: str, tree: ast.Module) -> list[str]:
         if isinstance(node, ast.Import):
             imports.extend(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
-            base = _resolve_import_from_base(modname, node)
-            if base:
-                imports.append(base)
+            for alias in node.names:
+                target = _resolve_from_alias_target(modname, node, alias)
+                if target:
+                    imports.append(target)
     return _dedupe_preserve_order(imports)
 
 
-def _resolve_import_from_base(module_name: str, node: ast.ImportFrom) -> str | None:
-    """Resolve the canonical import target for a ``from ... import`` statement.
+def _resolve_from_alias_target(
+    module_name: str, node: ast.ImportFrom, alias: ast.alias
+) -> str | None:
+    """Resolve the import target represented by ``alias``.
+
+    Parameters
+    ----------
+    module_name : str
+        Dotted name of the module being analyzed.
+    node : ast.ImportFrom
+        Import statement node containing alias information.
+    alias : ast.alias
+        Specific alias entry to resolve.
 
     Returns
     -------
     str | None
-        Resolved import target, or None if resolution fails.
+        Fully qualified module path for the alias, if resolvable.
     """
-    module = node.module or ""
     level = getattr(node, "level", 0) or 0
-    if level == 0:
-        return module or None
-    current_parts = module_name.split(".")
-    base_parts = current_parts[:-level] if level <= len(current_parts) else []
-    if module:
-        base_parts.append(module)
-    candidate = ".".join(part for part in base_parts if part)
-    return candidate or None
+    if level > 0:
+        relative = "." * level
+        if node.module:
+            relative += node.module
+            if alias.name and alias.name != "*":
+                relative += f".{alias.name}"
+        elif alias.name and alias.name != "*":
+            relative += alias.name
+        try:
+            return importlib_util.resolve_name(relative or ".", module_name)
+        except (ImportError, ValueError):
+            return None
+    if alias.name == "*":
+        return node.module
+    if node.module:
+        return f"{node.module}.{alias.name}"
+    return alias.name or None
 
 
 def _dedupe_preserve_order(items: Iterable[str]) -> list[str]:
     """Return the unique values from ``items`` while preserving order.
+
+    Parameters
+    ----------
+    items : Iterable[str]
+        Sequence of strings whose duplicates should be removed.
 
     Returns
     -------
@@ -354,6 +422,11 @@ def collect_public_api(tree: ast.Module) -> list[str]:
 
 def _extract_dunder_all(tree: ast.Module) -> list[str] | None:
     """Extract ``__all__`` assignments when present.
+
+    Parameters
+    ----------
+    tree : ast.Module
+        Parsed module whose ``__all__`` definition should be inspected.
 
     Returns
     -------
@@ -530,7 +603,9 @@ def is_test_file(path: Path, modname: str) -> bool:
     )
 
 
-def analyze_file(scan_root: Path, path: Path) -> ModuleReport:
+def analyze_file(
+    scan_root: Path, path: Path, *, strip_prefixes: tuple[str, ...] = ()
+) -> ModuleReport:
     """Produce a :class:`ModuleReport` for a single source file.
 
     Parameters
@@ -539,13 +614,15 @@ def analyze_file(scan_root: Path, path: Path) -> ModuleReport:
         Root directory passed to the scanner.
     path : Path
         File to analyze.
+    strip_prefixes : tuple[str, ...], optional
+        Path components to drop when computing module names.
 
     Returns
     -------
     ModuleReport
         Structured metadata for downstream aggregation.
     """
-    modname = module_name_from_path(scan_root, path)
+    modname = module_name_from_path(scan_root, path, strip_prefixes=strip_prefixes)
     tree = safe_parse_ast(path)
     if tree is None:
         return ModuleReport(
@@ -589,6 +666,84 @@ def analyze_file(scan_root: Path, path: Path) -> ModuleReport:
         loc=file_loc(path),
         parse_ok=True,
     )
+
+
+# --------------------------
+# Test enrichment
+# --------------------------
+
+
+def collect_relevant_tests(
+    repo_root: Path,
+    tests_subdirs: tuple[str, ...],
+    *,
+    strip_prefixes: tuple[str, ...],
+    target_modules: set[str],
+    exclude_paths: set[str],
+) -> list[ModuleReport]:
+    """Scan test directories and keep only tests that target `target_modules`.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root used for module name calculations.
+    tests_subdirs : tuple[str, ...]
+        Relative test directories that should be scanned.
+    strip_prefixes : tuple[str, ...]
+        Prefixes removed when constructing module names.
+    target_modules : set[str]
+        Modules already included in the scan scope.
+    exclude_paths : set[str]
+        Absolute paths that have already been analyzed.
+
+    Returns
+    -------
+    list[ModuleReport]
+        Reports for tests that exercise the selected modules.
+    """
+    results: list[ModuleReport] = []
+    seen = set(exclude_paths)
+    search_roots = tests_subdirs or ("tests",)
+    for subdir in search_roots:
+        candidate_root = (repo_root / subdir).resolve()
+        if not candidate_root.exists():
+            continue
+        for path in iter_py_files(candidate_root):
+            if str(path) in seen:
+                continue
+            report = analyze_file(repo_root, path, strip_prefixes=strip_prefixes)
+            if not report.is_test:
+                continue
+            if _imports_target_modules(report.imports, target_modules):
+                results.append(report)
+                seen.add(report.path)
+    return results
+
+
+def _imports_target_modules(imports: list[str], targets: set[str]) -> bool:
+    """Return True when an import references any module in `targets`.
+
+    Parameters
+    ----------
+    imports : list[str]
+        Import targets recorded for a test module.
+    targets : set[str]
+        Module names included in the scan scope.
+
+    Returns
+    -------
+    bool
+        ``True`` when any import overlaps with the target modules.
+    """
+    if not targets:
+        return False
+    for imp in imports:
+        if imp in targets:
+            return True
+        for target in targets:
+            if target.startswith(f"{imp}.") or imp.startswith(f"{target}."):
+                return True
+    return False
 
 
 # --------------------------
@@ -662,6 +817,11 @@ def collect_git_meta(repo_root: Path, scope_paths: list[Path]) -> dict[str, GitM
 def _is_git_repo(repo_root: Path) -> bool:
     """Return True when the provided path resides inside a Git repository.
 
+    Parameters
+    ----------
+    repo_root : Path
+        Candidate repository root to validate.
+
     Returns
     -------
     bool
@@ -680,6 +840,13 @@ def _is_git_repo(repo_root: Path) -> bool:
 
 def _git_scope_relative_path(repo_root: Path, scope_paths: Iterable[Path]) -> str:
     """Compute the relative path argument passed to git for limiting scope.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Root directory of the Git repository.
+    scope_paths : Iterable[Path]
+        Paths whose common ancestor should constrain the log.
 
     Returns
     -------
@@ -702,6 +869,15 @@ def _parse_git_log_output(
     output: str, repo_root: Path, scope_paths: Iterable[Path]
 ) -> dict[str, GitMeta]:
     """Transform ``git log`` output into ``GitMeta`` entries.
+
+    Parameters
+    ----------
+    output : str
+        Raw stdout captured from ``git log``.
+    repo_root : Path
+        Root directory used to resolve relative paths.
+    scope_paths : Iterable[Path]
+        Set of paths restricting which files should be recorded.
 
     Returns
     -------
@@ -733,6 +909,13 @@ def _parse_git_log_output(
 
 def _is_within_scope(path: Path, scope_paths: Iterable[Path]) -> bool:
     """Check whether ``path`` lies inside one of the ``scope_paths``.
+
+    Parameters
+    ----------
+    path : Path
+        Candidate path to evaluate.
+    scope_paths : Iterable[Path]
+        Collection of allowed prefixes.
 
     Returns
     -------
@@ -780,6 +963,8 @@ def build_local_import_graph(reports: list[ModuleReport]) -> list[tuple[str, str
             # allow partial prefix mapping: "pkg.sub" -> match "pkg.sub" or "pkg.sub.x"
             for target in available:
                 if target == imp or target.startswith(imp + "."):
+                    if target == r.module:
+                        continue
                     edges.add((r.module, target))
     return sorted(edges)
 
@@ -837,7 +1022,13 @@ def main() -> None:
     The function exits the process with ``sys.exit`` codes on failure.
     """
     ap = argparse.ArgumentParser(description="Scan a folder and emit repo metrics (stdlib-only).")
-    ap.add_argument("folder", type=str, help="Folder to scan (e.g., src/ or package root)")
+    ap.add_argument(
+        "folder",
+        nargs="?",
+        default=".",
+        type=str,
+        help="Folder to scan (defaults to current working directory)",
+    )
     ap.add_argument(
         "--repo-root",
         type=str,
@@ -846,20 +1037,70 @@ def main() -> None:
     )
     ap.add_argument("--out-json", type=str, default="repo_metrics.json")
     ap.add_argument("--out-dot", type=str, default="import_graph.dot")
+    ap.add_argument(
+        "--strip-prefix",
+        action="append",
+        default=["src"],
+        help="Top-level path prefixes to drop from module names (default: %(default)s)",
+    )
+    ap.add_argument(
+        "--include-subdir",
+        action="append",
+        default=None,
+        help=(
+            "Relative subdirectories to include during scanning; "
+            "can be provided multiple times (defaults to all subdirs)."
+        ),
+    )
+    ap.add_argument(
+        "--tests-subdir",
+        action="append",
+        default=None,
+        help=(
+            "Relative test directories to scan for relevant files "
+            "(default: %(default)s when unset)."
+        ),
+    )
+    ap.add_argument(
+        "--include-tests",
+        dest="include_tests",
+        action="store_true",
+        default=True,
+        help="Automatically include tests that exercise the selected modules.",
+    )
+    ap.add_argument(
+        "--no-include-tests",
+        dest="include_tests",
+        action="store_false",
+        help="Disable automatic inclusion of relevant test files.",
+    )
     args = ap.parse_args()
 
     scan_root = Path(args.folder).resolve()
     if not scan_root.exists() or not scan_root.is_dir():
-        print(f"scan root not found or not a directory: {scan_root}", file=sys.stderr)
+        msg = f"scan root not found or not a directory: {scan_root}"
+        logger.error(msg)
+        sys.stderr.write(f"{msg}\n")
         sys.exit(2)
 
     repo_root = Path(args.repo_root).resolve() if args.repo_root else scan_root
-    reports: list[ModuleReport] = []
-    paths: list[Path] = []
+    strip_prefixes = tuple(args.strip_prefix)
+    include_subdirs = tuple(args.include_subdir or [])
+    reports: list[ModuleReport] = [
+        analyze_file(scan_root, path, strip_prefixes=strip_prefixes)
+        for path in iter_py_files(scan_root, include_subdirs=include_subdirs)
+    ]
 
-    for path in iter_py_files(scan_root):
-        paths.append(path)
-        reports.append(analyze_file(scan_root, path))
+    if args.include_tests:
+        reports.extend(
+            collect_relevant_tests(
+                repo_root,
+                tuple(args.tests_subdir or ("tests",)),
+                strip_prefixes=strip_prefixes,
+                target_modules={r.module for r in reports if not r.is_test},
+                exclude_paths={r.path for r in reports},
+            )
+        )
 
     edges = build_local_import_graph(reports)
     test_map = map_tests_to_modules(reports)
@@ -885,7 +1126,7 @@ def main() -> None:
     Path(args.out_json).write_text(json.dumps(payload, indent=2, sort_keys=False), encoding="utf-8")
     write_dot(edges, Path(args.out_dot))
 
-    print(f"Wrote {args.out_json} and {args.out_dot}")
+    logger.info("Wrote %s and %s", args.out_json, args.out_dot)
 
 
 if __name__ == "__main__":

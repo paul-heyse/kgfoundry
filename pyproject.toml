@@ -785,6 +785,7 @@ runtime-evaluated-base-classes = [
 # DOC502 false positives: ruff doesn't recognize `raise exc` as explicitly raising Exception
 "codeintel_rev/app/main.py" = ["DOC502"]
 "codeintel_rev/runtime/cells.py" = ["DOC502"]  # Exception re-raised via bare `raise` from factory/disposer
+"tools/repo_scan.py" = ["BLE001"]  # Best-effort file counting; any I/O error is acceptable
 "tools/_shared/metrics.py" = ["DOC502"]
 "tools/docs/observability.py" = ["DOC502"]
 "tools/navmap/observability.py" = ["DOC502"]
@@ -796,6 +797,8 @@ runtime-evaluated-base-classes = [
 "docs/_scripts/**" = ["PLC2701"]  # docs._scripts is internal tooling; importing from docs._types and tools._shared is expected
 "docs/types/artifacts.py" = ["PLC2701"]  # docs/types is a facade re-exporting from private docs._types module
 "tools/lint/codemod_typing_migration.py" = ["N802"]  # LibCST visitor protocol requires CamelCase method names (leave_ImportFrom, leave_Call)
+"tools/codemods/blind_except_fix.py" = ["N802"]
+"tools/codemods/pathlib_fix.py" = ["N815"]
 # New: Façade modules are allowed to import from private sources (controlled re-export)
 "src/kgfoundry_common/typing/__init__.py" = []  # Canonical typing façade
 "tools/typing/__init__.py" = []  # Tooling typing façade

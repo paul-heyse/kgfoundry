@@ -26,6 +26,21 @@ def test_iter_py_files_skips_virtual_env_content(tmp_path: Path) -> None:
     assert Path(".venv/module.py") not in discovered
 
 
+def test_iter_py_files_include_subdir_filters(tmp_path: Path) -> None:
+    """Restrict scanning to the requested subdirectories."""
+    root = tmp_path / "workspace"
+    (root / "src" / "pkg").mkdir(parents=True, exist_ok=True)
+    (root / "tests").mkdir(parents=True, exist_ok=True)
+    (root / "src" / "pkg" / "module.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (root / "tests" / "test_pkg.py").write_text("VALUE = 2\n", encoding="utf-8")
+
+    discovered = {
+        path.relative_to(root) for path in repo_scan.iter_py_files(root, include_subdirs=("src",))
+    }
+    assert Path("src/pkg/module.py") in discovered
+    assert Path("tests/test_pkg.py") not in discovered
+
+
 @pytest.mark.parametrize(
     ("relative_parts", "module_name", "expected"),
     [
@@ -50,7 +65,9 @@ def test_repo_scan_main_generates_expected_payload(
 ) -> None:
     """Run the CLI end-to-end on a synthetic repo to validate the payload shape."""
     scan_root = tmp_path / "scan"
-    pkg_dir = scan_root / "pkg"
+    src_dir = scan_root / "src"
+    src_dir.mkdir(parents=True, exist_ok=True)
+    pkg_dir = src_dir / "pkg"
     tests_dir = scan_root / "tests"
     pkg_dir.mkdir(parents=True, exist_ok=True)
     tests_dir.mkdir(parents=True, exist_ok=True)
@@ -144,3 +161,14 @@ def test_repo_scan_main_generates_expected_payload(
 
     assert payload["tests_to_modules"]["pkg"] == ["tests.test_pkg"]
     assert Path(dot_path).read_text(encoding="utf-8").startswith("digraph imports")
+
+
+def test_module_name_strips_src_prefix(tmp_path: Path) -> None:
+    """Ensure module names drop the leading `src` segment by default."""
+    scan_root = tmp_path / "workspace"
+    target = scan_root / "src" / "pkg" / "mod.py"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text("VALUE = 1\n", encoding="utf-8")
+
+    name = repo_scan.module_name_from_path(scan_root, target, strip_prefixes=("src",))
+    assert name == "pkg.mod"

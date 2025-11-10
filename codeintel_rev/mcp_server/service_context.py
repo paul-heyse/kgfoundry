@@ -22,32 +22,26 @@ from codeintel_rev.app.config_context import ApplicationContext
 
 __all__ = ["get_service_context", "reset_service_context"]
 
+_CONTEXT_CACHE: dict[str, ApplicationContext | None] = {"value": None}
 # Protect lazy initialization so concurrent callers do not instantiate the
 # ApplicationContext multiple times.
 _CONTEXT_LOCK = Lock()
 
 
 def _get_cached_context() -> ApplicationContext | None:
-    """Get cached context using function attribute pattern.
+    """Return the cached context instance, if any.
 
     Returns
     -------
     ApplicationContext | None
-        Cached context instance or None if not yet initialized.
+        Previously cached context or ``None`` when not initialized.
     """
-    return getattr(_get_cached_context, "_cached", None)
+    return _CONTEXT_CACHE["value"]
 
 
 def _set_cached_context(context: ApplicationContext | None) -> None:
-    """Set cached context using function attribute pattern.
-
-    Parameters
-    ----------
-    context : ApplicationContext | None
-        Context instance to cache, or None to clear cache.
-    """
-    # Function attribute pattern for thread-safe caching without global state
-    _get_cached_context._cached = context  # type: ignore[attr-defined]  # lint-ignore[SLF001] Function attribute pattern
+    """Update the cached context reference."""
+    _CONTEXT_CACHE["value"] = context
 
 
 def get_service_context() -> ApplicationContext:

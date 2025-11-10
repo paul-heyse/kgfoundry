@@ -38,8 +38,8 @@ class _InprocessVLLMRuntime:
             if callable(shutdown):
                 try:
                     shutdown()
-                except Exception:  # lint-ignore[BLE001] best-effort shutdown; log and continue
-                    LOGGER.warning("vLLM engine shutdown failed", exc_info=True)
+                except (RuntimeError, OSError, ValueError) as exc:
+                    LOGGER.warning("vLLM engine shutdown failed: %s", exc, exc_info=True)
         self.engine = None
         self.tokenizer = None
 

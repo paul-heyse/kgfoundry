@@ -294,8 +294,8 @@ class NavMetadataModel(BaseModel):
 
         Yields
         ------
-        tuple[str, JsonValue]
-            Key and value pairs for navigation metadata entries. Keys include
+        Generator[tuple[str, JsonValue]]
+            Generator yielding key and value pairs for navigation metadata entries. Keys include
             standard fields (title, exports, sections, etc.) and any additional
             fields from the extras dictionary. Each tuple represents a key-value
             pair from the flattened metadata.

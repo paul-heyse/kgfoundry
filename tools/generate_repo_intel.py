@@ -41,7 +41,7 @@ from typing import Any
 
 import libcst as cst
 from libcst.helpers import get_node_fields
-from libcst.metadata import MetadataWrapper, PositionProvider
+from libcst.metadata import CodeRange, MetadataWrapper, PositionProvider
 
 _subprocess = importlib.import_module("subprocess")
 SubprocessError = _subprocess.SubprocessError
@@ -49,6 +49,10 @@ SubprocessError = _subprocess.SubprocessError
 
 class CommandExecutionError(SubprocessError):
     """Raised when a subprocess command fails."""
+
+
+JSONPrimitive = str | int | float | bool | None
+JSONType = JSONPrimitive | list["JSONType"] | dict[str, "JSONType"]
 
 
 # ---------- Utilities ----------
@@ -94,7 +98,8 @@ def _resolve_tool(name: str) -> str | None:
 
 def log(msg: str) -> None:
     """Log a message to stdout with a [generate] prefix."""
-    print(f"[generate] {msg}")  # lint-ignore[T201] CLI tool; print is appropriate
+    sys.stdout.write(f"[generate] {msg}\n")
+    sys.stdout.flush()
 
 
 def _validate_command(cmd: list[str] | str) -> list[str]:
@@ -191,7 +196,7 @@ def run(
     check: bool = True,
     env: Mapping[str, str] | None = None,
 ) -> str | None:
-    """Run a command safely with input validation and path sanitization.
+    r"""Run a command safely with input validation and path sanitization.
 
     This function executes subprocess commands with security hardening:
     - Commands are validated and normalized to list[str] format
@@ -303,9 +308,7 @@ def write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def write_json(
-    path: Path, obj: Any
-) -> None:  # lint-ignore[ANN401] Any type for JSON-serializable objects
+def write_json(path: Path, obj: JSONType) -> None:
     """Write JSON-serializable object to a file, creating parent directories as needed."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -429,11 +432,9 @@ def collect_cst(py_files: list[Path]) -> None:
         "Exporting CST via LibCST (helpers.get_node_fields + PositionProvider)…"
     )  # :contentReference[oaicite:8]{index=8}
 
-    def to_obj(
-        node: Any, posmap: Mapping[cst.CSTNode, Any]
-    ) -> Any:  # lint-ignore[ANN401] Any type for recursive CST node conversion
+    def to_obj(node: object, posmap: Mapping[cst.CSTNode, CodeRange]) -> JSONType:
         if isinstance(node, cst.CSTNode):
-            out: dict[str, object] = {"type": node.__class__.__name__}
+            out: dict[str, JSONType] = {"type": node.__class__.__name__}
             rng = posmap.get(node)
             if rng:
                 out["range"] = {
@@ -587,63 +588,65 @@ def collect_ctags_symbols() -> None:
 # ----- Import graph via Grimp → DOT -----
 
 
-def collect_import_graph(
-    packages: list[str], excludes: set[str]
-) -> None:  # lint-ignore[C901] complexity required for import graph collection
-    """Build import graph(s) for the given top-level package(s) using Grimp.
+def _collect_edges_with_grimp(packages: list[str], excludes: set[str]) -> set[tuple[str, str]]:
+    grimp = importlib.import_module("grimp")
+    edges: set[tuple[str, str]] = set()
+    for pkg in packages:
+        log(f"Building import graph for package '{pkg}' via Grimp…")
+        graph = grimp.build_graph(pkg)
+        for module in graph.modules:
+            for target in graph.find_modules_directly_imported_by(module):
+                if any(ex in target for ex in excludes):
+                    continue
+                edges.add((module, target))
+    return edges
 
-    Build import graph(s) for the given top-level package(s) using Grimp,
-    then write a DOT. Works without Graphviz installed; DOT is plain text.
-    """
-    try:
-        import grimp  # lint-ignore[PLC0415] late import for optional dependency
 
-        edges: set[tuple[str, str]] = set()
-        for pkg in packages:
-            log(f"Building import graph for package '{pkg}' via Grimp…")
-            g = grimp.build_graph(
-                pkg
-            )  # returns ImportGraph  # :contentReference[oaicite:14]{index=14}
-            for m in g.modules:
-                for n in g.find_modules_directly_imported_by(m):
-                    if any(x in n for x in excludes):
-                        continue
-                    edges.add((m, n))
-        dot_lines = ["digraph G {"]
-        for a, b in sorted(edges):
-            dot_lines.append(f'  "{a}" -> "{b}";')
-        dot_lines.append("}")
-        write_text(DIRS["imports"] / "imports.dot", "\n".join(dot_lines))
-        # render to svg if dot is available
-        if shutil.which("dot"):
-            run(
-                [
-                    "dot",
-                    "-Tsvg",
-                    str(DIRS["imports"] / "imports.dot"),
-                    "-o",
-                    str(DIRS["imports"] / "imports.svg"),
-                ]
+def _collect_edges_fallback(excludes: set[str]) -> set[tuple[str, str]]:
+    py_files = filter_paths(git_ls_files("*.py"), excludes)
+    edges: set[tuple[str, str]] = set()
+    for path in py_files:
+        relpkg = ".".join(path.relative_to(REPO).with_suffix("").parts)
+        for line in path.read_text("utf-8", "ignore").splitlines():
+            match = re.match(r"\s*import\s+([a-zA-Z_][\w\.]*)", line) or re.match(
+                r"\s*from\s+([a-zA-Z_][\w\.]*)\s+import", line
             )
-    except (ImportError, AttributeError, OSError) as e:
-        log(f"[imports] Grimp failed: {e}")
-        # Fallback: very rough static scan of 'import' lines
+            target = match.group(1) if match else None
+            if target and not any(ex in target for ex in excludes):
+                edges.add((relpkg, target))
+    return edges
+
+
+def _write_import_graph(edges: set[tuple[str, str]]) -> None:
+    dot_lines = ["digraph G {"]
+    for source, target in sorted(edges):
+        dot_lines.append(f'  "{source}" -> "{target}";')
+    dot_lines.append("}")
+    write_text(DIRS["imports"] / "imports.dot", "\n".join(dot_lines))
+    if shutil.which("dot"):
+        run(
+            [
+                "dot",
+                "-Tsvg",
+                str(DIRS["imports"] / "imports.dot"),
+                "-o",
+                str(DIRS["imports"] / "imports.svg"),
+            ]
+        )
+
+
+def collect_import_graph(packages: list[str], excludes: set[str]) -> None:
+    """Build import graph(s) for the given top-level package(s)."""
+    try:
+        edges = _collect_edges_with_grimp(packages, excludes)
+    except (ImportError, AttributeError, OSError) as exc:
+        log(f"[imports] Grimp failed: {exc}")
         try:
-            py_files = filter_paths(git_ls_files("*.py"), excludes)
-            edges = set()
-            for p in py_files:
-                relpkg = ".".join(p.relative_to(REPO).with_suffix("").parts)
-                for line in p.read_text("utf-8", "ignore").splitlines():
-                    m1 = re.match(r"\s*import\s+([a-zA-Z_][\w\.]*)", line)
-                    m2 = re.match(r"\s*from\s+([a-zA-Z_][\w\.]*)\s+import", line)
-                    match = m1 or m2
-                    target = match.group(1) if match else None
-                    if target and not any(x in target for x in excludes):
-                        edges.add((relpkg, target))
-            dot_lines = ["digraph G {"] + [f'  "{a}" -> "{b}";' for a, b in sorted(edges)] + ["}"]
-            write_text(DIRS["imports"] / "imports.dot", "\n".join(dot_lines))
-        except (OSError, UnicodeDecodeError) as e2:
-            log(f"[imports] fallback scan failed: {e2}")
+            edges = _collect_edges_fallback(excludes)
+        except (OSError, UnicodeDecodeError) as fallback_exc:
+            log(f"[imports] fallback scan failed: {fallback_exc}")
+            return
+    _write_import_graph(edges)
 
 
 # ----- Static call graph via PyCG -----
