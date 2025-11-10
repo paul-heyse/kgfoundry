@@ -43,17 +43,17 @@ def _check_cuda_availability() -> tuple[bool, str]:
                 False,
                 "CUDA not available",
             )
-        else:  # noqa: RET505  # else block required by TRY300 for explicit control flow
-            device_count = torch.cuda.device_count()
-            current_device = torch.cuda.current_device()
-            device_name = torch.cuda.get_device_name(current_device)
-            LOGGER.info(
-                "CUDA available: %s devices, current device %s: %s",
-                device_count,
-                current_device,
-                device_name,
-            )
-            return True, f"CUDA available ({device_count} devices)"
+        # lint-ignore[RET505] else block required by TRY300 for explicit control flow
+        device_count = torch.cuda.device_count()
+        current_device = torch.cuda.current_device()
+        device_name = torch.cuda.get_device_name(current_device)
+        LOGGER.info(
+            "CUDA available: %s devices, current device %s: %s",
+            device_count,
+            current_device,
+            device_name,
+        )
+        return True, f"CUDA available ({device_count} devices)"
     except ImportError:
         LOGGER.warning("PyTorch not available - skipping CUDA check")
         return False, "PyTorch not installed"
@@ -85,9 +85,9 @@ def _check_faiss_gpu_support() -> tuple[bool, str]:
                 False,
                 "FAISS GPU symbols not available",
             )
-        else:  # noqa: RET505  # else block required by TRY300 for explicit control flow
-            LOGGER.info("FAISS GPU symbols available")
-            return True, "FAISS GPU symbols available"
+        # lint-ignore[RET505] else block required by TRY300 for explicit control flow
+        LOGGER.info("FAISS GPU symbols available")
+        return True, "FAISS GPU symbols available"
     except ImportError:
         LOGGER.warning("FAISS not available - skipping GPU check")
         return False, "FAISS not installed"
@@ -109,14 +109,14 @@ def _test_torch_gpu_operations() -> tuple[bool, str]:
 
         if not torch.cuda.is_available():
             return False, "CUDA not available for torch test"
-        else:  # noqa: RET505  # else block required by TRY300 for explicit control flow
-            # Create a small tensor on GPU and perform basic operations
-            device = torch.device("cuda:0")
-            test_tensor = torch.randn(100, 100, device=device)
-            _ = torch.matmul(test_tensor, test_tensor.T)
-            torch.cuda.synchronize()  # Wait for GPU operations to complete
-            LOGGER.info("Torch GPU operations test passed")
-            return True, "Torch GPU operations test passed"
+        # lint-ignore[RET505] else block required by TRY300 for explicit control flow
+        # Create a small tensor on GPU and perform basic operations
+        device = torch.device("cuda:0")
+        test_tensor = torch.randn(100, 100, device=device)
+        _ = torch.matmul(test_tensor, test_tensor.T)
+        torch.cuda.synchronize()  # Wait for GPU operations to complete
+        LOGGER.info("Torch GPU operations test passed")
+        return True, "Torch GPU operations test passed"
     except ImportError:
         return False, "PyTorch not installed"
     except (RuntimeError, OSError, AttributeError) as exc:
@@ -138,11 +138,11 @@ def _test_faiss_gpu_resources() -> tuple[bool, str]:
         # Check if FAISS GPU symbols are available first
         if not all(hasattr(faiss, attr) for attr in ("StandardGpuResources",)):
             return False, "FAISS GPU symbols not available"
-        else:  # noqa: RET505  # else block required by TRY300 for explicit control flow
-            # Initialize GPU resources (this is lightweight)
-            _ = faiss.StandardGpuResources()
-            LOGGER.info("FAISS GPU resource initialization test passed")
-            return True, "FAISS GPU resource initialization test passed"
+        # lint-ignore[RET505] else block required by TRY300 for explicit control flow
+        # Initialize GPU resources (this is lightweight)
+        _ = faiss.StandardGpuResources()
+        LOGGER.info("FAISS GPU resource initialization test passed")
+        return True, "FAISS GPU resource initialization test passed"
     except ImportError:
         return False, "FAISS not installed"
     except (RuntimeError, AttributeError, OSError) as exc:

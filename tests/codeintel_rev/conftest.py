@@ -36,7 +36,6 @@ from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.vllm_client import VLLMClient
 
 # Import for side effects: ensures FAISS stub is registered
-from tests.codeintel_rev import _faiss_stub  # noqa: F401
 
 
 class _FakeRedis:

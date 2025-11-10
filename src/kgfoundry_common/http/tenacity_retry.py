@@ -42,7 +42,7 @@ def _set_random_seed(seed: int | None) -> None:
     seed : int | None
         Random seed value, or None to use system random.
     """
-    _get_random_seed._seed = seed  # type: ignore[attr-defined]  # noqa: SLF001  # Function attribute pattern
+    _get_random_seed._seed = seed  # type: ignore[attr-defined]  # lint-ignore[SLF001] Function attribute pattern
 
 
 @dataclass(frozen=True)
@@ -139,10 +139,10 @@ def _rand() -> float:
     seed = _get_random_seed()
     if seed is not None:
         # Use seeded random for deterministic testing
-        rng = random.Random(seed)  # noqa: S311  # Jitter doesn't need cryptographic randomness
+        rng = random.Random(seed)  # lint-ignore[S311] Jitter doesn't need cryptographic randomness
         return rng.random()
     # Use module-level random for jitter (non-cryptographic use case)
-    return random.random()  # noqa: S311  # Jitter doesn't need cryptographic randomness
+    return random.random()  # lint-ignore[S311] Jitter doesn't need cryptographic randomness
 
 
 def _status_in_sets(status: int, sets: tuple[tuple[int, int] | int, ...]) -> bool:

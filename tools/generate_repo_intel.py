@@ -94,7 +94,7 @@ def _resolve_tool(name: str) -> str | None:
 
 def log(msg: str) -> None:
     """Log a message to stdout with a [generate] prefix."""
-    print(f"[generate] {msg}")  # noqa: T201  # CLI tool; print is appropriate
+    print(f"[generate] {msg}")  # lint-ignore[T201] CLI tool; print is appropriate
 
 
 def _validate_command(cmd: list[str] | str) -> list[str]:
@@ -245,7 +245,7 @@ def run(
     r'file1.py\\nfile2.py\\n'
     >>> run("git ls-files", capture=True)  # String is safely parsed
     r'file1.py\\nfile2.py\\n'
-    """  # noqa: D301
+    """  # lint-ignore[D301] docstring continuation
     validated_cmd = _validate_command(cmd)
     sanitized_cwd = _sanitize_cwd(cwd)
     shown = " ".join(shlex.quote(arg) for arg in validated_cmd)
@@ -303,7 +303,9 @@ def write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def write_json(path: Path, obj: Any) -> None:  # noqa: ANN401
+def write_json(
+    path: Path, obj: Any
+) -> None:  # lint-ignore[ANN401] Any type for JSON-serializable objects
     """Write JSON-serializable object to a file, creating parent directories as needed."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -427,7 +429,9 @@ def collect_cst(py_files: list[Path]) -> None:
         "Exporting CST via LibCST (helpers.get_node_fields + PositionProvider)…"
     )  # :contentReference[oaicite:8]{index=8}
 
-    def to_obj(node: Any, posmap: Mapping[cst.CSTNode, Any]) -> Any:  # noqa: ANN401
+    def to_obj(
+        node: Any, posmap: Mapping[cst.CSTNode, Any]
+    ) -> Any:  # lint-ignore[ANN401] Any type for recursive CST node conversion
         if isinstance(node, cst.CSTNode):
             out: dict[str, object] = {"type": node.__class__.__name__}
             rng = posmap.get(node)
@@ -583,14 +587,16 @@ def collect_ctags_symbols() -> None:
 # ----- Import graph via Grimp → DOT -----
 
 
-def collect_import_graph(packages: list[str], excludes: set[str]) -> None:  # noqa: C901
+def collect_import_graph(
+    packages: list[str], excludes: set[str]
+) -> None:  # lint-ignore[C901] complexity required for import graph collection
     """Build import graph(s) for the given top-level package(s) using Grimp.
 
     Build import graph(s) for the given top-level package(s) using Grimp,
     then write a DOT. Works without Graphviz installed; DOT is plain text.
     """
     try:
-        import grimp  # noqa: PLC0415  # :contentReference[oaicite:13]{index=13}
+        import grimp  # lint-ignore[PLC0415] late import for optional dependency
 
         edges: set[tuple[str, str]] = set()
         for pkg in packages:

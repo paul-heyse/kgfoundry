@@ -47,7 +47,7 @@ def _set_cached_context(context: ApplicationContext | None) -> None:
         Context instance to cache, or None to clear cache.
     """
     # Function attribute pattern for thread-safe caching without global state
-    _get_cached_context._cached = context  # type: ignore[attr-defined]  # noqa: SLF001  # Function attribute pattern
+    _get_cached_context._cached = context  # type: ignore[attr-defined]  # lint-ignore[SLF001] Function attribute pattern
 
 
 def get_service_context() -> ApplicationContext:

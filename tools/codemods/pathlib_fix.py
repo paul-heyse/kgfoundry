@@ -181,8 +181,8 @@ class PathlibTransformer(cst.CSTTransformer):
 
     # LibCST visitor pattern requires these aliases to match AST node names
     # These are public API methods that must match the visitor interface
-    leave_Call = leave_call  # noqa: N815  # Required by LibCST visitor pattern
-    leave_With = leave_with  # noqa: N815  # Required by LibCST visitor pattern
+    leave_Call = leave_call  # lint-ignore[N815] Required by LibCST visitor pattern
+    leave_With = leave_with  # lint-ignore[N815] Required by LibCST visitor pattern
 
     def _transform_makedirs(self, node: cst.Call) -> cst.BaseExpression | None:
         if not (

@@ -142,5 +142,11 @@ def test_close_all_runtimes_idempotent(
 
 @pytest.fixture
 def application_context(_base_application_context):
-    """Expose the shared application_context fixture to this module."""
+    """Expose the shared application_context fixture to this module.
+
+    Returns
+    -------
+    ApplicationContext
+        The shared application context instance.
+    """
     return _base_application_context
