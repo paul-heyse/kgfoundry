@@ -1,0 +1,31 @@
+name: vulture-dead-code
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+
+jobs:
+  vulture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install vulture
+        run: pip install vulture
+      - name: Run vulture
+        run: |
+          vulture src tools stubs --min-confidence 90 | tee vulture_report.txt
+          if [ -s vulture_report.txt ]; then
+            echo "::error title=Vulture found potential dead code::See vulture_report.txt in the job artifacts."
+            exit 1
+          fi
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulture-report
+          path: vulture_report.txt
+

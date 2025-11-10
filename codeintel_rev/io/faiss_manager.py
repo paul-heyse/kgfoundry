@@ -331,14 +331,39 @@ class FAISSManager:
     def update_index(self, new_vectors: np.ndarray, new_ids: np.ndarray) -> None:
         """Add new vectors to secondary index for fast incremental updates.
 
-        Adds vectors to a secondary flat index (IndexFlatIP) which requires no
-        training and provides instant updates. This enables fast incremental
-        indexing without rebuilding the primary index.
+        Extended Summary
+        ----------------
+        This method adds new vectors to a secondary flat index (IndexFlatIP) which
+        requires no training and provides instant updates. This enables fast incremental
+        indexing without rebuilding the primary index. The method filters out vectors
+        that already exist in the primary index to avoid duplicates, then adds only
+        unique vectors to the secondary index. This is used for real-time index updates
+        during active codebase indexing workflows.
+
+        Parameters
+        ----------
+        new_vectors : np.ndarray
+            Array of new embedding vectors to add, shape (N, dim) where N is the number
+            of vectors and dim matches the index dimensionality. Must be float32 and
+            normalized if the index uses cosine similarity.
+        new_ids : np.ndarray
+            Array of document/chunk IDs corresponding to new_vectors, shape (N,).
+            Must be integer type. IDs that already exist in the primary index will be
+            filtered out before adding to the secondary index.
 
         Raises
         ------
         RuntimeError
-            If the secondary index is unexpectedly missing during the update.
+            If the secondary index is unexpectedly missing during the update. This
+            indicates a configuration or initialization error that should be resolved
+            before attempting updates.
+
+        Notes
+        -----
+        Time complexity O(N * log(M)) where N is new_vectors count and M is existing
+        index size, due to duplicate checking. Space complexity O(N) for temporary
+        storage. The method performs I/O to update the FAISS index on disk. Thread-safe
+        if called sequentially; concurrent updates may cause race conditions.
         """
         self._ensure_secondary_index()
         primary_contains = self._build_primary_contains()

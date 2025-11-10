@@ -33,6 +33,7 @@ from codeintel_rev.retrieval.telemetry import (
 from codeintel_rev.retrieval.types import (
     HybridResultDoc,
     HybridSearchResult,
+    StageDecision,
     StageSignals,
 )
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
@@ -510,15 +511,31 @@ def _should_execute_stage_two(
     coderank_stage: StageTiming,
 ) -> tuple[bool, list[str]]:
     notes: list[str] = []
+    stage_name = "stage_b"
     if not candidates:
         notes.append("No CodeRank candidates; skipping Stage-B.")
+        record_stage_decision(
+            COMPONENT_NAME,
+            stage_name,
+            decision=StageDecision(should_run=False, reason="no_candidates"),
+        )
         return False, notes
     if not options.use_warp:
         notes.append("Stage-B disabled via request option.")
+        record_stage_decision(
+            COMPONENT_NAME,
+            stage_name,
+            decision=StageDecision(should_run=False, reason="disabled_option"),
+        )
         return False, notes
     stage_available = context.settings.warp.enabled or context.settings.xtr.enable
     if not stage_available:
         notes.append("WARP/XTR disabled via configuration flag.")
+        record_stage_decision(
+            COMPONENT_NAME,
+            stage_name,
+            decision=StageDecision(should_run=False, reason="disabled_config"),
+        )
         return False, notes
     signals = StageSignals(
         candidate_count=len(candidates),
@@ -532,6 +549,7 @@ def _should_execute_stage_two(
         budget_ms=context.settings.coderank.budget_ms,
     )
     decision = should_run_secondary_stage(signals, gate_config)
+    record_stage_decision(COMPONENT_NAME, stage_name, decision=decision)
     if not decision.should_run:
         notes.append(f"Stage-B gating: {decision.reason}")
         notes.extend(decision.notes)
@@ -558,13 +576,19 @@ def _execute_stage_two(
             options=options,
         )
     notes = [*base_notes, *warp_notes]
-    return WarpOutcome(
+    outcome = WarpOutcome(
         hits=hits,
         notes=notes,
         timing=warp_timer.snapshot(),
         explainability=tuple(explain_payload),
         channel=channel,
     )
+    record_stage_decision(
+        COMPONENT_NAME,
+        channel,
+        decision=StageDecision(should_run=True, reason="executed"),
+    )
+    return outcome
 
 
 def _run_fusion_stage(
@@ -684,13 +708,19 @@ def _run_xtr_wide_stage(
     explain_payload = [(int(cid), payload) for cid, _score, payload in hits if payload]
     scored = [(int(cid), float(score)) for cid, score, _payload in hits]
     notes.append(f"XTR wide search returned {len(scored)} hits (k={k}).")
-    return WarpOutcome(
+    outcome = WarpOutcome(
         hits=scored,
         notes=notes,
         timing=timer.snapshot(),
         explainability=tuple(explain_payload),
         channel="xtr",
     )
+    record_stage_decision(
+        COMPONENT_NAME,
+        "xtr",
+        decision=StageDecision(should_run=True, reason="executed"),
+    )
+    return outcome
 
 
 def _calculate_xtr_k(limit: int, cfg: XTRConfig, options: SemanticProRuntimeOptions) -> int:
@@ -902,10 +932,30 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> tuple[list[dict], list[S
         msg = "DuckDB hydration failed"
         raise VectorSearchError(msg, cause=exc) from exc
 
-    if options.use_reranker and context.settings.coderank_llm.enabled:
+    rerank_cfg = context.settings.coderank_llm
+    rerank_stage_name = "coderank_llm"
+    if not options.use_reranker:
+        record_stage_decision(
+            COMPONENT_NAME,
+            rerank_stage_name,
+            decision=StageDecision(should_run=False, reason="disabled_option"),
+        )
+    elif not rerank_cfg.enabled:
+        record_stage_decision(
+            COMPONENT_NAME,
+            rerank_stage_name,
+            decision=StageDecision(should_run=False, reason="disabled_config"),
+        )
+    elif not records:
+        record_stage_decision(
+            COMPONENT_NAME,
+            rerank_stage_name,
+            decision=StageDecision(should_run=False, reason="no_candidates"),
+        )
+    else:
         with track_stage(
-            "coderank_llm",
-            budget_ms=context.settings.coderank_llm.budget_ms,
+            rerank_stage_name,
+            budget_ms=rerank_cfg.budget_ms,
         ) as rerank_timer:
             records = _maybe_rerank(
                 query=query,
@@ -914,6 +964,11 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> tuple[list[dict], list[S
                 enabled=True,
             )
         snapshots.append(rerank_timer.snapshot())
+        record_stage_decision(
+            COMPONENT_NAME,
+            rerank_stage_name,
+            decision=StageDecision(should_run=True, reason="executed"),
+        )
 
     return records[:effective_limit], snapshots
 

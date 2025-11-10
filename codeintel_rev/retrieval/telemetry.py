@@ -6,12 +6,14 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from time import perf_counter
+from typing import cast
 
+from prometheus_client import CollectorRegistry
+
+from codeintel_rev.retrieval.types import StageDecision
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.observability import MetricsProvider
 from kgfoundry_common.prometheus import build_counter, get_default_registry
-
-from codeintel_rev.retrieval.types import StageDecision
 
 
 @dataclass(slots=True, frozen=True)
@@ -85,10 +87,37 @@ def track_stage(
 ) -> Iterator[_StageTimer]:
     """Context manager yielding a timer that can be converted into StageTiming.
 
+    Extended Summary
+    ----------------
+    This context manager provides stage-level timing and observability for retrieval
+    pipeline stages. It creates a timer that automatically captures start/stop times
+    and can be converted to StageTiming objects for telemetry. The timer tracks
+    elapsed time and compares it against an optional budget, enabling performance
+    monitoring and budget-based gating decisions. This is used throughout the retrieval
+    pipeline to instrument stage execution times.
+
+    Parameters
+    ----------
+    name : str
+        Stage name identifier for telemetry and logging. Used to label metrics and
+        identify the stage in observability dashboards.
+    budget_ms : int | None, optional
+        Optional time budget in milliseconds. If provided, the timer compares elapsed
+        time against this budget. Used for adaptive gating decisions. Defaults to None.
+
     Yields
     ------
     _StageTimer
-        Timer instance used to capture duration metrics.
+        Timer instance used to capture duration metrics. The timer is automatically
+        started when entering the context and stopped when exiting. Can be converted
+        to StageTiming via timer.as_timing().
+
+    Notes
+    -----
+    Time complexity O(1) for timer operations. Space complexity O(1) aside from the
+    timer object. The function performs no I/O but captures system time via
+    time.monotonic(). Thread-safe if used within a single thread context. The timer
+    is automatically stopped even if an exception occurs within the context.
     """
     timer = _StageTimer(name=name, budget_ms=budget_ms)
     try:
@@ -102,7 +131,7 @@ _STAGE_DECISION_COUNTER = build_counter(
     "kgfoundry_stage_decisions_total",
     "Stage gating outcomes grouped by component, stage, and decision type.",
     ("component", "stage", "decision"),
-    registry=get_default_registry(),
+    registry=cast("CollectorRegistry | None", get_default_registry()),
 )
 
 

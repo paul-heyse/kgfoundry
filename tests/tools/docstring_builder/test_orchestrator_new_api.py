@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import tempfile
 import time
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast
 
@@ -49,6 +49,66 @@ class _PipelineCapture:
     plugins_enabled: bool | None = None
 
 
+class _PipelineCaptureProxy:
+    """Mutable proxy that always exposes the latest pipeline invocation snapshot."""
+
+    __slots__ = ("_state",)
+
+    def __init__(self) -> None:
+        self._state = _PipelineCapture()
+
+    def update(self, *, invocation: orchestrator_module._PipelineInvocation) -> None:
+        self._state = _PipelineCapture(
+            files=list(invocation.files),
+            request=invocation.request,
+            config=invocation.config,
+            selection=invocation.selection,
+            cache=invocation.cache,
+            plugins_enabled=invocation.plugins_enabled,
+        )
+
+    @property
+    def files(self) -> list[Path]:
+        """Return latest files passed to the pipeline."""
+        return self._state.files
+
+    @property
+    def request(self) -> DocstringBuildRequest | None:
+        """Return latest request passed to the pipeline."""
+        return self._state.request
+
+    @property
+    def config(self) -> BuilderConfig | None:
+        """Return latest builder configuration."""
+        return self._state.config
+
+    @property
+    def selection(self) -> ConfigSelection | None:
+        """Return latest config selection metadata."""
+        return self._state.selection
+
+    @property
+    def cache(self) -> DocstringBuilderCache | None:
+        """Return latest cache adapter instance."""
+        return self._state.cache
+
+    @property
+    def plugins_enabled(self) -> bool | None:
+        """Return latest plugin enablement flag."""
+        return self._state.plugins_enabled
+
+    def snapshot(self) -> _PipelineCapture:
+        """
+        Return the most recent capture snapshot.
+
+        Returns
+        -------
+        _PipelineCapture
+            Latest recorded pipeline invocation state.
+        """
+        return self._state
+
+
 class RecordingCache(DocstringBuilderCache):
     """Test double implementing :class:`DocstringBuilderCache` for assertions."""
 
@@ -76,8 +136,8 @@ class RecordingCache(DocstringBuilderCache):
 
 def _install_stubbed_pipeline(
     monkeypatch: pytest.MonkeyPatch,
-) -> tuple[_PipelineCapture, DocstringBuildResult, BuilderConfig]:
-    capture = _PipelineCapture()
+) -> tuple[_PipelineCaptureProxy, DocstringBuildResult, BuilderConfig]:
+    capture_proxy = _PipelineCaptureProxy()
     builder_config = BuilderConfig()
     config_selection = ConfigSelection(path=Path("docstring_builder.toml"), source="default")
 
@@ -102,20 +162,11 @@ def _install_stubbed_pipeline(
     def fake_run_pipeline(
         invocation: orchestrator_module._PipelineInvocation,
     ) -> DocstringBuildResult:
-        nonlocal capture
-        capture = replace(
-            capture,
-            files=list(invocation.files),
-            request=invocation.request,
-            config=invocation.config,
-            selection=invocation.selection,
-            cache=invocation.cache,
-            plugins_enabled=invocation.plugins_enabled,
-        )
+        capture_proxy.update(invocation=invocation)
         return result
 
     monkeypatch.setattr(orchestrator_module, "_run_pipeline", fake_run_pipeline)
-    return capture, result, builder_config
+    return capture_proxy, result, builder_config
 
 
 class TestRunBuild:

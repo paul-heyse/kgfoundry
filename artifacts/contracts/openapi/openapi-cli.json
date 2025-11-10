@@ -1,0 +1,2273 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "KgFoundry CLI",
+    "version": "0.1.0",
+    "x-kgf-interface": {
+      "id": "orchestration-cli",
+      "module": "orchestration",
+      "owner": "@orchestration",
+      "stability": "beta",
+      "binary": "kgf",
+      "protocol": "openapi-cli"
+    }
+  },
+  "tags": [
+    {
+      "name": "orchestration",
+      "x-displayName": "Orchestration",
+      "description": "Commands that orchestrate indexing, ingestion, and flow execution."
+    },
+    {
+      "name": "docstrings",
+      "x-displayName": "Docstring Builder",
+      "description": "Commands that generate, validate, and maintain managed docstrings."
+    },
+    {
+      "name": "docstrings-update",
+      "x-displayName": "Update",
+      "description": "Synchronize docstrings and DocFacts artifacts with source code."
+    },
+    {
+      "name": "docstrings-validate",
+      "x-displayName": "Validate",
+      "description": "Inspect docstrings for drift or policy violations without writing changes."
+    },
+    {
+      "name": "docstrings-observability",
+      "x-displayName": "Observability",
+      "description": "Emit metrics, listings, and auxiliary reports for docstring maintenance."
+    },
+    {
+      "name": "docstrings-diagnostics",
+      "x-displayName": "Diagnostics",
+      "description": "Diagnose configuration, environment, and stub health for the docstring builder."
+    },
+    {
+      "name": "docstrings-utilities",
+      "x-displayName": "Utilities",
+      "description": "Auxiliary helpers including schema export, cache management, and metadata harvesting."
+    },
+    {
+      "name": "docs",
+      "x-displayName": "Documentation Tooling",
+      "description": "Commands that operate on generated documentation artifacts and schemas."
+    },
+    {
+      "name": "docs-validation",
+      "x-displayName": "Artifact Validation",
+      "description": "Validate documentation outputs against their canonical schemas before publishing."
+    },
+    {
+      "name": "docs-symbol-index",
+      "x-displayName": "Symbol Index",
+      "description": "Build documentation symbol index artifacts and reverse lookup tables."
+    },
+    {
+      "name": "download",
+      "x-displayName": "Download",
+      "description": "Commands that harvest external corpora for downstream processing."
+    },
+    {
+      "name": "codeintel",
+      "x-displayName": "Code Intelligence",
+      "description": "Commands that surface Tree-sitter-based code intelligence capabilities."
+    },
+    {
+      "name": "navmap",
+      "x-displayName": "Navmap Builder",
+      "description": "Commands that generate and maintain navigation metadata for documentation tooling."
+    },
+    {
+      "name": "api",
+      "description": "Commands for api."
+    },
+    {
+      "name": "e2e",
+      "description": "Commands for e2e."
+    },
+    {
+      "name": "index_bm25",
+      "description": "Commands for index_bm25."
+    },
+    {
+      "name": "index_faiss",
+      "description": "Commands for index_faiss."
+    }
+  ],
+  "paths": {
+    "/cli/index-bm25": {
+      "post": {
+        "operationId": "cli.index_bm25",
+        "tags": [
+          "orchestration",
+          "index_bm25"
+        ],
+        "summary": "Build BM25 index from JSON/Parquet chunks.",
+        "description": "Invoke the Lucene-backed BM25 indexing flow. Requires chunk metadata and optional\nbackend selection. Emits structured metrics and Problem Details on failure.\n",
+        "x-cli": {
+          "bin": "kgf",
+          "command": "index-bm25",
+          "examples": [
+            "kgf index-bm25 <chunks_parquet> --backend <backend> --index-dir <index_dir>"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-interface": "orchestration-cli",
+          "x-handler": "orchestration.cli:index_bm25",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "kgf index-bm25 data/chunks.parquet --backend lucene --index-dir ./_indices/bm25"
+            },
+            {
+              "lang": "bash",
+              "source": "kgf index-bm25 data/chunks.parquet --backend lucene --index-dir ./_indices/bm25",
+              "label": null
+            }
+          ],
+          "x-problemDetails": [
+            "schema/examples/problem_details/tool-execution-error.json"
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "chunks_parquet": {
+                    "type": "string",
+                    "description": "Path to Parquet/JSONL with chunks"
+                  },
+                  "backend": {
+                    "type": "string",
+                    "description": "lucene|pure"
+                  },
+                  "index_dir": {
+                    "type": "string",
+                    "description": "Output index directory"
+                  }
+                },
+                "required": [
+                  "chunks_parquet"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json",
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "orchestration-cli",
+          "module": "orchestration",
+          "owner": "@orchestration",
+          "stability": "beta",
+          "binary": "kgf",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/index-faiss": {
+      "post": {
+        "operationId": "cli.index_faiss",
+        "tags": [
+          "orchestration",
+          "index_faiss"
+        ],
+        "summary": "Build FAISS index from dense vectors.",
+        "description": "Construct a FAISS ANN index from dense vectors. Supports CPU/GPU factories and exposes\ndetailed diagnostics. Rebuilds existing indices idempotently.\n",
+        "x-cli": {
+          "bin": "kgf",
+          "command": "index-faiss",
+          "examples": [
+            "kgf index-faiss <dense_vectors> --index-path <index_path> --factory <factory> --metric <metric>"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-interface": "orchestration-cli",
+          "x-handler": "orchestration.cli:index_faiss",
+          "x-env": [
+            "KGF_FAISS_RESOURCES"
+          ],
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "kgf index-faiss artifacts/vectors.json --factory 'OPQ64,IVF8192,PQ64' --metric ip"
+            },
+            {
+              "lang": "bash",
+              "source": "kgf index-faiss vectors.json --factory 'OPQ64,IVF8192,PQ64' --metric ip",
+              "label": null
+            }
+          ],
+          "x-problemDetails": [
+            "schema/examples/problem_details/tool-execution-error.json",
+            "schema/examples/problem_details/faiss-index-build-timeout.json"
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "dense_vectors": {
+                    "type": "string",
+                    "description": "Path to dense vectors JSON (skeleton)"
+                  },
+                  "index_path": {
+                    "type": "string",
+                    "description": "Output FAISS index path"
+                  },
+                  "factory": {
+                    "type": "string",
+                    "description": "FAISS factory string"
+                  },
+                  "metric": {
+                    "type": "string",
+                    "description": "Similarity metric ('ip' or 'l2')"
+                  }
+                },
+                "required": [
+                  "dense_vectors"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json",
+          "schema/examples/problem_details/faiss-index-build-timeout.json",
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "orchestration-cli",
+          "module": "orchestration",
+          "owner": "@orchestration",
+          "stability": "beta",
+          "binary": "kgf",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/api": {
+      "post": {
+        "operationId": "cli.api",
+        "tags": [
+          "orchestration",
+          "api"
+        ],
+        "summary": "Launch FastAPI search service.",
+        "description": "Start the FastAPI-based search service defined in `search_api.app`. Useful for local\nvalidation and integration testing. Requires uvicorn to be available.\n",
+        "x-cli": {
+          "bin": "kgf",
+          "command": "api",
+          "examples": [
+            "kgf api --port <port>"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-interface": "orchestration-cli",
+          "x-handler": "orchestration.cli:api",
+          "x-env": [
+            "KGF_SEARCH_CONFIG"
+          ],
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "kgf api --port 8080"
+            },
+            {
+              "lang": "bash",
+              "source": "kgf api --port 8080",
+              "label": null
+            }
+          ],
+          "x-problemDetails": [
+            "schema/examples/problem_details/public-api-invalid-config.json"
+          ]
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "port": {
+                    "type": "integer",
+                    "description": "Port to bind"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/public-api-invalid-config.json",
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "orchestration-cli",
+          "module": "orchestration",
+          "owner": "@orchestration",
+          "stability": "beta",
+          "binary": "kgf",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/e2e": {
+      "post": {
+        "operationId": "cli.e2e",
+        "tags": [
+          "orchestration",
+          "e2e"
+        ],
+        "summary": "Execute end-to-end orchestration demo.",
+        "description": "Run the bundled Prefect flow that exercises the full ingestion and search pipeline. Serves\nas a smoke test and example workflow.\n",
+        "x-cli": {
+          "bin": "kgf",
+          "command": "e2e",
+          "examples": [
+            "kgf e2e"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-interface": "orchestration-cli",
+          "x-handler": "orchestration.cli:e2e",
+          "x-env": [
+            "KGF_PROFILE"
+          ],
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "kgf e2e"
+            },
+            {
+              "lang": "bash",
+              "source": "kgf e2e",
+              "label": null
+            }
+          ],
+          "x-problemDetails": [
+            "schema/examples/problem_details/public-api-invalid-config.json"
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/public-api-invalid-config.json",
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "orchestration-cli",
+          "module": "orchestration",
+          "owner": "@orchestration",
+          "stability": "beta",
+          "binary": "kgf",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/download/harvest": {
+      "post": {
+        "operationId": "cli.download.harvest",
+        "tags": [
+          "download"
+        ],
+        "summary": "Harvest OpenAlex works for downstream ingestion.",
+        "description": "Collect OpenAlex publications matching a topic query and year filter. The command produces\nstructured CLI envelopes and metadata that downstream tooling can consume without bespoke glue.\n",
+        "x-cli": {
+          "bin": "kgf",
+          "command": "download harvest",
+          "examples": [
+            "kgf download harvest"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "download.cli:harvest",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "kgf download harvest 'foundation models' --years '>=2020' --max-works 5000"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "download-cli",
+          "module": "download",
+          "owner": "@data-platform",
+          "stability": "experimental",
+          "binary": "kgf",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/codeintel/indexer/query": {
+      "post": {
+        "operationId": "codeintel.indexer.query",
+        "tags": [
+          "codeintel"
+        ],
+        "summary": "Execute a Tree-sitter query against a source file.",
+        "description": "Run a Tree-sitter S-expression query against a single source file and emit capture metadata\nas structured JSON. The command integrates with the shared CLI tooling facade so downstream\ndocumentation, diagrams, and observability pipelines consume consistent envelopes.\n",
+        "x-cli": {
+          "bin": "kgf-codeintel",
+          "command": "codeintel indexer query",
+          "examples": [
+            "kgf-codeintel codeintel indexer query"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "codeintel.indexer.cli:query",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m codeintel.indexer.cli query src/example.py --language python --query queries/highlights.scm"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "codeintel-indexer",
+          "module": "codeintel.indexer",
+          "owner": "@code-intel",
+          "stability": "experimental",
+          "binary": "kgf-codeintel",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/navmap/build": {
+      "post": {
+        "operationId": "navmap.build",
+        "tags": [
+          "navmap"
+        ],
+        "summary": "Build the navigation metadata index for documentation tooling.",
+        "description": "Scan the repository for Python modules, resolve ``__navmap__`` declarations, and emit the\nnavmap JSON artefact consumed by documentation and automation pipelines. Emits structured CLI\nenvelopes so downstream tooling can track drift and failures consistently.\n",
+        "x-cli": {
+          "bin": "tools-navmap",
+          "command": "navmap build",
+          "examples": [
+            "tools-navmap navmap build"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "tools.navmap.build_navmap:main",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m tools.navmap.build_navmap --write site/_build/navmap/navmap.json"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "navmap-cli",
+          "module": "tools.navmap",
+          "owner": "@docs",
+          "stability": "experimental",
+          "binary": "tools-navmap",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/navmap/check": {
+      "post": {
+        "operationId": "navmap.check",
+        "tags": [
+          "navmap"
+        ],
+        "summary": "Validate navmap declarations and ensure documentation metadata is consistent.",
+        "description": "Run the navmap validation suite against the source tree, verifying inline markers, export\nmetadata, and drift between ``__navmap__`` declarations and generated artefacts. Emits\nstructured CLI envelopes and Problem Details to surface validation results.\n",
+        "x-cli": {
+          "bin": "tools-navmap",
+          "command": "navmap check",
+          "examples": [
+            "tools-navmap navmap check"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "tools.navmap.check_navmap:main",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m tools.navmap.check_navmap"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "navmap-cli",
+          "module": "tools.navmap",
+          "owner": "@docs",
+          "stability": "experimental",
+          "binary": "tools-navmap",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/docstrings/generate": {
+      "post": {
+        "operationId": "docstrings.generate",
+        "tags": [
+          "docstrings",
+          "docstrings-update"
+        ],
+        "summary": "Regenerate managed docstrings and DocFacts artifacts.",
+        "description": "Execute the full docstring builder pipeline, updating managed docstrings in-place and\nrefreshing DocFacts manifests. Intended for presubmit workflows and documentation rebuilds.\n",
+        "x-cli": {
+          "bin": "docstring-builder",
+          "command": "docstrings generate",
+          "examples": [
+            "docstring-builder docstrings generate"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "tools.docstring_builder.cli:_command_generate",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m tools.docstring_builder.cli generate"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "docstring-builder-cli",
+          "module": "tools.docstring_builder",
+          "owner": "@docs",
+          "stability": "beta",
+          "binary": "docstring-builder",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/docstrings/fix": {
+      "post": {
+        "operationId": "docstrings.fix",
+        "tags": [
+          "docstrings",
+          "docstrings-update"
+        ],
+        "summary": "Apply docstring updates while bypassing cache entries.",
+        "description": "Force-regenerate docstrings, ignoring cache hints so that all managed symbols are\nre-rendered. Useful after plugin or policy changes when stale cache entries must be\ninvalidated.\n",
+        "x-cli": {
+          "bin": "docstring-builder",
+          "command": "docstrings fix",
+          "examples": [
+            "docstring-builder docstrings fix"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "tools.docstring_builder.cli:_command_fix",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m tools.docstring_builder.cli fix"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "docstring-builder-cli",
+          "module": "tools.docstring_builder",
+          "owner": "@docs",
+          "stability": "beta",
+          "binary": "docstring-builder",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/docstrings/fmt": {
+      "post": {
+        "operationId": "docstrings.fmt",
+        "tags": [
+          "docstrings",
+          "docstrings-update"
+        ],
+        "summary": "Normalize docstring sections without regenerating content.",
+        "description": "Tidy managed docstrings by rewriting section headers and spacing without triggering the\nfull regeneration pipeline. Leaves content intact while ensuring formatting consistency.\n",
+        "x-cli": {
+          "bin": "docstring-builder",
+          "command": "docstrings fmt",
+          "examples": [
+            "docstring-builder docstrings fmt"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "tools.docstring_builder.cli:_command_fmt",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m tools.docstring_builder.cli fmt"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "docstring-builder-cli",
+          "module": "tools.docstring_builder",
+          "owner": "@docs",
+          "stability": "beta",
+          "binary": "docstring-builder",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/docstrings/update": {
+      "post": {
+        "operationId": "docstrings.update",
+        "tags": [
+          "docstrings",
+          "docstrings-update"
+        ],
+        "summary": "Legacy alias for the generate pipeline.",
+        "description": "Backwards compatible alias that invokes the same synchronization flow as the `generate`\nsubcommand. Maintained for existing automation until callers migrate to the new verbs.\n",
+        "x-cli": {
+          "bin": "docstring-builder",
+          "command": "docstrings update",
+          "examples": [
+            "docstring-builder docstrings update"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "tools.docstring_builder.cli:_command_update",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m tools.docstring_builder.cli update"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "docstring-builder-cli",
+          "module": "tools.docstring_builder",
+          "owner": "@docs",
+          "stability": "beta",
+          "binary": "docstring-builder",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/docstrings/check": {
+      "post": {
+        "operationId": "docstrings.check",
+        "tags": [
+          "docstrings",
+          "docstrings-validate"
+        ],
+        "summary": "Validate docstrings without writing updates.",
+        "description": "Inspect managed docstrings for drift, policy violations, or missing sections. Emits a\nstructured CLI envelope and non-zero exit status when remediation is required.\n",
+        "x-cli": {
+          "bin": "docstring-builder",
+          "command": "docstrings check",
+          "examples": [
+            "docstring-builder docstrings check"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "tools.docstring_builder.cli:_command_check",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m tools.docstring_builder.cli check"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "docstring-builder-cli",
+          "module": "tools.docstring_builder",
+          "owner": "@docs",
+          "stability": "beta",
+          "binary": "docstring-builder",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/docstrings/diff": {
+      "post": {
+        "operationId": "docstrings.diff",
+        "tags": [
+          "docstrings",
+          "docstrings-validate"
+        ],
+        "summary": "Show docstring drift previews without mutating files.",
+        "description": "Produce unified diffs for managed docstrings highlighting pending changes. Useful when\nreviewing edits prior to accepting updates or triaging regressions.\n",
+        "x-cli": {
+          "bin": "docstring-builder",
+          "command": "docstrings diff",
+          "examples": [
+            "docstring-builder docstrings diff"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "tools.docstring_builder.cli:_command_diff",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m tools.docstring_builder.cli diff"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "docstring-builder-cli",
+          "module": "tools.docstring_builder",
+          "owner": "@docs",
+          "stability": "beta",
+          "binary": "docstring-builder",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/docstrings/lint": {
+      "post": {
+        "operationId": "docstrings.lint",
+        "tags": [
+          "docstrings",
+          "docstrings-validate"
+        ],
+        "summary": "Alias for check with optional DocFacts skip.",
+        "description": "Run the validation workflow with optional DocFacts reconciliation disabled for speed.\nMirrors the `check` behavior while supporting quick linting loops.\n",
+        "x-cli": {
+          "bin": "docstring-builder",
+          "command": "docstrings lint",
+          "examples": [
+            "docstring-builder docstrings lint"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "tools.docstring_builder.cli:_command_lint",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m tools.docstring_builder.cli lint --no-docfacts"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "docstring-builder-cli",
+          "module": "tools.docstring_builder",
+          "owner": "@docs",
+          "stability": "beta",
+          "binary": "docstring-builder",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/docstrings/measure": {
+      "post": {
+        "operationId": "docstrings.measure",
+        "tags": [
+          "docstrings",
+          "docstrings-observability"
+        ],
+        "summary": "Execute validation and emit observability metrics.",
+        "description": "Run the validation pipeline and record observability counters, including processed file\ncounts and policy outcomes. Designed for CI environments that publish metrics.\n",
+        "x-cli": {
+          "bin": "docstring-builder",
+          "command": "docstrings measure",
+          "examples": [
+            "docstring-builder docstrings measure"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "tools.docstring_builder.cli:_command_measure",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m tools.docstring_builder.cli measure"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "docstring-builder-cli",
+          "module": "tools.docstring_builder",
+          "owner": "@docs",
+          "stability": "beta",
+          "binary": "docstring-builder",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/docstrings/list": {
+      "post": {
+        "operationId": "docstrings.list",
+        "tags": [
+          "docstrings",
+          "docstrings-observability"
+        ],
+        "summary": "List managed docstring targets detected by the pipeline.",
+        "description": "Enumerate symbols managed by the docstring builder, including modules and plugin coverage.\nHelpful when auditing what content is under automation.\n",
+        "x-cli": {
+          "bin": "docstring-builder",
+          "command": "docstrings list",
+          "examples": [
+            "docstring-builder docstrings list"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "tools.docstring_builder.cli:_command_list",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m tools.docstring_builder.cli list"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "docstring-builder-cli",
+          "module": "tools.docstring_builder",
+          "owner": "@docs",
+          "stability": "beta",
+          "binary": "docstring-builder",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/docstrings/harvest": {
+      "post": {
+        "operationId": "docstrings.harvest",
+        "tags": [
+          "docstrings",
+          "docstrings-utilities"
+        ],
+        "summary": "Gather docstring metadata without writing changes.",
+        "description": "Harvest symbol metadata and DocFacts inputs without applying edits. Supports workflows\nthat need intermediate data for analysis or experiment pipelines.\n",
+        "x-cli": {
+          "bin": "docstring-builder",
+          "command": "docstrings harvest",
+          "examples": [
+            "docstring-builder docstrings harvest"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "tools.docstring_builder.cli:_command_harvest",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m tools.docstring_builder.cli harvest"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "docstring-builder-cli",
+          "module": "tools.docstring_builder",
+          "owner": "@docs",
+          "stability": "beta",
+          "binary": "docstring-builder",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/docstrings/schema": {
+      "post": {
+        "operationId": "docstrings.schema",
+        "tags": [
+          "docstrings",
+          "docstrings-utilities"
+        ],
+        "summary": "Export the docstring IR schema to disk.",
+        "description": "Generate the JSON schema describing the docstring intermediate representation. Intended\nfor tooling integration tests and documentation.\n",
+        "x-cli": {
+          "bin": "docstring-builder",
+          "command": "docstrings schema",
+          "examples": [
+            "docstring-builder docstrings schema"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "tools.docstring_builder.cli:_command_schema",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m tools.docstring_builder.cli schema --output docs/_build/docstring-schema.json"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "docstring-builder-cli",
+          "module": "tools.docstring_builder",
+          "owner": "@docs",
+          "stability": "beta",
+          "binary": "docstring-builder",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/docstrings/clear-cache": {
+      "post": {
+        "operationId": "docstrings.clear_cache",
+        "tags": [
+          "docstrings",
+          "docstrings-utilities"
+        ],
+        "summary": "Remove cached docstring builder artifacts.",
+        "description": "Delete the docstring builder cache directory, forcing subsequent runs to recompute state\nfrom scratch. Useful after structural changes to plugins or configuration.\n",
+        "x-cli": {
+          "bin": "docstring-builder",
+          "command": "docstrings clear-cache",
+          "examples": [
+            "docstring-builder docstrings clear-cache"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "tools.docstring_builder.cli:_command_clear_cache",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m tools.docstring_builder.cli clear-cache"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "docstring-builder-cli",
+          "module": "tools.docstring_builder",
+          "owner": "@docs",
+          "stability": "beta",
+          "binary": "docstring-builder",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/docstrings/doctor": {
+      "post": {
+        "operationId": "docstrings.doctor",
+        "tags": [
+          "docstrings",
+          "docstrings-diagnostics"
+        ],
+        "summary": "Diagnose configuration, dependencies, and optional stubs.",
+        "description": "Run health checks covering Python version, configuration files, optional dependencies,\nand stub drift. Surfaces actionable guidance with structured Problem Details on failure.\n",
+        "x-cli": {
+          "bin": "docstring-builder",
+          "command": "docstrings doctor",
+          "examples": [
+            "docstring-builder docstrings doctor"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "tools.docstring_builder.cli:_command_doctor",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m tools.docstring_builder.cli doctor --stubs"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "docstring-builder-cli",
+          "module": "tools.docstring_builder",
+          "owner": "@docs",
+          "stability": "beta",
+          "binary": "docstring-builder",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/docs/symbol-index/build": {
+      "post": {
+        "operationId": "docs.symbol_index.build",
+        "tags": [
+          "docs",
+          "docs-symbol-index"
+        ],
+        "summary": "Build documentation symbol index artifacts.",
+        "description": "Generate the symbol index, file-level, and module-level lookup tables by traversing all\nconfigured packages. Each artifact is validated against its canonical JSON Schema prior\nto being written to disk.\n",
+        "x-cli": {
+          "bin": "docs-build-symbol-index",
+          "command": "docs symbol-index build",
+          "examples": [
+            "docs-build-symbol-index docs symbol-index build"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "docs.toolchain.build_symbol_index:build_symbol_index",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m docs.toolchain.build_symbol_index"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "docs-symbol-index-cli",
+          "module": "docs.toolchain",
+          "owner": "@docs",
+          "stability": "experimental",
+          "binary": "docs-build-symbol-index",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/docs/validate-artifacts": {
+      "post": {
+        "operationId": "docs.validate_artifacts",
+        "tags": [
+          "docs",
+          "docs-validation"
+        ],
+        "summary": "Validate documentation artifacts against canonical schemas.",
+        "description": "Execute the documentation validation suite to ensure generated artifacts remain schema\ncompliant before publishing. Intended for automated CI checks and local verification.\n",
+        "x-cli": {
+          "bin": "docs-validate-artifacts",
+          "command": "docs validate-artifacts",
+          "examples": [
+            "docs-validate-artifacts docs validate-artifacts"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "docs.toolchain.validate_artifacts:validate_artifacts",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m docs._scripts.validate_artifacts --docs-build-dir docs/_build"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "docs-validate-cli",
+          "module": "docs.toolchain",
+          "owner": "@docs",
+          "stability": "experimental",
+          "binary": "docs-validate-artifacts",
+          "protocol": "openapi-cli"
+        }
+      }
+    },
+    "/cli/docs/build-graphs": {
+      "post": {
+        "operationId": "docs.build_graphs",
+        "tags": [
+          "docs"
+        ],
+        "summary": "Build dependency graphs for documentation and subsystem analysis.",
+        "description": "Generate per-package and subsystem-wide dependency graphs using pydeps and pyreverse. The\ncommand manages caching, parallel execution, and policy enforcement so documentation tooling\nstays aligned with architectural guidelines.\n",
+        "x-cli": {
+          "bin": "docs-validate-artifacts",
+          "command": "docs build-graphs",
+          "examples": [
+            "docs-validate-artifacts docs build-graphs"
+          ],
+          "exitCodes": [
+            {
+              "code": 0,
+              "meaning": "success"
+            }
+          ],
+          "x-handler": "tools.docs.build_graphs:main",
+          "x-codeSamples": [
+            {
+              "lang": "bash",
+              "source": "uv run python -m tools.docs.build_graphs --format svg"
+            }
+          ]
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "CLI result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stdout": {
+                      "type": "string"
+                    },
+                    "stderr": {
+                      "type": "string"
+                    },
+                    "exitCode": {
+                      "type": "integer"
+                    },
+                    "artifacts": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "exitCode"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "x-problemDetails": [
+          "schema/examples/problem_details/tool-execution-error.json"
+        ],
+        "x-kgf-interface": {
+          "id": "docs-validate-cli",
+          "module": "docs.toolchain",
+          "owner": "@docs",
+          "stability": "experimental",
+          "binary": "docs-validate-artifacts",
+          "protocol": "openapi-cli"
+        }
+      }
+    }
+  },
+  "components": {},
+  "x-tagGroups": [
+    {
+      "name": "CLI Suites",
+      "tags": [
+        "orchestration"
+      ]
+    },
+    {
+      "name": "Docstring Builder",
+      "tags": [
+        "docstrings"
+      ]
+    },
+    {
+      "name": "Docstring Focus Areas",
+      "tags": [
+        "docstrings-update",
+        "docstrings-validate",
+        "docstrings-observability",
+        "docstrings-diagnostics",
+        "docstrings-utilities"
+      ]
+    },
+    {
+      "name": "Data Acquisition",
+      "tags": [
+        "download"
+      ]
+    },
+    {
+      "name": "Developer Tooling",
+      "tags": [
+        "codeintel",
+        "navmap"
+      ]
+    },
+    {
+      "name": "Documentation Tooling",
+      "tags": [
+        "docs",
+        "docs-validation",
+        "docs-symbol-index"
+      ]
+    }
+  ]
+}

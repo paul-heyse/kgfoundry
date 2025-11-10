@@ -550,10 +550,34 @@ class ReadinessProbe:
     def _check_vllm_http(base_url: str) -> CheckResult:
         """Validate HTTP vLLM endpoint reachability.
 
+        Extended Summary
+        ----------------
+        This static method performs a health check on a remote vLLM HTTP endpoint
+        by sending a GET request to the /health endpoint. It validates the URL format,
+        checks connectivity, and verifies that the endpoint returns a successful HTTP
+        status code. This is used by the readiness probe to determine if the vLLM
+        service is available and responding correctly when running in HTTP mode.
+
+        Parameters
+        ----------
+        base_url : str
+            Base URL of the vLLM HTTP service (e.g., "http://localhost:8001/v1").
+            Must be a valid HTTP or HTTPS URL with a netloc component. Invalid URLs
+            result in an unhealthy CheckResult.
+
         Returns
         -------
         CheckResult
-            Status representing endpoint availability.
+            Status representing endpoint availability. healthy=True if the endpoint
+            responds successfully, healthy=False with detail message if the endpoint
+            is unreachable, returns an error status, or the URL is invalid.
+
+        Notes
+        -----
+        Time complexity O(1) plus network latency. Space complexity O(1) aside from
+        HTTP response buffers. The method performs network I/O with a timeout defined
+        by HTTP_HEALTH_TIMEOUT_S. Thread-safe as it's a static method with no shared
+        state. Network errors are caught and converted to unhealthy CheckResult.
         """
         parsed = urlparse(base_url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:

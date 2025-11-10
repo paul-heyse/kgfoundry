@@ -203,12 +203,38 @@ class VLLMClient:
         )
 
     def embed_batch(self, texts: Sequence[str]) -> np.ndarray:
-        """Embed ``texts`` using the configured transport (HTTP or local).
+        """Embed texts using the configured transport (HTTP or local).
+
+        Extended Summary
+        ----------------
+        This method generates dense vector embeddings for a batch of text strings using
+        the configured vLLM service. It supports both HTTP-based remote embedding (when
+        vLLM runs as a separate service) and in-process embedding (when vLLM is loaded
+        locally). The method automatically selects the appropriate transport based on
+        the client configuration and handles empty input batches gracefully. This is the
+        primary entry point for generating embeddings in Stage-0 retrieval pipelines.
+
+        Parameters
+        ----------
+        texts : Sequence[str]
+            Ordered sequence of text strings to embed. Empty sequences result in an
+            empty embedding matrix. Each text will be tokenized and encoded by the
+            vLLM model to produce a dense vector representation.
 
         Returns
         -------
         np.ndarray
-            Embedding matrix with one row per input text.
+            Embedding matrix with shape (N, embedding_dim) where N is len(texts) and
+            embedding_dim matches the configured model's output dimensionality. Dtype is
+            float32. Each row corresponds to the embedding of the corresponding input text.
+
+        Notes
+        -----
+        Time complexity O(N * T) where N is batch size and T is average token count per
+        text, plus network latency for HTTP mode. Space complexity O(N * embedding_dim)
+        for the result matrix. The method performs network I/O in HTTP mode or GPU
+        computation in local mode. Thread-safe if the underlying HTTP client or local
+        engine is thread-safe. Empty batches return shape (0, embedding_dim).
         """
         if not texts:
             return np.empty((0, self.config.embedding_dim), dtype=np.float32)
@@ -326,12 +352,38 @@ class VLLMClient:
         return np.vstack(all_vectors)
 
     async def embed_batch_async(self, texts: Sequence[str]) -> np.ndarray:
-        """Asynchronous variant of :meth:`embed_batch`.
+        """Asynchronous variant of embed_batch for async/await workflows.
+
+        Extended Summary
+        ----------------
+        This method provides an asynchronous interface for generating dense vector
+        embeddings, enabling non-blocking embedding generation in async contexts.
+        It supports both HTTP-based remote embedding (via async HTTP client) and
+        in-process embedding (via async local engine wrapper). The method handles
+        empty input batches gracefully and provides the same functionality as
+        embed_batch but with async/await semantics for use in async event loops.
+
+        Parameters
+        ----------
+        texts : Sequence[str]
+            Ordered sequence of text strings to embed. Empty sequences result in an
+            empty embedding matrix. Each text will be tokenized and encoded by the
+            vLLM model to produce a dense vector representation.
 
         Returns
         -------
         np.ndarray
-            Embedding matrix with one row per input text.
+            Embedding matrix with shape (N, embedding_dim) where N is len(texts) and
+            embedding_dim matches the configured model's output dimensionality. Dtype is
+            float32. Each row corresponds to the embedding of the corresponding input text.
+
+        Notes
+        -----
+        Time complexity O(N * T) where N is batch size and T is average token count per
+        text, plus network latency for HTTP mode. Space complexity O(N * embedding_dim)
+        for the result matrix. The method performs async network I/O in HTTP mode or
+        async GPU computation in local mode. Thread-safe if the underlying async HTTP
+        client or local engine is thread-safe. Empty batches return shape (0, embedding_dim).
         """
         if not texts:
             return np.empty((0, self.config.embedding_dim), dtype=np.float32)

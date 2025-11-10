@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kgfoundry.dev/schema/docs/symbol-index.schema.json",
+  "title": "Symbol Index",
+  "description": "Schema describing the docs/_build/symbols.json payload",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "path",
+      "kind",
+      "doc",
+      "tested_by",
+      "source_link"
+    ],
+    "properties": {
+      "path": {
+        "type": "string",
+        "minLength": 1
+      },
+      "canonical_path": {
+        "type": ["string", "null"],
+        "minLength": 1
+      },
+      "kind": {
+        "type": "string",
+        "minLength": 1
+      },
+      "package": {
+        "type": ["string", "null"],
+        "minLength": 1
+      },
+      "module": {
+        "type": ["string", "null"],
+        "minLength": 1
+      },
+      "file": {
+        "type": ["string", "null"],
+        "minLength": 1
+      },
+      "lineno": {
+        "type": ["integer", "null"],
+        "minimum": 1
+      },
+      "endlineno": {
+        "type": ["integer", "null"],
+        "minimum": 1
+      },
+      "doc": {
+        "type": "string"
+      },
+      "signature": {
+        "type": ["string", "null"]
+      },
+      "is_async": {
+        "type": "boolean"
+      },
+      "is_property": {
+        "type": "boolean"
+      },
+      "owner": {
+        "type": ["string", "null"],
+        "minLength": 1
+      },
+      "stability": {
+        "type": ["string", "null"],
+        "minLength": 1
+      },
+      "since": {
+        "type": ["string", "null"],
+        "minLength": 1
+      },
+      "deprecated_in": {
+        "type": ["string", "null"],
+        "minLength": 1
+      },
+      "section": {
+        "type": ["string", "null"],
+        "minLength": 1
+      },
+      "tested_by": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uniqueItems": true
+      },
+      "source_link": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propertyNames": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
+

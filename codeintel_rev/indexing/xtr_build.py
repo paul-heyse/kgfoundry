@@ -34,12 +34,37 @@ class XTRBuildSummary:
 def _iter_chunk_text(
     catalog: DuckDBCatalog, *, batch_size: int = 1024
 ) -> Iterable[tuple[int, str]]:
-    """Yield ``(chunk_id, content)`` pairs from the DuckDB catalog.
+    """Yield (chunk_id, content) pairs from the DuckDB catalog.
+
+    Extended Summary
+    ----------------
+    This generator function efficiently streams chunk data from the DuckDB catalog
+    in batches to minimize memory usage. It queries the chunks table ordered by ID,
+    fetches rows in configurable batch sizes, and yields (chunk_id, content) tuples.
+    This is used during XTR index building to process chunks incrementally without
+    loading the entire catalog into memory.
+
+    Parameters
+    ----------
+    catalog : DuckDBCatalog
+        DuckDB catalog instance containing the chunks table. The catalog connection
+        is opened within this function and closed when iteration completes.
+    batch_size : int, optional
+        Number of rows to fetch per database query. Larger batches reduce query
+        overhead but increase memory usage. Defaults to 1024.
 
     Yields
     ------
     tuple[int, str]
-        Chunk identifier and raw content string.
+        Chunk identifier and raw content string. Chunks with None IDs are skipped.
+        Empty content strings are converted to empty strings.
+
+    Notes
+    -----
+    Time complexity O(N) where N is total chunk count, amortized across batch queries.
+    Space complexity O(batch_size) for temporary row storage. The function performs
+    database I/O and manages catalog connection lifecycle. Thread-safe if catalog
+    connection is thread-safe. Chunks are yielded in ID order.
     """
     with catalog.connection() as conn:
         cursor = conn.execute("SELECT id, content FROM chunks ORDER BY id")
@@ -60,10 +85,44 @@ def _gather_chunk_vectors(
 ) -> tuple[list[np.ndarray], list[int], list[int], list[int], int]:
     """Collect encoded vectors and offsets for all chunks.
 
+    Extended Summary
+    ----------------
+    This function processes all chunks from the catalog, encodes their text content
+    into token-level embeddings using the XTR index encoder, and collects the
+    resulting vectors along with metadata (chunk IDs, offsets, lengths). The vectors
+    are converted to the specified dtype for memory efficiency. This is a core step
+    in XTR index building, transforming raw chunk text into the token embeddings
+    that will be stored in the memory-mapped index.
+
+    Parameters
+    ----------
+    index : XTRIndex
+        XTR index instance used for encoding chunk text into token embeddings.
+        The index's encode_query_tokens method is called for each chunk.
+    catalog : DuckDBCatalog
+        DuckDB catalog containing chunks to encode. Chunks are iterated via
+        _iter_chunk_text helper.
+    dtype : np.dtype[Any]
+        NumPy dtype for the encoded vectors (typically float32 or float16).
+        Vectors are cast to this dtype after encoding to reduce memory usage.
+
     Returns
     -------
-    tuple
-        Buffers, chunk ids, offsets, lengths, and total token count.
+    tuple[list[np.ndarray], list[int], list[int], list[int], int]
+        Five-element tuple containing:
+        - List of token embedding arrays, one per chunk
+        - List of chunk IDs corresponding to each buffer
+        - List of token offsets (cumulative token count before each chunk)
+        - List of token lengths (number of tokens per chunk)
+        - Total token count across all chunks
+
+    Notes
+    -----
+    Time complexity O(N * T * D) where N is chunk count, T is average tokens per
+    chunk, and D is embedding dimension. Space complexity O(N * T * D) for all
+    buffers. The function performs I/O to read chunks from catalog and GPU/CPU
+    computation for encoding. Thread-safe if index encoder is thread-safe.
+    Dimension mismatches are logged as warnings but processing continues.
     """
     buffers: list[np.ndarray] = []
     chunk_ids: list[int] = []
@@ -100,10 +159,46 @@ def _write_token_matrix(
 ) -> Path:
     """Persist buffered token vectors to memmap storage.
 
+    Extended Summary
+    ----------------
+    This function writes token embedding vectors to a memory-mapped NumPy array file
+    for efficient random access during XTR search. It creates a memmap file with the
+    specified shape and dtype, then copies vectors from the input buffers into the
+    memmap in order. Vectors are truncated or zero-padded to match the target dimension.
+    The resulting file can be memory-mapped read-only for fast access during search
+    operations without loading the entire index into RAM.
+
+    Parameters
+    ----------
+    buffers : Sequence[np.ndarray]
+        Sequence of token embedding arrays, one per chunk. Each array has shape
+        (tokens_per_chunk, embedding_dim). Arrays are concatenated in order.
+    dtype : np.dtype[Any]
+        NumPy dtype for the memmap file (typically float32 or float16). Determines
+        file size and precision trade-off.
+    dim : int
+        Target embedding dimension for the memmap. Vectors are truncated or
+        zero-padded to this dimension. Must match the XTR index configuration.
+    root : Path
+        Directory path where the token matrix file will be written. The directory
+        must exist or be creatable.
+    total_tokens : int
+        Total number of tokens across all buffers. Used to allocate the memmap
+        shape as (total_tokens, dim).
+
     Returns
     -------
     Path
-        Path to the persisted token matrix file.
+        Path to the persisted token matrix file. Filename is "tokens.f32" for
+        float32 or "tokens.f16" for float16, based on dtype.
+
+    Notes
+    -----
+    Time complexity O(N * D) where N is total_tokens and D is dim, due to memmap
+    writes. Space complexity O(N * D) for the memmap file on disk. The function
+    performs file I/O and flushes the memmap to ensure data is persisted. Thread-safe
+    if buffers are not modified concurrently. Vectors shorter than dim are zero-padded;
+    vectors longer than dim are truncated.
     """
     token_path = root / ("tokens.f32" if dtype is np.float32 else "tokens.f16")
     token_memmap = np.memmap(
@@ -127,15 +222,40 @@ def _write_token_matrix(
 def build_xtr_index(settings: Settings | None = None) -> XTRBuildSummary:
     """Build XTR token artifacts from DuckDB chunks.
 
+    Extended Summary
+    ----------------
+    This function orchestrates the complete XTR index building process, reading chunks
+    from the DuckDB catalog, encoding them into token-level embeddings, and persisting
+    the results as memory-mapped files. It creates the XTR index directory structure,
+    encodes all chunks using the configured XTR model, writes token embeddings and
+    metadata, and returns a summary of the generated artifacts. This is the primary
+    entry point for building XTR indexes from existing chunk data.
+
+    Parameters
+    ----------
+    settings : Settings | None, optional
+        Application settings containing XTR configuration, paths, and model settings.
+        If None, settings are loaded from the default location. Defaults to None.
+
     Returns
     -------
     XTRBuildSummary
-        Summary describing the generated artifacts.
+        Summary describing the generated artifacts, including chunk count, token count,
+        embedding dimension, dtype, and file paths for the token matrix and metadata.
 
     Raises
     ------
     RuntimeError
-        If no chunks are available to encode.
+        If no chunks are available to encode in the catalog. This indicates the
+        catalog is empty or chunks table is missing, and index building cannot proceed.
+
+    Notes
+    -----
+    Time complexity O(N * T * D) where N is chunk count, T is average tokens per
+    chunk, and D is embedding dimension. Space complexity O(N * T * D) for buffers
+    and memmap files. The function performs database I/O, GPU/CPU encoding computation,
+    and file I/O. Not thread-safe due to catalog and file system operations.
+    The function creates the XTR directory if it doesn't exist.
     """
     settings = settings or load_settings()
     paths = resolve_application_paths(settings)

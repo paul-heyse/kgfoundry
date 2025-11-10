@@ -207,6 +207,27 @@ class VLLMConfig(msgspec.Struct, frozen=True):
     timeout_s : float
         HTTP request timeout in seconds. Embedding requests can take time for
         large batches, so this should be set appropriately. Defaults to 120 seconds.
+    run : VLLMRunMode
+        Runtime execution mode for vLLM. Controls whether embeddings are generated
+        via HTTP requests to a remote service ("http") or using an in-process vLLM
+        engine ("inprocess"). Defaults to "inprocess" for local development.
+    gpu_memory_utilization : float
+        Fraction of GPU memory to allocate for vLLM model and KV cache. Range [0.0, 1.0].
+        Higher values improve throughput but reduce available memory for other operations.
+        Defaults to 0.92 (92% of GPU memory).
+    max_num_batched_tokens : int
+        Maximum number of tokens to process in a single batch. Larger values improve
+        throughput but increase memory usage and latency. Defaults to 65536 tokens.
+    normalize : bool
+        Whether to L2-normalize embeddings after generation. Normalized embeddings
+        enable cosine similarity computation via dot product. Defaults to True.
+    pooling_type : Literal["lasttoken", "cls", "mean"]
+        Token pooling strategy for generating embeddings from token-level outputs.
+        "lasttoken" uses the final token embedding, "cls" uses a special CLS token,
+        "mean" averages all token embeddings. Defaults to "lasttoken".
+    max_concurrent_requests : int
+        Maximum number of concurrent embedding requests allowed when using HTTP mode.
+        Higher values improve throughput but increase memory usage. Defaults to 4.
     """
 
     base_url: str = "http://127.0.0.1:8001/v1"

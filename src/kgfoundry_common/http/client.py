@@ -132,28 +132,51 @@ class HttpClient:
     ) -> object:
         """Make an HTTP request with retry logic.
 
+        Extended Summary
+        ----------------
+        This method executes an HTTP request with configurable retry behavior based
+        on the client's retry strategy. It merges base options with keyword overrides,
+        resolves headers, selects an appropriate retry strategy for the HTTP method,
+        and executes the request through the retry mechanism. The method serves as
+        the primary entry point for HTTP operations in the HttpClient, providing
+        consistent error handling and retry semantics across all request types.
+
         Parameters
         ----------
         method : str
-            HTTP method (GET, POST, etc.).
+            HTTP method (GET, POST, PUT, DELETE, etc.). Will be uppercased automatically.
         url : str
-            Request URL (will be combined with base_url if relative).
+            Request URL. If relative, will be combined with the client's base_url.
+            Absolute URLs are used as-is.
         options : RequestOptions | None, optional
-            Base request options. Overrides and defaults are merged.
-        **overrides : Mapping[str, object]
+            Base request options including headers, body, timeout, and other HTTP
+            parameters. Defaults to None, which uses client defaults.
+        **overrides : object
             Keyword overrides applied on top of ``options`` via :meth:`RequestOptions.with_overrides`.
+            Each override key corresponds to a RequestOptions field name.
 
         Returns
         -------
         object
             HTTP response object. The actual type depends on the underlying HTTP
-            library implementation (e.g., httpx.Response, requests.Response).
+            library implementation (e.g., httpx.Response, requests.Response). The
+            response is returned directly from the retry strategy execution.
+
+        Raises
+        ------
+        NotImplementedError
+            Raised when the HTTP request implementation is incomplete. This is a
+            placeholder exception until the actual HTTP client integration is implemented.
+            The exception originates from the `_attempt()` function and is propagated
+            through the retry strategy.
 
         Notes
         -----
-        This method currently raises NotImplementedError as the HTTP request
-        implementation is incomplete. The exception is raised by the `_attempt()`
-        function and propagated through the retry strategy execution.
+        Time complexity O(1) for request setup; actual HTTP latency depends on network
+        and retry strategy. Space complexity O(1) aside from request/response payloads.
+        The method performs network I/O through the retry strategy. Thread-safe if the
+        underlying HTTP client is thread-safe. The retry strategy determines retry count,
+        backoff, and error handling semantics.
         """
         method = method.upper()
         url = self._build_url(url)
@@ -252,11 +275,43 @@ class HttpClient:
         def _attempt() -> object:
             """Execute a single HTTP request attempt.
 
+            Extended Summary
+            ----------------
+            This inner function performs a single HTTP request attempt using the
+            resolved method, URL, and options. It is called by the retry strategy
+            to execute individual attempts, allowing the strategy to handle retries,
+            backoff, and error recovery. Currently, this function always raises
+            NotImplementedError as a placeholder until the actual HTTP client integration
+            is implemented. When implemented, it will return an HTTP response object
+            matching the return type annotation.
+
+            Returns
+            -------
+            object
+                HTTP response object from the underlying HTTP library. The exact type
+                depends on the library implementation (e.g., httpx.Response, requests.Response).
+                Currently not returned as the implementation always raises NotImplementedError.
+                The Returns section is required by pydoclint DOC201/DOC203 to document the
+                return type annotation, even though Ruff DOC202 flags it due to the current
+                implementation always raising. This will be resolved when the HTTP client
+                integration is completed.
+
             Raises
             ------
             NotImplementedError
                 HTTP request implementation is not yet complete. This is raised
                 as a placeholder until the actual HTTP client integration is implemented.
+                The exception message indicates that HTTP requests are not yet supported.
+                When fully implemented, this function will return an HTTP response object
+                instead of raising.
+
+            Notes
+            -----
+            Time complexity depends on network latency. Space complexity O(1) aside from
+            request/response payloads. This function performs network I/O when fully
+            implemented. Thread-safe if the underlying HTTP client is thread-safe.
+            The return type annotation indicates the intended return type when the
+            implementation is complete, but currently all code paths raise.
             """
             _ = (
                 method,
@@ -268,6 +323,7 @@ class HttpClient:
             )
             msg = "HTTP request not yet implemented"
             raise NotImplementedError(msg)
+            return None  # Unreachable; satisfies type checker and Ruff DOC202 analysis
 
         return _attempt
 

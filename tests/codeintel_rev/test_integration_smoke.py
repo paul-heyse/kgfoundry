@@ -102,6 +102,7 @@ async def test_text_search(mock_application_context, monkeypatch: pytest.MonkeyP
 @pytest.mark.usefixtures("mock_session_id")
 async def test_semantic_search_no_index(mock_application_context) -> None:
     """Semantic search should gracefully handle missing FAISS index."""
+    mock_application_context.faiss_manager.search.side_effect = RuntimeError("missing index")
     with pytest.raises(VectorSearchError):
         await semantic_adapter.semantic_search(
             mock_application_context,

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 from codeintel_rev.config.settings import XTRConfig
 from codeintel_rev.io.xtr_manager import XTRIndex
 
@@ -52,17 +53,21 @@ def test_xtr_index_not_ready_without_artifacts(tmp_path: Path) -> None:
     assert not index.ready
 
 
-def test_xtr_search_and_rescore(tmp_path: Path) -> None:
+def test_xtr_search_and_rescore(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     _write_token_artifacts(tmp_path)
     config = XTRConfig(enable=True, dim=2, dtype="float16")
     index = XTRIndex(tmp_path, config)
     index.open()
     assert index.ready
-    def _encode_query(text: str) -> np.ndarray:
-        del text
+
+    def _encode_query(self: XTRIndex, text: str) -> np.ndarray:
+        del text, self
         return np.asarray([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
 
-    object.__setattr__(index, "encode_query_tokens", _encode_query)
+    monkeypatch.setattr(XTRIndex, "encode_query_tokens", _encode_query)
     wide_hits = index.search("query", k=2, explain=True)
     assert len(wide_hits) == 2
     assert wide_hits[0][0] in {1, 2}

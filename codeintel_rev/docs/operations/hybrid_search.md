@@ -100,6 +100,10 @@ Observability
   BM25/SPLADE providers fail to initialise. Alert on repeated warnings.
 * ``Finding["why"]`` now carries hybrid explanations (`Hybrid RRF …`) giving
   operators visibility into channel contributions for sampled queries.
+* Prometheus counter ``kgfoundry_stage_decisions_total`` records whether Stage-B
+  (WARP/XTR) and Stage-C (CodeRankLLM) ran or were skipped, broken down by skip
+  reason (decision label ``skip:<reason>``). Alert on sustained spikes in
+  ``skip:no_candidates`` or ``skip:disabled_config`` to catch upstream drift.
 
 Semantic Pro Budgets & Gating
 -----------------------------
@@ -124,6 +128,9 @@ Every stage exposes its measured duration via the response metadata and the
 ``kgfoundry_operation_duration_seconds`` Prometheus histogram (component:
 ``codeintel_mcp``, operation: stage name, status: ``success`` or ``degraded``).
 Use these metrics to alert when gating skips Stage-B/C too frequently.
+Stage-B/C gating outcomes are also exported via the
+``kgfoundry_stage_decisions_total`` counter with ``decision`` labels of
+``run`` or ``skip:<reason>`` for auditing and alerting.
 
 Rollback & Disaster Recovery
 ----------------------------

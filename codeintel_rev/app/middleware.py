@@ -142,8 +142,9 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
     ----------
     app : ASGIApp
         ASGI application to wrap with middleware.
-    **kwargs : object
-        Additional keyword arguments passed to base class (BaseHTTPMiddleware).
+    dispatch : DispatchFunction | None, optional
+        Optional custom dispatch function for the middleware. If None, uses the
+        default dispatch from BaseHTTPMiddleware. Defaults to None.
 
     Notes
     -----

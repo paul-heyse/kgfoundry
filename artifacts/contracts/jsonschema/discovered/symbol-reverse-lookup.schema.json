@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kgfoundry.dev/schema/docs/symbol-reverse-lookup.schema.json",
+  "title": "Symbol Reverse Lookup",
+  "description": "Schema describing the docs/_build/by_file.json and by_module.json payloads",
+  "type": "object",
+  "additionalProperties": {
+    "type": "array",
+    "items": {
+      "type": "string",
+      "minLength": 1
+    },
+    "uniqueItems": true
+  },
+  "propertyNames": {
+    "type": "string",
+    "minLength": 1
+  }
+}

@@ -35,11 +35,21 @@ class _InprocessVLLMRuntime:
 class InprocessVLLMEmbedder:
     """Embed text batches locally using vLLM.
 
-    Parameters
+    Extended Summary
+    ----------------
+    This embedder provides in-process embedding generation using vLLM, enabling
+    high-throughput batch embedding without HTTP overhead. It initializes a local
+    vLLM engine with the specified model and pooling configuration, tokenizes input
+    texts, and generates embeddings via vLLM's embedding API. The embedder is used
+    in Stage-0 retrieval pipelines when vLLM is available and in-process mode is
+    preferred over HTTP-based embedding services.
+
+    Attributes
     ----------
     config : VLLMConfig
         Fully populated vLLM configuration. The ``run.mode`` field must be
-        ``"inprocess"`` to avoid HTTP calls.
+        ``"inprocess"`` to avoid HTTP calls. Contains model path, pooling type,
+        normalization settings, and GPU memory configuration.
 
     Examples
     --------

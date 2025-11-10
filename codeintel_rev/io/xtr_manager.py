@@ -32,7 +32,7 @@ class XTRMetadata(TypedDict):
 class _XTRIndexRuntime:
     """Mutable runtime artifacts for XTRIndex."""
 
-    __slots__ = ("device", "meta", "model", "tokenizer", "tokens")
+    __slots__ = ("chunk_lookup", "device", "meta", "model", "tokenizer", "tokens")
 
     def __init__(self) -> None:
         self.meta: XTRMetadata | None = None
@@ -40,6 +40,7 @@ class _XTRIndexRuntime:
         self.tokenizer: Any | None = None
         self.model: Any | None = None
         self.device: str | None = None
+        self.chunk_lookup: dict[int, tuple[int, int]] | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -91,6 +92,7 @@ class XTRIndex:
         state = self._runtime
         state.meta = meta
         state.tokens = tokens
+        state.chunk_lookup = self._build_chunk_lookup(meta)
         LOGGER.info(
             "xtr_index_opened",
             extra={
@@ -177,13 +179,57 @@ class XTRIndex:
         explain: bool = False,
         topk_explanations: int = 5,
     ) -> list[tuple[int, float, dict[str, Any] | None]]:
-        """
-        Perform index-wide MaxSim search (wide mode).
+        """Perform index-wide MaxSim search across all chunks (wide mode).
+
+        Extended Summary
+        ----------------
+        This method performs exhaustive MaxSim search across the entire XTR index,
+        scoring all chunks against the query and returning the top-k results. It is
+        used for wide-mode retrieval when no initial candidate set is available. The
+        method encodes the query into token embeddings, computes MaxSim scores against
+        all document chunks, and returns ranked results with optional explainability
+        data. This is the primary entry point for XTR-based search when operating
+        without a Stage-0 retrieval system.
+
+        Parameters
+        ----------
+        query : str
+            Natural language search query string. Will be tokenized and encoded
+            into query token embeddings for MaxSim computation.
+        k : int
+            Maximum number of results to return. Must be positive. Results are
+            ranked by MaxSim score in descending order.
+        explain : bool, optional
+            If True, include explainability payload with token-level alignment
+            information for each result. Defaults to False.
+        topk_explanations : int, optional
+            Maximum number of token matches to include in explainability payload
+            when explain=True. Defaults to 5.
 
         Returns
         -------
         list[tuple[int, float, dict[str, Any] | None]]
-            Ranked list of chunk identifiers, scores, and optional explanations.
+            Ranked list of (chunk_id, score, explainability_payload) tuples.
+            Scores are MaxSim sums across query tokens. Explainability payload is
+            None if explain=False or no matches found. Length is min(k, total_chunks).
+
+        Notes
+        -----
+        Time complexity O(n * m * d) where n is query tokens, m is total document
+        tokens across all chunks, and d is embedding dimension. Space complexity
+        O(n * d + m * d) for query and document embeddings. The method performs
+        I/O to read token embeddings from memory-mapped files. Thread-safe if
+        index is read-only. Returns empty list if index is not ready or k <= 0.
+
+        Examples
+        --------
+        >>> # Requires XTRIndex instance with opened index
+        >>> # index = XTRIndex(root=Path("..."), config=...)
+        >>> # index.open()
+        >>> # results = index.search("vector store", k=10)
+        >>> # len(results) <= 10
+        >>> # all(isinstance(r[0], int) and isinstance(r[1], float) for r in results)
+        >>> # True
         """
         if not self.ready or k <= 0:
             return []
@@ -209,13 +255,60 @@ class XTRIndex:
         explain: bool = False,
         topk_explanations: int = 5,
     ) -> list[tuple[int, float, dict[str, Any] | None]]:
-        """
-        Rescore a Stage-0 candidate set (narrow mode).
+        """Rescore a Stage-0 candidate set using MaxSim (narrow mode).
+
+        Extended Summary
+        ----------------
+        This method performs focused MaxSim rescoring on a pre-filtered set of
+        candidate chunks, typically from an initial retrieval stage (e.g., CodeRank
+        FAISS search). It encodes the query, computes MaxSim scores only for the
+        provided candidates, and returns ranked results. This narrow-mode operation
+        is more efficient than full index search when a high-quality candidate set
+        is available. The method is used in two-stage retrieval pipelines where
+        Stage-0 provides candidates and XTR provides late-interaction reranking.
+
+        Parameters
+        ----------
+        query : str
+            Natural language search query string. Will be tokenized and encoded
+            into query token embeddings for MaxSim computation.
+        candidate_chunk_ids : Iterable[int]
+            Iterable of chunk IDs from Stage-0 retrieval to rescore. Duplicates
+            are automatically deduplicated. Empty iterables result in empty results.
+        explain : bool, optional
+            If True, include explainability payload with token-level alignment
+            information for each result. Defaults to False.
+        topk_explanations : int, optional
+            Maximum number of token matches to include in explainability payload
+            when explain=True. Defaults to 5.
 
         Returns
         -------
         list[tuple[int, float, dict[str, Any] | None]]
-            Ranked list restricted to the provided candidate chunk identifiers.
+            Ranked list of (chunk_id, score, explainability_payload) tuples,
+            restricted to the provided candidate chunk IDs. Scores are MaxSim sums
+            across query tokens. Explainability payload is None if explain=False
+            or no matches found. Results are sorted by score descending.
+
+        Notes
+        -----
+        Time complexity O(n * m * d) where n is query tokens, m is total document
+        tokens across candidate chunks, and d is embedding dimension. Space complexity
+        O(n * d + c * m * d) where c is candidate count. More efficient than search()
+        when candidate set is small relative to total chunks. The method performs
+        I/O to read token embeddings from memory-mapped files. Thread-safe if index
+        is read-only. Returns empty list if index is not ready or candidates is empty.
+
+        Examples
+        --------
+        >>> # Requires XTRIndex instance with opened index
+        >>> # index = XTRIndex(root=Path("..."), config=...)
+        >>> # index.open()
+        >>> # candidates = [1, 2, 3, 4, 5]
+        >>> # results = index.rescore("vector store", candidates, explain=True)
+        >>> # len(results) <= len(candidates)
+        >>> # all(r[0] in candidates for r in results)
+        >>> # True
         """
         materialized = [int(cid) for cid in candidate_chunk_ids]
         if not materialized or not self.ready:
@@ -348,16 +441,67 @@ class XTRIndex:
             config and availability.
         """
         state = self._runtime
-        configured = self.config.device or "cpu"
-        if configured == "cuda" and not torch_module.cuda.is_available():
-            if state.device != "cpu":
+        configured = (self.config.device or "cpu").strip()
+        if configured.lower().startswith("cuda"):
+            if not torch_module.cuda.is_available():
+                if state.device != "cpu":
+                    LOGGER.warning(
+                        "XTR requested CUDA but it is unavailable; falling back to CPU.",
+                    )
+                state.device = "cpu"
+                return torch_module.device(state.device)
+
+            ordinal = self._parse_cuda_ordinal(configured)
+            if ":" in configured and ordinal is None:
                 LOGGER.warning(
-                    "XTR requested CUDA but it is unavailable; falling back to CPU.",
+                    "Invalid CUDA device specification %r; falling back to CPU.",
+                    configured,
                 )
-            state.device = "cpu"
+                state.device = "cpu"
+                return torch_module.device(state.device)
+
+            device_count = torch_module.cuda.device_count()
+            if ordinal is not None:
+                if device_count == 0:
+                    LOGGER.warning(
+                        "No CUDA devices available despite torch.cuda.is_available(); using CPU.",
+                    )
+                    state.device = "cpu"
+                    return torch_module.device(state.device)
+                if ordinal >= device_count:
+                    selected = max(device_count - 1, 0)
+                    LOGGER.warning(
+                        "Requested CUDA ordinal %d >= available devices %d; using cuda:%d instead.",
+                        ordinal,
+                        device_count,
+                        selected,
+                    )
+                    state.device = f"cuda:{selected}"
+                else:
+                    state.device = f"cuda:{ordinal}"
+            else:
+                state.device = configured
         else:
             state.device = configured
         return torch_module.device(state.device)
+
+    @staticmethod
+    def _parse_cuda_ordinal(value: str) -> int | None:
+        """
+        Return the ordinal when ``value`` contains ``cuda:<ordinal>``.
+
+        Returns
+        -------
+        int | None
+            Parsed ordinal or ``None`` when unspecified or invalid.
+        """
+        parts = value.split(":", 1)
+        if len(parts) == 1:
+            return None
+        try:
+            return int(parts[1])
+        except ValueError:
+            return None
 
     def _slice_chunk(self, chunk_id: int) -> np.ndarray:
         """Return token matrix slice for chunk_id.
@@ -386,13 +530,39 @@ class XTRIndex:
         if meta is None or tokens is None:
             msg = f"XTR index not ready when slicing chunk {chunk_id}"
             raise RuntimeError(msg)
+        lookup = state.chunk_lookup
+        if lookup is None:
+            lookup = self._build_chunk_lookup(meta)
+            state.chunk_lookup = lookup
         try:
-            idx = meta["chunk_ids"].index(chunk_id)
-        except ValueError as exc:
+            offset, length = lookup[chunk_id]
+        except KeyError as exc:
             raise KeyError(chunk_id) from exc
-        offset = meta["offsets"][idx]
-        length = meta["lengths"][idx]
         return np.asarray(tokens[offset : offset + length])
+
+    @staticmethod
+    def _build_chunk_lookup(meta: XTRMetadata) -> dict[int, tuple[int, int]]:
+        """Build fast chunk metadata for offset lookups.
+
+        Parameters
+        ----------
+        meta : XTRMetadata
+            Metadata containing chunk dimensions for the index.
+
+        Returns
+        -------
+        dict[int, tuple[int, int]]
+            Mapping from chunk ID to (offset, length).
+        """
+        return {
+            int(chunk_id): (int(offset), int(length))
+            for chunk_id, offset, length in zip(
+                meta["chunk_ids"],
+                meta["offsets"],
+                meta["lengths"],
+                strict=True,
+            )
+        }
 
 
 class TorchDeviceModule(Protocol):

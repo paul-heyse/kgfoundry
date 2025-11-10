@@ -661,18 +661,50 @@ class ApplicationContext:
     ) -> ApplicationContext:
         """Return a new context with the provided overrides.
 
+        Extended Summary
+        ----------------
+        This method creates a new ApplicationContext instance with selective overrides
+        to the current context's dependencies. It is used for testing, dependency injection,
+        and creating specialized contexts (e.g., with mocked components or different
+        configuration). The method preserves all non-overridden dependencies from the
+        current context, allowing incremental customization without full reinitialization.
+        This is particularly useful in test fixtures where specific components need to
+        be replaced while keeping the rest of the context intact.
+
+        Parameters
+        ----------
+        settings : Settings | None, optional
+            Application settings to override. If None, uses the current context's
+            settings. Defaults to None.
+        paths : ResolvedPaths | None, optional
+            Resolved file system paths to override. If None, uses the current context's
+            paths. Defaults to None.
+        **components : object
+            Keyword arguments for component overrides. Accepted keys are:
+            ``vllm_client``, ``faiss_manager``, ``scope_store``, ``duckdb_manager``,
+            ``git_client``, ``async_git_client``. Each override replaces the corresponding
+            component in the new context. Unsupported keys raise ValueError.
+
         Returns
         -------
         ApplicationContext
             Fresh context instance sharing the existing dependencies unless
-            overridden via keyword arguments. Accepted component overrides:
-            ``vllm_client``, ``faiss_manager``, ``scope_store``,
-            ``duckdb_manager``, ``git_client``, ``async_git_client``.
+            overridden via keyword arguments. The new context is independent of the
+            original and can be modified without affecting it.
 
         Raises
         ------
         ValueError
-            If unsupported override keys are supplied.
+            If unsupported override keys are supplied in **components. Only the
+            accepted component names listed in Parameters are allowed.
+
+        Notes
+        -----
+        Time complexity O(1) for context creation. Space complexity O(1) aside from
+        the new context object and any overridden components. The method performs no
+        I/O and has no side effects. Thread-safe if all components are thread-safe.
+        Overrides are shallow; nested component dependencies are not automatically
+        updated to match overridden components.
         """
         allowed = {
             "vllm_client",

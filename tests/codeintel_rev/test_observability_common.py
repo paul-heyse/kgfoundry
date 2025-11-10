@@ -101,7 +101,6 @@ def test_observe_duration_records_error_on_exception(
 
 def test_observe_duration_noop_when_histogram_labels_disabled(
     prometheus_registry: CollectorRegistry,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Observations fall back to no-op when histograms do not expose labels."""
     provider = MetricsProvider(registry=prometheus_registry)
@@ -117,12 +116,7 @@ def test_observe_duration_noop_when_histogram_labels_disabled(
         def observe(self, *_args: object, **_kwargs: object) -> None:
             pytest.fail("metrics should not be recorded when labels are missing")
 
-    monkeypatch.setattr(
-        provider,
-        "operation_duration_seconds",
-        cast("HistogramLike", _HistogramWithoutLabels()),
-        raising=False,
-    )
+    provider.replace_operation_duration_histogram(cast("HistogramLike", _HistogramWithoutLabels()))
 
     with observe_duration(operation, component, metrics=provider) as observation:
         # No metrics should be recorded but methods remain safe to call.

@@ -261,8 +261,9 @@ async def semantic_search_pro(
         Natural language or code query text.
     limit : int, optional
         Maximum number of hydrated findings to return (default 20).
-    options : SemanticProOptions | None, optional
-        Optional dictionary of stage toggles and fusion weights.
+    options : semantic_pro_adapter.SemanticProOptions | None, optional
+        Optional runtime options for stage toggles and fusion weights. Controls
+        which retrieval stages are enabled and their configuration parameters.
 
     Returns
     -------

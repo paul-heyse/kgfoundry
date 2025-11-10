@@ -372,11 +372,10 @@ class _DefaultStubHybridEngine:
         self,
         query: str,
         *,
-        semantic_ids: Sequence[int],
-        semantic_scores: Sequence[float],
+        semantic_hits: Sequence[tuple[int, float]],
         limit: int,
     ) -> SimpleNamespace:
-        del query, semantic_ids, semantic_scores, limit
+        del query, semantic_hits, limit
         return SimpleNamespace(
             docs=[],
             contributions={},
@@ -772,11 +771,10 @@ async def test_semantic_search_hybrid_merges_channels() -> None:
             self,
             query: str,
             *,
-            semantic_ids: Sequence[int],
-            semantic_scores: Sequence[float],
+            semantic_hits: Sequence[tuple[int, float]],
             limit: int,
         ) -> SimpleNamespace:
-            del query, semantic_ids, semantic_scores, limit
+            del query, semantic_hits, limit
             docs = [
                 SimpleNamespace(doc_id="101", score=0.42),
                 SimpleNamespace(doc_id="102", score=0.35),

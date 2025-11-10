@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kgfoundry.dev/schemas/vectorstore/faiss-index-manifest.schema.json",
+  "title": "FAISS Index Manifest",
+  "description": "Manifest metadata for persisted FAISS vector indexes, including configuration, paths, and integrity information",
+  "type": "object",
+  "required": [
+    "version",
+    "factory",
+    "metric",
+    "embedding_dimension",
+    "accelerator",
+    "index_uri",
+    "ids_uri",
+    "checksum",
+    "created_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Schema version (SemVer format)",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "examples": ["0.1.0"]
+    },
+    "factory": {
+      "type": "string",
+      "description": "FAISS factory string used to build the index",
+      "examples": ["Flat", "OPQ64,IVF8192,PQ64"]
+    },
+    "metric": {
+      "type": "string",
+      "enum": ["ip", "l2"],
+      "description": "Similarity metric: inner-product or L2 distance"
+    },
+    "embedding_dimension": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Vector dimension"
+    },
+    "accelerator": {
+      "type": "string",
+      "enum": ["cpu", "gpu"],
+      "description": "Accelerator used during index build"
+    },
+    "index_uri": {
+      "type": "string",
+      "description": "Path to the FAISS index file (cpu .idx or gpu binary format)"
+    },
+    "ids_uri": {
+      "type": "string",
+      "description": "Path to the NumPy .npy file containing document/chunk IDs"
+    },
+    "checksum": {
+      "type": "string",
+      "description": "SHA256 hex digest of the index file for integrity verification"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp (RFC3339) when the index was created"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp (RFC3339) when the index was last updated"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional metadata (training set size, quantization info, etc.)"
+    }
+  },
+  "examples": [
+    {
+      "version": "0.1.0",
+      "factory": "OPQ64,IVF8192,PQ64",
+      "metric": "ip",
+      "embedding_dimension": 2560,
+      "accelerator": "gpu",
+      "index_uri": "/indices/faiss/shard_000.idx",
+      "ids_uri": "/indices/faiss/shard_000.ids.npy",
+      "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "created_at": "2025-11-02T10:30:00Z",
+      "updated_at": "2025-11-02T10:30:00Z",
+      "metadata": {
+        "training_vectors": 10000,
+        "total_vectors": 1000000,
+        "quantization_bits": 8
+      }
+    }
+  ]
+}

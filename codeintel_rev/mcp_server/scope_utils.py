@@ -69,7 +69,7 @@ LOGGER = get_logger(__name__)
 _scope_filter_duration_seconds = build_histogram(
     "codeintel_scope_filter_duration_seconds",
     "Time to apply scope filters",
-    ("filter_type",),
+    labelnames=("filter_type",),
 )
 
 # Language to file extension mapping

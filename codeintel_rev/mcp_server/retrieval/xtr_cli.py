@@ -69,10 +69,44 @@ def search(
 ) -> None:
     """Run a quick XTR search (wide or narrow depending on candidate ids).
 
+    Extended Summary
+    ----------------
+    This CLI command performs XTR-based semantic search, supporting both wide-mode
+    (index-wide search) and narrow-mode (rescoring Stage-0 candidates) depending on
+    whether candidate_ids are provided. It loads the XTR index, executes the search,
+    and prints results to stdout. This is a utility command for testing and debugging
+    XTR search functionality outside of the main MCP server.
+
+    Parameters
+    ----------
+    query : str
+        Natural language query string to search for. Will be encoded into token
+        embeddings and used for MaxSim computation against the XTR index.
+    k : int, optional
+        Maximum number of top-k documents to return. Must be at least 1.
+        Defaults to 5.
+    candidate_ids : list[int] | None, optional
+        Optional list of Stage-0 candidate chunk IDs to rescore. If provided,
+        performs narrow-mode rescoring on these candidates only. If None, performs
+        wide-mode search across all chunks. Defaults to None.
+    explain : bool | None, optional
+        Whether to include token-level attribution information in results. If True,
+        includes explainability data showing token alignments. Defaults to None
+        (no explainability).
+
     Raises
     ------
     typer.Exit
-        If artifacts are missing and the command cannot run.
+        If XTR artifacts are missing and the command cannot run. This occurs when
+        the XTR index has not been built or is not ready for search operations.
+
+    Notes
+    -----
+    Time complexity depends on search mode: O(N * T * D) for wide-mode where N is
+    total chunks, T is tokens per chunk, D is embedding dimension; O(C * T * D) for
+    narrow-mode where C is candidate count. Space complexity O(k) for results.
+    The function performs file I/O to load the XTR index and GPU/CPU computation
+    for encoding and scoring. Not thread-safe due to index loading.
     """
     settings = load_settings()
     paths = resolve_application_paths(settings)

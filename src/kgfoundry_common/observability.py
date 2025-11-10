@@ -103,11 +103,17 @@ class MetricsProvider:
     """
 
     runs_total: CounterLike
-    operation_duration_seconds: HistogramLike
+    _operation_duration_seconds: HistogramLike = field(init=False, repr=False)
     _registry: CollectorRegistry | None = field(default=None, repr=False)
 
     def __init__(self, registry: CollectorRegistry | None = None) -> None:
         resolved_registry = cast("CollectorRegistry | None", registry or get_default_registry())
+        histogram = build_histogram(
+            "kgfoundry_operation_duration_seconds",
+            "Operation duration in seconds for each component/operation pair.",
+            labelnames=("component", "operation", "status"),
+            registry=resolved_registry,
+        )
         _thaw(
             self,
             _registry=resolved_registry,
@@ -117,12 +123,7 @@ class MetricsProvider:
                 ("component", "status"),
                 registry=resolved_registry,
             ),
-            operation_duration_seconds=build_histogram(
-                "kgfoundry_operation_duration_seconds",
-                "Operation duration in seconds for each component/operation pair.",
-                labelnames=("component", "operation", "status"),
-                registry=resolved_registry,
-            ),
+            _operation_duration_seconds=histogram,
         )
 
     @property
@@ -142,6 +143,27 @@ class MetricsProvider:
         if _OBS_CACHE.provider is None:
             _thaw(_OBS_CACHE, provider=MetricsProvider())
         return cast("MetricsProvider", _OBS_CACHE.provider)
+
+    @property
+    def operation_duration_seconds(self) -> HistogramLike:
+        """Prometheus histogram for operation durations."""
+        return self._operation_duration_seconds
+
+    def replace_operation_duration_histogram(self, histogram: HistogramLike) -> HistogramLike:
+        """Replace the duration histogram (used in tests/instrumentation swaps).
+
+        Parameters
+        ----------
+        histogram : HistogramLike
+            Histogram instance that should back future duration observations.
+
+        Returns
+        -------
+        HistogramLike
+            The histogram that is now registered with this provider.
+        """
+        _thaw(self, _operation_duration_seconds=histogram)
+        return histogram
 
 
 @dataclass(slots=True, frozen=True)

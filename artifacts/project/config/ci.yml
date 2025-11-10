@@ -1,0 +1,483 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  precommit:
+    name: Pre-commit (all files)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Prep cache keys
+        id: cache-keys
+        run: |
+          echo "py=$(python - <<'PY'
+import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')
+PY
+)" >> $GITHUB_OUTPUT
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-
+
+      - name: Sync environment
+        run: uv sync --locked
+
+      - name: Install pre-commit
+        run: uv tool install pre-commit
+
+      - name: Run pre-commit
+        run: uvx pre-commit run --all-files
+
+  lint:
+    name: Ruff Lint
+    needs: precommit
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Prep cache keys
+        id: cache-keys
+        run: |
+          echo "py=$(python - <<'PY'
+import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')
+PY
+)" >> $GITHUB_OUTPUT
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-
+
+      - name: Sync environment
+        run: uv sync --locked
+
+      - name: Cache Ruff
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ruff
+          key: ruff-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ruff-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-
+
+      - name: Run Ruff (annotate)
+        run: uv run ruff check --output-format=github src tests tools docs/_scripts
+
+      - name: Run documentation linting
+        if: ${{ runner.os == 'Linux' }}
+        run: uv run make lint-docs
+
+  types:
+    name: Types (pyrefly + mypy)
+    needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Prep cache keys
+        id: cache-keys
+        run: |
+          echo "py=$(python - <<'PY'
+import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')
+PY
+)" >> $GITHUB_OUTPUT
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-
+
+      - name: Sync environment
+        run: uv sync --locked
+
+      - name: Cache mypy
+        uses: actions/cache@v4
+        with:
+          path: .mypy_cache
+          key: mypy-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-${{ hashFiles('mypy.ini', 'pyproject.toml') }}
+          restore-keys: |
+            mypy-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-
+
+      - name: Stub drift
+        run: uv run python tools/stubs/drift_check.py
+
+      - name: pyrefly
+        run: uv run pyrefly check
+
+      - name: mypy (strict project baseline)
+        run: uv run mypy --config-file mypy.ini
+
+      - name: Mypy HTML report
+        if: ${{ always() }}
+        run: |
+          rm -rf .mypy_html
+          uv run mypy --config-file mypy.ini --html-report .mypy_html || true
+
+      - name: Upload mypy report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mypy-report-${{ matrix.os }}
+          path: .mypy_html/**
+          retention-days: 7
+          if-no-files-found: ignore
+          compression-level: 9
+
+  tests:
+    name: Pytest
+    runs-on: ubuntu-latest
+    needs: types
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Prep cache keys
+        id: cache-keys
+        run: |
+          echo "py=$(python - <<'PY'
+import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')
+PY
+)" >> $GITHUB_OUTPUT
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-
+
+      - name: Sync environment
+        run: uv sync --locked
+
+      - name: Cache mypy
+        uses: actions/cache@v4
+        with:
+          path: .mypy_cache
+          key: mypy-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-${{ hashFiles('mypy.ini', 'pyproject.toml') }}
+          restore-keys: |
+            mypy-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-
+
+      - name: Build navmap
+        run: uv run python tools/navmap/build_navmap.py
+
+      - name: Check navmap
+        run: uv run python tools/navmap/check_navmap.py
+
+      - name: Run pytest
+        env:
+          PYTHONPATH: src
+        run: |
+          uv run pytest -q \
+            --cov=src --cov-report=xml:coverage.xml --cov-report=html:htmlcov \
+            --junitxml=junit.xml
+
+      - name: Check import-linter contracts
+        if: ${{ always() }}
+        run: |
+          uv run python tools/check_imports.py || echo "::warning::import-linter check failed"
+
+      - name: Check suppression guard
+        if: ${{ always() }}
+        run: |
+          uv run python tools/check_new_suppressions.py src || echo "::warning::Suppression guard found untracked suppressions"
+
+      - name: Generate PR summary
+        if: ${{ always() }}
+        run: |
+          uv run python tools/generate_pr_summary.py
+
+      - name: Upload coverage
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-ubuntu
+          path: |
+            coverage.xml
+            htmlcov/**
+          retention-days: 7
+          compression-level: 9
+          if-no-files-found: ignore
+
+      - name: Upload JUnit report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-ubuntu
+          path: junit.xml
+          retention-days: 7
+          if-no-files-found: ignore
+
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system packages
+        run: sudo apt-get update && sudo apt-get install -y graphviz
+
+      - uses: astral-sh/setup-uv@v3
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Prep cache keys
+        id: cache-keys
+        run: |
+          echo "py=$(python - <<'PY'
+import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')
+PY
+)" >> $GITHUB_OUTPUT
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-
+
+      - name: Sync environment
+        run: uv sync --locked
+
+      - name: Validate gallery examples
+        run: uv run python tools/validate_gallery.py
+
+      - name: Regenerate documentation
+        run: bash tools/update_docs.sh
+
+      - name: Check README freshness
+        run: |
+          uv run python tools/gen_readmes.py --link-mode github --editor relative
+          if git diff --quiet --exit-code -- src/**/README.md; then
+            echo "Package READMEs are up to date."
+          else
+            echo "::error::Detected stale package README files."
+            git diff -- src/**/README.md
+            exit 1
+          fi
+
+      - name: Verify clean tree
+        run: |
+          git status --short
+          git diff --exit-code
+          if [ -n "$(git ls-files --others --exclude-standard)" ]; then
+            echo "Unexpected untracked files:"
+            git ls-files --others --exclude-standard
+            exit 1
+          fi
+
+      - name: Upload documentation site(s)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-site
+          path: |
+            site/_build/html/**
+            site/_build/agent/**
+            docs/_build/html/**
+          retention-days: 7
+          compression-level: 9
+          if-no-files-found: ignore
+
+  docfacts:
+    name: DocFacts Drift Check
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Prep cache keys
+        id: cache-keys
+        run: |
+          echo "py=$(python - <<'PY'
+import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')
+PY
+)" >> $GITHUB_OUTPUT
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-
+
+      - name: Sync environment
+        run: uv sync --locked
+
+      - name: Run docfacts diff
+        run: make docfacts-diff
+
+  docs_artifacts:
+    name: Docs Artifacts
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Prep cache keys
+        id: cache-keys
+        run: |
+          echo "py=$(python - <<'PY'
+import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')
+PY
+)" >> $GITHUB_OUTPUT
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-
+
+      - name: Sync environment
+        run: uv sync --locked
+
+      - name: Regenerate documentation artifacts
+        run: uv run python tools/docs/build_artifacts.py
+
+      - name: Verify clean tree
+        run: |
+          git status --short
+          git diff --exit-code
+          if [ -n "$(git ls-files --others --exclude-standard)" ]; then
+            echo "Unexpected untracked files:"
+            git ls-files --others --exclude-standard
+            exit 1
+
+  agent_catalog_checks:
+    name: Agent Catalog QA
+    runs-on: ubuntu-latest
+    needs: docs_artifacts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Prep cache keys
+        id: cache-keys
+        run: |
+          echo "py=$(python - <<'PY'"
+import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")
+PY
+)" >> $GITHUB_OUTPUT
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-
+
+      - name: Sync environment
+        run: uv sync --locked
+
+      - name: Build catalog artifacts
+        run: |
+          uv run python tools/docs/build_agent_catalog.py
+          uv run python tools/docs/build_agent_api.py
+          uv run python tools/docs/build_agent_analytics.py --output docs/_build/analytics.ci.json --repo-root "$(pwd)" --link-sample 50
+
+      - name: Validate catalog schema
+        run: |
+          uv run python -m jsonschema --instance docs/_build/agent_catalog.json --schema docs/_build/schema_agent_catalog.json
+
+      - name: Summarize analytics
+        run: |
+          uv run python - <<'PY'
+from pathlib import Path
+import json
+
+analytics = json.loads(Path("docs/_build/analytics.ci.json").read_text(encoding="utf-8"))
+catalog = analytics["catalog"]
+errors = analytics["errors"]
+print(f"::notice::Agent catalog packages={catalog['packages']} modules={catalog['modules']} symbols={catalog['symbols']}")
+broken = int(errors.get("broken_links", 0))
+if broken:
+    print(f"::error::Detected {broken} broken catalog links")
+    raise SystemExit(1)
+PY
+
+      - name: Upload analytics summary
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-analytics
+          path: docs/_build/analytics.ci.json
+          retention-days: 7
+          if-no-files-found: ignore
+          fi
