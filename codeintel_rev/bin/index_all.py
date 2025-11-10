@@ -22,8 +22,10 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
-import numpy as np
+from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.typing import NDArrayF32, NDArrayI64
 
 from codeintel_rev.config.settings import (
     IndexConfig,
@@ -49,6 +51,11 @@ from codeintel_rev.io.symbol_catalog import (  # new
     SymbolOccurrenceRow,
 )
 from codeintel_rev.io.vllm_client import VLLMClient
+
+if TYPE_CHECKING:
+    import numpy as np
+else:
+    np = cast("np", LazyModule("numpy", "codeintel indexing pipeline"))
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -260,7 +267,7 @@ def _chunk_repository(
     return chunks
 
 
-def _embed_chunks(chunks: Sequence[Chunk], config: VLLMConfig) -> np.ndarray:
+def _embed_chunks(chunks: Sequence[Chunk], config: VLLMConfig) -> NDArrayF32:
     """Generate embeddings for the supplied chunks using vLLM.
 
     Parameters
@@ -272,7 +279,7 @@ def _embed_chunks(chunks: Sequence[Chunk], config: VLLMConfig) -> np.ndarray:
 
     Returns
     -------
-    np.ndarray
+    NDArrayF32
         Embedding matrix aligned with the chunk order.
     """
     client = VLLMClient(config)
@@ -284,7 +291,7 @@ def _embed_chunks(chunks: Sequence[Chunk], config: VLLMConfig) -> np.ndarray:
 
 def _write_parquet(
     chunks: Sequence[Chunk],
-    embeddings: np.ndarray,
+    embeddings: NDArrayF32,
     paths: PipelinePaths,
     vec_dim: int,
     preview_max_chars: int,
@@ -295,7 +302,7 @@ def _write_parquet(
     ----------
     chunks : Sequence[Chunk]
         Chunks to persist.
-    embeddings : np.ndarray
+    embeddings : NDArrayF32
         Embedding vectors aligned with chunks.
     paths : PipelinePaths
         Pipeline paths configuration.
@@ -325,7 +332,7 @@ def _write_parquet(
 
 
 def _build_faiss_index(
-    embeddings: np.ndarray,
+    embeddings: NDArrayF32,
     paths: PipelinePaths,
     index_config: IndexConfig,
 ) -> None:
@@ -337,7 +344,7 @@ def _build_faiss_index(
 
     Parameters
     ----------
-    embeddings : np.ndarray
+    embeddings : NDArrayF32
         Embedding vectors to index.
     paths : PipelinePaths
         Pipeline paths configuration.
@@ -385,7 +392,7 @@ def _build_faiss_index(
 
 def _update_faiss_index_incremental(
     chunks: Sequence[Chunk],
-    embeddings: np.ndarray,
+    embeddings: NDArrayF32,
     paths: PipelinePaths,
     index_config: IndexConfig,
 ) -> None:
@@ -399,7 +406,7 @@ def _update_faiss_index_incremental(
     ----------
     chunks : Sequence[Chunk]
         All chunks from the current indexing run.
-    embeddings : np.ndarray
+    embeddings : NDArrayF32
         Embedding vectors aligned with chunks.
     paths : PipelinePaths
         Pipeline paths configuration.

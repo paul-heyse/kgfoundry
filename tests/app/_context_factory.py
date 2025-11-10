@@ -61,6 +61,7 @@ def build_application_context(
     faiss_index.touch()
     coderank_index.touch()
     duckdb_path.touch()
+    scip_index.touch()
 
     paths = ResolvedPaths(
         repo_root=repo_root,

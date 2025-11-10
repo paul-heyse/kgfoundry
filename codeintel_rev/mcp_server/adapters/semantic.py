@@ -13,9 +13,6 @@ from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING, cast
 
-import httpx
-import numpy as np
-
 from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.vllm_client import VLLMClient
@@ -27,11 +24,18 @@ from codeintel_rev.mcp_server.schemas import (
     ScopeIn,
 )
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
+from codeintel_rev.typing import NDArrayF32
+from codeintel_rev._lazy_imports import LazyModule
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
+    import httpx
+    import numpy as np
     from codeintel_rev.app.config_context import ApplicationContext
+else:
+    httpx = cast("httpx", LazyModule("httpx", "semantic adapter HTTP error handling"))
+    np = cast("np", LazyModule("numpy", "semantic adapter embeddings"))
 
 SNIPPET_PREVIEW_CHARS = 500
 COMPONENT_NAME = "codeintel_mcp"
@@ -586,7 +590,7 @@ def _embed_query_or_raise(
     query: str,
     observation: Observation,
     vllm_url: str,
-) -> np.ndarray:
+) -> NDArrayF32:
     """Embed text or raise with a structured embedding error.
 
     Parameters
@@ -602,7 +606,7 @@ def _embed_query_or_raise(
 
     Returns
     -------
-    np.ndarray
+    NDArrayF32
         Normalized query vector with shape (1, dim).
 
     Raises
@@ -623,7 +627,7 @@ def _embed_query_or_raise(
 
 def _run_faiss_search_or_raise(
     context: ApplicationContext,
-    query_vector: np.ndarray,
+    query_vector: NDArrayF32,
     limit: int,
     nprobe: int,
     observation: Observation,
@@ -634,7 +638,7 @@ def _run_faiss_search_or_raise(
     ----------
     context : ApplicationContext
         Application context providing the FAISS manager and metadata.
-    query_vector : np.ndarray
+    query_vector : NDArrayF32
         Query vector produced by the embedding service.
     limit : int
         Requested fan-out.
@@ -774,7 +778,7 @@ def _annotate_hybrid_contributions(
         finding["why"] = f"Hybrid RRF (k={rrf_k}): " + ", ".join(parts)
 
 
-def _embed_query(client: VLLMClient, query: str) -> tuple[np.ndarray | None, str | None]:
+def _embed_query(client: VLLMClient, query: str) -> tuple[NDArrayF32 | None, str | None]:
     """Embed query text and return a normalized vector and error message.
 
     Parameters
@@ -786,7 +790,7 @@ def _embed_query(client: VLLMClient, query: str) -> tuple[np.ndarray | None, str
 
     Returns
     -------
-    tuple[np.ndarray | None, str | None]
+    tuple[NDArrayF32 | None, str | None]
         Pair of (query_vector, error_message). Exactly one element will be ``None``.
     """
     try:
@@ -800,7 +804,7 @@ def _embed_query(client: VLLMClient, query: str) -> tuple[np.ndarray | None, str
 
 def _run_faiss_search(
     faiss_mgr: FAISSManager,
-    query_vector: np.ndarray,
+    query_vector: NDArrayF32,
     limit: int,
     *,
     nprobe: int,
@@ -811,7 +815,7 @@ def _run_faiss_search(
     ----------
     faiss_mgr : FAISSManager
         FAISS index manager instance.
-    query_vector : np.ndarray
+    query_vector : NDArrayF32
         Query vector of shape (1, vec_dim).
     limit : int
         Maximum number of results to return.

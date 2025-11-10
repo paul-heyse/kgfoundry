@@ -67,6 +67,28 @@ if TYPE_CHECKING:
 
 from tools._shared.logging import get_logger
 
+try:  # pragma: no cover - executed in tooling context
+    from codeintel_rev.typing import HEAVY_DEPS as _HEAVY_DEPS_SOURCE
+except ImportError:  # pragma: no cover - when package not importable
+    _HEAVY_DEPS_SOURCE: dict[str, str | None] = {}
+
+_DEFAULT_HEAVY_MODULES = {
+    "numpy",
+    "faiss",
+    "duckdb",
+    "torch",
+    "tensorflow",
+    "pandas",
+    "sklearn",
+    "pydantic",
+    "sqlalchemy",
+    "fastapi",
+    "httpx",
+    "onnxruntime",
+}
+
+HEAVY_MODULES = set(_HEAVY_DEPS_SOURCE) or _DEFAULT_HEAVY_MODULES
+
 
 @dataclass(frozen=True)
 class TypeGateViolation:
@@ -90,6 +112,15 @@ class TypeGateViolation:
     suggestion: str
     """Actionable fix guidance."""
 
+    end_lineno: int | None = None
+    """Ending line number (for autofix)."""
+
+    col_offset: int = 0
+    """Column offset of the statement (autofix restriction)."""
+
+    fixable: bool = False
+    """True when the violation can be automatically wrapped."""
+
 
 class TypeGateVisitor(ast.NodeVisitor):
     """AST visitor to detect unguarded type-only imports.
@@ -100,11 +131,12 @@ class TypeGateVisitor(ast.NodeVisitor):
         Path to the file being analyzed.
     """
 
-    def __init__(self, filepath: Path) -> None:
+    def __init__(self, filepath: Path, heavy_modules: set[str]) -> None:
         self.filepath = filepath
         self.violations: list[TypeGateViolation] = []
         self.in_type_checking_block = False
         self.type_checking_depth = 0
+        self.heavy_modules = heavy_modules
 
     def visit_If(self, node: ast.If) -> None:
         """Track entry/exit of TYPE_CHECKING blocks."""
@@ -159,22 +191,9 @@ class TypeGateVisitor(ast.NodeVisitor):
                     )
                     self.violations.append(violation)
 
-        # Check for heavy imports outside TYPE_CHECKING
-        heavy_modules = {
-            "numpy",
-            "fastapi",
-            "faiss",
-            "torch",
-            "tensorflow",
-            "pandas",
-            "sklearn",
-            "pydantic",
-            "sqlalchemy",
-        }
-
         module_root = node.module.split(".")[0]
 
-        if module_root in heavy_modules:
+        if module_root in self.heavy_modules:
             suggestion = self._suggest_heavy_import_fix(node.module)
             context = f"Potentially type-only import from {node.module}"
             violation = TypeGateViolation(
@@ -184,6 +203,9 @@ class TypeGateVisitor(ast.NodeVisitor):
                 context=context,
                 violation_type="heavy_import",
                 suggestion=suggestion,
+                end_lineno=getattr(node, "end_lineno", node.lineno),
+                col_offset=getattr(node, "col_offset", 0),
+                fixable=getattr(node, "col_offset", 0) == 0,
             )
             self.violations.append(violation)
 
@@ -196,32 +218,32 @@ class TypeGateVisitor(ast.NodeVisitor):
             self.generic_visit(node)
             return
 
-        heavy_modules = {
-            "numpy",
-            "fastapi",
-            "faiss",
-            "torch",
-            "tensorflow",
-            "pandas",
-            "sklearn",
-            "pydantic",
-            "sqlalchemy",
-        }
-
+        heavy_aliases = []
         for alias in node.names:
             module_root = alias.name.split(".")[0]
-            if module_root in heavy_modules:
-                suggestion = self._suggest_heavy_import_fix(alias.name)
-                context = f"Potentially type-only import: {alias.name}"
-                violation = TypeGateViolation(
-                    filepath=str(self.filepath),
-                    lineno=node.lineno,
-                    module_name=alias.name,
-                    context=context,
-                    violation_type="heavy_import",
-                    suggestion=suggestion,
-                )
-                self.violations.append(violation)
+            if module_root in self.heavy_modules:
+                heavy_aliases.append(alias.name)
+
+        if not heavy_aliases:
+            self.generic_visit(node)
+            return
+
+        mixed = len(heavy_aliases) != len(node.names)
+        module_list = ", ".join(heavy_aliases)
+        suggestion = self._suggest_heavy_import_fix(module_list)
+        context = f"Potentially type-only import: {module_list}"
+        violation = TypeGateViolation(
+            filepath=str(self.filepath),
+            lineno=node.lineno,
+            module_name=module_list,
+            context=context,
+            violation_type="heavy_import",
+            suggestion=suggestion,
+            end_lineno=getattr(node, "end_lineno", node.lineno),
+            col_offset=getattr(node, "col_offset", 0),
+            fixable=(not mixed) and getattr(node, "col_offset", 0) == 0,
+        )
+        self.violations.append(violation)
 
         self.generic_visit(node)
 
@@ -306,13 +328,19 @@ class TypeGateVisitor(ast.NodeVisitor):
         )
 
 
-def check_file(filepath: Path, logger: LoggerAdapter | None = None) -> list[TypeGateViolation]:
+def check_file(
+    filepath: Path,
+    heavy_modules: set[str],
+    logger: LoggerAdapter | None = None,
+) -> list[TypeGateViolation]:
     """Check a single Python file for typing gate violations.
 
     Parameters
     ----------
     filepath : Path
         File to check.
+    heavy_modules : set[str]
+        Heavy modules that must be guarded.
     logger : LoggerAdapter | None, optional
         Logger instance (default: None).
 
@@ -326,7 +354,7 @@ def check_file(filepath: Path, logger: LoggerAdapter | None = None) -> list[Type
     try:
         content = filepath.read_text(encoding="utf-8")
         tree = ast.parse(content, filename=str(filepath))
-        visitor = TypeGateVisitor(filepath)
+        visitor = TypeGateVisitor(filepath, heavy_modules)
         visitor.visit(tree)
     except SyntaxError:
         active_logger.exception("Syntax error in %s", filepath)
@@ -339,6 +367,7 @@ def check_file(filepath: Path, logger: LoggerAdapter | None = None) -> list[Type
 
 def check_directory(
     root: Path,
+    heavy_modules: set[str],
     logger: LoggerAdapter | None = None,
 ) -> list[TypeGateViolation]:
     """Check all Python files in a directory.
@@ -347,6 +376,8 @@ def check_directory(
     ----------
     root : Path
         Directory to scan.
+    heavy_modules : set[str]
+        Heavy modules that must be guarded.
     logger : LoggerAdapter | None, optional
         Logger instance (default: None).
 
@@ -367,10 +398,122 @@ def check_directory(
         if "__pycache__" in fpath.parts:
             continue
 
-        violations = check_file(fpath, logger=active_logger)
+        violations = check_file(fpath, heavy_modules, logger=active_logger)
         all_violations.extend(violations)
 
     return all_violations
+
+
+def _has_type_checking_import(tree: ast.Module) -> bool:
+    """Return True when module imports TYPE_CHECKING from typing.
+
+    Returns
+    -------
+    bool
+        ``True`` when TYPE_CHECKING is imported.
+    """
+    for node in tree.body:
+        if isinstance(node, ast.ImportFrom) and node.module == "typing":
+            for alias in node.names:
+                if alias.name == "TYPE_CHECKING":
+                    return True
+    return False
+
+
+def _insert_type_checking_import(lines: list[str], tree: ast.Module) -> None:
+    """Ensure `from typing import TYPE_CHECKING` exists near the top of the file."""
+    insert_idx = 0
+    if lines and lines[0].startswith("#!"):
+        insert_idx += 1
+
+    docstring_end = 0
+    if tree.body and isinstance(tree.body[0], ast.Expr):
+        expr = tree.body[0]
+        if isinstance(expr.value, ast.Constant) and isinstance(expr.value.value, str):
+            docstring_end = getattr(expr, "end_lineno", expr.lineno)
+    insert_idx = max(insert_idx, docstring_end)
+
+    while insert_idx < len(lines) and lines[insert_idx].startswith("from __future__ import"):
+        insert_idx += 1
+
+    lines.insert(insert_idx, "from typing import TYPE_CHECKING")
+    lines.insert(insert_idx + 1, "")
+
+
+def _indent_block(block: list[str]) -> list[str]:
+    """Indent the provided code block by four spaces.
+
+    Returns
+    -------
+    list[str]
+        Indented block.
+    """
+    return ["    " + line if line.strip() else "    " for line in block]
+
+
+def apply_fixes(
+    filepath: Path,
+    violations: list[TypeGateViolation],
+    logger: LoggerAdapter | None = None,
+) -> bool:
+    """Guard fixable heavy imports behind TYPE_CHECKING blocks.
+
+    Returns
+    -------
+    bool
+        ``True`` when the file was modified.
+    """
+    fixable = [v for v in violations if v.violation_type == "heavy_import" and v.fixable]
+    if not fixable:
+        return False
+
+    text = filepath.read_text(encoding="utf-8")
+    lines = text.splitlines()
+    module = ast.parse(text, filename=str(filepath))
+
+    if not _has_type_checking_import(module):
+        _insert_type_checking_import(lines, module)
+
+    for violation in sorted(fixable, key=lambda v: v.lineno, reverse=True):
+        start = violation.lineno - 1
+        end = (violation.end_lineno or violation.lineno) - 1
+        snippet = lines[start : end + 1]
+        guarded = ["if TYPE_CHECKING:", *_indent_block(snippet)]
+        lines[start : end + 1] = guarded
+
+    filepath.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    if logger:
+        logger.info("Guarded %s heavy import(s) in %s", len(fixable), filepath)
+    return True
+
+
+def _apply_autofixes(
+    violations_by_path: dict[Path, list[TypeGateViolation]],
+    heavy_modules: set[str],
+    logger: LoggerAdapter | None = None,
+) -> tuple[list[TypeGateViolation], set[str]]:
+    """Apply autofixes for fixable violations and return refreshed results.
+
+    Returns
+    -------
+    tuple[list[TypeGateViolation], set[str]]
+        Refreshed violations and filepaths that were modified.
+    """
+    refreshed_paths: list[Path] = []
+    for path, violations in violations_by_path.items():
+        if not path.exists():
+            continue
+        if apply_fixes(path, violations, logger):
+            refreshed_paths.append(path)
+
+    if not refreshed_paths:
+        return [], set()
+
+    refreshed: list[TypeGateViolation] = []
+    for path in refreshed_paths:
+        refreshed.extend(check_file(path, heavy_modules, logger))
+
+    return refreshed, {str(path) for path in refreshed_paths}
 
 
 def format_violations(
@@ -460,11 +603,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="Output as flat list for codemod integration (filepath:lineno:type:module)",
     )
+    parser.add_argument(
+        "--write",
+        action="store_true",
+        help="Automatically guard fixable heavy imports behind TYPE_CHECKING",
+    )
 
     args = parser.parse_args(argv)
     logger = get_logger(__name__)
 
     all_violations: list[TypeGateViolation] = []
+    violations_by_path: dict[Path, list[TypeGateViolation]] = {}
 
     # Cast for type safety (argparse.Namespace.directories is typed as Any)
     raw_directories = cast("Sequence[Path]", getattr(args, "directories", ()))
@@ -475,8 +624,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             logger.warning(msg)
             continue
 
-        violations = check_directory(directory, logger=logger)
+        violations = check_directory(directory, HEAVY_MODULES, logger=logger)
         all_violations.extend(violations)
+        for violation in violations:
+            violations_by_path.setdefault(Path(violation.filepath), []).append(violation)
+
+    if getattr(args, "write", False):
+        refreshed, stale_keys = _apply_autofixes(violations_by_path, HEAVY_MODULES, logger)
+        if stale_keys:
+            all_violations = [v for v in all_violations if v.filepath not in stale_keys]
+            all_violations.extend(refreshed)
 
     # Output results
     json_attr: object = getattr(args, "json", False)

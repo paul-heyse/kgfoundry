@@ -10,14 +10,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
+
+from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.typing import NDArrayF32
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from codeintel_rev.indexing.cast_chunker import Chunk
+    import numpy as np
+else:
+    np = cast("np", LazyModule("numpy", "Parquet embedding storage"))
 
 
 def get_chunks_schema(vec_dim: int) -> pa.Schema:
@@ -61,7 +66,7 @@ class ParquetWriteOptions:
 def write_chunks_parquet(
     output_path: Path,
     chunks: Sequence[Chunk],
-    embeddings: np.ndarray,
+    embeddings: NDArrayF32,
     *,
     options: ParquetWriteOptions | None = None,
 ) -> None:
@@ -73,7 +78,7 @@ def write_chunks_parquet(
         Output Parquet file path.
     chunks : Sequence[Chunk]
         Chunk metadata.
-    embeddings : np.ndarray
+    embeddings : NDArrayF32
         Embeddings array of shape (len(chunks), vec_dim).
     options : ParquetWriteOptions | None, optional
         Configuration for chunk identifiers, embedding dimension, and preview
@@ -152,7 +157,7 @@ def read_chunks_parquet(parquet_path: Path) -> pa.Table:
     return pq.read_table(parquet_path)
 
 
-def extract_embeddings(table: pa.Table) -> np.ndarray:
+def extract_embeddings(table: pa.Table) -> NDArrayF32:
     """Extract embeddings from chunks table.
 
     Parameters
@@ -162,7 +167,7 @@ def extract_embeddings(table: pa.Table) -> np.ndarray:
 
     Returns
     -------
-    np.ndarray
+    NDArrayF32
         Embeddings array of shape (num_rows, vec_dim).
 
     Raises

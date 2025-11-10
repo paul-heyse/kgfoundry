@@ -12,10 +12,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 from time import perf_counter
-from typing import Self
+from typing import TYPE_CHECKING, Self, cast
 
-import duckdb
-import numpy as np
+from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.typing import NDArrayF32
 
 from codeintel_rev.io.duckdb_manager import (
     DuckDBManager,
@@ -28,6 +28,13 @@ from codeintel_rev.mcp_server.scope_utils import (
 )
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.prometheus import build_histogram
+
+if TYPE_CHECKING:
+    import duckdb
+    import numpy as np
+else:
+    duckdb = cast("duckdb", LazyModule("duckdb", "DuckDB catalog operations"))
+    np = cast("np", LazyModule("numpy", "DuckDB catalog embeddings"))
 
 LOGGER = get_logger(__name__)
 
@@ -786,7 +793,7 @@ class DuckDBCatalog:
             cols = [desc[0] for desc in relation.description]
         return [dict(zip(cols, row, strict=True)) for row in rows]
 
-    def get_embeddings_by_ids(self, ids: Sequence[int]) -> np.ndarray:
+    def get_embeddings_by_ids(self, ids: Sequence[int]) -> NDArrayF32:
         """Extract embedding vectors for given chunk IDs.
 
         Retrieves the pre-computed embedding vectors for chunks, typically used
@@ -806,7 +813,7 @@ class DuckDBCatalog:
 
         Returns
         -------
-        np.ndarray
+        NDArrayF32
             Embedding vectors as a 2D NumPy array of shape (n_found, vec_dim)
             where n_found <= len(ids). Dtype is float32 for memory efficiency.
             Returns empty array (shape (0, vec_dim)) if no IDs provided or no
@@ -833,7 +840,7 @@ class DuckDBCatalog:
         if not rows:
             return np.empty((0, dim), dtype=np.float32)
 
-        embeddings: list[np.ndarray] = []
+        embeddings: list[NDArrayF32] = []
         for _, embedding, _ in rows:
             if embedding is None:
                 continue

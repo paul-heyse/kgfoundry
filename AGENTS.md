@@ -308,6 +308,41 @@ Per-file ignores are defined in `pyproject.toml` for:
 
 **Deprecation path**: Old code using `docs._types` or private imports will emit `PLC2701` warnings and will be removed after Phase 1 migration (see openspec/changes/typing-gates-holistic-phase1/).
 
+### Using heavy types safely (recipe)
+
+1. Always add `from __future__ import annotations` and guard heavy imports with `if TYPE_CHECKING:`.
+2. Reach for facade aliases from `codeintel_rev.typing` (`NDArrayF32`, `NDArrayI64`, `gate_import`, `HEAVY_DEPS`) instead of raw types.
+3. For runtime access, wrap modules with `LazyModule` so that imports happen only when a function actually executes.
+4. Keep signatures and docstrings aligned with the façade aliases so lint/type gates remain clean.
+
+**Before (violates typing gates)**:
+
+```python
+import numpy as np
+
+def search(query: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    ...
+```
+
+**After (import-clean + typed)**:
+
+```python
+from typing import TYPE_CHECKING, cast
+from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.typing import NDArrayF32
+
+if TYPE_CHECKING:
+    import numpy as np
+else:
+    np = cast("np", LazyModule("numpy", "faiss manager vector ops"))
+
+def search(query: NDArrayF32) -> tuple[NDArrayF32, NDArrayF32]:
+    scores = np.asarray(...)
+    return scores, query
+```
+
+This pattern keeps `python -c "import codeintel_rev"` working on minimal hosts while preserving precise types for Ruff/pyright/pyrefly.
+
 ---
 
 ## Docstrings (NumPy style; enforced; runnable)

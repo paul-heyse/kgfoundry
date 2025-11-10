@@ -9,8 +9,8 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import TYPE_CHECKING, cast
 
+from codeintel_rev.typing import gate_import
 from kgfoundry_common.logging import get_logger
-from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
     import faiss as _faiss

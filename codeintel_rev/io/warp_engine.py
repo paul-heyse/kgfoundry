@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from kgfoundry_common.logging import get_logger
-from kgfoundry_common.typing import gate_import
+from codeintel_rev.typing import gate_import
 
 if TYPE_CHECKING:
     from types import ModuleType

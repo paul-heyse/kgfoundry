@@ -84,9 +84,10 @@ def _check_package_has_typed_via_subprocess(package_name: str) -> bool:
             f"import importlib.metadata; dist = importlib.metadata.distribution('{safe_package}'); files = [f.name for f in dist.files if f]; print('py.typed' in files)",
         ]
         stdout = run_subprocess(cmd, timeout=5, cwd=REPO_ROOT)
-        return "True" in stdout
     except (OSError, RuntimeError):
         return False
+    else:
+        return "True" in stdout
 
 
 def _get_all_installed_packages_via_subprocess() -> dict[str, str]:
@@ -403,13 +404,12 @@ def check_package_has_typed(package_name: str) -> bool:
     # Fallback: check if package is in stdlib
     try:
         spec = importlib.util.find_spec(package_name)
-        if spec and spec.origin and "site-packages" not in str(spec.origin):
-            # Likely stdlib
-            return True
     except (ImportError, ValueError) as exc:
         logger.debug("Failed to check stdlib for %s: %s", package_name, exc)
-
-    return False
+        return False
+    else:
+        # Likely stdlib if origin exists and is not in site-packages
+        return bool(spec and spec.origin and "site-packages" not in str(spec.origin))
 
 
 def normalize_package_name(name: str) -> str:
@@ -771,7 +771,7 @@ def _gather_package_data() -> tuple[dict[str, str], set[str]]:
     return installed_packages, dependency_tree
 
 
-@dataclass
+@dataclass(frozen=True)
 class _AuditContext:
     """Context for audit workflow execution."""
 
@@ -783,7 +783,9 @@ class _AuditContext:
     dependency_tree: set[str]
 
 
-def _execute_audit_workflow(context: _AuditContext) -> tuple[set[str], set[str], set[str], dict[str, str]]:
+def _execute_audit_workflow(
+    context: _AuditContext,
+) -> tuple[set[str], set[str], set[str], dict[str, str]]:
     """Execute the main audit workflow steps.
 
     Parameters

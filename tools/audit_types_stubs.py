@@ -196,10 +196,11 @@ def check_package_has_typed(package_name: str) -> bool:
             f"import importlib.metadata; dist = importlib.metadata.distribution('{safe_package}'); files = [f.name for f in dist.files if f]; print('py.typed' in files)",
         ]
         stdout = run_subprocess(cmd, timeout=5)
-        # Check if py.typed is mentioned
-        return "py.typed" in stdout or "py_typed" in stdout
     except (OSError, RuntimeError):
         return False
+    else:
+        # Check if py.typed is mentioned
+        return "py.typed" in stdout or "py_typed" in stdout
 
 
 def normalize_package_name(name: str) -> str:

@@ -6,15 +6,20 @@ import json
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
-import numpy as np
-
+from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.typing import NDArrayAny
 from codeintel_rev.app.config_context import resolve_application_paths
 from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.xtr_manager import XTRIndex
 from kgfoundry_common.logging import get_logger
+
+if TYPE_CHECKING:
+    import numpy as np
+else:
+    np = cast("np", LazyModule("numpy", "XTR build pipeline"))
 
 LOGGER = get_logger(__name__)
 
@@ -82,7 +87,7 @@ def _gather_chunk_vectors(
     index: XTRIndex,
     catalog: DuckDBCatalog,
     dtype: np.dtype[Any],
-) -> tuple[list[np.ndarray], list[int], list[int], list[int], int]:
+) -> tuple[list[NDArrayAny], list[int], list[int], list[int], int]:
     """Collect encoded vectors and offsets for all chunks.
 
     Extended Summary
@@ -108,7 +113,7 @@ def _gather_chunk_vectors(
 
     Returns
     -------
-    tuple[list[np.ndarray], list[int], list[int], list[int], int]
+    tuple[list[NDArrayAny], list[int], list[int], list[int], int]
         Five-element tuple containing:
         - List of token embedding arrays, one per chunk
         - List of chunk IDs corresponding to each buffer
@@ -124,7 +129,7 @@ def _gather_chunk_vectors(
     computation for encoding. Thread-safe if index encoder is thread-safe.
     Dimension mismatches are logged as warnings but processing continues.
     """
-    buffers: list[np.ndarray] = []
+    buffers: list[NDArrayAny] = []
     chunk_ids: list[int] = []
     offsets: list[int] = []
     lengths: list[int] = []
@@ -150,7 +155,7 @@ def _gather_chunk_vectors(
 
 
 def _write_token_matrix(
-    buffers: Sequence[np.ndarray],
+    buffers: Sequence[NDArrayAny],
     *,
     dtype: np.dtype[Any],
     dim: int,
@@ -170,7 +175,7 @@ def _write_token_matrix(
 
     Parameters
     ----------
-    buffers : Sequence[np.ndarray]
+    buffers : Sequence[NDArrayAny]
         Sequence of token embedding arrays, one per chunk. Each array has shape
         (tokens_per_chunk, embedding_dim). Arrays are concatenated in order.
     dtype : np.dtype[Any]

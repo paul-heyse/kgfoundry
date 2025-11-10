@@ -10,14 +10,17 @@ from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, cast
 
-import numpy as np
-
+from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.typing import NDArrayF32, NDArrayI64
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     import faiss
+    import numpy as np
 
     from codeintel_rev.config.settings import IndexConfig
+else:
+    np = cast("np", LazyModule("numpy", "FAISS dual index operations"))
 
 LOGGER = get_logger(__name__)
 
@@ -198,7 +201,7 @@ class FAISSDualIndexManager:
 
     def search(
         self,
-        query_vec: np.ndarray,
+        query_vec: NDArrayF32,
         *,
         k: int = 10,
         nprobe: int | None = None,
@@ -207,7 +210,7 @@ class FAISSDualIndexManager:
 
         Parameters
         ----------
-        query_vec : np.ndarray
+        query_vec : NDArrayF32
             Query vector with shape ``(vec_dim,)`` or ``(1, vec_dim)``.
         k : int, optional
             Number of results to return. Defaults to ``10``.
@@ -273,15 +276,15 @@ class FAISSDualIndexManager:
         sorted_results = sorted(results.items(), key=lambda item: item[1], reverse=True)
         return sorted_results[:k]
 
-    async def add_incremental(self, vectors: np.ndarray, chunk_ids: np.ndarray) -> None:
+    async def add_incremental(self, vectors: NDArrayF32, chunk_ids: NDArrayI64) -> None:
         """Append vectors to the secondary index and persist them to disk.
 
         Parameters
         ----------
-        vectors : np.ndarray
+        vectors : NDArrayF32
             2-D array of shape ``(n, vec_dim)`` containing the vectors to add. The
             vectors are L2-normalized before insertion.
-        chunk_ids : np.ndarray
+        chunk_ids : NDArrayI64
             1-D array of shape ``(n,)`` containing the chunk identifiers to bind to
             the provided vectors. IDs are coerced to ``int64``.
 

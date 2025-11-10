@@ -47,16 +47,19 @@ import shutil
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlparse
 
-import duckdb
-import httpx
-
+from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.app.config_context import ApplicationContext
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
-    from codeintel_rev.app.config_context import ApplicationContext
+    import duckdb
+    import httpx
+else:
+    duckdb = cast("duckdb", LazyModule("duckdb", "Readiness DuckDB checks"))
+    httpx = cast("httpx", LazyModule("httpx", "Readiness HTTP checks"))
 
 LOGGER = get_logger(__name__)
 HTTP_HEALTH_TIMEOUT_S = 2.0

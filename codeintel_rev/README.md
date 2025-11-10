@@ -41,6 +41,34 @@ Production-grade MCP server for AI-assisted code review with SCIP indexing, sema
   explains the shared metrics helper, naming conventions, resource cleanup, and
   RFC 9457 error handling expectations.
 
+### Capability Snapshot
+
+- `GET /capz` returns a cheap, side-effect-free view of what runtimes and indexes are
+  currently available. This is the canonical source for gated MCP tool registration.
+- Append `?refresh=true` to recompute the snapshot without restarting the server.
+
+Example response:
+
+```json
+{
+  "faiss_index_present": true,
+  "duckdb_catalog_present": true,
+  "scip_index_present": true,
+  "vllm_client_ready": true,
+  "coderank_index_present": false,
+  "warp_index_present": true,
+  "xtr_index_present": true,
+  "faiss_importable": true,
+  "duckdb_importable": true,
+  "httpx_importable": true,
+  "torch_importable": true,
+  "faiss_gpu_available": false,
+  "faiss_gpu_disabled_reason": "no-gpu-visible",
+  "has_semantic": true,
+  "has_symbols": true
+}
+```
+
 ### Sparse Retrieval
 
 - [BM25 Architecture Guide](docs/architecture/bm25.md)
@@ -812,4 +840,3 @@ See main project LICENSE.
 - [vLLM Documentation](https://docs.vllm.ai/)
 - [FAISS Wiki](https://github.com/facebookresearch/faiss/wiki)
 - [AGENTS.md](../AGENTS.md) - Development standards
-

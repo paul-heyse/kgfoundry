@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, ClassVar, cast
 
 from kgfoundry_common.logging import get_logger
-from kgfoundry_common.typing import gate_import
+from codeintel_rev.typing import gate_import
 
 if TYPE_CHECKING:
     from transformers import AutoModelForCausalLM, PreTrainedTokenizerBase

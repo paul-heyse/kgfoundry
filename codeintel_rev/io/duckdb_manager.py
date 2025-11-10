@@ -8,8 +8,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from queue import Empty, Full, LifoQueue
 from threading import Lock
+from typing import TYPE_CHECKING, cast
 
-import duckdb
+from codeintel_rev._lazy_imports import LazyModule
+
+if TYPE_CHECKING:
+    import duckdb
+else:
+    duckdb = cast("duckdb", LazyModule("duckdb", "DuckDB connection management"))
 
 __all__ = ["DuckDBConfig", "DuckDBManager", "DuckDBQueryBuilder", "DuckDBQueryOptions"]
 

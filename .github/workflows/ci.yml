@@ -171,9 +171,138 @@ PY
           compression-level: 9
 
   tests:
-    name: Pytest
+    name: Tests (${{ matrix.profile }})
     runs-on: ubuntu-latest
     needs: types
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [minimal, full]
+    env:
+      PYTHONPATH: src
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v3
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Prep cache keys
+        id: cache-keys
+        run: |
+          echo "py=$(python - <<'PY'
+import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')
+PY
+)" >> $GITHUB_OUTPUT
+
+      - name: Cache uv
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-${{ hashFiles('uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-
+
+      - name: Sync environment (minimal)
+        if: ${{ matrix.profile == 'minimal' }}
+        run: uv sync --locked
+
+      - name: Sync environment (full)
+        if: ${{ matrix.profile == 'full' }}
+        run: uv sync --locked --extra gpu
+
+      - name: Remove heavy dependencies
+        if: ${{ matrix.profile == 'minimal' }}
+        run: |
+          pkgs=$(uv run python - <<'PY'
+from codeintel_rev.typing import HEAVY_DEPS
+print(" ".join(sorted(HEAVY_DEPS)))
+PY
+)
+          if [ -n "$pkgs" ]; then
+            uv pip uninstall -y $pkgs || true
+          fi
+
+      - name: Import smoke test
+        if: ${{ matrix.profile == 'minimal' }}
+        run: uv run python -c "import codeintel_rev"
+
+      - name: Typing gate enforcement
+        if: ${{ matrix.profile == 'minimal' }}
+        run: uv run python -m tools.lint.check_typing_gates src tools
+
+      - name: Pytest (minimal profile)
+        if: ${{ matrix.profile == 'minimal' }}
+        env:
+          SKIP_GPU_WARMUP: "1"
+        run: uv run pytest -q -m "not integration and not gpu"
+
+      - name: Cache mypy
+        if: ${{ matrix.profile == 'full' }}
+        uses: actions/cache@v4
+        with:
+          path: .mypy_cache
+          key: mypy-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-${{ hashFiles('mypy.ini', 'pyproject.toml') }}
+          restore-keys: |
+            mypy-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-
+
+      - name: Build navmap
+        if: ${{ matrix.profile == 'full' }}
+        run: uv run python tools/navmap/build_navmap.py
+
+      - name: Check navmap
+        if: ${{ matrix.profile == 'full' }}
+        run: uv run python tools/navmap/check_navmap.py
+
+      - name: Run pytest (full profile)
+        if: ${{ matrix.profile == 'full' }}
+        run: |
+          uv run pytest -q \
+            --cov=src --cov-report=xml:coverage.xml --cov-report=html:htmlcov \
+            --junitxml=junit.xml
+
+      - name: Check import-linter contracts
+        if: ${{ always() && matrix.profile == 'full' }}
+        run: |
+          uv run python tools/check_imports.py || echo "::warning::import-linter check failed"
+
+      - name: Check suppression guard
+        if: ${{ always() && matrix.profile == 'full' }}
+        run: |
+          uv run python tools/check_new_suppressions.py src || echo "::warning::Suppression guard found untracked suppressions"
+
+      - name: Generate PR summary
+        if: ${{ always() && matrix.profile == 'full' }}
+        run: |
+          uv run python tools/generate_pr_summary.py
+
+      - name: Upload coverage
+        if: ${{ always() && matrix.profile == 'full' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-ubuntu
+          path: |
+            coverage.xml
+            htmlcov/**
+          retention-days: 7
+          compression-level: 9
+          if-no-files-found: ignore
+
+      - name: Upload JUnit report
+        if: ${{ always() && matrix.profile == 'full' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-ubuntu
+          path: junit.xml
+          retention-days: 7
+          if-no-files-found: ignore
+
+  security:
+    name: Security (pip-audit)
+    runs-on: ubuntu-latest
+    needs: tests
     steps:
       - uses: actions/checkout@v4
 
@@ -202,63 +331,8 @@ PY
       - name: Sync environment
         run: uv sync --locked
 
-      - name: Cache mypy
-        uses: actions/cache@v4
-        with:
-          path: .mypy_cache
-          key: mypy-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-${{ hashFiles('mypy.ini', 'pyproject.toml') }}
-          restore-keys: |
-            mypy-${{ runner.os }}-py${{ steps.cache-keys.outputs.py }}-
-
-      - name: Build navmap
-        run: uv run python tools/navmap/build_navmap.py
-
-      - name: Check navmap
-        run: uv run python tools/navmap/check_navmap.py
-
-      - name: Run pytest
-        env:
-          PYTHONPATH: src
-        run: |
-          uv run pytest -q \
-            --cov=src --cov-report=xml:coverage.xml --cov-report=html:htmlcov \
-            --junitxml=junit.xml
-
-      - name: Check import-linter contracts
-        if: ${{ always() }}
-        run: |
-          uv run python tools/check_imports.py || echo "::warning::import-linter check failed"
-
-      - name: Check suppression guard
-        if: ${{ always() }}
-        run: |
-          uv run python tools/check_new_suppressions.py src || echo "::warning::Suppression guard found untracked suppressions"
-
-      - name: Generate PR summary
-        if: ${{ always() }}
-        run: |
-          uv run python tools/generate_pr_summary.py
-
-      - name: Upload coverage
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-ubuntu
-          path: |
-            coverage.xml
-            htmlcov/**
-          retention-days: 7
-          compression-level: 9
-          if-no-files-found: ignore
-
-      - name: Upload JUnit report
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: junit-ubuntu
-          path: junit.xml
-          retention-days: 7
-          if-no-files-found: ignore
+      - name: Run pip-audit
+        run: uvx pip-audit --fail-on=critical
 
   docs:
     name: Documentation

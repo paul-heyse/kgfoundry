@@ -13,11 +13,11 @@ from __future__ import annotations
 import json
 import logging
 import shutil
-import subprocess  # lint-ignore[S404] Required for check=False; executable validated via shutil.which
 import sys
 from pathlib import Path
 
 from tools._shared.logging import get_logger
+from tools._shared.proc import run_tool
 
 REPO_ROOT = Path(__file__).parent.parent
 
@@ -60,17 +60,13 @@ def _run_type_checker(cmd: list[str], tool_name: str) -> tuple[bool, str]:
         Tuple of (success boolean, output message).
     """
     # Executable is validated via shutil.which; args are literal strings
-    # subprocess.run required for check=False to capture return codes
-    result = subprocess.run(  # lint-ignore[S603] Input validated; executable from shutil.which
-        cmd,
-        check=False,
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-    )
+    # Use run_tool for safe subprocess execution with check=False
+    result = run_tool(cmd, check=False, cwd=REPO_ROOT)
 
     if result.returncode != 0:
-        return False, f"{tool_name} failed:\n{result.stdout}\n{result.stderr}"
+        stdout = getattr(result, "stdout", "")
+        stderr = getattr(result, "stderr", "")
+        return False, f"{tool_name} failed:\n{stdout}\n{stderr}"
 
     return True, f"{tool_name} passed"
 

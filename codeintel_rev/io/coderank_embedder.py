@@ -6,13 +6,15 @@ import threading
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, ClassVar, Protocol, cast
 
-import numpy as np
-
+from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.typing import NDArrayF32, gate_import
 from kgfoundry_common.logging import get_logger
-from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
+    import numpy as np
     from sentence_transformers import SentenceTransformer
+else:
+    np = cast("np", LazyModule("numpy", "CodeRank embeddings"))
 
 
 class SupportsCodeRankSettings(Protocol):
@@ -71,7 +73,7 @@ class CodeRankEmbedder:
         self.normalize = settings.normalize
         self.batch_size = settings.batch_size
 
-    def encode_queries(self, queries: Iterable[str]) -> np.ndarray:
+    def encode_queries(self, queries: Iterable[str]) -> NDArrayF32:
         """Return CodeRank embeddings for queries with prefix applied.
 
         Parameters
@@ -82,7 +84,7 @@ class CodeRankEmbedder:
 
         Returns
         -------
-        np.ndarray
+        NDArrayF32
             Array of query embeddings with shape (num_queries, embedding_dim).
 
         Raises
@@ -102,7 +104,7 @@ class CodeRankEmbedder:
         )
         return np.asarray(vectors, dtype=np.float32).reshape(len(query_list), -1)
 
-    def encode_codes(self, snippets: Iterable[str]) -> np.ndarray:
+    def encode_codes(self, snippets: Iterable[str]) -> NDArrayF32:
         """Return embeddings for code snippets (used during indexing).
 
         Parameters
@@ -113,7 +115,7 @@ class CodeRankEmbedder:
 
         Returns
         -------
-        np.ndarray
+        NDArrayF32
             Array of code embeddings with shape (num_snippets, embedding_dim).
 
         Raises

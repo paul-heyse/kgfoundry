@@ -6,14 +6,18 @@ import json
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal, Protocol, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Literal, Protocol, TypedDict, cast
 
-import numpy as np
-
+from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.config.settings import XTRConfig
 from codeintel_rev.runtime import RuntimeCell
+from codeintel_rev.typing import NDArrayF32, gate_import
 from kgfoundry_common.logging import get_logger
-from kgfoundry_common.typing import gate_import
+
+if TYPE_CHECKING:
+    import numpy as np
+else:
+    np = cast("np", LazyModule("numpy", "XTR index operations"))
 
 LOGGER = get_logger(__name__)
 
@@ -144,7 +148,7 @@ class XTRIndex:
             return None
         return cast("XTRMetadata", dict(state.meta))
 
-    def encode_query_tokens(self, text: str) -> np.ndarray:
+    def encode_query_tokens(self, text: str) -> NDArrayF32:
         """Encode text into normalized token embeddings.
 
         Parameters
@@ -155,7 +159,7 @@ class XTRIndex:
 
         Returns
         -------
-        np.ndarray
+        NDArrayF32
             Array shaped [tokens, dim] with L2-normalized token vectors.
             Each row is a token embedding normalized to unit length.
         """
@@ -338,7 +342,7 @@ class XTRIndex:
 
     def score_candidates(
         self,
-        query_vecs: np.ndarray,
+        query_vecs: NDArrayF32,
         candidate_chunk_ids: Iterable[int],
         *,
         explain: bool = False,
@@ -349,7 +353,7 @@ class XTRIndex:
 
         Parameters
         ----------
-        query_vecs : np.ndarray
+        query_vecs : NDArrayF32
             Query token embeddings array shaped [query_tokens, dim]. Used to compute
             MaxSim scores against document token embeddings.
         candidate_chunk_ids : Iterable[int]
@@ -540,7 +544,7 @@ class XTRIndex:
         except ValueError:
             return None
 
-    def _slice_chunk(self, chunk_id: int) -> np.ndarray:
+    def _slice_chunk(self, chunk_id: int) -> NDArrayF32:
         """Return token matrix slice for chunk_id.
 
         Parameters
@@ -550,7 +554,7 @@ class XTRIndex:
 
         Returns
         -------
-        np.ndarray
+        NDArrayF32
             View over the token matrix for the requested chunk. Array shaped
             [tokens, dim] with token embeddings.
 

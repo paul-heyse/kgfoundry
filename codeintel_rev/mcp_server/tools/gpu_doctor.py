@@ -22,13 +22,15 @@ import sys
 import traceback
 from typing import TYPE_CHECKING, cast
 
-import numpy as np
-
-from kgfoundry_common.typing import gate_import
+from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.typing import gate_import
 
 if TYPE_CHECKING:
     import faiss as _faiss
     import torch as _torch
+    import numpy as np
+else:
+    np = cast("np", LazyModule("numpy", "GPU diagnostics random probes"))
 
 
 def check_torch(device_index: int = 0) -> tuple[bool, dict[str, object]]:

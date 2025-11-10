@@ -13,13 +13,15 @@ from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, cast
 
-import numpy as np
-
+from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.typing import NDArrayF32, NDArrayI64, gate_import
 from kgfoundry_common.logging import get_logger
-from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
     import faiss as _faiss
+    import numpy as np
+else:
+    np = cast("np", LazyModule("numpy", "FAISS manager vector operations"))
 
 LOGGER = get_logger(__name__)
 logger = LOGGER  # Alias for compatibility
@@ -189,7 +191,7 @@ class FAISSManager:
             index_path.parent / f"{index_path.stem}.secondary{index_path.suffix}"
         )
 
-    def build_index(self, vectors: np.ndarray) -> None:
+    def build_index(self, vectors: NDArrayF32) -> None:
         """Build and train FAISS index with adaptive type selection.
 
         Chooses the optimal index type based on corpus size:
@@ -202,7 +204,7 @@ class FAISSManager:
 
         Parameters
         ----------
-        vectors : np.ndarray
+        vectors : NDArrayF32
             Training vectors of shape (n, vec_dim). Vectors are automatically
             L2-normalized for cosine similarity.
 
@@ -338,7 +340,7 @@ class FAISSManager:
             "total_bytes": cpu_mem + gpu_mem,
         }
 
-    def add_vectors(self, vectors: np.ndarray, ids: np.ndarray) -> None:
+    def add_vectors(self, vectors: NDArrayF32, ids: NDArrayI64) -> None:
         """Add vectors with IDs to the index.
 
         Adds a batch of vectors to the FAISS index with their associated IDs.
@@ -351,10 +353,10 @@ class FAISSManager:
 
         Parameters
         ----------
-        vectors : np.ndarray
+        vectors : NDArrayF32
             Vectors to add, shape (n, vec_dim) where n is the number of vectors
             and vec_dim matches the index dimension. Dtype should be float32.
-        ids : np.ndarray
+        ids : NDArrayI64
             Unique IDs for each vector, shape (n,). IDs are stored as int64 in
             FAISS. These should correspond to chunk IDs from the indexing pipeline.
 
@@ -376,7 +378,7 @@ class FAISSManager:
         # Add with IDs
         cpu_index.add_with_ids(vectors_norm, ids.astype(np.int64))
 
-    def update_index(self, new_vectors: np.ndarray, new_ids: np.ndarray) -> None:
+    def update_index(self, new_vectors: NDArrayF32, new_ids: NDArrayI64) -> None:
         """Add new vectors to secondary index for fast incremental updates.
 
         Extended Summary
@@ -390,11 +392,11 @@ class FAISSManager:
 
         Parameters
         ----------
-        new_vectors : np.ndarray
+        new_vectors : NDArrayF32
             Array of new embedding vectors to add, shape (N, dim) where N is the number
             of vectors and dim matches the index dimensionality. Must be float32 and
             normalized if the index uses cosine similarity.
-        new_ids : np.ndarray
+        new_ids : NDArrayI64
             Array of document/chunk IDs corresponding to new_vectors, shape (N,).
             Must be integer type. IDs that already exist in the primary index will be
             filtered out before adding to the secondary index.
@@ -517,7 +519,7 @@ class FAISSManager:
             return set()
 
     def _collect_unique_indices(
-        self, new_ids: np.ndarray, primary_contains: Callable[[int], bool]
+        self, new_ids: NDArrayI64, primary_contains: Callable[[int], bool]
     ) -> list[int]:
         unique_indices: list[int] = []
         seen_in_batch: set[int] = set()
@@ -750,8 +752,8 @@ class FAISSManager:
         return True
 
     def search(
-        self, query: np.ndarray, k: int = 50, nprobe: int = 128
-    ) -> tuple[np.ndarray, np.ndarray]:
+        self, query: NDArrayF32, k: int = 50, nprobe: int = 128
+    ) -> tuple[NDArrayF32, NDArrayI64]:
         """Search for nearest neighbors using cosine similarity with dual-index support.
 
         Performs approximate nearest neighbor search using the FAISS index(es).
@@ -766,7 +768,7 @@ class FAISSManager:
 
         Parameters
         ----------
-        query : np.ndarray
+        query : NDArrayF32
             Query vector(s) of shape (n_queries, vec_dim) or (vec_dim,) for
             single query. Dtype should be float32. Vectors are automatically
             normalized for cosine similarity.
@@ -781,7 +783,7 @@ class FAISSManager:
 
         Returns
         -------
-        tuple[np.ndarray, np.ndarray]
+        tuple[NDArrayF32, NDArrayI64]
             Tuple of (distances, ids) arrays:
             - distances: shape (n_queries, k), cosine similarity scores (higher
               is more similar, range typically 0-1 after normalization)
@@ -827,8 +829,8 @@ class FAISSManager:
         return primary_dists, primary_ids
 
     def search_primary(
-        self, query: np.ndarray, k: int, nprobe: int
-    ) -> tuple[np.ndarray, np.ndarray]:
+        self, query: NDArrayF32, k: int, nprobe: int
+    ) -> tuple[NDArrayF32, NDArrayI64]:
         """Search the primary index (adaptive type: Flat/IVFFlat/IVF-PQ).
 
         This method is public for testing and advanced use cases where
@@ -836,7 +838,7 @@ class FAISSManager:
 
         Parameters
         ----------
-        query : np.ndarray
+        query : NDArrayF32
             Query vector(s), shape (n_queries, vec_dim) or (vec_dim,).
         k : int
             Number of nearest neighbors to return.
@@ -845,7 +847,7 @@ class FAISSManager:
 
         Returns
         -------
-        tuple[np.ndarray, np.ndarray]
+        tuple[NDArrayF32, NDArrayI64]
             Tuple of (distances, ids) from primary index search.
 
         Notes
@@ -881,7 +883,7 @@ class FAISSManager:
         # Search primary index
         return index.search(query_norm, k)
 
-    def search_secondary(self, query: np.ndarray, k: int) -> tuple[np.ndarray, np.ndarray]:
+    def search_secondary(self, query: NDArrayF32, k: int) -> tuple[NDArrayF32, NDArrayI64]:
         """Search the secondary index (flat, no training required).
 
         This method is public for testing and advanced use cases where
@@ -889,14 +891,14 @@ class FAISSManager:
 
         Parameters
         ----------
-        query : np.ndarray
+        query : NDArrayF32
             Query vector(s), shape (n_queries, vec_dim) or (vec_dim,).
         k : int
             Number of nearest neighbors to return.
 
         Returns
         -------
-        tuple[np.ndarray, np.ndarray]
+        tuple[NDArrayF32, NDArrayI64]
             Tuple of (distances, ids) from secondary index search.
 
         Raises
@@ -922,12 +924,12 @@ class FAISSManager:
 
     @staticmethod
     def _merge_results(
-        dists1: np.ndarray,
-        ids1: np.ndarray,
-        dists2: np.ndarray,
-        ids2: np.ndarray,
+        dists1: NDArrayF32,
+        ids1: NDArrayI64,
+        dists2: NDArrayF32,
+        ids2: NDArrayI64,
         k: int,
-    ) -> tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[NDArrayF32, NDArrayI64]:
         """Merge search results from two indexes by score.
 
         Combines results from primary and secondary indexes, sorts by distance
@@ -935,20 +937,20 @@ class FAISSManager:
 
         Parameters
         ----------
-        dists1 : np.ndarray
+        dists1 : NDArrayF32
             Distances from first index, shape (n_queries, k1).
-        ids1 : np.ndarray
+        ids1 : NDArrayI64
             IDs from first index, shape (n_queries, k1).
-        dists2 : np.ndarray
+        dists2 : NDArrayF32
             Distances from second index, shape (n_queries, k2).
-        ids2 : np.ndarray
+        ids2 : NDArrayI64
             IDs from second index, shape (n_queries, k2).
         k : int
             Number of top results to return after merging.
 
         Returns
         -------
-        tuple[np.ndarray, np.ndarray]
+        tuple[NDArrayF32, NDArrayI64]
             Tuple of (merged_distances, merged_ids), both shape (n_queries, k).
             Results are sorted by distance (descending for inner product).
 
@@ -1078,7 +1080,7 @@ class FAISSManager:
             ),
         )
 
-    def _extract_all_vectors(self, index: _faiss.Index) -> tuple[np.ndarray, np.ndarray]:
+    def _extract_all_vectors(self, index: _faiss.Index) -> tuple[NDArrayF32, NDArrayI64]:
         """Extract all vectors and IDs from a FAISS index.
 
         Reconstructs vectors from the index and retrieves their associated IDs.
@@ -1093,7 +1095,7 @@ class FAISSManager:
 
         Returns
         -------
-        tuple[np.ndarray, np.ndarray]
+        tuple[NDArrayF32, NDArrayI64]
             Tuple of (vectors, ids):
             - vectors: shape (n_vectors, vec_dim), dtype float32
             - ids: shape (n_vectors,), dtype int64

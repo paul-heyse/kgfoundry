@@ -11,19 +11,22 @@ from importlib import import_module
 from types import ModuleType
 from typing import TYPE_CHECKING, cast
 
-import httpx
 import msgspec
 
+from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.typing import NDArrayF32, gate_import
 from kgfoundry_common.logging import get_logger
-from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     import numpy as np
+    import httpx
 
     from codeintel_rev.config.settings import VLLMConfig
     from codeintel_rev.io.vllm_engine import InprocessVLLMEmbedder
+else:
+    httpx = cast("httpx", LazyModule("httpx", "vLLM HTTP client"))
 
 LOGGER = get_logger(__name__)
 
@@ -243,7 +246,7 @@ class VLLMClient:
             },
         )
 
-    def embed_batch(self, texts: Sequence[str]) -> np.ndarray:
+    def embed_batch(self, texts: Sequence[str]) -> NDArrayF32:
         """Embed texts using the configured transport (HTTP or local).
 
         Extended Summary
@@ -264,7 +267,7 @@ class VLLMClient:
 
         Returns
         -------
-        np.ndarray
+        NDArrayF32
             Embedding matrix with shape (N, embedding_dim) where N is len(texts) and
             embedding_dim matches the configured model's output dimensionality. Dtype is
             float32. Each row corresponds to the embedding of the corresponding input text.
@@ -300,7 +303,7 @@ class VLLMClient:
         )
         return vectors
 
-    def _embed_batch_http(self, texts: Sequence[str]) -> np.ndarray:
+    def _embed_batch_http(self, texts: Sequence[str]) -> NDArrayF32:
         request = EmbeddingRequest(input=list(texts), model=self.config.model)
         payload = self._encoder.encode(request)
 
@@ -327,7 +330,7 @@ class VLLMClient:
             dtype=np_module.float32,
         )
 
-    def embed_single(self, text: str) -> np.ndarray:
+    def embed_single(self, text: str) -> NDArrayF32:
         """Embed a single string and return its vector.
 
         Parameters
@@ -337,7 +340,7 @@ class VLLMClient:
 
         Returns
         -------
-        np.ndarray
+        NDArrayF32
             One-dimensional embedding vector for the supplied text.
 
         Raises
@@ -355,7 +358,7 @@ class VLLMClient:
         self,
         texts: Sequence[str],
         batch_size: int | None = None,
-    ) -> np.ndarray:
+    ) -> NDArrayF32:
         """Embed texts in batches.
 
         This method processes multiple texts efficiently by splitting them into
@@ -381,7 +384,7 @@ class VLLMClient:
 
         Returns
         -------
-        np.ndarray
+        NDArrayF32
             Embeddings array of shape (len(texts), vec_dim) where vec_dim is the
             model's embedding dimension (e.g., 2560). Dtype is float32 for memory
             efficiency. Returns an empty array of shape (0, self.config.embedding_dim)
@@ -404,7 +407,7 @@ class VLLMClient:
 
         return np_module.vstack(all_vectors)
 
-    async def embed_batch_async(self, texts: Sequence[str]) -> np.ndarray:
+    async def embed_batch_async(self, texts: Sequence[str]) -> NDArrayF32:
         """Asynchronous variant of embed_batch for async/await workflows.
 
         Extended Summary
@@ -425,7 +428,7 @@ class VLLMClient:
 
         Returns
         -------
-        np.ndarray
+        NDArrayF32
             Embedding matrix with shape (N, embedding_dim) where N is len(texts) and
             embedding_dim matches the configured model's output dimensionality. Dtype is
             float32. Each row corresponds to the embedding of the corresponding input text.
@@ -521,7 +524,7 @@ class VLLMClient:
             self._local_engine = None
         LOGGER.debug("VLLMClient resources closed (async)")
 
-    async def _embed_batch_async_local(self, texts: Sequence[str]) -> np.ndarray:
+    async def _embed_batch_async_local(self, texts: Sequence[str]) -> NDArrayF32:
         if self._local_engine is None:
             msg = "Local vLLM engine not initialized."
             raise RuntimeError(msg)

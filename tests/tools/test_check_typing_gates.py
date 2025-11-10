@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 from tools.lint.check_typing_gates import (
+    HEAVY_MODULES,
     check_file,
     format_violations,
     main,
@@ -40,7 +41,7 @@ def process(arr: np.ndarray) -> None:
             encoding="utf-8",
         )
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         assert len(violations) == 1
         assert violations[0].violation_type == "heavy_import"
         assert violations[0].module_name == "numpy"
@@ -58,7 +59,7 @@ app: FastAPI = None
             encoding="utf-8",
         )
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         assert len(violations) == 1
         assert violations[0].violation_type == "heavy_import"
         assert violations[0].module_name == "fastapi"
@@ -74,7 +75,7 @@ from docs._types.symbol import SymbolDefinition
             encoding="utf-8",
         )
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         assert len(violations) == 1
         assert violations[0].violation_type == "private_module"
         assert violations[0].module_name == "docs._types.symbol"
@@ -90,7 +91,7 @@ from docs._cache import get_cached_symbols
             encoding="utf-8",
         )
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         assert len(violations) == 1
         assert violations[0].violation_type == "private_module"
         assert "docs._cache" in violations[0].module_name
@@ -105,7 +106,7 @@ from kgfoundry_common.typing import resolve_numpy
             encoding="utf-8",
         )
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         assert len(violations) == 1
         assert violations[0].violation_type == "deprecated_shim"
         assert "resolve_numpy" in violations[0].module_name
@@ -121,7 +122,7 @@ from kgfoundry_common.typing import resolve_fastapi
             encoding="utf-8",
         )
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         assert len(violations) == 1
         assert violations[0].violation_type == "deprecated_shim"
         assert "resolve_fastapi" in violations[0].module_name
@@ -136,7 +137,7 @@ from kgfoundry_common.typing import resolve_faiss
             encoding="utf-8",
         )
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         assert len(violations) == 1
         assert violations[0].violation_type == "deprecated_shim"
         assert "resolve_faiss" in violations[0].module_name
@@ -157,7 +158,7 @@ def process(arr: np.ndarray) -> None:
             encoding="utf-8",
         )
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         assert len(violations) == 0
 
     def test_no_violation_for_stdlib(self, tmp_path: Path) -> None:
@@ -174,7 +175,7 @@ def process(p: Path) -> None:
             encoding="utf-8",
         )
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         assert len(violations) == 0
 
 
@@ -186,7 +187,7 @@ class TestAutoFixSuggestions:
         test_file = tmp_path / "test.py"
         test_file.write_text("import torch\n", encoding="utf-8")
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         assert len(violations) == 1
         assert "TYPE_CHECKING" in violations[0].suggestion
 
@@ -195,7 +196,7 @@ class TestAutoFixSuggestions:
         test_file = tmp_path / "test.py"
         test_file.write_text("import tensorflow\n", encoding="utf-8")
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         assert len(violations) == 1
         assert "gate_import" in violations[0].suggestion
 
@@ -204,7 +205,7 @@ class TestAutoFixSuggestions:
         test_file = tmp_path / "test.py"
         test_file.write_text("from docs._types.symbol import Symbol\n", encoding="utf-8")
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         assert len(violations) == 1
         assert "façade" in violations[0].suggestion.lower()
         assert "docs.types" in violations[0].suggestion
@@ -216,7 +217,7 @@ class TestAutoFixSuggestions:
             "from kgfoundry_common.typing import resolve_numpy\n", encoding="utf-8"
         )
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         assert len(violations) == 1
         assert "gate_import" in violations[0].suggestion
 
@@ -229,7 +230,7 @@ class TestOutputFormats:
         test_file = tmp_path / "test.py"
         test_file.write_text("import numpy as np\n", encoding="utf-8")
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         json_output = format_violations(violations, json_output=True)
         data = cast("list[dict[str, Any]]", json.loads(json_output))
 
@@ -245,7 +246,7 @@ class TestOutputFormats:
         test_file = tmp_path / "test.py"
         test_file.write_text("import numpy as np\n", encoding="utf-8")
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         list_output = format_violations(violations, list_output=True)
         lines = list_output.strip().split("\n")
 
@@ -261,7 +262,7 @@ class TestOutputFormats:
         test_file = tmp_path / "test.py"
         test_file.write_text("from docs._types import Symbol\n", encoding="utf-8")
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         output = format_violations(violations)
 
         assert "Fix:" in output
@@ -273,7 +274,7 @@ class TestOutputFormats:
         test_file = tmp_path / "test.py"
         test_file.write_text("import sys\n", encoding="utf-8")
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         output = format_violations(violations)
 
         assert "✓ No typing gate violations found" in output
@@ -324,7 +325,7 @@ if TYPE_CHECKING:
             encoding="utf-8",
         )
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         assert len(violations) == 0
 
     def test_faiss_submodule_import(self, tmp_path: Path) -> None:
@@ -332,7 +333,7 @@ if TYPE_CHECKING:
         test_file = tmp_path / "test.py"
         test_file.write_text("from faiss.swigfaiss import IndexFlat\n", encoding="utf-8")
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         assert len(violations) == 1
         assert violations[0].violation_type == "heavy_import"
         assert "faiss" in violations[0].module_name
@@ -350,7 +351,7 @@ from kgfoundry_common.typing import resolve_numpy
             encoding="utf-8",
         )
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         assert len(violations) == 4
         violation_types = {v.violation_type for v in violations}
         assert violation_types == {"heavy_import", "private_module", "deprecated_shim"}
@@ -360,7 +361,7 @@ from kgfoundry_common.typing import resolve_numpy
         test_file = tmp_path / "test.py"
         test_file.write_text("import numpy\nthis is not valid python\n", encoding="utf-8")
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         # Should return empty list for files with syntax errors
         assert isinstance(violations, list)
 
@@ -376,6 +377,6 @@ import numpy  # Line 3
             encoding="utf-8",
         )
 
-        violations = check_file(test_file)
+        violations = check_file(test_file, HEAVY_MODULES)
         assert len(violations) == 1
         assert violations[0].lineno == 4  # 1-indexed, counting blank line at start

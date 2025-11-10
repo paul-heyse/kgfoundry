@@ -5,19 +5,30 @@ from __future__ import annotations
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
-import numpy as np
-from transformers import AutoTokenizer, PreTrainedTokenizerBase
-from vllm import LLM
-from vllm.config import PoolerConfig
-from vllm.inputs import TokensPrompt
-
+from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.runtime import RuntimeCell
+from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
+    import numpy as np
+    import transformers
+    import vllm
+    import vllm.config as vllm_config
+    import vllm.inputs as vllm_inputs
+    from transformers import AutoTokenizer, PreTrainedTokenizerBase
+    from vllm import LLM
+    from vllm.config import PoolerConfig
+    from vllm.inputs import TokensPrompt
     from codeintel_rev.config.settings import VLLMConfig
+else:
+    np = cast("np", LazyModule("numpy", "in-process vLLM embeddings"))
+    transformers = LazyModule("transformers", "in-process vLLM tokenizer")
+    vllm = LazyModule("vllm", "in-process vLLM runtime")
+    vllm_config = LazyModule("vllm.config", "in-process vLLM config")
+    vllm_inputs = LazyModule("vllm.inputs", "in-process vLLM prompts")
 
 LOGGER = get_logger(__name__)
 
@@ -93,7 +104,7 @@ class InprocessVLLMEmbedder:
             },
         )
 
-    def embed_batch(self, texts: Sequence[str]) -> np.ndarray:
+    def embed_batch(self, texts: Sequence[str]) -> NDArrayF32:
         """Return embeddings for ``texts`` (shape ``[N, dim]``).
 
         Parameters
@@ -103,7 +114,7 @@ class InprocessVLLMEmbedder:
 
         Returns
         -------
-        np.ndarray
+        NDArrayF32
             Embedding matrix aligned with the input order.
 
         Raises
@@ -130,8 +141,9 @@ class InprocessVLLMEmbedder:
             msg = "Tokenizer did not return input_ids"
             raise RuntimeError(msg)
         token_sequences = cast("Sequence[Sequence[int]]", raw_input_ids)
+        tokens_prompt_cls = cast("type[TokensPrompt]", getattr(vllm_inputs, "TokensPrompt"))
         prompts: list[TokensPrompt] = [
-            TokensPrompt(prompt_token_ids=list(map(int, ids))) for ids in token_sequences
+            tokens_prompt_cls(prompt_token_ids=list(map(int, ids))) for ids in token_sequences
         ]
         outputs = engine.embed(prompts)
         vectors = np.asarray(
@@ -153,20 +165,23 @@ class InprocessVLLMEmbedder:
         self._cell.close()
 
     def _load_tokenizer(self) -> PreTrainedTokenizerBase:
-        return AutoTokenizer.from_pretrained(
+        transformers_mod = cast("Any", transformers)
+        return transformers_mod.AutoTokenizer.from_pretrained(
             self.config.model,
             trust_remote_code=True,
         )
 
     def _load_engine(self) -> LLM:
-        return LLM(
+        llm_cls = cast("type[LLM]", getattr(vllm, "LLM"))
+        pooler_config_cls = cast("type[PoolerConfig]", getattr(vllm_config, "PoolerConfig"))
+        return llm_cls(
             model=self.config.model,
             task="embed",
             trust_remote_code=True,
             enforce_eager=True,
             gpu_memory_utilization=self.config.gpu_memory_utilization,
             max_num_batched_tokens=self.config.max_num_batched_tokens,
-            override_pooler_config=PoolerConfig(
+            override_pooler_config=pooler_config_cls(
                 pooling_type=self.config.pooling_type,
                 normalize=self.config.normalize,
             ),

@@ -66,9 +66,9 @@ from codeintel_rev.runtime import (
     RuntimeCell,
     RuntimeCellObserver,
 )
+from codeintel_rev.typing import gate_import
 from kgfoundry_common.errors import ConfigurationError
 from kgfoundry_common.logging import get_logger
-from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
     from collections.abc import Iterator

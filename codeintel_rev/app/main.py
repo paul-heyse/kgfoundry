@@ -402,6 +402,28 @@ async def readyz(request: Request) -> JSONResponse:
     return JSONResponse({"ready": overall_ready, "checks": payload})
 
 
+@app.get("/capz")
+async def capz(request: Request, *, refresh: bool = False) -> JSONResponse:
+    """Return a cached capability snapshot (refreshable via query flag).
+
+    Returns
+    -------
+    JSONResponse
+        Capability payload.
+    """
+    context: ApplicationContext | None = getattr(request.app.state, "context", None)
+    if context is None:
+        return JSONResponse(
+            {"error": "application context not initialized"},
+            status_code=503,
+        )
+    capabilities: Capabilities | None = getattr(request.app.state, "capabilities", None)
+    if refresh or capabilities is None:
+        capabilities = Capabilities.from_context(context)
+        request.app.state.capabilities = capabilities
+    return JSONResponse(capabilities.model_dump())
+
+
 @app.get("/sse")
 async def sse_demo() -> StreamingResponse:
     """SSE streaming demo endpoint.
