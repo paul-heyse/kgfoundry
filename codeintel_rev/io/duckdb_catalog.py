@@ -253,14 +253,39 @@ class DuckDBCatalog:
         """
         row = conn.execute(
             """
-            SELECT COUNT(*)
-            FROM information_schema.tables
-            WHERE table_schema = 'main'
-              AND table_name = ?
+            SELECT EXISTS(
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_schema = 'main'
+                  AND table_name = ?
+                UNION ALL
+                SELECT 1
+                FROM information_schema.views
+                WHERE table_schema = 'main'
+                  AND table_name = ?
+            )
             """,
-            [name],
+            [name, name],
         ).fetchone()
         return bool(row and row[0])
+
+    @staticmethod
+    def relation_exists(conn: duckdb.DuckDBPyConnection, name: str) -> bool:
+        """Return True when a table or view exists (public wrapper).
+
+        Parameters
+        ----------
+        conn : duckdb.DuckDBPyConnection
+            DuckDB connection to inspect.
+        name : str
+            Table or view name to look up.
+
+        Returns
+        -------
+        bool
+            ``True`` when the relation exists in schema ``main``.
+        """
+        return DuckDBCatalog._relation_exists(conn, name)
 
     def query_by_ids(self, ids: Sequence[int]) -> list[dict]:
         """Query chunks by their unique IDs.

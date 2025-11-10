@@ -60,10 +60,10 @@ def verify() -> None:
 @app.command("search")
 def search(
     query: Annotated[str, typer.Argument(help="Natural language query.")],
-    k: Annotated[int, typer.Option(--k, -k, min=1, help="Top-k documents to return.")] = 5,
+    k: Annotated[int, typer.Option("--k", "-k", min=1, help="Top-k documents to return.")] = 5,
     candidate_ids: Annotated[
         list[int] | None,
-        typer.Option(--candidate-id, -c, help="Optional Stage-0 candidate ids to rescore."),
+        typer.Option("--candidate-id", "-c", help="Optional Stage-0 candidate ids to rescore."),
     ] = None,
     explain: Annotated[bool | None, typer.Option(help="Include token-level attributions.")] = None,
 ) -> None:

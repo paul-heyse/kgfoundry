@@ -6,22 +6,44 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 from __future__ import annotations
 
 import asyncio
+from functools import lru_cache
 from importlib import import_module
-from typing import TYPE_CHECKING
+from types import ModuleType
+from typing import TYPE_CHECKING, cast
 
 import httpx
 import msgspec
-import numpy as np
 
 from kgfoundry_common.logging import get_logger
+from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    import numpy as np
 
     from codeintel_rev.config.settings import VLLMConfig
     from codeintel_rev.io.vllm_engine import InprocessVLLMEmbedder
 
 LOGGER = get_logger(__name__)
+
+
+@lru_cache(maxsize=1)
+def _get_numpy() -> ModuleType:
+    """Load numpy lazily when embeddings are computed.
+
+    Returns
+    -------
+    numpy
+        Lazily imported NumPy module for embedding operations.
+    """
+    return cast(
+        "np",
+        gate_import(
+            "numpy",
+            "Embedding batching operations in VLLMClient",
+        ),
+    )
 
 
 class EmbeddingRequest(msgspec.Struct):
@@ -236,8 +258,12 @@ class VLLMClient:
         computation in local mode. Thread-safe if the underlying HTTP client or local
         engine is thread-safe. Empty batches return shape (0, embedding_dim).
         """
+        np_module = _get_numpy()
         if not texts:
-            return np.empty((0, self.config.embedding_dim), dtype=np.float32)
+            return np_module.empty(
+                (0, self.config.embedding_dim),
+                dtype=np_module.float32,
+            )
 
         if self._local_engine is not None:
             vectors = self._local_engine.embed_batch(texts)
@@ -276,7 +302,11 @@ class VLLMClient:
 
         # Sort by index and extract vectors
         sorted_data = sorted(result.data, key=lambda d: d.index)
-        return np.array([d.embedding for d in sorted_data], dtype=np.float32)
+        np_module = _get_numpy()
+        return np_module.array(
+            [d.embedding for d in sorted_data],
+            dtype=np_module.float32,
+        )
 
     def embed_single(self, text: str) -> np.ndarray:
         """Embed a single string and return its vector.
@@ -338,8 +368,12 @@ class VLLMClient:
             efficiency. Returns an empty array of shape (0, self.config.embedding_dim)
             when texts is empty. The order matches the input texts.
         """
+        np_module = _get_numpy()
         if not texts:
-            return np.empty((0, self.config.embedding_dim), dtype=np.float32)
+            return np_module.empty(
+                (0, self.config.embedding_dim),
+                dtype=np_module.float32,
+            )
 
         bs = batch_size or self.config.batch_size
         all_vectors = []
@@ -349,7 +383,7 @@ class VLLMClient:
             vectors = self.embed_batch(batch)
             all_vectors.append(vectors)
 
-        return np.vstack(all_vectors)
+        return np_module.vstack(all_vectors)
 
     async def embed_batch_async(self, texts: Sequence[str]) -> np.ndarray:
         """Asynchronous variant of embed_batch for async/await workflows.
@@ -385,8 +419,12 @@ class VLLMClient:
         async GPU computation in local mode. Thread-safe if the underlying async HTTP
         client or local engine is thread-safe. Empty batches return shape (0, embedding_dim).
         """
+        np_module = _get_numpy()
         if not texts:
-            return np.empty((0, self.config.embedding_dim), dtype=np.float32)
+            return np_module.empty(
+                (0, self.config.embedding_dim),
+                dtype=np_module.float32,
+            )
 
         if self._local_engine is not None:
             return await self._embed_batch_async_local(texts)
@@ -411,7 +449,10 @@ class VLLMClient:
 
         # Sort by index and extract vectors
         sorted_data = sorted(result.data, key=lambda d: d.index)
-        vectors = np.array([d.embedding for d in sorted_data], dtype=np.float32)
+        vectors = np_module.array(
+            [d.embedding for d in sorted_data],
+            dtype=np_module.float32,
+        )
 
         LOGGER.debug(
             "Batch embedding completed (async)",
