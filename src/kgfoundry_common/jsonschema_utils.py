@@ -96,5 +96,7 @@ def create_draft202012_validator(
         Typed validator instance.
     """
     concrete_schema = {str(key): value for key, value in schema.items()}
-    instance = _Draft202012Validator(concrete_schema)
+    # pyrefly incorrectly flags this as protocol instantiation, but _Draft202012Validator
+    # is the concrete class from jsonschema.validators, not the Protocol
+    instance = _Draft202012Validator(concrete_schema)  # type: ignore[assignment]
     return cast("Draft202012ValidatorProtocol", instance)

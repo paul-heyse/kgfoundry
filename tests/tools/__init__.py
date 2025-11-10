@@ -1,1 +1,1 @@
-"""Tools test utilities package."""
+"""Tests for repo scanning utilities."""

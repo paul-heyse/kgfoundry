@@ -36,8 +36,11 @@ from collections.abc import Iterable, Iterator
 from dataclasses import asdict, dataclass
 from importlib import util as importlib_util
 from pathlib import Path
+from typing import Any, cast
 
 from kgfoundry_common.subprocess_utils import SubprocessError, run_subprocess
+from tools.repo_scan_griffe import DocstringStyle, collect_api_symbols_with_griffe
+from tools.repo_scan_libcst import collect_imports_with_libcst
 
 logger = logging.getLogger(__name__)
 
@@ -291,6 +294,8 @@ class ModuleReport:
         Indicates whether ``ast.parse`` succeeded.
     parse_error : str | None
         Optional marker describing parse failures.
+    imports_cst : dict[str, Any] | None
+        Optional LibCST-derived import/export snapshot.
     """
 
     module: str
@@ -304,6 +309,30 @@ class ModuleReport:
     loc: int
     parse_ok: bool
     parse_error: str | None = None
+    imports_cst: dict[str, Any] | None = None
+
+
+@dataclass(frozen=True)
+class TestScanConfig:
+    """Immutable configuration for collecting relevant test modules."""
+
+    repo_root: Path
+    tests_subdirs: tuple[str, ...]
+    strip_prefixes: tuple[str, ...]
+    target_modules: set[str]
+    exclude_paths: set[str]
+    use_libcst: bool = False
+
+
+@dataclass(frozen=True)
+class PayloadOptions:
+    """Configuration for assembling the JSON payload."""
+
+    scan_root: Path
+    repo_root: Path
+    with_griffe: bool
+    with_libcst: bool
+    docstyle: DocstringStyle
 
 
 def collect_imports(modname: str, tree: ast.Module) -> list[str]:
@@ -604,7 +633,11 @@ def is_test_file(path: Path, modname: str) -> bool:
 
 
 def analyze_file(
-    scan_root: Path, path: Path, *, strip_prefixes: tuple[str, ...] = ()
+    scan_root: Path,
+    path: Path,
+    *,
+    strip_prefixes: tuple[str, ...] = (),
+    use_libcst: bool = False,
 ) -> ModuleReport:
     """Produce a :class:`ModuleReport` for a single source file.
 
@@ -616,6 +649,8 @@ def analyze_file(
         File to analyze.
     strip_prefixes : tuple[str, ...], optional
         Path components to drop when computing module names.
+    use_libcst : bool, optional
+        When ``True``, capture LibCST-derived import metadata for the module.
 
     Returns
     -------
@@ -654,6 +689,16 @@ def analyze_file(
     doc = collect_docstats(tree)
     typing = collect_typehints(tree)
     complexity = collect_complexity(tree)
+    imports_cst: dict[str, Any] | None = None
+    if use_libcst:
+        cst_report = collect_imports_with_libcst(path, modname)
+        imports_cst = {
+            "imports": list(cst_report.imports),
+            "type_checking_imports": list(cst_report.tc_imports),
+            "exports": list(cst_report.exports),
+            "star_imports": list(cst_report.star_imports),
+            "has_parse_errors": cst_report.has_parse_errors,
+        }
     return ModuleReport(
         module=modname,
         path=str(path),
@@ -665,6 +710,7 @@ def analyze_file(
         complexity=complexity,
         loc=file_loc(path),
         parse_ok=True,
+        imports_cst=imports_cst,
     )
 
 
@@ -673,28 +719,13 @@ def analyze_file(
 # --------------------------
 
 
-def collect_relevant_tests(
-    repo_root: Path,
-    tests_subdirs: tuple[str, ...],
-    *,
-    strip_prefixes: tuple[str, ...],
-    target_modules: set[str],
-    exclude_paths: set[str],
-) -> list[ModuleReport]:
+def collect_relevant_tests(config: TestScanConfig) -> list[ModuleReport]:
     """Scan test directories and keep only tests that target `target_modules`.
 
     Parameters
     ----------
-    repo_root : Path
-        Repository root used for module name calculations.
-    tests_subdirs : tuple[str, ...]
-        Relative test directories that should be scanned.
-    strip_prefixes : tuple[str, ...]
-        Prefixes removed when constructing module names.
-    target_modules : set[str]
-        Modules already included in the scan scope.
-    exclude_paths : set[str]
-        Absolute paths that have already been analyzed.
+    config : TestScanConfig
+        Immutable settings describing how and where tests should be scanned.
 
     Returns
     -------
@@ -702,19 +733,24 @@ def collect_relevant_tests(
         Reports for tests that exercise the selected modules.
     """
     results: list[ModuleReport] = []
-    seen = set(exclude_paths)
-    search_roots = tests_subdirs or ("tests",)
+    seen = set(config.exclude_paths)
+    search_roots = config.tests_subdirs or ("tests",)
     for subdir in search_roots:
-        candidate_root = (repo_root / subdir).resolve()
+        candidate_root = (config.repo_root / subdir).resolve()
         if not candidate_root.exists():
             continue
         for path in iter_py_files(candidate_root):
             if str(path) in seen:
                 continue
-            report = analyze_file(repo_root, path, strip_prefixes=strip_prefixes)
+            report = analyze_file(
+                config.repo_root,
+                path,
+                strip_prefixes=config.strip_prefixes,
+                use_libcst=config.use_libcst,
+            )
             if not report.is_test:
                 continue
-            if _imports_target_modules(report.imports, target_modules):
+            if _imports_target_modules(report.imports, config.target_modules):
                 results.append(report)
                 seen.add(report.path)
     return results
@@ -958,7 +994,14 @@ def build_local_import_graph(reports: list[ModuleReport]) -> list[tuple[str, str
     for r in reports:
         if not r.parse_ok:
             continue
-        for imp in r.imports:
+        import_sources: Iterable[str] = r.imports
+        if (
+            r.imports_cst
+            and not r.imports_cst.get("has_parse_errors")
+            and r.imports_cst.get("imports")
+        ):
+            import_sources = r.imports_cst["imports"]
+        for imp in import_sources:
             # normalize: keep full import, and also match prefixes
             # allow partial prefix mapping: "pkg.sub" -> match "pkg.sub" or "pkg.sub.x"
             for target in available:
@@ -1016,10 +1059,13 @@ def write_dot(edges: list[tuple[str, str]], out_path: Path) -> None:
 # --------------------------
 
 
-def main() -> None:
-    """Entrypoint for the CLI invocation defined in the module docstring.
+def _build_arg_parser() -> argparse.ArgumentParser:
+    """Return the configured argument parser for the CLI.
 
-    The function exits the process with ``sys.exit`` codes on failure.
+    Returns
+    -------
+    argparse.ArgumentParser
+        Parser pre-populated with all CLI arguments.
     """
     ap = argparse.ArgumentParser(description="Scan a folder and emit repo metrics (stdlib-only).")
     ap.add_argument(
@@ -1074,8 +1120,360 @@ def main() -> None:
         action="store_false",
         help="Disable automatic inclusion of relevant test files.",
     )
-    args = ap.parse_args()
+    ap.add_argument(
+        "--with-libcst",
+        action="store_true",
+        help="Augment import analysis with LibCST (captures TYPE_CHECKING + __all__).",
+    )
+    ap.add_argument(
+        "--with-griffe",
+        action="store_true",
+        help="Enable Griffe-powered API/doc extraction for scanned packages.",
+    )
+    ap.add_argument(
+        "--docstyle",
+        choices=["google", "numpy", "sphinx"],
+        default="google",
+        help="Docstring style passed to Griffe parsing (default: %(default)s).",
+    )
+    return ap
 
+
+def _collect_module_reports(
+    scan_root: Path,
+    *,
+    include_subdirs: tuple[str, ...],
+    strip_prefixes: tuple[str, ...],
+    use_libcst: bool,
+) -> list[ModuleReport]:
+    """Collect module reports for all Python files under ``scan_root``.
+
+    Extended Summary
+    ----------------
+    Scans the filesystem for Python source files and analyzes each one
+    to extract import edges, public APIs, docstring coverage, typing
+    coverage, and complexity metrics. This is the core data collection
+    step of the repository scanning workflow. Results are used to build
+    the JSON payload and import graph visualization.
+
+    Parameters
+    ----------
+    scan_root : Path
+        Root directory to scan recursively. Must exist and be readable.
+        Python files are discovered via `iter_py_files()`.
+    include_subdirs : tuple[str, ...]
+        Relative subdirectory names to include in the scan (e.g., ("src", "tests")).
+        Empty tuple means scan all subdirectories. Used to filter
+        `iter_py_files()` output.
+    strip_prefixes : tuple[str, ...]
+        Module name prefixes to strip when computing module identifiers
+        (e.g., ("src.",) to convert "src.kgfoundry.foo" to "kgfoundry.foo").
+        Applied during `analyze_file()` processing.
+    use_libcst : bool
+        If True, use LibCST for enhanced import analysis (type-checking
+        imports, star imports). If False, use AST-only parsing.
+        Affects `analyze_file()` behavior and import edge extraction.
+
+    Returns
+    -------
+    list[ModuleReport]
+        Per-module metadata discovered during scanning. Each report
+        contains module name, import edges, parse status, docstring
+        coverage, typing coverage, complexity metrics, and test mapping.
+        Order matches filesystem traversal order (not sorted).
+
+    Notes
+    -----
+    Time O(n * m) where n is number of files and m is average file size.
+    Memory O(n) for the report list. No I/O beyond file reads.
+    This function is the bottleneck of the scanning workflow; consider
+    parallelization for large repositories.
+
+    See Also
+    --------
+    iter_py_files : File discovery utility
+    analyze_file : Per-file analysis function
+    ModuleReport : Report dataclass structure
+    """
+    return [
+        analyze_file(
+            scan_root,
+            path,
+            strip_prefixes=strip_prefixes,
+            use_libcst=use_libcst,
+        )
+        for path in iter_py_files(scan_root, include_subdirs=include_subdirs)
+    ]
+
+
+def _collect_api_symbols_for_payload(
+    module_roots: set[str],
+    *,
+    options: PayloadOptions,
+) -> list[dict[str, Any]]:
+    """Return serialized API symbols when Griffe integration is enabled.
+
+    Extended Summary
+    ----------------
+    Collects public API symbols (classes, functions, constants) using
+    Griffe's AST-based analysis when `with_griffe` is enabled in options.
+    This provides richer symbol metadata (docstrings, signatures, decorators)
+    than the basic AST parsing used in `analyze_file()`. Symbols are
+    serialized to dictionaries for JSON payload inclusion.
+
+    Parameters
+    ----------
+    module_roots : set[str]
+        Top-level module names discovered during scanning (e.g., {"kgfoundry", "tools"}).
+        Used to filter Griffe analysis to relevant packages. Empty set
+        results in empty return value.
+    options : PayloadOptions
+        Configuration object containing `scan_root`, `with_griffe` flag,
+        and `docstyle` preference. The `with_griffe` flag must be True
+        for this function to perform any work.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        Serialized dataclass entries describing public symbols. Each
+        dictionary contains symbol name, kind (class/function/constant),
+        module path, docstring, signature (if applicable), and metadata.
+        Empty list if `with_griffe` is False or `module_roots` is empty.
+
+    Notes
+    -----
+    Time O(p * f) where p is number of packages and f is average files per package.
+    Memory O(s) where s is number of symbols. No I/O beyond file reads.
+    This function is a no-op if `options.with_griffe` is False, returning
+    an empty list immediately.
+
+    See Also
+    --------
+    collect_api_symbols_with_griffe : Griffe-based symbol collection
+    PayloadOptions : Configuration dataclass
+    """
+    if not options.with_griffe:
+        return []
+    package_names = sorted(root for root in module_roots if root)
+    if not package_names:
+        return []
+    return [
+        asdict(symbol)
+        for symbol in collect_api_symbols_with_griffe(
+            options.scan_root, package_names, docstyle=options.docstyle
+        )
+    ]
+
+
+def _derive_external_dependencies(
+    reports: list[ModuleReport],
+    module_roots: set[str],
+    *,
+    with_libcst: bool,
+) -> list[str]:
+    """Compute external dependency roots based on LibCST data.
+
+    Extended Summary
+    ----------------
+    Analyzes import statements across all scanned modules to identify
+    external dependencies (packages not in `module_roots`). Uses LibCST
+    import data when available to capture type-checking imports and
+    star imports that AST-only parsing misses. Returns the top-level
+    package names (first component of import paths) for dependency
+    tracking and visualization.
+
+    Parameters
+    ----------
+    reports : list[ModuleReport]
+        Module reports from `_collect_module_reports()`. Each report
+        contains import lists and optional LibCST import metadata.
+        Used to extract import names and compute dependency roots.
+    module_roots : set[str]
+        Top-level module names that are part of the scanned codebase
+        (e.g., {"kgfoundry", "tools"}). Imports matching these roots
+        are excluded from external dependencies.
+    with_libcst : bool
+        If True, use LibCST import data (`imports_cst` field) to
+        include type-checking imports and star imports. If False,
+        returns empty list immediately.
+
+    Returns
+    -------
+    list[str]
+        Sorted list of dependency roots detected in the scan. Each
+        string is the top-level package name (e.g., "numpy", "fastapi").
+        Empty list if `with_libcst` is False or no external dependencies
+        are found.
+
+    Notes
+    -----
+    Time O(n * i) where n is number of reports and i is average imports per module.
+    Memory O(d) where d is number of unique dependency roots. No I/O.
+    This function is a no-op if `with_libcst` is False, returning an
+    empty list immediately.
+
+    See Also
+    --------
+    ModuleReport : Report structure with import data
+    _collect_module_reports : Report collection function
+    """
+    if not with_libcst:
+        return []
+    deps: set[str] = set()
+    for report in reports:
+        for name in report.imports:
+            root = name.split(".", 1)[0] if name else ""
+            if root and root not in module_roots:
+                deps.add(root)
+        if not report.imports_cst:
+            continue
+        for name in report.imports_cst.get("type_checking_imports", []):
+            root = name.split(".", 1)[0] if name else ""
+            if root and root not in module_roots:
+                deps.add(root)
+        for name in report.imports_cst.get("star_imports", []):
+            root = name.split(".", 1)[0] if name else ""
+            if root and root not in module_roots:
+                deps.add(root)
+    return sorted(deps)
+
+
+def _assemble_payload(
+    *,
+    reports: list[ModuleReport],
+    edges: list[tuple[str, str]],
+    options: PayloadOptions,
+) -> dict[str, Any]:
+    """Compose the JSON payload written to disk.
+
+    Extended Summary
+    ----------------
+    Assembles the complete JSON payload structure from collected module
+    reports, import edges, test mappings, git metadata, API symbols, and
+    external dependencies. This payload is the canonical output format
+    for repository scanning, consumed by documentation generators, CI
+    automation, and dependency analysis tools. The structure follows
+    the Agent Operating Protocol (AOP) specifications.
+
+    Parameters
+    ----------
+    reports : list[ModuleReport]
+        Module reports from `_collect_module_reports()`. Serialized
+        to the "modules" array in the payload. Used to compute summary
+        statistics (file count, parse success rate, test count).
+    edges : list[tuple[str, str]]
+        Import edge tuples (source_module, target_module) extracted
+        during scanning. Included as "import_edges" in the payload
+        for graph visualization and dependency analysis.
+    options : PayloadOptions
+        Configuration object containing `scan_root`, `repo_root`,
+        `with_griffe`, `with_libcst`, and `docstyle`. Used to derive
+        module roots, trigger API symbol collection, and compute
+        external dependencies.
+
+    Returns
+    -------
+    dict[str, Any]
+        Payload ready to be serialized as JSON. Contains keys:
+        "generated_at" (ISO timestamp), "scan_root", "repo_root",
+        "summary" (file/test/parse stats), "modules" (serialized reports),
+        "import_edges", "tests_to_modules" (test mapping), "git" (metadata),
+        "api_symbols" (if Griffe enabled), "external_deps" (if LibCST enabled).
+
+    Notes
+    -----
+    Time O(n + m + s) where n is reports, m is edges, s is symbols.
+    Memory O(n + m + s) for the payload dictionary. No I/O beyond
+    git metadata collection. The payload structure is stable and
+    versioned per AOP specifications.
+
+    See Also
+    --------
+    _collect_module_reports : Report collection
+    _collect_api_symbols_for_payload : API symbol collection
+    _derive_external_dependencies : Dependency extraction
+    map_tests_to_modules : Test mapping utility
+    collect_git_meta : Git metadata collection
+    """
+    test_map = map_tests_to_modules(reports)
+    git_meta = collect_git_meta(options.repo_root, [options.scan_root])
+    git_by_path = {k: asdict(v) for k, v in git_meta.items()}
+    module_roots = {r.module.split(".", 1)[0] for r in reports if r.module}
+    api_symbols_payload = _collect_api_symbols_for_payload(module_roots, options=options)
+    external_deps = _derive_external_dependencies(
+        reports,
+        module_roots,
+        with_libcst=options.with_libcst,
+    )
+
+    return {
+        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "scan_root": str(options.scan_root),
+        "repo_root": str(options.repo_root),
+        "summary": {
+            "files": len(reports),
+            "parsed_ok": sum(1 for r in reports if r.parse_ok),
+            "tests": sum(1 for r in reports if r.is_test),
+        },
+        "modules": [asdict(r) for r in reports],
+        "import_edges": edges,
+        "tests_to_modules": test_map,
+        "git": git_by_path,
+        "api_symbols": api_symbols_payload,
+        "external_deps": external_deps,
+    }
+
+
+def _execute_scan(args: argparse.Namespace) -> tuple[dict[str, Any], list[tuple[str, str]]]:
+    """Run the scanning workflow and return the payload plus import edges.
+
+    Extended Summary
+    ----------------
+    Orchestrates the complete repository scanning workflow: validates
+    scan root, collects module reports, extracts import edges, assembles
+    the JSON payload, and optionally writes outputs to disk. This is the
+    main entry point for the scanning process, called by the CLI after
+    argument parsing. Returns the payload and edges for programmatic
+    use or further processing.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed command-line arguments containing scan configuration:
+        `folder` (scan root path), `repo_root` (optional, defaults to
+        scan root), `strip_prefix` (module prefix stripping), `include_subdir`
+        (subdirectory filtering), `with_griffe` (Griffe integration),
+        `with_libcst` (LibCST integration), `docstyle` (docstring style),
+        `out_json` (optional JSON output path), `out_dot` (optional DOT
+        output path).
+
+    Returns
+    -------
+    tuple[dict[str, Any], list[tuple[str, str]]]
+        JSON payload (sans DOT output) and the import edge list.
+        The payload is the complete scan result structure; edges are
+        the (source, target) import tuples extracted during scanning.
+        Both can be used for programmatic analysis or written to disk
+        via the `out_json` and `out_dot` arguments.
+
+    Notes
+    -----
+    Time dominated by `_collect_module_reports()` (O(n * m) file analysis).
+    Memory O(n + m + s) for reports, edges, and payload. I/O includes
+    file reads during scanning and optional JSON/DOT writes. This function
+    is the main workflow coordinator; performance is determined by the
+    scanning and analysis steps.
+
+    Calls `sys.exit(2)` (raising `SystemExit`) if `args.folder` does not
+    exist or is not a directory. This is a fail-fast validation before
+    starting the scan.
+
+    See Also
+    --------
+    _collect_module_reports : Module report collection
+    _assemble_payload : Payload assembly
+    extract_import_edges : Import edge extraction
+    """
     scan_root = Path(args.folder).resolve()
     if not scan_root.exists() or not scan_root.is_dir():
         msg = f"scan root not found or not a directory: {scan_root}"
@@ -1086,42 +1484,50 @@ def main() -> None:
     repo_root = Path(args.repo_root).resolve() if args.repo_root else scan_root
     strip_prefixes = tuple(args.strip_prefix)
     include_subdirs = tuple(args.include_subdir or [])
-    reports: list[ModuleReport] = [
-        analyze_file(scan_root, path, strip_prefixes=strip_prefixes)
-        for path in iter_py_files(scan_root, include_subdirs=include_subdirs)
-    ]
+    reports = _collect_module_reports(
+        scan_root,
+        include_subdirs=include_subdirs,
+        strip_prefixes=strip_prefixes,
+        use_libcst=args.with_libcst,
+    )
 
     if args.include_tests:
         reports.extend(
             collect_relevant_tests(
-                repo_root,
-                tuple(args.tests_subdir or ("tests",)),
-                strip_prefixes=strip_prefixes,
-                target_modules={r.module for r in reports if not r.is_test},
-                exclude_paths={r.path for r in reports},
+                TestScanConfig(
+                    repo_root=repo_root,
+                    tests_subdirs=tuple(args.tests_subdir or ("tests",)),
+                    strip_prefixes=strip_prefixes,
+                    target_modules={r.module for r in reports if not r.is_test},
+                    exclude_paths={r.path for r in reports},
+                    use_libcst=args.with_libcst,
+                )
             )
         )
 
     edges = build_local_import_graph(reports)
-    test_map = map_tests_to_modules(reports)
+    payload = _assemble_payload(
+        reports=reports,
+        edges=edges,
+        options=PayloadOptions(
+            scan_root=scan_root,
+            repo_root=repo_root,
+            with_griffe=args.with_griffe,
+            with_libcst=args.with_libcst,
+            docstyle=cast("DocstringStyle", args.docstyle),
+        ),
+    )
 
-    git_meta = collect_git_meta(repo_root, [scan_root])
-    git_by_path = {k: asdict(v) for k, v in git_meta.items()}
+    return payload, edges
 
-    payload = {
-        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "scan_root": str(scan_root),
-        "repo_root": str(repo_root),
-        "summary": {
-            "files": len(reports),
-            "parsed_ok": sum(1 for r in reports if r.parse_ok),
-            "tests": sum(1 for r in reports if r.is_test),
-        },
-        "modules": [asdict(r) for r in reports],
-        "import_edges": edges,
-        "tests_to_modules": test_map,
-        "git": git_by_path,
-    }
+
+def main() -> None:
+    """Entrypoint for the CLI invocation defined in the module docstring.
+
+    The function exits the process with ``sys.exit`` codes on failure.
+    """
+    args = _build_arg_parser().parse_args()
+    payload, edges = _execute_scan(args)
 
     Path(args.out_json).write_text(json.dumps(payload, indent=2, sort_keys=False), encoding="utf-8")
     write_dot(edges, Path(args.out_dot))

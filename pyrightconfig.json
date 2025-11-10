@@ -2,6 +2,8 @@
   "typeCheckingMode": "standard",
   "pythonVersion": "3.13",
   "pythonPlatform": "Linux",
+  "venvPath": ".",
+  "venv": ".venv",
   "useLibraryCodeForTypes": true,
   "stubPath": "stubs",
   "include": ["src", "codeintel_rev", "tools", "tests"],
@@ -27,12 +29,35 @@
   "executionEnvironments": [
     {
       "root": "src",
-      "extraPaths": ["src", "stubs"],
+      "extraPaths": [
+        "src",
+        "codeintel_rev",
+        "tools",
+        "stubs",
+        ".venv/lib/python3.13/site-packages"
+      ],
       "pythonVersion": "3.13"
     },
     {
-      "root": "codeintel",
-      "extraPaths": ["src", "stubs"],
+      "root": "codeintel_rev",
+      "extraPaths": [
+        "src",
+        "codeintel_rev",
+        "tools",
+        "stubs",
+        ".venv/lib/python3.13/site-packages"
+      ],
+      "pythonVersion": "3.13"
+    },
+    {
+      "root": "tools",
+      "extraPaths": [
+        "src",
+        "codeintel_rev",
+        "tools",
+        "stubs",
+        ".venv/lib/python3.13/site-packages"
+      ],
       "pythonVersion": "3.13"
     }
   ]

@@ -73,6 +73,7 @@ from kgfoundry_common.typing import gate_import
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from codeintel_rev.app.scope_store import SupportsAsyncRedis
     from codeintel_rev.io.faiss_manager import FAISSManager
     from codeintel_rev.io.hybrid_search import HybridSearchEngine
     from codeintel_rev.io.xtr_manager import XTRIndex
@@ -140,10 +141,48 @@ def _import_xtr_index_cls() -> type[XTRIndex]:
 def _require_dependency(module: str, *, runtime: str, purpose: str) -> None:
     """Ensure a heavy dependency is available, raising RuntimeUnavailableError.
 
+    Extended Summary
+    ----------------
+    Validates that an optional runtime dependency can be imported before
+    constructing runtime components. This function gates access to heavy
+    dependencies (e.g., FAISS, CUDA libraries) that may not be installed
+    in all deployment environments. Used during ApplicationContext
+    initialization to fail-fast when required runtimes are unavailable.
+
+    Parameters
+    ----------
+    module : str
+        Python module name to import (e.g., "faiss", "cupy").
+        Must be importable via `importlib.import_module()`.
+    runtime : str
+        Human-readable runtime identifier for error messages
+        (e.g., "coderank-faiss", "xtr-index").
+    purpose : str
+        Brief description of why this dependency is needed,
+        included in error messages for diagnostics.
+
     Raises
     ------
     RuntimeUnavailableError
-        If ``module`` cannot be imported.
+        If ``module`` cannot be imported. The error includes the
+        runtime identifier, purpose, and underlying ImportError detail.
+
+    Notes
+    -----
+    Uses `gate_import()` from `kgfoundry_common.typing` to safely
+    attempt the import. Time O(1); no I/O or state mutations.
+    This is a fail-fast validation helper, not a lazy loader.
+
+    Examples
+    --------
+    >>> # doctest: +SKIP
+    >>> # Example requires faiss to be installed
+    >>> _require_dependency("faiss", runtime="test", purpose="vector search")
+    >>> # If module is not installed:
+    >>> _require_dependency("nonexistent_module_xyz", runtime="test", purpose="demo")
+    Traceback (most recent call last):
+        ...
+    RuntimeUnavailableError: ...test runtime unavailable: demo...
     """
     try:
         gate_import(module, purpose)
@@ -161,10 +200,51 @@ def _require_dependency(module: str, *, runtime: str, purpose: str) -> None:
 def _ensure_path_exists(path: Path, *, runtime: str, description: str) -> None:
     """Validate that a filesystem path exists for a given runtime.
 
+    Extended Summary
+    ----------------
+    Checks filesystem existence of a required resource path (index files,
+    data directories, etc.) before constructing runtime components.
+    Used during ApplicationContext initialization to fail-fast when
+    configured resources are missing. This prevents runtime errors
+    during request handling by catching missing resources at startup.
+
+    Parameters
+    ----------
+    path : Path
+        Filesystem path to validate. Must be absolute or relative
+        to the repository root. Resolved via `pathlib.Path.resolve()`.
+    runtime : str
+        Human-readable runtime identifier for error messages
+        (e.g., "coderank-faiss", "xtr-index").
+    description : str
+        Brief description of what the path represents,
+        included in error messages (e.g., "CodeRank FAISS index").
+
     Raises
     ------
     RuntimeUnavailableError
-        If ``path`` does not exist.
+        If ``path`` does not exist. The error includes the runtime
+        identifier, description, and the absolute path string.
+
+    Notes
+    -----
+    Time O(1) filesystem stat; no I/O beyond existence check.
+    This is a fail-fast validation helper, not a lazy loader.
+    Paths are expected to be pre-resolved by `resolve_application_paths()`.
+
+    Examples
+    --------
+    >>> from pathlib import Path
+    >>> import tempfile
+    >>> # doctest: +SKIP
+    >>> # Example with existing path (requires temp directory)
+    >>> with tempfile.TemporaryDirectory() as tmpdir:
+    ...     _ensure_path_exists(Path(tmpdir), runtime="test", description="temp")
+    >>> # Missing path raises error:
+    >>> _ensure_path_exists(Path("/nonexistent/path/xyz"), runtime="test", description="index")
+    Traceback (most recent call last):
+        ...
+    RuntimeUnavailableError: ...index not found...
     """
     if path.exists():
         return
@@ -571,8 +651,10 @@ class ApplicationContext:
 
         # Initialize scope store for session-scoped query constraints
         redis_client = redis_asyncio.from_url(settings.redis.url)
+        # redis.asyncio.Redis implements SupportsAsyncRedis protocol, but pyright
+        # doesn't recognize it without explicit cast
         scope_store = ScopeStore(
-            redis_client,
+            cast("SupportsAsyncRedis", redis_client),
             l1_maxsize=settings.redis.scope_l1_size,
             l1_ttl_seconds=settings.redis.scope_l1_ttl_seconds,
             l2_ttl_seconds=settings.redis.scope_l2_ttl_seconds,
@@ -739,10 +821,46 @@ class ApplicationContext:
     def _build_coderank_faiss_manager(self, *, vec_dim: int) -> FAISSManager:
         """Construct the CodeRank FAISS manager with dependency gates.
 
+        Extended Summary
+        ----------------
+        Builds a FAISSManager instance for CodeRank vector search by
+        validating the index path exists, ensuring FAISS is importable,
+        and loading the pre-built index from disk. This method gates
+        access to the CodeRank runtime, failing fast if dependencies
+        or resources are missing. The manager is configured with
+        application settings (nlist, cuvs preference) and loaded
+        into CPU memory for immediate use.
+
+        Parameters
+        ----------
+        vec_dim : int
+            Vector dimensionality expected by the CodeRank index.
+            Must match the dimension used when the index was built.
+            Typically 768 or 1536 for transformer-based embeddings.
+
         Returns
         -------
         FAISSManager
             Ready-to-use FAISS manager configured for the CodeRank index.
+            The index is loaded into CPU memory and ready for search queries.
+            GPU support is enabled if `use_cuvs` is True and CUDA is available.
+
+        Notes
+        -----
+        Time O(1) for validation; index loading time depends on index size.
+        The manager loads the index synchronously; no lazy loading.
+        GPU support (cuvs) is determined by application settings and
+        runtime availability. This method is called during ApplicationContext
+        initialization, not per-request.
+
+        May propagate `RuntimeUnavailableError` from `_ensure_path_exists()`
+        if the index path does not exist, or from `_require_dependency()`
+        if the FAISS library cannot be imported.
+
+        See Also
+        --------
+        ApplicationContext._build_xtr_index : Similar pattern for XTR index
+        codeintel_rev.io.faiss_manager.FAISSManager : Manager implementation
         """
         runtime = "coderank-faiss"
         index_path = self.paths.coderank_faiss_index

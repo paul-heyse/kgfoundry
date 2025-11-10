@@ -811,6 +811,8 @@ def _check_writable_directories(directories: Sequence[Path]) -> list[str]:
 
 def _extract_precommit_hook_names(config_path: Path) -> list[str]:
     data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    if not isinstance(data, dict):
+        return []
     repos = data.get("repos", [])
     return [
         name

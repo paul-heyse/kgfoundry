@@ -167,7 +167,7 @@ def param_schema(param: click.Parameter) -> tuple[dict[str, object], bool, str]:
     """
     schema: dict[str, object] = {"type": "string"}
     required = bool(getattr(param, "required", False))
-    example_name = param.name
+    example_name = param.name or "param"
 
     param_type = getattr(param, "type", None)
     type_name = getattr(param_type, "name", "").lower()
@@ -216,13 +216,15 @@ def build_example(bin_name: str, tokens: Sequence[str], params: Sequence[click.P
     parts = [bin_name, *tokens]
     for param in params:
         if param.param_type_name == "argument":
-            parts.append(f"<{param.name}>")
+            param_name = param.name or "arg"
+            parts.append(f"<{param_name}>")
             continue
-        option = f"--{snake_to_kebab(param.name)}"
+        param_name = param.name or "option"
+        option = f"--{snake_to_kebab(param_name)}"
         if getattr(param, "is_flag", False):
             parts.append(option)
         else:
-            parts.extend([option, f"<{param.name}>"])
+            parts.extend([option, f"<{param_name}>"])
     return " ".join(parts)
 
 
