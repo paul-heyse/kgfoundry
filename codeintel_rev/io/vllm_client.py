@@ -32,10 +32,29 @@ LOGGER = get_logger(__name__)
 def _get_numpy() -> ModuleType:
     """Load numpy lazily when embeddings are computed.
 
+    Extended Summary
+    ----------------
+    This function provides lazy import of the NumPy module for embedding operations
+    in VLLMClient. It uses LRU caching to ensure the module is imported only once
+    per process, reducing import overhead. The function gates the import using
+    ``gate_import`` to prevent eager loading of NumPy when it's not needed, which
+    is important for keeping the codebase lightweight and avoiding unnecessary
+    dependencies in environments where NumPy may not be available.
+
     Returns
     -------
-    numpy
-        Lazily imported NumPy module for embedding operations.
+    ModuleType
+        The lazily imported NumPy module. The return type is ``ModuleType`` to
+        match the runtime type, but the actual value is the ``numpy`` module
+        (cast from the gate_import result).
+
+    Notes
+    -----
+    Time complexity O(1) after first call (cached); O(n) on first call where n
+    is import overhead. Space complexity O(1) - single module reference cached.
+    The function performs module import I/O on first call only. Thread-safe due
+    to lru_cache implementation. Uses ``gate_import`` to ensure proper typing
+    facade compliance and prevent eager NumPy loading.
     """
     return cast(
         "np",

@@ -86,7 +86,14 @@ _OBS_CACHE = _ObservabilityCache()
 class MetricsProvider:
     """Provide component-level metrics for long-running operations.
 
-    Initialises the metrics provider with a Prometheus registry.
+    Extended Summary
+    ----------------
+    This class provides Prometheus-based metrics collection for component-level
+    operations, tracking execution counts and durations. It initializes counters
+    and histograms with appropriate labels (component, operation, status) and
+    integrates with the Prometheus registry system. The provider is designed for
+    long-running services where observability is critical for performance monitoring
+    and debugging. It supports both default and custom registry configurations.
 
     Parameters
     ----------
@@ -98,8 +105,15 @@ class MetricsProvider:
     ----------
     runs_total : CounterLike
         Counter for total number of operations executed by a component.
-    operation_duration_seconds : HistogramLike
-        Histogram for operation duration in seconds.
+        Labeled by (component, status) for filtering and aggregation.
+
+    Notes
+    -----
+    The class exposes ``operation_duration_seconds`` as a property (not a class
+    attribute) to provide access to the duration histogram. Private attributes
+    ``_operation_duration_seconds`` and ``_registry`` are used internally for
+    implementation details. Thread-safe for concurrent metric observations.
+    No I/O operations; all metrics are in-memory Prometheus collectors.
     """
 
     runs_total: CounterLike

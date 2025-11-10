@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from queue import Empty, Full, LifoQueue
@@ -115,6 +115,11 @@ class DuckDBManager:
         if pool_lock is not None:
             with pool_lock:
                 self._connections_created = 0
+
+    def __del__(self) -> None:  # pragma: no cover - best-effort cleanup
+        """Ensure pooled connections are released during garbage collection."""
+        with suppress(Exception):
+            self.close()
 
     def _create_connection(self) -> duckdb.DuckDBPyConnection:
         conn = duckdb.connect(str(self._db_path))

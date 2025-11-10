@@ -17,6 +17,15 @@ app = typer.Typer(
     add_completion=False,
 )
 
+# Type aliases for CLI parameters to help pydoclint parse Annotated types correctly
+_QueryArg = Annotated[str, typer.Argument(help="Natural language query.")]
+_KOption = Annotated[int, typer.Option("--k", "-k", min=1, help="Top-k documents to return.")]
+_CandidateIdsOption = Annotated[
+    list[int] | None,
+    typer.Option("--candidate-id", "-c", help="Optional Stage-0 candidate ids to rescore."),
+]
+_ExplainOption = Annotated[bool | None, typer.Option(help="Include token-level attributions.")]
+
 
 @app.command("build")
 def build() -> None:
@@ -59,13 +68,10 @@ def verify() -> None:
 
 @app.command("search")
 def search(
-    query: Annotated[str, typer.Argument(help="Natural language query.")],
-    k: Annotated[int, typer.Option("--k", "-k", min=1, help="Top-k documents to return.")] = 5,
-    candidate_ids: Annotated[
-        list[int] | None,
-        typer.Option("--candidate-id", "-c", help="Optional Stage-0 candidate ids to rescore."),
-    ] = None,
-    explain: Annotated[bool | None, typer.Option(help="Include token-level attributions.")] = None,
+    query: _QueryArg,
+    k: _KOption = 5,
+    candidate_ids: _CandidateIdsOption = None,
+    explain: _ExplainOption = None,
 ) -> None:
     """Run a quick XTR search (wide or narrow depending on candidate ids).
 
@@ -79,20 +85,27 @@ def search(
 
     Parameters
     ----------
-    query : str
+    query : _QueryArg
         Natural language query string to search for. Will be encoded into token
         embeddings and used for MaxSim computation against the XTR index.
-    k : int, optional
+        Type alias for ``Annotated[str, typer.Argument(...)]`` for CLI argument
+        specification. Provided as a positional argument via typer.
+    k : _KOption, optional
         Maximum number of top-k documents to return. Must be at least 1.
-        Defaults to 5.
-    candidate_ids : list[int] | None, optional
+        Defaults to 5. Type alias for ``Annotated[int, typer.Option(...)]`` for
+        CLI option specification. Provided as an option via typer (--k, -k).
+    candidate_ids : _CandidateIdsOption, optional
         Optional list of Stage-0 candidate chunk IDs to rescore. If provided,
         performs narrow-mode rescoring on these candidates only. If None, performs
-        wide-mode search across all chunks. Defaults to None.
-    explain : bool | None, optional
+        wide-mode search across all chunks. Defaults to None. Type alias for
+        ``Annotated[list[int] | None, typer.Option(...)]`` for CLI option
+        specification. Provided as an option via typer (--candidate-id, -c).
+    explain : _ExplainOption, optional
         Whether to include token-level attribution information in results. If True,
-        includes explainability data showing token alignments. Defaults to None
-        (no explainability).
+        includes explainability data showing token alignments. If None, defaults
+        to True (explainability enabled). Type alias for
+        ``Annotated[bool | None, typer.Option(...)]`` for CLI option specification.
+        Provided as an option via typer.
 
     Raises
     ------

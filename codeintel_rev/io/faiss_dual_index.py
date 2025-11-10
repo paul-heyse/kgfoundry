@@ -8,7 +8,7 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from types import ModuleType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -184,6 +184,17 @@ class FAISSDualIndexManager:
         )
 
         return True, self._gpu_disabled_reason
+
+    def close(self) -> None:
+        """Release FAISS handles and GPU resources."""
+        self._primary_cpu = None
+        self._secondary_cpu = None
+        self._primary_gpu = None
+        self._secondary_gpu = None
+        self._gpu_resources = None
+        self._gpu_enabled = False
+        self._gpu_disabled_reason = None
+        LOGGER.debug("faiss_dual_index_closed", extra={"index_dir": str(self._index_dir)})
 
     def search(
         self,
@@ -406,7 +417,9 @@ class FAISSDualIndexManager:
             return None, reason
 
         try:
-            primary_cpu = await asyncio.to_thread(faiss_module.read_index, str(primary_path))
+            primary_cpu = cast(
+                "faiss.Index", await asyncio.to_thread(faiss_module.read_index, str(primary_path))
+            )
         except RuntimeError as exc:
             reason = f"Failed to load primary index: {exc}"
             LOGGER.exception(

@@ -282,21 +282,7 @@ np = gate_import("numpy", "array reshaping in process()")
 result = np.reshape(data, (10, 10))
 ```
 
-### 3. Typing Gate Checker
-
-Enforce that type-only imports are guarded:
-```bash
-python -m tools.lint.check_typing_gates src/ tools/ docs/
-```
-
-This AST-based checker scans for unguarded imports of:
-- `numpy`, `torch`, `tensorflow`, `sklearn`
-- `fastapi`, `pydantic`, `sqlalchemy`
-- `pandas`, Other heavy dependencies
-
-It emits errors if imports appear outside `TYPE_CHECKING` blocks.
-
-### 4. Ruff Rules (Automatic Enforcement)
+### 3. Ruff Rules (Automatic Enforcement)
 
 **Enabled rules** (errors by default):
 - `TC001–TC006` — Type-checking import violations (move to TYPE_CHECKING blocks)
@@ -316,8 +302,8 @@ Per-file ignores are defined in `pyproject.toml` for:
 3. For runtime needs, use `gate_import()` from the façade
 4. Run checks before committing:
    ```bash
+   uv run pyrefly check
    uv run ruff check --fix  # Enforces TC/INP/EXE rules
-   python -m tools.lint.check_typing_gates src/  # Verifies no unguarded imports
    ```
 
 **Deprecation path**: Old code using `docs._types` or private imports will emit `PLC2701` warnings and will be removed after Phase 1 migration (see openspec/changes/typing-gates-holistic-phase1/).

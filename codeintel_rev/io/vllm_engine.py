@@ -13,6 +13,7 @@ from vllm import LLM
 from vllm.config import PoolerConfig
 from vllm.inputs import TokensPrompt
 
+from codeintel_rev.runtime import RuntimeCell
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -29,6 +30,18 @@ class _InprocessVLLMRuntime:
     def __init__(self) -> None:
         self.tokenizer: PreTrainedTokenizerBase | None = None
         self.engine: LLM | None = None
+
+    def close(self) -> None:  # pragma: no cover - exercised during shutdown
+        """Release tokenizer/engine references."""
+        if self.engine is not None:
+            shutdown = getattr(self.engine, "shutdown", None)
+            if callable(shutdown):
+                try:
+                    shutdown()
+                except Exception:  # noqa: BLE001
+                    LOGGER.warning("vLLM engine shutdown failed", exc_info=True)
+        self.engine = None
+        self.tokenizer = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -62,18 +75,17 @@ class InprocessVLLMEmbedder:
     """
 
     config: VLLMConfig
-    _runtime: _InprocessVLLMRuntime = field(
-        default_factory=_InprocessVLLMRuntime, init=False, repr=False
+    _cell: RuntimeCell[_InprocessVLLMRuntime] = field(
+        default_factory=lambda: RuntimeCell(name="inprocess-vllm"),
+        init=False,
+        repr=False,
     )
 
     def __post_init__(self) -> None:
         """Initialize tokenizer and vLLM engine."""
         os.environ.setdefault("VLLM_ATTENTION_BACKEND", "FLASHINFER")
-        runtime = self._runtime
-        runtime.tokenizer = self._load_tokenizer()
-        runtime.engine = self._load_engine()
         LOGGER.info(
-            "Initialized in-process vLLM embedder",
+            "Prepared in-process vLLM embedder configuration",
             extra={
                 "model": self.config.model,
                 "pooling": self.config.pooling_type,
@@ -101,7 +113,7 @@ class InprocessVLLMEmbedder:
         """
         if not texts:
             return np.zeros((0, self.config.embedding_dim), dtype=np.float32)
-        runtime = self._ensure_runtime()
+        runtime = self._runtime()
         tokenizer = runtime.tokenizer
         engine = runtime.engine
         if tokenizer is None or engine is None:  # pragma: no cover - defensive
@@ -138,9 +150,7 @@ class InprocessVLLMEmbedder:
 
     def close(self) -> None:  # pragma: no cover - best-effort cleanup
         """Release tokenizer/engine references to help GC."""
-        runtime = self._runtime
-        runtime.engine = None
-        runtime.tokenizer = None
+        self._cell.close()
 
     def _load_tokenizer(self) -> PreTrainedTokenizerBase:
         return AutoTokenizer.from_pretrained(
@@ -162,19 +172,25 @@ class InprocessVLLMEmbedder:
             ),
         )
 
-    def _ensure_runtime(self) -> _InprocessVLLMRuntime:
-        """Ensure tokenizer and engine exist, lazily creating them if needed.
+    def _initialize_runtime(self) -> _InprocessVLLMRuntime:
+        runtime = _InprocessVLLMRuntime()
+        runtime.tokenizer = self._load_tokenizer()
+        runtime.engine = self._load_engine()
+        LOGGER.info(
+            "Initialized in-process vLLM runtime",
+            extra={
+                "model": self.config.model,
+                "pooling": self.config.pooling_type,
+                "normalize": self.config.normalize,
+            },
+        )
+        return runtime
 
-        Returns
-        -------
-        _InprocessVLLMRuntime
-            Mutable runtime container with initialized tokenizer/engine.
-        """
-        runtime = self._runtime
-        if runtime.tokenizer is None:
-            runtime.tokenizer = self._load_tokenizer()
-        if runtime.engine is None:
-            runtime.engine = self._load_engine()
+    def _runtime(self) -> _InprocessVLLMRuntime:
+        runtime = self._cell.get_or_initialize(self._initialize_runtime)
+        if runtime.tokenizer is None or runtime.engine is None:  # pragma: no cover - defensive
+            msg = "vLLM runtime not initialized"
+            raise RuntimeError(msg)
         return runtime
 
 

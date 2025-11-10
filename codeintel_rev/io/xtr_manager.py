@@ -11,6 +11,7 @@ from typing import Any, Literal, Protocol, TypedDict, cast
 import numpy as np
 
 from codeintel_rev.config.settings import XTRConfig
+from codeintel_rev.runtime import RuntimeCell
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.typing import gate_import
 
@@ -42,6 +43,15 @@ class _XTRIndexRuntime:
         self.device: str | None = None
         self.chunk_lookup: dict[int, tuple[int, int]] | None = None
 
+    def close(self) -> None:
+        """Release loaded tokenizer/model/memmaps."""
+        self.meta = None
+        self.tokens = None
+        self.tokenizer = None
+        self.model = None
+        self.device = None
+        self.chunk_lookup = None
+
 
 @dataclass(slots=True, frozen=True)
 class XTRIndex:
@@ -49,7 +59,11 @@ class XTRIndex:
 
     root: Path
     config: XTRConfig
-    _runtime: _XTRIndexRuntime = field(default_factory=_XTRIndexRuntime, init=False, repr=False)
+    _cell: RuntimeCell[_XTRIndexRuntime] = field(
+        default_factory=lambda: RuntimeCell(name="xtr-index"),
+        init=False,
+        repr=False,
+    )
 
     def open(self) -> None:
         """Open metadata and memory-map the token matrix if artifacts exist.
@@ -89,7 +103,8 @@ class XTRIndex:
                 extra={"token_path": str(token_path), "error": str(exc)},
             )
             raise
-        state = self._runtime
+        state = self._ensure_state()
+        state.close()
         state.meta = meta
         state.tokens = tokens
         state.chunk_lookup = self._build_chunk_lookup(meta)
@@ -113,8 +128,8 @@ class XTRIndex:
         bool
             ``True`` if the index is ready for scoring.
         """
-        state = self._runtime
-        return state.meta is not None and state.tokens is not None
+        state = self._current_state()
+        return bool(state and state.meta is not None and state.tokens is not None)
 
     def metadata(self) -> XTRMetadata | None:
         """Return a shallow copy of index metadata when loaded.
@@ -124,8 +139,8 @@ class XTRIndex:
         XTRMetadata | None
             Metadata dictionary or ``None`` when index not opened.
         """
-        state = self._runtime
-        if state.meta is None:
+        state = self._current_state()
+        if state is None or state.meta is None:
             return None
         return cast("XTRMetadata", dict(state.meta))
 
@@ -233,10 +248,10 @@ class XTRIndex:
         """
         if not self.ready or k <= 0:
             return []
-        state = self._runtime
-        meta = state.meta
-        if meta is None:
+        state = self._current_state()
+        if state is None or state.meta is None:
             return []
+        meta = state.meta
         query_vecs = self.encode_query_tokens(query)
         candidates = meta["chunk_ids"]
         return self.score_candidates(
@@ -409,7 +424,7 @@ class XTRIndex:
         tuple[Any, Any]
             Tokenizer/model pair loaded from Hugging Face.
         """
-        state = self._runtime
+        state = self._ensure_state()
         if state.tokenizer is not None and state.model is not None:
             return state.tokenizer, state.model
         transformers = cast("Any", gate_import("transformers", "XTR encoder loading"))
@@ -440,7 +455,7 @@ class XTRIndex:
             Device reference (torch.device) pointing to cpu or cuda based on
             config and availability.
         """
-        state = self._runtime
+        state = self._ensure_state()
         configured = (self.config.device or "cpu").strip()
         if configured.lower().startswith("cuda"):
             if not torch_module.cuda.is_available():
@@ -487,13 +502,35 @@ class XTRIndex:
 
     @staticmethod
     def _parse_cuda_ordinal(value: str) -> int | None:
-        """
-        Return the ordinal when ``value`` contains ``cuda:<ordinal>``.
+        """Extract CUDA device ordinal from a device string.
+
+        Extended Summary
+        ----------------
+        This method parses a CUDA device string (e.g., "cuda:0", "cuda:1") to extract
+        the device ordinal. It handles malformed input gracefully by returning None
+        when the format is invalid or when no ordinal is specified. This is used
+        internally by the XTR index to resolve device assignments from configuration
+        strings and ensure proper GPU device selection for tensor operations.
+
+        Parameters
+        ----------
+        value : str
+            Device string that may contain a CUDA ordinal in the format "cuda:<ordinal>".
+            If the string doesn't contain a colon or the part after the colon is not
+            a valid integer, the function returns None.
 
         Returns
         -------
         int | None
-            Parsed ordinal or ``None`` when unspecified or invalid.
+            Parsed ordinal as an integer (e.g., 0, 1, 2) when ``value`` contains
+            ``cuda:<ordinal>``, or ``None`` when unspecified, invalid, or not in
+            the expected format.
+
+        Notes
+        -----
+        Time complexity O(1) - simple string split and int conversion. Space
+        complexity O(1). No I/O or side effects. Handles ValueError exceptions
+        from int() conversion by returning None, making it safe for malformed input.
         """
         parts = value.split(":", 1)
         if len(parts) == 1:
@@ -524,12 +561,12 @@ class XTRIndex:
         KeyError
             If the chunk identifier is not present in metadata.
         """
-        state = self._runtime
-        meta = state.meta
-        tokens = state.tokens
-        if meta is None or tokens is None:
+        state = self._current_state()
+        if state is None or state.meta is None or state.tokens is None:
             msg = f"XTR index not ready when slicing chunk {chunk_id}"
             raise RuntimeError(msg)
+        meta = state.meta
+        tokens = state.tokens
         lookup = state.chunk_lookup
         if lookup is None:
             lookup = self._build_chunk_lookup(meta)
@@ -564,12 +601,23 @@ class XTRIndex:
             )
         }
 
+    def close(self) -> None:
+        """Release runtime resources such as memmaps and tokenizer."""
+        self._cell.close()
+
+    def _ensure_state(self) -> _XTRIndexRuntime:
+        return self._cell.get_or_initialize(_XTRIndexRuntime)
+
+    def _current_state(self) -> _XTRIndexRuntime | None:
+        return self._cell.peek()
+
 
 class TorchDeviceModule(Protocol):
     """Subset of torch API required for device resolution."""
 
     class _CudaAPI(Protocol):
         def is_available(self) -> bool: ...
+        def device_count(self) -> int: ...
 
     cuda: _CudaAPI
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-generate_repo_intel.py
+generate_repo_intel.py.
 
 A robust, batteries-included collector that emits AI-ready artifacts:
 
@@ -25,6 +25,7 @@ Tested on Linux/macOS with Python ≥3.10.
 from __future__ import annotations
 
 import argparse
+import ast
 import contextlib
 import importlib.util
 import json
@@ -34,8 +35,13 @@ import shlex
 import shutil
 import subprocess
 import sys
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from pathlib import Path
+from typing import Any
+
+import libcst as cst
+from libcst.helpers import get_node_fields
+from libcst.metadata import MetadataWrapper, PositionProvider
 
 # ---------- Utilities ----------
 
@@ -60,7 +66,13 @@ DIRS = {
 
 
 def _resolve_tool(name: str) -> str | None:
-    """Return the best-effort path to a CLI inside the active environment."""
+    """Return the best-effort path to a CLI inside the active environment.
+
+    Returns
+    -------
+    str | None
+        Path to the CLI tool if found, otherwise None.
+    """
     path = shutil.which(name)
     if path:
         return path
@@ -73,54 +85,230 @@ def _resolve_tool(name: str) -> str | None:
 
 
 def log(msg: str) -> None:
-    print(f"[generate] {msg}")
+    """Log a message to stdout with a [generate] prefix."""
+    print(f"[generate] {msg}")  # noqa: T201  # CLI tool; print is appropriate
+
+
+def _validate_command(cmd: list[str] | str) -> list[str]:
+    """Validate and normalize command for secure subprocess execution.
+
+    Parameters
+    ----------
+    cmd : list[str] | str
+        Command to validate. String commands are split using shlex for safety.
+
+    Returns
+    -------
+    list[str]
+        Validated command as list of strings.
+
+    Raises
+    ------
+    TypeError
+        If command arguments are not strings.
+    ValueError
+        If command is empty or contains invalid characters.
+    """
+    if isinstance(cmd, str):
+        # Parse shell command safely using shlex to prevent injection
+        parsed = shlex.split(cmd, posix=True)
+        if not parsed:
+            msg = "Command string must contain at least one argument"
+            raise ValueError(msg)
+        return parsed
+    if not isinstance(cmd, list):
+        msg = f"Command must be list[str] or str, got {type(cmd).__name__}"
+        raise TypeError(msg)
+    if not cmd:
+        msg = "Command list must contain at least one argument"
+        raise ValueError(msg)
+    # Validate all arguments are strings and non-empty
+    validated = []
+    for i, arg in enumerate(cmd):
+        if not isinstance(arg, str):
+            msg = f"Command argument {i} must be a string, got {type(arg).__name__}"
+            raise TypeError(msg)
+        if not arg:
+            msg = f"Command argument {i} cannot be empty"
+            raise ValueError(msg)
+        validated.append(arg)
+    return validated
+
+
+def _sanitize_cwd(cwd: Path | None) -> Path | None:
+    """Sanitize working directory path for subprocess execution.
+
+    Parameters
+    ----------
+    cwd : Path | None
+        Working directory to sanitize.
+
+    Returns
+    -------
+    Path | None
+        Resolved absolute path if provided, None otherwise.
+
+    Raises
+    ------
+    ValueError
+        If path is outside repository root or cannot be resolved.
+    OSError
+        If path cannot be resolved.
+    """
+    if cwd is None:
+        return None
+    try:
+        resolved = cwd.resolve(strict=True)
+    except OSError as exc:
+        msg = f"Cannot resolve working directory {cwd}: {exc}"
+        raise OSError(msg) from exc
+    except RuntimeError as exc:
+        msg = f"Cannot resolve working directory {cwd}: {exc}"
+        raise ValueError(msg) from exc
+    else:
+        # Ensure path is within repository to prevent directory traversal
+        try:
+            resolved.relative_to(REPO.resolve())
+        except ValueError:
+            msg = f"Working directory {resolved} is outside repository root {REPO.resolve()}"
+            raise ValueError(msg) from None
+        return resolved
 
 
 def run(
-    cmd: list[str] | str, *, cwd: Path | None = None, capture=False, check=True, env=None
+    cmd: list[str] | str,
+    *,
+    cwd: Path | None = None,
+    capture: bool = False,
+    check: bool = True,
+    env: Mapping[str, str] | None = None,
 ) -> str | None:
-    """Run a command safely; return stdout if capture=True. Logs failures and continues."""
-    if isinstance(cmd, list):
-        shown = " ".join(shlex.quote(str(x)) for x in cmd)
-    else:
-        shown = cmd
+    """Run a command safely with input validation and path sanitization.
+
+    This function executes subprocess commands with security hardening:
+    - Commands are validated and normalized to list[str] format
+    - Working directories are resolved and validated against repository root
+    - Shell execution is avoided (shell=True never used) to prevent injection
+    - Environment variables are passed as explicit mapping
+
+    Parameters
+    ----------
+    cmd : list[str] | str
+        Command to execute. String commands are parsed safely using shlex.
+        All arguments are validated to be non-empty strings.
+    cwd : Path | None, optional
+        Working directory for subprocess. Must be within repository root.
+        Resolved to absolute path before execution. Defaults to None.
+    capture : bool, optional
+        Whether to capture and return stdout. Defaults to False.
+    check : bool, optional
+        Whether to raise on non-zero exit code. Defaults to True.
+    env : Mapping[str, str] | None, optional
+        Environment variables to pass to subprocess. Defaults to None.
+
+    Returns
+    -------
+    str | None
+        Command stdout if capture=True, otherwise None.
+
+    Raises
+    ------
+    TypeError
+        If command arguments are not strings.
+    ValueError
+        If command or working directory validation fails.
+    OSError
+        If subprocess cannot be spawned or working directory cannot be resolved.
+    subprocess.SubprocessError
+        If subprocess execution fails and check=True.
+
+    Notes
+    -----
+    Security model:
+    - Commands are never executed via shell=True to prevent injection attacks
+    - String commands are parsed using shlex.split() for safe tokenization
+    - Working directories are validated to be within repository root
+    - All command arguments are validated to be non-empty strings
+    - Environment variables are passed as explicit mapping (no shell expansion)
+
+    Examples
+    --------
+    >>> run(["git", "ls-files"], capture=True)
+    r'file1.py\\nfile2.py\\n'
+    >>> run("git ls-files", capture=True)  # String is safely parsed
+    r'file1.py\\nfile2.py\\n'
+    """  # noqa: D301
+    validated_cmd = _validate_command(cmd)
+    sanitized_cwd = _sanitize_cwd(cwd)
+    shown = " ".join(shlex.quote(arg) for arg in validated_cmd)
     log(f"→ {shown}")
+    # Security: validated_cmd is sanitized list[str] from _validate_command(), shell=False
+    # This prevents injection attacks by ensuring commands are never shell-interpreted
     try:
         if capture:
-            out = subprocess.run(
-                cmd,
-                cwd=cwd,
-                env=env,
+            out = subprocess.run(  # Security: validated_cmd is sanitized, shell=False prevents injection
+                validated_cmd,
+                cwd=str(sanitized_cwd) if sanitized_cwd else None,
+                env=dict(env) if env else None,
                 check=check,
-                shell=isinstance(cmd, str),
+                shell=False,  # Never use shell=True for security
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
             )
             return out.stdout
-        subprocess.run(cmd, cwd=cwd, env=env, check=check, shell=isinstance(cmd, str))
+        subprocess.run(  # Security: validated_cmd is sanitized, shell=False prevents injection
+            validated_cmd,
+            cwd=str(sanitized_cwd) if sanitized_cwd else None,
+            env=dict(env) if env else None,
+            check=check,
+            shell=False,  # Never use shell=True for security
+        )
         return None
-    except Exception as e:
+    except ValueError as e:
+        # Re-raise validation errors explicitly
+        log(f"✖ command validation failed: {e}")
+        raise
+    except TypeError as e:
+        # Re-raise type errors explicitly
+        log(f"✖ command type error: {e}")
+        raise
+    except OSError as e:
+        # Re-raise OS errors explicitly
+        log(f"✖ command execution failed: {e}")
+        raise
+    except subprocess.SubprocessError as e:
+        # Re-raise subprocess errors explicitly
         log(f"✖ command failed: {e}")
-        return None
+        raise
 
 
 def ensure_dirs() -> None:
+    """Create all artifact directories if they don't exist."""
     for p in DIRS.values():
         p.mkdir(parents=True, exist_ok=True)
 
 
 def write_text(path: Path, text: str) -> None:
+    """Write text content to a file, creating parent directories as needed."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
 
 
-def write_json(path: Path, obj) -> None:
+def write_json(path: Path, obj: Any) -> None:  # noqa: ANN401
+    """Write JSON-serializable object to a file, creating parent directories as needed."""
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def git_ls_files(glob: str | None = None) -> list[Path]:
+    """List tracked git files, optionally filtered by glob pattern.
+
+    Returns
+    -------
+    list[Path]
+        List of file paths from git or filesystem fallback.
+    """
     args = ["git", "ls-files"]
     if glob:
         args.append(glob)
@@ -142,6 +330,13 @@ def git_ls_files(glob: str | None = None) -> list[Path]:
 
 
 def filter_paths(paths: Iterable[Path], excludes: set[str]) -> list[Path]:
+    """Filter file paths by excluding those containing any exclude substring.
+
+    Returns
+    -------
+    list[Path]
+        Filtered list of paths excluding those matching exclude patterns.
+    """
     if not excludes:
         return list(paths)
     ret = []
@@ -156,7 +351,8 @@ def filter_paths(paths: Iterable[Path], excludes: set[str]) -> list[Path]:
 # ---------- Core collectors ----------
 
 
-def collect_project_layout():
+def collect_project_layout() -> None:
+    """Collect project layout files, tree structure, and configuration files."""
     log("Collecting project files & tree…")
     files = run(["git", "ls-files"], capture=True) or ""
     write_text(DIRS["project"] / "files.txt", files)
@@ -173,13 +369,12 @@ def collect_project_layout():
     # CI configs
     for pattern in (".github/workflows/*.yml", ".github/workflows/*.yaml", ".gitlab-ci.yml"):
         for f in REPO.glob(pattern):
-            try:
+            with contextlib.suppress(OSError, shutil.Error):
                 shutil.copy2(f, DIRS["project"] / "config" / f.name)
-            except Exception:
-                pass
 
 
-def collect_deps():
+def collect_deps() -> None:
+    """Collect dependency trees using pipdeptree in flat and nested JSON formats."""
     exe = shutil.which("pipdeptree")
     if not exe:
         log("pipdeptree not found; skipping dependency trees.")
@@ -194,11 +389,11 @@ def collect_deps():
         write_text(DIRS["deps"] / "pipdeptree.tree.json", nested)
 
 
-def collect_ast(py_files: list[Path]):
+def collect_ast(py_files: list[Path]) -> None:
+    """Export AST dumps for Python files using CPython's ast module."""
     log(
         "Exporting AST (CPython ast.dump include_attributes=True)…"
     )  # :contentReference[oaicite:7]{index=7}
-    import ast
 
     for fp in py_files:
         try:
@@ -214,21 +409,19 @@ def collect_ast(py_files: list[Path]):
                     "ast": dump,
                 },
             )
-        except Exception as e:
+        except (SyntaxError, UnicodeDecodeError, OSError) as e:
             log(f"[AST] skip {fp}: {e}")
 
 
-def collect_cst(py_files: list[Path]):
+def collect_cst(py_files: list[Path]) -> None:
+    """Export CST dumps for Python files using LibCST with position metadata."""
     log(
         "Exporting CST via LibCST (helpers.get_node_fields + PositionProvider)…"
     )  # :contentReference[oaicite:8]{index=8}
-    import libcst as cst
-    from libcst.helpers import get_node_fields
-    from libcst.metadata import MetadataWrapper, PositionProvider
 
-    def to_obj(node, posmap):
+    def to_obj(node: Any, posmap: Mapping[cst.CSTNode, Any]) -> Any:  # noqa: ANN401
         if isinstance(node, cst.CSTNode):
-            out = {"type": node.__class__.__name__}
+            out: dict[str, object] = {"type": node.__class__.__name__}
             rng = posmap.get(node)
             if rng:
                 out["range"] = {
@@ -251,7 +444,7 @@ def collect_cst(py_files: list[Path]):
             rel = fp.relative_to(REPO)
             out_path = (DIRS["cst"] / rel).with_suffix(rel.suffix + ".cst.json")
             write_json(out_path, obj)
-        except Exception as e:
+        except (cst.ParserSyntaxError, UnicodeDecodeError, OSError) as e:
             log(f"[CST] skip {fp}: {e}")
 
 
@@ -259,11 +452,17 @@ def collect_cst(py_files: list[Path]):
 
 
 def ensure_scip_json(user_path: Path | None) -> Path | None:
-    """
+    """Return a path to SCIP JSON.
+
     Return a path to SCIP JSON:
     - if user provided, use it
     - else if index.scip exists, scip print --json to artifacts/scip/index.json
     - else try `scip-python index .` then print to JSON
+
+    Returns
+    -------
+    Path | None
+        Path to SCIP JSON file if available, otherwise None.
     """
     out_json = DIRS["scip"] / "index.json"
     out_json.parent.mkdir(parents=True, exist_ok=True)
@@ -307,10 +506,11 @@ def ensure_scip_json(user_path: Path | None) -> Path | None:
     return None
 
 
-def scip_to_symbol_xrefs(scip_json_path: Path):
+def scip_to_symbol_xrefs(scip_json_path: Path) -> None:
+    """Extract symbol definitions and cross-references from SCIP JSON."""
     try:
         data = json.loads(scip_json_path.read_text(encoding="utf-8"))
-    except Exception as e:
+    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as e:
         log(f"[SCIP] failed to read JSON: {e}")
         return
 
@@ -348,7 +548,8 @@ def scip_to_symbol_xrefs(scip_json_path: Path):
             f.write(json.dumps({"symbol": sym, **rows}, ensure_ascii=False) + "\n")
 
 
-def collect_ctags_symbols():
+def collect_ctags_symbols() -> None:
+    """Collect symbol information using universal-ctags in JSON format."""
     if not shutil.which("ctags"):
         log("ctags not found; skipping ctags symbol export.")
         return
@@ -374,13 +575,14 @@ def collect_ctags_symbols():
 # ----- Import graph via Grimp → DOT -----
 
 
-def collect_import_graph(packages: list[str], excludes: set[str]):
-    """
+def collect_import_graph(packages: list[str], excludes: set[str]) -> None:  # noqa: C901
+    """Build import graph(s) for the given top-level package(s) using Grimp.
+
     Build import graph(s) for the given top-level package(s) using Grimp,
     then write a DOT. Works without Graphviz installed; DOT is plain text.
     """
     try:
-        import grimp  # :contentReference[oaicite:13]{index=13}
+        import grimp  # noqa: PLC0415  # :contentReference[oaicite:13]{index=13}
 
         edges: set[tuple[str, str]] = set()
         for pkg in packages:
@@ -409,7 +611,7 @@ def collect_import_graph(packages: list[str], excludes: set[str]):
                     str(DIRS["imports"] / "imports.svg"),
                 ]
             )
-    except Exception as e:
+    except (ImportError, AttributeError, OSError) as e:
         log(f"[imports] Grimp failed: {e}")
         # Fallback: very rough static scan of 'import' lines
         try:
@@ -420,19 +622,21 @@ def collect_import_graph(packages: list[str], excludes: set[str]):
                 for line in p.read_text("utf-8", "ignore").splitlines():
                     m1 = re.match(r"\s*import\s+([a-zA-Z_][\w\.]*)", line)
                     m2 = re.match(r"\s*from\s+([a-zA-Z_][\w\.]*)\s+import", line)
-                    target = (m1 or m2).group(1) if (m1 or m2) else None
+                    match = m1 or m2
+                    target = match.group(1) if match else None
                     if target and not any(x in target for x in excludes):
                         edges.add((relpkg, target))
             dot_lines = ["digraph G {"] + [f'  "{a}" -> "{b}";' for a, b in sorted(edges)] + ["}"]
             write_text(DIRS["imports"] / "imports.dot", "\n".join(dot_lines))
-        except Exception as e2:
+        except (OSError, UnicodeDecodeError) as e2:
             log(f"[imports] fallback scan failed: {e2}")
 
 
 # ----- Static call graph via PyCG -----
 
 
-def collect_call_graph_pycg(packages: list[str], excludes: set[str]):
+def collect_call_graph_pycg(packages: list[str], excludes: set[str]) -> None:
+    """Collect static call graph using PyCG in JSON adjacency format."""
     pycg_module = importlib.util.find_spec("pycg")
     pycg_cli = _resolve_tool("pycg")
     if pycg_module is None and pycg_cli is None:
@@ -445,10 +649,7 @@ def collect_call_graph_pycg(packages: list[str], excludes: set[str]):
         return
     # PyCG CLI produces JSON adjacency (and has an ICSE'21 paper)  # :contentReference[oaicite:15]{index=15}
     out = DIRS["calls"] / "pycg.simple.json"
-    if pycg_module is not None:
-        args = [sys.executable, "-m", "pycg"]
-    else:
-        args = [pycg_cli or "pycg"]
+    args = [sys.executable, "-m", "pycg"] if pycg_module is not None else [pycg_cli or "pycg"]
     if packages:
         args += ["--package", packages[0]]
     args += [str(p) for p in files] + ["-o", str(out)]
@@ -458,7 +659,8 @@ def collect_call_graph_pycg(packages: list[str], excludes: set[str]):
 # ----- Type diagnostics & dependency tree via basedpyright -----
 
 
-def collect_pyright():
+def collect_pyright() -> None:
+    """Collect type diagnostics and dependency tree using basedpyright or pyright."""
     exe = shutil.which("basedpyright") or shutil.which("pyright")
     if not exe:
         log("basedpyright/pyright not found; skipping type diagnostics.")
@@ -475,7 +677,8 @@ def collect_pyright():
 # ----- Runtime profile via Pyinstrument → speedscope -----
 
 
-def collect_runtime_profile(entry_cmd: str | None):
+def collect_runtime_profile(entry_cmd: str | None) -> None:
+    """Collect runtime profiling data using Pyinstrument in speedscope JSON format."""
     if not entry_cmd:
         return
     if importlib.util.find_spec("pyinstrument") is None and shutil.which("pyinstrument") is None:
@@ -498,7 +701,8 @@ def collect_runtime_profile(entry_cmd: str | None):
 # ----- Contracts: OpenAPI, JSON Schemas, Pydantic model schemas -----
 
 
-def collect_openapi():
+def collect_openapi() -> None:
+    """Collect and validate OpenAPI specifications using redocly CLI."""
     produced = 0
     if shutil.which("redocly"):
         # bundle everything into JSON and validate (if openapi-cli is present)
@@ -507,7 +711,7 @@ def collect_openapi():
             if any(k in name for k in ("openapi", "swagger")):
                 base = f.with_suffix("").name + ".json"
                 out = DIRS["openapi"] / base
-                res = run(
+                run(
                     ["redocly", "bundle", str(f), "--output", str(out), "--ext", "json"],
                     capture=True,
                 )
@@ -524,16 +728,18 @@ def collect_openapi():
         log("redocly CLI not found; skipping OpenAPI bundle/validate.")
 
 
-def collect_jsonschemas():
+def collect_jsonschemas() -> None:
+    """Copy JSON Schema files to artifacts directory."""
     for f in git_ls_files("*.schema.json"):
-        try:
+        with contextlib.suppress(OSError, shutil.Error):
             shutil.copy2(f, DIRS["jsonschema"] / f.name)
-        except Exception:
-            pass
 
 
-def collect_pydantic_schemas(src_root: Path, packages: list[str]):
-    # Emit Pydantic v2 model schemas via model_json_schema()
+def collect_pydantic_schemas(src_root: Path, packages: list[str]) -> None:
+    """Collect Pydantic v2 model schemas using model_json_schema().
+
+    Emit Pydantic v2 model schemas via model_json_schema()
+    """
     code = r"""
 import importlib, inspect, json, pathlib, pkgutil, sys
 
@@ -610,7 +816,8 @@ for pkgname, pkgpath in iter_top_level_packages(src_root):
 # ---------- Manifest ----------
 
 
-def write_manifest(extra: dict):
+def write_manifest(extra: dict[str, Any]) -> None:
+    """Write manifest JSON file with repository metadata and tool availability."""
     manifest = {
         "repo_root": str(REPO),
         "generated_at_utc": __import__("datetime").datetime.utcnow().isoformat(timespec="seconds")
@@ -636,7 +843,8 @@ def write_manifest(extra: dict):
 # ---------- Main ----------
 
 
-def main():
+def main() -> None:
+    """Generate repository intelligence artifacts."""
     ap = argparse.ArgumentParser(description="Generate AI-ready repository intelligence.")
     ap.add_argument(
         "--package",
@@ -688,10 +896,8 @@ def main():
     scip_json = ensure_scip_json(args.scip)
     if scip_json:
         # keep a provenance copy
-        try:
+        with contextlib.suppress(OSError, shutil.Error):
             shutil.copy2(scip_json, DIRS["scip"] / "index.json")
-        except Exception:
-            pass
         scip_to_symbol_xrefs(DIRS["scip"] / "index.json")
     else:
         log("[SCIP] not available; will rely on ctags symbols only.")
@@ -708,7 +914,7 @@ def main():
             [
                 t
                 for t in tops
-                if re.match(r"^[a-zA-Z_]\w*$", t) and t not in ("tests", "scripts", "tools")
+                if re.match(r"^[a-zA-Z_]\w*$", t) and t not in {"tests", "scripts", "tools"}
             ]
         )
     collect_import_graph(packages, excludes)

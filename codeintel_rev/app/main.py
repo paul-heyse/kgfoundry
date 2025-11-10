@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -150,12 +150,8 @@ async def lifespan(
         yield
     finally:
         LOGGER.info("Starting application shutdown")
-        # Shutdown: close VLLMClient HTTP connections to prevent resource leaks
-        # The persistent HTTP client must be explicitly closed to release
-        # network connections and avoid connection pool exhaustion
-        context.vllm_client.close()
-        LOGGER.debug("VLLMClient HTTP connections closed during shutdown")
-        await context.scope_store.close()
+        with suppress(Exception):
+            await context.close_all_runtimes()
         await readiness.shutdown()
         LOGGER.info("Application shutdown complete")
 

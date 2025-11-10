@@ -45,7 +45,7 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 
 from __future__ import annotations
 
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
@@ -62,6 +62,7 @@ from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.hybrid_search import HybridSearchEngine
 from codeintel_rev.io.vllm_client import VLLMClient
 from codeintel_rev.io.xtr_manager import XTRIndex
+from codeintel_rev.runtime import RuntimeCell
 from kgfoundry_common.errors import ConfigurationError
 from kgfoundry_common.logging import get_logger
 
@@ -246,16 +247,6 @@ def resolve_application_paths(settings: Settings) -> ResolvedPaths:
 T = TypeVar("T")
 
 
-class _RuntimeHandle[T]:
-    """Mutable holder for lazily initialized singletons."""
-
-    __slots__ = ("lock", "value")
-
-    def __init__(self) -> None:
-        self.lock = Lock()
-        self.value: T | None = None
-
-
 class _FaissRuntimeState:
     """Runtime bookkeeping for FAISS initialization."""
 
@@ -271,9 +262,13 @@ class _FaissRuntimeState:
 class _ContextRuntimeState:
     """Mutable runtime state backing the frozen ApplicationContext."""
 
-    hybrid: _RuntimeHandle[HybridSearchEngine] = field(default_factory=_RuntimeHandle)
-    coderank_faiss: _RuntimeHandle[FAISSManager] = field(default_factory=_RuntimeHandle)
-    xtr: _RuntimeHandle[XTRIndex] = field(default_factory=_RuntimeHandle)
+    hybrid: RuntimeCell[HybridSearchEngine] = field(
+        default_factory=lambda: RuntimeCell(name="hybrid-engine")
+    )
+    coderank_faiss: RuntimeCell[FAISSManager] = field(
+        default_factory=lambda: RuntimeCell(name="coderank-faiss")
+    )
+    xtr: RuntimeCell[XTRIndex] = field(default_factory=lambda: RuntimeCell(name="xtr-index"))
     faiss: _FaissRuntimeState = field(default_factory=_FaissRuntimeState)
 
 
@@ -469,15 +464,11 @@ class ApplicationContext:
         RuntimeError
             If the engine fails to initialize.
         """
-        runtime = self._runtime
-        handle = runtime.hybrid
-        engine = handle.value
-        if engine is not None:
-            return engine
-        with handle.lock:
-            if handle.value is None:
-                handle.value = HybridSearchEngine(self.settings, self.paths)
-            engine = handle.value
+
+        def _factory() -> HybridSearchEngine:
+            return HybridSearchEngine(self.settings, self.paths)
+
+        engine = self._runtime.hybrid.get_or_initialize(_factory)
         if engine is None:  # pragma: no cover - defensive
             msg = "HybridSearchEngine failed to initialize"
             raise RuntimeError(msg)
@@ -504,27 +495,37 @@ class ApplicationContext:
         if vec_dim <= 0:
             msg = "vec_dim must be positive for CodeRank FAISS manager."
             raise ValueError(msg)
-        runtime = self._runtime
-        handle = runtime.coderank_faiss
-        with handle.lock:
-            manager = handle.value
-            if manager is None:
-                manager = FAISSManager(
-                    index_path=self.paths.coderank_faiss_index,
-                    vec_dim=vec_dim,
-                    nlist=self.settings.index.faiss_nlist,
-                    use_cuvs=self.settings.index.use_cuvs,
-                )
-                manager.load_cpu_index()
-                handle.value = manager
-            elif manager.vec_dim != vec_dim:
-                existing_dim = manager.vec_dim
+        cell = self._runtime.coderank_faiss
+        existing = cell.peek()
+        if existing is not None:
+            if existing.vec_dim != vec_dim:
+                existing_dim = existing.vec_dim
                 msg = (
                     "Existing CodeRank index dimension "
                     f"{existing_dim} does not match requested {vec_dim}."
                 )
                 raise ValueError(msg)
+            return existing
+
+        def _factory() -> FAISSManager:
+            manager = FAISSManager(
+                index_path=self.paths.coderank_faiss_index,
+                vec_dim=vec_dim,
+                nlist=self.settings.index.faiss_nlist,
+                use_cuvs=self.settings.index.use_cuvs,
+            )
+            manager.load_cpu_index()
             return manager
+
+        manager = cell.get_or_initialize(_factory)
+        if manager.vec_dim != vec_dim:  # pragma: no cover - defensive double-check
+            existing_dim = manager.vec_dim
+            msg = (
+                "Existing CodeRank index dimension "
+                f"{existing_dim} does not match requested {vec_dim}."
+            )
+            raise ValueError(msg)
+        return manager
 
     def get_xtr_index(self) -> XTRIndex | None:
         """Return the lazily initialized XTR token index when enabled.
@@ -536,23 +537,34 @@ class ApplicationContext:
         """
         if not self.settings.xtr.enable:
             return None
-        runtime = self._runtime
-        handle = runtime.xtr
-        with handle.lock:
-            if handle.value is None:
-                try:
-                    index = XTRIndex(root=self.paths.xtr_dir, config=self.settings.xtr)
-                    index.open()
-                    handle.value = index
-                except (OSError, RuntimeError, ValueError) as exc:  # pragma: no cover
-                    LOGGER.warning(
-                        "Failed to initialize XTR index; continuing without late interaction",
-                        extra={"xtr_dir": str(self.paths.xtr_dir)},
-                        exc_info=exc,
-                    )
-                    return None
-        if handle.value and handle.value.ready:
-            return handle.value
+        cell = self._runtime.xtr
+        existing = cell.peek()
+        if existing is not None:
+            if existing.ready:
+                return existing
+            cell.close()
+
+        def _factory() -> XTRIndex:
+            index = XTRIndex(root=self.paths.xtr_dir, config=self.settings.xtr)
+            index.open()
+            return index
+
+        try:
+            index = cell.get_or_initialize(_factory)
+        except (OSError, RuntimeError, ValueError) as exc:  # pragma: no cover
+            LOGGER.warning(
+                "Failed to initialize XTR index; continuing without late interaction",
+                extra={"xtr_dir": str(self.paths.xtr_dir)},
+                exc_info=exc,
+            )
+            cell.close()
+            return None
+        if index.ready:
+            return index
+        LOGGER.warning(
+            "XTR index not ready after initialization attempt",
+            extra={"xtr_dir": str(self.paths.xtr_dir)},
+        )
         return None
 
     def ensure_faiss_ready(self) -> tuple[bool, list[str], str | None]:
@@ -755,3 +767,22 @@ class ApplicationContext:
             git_client=_component_value("git_client", self.git_client),
             async_git_client=_component_value("async_git_client", self.async_git_client),
         )
+
+    async def close_all_runtimes(self) -> None:
+        """Best-effort shutdown for mutable runtimes."""
+        LOGGER.info("Closing runtime resources")
+        with suppress(Exception):
+            self.vllm_client.close()
+        with suppress(Exception):
+            self.duckdb_manager.close()
+        with suppress(Exception):
+            self.faiss_manager.gpu_index = None
+            self.faiss_manager.secondary_gpu_index = None
+            self.faiss_manager.gpu_resources = None
+        with suppress(Exception):
+            runtime = self._runtime
+            runtime.hybrid.close()
+            runtime.coderank_faiss.close()
+            runtime.xtr.close()
+        with suppress(Exception):
+            await self.scope_store.close()

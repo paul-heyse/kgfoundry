@@ -279,13 +279,18 @@ class NavMetadataModel(BaseModel):
         """
         return self.as_mapping()[key]
 
-    def __iter__(self) -> NavMetadataIterator:
+    def __iter__(self) -> Generator[tuple[str, JsonValue]]:
         """Iterate over flattened key-value pairs for dictionary compatibility.
 
+        Extended Summary
+        ----------------
         This method enables dictionary-like iteration over navigation metadata,
         yielding key-value pairs from the flattened representation that includes
         both standard fields and extras. It delegates to the underlying mapping
         via ``yield from``, making it compatible with dictionary iteration patterns.
+        This implementation supports the iterator protocol, allowing the model to
+        be used in for-loops, dict constructors, and other iteration contexts
+        where dictionary-like behavior is expected.
 
         Yields
         ------
@@ -301,13 +306,24 @@ class NavMetadataModel(BaseModel):
         delegate to the underlying mapping's items. The function is a generator
         (uses ``yield from``) and returns a generator object that can be used
         in for-loops, dict constructors, and other iteration contexts.
+        Time complexity O(n) where n is the number of metadata entries; space
+        complexity O(1) aside from the generator object. No I/O or side effects.
 
         Examples
         --------
-        >>> model = NavMetadataModel(...)
+        >>> model = NavMetadataModel(
+        ...     title="test",
+        ...     exports=("func1",),
+        ...     sections=(),
+        ...     module_meta=NavModuleMeta(tags=()),
+        ...     symbols={},
+        ... )
         >>> dict(model)  # Convert to dictionary
+        {'title': 'test', 'exports': ('func1',), ...}
         >>> for key, value in model:  # Iterate like a dictionary
         ...     print(f"{key}: {value}")
+        title: test
+        exports: ('func1',)
         """
         yield from self.as_mapping().items()
 

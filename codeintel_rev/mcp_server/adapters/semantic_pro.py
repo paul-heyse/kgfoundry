@@ -643,10 +643,37 @@ def _maybe_schedule_xtr_wide(
 def _resolve_stage_one_outcome(plan: StageOnePlan) -> WarpOutcome:
     """Resolve Stage-1 orchestration outcome from a StageOnePlan.
 
+    Extended Summary
+    ----------------
+    This function orchestrates the resolution of Stage-1 search outcomes, coordinating
+    between wide-mode XTR search (if initiated) and narrow-mode Stage-2 execution.
+    It evaluates whether Stage-2 should run based on candidate quality and options,
+    handles wide search futures, and falls back to narrow mode when wide search fails
+    or is not available. The function manages executor lifecycle and aggregates notes
+    from both stages, producing a unified WarpOutcome for downstream processing.
+
+    Parameters
+    ----------
+    plan : StageOnePlan
+        Container holding Stage-1 orchestration inputs including context, query,
+        candidates, options, coderank timing, and optional wide search handle.
+        The plan encapsulates all state needed to resolve the search outcome.
+
     Returns
     -------
     WarpOutcome
         Outcome describing hits, notes, timing, explainability, and channel.
+        The outcome aggregates results from wide search (if successful) or Stage-2
+        execution, with notes from both stages combined.
+
+    Notes
+    -----
+    Time complexity depends on search mode: O(1) if Stage-2 is skipped, O(C * T * D)
+    for narrow mode where C is candidate count, T is tokens, D is embedding dimension.
+    Space complexity O(k) for results where k is the effective limit. The function
+    performs I/O via wide search future and Stage-2 execution. Executor shutdown is
+    best-effort (wait=False) to avoid blocking. Thread-safe for concurrent plan
+    processing. Handles wide search failures gracefully by falling back to narrow mode.
     """
     context = plan.context
     query = plan.query
@@ -899,15 +926,47 @@ def _hydrate_records(
 def _hydrate_and_rerank_records(plan: HydrationPlan) -> tuple[list[dict], list[StageTiming]]:
     """Hydrate DuckDB records and optionally rerank them using CodeRankLLM.
 
+    Extended Summary
+    ----------------
+    This function performs the hydration and reranking stage of semantic search,
+    converting chunk IDs from hybrid search results into full DuckDB records with
+    metadata. It optionally applies CodeRankLLM reranking when enabled in options,
+    and clips results to the effective limit specified in the plan. The function
+    aggregates timing information from both hydration and reranking operations,
+    providing observability into stage performance. This is a critical path in the
+    semantic search pipeline, bridging between vector search results and final
+    ranked document outputs.
+
+    Parameters
+    ----------
+    plan : HydrationPlan
+        Container holding hydration and reranking inputs including context, query,
+        fused hybrid search results, scope filters, effective limit, options, and
+        observation tracking. The plan encapsulates all state needed to hydrate
+        and rerank search results.
+
     Returns
     -------
     tuple[list[dict], list[StageTiming]]
-        Hydrated records clipped to ``effective_limit`` and timing snapshots.
+        A tuple containing:
+        - Hydrated records clipped to ``effective_limit``, each record is a dict
+          with chunk metadata from DuckDB.
+        - Timing snapshots from hydration and reranking stages for observability.
 
     Raises
     ------
     VectorSearchError
-        Raised when DuckDB hydration fails even after retries.
+        Raised when DuckDB hydration fails even after retries. This occurs when
+        the database is unavailable, queries timeout, or chunk IDs are invalid.
+
+    Notes
+    -----
+    Time complexity O(R + L) where R is reranking cost (if enabled, depends on
+    LLM inference) and L is limit clipping. Space complexity O(k) where k is
+    effective_limit. The function performs database I/O for hydration and optional
+    LLM API calls for reranking. Thread-safe for concurrent plan processing.
+    Results are clipped to effective_limit to respect user constraints and prevent
+    memory exhaustion. Timing snapshots enable performance monitoring and debugging.
     """
     context = plan.context
     query = plan.query

@@ -216,6 +216,9 @@ class _ShardState:
     shard_count: int = 0
 
 
+_SET_SHARD_STATE_ATTR = object.__setattr__
+
+
 @dataclass(frozen=True)
 class _ExportContext:
     """Context for SPLADE export operations."""
@@ -442,8 +445,8 @@ def _flush_batch(
         vector = _quantize_tokens(token_pairs, state.quantization)
         if state.shard_handle is None:
             _, handle = _open_writer(state.vectors_dir, state.shard_index)
-            state.shard_handle = handle
-            state.shard_count += 1
+            _SET_SHARD_STATE_ATTR(state, "shard_handle", handle)
+            _SET_SHARD_STATE_ATTR(state, "shard_count", state.shard_count + 1)
         handle = state.shard_handle
         if handle is None:  # pragma: no cover - defensive
             msg = "Shard handle unexpectedly missing during encoding."
@@ -451,11 +454,11 @@ def _flush_batch(
         handle.write(
             json.dumps({"id": doc_id, "contents": "", "vector": vector}, ensure_ascii=False) + "\n"
         )
-        state.doc_count += 1
+        _SET_SHARD_STATE_ATTR(state, "doc_count", state.doc_count + 1)
         if state.doc_count % state.shard_size == 0:
             handle.close()
-            state.shard_handle = None
-            state.shard_index += 1
+            _SET_SHARD_STATE_ATTR(state, "shard_handle", None)
+            _SET_SHARD_STATE_ATTR(state, "shard_index", state.shard_index + 1)
 
     batch.clear()
 
@@ -1021,7 +1024,7 @@ class SpladeEncoderService:
 
         if state.shard_handle is not None:
             state.shard_handle.close()
-            state.shard_handle = None
+            _SET_SHARD_STATE_ATTR(state, "shard_handle", None)
 
         summary = _persist_encoding_metadata(
             state=state,

@@ -331,6 +331,48 @@ class GitOperationError(KgFoundryError):
         )
 
 
+class RuntimeLifecycleError(KgFoundryError):
+    """Raised when a runtime fails to initialize or shut down."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        runtime: str,
+        cause: Exception | None = None,
+    ) -> None:
+        super().__init__(
+            message,
+            code=ErrorCode.RUNTIME_ERROR,
+            http_status=500,
+            context={"runtime": runtime},
+            cause=cause,
+        )
+
+
+class RuntimeUnavailableError(KgFoundryError):
+    """Raised when a runtime dependency is missing or disabled."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        runtime: str,
+        detail: str | None = None,
+        cause: Exception | None = None,
+    ) -> None:
+        context: dict[str, object] = {"runtime": runtime}
+        if detail:
+            context["detail"] = detail
+        super().__init__(
+            message,
+            code=ErrorCode.RESOURCE_UNAVAILABLE,
+            http_status=503,
+            context=context,
+            cause=cause,
+        )
+
+
 # ==================== Re-exports ====================
 
 # Search operation errors are already defined in kgfoundry_common.errors.
@@ -351,4 +393,6 @@ __all__ = [
     "InvalidLineRangeError",
     "PathNotDirectoryError",
     "PathNotFoundError",
+    "RuntimeLifecycleError",
+    "RuntimeUnavailableError",
 ]
