@@ -45,6 +45,7 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 
 from __future__ import annotations
 
+import importlib
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -55,13 +56,11 @@ import redis.asyncio as redis_asyncio
 
 from codeintel_rev.app.scope_store import ScopeStore
 from codeintel_rev.config.settings import Settings, load_settings
+from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.duckdb_manager import DuckDBManager
-from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
-from codeintel_rev.io.hybrid_search import HybridSearchEngine
 from codeintel_rev.io.vllm_client import VLLMClient
-from codeintel_rev.io.xtr_manager import XTRIndex
 from codeintel_rev.runtime import (
     NullRuntimeCellObserver,
     RuntimeCell,
@@ -69,13 +68,112 @@ from codeintel_rev.runtime import (
 )
 from kgfoundry_common.errors import ConfigurationError
 from kgfoundry_common.logging import get_logger
+from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from codeintel_rev.io.faiss_manager import FAISSManager
+    from codeintel_rev.io.hybrid_search import HybridSearchEngine
+    from codeintel_rev.io.xtr_manager import XTRIndex
+else:  # pragma: no cover - runtime only; annotations are postponed
+    FAISSManager = Any
+    HybridSearchEngine = Any
+    XTRIndex = Any
+
 LOGGER = get_logger(__name__)
 
 __all__ = ["ApplicationContext", "ResolvedPaths", "resolve_application_paths"]
+
+
+def _import_faiss_manager_cls() -> type[FAISSManager]:
+    """Import ``FAISSManager`` lazily to keep module import costs low.
+
+    Returns
+    -------
+    type[FAISSManager]
+        FAISS manager class implementation.
+    """
+    existing = globals().get("FAISSManager")
+    if existing is not None and existing is not Any:
+        return cast("type[FAISSManager]", existing)
+    module = importlib.import_module("codeintel_rev.io.faiss_manager")
+    manager_cls = module.FAISSManager
+    globals()["FAISSManager"] = manager_cls
+    return manager_cls
+
+
+def _import_hybrid_engine_cls() -> type[HybridSearchEngine]:
+    """Import ``HybridSearchEngine`` lazily for runtime cell initialization.
+
+    Returns
+    -------
+    type[HybridSearchEngine]
+        Hybrid search engine class.
+    """
+    existing = globals().get("HybridSearchEngine")
+    if existing is not None and existing is not Any:
+        return cast("type[HybridSearchEngine]", existing)
+    module = importlib.import_module("codeintel_rev.io.hybrid_search")
+    engine_cls = module.HybridSearchEngine
+    globals()["HybridSearchEngine"] = engine_cls
+    return engine_cls
+
+
+def _import_xtr_index_cls() -> type[XTRIndex]:
+    """Import ``XTRIndex`` lazily to avoid eager heavy dependencies.
+
+    Returns
+    -------
+    type[XTRIndex]
+        XTR index class.
+    """
+    existing = globals().get("XTRIndex")
+    if existing is not None and existing is not Any:
+        return cast("type[XTRIndex]", existing)
+    module = importlib.import_module("codeintel_rev.io.xtr_manager")
+    index_cls = module.XTRIndex
+    globals()["XTRIndex"] = index_cls
+    return index_cls
+
+
+def _require_dependency(module: str, *, runtime: str, purpose: str) -> None:
+    """Ensure a heavy dependency is available, raising RuntimeUnavailableError.
+
+    Raises
+    ------
+    RuntimeUnavailableError
+        If ``module`` cannot be imported.
+    """
+    try:
+        gate_import(module, purpose)
+    except ImportError as exc:  # pragma: no cover - exercised via unit tests
+        detail = str(exc)
+        message = f"{runtime} runtime unavailable: {purpose}"
+        raise RuntimeUnavailableError(
+            message,
+            runtime=runtime,
+            detail=detail,
+            cause=exc,
+        ) from exc
+
+
+def _ensure_path_exists(path: Path, *, runtime: str, description: str) -> None:
+    """Validate that a filesystem path exists for a given runtime.
+
+    Raises
+    ------
+    RuntimeUnavailableError
+        If ``path`` does not exist.
+    """
+    if path.exists():
+        return
+    message = f"{description} not found"
+    raise RuntimeUnavailableError(
+        message,
+        runtime=runtime,
+        detail=str(path),
+    )
 
 
 @dataclass(slots=True, frozen=True)
@@ -463,7 +561,8 @@ class ApplicationContext:
         paths = resolve_application_paths(settings)
 
         vllm_client = VLLMClient(settings.vllm)
-        faiss_manager = FAISSManager(
+        faiss_manager_cls = _import_faiss_manager_cls()
+        faiss_manager = faiss_manager_cls(
             index_path=paths.faiss_index,
             vec_dim=settings.index.vec_dim,
             nlist=settings.index.faiss_nlist,
@@ -537,7 +636,7 @@ class ApplicationContext:
         """
 
         def _factory() -> HybridSearchEngine:
-            return HybridSearchEngine(self.settings, self.paths)
+            return self._build_hybrid_engine()
 
         engine = self._runtime.hybrid.get_or_initialize(_factory)
         if engine is None:  # pragma: no cover - defensive
@@ -579,14 +678,7 @@ class ApplicationContext:
             return existing
 
         def _factory() -> FAISSManager:
-            manager = FAISSManager(
-                index_path=self.paths.coderank_faiss_index,
-                vec_dim=vec_dim,
-                nlist=self.settings.index.faiss_nlist,
-                use_cuvs=self.settings.index.use_cuvs,
-            )
-            manager.load_cpu_index()
-            return manager
+            return self._build_coderank_faiss_manager(vec_dim=vec_dim)
 
         manager = cell.get_or_initialize(_factory)
         if manager.vec_dim != vec_dim:  # pragma: no cover - defensive double-check
@@ -605,6 +697,11 @@ class ApplicationContext:
         -------
         XTRIndex | None
             Ready XTR index instance or ``None`` when disabled/unavailable.
+
+        Raises
+        ------
+        RuntimeUnavailableError
+            If configuration enables XTR but artifacts or dependencies are missing.
         """
         if not self.settings.xtr.enable:
             return None
@@ -616,13 +713,14 @@ class ApplicationContext:
             cell.close()
 
         def _factory() -> XTRIndex:
-            index = XTRIndex(root=self.paths.xtr_dir, config=self.settings.xtr)
-            index.open()
-            return index
+            return self._build_xtr_index()
 
         try:
             index = cell.get_or_initialize(_factory)
-        except (OSError, RuntimeError, ValueError) as exc:  # pragma: no cover
+        except RuntimeUnavailableError:
+            cell.close()
+            raise
+        except (OSError, RuntimeError, ValueError) as exc:
             LOGGER.warning(
                 "Failed to initialize XTR index; continuing without late interaction",
                 extra={"xtr_dir": str(self.paths.xtr_dir)},
@@ -637,6 +735,75 @@ class ApplicationContext:
             extra={"xtr_dir": str(self.paths.xtr_dir)},
         )
         return None
+
+    def _build_coderank_faiss_manager(self, *, vec_dim: int) -> FAISSManager:
+        """Construct the CodeRank FAISS manager with dependency gates.
+
+        Returns
+        -------
+        FAISSManager
+            Ready-to-use FAISS manager configured for the CodeRank index.
+        """
+        runtime = "coderank-faiss"
+        index_path = self.paths.coderank_faiss_index
+        _ensure_path_exists(index_path, runtime=runtime, description="CodeRank FAISS index")
+        _require_dependency("faiss", runtime=runtime, purpose="CodeRank FAISS manager")
+        manager_cls = _import_faiss_manager_cls()
+        manager = manager_cls(
+            index_path=index_path,
+            vec_dim=vec_dim,
+            nlist=self.settings.index.faiss_nlist,
+            use_cuvs=self.settings.index.use_cuvs,
+        )
+        manager.load_cpu_index()
+        return manager
+
+    def _build_xtr_index(self) -> XTRIndex:
+        """Construct the XTR index runtime with artifact and dependency gates.
+
+        Returns
+        -------
+        XTRIndex
+            Ready XTR index instance.
+
+        Raises
+        ------
+        RuntimeUnavailableError
+            If configuration disables XTR or required artifacts/dependencies are missing.
+        """
+        runtime = "xtr"
+        if not self.settings.xtr.enable:
+            message = "XTR runtime disabled in configuration"
+            raise RuntimeUnavailableError(
+                message,
+                runtime=runtime,
+                detail="settings.xtr.enable is False",
+            )
+        root = self.paths.xtr_dir
+        _ensure_path_exists(root, runtime=runtime, description="XTR artifact directory")
+        _require_dependency("torch", runtime=runtime, purpose="XTR encoder runtime")
+        index_cls = _import_xtr_index_cls()
+        index = index_cls(root=root, config=self.settings.xtr)
+        index.open()
+        if not index.ready:
+            message = "XTR artifacts incomplete"
+            raise RuntimeUnavailableError(
+                message,
+                runtime=runtime,
+                detail=str(root),
+            )
+        return index
+
+    def _build_hybrid_engine(self) -> HybridSearchEngine:
+        """Construct the hybrid search engine with dependency gates per channel.
+
+        Returns
+        -------
+        HybridSearchEngine
+            Configured hybrid search engine instance.
+        """
+        engine_cls = _import_hybrid_engine_cls()
+        return engine_cls(self.settings, self.paths)
 
     def ensure_faiss_ready(self) -> tuple[bool, list[str], str | None]:
         """Load FAISS index (once) and attempt GPU clone.

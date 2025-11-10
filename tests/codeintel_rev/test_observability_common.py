@@ -24,6 +24,15 @@ def _get_sample_value(
 ) -> float | None:
     """Return the Prometheus sample value for the given metric/labels.
 
+    Parameters
+    ----------
+    registry : CollectorRegistry
+        Prometheus registry containing the metrics.
+    metric : str
+        Name of the metric to query.
+    labels : dict[str, str]
+        Label key-value pairs to match the sample.
+
     Returns
     -------
     float | None
@@ -63,6 +72,11 @@ def test_observe_duration_records_error_on_exception(
     prometheus_registry: CollectorRegistry,
 ) -> None:
     """Exceptions propagate while recording error metrics.
+
+    Parameters
+    ----------
+    prometheus_registry : CollectorRegistry
+        Prometheus registry for recording metrics during the test.
 
     Raises
     ------

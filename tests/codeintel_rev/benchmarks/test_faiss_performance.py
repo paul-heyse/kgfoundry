@@ -47,6 +47,11 @@ else:
 def _get_underlying_index(cpu_index: Any) -> Any:
     """Return the underlying FAISS index from an ID map wrapper.
 
+    Parameters
+    ----------
+    cpu_index : Any
+        FAISS index wrapper (e.g., IndexIDMap2) containing the underlying index.
+
     Returns
     -------
     Any

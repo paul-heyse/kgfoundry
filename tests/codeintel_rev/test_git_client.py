@@ -67,6 +67,13 @@ def git_client(tmp_path: Path) -> GitClient:
 def _client_with_repo(client: GitClient, repo: Mock) -> GitClient:
     """Return a new GitClient with ``repo`` cached for testing.
 
+    Parameters
+    ----------
+    client : GitClient
+        Base GitClient instance to configure.
+    repo : Mock
+        Mock Git repository object to cache in the client.
+
     Returns
     -------
     GitClient

@@ -15,6 +15,11 @@ from codeintel_rev.io.hybrid_search import HybridSearchEngine
 def _make_engine(repo_root: Path) -> HybridSearchEngine:
     """Create a ``HybridSearchEngine`` with a minimal settings object.
 
+    Parameters
+    ----------
+    repo_root : Path
+        Repository root directory for the search engine.
+
     Returns
     -------
     HybridSearchEngine

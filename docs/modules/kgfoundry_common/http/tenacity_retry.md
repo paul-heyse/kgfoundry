@@ -58,7 +58,7 @@ Tenacity-based retry strategy implementation.
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `collections.abc.Callable`, `dataclasses.dataclass`, `kgfoundry_common.http.errors.HttpStatusError`, `kgfoundry_common.http.policy.RetryPolicyDoc`, `kgfoundry_common.http.types.RetryStrategy`, `random`, `tenacity.Retrying`, `tenacity.retry_if_exception`, `tenacity.stop_after_attempt`, `tenacity.stop_after_delay`, `tenacity.wait.wait_base`
+**Imports:** `__future__.annotations`, `collections.abc.Callable`, `contextvars.ContextVar`, `dataclasses.dataclass`, `kgfoundry_common.http.errors.HttpStatusError`, `kgfoundry_common.http.policy.RetryPolicyDoc`, `kgfoundry_common.http.types.RetryStrategy`, `numpy.random.default_rng`, `tenacity.Retrying`, `tenacity.retry_if_exception`, `tenacity.stop_after_attempt`, `tenacity.stop_after_delay`, `tenacity.wait.wait_base`
 
 ## Autorefs Examples
 
@@ -92,6 +92,8 @@ direction: right
 "kgfoundry_common.http.tenacity_retry" -> "__future__.annotations"
 "collections.abc.Callable": "collections.abc.Callable"
 "kgfoundry_common.http.tenacity_retry" -> "collections.abc.Callable"
+"contextvars.ContextVar": "contextvars.ContextVar"
+"kgfoundry_common.http.tenacity_retry" -> "contextvars.ContextVar"
 "dataclasses.dataclass": "dataclasses.dataclass"
 "kgfoundry_common.http.tenacity_retry" -> "dataclasses.dataclass"
 "kgfoundry_common.http.errors.HttpStatusError": "kgfoundry_common.http.errors.HttpStatusError"
@@ -100,8 +102,8 @@ direction: right
 "kgfoundry_common.http.tenacity_retry" -> "kgfoundry_common.http.policy.RetryPolicyDoc"
 "kgfoundry_common.http.types.RetryStrategy": "kgfoundry_common.http.types.RetryStrategy"
 "kgfoundry_common.http.tenacity_retry" -> "kgfoundry_common.http.types.RetryStrategy"
-"random": "random"
-"kgfoundry_common.http.tenacity_retry" -> "random"
+"numpy.random.default_rng": "numpy.random.default_rng"
+"kgfoundry_common.http.tenacity_retry" -> "numpy.random.default_rng"
 "tenacity.Retrying": "tenacity.Retrying"
 "kgfoundry_common.http.tenacity_retry" -> "tenacity.Retrying"
 "tenacity.retry_if_exception": "tenacity.retry_if_exception"

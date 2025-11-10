@@ -6,22 +6,18 @@ Implements full MCP tool catalog for code intelligence.
 from __future__ import annotations
 
 import contextvars
+import importlib
 
 from fastmcp import FastMCP
+from starlette.types import ASGIApp
 
+from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.mcp_server.adapters import files as files_adapter
 from codeintel_rev.mcp_server.adapters import history as history_adapter
-from codeintel_rev.mcp_server.adapters import semantic as semantic_adapter
-from codeintel_rev.mcp_server.adapters import semantic_pro as semantic_pro_adapter
 from codeintel_rev.mcp_server.adapters import text_search as text_search_adapter
 from codeintel_rev.mcp_server.error_handling import handle_adapter_errors
-from codeintel_rev.mcp_server.schemas import (
-    AnswerEnvelope,
-    Location,
-    ScopeIn,
-    SymbolInfo,
-)
+from codeintel_rev.mcp_server.schemas import ScopeIn
 
 # Create FastMCP instance
 mcp = FastMCP("CodeIntel MCP")
@@ -211,273 +207,6 @@ async def search_text(
     )
 
 
-@mcp.tool()
-@handle_adapter_errors(
-    operation="search:semantic",
-    empty_result={"findings": [], "answer": "", "confidence": 0.0},
-)
-async def semantic_search(
-    query: str,
-    limit: int = 20,
-) -> AnswerEnvelope:
-    """Semantic code search using embeddings.
-
-    Error handling is automatic via decorator. All exceptions are caught
-    and converted to unified error envelopes with Problem Details.
-
-    Parameters
-    ----------
-    query : str
-        Natural language or code query.
-    limit : int
-        Maximum results.
-
-    Returns
-    -------
-    AnswerEnvelope
-        Search results with findings. On error, returns error envelope with
-        empty result fields and Problem Details.
-    """
-    context = get_context()
-    return await semantic_adapter.semantic_search(context, query, limit)
-
-
-@mcp.tool()
-@handle_adapter_errors(
-    operation="search:semantic_pro",
-    empty_result={"findings": [], "answer": "", "confidence": 0.0},
-)
-async def semantic_search_pro(
-    query: str,
-    limit: int = 20,
-    *,
-    options: semantic_pro_adapter.SemanticProOptions | None = None,
-) -> AnswerEnvelope:
-    """Two-stage semantic retrieval with optional late interaction and reranker.
-
-    Parameters
-    ----------
-    query : str
-        Natural language or code query text.
-    limit : int, optional
-        Maximum number of hydrated findings to return (default 20).
-    options : semantic_pro_adapter.SemanticProOptions | None, optional
-        Optional runtime options for stage toggles and fusion weights. Controls
-        which retrieval stages are enabled and their configuration parameters.
-
-    Returns
-    -------
-    AnswerEnvelope
-        Structured response with findings and method metadata.
-    """
-    context = get_context()
-    return await semantic_pro_adapter.semantic_search_pro(
-        context,
-        query=query,
-        limit=limit,
-        options=options,
-    )
-
-
-# ==================== Symbols ====================
-
-
-@mcp.tool()
-@handle_adapter_errors(
-    operation="symbols:search",
-    empty_result={"symbols": [], "total": 0},
-)
-def symbol_search(
-    query: str,
-    kind: str | None = None,
-    language: str | None = None,
-) -> dict:
-    """Search for symbols (functions, classes, etc).
-
-    Parameters
-    ----------
-    query : str
-        Symbol name query.
-    kind : str | None
-        Symbol kind filter (function, class, variable).
-    language : str | None
-        Language filter.
-
-    Returns
-    -------
-    dict
-        Symbol matches.
-    """
-    context = get_context()
-    with context.open_catalog() as catalog, catalog.connection() as conn:
-        sql_lines = [
-            "SELECT display_name, kind, language, uri, start_line, start_col, end_line, end_col",
-            "FROM symbol_defs WHERE 1=1",
-        ]
-        params: list[object] = []
-        if query:
-            trimmed = query.strip()
-            sql_lines.append("AND LOWER(display_name) LIKE LOWER(?)")
-            params.append(f"{trimmed}%")
-        if kind:
-            sql_lines.append("AND kind = ?")
-            params.append(kind)
-        if language:
-            sql_lines.append("AND language = ?")
-            params.append(language)
-        sql_lines.append("ORDER BY LENGTH(display_name), kind, uri LIMIT 200")
-
-        relation = conn.execute("\n".join(sql_lines), params)
-        rows = relation.fetchall()
-
-    items: list[SymbolInfo] = []
-    for name, k, _lang, uri, sl, sc, el, ec in rows:
-        items.append(
-            {
-                "name": name,
-                "kind": k or "symbol",
-                "location": {
-                    "uri": uri,
-                    "start_line": sl,
-                    "start_column": sc,
-                    "end_line": el,
-                    "end_column": ec,
-                },
-            }
-        )
-    return {"symbols": items, "total": len(items)}
-
-
-@mcp.tool()
-@handle_adapter_errors(
-    operation="symbols:definition_at",
-    empty_result={"locations": []},
-)
-def definition_at(
-    path: str,
-    line: int,
-    character: int,
-) -> dict:
-    """Find definition at position.
-
-    Parameters
-    ----------
-    path : str
-        File path.
-    line : int
-        Line number (1-indexed).
-    character : int
-        Character offset (0-indexed).
-
-    Returns
-    -------
-    dict
-        Definition locations.
-    """
-    context = get_context()
-    with context.open_catalog() as catalog, catalog.connection() as conn:
-        occ = conn.execute(
-            """
-                SELECT symbol FROM symbol_occurrences
-                WHERE uri = ?
-                  AND (start_line < ? OR (start_line = ? AND start_col <= ?))
-                  AND (end_line   > ? OR (end_line   = ? AND end_col   >= ?))
-                ORDER BY (end_line - start_line) ASC, (end_col - start_col) ASC
-                LIMIT 1
-                """,
-            [path, line - 1, line - 1, character, line - 1, line - 1, character],
-        ).fetchone()
-        if not occ:
-            return {"locations": []}
-        sym = occ[0]
-        row = conn.execute(
-            """
-                SELECT uri, start_line, start_col, end_line, end_col
-                FROM symbol_defs WHERE symbol = ? LIMIT 1
-                """,
-            [sym],
-        ).fetchone()
-    if not row:
-        return {"locations": []}
-    uri, sl, sc, el, ec = row
-    return {
-        "locations": [
-            {
-                "uri": uri,
-                "start_line": sl,
-                "start_column": sc,
-                "end_line": el,
-                "end_column": ec,
-            }
-        ]
-    }
-
-
-@mcp.tool()
-@handle_adapter_errors(
-    operation="symbols:references_at",
-    empty_result={"locations": []},
-)
-def references_at(
-    path: str,
-    line: int,
-    character: int,
-) -> dict:
-    """Find references at position.
-
-    Parameters
-    ----------
-    path : str
-        File path.
-    line : int
-        Line number (1-indexed).
-    character : int
-        Character offset (0-indexed).
-
-    Returns
-    -------
-    dict
-        Reference locations.
-    """
-    context = get_context()
-    with context.open_catalog() as catalog, catalog.connection() as conn:
-        occ = conn.execute(
-            """
-                SELECT symbol FROM symbol_occurrences
-                WHERE uri = ?
-                  AND (start_line < ? OR (start_line = ? AND start_col <= ?))
-                  AND (end_line   > ? OR (end_line   = ? AND end_col   >= ?))
-                ORDER BY (end_line - start_line) ASC, (end_col - start_col) ASC
-                LIMIT 1
-                """,
-            [path, line - 1, line - 1, character, line - 1, line - 1, character],
-        ).fetchone()
-        if not occ:
-            return {"locations": []}
-        sym = occ[0]
-        rows = conn.execute(
-            """
-                SELECT uri, start_line, start_col, end_line, end_col, roles
-                FROM symbol_occurrences WHERE symbol = ?
-                """,
-            [sym],
-        ).fetchall()
-    locs: list[Location] = []
-    for uri, sl, sc, el, ec, roles in rows:
-        if int(roles) & 1:
-            continue
-        locs.append(
-            {
-                "uri": uri,
-                "start_line": sl,
-                "start_column": sc,
-                "end_line": el,
-                "end_column": ec,
-            }
-        )
-    return {"locations": locs}
-
-
 # ==================== Git History ====================
 
 
@@ -590,10 +319,19 @@ def prompt_code_review(area: str) -> str:
     return f"Review the code in {area}. Focus on correctness, performance, and style."
 
 
-# ==================== ASGI App ====================
+def build_http_app(capabilities: Capabilities) -> ASGIApp:
+    """Return the FastMCP ASGI app with capability-gated tool registration.
 
-# Export ASGI app for mounting in FastAPI
-# FastMCP 2.3.2+ uses http_app() method
-asgi_app = mcp.http_app()
+    Returns
+    -------
+    ASGIApp
+        ASGI application implementing the MCP HTTP API.
+    """
+    if getattr(capabilities, "has_symbols", False):
+        importlib.import_module("codeintel_rev.mcp_server.server_symbols")
+    if getattr(capabilities, "has_semantic", False):
+        importlib.import_module("codeintel_rev.mcp_server.server_semantic")
+    return mcp.http_app()
 
-__all__ = ["asgi_app", "mcp"]
+
+__all__ = ["app_context", "build_http_app", "get_context", "mcp"]

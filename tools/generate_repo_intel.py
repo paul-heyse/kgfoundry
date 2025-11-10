@@ -80,6 +80,11 @@ DIRS = {
 def _resolve_tool(name: str) -> str | None:
     """Return the best-effort path to a CLI inside the active environment.
 
+    Parameters
+    ----------
+    name : str
+        Name of the CLI tool to locate (e.g., "ruff", "pyright").
+
     Returns
     -------
     str | None
@@ -317,6 +322,11 @@ def write_json(path: Path, obj: JSONType) -> None:
 def git_ls_files(glob: str | None = None) -> list[Path]:
     """List tracked git files, optionally filtered by glob pattern.
 
+    Parameters
+    ----------
+    glob : str | None, optional
+        Optional glob pattern to filter files (e.g., "*.py"), by default None.
+
     Returns
     -------
     list[Path]
@@ -344,6 +354,13 @@ def git_ls_files(glob: str | None = None) -> list[Path]:
 
 def filter_paths(paths: Iterable[Path], excludes: set[str]) -> list[Path]:
     """Filter file paths by excluding those containing any exclude substring.
+
+    Parameters
+    ----------
+    paths : Iterable[Path]
+        Collection of file paths to filter.
+    excludes : set[str]
+        Set of substring patterns to exclude from the results.
 
     Returns
     -------
@@ -471,6 +488,11 @@ def ensure_scip_json(user_path: Path | None) -> Path | None:
     - if user provided, use it
     - else if index.scip exists, scip print --json to artifacts/scip/index.json
     - else try `scip-python index .` then print to JSON
+
+    Parameters
+    ----------
+    user_path : Path | None
+        Optional user-provided path to SCIP JSON file.
 
     Returns
     -------

@@ -25,11 +25,12 @@
     "imports": [
       "__future__.annotations",
       "collections.abc.Callable",
+      "contextvars.ContextVar",
       "dataclasses.dataclass",
       "kgfoundry_common.http.errors.HttpStatusError",
       "kgfoundry_common.http.policy.RetryPolicyDoc",
       "kgfoundry_common.http.types.RetryStrategy",
-      "random",
+      "numpy.random.default_rng",
       "tenacity.Retrying",
       "tenacity.retry_if_exception",
       "tenacity.stop_after_attempt",

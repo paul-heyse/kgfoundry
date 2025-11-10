@@ -15,12 +15,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from starlette.responses import Response
 
+from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.gpu_warmup import warmup_gpu
 from codeintel_rev.app.middleware import SessionScopeMiddleware
 from codeintel_rev.app.readiness import ReadinessProbe
-from codeintel_rev.mcp_server.server import app_context
-from codeintel_rev.mcp_server.server import asgi_app as mcp_asgi
+from codeintel_rev.errors import RuntimeUnavailableError
+from codeintel_rev.mcp_server.server import app_context, build_http_app
 from kgfoundry_common.errors import ConfigurationError
 from kgfoundry_common.logging import get_logger
 
@@ -113,7 +114,7 @@ def _preload_xtr_if_configured(context: ApplicationContext) -> None:
     LOGGER.info("Pre-loading XTR index during startup")
     try:
         index = context.get_xtr_index()
-    except (RuntimeError, OSError, ValueError):
+    except (RuntimeError, OSError, ValueError, RuntimeUnavailableError):
         LOGGER.warning("XTR preload failed; continuing lazily", exc_info=True)
         return
     if index is None or not getattr(index, "ready", False):
@@ -127,7 +128,7 @@ def _preload_hybrid_if_configured(context: ApplicationContext) -> None:
     LOGGER.info("Pre-loading HybridSearchEngine during startup")
     try:
         context.get_hybrid_engine()
-    except (RuntimeError, OSError, ValueError):
+    except (RuntimeError, OSError, ValueError, RuntimeUnavailableError):
         LOGGER.warning("Hybrid preload failed; continuing lazily", exc_info=True)
 
 
@@ -262,6 +263,9 @@ async def lifespan(
 
     try:
         context, readiness = await _initialize_context(app)
+        capabilities = Capabilities.from_context(context)
+        app.state.capabilities = capabilities
+        app.mount("/mcp", build_http_app(capabilities))
         yield
     except ConfigurationError as exc:
         LOGGER.exception(
@@ -419,8 +423,5 @@ async def sse_demo() -> StreamingResponse:
         media_type="text/event-stream",
     )
 
-
-# Mount MCP server at /mcp
-app.mount("/mcp", mcp_asgi)
 
 __all__ = ["app"]

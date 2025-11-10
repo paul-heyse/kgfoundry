@@ -77,6 +77,13 @@ def _build_match(path: Path) -> str:
 def _run_search(context: Mock, options: TextSearchOptions) -> dict:
     """Execute :func:`search_text` synchronously for the provided options.
 
+    Parameters
+    ----------
+    context : Mock
+        Mock application context for search execution.
+    options : TextSearchOptions
+        Search configuration options (query, filters, etc.).
+
     Returns
     -------
     dict

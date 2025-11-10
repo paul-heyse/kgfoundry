@@ -29,6 +29,13 @@ from kgfoundry_common.subprocess_utils import SubprocessError
 def _bootstrap_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Prepare a synthetic repository layout with SPLADE environment variables.
 
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for creating the repository structure.
+    monkeypatch : pytest.MonkeyPatch
+        Pytest fixture for patching environment variables.
+
     Returns
     -------
     Path

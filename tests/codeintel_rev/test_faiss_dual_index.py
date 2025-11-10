@@ -57,7 +57,7 @@ def _build_flat_index(vec_dim: int, count: int) -> Any:
 
     Returns
     -------
-    faiss_module.Index
+    Any
         Flat inner-product index containing ``count`` normalized vectors.
     """
     index = faiss_module.IndexFlatIP(vec_dim)

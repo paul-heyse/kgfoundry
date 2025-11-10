@@ -18,6 +18,13 @@ from codeintel_rev.io.bm25_manager import (
 def _bootstrap_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Initialize a fake repository layout and configure environment variables.
 
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory for creating the repository structure.
+    monkeypatch : pytest.MonkeyPatch
+        Pytest fixture for patching environment variables.
+
     Returns
     -------
     Path

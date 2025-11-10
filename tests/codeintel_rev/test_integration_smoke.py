@@ -7,13 +7,14 @@ from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
+from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.io.path_utils import PathOutsideRepositoryError
 from codeintel_rev.mcp_server.adapters import files as files_adapter
 from codeintel_rev.mcp_server.adapters import history as history_adapter
 from codeintel_rev.mcp_server.adapters import semantic as semantic_adapter
 from codeintel_rev.mcp_server.adapters import text_search as text_search_adapter
 from codeintel_rev.mcp_server.schemas import ScopeIn
-from codeintel_rev.mcp_server.server import asgi_app, mcp
+from codeintel_rev.mcp_server.server import build_http_app, mcp
 
 from kgfoundry_common.errors import VectorSearchError
 
@@ -26,10 +27,9 @@ def _expect(*, condition: bool, message: str) -> None:
 def test_mcp_server_import() -> None:
     """Ensure the MCP server entry points are initialised."""
     _expect(condition=mcp is not None, message="Expected MCP instance to be initialised")
-    _expect(
-        condition=asgi_app is not None,
-        message="Expected ASGI application to be initialised",
-    )
+    caps = Capabilities()
+    http_app = build_http_app(caps)
+    _expect(condition=http_app is not None, message="Expected HTTP app factory to produce an app")
 
 
 @pytest.mark.asyncio
@@ -66,6 +66,15 @@ async def test_text_search(mock_application_context, monkeypatch: pytest.MonkeyP
 
     def _fake_run_subprocess(cmd: list[str], *, cwd: Path | None, timeout: int) -> str:
         """Simulate ripgrep JSON output for deterministic tests.
+
+        Parameters
+        ----------
+        cmd : list[str]
+            Command arguments (unused in mock).
+        cwd : Path | None
+            Working directory for command execution.
+        timeout : int
+            Command timeout in seconds (unused in mock).
 
         Returns
         -------

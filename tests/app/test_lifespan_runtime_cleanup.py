@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -9,6 +10,8 @@ import pytest
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.main import lifespan
 from fastapi import FastAPI
+
+from tests.app._context_factory import build_application_context
 
 
 class _FakeScopeStore:
@@ -140,9 +143,33 @@ def test_close_all_runtimes_idempotent(
     assert application_context.faiss_manager.cpu_index is None
 
 
+@pytest.fixture(name="_base_application_context")
+def _base_application_context_fixture(
+    tmp_path: Path,
+) -> ApplicationContext:
+    """Provide the shared ApplicationContext fixture for this module.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory path for creating test repository structure.
+
+    Returns
+    -------
+    ApplicationContext
+        Shared application context instance for test isolation.
+    """
+    return build_application_context(tmp_path)
+
+
 @pytest.fixture
-def application_context(_base_application_context):
+def application_context(_base_application_context: ApplicationContext) -> ApplicationContext:
     """Expose the shared application_context fixture to this module.
+
+    Parameters
+    ----------
+    _base_application_context : ApplicationContext
+        The base application context fixture to expose.
 
     Returns
     -------

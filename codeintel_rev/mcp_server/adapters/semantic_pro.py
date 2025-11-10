@@ -11,6 +11,7 @@ from time import perf_counter
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 from codeintel_rev.app.middleware import get_session_id
+from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.io.hybrid_search import ChannelHit
 from codeintel_rev.io.rerank_coderankllm import CodeRankListwiseReranker
 from codeintel_rev.io.warp_engine import WarpEngine, WarpUnavailableError
@@ -624,7 +625,14 @@ def _maybe_schedule_xtr_wide(
     cfg = context.settings.xtr
     if not (options.use_warp and cfg.enable and getattr(cfg, "mode", "narrow") == "wide"):
         return None
-    index = context.get_xtr_index()
+    try:
+        index = context.get_xtr_index()
+    except RuntimeUnavailableError as exc:
+        LOGGER.info(
+            "XTR wide-stage unavailable",
+            extra={"detail": exc.context.get("detail") if hasattr(exc, "context") else str(exc)},
+        )
+        return None
     if index is None or not index.ready:
         return None
     k = _calculate_xtr_k(limit, cfg, options)
@@ -877,7 +885,11 @@ def _xtr_rescore_hits(
         notes.append("XTR disabled via configuration flag.")
         return [], notes, explain_payload
 
-    xtr_index = context.get_xtr_index()
+    try:
+        xtr_index = context.get_xtr_index()
+    except RuntimeUnavailableError as exc:
+        notes.append(str(exc))
+        return [], notes, explain_payload
     if xtr_index is None or not xtr_index.ready:
         notes.append("XTR index unavailable; skipping late interaction.")
         return [], notes, explain_payload

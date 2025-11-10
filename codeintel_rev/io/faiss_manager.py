@@ -10,7 +10,8 @@ from __future__ import annotations
 import importlib
 from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from types import ModuleType
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
@@ -23,7 +24,52 @@ if TYPE_CHECKING:
 LOGGER = get_logger(__name__)
 logger = LOGGER  # Alias for compatibility
 
-faiss = cast("_faiss", gate_import("faiss", "FAISS manager operations"))
+
+class _LazyFaissProxy:
+    """Deferred FAISS module loader to avoid import-time side effects."""
+
+    __slots__ = ("_module",)
+
+    def __init__(self) -> None:
+        self._module: ModuleType | None = None
+
+    def module(self) -> ModuleType:
+        """Return the cached FAISS module, importing it on demand.
+
+        Returns
+        -------
+        ModuleType
+            Materialized FAISS module.
+        """
+        if self._module is None:
+            imported = gate_import("faiss", "FAISS manager operations")
+            self._module = cast("_faiss", imported)
+        return self._module
+
+    def __getattr__(self, name: str) -> object:
+        """Proxy attribute access to the underlying FAISS module.
+
+        Returns
+        -------
+        object
+            Attribute resolved from the proxied FAISS module.
+        """
+        return getattr(self.module(), name)
+
+
+_FAISS_PROXY = _LazyFaissProxy()
+faiss = cast("Any", _FAISS_PROXY)
+
+
+def _faiss_module() -> ModuleType:
+    """Return the lazily imported FAISS module.
+
+    Returns
+    -------
+    ModuleType
+        Cached FAISS module instance.
+    """
+    return _FAISS_PROXY.module()
 
 
 def _has_faiss_gpu_support() -> bool:
@@ -34,11 +80,13 @@ def _has_faiss_gpu_support() -> bool:
     bool
         ``True`` when GPU capabilities are available, otherwise ``False``.
     """
+    try:
+        module = _faiss_module()
+    except ImportError:
+        return False
     required_attrs = ("StandardGpuResources", "GpuClonerOptions", "index_cpu_to_gpu")
-    return all(hasattr(faiss, attr) for attr in required_attrs)
+    return all(hasattr(module, attr) for attr in required_attrs)
 
-
-_FAISS_GPU_AVAILABLE = _has_faiss_gpu_support()
 
 # Adaptive indexing thresholds
 _SMALL_CORPUS_THRESHOLD = 5000
@@ -658,7 +706,7 @@ class FAISSManager:
 
         self.gpu_disabled_reason = None
 
-        if not _FAISS_GPU_AVAILABLE:
+        if not _has_faiss_gpu_support():
             self.gpu_disabled_reason = "FAISS GPU symbols unavailable - running in CPU mode"
             LOGGER.info(
                 "Skipping GPU clone; FAISS GPU symbols unavailable",

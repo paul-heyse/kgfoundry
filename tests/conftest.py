@@ -116,7 +116,12 @@ def _faiss_runtime_available() -> bool:
         faiss_module = import_module("faiss")
     except ModuleNotFoundError:
         return False
-    except (ImportError, OSError, AttributeError, RuntimeError) as exc:  # pragma: no cover - defensive against broken wheels
+    except (
+        ImportError,
+        OSError,
+        AttributeError,
+        RuntimeError,
+    ) as exc:  # pragma: no cover - defensive against broken wheels
         logging.getLogger(__name__).debug(
             "faiss import failed, disabling FAISS-dependent tests", exc_info=exc
         )
