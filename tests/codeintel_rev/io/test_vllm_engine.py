@@ -21,7 +21,7 @@ class _StubPooler:
         pass
 
 
-@dataclass
+@dataclass(frozen=True)
 class _StubTokensPrompt:
     prompt_token_ids: list[int]
 

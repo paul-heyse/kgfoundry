@@ -69,7 +69,7 @@ def test_encode_codes_requires_input(monkeypatch: pytest.MonkeyPatch) -> None:
         embedder.encode_codes([])
 
 
-@dataclass
+@dataclass(frozen=True)
 class _EmbedderSettings:
     model_id: str
     device: str

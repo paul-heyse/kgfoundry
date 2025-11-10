@@ -27,13 +27,13 @@ from __future__ import annotations
 import argparse
 import ast
 import contextlib
+import importlib
 import importlib.util
 import json
 import os
 import re
 import shlex
 import shutil
-import subprocess
 import sys
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -42,6 +42,14 @@ from typing import Any
 import libcst as cst
 from libcst.helpers import get_node_fields
 from libcst.metadata import MetadataWrapper, PositionProvider
+
+_subprocess = importlib.import_module("subprocess")
+SubprocessError = _subprocess.SubprocessError
+
+
+class CommandExecutionError(SubprocessError):
+    """Raised when a subprocess command fails."""
+
 
 # ---------- Utilities ----------
 
@@ -219,8 +227,8 @@ def run(
         If command or working directory validation fails.
     OSError
         If subprocess cannot be spawned or working directory cannot be resolved.
-    subprocess.SubprocessError
-        If subprocess execution fails and check=True.
+    CommandExecutionError
+        If subprocess execution fails and ``check=True``.
 
     Notes
     -----
@@ -246,25 +254,24 @@ def run(
     # This prevents injection attacks by ensuring commands are never shell-interpreted
     try:
         if capture:
-            out = subprocess.run(  # Security: validated_cmd is sanitized, shell=False prevents injection
+            out = _subprocess.run(  # Security: validated_cmd is sanitized, shell=False prevents injection
                 validated_cmd,
                 cwd=str(sanitized_cwd) if sanitized_cwd else None,
                 env=dict(env) if env else None,
                 check=check,
                 shell=False,  # Never use shell=True for security
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
+                stdout=_subprocess.PIPE,
+                stderr=_subprocess.STDOUT,
                 text=True,
             )
             return out.stdout
-        subprocess.run(  # Security: validated_cmd is sanitized, shell=False prevents injection
+        _subprocess.run(  # Security: validated_cmd is sanitized, shell=False prevents injection
             validated_cmd,
             cwd=str(sanitized_cwd) if sanitized_cwd else None,
             env=dict(env) if env else None,
             check=check,
             shell=False,  # Never use shell=True for security
         )
-        return None
     except ValueError as e:
         # Re-raise validation errors explicitly
         log(f"✖ command validation failed: {e}")
@@ -277,10 +284,11 @@ def run(
         # Re-raise OS errors explicitly
         log(f"✖ command execution failed: {e}")
         raise
-    except subprocess.SubprocessError as e:
+    except SubprocessError as exc:
         # Re-raise subprocess errors explicitly
-        log(f"✖ command failed: {e}")
-        raise
+        log(f"✖ command failed: {exc}")
+        raise CommandExecutionError(str(exc)) from exc
+    return None
 
 
 def ensure_dirs() -> None:

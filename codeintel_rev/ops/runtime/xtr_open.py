@@ -32,40 +32,100 @@ PROBLEM_INSTANCE = "/ops/runtime/xtr-open"
 _VERBOSE_DEFAULT = False
 _VERBOSE_FLAGS = ("--verbose", "-v")
 
+# Type aliases for typer CLI parameters
+_RootOption = Annotated[
+    Path | None,
+    typer.Option(
+        "--root",
+        help="Override the configured XTR artifact directory.",
+    ),
+]
+_VerboseOption = Annotated[
+    bool,
+    typer.Option(
+        *_VERBOSE_FLAGS,
+        help="Pretty-print success payloads.",
+    ),
+]
+
 
 @APP.command("xtr-open")
 def xtr_open(
-    root: Annotated[
-        Path | None,
-        typer.Option(
-            "--root",
-            help="Override the configured XTR artifact directory.",
-            dir_okay=True,
-            file_okay=False,
-            writable=False,
-            readable=True,
-        ),
-    ] = None,
+    root: _RootOption = None,
     *,
-    verbose: Annotated[
-        bool,
-        typer.Option(
-            _VERBOSE_DEFAULT,
-            *_VERBOSE_FLAGS,
-            help="Pretty-print success payloads.",
-        ),
-    ] = _VERBOSE_DEFAULT,
+    verbose: _VerboseOption = _VERBOSE_DEFAULT,
 ) -> None:
-    """Validate that XTR artifacts are present and readable."""
+    """Validate that XTR artifacts are present and readable.
+
+    Extended Summary
+    ----------------
+    This CLI command performs a fail-fast probe for XTR (eXtended Token Retrieval)
+    artifacts. It validates that the XTR index directory exists, can be opened,
+    and is ready for use. The command is used for health checks and deployment
+    validation. On success, it prints a JSON payload with readiness status and
+    metadata (chunk count, token count, dimension, dtype). On failure, it exits
+    with a non-zero code and prints RFC 9457 Problem Details.
+
+    Parameters
+    ----------
+    root : _RootOption, optional
+        Override the configured XTR artifact directory. If None (default), uses
+        the directory resolved from application settings. Type alias for
+        ``Annotated[Path | None, typer.Option(...)]`` for CLI option specification.
+        Defaults to None.
+    verbose : _VerboseOption, optional
+        Pretty-print success payloads with indentation. When False (default),
+        outputs compact JSON. Type alias for ``Annotated[bool, typer.Option(...)]``
+        for CLI option specification. Defaults to False.
+
+    Raises
+    ------
+    typer.Exit
+        Raised by Typer to signal successful completion (code=0) or failure
+        (code=1). On failure, the exit includes RFC 9457 Problem Details
+        printed to stderr.
+
+    Notes
+    -----
+    Time complexity O(1) for directory checks; O(I) for index opening where I
+    is the cost of loading index metadata. The function performs filesystem I/O
+    to validate paths and open the index. Thread-safe if called from a single
+    process. The function is idempotent - multiple calls with the same inputs
+    produce the same results.
+
+    Examples
+    --------
+    >>> # Validate default XTR directory
+    >>> xtr_open(root=None, verbose=False)
+    {"ready": true, "limits": [], "metadata": {...}}
+
+    >>> # Validate custom directory with verbose output
+    >>> xtr_open(root=Path("/custom/xtr"), verbose=True)
+    {
+      "ready": true,
+      "limits": [],
+      "metadata": {
+        "root": "/custom/xtr",
+        "chunks": 1000,
+        "tokens": 50000,
+        "dim": 768,
+        "dtype": "float32"
+      }
+    }
+    """
     settings = load_settings()
     paths = resolve_application_paths(settings)
     xtr_root = root or paths.xtr_dir
+    if root is not None and not root.is_dir():
+        _exit_with_problem(
+            "XTR artifacts unavailable",
+            detail=f"Not a directory: {root}",
+        )
 
     if not settings.xtr.enable:
-        _exit_with_problem(
-            "XTR disabled via configuration.",
-            detail="Set XTR_ENABLE=1 to enable late interaction.",
-        )
+        payload = {"ready": False, "limits": ["xtr disabled"]}
+        typer.echo(json.dumps(payload, indent=2 if verbose else None))
+        raise typer.Exit(code=0)
 
     if not xtr_root.exists():
         _exit_with_problem(
@@ -89,12 +149,15 @@ def xtr_open(
 
     metadata = index.metadata() or {}
     payload = {
-        "status": "ready",
-        "root": str(xtr_root),
-        "chunks": metadata.get("doc_count"),
-        "tokens": metadata.get("total_tokens"),
-        "dim": metadata.get("dim"),
-        "dtype": metadata.get("dtype"),
+        "ready": True,
+        "limits": [],
+        "metadata": {
+            "root": str(xtr_root),
+            "chunks": metadata.get("doc_count"),
+            "tokens": metadata.get("total_tokens"),
+            "dim": metadata.get("dim"),
+            "dtype": metadata.get("dtype"),
+        },
     }
     typer.echo(json.dumps(payload, indent=2 if verbose else None))
 
@@ -111,7 +174,8 @@ def _exit_with_problem(
         detail=detail,
         cause=cause,
     ).to_problem_details(instance=PROBLEM_INSTANCE)
-    typer.echo(json.dumps(problem, indent=2), err=False)
+    problem["title"] = message
+    typer.echo(json.dumps(problem), err=True)
     raise typer.Exit(code=1)
 
 

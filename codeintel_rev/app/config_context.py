@@ -49,7 +49,7 @@ from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
-from typing import TYPE_CHECKING, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import redis.asyncio as redis_asyncio
 
@@ -62,7 +62,11 @@ from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.hybrid_search import HybridSearchEngine
 from codeintel_rev.io.vllm_client import VLLMClient
 from codeintel_rev.io.xtr_manager import XTRIndex
-from codeintel_rev.runtime import RuntimeCell
+from codeintel_rev.runtime import (
+    NullRuntimeCellObserver,
+    RuntimeCell,
+    RuntimeCellObserver,
+)
 from kgfoundry_common.errors import ConfigurationError
 from kgfoundry_common.logging import get_logger
 
@@ -271,6 +275,26 @@ class _ContextRuntimeState:
     xtr: RuntimeCell[XTRIndex] = field(default_factory=lambda: RuntimeCell(name="xtr-index"))
     faiss: _FaissRuntimeState = field(default_factory=_FaissRuntimeState)
 
+    def attach_observer(self, observer: RuntimeCellObserver) -> None:
+        """Attach observer to each runtime cell."""
+        self.hybrid.configure_observer(observer)
+        self.coderank_faiss.configure_observer(observer)
+        self.xtr.configure_observer(observer)
+
+    def iter_cells(self) -> tuple[tuple[str, RuntimeCell[Any]], ...]:
+        """Return ordered tuples of runtime cell names and instances.
+
+        Returns
+        -------
+        tuple[tuple[str, RuntimeCell[Any]], ...]
+            Ordered collection of runtime cell name/value pairs.
+        """
+        return (
+            ("hybrid", cast("RuntimeCell[Any]", self.hybrid)),
+            ("coderank-faiss", cast("RuntimeCell[Any]", self.coderank_faiss)),
+            ("xtr", cast("RuntimeCell[Any]", self.xtr)),
+        )
+
 
 @dataclass(slots=True, frozen=True)
 class ApplicationContext:
@@ -309,6 +333,10 @@ class ApplicationContext:
     async_git_client : AsyncGitClient
         Async wrapper around git_client for non-blocking Git operations. Runs
         synchronous GitPython operations in threadpool via asyncio.to_thread.
+    runtime_observer : RuntimeCellObserver
+        Observer instance that receives lifecycle callbacks from runtime cells
+        (hybrid engine, FAISS manager, XTR index). Defaults to NullRuntimeCellObserver
+        when not provided. Used for instrumentation, monitoring, and diagnostics.
 
     Examples
     --------
@@ -352,37 +380,49 @@ class ApplicationContext:
     duckdb_manager: DuckDBManager
     git_client: GitClient
     async_git_client: AsyncGitClient
+    runtime_observer: RuntimeCellObserver = field(
+        default_factory=NullRuntimeCellObserver, repr=False
+    )
     _runtime: _ContextRuntimeState = field(
         default_factory=_ContextRuntimeState, init=False, repr=False
     )
 
+    def __post_init__(self) -> None:
+        """Attach the configured observer to all runtime cells."""
+        self._runtime.attach_observer(self.runtime_observer)
+
     @classmethod
-    def create(cls) -> ApplicationContext:
+    def create(
+        cls,
+        *,
+        runtime_observer: RuntimeCellObserver | None = None,
+    ) -> ApplicationContext:
         """Create application context from environment variables.
 
-        This is the primary way to create an ApplicationContext. It:
-        1. Loads settings from environment variables (via load_settings())
-        2. Resolves and validates all filesystem paths
-        3. Creates long-lived HTTP and index manager clients
-        4. Logs successful initialization with key configuration values
+        Extended Summary
+        ----------------
+        This is the primary way to create an ApplicationContext. It loads settings
+        from environment variables, resolves and validates all filesystem paths,
+        creates long-lived HTTP and index manager clients, and logs successful
+        initialization with key configuration values. The method is designed to
+        be called exactly once during application startup (typically in the FastAPI
+        lifespan() function). Configuration errors cause ConfigurationError to be
+        raised by resolve_application_paths(), preventing application startup with
+        clear error messages including RFC 9457 Problem Details.
 
-        This method should be called exactly once during application startup
-        (typically in the FastAPI lifespan() function). Configuration errors
-        cause ConfigurationError to be raised by resolve_application_paths(),
-        preventing application startup.
+        Parameters
+        ----------
+        runtime_observer : RuntimeCellObserver | None, optional
+            Observer instance that receives lifecycle callbacks from runtime cells
+            (hybrid engine, FAISS manager, XTR index). Used for instrumentation,
+            monitoring, and diagnostics. If None (default), uses NullRuntimeCellObserver
+            which suppresses all callbacks. Defaults to None.
 
         Returns
         -------
         ApplicationContext
-            Initialized context with all clients and configuration ready.
-
-        See Also
-        --------
-        resolve_application_paths : Function that raises ConfigurationError
-            This function is called internally and may raise ConfigurationError
-            if paths cannot be resolved or validated. The exception propagates
-            to the caller, causing application startup to fail with a clear
-            error message including RFC 9457 Problem Details.
+            Initialized context with all clients and configuration ready. The context
+            is frozen after creation and thread-safe for concurrent access.
 
         Examples
         --------
@@ -392,6 +432,24 @@ class ApplicationContext:
         ...     context = ApplicationContext.create()
         ...     app.state.context = context
         ...     yield
+
+        >>> # With custom observer for instrumentation
+        >>> observer = MyCustomObserver()
+        >>> context = ApplicationContext.create(runtime_observer=observer)
+
+        Notes
+        -----
+        Time complexity O(1) for context creation; I/O occurs during path resolution
+        and client initialization. The method performs filesystem operations to validate
+        paths and may establish network connections for HTTP clients. Thread-safe after
+        creation due to frozen dataclass design. The method is idempotent in the sense
+        that calling it multiple times creates independent contexts, but it should only
+        be called once per application lifecycle.
+
+        This method may propagate ConfigurationError from resolve_application_paths()
+        if paths cannot be resolved or validated. The exception includes RFC 9457 Problem
+        Details with context fields for debugging (repo_root value, source environment
+        variable) and causes application startup to fail.
 
         See Also
         --------
@@ -440,6 +498,8 @@ class ApplicationContext:
             },
         )
 
+        observer = runtime_observer or NullRuntimeCellObserver()
+
         return cls(
             settings=settings,
             paths=paths,
@@ -449,7 +509,18 @@ class ApplicationContext:
             duckdb_manager=duckdb_manager,
             git_client=git_client,
             async_git_client=async_git_client,
+            runtime_observer=observer,
         )
+
+    def _iter_runtime_cells(self) -> tuple[tuple[str, RuntimeCell[Any]], ...]:
+        """Return managed runtime cells for diagnostics and cleanup.
+
+        Returns
+        -------
+        tuple[tuple[str, RuntimeCell[Any]], ...]
+            Tuple of runtime cell name/value pairs.
+        """
+        return self._runtime.iter_cells()
 
     def get_hybrid_engine(self) -> HybridSearchEngine:
         """Return the hybrid search engine, instantiating it lazily.
@@ -766,23 +837,25 @@ class ApplicationContext:
             duckdb_manager=_component_value("duckdb_manager", self.duckdb_manager),
             git_client=_component_value("git_client", self.git_client),
             async_git_client=_component_value("async_git_client", self.async_git_client),
+            runtime_observer=self.runtime_observer,
         )
 
-    async def close_all_runtimes(self) -> None:
+    def close_all_runtimes(self) -> None:
         """Best-effort shutdown for mutable runtimes."""
         LOGGER.info("Closing runtime resources")
+        runtime = self._runtime
+        for name, cell in self._iter_runtime_cells():
+            with suppress(Exception):
+                LOGGER.debug("closing_runtime_cell", extra={"cell": name})
+                cell.close()
         with suppress(Exception):
             self.vllm_client.close()
         with suppress(Exception):
             self.duckdb_manager.close()
         with suppress(Exception):
+            self.faiss_manager.cpu_index = None
             self.faiss_manager.gpu_index = None
             self.faiss_manager.secondary_gpu_index = None
             self.faiss_manager.gpu_resources = None
-        with suppress(Exception):
-            runtime = self._runtime
-            runtime.hybrid.close()
-            runtime.coderank_faiss.close()
-            runtime.xtr.close()
-        with suppress(Exception):
-            await self.scope_store.close()
+            runtime.faiss.loaded = False
+            runtime.faiss.gpu_attempted = False

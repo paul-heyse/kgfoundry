@@ -6,7 +6,8 @@ Provides health/readiness endpoints, CORS, and streaming support.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Awaitable, Callable
+import os
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager, suppress
 
 from fastapi import FastAPI, Request
@@ -57,6 +58,161 @@ def _preload_faiss_index(context: ApplicationContext) -> bool:
         return True
 
 
+def _env_flag(name: str) -> bool:
+    """Return ``True`` when an environment flag is explicitly enabled.
+
+    Parameters
+    ----------
+    name : str
+        Environment variable name to inspect.
+
+    Returns
+    -------
+    bool
+        ``True`` if the variable is set to a truthy value.
+    """
+    value = os.getenv(name, "")
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _log_gpu_warmup(status: Mapping[str, object]) -> None:
+    """Log the GPU warmup status summary.
+
+    Parameters
+    ----------
+    status : Mapping[str, object]
+        Warmup status payload emitted by :func:`warmup_gpu`.
+
+    """
+    overall = status.get("overall_status")
+    if overall == "ready":
+        LOGGER.info("GPU warmup successful - GPU acceleration available")
+    elif overall == "degraded":
+        LOGGER.warning(
+            "GPU warmup partial - some GPU features unavailable: %s",
+            status.get("details"),
+        )
+    else:
+        LOGGER.info("GPU warmup indicates GPU unavailable - continuing with CPU-only mode")
+
+
+async def _preload_faiss_if_configured(context: ApplicationContext) -> None:
+    """Preload FAISS indexes when configured to do so."""
+    if not context.settings.index.faiss_preload:
+        return
+    LOGGER.info("Pre-loading FAISS index during startup")
+    preload_success = await asyncio.to_thread(_preload_faiss_index, context)
+    if not preload_success:
+        LOGGER.warning("FAISS index pre-load failed; will lazy-load on first search")
+
+
+def _preload_xtr_if_configured(context: ApplicationContext) -> None:
+    """Preload XTR runtime when toggle is enabled."""
+    if not _env_flag("XTR_PRELOAD"):
+        return
+    LOGGER.info("Pre-loading XTR index during startup")
+    try:
+        index = context.get_xtr_index()
+    except (RuntimeError, OSError, ValueError):
+        LOGGER.warning("XTR preload failed; continuing lazily", exc_info=True)
+        return
+    if index is None or not getattr(index, "ready", False):
+        LOGGER.warning("XTR preload requested but index unavailable")
+
+
+def _preload_hybrid_if_configured(context: ApplicationContext) -> None:
+    """Preload HybridSearchEngine when toggle is enabled."""
+    if not _env_flag("HYBRID_PRELOAD"):
+        return
+    LOGGER.info("Pre-loading HybridSearchEngine during startup")
+    try:
+        context.get_hybrid_engine()
+    except (RuntimeError, OSError, ValueError):
+        LOGGER.warning("Hybrid preload failed; continuing lazily", exc_info=True)
+
+
+async def _initialize_context(
+    app: FastAPI,
+) -> tuple[ApplicationContext, ReadinessProbe]:
+    """Initialize application context, readiness probe, and optional runtimes.
+
+    Extended Summary
+    ----------------
+    This function orchestrates the application startup sequence by creating the
+    ApplicationContext, performing GPU warmup, initializing the readiness probe,
+    and optionally pre-loading FAISS, XTR, and hybrid search runtimes. It stores
+    the context and readiness probe in the FastAPI app.state for access by request
+    handlers. This function is called once during application startup from the
+    lifespan() context manager.
+
+    Parameters
+    ----------
+    app : FastAPI
+        FastAPI application instance. Used to store application context and
+        readiness probe in app.state for access by request handlers.
+
+    Returns
+    -------
+    tuple[ApplicationContext, ReadinessProbe]
+        Pair containing the initialized context and readiness probe. The context
+        contains all configuration and long-lived clients. The readiness probe
+        monitors the health of dependent services and resources.
+
+    Notes
+    -----
+    Time complexity depends on runtime pre-loading configuration. GPU warmup and
+    optional pre-loading operations may take several seconds. The function performs
+    I/O operations (filesystem access, network requests for readiness checks) and
+    may allocate GPU resources. Thread-safe if called from a single async context
+    during startup. The function is not idempotent - it should only be called once
+    per application lifecycle.
+
+    This function may propagate ConfigurationError from ApplicationContext.create()
+    if application configuration is invalid or required resources are missing. The
+    exception propagates to lifespan(), causing FastAPI startup to fail.
+
+    Examples
+    --------
+    >>> # Called from lifespan() context manager
+    >>> context, readiness = await _initialize_context(app)
+    >>> assert context is not None
+    >>> assert readiness is not None
+    """
+    context = ApplicationContext.create()
+    app.state.context = context
+    _log_gpu_warmup(warmup_gpu())
+    readiness = ReadinessProbe(context)
+    await readiness.initialize()
+    app.state.readiness = readiness
+    await _preload_faiss_if_configured(context)
+    _preload_xtr_if_configured(context)
+    _preload_hybrid_if_configured(context)
+    LOGGER.info("Application initialization complete")
+    return context, readiness
+
+
+async def _shutdown_context(
+    context: ApplicationContext | None,
+    readiness: ReadinessProbe | None,
+) -> None:
+    """Shut down mutable runtimes and readiness probes."""
+    LOGGER.info("Starting application shutdown")
+    if context is not None:
+        with suppress(Exception):
+            context.close_all_runtimes()
+        if hasattr(context, "scope_store"):
+            try:
+                await context.scope_store.close()
+            except (RuntimeError, OSError, ValueError):
+                LOGGER.warning("Scope store shutdown failed", exc_info=True)
+    if readiness is not None:
+        try:
+            await readiness.shutdown()
+        except (RuntimeError, OSError, ValueError):
+            LOGGER.warning("Readiness shutdown failed", exc_info=True)
+    LOGGER.info("Application shutdown complete")
+
+
 @asynccontextmanager
 async def lifespan(
     app: FastAPI,
@@ -81,10 +237,8 @@ async def lifespan(
     ------
     ConfigurationError
         If configuration is invalid or required resources are missing.
-        FastAPI will fail to start, preventing broken deployment.
-    Exception
-        If an unexpected error occurs during application startup. The error
-        is logged and re-raised to prevent FastAPI from starting in a broken state.
+        FastAPI will fail to start, preventing broken deployment. The exception
+        includes RFC 9457 Problem Details with context fields for debugging.
 
     Notes
     -----
@@ -103,57 +257,20 @@ async def lifespan(
     3. Explicitly close any open resources
     """
     LOGGER.info("Starting application initialization")
+    context: ApplicationContext | None = None
+    readiness: ReadinessProbe | None = None
 
     try:
-        # Phase 1: Load configuration
-        context = ApplicationContext.create()
-        app.state.context = context
-
-        # Phase 2: GPU warmup sequence
-        gpu_status = warmup_gpu()
-        if gpu_status["overall_status"] == "ready":
-            LOGGER.info("GPU warmup successful - GPU acceleration available")
-        elif gpu_status["overall_status"] == "degraded":
-            LOGGER.warning(
-                "GPU warmup partial - some GPU features unavailable: %s",
-                gpu_status["details"],
-            )
-        else:
-            LOGGER.info("GPU warmup indicates GPU unavailable - continuing with CPU-only mode")
-
-        # Phase 3: Initialize readiness probe
-        readiness = ReadinessProbe(context)
-        await readiness.initialize()
-        app.state.readiness = readiness
-
-        # Phase 4: Optional FAISS preloading (controlled by env var)
-        if context.settings.index.faiss_preload:
-            LOGGER.info("Pre-loading FAISS index during startup")
-            preload_success = await asyncio.to_thread(_preload_faiss_index, context)
-            if not preload_success:
-                LOGGER.warning("FAISS index pre-load failed; will lazy-load on first search")
-
-        LOGGER.info("Application initialization complete")
-
+        context, readiness = await _initialize_context(app)
+        yield
     except ConfigurationError as exc:
-        # Log structured error and re-raise to prevent FastAPI from starting
         LOGGER.exception(
             "Application startup failed due to configuration error",
             extra={"error_code": exc.code.value, "context": exc.context},
         )
         raise
-    except Exception:
-        LOGGER.exception("Unexpected error during application startup")
-        raise
-
-    try:
-        yield
     finally:
-        LOGGER.info("Starting application shutdown")
-        with suppress(Exception):
-            await context.close_all_runtimes()
-        await readiness.shutdown()
-        LOGGER.info("Application shutdown complete")
+        await _shutdown_context(context, readiness)
 
 
 app = FastAPI(

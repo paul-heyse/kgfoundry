@@ -2,6 +2,18 @@
 
 from __future__ import annotations
 
-from codeintel_rev.runtime.cells import RuntimeCell
+from codeintel_rev.runtime.cells import (
+    NullRuntimeCellObserver,
+    RuntimeCell,
+    RuntimeCellCloseResult,
+    RuntimeCellInitResult,
+    RuntimeCellObserver,
+)
 
-__all__ = ["RuntimeCell"]
+__all__ = [
+    "NullRuntimeCellObserver",
+    "RuntimeCell",
+    "RuntimeCellCloseResult",
+    "RuntimeCellInitResult",
+    "RuntimeCellObserver",
+]
