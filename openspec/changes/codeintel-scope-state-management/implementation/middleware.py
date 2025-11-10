@@ -203,7 +203,13 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
 
     @staticmethod
     def _fetch_or_generate_session_id(request: Request) -> str:
-        """Return the session ID extracted from headers or generated."""
+        """Return the session ID extracted from headers or generated.
+
+        Returns
+        -------
+        str
+            Session identifier used to scope queries.
+        """
         session_id = request.headers.get("X-Session-ID")
         log_extra = {"path": request.url.path}
         if session_id is None:

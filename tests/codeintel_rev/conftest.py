@@ -8,6 +8,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
+import numpy as np
 import pytest
 
 os.environ.setdefault("FAISS_OPT_LEVEL", "generic")
@@ -148,8 +149,14 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
     paths.faiss_index.parent.mkdir(parents=True, exist_ok=True)
     paths.duckdb_path.parent.mkdir(parents=True, exist_ok=True)
     paths.xtr_dir.mkdir(parents=True, exist_ok=True)
+    paths.faiss_index.touch()
+    paths.duckdb_path.touch()
 
     vllm_client = MagicMock(spec=VLLMClient)
+    vllm_client.embed_batch.return_value = np.zeros(
+        (1, settings.vllm.embedding_dim),
+        dtype=np.float32,
+    )
     faiss_manager = MagicMock(spec=FAISSManager)
     faiss_manager.gpu_index = None
     faiss_manager.gpu_disabled_reason = None

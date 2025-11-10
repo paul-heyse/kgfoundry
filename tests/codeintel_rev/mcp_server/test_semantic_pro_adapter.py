@@ -16,12 +16,9 @@ from codeintel_rev.retrieval.types import HybridResultDoc, HybridSearchResult
 from kgfoundry_common.errors import VectorSearchError
 
 
-class _FakeEmbedder:
-    def __init__(self, **_: object) -> None:
-        pass
-
-    def encode_queries(self, queries: list[str]) -> np.ndarray:
-        assert queries, "queries should not be empty"
+class _FakeVLLMClient:
+    def embed_batch(self, texts: list[str]) -> np.ndarray:
+        assert texts
         return np.asarray([[0.1, 0.2]], dtype=np.float32)
 
 
@@ -96,6 +93,7 @@ class _FakeContext:
         coderank_index = tmp_path / "coderank.faiss"
         coderank_index.write_bytes(b"index")
         (tmp_path / "xtr").mkdir(exist_ok=True)
+        self.vllm_client = _FakeVLLMClient()
         self.paths = SimpleNamespace(
             coderank_faiss_index=coderank_index,
             warp_index_dir=tmp_path / "warp",
@@ -129,6 +127,7 @@ class _FakeContext:
                 max_query_tokens=32,
                 device="cpu",
                 model_id="stub",
+                mode="narrow",
             ),
             coderank_llm=SimpleNamespace(
                 enabled=False,
@@ -139,6 +138,7 @@ class _FakeContext:
                 top_p=1.0,
                 budget_ms=500,
             ),
+            vllm=SimpleNamespace(model="stub", run=SimpleNamespace(mode="inprocess")),
         )
 
     def get_coderank_faiss_manager(self, vec_dim: int) -> _FakeFaissManager:
@@ -177,7 +177,6 @@ def _stub_observer(monkeypatch: pytest.MonkeyPatch) -> None:
         await asyncio.sleep(0)
 
     monkeypatch.setattr(semantic_pro, "observe_duration", _observer)
-    monkeypatch.setattr(semantic_pro, "CodeRankEmbedder", _FakeEmbedder)
     monkeypatch.setattr(semantic_pro, "get_session_id", lambda: "test-session")
     monkeypatch.setattr(semantic_pro, "get_effective_scope", _fake_scope)
 
@@ -210,7 +209,7 @@ def test_semantic_pro_produces_findings(tmp_path: Path) -> None:
     assert method.get("stages")
     notes = method.get("notes")
     assert notes
-    assert "WARP disabled via request option." in notes[0]
+    assert "Stage-B disabled via request option." in notes[0]
 
 
 def test_semantic_pro_requires_coderank_enabled(tmp_path: Path) -> None:

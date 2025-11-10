@@ -4,69 +4,15 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from typing import cast
 from unittest.mock import Mock, patch
 
 import duckdb
 import httpx
 import pytest
-from codeintel_rev.app.config_context import ApplicationContext, ResolvedPaths
+from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.readiness import CheckResult, ReadinessProbe
-from codeintel_rev.config.settings import (
-    IndexConfig,
-    Settings,
-    VLLMConfig,
-    load_settings,
-)
-
-
-@pytest.fixture
-def mock_context(tmp_path: Path) -> ApplicationContext:
-    """Create a mock ApplicationContext for testing.
-
-    Parameters
-    ----------
-    tmp_path : Path
-        Temporary directory path provided by pytest fixture.
-
-    Returns
-    -------
-    ApplicationContext
-        Mock application context with test paths and settings.
-    """
-    repo_root = tmp_path / "repo"
-    repo_root.mkdir()
-    (repo_root / "data").mkdir()
-    (repo_root / "data" / "vectors").mkdir()
-    (repo_root / "data" / "faiss").mkdir()
-    (repo_root / "data" / "faiss" / "code.ivfpq.faiss").touch()
-    (repo_root / "data" / "catalog.duckdb").touch()
-    (repo_root / "data" / "coderank_vectors").mkdir()
-    (repo_root / "data" / "faiss" / "coderank.faiss").touch()
-    (repo_root / "data" / "xtr").mkdir()
-    (repo_root / "indexes").mkdir()
-    (repo_root / "indexes" / "warp_xtr").mkdir()
-    (repo_root / "index.scip").touch()
-
-    paths = ResolvedPaths(
-        repo_root=repo_root,
-        data_dir=repo_root / "data",
-        vectors_dir=repo_root / "data" / "vectors",
-        faiss_index=repo_root / "data" / "faiss" / "code.ivfpq.faiss",
-        duckdb_path=repo_root / "data" / "catalog.duckdb",
-        scip_index=repo_root / "index.scip",
-        coderank_vectors_dir=repo_root / "data" / "coderank_vectors",
-        coderank_faiss_index=repo_root / "data" / "faiss" / "coderank.faiss",
-        warp_index_dir=repo_root / "indexes" / "warp_xtr",
-        xtr_dir=repo_root / "data" / "xtr",
-    )
-
-    settings = load_settings()
-    context = Mock(spec=ApplicationContext)
-    context.paths = paths
-    context.settings = settings
-
-    return context
+from codeintel_rev.config.settings import IndexConfig, Settings, VLLMConfig, VLLMRunMode
+from codeintel_rev.config.utils import replace_settings, replace_struct
 
 
 def _materialized_index_config(index: IndexConfig, *, enabled: bool) -> IndexConfig:
@@ -84,19 +30,7 @@ def _materialized_index_config(index: IndexConfig, *, enabled: bool) -> IndexCon
     IndexConfig
         New configuration with identical fields and updated duckdb_materialize flag.
     """
-    return IndexConfig(
-        vec_dim=index.vec_dim,
-        chunk_budget=index.chunk_budget,
-        faiss_nlist=index.faiss_nlist,
-        faiss_nprobe=index.faiss_nprobe,
-        bm25_k1=index.bm25_k1,
-        bm25_b=index.bm25_b,
-        rrf_k=index.rrf_k,
-        use_cuvs=index.use_cuvs,
-        faiss_preload=index.faiss_preload,
-        duckdb_materialize=enabled,
-        preview_max_chars=index.preview_max_chars,
-    )
+    return replace_struct(index, duckdb_materialize=enabled)
 
 
 def _reset_duckdb_catalog(db_path: Path) -> None:
@@ -111,10 +45,7 @@ def _context_with_settings(
     context: ApplicationContext,
     settings: Settings,
 ) -> ApplicationContext:
-    clone = Mock(spec=ApplicationContext)
-    clone.paths = context.paths
-    clone.settings = settings
-    return cast("ApplicationContext", clone)
+    return context.with_overrides(settings=settings)
 
 
 def test_check_result_as_payload_healthy() -> None:
@@ -142,10 +73,12 @@ def test_check_result_as_payload_unhealthy() -> None:
 
 
 @pytest.mark.asyncio
-async def test_readiness_probe_initialize(mock_context: ApplicationContext) -> None:
+async def test_readiness_probe_initialize(
+    mock_application_context: ApplicationContext,
+) -> None:
     """Test ReadinessProbe.initialize() calls refresh."""
     # Arrange
-    probe = ReadinessProbe(mock_context)
+    probe = ReadinessProbe(mock_application_context)
 
     # Act
     await probe.initialize()
@@ -157,10 +90,12 @@ async def test_readiness_probe_initialize(mock_context: ApplicationContext) -> N
 
 
 @pytest.mark.asyncio
-async def test_readiness_probe_all_healthy(mock_context: ApplicationContext) -> None:
+async def test_readiness_probe_all_healthy(
+    mock_application_context: ApplicationContext,
+) -> None:
     """Test ReadinessProbe when all checks pass."""
     # Arrange
-    probe = ReadinessProbe(mock_context)
+    probe = ReadinessProbe(mock_application_context)
 
     # Act
     results = await probe.refresh()
@@ -176,26 +111,16 @@ async def test_readiness_probe_all_healthy(mock_context: ApplicationContext) -> 
 
 @pytest.mark.asyncio
 async def test_readiness_probe_materialize_reports_missing_table(
-    mock_context: ApplicationContext,
+    mock_application_context: ApplicationContext,
 ) -> None:
     """Readiness should fail when materialization enabled but table missing."""
-    existing_settings = mock_context.settings
-    _reset_duckdb_catalog(mock_context.paths.duckdb_path)
-    new_settings = Settings(
-        vllm=existing_settings.vllm,
-        paths=existing_settings.paths,
+    existing_settings = mock_application_context.settings
+    _reset_duckdb_catalog(mock_application_context.paths.duckdb_path)
+    new_settings = replace_settings(
+        existing_settings,
         index=_materialized_index_config(existing_settings.index, enabled=True),
-        limits=existing_settings.limits,
-        redis=existing_settings.redis,
-        duckdb=existing_settings.duckdb,
-        bm25=existing_settings.bm25,
-        splade=existing_settings.splade,
-        coderank=existing_settings.coderank,
-        warp=existing_settings.warp,
-        xtr=existing_settings.xtr,
-        coderank_llm=existing_settings.coderank_llm,
     )
-    probe = ReadinessProbe(_context_with_settings(mock_context, new_settings))
+    probe = ReadinessProbe(_context_with_settings(mock_application_context, new_settings))
 
     results = await probe.refresh()
     duckdb_result = results["duckdb_catalog"]
@@ -207,26 +132,16 @@ async def test_readiness_probe_materialize_reports_missing_table(
 
 @pytest.mark.asyncio
 async def test_readiness_probe_materialize_validates_index(
-    mock_context: ApplicationContext,
+    mock_application_context: ApplicationContext,
 ) -> None:
     """Readiness passes when materialized table and index exist."""
-    existing_settings = mock_context.settings
-    _reset_duckdb_catalog(mock_context.paths.duckdb_path)
-    new_settings = Settings(
-        vllm=existing_settings.vllm,
-        paths=existing_settings.paths,
+    existing_settings = mock_application_context.settings
+    _reset_duckdb_catalog(mock_application_context.paths.duckdb_path)
+    new_settings = replace_settings(
+        existing_settings,
         index=_materialized_index_config(existing_settings.index, enabled=True),
-        limits=existing_settings.limits,
-        redis=existing_settings.redis,
-        duckdb=existing_settings.duckdb,
-        bm25=existing_settings.bm25,
-        splade=existing_settings.splade,
-        coderank=existing_settings.coderank,
-        warp=existing_settings.warp,
-        xtr=existing_settings.xtr,
-        coderank_llm=existing_settings.coderank_llm,
     )
-    context = _context_with_settings(mock_context, new_settings)
+    context = _context_with_settings(mock_application_context, new_settings)
 
     with duckdb.connect(str(context.paths.duckdb_path)) as connection:
         connection.execute("DROP VIEW IF EXISTS chunks")
@@ -255,11 +170,11 @@ async def test_readiness_probe_materialize_validates_index(
 
 
 @pytest.mark.asyncio
-async def test_readiness_probe_missing_faiss(mock_context: ApplicationContext) -> None:
+async def test_readiness_probe_missing_faiss(mock_application_context: ApplicationContext) -> None:
     """Test ReadinessProbe when FAISS index is missing."""
     # Arrange
-    mock_context.paths.faiss_index.unlink()
-    probe = ReadinessProbe(mock_context)
+    mock_application_context.paths.faiss_index.unlink(missing_ok=True)
+    probe = ReadinessProbe(mock_application_context)
 
     # Act
     results = await probe.refresh()
@@ -272,11 +187,16 @@ async def test_readiness_probe_missing_faiss(mock_context: ApplicationContext) -
 
 @pytest.mark.asyncio
 async def test_readiness_probe_vllm_unreachable(
-    mock_context: ApplicationContext,
+    mock_application_context: ApplicationContext,
 ) -> None:
     """Test ReadinessProbe when vLLM service is unreachable."""
     # Arrange
-    probe = ReadinessProbe(mock_context)
+    http_vllm = VLLMConfig(base_url="http://localhost:8001/v1", run=VLLMRunMode(mode="http"))
+    context = _context_with_settings(
+        mock_application_context,
+        replace_settings(mock_application_context.settings, vllm=http_vllm),
+    )
+    probe = ReadinessProbe(context)
 
     # Act - mock httpx to raise HTTPError
     with patch("httpx.Client") as mock_client:
@@ -293,17 +213,17 @@ async def test_readiness_probe_vllm_unreachable(
 
 
 @pytest.mark.asyncio
-async def test_readiness_probe_caching(mock_context: ApplicationContext) -> None:
+async def test_readiness_probe_caching(mock_application_context: ApplicationContext) -> None:
     """Test that ReadinessProbe caches results."""
     # Arrange
-    probe = ReadinessProbe(mock_context)
+    probe = ReadinessProbe(mock_application_context)
     await probe.initialize()
 
     # Act - get snapshot without refresh
     snapshot1 = probe.snapshot()
 
     # Modify context (shouldn't affect cached results)
-    mock_context.paths.faiss_index.unlink()
+    mock_application_context.paths.faiss_index.unlink(missing_ok=True)
 
     snapshot2 = probe.snapshot()
 
@@ -317,10 +237,10 @@ async def test_readiness_probe_caching(mock_context: ApplicationContext) -> None
 
 
 @pytest.mark.asyncio
-async def test_readiness_probe_shutdown(mock_context: ApplicationContext) -> None:
+async def test_readiness_probe_shutdown(mock_application_context: ApplicationContext) -> None:
     """Test ReadinessProbe.shutdown() clears state."""
     # Arrange
-    probe = ReadinessProbe(mock_context)
+    probe = ReadinessProbe(mock_application_context)
     await probe.initialize()
 
     # Act
@@ -405,26 +325,13 @@ def test_readiness_probe_check_file_required() -> None:
 
 
 def test_readiness_probe_check_vllm_invalid_url(
-    mock_context: ApplicationContext,
+    mock_application_context: ApplicationContext,
 ) -> None:
     """Test _check_vllm_connection() with invalid URL."""
     # Arrange - create new settings with invalid URL
-    invalid_vllm = VLLMConfig(base_url="not-a-valid-url")
-    new_settings = Settings(
-        vllm=invalid_vllm,
-        paths=mock_context.settings.paths,
-        index=mock_context.settings.index,
-        limits=mock_context.settings.limits,
-        redis=mock_context.settings.redis,
-        duckdb=mock_context.settings.duckdb,
-        bm25=mock_context.settings.bm25,
-        splade=mock_context.settings.splade,
-        coderank=mock_context.settings.coderank,
-        warp=mock_context.settings.warp,
-        xtr=mock_context.settings.xtr,
-        coderank_llm=mock_context.settings.coderank_llm,
-    )
-    context = _context_with_settings(mock_context, new_settings)
+    invalid_vllm = VLLMConfig(base_url="not-a-valid-url", run=VLLMRunMode(mode="http"))
+    new_settings = replace_settings(mock_application_context.settings, vllm=invalid_vllm)
+    context = _context_with_settings(mock_application_context, new_settings)
     probe = ReadinessProbe(context)
 
     # Act
@@ -436,25 +343,12 @@ def test_readiness_probe_check_vllm_invalid_url(
     assert "invalid" in result.detail.lower()
 
 
-def test_readiness_probe_check_vllm_success(mock_context: ApplicationContext) -> None:
+def test_readiness_probe_check_vllm_success(mock_application_context: ApplicationContext) -> None:
     """Test _check_vllm_connection() with successful health check."""
     # Arrange - create new settings with valid URL
-    valid_vllm = VLLMConfig(base_url="http://localhost:8001/v1")
-    new_settings = Settings(
-        vllm=valid_vllm,
-        paths=mock_context.settings.paths,
-        index=mock_context.settings.index,
-        limits=mock_context.settings.limits,
-        redis=mock_context.settings.redis,
-        duckdb=mock_context.settings.duckdb,
-        bm25=mock_context.settings.bm25,
-        splade=mock_context.settings.splade,
-        coderank=mock_context.settings.coderank,
-        warp=mock_context.settings.warp,
-        xtr=mock_context.settings.xtr,
-        coderank_llm=mock_context.settings.coderank_llm,
-    )
-    context = _context_with_settings(mock_context, new_settings)
+    valid_vllm = VLLMConfig(base_url="http://localhost:8001/v1", run=VLLMRunMode(mode="http"))
+    new_settings = replace_settings(mock_application_context.settings, vllm=valid_vllm)
+    context = _context_with_settings(mock_application_context, new_settings)
     probe = ReadinessProbe(context)
 
     # Act - mock successful HTTP response
@@ -472,26 +366,13 @@ def test_readiness_probe_check_vllm_success(mock_context: ApplicationContext) ->
 
 
 def test_readiness_probe_check_vllm_http_error(
-    mock_context: ApplicationContext,
+    mock_application_context: ApplicationContext,
 ) -> None:
     """Test _check_vllm_connection() with HTTP error."""
     # Arrange - create new settings with valid URL
-    valid_vllm = VLLMConfig(base_url="http://localhost:8001/v1")
-    new_settings = Settings(
-        vllm=valid_vllm,
-        paths=mock_context.settings.paths,
-        index=mock_context.settings.index,
-        limits=mock_context.settings.limits,
-        redis=mock_context.settings.redis,
-        duckdb=mock_context.settings.duckdb,
-        bm25=mock_context.settings.bm25,
-        splade=mock_context.settings.splade,
-        coderank=mock_context.settings.coderank,
-        warp=mock_context.settings.warp,
-        xtr=mock_context.settings.xtr,
-        coderank_llm=mock_context.settings.coderank_llm,
-    )
-    context = _context_with_settings(mock_context, new_settings)
+    valid_vllm = VLLMConfig(base_url="http://localhost:8001/v1", run=VLLMRunMode(mode="http"))
+    new_settings = replace_settings(mock_application_context.settings, vllm=valid_vllm)
+    context = _context_with_settings(mock_application_context, new_settings)
     probe = ReadinessProbe(context)
 
     # Act - mock HTTP error

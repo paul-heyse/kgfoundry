@@ -7,6 +7,12 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from time import perf_counter
 
+from kgfoundry_common.logging import get_logger
+from kgfoundry_common.observability import MetricsProvider
+from kgfoundry_common.prometheus import build_counter, get_default_registry
+
+from codeintel_rev.retrieval.types import StageDecision
+
 
 @dataclass(slots=True, frozen=True)
 class StageTiming:
@@ -33,26 +39,39 @@ class StageTiming:
         }
 
 
-@dataclass(slots=True)
+class _TimerRuntime:
+    """Mutable stopwatch backing the frozen stage timer."""
+
+    __slots__ = ("duration_ms", "started_at", "stopped")
+
+    def __init__(self) -> None:
+        self.started_at = perf_counter()
+        self.duration_ms = 0.0
+        self.stopped = False
+
+    def stop(self) -> float:
+        if self.stopped:
+            return self.duration_ms
+        self.duration_ms = (perf_counter() - self.started_at) * 1000.0
+        self.stopped = True
+        return self.duration_ms
+
+
+@dataclass(slots=True, frozen=True)
 class _StageTimer:
     name: str
     budget_ms: int | None
-    _started_at: float = field(default_factory=perf_counter, init=False)
-    _duration_ms: float = field(default=0.0, init=False)
-    _stopped: bool = field(default=False, init=False)
+    _runtime: _TimerRuntime = field(default_factory=_TimerRuntime, init=False, repr=False)
 
     def stop(self) -> None:
-        if self._stopped:
-            return
-        self._duration_ms = (perf_counter() - self._started_at) * 1000.0
-        self._stopped = True
+        self._runtime.stop()
 
     def snapshot(self) -> StageTiming:
-        self.stop()
-        exceeded = bool(self.budget_ms is not None and self._duration_ms > self.budget_ms)
+        duration = self._runtime.stop()
+        exceeded = bool(self.budget_ms is not None and duration > self.budget_ms)
         return StageTiming(
             name=self.name,
-            duration_ms=self._duration_ms,
+            duration_ms=duration,
             budget_ms=self.budget_ms,
             exceeded_budget=exceeded,
         )
@@ -78,4 +97,58 @@ def track_stage(
         timer.stop()
 
 
-__all__ = ["StageTiming", "track_stage"]
+LOGGER = get_logger(__name__)
+_STAGE_DECISION_COUNTER = build_counter(
+    "kgfoundry_stage_decisions_total",
+    "Stage gating outcomes grouped by component, stage, and decision type.",
+    ("component", "stage", "decision"),
+    registry=get_default_registry(),
+)
+
+
+def record_stage_metric(
+    component: str,
+    timing: StageTiming,
+    *,
+    metrics: MetricsProvider | None = None,
+) -> None:
+    """Record the provided ``timing`` in Prometheus metrics."""
+    provider = metrics or MetricsProvider.default()
+    try:
+        provider.operation_duration_seconds.labels(
+            component=component,
+            operation=timing.name,
+            status="degraded" if timing.exceeded_budget else "success",
+        ).observe(timing.duration_ms / 1000.0)
+    except ValueError as exc:  # pragma: no cover - defensive logging
+        LOGGER.warning(
+            "Failed to emit stage metric",
+            extra={
+                "component": component,
+                "stage": timing.name,
+                "error": str(exc),
+            },
+        )
+
+
+def record_stage_decision(
+    component: str,
+    stage: str,
+    *,
+    decision: StageDecision,
+) -> None:
+    """Increment the stage decision counter for the given outcome."""
+    label_value = "run" if decision.should_run else f"skip:{decision.reason}"
+    _STAGE_DECISION_COUNTER.labels(
+        component=component,
+        stage=stage,
+        decision=label_value,
+    ).inc()
+
+
+__all__ = [
+    "StageTiming",
+    "record_stage_decision",
+    "record_stage_metric",
+    "track_stage",
+]

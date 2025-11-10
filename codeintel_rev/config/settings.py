@@ -23,6 +23,62 @@ DEFAULT_RRF_WEIGHTS: dict[str, float] = {
 }
 
 
+def _parse_int_with_suffix(value: str, default: int) -> int:
+    normalized = value.strip().lower().replace("_", "")
+    if not normalized:
+        return default
+    try:
+        if normalized.endswith("k"):
+            return int(float(normalized[:-1]) * 1000)
+        return int(normalized)
+    except ValueError:
+        return default
+
+
+def _build_vllm_config() -> VLLMConfig:
+    run_mode_env = os.environ.get("VLLM_RUN_MODE", "inprocess").lower()
+    run_mode = VLLMRunMode(mode="http" if run_mode_env == "http" else "inprocess")
+    pooling_env = os.environ.get("VLLM_POOLING_TYPE", "lasttoken").lower()
+    if pooling_env == "cls":
+        pooling_type: Literal["lasttoken", "cls", "mean"] = "cls"
+    elif pooling_env == "mean":
+        pooling_type = "mean"
+    else:
+        pooling_type = "lasttoken"
+    return VLLMConfig(
+        base_url=os.environ.get("VLLM_URL", "http://127.0.0.1:8001/v1"),
+        model=os.environ.get("VLLM_MODEL", "nomic-ai/nomic-embed-code"),
+        batch_size=int(os.environ.get("VLLM_BATCH_SIZE", "64")),
+        embedding_dim=int(os.environ.get("VLLM_EMBED_DIM", "2560")),
+        timeout_s=float(os.environ.get("VLLM_TIMEOUT_S", "120.0")),
+        run=run_mode,
+        gpu_memory_utilization=float(os.environ.get("VLLM_GPU_MEMORY_UTILIZATION", "0.92")),
+        max_num_batched_tokens=_parse_int_with_suffix(
+            os.environ.get("VLLM_MAX_BATCHED_TOKENS", "65536"),
+            65_536,
+        ),
+        normalize=os.environ.get("VLLM_NORMALIZE", "1").lower() in {"1", "true", "yes"},
+        pooling_type=pooling_type,
+        max_concurrent_requests=int(os.environ.get("VLLM_MAX_CONCURRENT_REQUESTS", "4")),
+    )
+
+
+def _build_xtr_config() -> XTRConfig:
+    dtype_env = (os.environ.get("XTR_DTYPE") or "float16").lower()
+    mode_env = os.environ.get("XTR_MODE", "narrow").lower()
+    mode: Literal["narrow", "wide"] = "wide" if mode_env == "wide" else "narrow"
+    return XTRConfig(
+        model_id=os.environ.get("XTR_MODEL_ID", "nomic-ai/CodeRankEmbed"),
+        device=os.environ.get("XTR_DEVICE", "cuda"),
+        max_query_tokens=int(os.environ.get("XTR_MAX_QUERY_TOKENS", "256")),
+        candidate_k=int(os.environ.get("XTR_CANDIDATE_K", "200")),
+        dim=int(os.environ.get("XTR_DIM", "768")),
+        dtype="float32" if dtype_env == "float32" else "float16",
+        enable=os.environ.get("XTR_ENABLE", "0").lower() in {"1", "true", "yes"},
+        mode=mode,
+    )
+
+
 class CodeRankConfig(msgspec.Struct, frozen=True):
     """Configuration for the CodeRank dense retriever.
 
@@ -99,6 +155,7 @@ class XTRConfig(msgspec.Struct, frozen=True):
     dim: int = 768
     dtype: Literal["float16", "float32"] = "float16"
     enable: bool = False
+    mode: Literal["narrow", "wide"] = "narrow"
 
 
 class CodeRankLLMConfig(msgspec.Struct, frozen=True):
@@ -111,6 +168,12 @@ class CodeRankLLMConfig(msgspec.Struct, frozen=True):
     top_p: float = 1.0
     enabled: bool = False
     budget_ms: int = 300
+
+
+class VLLMRunMode(msgspec.Struct, frozen=True):
+    """Execution mode for the vLLM embedder."""
+
+    mode: Literal["inprocess", "http"] = "inprocess"
 
 
 class VLLMConfig(msgspec.Struct, frozen=True):
@@ -151,6 +214,12 @@ class VLLMConfig(msgspec.Struct, frozen=True):
     batch_size: int = 64
     embedding_dim: int = 2560
     timeout_s: float = 120.0
+    run: VLLMRunMode = VLLMRunMode()
+    gpu_memory_utilization: float = 0.92
+    max_num_batched_tokens: int = 65_536
+    normalize: bool = True
+    pooling_type: Literal["lasttoken", "cls", "mean"] = "lasttoken"
+    max_concurrent_requests: int = 4
 
 
 class BM25Config(msgspec.Struct, frozen=True):
@@ -707,13 +776,7 @@ def load_settings() -> Settings:
     """
     repo_root = os.environ.get("REPO_ROOT", str(Path.cwd()))
 
-    vllm = VLLMConfig(
-        base_url=os.environ.get("VLLM_URL", "http://127.0.0.1:8001/v1"),
-        model=os.environ.get("VLLM_MODEL", "nomic-ai/nomic-embed-code"),
-        batch_size=int(os.environ.get("VLLM_BATCH_SIZE", "64")),
-        timeout_s=float(os.environ.get("VLLM_TIMEOUT_S", "120.0")),
-        embedding_dim=int(os.environ.get("VLLM_EMBED_DIM", "2560")),
-    )
+    vllm = _build_vllm_config()
 
     paths = PathsConfig(
         repo_root=repo_root,
@@ -808,8 +871,6 @@ def load_settings() -> Settings:
         pool_size=duckdb_pool_size,
     )
 
-    xtr_dtype_env = (os.environ.get("XTR_DTYPE") or "float16").lower()
-
     return Settings(
         vllm=vllm,
         paths=paths,
@@ -860,15 +921,7 @@ def load_settings() -> Settings:
             enabled=os.environ.get("WARP_ENABLED", "0").lower() in {"1", "true", "yes"},
             budget_ms=int(os.environ.get("WARP_BUDGET_MS", "180")),
         ),
-        xtr=XTRConfig(
-            model_id=os.environ.get("XTR_MODEL_ID", "nomic-ai/CodeRankEmbed"),
-            device=os.environ.get("XTR_DEVICE", "cuda"),
-            max_query_tokens=int(os.environ.get("XTR_MAX_QUERY_TOKENS", "256")),
-            candidate_k=int(os.environ.get("XTR_CANDIDATE_K", "200")),
-            dim=int(os.environ.get("XTR_DIM", "768")),
-            dtype="float32" if xtr_dtype_env == "float32" else "float16",
-            enable=os.environ.get("XTR_ENABLE", "0").lower() in {"1", "true", "yes"},
-        ),
+        xtr=_build_xtr_config(),
         coderank_llm=CodeRankLLMConfig(
             model_id=os.environ.get("CODERANK_LLM_MODEL_ID", "nomic-ai/CodeRankLLM"),
             device=os.environ.get("CODERANK_LLM_DEVICE", "cpu"),
@@ -892,6 +945,7 @@ __all__ = [
     "Settings",
     "SpladeConfig",
     "VLLMConfig",
+    "VLLMRunMode",
     "WarpConfig",
     "XTRConfig",
     "load_settings",

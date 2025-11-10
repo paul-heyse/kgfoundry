@@ -221,19 +221,35 @@ def resolve_application_paths(settings: Settings) -> ResolvedPaths:
     )
 
 
-@dataclass(slots=True)
+class _RuntimeHandle[T]:
+    """Mutable holder for lazily initialized singletons."""
+
+    __slots__ = ("lock", "value")
+
+    def __init__(self) -> None:
+        self.lock = Lock()
+        self.value: T | None = None
+
+
+class _FaissRuntimeState:
+    """Runtime bookkeeping for FAISS initialization."""
+
+    __slots__ = ("gpu_attempted", "loaded", "lock")
+
+    def __init__(self) -> None:
+        self.lock = Lock()
+        self.loaded = False
+        self.gpu_attempted = False
+
+
+@dataclass(slots=True, frozen=True)
 class _ContextRuntimeState:
     """Mutable runtime state backing the frozen ApplicationContext."""
 
-    hybrid_engine: HybridSearchEngine | None = None
-    hybrid_lock: Lock = field(default_factory=Lock)
-    coderank_faiss_manager: FAISSManager | None = None
-    coderank_faiss_lock: Lock = field(default_factory=Lock)
-    xtr_index: XTRIndex | None = None
-    xtr_lock: Lock = field(default_factory=Lock)
-    faiss_lock: Lock = field(default_factory=Lock)
-    faiss_loaded: bool = False
-    faiss_gpu_attempted: bool = False
+    hybrid: _RuntimeHandle[HybridSearchEngine] = field(default_factory=_RuntimeHandle)
+    coderank_faiss: _RuntimeHandle[FAISSManager] = field(default_factory=_RuntimeHandle)
+    xtr: _RuntimeHandle[XTRIndex] = field(default_factory=_RuntimeHandle)
+    faiss: _FaissRuntimeState = field(default_factory=_FaissRuntimeState)
 
 
 @dataclass(slots=True, frozen=True)
@@ -316,7 +332,9 @@ class ApplicationContext:
     duckdb_manager: DuckDBManager
     git_client: GitClient
     async_git_client: AsyncGitClient
-    _runtime: _ContextRuntimeState = field(default_factory=_ContextRuntimeState, init=False, repr=False)
+    _runtime: _ContextRuntimeState = field(
+        default_factory=_ContextRuntimeState, init=False, repr=False
+    )
 
     @classmethod
     def create(cls) -> ApplicationContext:
@@ -420,14 +438,25 @@ class ApplicationContext:
         -------
         HybridSearchEngine
             Shared hybrid retrieval engine configured for the current settings.
+
+        Raises
+        ------
+        RuntimeError
+            If the engine fails to initialize.
         """
         runtime = self._runtime
-        if runtime.hybrid_engine is not None:
-            return runtime.hybrid_engine
-        with runtime.hybrid_lock:
-            if runtime.hybrid_engine is None:
-                runtime.hybrid_engine = HybridSearchEngine(self.settings, self.paths)
-            return runtime.hybrid_engine
+        handle = runtime.hybrid
+        engine = handle.value
+        if engine is not None:
+            return engine
+        with handle.lock:
+            if handle.value is None:
+                handle.value = HybridSearchEngine(self.settings, self.paths)
+            engine = handle.value
+        if engine is None:  # pragma: no cover - defensive
+            msg = "HybridSearchEngine failed to initialize"
+            raise RuntimeError(msg)
+        return engine
 
     def get_coderank_faiss_manager(self, vec_dim: int) -> FAISSManager:
         """Return a lazily loaded FAISS manager for CodeRank search.
@@ -451,8 +480,10 @@ class ApplicationContext:
             msg = "vec_dim must be positive for CodeRank FAISS manager."
             raise ValueError(msg)
         runtime = self._runtime
-        with runtime.coderank_faiss_lock:
-            if runtime.coderank_faiss_manager is None:
+        handle = runtime.coderank_faiss
+        with handle.lock:
+            manager = handle.value
+            if manager is None:
                 manager = FAISSManager(
                     index_path=self.paths.coderank_faiss_index,
                     vec_dim=vec_dim,
@@ -460,15 +491,15 @@ class ApplicationContext:
                     use_cuvs=self.settings.index.use_cuvs,
                 )
                 manager.load_cpu_index()
-                runtime.coderank_faiss_manager = manager
-            elif runtime.coderank_faiss_manager.vec_dim != vec_dim:
-                existing_dim = runtime.coderank_faiss_manager.vec_dim
+                handle.value = manager
+            elif manager.vec_dim != vec_dim:
+                existing_dim = manager.vec_dim
                 msg = (
                     "Existing CodeRank index dimension "
                     f"{existing_dim} does not match requested {vec_dim}."
                 )
                 raise ValueError(msg)
-            return cast(FAISSManager, runtime.coderank_faiss_manager)
+            return manager
 
     def get_xtr_index(self) -> XTRIndex | None:
         """Return the lazily initialized XTR token index when enabled.
@@ -481,12 +512,13 @@ class ApplicationContext:
         if not self.settings.xtr.enable:
             return None
         runtime = self._runtime
-        with runtime.xtr_lock:
-            if runtime.xtr_index is None:
+        handle = runtime.xtr
+        with handle.lock:
+            if handle.value is None:
                 try:
                     index = XTRIndex(root=self.paths.xtr_dir, config=self.settings.xtr)
                     index.open()
-                    runtime.xtr_index = index
+                    handle.value = index
                 except (OSError, RuntimeError, ValueError) as exc:  # pragma: no cover
                     LOGGER.warning(
                         "Failed to initialize XTR index; continuing without late interaction",
@@ -494,8 +526,8 @@ class ApplicationContext:
                         exc_info=exc,
                     )
                     return None
-        if runtime.xtr_index and runtime.xtr_index.ready:
-            return runtime.xtr_index
+        if handle.value and handle.value.ready:
+            return handle.value
         return None
 
     def ensure_faiss_ready(self) -> tuple[bool, list[str], str | None]:
@@ -546,16 +578,18 @@ class ApplicationContext:
         if not self.paths.faiss_index.exists():
             return False, limits, f"FAISS index not found at {self.paths.faiss_index}"
 
-        with runtime.faiss_lock:
-            if not runtime.faiss_loaded:
+        faiss_state = runtime.faiss
+
+        with faiss_state.lock:
+            if not faiss_state.loaded:
                 try:
                     self.faiss_manager.load_cpu_index()
                 except (FileNotFoundError, RuntimeError) as exc:
                     return False, limits, f"FAISS index load failed: {exc}"
-                runtime.faiss_loaded = True
+                faiss_state.loaded = True
 
-            if self.faiss_manager.gpu_index is None and not runtime.faiss_gpu_attempted:
-                runtime.faiss_gpu_attempted = True
+            if self.faiss_manager.gpu_index is None and not faiss_state.gpu_attempted:
+                faiss_state.gpu_attempted = True
                 try:
                     gpu_enabled = self.faiss_manager.clone_to_gpu()
                 except RuntimeError as exc:
@@ -617,3 +651,52 @@ class ApplicationContext:
             yield catalog
         finally:
             catalog.close()
+
+    def with_overrides(
+        self,
+        *,
+        settings: Settings | None = None,
+        paths: ResolvedPaths | None = None,
+        **components: object,
+    ) -> ApplicationContext:
+        """Return a new context with the provided overrides.
+
+        Returns
+        -------
+        ApplicationContext
+            Fresh context instance sharing the existing dependencies unless
+            overridden via keyword arguments. Accepted component overrides:
+            ``vllm_client``, ``faiss_manager``, ``scope_store``,
+            ``duckdb_manager``, ``git_client``, ``async_git_client``.
+
+        Raises
+        ------
+        ValueError
+            If unsupported override keys are supplied.
+        """
+        allowed = {
+            "vllm_client",
+            "faiss_manager",
+            "scope_store",
+            "duckdb_manager",
+            "git_client",
+            "async_git_client",
+        }
+        unknown = set(components) - allowed
+        if unknown:
+            message = f"Unsupported context override(s): {sorted(unknown)}"
+            raise ValueError(message)
+
+        def _component_value[TOverride](name: str, default: TOverride) -> TOverride:
+            return cast("TOverride", components.get(name, default))
+
+        return ApplicationContext(
+            settings=settings or self.settings,
+            paths=paths or self.paths,
+            vllm_client=_component_value("vllm_client", self.vllm_client),
+            faiss_manager=_component_value("faiss_manager", self.faiss_manager),
+            scope_store=_component_value("scope_store", self.scope_store),
+            duckdb_manager=_component_value("duckdb_manager", self.duckdb_manager),
+            git_client=_component_value("git_client", self.git_client),
+            async_git_client=_component_value("async_git_client", self.async_git_client),
+        )

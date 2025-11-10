@@ -64,7 +64,6 @@ class CodeRankEmbedder:
     _CACHE_LOCK: ClassVar[threading.Lock] = threading.Lock()
 
     def __init__(self, *, settings: SupportsCodeRankSettings) -> None:
-        """Initialize the embedder with CodeRank runtime settings."""
         self.model_id = settings.model_id
         self.device = settings.device
         self.trust_remote_code = settings.trust_remote_code
@@ -73,7 +72,13 @@ class CodeRankEmbedder:
         self.batch_size = settings.batch_size
 
     def encode_queries(self, queries: Iterable[str]) -> np.ndarray:
-        """Return CodeRank embeddings for ``queries`` with prefix applied.
+        """Return CodeRank embeddings for queries with prefix applied.
+
+        Parameters
+        ----------
+        queries : Iterable[str]
+            Iterable of query strings. Each query will have the configured
+            query_prefix prepended before encoding.
 
         Returns
         -------
@@ -99,6 +104,12 @@ class CodeRankEmbedder:
 
     def encode_codes(self, snippets: Iterable[str]) -> np.ndarray:
         """Return embeddings for code snippets (used during indexing).
+
+        Parameters
+        ----------
+        snippets : Iterable[str]
+            Iterable of code snippet strings to embed. Used during indexing
+            to create document embeddings.
 
         Returns
         -------

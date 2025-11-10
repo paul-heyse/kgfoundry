@@ -275,7 +275,19 @@ class TenacityRetryStrategy(RetryStrategy[object]):
         return _MethodStrategy(self._build_retrying(method))
 
     def _build_retrying(self, method: str) -> Retrying:
-        """Create a configured Tenacity Retrying instance."""
+        """Create a configured Tenacity Retrying instance.
+
+        Parameters
+        ----------
+        method : str
+            HTTP method name used to determine retry policy.
+
+        Returns
+        -------
+        Retrying
+            Configured Tenacity Retrying instance with retry predicate,
+            stop conditions, and wait strategy from the policy.
+        """
         predicate = retry_if_exception(_should_retry_exception(method=method, policy=self.policy))
         stopper = stop_after_attempt(self.policy.stop_after_attempt)
         if self.policy.stop_after_delay_s:

@@ -1,8 +1,9 @@
-"""Session-scoped scope registry for CodeIntel MCP.
+"""Session-scoped scope registry for CodeIntel MCP (legacy helper).
 
-This module provides thread-safe in-memory storage for per-session query scopes.
-Instead of passing scope parameters with every query, clients call `set_scope` once
-and subsequent queries within the same session automatically apply those constraints.
+This helper predates the Redis-backed :mod:`codeintel_rev.app.scope_store` that
+ApplicationContext wires up automatically today. The registry is still available
+for standalone tooling, but production adapters should use ``context.scope_store``
+directly rather than mutating ``ApplicationContext``.
 
 Key Components
 --------------
@@ -17,11 +18,13 @@ Design Principles
 - **Fail-Safe**: Missing sessions return None rather than raising exceptions
 
 Example Usage
--------------
-Initialize registry in application startup:
+--------------
+Initialize registry manually (e.g., in a short-lived script). When running the
+full FastAPI app, use ``ApplicationContext.scope_store`` instead—application
+contexts are frozen and cannot be reassigned after creation.
 
 >>> registry = ScopeRegistry()
->>> app_context.scope_registry = registry
+>>> registry.set_scope("session", {"languages": ["python"]})
 
 Store scope for a session:
 

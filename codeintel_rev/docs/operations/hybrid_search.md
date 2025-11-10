@@ -101,6 +101,30 @@ Observability
 * ``Finding["why"]`` now carries hybrid explanations (`Hybrid RRF …`) giving
   operators visibility into channel contributions for sampled queries.
 
+Semantic Pro Budgets & Gating
+-----------------------------
+
+The semantic_pro adapter adds a GPU-centric CodeRank → WARP → reranker pipeline
+with explicit latency budgets. Tune the following environment variables to
+balance quality vs. responsiveness:
+
+* ``CODERANK_TOP_K`` – Stage-A fanout before hybrid fusion (default 200).
+* ``CODERANK_BUDGET_MS`` – Soft latency budget for the CodeRank embed + FAISS
+  search span. If exceeded, Stage-B is skipped to keep tail latency bounded.
+* ``CODERANK_MARGIN_THRESHOLD`` / ``CODERANK_MIN_STAGE2`` – Gate Stage-B when
+  the CodeRank margin is already high or there are too few candidates.
+* ``WARP_BUDGET_MS`` – Stage-B (WARP/XTR) budget. Exceeding the budget downgrades
+  the response, emits a limit note, and records a metrics sample with status
+  ``degraded``.
+* ``CODERANK_LLM_BUDGET_MS`` – Stage-C (CodeRankLLM reranker) budget.
+* ``RRF_WEIGHTS_JSON`` – Optional JSON map to override weighted-RRF channel
+  weights (e.g., ``{"semantic": 1.0, "warp": 1.2}``).
+
+Every stage exposes its measured duration via the response metadata and the
+``kgfoundry_operation_duration_seconds`` Prometheus histogram (component:
+``codeintel_mcp``, operation: stage name, status: ``success`` or ``degraded``).
+Use these metrics to alert when gating skips Stage-B/C too frequently.
+
 Rollback & Disaster Recovery
 ----------------------------
 
@@ -136,4 +160,3 @@ Reference Paths
 
 Use these paths when triaging build drift, validating deployments, or wiring
 automation.
-

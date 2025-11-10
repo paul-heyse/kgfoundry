@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from bisect import bisect_right
 from collections.abc import Sequence
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -222,35 +222,58 @@ def range_to_bytes(text: str, line_index: LineIndex, rng: Range) -> tuple[int, i
     return start_byte, end_byte
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _ChunkAccumulator:
-    """Accumulate SCIP symbol ranges into budgeted chunks."""
+    """Immutable accumulator configuration; delegates mutation to a builder."""
 
     uri: str
     text: str
     encoded: bytes
     line_index: LineIndex
     budget: int
-    chunks: list[Chunk] = field(default_factory=list)
-    _current_start_char: int | None = None
-    _current_end_char: int | None = None
-    _current_symbols: list[str] = field(default_factory=list)
-    language: str = ""
+    language: str
+
+    def build_chunks(
+        self,
+        symbols_with_positions: Sequence[tuple[SymbolDef, int, int]],
+    ) -> list[Chunk]:
+        builder = _ChunkBuilder(config=self)
+        for symbol, start, end in symbols_with_positions:
+            builder.add_symbol(symbol, start, end)
+        return builder.finalize()
+
+
+class _ChunkBuilder:
+    """Mutable helper that performs chunk assembly for a fixed configuration."""
+
+    __slots__ = (
+        "_chunks",
+        "_config",
+        "_current_end_char",
+        "_current_start_char",
+        "_current_symbols",
+    )
+
+    def __init__(self, config: _ChunkAccumulator) -> None:
+        self._config = config
+        self._chunks: list[Chunk] = []
+        self._current_start_char: int | None = None
+        self._current_end_char: int | None = None
+        self._current_symbols: list[str] = []
 
     def add_symbol(self, symbol: SymbolDef, start: int, end: int) -> None:
-        """Incorporate a symbol range into the current chunk set."""
         if self._current_start_char is None or self._current_end_char is None:
             self._start_chunk(start, end, symbol.symbol)
             return
 
         merged_end = max(self._current_end_char, end)
-        if merged_end - self._current_start_char <= self.budget:
+        if merged_end - self._current_start_char <= self._config.budget:
             self._current_end_char = merged_end
             self._current_symbols.append(symbol.symbol)
             return
 
         self._flush_current()
-        if end - start > self.budget:
+        if end - start > self._config.budget:
             self._split_large_symbol(symbol, start, end)
             self._reset()
             return
@@ -258,15 +281,8 @@ class _ChunkAccumulator:
         self._start_chunk(start, end, symbol.symbol)
 
     def finalize(self) -> list[Chunk]:
-        """Flush any pending chunk and return accumulated results.
-
-        Returns
-        -------
-        list[Chunk]
-            All generated chunks in source order.
-        """
         self._flush_current()
-        return self.chunks
+        return self._chunks
 
     def _start_chunk(self, start: int, end: int, symbol: str) -> None:
         self._current_start_char = start
@@ -291,43 +307,39 @@ class _ChunkAccumulator:
     ) -> None:
         if end <= start:
             return
-        start_byte = self.line_index.char_to_byte[start]
-        end_byte = self.line_index.char_to_byte[end]
+        start_byte = self._config.line_index.char_to_byte[start]
+        end_byte = self._config.line_index.char_to_byte[end]
         if end_byte <= start_byte:
             return
-        start_line = _line_index_from_byte(self.line_index.byte_starts, start_byte)
-        end_line = _line_index_from_byte(self.line_index.byte_starts, max(end_byte - 1, 0))
-        chunk_text = self.encoded[start_byte:end_byte].decode("utf-8")
-        self.chunks.append(
+        start_line = _line_index_from_byte(self._config.line_index.byte_starts, start_byte)
+        end_line = _line_index_from_byte(self._config.line_index.byte_starts, max(end_byte - 1, 0))
+        chunk_text = self._config.encoded[start_byte:end_byte].decode("utf-8")
+        self._chunks.append(
             Chunk(
-                uri=self.uri,
+                uri=self._config.uri,
                 start_byte=start_byte,
                 end_byte=end_byte,
                 start_line=start_line,
                 end_line=end_line,
                 text=chunk_text,
                 symbols=symbols,
-                language=self.language,
+                language=self._config.language,
             )
         )
 
-    def _split_large_symbol(
-        self,
-        symbol: SymbolDef,
-        start: int,
-        end: int,
-    ) -> None:
-        """Split an oversized symbol range on blank-line boundaries."""
+    def _split_large_symbol(self, symbol: SymbolDef, start: int, end: int) -> None:
+        budget = self._config.budget
+        text = self._config.text
         position = start
         while position < end:
-            tentative_end = min(position + self.budget, end)
-            search_start = position + self.budget // 2
+            tentative_end = min(position + budget, end)
+            search_start = position + budget // 2
             search_end = min(tentative_end, end)
-            newline_idx = self.text.rfind("\n\n", search_start, search_end)
+            newline_idx = text.rfind("\n\n", search_start, search_end)
             if newline_idx != -1 and newline_idx > position:
                 tentative_end = newline_idx + 1
             if tentative_end <= position:
-                tentative_end = min(position + self.budget, end)
+                tentative_end = min(position + budget, end)
                 if tentative_end <= position:
                     tentative_end = end
             self._append_chunk(
@@ -410,10 +422,7 @@ def chunk_file(
         key=lambda item: item[1],
     )
 
-    for sym_def, start, end in symbols_with_positions:
-        accumulator.add_symbol(sym_def, start, end)
-
-    chunks = accumulator.finalize()
+    chunks = accumulator.build_chunks(symbols_with_positions)
 
     if opts.overlap is not None:
         chunks = _apply_call_site_overlap(

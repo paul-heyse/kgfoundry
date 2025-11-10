@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping, Sequence
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 from codeintel_rev.app.middleware import get_session_id
-from codeintel_rev.io.coderank_embedder import CodeRankEmbedder
 from codeintel_rev.io.hybrid_search import ChannelHit
 from codeintel_rev.io.rerank_coderankllm import CodeRankListwiseReranker
 from codeintel_rev.io.warp_engine import WarpEngine, WarpUnavailableError
@@ -24,7 +24,12 @@ from codeintel_rev.mcp_server.schemas import (
 )
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
 from codeintel_rev.retrieval.gating import StageGateConfig, should_run_secondary_stage
-from codeintel_rev.retrieval.telemetry import StageTiming, track_stage
+from codeintel_rev.retrieval.telemetry import (
+    StageTiming,
+    record_stage_decision,
+    record_stage_metric,
+    track_stage,
+)
 from codeintel_rev.retrieval.types import (
     HybridResultDoc,
     HybridSearchResult,
@@ -35,6 +40,8 @@ from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
+    from codeintel_rev.config.settings import XTRConfig
+    from codeintel_rev.io.xtr_manager import XTRIndex
 
 SNIPPET_PREVIEW_CHARS = 500
 COMPONENT_NAME = "codeintel_mcp"
@@ -49,6 +56,7 @@ class SemanticProOptions(TypedDict, total=False):
     use_reranker: bool
     stage_weights: dict[str, float]
     explain: bool
+    xtr_k: int
 
 
 @dataclass(frozen=True)
@@ -60,6 +68,35 @@ class SemanticProRuntimeOptions:
     use_reranker: bool = False
     stage_weights: dict[str, float] = field(default_factory=dict)
     explain: bool = True
+    xtr_k: int | None = None
+
+
+WideSearchHandle = tuple[Future["WarpOutcome"], ThreadPoolExecutor]
+
+
+@dataclass(slots=True, frozen=True)
+class StageOnePlan:
+    """Container for Stage-1 orchestration inputs to reduce argument lists."""
+
+    context: ApplicationContext
+    query: str
+    candidates: Sequence[tuple[int, float]]
+    options: SemanticProRuntimeOptions
+    coderank_stage: StageTiming
+    wide_handle: WideSearchHandle | None
+
+
+@dataclass(slots=True, frozen=True)
+class HydrationPlan:
+    """Hydration plus rerank inputs passed as a cohesive plan."""
+
+    context: ApplicationContext
+    query: str
+    fused: HybridSearchResult
+    scope: ScopeIn | None
+    effective_limit: int
+    options: SemanticProRuntimeOptions
+    observation: Observation
 
 
 def build_runtime_options(
@@ -114,12 +151,23 @@ def build_runtime_options(
     """
     if options is None:
         return SemanticProRuntimeOptions()
+    xtr_k_value = options.get("xtr_k")
+    parsed_xtr_k = None
+    if xtr_k_value is not None:
+        try:
+            parsed_xtr_k = int(xtr_k_value)
+        except (TypeError, ValueError):
+            LOGGER.warning(
+                "Ignoring non-numeric xtr_k override",
+                extra={"value": xtr_k_value},
+            )
     return SemanticProRuntimeOptions(
         use_coderank=options.get("use_coderank", True),
         use_warp=options.get("use_warp", True),
         use_reranker=options.get("use_reranker", False),
         stage_weights=dict(options.get("stage_weights", {})),
         explain=options.get("explain", True),
+        xtr_k=parsed_xtr_k,
     )
 
 
@@ -236,6 +284,12 @@ def _semantic_search_pro_sync(
             context.settings.limits.max_results,
             limits,
         )
+        wide_handle = _maybe_schedule_xtr_wide(
+            context=context,
+            query=query,
+            limit=effective_limit,
+            options=options,
+        )
         coderank_hits, coderank_stage = _timed_coderank_stage(
             context=context,
             query=query,
@@ -247,26 +301,31 @@ def _semantic_search_pro_sync(
         )
         stage_timings.append(coderank_stage)
 
-        warp_outcome = _maybe_run_warp(
-            context=context,
-            query=query,
-            candidates=coderank_hits,
-            options=options,
-            coderank_stage=coderank_stage,
+        warp_outcome = _resolve_stage_one_outcome(
+            StageOnePlan(
+                context=context,
+                query=query,
+                candidates=tuple(coderank_hits),
+                options=options,
+                coderank_stage=coderank_stage,
+                wide_handle=wide_handle,
+            )
         )
         if warp_outcome.timing is not None:
             stage_timings.append(warp_outcome.timing)
 
-        fusion_request = FusionRequest(
-            query=query,
-            coderank_hits=coderank_hits,
-            warp_hits=warp_outcome.hits,
-            effective_limit=effective_limit,
-            weights=_merge_rrf_weights(context.settings.index.rrf_weights, options.stage_weights),
-        )
         fused = _run_fusion_stage(
             context=context,
-            request=fusion_request,
+            request=FusionRequest(
+                query=query,
+                coderank_hits=coderank_hits,
+                warp_hits=warp_outcome.hits,
+                warp_channel=warp_outcome.channel,
+                effective_limit=effective_limit,
+                weights=_merge_rrf_weights(
+                    context.settings.index.rrf_weights, options.stage_weights
+                ),
+            ),
             stage_timings=stage_timings,
         )
 
@@ -295,47 +354,28 @@ def _semantic_search_pro_sync(
                 extras=extras,
             )
 
-        ordered_ids = _dedupe_preserve_order([_safe_int(doc.doc_id) for doc in fused.docs])
-        try:
-            with track_stage("duckdb_hydration") as hydration_timer:
-                records = _hydrate_records(
-                    context=context,
-                    chunk_ids=ordered_ids[
-                        : min(
-                            len(ordered_ids),
-                            max(effective_limit * 2, effective_limit),
-                        )
-                    ],
-                    scope=scope,
-                )
-            stage_timings.append(hydration_timer.snapshot())
-        except (RuntimeError, OSError) as exc:
-            observation.mark_error()
-            msg = "DuckDB hydration failed"
-            raise VectorSearchError(msg, cause=exc) from exc
-
-        if options.use_reranker and context.settings.coderank_llm.enabled:
-            with track_stage(
-                "coderank_llm",
-                budget_ms=context.settings.coderank_llm.budget_ms,
-            ) as rerank_timer:
-                records = _maybe_rerank(
-                    query=query,
-                    records=records,
-                    context=context,
-                    enabled=True,
-                )
-            stage_timings.append(rerank_timer.snapshot())
+        records, hydration_stages = _hydrate_and_rerank_records(
+            HydrationPlan(
+                context=context,
+                query=query,
+                fused=fused,
+                scope=scope,
+                effective_limit=effective_limit,
+                options=options,
+                observation=observation,
+            )
+        )
+        stage_timings.extend(hydration_stages)
 
         findings = _build_findings(
-            records=records[:effective_limit],
+            records=records,
             docs=fused.docs,
             contribution_map=fused.contributions,
             explain=options.explain,
         )
         merge_explainability_into_findings(findings, warp_outcome.explainability)
         observation.mark_success()
-        _append_budget_notes(stage_timings, limits)
+        _append_budget_notes(COMPONENT_NAME, stage_timings, limits)
         method = _build_method(
             MethodContext(
                 findings_count=len(findings),
@@ -376,16 +416,17 @@ def _run_coderank_stage(
             context={"coderank_faiss_index": str(context.paths.coderank_faiss_index)},
         )
 
-    cfg = context.settings.coderank
-    embedder = CodeRankEmbedder(settings=cfg)
     try:
-        query_vec = embedder.encode_queries([query])
+        query_vec = context.vllm_client.embed_batch([query])
     except Exception as exc:
         observation.mark_error()
         msg = f"CodeRank embedding failed: {exc}"
         raise EmbeddingError(
             msg,
-            context={"model_id": cfg.model_id, "device": cfg.device},
+            context={
+                "model_id": context.settings.vllm.model,
+                "mode": context.settings.vllm.run.mode,
+            },
         ) from exc
 
     try:
@@ -444,19 +485,41 @@ def _maybe_run_warp(
     options: SemanticProRuntimeOptions,
     coderank_stage: StageTiming,
 ) -> WarpOutcome:
+    should_run, notes = _should_execute_stage_two(
+        context=context,
+        candidates=candidates,
+        options=options,
+        coderank_stage=coderank_stage,
+    )
+    if not should_run:
+        return WarpOutcome(hits=[], notes=notes, timing=None, explainability=())
+    return _execute_stage_two(
+        context=context,
+        query=query,
+        candidates=candidates,
+        options=options,
+        base_notes=notes,
+    )
+
+
+def _should_execute_stage_two(
+    *,
+    context: ApplicationContext,
+    candidates: list[tuple[int, float]],
+    options: SemanticProRuntimeOptions,
+    coderank_stage: StageTiming,
+) -> tuple[bool, list[str]]:
     notes: list[str] = []
     if not candidates:
-        notes.append("No CodeRank candidates; skipping WARP.")
-        return WarpOutcome(hits=[], notes=notes, timing=None, explainability=())
+        notes.append("No CodeRank candidates; skipping Stage-B.")
+        return False, notes
     if not options.use_warp:
-        notes.append("WARP disabled via request option.")
-        return WarpOutcome(hits=[], notes=notes, timing=None, explainability=())
-
+        notes.append("Stage-B disabled via request option.")
+        return False, notes
     stage_available = context.settings.warp.enabled or context.settings.xtr.enable
     if not stage_available:
         notes.append("WARP/XTR disabled via configuration flag.")
-        return WarpOutcome(hits=[], notes=notes, timing=None, explainability=())
-
+        return False, notes
     signals = StageSignals(
         candidate_count=len(candidates),
         elapsed_ms=coderank_stage.duration_ms,
@@ -472,24 +535,35 @@ def _maybe_run_warp(
     if not decision.should_run:
         notes.append(f"Stage-B gating: {decision.reason}")
         notes.extend(decision.notes)
-        return WarpOutcome(hits=[], notes=notes, timing=None, explainability=())
+        return False, notes
+    return True, notes
 
+
+def _execute_stage_two(
+    *,
+    context: ApplicationContext,
+    query: str,
+    candidates: list[tuple[int, float]],
+    options: SemanticProRuntimeOptions,
+    base_notes: list[str],
+) -> WarpOutcome:
     with track_stage(
         "warp_late_interaction",
         budget_ms=context.settings.warp.budget_ms,
     ) as warp_timer:
-        hits, warp_notes, explain_payload = _run_warp_stage(
+        hits, warp_notes, explain_payload, channel = _run_warp_stage(
             context=context,
             query=query,
             candidates=candidates,
-            explain=options.explain,
+            options=options,
         )
-    notes.extend(warp_notes)
+    notes = [*base_notes, *warp_notes]
     return WarpOutcome(
         hits=hits,
         notes=notes,
         timing=warp_timer.snapshot(),
         explainability=tuple(explain_payload),
+        channel=channel,
     )
 
 
@@ -509,25 +583,143 @@ def _run_fusion_stage(
             request.query,
             semantic_hits=request.coderank_hits,
             limit=total_limit,
-            extra_channels=_build_extra_channels(request.warp_hits),
+            extra_channels=_build_extra_channels(request.warp_hits, request.warp_channel),
             weights=request.weights,
         )
     stage_timings.append(fusion_timer.snapshot())
     return fused
 
 
+def _maybe_schedule_xtr_wide(
+    *,
+    context: ApplicationContext,
+    query: str,
+    limit: int,
+    options: SemanticProRuntimeOptions,
+) -> WideSearchHandle | None:
+    cfg = context.settings.xtr
+    if not (options.use_warp and cfg.enable and getattr(cfg, "mode", "narrow") == "wide"):
+        return None
+    index = context.get_xtr_index()
+    if index is None or not index.ready:
+        return None
+    k = _calculate_xtr_k(limit, cfg, options)
+    executor = ThreadPoolExecutor(max_workers=1)
+    future = executor.submit(
+        _run_xtr_wide_stage,
+        index,
+        query,
+        k,
+        explain=options.explain,
+        budget_ms=context.settings.warp.budget_ms,
+    )
+    return future, executor
+
+
+def _resolve_stage_one_outcome(plan: StageOnePlan) -> WarpOutcome:
+    """Resolve Stage-1 orchestration outcome from a StageOnePlan.
+
+    Returns
+    -------
+    WarpOutcome
+        Outcome describing hits, notes, timing, explainability, and channel.
+    """
+    context = plan.context
+    query = plan.query
+    candidates = list(plan.candidates)
+    options = plan.options
+    coderank_stage = plan.coderank_stage
+    wide_handle = plan.wide_handle
+    query = plan.query
+    should_run, base_notes = _should_execute_stage_two(
+        context=context,
+        candidates=candidates,
+        options=options,
+        coderank_stage=coderank_stage,
+    )
+    if not should_run:
+        if wide_handle is not None:
+            _, executor = wide_handle
+            executor.shutdown(wait=False)
+        return WarpOutcome(hits=[], notes=base_notes, timing=None, explainability=())
+
+    if wide_handle is not None:
+        wide_future, wide_executor = wide_handle
+        try:
+            outcome = wide_future.result()
+        except (RuntimeError, ValueError, OSError) as exc:  # pragma: no cover - defensive logging
+            LOGGER.warning(
+                "XTR wide search failed; falling back to narrow mode.",
+                extra={"error": str(exc)},
+            )
+        else:
+            outcome.notes.extend(base_notes)
+            return outcome
+        finally:
+            if wide_executor is not None:
+                wide_executor.shutdown(wait=False)
+    return _execute_stage_two(
+        context=context,
+        query=query,
+        candidates=candidates,
+        options=options,
+        base_notes=base_notes,
+    )
+
+
+def _run_xtr_wide_stage(
+    index: XTRIndex,
+    query: str,
+    k: int,
+    *,
+    explain: bool,
+    budget_ms: int | None,
+) -> WarpOutcome:
+    notes: list[str] = []
+    with track_stage(
+        "xtr_wide_search",
+        budget_ms=budget_ms,
+    ) as timer:
+        hits = index.search(query=query, k=k, explain=explain)
+    explain_payload = [(int(cid), payload) for cid, _score, payload in hits if payload]
+    scored = [(int(cid), float(score)) for cid, score, _payload in hits]
+    notes.append(f"XTR wide search returned {len(scored)} hits (k={k}).")
+    return WarpOutcome(
+        hits=scored,
+        notes=notes,
+        timing=timer.snapshot(),
+        explainability=tuple(explain_payload),
+        channel="xtr",
+    )
+
+
+def _calculate_xtr_k(limit: int, cfg: XTRConfig, options: SemanticProRuntimeOptions) -> int:
+    candidate_limits = [cfg.candidate_k, limit]
+    if options.xtr_k is not None and options.xtr_k > 0:
+        candidate_limits.append(options.xtr_k)
+    return max(candidate_limits)
+
+
 def _build_extra_channels(
     warp_hits: list[tuple[int, float]],
+    channel_name: str,
 ) -> dict[str, list[ChannelHit]] | None:
     if not warp_hits:
         return None
     return {
-        "warp": [ChannelHit(doc_id=str(doc_id), score=float(score)) for doc_id, score in warp_hits]
+        channel_name: [
+            ChannelHit(doc_id=str(doc_id), score=float(score)) for doc_id, score in warp_hits
+        ]
     }
 
 
-def _append_budget_notes(stage_timings: Sequence[StageTiming], limits: list[str]) -> None:
+def _append_budget_notes(
+    component: str,
+    stage_timings: Sequence[StageTiming],
+    limits: list[str],
+) -> None:
     for timing in stage_timings:
+        record_stage_metric(component, timing)
         if timing.budget_ms is None:
             continue
         if timing.exceeded_budget:
@@ -565,22 +757,22 @@ def _run_warp_stage(
     context: ApplicationContext,
     query: str,
     candidates: list[tuple[int, float]],
-    explain: bool,
-) -> tuple[list[tuple[int, float]], list[str], list[tuple[int, dict[str, Any]]]]:
+    options: SemanticProRuntimeOptions,
+) -> tuple[list[tuple[int, float]], list[str], list[tuple[int, dict[str, Any]]], str]:
     notes: list[str] = []
     warp_hits, warp_notes = _warp_executor_hits(context, query, candidates)
     notes.extend(warp_notes)
     if warp_hits is not None:
-        return warp_hits, notes, []
+        return warp_hits, notes, [], "warp"
 
     xtr_hits, xtr_notes, explain_payload = _xtr_rescore_hits(
         context=context,
         query=query,
         candidates=candidates,
-        explain=explain,
+        options=options,
     )
     notes.extend(xtr_notes)
-    return xtr_hits, notes, explain_payload
+    return xtr_hits, notes, explain_payload, "xtr"
 
 
 def _warp_executor_hits(
@@ -620,7 +812,7 @@ def _xtr_rescore_hits(
     context: ApplicationContext,
     query: str,
     candidates: list[tuple[int, float]],
-    explain: bool,
+    options: SemanticProRuntimeOptions,
 ) -> tuple[list[tuple[int, float]], list[str], list[tuple[int, dict[str, Any]]]]:
     notes: list[str] = []
     explain_payload: list[tuple[int, dict[str, Any]]] = []
@@ -633,22 +825,16 @@ def _xtr_rescore_hits(
         notes.append("XTR index unavailable; skipping late interaction.")
         return [], notes, explain_payload
 
-    candidate_ids = [cid for cid, _ in candidates][: context.settings.xtr.candidate_k]
+    limit = options.xtr_k or context.settings.xtr.candidate_k
+    candidate_ids = [cid for cid, _ in candidates][:limit]
     if not candidate_ids:
         notes.append("Insufficient candidates for XTR rescoring.")
         return [], notes, explain_payload
 
-    try:
-        query_vecs = xtr_index.encode_query_tokens(query)
-    except (RuntimeError, ValueError, OSError) as exc:  # pragma: no cover
-        notes.append(f"XTR encoding failed: {exc}")
-        LOGGER.warning("XTR encoding failed", exc_info=exc)
-        return [], notes, explain_payload
-
-    rescored = xtr_index.score_candidates(
-        query_vecs,
-        candidate_ids,
-        explain=explain,
+    rescored = xtr_index.rescore(
+        query=query,
+        candidate_chunk_ids=candidate_ids,
+        explain=options.explain,
     )
     hits = [(chunk_id, score) for chunk_id, score, _payload in rescored]
     explain_payload = [(chunk_id, payload) for chunk_id, _score, payload in rescored if payload]
@@ -678,6 +864,58 @@ def _hydrate_records(
                 languages=languages,
             )
         return catalog.query_by_ids(chunk_ids)
+
+
+def _hydrate_and_rerank_records(plan: HydrationPlan) -> tuple[list[dict], list[StageTiming]]:
+    """Hydrate DuckDB records and optionally rerank them using CodeRankLLM.
+
+    Returns
+    -------
+    tuple[list[dict], list[StageTiming]]
+        Hydrated records clipped to ``effective_limit`` and timing snapshots.
+
+    Raises
+    ------
+    VectorSearchError
+        Raised when DuckDB hydration fails even after retries.
+    """
+    context = plan.context
+    query = plan.query
+    fused = plan.fused
+    scope = plan.scope
+    effective_limit = plan.effective_limit
+    options = plan.options
+    observation = plan.observation
+    ordered_ids = _dedupe_preserve_order([_safe_int(doc.doc_id) for doc in fused.docs])
+    try:
+        with track_stage("duckdb_hydration") as hydration_timer:
+            records = _hydrate_records(
+                context=context,
+                chunk_ids=ordered_ids[
+                    : min(len(ordered_ids), max(effective_limit * 2, effective_limit))
+                ],
+                scope=scope,
+            )
+        snapshots = [hydration_timer.snapshot()]
+    except (RuntimeError, OSError) as exc:
+        observation.mark_error()
+        msg = "DuckDB hydration failed"
+        raise VectorSearchError(msg, cause=exc) from exc
+
+    if options.use_reranker and context.settings.coderank_llm.enabled:
+        with track_stage(
+            "coderank_llm",
+            budget_ms=context.settings.coderank_llm.budget_ms,
+        ) as rerank_timer:
+            records = _maybe_rerank(
+                query=query,
+                records=records,
+                context=context,
+                enabled=True,
+            )
+        snapshots.append(rerank_timer.snapshot())
+
+    return records[:effective_limit], snapshots
 
 
 def _maybe_rerank(
@@ -1025,6 +1263,7 @@ class WarpOutcome:
     notes: list[str]
     timing: StageTiming | None
     explainability: tuple[tuple[int, dict[str, Any]], ...]
+    channel: str = "warp"
 
 
 @dataclass(slots=True, frozen=True)
@@ -1034,6 +1273,7 @@ class FusionRequest:
     query: str
     coderank_hits: Sequence[tuple[int, float]]
     warp_hits: list[tuple[int, float]]
+    warp_channel: str
     effective_limit: int
     weights: Mapping[str, float]
 

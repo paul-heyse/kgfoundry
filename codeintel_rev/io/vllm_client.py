@@ -6,6 +6,7 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 from __future__ import annotations
 
 import asyncio
+from importlib import import_module
 from typing import TYPE_CHECKING
 
 import httpx
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from codeintel_rev.config.settings import VLLMConfig
+    from codeintel_rev.io.vllm_engine import InprocessVLLMEmbedder
 
 LOGGER = get_logger(__name__)
 
@@ -107,7 +109,7 @@ class EmbeddingResponse(msgspec.Struct):
 
 
 class VLLMClient:
-    """vLLM embedding client with persistent HTTP connection pooling.
+    """vLLM embedding client supporting HTTP or in-process execution.
 
     Maintains a persistent HTTP client for connection reuse across embedding
     batches. This reduces latency by eliminating TCP handshake overhead and
@@ -161,72 +163,73 @@ class VLLMClient:
         self.config = config
         self._encoder = msgspec.json.Encoder()
         self._decoder = msgspec.json.Decoder(EmbeddingResponse)
+        self._mode = getattr(config.run, "mode", "inprocess")
+        self._client: httpx.Client | None = None
+        self._async_client: httpx.AsyncClient | None = None
+        self._local_engine: InprocessVLLMEmbedder | None = None
+        self._local_semaphore: asyncio.Semaphore | None = None
 
-        # Create persistent HTTP client with connection pooling
+        if self._mode == "inprocess":
+            self._initialize_local_engine()
+        else:
+            self._initialize_http_client()
+
+    def _initialize_local_engine(self) -> None:
+        engine_module = import_module("codeintel_rev.io.vllm_engine")
+        engine_cls = engine_module.InprocessVLLMEmbedder
+        self._local_engine = engine_cls(self.config)
+        LOGGER.debug(
+            "Initialized VLLMClient in in-process mode",
+            extra={"model": self.config.model},
+        )
+
+    def _initialize_http_client(self) -> None:
         self._client = httpx.Client(
-            timeout=config.timeout_s,
+            timeout=self.config.timeout_s,
             limits=httpx.Limits(
-                max_connections=100,  # Maximum total connections in pool
-                max_keepalive_connections=20,  # Maximum keep-alive connections
+                max_connections=100,
+                max_keepalive_connections=20,
             ),
         )
-        self._async_client: httpx.AsyncClient | None = None
-
         LOGGER.debug(
-            "Initialized VLLMClient with persistent HTTP connection pool",
+            "Initialized VLLMClient HTTP transport",
             extra={
-                "base_url": config.base_url,
-                "model": config.model,
-                "timeout_s": config.timeout_s,
+                "base_url": self.config.base_url,
+                "model": self.config.model,
+                "timeout_s": self.config.timeout_s,
                 "max_connections": 100,
                 "max_keepalive_connections": 20,
             },
         )
 
     def embed_batch(self, texts: Sequence[str]) -> np.ndarray:
-        """Embed a batch of texts using the vLLM service.
-
-        Sends a batch of texts to the vLLM embedding service and returns their
-        embedding vectors as a NumPy array. The function uses msgspec for fast
-        JSON encoding/decoding, which is significantly faster than standard
-        json module.
-
-        The function handles reordering - vLLM may return embeddings in a
-        different order than the input, so results are sorted by index to
-        match the input sequence.
-
-        Parameters
-        ----------
-        texts : Sequence[str]
-            Sequence of texts to embed. Can be any sequence type (list, tuple, etc.).
-            Empty sequence returns empty array. Each text should be a code chunk
-            or query string suitable for the embedding model.
+        """Embed ``texts`` using the configured transport (HTTP or local).
 
         Returns
         -------
         np.ndarray
-            Embedding vectors as a 2D NumPy array of shape (len(texts), vec_dim)
-            where vec_dim is the model's embedding dimension (e.g., 2560).
-            Dtype is float32 for memory efficiency. Returns empty array (shape
-            (0, ``self.config.embedding_dim``)) if texts is empty. The order
-            matches the input texts.
-
-        Notes
-        -----
-        The function uses the persistent HTTP client (self._client) created during
-        initialization. This enables connection reuse and HTTP/1.1 keep-alive,
-        reducing latency by eliminating TCP handshake overhead.
-
-        If the request fails (network error, timeout, HTTP error), httpx will raise
-        an exception (HTTPStatusError, TimeoutException, etc.). These exceptions
-        propagate to the caller - handle them appropriately.
-
-        The function does not retry failed requests. For production use, consider
-        adding retry logic with exponential backoff for transient failures.
+            Embedding matrix with one row per input text.
         """
         if not texts:
             return np.empty((0, self.config.embedding_dim), dtype=np.float32)
 
+        if self._local_engine is not None:
+            vectors = self._local_engine.embed_batch(texts)
+        else:
+            vectors = self._embed_batch_http(texts)
+
+        LOGGER.debug(
+            "Batch embedding completed",
+            extra={
+                "batch_size": len(texts),
+                "vectors_shape": vectors.shape,
+                "model": self.config.model,
+                "mode": self._mode,
+            },
+        )
+        return vectors
+
+    def _embed_batch_http(self, texts: Sequence[str]) -> np.ndarray:
         request = EmbeddingRequest(input=list(texts), model=self.config.model)
         payload = self._encoder.encode(request)
 
@@ -235,8 +238,8 @@ class VLLMClient:
             extra={"batch_size": len(texts), "model": self.config.model},
         )
 
-        # Use persistent client (no context manager - client is reused)
-        response = self._client.post(
+        client = self._require_http_client()
+        response = client.post(
             f"{self.config.base_url}/embeddings",
             content=payload,
             headers={"Content-Type": "application/json"},
@@ -247,18 +250,7 @@ class VLLMClient:
 
         # Sort by index and extract vectors
         sorted_data = sorted(result.data, key=lambda d: d.index)
-        vectors = np.array([d.embedding for d in sorted_data], dtype=np.float32)
-
-        LOGGER.debug(
-            "Batch embedding completed",
-            extra={
-                "batch_size": len(texts),
-                "vectors_shape": vectors.shape,
-                "model": self.config.model,
-            },
-        )
-
-        return vectors
+        return np.array([d.embedding for d in sorted_data], dtype=np.float32)
 
     def embed_single(self, text: str) -> np.ndarray:
         """Embed a single string and return its vector.
@@ -334,85 +326,20 @@ class VLLMClient:
         return np.vstack(all_vectors)
 
     async def embed_batch_async(self, texts: Sequence[str]) -> np.ndarray:
-        """Embed a batch of texts asynchronously using the vLLM service.
-
-        Async variant of embed_batch() that uses an async HTTP client for
-        concurrent embedding generation. This is useful when embedding multiple
-        queries concurrently during semantic search, as it allows multiple
-        requests to proceed in parallel without blocking the event loop.
-
-        The async client is lazy-initialized on first call and reused for all
-        subsequent async embedding requests. Connection pooling is configured
-        identically to the sync client.
-
-        Parameters
-        ----------
-        texts : Sequence[str]
-            Sequence of texts to embed. Can be any sequence type (list, tuple, etc.).
-            Empty sequence returns empty array. Each text should be a code chunk
-            or query string suitable for the embedding model.
+        """Asynchronous variant of :meth:`embed_batch`.
 
         Returns
         -------
         np.ndarray
-            Embedding vectors as a 2D NumPy array of shape (len(texts), vec_dim)
-            where vec_dim is the model's embedding dimension (e.g., 2560).
-            Dtype is float32 for memory efficiency. Returns empty array (shape
-            (0, ``self.config.embedding_dim``)) if texts is empty. The order
-            matches the input texts.
-
-        Examples
-        --------
-        Embed batch asynchronously:
-
-        >>> client = VLLMClient(config)
-        >>> vectors = await client.embed_batch_async(["def hello(): pass"])
-        >>> vectors.shape
-        (1, 2560)
-
-        Concurrent embedding:
-
-        >>> import asyncio
-        >>> tasks = [
-        ...     client.embed_batch_async(["query 1"]),
-        ...     client.embed_batch_async(["query 2"]),
-        ...     client.embed_batch_async(["query 3"]),
-        ... ]
-        >>> results = await asyncio.gather(*tasks)
-
-        Notes
-        -----
-        The async client is created lazily on first call to this method. This
-        avoids creating an async client if only sync methods are used.
-
-        Connection pooling is configured identically to the sync client:
-        - max_connections=100
-        - max_keepalive_connections=20
-
-        If the request fails (network error, timeout, HTTP error), httpx will
-        raise an exception (HTTPStatusError, TimeoutException, etc.). These
-        exceptions propagate to the caller - handle them appropriately.
+            Embedding matrix with one row per input text.
         """
         if not texts:
             return np.empty((0, self.config.embedding_dim), dtype=np.float32)
 
-        # Lazy-initialize async client on first call
-        if self._async_client is None:
-            self._async_client = httpx.AsyncClient(
-                timeout=self.config.timeout_s,
-                limits=httpx.Limits(
-                    max_connections=100,  # Maximum total connections in pool
-                    max_keepalive_connections=20,  # Maximum keep-alive connections
-                ),
-            )
-            LOGGER.debug(
-                "Initialized async HTTP client for VLLMClient",
-                extra={
-                    "base_url": self.config.base_url,
-                    "model": self.config.model,
-                },
-            )
+        if self._local_engine is not None:
+            return await self._embed_batch_async_local(texts)
 
+        async_client = self._ensure_async_http_client()
         request = EmbeddingRequest(input=list(texts), model=self.config.model)
         payload = self._encoder.encode(request)
 
@@ -421,8 +348,7 @@ class VLLMClient:
             extra={"batch_size": len(texts), "model": self.config.model},
         )
 
-        # Use async client with connection pooling
-        response = await self._async_client.post(
+        response = await async_client.post(
             f"{self.config.base_url}/embeddings",
             content=payload,
             headers={"Content-Type": "application/json"},
@@ -447,89 +373,76 @@ class VLLMClient:
         return vectors
 
     def close(self) -> None:
-        """Close HTTP clients and release resources.
-
-        Closes the persistent HTTP client and async client (if initialized),
-        releasing all network connections and resources. This method must be
-        called during application shutdown to avoid resource leaks.
-
-        The method is idempotent - calling it multiple times is safe. After
-        calling close(), the client should not be used for further requests.
-
-        Typically called in FastAPI lifespan shutdown handler or application
-        cleanup code.
-
-        Examples
-        --------
-        Cleanup during shutdown:
-
-        >>> client = VLLMClient(config)
-        >>> # ... use client ...
-        >>> client.close()  # Release resources
-
-        Notes
-        -----
-        This method closes both the synchronous and asynchronous HTTP clients.
-        If the async client was never initialized (never called embed_batch_async),
-        only the sync client is closed.
-
-        After calling close(), attempting to use embed_batch() or
-        embed_batch_async() will raise httpx errors.
-        """
-        LOGGER.debug("Closing VLLMClient HTTP connections")
-        self._client.close()
+        """Close HTTP clients, async clients, and the local engine."""
+        LOGGER.debug("Closing VLLMClient resources", extra={"mode": self._mode})
+        if self._client is not None:
+            self._client.close()
+            self._client = None
         if self._async_client is not None:
-            # Close async client synchronously (for use in sync cleanup)
             try:
                 loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # If event loop is running, schedule close
-                    # Note: Task will complete asynchronously, but we can't await here
-                    # Store reference to task to prevent garbage collection
-                    close_task = loop.create_task(self._async_client.aclose())
-                    # Task is scheduled but not awaited - will complete asynchronously
-                    _ = close_task
-                else:
-                    loop.run_until_complete(self._async_client.aclose())
             except RuntimeError:
-                # No event loop - create new one for cleanup
+                loop = None
+            if loop and loop.is_running():
+                close_task = loop.create_task(self._async_client.aclose())
+                _ = close_task
+            elif loop:
+                loop.run_until_complete(self._async_client.aclose())
+            else:
                 asyncio.run(self._async_client.aclose())
             self._async_client = None
-        LOGGER.debug("VLLMClient HTTP connections closed")
+        if self._local_engine is not None:
+            self._local_engine.close()
+            self._local_engine = None
+        LOGGER.debug("VLLMClient resources closed")
 
     async def aclose(self) -> None:
-        """Async close for async context managers.
-
-        Closes HTTP clients asynchronously. Use this method when cleaning up
-        in async code (e.g., async context managers, async lifespan handlers).
-
-        This method is idempotent - calling it multiple times is safe.
-
-        Examples
-        --------
-        Async cleanup:
-
-        >>> async with VLLMClient(config) as client:
-        ...     vectors = await client.embed_batch_async(texts)
-        ... # Client automatically closed
-
-        Or manual async cleanup:
-
-        >>> client = VLLMClient(config)
-        >>> # ... use client ...
-        >>> await client.aclose()  # Async cleanup
-
-        Notes
-        -----
-        This method closes both clients asynchronously. Prefer this over
-        close() when called from async code to avoid blocking the event loop.
-        """
-        LOGGER.debug("Closing VLLMClient HTTP connections (async)")
-        self._client.close()
+        """Asynchronously release all clients/engines."""
+        if self._client is not None:
+            self._client.close()
+            self._client = None
         if self._async_client is not None:
             await self._async_client.aclose()
             self._async_client = None
-        LOGGER.debug("VLLMClient HTTP connections closed (async)")
+        if self._local_engine is not None:
+            self._local_engine.close()
+            self._local_engine = None
+        LOGGER.debug("VLLMClient resources closed (async)")
+
+    async def _embed_batch_async_local(self, texts: Sequence[str]) -> np.ndarray:
+        if self._local_engine is None:
+            msg = "Local vLLM engine not initialized."
+            raise RuntimeError(msg)
+        if self._local_semaphore is None:
+            permits = max(1, self.config.max_concurrent_requests)
+            self._local_semaphore = asyncio.Semaphore(permits)
+        async with self._local_semaphore:
+            loop = asyncio.get_running_loop()
+            return await loop.run_in_executor(None, self._local_engine.embed_batch, list(texts))
+
+    def _ensure_async_http_client(self) -> httpx.AsyncClient:
+        if self._async_client is None:
+            self._async_client = httpx.AsyncClient(
+                timeout=self.config.timeout_s,
+                limits=httpx.Limits(
+                    max_connections=100,
+                    max_keepalive_connections=20,
+                ),
+            )
+            LOGGER.debug(
+                "Initialized async HTTP client for VLLMClient",
+                extra={
+                    "base_url": self.config.base_url,
+                    "model": self.config.model,
+                },
+            )
+        return self._async_client
+
+    def _require_http_client(self) -> httpx.Client:
+        if self._client is None:
+            msg = "HTTP transport not initialized; set VLLM run mode to 'http'."
+            raise RuntimeError(msg)
+        return self._client
 
 
 __all__ = [

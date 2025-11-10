@@ -59,6 +59,9 @@ if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
 
 LOGGER = get_logger(__name__)
+HTTP_HEALTH_TIMEOUT_S = 2.0
+_EMBED_BATCH_RANK = 2
+_EMBED_BATCH_MIN_ROWS = 1
 
 
 @dataclass(slots=True, frozen=True)
@@ -507,45 +510,67 @@ class ReadinessProbe:
         )
 
     def check_vllm_connection(self) -> CheckResult:
-        """Verify vLLM service is reachable with a lightweight health check.
-
-        Performs a two-phase check:
-        1. Validates URL format (scheme and netloc)
-        2. Attempts HTTP GET to /health endpoint with short timeout
+        """Verify vLLM availability for the configured execution mode.
 
         Returns
         -------
         CheckResult
-            Healthy status reflecting vLLM service availability.
-
-        Examples
-        --------
-        >>> result = readiness.check_vllm_connection()
-        >>> if result.healthy:
-        ...     # vLLM is reachable
-        ...     pass
+            Result of the probe indicating health and optional detail.
         """
-        vllm_url = self._context.settings.vllm.base_url
-        parsed = urlparse(vllm_url)
+        mode = getattr(self._context.settings.vllm.run, "mode", "inprocess")
+        if mode == "http":
+            return self._check_vllm_http(self._context.settings.vllm.base_url)
+        return self._check_vllm_inprocess()
 
-        # Phase 1: URL validation
+    def _check_vllm_inprocess(self) -> CheckResult:
+        """Perform an embedding smoke test when running vLLM in-process.
+
+        Returns
+        -------
+        CheckResult
+            Healthy status along with diagnostic detail when failures occur.
+        """
+        client = self._context.vllm_client
+        try:
+            vectors = client.embed_batch(["__readyz__"])
+        except (RuntimeError, ValueError) as exc:  # pragma: no cover - defensive
+            return CheckResult(
+                healthy=False,
+                detail=f"vLLM in-process embedding failed: {exc}",
+            )
+        shape = getattr(vectors, "shape", None)
+        if not shape or len(shape) != _EMBED_BATCH_RANK or shape[0] != _EMBED_BATCH_MIN_ROWS:
+            return CheckResult(
+                healthy=False,
+                detail=f"Unexpected embedding output shape: {shape}",
+            )
+        return CheckResult(healthy=True)
+
+    @staticmethod
+    def _check_vllm_http(base_url: str) -> CheckResult:
+        """Validate HTTP vLLM endpoint reachability.
+
+        Returns
+        -------
+        CheckResult
+            Status representing endpoint availability.
+        """
+        parsed = urlparse(base_url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             return CheckResult(
                 healthy=False,
-                detail=f"Invalid vLLM endpoint URL: {vllm_url}",
+                detail=f"Invalid vLLM endpoint URL: {base_url}",
             )
-
-        # Phase 2: HTTP reachability check (non-blocking, short timeout)
         try:
-            with httpx.Client(timeout=2.0) as client:
-                response = client.get(f"{vllm_url}/health", follow_redirects=True)
+            with httpx.Client(timeout=HTTP_HEALTH_TIMEOUT_S) as client:
+                response = client.get(f"{base_url}/health", follow_redirects=True)
                 if response.is_success:
                     return CheckResult(healthy=True)
                 return CheckResult(
                     healthy=False,
                     detail=f"vLLM health check failed: HTTP {response.status_code}",
                 )
-        except httpx.HTTPError as exc:
+        except httpx.HTTPError as exc:  # pragma: no cover - network errors
             return CheckResult(
                 healthy=False,
                 detail=f"vLLM service unreachable: {exc}",

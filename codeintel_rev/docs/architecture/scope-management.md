@@ -63,8 +63,8 @@ sequenceDiagram
    - Stores session ID in `ContextVar` for thread-local access
 3. **Adapter Execution**: 
    - Retrieves session ID from `ContextVar` via `get_session_id()`
-   - Calls `scope_registry.set_scope(session_id, scope)`
-4. **Registry Storage**: 
+   - Calls `context.scope_store.set(session_id, scope)` (async)
+4. **Store Persistence**: 
    - Stores scope dictionary with current timestamp
    - Uses `threading.RLock` for thread-safe access
    - Returns confirmation
@@ -76,7 +76,7 @@ sequenceDiagram
 2. **Middleware Processing**: Same session ID extraction and ContextVar storage
 3. **Adapter Execution**: 
    - Retrieves session ID from `ContextVar`
-   - Calls `scope_registry.get_scope(session_id)` to retrieve stored scope
+   - Calls `await context.scope_store.get(session_id)` to retrieve stored scope
    - Merges scope with explicit parameters (explicit parameters override scope)
 4. **Registry Retrieval**: 
    - Returns stored scope dictionary
@@ -111,8 +111,8 @@ Adapter Function
         ├─ search_text → pass paths to ripgrep
         └─ semantic_search → query_by_filters() in DuckDB
             ↓
-ScopeRegistry
-    ├─ get_scope(session_id) → retrieve stored scope
+ScopeStore
+    ├─ get(session_id) → retrieve stored scope
     └─ Update timestamp (LRU tracking)
         ↓
 DuckDBCatalog (for semantic_search)
@@ -138,14 +138,13 @@ classDiagram
         +ScopeRegistry scope_registry
     }
     
-    class ScopeRegistry {
-        -dict[str, tuple[ScopeIn, float]] _scopes
-        -RLock _lock
-        +set_scope(session_id, scope)
-        +get_scope(session_id) ScopeIn | None
-        +clear_scope(session_id)
-        +prune_expired(max_age_seconds) int
-        +get_session_count() int
+    class ScopeStore {
+        -LRUCache cache
+        -SupportsAsyncRedis redis
+        +set(session_id, scope)
+        +get(session_id) -> ScopeIn | None
+        +delete(session_id)
+        +clear()
     }
     
     class SessionScopeMiddleware {
@@ -172,17 +171,17 @@ classDiagram
         +set_scope(context, scope)
     }
     
-    ApplicationContext --> ScopeRegistry : contains
+    ApplicationContext --> ScopeStore : contains
     SessionScopeMiddleware --> ContextVar : sets session_id_var
     Adapter --> scope_utils : uses utilities
-    Adapter --> ScopeRegistry : accesses via context.scope_registry
+    Adapter --> ScopeStore : accesses via context.scope_store
     Adapter --> DuckDBCatalog : queries with filters
     scope_utils --> ScopeRegistry : retrieves scope
 ```
 
 ### Relationship Descriptions
 
-- **ApplicationContext → ScopeRegistry**: The application context contains a single `ScopeRegistry` instance initialized during FastAPI startup. All adapters access the registry via `context.scope_registry`.
+- **ApplicationContext → ScopeStore**: The application context contains a single Redis-backed `ScopeStore` instance initialized during startup. All adapters access the store via `context.scope_store`; mutation of the frozen context is never required.
 
 - **SessionScopeMiddleware → ContextVar**: The middleware sets a thread-local `ContextVar` (`session_id_var`) that adapters read via `get_session_id()`. This enables session ID access without passing `Request` objects to adapters.
 
@@ -191,7 +190,7 @@ classDiagram
   - Merge scope with explicit parameters (`merge_scope_filters`)
   - Apply path and language filters (`apply_path_filters`, `apply_language_filter`)
 
-- **Adapter → ScopeRegistry**: Adapters access the registry through `ApplicationContext.scope_registry` to store and retrieve session scopes.
+- **Adapter → ScopeStore**: Adapters access the store through `ApplicationContext.scope_store` to persist and retrieve session scopes asynchronously.
 
 - **Adapter → DuckDBCatalog**: For semantic search, adapters call `query_by_filters` instead of `query_by_ids` when scope filters are present, enabling SQL-side filtering for performance.
 
@@ -423,7 +422,6 @@ scope = registry.get_scope(session_id)  # Returns None (expired)
 ## See Also
 
 - [Scope Management README](../../README.md#scope-management) - User-facing documentation
-- [Scope Registry API](../../app/scope_registry.py) - Implementation details
+- [Scope Store API](../../app/scope_store.py) - Implementation details
 - [Scope Utilities](../../mcp_server/scope_utils.py) - Helper functions
 - [Middleware Implementation](../../app/middleware.py) - Session ID extraction
-

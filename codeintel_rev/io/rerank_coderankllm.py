@@ -56,10 +56,19 @@ class CodeRankListwiseReranker:
     def rerank(self, query: str, candidates: Sequence[tuple[int, str]]) -> list[int]:
         """Return ordered chunk IDs ranked by CodeRankLLM.
 
+        Parameters
+        ----------
+        query : str
+            Natural language search query string.
+        candidates : Sequence[tuple[int, str]]
+            Sequence of (chunk_id, code_snippet) tuples to rerank. The code
+            snippets are used as context for the LLM to determine relevance.
+
         Returns
         -------
         list[int]
             Ordered list of chunk IDs ranked by CodeRankLLM, highest score first.
+            Length matches len(candidates).
 
         Raises
         ------

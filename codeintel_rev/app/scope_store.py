@@ -271,7 +271,7 @@ class AsyncSingleFlight[KeyT: Hashable, ValueT]:
                 self._inflight.pop(key, None)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ScopeStoreMetrics:
     """Runtime counters describing scope store cache performance."""
 
@@ -280,21 +280,69 @@ class ScopeStoreMetrics:
     l2_hits: int = 0
     l2_misses: int = 0
 
-    def record_l1_hit(self) -> None:
-        """Increment the L1 hit counter."""
-        self.l1_hits += 1
+    def record_l1_hit(self) -> ScopeStoreMetrics:
+        """
+        Return a new metrics instance with an incremented L1 hit counter.
 
-    def record_l1_miss(self) -> None:
-        """Increment the L1 miss counter."""
-        self.l1_misses += 1
+        Returns
+        -------
+        ScopeStoreMetrics
+            Fresh metrics snapshot reflecting the increment.
+        """
+        return ScopeStoreMetrics(
+            l1_hits=self.l1_hits + 1,
+            l1_misses=self.l1_misses,
+            l2_hits=self.l2_hits,
+            l2_misses=self.l2_misses,
+        )
 
-    def record_l2_hit(self) -> None:
-        """Increment the L2 hit counter."""
-        self.l2_hits += 1
+    def record_l1_miss(self) -> ScopeStoreMetrics:
+        """
+        Return a new metrics instance with an incremented L1 miss counter.
 
-    def record_l2_miss(self) -> None:
-        """Increment the L2 miss counter."""
-        self.l2_misses += 1
+        Returns
+        -------
+        ScopeStoreMetrics
+            Fresh metrics snapshot reflecting the increment.
+        """
+        return ScopeStoreMetrics(
+            l1_hits=self.l1_hits,
+            l1_misses=self.l1_misses + 1,
+            l2_hits=self.l2_hits,
+            l2_misses=self.l2_misses,
+        )
+
+    def record_l2_hit(self) -> ScopeStoreMetrics:
+        """
+        Return a new metrics instance with an incremented L2 hit counter.
+
+        Returns
+        -------
+        ScopeStoreMetrics
+            Fresh metrics snapshot reflecting the increment.
+        """
+        return ScopeStoreMetrics(
+            l1_hits=self.l1_hits,
+            l1_misses=self.l1_misses,
+            l2_hits=self.l2_hits + 1,
+            l2_misses=self.l2_misses,
+        )
+
+    def record_l2_miss(self) -> ScopeStoreMetrics:
+        """
+        Return a new metrics instance with an incremented L2 miss counter.
+
+        Returns
+        -------
+        ScopeStoreMetrics
+            Fresh metrics snapshot reflecting the increment.
+        """
+        return ScopeStoreMetrics(
+            l1_hits=self.l1_hits,
+            l1_misses=self.l1_misses,
+            l2_hits=self.l2_hits,
+            l2_misses=self.l2_misses + 1,
+        )
 
     @property
     def l1_hit_rate(self) -> float:
@@ -380,10 +428,10 @@ class ScopeStore:
 
         cached = self._l1.get(session_id)
         if cached is not None:
-            self._metrics.record_l1_hit()
+            self._metrics = self._metrics.record_l1_hit()
             return cached
 
-        self._metrics.record_l1_miss()
+        self._metrics = self._metrics.record_l1_miss()
         return await self._flight.do(session_id, lambda: self._fetch_from_l2(session_id))
 
     async def set(self, session_id: str, scope: ScopeIn) -> None:
@@ -472,17 +520,17 @@ class ScopeStore:
         data = await self._redis.get(key)
 
         if data is None:
-            self._metrics.record_l2_miss()
+            self._metrics = self._metrics.record_l2_miss()
             return None
 
         try:
             scope = cast("ScopeIn", msgspec.json.decode(data, type=dict[str, Any]))
         except msgspec.DecodeError:
-            self._metrics.record_l2_miss()
+            self._metrics = self._metrics.record_l2_miss()
             await self._redis.delete(key)
             return None
 
-        self._metrics.record_l2_hit()
+        self._metrics = self._metrics.record_l2_hit()
         self._l1.set(session_id, scope)
         return scope
 

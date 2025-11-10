@@ -40,12 +40,23 @@ class WarpEngine:
         candidate_ids: Sequence[int],
         top_k: int,
     ) -> list[tuple[int, float]]:
-        """Return WARP scores for ``candidate_ids``.
+        """Return WARP scores for candidate document IDs.
+
+        Parameters
+        ----------
+        query : str
+            Natural language search query string.
+        candidate_ids : Sequence[int]
+            Sequence of document/chunk IDs to rerank using WARP late-interaction
+            scoring. These are typically top-k results from an initial retrieval stage.
+        top_k : int
+            Maximum number of results to return. Must be positive.
 
         Returns
         -------
         list[tuple[int, float]]
-            List of (doc_id, score) tuples ranked by WARP scores.
+            List of (doc_id, score) tuples ranked by WARP scores in descending order.
+            Length is min(len(candidate_ids), top_k).
 
         Raises
         ------
@@ -84,8 +95,8 @@ class WarpEngine:
 
         Returns
         -------
-        type[object]
-            The WarpExecutor class from xtr_warp.executor module.
+        WarpExecutorFactory
+            The WarpExecutor factory class from xtr_warp.executor module.
 
         Raises
         ------
@@ -136,12 +147,20 @@ class WarpEngine:
 
 
 def _safe_int(value: object | None, default: int = 0) -> int:
-    """Convert an object to ``int`` safely, falling back to the provided default.
+    """Convert an object to int safely, falling back to the provided default.
+
+    Parameters
+    ----------
+    value : object | None
+        Value to convert to int. Can be int, float, or str. If None or
+        conversion fails, returns default.
+    default : int, optional
+        Fallback value returned if conversion fails. Defaults to 0.
 
     Returns
     -------
     int
-        Integer representation of ``value`` or the fallback default.
+        Integer representation of value or the fallback default.
     """
     if isinstance(value, (int, float, str)):
         try:
@@ -152,12 +171,20 @@ def _safe_int(value: object | None, default: int = 0) -> int:
 
 
 def _safe_float(value: object | None, default: float = 0.0) -> float:
-    """Convert an object to ``float`` safely, falling back to the provided default.
+    """Convert an object to float safely, falling back to the provided default.
+
+    Parameters
+    ----------
+    value : object | None
+        Value to convert to float. Can be int, float, or str. If None or
+        conversion fails, returns default.
+    default : float, optional
+        Fallback value returned if conversion fails. Defaults to 0.0.
 
     Returns
     -------
     float
-        Float representation of ``value`` or the fallback default.
+        Float representation of value or the fallback default.
     """
     if isinstance(value, (int, float, str)):
         try:

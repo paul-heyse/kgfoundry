@@ -29,17 +29,26 @@ class XTRMetadata(TypedDict):
     lengths: list[int]
 
 
-@dataclass(slots=True)
+class _XTRIndexRuntime:
+    """Mutable runtime artifacts for XTRIndex."""
+
+    __slots__ = ("device", "meta", "model", "tokenizer", "tokens")
+
+    def __init__(self) -> None:
+        self.meta: XTRMetadata | None = None
+        self.tokens: np.memmap | None = None
+        self.tokenizer: Any | None = None
+        self.model: Any | None = None
+        self.device: str | None = None
+
+
+@dataclass(slots=True, frozen=True)
 class XTRIndex:
     """Memory-mapped XTR token index with query encoding + scoring helpers."""
 
     root: Path
     config: XTRConfig
-    _meta: XTRMetadata | None = field(default=None, init=False, repr=False)
-    _tokens: np.memmap | None = field(default=None, init=False, repr=False)
-    _tokenizer: Any | None = field(default=None, init=False, repr=False)
-    _model: Any | None = field(default=None, init=False, repr=False)
-    _device: str | None = field(default=None, init=False, repr=False)
+    _runtime: _XTRIndexRuntime = field(default_factory=_XTRIndexRuntime, init=False, repr=False)
 
     def open(self) -> None:
         """Open metadata and memory-map the token matrix if artifacts exist.
@@ -79,8 +88,9 @@ class XTRIndex:
                 extra={"token_path": str(token_path), "error": str(exc)},
             )
             raise
-        self._meta = meta
-        self._tokens = tokens
+        state = self._runtime
+        state.meta = meta
+        state.tokens = tokens
         LOGGER.info(
             "xtr_index_opened",
             extra={
@@ -101,7 +111,8 @@ class XTRIndex:
         bool
             ``True`` if the index is ready for scoring.
         """
-        return self._meta is not None and self._tokens is not None
+        state = self._runtime
+        return state.meta is not None and state.tokens is not None
 
     def metadata(self) -> XTRMetadata | None:
         """Return a shallow copy of index metadata when loaded.
@@ -111,17 +122,25 @@ class XTRIndex:
         XTRMetadata | None
             Metadata dictionary or ``None`` when index not opened.
         """
-        if self._meta is None:
+        state = self._runtime
+        if state.meta is None:
             return None
-        return cast("XTRMetadata", dict(self._meta))
+        return cast("XTRMetadata", dict(state.meta))
 
     def encode_query_tokens(self, text: str) -> np.ndarray:
-        """Encode ``text`` into normalized token embeddings.
+        """Encode text into normalized token embeddings.
+
+        Parameters
+        ----------
+        text : str
+            Query text string to encode. Will be tokenized and truncated to
+            max_query_tokens if necessary.
 
         Returns
         -------
-        numpy.ndarray
-            Array shaped ``[tokens, dim]`` with L2-normalized vectors.
+        np.ndarray
+            Array shaped [tokens, dim] with L2-normalized token vectors.
+            Each row is a token embedding normalized to unit length.
         """
         tokenizer, model = self._ensure_encoder()
         torch_module = gate_import("torch", "XTR query encoding")
@@ -150,6 +169,65 @@ class XTRIndex:
             )
         return result
 
+    def search(
+        self,
+        query: str,
+        k: int,
+        *,
+        explain: bool = False,
+        topk_explanations: int = 5,
+    ) -> list[tuple[int, float, dict[str, Any] | None]]:
+        """
+        Perform index-wide MaxSim search (wide mode).
+
+        Returns
+        -------
+        list[tuple[int, float, dict[str, Any] | None]]
+            Ranked list of chunk identifiers, scores, and optional explanations.
+        """
+        if not self.ready or k <= 0:
+            return []
+        state = self._runtime
+        meta = state.meta
+        if meta is None:
+            return []
+        query_vecs = self.encode_query_tokens(query)
+        candidates = meta["chunk_ids"]
+        return self.score_candidates(
+            query_vecs,
+            candidates,
+            explain=explain,
+            topk_explanations=topk_explanations,
+            limit=k,
+        )
+
+    def rescore(
+        self,
+        query: str,
+        candidate_chunk_ids: Iterable[int],
+        *,
+        explain: bool = False,
+        topk_explanations: int = 5,
+    ) -> list[tuple[int, float, dict[str, Any] | None]]:
+        """
+        Rescore a Stage-0 candidate set (narrow mode).
+
+        Returns
+        -------
+        list[tuple[int, float, dict[str, Any] | None]]
+            Ranked list restricted to the provided candidate chunk identifiers.
+        """
+        materialized = [int(cid) for cid in candidate_chunk_ids]
+        if not materialized or not self.ready:
+            return []
+        query_vecs = self.encode_query_tokens(query)
+        return self.score_candidates(
+            query_vecs,
+            materialized,
+            explain=explain,
+            topk_explanations=topk_explanations,
+        )
+
     def score_candidates(
         self,
         query_vecs: np.ndarray,
@@ -157,13 +235,33 @@ class XTRIndex:
         *,
         explain: bool = False,
         topk_explanations: int = 5,
+        limit: int | None = None,
     ) -> list[tuple[int, float, dict[str, Any] | None]]:
-        """Compute MaxSim scores for ``candidate_chunk_ids``.
+        """Compute MaxSim scores for candidate chunk IDs.
+
+        Parameters
+        ----------
+        query_vecs : np.ndarray
+            Query token embeddings array shaped [query_tokens, dim]. Used to compute
+            MaxSim scores against document token embeddings.
+        candidate_chunk_ids : Iterable[int]
+            Iterable of chunk IDs to score. Duplicates are automatically deduplicated.
+        explain : bool, optional
+            If True, include explainability payload with token-level alignments.
+            Defaults to False.
+        topk_explanations : int, optional
+            Maximum number of token matches to include in explainability payload.
+            Defaults to 5.
+        limit : int | None, optional
+            Optional cap on the number of rescored results returned. ``None`` retains
+            every candidate.
 
         Returns
         -------
         list[tuple[int, float, dict[str, Any] | None]]
-            Ranked list containing chunk id, score, and optional explainability payload.
+            Ranked list containing (chunk_id, score, explainability_payload) tuples.
+            Scores are MaxSim sums across query tokens. Explainability payload is None
+            if explain=False or no matches found.
         """
         if not self.ready:
             LOGGER.debug("xtr_not_ready", extra={"root": str(self.root)})
@@ -190,8 +288,8 @@ class XTRIndex:
             score = float(max_per_query.sum())
             payload = None
             if explain and max_per_query.size:
-                limit = min(topk, max_per_query.size)
-                top_idx = np.argpartition(-max_per_query, limit - 1)[:limit]
+                explain_limit = min(topk, max_per_query.size)
+                top_idx = np.argpartition(-max_per_query, explain_limit - 1)[:explain_limit]
                 top_idx = top_idx[np.argsort(-max_per_query[top_idx])]
                 payload = {
                     "token_matches": [
@@ -206,6 +304,8 @@ class XTRIndex:
             results.append((chunk_id, score, payload))
 
         results.sort(key=lambda item: item[1], reverse=True)
+        if limit is not None and limit > 0:
+            return results[:limit]
         return results
 
     def _ensure_encoder(self) -> tuple[Any, Any]:
@@ -216,47 +316,62 @@ class XTRIndex:
         tuple[Any, Any]
             Tokenizer/model pair loaded from Hugging Face.
         """
-        if self._tokenizer is not None and self._model is not None:
-            return self._tokenizer, self._model
-        transformers = cast(Any, gate_import("transformers", "XTR encoder loading"))
+        state = self._runtime
+        if state.tokenizer is not None and state.model is not None:
+            return state.tokenizer, state.model
+        transformers = cast("Any", gate_import("transformers", "XTR encoder loading"))
         auto_tokenizer_cls = transformers.AutoTokenizer
         auto_model_cls = transformers.AutoModel
         tokenizer = auto_tokenizer_cls.from_pretrained(self.config.model_id)
         model = auto_model_cls.from_pretrained(self.config.model_id)
-        torch_module = cast(TorchDeviceModule, gate_import("torch", "XTR encoder device"))
+        torch_module = cast("TorchDeviceModule", gate_import("torch", "XTR encoder device"))
         device = self._resolve_device(torch_module)
         model.to(device)
         model.eval()
-        self._tokenizer = tokenizer
-        self._model = model
+        state.tokenizer = tokenizer
+        state.model = model
         return tokenizer, model
 
     def _resolve_device(self, torch_module: TorchDeviceModule) -> object:
         """Resolve the runtime torch.device honoring config preferences.
 
+        Parameters
+        ----------
+        torch_module : TorchDeviceModule
+            Torch module instance used to check CUDA availability and create
+            device objects.
+
         Returns
         -------
-        torch.device
-            Device reference pointing to ``cpu`` or ``cuda``.
+        object
+            Device reference (torch.device) pointing to cpu or cuda based on
+            config and availability.
         """
+        state = self._runtime
         configured = self.config.device or "cpu"
         if configured == "cuda" and not torch_module.cuda.is_available():
-            if self._device != "cpu":
+            if state.device != "cpu":
                 LOGGER.warning(
                     "XTR requested CUDA but it is unavailable; falling back to CPU.",
                 )
-            self._device = "cpu"
+            state.device = "cpu"
         else:
-            self._device = configured
-        return torch_module.device(self._device)
+            state.device = configured
+        return torch_module.device(state.device)
 
     def _slice_chunk(self, chunk_id: int) -> np.ndarray:
-        """Return token matrix slice for ``chunk_id``.
+        """Return token matrix slice for chunk_id.
+
+        Parameters
+        ----------
+        chunk_id : int
+            Chunk ID to extract embeddings for. Must exist in the index metadata.
 
         Returns
         -------
-        numpy.ndarray
-            View over the token matrix for the requested chunk.
+        np.ndarray
+            View over the token matrix for the requested chunk. Array shaped
+            [tokens, dim] with token embeddings.
 
         Raises
         ------
@@ -265,8 +380,9 @@ class XTRIndex:
         KeyError
             If the chunk identifier is not present in metadata.
         """
-        meta = self._meta
-        tokens = self._tokens
+        state = self._runtime
+        meta = state.meta
+        tokens = state.tokens
         if meta is None or tokens is None:
             msg = f"XTR index not ready when slicing chunk {chunk_id}"
             raise RuntimeError(msg)

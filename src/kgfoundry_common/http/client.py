@@ -48,7 +48,25 @@ class RequestOptions:
     timeout_s: float | None = None
 
     def with_overrides(self, overrides: Mapping[str, object]) -> RequestOptions:
-        """Return a new options object with overrides applied."""
+        """Return a new options object with overrides applied.
+
+        Parameters
+        ----------
+        overrides : Mapping[str, object]
+            Dictionary of option overrides. Keys must be in the allowed set:
+            params, headers, json_body, data, timeout_s.
+
+        Returns
+        -------
+        RequestOptions
+            New RequestOptions instance with overrides merged. Returns self
+            unchanged if overrides is empty.
+
+        Raises
+        ------
+        TypeError
+            If any key in overrides is not in the allowed set of option keys.
+        """
         if not overrides:
             return self
         unexpected = set(overrides) - self._ALLOWED_KEYS
@@ -165,14 +183,42 @@ class HttpClient:
     def _resolve_options(
         options: RequestOptions | None, overrides: Mapping[str, object]
     ) -> RequestOptions:
-        """Return resolved request options with overrides validated."""
+        """Return resolved request options with overrides validated.
+
+        Parameters
+        ----------
+        options : RequestOptions | None
+            Base request options. If None, a default RequestOptions instance
+            is used.
+        overrides : Mapping[str, object]
+            Option overrides to apply on top of base options.
+
+        Returns
+        -------
+        RequestOptions
+            Resolved options with overrides merged and validated.
+        """
         base = options or RequestOptions()
         if overrides:
             base = base.with_overrides(overrides)
         return base
 
     def _select_strategy(self, method: str, headers: dict[str, str]) -> RetryStrategy | None:
-        """Determine which retry strategy applies for this request."""
+        """Determine which retry strategy applies for this request.
+
+        Parameters
+        ----------
+        method : str
+            HTTP method name (e.g., "GET", "POST").
+        headers : dict[str, str]
+            Request headers dictionary.
+
+        Returns
+        -------
+        RetryStrategy | None
+            Retry strategy for the request, or None if retries should be disabled
+            (e.g., when idempotency key is required but missing for non-idempotent methods).
+        """
         if (
             method not in {"GET", "HEAD", "OPTIONS"}
             and isinstance(self.retry_strategy, TenacityRetryStrategy)
@@ -184,7 +230,24 @@ class HttpClient:
 
     @staticmethod
     def _build_attempt(method: str, url: str, options: RequestOptions) -> Callable[[], object]:
-        """Build the callable that performs a single HTTP attempt."""
+        """Build the callable that performs a single HTTP attempt.
+
+        Parameters
+        ----------
+        method : str
+            HTTP method name.
+        url : str
+            Full request URL.
+        options : RequestOptions
+            Request options including params, headers, body, etc.
+
+        Returns
+        -------
+        Callable[[], object]
+            Callable that executes a single HTTP request attempt when called.
+            The callable raises NotImplementedError as the HTTP implementation
+            is not yet complete.
+        """
 
         def _attempt() -> object:
             """Execute a single HTTP request attempt.

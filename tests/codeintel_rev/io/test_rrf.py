@@ -35,8 +35,6 @@ def test_weighted_rrf_applies_minmax_normalization() -> None:
         top_k=2,
         normalize="minmax",
     )
-    coderank_entries = {
-        doc_id: contribs[0][2] for doc_id, contribs in contributions.items()
-    }
+    coderank_entries = {doc_id: contribs[0][2] for doc_id, contribs in contributions.items()}
     assert coderank_entries[1] == 0.0
     assert coderank_entries[2] == 1.0

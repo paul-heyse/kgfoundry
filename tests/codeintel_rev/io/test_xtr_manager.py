@@ -50,3 +50,21 @@ def test_xtr_index_not_ready_without_artifacts(tmp_path: Path) -> None:
     index = XTRIndex(tmp_path, XTRConfig(enable=True))
     index.open()
     assert not index.ready
+
+
+def test_xtr_search_and_rescore(tmp_path: Path) -> None:
+    _write_token_artifacts(tmp_path)
+    config = XTRConfig(enable=True, dim=2, dtype="float16")
+    index = XTRIndex(tmp_path, config)
+    index.open()
+    assert index.ready
+    def _encode_query(text: str) -> np.ndarray:
+        del text
+        return np.asarray([[1.0, 0.0], [0.0, 1.0]], dtype=np.float32)
+
+    object.__setattr__(index, "encode_query_tokens", _encode_query)
+    wide_hits = index.search("query", k=2, explain=True)
+    assert len(wide_hits) == 2
+    assert wide_hits[0][0] in {1, 2}
+    narrow_hits = index.rescore("query", [1], explain=False)
+    assert len(narrow_hits) == 1
