@@ -49,7 +49,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, TypeVar, cast
 
 import redis.asyncio as redis_asyncio
 
@@ -69,6 +69,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 LOGGER = get_logger(__name__)
+
+__all__ = ["ApplicationContext", "ResolvedPaths", "resolve_application_paths"]
 
 
 @dataclass(slots=True, frozen=True)
@@ -207,7 +209,7 @@ def resolve_application_paths(settings: Settings) -> ResolvedPaths:
             return path.expanduser().resolve()
         return (repo_root / path).resolve()
 
-    return ResolvedPaths(
+    paths = ResolvedPaths(
         repo_root=repo_root,
         data_dir=_resolve(settings.paths.data_dir),
         vectors_dir=_resolve(settings.paths.vectors_dir),
@@ -219,6 +221,29 @@ def resolve_application_paths(settings: Settings) -> ResolvedPaths:
         warp_index_dir=_resolve(settings.paths.warp_index_dir),
         xtr_dir=_resolve(settings.paths.xtr_dir),
     )
+
+    for directory in (
+        paths.data_dir,
+        paths.vectors_dir,
+        paths.coderank_vectors_dir,
+        paths.warp_index_dir,
+        paths.xtr_dir,
+    ):
+        try:
+            directory.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            msg = f"Failed to ensure required directory exists: {directory}"
+            raise ConfigurationError(
+                msg,
+                context={"path": str(directory), "source": "resolve_application_paths"},
+            ) from exc
+        else:
+            LOGGER.debug("Ensured directory exists", extra={"path": str(directory)})
+
+    return paths
+
+
+T = TypeVar("T")
 
 
 class _RuntimeHandle[T]:
@@ -597,12 +622,10 @@ class ApplicationContext:
                     gpu_enabled = False
                 if not gpu_enabled and self.faiss_manager.gpu_disabled_reason:
                     limits.append(self.faiss_manager.gpu_disabled_reason)
-            elif (
-                self.faiss_manager.gpu_disabled_reason
-                and limits.count(self.faiss_manager.gpu_disabled_reason) == 0
-            ):
+            elif self.faiss_manager.gpu_disabled_reason:
                 limits.append(self.faiss_manager.gpu_disabled_reason)
 
+        limits = list(dict.fromkeys(limits))
         return True, limits, None
 
     @contextmanager

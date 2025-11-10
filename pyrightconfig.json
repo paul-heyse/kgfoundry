@@ -4,7 +4,7 @@
   "pythonPlatform": "Linux",
   "useLibraryCodeForTypes": true,
   "stubPath": "stubs",
-  "include": ["src", "codeintel_rev", "tools", "tests", "docs"],
+  "include": ["src", "codeintel_rev", "tools", "tests"],
   "exclude": [
     ".git",
     ".hg",
@@ -22,6 +22,7 @@
     "src/kgfoundry_common/http/**",
     "codeintel_rev/xtr-warp/**",
     "codeintel_rev/patches/**",
+    "docs/**",
   ],
   "executionEnvironments": [
     {

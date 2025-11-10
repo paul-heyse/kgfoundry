@@ -240,7 +240,7 @@ class MethodInfo(TypedDict, total=False):
 
     retrieval: list[str]
     coverage: str
-    stages: list["StageInfo"]
+    stages: list[StageInfo]
     notes: list[str]
     explainability: dict[str, list[dict[str, object]]]
 

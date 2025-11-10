@@ -322,7 +322,6 @@ dependencies = [
     "types-tree-sitter",
     "types-tree-sitter-languages",
     "types-ttkthemes",
-    "types-typed-ast",
     "types-tzlocal",
     "types-ujson",
     "types-unidiff",
@@ -517,6 +516,7 @@ dependencies = [
     "openapi-spec-validator>=0.8.0b1",
     "tree>=0.2.4",
     "dot>=0.3.0",
+    "grimp>=3.13",
 ]
 
 [project.scripts]

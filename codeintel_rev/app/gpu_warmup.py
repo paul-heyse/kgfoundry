@@ -6,16 +6,19 @@ GPU is reachable and functional before expensive operations begin.
 
 from __future__ import annotations
 
-import logging
+from functools import lru_cache
 from typing import TYPE_CHECKING, cast
 
+from kgfoundry_common.logging import get_logger
 from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
     import faiss as _faiss
     import torch as _torch
 
-logger = logging.getLogger(__name__)
+LOGGER = get_logger(__name__)
+
+__all__ = ["warmup_gpu"]
 
 # Constants for GPU warmup checks
 _TOTAL_GPU_CHECKS = 4
@@ -35,7 +38,7 @@ def _check_cuda_availability() -> tuple[bool, str]:
 
         cuda_available = torch.cuda.is_available()
         if not cuda_available:
-            logger.warning("CUDA not available via PyTorch")
+            LOGGER.warning("CUDA not available via PyTorch")
             return (
                 False,
                 "CUDA not available",
@@ -44,7 +47,7 @@ def _check_cuda_availability() -> tuple[bool, str]:
             device_count = torch.cuda.device_count()
             current_device = torch.cuda.current_device()
             device_name = torch.cuda.get_device_name(current_device)
-            logger.info(
+            LOGGER.info(
                 "CUDA available: %s devices, current device %s: %s",
                 device_count,
                 current_device,
@@ -52,10 +55,10 @@ def _check_cuda_availability() -> tuple[bool, str]:
             )
             return True, f"CUDA available ({device_count} devices)"
     except ImportError:
-        logger.warning("PyTorch not available - skipping CUDA check")
+        LOGGER.warning("PyTorch not available - skipping CUDA check")
         return False, "PyTorch not installed"
     except (RuntimeError, AttributeError, OSError) as exc:
-        logger.warning("CUDA availability check failed: %s", exc, exc_info=True)
+        LOGGER.warning("CUDA availability check failed: %s", exc, exc_info=True)
         return False, f"CUDA check error: {exc}"
 
 
@@ -77,19 +80,19 @@ def _check_faiss_gpu_support() -> tuple[bool, str]:
         )
         faiss_gpu_available = all(hasattr(faiss, attr) for attr in required_attrs)
         if not faiss_gpu_available:
-            logger.warning("FAISS GPU symbols not available")
+            LOGGER.warning("FAISS GPU symbols not available")
             return (
                 False,
                 "FAISS GPU symbols not available",
             )
         else:  # noqa: RET505  # else block required by TRY300 for explicit control flow
-            logger.info("FAISS GPU symbols available")
+            LOGGER.info("FAISS GPU symbols available")
             return True, "FAISS GPU symbols available"
     except ImportError:
-        logger.warning("FAISS not available - skipping GPU check")
+        LOGGER.warning("FAISS not available - skipping GPU check")
         return False, "FAISS not installed"
     except (RuntimeError, AttributeError, OSError) as exc:
-        logger.warning("FAISS GPU check failed: %s", exc, exc_info=True)
+        LOGGER.warning("FAISS GPU check failed: %s", exc, exc_info=True)
         return False, f"FAISS GPU check error: {exc}"
 
 
@@ -112,12 +115,12 @@ def _test_torch_gpu_operations() -> tuple[bool, str]:
             test_tensor = torch.randn(100, 100, device=device)
             _ = torch.matmul(test_tensor, test_tensor.T)
             torch.cuda.synchronize()  # Wait for GPU operations to complete
-            logger.info("Torch GPU operations test passed")
+            LOGGER.info("Torch GPU operations test passed")
             return True, "Torch GPU operations test passed"
     except ImportError:
         return False, "PyTorch not installed"
     except (RuntimeError, OSError, AttributeError) as exc:
-        logger.warning("Torch GPU operations test failed: %s", exc, exc_info=True)
+        LOGGER.warning("Torch GPU operations test failed: %s", exc, exc_info=True)
         return False, f"Torch GPU test error: {exc}"
 
 
@@ -138,17 +141,22 @@ def _test_faiss_gpu_resources() -> tuple[bool, str]:
         else:  # noqa: RET505  # else block required by TRY300 for explicit control flow
             # Initialize GPU resources (this is lightweight)
             _ = faiss.StandardGpuResources()
-            logger.info("FAISS GPU resource initialization test passed")
+            LOGGER.info("FAISS GPU resource initialization test passed")
             return True, "FAISS GPU resource initialization test passed"
     except ImportError:
         return False, "FAISS not installed"
     except (RuntimeError, AttributeError, OSError) as exc:
-        logger.warning("FAISS GPU resource initialization failed: %s", exc, exc_info=True)
+        LOGGER.warning("FAISS GPU resource initialization failed: %s", exc, exc_info=True)
         return False, f"FAISS GPU init error: {exc}"
 
 
+@lru_cache(maxsize=1)
+@lru_cache(maxsize=1)
 def warmup_gpu() -> dict[str, bool | str]:
     """Perform GPU warmup sequence to verify GPU availability and functionality.
+
+    Results are cached after the first run; call ``warmup_gpu.cache_clear()`` in tests
+    to force a re-run.
 
     Checks:
     1. CUDA availability via PyTorch
@@ -232,5 +240,5 @@ def warmup_gpu() -> dict[str, bool | str]:
             f"GPU warmup failed - {checks_passed}/{_TOTAL_GPU_CHECKS} checks passed"
         )
 
-    logger.info("GPU warmup complete: %s", results["details"])
+    LOGGER.info("GPU warmup complete: %s", results["details"])
     return results

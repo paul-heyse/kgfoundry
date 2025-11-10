@@ -166,10 +166,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Session scope middleware (must be registered early, before other middleware)
-app.add_middleware(SessionScopeMiddleware)
-
-# CORS middleware for browser clients
+# CORS middleware for browser clients (handle preflight before session scope)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -180,6 +177,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Session scope middleware (must be registered after CORS to avoid preflight conflicts)
+app.add_middleware(SessionScopeMiddleware)
 
 
 @app.middleware("http")

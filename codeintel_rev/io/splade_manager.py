@@ -203,7 +203,7 @@ class SpladeIndexMetadata(msgspec.Struct, frozen=True):
     generator: str
 
 
-@dataclass
+@dataclass(frozen=True)
 class _ShardState:
     """Mutable encoding state for shard rotation."""
 
