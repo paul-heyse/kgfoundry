@@ -1,0 +1,62 @@
+diff --git a/.github/workflows/search-regression.yml b/.github/workflows/search-regression.yml
+new file mode 100644
+index 0000000..0b91e2a
+--- /dev/null
++++ b/.github/workflows/search-regression.yml
+@@ -0,0 +1,97 @@
++name: retrieval-regression
++
++on:
++  workflow_dispatch: {}
++  schedule:
++    - cron: "17 5 * * *"   # daily 05:17 UTC
++  pull_request:
++    paths:
++      - "codeintel_rev/**"
++      - "tools/recall_harness.py"
++      - ".github/workflows/search-regression.yml"
++
++jobs:
++  recall-harness:
++    runs-on: ubuntu-22.04
++    timeout-minutes: 60
++    steps:
++      - uses: actions/checkout@v4
++
++      - name: Setup Python
++        uses: actions/setup-python@v5
++        with:
++          python-version: "3.11"
++
++      - name: Cache pip
++        uses: actions/cache@v4
++        with:
++          path: ~/.cache/pip
++          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
++
++      - name: Install deps
++        run: |
++          python -m pip install --upgrade pip
++          pip install pyserini==0.36.0  # Lucene 9 line
++
++      - name: Resolve inputs
++        id: inputs
++        run: |
++          echo "BM25_INDEX=${BM25_INDEX:-/mnt/bm25}" >> $GITHUB_OUTPUT
++          echo "QFILE=${QUERIES_JSONL:-ci/queries.jsonl}" >> $GITHUB_OUTPUT
++          echo "QRELS=${QRELS_TSV:-ci/qrels.tsv}" >> $GITHUB_OUTPUT
++
++      - name: Run recall harness
++        run: |
++          mkdir -p runs/ci
++          python tools/recall_harness.py +            --bm25-index "${{ steps.inputs.outputs.BM25_INDEX }}" +            --queries "${{ steps.inputs.outputs.QFILE }}" +            --qrels "${{ steps.inputs.outputs.QRELS }}" +            --k 10 +            --sweep-k1 0.6,0.9,1.2 +            --sweep-b 0.2,0.4,0.75 +            --rm3 off,10-10-0.5,20-10-0.5 +            --auto-rm3 true +            --outdir runs/ci
++
++      - name: Upload results
++        uses: actions/upload-artifact@v4
++        with:
++          name: recall-harness
++          path: runs/ci/*
++
++      - name: Guardrail
++        run: |
++          jq -r '.best.recall_at_k' runs/ci/summary.json | awk '{ if ($1 < 0.60) { exit 1 } }'

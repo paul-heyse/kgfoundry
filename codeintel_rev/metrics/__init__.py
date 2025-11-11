@@ -1,0 +1,1 @@
+"""Metric registry package."""

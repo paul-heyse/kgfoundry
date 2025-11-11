@@ -31,6 +31,7 @@ from codeintel_rev.config.settings import (
     VLLMConfig,
     load_settings,
 )
+from codeintel_rev.evaluation.offline_recall import OfflineRecallEvaluator
 from codeintel_rev.indexing.cast_chunker import Chunk, ChunkOptions, chunk_file
 from codeintel_rev.indexing.scip_reader import (
     SCIPIndex,
@@ -41,7 +42,7 @@ from codeintel_rev.indexing.scip_reader import (
 )
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.duckdb_manager import DuckDBManager
-from codeintel_rev.io.faiss_manager import FAISSManager
+from codeintel_rev.io.faiss_manager import FAISSManager, FAISSRuntimeOptions
 from codeintel_rev.io.parquet_store import ParquetWriteOptions, write_chunks_parquet
 from codeintel_rev.io.symbol_catalog import (  # new
     SymbolCatalog,
@@ -89,6 +90,17 @@ def main() -> None:
         action="store_true",
         help="Add new chunks to existing index instead of rebuilding (fast incremental updates)",
     )
+    parser.add_argument(
+        "--eval-after-index",
+        action="store_true",
+        help="Run offline recall evaluation after indexing completes.",
+    )
+    parser.add_argument(
+        "--eval-queries",
+        type=Path,
+        default=None,
+        help="Optional JSONL payload for offline evaluation queries.",
+    )
     args = parser.parse_args()
 
     settings = load_settings()
@@ -134,6 +146,8 @@ def main() -> None:
         paths.faiss_index,
         catalog_count,
     )
+    if args.eval_after_index:
+        _run_offline_evaluation(settings, paths, args.eval_queries)
 
 
 def _resolve_paths(settings: Settings) -> PipelinePaths:
@@ -362,11 +376,13 @@ def _build_faiss_index(
     n_vectors = len(embeddings)
     logger.info("Building FAISS index for %s vectors (adaptive type selection)", n_vectors)
 
+    runtime_opts = _runtime_options_from_index(index_config)
     faiss_mgr = FAISSManager(
         index_path=paths.faiss_index,
         vec_dim=index_config.vec_dim,
-        nlist=index_config.faiss_nlist,
+        nlist=index_config.nlist,
         use_cuvs=index_config.use_cuvs,
+        runtime=runtime_opts,
     )
 
     # Log memory estimate before building
@@ -425,11 +441,13 @@ def _update_faiss_index_incremental(
 
     logger.info("Incremental indexing mode: adding new chunks to existing index")
 
+    runtime_opts = _runtime_options_from_index(index_config)
     faiss_mgr = FAISSManager(
         index_path=paths.faiss_index,
         vec_dim=index_config.vec_dim,
-        nlist=index_config.faiss_nlist,
+        nlist=index_config.nlist,
         use_cuvs=index_config.use_cuvs,
+        runtime=runtime_opts,
     )
 
     # Load existing primary index
@@ -488,18 +506,94 @@ def _update_faiss_index_incremental(
         len(new_chunks),
         len(chunks) - len(new_chunks),
     )
-
-    # Add to secondary index
     faiss_mgr.update_index(new_embeddings, new_ids)
-
-    # Save both indexes
-    faiss_mgr.save_cpu_index()  # Save primary (unchanged, but ensures consistency)
-    faiss_mgr.save_secondary_index()  # Save secondary with new chunks
-
+    faiss_mgr.save_cpu_index()
+    faiss_mgr.save_secondary_index()
     logger.info(
         "Incremental update complete: %s new vectors added to secondary index",
         len(new_ids),
     )
+
+
+def _runtime_options_from_index(index_config: IndexConfig) -> FAISSRuntimeOptions:
+    """Return FAISS runtime options derived from the active index configuration.
+
+    Extended Summary
+    ----------------
+    This helper converts structured IndexConfig (from index manifest or settings)
+    into FAISS-specific runtime options. It maps configuration parameters (family,
+    PQ settings, HNSW parameters, GPU options) to FAISSRuntimeOptions fields.
+    Used during index building to configure FAISS manager with index-specific
+    runtime behavior.
+
+    Parameters
+    ----------
+    index_config : IndexConfig
+        Structured index configuration containing FAISS parameters: family type,
+        quantization settings (pq_m, pq_nbits, opq_m), HNSW parameters (m,
+        ef_construction, ef_search), GPU preferences, and search tuning defaults.
+
+    Returns
+    -------
+    FAISSRuntimeOptions
+        Runtime options instance populated from index_config parameters. The
+        returned object is used to initialize FAISS manager with index-appropriate
+        runtime configuration.
+
+    Notes
+    -----
+    This helper ensures runtime options match the index structure (e.g., HNSW
+    parameters only apply to HNSW indexes). Used during index building and
+    manager initialization to maintain consistency between index type and runtime
+    behavior. Time complexity: O(1) for option construction.
+    """
+    return FAISSRuntimeOptions(
+        faiss_family=index_config.faiss_family,
+        pq_m=index_config.pq_m,
+        pq_nbits=index_config.pq_nbits,
+        opq_m=index_config.opq_m,
+        default_nprobe=index_config.default_nprobe,
+        default_k=index_config.default_k,
+        hnsw_m=index_config.hnsw_m,
+        hnsw_ef_construction=index_config.hnsw_ef_construction,
+        hnsw_ef_search=index_config.hnsw_ef_search,
+        refine_k_factor=index_config.refine_k_factor,
+        use_gpu=index_config.use_gpu,
+        gpu_clone_mode=index_config.gpu_clone_mode,
+        autotune_on_start=index_config.autotune_on_start,
+        enable_range_search=index_config.enable_range_search,
+        semantic_min_score=index_config.semantic_min_score,
+    )
+
+
+def _run_offline_evaluation(
+    settings: Settings,
+    paths: PipelinePaths,
+    queries_path: Path | None,
+) -> None:
+    """Execute the offline recall evaluator if enabled."""
+    if not settings.eval.enabled and queries_path is None:
+        logger.info("Offline evaluation disabled; skipping.")
+        return
+    duckdb_manager = DuckDBManager(paths.duckdb_path, settings.duckdb)
+    vllm_client = VLLMClient(settings.vllm)
+    runtime_opts = _runtime_options_from_index(settings.index)
+    faiss_mgr = FAISSManager(
+        index_path=paths.faiss_index,
+        vec_dim=settings.index.vec_dim,
+        nlist=settings.index.nlist,
+        use_cuvs=settings.index.use_cuvs,
+        runtime=runtime_opts,
+    )
+    faiss_mgr.load_cpu_index()
+    evaluator = OfflineRecallEvaluator(
+        settings=settings,
+        paths=settings.paths,
+        faiss_manager=faiss_mgr,
+        vllm_client=vllm_client,
+        duckdb_manager=duckdb_manager,
+    )
+    evaluator.run(queries_path=queries_path, output_dir=settings.eval.output_dir)
 
 
 def _initialize_duckdb(paths: PipelinePaths, *, materialize: bool) -> int:

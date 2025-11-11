@@ -72,6 +72,10 @@ class ScopeIn(TypedDict, total=False):
         Results are scoped to these symbol categories when provided.
     symbols : list[str]
         Specific SCIP symbol identifiers to focus on regardless of location.
+    faiss_tuning : NotRequired[dict[str, float]]
+        Optional per-session FAISS overrides (e.g., {"nprobe": 64.0, "ef_search": 128.0})
+        used to adjust runtime search knobs without rebuilding indexes. Values are
+        converted to float during normalization. This attribute is optional (NotRequired).
     """
 
     repos: list[str]
@@ -82,6 +86,7 @@ class ScopeIn(TypedDict, total=False):
     languages: list[str]
     kinds: list[str]
     symbols: list[str]
+    faiss_tuning: NotRequired[dict[str, float]]
 
 
 class Match(TypedDict):

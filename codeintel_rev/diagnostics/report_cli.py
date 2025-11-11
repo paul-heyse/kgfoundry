@@ -234,10 +234,39 @@ def _render_decisions_section(decisions: list[dict[str, Any]]) -> list[str]:
 def _render_report(session: str, run_id: str | None, events: list[dict[str, Any]]) -> str:
     """Render a Markdown report for the provided session.
 
+    Extended Summary
+    ----------------
+    This function generates a human-readable Markdown report from timeline events
+    for a specific session. It analyzes events to extract operation chains, stage
+    entries, skip events, and decisions, then formats them into structured sections.
+    Used by the diagnostics CLI to produce readable reports for debugging and
+    performance analysis.
+
+    Parameters
+    ----------
+    session : str
+        Session identifier to filter events and include in report header.
+    run_id : str | None, optional
+        Optional run identifier to include in report header. If None, omitted.
+    events : list[dict[str, Any]]
+        Timeline events for the session, typically loaded from JSONL files.
+        Events are analyzed to extract operations, stages, skips, and decisions.
+
     Returns
     -------
     str
-        Markdown payload describing the session timeline.
+        Markdown payload describing the session timeline with sections:
+        - Header (session, run_id, success/failure status)
+        - Operations chain
+        - Stage entries
+        - Skip events
+        - Decisions
+
+    Notes
+    -----
+    This function processes events to build a structured report. It identifies
+    the last successful operation and first failure to provide quick status
+    overview. Time complexity: O(n) where n is the number of events.
     """
     last_success = _find_last_success(events)
     first_failure = _find_first_failure(events)
@@ -263,10 +292,31 @@ def _render_report(session: str, run_id: str | None, events: list[dict[str, Any]
 def main(argv: list[str] | None = None) -> int:
     """Entrypoint for the diagnostics CLI.
 
+    Extended Summary
+    ----------------
+    This CLI entry point renders timeline events from JSONL files as Markdown
+    reports. It filters events by session identifier, generates a structured
+    report, and writes it to the specified output file. Used for post-processing
+    timeline data to produce human-readable diagnostics reports.
+
+    Parameters
+    ----------
+    argv : list[str] | None, optional
+        Command-line arguments. If None, uses `sys.argv[1:]`. Arguments are:
+        --events (path to events JSONL file), --session (session identifier),
+        --out (output Markdown file path).
+
     Returns
     -------
     int
-        Zero on success, non-zero when no events were processed.
+        Zero on success, non-zero when no events were processed or file I/O fails.
+
+    Notes
+    -----
+    This tool reads timeline events from JSONL files and generates Markdown
+    reports. It filters events by session and processes them to extract
+    operations, stages, skips, and decisions. Time complexity: O(n) where n
+    is the number of events in the input file.
     """
     parser = argparse.ArgumentParser(description="Render timeline JSONL as Markdown.")
     parser.add_argument("--events", required=True, help="Path to events-*.jsonl file")

@@ -7,7 +7,7 @@ the FAISS index, then hydrating results from DuckDB.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
@@ -15,7 +15,8 @@ from typing import TYPE_CHECKING, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.app.middleware import get_session_id
-from codeintel_rev.io.faiss_manager import FAISSManager
+from codeintel_rev.io.faiss_manager import FAISSManager, SearchRuntimeOverrides
+from codeintel_rev.io.hybrid_search import HybridSearchOptions, HybridSearchTuning
 from codeintel_rev.io.vllm_client import VLLMClient
 from codeintel_rev.mcp_server.common.observability import Observation, observe_duration
 from codeintel_rev.mcp_server.schemas import (
@@ -94,6 +95,8 @@ class _HybridSearchState:
     result_ids: Sequence[int]
     result_scores: Sequence[float]
     effective_limit: int
+    faiss_k: int
+    nprobe: int
 
 
 @dataclass(frozen=True)
@@ -104,6 +107,7 @@ class _HybridResult:
     hydration_scores: list[float]
     contribution_map: dict[int, list[tuple[str, int, float]]] | None
     retrieval_channels: list[str]
+    method: MethodInfo | None
 
 
 @dataclass(frozen=True)
@@ -116,14 +120,39 @@ class _SearchBudget:
 
 
 @dataclass(frozen=True)
+class _SemanticSearchPlan:
+    """Bundled semantic search parameters derived from scope and settings."""
+
+    scope_flags: _ScopeFilterFlags
+    tuning_overrides: dict[str, float | int]
+    limits_metadata: tuple[str, ...]
+    effective_limit: int
+    fanout: _FaissFanout
+    nprobe: int
+
+
+@dataclass(frozen=True)
 class _MethodContext:
     """Inputs required to build method metadata."""
+
+
+@dataclass(frozen=True)
+class _FaissSearchRequest:
+    """Container describing a FAISS search invocation."""
+
+    context: ApplicationContext
+    query_vector: NDArrayF32
+    limit: int
+    nprobe: int
+    observation: Observation
+    tuning_overrides: Mapping[str, float | int] | None = None
 
     findings_count: int
     requested_limit: int
     effective_limit: int
     start_time: float
     retrieval_channels: Sequence[str]
+    hybrid_method: MethodInfo | None = None
 
 
 async def semantic_search(
@@ -204,6 +233,10 @@ def _semantic_search_sync(
     with observe_duration("semantic_search", COMPONENT_NAME) as observation:
         scope_flags = _ScopeFilterFlags.from_scope(scope)
 
+        tuning_overrides, tuning_warnings = _normalize_scope_faiss_tuning(
+            scope.get("faiss_tuning") if scope else None
+        )
+
         LOGGER.debug(
             "Semantic search with scope",
             extra={
@@ -231,6 +264,7 @@ def _semantic_search_sync(
             limits_metadata.append(
                 f"FAISS fan-out clamped to {fanout.faiss_k} (max_results={budget.max_results})."
             )
+        limits_metadata.extend(tuning_warnings)
 
         LOGGER.debug(
             "Computed FAISS fan-out",
@@ -247,22 +281,33 @@ def _semantic_search_sync(
             },
         )
 
-        result_ids, result_scores = _run_faiss_search_or_raise(
-            context,
-            _embed_query_or_raise(
-                context.vllm_client,
-                query,
-                observation,
-                context.settings.vllm.base_url,
-            ),
-            fanout.faiss_k,
-            context.settings.index.faiss_nprobe,
+        faiss_nprobe = int(tuning_overrides.get("nprobe", context.settings.index.faiss_nprobe))
+        query_vector = _embed_query_or_raise(
+            context.vllm_client,
+            query,
             observation,
+            context.settings.vllm.base_url,
         )
+        faiss_request = _FaissSearchRequest(
+            context=context,
+            query_vector=query_vector,
+            limit=fanout.faiss_k,
+            nprobe=faiss_nprobe,
+            observation=observation,
+            tuning_overrides=tuning_overrides,
+        )
+        result_ids, result_scores = _run_faiss_search_or_raise(faiss_request)
 
         hybrid_result = _resolve_hybrid_results(
             context,
-            _HybridSearchState(query, result_ids, result_scores, budget.effective_limit),
+            _HybridSearchState(
+                query,
+                result_ids,
+                result_scores,
+                budget.effective_limit,
+                fanout.faiss_k,
+                faiss_nprobe,
+            ),
             limits_metadata,
             ("semantic", "faiss"),
         )
@@ -297,6 +342,7 @@ def _semantic_search_sync(
                 budget.effective_limit,
                 start_time,
                 hybrid_result.retrieval_channels,
+                hybrid_result.method,
             ),
             limits_metadata,
             scope,
@@ -384,6 +430,58 @@ def _build_search_budget(
 
     limits_metadata = (*faiss_limits, *clamp_messages)
     return _SearchBudget(effective_limit, max_results, limits_metadata)
+
+
+def _build_semantic_search_plan(
+    context: ApplicationContext,
+    scope: ScopeIn | None,
+    requested_limit: int,
+    observation: Observation,
+) -> _SemanticSearchPlan:
+    """Construct FAISS fan-out and tuning plan for a semantic search."""
+    scope_flags = _ScopeFilterFlags.from_scope(scope)
+    tuning_overrides, tuning_warnings = _normalize_scope_faiss_tuning(
+        scope.get("faiss_tuning") if scope else None
+    )
+    budget = _build_search_budget(context, requested_limit, observation)
+    multiplier = max(1, context.settings.limits.semantic_overfetch_multiplier)
+    fanout = _calculate_faiss_fanout(
+        budget.effective_limit,
+        budget.max_results,
+        multiplier,
+        scope_flags,
+    )
+
+    limits_metadata = [*budget.limits_metadata]
+    if fanout.faiss_k < fanout.faiss_k_target:
+        limits_metadata.append(
+            f"FAISS fan-out clamped to {fanout.faiss_k} (max_results={budget.max_results})."
+        )
+    limits_metadata.extend(tuning_warnings)
+    LOGGER.debug(
+        "Computed FAISS fan-out",
+        extra={
+            "requested_limit": requested_limit,
+            "effective_limit": budget.effective_limit,
+            "faiss_k": fanout.faiss_k,
+            "faiss_k_target": fanout.faiss_k_target,
+            "multiplier": multiplier,
+            "has_scope_filters": scope_flags.has_filters,
+            "has_include_globs": scope_flags.has_include_globs,
+            "has_exclude_globs": scope_flags.has_exclude_globs,
+            "has_languages": scope_flags.has_languages,
+        },
+    )
+
+    faiss_nprobe = int(tuning_overrides.get("nprobe", context.settings.index.faiss_nprobe))
+    return _SemanticSearchPlan(
+        scope_flags=scope_flags,
+        tuning_overrides=tuning_overrides,
+        limits_metadata=tuple(limits_metadata),
+        effective_limit=budget.effective_limit,
+        fanout=fanout,
+        nprobe=faiss_nprobe,
+    )
 
 
 def _calculate_faiss_fanout(
@@ -490,20 +588,20 @@ def _resolve_hybrid_results(
         limits_metadata.append(f"Hybrid search unavailable: {exc}")
         LOGGER.warning("Hybrid engine unavailable", exc_info=exc)
         return _build_hybrid_result(
-            hydration_ids,
-            hydration_scores,
-            state.effective_limit,
-            contribution_map,
-            channels_out,
+            (hydration_ids, hydration_scores),
+            limit=state.effective_limit,
+            contribution_map=contribution_map,
+            retrieval_channels=channels_out,
+            method=None,
         )
 
     if hybrid_engine is None:
         return _build_hybrid_result(
-            hydration_ids,
-            hydration_scores,
-            state.effective_limit,
-            contribution_map,
-            channels_out,
+            (hydration_ids, hydration_scores),
+            limit=state.effective_limit,
+            contribution_map=contribution_map,
+            retrieval_channels=channels_out,
+            method=None,
         )
 
     semantic_hits = list(
@@ -513,6 +611,9 @@ def _resolve_hybrid_results(
         query=state.query,
         semantic_hits=semantic_hits,
         limit=state.effective_limit,
+        options=HybridSearchOptions(
+            tuning=HybridSearchTuning(k=state.faiss_k, nprobe=state.nprobe)
+        ),
     )
     if hybrid_result.warnings:
         limits_metadata.extend(hybrid_result.warnings)
@@ -534,48 +635,50 @@ def _resolve_hybrid_results(
     if fused_ids:
         channels_out = list(dict.fromkeys(["semantic", "faiss", *hybrid_result.channels]))
         return _build_hybrid_result(
-            fused_ids,
-            fused_scores,
-            state.effective_limit,
-            fused_contributions,
-            channels_out,
+            (fused_ids, fused_scores),
+            limit=state.effective_limit,
+            contribution_map=fused_contributions,
+            retrieval_channels=channels_out,
+            method=hybrid_result.method,
         )
     return _build_hybrid_result(
-        hydration_ids,
-        hydration_scores,
-        state.effective_limit,
-        contribution_map,
-        channels_out,
+        (hydration_ids, hydration_scores),
+        limit=state.effective_limit,
+        contribution_map=contribution_map,
+        retrieval_channels=channels_out,
+        method=hybrid_result.method,
     )
 
 
 def _build_hybrid_result(
-    hydration_ids: list[int],
-    hydration_scores: list[float],
+    hydration: tuple[list[int], list[float]],
+    *,
     limit: int,
     contribution_map: dict[int, list[tuple[str, int, float]]] | None,
     retrieval_channels: Sequence[str],
+    method: MethodInfo | None,
 ) -> _HybridResult:
     """Trim FAISS/hybrid candidates to the effective limit.
 
     Parameters
     ----------
-    hydration_ids : list[int]
-        Candidate IDs to trim.
-    hydration_scores : list[float]
-        Candidate scores corresponding to IDs.
+    hydration : tuple[list[int], list[float]]
+        Candidate IDs and scores to trim.
     limit : int
-        Maximum number of results to return.
+        Maximum number of results to keep.
     contribution_map : dict[int, list[tuple[str, int, float]]] | None
-        Optional contribution map for hybrid results.
+        Optional map of contributions.
     retrieval_channels : Sequence[str]
-        List of retrieval channels used.
+        Channels that participated in retrieval.
+    method : MethodInfo | None
+        Hybrid method metadata.
 
     Returns
     -------
     _HybridResult
         Trimmed result with IDs, scores, contribution map, and channels.
     """
+    hydration_ids, hydration_scores = hydration
     trimmed_ids = hydration_ids[:limit]
     trimmed_scores = hydration_scores[: len(trimmed_ids)]
     return _HybridResult(
@@ -583,6 +686,7 @@ def _build_hybrid_result(
         trimmed_scores,
         contribution_map,
         list(retrieval_channels),
+        method,
     )
 
 
@@ -626,27 +730,20 @@ def _embed_query_or_raise(
     return embedding
 
 
-def _run_faiss_search_or_raise(
-    context: ApplicationContext,
-    query_vector: NDArrayF32,
-    limit: int,
-    nprobe: int,
-    observation: Observation,
-) -> tuple[list[int], list[float]]:
+def _run_faiss_search_or_raise(request: _FaissSearchRequest) -> tuple[list[int], list[float]]:
     """Perform FAISS search and raise when the index search fails.
+
+    Extended Summary
+    ----------------
+    This helper executes FAISS search with error handling and observation tracking.
+    It applies optional tuning overrides (from scope metadata), performs the search,
+    and raises exceptions if search fails. Used by semantic search adapters to
+    execute FAISS queries with consistent error handling and telemetry.
 
     Parameters
     ----------
-    context : ApplicationContext
-        Application context providing the FAISS manager and metadata.
-    query_vector : NDArrayF32
-        Query vector produced by the embedding service.
-    limit : int
-        Requested fan-out.
-    nprobe : int
-        Number of IVF cells to probe.
-    observation : Observation
-        Observation block used to mark errors.
+    request : _FaissSearchRequest
+        Prepared FAISS search request containing context, vector, limits, and overrides.
 
     Returns
     -------
@@ -658,18 +755,13 @@ def _run_faiss_search_or_raise(
     VectorSearchError
         If FAISS search fails.
     """
-    result_ids, result_scores, search_exc = _run_faiss_search(
-        context.faiss_manager,
-        query_vector,
-        limit,
-        nprobe=nprobe,
-    )
+    result_ids, result_scores, search_exc = _run_faiss_search(request)
     if search_exc is not None:
-        observation.mark_error()
+        request.observation.mark_error()
         raise VectorSearchError(
             str(search_exc),
             cause=search_exc,
-            context={"faiss_index": str(context.paths.faiss_index)},
+            context={"faiss_index": str(request.context.paths.faiss_index)},
         )
 
     return result_ids, result_scores
@@ -804,26 +896,22 @@ def _embed_query(client: VLLMClient, query: str) -> tuple[NDArrayF32 | None, str
 
 
 def _run_faiss_search(
-    faiss_mgr: FAISSManager,
-    query_vector: NDArrayF32,
-    limit: int,
-    *,
-    nprobe: int,
+    request: _FaissSearchRequest,
 ) -> tuple[list[int], list[float], Exception | None]:
     """Execute FAISS search and return result identifiers and scores.
 
+    Extended Summary
+    ----------------
+    This helper executes FAISS search with error handling that returns exceptions
+    instead of raising them. It applies optional tuning overrides, performs the
+    search, and returns results with any exception that occurred. Used by semantic
+    search adapters when exceptions should be handled by callers rather than
+    propagated immediately.
+
     Parameters
     ----------
-    faiss_mgr : FAISSManager
-        FAISS index manager instance.
-    query_vector : NDArrayF32
+    request : _FaissSearchRequest
         Query vector of shape (1, vec_dim).
-    limit : int
-        Maximum number of results to return.
-    nprobe : int
-        Number of IVF cells to probe during the search. Higher values improve
-        recall at the cost of latency. Passed directly to
-        :meth:`FAISSManager.search`.
 
     Returns
     -------
@@ -832,11 +920,89 @@ def _run_faiss_search(
         search succeeds; otherwise it contains the triggering exception.
     """
     try:
-        distances, ids = faiss_mgr.search(query_vector, k=limit, nprobe=nprobe)
+        overrides = dict(request.tuning_overrides or {})
+        final_nprobe = int(overrides.get("nprobe", request.nprobe))
+        runtime = SearchRuntimeOverrides(
+            ef_search=int(overrides["ef_search"]) if "ef_search" in overrides else None,
+            quantizer_ef_search=(
+                int(overrides["quantizer_ef_search"])
+                if "quantizer_ef_search" in overrides
+                else None
+            ),
+            k_factor=float(overrides["k_factor"]) if "k_factor" in overrides else None,
+        )
+        distances, ids = request.context.faiss_manager.search(
+            request.query_vector,
+            k=request.limit,
+            nprobe=final_nprobe,
+            runtime=runtime,
+        )
     except RuntimeError as exc:
         return [], [], exc
 
     return ids[0].tolist(), distances[0].tolist(), None
+
+
+def _normalize_scope_faiss_tuning(
+    raw: Mapping[str, object] | None,
+) -> tuple[dict[str, float | int], list[str]]:
+    """Normalize faiss_tuning payload from scope metadata.
+
+    Extended Summary
+    ----------------
+    This helper normalizes FAISS tuning parameters from scope metadata by mapping
+    aliases to canonical key names and filtering unrecognized keys. It handles
+    both camelCase and snake_case variants (e.g., "efSearch" -> "ef_search") and
+    validates parameter types. Used to extract tuning overrides from session scope
+    for application to FAISS searches.
+
+    Parameters
+    ----------
+    raw : Mapping[str, object] | None
+        Raw tuning parameters from scope metadata. May contain aliases (e.g., "efSearch")
+        and unrecognized keys. If None, returns empty dict and empty list.
+
+    Returns
+    -------
+    tuple[dict[str, float | int], list[str]]
+        Tuple of (normalized tuning parameters dict, list of unrecognized keys).
+        Normalized dict uses canonical key names (e.g., "ef_search" not "efSearch").
+        Unrecognized keys are returned for logging/debugging purposes.
+
+    Notes
+    -----
+    This helper ensures consistent parameter naming across the codebase by mapping
+    aliases to canonical names. Parameter values are validated as numeric (float or int).
+    Time complexity: O(n) where n is the number of keys in raw.
+    """
+    if not raw:
+        return {}, []
+
+    alias_map = {
+        "nprobe": "nprobe",
+        "ef_search": "ef_search",
+        "efSearch": "ef_search",
+        "quantizer_ef_search": "quantizer_ef_search",
+        "quantizer_efSearch": "quantizer_ef_search",
+        "k_factor": "k_factor",
+        "kFactor": "k_factor",
+    }
+    overrides: dict[str, float | int] = {}
+    warnings: list[str] = []
+
+    for key, value in raw.items():
+        normalized = alias_map.get(key)
+        if normalized is None:
+            warnings.append(f"Ignored unsupported faiss_tuning.{key} override.")
+            continue
+        caster = float if normalized == "k_factor" else int
+        try:
+            coerced = caster(value)
+        except (TypeError, ValueError):
+            warnings.append(f"Ignored invalid faiss_tuning.{key} override.")
+            continue
+        overrides[normalized] = coerced
+    return overrides, warnings
 
 
 def _hydrate_findings(
@@ -1085,13 +1251,21 @@ def _build_response_extras(
     dict[str, object]
         Extras payload dictionary containing method metadata and optional scope.
     """
-    method_metadata = _build_method(
+    base_method = _build_method(
         context.findings_count,
         context.requested_limit,
         context.effective_limit,
         context.start_time,
         context.retrieval_channels,
     )
+    if context.hybrid_method:
+        method_metadata: MethodInfo = dict(context.hybrid_method)
+        method_metadata.setdefault("coverage", base_method["coverage"])
+        method_metadata.setdefault("retrieval", base_method["retrieval"])
+        if "notes" not in method_metadata and base_method.get("notes"):
+            method_metadata["notes"] = base_method["notes"]
+    else:
+        method_metadata = base_method
     extras = _success_extras(limits, method_metadata)
     if scope:
         extras["scope"] = scope

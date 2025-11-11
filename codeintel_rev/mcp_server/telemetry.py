@@ -18,10 +18,33 @@ def tool_operation_scope(
 ) -> Iterator[Timeline]:
     """Emit start/end events for an MCP tool and yield the active timeline.
 
+    Extended Summary
+    ----------------
+    This context manager emits timeline events for MCP tool operations, providing
+    observability into tool execution. It yields the active timeline (from context
+    or newly created) and emits start/end events with optional attributes. Used
+    throughout MCP tool handlers to track operation timing and context.
+
+    Parameters
+    ----------
+    tool_name : str
+        Name of the MCP tool being executed (e.g., "search.semantic", "symbols.search").
+        Used in timeline event names and telemetry.
+    **attrs : object
+        Optional keyword arguments to include in timeline events as attributes.
+        Common attributes include query_chars, limit, path, line, character, etc.
+
     Yields
     ------
     Timeline
         Active timeline bound to the current session or a new one when absent.
+        The timeline is used to emit operation events and track execution context.
+
+    Notes
+    -----
+    This context manager integrates with the timeline system to provide structured
+    logging and observability. Events are emitted at context entry and exit with
+    duration tracking. Time complexity: O(1) for context setup and event emission.
     """
     try:
         session_id = get_session_id()

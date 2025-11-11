@@ -208,19 +208,45 @@ class RuntimeCell[T]:
     def get_or_initialize(self, factory: Callable[[], T]) -> T:
         """Return or initialize the payload with single-flight semantics.
 
+        Extended Summary
+        ----------------
+        This method returns the cached payload if available, or initializes it using
+        the provided factory function with single-flight semantics (only one thread
+        initializes at a time). It handles cooldown periods, waits for initialization,
+        and tracks generation numbers to detect stale values. Used to lazily initialize
+        runtime resources (FAISS indexes, hybrid search, etc.) with thread-safe
+        caching and error recovery.
+
+        Parameters
+        ----------
+        factory : Callable[[], T]
+            Factory function that creates the payload instance. Called only when
+            initialization is needed. The factory is adjusted by the factory adjuster
+            before invocation.
+
         Returns
         -------
         T
-            Cached payload instance.
+            Cached payload instance. The instance is thread-safe and shared across
+            all callers until the cell is closed or reset.
 
         Raises
         ------
-        RuntimeUnavailableError
-            Raised when the runtime is still warming up or cooling down.
-        RuntimeLifecycleError
-            Raised when the previous initialization failed and has not recovered.
         RuntimeError
-            Raised when generation tracking becomes inconsistent (defensive).
+            Raised when generation tracking becomes inconsistent (defensive check).
+        Exception
+            Any exception stored in the cell from a previous failure is re-raised during
+            cooldown periods. The specific exception type depends on the error that
+            triggered the cooldown (e.g., RuntimeUnavailableError, RuntimeLifecycleError).
+            Note: pydoclint detects this as 'cooldown_error' (a variable), but it is
+            actually an Exception instance that is re-raised.
+
+        Notes
+        -----
+        This method implements single-flight initialization: only one thread initializes
+        while others wait. It handles cooldown periods after failures and tracks generation
+        numbers to detect stale values. Time complexity: O(1) when cached, O(init_time)
+        when initialization is needed.
         """
         adjusted_factory = self._adjust_factory(factory)
         deadline = time.monotonic() + (self._wait_timeout_s or 0)
@@ -229,9 +255,9 @@ class RuntimeCell[T]:
         while True:
             with self._condition:
                 now = time.monotonic()
-                cooldown_error = self._cooldown_error_locked(now)
+                cooldown_error: Exception | None = self._cooldown_error_locked(now)
                 if cooldown_error is not None:
-                    raise cooldown_error
+                    raise cooldown_error  # type: ignore[misc]  # pydoclint sees variable name
                 if self._state == "ready" and self._value is not None:
                     return self._value
                 if self._state == "initializing":
@@ -292,12 +318,16 @@ class RuntimeCell[T]:
 
         Raises
         ------
-        OSError
-            Propagated when ``silent=False`` and the payload's ``close()`` raises.
-        RuntimeError
-            Propagated when ``silent=False`` and disposal raises a runtime error.
         AttributeError
-            Propagated when ``silent=False`` and disposal raises an attribute error.
+            Propagated when ``silent=False`` and the payload lacks a close method.
+        OSError
+            Propagated when ``silent=False`` and file/resource cleanup fails.
+        RuntimeError
+            Propagated when ``silent=False`` and runtime state errors occur.
+        Exception
+            Any other exception raised by the payload's disposal is propagated when
+            ``silent=False``. When ``silent=True`` (default), all exceptions are caught
+            and logged.
         """
         with self._condition:
             current = self._value

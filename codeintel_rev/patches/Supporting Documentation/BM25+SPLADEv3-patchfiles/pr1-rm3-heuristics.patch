@@ -1,0 +1,239 @@
+diff --git a/codeintel_rev/retrieval/rm3_heuristics.py b/codeintel_rev/retrieval/rm3_heuristics.py
+new file mode 100644
+index 0000000..4b7fbe1
+--- /dev/null
++++ b/codeintel_rev/retrieval/rm3_heuristics.py
+@@ -0,0 +1,193 @@
++from __future__ import annotations
++
++from dataclasses import dataclass
++import re
++from typing import Iterable
++
++__all__ = ["RM3Params", "RM3Heuristics"]
++
++
++@dataclass(frozen=True)
++class RM3Params:
++    """RM3 configuration (feedback docs/terms + original query mix weight).
++
++    Attributes
++    ----------
++    fb_docs : int
++        Number of top documents used as feedback corpus.
++    fb_terms : int
++        Number of terms to select from feedback documents.
++    orig_weight : float
++        Interpolation weight of the original query (0..1). Smaller values give
++        more influence to expansion terms.
++    """
++    fb_docs: int = 10
++    fb_terms: int = 10
++    orig_weight: float = 0.5
++
++
++class RM3Heuristics:
++    """Lightweight, deterministic heuristics to toggle RM3 per query.
++
++    Design goals:
++      * Enable PRF for short/natural-language "head" queries.
++      * Disable PRF for code-like/symbolic queries to avoid spurious expansion.
++      * Keep decisions fast and side-effect free.
++
++    Parameters
++    ----------
++    short_query_max_terms : int
++        Enable RM3 when token count <= this value.
++    symbol_like_regex : str
++        Regex that flags "codey" tokens (paths, scopes, camelCase, snake_case, colons).
++    head_terms : Iterable[str]
++        Optional set of common head terms; presence nudges RM3 on.
++    default_params : RM3Params
++        Default RM3 parameters to use when enabled.
++    """
++
++    _DEFAULT_SYMBOL_RE = r"(?:\w+::\w+)|(?:\w+\.\w+)|(?:[/\\])|(?:[A-Za-z]+[A-Z][a-z]+)|(?:[A-Za-z_]+\d+)"
++
++    def __init__(
++        self,
++        *,
++        short_query_max_terms: int = 3,
++        symbol_like_regex: str | None = None,
++        head_terms: Iterable[str] | None = None,
++        default_params: RM3Params | None = None,
++    ) -> None:
++        self.short_query_max_terms = max(1, short_query_max_terms)
++        self._sym_re = re.compile(symbol_like_regex or self._DEFAULT_SYMBOL_RE)
++        self._head = set(t.strip().lower() for t in (head_terms or (
++            # Generic head-y verbs/nouns we often see in NL code queries
++            "how, find, where, get, set, create, update, delete, auth, login, error, bug, serialize, "
++            "deserialize, connect, database, config, configuration, path, file, read, write, parse, "
++            "build, test, mock, client, server, handle, exception, timeout"
++        ).split(",")) if t)
++        self._params = default_params or RM3Params()
++
++    @staticmethod
++    def _simple_tokens(text: str) -> list[str]:
++        # Very cheap tokenization sufficient for the toggle
++        return [t for t in re.split(r"[^A-Za-z0-9_]+", text.lower()) if t]
++
++    def _looks_symbolic(self, text: str) -> bool:
++        return bool(self._sym_re.search(text))
++
++    def should_enable(self, query: str) -> bool:
++        """Return True if RM3 should be enabled for this query."""
++        if not query:
++            return False
++        toks = self._simple_tokens(query)
++        if len(toks) <= self.short_query_max_terms:
++            return True
++        if self._looks_symbolic(query):
++            return False
++        # If >= 1 head-like token present, allow PRF
++        if any(t in self._head for t in toks):
++            return True
++        return False
++
++    def parameters(self, query: str) -> RM3Params:
++        """RM3 params to use (constant for now; hook to adapt in future)."""
++        # Potential hook: return different params for very short queries (e.g., heavier expansion)
++        return self._params
++
+diff --git a/codeintel_rev/io/hybrid_search.py b/codeintel_rev/io/hybrid_search.py
+index 2d18f0a..a8f1d93 100644
+--- a/codeintel_rev/io/hybrid_search.py
++++ b/codeintel_rev/io/hybrid_search.py
+@@ -1,18 +1,34 @@
+ from __future__ import annotations
+
+-from importlib import import_module
+-from pathlib import Path
+-from typing import TYPE_CHECKING, Any
++from importlib import import_module
++from pathlib import Path
++from typing import TYPE_CHECKING, Any
+
+ from kgfoundry_common.logging import get_logger
+
+-from codeintel_rev.retrieval.types import ChannelHit, HybridResultDoc, HybridSearchResult
++from codeintel_rev.retrieval.types import ChannelHit, HybridResultDoc, HybridSearchResult
+ from codeintel_rev.retrieval.fusion import fuse_weighted_rrf
+ from codeintel_rev.plugins.channels import Channel, ChannelContext, ChannelError
+ from codeintel_rev.plugins.registry import ChannelRegistry
+-from codeintel_rev.observability.timeline import Timeline, current_timeline
++from codeintel_rev.observability.timeline import Timeline, current_timeline
++from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
+
+ LOGGER = get_logger(__name__)
+
++
++def _mk_bm25_searcher(lucene_mod: Any, index_dir: Path, *, k1: float, b: float) -> Any:
++    searcher = lucene_mod.LuceneSearcher(str(index_dir))
++    # Some Pyserini builds use set_bm25(), older use set_bm25(k1, b)
++    try:
++        searcher.set_bm25(k1, b)  # type: ignore[attr-defined]
++    except TypeError:
++        searcher.set_bm25(k1=k1, b=b)  # type: ignore[attr-defined]
++    return searcher
++
++
+ class BM25SearchProvider:
+     """Thin wrapper around Pyserini's LuceneSearcher for BM25 retrieval."""
+
+-    def __init__(self, index_dir: Path, *, k1: float, b: float) -> None:
++    def __init__(
++        self,
++        index_dir: Path,
++        *,
++        k1: float,
++        b: float,
++        rm3_heuristics: RM3Heuristics | None = None,
++        rm3_default: RM3Params | None = None,
++    ) -> None:
+         if not index_dir.exists():
+             raise FileNotFoundError(f"BM25 index does not exist: {index_dir}")
+-        lucene = import_module("pyserini.search.lucene")
+-        self._searcher = lucene.LuceneSearcher(str(index_dir))
+-        # Configure BM25 params
+-        try:
+-            self._searcher.set_bm25(k1, b)  # type: ignore[attr-defined]
+-        except TypeError:
+-            self._searcher.set_bm25(k1=k1, b=b)  # type: ignore[attr-defined]
++        self._lucene = import_module("pyserini.search.lucene")
++        self._index_dir = index_dir
++        self._k1 = float(k1)
++        self._b = float(b)
++        self._rm3_heur = rm3_heuristics
++        self._rm3_default = rm3_default or RM3Params()
++        # Keep two searchers to avoid mutating PRF state per query
++        self._base = _mk_bm25_searcher(self._lucene, index_dir, k1=self._k1, b=self._b)
++        self._rm3 = None  # lazy init when first used
+
+-    def search(self, query: str, top_k: int) -> list[ChannelHit]:
+-        hits = self._searcher.search(query, k=top_k)
++    def _ensure_rm3(self) -> Any:
++        if self._rm3 is None:
++            self._rm3 = _mk_bm25_searcher(self._lucene, self._index_dir, k1=self._k1, b=self._b)
++            # Configure RM3 with defaults; per-query overrides may follow
++            rp = self._rm3_default
++            try:
++                self._rm3.set_rm3(rp.fb_docs, rp.fb_terms, rp.orig_weight)  # type: ignore[attr-defined]
++            except TypeError:
++                self._rm3.set_rm3(  # type: ignore[attr-defined]
++                    fb_docs=rp.fb_docs, fb_terms=rp.fb_terms, original_query_weight=rp.orig_weight
++                )
++        return self._rm3
++
++    def search(self, query: str, top_k: int) -> list[ChannelHit]:
++        # Choose PRF if heuristics say so
++        if self._rm3_heur and self._rm3_heur.should_enable(query):
++            searcher = self._ensure_rm3()
++        else:
++            searcher = self._base
++        hits = searcher.search(query, k=top_k)
+         return [ChannelHit(doc_id=int(hit.docid), score=float(hit.score)) for hit in hits]
+
+
+diff --git a/codeintel_rev/config/settings.py b/codeintel_rev/config/settings.py
+index 8f1d31b..1ac3bc1 100644
+--- a/codeintel_rev/config/settings.py
++++ b/codeintel_rev/config/settings.py
+@@ -260,6 +260,49 @@ class BM25Config(msgspec.Struct):
+     b: float = 0.4
+     """BM25 length normalization (0..1)."""
+
++
++class PRFConfig(msgspec.Struct):
++    """Pseudo-relevance feedback (RM3) configuration and heuristics.
++
++    When ``enable_auto`` is true, the BM25 searcher will select between a base
++    searcher (RM3 disabled) and an RM3-enabled searcher using lightweight
++    heuristics. Defaults align with Pyserini's common settings.
++    """
++
++    enable_auto: bool = True
++    """If true, toggle RM3 per-query using heuristics."""
++
++    fb_docs: int = 10
++    fb_terms: int = 10
++    orig_weight: float = 0.5
++    """Default RM3 parameters when enabled."""
++
++    short_query_max_terms: int = 3
++    """Enable RM3 for queries with <= this many tokens."""
++
++    symbol_like_regex: str | None = None
++    """Regex to detect code-like queries (disable RM3 when matched)."""
++
++    head_terms_csv: str | None = None
++    """Optional comma-separated list of head-like NL terms (boost RM3)."""
++
++
+@@ -404,6 +447,7 @@ class IndexConfig(msgspec.Struct):
+     splade: SpladeConfig = SpladeConfig()
+     rrf_k: int = 60
+     """RRF constant K (controls how aggressively lower ranks contribute)."""
++    prf: PRFConfig = PRFConfig()
+
+
+ class ServerLimits(msgspec.Struct):

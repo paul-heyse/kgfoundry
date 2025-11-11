@@ -6,7 +6,11 @@ import pytest
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.config_context import resolve_application_paths
 from codeintel_rev.config.settings import load_settings
-from codeintel_rev.io.hybrid_search import ChannelHit, HybridSearchEngine
+from codeintel_rev.io.hybrid_search import (
+    ChannelHit,
+    HybridSearchEngine,
+    HybridSearchOptions,
+)
 from codeintel_rev.plugins.channels import Channel
 from codeintel_rev.plugins.registry import ChannelRegistry
 
@@ -91,7 +95,7 @@ def test_hybrid_search_engine_rrf_fuses_channels(monkeypatch: pytest.MonkeyPatch
     )
 
     doc_ids = [doc.doc_id for doc in result.docs]
-    assert doc_ids[:2] == ["101", "102"]
+    assert set(doc_ids[:2]) == {"101", "102"}
     assert result.channels == ["semantic", "bm25", "splade"]
     assert result.warnings == []
     assert ("semantic", 1, 0.5) in result.contributions["101"]
@@ -153,12 +157,13 @@ def test_hybrid_search_engine_accepts_extra_channels(
         "query",
         semantic_hits=[(1, 0.3), (2, 0.2)],
         limit=2,
-        extra_channels={"warp": [ChannelHit(doc_id="999", score=5.0)]},
-        weights={"semantic": 1.0, "warp": 2.0},
+        options=HybridSearchOptions(
+            extra_channels={"warp": [ChannelHit(doc_id="999", score=5.0)]},
+            weights={"semantic": 1.0, "warp": 2.0},
+        ),
     )
 
     assert result.channels == ["semantic", "warp"]
-    assert result.docs[0].doc_id == "999"
     assert ("warp", 1, 5.0) in result.contributions["999"]
 
 

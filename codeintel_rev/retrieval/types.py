@@ -30,6 +30,7 @@ class HybridSearchResult:
     contributions: Mapping[str, list[tuple[str, int, float]]]
     channels: list[str]
     warnings: list[str]
+    method: Mapping[str, object] | None = None
 
 
 @dataclass(slots=True, frozen=True)

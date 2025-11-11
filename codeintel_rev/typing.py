@@ -46,9 +46,36 @@ def gate_import(
 ) -> object:
     """Resolve ``module_name`` lazily using the heavy dependency policy.
 
+    Extended Summary
+    ----------------
+    This function provides lazy import resolution for heavy optional dependencies
+    (e.g., numpy, fastapi, FAISS) using the shared gate helper. It validates
+    module availability, checks minimum version requirements, and provides helpful
+    error messages if dependencies are missing. Used throughout the codebase to
+    safely import optional dependencies without breaking on minimal installations.
+
+    Parameters
+    ----------
+    module_name : str
+        Name of the module to import (e.g., "numpy", "faiss"). The module must
+        be registered in the heavy dependency registry.
+    purpose : str
+        Human-readable purpose description for the import (e.g., "vector operations",
+        "FAISS index management"). Used in error messages if the module is unavailable.
+    min_version : str | None, optional
+        Optional minimum version requirement (e.g., "1.24.0"). If provided, the
+        module version is validated against this requirement.
+
     Returns
     -------
     object
-        Imported module or attribute returned by the shared gate helper.
+        Imported module or attribute returned by the shared gate helper. The return
+        type depends on the module structure.
+
+    Notes
+    -----
+    This function delegates to the base gate helper from kgfoundry_common.typing.
+    It provides a consistent API for lazy imports across the codebase. Time
+    complexity: O(1) for cached imports, O(import_time) for first-time imports.
     """
     return _base_gate_import(module_name, purpose, min_version=min_version)

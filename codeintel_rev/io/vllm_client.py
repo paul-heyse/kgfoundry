@@ -275,6 +275,13 @@ class VLLMClient:
             embedding_dim matches the configured model's output dimensionality. Dtype is
             float32. Each row corresponds to the embedding of the corresponding input text.
 
+        Raises
+        ------
+        Exception
+            Any exception raised by the embedding operation is propagated. Common
+            exceptions include network errors (HTTP mode), model loading errors (local
+            mode), timeout errors, and encoding/decoding errors.
+
         Notes
         -----
         Time complexity O(N * T) where N is batch size and T is average token count per

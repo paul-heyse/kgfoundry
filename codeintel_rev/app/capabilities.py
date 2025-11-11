@@ -89,10 +89,23 @@ _CAPABILITY_HINT_ATTRS: Final[dict[str, str]] = {
 def _import_optional(module_name: str) -> ModuleType | None:
     """Return imported module when available, otherwise ``None``.
 
+    Parameters
+    ----------
+    module_name : str
+        Name of the module to import (e.g., "faiss", "duckdb").
+
     Returns
     -------
     ModuleType | None
-        Imported module instance or ``None`` when unavailable.
+        Imported module instance or ``None`` when unavailable (module not found
+        or import error occurred). Import errors are logged at debug level.
+
+    Notes
+    -----
+    This helper safely imports optional dependencies without raising exceptions.
+    Used for capability detection to determine which features are available
+    at runtime. Time complexity: O(1) for cached imports, O(module_load_time)
+    for first-time imports.
     """
     spec = importlib.util.find_spec(module_name)
     if spec is None:
@@ -111,10 +124,23 @@ def _import_optional(module_name: str) -> ModuleType | None:
 def _probe_faiss_gpu(module: ModuleType | None) -> tuple[bool, str | None]:
     """Return FAISS GPU availability and optional reason for failure.
 
+    Parameters
+    ----------
+    module : ModuleType | None
+        FAISS module instance. If None, returns (False, "faiss-missing").
+
     Returns
     -------
     tuple[bool, str | None]
-        Availability flag and optional reason string.
+        Availability flag and optional reason string. Returns (True, None) if GPU
+        is available, (False, reason) otherwise. Reason codes include:
+        "faiss-missing", "gpu-symbols-missing", "no-gpu-visible", "gpu-probe-error:<class>".
+
+    Notes
+    -----
+    This helper probes FAISS GPU support by checking for required GPU symbols
+    (StandardGpuResources, GpuClonerOptions, index_cpu_to_gpu) and attempting
+    to query GPU count. Handles various failure modes gracefully without raising.
     """
     if module is None:
         return False, "faiss-missing"
@@ -135,10 +161,21 @@ def _probe_faiss_gpu(module: ModuleType | None) -> tuple[bool, str | None]:
 def _path_exists(path: Path | None) -> bool:
     """Return True when ``path`` is populated and exists on the filesystem.
 
+    Parameters
+    ----------
+    path : Path | None
+        Filesystem path to check. If None, returns False.
+
     Returns
     -------
     bool
-        ``True`` when the path exists, otherwise ``False``.
+        ``True`` when the path exists, otherwise ``False``. Returns False if
+        path is None or if the path does not exist on the filesystem.
+
+    Notes
+    -----
+    This helper safely checks path existence without raising exceptions.
+    Used for capability detection to verify index files and other resources.
     """
     return bool(path and path.exists())
 
@@ -241,10 +278,23 @@ class Capabilities:
     def stamp(self, payload: dict[str, object] | None = None) -> str:
         """Return a stable hash representing the current capability snapshot.
 
+        Parameters
+        ----------
+        payload : dict[str, object] | None, optional
+            Capability payload to hash. If None, uses `self.model_dump()`.
+
         Returns
         -------
         str
-            Hex-encoded SHA-256 digest of the capability payload.
+            Hex-encoded SHA-256 digest of the capability payload. The hash is
+            deterministic and stable for identical capability configurations.
+
+        Notes
+        -----
+        This method computes a stable hash of the capability snapshot for
+        versioning and change detection. The payload is JSON-serialized with
+        sorted keys to ensure deterministic hashing. Time complexity: O(n) where
+        n is the size of the serialized payload.
         """
         snapshot = payload or self.model_dump()
         encoded = json.dumps(snapshot, sort_keys=True, separators=(",", ":"))
@@ -254,10 +304,26 @@ class Capabilities:
     def from_context(cls, context: ApplicationContext) -> Capabilities:
         """Build a capability snapshot from the provided application context.
 
+        Parameters
+        ----------
+        context : ApplicationContext
+            Application context containing paths, clients, and managers used
+            to detect available capabilities.
+
         Returns
         -------
         Capabilities
-            Snapshot computed from the context.
+            Snapshot computed from the context, including detected features
+            (FAISS index, DuckDB, SCIP index, vLLM client, GPU support, etc.)
+            and optional hints for missing capabilities.
+
+        Notes
+        -----
+        This class method probes the application context to determine which
+        features are available. It checks for index files, optional module
+        imports, GPU availability, and index version information. The resulting
+        snapshot is used for MCP tool gating and the /capz endpoint. Time
+        complexity: O(1) for most checks, O(module_load_time) for optional imports.
         """
         paths = getattr(context, "paths", None)
         faiss_module = _import_optional("faiss")

@@ -17,6 +17,7 @@ from types import FrameType
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.responses import Response
 
 from codeintel_rev.app.capabilities import Capabilities
@@ -355,6 +356,19 @@ app.add_middleware(
 # Session scope middleware (must be registered after CORS to avoid preflight conflicts)
 app.add_middleware(SessionScopeMiddleware)
 
+
+@app.get("/metrics")
+async def metrics_endpoint() -> Response:
+    """Expose Prometheus metrics for scraping.
+
+    Returns
+    -------
+    Response
+        Text-based metrics payload encoded in Prometheus exposition format.
+    """
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
 if os.getenv("CODEINTEL_ADMIN", "").strip().lower() in {"1", "true", "yes", "on"}:
     app.include_router(index_admin.router)
 
@@ -380,6 +394,19 @@ async def set_mcp_context(
     -------
     Response
         Response from the next handler.
+
+    Raises
+    ------
+    Exception
+        Propagated from `call_next()` if the downstream handler raises any
+        exception. Also propagates exceptions from timeline event recording.
+
+    Notes
+    -----
+    This middleware extracts the ApplicationContext from `request.app.state`
+    and sets it in a context variable (`app_context`) for MCP tool handlers.
+    It also records timeline events for request processing. Time complexity:
+    O(1) for context variable operations, plus downstream handler time.
     """
     # Set context in context variable for MCP tool handlers
     context: ApplicationContext | None = getattr(request.app.state, "context", None)
@@ -502,10 +529,27 @@ async def readyz(request: Request) -> JSONResponse:
 async def capz(request: Request, *, refresh: bool = False) -> JSONResponse:
     """Return a cached capability snapshot (refreshable via query flag).
 
+    Parameters
+    ----------
+    request : Request
+        Incoming HTTP request from FastAPI/Starlette.
+    refresh : bool, optional
+        If True, forces refresh of the capability snapshot. Otherwise returns
+        cached snapshot if available (default: False).
+
     Returns
     -------
     JSONResponse
-        Capability payload.
+        Capability payload with keys: capability flags (faiss_index, duckdb,
+        etc.), optional hints, and stamp (SHA-256 hash). Returns 503 status
+        if application context is not initialized.
+
+    Notes
+    -----
+    This endpoint provides capability detection for MCP tool gating and
+    monitoring. The snapshot is cached in `request.app.state.capabilities`
+    and refreshed on demand or when missing. Time complexity: O(1) for cached
+    responses, O(module_probe_time) for refresh.
     """
     context: ApplicationContext | None = getattr(request.app.state, "context", None)
     if context is None:

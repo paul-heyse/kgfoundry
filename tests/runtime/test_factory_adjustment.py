@@ -6,7 +6,7 @@ from codeintel_rev.runtime.cells import RuntimeCell
 from codeintel_rev.runtime.factory_adjustment import DefaultFactoryAdjuster, NoopFactoryAdjuster
 
 
-@dataclass
+@dataclass(frozen=True)
 class _DummyFaiss:
     nprobe: int = 1
 

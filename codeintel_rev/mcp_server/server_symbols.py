@@ -20,10 +20,39 @@ def symbol_search(
 ) -> dict:
     """Search for symbols (functions, classes, etc).
 
+    Extended Summary
+    ----------------
+    This MCP tool performs symbol search by querying the DuckDB catalog for symbol
+    definitions matching the query string, optional kind filter, and optional language
+    filter. Results are ranked by symbol name length (shorter names first) and
+    limited to 200 matches. Used for finding functions, classes, methods, and other
+    code symbols by name.
+
+    Parameters
+    ----------
+    query : str
+        Symbol name or prefix to search for (e.g., "parse_json", "User"). The search
+        is case-insensitive and matches symbols starting with the query string.
+    kind : str | None, optional
+        Optional symbol kind filter (e.g., "function", "class", "method"). If provided,
+        only symbols of this kind are returned.
+    language : str | None, optional
+        Optional programming language filter (e.g., "python", "typescript"). If provided,
+        only symbols from this language are returned.
+
     Returns
     -------
     dict
-        Symbol matches payload.
+        Symbol matches payload containing:
+        - symbols: list[SymbolInfo], matching symbols with name, kind, and location
+        - total: int, number of symbols returned (max 200)
+
+    Notes
+    -----
+    This tool requires SCIP index and DuckDB catalog to be available. Search is
+    performed via SQL LIKE queries on the symbol_defs table. Results are sorted by
+    name length to prioritize shorter, more specific matches. Time complexity: O(1)
+    for SQL query execution.
     """
     context = get_context()
     with tool_operation_scope(
@@ -83,10 +112,34 @@ def definition_at(
 ) -> dict:
     """Find definition at position.
 
+    Extended Summary
+    ----------------
+    This MCP tool finds the definition of a symbol at a specific file position by
+    querying the DuckDB catalog for symbol occurrences at that location, then
+    retrieving the corresponding definition. Used for "go to definition" functionality
+    in code editors and IDEs.
+
+    Parameters
+    ----------
+    path : str
+        File path (URI) where the symbol occurs.
+    line : int
+        Line number (1-indexed) where the symbol occurs.
+    character : int
+        Character offset (0-indexed) within the line where the symbol occurs.
+
     Returns
     -------
     dict
-        Definition locations response.
+        Definition locations response containing:
+        - locations: list[dict], definition locations with uri, start_line, start_column,
+          end_line, end_column. Empty list if no definition found.
+
+    Notes
+    -----
+    This tool requires SCIP index and DuckDB catalog to be available. It performs
+    two SQL queries: first to find the symbol at the position, then to find its
+    definition. Time complexity: O(1) for SQL query execution.
     """
     context = get_context()
     with tool_operation_scope("symbols.definition_at", path=path, line=line, character=character):
@@ -140,10 +193,34 @@ def references_at(
 ) -> dict:
     """Find references at position.
 
+    Extended Summary
+    ----------------
+    This MCP tool finds all references to a symbol at a specific file position by
+    querying the DuckDB catalog for symbol occurrences, then retrieving all occurrences
+    of that symbol. Used for "find all references" functionality in code editors and IDEs.
+
+    Parameters
+    ----------
+    path : str
+        File path (URI) where the symbol occurs.
+    line : int
+        Line number (1-indexed) where the symbol occurs.
+    character : int
+        Character offset (0-indexed) within the line where the symbol occurs.
+
     Returns
     -------
     dict
-        Reference locations response.
+        Reference locations response containing:
+        - locations: list[dict], all reference locations with uri, start_line, start_column,
+          end_line, end_column. Empty list if no references found.
+
+    Notes
+    -----
+    This tool requires SCIP index and DuckDB catalog to be available. It performs
+    two SQL queries: first to find the symbol at the position, then to find all
+    occurrences of that symbol. Time complexity: O(n) where n is the number of
+    references (SQL query execution).
     """
     context = get_context()
     with tool_operation_scope("symbols.references_at", path=path, line=line, character=character):

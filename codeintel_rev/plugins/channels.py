@@ -20,7 +20,7 @@ else:  # pragma: no cover - runtime values supplied by the app context
 __all__ = ["Channel", "ChannelContext", "ChannelError"]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ChannelContext:
     """Context passed to channel factories when they are constructed."""
 

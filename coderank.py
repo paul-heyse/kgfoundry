@@ -12,7 +12,7 @@ from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.io.coderank_embedder import CodeRankEmbedder
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.duckdb_manager import DuckDBManager
-from codeintel_rev.io.faiss_manager import FAISSManager
+from codeintel_rev.io.faiss_manager import FAISSManager, FAISSRuntimeOptions
 
 app = typer.Typer(no_args_is_help=True, add_completion=False)
 
@@ -62,13 +62,31 @@ def build_index() -> None:
     vectors = embedder.encode_codes(snippets)
 
     index_path = Path(paths.coderank_faiss_index)
+    runtime_opts = FAISSRuntimeOptions(
+        faiss_family=settings.index.faiss_family,
+        pq_m=settings.index.pq_m,
+        pq_nbits=settings.index.pq_nbits,
+        opq_m=settings.index.opq_m,
+        default_nprobe=settings.index.default_nprobe,
+        default_k=settings.index.default_k,
+        hnsw_m=settings.index.hnsw_m,
+        hnsw_ef_construction=settings.index.hnsw_ef_construction,
+        hnsw_ef_search=settings.index.hnsw_ef_search,
+        refine_k_factor=settings.index.refine_k_factor,
+        use_gpu=settings.index.use_gpu,
+        gpu_clone_mode=settings.index.gpu_clone_mode,
+        autotune_on_start=settings.index.autotune_on_start,
+        enable_range_search=settings.index.enable_range_search,
+        semantic_min_score=settings.index.semantic_min_score,
+    )
     manager = FAISSManager(
         index_path=index_path,
         vec_dim=vectors.shape[1],
-        nlist=settings.index.faiss_nlist,
+        nlist=settings.index.nlist,
         use_cuvs=settings.index.use_cuvs,
+        runtime=runtime_opts,
     )
-    manager.build_index(vectors.copy())
+    manager.build_index(vectors.copy(), family=settings.index.faiss_family)
     manager.add_vectors(vectors, np.asarray(chunk_ids, dtype=np.int64))
     manager.save_cpu_index()
     typer.echo(f"Saved CodeRank FAISS index to {index_path}")

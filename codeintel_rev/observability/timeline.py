@@ -186,21 +186,68 @@ class Timeline:
     def operation(self, name: str, **attrs: object) -> _TimelineScope:
         """Return a context manager that surrounds a root operation.
 
+        Extended Summary
+        ----------------
+        This method creates a context manager for tracking root-level operations
+        (e.g., "search", "index", "publish"). The context manager emits start/end
+        events with duration tracking and optional attributes. Used to instrument
+        high-level operations in the application.
+
+        Parameters
+        ----------
+        name : str
+            Operation name (e.g., "search", "index.build"). Used in event names
+            and telemetry.
+        **attrs : object
+            Optional keyword arguments to include in operation events as attributes.
+            Common attributes include query parameters, result counts, error details.
+
         Returns
         -------
         _TimelineScope
-            Context manager that emits operation start/end events.
-        """
+            Context manager that emits operation start/end events with duration
+            tracking. Events are only emitted if the timeline is sampled.
+
+        Notes
+        -----
+        This method creates a scoped context manager that tracks operation execution.
+        Events are emitted at context entry and exit with duration in milliseconds.
+        Time complexity: O(1) for scope creation, O(1) for event emission.
+    """
         return _TimelineScope(self, "operation", name, attrs)
 
     def step(self, name: str, **attrs: object) -> _TimelineScope:
         """Return a context manager that surrounds an internal step.
 
+        Extended Summary
+        ----------------
+        This method creates a context manager for tracking internal steps within
+        operations (e.g., "embed", "search", "hydrate"). The context manager emits
+        start/end events with duration tracking and optional attributes. Used to
+        instrument sub-operations within larger workflows.
+
+        Parameters
+        ----------
+        name : str
+            Step name (e.g., "embed", "search.faiss", "hydrate.duckdb"). Used in
+            event names and telemetry.
+        **attrs : object
+            Optional keyword arguments to include in step events as attributes.
+            Common attributes include parameters, result counts, performance metrics.
+
         Returns
         -------
         _TimelineScope
-            Context manager emitting step start/end events.
-        """
+            Context manager emitting step start/end events with duration tracking.
+            Events are only emitted if the timeline is sampled.
+
+        Notes
+        -----
+        This method creates a scoped context manager that tracks step execution.
+        Events are emitted at context entry and exit with duration in milliseconds.
+        Steps are nested within operations for hierarchical observability. Time
+        complexity: O(1) for scope creation, O(1) for event emission.
+    """
         return _TimelineScope(self, "step", name, attrs)
 
 
@@ -260,10 +307,32 @@ class _TimelineScope:
 def new_timeline(session_id: str | None, *, force: bool = False) -> Timeline:
     """Return a new timeline bound to ``session_id``.
 
+    Extended Summary
+    ----------------
+    This function creates a new timeline instance for a session, generating a
+    unique run identifier and determining sampling status. Timelines provide
+    structured event logging and observability for request processing. Used
+    during request initialization to create per-request observability context.
+
+    Parameters
+    ----------
+    session_id : str | None
+        Session identifier. If None, uses "anonymous" as the session identifier.
+    force : bool, optional
+        If True, forces timeline sampling even if sampling rate would normally
+        skip this session (default: False). Used for debugging and critical paths.
+
     Returns
     -------
     Timeline
-        Timeline configured for the incoming session/run pair.
+        Timeline configured for the incoming session/run pair. The timeline has
+        a unique run_id and sampled status determined by the flight recorder.
+
+    Notes
+    -----
+    This function creates a new timeline with a unique run identifier. Sampling
+    status is determined by the FlightRecorder based on sampling rate and force
+    flag. Time complexity: O(1) for timeline creation.
     """
     session = session_id or "anonymous"
     sampled = _FlightRecorder.should_sample(force=force)
@@ -288,10 +357,32 @@ def current_or_new_timeline(
 ) -> Timeline:
     """Return the active timeline or create a new one when missing.
 
+    Extended Summary
+    ----------------
+    This function returns the currently active timeline from context, or creates
+    a new timeline if none exists. Used as a fallback when timeline access is
+    needed but context may not be initialized. Ensures observability is always
+    available even when middleware hasn't set up a timeline.
+
+    Parameters
+    ----------
+    session_id : str | None, optional
+        Session identifier to use if creating a new timeline. If None and a new
+        timeline is needed, uses "anonymous".
+    force : bool, optional
+        If True, forces timeline sampling when creating a new timeline (default: False).
+
     Returns
     -------
     Timeline
-        Timeline bound to the request or a freshly created fallback.
+        Timeline bound to the request (from context) or a freshly created fallback.
+        Always returns a valid timeline instance, never None.
+
+    Notes
+    -----
+    This function provides a safe way to access timelines when context may not be
+    initialized. It checks context variables first, then falls back to creating
+    a new timeline. Time complexity: O(1) for context lookup or timeline creation.
     """
     timeline = current_timeline()
     if timeline is not None:
@@ -303,10 +394,30 @@ def current_or_new_timeline(
 def bind_timeline(timeline: Timeline | None) -> Iterator[None]:
     """Bind ``timeline`` to the current async/task context.
 
+    Extended Summary
+    ----------------
+    This context manager binds a timeline to the current context variable, making
+    it available to `current_timeline()` calls within the context. Used to set
+    up timeline context for async operations and background tasks. The timeline
+    is automatically unbound when the context exits.
+
+    Parameters
+    ----------
+    timeline : Timeline | None
+        Timeline instance to bind to context. If None, unbinds any existing timeline
+        (useful for clearing context).
+
     Yields
     ------
     None
-        Control back to the caller with the timeline bound.
+        Control back to the caller with the timeline bound to context. The timeline
+        is available via `current_timeline()` within this context.
+
+    Notes
+    -----
+    This context manager uses context variables to propagate timelines across async
+    boundaries. The timeline is bound at context entry and unbound at exit. Time
+    complexity: O(1) for context variable operations.
     """
     token = _timeline_var.set(timeline)
     try:

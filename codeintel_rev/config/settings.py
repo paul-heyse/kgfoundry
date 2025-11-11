@@ -24,6 +24,38 @@ DEFAULT_RRF_WEIGHTS: dict[str, float] = {
 
 
 def _parse_int_with_suffix(value: str, default: int) -> int:
+    """Return an integer, accepting 1k-style suffixes (k=1_000).
+
+    Extended Summary
+    ----------------
+    This helper parses integer values from configuration strings, supporting
+    compact notation with 'k' suffix (e.g., "10k" = 10000). Used for parsing
+    environment variables that specify sizes or counts in a human-readable format.
+    Normalizes input by stripping whitespace, converting to lowercase, and removing
+    underscores before parsing.
+
+    Parameters
+    ----------
+    value : str
+        String to parse, optionally ending with 'k' suffix (e.g., "10k", "1_000k").
+        Whitespace and underscores are normalized before parsing.
+    default : int
+        Default value returned if parsing fails, value is empty, or ValueError
+        is raised during conversion.
+
+    Returns
+    -------
+    int
+        Parsed integer value, or default if parsing fails or value is empty.
+        Suffix 'k' multiplies the numeric part by 1000.
+
+    Notes
+    -----
+    This helper is used for parsing configuration values that may be specified
+    in compact notation (e.g., "10k" instead of "10000"). Defensively handles
+    malformed input by returning the default value. Time complexity: O(n) where
+    n is the length of the input string.
+    """
     normalized = value.strip().lower().replace("_", "")
     if not normalized:
         return default
@@ -33,6 +65,89 @@ def _parse_int_with_suffix(value: str, default: int) -> int:
         return int(normalized)
     except ValueError:
         return default
+
+
+def _parse_int_list(env_value: str | None, fallback: tuple[int, ...]) -> tuple[int, ...]:
+    """Return a tuple of integers from a comma-separated configuration string.
+
+    Extended Summary
+    ----------------
+    This helper parses comma-separated integer lists from configuration strings
+    (e.g., "10,20,30" -> (10, 20, 30)). Used for parsing environment variables
+    that specify multiple integer values. If any element fails to parse, the
+    entire operation fails and returns the fallback value.
+
+    Parameters
+    ----------
+    env_value : str | None
+        Comma-separated string of integers (e.g., "10,20,30"). Whitespace around
+        commas is stripped. If None or empty, returns fallback.
+    fallback : tuple[int, ...]
+        Default value returned if parsing fails, env_value is None/empty, or
+        any element cannot be converted to int.
+
+    Returns
+    -------
+    tuple[int, ...]
+        Parsed integers, or fallback if parsing fails or env_value is None/empty.
+        Empty strings between commas are ignored.
+
+    Notes
+    -----
+    This helper is used for parsing configuration values that specify multiple
+    integers (e.g., nlist values for adaptive indexing). Defensively handles
+    malformed input by returning the fallback value. Time complexity: O(n) where
+    n is the length of the input string.
+    """
+    if not env_value:
+        return fallback
+    parts = [part.strip() for part in env_value.split(",")]
+    parsed: list[int] = []
+    for part in parts:
+        if not part:
+            continue
+        try:
+            parsed.append(int(part))
+        except ValueError:
+            return fallback
+    return tuple(parsed) if parsed else fallback
+
+
+def _optional_int(raw: str | None) -> int | None:
+    """Convert an optional string to ``int`` when possible.
+
+    Extended Summary
+    ----------------
+    This helper safely converts optional configuration strings to integers.
+    Used for parsing environment variables that may be unset or empty. Returns
+    None for None, empty strings, or invalid values, allowing callers to use
+    None as a sentinel for "not configured".
+
+    Parameters
+    ----------
+    raw : str | None
+        String to convert to integer. If None, empty, or contains non-numeric
+        characters (after stripping), returns None.
+
+    Returns
+    -------
+    int | None
+        Parsed integer, or None if raw is None, empty, or invalid. ValueError
+        during conversion is caught and returns None.
+
+    Notes
+    -----
+    This helper is used for parsing optional configuration values where None
+    indicates "use default" rather than "zero". Defensively handles malformed
+    input by returning None. Time complexity: O(1) for None/empty, O(n) for
+    parsing where n is the string length.
+    """
+    if raw is None or not raw.strip():
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
 
 
 def _build_vllm_config() -> VLLMConfig:
@@ -178,6 +293,18 @@ class RerankConfig(msgspec.Struct, frozen=True):
     explain: bool = False
 
 
+class EvalConfig(msgspec.Struct, frozen=True):
+    """Offline evaluation configuration."""
+
+    enabled: bool = False
+    queries_path: str | None = None
+    output_dir: str = "artifacts/eval"
+    k_values: tuple[int, ...] = (5, 10, 20)
+    max_queries: int | None = 200
+    oracle_top_k: int = 50
+    xtr_as_oracle: bool = False
+
+
 class CodeRankLLMConfig(msgspec.Struct, frozen=True):
     """Configuration for the CodeRank listwise reranker."""
 
@@ -264,22 +391,32 @@ class VLLMConfig(msgspec.Struct, frozen=True):
 
 
 class BM25Config(msgspec.Struct, frozen=True):
-    """BM25 indexing and search configuration.
-
-    Attributes
-    ----------
-    corpus_json_dir : str
-        Directory containing per-document JSON files used to build the BM25 index.
-        Defaults to ``data/jsonl`` (relative to ``paths.repo_root``).
-    index_dir : str
-        Output directory for the Lucene index. Defaults to ``indexes/bm25``.
-    threads : int
-        Number of worker threads to use while building the index. Defaults to 8.
-    """
+    """BM25 indexing and search configuration."""
 
     corpus_json_dir: str = "data/jsonl"
     index_dir: str = "indexes/bm25"
     threads: int = 8
+    enabled: bool = True
+    k1: float = 0.9
+    b: float = 0.4
+    rm3_enabled: bool = False
+    rm3_fb_docs: int = 10
+    rm3_fb_terms: int = 10
+    rm3_original_query_weight: float = 0.5
+    analyzer: Literal["code", "standard"] = "code"
+    stopwords: tuple[str, ...] = ()
+
+
+class PRFConfig(msgspec.Struct, frozen=True):
+    """Pseudo relevance feedback (RM3) configuration."""
+
+    enable_auto: bool = True
+    fb_docs: int = 10
+    fb_terms: int = 10
+    orig_weight: float = 0.5
+    short_query_max_terms: int = 3
+    symbol_like_regex: str | None = None
+    head_terms_csv: str | None = None
 
 
 class SpladeConfig(msgspec.Struct, frozen=True):
@@ -328,6 +465,11 @@ class SpladeConfig(msgspec.Struct, frozen=True):
     max_clause_count: int = 4096
     batch_size: int = 32
     threads: int = 8
+    enabled: bool = True
+    max_query_terms: int = 64
+    prune_below: float = 0.0
+    analyzer: Literal["wordpiece", "code"] = "wordpiece"
+    static_prune_pct: float = 0.0
 
 
 class PathsConfig(msgspec.Struct, frozen=True):
@@ -401,85 +543,13 @@ class PathsConfig(msgspec.Struct, frozen=True):
 class IndexConfig(msgspec.Struct, frozen=True):
     """Indexing and search configuration.
 
-    Configuration parameters for the indexing pipeline and search algorithms.
-    This includes settings for chunking, vector dimensions, FAISS index structure,
-    BM25 parameters, and hybrid retrieval fusion.
-
-    The configuration balances search quality (recall/precision) with performance
-    (index size, search speed). The defaults are tuned for code search workloads
-    with typical repository sizes (thousands to millions of chunks).
-
-    Attributes
-    ----------
-    vec_dim : int
-        Dimensionality of embedding vectors. Must match the embedding model's
-        output dimension and stay aligned with :class:`VLLMConfig` ``embedding_dim``.
-        Defaults to 2560 for nomic-embed-code model. Changing this requires
-        re-indexing with a different model.
-    chunk_budget : int
-        Target chunk size in characters. The cAST chunker tries to pack symbols
-        up to this size before splitting. Larger chunks provide more context but
-        may reduce precision. Defaults to 2200 characters, which is optimal for
-        code search (roughly 50-100 lines depending on code style).
-    faiss_nlist : int
-        Number of IVF (Inverted File) centroids/clusters. More centroids improve
-        recall but increase index size and training time. Defaults to 8192, which
-        provides good recall for millions of vectors. For smaller datasets (<100k),
-        consider 4096; for very large (>10M), consider 16384.
-    faiss_nprobe : int
-        Number of IVF cells to probe during live semantic search queries. Higher
-        values improve recall but increase response latency. Defaults to 128,
-        which probes ~1.5% of cells for nlist=8192. For higher recall, increase
-        to 256 or 512; for faster searches, decrease to 64.
-    bm25_k1 : float
-        BM25 term frequency saturation parameter. Controls how quickly term
-        frequency saturates. Higher values (1.0-2.0) give more weight to
-        repeated terms. Defaults to 0.9, which is standard for code search.
-    bm25_b : float
-        BM25 length normalization parameter. Controls how much document length
-        affects scoring (0 = no normalization, 1 = full normalization).
-        Defaults to 0.4, which provides moderate length normalization suitable
-        for code where length varies significantly.
-    rrf_k : int
-        Reciprocal Rank Fusion (RRF) K parameter. Used to fuse results from
-        multiple retrieval systems (FAISS, BM25, SPLADE). Higher K values give
-        more weight to lower-ranked results. Defaults to 60, which is standard
-        for hybrid search. Lower values (30-40) favor top results; higher (80-100)
-        give more weight to consensus across systems.
-    enable_bm25_channel : bool
-        Enable BM25 channel when performing hybrid retrieval. When disabled, BM25
-        results are excluded from fusion but the index can still be built for
-        other workflows. Defaults to ``True``.
-    enable_splade_channel : bool
-        Enable SPLADE channel when performing hybrid retrieval. When disabled,
-        SPLADE results are excluded from fusion. Defaults to ``True``.
-    hybrid_top_k_per_channel : int
-        Per-channel cutoff used when gathering candidates before RRF fusion.
-        Defaults to 50, which balances coverage with latency.
-    use_cuvs : bool
-        Enable cuVS (CUDA Vector Search) acceleration for FAISS GPU operations.
-        cuVS provides optimized GPU kernels that can be 2-3x faster than standard
-        FAISS GPU. Requires libcuvs-cu13 package. Defaults to True. Set to False
-        if cuVS is unavailable or causes issues.
-    faiss_preload : bool
-        Pre-load FAISS index during application startup (eager loading). When True,
-        the FAISS index is loaded immediately at startup, eliminating first-request
-        latency. When False (default), the index is loaded lazily on first semantic
-        search request. Set to True in production for consistent response times;
-        keep False in development for faster startup iteration.
-    duckdb_materialize : bool
-        Persist chunk metadata into a DuckDB table (``chunks_materialized``) to
-        enable secondary indexes. When ``False`` (default), the catalog exposes
-        Parquet files via a view for zero-copy reads. Enable this for very large
-        catalogs when SQL filtering requires indexes. Defaults to ``False``.
-    preview_max_chars : int
-        Maximum number of characters to persist in the Parquet ``preview`` column.
-        This controls indexing-time truncation. Defaults to 240 characters.
-    compaction_threshold : float
-        Fraction of primary index size that the secondary index can reach before a
-        compaction is recommended. Defaults to 0.05 (5%).
-    rrf_weights : dict[str, float]
-        Default per-channel weights applied during weighted RRF fusion.
+    This configuration controls chunking, embedding dimensionality, FAISS build and
+    search-time parameters, and the hybrid retrieval stacks (BM25, SPLADE, fusion).
+    The defaults favor accuracy-first personal RAG deployments: IVF/PQ with OPQ
+    pre-rotation, higher search fan-out, structured logging, and GPU/cuVS when
+    available. Backwards-compatible legacy knobs (``faiss_nlist`` / ``faiss_nprobe``)
+    remain but new code should prefer the richer ``faiss_family`` + runtime tuning
+    controls introduced here.
     """
 
     vec_dim: int = 2560
@@ -500,6 +570,48 @@ class IndexConfig(msgspec.Struct, frozen=True):
     rrf_weights: dict[str, float] = msgspec.field(
         default_factory=lambda: {"semantic": 1.0, "bm25": 1.0, "splade": 1.0, "warp": 1.1}
     )
+    hybrid_prefetch: dict[str, int] = msgspec.field(
+        default_factory=lambda: {"semantic": 200, "bm25": 200, "splade": 200}
+    )
+    hybrid_use_rrf: bool = True
+    hybrid_weights_override: dict[str, float] = msgspec.field(default_factory=dict)
+    prf: PRFConfig = PRFConfig()
+    recency_enabled: bool = False
+    recency_half_life_days: float = 30.0
+    recency_max_boost: float = 0.15
+    recency_table: str = "chunks"
+
+    # Modern FAISS construction/runtime controls ---------------------------------
+    faiss_family: Literal[
+        "auto",
+        "flat",
+        "ivf_flat",
+        "ivf_pq",
+        "ivf_pq_refine",
+        "hnsw",
+    ] = "auto"
+    nlist: int | None = None
+    pq_m: int = 64
+    pq_nbits: int = 8
+    opq_m: int = 0
+    hnsw_m: int = 32
+    hnsw_ef_construction: int = 200
+    default_k: int = 50
+    default_nprobe: int | None = None
+    hnsw_ef_search: int = 128
+    refine_k_factor: float = 1.0
+    use_gpu: bool = True
+    gpu_clone_mode: Literal["replicate", "shard"] = "replicate"
+    autotune_on_start: bool = False
+    enable_range_search: bool = False
+    semantic_min_score: float = 0.0
+
+    def __post_init__(self) -> None:  # pragma: no cover - simple attribute wiring
+        """Bridge legacy and new fields so existing callers continue to work."""
+        resolved_nlist = self.nlist or self.faiss_nlist
+        resolved_nprobe = self.default_nprobe or self.faiss_nprobe
+        object.__setattr__(self, "nlist", resolved_nlist)
+        object.__setattr__(self, "default_nprobe", resolved_nprobe)
 
 
 class ServerLimits(msgspec.Struct, frozen=True):
@@ -614,6 +726,8 @@ class Settings(msgspec.Struct, frozen=True):
         Late-interaction reranker configuration.
     coderank_llm : CodeRankLLMConfig
         CodeRank listwise reranker configuration.
+    eval : EvalConfig
+        Offline evaluation (recall/coverage) configuration.
     """
 
     vllm: VLLMConfig
@@ -629,6 +743,7 @@ class Settings(msgspec.Struct, frozen=True):
     xtr: XTRConfig
     rerank: RerankConfig
     coderank_llm: CodeRankLLMConfig
+    eval: EvalConfig
 
 
 def load_settings() -> Settings:
@@ -914,6 +1029,15 @@ def load_settings() -> Settings:
         },
         pool_size=duckdb_pool_size,
     )
+    eval_config = EvalConfig(
+        enabled=os.environ.get("EVAL_ENABLED", "0").lower() in {"1", "true", "yes"},
+        queries_path=os.environ.get("EVAL_QUERIES_PATH"),
+        output_dir=os.environ.get("EVAL_OUTPUT_DIR", "artifacts/eval"),
+        k_values=_parse_int_list(os.environ.get("EVAL_K_VALUES"), (5, 10, 20)),
+        max_queries=_optional_int(os.environ.get("EVAL_MAX_QUERIES")),
+        oracle_top_k=int(os.environ.get("EVAL_ORACLE_TOP_K", "50")),
+        xtr_as_oracle=os.environ.get("EVAL_XTR_AS_ORACLE", "0").lower() in {"1", "true", "yes"},
+    )
 
     return Settings(
         vllm=vllm,
@@ -976,6 +1100,7 @@ def load_settings() -> Settings:
             enabled=os.environ.get("CODERANK_LLM_ENABLED", "0").lower() in {"1", "true", "yes"},
             budget_ms=int(os.environ.get("CODERANK_LLM_BUDGET_MS", "300")),
         ),
+        eval=eval_config,
     )
 
 

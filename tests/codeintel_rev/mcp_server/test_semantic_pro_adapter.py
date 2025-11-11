@@ -62,11 +62,10 @@ class _FakeHybridEngine:
         *,
         semantic_hits,
         limit: int,
-        extra_channels=None,
-        weights: object | None = None,
+        options=None,
     ) -> HybridSearchResult:
         assert query
-        _ = weights
+        extra_channels = options.extra_channels if options else None
         docs = [
             HybridResultDoc(doc_id=str(cid), score=float(score)) for cid, score in semantic_hits
         ]
@@ -85,6 +84,7 @@ class _FakeHybridEngine:
             contributions=contributions,
             channels=channels,
             warnings=[],
+            method={"retrieval": channels, "coverage": f"{len(docs[:limit])}/{limit} results"},
         )
 
 

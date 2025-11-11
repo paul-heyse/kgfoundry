@@ -312,6 +312,9 @@ class _BaseStubFAISSManager:
         self.clone_invocations = 0
         self.last_k: int | None = None
         self.last_nprobe: int | None = None
+        self.last_ef_search: int | None = None
+        self.last_quantizer_ef_search: int | None = None
+        self.last_k_factor: float | None = None
         self._search_ids = search_ids or [123]
 
     def load_cpu_index(self) -> None:
@@ -334,7 +337,12 @@ class _BaseStubFAISSManager:
         return True
 
     def search(
-        self, query: np.ndarray, *, k: int, nprobe: int = 128
+        self,
+        query: np.ndarray,
+        *,
+        k: int,
+        nprobe: int = 128,
+        runtime: object | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Return mock search results.
 
@@ -356,6 +364,9 @@ class _BaseStubFAISSManager:
         assert k >= 1
         self.last_k = k
         self.last_nprobe = nprobe
+        self.last_ef_search = getattr(runtime, "ef_search", None)
+        self.last_quantizer_ef_search = getattr(runtime, "quantizer_ef_search", None)
+        self.last_k_factor = getattr(runtime, "k_factor", None)
         assert nprobe >= 1
         # Return k results (or fewer if k > available chunks)
         # Use stored search_ids or default to [123]
@@ -374,13 +385,15 @@ class _DefaultStubHybridEngine:
         *,
         semantic_hits: Sequence[tuple[int, float]],
         limit: int,
+        options: Any | None = None,
     ) -> SimpleNamespace:
-        del query, semantic_hits, limit
+        del query, semantic_hits, limit, options
         return SimpleNamespace(
             docs=[],
             contributions={},
             channels=[],
             warnings=[],
+            method=None,
         )
 
 
@@ -544,6 +557,32 @@ async def test_semantic_search_gpu_fallback() -> None:
     location = findings[0].get("location")
     assert location is not None
     assert location.get("uri") == "src/module.py"
+
+
+@pytest.mark.asyncio
+async def test_semantic_search_applies_scope_faiss_tuning() -> None:
+    manager = _BaseStubFAISSManager(should_fail_gpu=False)
+    context = StubContext(
+        faiss_manager=manager,
+        config=StubContextConfig(limits=[], error=None),
+    )
+    scope = {"faiss_tuning": {"nprobe": 256, "ef_search": 96, "k_factor": 2.0}}
+    with (
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
+            return_value="session-tune",
+        ),
+        patch(
+            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
+            return_value=scope,
+        ),
+    ):
+        result = await semantic_search(cast("ApplicationContext", context), "hello scope", limit=1)
+
+    assert result.get("findings")
+    assert manager.last_nprobe == 256
+    assert manager.last_ef_search == 96
+    assert manager.last_k_factor == pytest.approx(2.0)
 
 
 @pytest.mark.asyncio
@@ -773,8 +812,9 @@ async def test_semantic_search_hybrid_merges_channels() -> None:
             *,
             semantic_hits: Sequence[tuple[int, float]],
             limit: int,
+            options: Any | None = None,
         ) -> SimpleNamespace:
-            del query, semantic_hits, limit
+            del query, semantic_hits, limit, options
             docs = [
                 SimpleNamespace(doc_id="101", score=0.42),
                 SimpleNamespace(doc_id="102", score=0.35),
@@ -788,6 +828,7 @@ async def test_semantic_search_hybrid_merges_channels() -> None:
                 contributions=contributions,
                 channels=["semantic", "bm25", "splade"],
                 warnings=["bm25 warmed up"],
+                method=None,
             )
 
     faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False, search_ids=[101, 102])

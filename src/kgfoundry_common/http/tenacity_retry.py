@@ -36,10 +36,44 @@ _RANDOM_SEED: ContextVar[int | None] = ContextVar("_random_seed", default=None)
 def _default_rng_factory() -> TypingCallable[[int | None], Generator]:
     """Return cached numpy random factory resolved lazily.
 
+    Extended Summary
+    ----------------
+    This function provides a lazily-loaded factory for creating numpy.random.Generator
+    instances used for jitter calculation in exponential backoff retry strategies. It
+    defers numpy import until first use via gate_import to keep the module lightweight
+    for hosts without numpy installed. The factory is cached with lru_cache to avoid
+    repeated import overhead. This factory is consumed by _rand() to generate jitter
+    values that spread retry attempts and prevent thundering herd problems.
+
     Returns
     -------
-    collections.abc.Callable[[int | None], Generator]
-        Callable that yields :class:`numpy.random.Generator` instances.
+    TypingCallable[[int | None], Generator]
+        Callable that accepts an optional seed (int | None) and returns a
+        :class:`numpy.random.Generator` instance. When called with None, uses
+        system random state. When called with an int seed, creates a deterministic
+        generator for testing.
+
+    Notes
+    -----
+    • Caching: Uses @lru_cache(maxsize=1) to ensure the factory is resolved once
+      and reused across all retry attempts.
+    • Lazy import: Uses gate_import() to defer numpy.random import until first
+      call, keeping the module importable on minimal hosts.
+    • Complexity: O(1) after first call (cached); O(1) import cost on first call.
+    • Side effects: First call imports numpy.random module; subsequent calls are
+      pure (no I/O, no global state mutations beyond cache).
+    • Thread-safety: lru_cache is thread-safe; factory function itself is stateless.
+
+    Examples
+    --------
+    >>> factory = _default_rng_factory()
+    >>> rng = factory(42)  # Deterministic generator with seed
+    >>> isinstance(rng.random(), float)
+    True
+
+    >>> rng2 = factory()  # System random state
+    >>> 0.0 <= rng2.random() <= 1.0
+    True
     """
     module = gate_import("numpy.random", "tenacity retry jitter generation")
     factory = module.default_rng

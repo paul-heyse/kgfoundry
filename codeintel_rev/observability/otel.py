@@ -18,7 +18,7 @@ LOGGER = get_logger(__name__)
 SpanAttribute = str | int | float | bool
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _TelemetryState:
     initialized: bool = False
     tracing_enabled: bool = False

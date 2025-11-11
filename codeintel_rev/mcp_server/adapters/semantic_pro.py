@@ -12,7 +12,11 @@ from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.errors import RuntimeUnavailableError
-from codeintel_rev.io.hybrid_search import ChannelHit
+from codeintel_rev.io.hybrid_search import (
+    ChannelHit,
+    HybridSearchOptions,
+    HybridSearchTuning,
+)
 from codeintel_rev.io.rerank_coderankllm import CodeRankListwiseReranker
 from codeintel_rev.io.warp_engine import WarpEngine, WarpUnavailableError
 from codeintel_rev.mcp_server.common.observability import Observation, observe_duration
@@ -359,13 +363,14 @@ def _semantic_search_pro_sync(
             limit=effective_limit,
             options=options,
         )
+        coderank_fanout = max(
+            effective_limit,
+            effective_limit * context.settings.limits.semantic_overfetch_multiplier,
+        )
         coderank_hits, coderank_stage = _timed_coderank_stage(
             context=context,
             query=query,
-            fanout=max(
-                effective_limit,
-                effective_limit * context.settings.limits.semantic_overfetch_multiplier,
-            ),
+            fanout=coderank_fanout,
             observation=observation,
         )
         stage_timings.append(coderank_stage)
@@ -394,6 +399,8 @@ def _semantic_search_pro_sync(
                 weights=_merge_rrf_weights(
                     context.settings.index.rrf_weights, options.stage_weights
                 ),
+                faiss_k=coderank_fanout,
+                nprobe=context.settings.index.faiss_nprobe,
             ),
             stage_timings=stage_timings,
         )
@@ -424,6 +431,7 @@ def _semantic_search_pro_sync(
                                 warp_outcome.explainability
                             ),
                             rerank=rerank_metadata,
+                            hybrid_method=fused.method,
                         )
                     ),
                     limits=limits + fused.warnings,
@@ -468,6 +476,7 @@ def _semantic_search_pro_sync(
                         notes=tuple(warp_outcome.notes),
                         explainability=_build_method_explainability(warp_outcome.explainability),
                         rerank=rerank_metadata,
+                        hybrid_method=fused.method,
                     )
                 ),
                 limits=limits + fused.warnings,
@@ -681,8 +690,11 @@ def _run_fusion_stage(
             request.query,
             semantic_hits=request.coderank_hits,
             limit=total_limit,
-            extra_channels=_build_extra_channels(request.warp_hits, request.warp_channel),
-            weights=request.weights,
+            options=HybridSearchOptions(
+                extra_channels=_build_extra_channels(request.warp_hits, request.warp_channel),
+                weights=request.weights,
+                tuning=HybridSearchTuning(k=request.faiss_k, nprobe=request.nprobe),
+            ),
         )
     stage_timings.append(fusion_timer.snapshot())
     return fused
@@ -801,6 +813,7 @@ def _reorder_docs(
         contributions=fused.contributions,
         channels=fused.channels,
         warnings=fused.warnings,
+        method=fused.method,
     )
     return _RerankOutcome(result=updated_result, changes=changes)
 
@@ -1191,11 +1204,12 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
 
     Returns
     -------
-    tuple[list[dict], list[StageTiming]]
-        A tuple containing:
-        - Hydrated records clipped to ``effective_limit``, each record is a dict
-          with chunk metadata from DuckDB.
-        - Timing snapshots from hydration and reranking stages for observability.
+    HydrationOutcome
+        Dataclass containing:
+        - records: list[dict], hydrated records clipped to ``effective_limit``, each
+          record is a dict with chunk metadata from DuckDB.
+        - timings: list[StageTiming], timing snapshots from hydration and reranking
+          stages for observability.
 
     Raises
     ------
@@ -1530,16 +1544,31 @@ def _build_method(context: MethodContext) -> MethodInfo:
     coverage = f"{context.findings_count}/{context.effective_limit} results in {elapsed_ms}ms"
     if context.requested_limit != context.effective_limit:
         coverage = f"{coverage} (requested {context.requested_limit})"
-    method: MethodInfo = {
+    base: MethodInfo = {
         "retrieval": list(dict.fromkeys(context.channels)),
         "coverage": coverage,
     }
+    if context.hybrid_method:
+        method: MethodInfo = dict(context.hybrid_method)
+        method.setdefault("coverage", base["coverage"])
+        method.setdefault("retrieval", base["retrieval"])
+    else:
+        method = base
     if context.stages:
         method["stages"] = [cast("StageInfo", stage.as_payload()) for stage in context.stages]
     if context.notes:
-        method["notes"] = list(context.notes)
+        existing_notes = (
+            list(method.get("notes", [])) if isinstance(method.get("notes"), list) else []
+        )
+        method["notes"] = list(dict.fromkeys([*existing_notes, *context.notes]))
     if context.explainability:
-        method["explainability"] = context.explainability
+        merged_exp = (
+            dict(method.get("explainability", {}))
+            if isinstance(method.get("explainability"), dict)
+            else {}
+        )
+        merged_exp.update(context.explainability)
+        method["explainability"] = merged_exp
     if context.rerank:
         method["rerank"] = context.rerank
     return method
@@ -1676,6 +1705,8 @@ class FusionRequest:
     warp_channel: str
     effective_limit: int
     weights: Mapping[str, float]
+    faiss_k: int
+    nprobe: int
 
 
 @dataclass(slots=True, frozen=True)
@@ -1691,3 +1722,4 @@ class MethodContext:
     notes: tuple[str, ...] | None = None
     explainability: dict[str, list[dict[str, Any]]] | None = None
     rerank: dict[str, object] | None = None
+    hybrid_method: MethodInfo | None = None

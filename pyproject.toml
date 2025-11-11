@@ -382,6 +382,7 @@ extend-exclude = [
     "flashinfer/**",
     "codeintel/ts_languages/**",
     "codeintel_rev/io/TEMP_BM25+SPLADE_GUIDE/**",
+    "codeintel_rev/patches/**",
 ]
 
 [tool.ruff.format]

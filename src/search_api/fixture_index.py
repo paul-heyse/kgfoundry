@@ -180,9 +180,7 @@ class FixtureIndex:
         return Path(parquet_root)
 
     @staticmethod
-    def _iter_fixture_docs(
-        connection: DuckDBPyConnection, root_path: Path
-    ) -> Iterator[FixtureDoc]:
+    def _iter_fixture_docs(connection: DuckDBPyConnection, root_path: Path) -> Iterator[FixtureDoc]:
         parquet_pattern = str(root_path / "*" / "*.parquet")
         rows: Sequence[tuple[object, ...]] = fetch_all(
             connection,

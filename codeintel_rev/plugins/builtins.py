@@ -19,10 +19,31 @@ __all__ = ["bm25_factory", "splade_factory"]
 def bm25_factory(context: ChannelContext) -> Channel:
     """Return the built-in BM25 channel.
 
+    Extended Summary
+    ----------------
+    This factory function creates a BM25 (Best Matching 25) retrieval channel
+    using the built-in BM25 index. BM25 is a sparse retrieval method that ranks
+    documents based on term frequency and inverse document frequency. Used in
+    hybrid search pipelines to provide keyword-based retrieval alongside dense
+    vector search.
+
+    Parameters
+    ----------
+    context : ChannelContext
+        Channel context providing BM25 index path and configuration. The context
+        must have a valid BM25 index directory.
+
     Returns
     -------
     Channel
-        Channel implementation wrapping the BM25 provider.
+        Channel implementation wrapping the BM25 provider. The channel performs
+        BM25 retrieval and returns ranked document hits.
+
+    Notes
+    -----
+    This factory is registered as a built-in channel plugin. The BM25 channel
+    requires a BM25 index to be available in the context. Time complexity: O(n)
+    for BM25 search where n is the number of documents in the index.
     """
     return _BM25Channel(context)
 
@@ -30,10 +51,32 @@ def bm25_factory(context: ChannelContext) -> Channel:
 def splade_factory(context: ChannelContext) -> Channel:
     """Return the built-in SPLADE impact channel.
 
+    Extended Summary
+    ----------------
+    This factory function creates a SPLADE (Sparse Lexical and Expansion) retrieval
+    channel using the built-in SPLADE index. SPLADE is a learned sparse retrieval
+    method that generates high-dimensional sparse vectors with learned term weights.
+    Used in hybrid search pipelines to provide learned sparse retrieval alongside
+    dense vector search.
+
+    Parameters
+    ----------
+    context : ChannelContext
+        Channel context providing SPLADE index path and configuration. The context
+        must have a valid SPLADE index directory.
+
     Returns
     -------
     Channel
-        Channel implementation wrapping the SPLADE provider.
+        Channel implementation wrapping the SPLADE provider. The channel performs
+        SPLADE retrieval and returns ranked document hits.
+
+    Notes
+    -----
+    This factory is registered as a built-in channel plugin. The SPLADE channel
+    requires a SPLADE index to be available in the context. SPLADE provides better
+    semantic matching than BM25 while maintaining sparse retrieval efficiency. Time
+    complexity: O(n) for SPLADE search where n is the number of documents in the index.
     """
     return _SpladeChannel(context)
 

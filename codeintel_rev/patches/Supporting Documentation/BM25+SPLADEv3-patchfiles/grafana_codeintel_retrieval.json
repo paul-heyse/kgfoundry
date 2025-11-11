@@ -1,0 +1,102 @@
+{
+  "title": "CodeIntel Retrieval (BM25 \u2295 SPLADE \u2295 Dense)",
+  "schemaVersion": 38,
+  "version": 1,
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Recall@K (offline)",
+      "id": 1,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom"
+      },
+      "targets": [
+        {
+          "expr": "codeintel_rev_recall_at_k{k=\"10\"}",
+          "legendFormat": "Recall@10"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "RRF Fusion Latency",
+      "id": 2,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(codeintel_rev_rrf_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Channel Latency (p95)",
+      "id": 3,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(codeintel_rev_channel_duration_seconds_bucket[5m])) by (le,channel))",
+          "legendFormat": "{{channel}} p95"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Queries & Errors",
+      "id": 4,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(codeintel_rev_queries_total[5m])) by (kind)",
+          "legendFormat": "qps {{kind}}"
+        },
+        {
+          "expr": "sum(rate(codeintel_rev_query_errors_total[5m])) by (kind,channel)",
+          "legendFormat": "errs {{kind}}/{{channel}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Index Versions",
+      "id": 5,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom"
+      },
+      "targets": [
+        {
+          "expr": "codeintel_rev_index_version_info{component='faiss'}",
+          "legendFormat": "FAISS"
+        },
+        {
+          "expr": "codeintel_rev_index_version_info{component='bm25'}",
+          "legendFormat": "BM25"
+        },
+        {
+          "expr": "codeintel_rev_index_version_info{component='splade'}",
+          "legendFormat": "SPLADE"
+        }
+      ]
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  }
+}

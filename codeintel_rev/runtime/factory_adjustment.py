@@ -18,10 +18,27 @@ class FactoryAdjuster(Protocol):
     ) -> Callable[[], T]:  # pragma: no cover - protocol
         """Return a possibly wrapped factory for the given runtime.
 
+        Extended Summary
+        ----------------
+        This protocol method adjusts factory functions for runtime cells by wrapping
+        them with tuning hooks. Implementations may apply runtime-specific configuration
+        (e.g., FAISS nprobe, hybrid search weights) after object creation. Used by
+        RuntimeCell to customize runtime initialization based on application settings.
+
+        Parameters
+        ----------
+        cell : str
+            Runtime cell identifier (e.g., "coderank-faiss", "hybrid", "xtr"). Used
+            to determine which tuning hooks to apply.
+        factory : Callable[[], T]
+            Original factory function that creates the runtime object. May be wrapped
+            or returned unchanged.
+
         Returns
         -------
         Callable[[], T]
-            Factory callable invoked by :class:`RuntimeCell`.
+            Factory callable invoked by :class:`RuntimeCell`. May be the original
+            factory or a wrapped version that applies tuning hooks.
         """
         ...
 
@@ -33,16 +50,28 @@ class NoopFactoryAdjuster:
     def adjust(self, *, cell: str, factory: Callable[[], T]) -> Callable[[], T]:
         """Return ``factory`` unchanged.
 
+        Extended Summary
+        ----------------
+        This no-op adjuster returns the factory function unchanged without applying
+        any tuning hooks. Used when factory adjustment is disabled or not needed.
+
+        Parameters
+        ----------
+        cell : str
+            Runtime cell identifier (unused by this adjuster).
+        factory : Callable[[], T]
+            Original factory function to return unchanged.
+
         Returns
         -------
         Callable[[], T]
-            Original factory callable.
+            Original factory callable, returned without modification.
         """
         _ = (self, cell)
         return factory
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DefaultFactoryAdjuster:
     """Reference adjuster that tunes common runtimes after creation."""
 
@@ -57,10 +86,27 @@ class DefaultFactoryAdjuster:
     def adjust(self, *, cell: str, factory: Callable[[], T]) -> Callable[[], T]:
         """Return a wrapped factory when tuning hooks are known.
 
+        Extended Summary
+        ----------------
+        This adjuster wraps factory functions with runtime-specific tuning hooks based
+        on the cell identifier. It applies FAISS tuning (nprobe, GPU preference), hybrid
+        search tuning (RRF k, channel weights), or XTR tuning based on the cell name.
+        Used to customize runtime initialization from application settings.
+
+        Parameters
+        ----------
+        cell : str
+            Runtime cell identifier (e.g., "coderank-faiss", "hybrid", "xtr"). Determines
+            which tuning hooks to apply. Underscores are normalized to hyphens.
+        factory : Callable[[], T]
+            Original factory function that creates the runtime object. Wrapped with
+            tuning hooks if the cell matches known patterns.
+
         Returns
         -------
         Callable[[], T]
-            Either the original or wrapped factory.
+            Either the original factory (if no tuning hooks match) or a wrapped factory
+            that applies runtime-specific configuration after object creation.
         """
         normalized = cell.replace("_", "-")
         if normalized.startswith("coderank-faiss"):
@@ -74,10 +120,22 @@ class DefaultFactoryAdjuster:
     def _wrap_faiss(self, base: Callable[[], T]) -> Callable[[], T]:
         """Apply FAISS-specific tuning hooks.
 
+        Extended Summary
+        ----------------
+        This helper wraps a FAISS factory function with tuning hooks that apply
+        nprobe and GPU preference settings after object creation. It handles both
+        setter methods and attribute assignment, suppressing errors if tuning fails.
+
+        Parameters
+        ----------
+        base : Callable[[], T]
+            Original FAISS factory function that creates the FAISS manager or index.
+
         Returns
         -------
         Callable[[], T]
-            Wrapped factory that enforces FAISS settings.
+            Wrapped factory that enforces FAISS settings (nprobe, GPU preference)
+            after object creation. Tuning failures are suppressed.
         """
 
         def _wrapped() -> T:
@@ -99,10 +157,22 @@ class DefaultFactoryAdjuster:
     def _wrap_hybrid(self, base: Callable[[], T]) -> Callable[[], T]:
         """Apply hybrid-channel tuning hooks.
 
+        Extended Summary
+        ----------------
+        This helper wraps a hybrid search factory function with tuning hooks that
+        apply RRF (Reciprocal Rank Fusion) k and channel weights (BM25, SPLADE) after
+        object creation. It handles setter methods and suppresses errors if tuning fails.
+
+        Parameters
+        ----------
+        base : Callable[[], T]
+            Original hybrid search factory function that creates the hybrid search manager.
+
         Returns
         -------
         Callable[[], T]
-            Wrapped factory applying hybrid weights.
+            Wrapped factory that applies hybrid search settings (RRF k, BM25 weight,
+            SPLADE weight) after object creation. Tuning failures are suppressed.
         """
 
         def _wrapped() -> T:
@@ -124,10 +194,21 @@ class DefaultFactoryAdjuster:
     def _wrap_xtr(base: Callable[[], T]) -> Callable[[], T]:
         """Return the base factory; placeholder for future tuning.
 
+        Extended Summary
+        ----------------
+        This static helper is a placeholder for future XTR tuning hooks. Currently
+        returns the factory unchanged, but may be extended to apply XTR-specific
+        configuration in the future.
+
+        Parameters
+        ----------
+        base : Callable[[], T]
+            Original XTR factory function that creates the XTR index or manager.
+
         Returns
         -------
         Callable[[], T]
-            Unmodified factory.
+            Unmodified factory. Future versions may wrap with XTR tuning hooks.
         """
         return base
 

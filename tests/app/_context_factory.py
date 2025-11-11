@@ -81,6 +81,11 @@ def build_application_context(
         use_cuvs=False,
         enable_bm25_channel=enable_bm25,
         enable_splade_channel=enable_splade,
+        vec_dim=2,
+        default_k=50,
+        default_nprobe=32,
+        hnsw_ef_search=64,
+        refine_k_factor=1.0,
     )
     xtr_cfg = SimpleNamespace(
         enable=xtr_enabled,

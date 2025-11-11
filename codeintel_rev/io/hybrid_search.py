@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from codeintel_rev.evaluation.hybrid_pool import Hit, HybridPoolEvaluator
 from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.plugins.channels import Channel, ChannelContext, ChannelError
 from codeintel_rev.plugins.registry import ChannelRegistry
-from codeintel_rev.retrieval.fusion import fuse_weighted_rrf
 from codeintel_rev.retrieval.types import (
     ChannelHit,
     HybridResultDoc,
@@ -227,6 +228,32 @@ class SpladeSearchProvider:
         return " ".join(tokens)
 
 
+@dataclass(slots=True, frozen=True)
+class HybridSearchTuning:
+    """Runtime overrides for FAISS search metadata."""
+
+    k: int | None = None
+    nprobe: int | None = None
+
+
+@dataclass(slots=True, frozen=True)
+class HybridSearchOptions:
+    """Optional knobs influencing hybrid fusion."""
+
+    extra_channels: Mapping[str, Sequence[ChannelHit]] | None = None
+    weights: Mapping[str, float] | None = None
+    tuning: HybridSearchTuning | None = None
+
+
+@dataclass(slots=True, frozen=True)
+class _MethodStats:
+    fused_count: int
+    limit: int
+    faiss_k: int | None
+    nprobe: int | None
+    weights: Mapping[str, float]
+
+
 class HybridSearchEngine:
     """Combine dense (FAISS) and sparse channel plugins via RRF."""
 
@@ -250,6 +277,9 @@ class HybridSearchEngine:
             self._registry = ChannelRegistry.discover(channel_context)
         else:
             self._registry = registry
+        self._pool_weights = self._compute_pool_weights()
+        self._pooler = self._make_pooler()
+        self._explain_last: dict[str, object] = {}
 
     def search(
         self,
@@ -257,8 +287,7 @@ class HybridSearchEngine:
         *,
         semantic_hits: Sequence[tuple[int, float]],
         limit: int,
-        extra_channels: Mapping[str, Sequence[ChannelHit]] | None = None,
-        weights: Mapping[str, float] | None = None,
+        options: HybridSearchOptions | None = None,
     ) -> HybridSearchResult:
         """Fuse dense and sparse retrieval results for ``query``.
 
@@ -286,12 +315,9 @@ class HybridSearchEngine:
             Maximum number of final results to return after RRF fusion. The fusion
             process ranks all documents from all channels, then returns the top
             'limit' documents. Must be a positive integer.
-        extra_channels : Mapping[str, Sequence[ChannelHit]] | None
-            Optional externally supplied channels (e.g., WARP). Each entry is
-            merged into the RRF runs prior to fusion.
-        weights : Mapping[str, float] | None
-            Optional per-channel weights applied during fusion. Defaults to
-            equal weighting.
+        options : HybridSearchOptions | None
+            Optional bundle controlling extra channels, channel weights, and
+            FAISS runtime metadata for explainability.
 
         Returns
         -------
@@ -306,8 +332,10 @@ class HybridSearchEngine:
         """
         timeline = current_timeline()
         runs, warnings = self._gather_channel_hits(query, semantic_hits)
-        if extra_channels:
-            for name, hits in extra_channels.items():
+        opts = options or HybridSearchOptions()
+        pooler, weights_used = self._select_pooler(opts)
+        if opts.extra_channels:
+            for name, hits in opts.extra_channels.items():
                 if not hits:
                     continue
                 runs[name] = list(hits)
@@ -322,47 +350,68 @@ class HybridSearchEngine:
                     "total": total_candidates,
                 },
             )
-        if not runs:
+        contributions = self._build_contribution_map(runs)
+        flattened = self._flatten_hits_for_pool(runs)
+        active_channels = [channel for channel, hits in runs.items() if hits] or ["semantic"]
+        runtime = opts.tuning or HybridSearchTuning()
+        if not flattened:
+            method = self._compose_method_metadata(
+                active_channels,
+                warnings,
+                stats=_MethodStats(
+                    fused_count=0,
+                    limit=limit,
+                    faiss_k=runtime.k,
+                    nprobe=runtime.nprobe,
+                    weights=weights_used,
+                ),
+            )
+            self._explain_last = method
             return HybridSearchResult(
                 docs=[],
                 contributions={},
-                channels=[],
+                channels=active_channels,
                 warnings=warnings,
+                method=method,
             )
 
-        if weights:
-            docs, contributions = fuse_weighted_rrf(
-                runs,
-                weights=weights,
-                k=self._settings.index.rrf_k,
+        pooled_hits = pooler.pool(flattened, k=limit)
+        docs = [
+            HybridResultDoc(doc_id=pooled.doc_id, score=pooled.blended_score)
+            for pooled in pooled_hits
+        ]
+        contributions_for_docs = {doc.doc_id: contributions.get(doc.doc_id, []) for doc in docs}
+        method = self._compose_method_metadata(
+            active_channels,
+            warnings,
+            stats=_MethodStats(
+                fused_count=len(docs),
                 limit=limit,
-            )
-        else:
-            docs, contributions = _rrf_fuse(
-                runs,
-                k=self._settings.index.rrf_k,
-                limit=limit,
-            )
-        active_channels = [channel for channel, hits in runs.items() if hits]
-        result = HybridSearchResult(
-            docs=docs,
-            contributions={doc.doc_id: contributions.get(doc.doc_id, []) for doc in docs},
-            channels=active_channels,
-            warnings=warnings,
+                faiss_k=runtime.k,
+                nprobe=runtime.nprobe,
+                weights=weights_used,
+            ),
         )
+        self._explain_last = method
         if timeline is not None:
             total_candidates = sum(len(hits) for hits in runs.values())
             timeline.event(
                 "hybrid.fuse.end",
                 "fusion",
                 attrs={
-                    "returned": len(result.docs),
+                    "returned": len(docs),
                     "channels": active_channels,
                     "rrf_k": self._settings.index.rrf_k,
                     "total": total_candidates,
                 },
             )
-        return result
+        return HybridSearchResult(
+            docs=docs,
+            contributions=contributions_for_docs,
+            channels=active_channels,
+            warnings=warnings,
+            method=method,
+        )
 
     def _gather_channel_hits(
         self,
@@ -530,27 +579,104 @@ class HybridSearchEngine:
             ChannelHit(doc_id=str(chunk_id), score=float(score)) for chunk_id, score in hits[:top_k]
         ]
 
+    def _compute_pool_weights(self) -> dict[str, float]:
+        weights = {
+            "semantic": 1.0,
+            "bm25": 1.0,
+            "splade": 1.0,
+            "warp": 1.0,
+            "xtr": 1.0,
+        }
+        configured = getattr(self._settings.index, "rrf_weights", {}) or {}
+        weights.update({k: float(v) for k, v in configured.items()})
+        return weights
 
-def _rrf_fuse(
-    runs: Mapping[str, Sequence[ChannelHit]],
-    *,
-    k: int,
-    limit: int,
-) -> tuple[list[HybridResultDoc], dict[str, list[tuple[str, int, float]]]]:
-    fused_scores: dict[str, float] = {}
-    contributions: dict[str, list[tuple[str, int, float]]] = {}
+    def _resolve_pool_weights(
+        self,
+        weights_override: Mapping[str, float] | None = None,
+        extra_channels: Sequence[str] | None = None,
+    ) -> dict[str, float]:
+        weights = dict(self._pool_weights)
+        if extra_channels:
+            for name in extra_channels:
+                weights.setdefault(name, 1.0)
+        if weights_override:
+            weights.update({k: float(v) for k, v in weights_override.items()})
+        return weights
 
-    for channel, hits in runs.items():
-        for rank, hit in enumerate(hits, start=1):
-            contribution = 1.0 / (k + rank)
-            fused_scores[hit.doc_id] = fused_scores.get(hit.doc_id, 0.0) + contribution
-            contributions.setdefault(hit.doc_id, []).append((channel, rank, hit.score))
+    def _make_pooler(
+        self,
+        weights_override: Mapping[str, float] | None = None,
+        *,
+        extra_channels: Sequence[str] | None = None,
+    ) -> HybridPoolEvaluator:
+        weights = self._resolve_pool_weights(weights_override, extra_channels)
+        threshold = getattr(self._settings.index, "semantic_min_score", 0.0)
+        return HybridPoolEvaluator(weights=weights, sim_threshold=threshold)
 
-    sorted_docs = sorted(fused_scores.items(), key=lambda item: item[1], reverse=True)
-    top_docs = sorted_docs[:limit]
-    docs = [HybridResultDoc(doc_id=doc_id, score=score) for doc_id, score in top_docs]
-    filtered = {doc_id: contributions.get(doc_id, []) for doc_id, _ in top_docs}
-    return docs, filtered
+    def _select_pooler(
+        self,
+        options: HybridSearchOptions,
+    ) -> tuple[HybridPoolEvaluator, Mapping[str, float]]:
+        extra_channels = tuple((options.extra_channels or {}).keys())
+        weights = self._resolve_pool_weights(options.weights, extra_channels)
+        if extra_channels or options.weights is not None:
+            pooler = self._make_pooler(options.weights, extra_channels=extra_channels)
+        else:
+            pooler = self._pooler
+        return pooler, weights
+
+    @staticmethod
+    def _flatten_hits_for_pool(runs: Mapping[str, Sequence[ChannelHit]]) -> list[Hit]:
+        flattened: list[Hit] = []
+        for source, hits in runs.items():
+            for rank, hit in enumerate(hits, start=1):
+                flattened.append(
+                    Hit(
+                        doc_id=str(hit.doc_id),
+                        score=float(hit.score),
+                        source=source,
+                        meta={"score": float(hit.score), "rank": rank},
+                    )
+                )
+        return flattened
+
+    @staticmethod
+    def _build_contribution_map(
+        runs: Mapping[str, Sequence[ChannelHit]],
+    ) -> dict[str, list[tuple[str, int, float]]]:
+        contributions: dict[str, list[tuple[str, int, float]]] = {}
+        for channel, hits in runs.items():
+            for rank, hit in enumerate(hits, start=1):
+                contributions.setdefault(hit.doc_id, []).append((channel, rank, float(hit.score)))
+        return contributions
+
+    def _compose_method_metadata(
+        self,
+        active_channels: Sequence[str],
+        warnings: Sequence[str],
+        stats: _MethodStats,
+    ) -> dict[str, object]:
+        default_k = stats.faiss_k or self._settings.index.default_k
+        default_nprobe = stats.nprobe or self._settings.index.default_nprobe
+        coverage = (
+            f"Hybrid pool fused {stats.fused_count}/{max(1, stats.limit)} results "
+            f"(faiss k={default_k}, nprobe={default_nprobe})"
+        )
+        explainability = {
+            "pool": {
+                "weights": dict(stats.weights),
+                "sim_threshold": getattr(self._settings.index, "semantic_min_score", 0.0),
+            }
+        }
+        retrieval = list(dict.fromkeys(active_channels or ["semantic"]))
+        notes = list(dict.fromkeys(warnings)) if warnings else []
+        return {
+            "retrieval": retrieval,
+            "coverage": coverage,
+            "notes": notes,
+            "explainability": explainability,
+        }
 
 
 __all__ = [
@@ -558,6 +684,8 @@ __all__ = [
     "ChannelHit",
     "HybridResultDoc",
     "HybridSearchEngine",
+    "HybridSearchOptions",
     "HybridSearchResult",
+    "HybridSearchTuning",
     "SpladeSearchProvider",
 ]

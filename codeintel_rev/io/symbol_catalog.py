@@ -110,7 +110,7 @@ class SymbolCatalog:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS path_weights(
-                  glob TEXT PRIMARY KEY,
+                  glob_pattern TEXT PRIMARY KEY,
                   weight DOUBLE
                 )"""
             )
@@ -127,19 +127,43 @@ class SymbolCatalog:
         if not rows:
             return
 
+        payload = [
+            (
+                row.symbol,
+                row.display_name,
+                row.kind,
+                row.language,
+                row.uri,
+                row.start_line,
+                row.start_col,
+                row.end_line,
+                row.end_col,
+                row.chunk_id,
+                row.docstring,
+                row.signature,
+            )
+            for row in rows
+        ]
         with self._manager.connection() as conn:
-            conn.execute("BEGIN")
-            try:
-                conn.execute(
-                    "CREATE TEMP TABLE _defs AS SELECT * FROM (SELECT ''::TEXT AS symbol) WHERE 1=0"
-                )
-                conn.register("_tmp_defs", rows)
-                conn.execute("INSERT OR REPLACE INTO symbol_defs SELECT * FROM _tmp_defs")
-            except Exception:
-                conn.execute("ROLLBACK")
-                raise
-            else:
-                conn.execute("COMMIT")
+            conn.executemany(
+                """
+                INSERT OR REPLACE INTO symbol_defs(
+                  symbol,
+                  display_name,
+                  kind,
+                  language,
+                  uri,
+                  start_line,
+                  start_col,
+                  end_line,
+                  end_col,
+                  chunk_id,
+                  docstring,
+                  signature
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                payload,
+            )
 
     def bulk_insert_occurrences(self, rows: Sequence[SymbolOccurrenceRow]) -> None:
         """Bulk load symbol occurrences."""
@@ -160,3 +184,57 @@ class SymbolCatalog:
                 [{"chunk_id": chunk_id, "symbol": symbol} for chunk_id, symbol in pairs],
             )
             conn.execute("INSERT INTO chunk_symbols SELECT * FROM _tmp_pairs")
+
+    def fetch_symbol_defs(
+        self,
+        *,
+        limit: int | None = None,
+        kinds: Sequence[str] | None = None,
+    ) -> list[SymbolDefRow]:
+        """Return symbol definitions with stable chunk identifiers.
+
+        Parameters
+        ----------
+        limit : int | None, optional
+            Optional upper bound on the number of rows returned.
+        kinds : Sequence[str] | None, optional
+            When provided, restricts returned rows to the specified symbol kinds.
+
+        Returns
+        -------
+        list[SymbolDefRow]
+            Materialized symbol definition rows ordered by symbol identifier.
+        """
+        sql = (
+            "SELECT symbol, display_name, kind, language, uri, start_line, start_col, "
+            "end_line, end_col, chunk_id, docstring, signature "
+            "FROM symbol_defs WHERE chunk_id IS NOT NULL"
+        )
+        params: list[object] = []
+        if kinds:
+            placeholders = ",".join("?" for _ in kinds)
+            sql += f" AND kind IN ({placeholders})"
+            params.extend(kinds)
+        sql += " ORDER BY symbol"
+        if limit is not None:
+            sql += " LIMIT ?"
+            params.append(limit)
+        with self._manager.connection() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return [
+            SymbolDefRow(
+                symbol=row[0],
+                display_name=row[1],
+                kind=row[2],
+                language=row[3],
+                uri=row[4],
+                start_line=row[5],
+                start_col=row[6],
+                end_line=row[7],
+                end_col=row[8],
+                chunk_id=int(row[9]),
+                docstring=row[10],
+                signature=row[11],
+            )
+            for row in rows
+        ]

@@ -1,0 +1,128 @@
+diff --git a/codeintel_rev/retrieval/hybrid.py b/codeintel_rev/retrieval/hybrid.py
+new file mode 100644
+index 0000000..bbbbbbb 100644
+--- /dev/null
++++ b/codeintel_rev/retrieval/hybrid.py
+@@ -0,0 +1,130 @@
++from __future__ import annotations
++from dataclasses import dataclass
++from typing import Iterable, Mapping, Sequence
++from collections import defaultdict
++
++@dataclass(frozen=True)
++class SearchHit:
++    doc_id: str
++    score: float
++    rank: int
++    source: str  # 'semantic' | 'bm25' | 'splade' | 'other'
++
++def rrf_fuse(runs: Sequence[Sequence[SearchHit]], K: int = 60, limit: int = 50) -> list[tuple[str, float]]:
++    \"\"\"Reciprocal Rank Fusion across multiple ranked lists (robust, no score norm).\"\"\"
++    agg: dict[str, float] = defaultdict(float)
++    for run in runs:
++        for hit in run:
++            agg[hit.doc_id] += 1.0 / (K + hit.rank + 1)
++    return sorted(agg.items(), key=lambda x: -x[1])[:limit]
++
++def make_hits(ids: Sequence[str], scores: Sequence[float], source: str) -> list[SearchHit]:
++    return [SearchHit(doc_id=d, score=s, rank=i, source=source) for i, (d, s) in enumerate(zip(ids, scores))]
++
+diff --git a/codeintel_rev/io/hybrid_search.py b/codeintel_rev/io/hybrid_search.py
+index ccccccc..ddddddd 100644
+--- a/codeintel_rev/io/hybrid_search.py
++++ b/codeintel_rev/io/hybrid_search.py
+@@ -1,7 +1,68 @@
+ from __future__ import annotations
+-from typing import Mapping, Sequence
++from typing import Mapping, Sequence, Iterable
++from kgfoundry_common.prometheus import counter, histogram, gauge
++from time import perf_counter
++
++from codeintel_rev.config.settings import load_settings
++from codeintel_rev.retrieval.hybrid import rrf_fuse, make_hits
+ 
+ class HybridSearchEngine:
+     ...
++    _metrics_ready = False
++    _q_counter = counter("codeintel_rev_queries_total", "Total retrieval requests", ["kind"])
++    _q_errors = counter("codeintel_rev_query_errors_total", "Failed retrieval requests", ["kind", "channel"])
++    _lat_rrf = histogram("codeintel_rev_rrf_duration_seconds", "RRF fusion latency (s)")
++    _lat_channel = histogram("codeintel_rev_channel_duration_seconds", "Channel search latency (s)", ["channel"])
++    _index_version = gauge("codeintel_rev_index_version_info", "Active index version", ["component"])
++
++    def _ensure_metrics(self) -> None:
++        if self._metrics_ready:
++            return
++        # Set index versions (read from IndexLifecycle stable paths)
++        try:
++            self._index_version.labels(component="faiss").set(self._paths.version("faiss"))
++            self._index_version.labels(component="bm25").set(self._paths.version("lucene_bm25"))
++            self._index_version.labels(component="splade").set(self._paths.version("lucene_splade"))
++        except Exception:
++            pass
++        self._metrics_ready = True
++
++    def _run_channel(self, channel, query: str, limit: int) -> list[tuple[str, float]]:
++        t0 = perf_counter()
++        try:
++            hits = channel.search(query, top_k=limit)
++            return [(h.doc_id, h.score) for h in hits]
++        finally:
++            self._lat_channel.labels(channel=channel.name).observe(perf_counter() - t0)
++
++    def search(self, query: str, *, semantic_hits: Sequence[tuple[int, float]], limit: int,
++               extra_channels: Mapping[str, Sequence[ChannelHit]] | None = None,
++               weights: Mapping[str, float] | None = None) -> HybridSearchResult:
++        \"\"\"Fuse dense and sparse retrieval results using RRF (configurable prefetch).\"\"\"
++        self._ensure_metrics()
++        settings = load_settings()
++        prefetch = settings.hybrid.prefetch
++        rrfK = settings.hybrid.rrf_K
++
++        # Gather runs
++        runs = []
++        # semantic comes in as (doc_id, score)
++        sem_ids = [str(doc_id) for (doc_id, _s) in semantic_hits[:prefetch.get("semantic", len(semantic_hits))]]
++        sem_scores = [float(s) for (_id, s) in semantic_hits[:prefetch.get("semantic", len(semantic_hits))]]
++        runs.append(make_hits(sem_ids, sem_scores, "semantic"))
++
++        # optional BM25/SPLADE channels
++        for ch_name, ch in (("bm25", self._registry.get("bm25")), ("splade", self._registry.get("splade"))):
++            if ch is None:
++                continue
++            try:
++                ch_hits = self._run_channel(ch, query, prefetch.get(ch_name, 200))
++                runs.append(make_hits([d for d, _ in ch_hits], [s for _d, s in ch_hits], ch_name))
++            except Exception:
++                self._q_errors.labels(kind="search", channel=ch_name).inc()
++
++        # RRF fuse
++        with self._lat_rrf.time():
++            fused = rrf_fuse(runs, K=rrfK, limit=limit)
++        self._q_counter.labels(kind="search").inc()
++        return self._build_result(fused, runs, query)
+ 
+diff --git a/codeintel_rev/mcp_server/routes.py b/codeintel_rev/mcp_server/routes.py
+new file mode 100644
+index 0000000..eeeeeee 100644
+--- /dev/null
++++ b/codeintel_rev/mcp_server/routes.py
+@@ -0,0 +1,78 @@
++from __future__ import annotations
++from fastapi import APIRouter, Query
++from codeintel_rev.io.hybrid_search import HybridSearchEngine
++
++router = APIRouter(prefix="/retrieval", tags=["retrieval"])
++
++@router.get("/explain")
++def explain(query: str = Query(...), k: int = Query(10)) -> dict:
++    \"\"\"Return per-channel top-k and fused ranks for debugging in MCP clients.\"\"\"
++    engine = HybridSearchEngine(...)
++    result = engine.search(query, semantic_hits=[], limit=k)  # semantic injected upstream
++    return {
++        "query": query,
++        "k": k,
++        "channels": result.channel_breakdown,  # per-channel hits
++        "fused": result.results,               # final top-k
++        "rrf_K": engine._settings.hybrid.rrf_K,
++    }

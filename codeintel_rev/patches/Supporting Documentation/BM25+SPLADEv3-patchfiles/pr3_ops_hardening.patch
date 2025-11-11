@@ -1,0 +1,138 @@
+diff --git a/.github/workflows/retrieval-ci.yml b/.github/workflows/retrieval-ci.yml
+new file mode 100644
+index 0000000..1212121 100644
+--- /dev/null
++++ b/.github/workflows/retrieval-ci.yml
+@@ -0,0 +1,145 @@
++name: retrieval-ci
++on:
++  workflow_dispatch:
++  schedule:
++    - cron: "13 3 * * *"  # nightly
++
++jobs:
++  build-and-test:
++    runs-on: [self-hosted, onprem-search]
++    steps:
++      - uses: actions/checkout@v4
++      - name: Set up JDK 21 (Lucene/Anserini)
++        uses: actions/setup-java@v4
++        with:
++          java-version: "21"
++          distribution: "temurin"
++      - name: Set up Python
++        uses: actions/setup-python@v5
++        with:
++          python-version: "3.11"
++      - name: Install deps
++        run: |
++          python -m pip install -U pip wheel
++          pip install -e .[dev] pyserini==0.40.0
++      - name: Unit tests
++        run: pytest -q
++
++  rebuild-indexes:
++    needs: build-and-test
++    runs-on: [self-hosted, onprem-search]
++    steps:
++      - uses: actions/checkout@v4
++      - name: Build BM25 Lucene index
++        run: |
++          python -m codeintel_rev.cli.build_indexes bm25 \
++            --jsonl-dir data/jsonl \
++            --index-dir artifacts/lucene_bm25_new
++      - name: Build SPLADE impact index
++        run: |
++          python -m codeintel_rev.cli.build_indexes splade-impact \
++            --jsonl-dir artifacts/splade_vectors \
++            --index-dir artifacts/lucene_splade_new
++      - name: Publish/flip current
++        run: |
++          python -m codeintel_rev.cli.build_indexes publish \
++            --base-dir artifacts \
++            --version ${{ github.run_id }} \
++            --bm25-dir artifacts/lucene_bm25_new \
++            --splade-dir artifacts/lucene_splade_new
++
++  recall-regression:
++    needs: rebuild-indexes
++    runs-on: [self-hosted, onprem-search]
++    steps:
++      - uses: actions/checkout@v4
++      - name: Install deps
++        run: |
++          python -m pip install -U pip wheel
++          pip install -e .[dev] pyserini==0.40.0
++      - name: Run recall harness (synthetic & golden queries)
++        run: |
++          python tools/recall_harness.py --queries ops/recall_queries.yaml --k 10 --threshold 0.95
++
++
+diff --git a/tools/recall_harness.py b/tools/recall_harness.py
+new file mode 100755
+index 0000000..3434343 100755
+--- /dev/null
++++ b/tools/recall_harness.py
+@@ -0,0 +1,130 @@
++#!/usr/bin/env python
++from __future__ import annotations
++import json, sys, time, statistics as stats
++from pathlib import Path
++import typer, yaml
++from kgfoundry_common.prometheus import gauge
++from codeintel_rev.io.hybrid_search import HybridSearchEngine
++
++app = typer.Typer()
++recall_g = gauge("codeintel_rev_recall_at_k", "Offline recall@k for golden queries", ["k"])
++
++@app.command()
++def main(queries: Path, k: int = 10, threshold: float = 0.9) -> None:
++    \"\"\"Compute recall@k over a small golden set; fail CI if below threshold.\"\"\"
++    data = yaml.safe_load(queries.read_text())
++    engine = HybridSearchEngine(...)
++    recalls = []
++    for q in data["queries"]:
++        expected = set(q["expect_ids"])  # union of acceptable ids
++        res = engine.search(q["text"], semantic_hits=[], limit=k)
++        got = {str(h.doc_id) for h in res.results}
++        recalls.append(1.0 if expected & got else 0.0)
++    recall_at_k = sum(recalls) / max(1, len(recalls))
++    recall_g.labels(k=str(k)).set(recall_at_k)
++    print(json.dumps({"recall_at_k": recall_at_k}))
++    if recall_at_k < threshold:
++        raise SystemExit(f"Recall@{k} {recall_at_k:.3f} < threshold {threshold:.3f}")
++
++if __name__ == "__main__":
++    app()
++
+diff --git a/ops/recall_queries.yaml b/ops/recall_queries.yaml
+new file mode 100644
+index 0000000..5656565 100644
+--- /dev/null
++++ b/ops/recall_queries.yaml
+@@ -0,0 +1,22 @@
++queries:
++  - text: "find FooBar class"
++    expect_ids: ["FooBar", "FooBar.java:class", "src/foo/Bar.py:FooBar"]
++  - text: "database connection"
++    expect_ids: ["connect_db", "Database.connect", "db_connect"]
++  - text: "jwt token refresh"
++    expect_ids: ["renewAuthToken", "refresh_jwt", "AuthService.renew"]
++
+diff --git a/codeintel_rev/observability/metrics.py b/codeintel_rev/observability/metrics.py
+new file mode 100644
+index 0000000..abababa 100644
+--- /dev/null
++++ b/codeintel_rev/observability/metrics.py
+@@ -0,0 +1,40 @@
++from __future__ import annotations
++from kgfoundry_common.prometheus import counter, histogram, gauge
++
++# Expose stable names used by Grafana dashboard
++queries_total = counter("codeintel_rev_queries_total", "Total retrieval requests", ["kind"])
++query_errors_total = counter("codeintel_rev_query_errors_total", "Failed retrieval requests", ["kind", "channel"])
++rrf_duration_seconds = histogram("codeintel_rev_rrf_duration_seconds", "RRF fusion latency (s)")
++channel_duration_seconds = histogram("codeintel_rev_channel_duration_seconds", "Channel search latency (s)", ["channel"])
++index_version_info = gauge("codeintel_rev_index_version_info", "Active index version", ["component"])
++recall_at_k = gauge("codeintel_rev_recall_at_k", "Offline recall@k for golden queries", ["k"])
++

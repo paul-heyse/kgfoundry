@@ -1,0 +1,3878 @@
+[
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "AdditiveCoarseQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "AdditiveQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "AlignedTableFloat32",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "AlignedTableUint16",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "AlignedTableUint8",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "AllocInfo",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "AllocRequest",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ArrayInvertedLists",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ArrayInvertedListsPanorama",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "AutoTuneCriterion",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "BinaryInvertedListScanner",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "BitstringReader",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "BitstringWriter",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "BlockInvertedLists",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "BufferList",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "BufferedIOReader",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "BufferedIOWriter",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Vector transform",
+    "Symbol": "CenteringTransform",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "Cloner",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Clustering/Training",
+    "Symbol": "Clustering",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Clustering/Training",
+    "Symbol": "Clustering1D",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Clustering/Training",
+    "Symbol": "ClusteringIterationStats",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Clustering/Training",
+    "Symbol": "ClusteringIterationStatsVector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Clustering/Training",
+    "Symbol": "ClusteringParameters",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "CodePacker",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "CodePackerFlat",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "CodeSet",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "CombinerRangeKNNfloat",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "CombinerRangeKNNint16",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ComputeCodesAddCentroidsLUT0MemoryPool",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ComputeCodesAddCentroidsLUT1MemoryPool",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "DefaultShardingFunction",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "DirectMap",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "DirectMapAdd",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "DistanceComputer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "DummyResultHandler",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "Embedding",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "EnumeratedVectors",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "FFN",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "FactorsData",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "FastScanDistancePostProcessing",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "FastScanStats",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "FileIOReader",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "FileIOWriter",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "FlatCodesDistanceComputer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "Float32Vector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "Float32VectorVector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "Float64Vector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuClonerOptions",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuDistanceParams",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIcmEncoder",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIcmEncoderFactory",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIndex",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIndexBinaryCagra",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIndexBinaryFlat",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIndexBinaryFlatConfig",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIndexCagra",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIndexCagraConfig",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIndexConfig",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIndexFlat",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIndexFlatConfig",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIndexFlatIP",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIndexFlatL2",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIndexIVF",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIndexIVFConfig",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIndexIVFFlat",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIndexIVFFlatConfig",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIndexIVFPQ",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIndexIVFPQConfig",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "GpuIndexIVFScalarQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuIndexIVFScalarQuantizerConfig",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuMultipleClonerOptions",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuParameterSpace",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuProgressiveDimIndexFactory",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuResources",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuResourcesProvider",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuResourcesProviderFromInstance",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "GpuResourcesVector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (HNSW/graph)",
+    "Symbol": "HNSW",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "HNSWStats",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "HStackInvertedLists",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IDSelector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IDSelectorAll",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IDSelectorAnd",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IDSelectorArray",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IDSelectorBatch",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IDSelectorBitmap",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IDSelectorNot",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IDSelectorOr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IDSelectorRange",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IDSelectorTranslated",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IDSelectorXOr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IOReader",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IOWriter",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Vector transform",
+    "Symbol": "ITQMatrix",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Vector transform",
+    "Symbol": "ITQTransform",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IVFFastScanStats",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IVFPQBuildCagraConfig",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IVFPQSearchCagraConfig",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IVFPQSearchParameters",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IVFRaBitQSearchParameters",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IcmEncoder",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IcmEncoderFactory",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "Index",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "Index2Layer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "IndexAdditiveQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "IndexAdditiveQuantizerFastScan",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (Binary)",
+    "Symbol": "IndexBinary",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (Binary)",
+    "Symbol": "IndexBinaryFlat",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (Binary)",
+    "Symbol": "IndexBinaryFromFloat",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (Binary)",
+    "Symbol": "IndexBinaryHNSW",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (Binary)",
+    "Symbol": "IndexBinaryHNSWCagra",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (Binary)",
+    "Symbol": "IndexBinaryHash",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (Binary)",
+    "Symbol": "IndexBinaryHashStats",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (Binary)",
+    "Symbol": "IndexBinaryIDMap",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (Binary)",
+    "Symbol": "IndexBinaryIDMap2",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (Binary)",
+    "Symbol": "IndexBinaryIVF",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (Binary)",
+    "Symbol": "IndexBinaryMultiHash",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (Binary)",
+    "Symbol": "IndexBinaryReplicas",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (Binary)",
+    "Symbol": "IndexBinaryShards",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexFastScan",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (Flat/Exact)",
+    "Symbol": "IndexFlat",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (Flat/Exact)",
+    "Symbol": "IndexFlat1D",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (Flat/Exact)",
+    "Symbol": "IndexFlatCodes",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (Flat/Exact)",
+    "Symbol": "IndexFlatIP",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (Flat/Exact)",
+    "Symbol": "IndexFlatL2",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (HNSW/graph)",
+    "Symbol": "IndexHNSW",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (HNSW/graph)",
+    "Symbol": "IndexHNSW2Level",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (HNSW/graph)",
+    "Symbol": "IndexHNSWCagra",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (HNSW/graph)",
+    "Symbol": "IndexHNSWFlat",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (HNSW/graph)",
+    "Symbol": "IndexHNSWPQ",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (HNSW/graph)",
+    "Symbol": "IndexHNSWSQ",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexIDMap",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexIDMap2",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVF",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFAdditiveQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFAdditiveQuantizerFastScan",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFFastScan",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFFlat",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFFlatDedup",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFFlatPanorama",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFIndependentQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFInterface",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFLocalSearchQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFLocalSearchQuantizerFastScan",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFPQ",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFPQFastScan",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFPQR",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFPQStats",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFProductLocalSearchQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFProductLocalSearchQuantizerFastScan",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFProductResidualQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFProductResidualQuantizerFastScan",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFRaBitQ",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFRaBitQFastScan",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFResidualQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFResidualQuantizerFastScan",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFScalarQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFSpectralHash",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (IVF family)",
+    "Symbol": "IndexIVFStats",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexLSH",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexLattice",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "IndexLocalSearchQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexLocalSearchQuantizerFastScan",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexNNDescent",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexNNDescentFlat",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (NSG/graph)",
+    "Symbol": "IndexNSG",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (NSG/graph)",
+    "Symbol": "IndexNSGFlat",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (NSG/graph)",
+    "Symbol": "IndexNSGPQ",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (NSG/graph)",
+    "Symbol": "IndexNSGSQ",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexNeuralNetCodec",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "IndexPQ",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "IndexPQFastScan",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "IndexPQStats",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexPreTransform",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "IndexProductLocalSearchQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexProductLocalSearchQuantizerFastScan",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "IndexProductResidualQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "IndexProductResidualQuantizerFastScan",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexQINCo",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexRaBitQ",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexRaBitQFastScan",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexRandom",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexRefine",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexRefineFlat",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexRefineSearchParameters",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexReplicas",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "IndexResidualQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "IndexResidualQuantizerFastScan",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexRowwiseMinMax",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexRowwiseMinMaxBase",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexRowwiseMinMaxFP16",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "IndexScalarQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexShards",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexShardsIVF",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (other)",
+    "Symbol": "IndexSplitVectors",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "Int16Vector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "Int32Tensor2D",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "Int32Vector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "Int32VectorVector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "Int64Vector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "Int64VectorVector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "Int8Vector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "InterruptCallback",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "IntersectionCriterion",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "InvertedListScanner",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "InvertedLists",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "InvertedListsIOHook",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "InvertedListsIterator",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "InvertedListsPtrVector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "LSQTimer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "LSQTimerScope",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "Level1Quantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "Linear",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Vector transform",
+    "Symbol": "LinearTransform",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "LocalSearchCoarseQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "LocalSearchQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "MapLong2Long",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "MappedFileIOReader",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "MaskedInvertedLists",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "MatrixStats",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "MaybeOwnedVectorFloat32",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "MaybeOwnedVectorFloat32Vector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "MaybeOwnedVectorInt32",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "MaybeOwnedVectorInt32Vector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "MaybeOwnedVectorOwner",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "MaybeOwnedVectorUInt8",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "MaybeOwnedVectorUInt8Vector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "MmappedFileMappingOwner",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "MultiIndexQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "MultiIndexQuantizer2",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "NNDescent",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Index (NSG/graph)",
+    "Symbol": "NSG",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "NSG_Graph_int",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "NegativeDistanceComputer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "Neighbor",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "NeuralNetCodec",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "Nhood",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Vector transform",
+    "Symbol": "NormalizationTransform",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Vector transform",
+    "Symbol": "OPQMatrix",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "OnDiskInvertedLists",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "OnDiskOneList",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "OnDiskOneListVector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "OneRecallAtRCriterion",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "OperatingPoint",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "OperatingPointVector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "OperatingPoints",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Vector transform",
+    "Symbol": "PCAMatrix",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "PQDecoder16",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "PQDecoder8",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "PQDecoderGeneric",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "PQEncoder16",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "PQEncoder8",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "PQEncoderGeneric",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "PanoramaStats",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ParameterRange",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ParameterRangeVector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ParameterSpace",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "PartitionStats",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "PermutationObjective",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "PolysemousTraining",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "ProductAdditiveQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "ProductLocalSearchQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "ProductQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "ProductResidualQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Clustering/Training",
+    "Symbol": "ProgressiveDimClustering",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Clustering/Training",
+    "Symbol": "ProgressiveDimClusteringParameters",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ProgressiveDimIndexFactory",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "PyCallbackIDSelector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "PyCallbackIOReader",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "PyCallbackIOWriter",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "PyCallbackShardingFunction",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "PythonInterruptCallback",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "QINCo",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "QINCoStep",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "Quantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "QueryFactorsData",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "RaBitQSearchParameters",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "RaBitQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "RandomGenerator",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Vector transform",
+    "Symbol": "RandomRotationMatrix",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "RangeQueryResult",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "RangeSearchPartialResult",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "RangeSearchResult",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ReadOnlyInvertedLists",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "RefineBeamLUTMemoryPool",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "RefineBeamMemoryPool",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Vector transform",
+    "Symbol": "RemapDimensionsTransform",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "Repeat",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "RepeatVector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "Repeats",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ReproduceDistancesObjective",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "ResidualCoarseQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "ResidualQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "SIMDResultHandler",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "SIMDResultHandlerToFloat",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "ScalarQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "SearchParameters",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "SearchParametersCagra",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "SearchParametersHNSW",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "SearchParametersIVF",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "SearchParametersPQ",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Vector transform",
+    "Symbol": "SearchParametersPreTransform",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Quantization",
+    "Symbol": "SearchParametersResidualCoarseQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ShardingFunction",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "SimulatedAnnealingOptimizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "SimulatedAnnealingParameters",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "SliceInvertedLists",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "SlidingIndexWindow",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "SplitMix64RandomGenerator",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "StandardGpuResources",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "StandardGpuResourcesImpl",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "StopWordsInvertedLists",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "StoreResultHandler",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "SwigPyIterator",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "Tensor2D",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ThreadedIndexBase",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ThreadedIndexBaseBinary",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "TimeoutCallback",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ToCPUCloner",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "ToGpuCloner",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "GPU API/Class",
+    "Symbol": "ToGpuClonerMultiple",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "UInt16Vector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "UInt32Vector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "UInt64Vector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "UInt8Vector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "UInt8VectorVector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "VStackInvertedLists",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "VectorIOReader",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "VectorIOWriter",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Vector transform",
+    "Symbol": "VectorTransform",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Vector transform",
+    "Symbol": "VectorTransformVector",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "VisitedTable",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ZeroCopyIOReader",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ZnSphereCodec",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ZnSphereCodecAlt",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ZnSphereCodecRec",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "ZnSphereSearch",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "_SwigNonDynamicMeta",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "float_maxheap_array_t",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "float_minheap_array_t",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "int_maxheap_array_t",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "int_minheap_array_t",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Class",
+    "Category": "Other",
+    "Symbol": "simd16uint16",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "CMax_float_partition_fuzzy",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "CMax_uint16_partition_fuzzy",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "CMin_float_partition_fuzzy",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "CMin_uint16_partition_fuzzy",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "_swig_add_metaclass",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "_swig_repr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "_swig_setattr_nondynamic_class_variable",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "_swig_setattr_nondynamic_instance_variable",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "allocTypeToString",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "aq_estimate_norm_scale",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "aq_quantize_LUT_and_bias",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "beam_search_encode_step",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "beam_search_encode_step_tab",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Search (k-NN)",
+    "Symbol": "bfKnn",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Search (k-NN)",
+    "Symbol": "bfKnn_tiling",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "binary_to_real",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "bincode_hist",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "bitvec_print",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "bitvec_shuffle",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "bitvecs2fvecs",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Search (k-NN)",
+    "Symbol": "bruteForceKnn",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "bucket_sort",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "bvec_checksum",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "bvecs_checksum",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "byte_rand",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "cast_cudastream_t_to_integer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "cast_integer_to_cudastream_t",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "cast_integer_to_float_ptr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "cast_integer_to_idx_t_ptr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "cast_integer_to_int_ptr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "cast_integer_to_uint8_ptr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "cast_integer_to_void_ptr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "check_compatible_for_merge",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "check_openmp",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "clone_Quantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "clone_binary_index",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "clone_index",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "compute_PQ_dis_tables_dsub2",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "compute_codes_add_centroids_mp_lut0",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "compute_codes_add_centroids_mp_lut1",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "compute_factors_from_intermediates",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "compute_query_factors",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "compute_vector_factors",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "compute_vector_intermediate_values",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "crosshamming_count_thres",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "downcast_AdditiveQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "downcast_IndexBinary",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "downcast_InvertedLists",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "downcast_Quantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "downcast_VectorTransform",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "downcast_index",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "extract_bit_fastscan",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "extract_bit_standard",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "extract_index_ivf",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "float_rand",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "float_randn",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fourcc",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fourcc_inv",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fourcc_inv_printable",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec2bitvec",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_L1",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_L2sqr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_L2sqr_batch_4",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_L2sqr_by_idx",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_L2sqr_ny",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_L2sqr_ny_nearest",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_L2sqr_ny_nearest_y_transposed",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_L2sqr_ny_transposed",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_Linf",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_add",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_argsort",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_argsort_parallel",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_inner_product",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_inner_product_batch_4",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_inner_products_by_idx",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_inner_products_ny",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_madd",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_madd_and_argmin",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_norm_L2sqr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_norms_L2",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_norms_L2sqr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_renorm_L2",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvec_sub",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvecs2bitvecs",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "fvecs_maybe_subsample",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Search (k-NN)",
+    "Symbol": "generalized_hammings_knn_hc",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "System/Introspection",
+    "Symbol": "get_compile_options",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "System/Introspection",
+    "Symbol": "get_cycles",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "System/Introspection",
+    "Symbol": "get_extra_distance_computer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "System/Introspection",
+    "Symbol": "get_invlist_range",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "System/Introspection",
+    "Symbol": "get_mem_usage_kb",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "GPU Utilities",
+    "Symbol": "get_num_gpus",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "System/Introspection",
+    "Symbol": "get_numeric_type_size",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "System/Introspection",
+    "Symbol": "get_version",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "getmillisecs",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "GPU Utilities",
+    "Symbol": "gpu_profiler_start",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "GPU Utilities",
+    "Symbol": "gpu_profiler_stop",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "GPU Utilities",
+    "Symbol": "gpu_sync_all_devices",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "greedy_update_nearest",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "hamming_count_thres",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Search (range)",
+    "Symbol": "hamming_range_search",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "hammings",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Search (k-NN)",
+    "Symbol": "hammings_knn",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Search (k-NN)",
+    "Symbol": "hammings_knn_hc",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Search (k-NN)",
+    "Symbol": "hammings_knn_mc",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "hash_bytes",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "hashtable_int64_to_int64_add",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "hashtable_int64_to_int64_init",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "hashtable_int64_to_int64_lookup",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "imbalance_factor",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "GPU Utilities",
+    "Symbol": "index_binary_cpu_to_gpu",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "GPU Utilities",
+    "Symbol": "index_binary_cpu_to_gpu_multiple",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "index_binary_factory",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "GPU Utilities",
+    "Symbol": "index_binary_gpu_to_cpu",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "GPU Utilities",
+    "Symbol": "index_cpu_to_gpu",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "GPU Utilities",
+    "Symbol": "index_cpu_to_gpu_multiple",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Index factory",
+    "Symbol": "index_factory",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "GPU Utilities",
+    "Symbol": "index_gpu_to_cpu",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "initialize_IVFPQ_precomputed_table",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "inner_product_to_L2sqr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "int64_rand",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "int64_rand_max",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "GPU Utilities",
+    "Symbol": "isGpuIndex",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "GPU Utilities",
+    "Symbol": "isGpuIndexImplemented",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "is_similarity_metric",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "ivec_checksum",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "ivec_hist",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "ivf_residual_add_from_flat_codes",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "ivf_residual_from_quantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Clustering/Training",
+    "Symbol": "kmeans1d",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Clustering/Training",
+    "Symbol": "kmeans_clustering",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Search (k-NN)",
+    "Symbol": "knn_L2sqr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Search (k-NN)",
+    "Symbol": "knn_L2sqr_by_idx",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Search (k-NN)",
+    "Symbol": "knn_extra_metrics",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Search (k-NN)",
+    "Symbol": "knn_inner_product",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Search (k-NN)",
+    "Symbol": "knn_inner_products_by_idx",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "lo_build",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "lo_listno",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "lo_offset",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "makeDevAlloc",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "makeSpaceAlloc",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "makeTempAlloc",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "match_hamming_thres",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "matrix_bucket_sort_inplace",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "matrix_qr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "memcpy",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "memorySpaceToString",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "merge_into",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Search (k-NN)",
+    "Symbol": "merge_knn_results_CMax",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Search (k-NN)",
+    "Symbol": "merge_knn_results_CMin",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "merge_result_table_with",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "omp_get_max_threads",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "omp_set_num_threads",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "pack_bitstrings",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "pairwise_L2sqr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "pairwise_extra_distances",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "pairwise_indexed_L2sqr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "pairwise_indexed_inner_product",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "popcount32",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "popcount64",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "quantize_LUT_and_bias",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "rand_perm",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "rand_perm_splitmix64",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "rand_smooth_vectors",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Search (range)",
+    "Symbol": "range_search_L2sqr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Search (range)",
+    "Symbol": "range_search_inner_product",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Search (range)",
+    "Symbol": "range_search_with_parameters",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "ranklist_handle_ties",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "ranklist_intersection_size",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "I/O & Serialization",
+    "Symbol": "read_InvertedLists",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "I/O & Serialization",
+    "Symbol": "read_ProductQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "I/O & Serialization",
+    "Symbol": "read_VectorTransform",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "I/O & Serialization",
+    "Symbol": "read_index",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "I/O & Serialization",
+    "Symbol": "read_index_binary",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "real_to_binary",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "refine_beam_LUT_mp",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "refine_beam_mp",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "reflection",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "rev_swig_ptr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "round_uint8_per_column",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "round_uint8_per_column_multi",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "search_and_return_centroids",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "search_centroid",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "search_from_candidate_unbounded",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "search_from_candidates",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "search_neighbors_to_add",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "search_with_parameters",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "System/Introspection",
+    "Symbol": "set_bit_fastscan",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "System/Introspection",
+    "Symbol": "set_bit_standard",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "System/Introspection",
+    "Symbol": "set_invlist_range",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "shard_binary_ivf_index_centroids",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "shard_ivf_index_centroids",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "should_use_cuvs",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "simd_histogram_16",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "simd_histogram_8",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "smawk",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "storage_distance_computer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "swig_ptr",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "swig_version",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "GPU Utilities",
+    "Symbol": "tryCastGpuIndex",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "try_extract_index_ivf",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Misc",
+    "Symbol": "unpack_bitstrings",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "I/O & Serialization",
+    "Symbol": "write_InvertedLists",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "I/O & Serialization",
+    "Symbol": "write_ProductQuantizer",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "I/O & Serialization",
+    "Symbol": "write_VectorTransform",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "I/O & Serialization",
+    "Symbol": "write_index",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "I/O & Serialization",
+    "Symbol": "write_index_binary",
+    "Source": "faiss/swigfaiss.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "bucket_sort",
+    "Source": "faiss/extra_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "checksum",
+    "Source": "faiss/extra_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "eval_intersection",
+    "Source": "faiss/extra_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "is_sequence",
+    "Source": "faiss/extra_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "kmax",
+    "Source": "faiss/extra_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "kmin",
+    "Source": "faiss/extra_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "knn",
+    "Source": "faiss/extra_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "knn_hamming",
+    "Source": "faiss/extra_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "matrix_bucket_sort_inplace",
+    "Source": "faiss/extra_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "merge_knn_results",
+    "Source": "faiss/extra_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "normalize_L2",
+    "Source": "faiss/extra_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "pack_bitstrings",
+    "Source": "faiss/extra_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "pairwise_distances",
+    "Source": "faiss/extra_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "rand",
+    "Source": "faiss/extra_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "rand_smooth_vectors",
+    "Source": "faiss/extra_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "randint",
+    "Source": "faiss/extra_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "randn",
+    "Source": "faiss/extra_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "unpack_bitstrings",
+    "Source": "faiss/extra_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "index_cpu_to_all_gpus",
+    "Source": "faiss/gpu_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "index_cpu_to_gpu_multiple_py",
+    "Source": "faiss/gpu_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "index_cpu_to_gpus_list",
+    "Source": "faiss/gpu_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "knn_gpu",
+    "Source": "faiss/gpu_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "Helper/Wrapper",
+    "Symbol": "pairwise_distance_gpu",
+    "Source": "faiss/gpu_wrappers.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "big_batch_search",
+    "Source": "faiss/contrib/big_batch_search.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "run_index_server",
+    "Source": "faiss/contrib/client_server.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "check_if_torch",
+    "Source": "faiss/contrib/clustering.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "imbalance_factor",
+    "Source": "faiss/contrib/clustering.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "kmeans",
+    "Source": "faiss/contrib/clustering.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "print_nop",
+    "Source": "faiss/contrib/clustering.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "reassign_centroids",
+    "Source": "faiss/contrib/clustering.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "sparse_assign_to_dense",
+    "Source": "faiss/contrib/clustering.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "sparse_assign_to_dense_blocks",
+    "Source": "faiss/contrib/clustering.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "train_ivf_index_with_2level",
+    "Source": "faiss/contrib/clustering.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "two_level_clustering",
+    "Source": "faiss/contrib/clustering.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "dataset_from_name",
+    "Source": "faiss/contrib/datasets.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "sanitize",
+    "Source": "faiss/contrib/datasets.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "set_dataset_basedir",
+    "Source": "faiss/contrib/datasets.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "_cluster_tables_with_tolerance",
+    "Source": "faiss/contrib/evaluation.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "check_ref_knn_with_draws",
+    "Source": "faiss/contrib/evaluation.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "check_ref_range_results",
+    "Source": "faiss/contrib/evaluation.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "counts_to_PR",
+    "Source": "faiss/contrib/evaluation.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "filter_range_results",
+    "Source": "faiss/contrib/evaluation.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "knn_intersection_measure",
+    "Source": "faiss/contrib/evaluation.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "range_PR",
+    "Source": "faiss/contrib/evaluation.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "range_PR_multiple_thresholds",
+    "Source": "faiss/contrib/evaluation.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "sort_range_res_1",
+    "Source": "faiss/contrib/evaluation.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "sort_range_res_2",
+    "Source": "faiss/contrib/evaluation.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "apply_maxres",
+    "Source": "faiss/contrib/exhaustive_search.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "exponential_query_iterator",
+    "Source": "faiss/contrib/exhaustive_search.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "knn_ground_truth",
+    "Source": "faiss/contrib/exhaustive_search.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "range_ground_truth",
+    "Source": "faiss/contrib/exhaustive_search.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "range_search_gpu",
+    "Source": "faiss/contrib/exhaustive_search.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "range_search_max_results",
+    "Source": "faiss/contrib/exhaustive_search.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "threshold_radius",
+    "Source": "faiss/contrib/exhaustive_search.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "threshold_radius_nres",
+    "Source": "faiss/contrib/exhaustive_search.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "get_code_size",
+    "Source": "faiss/contrib/factory_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "get_hnsw_M",
+    "Source": "faiss/contrib/factory_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "reverse_index_factory",
+    "Source": "faiss/contrib/factory_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "get_LinearTransform_matrix",
+    "Source": "faiss/contrib/inspect_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "get_NSG_neighbors",
+    "Source": "faiss/contrib/inspect_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "get_additive_quantizer_codebooks",
+    "Source": "faiss/contrib/inspect_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "get_flat_codes",
+    "Source": "faiss/contrib/inspect_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "get_flat_data",
+    "Source": "faiss/contrib/inspect_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "get_invlist",
+    "Source": "faiss/contrib/inspect_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "get_invlist_sizes",
+    "Source": "faiss/contrib/inspect_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "get_pq_centroids",
+    "Source": "faiss/contrib/inspect_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "make_LinearTransform_matrix",
+    "Source": "faiss/contrib/inspect_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "print_object_fields",
+    "Source": "faiss/contrib/inspect_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "add_preassigned",
+    "Source": "faiss/contrib/ivf_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "permute_invlists",
+    "Source": "faiss/contrib/ivf_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "range_search_preassigned",
+    "Source": "faiss/contrib/ivf_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "replace_ivf_quantizer",
+    "Source": "faiss/contrib/ivf_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "search_preassigned",
+    "Source": "faiss/contrib/ivf_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "sort_invlists_by_size",
+    "Source": "faiss/contrib/ivf_tools.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "merge_ondisk",
+    "Source": "faiss/contrib/ondisk.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "run_server",
+    "Source": "faiss/contrib/rpc.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "handle_torch_Index",
+    "Source": "faiss/contrib/torch_utils.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "swig_ptr_from_BFloat16Tensor",
+    "Source": "faiss/contrib/torch_utils.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "swig_ptr_from_FloatTensor",
+    "Source": "faiss/contrib/torch_utils.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "swig_ptr_from_HalfTensor",
+    "Source": "faiss/contrib/torch_utils.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "swig_ptr_from_IndicesTensor",
+    "Source": "faiss/contrib/torch_utils.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "swig_ptr_from_IntTensor",
+    "Source": "faiss/contrib/torch_utils.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "swig_ptr_from_UInt8Tensor",
+    "Source": "faiss/contrib/torch_utils.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "torch_replace_method",
+    "Source": "faiss/contrib/torch_utils.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "torch_replacement_knn",
+    "Source": "faiss/contrib/torch_utils.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "torch_replacement_knn_gpu",
+    "Source": "faiss/contrib/torch_utils.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "torch_replacement_pairwise_distance_gpu",
+    "Source": "faiss/contrib/torch_utils.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "using_stream",
+    "Source": "faiss/contrib/torch_utils.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "bvecs_mmap",
+    "Source": "faiss/contrib/vecs_io.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "fvecs_mmap",
+    "Source": "faiss/contrib/vecs_io.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "fvecs_read",
+    "Source": "faiss/contrib/vecs_io.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "fvecs_write",
+    "Source": "faiss/contrib/vecs_io.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "ivecs_mmap",
+    "Source": "faiss/contrib/vecs_io.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "ivecs_read",
+    "Source": "faiss/contrib/vecs_io.py"
+  },
+  {
+    "Kind": "Function",
+    "Category": "faiss.contrib",
+    "Symbol": "ivecs_write",
+    "Source": "faiss/contrib/vecs_io.py"
+  }
+]

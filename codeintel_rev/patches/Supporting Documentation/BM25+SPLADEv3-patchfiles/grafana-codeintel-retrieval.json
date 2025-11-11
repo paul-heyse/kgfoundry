@@ -1,0 +1,90 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Hybrid retrieval latency p95 by stage",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le,operation) (rate(operation_duration_seconds_bucket{component=\"hybrid_search\"}[5m])))"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "BM25 RM3 enable decisions (rate)",
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(stage_decision_total{component=\"bm25\",stage=\"rm3\"}[5m])) by (decision)" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "RRF fusion latency p95",
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum(rate(operation_duration_seconds_bucket{component=\"hybrid_search\",operation=\"fuse\"}[5m])) by (le))"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Recall@K from harness (last push)",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 14 },
+      "targets": [
+        { "refId": "A", "expr": "max_over_time(kgf_recall_harness_recall_at_k[24h])" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Channel latency p95",
+      "gridPos": { "h": 6, "w": 16, "x": 8, "y": 14 },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le,operation) (rate(operation_duration_seconds_bucket{component=\"hybrid_search\",operation=~\"bm25|splade|faiss\"}[5m])))"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Top-K contribution by channel (RRF)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "targets": [
+        { "refId": "A", "expr": "sum(rate(hybrid_rrf_contribution_total[5m])) by (channel)" }
+      ]
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": ["codeintel", "retrieval"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": ""
+}

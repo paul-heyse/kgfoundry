@@ -1,0 +1,210 @@
+diff --git a/codeintel_rev/config/settings.py b/codeintel_rev/config/settings.py
+index 1111111..2222222 100644
+--- a/codeintel_rev/config/settings.py
++++ b/codeintel_rev/config/settings.py
+@@ -1,6 +1,54 @@
+ from __future__ import annotations
+-from dataclasses import dataclass
++from dataclasses import dataclass, field
+ from pathlib import Path
++from typing import Literal, Sequence
+ 
+ @dataclass(slots=True)
+ class BM25Config:
+-    index_dir: Path
+-    k1: float = 0.9
+-    b: float = 0.4
++    index_dir: Path
++    enabled: bool = True
++    k1: float = 0.9
++    b: float = 0.4
++    # Optional pseudo-relevance feedback (RM3) for head queries.
++    rm3: bool = False
++    rm3_fb_docs: int = 10
++    rm3_fb_terms: int = 10
++    rm3_original_query_weight: float = 0.5
++    # Analyzer alignment for code: split camelCase/underscores, lowercase.
++    analyzer: Literal["code", "standard"] = "code"
++    # Optional stopwords to drop at index-time, kept minimal due to IDF.
++    stopwords: tuple[str, ...] = ()
++
++@dataclass(slots=True)
++class SpladeConfig:
++    # Root directories for SPLADE artifacts
++    model_dir: Path
++    onnx_dir: Path | None = None
++    index_dir: Path | None = None  # Lucene impact index path
++    enabled: bool = True
++    # Query-time encoder options
++    max_query_terms: int = 64
++    prune_below: float = 0.0  # ignore weights below this at query time
++    # Analyzer alignment (should mimic model tokenizer; WordPiece-ish)
++    analyzer: Literal["wordpiece", "code"] = "wordpiece"
++    # Optional static pruning after build (percentage of lowest-impact terms to drop)
++    static_prune_pct: float = 0.0
++
++@dataclass(slots=True)
++class HybridConfig:
++    # RRF fusion across channels; K=60 conventional and robust
++    rrf_K: int = 60
++    # Pre-fusion cutoffs per channel (how deep to fetch before fusing)
++    prefetch: dict[str, int] = field(default_factory=lambda: {"semantic": 200, "bm25": 200, "splade": 200})
++    # Optional per-channel weights if using weighted fusion (not default)
++    weights: dict[str, float] = field(default_factory=dict)
++    # Whether to prefer RRF over weighted sum (recommended)
++    use_rrf: bool = True
++    # Conditional PRF for BM25, e.g., apply when query <= N tokens
++    prf_head_query_max_tokens: int | None = 6
++
++# The Settings dataclass should include:
++#   bm25: BM25Config
++#   splade: SpladeConfig
++#   hybrid: HybridConfig
++# Ensure load_settings() reads these from env/pyproject with sensible defaults.
++
+diff --git a/codeintel_rev/indexing/index_lifecycle.py b/codeintel_rev/indexing/index_lifecycle.py
+index 3333333..4444444 100644
+--- a/codeintel_rev/indexing/index_lifecycle.py
++++ b/codeintel_rev/indexing/index_lifecycle.py
+@@ -1,5 +1,38 @@
+ from __future__ import annotations
+ from dataclasses import dataclass
++from pathlib import Path
++from typing import Iterable
++
++@dataclass(slots=True, frozen=True)
++class LuceneAssets:
++    \"\"\"Lucene index assets that advance together for one version.
++
++    We maintain separate paths for lexical (BM25) and impact (SPLADE) indexes.
++    When publishing a new version, both should be switched atomically.
++    \"\"\"
++    bm25_dir: Path | None = None
++    splade_dir: Path | None = None
++
++    def iter_dirs(self) -> Iterable[Path]:
++        for p in (self.bm25_dir, self.splade_dir):
++            if p is not None:
++                yield p
++
++def link_current_lucene(base_dir: Path, version: str, assets: LuceneAssets) -> None:
++    \"\"\"Publish Lucene assets under base_dir/current for the given version.
++
++    Creates `base_dir/versions/<version>/lucene_{bm25,splade}` and atomically
++    flips the CURRENT pointer and best-effort `current/` symlink.
++    \"\"\"
++    versions = base_dir / "versions" / version
++    (versions / "lucene_bm25").mkdir(parents=True, exist_ok=True)
++    (versions / "lucene_splade").mkdir(parents=True, exist_ok=True)
++    if assets.bm25_dir: _copy_tree(assets.bm25_dir, versions / "lucene_bm25")
++    if assets.splade_dir: _copy_tree(assets.splade_dir, versions / "lucene_splade")
++    _write_current(base_dir, version)
++    _symlink_current(base_dir)
+ 
+diff --git a/codeintel_rev/cli/build_indexes.py b/codeintel_rev/cli/build_indexes.py
+new file mode 100644
+index 0000000..aaaaaaa 100644
+--- /dev/null
++++ b/codeintel_rev/cli/build_indexes.py
+@@ -0,0 +1,176 @@
++from __future__ import annotations
++import json, subprocess, sys
++from pathlib import Path
++import typer
++
++from codeintel_rev.config.settings import load_settings
++from codeintel_rev.indexing.index_lifecycle import LuceneAssets, link_current_lucene
++
++app = typer.Typer(help="Build BM25 and SPLADE Lucene indexes from JSONL corpus.")
++
++@app.command("bm25")
++def build_bm25(
++    jsonl_dir: Path = typer.Option(..., "--jsonl-dir", exists=True, file_okay=False),
++    index_dir: Path = typer.Option(..., "--index-dir"),
++    threads: int = typer.Option(8, "--threads"),
++    store_positions: bool = typer.Option(True, "--store-positions/--no-store-positions"),
++    store_docvectors: bool = typer.Option(True, "--store-docvectors/--no-store-docvectors"),
++    store_raw: bool = typer.Option(True, "--store-raw/--no-store-raw"),
++):
++    \"\"\"Build a positional Lucene index suitable for BM25 + PRF.\"\"\"
++    args = [
++        sys.executable, "-m", "pyserini.index.lucene",
++        "--collection", "JsonCollection",
++        "--input", str(jsonl_dir),
++        "--index", str(index_dir),
++        "--generator", "DefaultLuceneDocumentGenerator",
++        "--threads", str(threads),
++    ]
++    if store_positions: args.append("--storePositions")
++    if store_docvectors: args.append("--storeDocvectors")
++    if store_raw: args.append("--storeRaw")
++    subprocess.run(args, check=True)
++
++@app.command("splade-impact")
++def build_splade_impact(
++    doc_vectors_jsonl: Path = typer.Option(..., "--jsonl-dir", exists=True, file_okay=False),
++    index_dir: Path = typer.Option(..., "--index-dir"),
++    threads: int = typer.Option(8, "--threads"),
++):
++    \"\"\"Build a SPLADE impact index from pre-encoded (term,weight) jsonl shards.\"\"\"
++    args = [
++        sys.executable, "-m", "pyserini.index.lucene",
++        "--collection", "ImpactJsonCollection",
++        "--input", str(doc_vectors_jsonl),
++        "--index", str(index_dir),
++        "--generator", "DefaultLuceneDocumentGenerator",
++        "--threads", str(threads),
++        "--impact",
++    ]
++    subprocess.run(args, check=True)
++
++@app.command("publish")
++def publish_all(
++    base_dir: Path = typer.Option(..., "--base-dir", help="IndexLifecycle base dir"),
++    version: str = typer.Option(..., "--version"),
++    bm25_dir: Path | None = typer.Option(None, "--bm25-dir"),
++    splade_dir: Path | None = typer.Option(None, "--splade-dir"),
++):
++    assets = LuceneAssets(bm25_dir=bm25_dir, splade_dir=splade_dir)
++    link_current_lucene(base_dir, version, assets)
++
++if __name__ == "__main__":
++    app()
++
+diff --git a/codeintel_rev/plugins/builtins.py b/codeintel_rev/plugins/builtins.py
+index 5555555..6666666 100644
+--- a/codeintel_rev/plugins/builtins.py
++++ b/codeintel_rev/plugins/builtins.py
+@@ -1,5 +1,32 @@
+ from __future__ import annotations
+-from codeintel_rev.io.hybrid_search import BM25SearchProvider, SpladeSearchProvider
++from codeintel_rev.io.hybrid_search import BM25SearchProvider, SpladeSearchProvider
++from codeintel_rev.config.settings import load_settings
++
++def analyzer_for(name: str):
++    # keep minimal hook for analyzer alignment; actual Lucene analyzer set at index-time
++    return name
++
+ def bm25_factory(context):
+-    return BM25SearchProvider(context.paths.lucene_bm25, k1=context.settings.bm25.k1, b=context.settings.bm25.b)
++    s = load_settings()
++    if not s.bm25.enabled:
++        raise RuntimeError("BM25 channel disabled by configuration")
++    return BM25SearchProvider(
++        index_dir=context.paths.lucene_bm25,
++        k1=s.bm25.k1,
++        b=s.bm25.b,
++        rm3=(s.bm25.rm3, s.bm25.rm3_fb_docs, s.bm25.rm3_fb_terms, s.bm25.rm3_original_query_weight),
++        analyzer=analyzer_for(s.bm25.analyzer),
++    )
+ 
+ def splade_factory(context):
+-    return SpladeSearchProvider(context.settings.splade, context.paths.models / "splade", context.paths.onnx)
++    s = load_settings()
++    if not s.splade.enabled:
++        raise RuntimeError("SPLADE channel disabled by configuration")
++    return SpladeSearchProvider(
++        config=s.splade,
++        model_dir=context.paths.models / "splade",
++        onnx_dir=context.paths.onnx / "splade" if (context.paths.onnx / "splade").exists() else None,
++    )

@@ -207,15 +207,47 @@ class IndexLifecycleManager:
     ) -> Path:
         """Copy assets into a staging directory for ``version``.
 
+        Extended Summary
+        ----------------
+        This method stages index assets for a new version by copying FAISS index,
+        DuckDB catalog, SCIP index, and optional sparse indexes (BM25, SPLADE, XTR)
+        into a versioned staging directory. It validates asset existence, creates
+        version metadata, and prepares the staging area for atomic publication.
+        Used as the first step in the index publication workflow.
+
+        Parameters
+        ----------
+        version : str
+            Version identifier (e.g., "v1.2.3") for the staged assets. Must be
+            non-empty and unique (staging directory must not exist).
+        assets : IndexAssets
+            Index assets to stage, including paths to FAISS index, DuckDB catalog,
+            SCIP index, and optional sparse index directories. All required assets
+            must exist on the filesystem.
+        attrs : Mapping[str, Any] | None, optional
+            Optional metadata attributes to include in version metadata. If None,
+            uses empty dict. Attributes are persisted in version.json.
+
         Returns
         -------
         Path
-            Directory containing the staged assets.
+            Directory containing the staged assets. The directory name follows
+            the pattern "{version}.staging" and contains all copied assets plus
+            version.json metadata.
 
         Raises
         ------
         RuntimeLifecycleError
-            If validation fails or staging already exists.
+            If validation fails (empty version, missing assets) or staging already
+            exists (concurrent staging attempt).
+
+        Notes
+        -----
+        This method performs atomic staging by creating the staging directory and
+        copying all assets. If any copy operation fails, the staging directory
+        may be left in an incomplete state. The staging directory must be published
+        or cleaned up manually. Time complexity: O(asset_count * file_size) for
+        file copy operations.
         """
         if not version:
             message = "version id missing"
@@ -243,15 +275,39 @@ class IndexLifecycleManager:
     def publish(self, version: str) -> Path:
         """Atomically promote a staged directory to active ``version``.
 
+        Extended Summary
+        ----------------
+        This method atomically publishes a staged index version by creating a
+        versioned directory, moving staged assets, updating the CURRENT symlink,
+        and updating the lifecycle manifest. The operation is atomic: if any step
+        fails, the previous version remains active. Used to deploy new index versions
+        in production after staging completes.
+
+        Parameters
+        ----------
+        version : str
+            Version identifier of the staged directory to publish (e.g., "v1.2.3").
+            The staging directory "{version}.staging" must exist and contain valid
+            assets.
+
         Returns
         -------
         Path
-            Directory containing the published assets.
+            Directory containing the published assets. The directory name follows
+            the pattern "{version}" and becomes the active version via CURRENT symlink.
 
         Raises
         ------
         RuntimeLifecycleError
-            If the requested staging area is missing.
+            If the requested staging area is missing, symlink creation fails, or
+            manifest update fails.
+
+        Notes
+        -----
+        This method performs atomic publication by creating the version directory,
+        moving staged assets, updating CURRENT symlink, and updating the manifest.
+        The operation is designed to be safe for concurrent access. Time complexity:
+        O(1) for directory operations plus I/O time for symlink and manifest updates.
         """
         staging_dir = self.versions_dir / f"{version}.staging"
         if not staging_dir.exists():
@@ -269,10 +325,32 @@ class IndexLifecycleManager:
     def rollback(self, version: str) -> None:
         """Point the ``CURRENT`` pointer at an existing version.
 
+        Extended Summary
+        ----------------
+        This method performs a rollback operation by updating the CURRENT symlink
+        to point to a previously published version. It validates that the target
+        version exists, updates the symlink atomically, and updates the lifecycle
+        manifest. Used for rapid recovery from problematic index deployments without
+        requiring full re-publication.
+
+        Parameters
+        ----------
+        version : str
+            Version identifier to rollback to (e.g., "v1.2.0"). Must exist in the
+            published versions list (version directory must exist).
+
         Raises
         ------
         RuntimeLifecycleError
-            If the requested version is unavailable.
+            If the requested version cannot be located (version directory missing),
+            symlink update fails, or manifest update fails.
+
+        Notes
+        -----
+        This method performs atomic rollback by updating the CURRENT symlink and
+        manifest. The operation is fast (O(1) symlink update) but requires the
+        target version to exist. Time complexity: O(1) for symlink operations
+        plus I/O time for manifest updates.
         """
         candidate = self.versions_dir / version
         if not candidate.exists():

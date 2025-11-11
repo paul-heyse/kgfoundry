@@ -26,10 +26,31 @@ class ChannelRegistry:
     def discover(cls, context: ChannelContext) -> ChannelRegistry:
         """Return a registry populated by entry-point factories.
 
+        Extended Summary
+        ----------------
+        This class method discovers channel plugins via Python entry points and
+        creates a registry containing all successfully loaded channels. It iterates
+        through entry points in the "codeintel_rev.channels" group, loads factory
+        functions, instantiates channels, and collects them into a registry. Used
+        during application startup to auto-discover available retrieval channels.
+
+        Parameters
+        ----------
+        context : ChannelContext
+            Channel context providing index paths and configuration. Passed to
+            each factory function during channel instantiation.
+
         Returns
         -------
         ChannelRegistry
             Registry containing every channel whose factory loaded successfully.
+            Channels that fail to load are logged and skipped.
+
+        Notes
+        -----
+        This method performs dynamic plugin discovery via entry points. Factory
+        failures are logged but don't stop discovery. Time complexity: O(n) where
+        n is the number of entry points in the channel group.
         """
         discovered: list[Channel] = []
         for entry_point in _iter_entry_points():
@@ -51,10 +72,30 @@ class ChannelRegistry:
     def from_channels(cls, channels: Sequence[Channel]) -> ChannelRegistry:
         """Construct a registry from an explicit channel list.
 
+        Extended Summary
+        ----------------
+        This class method creates a registry from an explicitly provided sequence
+        of channels. Used for testing and when programmatic channel configuration
+        is preferred over entry point discovery. The channels are stored in the
+        order provided.
+
+        Parameters
+        ----------
+        channels : Sequence[Channel]
+            Explicit sequence of channel instances to include in the registry.
+            Channels are stored in the order provided.
+
         Returns
         -------
         ChannelRegistry
-            Registry containing the provided channel sequence.
+            Registry containing the provided channel sequence. The registry
+            provides access to channels via the `channels()` method.
+
+        Notes
+        -----
+        This method creates a registry without entry point discovery. Useful for
+        testing and programmatic configuration. Time complexity: O(n) where n is
+        the number of channels.
         """
         return cls(list(channels))
 
@@ -99,10 +140,31 @@ def _iter_entry_points() -> Iterable[EntryPoint]:
 def _load_factory(entry_point: EntryPoint) -> Callable[[ChannelContext], Channel] | None:
     """Return a callable factory if the entry point loads successfully.
 
+    Extended Summary
+    ----------------
+    This helper loads a channel factory function from a Python entry point. It
+    attempts to load the entry point's target (module:function), validates that
+    it's callable, and returns it. Used during channel discovery to load factory
+    functions from plugin entry points.
+
+    Parameters
+    ----------
+    entry_point : EntryPoint
+        Python entry point definition pointing to a channel factory function.
+        The entry point target should be a callable that accepts ChannelContext
+        and returns a Channel instance.
+
     Returns
     -------
     Callable[[ChannelContext], Channel] | None
-        Factory callable when loading succeeds, otherwise ``None``.
+        Factory function if loading succeeds, None if loading fails (module not
+        found, function not found, not callable, etc.). Failures are logged.
+
+    Notes
+    -----
+    This helper defensively handles entry point loading failures. Import errors
+    and validation failures are caught and logged, allowing discovery to continue
+    with other entry points. Time complexity: O(1) for entry point loading.
     """
     try:
         factory = entry_point.load()

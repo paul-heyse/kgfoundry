@@ -51,15 +51,18 @@ from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
+from types import ModuleType
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.scope_store import ScopeStore
-from codeintel_rev.config.settings import Settings, load_settings
+from codeintel_rev.config.settings import IndexConfig, Settings, load_settings
 from codeintel_rev.errors import RuntimeLifecycleError, RuntimeUnavailableError
+from codeintel_rev.evaluation.offline_recall import OfflineRecallEvaluator
 from codeintel_rev.indexing.index_lifecycle import IndexLifecycleManager
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.duckdb_manager import DuckDBManager
+from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.vllm_client import VLLMClient
 from codeintel_rev.runtime import (
@@ -82,11 +85,9 @@ if TYPE_CHECKING:
     import redis.asyncio as _redis_asyncio
 
     from codeintel_rev.app.scope_store import SupportsAsyncRedis
-    from codeintel_rev.io.faiss_manager import FAISSManager
     from codeintel_rev.io.hybrid_search import HybridSearchEngine
     from codeintel_rev.io.xtr_manager import XTRIndex
 else:  # pragma: no cover - runtime only; annotations are postponed
-    FAISSManager = Any
     HybridSearchEngine = Any
     XTRIndex = Any
 
@@ -99,10 +100,23 @@ __all__ = ["ApplicationContext", "ResolvedPaths", "resolve_application_paths"]
 def _infer_index_root(paths: ResolvedPaths) -> Path:
     """Return the directory that stores versioned index assets.
 
+    Parameters
+    ----------
+    paths : ResolvedPaths
+        Resolved application paths containing FAISS index location.
+
     Returns
     -------
     Path
-        Directory containing the lifecycle manifest and versions.
+        Directory containing the lifecycle manifest and versions. If
+        `CODEINTEL_INDEXES_DIR` environment variable is set, uses that path.
+        Otherwise infers from `paths.faiss_index` parent directory structure.
+
+    Notes
+    -----
+    This helper determines the index root directory for versioned index lifecycle
+    management. The root contains subdirectories for each version and a manifest
+    tracking published/active versions.
     """
     env_override = os.getenv("CODEINTEL_INDEXES_DIR")
     if env_override:
@@ -116,10 +130,23 @@ def _infer_index_root(paths: ResolvedPaths) -> Path:
 def _build_factory_adjuster(settings: Settings) -> FactoryAdjuster:
     """Return a DefaultFactoryAdjuster derived from settings.
 
+    Parameters
+    ----------
+    settings : Settings
+        Application settings containing index configuration defaults.
+
     Returns
     -------
     FactoryAdjuster
-        Adjuster informed by ``settings.index`` defaults.
+        Adjuster informed by ``settings.index`` defaults. If settings are invalid
+        or missing required attributes, returns `NoopFactoryAdjuster()` as fallback.
+
+    Notes
+    -----
+    This helper extracts FAISS and hybrid search tuning parameters from settings
+    and constructs a factory adjuster that applies these defaults when creating
+    runtime cells. Defensively handles missing or malformed settings by falling
+    back to a no-op adjuster.
     """
     try:
         rrf_weights = getattr(settings.index, "rrf_weights", {})
@@ -141,21 +168,85 @@ def _assign_frozen(instance: object, name: str, value: object) -> None:
     _FROZEN_SETATTR(instance, name, value)
 
 
+def _faiss_module() -> ModuleType:
+    """Return the cached FAISS manager module.
+
+    Returns
+    -------
+    ModuleType
+        Imported FAISS manager module.
+    """
+    cached = globals().get("_FAISS_MODULE")
+    if cached is not None:
+        return cast("ModuleType", cached)
+    module = importlib.import_module("codeintel_rev.io.faiss_manager")
+    globals()["_FAISS_MODULE"] = module
+    return module
+
+
 def _import_faiss_manager_cls() -> type[FAISSManager]:
     """Import ``FAISSManager`` lazily to keep module import costs low.
 
     Returns
     -------
     type[FAISSManager]
-        FAISS manager class implementation.
+        Resolved manager class.
     """
-    existing = globals().get("FAISSManager")
-    if existing is not None and existing is not Any:
-        return cast("type[FAISSManager]", existing)
-    module = importlib.import_module("codeintel_rev.io.faiss_manager")
-    manager_cls = module.FAISSManager
-    globals()["FAISSManager"] = manager_cls
-    return manager_cls
+    module = _faiss_module()
+    return cast("type[FAISSManager]", module.FAISSManager)
+
+
+def _import_faiss_runtime_opts_cls() -> type:
+    """Return the FAISS runtime options dataclass.
+
+    Returns
+    -------
+    type
+        Runtime options dataclass exported by ``codeintel_rev.io.faiss_manager``.
+    """
+    module = _faiss_module()
+    return module.FAISSRuntimeOptions
+
+
+def _faiss_runtime_options_from_index(index_cfg: IndexConfig) -> object:
+    """Materialize FAISS runtime options from the structured index config.
+
+    Parameters
+    ----------
+    index_cfg : IndexConfig
+        Structured index configuration containing FAISS parameters (family, PQ
+        settings, HNSW parameters, GPU options, etc.).
+
+    Returns
+    -------
+    object
+        Instance of ``FAISSRuntimeOptions`` matching ``index_cfg`` parameters.
+        The returned object is used to configure FAISS manager runtime behavior.
+
+    Notes
+    -----
+    This helper converts structured `IndexConfig` (from settings or index manifest)
+    into FAISS-specific runtime options. It dynamically imports the FAISS runtime
+    options class and instantiates it with values from the config.
+    """
+    runtime_cls = _import_faiss_runtime_opts_cls()
+    return runtime_cls(
+        faiss_family=index_cfg.faiss_family,
+        pq_m=index_cfg.pq_m,
+        pq_nbits=index_cfg.pq_nbits,
+        opq_m=index_cfg.opq_m,
+        default_nprobe=index_cfg.default_nprobe,
+        default_k=index_cfg.default_k,
+        hnsw_m=index_cfg.hnsw_m,
+        hnsw_ef_construction=index_cfg.hnsw_ef_construction,
+        hnsw_ef_search=index_cfg.hnsw_ef_search,
+        refine_k_factor=index_cfg.refine_k_factor,
+        use_gpu=index_cfg.use_gpu,
+        gpu_clone_mode=index_cfg.gpu_clone_mode,
+        autotune_on_start=index_cfg.autotune_on_start,
+        enable_range_search=index_cfg.enable_range_search,
+        semantic_min_score=index_cfg.semantic_min_score,
+    )
 
 
 def _import_hybrid_engine_cls() -> type[HybridSearchEngine]:
@@ -575,6 +666,14 @@ class ApplicationContext:
         Observer instance that receives lifecycle callbacks from runtime cells
         (hybrid engine, FAISS manager, XTR index). Defaults to NullRuntimeCellObserver
         when not provided. Used for instrumentation, monitoring, and diagnostics.
+    factory_adjuster : FactoryAdjuster
+        Adjuster applied to runtime cell factories to inject tuning parameters
+        (e.g., FAISS nprobe, hybrid RRF weights). Defaults to NoopFactoryAdjuster
+        if not provided. Can be updated at runtime via `apply_factory_adjuster()`.
+    index_manager : IndexLifecycleManager
+        Manager for versioned index lifecycle operations (stage, publish, rollback).
+        Initialized during context setup with index root inferred from paths.
+        Provides APIs for managing index versions and manifests.
 
     Examples
     --------
@@ -626,6 +725,7 @@ class ApplicationContext:
         default_factory=_ContextRuntimeState, init=False, repr=False
     )
     index_manager: IndexLifecycleManager = field(init=False, repr=False)
+    _offline_evaluator: OfflineRecallEvaluator | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         """Attach the configured observer to all runtime cells."""
@@ -715,12 +815,21 @@ class ApplicationContext:
 
         vllm_client = VLLMClient(settings.vllm)
         faiss_manager_cls = _import_faiss_manager_cls()
+        runtime_opts = _faiss_runtime_options_from_index(settings.index)
         faiss_manager = faiss_manager_cls(
             index_path=paths.faiss_index,
             vec_dim=settings.index.vec_dim,
-            nlist=settings.index.faiss_nlist,
+            nlist=settings.index.nlist,
             use_cuvs=settings.index.use_cuvs,
+            runtime=runtime_opts,
         )
+        try:
+            LOGGER.info(
+                "faiss.compile",
+                extra={"opts": faiss_manager.get_compile_options(), "component": "app_start"},
+            )
+        except Exception:  # noqa: BLE001
+            LOGGER.debug("Unable to fetch FAISS compile options at startup", exc_info=True)
 
         # Initialize scope store for session-scoped query constraints
         redis_asyncio = cast(
@@ -832,6 +941,37 @@ class ApplicationContext:
             msg = "HybridSearchEngine failed to initialize"
             raise RuntimeError(msg)
         return engine
+
+    def get_offline_recall_evaluator(self) -> OfflineRecallEvaluator:
+        """Return the offline recall evaluator for diagnostic runs.
+
+        Returns
+        -------
+        OfflineRecallEvaluator
+            Evaluator bound to the current FAISS manager and catalog paths.
+
+        Raises
+        ------
+        RuntimeError
+            If offline evaluation has been disabled via configuration.
+        """
+        if not self.settings.eval.enabled:
+            msg = "Offline evaluation is disabled in configuration"
+            raise RuntimeError(msg)
+        evaluator = self._offline_evaluator
+        if evaluator is not None:
+            return evaluator
+
+        faiss_manager = self.get_coderank_faiss_manager(self.settings.index.vec_dim)
+        evaluator = OfflineRecallEvaluator(
+            settings=self.settings,
+            paths=self.paths,
+            faiss_manager=faiss_manager,
+            vllm_client=self.vllm_client,
+            duckdb_manager=self.duckdb_manager,
+        )
+        _assign_frozen(self, "_offline_evaluator", evaluator)
+        return evaluator
 
     def get_coderank_faiss_manager(self, vec_dim: int) -> FAISSManager:
         """Return a lazily loaded FAISS manager for CodeRank search.
@@ -975,13 +1115,22 @@ class ApplicationContext:
         _ensure_path_exists(index_path, runtime=runtime, description="CodeRank FAISS index")
         _require_dependency("faiss", runtime=runtime, purpose="CodeRank FAISS manager")
         manager_cls = _import_faiss_manager_cls()
+        runtime_opts = _faiss_runtime_options_from_index(self.settings.index)
         manager = manager_cls(
             index_path=index_path,
             vec_dim=vec_dim,
-            nlist=self.settings.index.faiss_nlist,
+            nlist=self.settings.index.nlist,
             use_cuvs=self.settings.index.use_cuvs,
+            runtime=runtime_opts,
         )
         manager.load_cpu_index()
+        try:
+            LOGGER.info(
+                "faiss.compile",
+                extra={"opts": manager.get_compile_options(), "component": runtime},
+            )
+        except Exception:  # noqa: BLE001
+            LOGGER.debug("Unable to fetch FAISS compile options", exc_info=True)
         return manager
 
     def _build_xtr_index(self) -> XTRIndex:

@@ -130,7 +130,7 @@ def test_adaptive_index_selection(tmp_index_path: Path, n_vectors: int, expected
 
     # Check index type by examining the underlying index structure
     assert isinstance(cpu_index, faiss_module.IndexIDMap2)
-    underlying = manager.primary_index_impl()
+    underlying = manager._primary_index_impl()
     underlying_any = cast("Any", underlying)
 
     # Get type information for debugging
@@ -200,7 +200,7 @@ def test_small_corpus_flat_index(tmp_index_path: Path) -> None:
     assert manager.cpu_index is not None
     cpu_index = manager.cpu_index
     assert isinstance(cpu_index, faiss_module.IndexIDMap2)
-    underlying = manager.primary_index_impl()
+    underlying = manager._primary_index_impl()
     # Check by type name since isinstance may not work with dynamic types
     assert "FlatIP" in type(underlying).__name__, (
         f"Expected FlatIP, got {type(underlying).__name__}"
@@ -252,7 +252,7 @@ def test_medium_corpus_ivf_flat_nlist(tmp_index_path: Path) -> None:
     cpu_index = manager.cpu_index
     assert faiss_module is not None
     assert isinstance(cpu_index, faiss_module.IndexIDMap2)
-    underlying = manager.primary_index_impl()
+    underlying = manager._primary_index_impl()
     underlying_any = cast("Any", underlying)
     # Check by type name since isinstance may not work with dynamic types
     assert "IVFFlat" in type(underlying_any).__name__, (
@@ -293,7 +293,7 @@ def test_large_corpus_ivf_pq_nlist(tmp_index_path: Path) -> None:
     cpu_index = manager.cpu_index
     assert faiss_module is not None
     assert isinstance(cpu_index, faiss_module.IndexIDMap2)
-    underlying = manager.primary_index_impl()
+    underlying = manager._primary_index_impl()
     underlying_any = cast("Any", underlying)
 
     # Verify nlist is calculated correctly

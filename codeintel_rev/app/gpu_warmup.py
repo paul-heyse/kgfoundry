@@ -9,6 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import TYPE_CHECKING, cast
 
+from codeintel_rev.metrics.registry import GPU_AVAILABLE, GPU_TEMP_SCRATCH_BYTES
 from codeintel_rev.typing import gate_import
 from kgfoundry_common.logging import get_logger
 
@@ -120,27 +121,34 @@ def _test_torch_gpu_operations() -> tuple[bool, str]:
         return True, "Torch GPU operations test passed"
 
 
-def _test_faiss_gpu_resources() -> tuple[bool, str]:
+def _test_faiss_gpu_resources() -> tuple[bool, str, int | None]:
     """Test FAISS GPU resource initialization.
 
     Returns
     -------
-    tuple[bool, str]
-        (test_passed, status_message)
+    tuple[bool, str, int | None]
+        Tuple of (test_passed, status_message, scratch_bytes).
     """
     try:
         faiss = cast("_faiss", gate_import("faiss", "FAISS GPU resource smoke test"))
     except ImportError:
-        return False, "FAISS not installed"
+        return False, "FAISS not installed", None
     except (RuntimeError, AttributeError, OSError) as exc:
         LOGGER.warning("FAISS GPU resource initialization failed: %s", exc, exc_info=True)
-        return False, f"FAISS GPU init error: {exc}"
+        return False, f"FAISS GPU init error: {exc}", None
     else:
         if not all(hasattr(faiss, attr) for attr in ("StandardGpuResources",)):
-            return False, "FAISS GPU symbols not available"
-        _ = faiss.StandardGpuResources()
+            return False, "FAISS GPU symbols not available", None
+        resources = faiss.StandardGpuResources()
+        scratch_bytes: int | None = None
+        get_temp = getattr(resources, "getTempMemory", None)
+        if callable(get_temp):
+            try:
+                scratch_bytes = int(get_temp())
+            except (RuntimeError, ValueError, TypeError):  # pragma: no cover - defensive
+                scratch_bytes = None
         LOGGER.info("FAISS GPU resource initialization test passed")
-        return True, "FAISS GPU resource initialization test passed"
+        return True, "FAISS GPU resource initialization test passed", scratch_bytes
 
 
 @lru_cache(maxsize=1)
@@ -152,7 +160,7 @@ def warmup_gpu() -> dict[str, bool | str]:
 
     Checks:
     1. CUDA availability via PyTorch
-    2. FAISS GPU support
+    2. FAISS GPU support (+ cuVS/CAGRA symbol presence)
     3. Basic GPU tensor operations (torch)
     4. FAISS GPU resource initialization
 
@@ -162,6 +170,7 @@ def warmup_gpu() -> dict[str, bool | str]:
         Dictionary with warmup results:
         - ``cuda_available``: True if CUDA is available via PyTorch
         - ``faiss_gpu_available``: True if FAISS GPU symbols are available
+        - ``faiss_cuvs_available``: True if FAISS exposes cuVS/CAGRA bindings
         - ``torch_gpu_test``: True if basic torch GPU operations succeed
         - ``faiss_gpu_test``: True if FAISS GPU resource initialization succeeds
         - ``overall_status``: "ready" if all checks pass, "degraded" if some fail,
@@ -181,6 +190,7 @@ def warmup_gpu() -> dict[str, bool | str]:
         "faiss_gpu_available": False,
         "torch_gpu_test": False,
         "faiss_gpu_test": False,
+        "faiss_cuvs_available": False,
         "overall_status": "unavailable",
         "details": "GPU warmup not attempted",
     }
@@ -188,6 +198,7 @@ def warmup_gpu() -> dict[str, bool | str]:
     # Step 1: Check CUDA availability via PyTorch
     cuda_available, cuda_msg = _check_cuda_availability()
     results["cuda_available"] = cuda_available
+    GPU_AVAILABLE.set(1 if cuda_available else 0)
     if not cuda_available:
         results["details"] = cuda_msg
 
@@ -196,6 +207,11 @@ def warmup_gpu() -> dict[str, bool | str]:
     results["faiss_gpu_available"] = faiss_gpu_available
     if not faiss_gpu_available and results["details"] == "GPU warmup not attempted":
         results["details"] = faiss_msg
+    try:
+        faiss_mod = cast("_faiss", gate_import("faiss", "FAISS cuVS probe"))
+        results["faiss_cuvs_available"] = bool(getattr(faiss_mod, "GpuIndexCagra", None))
+    except ImportError:
+        results["faiss_cuvs_available"] = False
 
     # Step 3: Test basic GPU tensor operations (torch)
     if cuda_available:
@@ -204,8 +220,10 @@ def warmup_gpu() -> dict[str, bool | str]:
 
     # Step 4: Test FAISS GPU resource initialization
     if faiss_gpu_available:
-        faiss_test_passed, _faiss_test_msg = _test_faiss_gpu_resources()
+        faiss_test_passed, _faiss_test_msg, scratch_bytes = _test_faiss_gpu_resources()
         results["faiss_gpu_test"] = faiss_test_passed
+        if scratch_bytes is not None:
+            GPU_TEMP_SCRATCH_BYTES.set(scratch_bytes)
 
     # Determine overall status
     # Count boolean checks only (exclude string fields)

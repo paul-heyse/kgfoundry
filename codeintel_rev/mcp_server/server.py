@@ -352,10 +352,33 @@ def prompt_code_review(area: str) -> str:
 def build_http_app(capabilities: Capabilities) -> ASGIApp:
     """Return the FastMCP ASGI app with capability-gated tool registration.
 
+    Extended Summary
+    ----------------
+    This function constructs the FastMCP ASGI application with capability-based
+    tool registration. It conditionally imports and registers MCP tools based on
+    available capabilities (symbol search, semantic search). Tools are only
+    registered if their required dependencies are available, enabling graceful
+    degradation when optional components are missing.
+
+    Parameters
+    ----------
+    capabilities : Capabilities
+        Capability snapshot indicating which features are available. Used to gate
+        tool registration (e.g., symbol search requires SCIP index, semantic search
+        requires FAISS index).
+
     Returns
     -------
     ASGIApp
-        ASGI application implementing the MCP HTTP API.
+        ASGI application implementing the MCP HTTP API with capability-gated tools.
+        The app exposes MCP-compliant endpoints for registered tools.
+
+    Notes
+    -----
+    This function performs dynamic tool registration based on capabilities. Tools
+    are registered by importing their modules, which triggers FastMCP decorator
+    registration. Time complexity: O(1) for app construction, O(tool_count) for
+    tool registration where tool_count is the number of available tools.
     """
     if getattr(capabilities, "has_symbols", False):
         importlib.import_module("codeintel_rev.mcp_server.server_symbols")
