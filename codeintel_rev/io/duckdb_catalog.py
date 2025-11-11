@@ -15,8 +15,6 @@ from time import perf_counter
 from typing import TYPE_CHECKING, Self, cast
 
 from codeintel_rev._lazy_imports import LazyModule
-from codeintel_rev.typing import NDArrayF32
-
 from codeintel_rev.io.duckdb_manager import (
     DuckDBManager,
     DuckDBQueryBuilder,
@@ -26,6 +24,7 @@ from codeintel_rev.mcp_server.scope_utils import (
     LANGUAGE_EXTENSIONS,
     path_matches_glob,
 )
+from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.prometheus import build_histogram
 

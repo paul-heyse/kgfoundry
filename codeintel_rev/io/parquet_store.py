@@ -19,8 +19,9 @@ from codeintel_rev.typing import NDArrayF32
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from codeintel_rev.indexing.cast_chunker import Chunk
     import numpy as np
+
+    from codeintel_rev.indexing.cast_chunker import Chunk
 else:
     np = cast("np", LazyModule("numpy", "Parquet embedding storage"))
 

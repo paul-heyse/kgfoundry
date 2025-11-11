@@ -58,9 +58,9 @@ else:  # pragma: no cover - fallback for older mkdocs-gen-files versions
 
         def __setitem__(self, keys: str | Sequence[str], item: str) -> None:
             if isinstance(keys, tuple):
-                normalized: str | tuple[str, ...] = keys
+                normalized: str | tuple[str, ...] = tuple(str(part) for part in keys)
             elif isinstance(keys, Sequence) and not isinstance(keys, (str, bytes)):
-                normalized = tuple(keys)
+                normalized = tuple(str(part) for part in keys)
             else:
                 normalized = str(keys)
             super().__setitem__(normalized, item)

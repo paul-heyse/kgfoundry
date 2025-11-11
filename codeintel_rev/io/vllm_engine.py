@@ -18,10 +18,11 @@ if TYPE_CHECKING:
     import vllm
     import vllm.config as vllm_config
     import vllm.inputs as vllm_inputs
-    from transformers import AutoTokenizer, PreTrainedTokenizerBase
+    from transformers import PreTrainedTokenizerBase
     from vllm import LLM
     from vllm.config import PoolerConfig
     from vllm.inputs import TokensPrompt
+
     from codeintel_rev.config.settings import VLLMConfig
 else:
     np = cast("np", LazyModule("numpy", "in-process vLLM embeddings"))
@@ -141,7 +142,7 @@ class InprocessVLLMEmbedder:
             msg = "Tokenizer did not return input_ids"
             raise RuntimeError(msg)
         token_sequences = cast("Sequence[Sequence[int]]", raw_input_ids)
-        tokens_prompt_cls = cast("type[TokensPrompt]", getattr(vllm_inputs, "TokensPrompt"))
+        tokens_prompt_cls = cast("type[TokensPrompt]", vllm_inputs.TokensPrompt)
         prompts: list[TokensPrompt] = [
             tokens_prompt_cls(prompt_token_ids=list(map(int, ids))) for ids in token_sequences
         ]
@@ -172,8 +173,8 @@ class InprocessVLLMEmbedder:
         )
 
     def _load_engine(self) -> LLM:
-        llm_cls = cast("type[LLM]", getattr(vllm, "LLM"))
-        pooler_config_cls = cast("type[PoolerConfig]", getattr(vllm_config, "PoolerConfig"))
+        llm_cls = cast("type[LLM]", vllm.LLM)
+        pooler_config_cls = cast("type[PoolerConfig]", vllm_config.PoolerConfig)
         return llm_cls(
             model=self.config.model,
             task="embed",

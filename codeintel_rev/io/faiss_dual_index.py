@@ -118,7 +118,12 @@ class FAISSDualIndexManager:
             Secondary CPU index to set.
         """
         self._primary_cpu = primary
-        self._secondary_cpu = secondary
+        if secondary is None:
+            self._secondary_cpu = None
+            return
+        faiss_module = self._faiss_module or importlib.import_module("faiss")
+        self._faiss_module = faiss_module
+        self._secondary_cpu = self._wrap_with_idmap(secondary, faiss_module)
 
     @property
     def gpu_enabled(self) -> bool:
@@ -450,14 +455,37 @@ class FAISSDualIndexManager:
         secondary_path = self._index_dir / "secondary.faiss"
         if secondary_path.exists():
             try:
-                return await asyncio.to_thread(faiss_module.read_index, str(secondary_path))
+                index = await asyncio.to_thread(faiss_module.read_index, str(secondary_path))
+                return self._wrap_with_idmap(index, faiss_module)
             except RuntimeError as exc:
                 LOGGER.exception(
                     "faiss_secondary_load_failed",
                     extra={"path": str(secondary_path), "error": str(exc)},
                 )
 
-        return faiss_module.IndexFlatIP(self._vec_dim)
+        return self._wrap_with_idmap(faiss_module.IndexFlatIP(self._vec_dim), faiss_module)
+
+    def _wrap_with_idmap(self, index: faiss.Index, faiss_module: ModuleType) -> faiss.Index:
+        if hasattr(index, "id_map"):
+            self._configure_direct_map(index, faiss_module)
+            return index
+        wrapped = faiss_module.IndexIDMap2(index)
+        self._configure_direct_map(wrapped, faiss_module)
+        return wrapped
+
+    @staticmethod
+    def _configure_direct_map(index: faiss.Index, faiss_module: ModuleType) -> None:
+        direct_map = getattr(index, "direct_map", None)
+        direct_map_type = getattr(faiss_module, "DirectMap", None)
+        if direct_map is None or direct_map_type is None:
+            return
+        try:
+            direct_map.set_type(faiss_module.DirectMap.Array)
+        except AttributeError:
+            LOGGER.debug(
+                "faiss_direct_map_set_type_failed",
+                extra={"index": type(index).__name__},
+            )
 
     def _load_manifest(self) -> None:
         manifest_path = self._index_dir / "primary.manifest.json"

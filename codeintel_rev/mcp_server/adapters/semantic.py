@@ -13,6 +13,7 @@ from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING, cast
 
+from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.vllm_client import VLLMClient
@@ -25,13 +26,13 @@ from codeintel_rev.mcp_server.schemas import (
 )
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
 from codeintel_rev.typing import NDArrayF32
-from codeintel_rev._lazy_imports import LazyModule
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     import httpx
     import numpy as np
+
     from codeintel_rev.app.config_context import ApplicationContext
 else:
     httpx = cast("httpx", LazyModule("httpx", "semantic adapter HTTP error handling"))

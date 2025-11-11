@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 else:  # pragma: no cover - typing-only shim
     libcst_types = cst if cst is not None else Any
 
+
 @dataclass(slots=True, frozen=True)
 class CSTImports:
     """Structured import/export information for a module."""
@@ -256,7 +257,6 @@ if cst is not None:
 
 
 else:
-
     ImportCollector = None  # type: ignore[assignment]
 
 

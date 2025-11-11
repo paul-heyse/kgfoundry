@@ -450,7 +450,9 @@ class FAISSManager:
         if self.secondary_index is not None:
             return
         flat_index = faiss.IndexFlatIP(self.vec_dim)
-        self.secondary_index = faiss.IndexIDMap2(flat_index)
+        index = faiss.IndexIDMap2(flat_index)
+        self._configure_direct_map(index)
+        self.secondary_index = index
         LOGGER.info(
             "Created secondary flat index for incremental updates",
             extra=_log_extra(event="secondary_index_created"),
@@ -553,6 +555,24 @@ class FAISSManager:
             ),
         )
 
+    @staticmethod
+    def _configure_direct_map(index: _faiss.Index) -> None:
+        """Ensure FAISS direct maps are array-backed for reconstruction."""
+        direct_map = getattr(index, "direct_map", None)
+        try:
+            direct_map_enum = faiss.DirectMap  # type: ignore[attr-defined]
+        except AttributeError:
+            return
+        if direct_map is None:
+            return
+        try:
+            direct_map.set_type(direct_map_enum.Array)
+        except AttributeError:
+            LOGGER.debug(
+                "Failed to set FAISS direct map type",
+                extra=_log_extra(index_type=type(index).__name__),
+            )
+
     def save_cpu_index(self) -> None:
         """Save CPU index to disk for persistence.
 
@@ -648,7 +668,9 @@ class FAISSManager:
             msg = f"Secondary index not found: {self.secondary_index_path}"
             raise FileNotFoundError(msg)
 
-        self.secondary_index = faiss.read_index(str(self.secondary_index_path))
+        index = faiss.read_index(str(self.secondary_index_path))
+        self._configure_direct_map(index)
+        self.secondary_index = index
 
         # Restore incremental_ids from the loaded index
         if self.secondary_index is not None:
@@ -922,6 +944,18 @@ class FAISSManager:
         # Search secondary index (flat, no nprobe needed)
         return self.secondary_index.search(query_norm, k)
 
+    def primary_index_impl(self) -> _faiss.Index:
+        """Return the underlying FAISS index implementation for primary CPU index.
+
+        Returns
+        -------
+        _faiss.Index
+            Downcast FAISS index representing the current primary structure.
+        """
+        cpu_index = self._require_cpu_index()
+        base = getattr(cpu_index, "index", cpu_index)
+        return self._downcast_index(base)
+
     @staticmethod
     def _merge_results(
         dists1: NDArrayF32,
@@ -1134,8 +1168,9 @@ class FAISSManager:
 
         for i in range(n_vectors):
             try:
-                vectors[i] = index.reconstruct(i)
-                ids[i] = at_callable(i)
+                stored_id = int(at_callable(i))
+                vectors[i] = index.reconstruct(stored_id)
+                ids[i] = stored_id
             except (AttributeError, RuntimeError) as exc:
                 msg = f"Failed to extract vector at index {i}: {exc}"
                 raise RuntimeError(msg) from exc
@@ -1188,6 +1223,20 @@ class FAISSManager:
             msg = "Index not built"
             raise RuntimeError(msg)
         return self.cpu_index
+
+    @staticmethod
+    def _downcast_index(index: _faiss.Index) -> _faiss.Index:
+        """Return a concrete FAISS index implementation when possible.
+
+        Returns
+        -------
+        _faiss.Index
+            Downcast index when supported, otherwise the provided handle.
+        """
+        try:
+            return faiss.downcast_index(index)
+        except (AttributeError, RuntimeError):
+            return index
 
     def _active_index(self) -> _faiss.Index:
         """Return the best available search index.

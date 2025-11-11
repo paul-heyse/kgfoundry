@@ -231,7 +231,6 @@ dependencies = [
     "cyclopts>=5.0.0a1",
     "pytest-benchmark>=5.2.2",
     "fastapi-healthz>=1.2.7",
-    "faiss-cpu>=1.12.0",
     "torch @ https://download.pytorch.org/whl/cpu/torch-2.9.0%2Bcpu-cp313-cp313t-manylinux_2_28_x86_64.whl#sha256=528fd338311f31c9fb18038cafd00e6eae0bf5ad5577521701acb62510753d18",
     "torchvision @ https://download.pytorch.org/whl/cpu/torchvision-0.24.0%2Bcpu-cp313-cp313t-manylinux_2_28_x86_64.whl#sha256=b8bbac1a0aedb4c14c25474cc1d40da3f85372156b1048671ec1ef5901886b3a",
     "torchaudio @ https://download.pytorch.org/whl/cpu/torchaudio-2.9.0%2Bcpu-cp313-cp313-manylinux_2_28_x86_64.whl#sha256=20c0585786f69a182687ee6c3ab76c0ca8e5bf7b209015022e74ee67cda38af4",
@@ -297,44 +296,21 @@ scan-plus = [
 ]
 gpu = [
     "cython>=3.2.0b1",
-    "nvidia-cublas",
-    "nvidia-cuda-cupti",
-    "nvidia-cuda-nvrtc",
-    "nvidia-cuda-runtime",
-    "nvidia-cudnn-cu12",
-    "nvidia-cudnn-frontend",
-    "nvidia-cufft",
-    "nvidia-cufile",
-    "nvidia-curand",
-    "nvidia-cusolver",
-    "nvidia-cusparse",
-    "nvidia-cusparselt-cu12",
-    "nvidia-cutlass-dsl",
-    "nvidia-ml-py",
-    "nvidia-nccl-cu12",
-    "nvidia-nvjitlink",
-    "nvidia-nvshmem-cu12",
-    "nvidia-nvtx",
-    "cuda-bindings",
-    "cuda-pathfinder",
-    "cuda-python",
-    "cuda-toolkit",
-    "pylibraft-cu13",
-    "rmm-cu13",
+    "pylibraft-cu12",
+    "rmm-cu12",
     "torch",
     "torchvision",
     "torchaudio",
     "apache-tvm-ffi",
     "flashinfer-python",
     "flashinfer-cubin",
-    "flashinfer-jit-cache",
     "compressed-tensors",
     "accelerate",
     "easyocr",
-    "libcuvs-cu13==25.10.0",
-    "libraft-cu13==25.10.0",
-    "librmm-cu13==25.10.0",
-    "cuvs-cu13==25.10.0",
+    "libcuvs-cu12",
+    "libraft-cu12",
+    "librmm-cu12",
+    "cuvs-cu12",
     "docling",
     "docling-ibm-models",
     "openai",
@@ -346,12 +322,9 @@ gpu = [
     "xgrammar",
     "safetensors",
     "triton",
-    "cupy-cuda13x>=13.6.0",
-    "triton-kernels @git+https://github.com/triton-lang/triton.git@v3.5.0#subdirectory=python/triton_kernels",
-    "vllm",
+    "vllm==0.11.0",
     "faiss==1.12.0 ; python_version >= '3.13' and python_version < '3.14' and platform_system == 'Linux' and platform_machine == 'x86_64'",
     "ray",
-    "huggingface-hub",
 ]
 
 
@@ -660,20 +633,20 @@ markers = [
 ]
 testpaths = ["tests"]
 
-# Tell uv that vllm should come ONLY from the vllm-nightly index.
+
 [tool.uv.sources]
-vllm = { index = "wheelhouse" }
+#vllm = { index = "wheelhouse" }
 faiss = { index = "wheelhouse" }
-xformers = { index = "wheelhouse" }
+#xformers = { index = "wheelhouse" }
 
-# point torch packages to the *named* PyTorch cu130 index
-torch = [       { index = "pytorch-cu130" } ]
-torchvision = [ { index = "pytorch-cu130" } ]
-torchaudio = [  { index = "pytorch-cu130" } ]
+# point torch packages to the *named* PyTorch cu129 index
+torch = [       { index = "pytorch-cu129" } ]
+torchvision = [ { index = "pytorch-cu129" } ]
+torchaudio = [  { index = "pytorch-cu129" } ]
 
-flashinfer-python = [  { index = "flashinfer-nightly" } ]
-flashinfer-cubin = [  { index = "flashinfer-nightly" } ]
-flashinfer-jit-cache = [  { index = "flashinfer-nightly-cu130" } ]
+#flashinfer-python = [  { index = "flashinfer-nightly" } ]
+#flashinfer-cubin = [  { index = "flashinfer-nightly" } ]
+#flashinfer-jit-cache = [  { index = "flashinfer-nightly-cu130" } ]
 
 
 # Define named indexes uv can use.
@@ -698,21 +671,26 @@ url = ".wheelhouse"
 format = "flat"
 explicit = true
 
+[[tool.uv.index]]
+name = "pytorch-cu129"
+url  = "https://download.pytorch.org/whl/cu129"
+explicit = true
+
 # NEW — define the cu130 index *by name*, then reference it above
-[[tool.uv.index]]
-name = "pytorch-cu130"
-url  = "https://download.pytorch.org/whl/cu130"
-explicit = true
+#[[tool.uv.index]]
+#name = "pytorch-cu130"
+#url  = "https://download.pytorch.org/whl/cu130"
+#explicit = true
 
-[[tool.uv.index]]
-name = "flashinfer-nightly"
-url  = "https://flashinfer.ai/whl/nightly/"
-explicit = true
+#[[tool.uv.index]]
+#name = "flashinfer-nightly"
+#url  = "https://flashinfer.ai/whl/nightly/"
+#explicit = true
 
-[[tool.uv.index]]
-name = "flashinfer-nightly-cu130"
-url  = "https://flashinfer.ai/whl/nightly/cu130"
-explicit = true
+#[[tool.uv.index]]
+#name = "flashinfer-nightly-cu130"
+#url  = "https://flashinfer.ai/whl/nightly/cu130"
+#explicit = true
 
 
 [tool.uv]
@@ -720,12 +698,12 @@ explicit = true
 # (Default behavior is "if-necessary-or-explicit"; "allow" is simplest here.)
 prerelease = "allow"
 
-override-dependencies = [
-  "xformers @ file:///home/paul/wheelhouse/xformers-0.0.33+5d4b92a5.d20251029-*.whl",
-  "flashinfer-python",
-  "flashinfer-cubin",
-  "flashinfer-jit-cache",
-]
+#override-dependencies = [
+#  "xformers @ file:///home/paul/wheelhouse/xformers-0.0.33+5d4b92a5.d20251029-*.whl",
+#  "flashinfer-python",
+#  "flashinfer-cubin",
+#  "flashinfer-jit-cache",
+#]
 
 
 

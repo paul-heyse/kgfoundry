@@ -8,27 +8,28 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, TypeAlias
+from typing import TYPE_CHECKING, Any
 
 from kgfoundry_common.typing import gate_import as _base_gate_import
 
 if TYPE_CHECKING:
-    import numpy as _np
-    import numpy.typing as _npt
-else:  # pragma: no cover
-    _np = None  # type: ignore[assignment]
-    _npt = None  # type: ignore[assignment]
+    import numpy as np
+    import numpy.typing as npt
 
-NDArrayF32: TypeAlias = "_npt.NDArray[_np.float32]"
-NDArrayI64: TypeAlias = "_npt.NDArray[_np.int64]"
-NDArrayAny: TypeAlias = "_npt.NDArray[Any]"
+    type NDArrayF32 = npt.NDArray[np.float32]
+    type NDArrayI64 = npt.NDArray[np.int64]
+    type NDArrayAny = npt.NDArray[Any]
+else:  # pragma: no cover
+    NDArrayF32 = Any  # type: ignore[assignment]
+    NDArrayI64 = Any  # type: ignore[assignment]
+    NDArrayAny = Any  # type: ignore[assignment]
 
 __all__ = [
+    "HEAVY_DEPS",
+    "NDArrayAny",
     "NDArrayF32",
     "NDArrayI64",
-    "NDArrayAny",
     "gate_import",
-    "HEAVY_DEPS",
 ]
 
 
@@ -50,7 +51,13 @@ def gate_import(
     *,
     min_version: str | None = None,
 ) -> object:
-    """Resolve ``module_name`` lazily using the heavy dependency policy."""
+    """Resolve ``module_name`` lazily using the heavy dependency policy.
+
+    Returns
+    -------
+    object
+        Imported module or attribute returned by the shared gate helper.
+    """
     root = module_name.split(".", maxsplit=1)[0]
     resolved_min = min_version if min_version is not None else HEAVY_DEPS.get(root)
     return _base_gate_import(module_name, purpose, min_version=resolved_min)

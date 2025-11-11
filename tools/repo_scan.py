@@ -33,7 +33,7 @@ import sys
 import time
 import tokenize
 from collections.abc import Iterable, Iterator
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field, replace
 from importlib import util as importlib_util
 from pathlib import Path
 from typing import Any, cast
@@ -282,6 +282,10 @@ class ModuleReport:
         Import targets referenced by the module.
     public_api : list[str]
         Exported functions/classes as inferred by :func:`collect_public_api`.
+    public_api_details : list[dict[str, str]]
+        Signature/doc summaries for public API symbols.
+    raises : dict[str, list[str]]
+        Mapping of function names to exceptions raised.
     doc : DocStats
         Docstring coverage counters.
     typing : TypeHintStats
@@ -310,6 +314,11 @@ class ModuleReport:
     parse_ok: bool
     parse_error: str | None = None
     imports_cst: dict[str, Any] | None = None
+    test_count: int = 0
+    has_tests: bool = False
+    public_api_without_tests: list[str] = field(default_factory=list)
+    public_api_details: list[dict[str, str]] = field(default_factory=list)
+    raises: dict[str, list[str]] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -447,6 +456,206 @@ def collect_public_api(tree: ast.Module) -> list[str]:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
         and not node.name.startswith("_")
     ]
+
+
+def _annotation_to_str(node: ast.AST | None) -> str:
+    """Return the string representation of an annotation or default value.
+
+    Returns
+    -------
+    str
+        Rendered annotation or an empty string when unavailable.
+    """
+    if node is None:
+        return ""
+    try:
+        return ast.unparse(node)
+    except Exception:
+        return ""
+
+
+def _doc_one_liner(text: str | None) -> str:
+    """Return the first non-empty line from ``text``.
+
+    Returns
+    -------
+    str
+        A single trimmed line or an empty string when ``text`` is blank.
+    """
+    if not text:
+        return ""
+    for line in text.strip().splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return ""
+
+
+def _format_parameters(args: ast.arguments) -> list[str]:
+    """Render human-friendly parameter strings for ``args``.
+
+    Returns
+    -------
+    list[str]
+        Parameter representations suitable for signature display.
+    """
+    params: list[str] = []
+    total_pos = list(getattr(args, "posonlyargs", [])) + list(args.args)
+    defaults = list(args.defaults or [])
+    default_offset = len(total_pos) - len(defaults)
+
+    for index, arg in enumerate(total_pos):
+        default_value = defaults[index - default_offset] if index >= default_offset else None
+        params.append(_format_arg(arg, default_value))
+
+    if args.vararg:
+        params.append(_format_arg(args.vararg, None, prefix="*"))
+
+    if args.kwonlyargs:
+        if not args.vararg:
+            params.append("*")
+        kw_defaults = list(args.kw_defaults or [])
+        if len(kw_defaults) < len(args.kwonlyargs):
+            kw_defaults.extend([None] * (len(args.kwonlyargs) - len(kw_defaults)))
+        for kwarg, default in zip(args.kwonlyargs, kw_defaults, strict=False):
+            params.append(_format_arg(kwarg, default))
+
+    if args.kwarg:
+        params.append(_format_arg(args.kwarg, None, prefix="**"))
+
+    return params
+
+
+def _format_arg(arg: ast.arg, default: ast.AST | None, prefix: str = "") -> str:
+    """Format a single argument with annotation/defaults.
+
+    Returns
+    -------
+    str
+        String representation of the argument.
+    """
+    name = f"{prefix}{arg.arg}"
+    annotation = _annotation_to_str(arg.annotation)
+    if annotation:
+        name += f": {annotation}"
+    if default is not None:
+        default_text = _annotation_to_str(default)
+        if default_text:
+            name += f" = {default_text}"
+    return name
+
+
+def _function_signature(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
+    """Return a repr-style signature string for ``fn``.
+
+    Returns
+    -------
+    str
+        Signature string containing parameters and optional return type.
+    """
+    params = ", ".join(_format_parameters(fn.args))
+    ret = _annotation_to_str(fn.returns)
+    suffix = f" -> {ret}" if ret else ""
+    return f"{fn.name}({params}){suffix}"
+
+
+def _class_signature(cls: ast.ClassDef) -> str:
+    """Return a class signature showing its bases.
+
+    Returns
+    -------
+    str
+        Class depiction including base classes when available.
+    """
+    bases = ", ".join(filter(None, (_annotation_to_str(base) for base in cls.bases)))
+    return f"class {cls.name}({bases})" if bases else f"class {cls.name}"
+
+
+def collect_public_api_details(
+    tree: ast.Module,
+    module_path: Path,
+    allowed_names: set[str],
+) -> list[dict[str, str]]:
+    """Emit signature/doc summaries for public API members.
+
+    Returns
+    -------
+    list[dict[str, str]]
+        Sequence describing each exported symbol.
+    """
+    details: list[dict[str, str]] = []
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in allowed_names:
+            sig = _function_signature(node)
+            details.append(
+                {
+                    "name": node.name,
+                    "kind": "function",
+                    "signature": sig,
+                    "doc_one_liner": _doc_one_liner(ast.get_docstring(node, clean=True)),
+                    "defined_at": f"{module_path}:{node.lineno}",
+                }
+            )
+        elif isinstance(node, ast.ClassDef) and node.name in allowed_names:
+            details.append(
+                {
+                    "name": node.name,
+                    "kind": "class",
+                    "signature": _class_signature(node),
+                    "doc_one_liner": _doc_one_liner(ast.get_docstring(node, clean=True)),
+                    "defined_at": f"{module_path}:{node.lineno}",
+                }
+            )
+    return details
+
+
+def _exception_name(expr: ast.AST | None) -> str | None:
+    """Return the fully qualified exception name referenced by ``expr``.
+
+    Returns
+    -------
+    str | None
+        Exception identifier when resolvable.
+    """
+    if expr is None:
+        return None
+    if isinstance(expr, ast.Call):
+        return _exception_name(expr.func)
+    if isinstance(expr, ast.Name):
+        return expr.id
+    if isinstance(expr, ast.Attribute):
+        parts: list[str] = []
+        current: ast.AST | None = expr
+        while isinstance(current, ast.Attribute):
+            parts.append(current.attr)
+            current = current.value
+        if isinstance(current, ast.Name):
+            parts.append(current.id)
+        if parts:
+            return ".".join(reversed(parts))
+    return None
+
+
+def collect_function_raises(tree: ast.Module) -> dict[str, list[str]]:
+    """Map function names to the exceptions they raise.
+
+    Returns
+    -------
+    dict[str, list[str]]
+        Mapping of function names to sorted exception lists.
+    """
+    raises_map: dict[str, set[str]] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            raised: set[str] = set()
+            for sub in ast.walk(node):
+                if isinstance(sub, ast.Raise):
+                    name = _exception_name(sub.exc)
+                    if name:
+                        raised.add(name.split(".")[-1])
+            if raised:
+                raises_map[node.name] = raised
+    return {name: sorted(values) for name, values in raises_map.items()}
 
 
 def _extract_dunder_all(tree: ast.Module) -> list[str] | None:
@@ -686,9 +895,11 @@ def analyze_file(
         )
     imports = collect_imports(modname, tree)
     public_api = collect_public_api(tree)
+    public_api_details = collect_public_api_details(tree, path, set(public_api))
     doc = collect_docstats(tree)
     typing = collect_typehints(tree)
     complexity = collect_complexity(tree)
+    raises_map = collect_function_raises(tree)
     imports_cst: dict[str, Any] | None = None
     if use_libcst:
         cst_report = collect_imports_with_libcst(path, modname)
@@ -705,6 +916,8 @@ def analyze_file(
         is_test=is_test_file(path, modname),
         imports=imports,
         public_api=public_api,
+        public_api_details=public_api_details,
+        raises=raises_map,
         doc=doc,
         typing=typing,
         complexity=complexity,
@@ -1037,6 +1250,34 @@ def map_tests_to_modules(reports: list[ModuleReport]) -> dict[str, list[str]]:
     return {m: sorted(v) for m, v in mapping.items() if v}
 
 
+def _apply_test_metadata(
+    reports: list[ModuleReport], test_map: dict[str, list[str]]
+) -> list[ModuleReport]:
+    """Attach test counts/flags to module reports.
+
+    Returns
+    -------
+    list[ModuleReport]
+        Reports updated with testing metadata.
+    """
+    counts = {module: len(tests) for module, tests in test_map.items()}
+    updated: list[ModuleReport] = []
+    for report in reports:
+        if report.is_test:
+            updated.append(report)
+            continue
+        count = counts.get(report.module, 0)
+        updated.append(
+            replace(
+                report,
+                test_count=count,
+                has_tests=count > 0,
+                public_api_without_tests=list(report.public_api) if count == 0 else [],
+            )
+        )
+    return updated
+
+
 def write_dot(edges: list[tuple[str, str]], out_path: Path) -> None:
     """Persist an import graph to a Graphviz DOT file.
 
@@ -1050,6 +1291,181 @@ def write_dot(edges: list[tuple[str, str]], out_path: Path) -> None:
     lines = ["digraph imports {"]
     for a, b in edges:
         lines.append(f'  "{a}" -> "{b}";')
+    lines.append("}")
+    out_path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def summarize_graph(reports: list[ModuleReport], edges: list[tuple[str, str]]) -> dict[str, Any]:
+    """Return graph analytics for downstream consumption.
+
+    Returns
+    -------
+    dict[str, Any]
+        Node metrics (degrees, PageRank, cycle membership) and cycle list.
+    """
+    nodes = {r.module: r.is_test for r in reports if r.parse_ok}
+    if not nodes:
+        return {"nodes": {}, "cycles": []}
+
+    in_deg = dict.fromkeys(nodes.keys(), 0)
+    out_deg = dict.fromkeys(nodes.keys(), 0)
+    filtered_edges: list[tuple[str, str]] = []
+    for src, dst in edges:
+        if src in nodes and dst in nodes:
+            out_deg[src] += 1
+            in_deg[dst] += 1
+            filtered_edges.append((src, dst))
+
+    cycles = _strongly_connected_components(nodes.keys(), filtered_edges)
+    cycle_nodes = {entry for comp in cycles for entry in comp}
+    ranks = _pagerank(nodes.keys(), filtered_edges)
+
+    node_info = {
+        node: {
+            "in_degree": in_deg[node],
+            "out_degree": out_deg[node],
+            "pagerank": round(ranks.get(node, 0.0), 6),
+            "cycle": node in cycle_nodes,
+            "is_test": is_test,
+        }
+        for node, is_test in nodes.items()
+    }
+    return {"nodes": node_info, "cycles": cycles}
+
+
+def _strongly_connected_components(
+    nodes: Iterable[str], edges: list[tuple[str, str]]
+) -> list[list[str]]:
+    """Compute strongly connected components using Kosaraju's algorithm.
+
+    Returns
+    -------
+    list[list[str]]
+        Each entry is a strongly connected component with >1 node.
+    """
+    node_list = list(nodes)
+    graph: dict[str, list[str]] = {}
+    reverse_graph: dict[str, list[str]] = {}
+    for node in node_list:
+        graph[node] = []
+        reverse_graph[node] = []
+    for src, dst in edges:
+        graph.setdefault(src, []).append(dst)
+        reverse_graph.setdefault(dst, []).append(src)
+
+    order = _dfs_finish_order(graph)
+    seen: set[str] = set()
+    components: list[list[str]] = []
+    for node in reversed(order):
+        if node in seen:
+            continue
+        comp = _collect_component(reverse_graph, node, seen)
+        if len(comp) > 1:
+            components.append(comp)
+    return components
+
+
+def _dfs_finish_order(graph: dict[str, list[str]]) -> list[str]:
+    """Return nodes ordered by DFS finish time.
+
+    Returns
+    -------
+    list[str]
+        Nodes ordered by decreasing finish time.
+    """
+    seen: set[str] = set()
+    order: list[str] = []
+
+    def dfs(node: str) -> None:
+        seen.add(node)
+        for neighbor in graph.get(node, []):
+            if neighbor not in seen:
+                dfs(neighbor)
+        order.append(node)
+
+    for node in graph:
+        if node not in seen:
+            dfs(node)
+    return order
+
+
+def _collect_component(
+    reverse_graph: dict[str, list[str]],
+    start: str,
+    seen: set[str],
+) -> list[str]:
+    """Collect nodes reachable in the reverse graph from ``start``.
+
+    Returns
+    -------
+    list[str]
+        Nodes forming a single strongly connected component.
+    """
+    component: list[str] = []
+    stack = [start]
+    while stack:
+        node = stack.pop()
+        if node in seen:
+            continue
+        seen.add(node)
+        component.append(node)
+        stack.extend(neighbor for neighbor in reverse_graph.get(node, []) if neighbor not in seen)
+    return component
+
+
+def _pagerank(
+    nodes: Iterable[str], edges: list[tuple[str, str]], damping: float = 0.85, iters: int = 25
+) -> dict[str, float]:
+    """Compute a simple PageRank over the provided nodes.
+
+    Returns
+    -------
+    dict[str, float]
+        PageRank scores keyed by node.
+    """
+    node_list = list(nodes)
+    if not node_list:
+        return {}
+    score = {node: 1.0 / len(node_list) for node in node_list}
+    outgoing: dict[str, list[str]] = {}
+    for node in node_list:
+        outgoing[node] = []
+    for src, dst in edges:
+        outgoing.setdefault(src, []).append(dst)
+    base = (1.0 - damping) / len(node_list)
+    for _ in range(iters):
+        next_score = dict.fromkeys(node_list, base)
+        for node in node_list:
+            neighbors = outgoing.get(node) or []
+            if not neighbors:
+                continue
+            share = score[node] / len(neighbors)
+            for neighbor in neighbors:
+                next_score[neighbor] = next_score.get(neighbor, base) + damping * share
+        score = next_score
+    return score
+
+
+def write_enriched_dot(
+    edges: list[tuple[str, str]],
+    out_path: Path,
+    summary: dict[str, Any],
+) -> None:
+    """Write a DOT file with node styling based on analytics."""
+    nodes = summary.get("nodes", {})
+    lines = ["digraph imports {"]
+    for node, info in nodes.items():
+        attrs = []
+        if info.get("is_test"):
+            attrs.append('style="dashed"')
+        color = "red" if info.get("cycle") else "black"
+        attrs.append(f'color="{color}"')
+        pagerank = info.get("pagerank", 0.0) or 0.0
+        penwidth = 1.0 + pagerank * 40
+        attrs.append(f'penwidth="{penwidth:.2f}"')
+        lines.append(f'  "{node}" [{", ".join(attrs)}];')
+    for src, dst in edges:
+        lines.append(f'  "{src}" -> "{dst}";')
     lines.append("}")
     out_path.write_text("\n".join(lines), encoding="utf-8")
 
@@ -1120,21 +1536,36 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         action="store_false",
         help="Disable automatic inclusion of relevant test files.",
     )
+    ap.set_defaults(with_libcst=True, with_griffe=True, write_enriched_dot=True)
     ap.add_argument(
-        "--with-libcst",
-        action="store_true",
-        help="Augment import analysis with LibCST (captures TYPE_CHECKING + __all__).",
+        "--no-libcst",
+        dest="with_libcst",
+        action="store_false",
+        help="Disable LibCST enrichment (enabled by default).",
     )
     ap.add_argument(
-        "--with-griffe",
-        action="store_true",
-        help="Enable Griffe-powered API/doc extraction for scanned packages.",
+        "--no-griffe",
+        dest="with_griffe",
+        action="store_false",
+        help="Disable Griffe-powered API/doc extraction.",
     )
     ap.add_argument(
         "--docstyle",
         choices=["google", "numpy", "sphinx"],
         default="google",
         help="Docstring style passed to Griffe parsing (default: %(default)s).",
+    )
+    ap.add_argument(
+        "--enriched-dot",
+        type=str,
+        default="import_graph_enriched.dot",
+        help="Path for an analytics-enriched DOT graph (default: %(default)s).",
+    )
+    ap.add_argument(
+        "--no-enriched-dot",
+        dest="write_enriched_dot",
+        action="store_false",
+        help="Skip writing the analytics-enriched DOT graph.",
     )
     return ap
 
@@ -1342,6 +1773,7 @@ def _assemble_payload(
     *,
     reports: list[ModuleReport],
     edges: list[tuple[str, str]],
+    graph_summary: dict[str, Any],
     options: PayloadOptions,
 ) -> dict[str, Any]:
     """Compose the JSON payload written to disk.
@@ -1365,6 +1797,9 @@ def _assemble_payload(
         Import edge tuples (source_module, target_module) extracted
         during scanning. Included as "import_edges" in the payload
         for graph visualization and dependency analysis.
+    graph_summary : dict[str, Any]
+        Derived graph analytics (degrees, PageRank, strongly connected
+        components) stored under "graph_summary".
     options : PayloadOptions
         Configuration object containing `scan_root`, `repo_root`,
         `with_griffe`, `with_libcst`, and `docstyle`. Used to derive
@@ -1378,7 +1813,8 @@ def _assemble_payload(
         "generated_at" (ISO timestamp), "scan_root", "repo_root",
         "summary" (file/test/parse stats), "modules" (serialized reports),
         "import_edges", "tests_to_modules" (test mapping), "git" (metadata),
-        "api_symbols" (if Griffe enabled), "external_deps" (if LibCST enabled).
+        "api_symbols" (if Griffe enabled), "external_deps" (if LibCST enabled),
+        and "graph_summary" describing import-graph analytics.
 
     Notes
     -----
@@ -1421,6 +1857,7 @@ def _assemble_payload(
         "git": git_by_path,
         "api_symbols": api_symbols_payload,
         "external_deps": external_deps,
+        "graph_summary": graph_summary,
     }
 
 
@@ -1506,9 +1943,13 @@ def _execute_scan(args: argparse.Namespace) -> tuple[dict[str, Any], list[tuple[
         )
 
     edges = build_local_import_graph(reports)
+    test_map = map_tests_to_modules(reports)
+    reports = _apply_test_metadata(reports, test_map)
+    graph_summary = summarize_graph(reports, edges)
     payload = _assemble_payload(
         reports=reports,
         edges=edges,
+        graph_summary=graph_summary,
         options=PayloadOptions(
             scan_root=scan_root,
             repo_root=repo_root,
@@ -1531,6 +1972,12 @@ def main() -> None:
 
     Path(args.out_json).write_text(json.dumps(payload, indent=2, sort_keys=False), encoding="utf-8")
     write_dot(edges, Path(args.out_dot))
+    if getattr(args, "write_enriched_dot", False):
+        write_enriched_dot(
+            edges,
+            Path(args.enriched_dot),
+            payload.get("graph_summary", {}),
+        )
 
     logger.info("Wrote %s and %s", args.out_json, args.out_dot)
 

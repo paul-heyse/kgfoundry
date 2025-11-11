@@ -27,8 +27,8 @@ from codeintel_rev.typing import gate_import
 
 if TYPE_CHECKING:
     import faiss as _faiss
-    import torch as _torch
     import numpy as np
+    import torch as _torch
 else:
     np = cast("np", LazyModule("numpy", "GPU diagnostics random probes"))
 
@@ -53,8 +53,9 @@ def check_torch(device_index: int = 0) -> tuple[bool, dict[str, object]]:
         return False, {"error": f"torch import failed: {exc}"}
 
     info["torch_import_ok"] = True
-    info["torch_version"] = torch.__version__
-    info["cuda_version"] = getattr(torch.version, "cuda", None)
+    info["torch_version"] = getattr(torch, "__version__", None)
+    version_mod = getattr(torch, "version", None)
+    info["cuda_version"] = getattr(version_mod, "cuda", None) if version_mod else None
 
     if not torch.cuda.is_available():
         return False, {"error": "torch.cuda.is_available() is False", **info}

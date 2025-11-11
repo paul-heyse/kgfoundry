@@ -25,8 +25,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from codeintel_rev._lazy_imports import LazyModule
-from codeintel_rev.typing import NDArrayF32, NDArrayI64
-
 from codeintel_rev.config.settings import (
     IndexConfig,
     Settings,
@@ -51,6 +49,7 @@ from codeintel_rev.io.symbol_catalog import (  # new
     SymbolOccurrenceRow,
 )
 from codeintel_rev.io.vllm_client import VLLMClient
+from codeintel_rev.typing import NDArrayF32
 
 if TYPE_CHECKING:
     import numpy as np

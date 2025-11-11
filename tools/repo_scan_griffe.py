@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -402,9 +403,10 @@ def collect_api_symbols_with_griffe(
         return []
 
     modules: list[GriffeModule] = []
+    search_paths = [str(repo_root), *[path for path in sys.path if path]]
     for name in package_names:
         try:
-            module = griffe.load(name, search_paths=[str(repo_root)])
+            module = griffe.load(name, search_paths=search_paths)
             modules.append(cast("GriffeModule", module))
         except (GriffeError, ImportError, ModuleNotFoundError, OSError, FileNotFoundError) as exc:
             LOGGER.debug("Skipping package %s due to load error: %s", name, exc)

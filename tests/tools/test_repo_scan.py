@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -15,16 +16,30 @@ def _run_repo_scan_cli(
     scan_root: Path,
     tmp_path: Path,
     extra_args: list[str] | None = None,
-) -> tuple[dict[str, Any], Path]:
-    """Invoke repo_scan.main() with the provided arguments and return its payload.
+) -> tuple[dict[str, Any], Path, Path | None]:
+    """Invoke repo_scan.main() and capture JSON, DOT, and enriched graph paths.
 
     Returns
     -------
-    tuple[dict[str, object], Path]
-        Parsed JSON payload and the path to the generated DOT file.
+    tuple[dict[str, Any], Path, Path | None]
+        Parsed payload, standard DOT path, and enriched DOT path (if written).
     """
     json_path = tmp_path / "metrics.json"
     dot_path = tmp_path / "graph.dot"
+    extra_args = extra_args or []
+    enriched_path: Path | None = None
+    enriched_specified = False
+    for idx, arg in enumerate(extra_args):
+        if arg == "--enriched-dot" and idx + 1 < len(extra_args):
+            enriched_specified = True
+            enriched_path = Path(extra_args[idx + 1])
+            break
+        if arg == "--no-enriched-dot":
+            enriched_specified = True
+            enriched_path = None
+            break
+    if not enriched_specified:
+        enriched_path = tmp_path / "graph_enriched.dot"
     argv = [
         "repo_scan.py",
         str(scan_root),
@@ -35,12 +50,14 @@ def _run_repo_scan_cli(
         "--out-dot",
         str(dot_path),
     ]
+    if not enriched_specified and enriched_path is not None:
+        argv.extend(["--enriched-dot", str(enriched_path)])
     if extra_args:
         argv.extend(extra_args)
     monkeypatch.setattr(sys, "argv", argv)
     repo_scan.main()
     payload = json.loads(json_path.read_text(encoding="utf-8"))
-    return payload, dot_path
+    return payload, dot_path, enriched_path
 
 
 def test_iter_py_files_skips_virtual_env_content(tmp_path: Path) -> None:
@@ -140,10 +157,23 @@ def test_repo_scan_main_generates_expected_payload(
 
             def helper(lhs: int, rhs: int) -> int:
                 """Provide deterministic arithmetic for the test repo."""
+                if lhs < 0 or rhs < 0:
+                    raise ValueError("arguments must be non-negative")
                 if lhs > rhs:
                     return lhs - rhs
                 return rhs - lhs
             '''
+        ),
+        encoding="utf-8",
+    )
+    (pkg_dir / "utils.py").write_text(
+        dedent(
+            """\
+            def orphan(value: int) -> int:
+                \"\"\"Return the provided value to simulate an untested API.\"\"\"
+
+                return value
+            """
         ),
         encoding="utf-8",
     )
@@ -164,13 +194,17 @@ def test_repo_scan_main_generates_expected_payload(
         encoding="utf-8",
     )
 
-    payload, dot_path = _run_repo_scan_cli(monkeypatch, scan_root, tmp_path)
+    payload, dot_path, enriched_path = _run_repo_scan_cli(monkeypatch, scan_root, tmp_path)
     modules = {entry["module"]: entry for entry in payload["modules"]}
 
-    assert payload["summary"] == {"files": 3, "parsed_ok": 3, "tests": 1}
+    assert payload["summary"] == {"files": 4, "parsed_ok": 4, "tests": 1}
     assert modules["pkg"]["doc"]["module_doc"] is True
     assert modules["pkg.mod_a"]["typing"]["functions"] >= 1
-    assert payload["api_symbols"] == []
+    griffe_available = importlib.util.find_spec("griffe") is not None
+    if griffe_available:
+        assert payload["api_symbols"]
+    else:
+        assert payload["api_symbols"] == []
     assert payload["external_deps"] == []
 
     edge_set = {tuple(edge) for edge in payload["import_edges"]}
@@ -178,6 +212,15 @@ def test_repo_scan_main_generates_expected_payload(
 
     assert payload["tests_to_modules"]["pkg"] == ["tests.test_pkg"]
     assert Path(dot_path).read_text(encoding="utf-8").startswith("digraph imports")
+    if enriched_path is not None:
+        assert enriched_path.exists()
+    public_details = modules["pkg"]["public_api_details"]
+    assert any(entry["name"] == "public_func" for entry in public_details)
+    assert modules["pkg.mod_a"]["raises"]["helper"] == ["ValueError"]
+    assert modules["pkg.mod_a"]["test_count"] >= 1
+    assert modules["pkg.utils"]["public_api_without_tests"] == ["orphan"]
+    assert payload["graph_summary"]["nodes"]
+    assert "pkg.mod_a" in payload["graph_summary"]["nodes"]
 
 
 def test_module_name_strips_src_prefix(tmp_path: Path) -> None:
@@ -192,7 +235,7 @@ def test_module_name_strips_src_prefix(tmp_path: Path) -> None:
 
 
 def test_repo_scan_with_libcst_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Ensure LibCST wiring enriches module reports and external dependency summary."""
+    """Ensure LibCST enrichment is enabled by default and can be disabled."""
     pytest.importorskip("libcst")
     scan_root = tmp_path / "libcst_scan"
     mod_path = scan_root / "pkg" / "mod.py"
@@ -210,7 +253,7 @@ def test_repo_scan_with_libcst_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         encoding="utf-8",
     )
 
-    payload, _ = _run_repo_scan_cli(monkeypatch, scan_root, tmp_path, ["--with-libcst"])
+    payload, _, _ = _run_repo_scan_cli(monkeypatch, scan_root, tmp_path)
     modules = {entry["module"]: entry for entry in payload["modules"]}
     module_report = modules["pkg.mod"]
     assert module_report["imports_cst"] is not None
@@ -218,6 +261,16 @@ def test_repo_scan_with_libcst_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     assert module_report["imports_cst"]["type_checking_imports"] == ["vendor.tools.FancyType"]
     assert "json" in payload["external_deps"]
     assert "vendor" in payload["external_deps"]
+
+    payload_disabled, _, _ = _run_repo_scan_cli(
+        monkeypatch,
+        scan_root,
+        tmp_path,
+        ["--no-libcst"],
+    )
+    modules_disabled = {entry["module"]: entry for entry in payload_disabled["modules"]}
+    assert modules_disabled["pkg.mod"]["imports_cst"] is None
+    assert payload_disabled["external_deps"] == []
 
 
 def test_repo_scan_with_griffe_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -257,13 +310,21 @@ def test_repo_scan_with_griffe_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         encoding="utf-8",
     )
 
-    payload, _ = _run_repo_scan_cli(
+    payload, _, _ = _run_repo_scan_cli(
         monkeypatch,
         scan_root,
         tmp_path,
-        ["--with-griffe", "--docstyle", "google"],
+        ["--docstyle", "google"],
     )
     assert payload["api_symbols"], "Expected Griffe symbols to be emitted"
     greeter_symbol = next((s for s in payload["api_symbols"] if s["short_name"] == "Greeter"), None)
     assert greeter_symbol is not None
     assert any(param["name"] == "prefix" for param in greeter_symbol["params"])
+
+    payload_disabled, _, _ = _run_repo_scan_cli(
+        monkeypatch,
+        scan_root,
+        tmp_path,
+        ["--no-griffe"],
+    )
+    assert payload_disabled["api_symbols"] == []

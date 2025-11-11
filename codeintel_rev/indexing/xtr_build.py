@@ -9,11 +9,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from codeintel_rev._lazy_imports import LazyModule
-from codeintel_rev.typing import NDArrayAny
 from codeintel_rev.app.config_context import resolve_application_paths
 from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.xtr_manager import XTRIndex
+from codeintel_rev.typing import NDArrayAny
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:

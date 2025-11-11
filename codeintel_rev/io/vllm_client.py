@@ -20,8 +20,8 @@ from kgfoundry_common.logging import get_logger
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    import numpy as np
     import httpx
+    import numpy as np
 
     from codeintel_rev.config.settings import VLLMConfig
     from codeintel_rev.io.vllm_engine import InprocessVLLMEmbedder

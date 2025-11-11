@@ -61,18 +61,28 @@ def _patch_vllm(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(
         engine_module,
-        "AutoTokenizer",
-        SimpleNamespace(from_pretrained=_tokenizer_factory),
+        "transformers",
+        SimpleNamespace(AutoTokenizer=SimpleNamespace(from_pretrained=_tokenizer_factory)),
         raising=False,
     )
-    monkeypatch.setattr(engine_module, "TokensPrompt", _StubTokensPrompt, raising=False)
-    monkeypatch.setattr(engine_module, "PoolerConfig", _StubPooler, raising=False)
-    monkeypatch.setattr(engine_module, "LLM", _StubLLM, raising=False)
+    monkeypatch.setattr(
+        engine_module,
+        "vllm_inputs",
+        SimpleNamespace(TokensPrompt=_StubTokensPrompt),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        engine_module,
+        "vllm_config",
+        SimpleNamespace(PoolerConfig=_StubPooler),
+        raising=False,
+    )
+    monkeypatch.setattr(engine_module, "vllm", SimpleNamespace(LLM=_StubLLM), raising=False)
 
 
 def test_embed_batch_returns_expected_shape() -> None:
     config = VLLMConfig(
-        model="stub",
+        model="nomic-ai/nomic-embed-code",
         embedding_dim=2,
         run=VLLMRunMode(mode="inprocess"),
     )
@@ -86,7 +96,7 @@ def test_embed_batch_returns_expected_shape() -> None:
 
 def test_embed_batch_handles_empty_input() -> None:
     config = VLLMConfig(
-        model="stub",
+        model="nomic-ai/nomic-embed-code",
         embedding_dim=3,
         run=VLLMRunMode(mode="inprocess"),
     )

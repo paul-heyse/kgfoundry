@@ -7,8 +7,8 @@ import threading
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, ClassVar, cast
 
-from kgfoundry_common.logging import get_logger
 from codeintel_rev.typing import gate_import
+from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     from transformers import AutoModelForCausalLM, PreTrainedTokenizerBase
