@@ -55,9 +55,10 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import redis.asyncio as redis_asyncio
 
+from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.scope_store import ScopeStore
 from codeintel_rev.config.settings import Settings, load_settings
-from codeintel_rev.errors import RuntimeUnavailableError
+from codeintel_rev.errors import RuntimeLifecycleError, RuntimeUnavailableError
 from codeintel_rev.indexing.index_lifecycle import IndexLifecycleManager
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.duckdb_manager import DuckDBManager
@@ -1022,7 +1023,12 @@ class ApplicationContext:
             Configured hybrid search engine instance.
         """
         engine_cls = _import_hybrid_engine_cls()
-        return engine_cls(self.settings, self.paths)
+        capabilities = None
+        try:
+            capabilities = Capabilities.from_context(self)
+        except RuntimeLifecycleError:  # pragma: no cover - defensive logging
+            LOGGER.warning("capabilities.detect_failed", exc_info=True)
+        return engine_cls(self.settings, self.paths, capabilities=capabilities)
 
     def ensure_faiss_ready(self) -> tuple[bool, list[str], str | None]:
         """Load FAISS index (once) and attempt GPU clone.

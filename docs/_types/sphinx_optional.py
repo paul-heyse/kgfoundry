@@ -16,10 +16,18 @@ Examples
 from __future__ import annotations
 
 from importlib import import_module
-from typing import Protocol, cast, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
-from docs._types.astroid_facade import AstroidManagerProtocol
-from docs._types.autoapi_parser import AutoapiParserProtocol, coerce_parser_class
+if TYPE_CHECKING:
+    from docs._types.astroid_facade import AstroidManagerProtocol
+    from docs._types.autoapi_parser import AutoapiParserProtocol, coerce_parser_class
+else:  # pragma: no cover - runtime import guarded
+    _astroid_facade = import_module("docs._types.astroid_facade")
+    AstroidManagerProtocol = _astroid_facade.AstroidManagerProtocol
+    _autoapi_parser = import_module("docs._types.autoapi_parser")
+    AutoapiParserProtocol = _autoapi_parser.AutoapiParserProtocol
+    coerce_parser_class = _autoapi_parser.coerce_parser_class
+    del _astroid_facade, _autoapi_parser
 
 __all__ = [
     "AstroidManagerFacade",

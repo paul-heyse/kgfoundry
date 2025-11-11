@@ -28,7 +28,7 @@ Typed NumPy helpers shared across vector search modules.
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `numpy`, `numpy.typing`, `typing.Final`, `typing.TYPE_CHECKING`, `typing.cast`
+**Imports:** `__future__.annotations`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.typing.gate_import`, `numpy`, `numpy.typing`, `typing.Final`, `typing.TYPE_CHECKING`, `typing.cast`
 
 ## Autorefs Examples
 
@@ -45,6 +45,8 @@ direction: right
 "kgfoundry_common.numpy_typing" -> "__future__.annotations"
 "kgfoundry_common.navmap_loader.load_nav_metadata": "kgfoundry_common.navmap_loader.load_nav_metadata"
 "kgfoundry_common.numpy_typing" -> "kgfoundry_common.navmap_loader.load_nav_metadata"
+"kgfoundry_common.typing.gate_import": "kgfoundry_common.typing.gate_import"
+"kgfoundry_common.numpy_typing" -> "kgfoundry_common.typing.gate_import"
 "numpy": "numpy"
 "kgfoundry_common.numpy_typing" -> "numpy"
 "numpy.typing": "numpy.typing"

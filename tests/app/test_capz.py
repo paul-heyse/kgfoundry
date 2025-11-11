@@ -65,6 +65,11 @@ def test_capz_endpoint_refresh(tmp_path, monkeypatch) -> None:
         duckdb=False,
         scip_index=False,
         vllm_client=False,
+        faiss_importable=False,
+        duckdb_importable=False,
+        torch_importable=False,
+        onnxruntime_importable=False,
+        lucene_importable=False,
         active_index_version="v2",
         versions_available=2,
     )
@@ -96,3 +101,5 @@ def test_capz_endpoint_refresh(tmp_path, monkeypatch) -> None:
         assert body["faiss_index_present"] is False
         assert body["active_index_version"] == "v2"
         assert body["versions_available"] == 2
+        assert body["hints"]["faiss"] == "faiss-cpu or faiss-gpu"
+        assert body["hints"]["duckdb"] == "duckdb"

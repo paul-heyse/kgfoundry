@@ -16,9 +16,15 @@ Examples
 from __future__ import annotations
 
 import logging
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
-from pydantic import BaseModel
+if TYPE_CHECKING:
+    from pydantic import BaseModel
+else:  # pragma: no cover - runtime stub for typing
+
+    class BaseModel:  # type: ignore[too-many-ancestors]
+        """Runtime stub for Pydantic BaseModel to avoid heavy import."""
+
 
 from kgfoundry_common.errors import ArtifactValidationError
 

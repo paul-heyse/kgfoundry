@@ -26,10 +26,12 @@
       "__future__.annotations",
       "kgfoundry_common.navmap_loader.load_nav_metadata",
       "kgfoundry_common.pydantic.BaseModel",
+      "kgfoundry_common.typing.gate_import",
       "pydantic.ConfigDict",
       "pydantic.Field",
       "typing.ClassVar",
-      "typing.Literal"
+      "typing.Literal",
+      "typing.TYPE_CHECKING"
     ]
   }
 }

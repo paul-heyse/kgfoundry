@@ -48,6 +48,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, NoReturn, Protocol, cast
 
 from kgfoundry_common.navmap_loader import load_nav_metadata
+from kgfoundry_common.typing.heavy_deps import EXTRAS_HINT, HEAVY_DEPS
 
 
 class _Comparable(Protocol):
@@ -95,6 +96,7 @@ def _protocol_stub(method: str, *args: object) -> NoReturn:
 # =============================================================================
 
 __all__ = [
+    "HEAVY_DEPS",
     "TYPE_CHECKING",
     "JSONValue",
     "NavMap",
@@ -167,25 +169,46 @@ def gate_import(
     >>> np = gate_import("numpy", "array manipulation")
     >>> arr = np.zeros((10,))
     """
+    module_root = module_name.split(".", maxsplit=1)[0]
+    resolved_min = min_version if min_version is not None else HEAVY_DEPS.get(module_root)
+    hint = EXTRAS_HINT.get(module_root)
+
     # Attempt import
     try:
         module = __import__(module_name, fromlist=[""])
     except ImportError as exc:
-        msg = (
-            f"Cannot proceed with {purpose}: '{module_name}' is not installed. "
-            f"Install via: pip install {module_name.split('.', maxsplit=1)[0]}"
-        )
+        msg = f"Cannot proceed with {purpose}: '{module_name}' is not installed."
+        if hint:
+            if " or " in hint:
+                options = " or ".join(
+                    f"pip install codeintel-rev[{option.strip()}]" for option in hint.split(" or ")
+                )
+                msg = f"{msg} Install with: {options}"
+            else:
+                msg = f"{msg} Install with: pip install codeintel-rev[{hint}]"
+        else:
+            msg = f"{msg} Install via: pip install {module_root}"
         raise ImportError(msg) from exc
 
     # Check version if requested
-    if min_version is not None and hasattr(module, "__version__"):
+    if resolved_min is not None and hasattr(module, "__version__"):
         installed: str = getattr(module, "__version__", "unknown")
-        if not _version_gte(installed, min_version):
+        if not _version_gte(installed, resolved_min):
             msg = (
                 f"Cannot proceed with {purpose}: '{module_name}' version "
-                f"{installed} < {min_version} (required). "
-                f"Upgrade via: pip install --upgrade {module_name.split('.', maxsplit=1)[0]}"
+                f"{installed} < {resolved_min} (required)."
             )
+            if hint:
+                if " or " in hint:
+                    options = " or ".join(
+                        f"pip install --upgrade codeintel-rev[{option.strip()}]"
+                        for option in hint.split(" or ")
+                    )
+                    msg = f"{msg} Upgrade via: {options}"
+                else:
+                    msg = f"{msg} Upgrade via: pip install codeintel-rev[{hint}]"
+            else:
+                msg = f"{msg} Upgrade via: pip install --upgrade {module_root}"
             raise ImportError(msg)
 
     return module

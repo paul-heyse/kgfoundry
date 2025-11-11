@@ -35,6 +35,7 @@
       "kgfoundry_common.navmap_loader.load_nav_metadata",
       "kgfoundry_common.pydantic.BaseModel",
       "kgfoundry_common.types.JsonValue",
+      "kgfoundry_common.typing.gate_import",
       "pydantic.ConfigDict",
       "pydantic.Field",
       "typing.ClassVar",

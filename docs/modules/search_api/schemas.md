@@ -34,7 +34,7 @@ FastAPI service exposing search endpoints, aggregation helpers, and Problem Deta
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `importlib`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.pydantic.BaseModel`, `kgfoundry_common.types.JsonValue`, `pydantic.ConfigDict`, `pydantic.Field`, `typing.ClassVar`, `typing.TYPE_CHECKING`
+**Imports:** `__future__.annotations`, `importlib`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.pydantic.BaseModel`, `kgfoundry_common.types.JsonValue`, `kgfoundry_common.typing.gate_import`, `pydantic.ConfigDict`, `pydantic.Field`, `typing.ClassVar`, `typing.TYPE_CHECKING`
 
 **Imported by:** [search_api](../search_api.md)
 
@@ -72,6 +72,8 @@ direction: right
 "search_api.schemas" -> "kgfoundry_common.pydantic.BaseModel"
 "kgfoundry_common.types.JsonValue": "kgfoundry_common.types.JsonValue"
 "search_api.schemas" -> "kgfoundry_common.types.JsonValue"
+"kgfoundry_common.typing.gate_import": "kgfoundry_common.typing.gate_import"
+"search_api.schemas" -> "kgfoundry_common.typing.gate_import"
 "pydantic.ConfigDict": "pydantic.ConfigDict"
 "search_api.schemas" -> "pydantic.ConfigDict"
 "pydantic.Field": "pydantic.Field"

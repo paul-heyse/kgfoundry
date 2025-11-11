@@ -31,7 +31,7 @@ class SupportsState(Protocol):
     state: Any
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _TraceHandles:
     trace: ModuleType
     sdk_trace: ModuleType
@@ -187,10 +187,26 @@ def init_telemetry(
 def as_span(name: str, **attrs: object) -> AbstractContextManager[None]:
     """Create a span context that no-ops when telemetry is disabled.
 
+    Extended Summary
+    ----------------
+    Returns a context manager that creates an OpenTelemetry span when tracing
+    is enabled, or a no-op context manager when disabled. Attributes are
+    sanitized (coerced to span-compatible types, truncated if needed) before
+    being attached to the span.
+
+    Parameters
+    ----------
+    name : str
+        Span name used for identification in traces.
+    **attrs : object
+        Arbitrary keyword arguments converted to span attributes. Values are
+        coerced to str/int/float/bool and truncated if strings exceed max length.
+
     Returns
     -------
-    Iterator[None]
-        Context manager that wraps an OpenTelemetry span when available.
+    AbstractContextManager[None]
+        Context manager that enters/exits a span when telemetry is enabled,
+        or a no-op context manager when disabled. Always yields None.
     """
     span_attrs = _sanitize_span_attrs(attrs)
     return start_span(name, attributes=span_attrs or None)

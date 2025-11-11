@@ -33,12 +33,16 @@
       "__future__.annotations",
       "collections.abc.Sequence",
       "dataclasses.dataclass",
-      "duckdb",
+      "duckdb.DuckDBPyConnection",
+      "functools.lru_cache",
       "kgfoundry_common.navmap_loader.load_nav_metadata",
+      "kgfoundry_common.typing.gate_import",
       "pathlib.Path",
       "re",
+      "types.ModuleType",
       "typing.Final",
-      "typing.TYPE_CHECKING"
+      "typing.TYPE_CHECKING",
+      "typing.cast"
     ],
     "imported_by": [
       "search_api"

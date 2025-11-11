@@ -29,17 +29,18 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final, NewType, cast
 
-import numpy as np
-
 from kgfoundry_common.navmap_loader import load_nav_metadata
+from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Iterable, Sequence
 
+    import numpy as np
     import numpy.typing as npt
 
     type VectorMatrix = npt.NDArray[np.float32]
 else:  # pragma: no cover - runtime fallback
+    np = gate_import("numpy", "vector type validation helpers")
     VectorMatrix = np.ndarray
 
 VECTOR_MATRIX_NDIM: Final[int] = 2

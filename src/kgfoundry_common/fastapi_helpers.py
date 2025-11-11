@@ -16,18 +16,21 @@ import typing as t
 from collections.abc import Callable
 from typing import TYPE_CHECKING, cast
 
-from fastapi import Depends
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from kgfoundry_common.logging import get_correlation_id, get_logger, with_fields
 from kgfoundry_common.navmap_loader import load_nav_metadata
+from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
-    from fastapi import FastAPI, Request
+    from fastapi import Depends, FastAPI, Request
     from fastapi.params import Depends as DependsMarker
     from starlette.requests import Request as StarletteRequest
     from starlette.responses import Response
     from starlette.types import ASGIApp
+else:  # pragma: no cover - runtime import guarded
+    _fastapi = gate_import("fastapi", "FastAPI helper instrumentation")
+    Depends = _fastapi.Depends
 
 __all__ = [
     "DEFAULT_TIMEOUT_SECONDS",

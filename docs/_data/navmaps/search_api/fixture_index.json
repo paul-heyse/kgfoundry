@@ -34,14 +34,18 @@
       "collections.abc.Iterator",
       "collections.abc.Sequence",
       "dataclasses.dataclass",
-      "duckdb",
+      "duckdb.DuckDBPyConnection",
+      "functools.lru_cache",
       "kgfoundry_common.navmap_loader.load_nav_metadata",
+      "kgfoundry_common.typing.gate_import",
       "math",
       "pathlib.Path",
       "re",
       "registry.duckdb_helpers.fetch_all",
       "registry.duckdb_helpers.fetch_one",
-      "typing.TYPE_CHECKING"
+      "types.ModuleType",
+      "typing.TYPE_CHECKING",
+      "typing.cast"
     ],
     "imported_by": [
       "search_api"

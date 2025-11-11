@@ -13,10 +13,10 @@ import math
 import os
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
+from types import ModuleType
 from typing import TYPE_CHECKING, cast
-
-import duckdb
 
 from kgfoundry_common.errors import ConfigurationError, DeserializationError
 from kgfoundry_common.navmap_loader import load_nav_metadata
@@ -28,6 +28,7 @@ from kgfoundry_common.serialization import (
     deserialize_json,
     serialize_json,
 )
+from kgfoundry_common.typing import gate_import
 from registry.duckdb_helpers import fetch_all, fetch_one
 
 if TYPE_CHECKING:
@@ -44,6 +45,18 @@ __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
 
 TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
+
+
+@lru_cache(maxsize=1)
+def _duckdb_module() -> ModuleType:
+    """Return duckdb module loaded lazily for typing gate compliance.
+
+    Returns
+    -------
+    ModuleType
+        Imported :mod:`duckdb` module reference.
+    """
+    return cast("ModuleType", gate_import("duckdb", "BM25 index hydration"))
 
 
 def _validate_parquet_path(
@@ -301,7 +314,7 @@ class BM25Index:
         :func:`_validate_parquet_path` propagate unchanged.
         """
         index = cls()
-        con = duckdb.connect(db_path)
+        con = _duckdb_module().connect(db_path)
         try:
             dataset = fetch_one(
                 con,
@@ -418,7 +431,7 @@ class BM25Index:
         :func:`_validate_parquet_path` propagate unchanged.
         """
         index = cls(k1=k1, b=b)
-        con = duckdb.connect(database=":memory:")
+        con = _duckdb_module().connect(database=":memory:")
         try:
             # Validate and resolve path to prevent path traversal
             resolved_path = _validate_parquet_path(path)

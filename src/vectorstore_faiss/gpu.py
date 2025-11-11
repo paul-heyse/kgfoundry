@@ -9,10 +9,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 from weakref import WeakKeyDictionary
 
-import numpy as np
-
 from kgfoundry_common.navmap_loader import load_nav_metadata
 from kgfoundry_common.numpy_typing import normalize_l2
+from kgfoundry_common.typing import gate_import
 from search_api.faiss_gpu import (
     clone_index_to_gpu,
     configure_search_parameters,
@@ -22,6 +21,7 @@ from search_api.faiss_gpu import (
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from collections.abc import Sequence
 
+    import numpy as np
     import numpy.typing as npt
 
     from kgfoundry_common.numpy_typing import FloatMatrix, FloatVector, IntVector
@@ -35,6 +35,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     type StrArray = npt.NDArray[np.str_]
     type VecArray = npt.NDArray[np.float32]
 else:  # pragma: no cover - runtime fallback
+    np = gate_import("numpy", "FAISS GPU adapter")
     FloatArray = np.ndarray
     IntArray = np.ndarray
     StrArray = np.ndarray

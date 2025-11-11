@@ -7,12 +7,20 @@ import logging
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final, Protocol, TypedDict, cast
-
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from typing import TYPE_CHECKING, Final, Protocol, TypedDict, cast
 
 from kgfoundry_common.errors import DeserializationError, SchemaValidationError
+from kgfoundry_common.typing import gate_import
 from tools._shared.schema import validate_tools_payload
+
+if TYPE_CHECKING:
+    from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+else:
+    _pydantic = gate_import("pydantic", "docstring builder cache")
+    BaseModel = _pydantic.BaseModel
+    ConfigDict = _pydantic.ConfigDict
+    Field = _pydantic.Field
+    TypeAdapter = _pydantic.TypeAdapter
 
 logger = logging.getLogger(__name__)
 

@@ -12,17 +12,19 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-import duckdb
+from types import ModuleType
+from typing import TYPE_CHECKING, cast
 
 from kgfoundry_common.navmap_loader import load_nav_metadata
+from kgfoundry_common.typing import gate_import
 from registry.duckdb_helpers import fetch_all, fetch_one
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
 
+    from duckdb import DuckDBPyConnection
 
 __all__ = [
     "FixtureDoc",
@@ -33,6 +35,18 @@ __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
 
 TOKEN_RE = re.compile(r"[A-Za-z0-9]+")
+
+
+@lru_cache(maxsize=1)
+def _duckdb_module() -> ModuleType:
+    """Return duckdb module resolved lazily for fixture index loading.
+
+    Returns
+    -------
+    ModuleType
+        Imported :mod:`duckdb` module reference.
+    """
+    return cast("ModuleType", gate_import("duckdb", "fixture index loading"))
 
 
 def _as_str(value: object) -> str:
@@ -136,7 +150,8 @@ class FixtureIndex:
         if not db_file.exists():
             return
 
-        with duckdb.connect(str(db_file)) as connection:
+        duckdb_module = _duckdb_module()
+        with duckdb_module.connect(str(db_file)) as connection:
             root_path = self._latest_chunks_root(connection)
             if root_path is None:
                 return
@@ -146,7 +161,7 @@ class FixtureIndex:
         self._build_lex()
 
     @staticmethod
-    def _latest_chunks_root(connection: duckdb.DuckDBPyConnection) -> Path | None:
+    def _latest_chunks_root(connection: DuckDBPyConnection) -> Path | None:
         dataset_row = fetch_one(
             connection,
             """
@@ -166,7 +181,7 @@ class FixtureIndex:
 
     @staticmethod
     def _iter_fixture_docs(
-        connection: duckdb.DuckDBPyConnection, root_path: Path
+        connection: DuckDBPyConnection, root_path: Path
     ) -> Iterator[FixtureDoc]:
         parquet_pattern = str(root_path / "*" / "*.parquet")
         rows: Sequence[tuple[object, ...]] = fetch_all(

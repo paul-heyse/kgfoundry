@@ -34,6 +34,7 @@
       "kgfoundry_common.logging.get_logger",
       "kgfoundry_common.logging.with_fields",
       "kgfoundry_common.navmap_loader.load_nav_metadata",
+      "kgfoundry_common.typing.gate_import",
       "starlette.middleware.base.BaseHTTPMiddleware",
       "starlette.requests.Request",
       "starlette.responses.Response",

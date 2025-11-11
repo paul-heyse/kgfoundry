@@ -111,28 +111,38 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping as MappingABC
+from importlib import import_module
 from typing import TYPE_CHECKING, NoReturn, cast
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
-
-from docs._types.alignment import (
-    SYMBOL_DELTA_CHANGE_FIELDS,
-    SYMBOL_DELTA_PAYLOAD_FIELDS,
-    SYMBOL_INDEX_ARTIFACTS_FIELDS,
-    SYMBOL_INDEX_ROW_FIELDS,
-    align_schema_fields,
-)
 from kgfoundry_common.errors import (
     ArtifactDeserializationError,
     ArtifactSerializationError,
     ArtifactValidationError,
 )
 
-# Type aliases matching RFC 7159 JSON structure
-type JsonPrimitive = str | int | float | bool | None
+_alignment_module = import_module("docs._types.alignment")
+SYMBOL_DELTA_CHANGE_FIELDS = _alignment_module.SYMBOL_DELTA_CHANGE_FIELDS
+SYMBOL_DELTA_PAYLOAD_FIELDS = _alignment_module.SYMBOL_DELTA_PAYLOAD_FIELDS
+SYMBOL_INDEX_ARTIFACTS_FIELDS = _alignment_module.SYMBOL_INDEX_ARTIFACTS_FIELDS
+SYMBOL_INDEX_ROW_FIELDS = _alignment_module.SYMBOL_INDEX_ROW_FIELDS
+align_schema_fields = _alignment_module.align_schema_fields
+del _alignment_module
+
 if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
+
+    from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+else:  # pragma: no cover - runtime import guarded
+    _pydantic = import_module("pydantic")
+    BaseModel = _pydantic.BaseModel
+    ConfigDict = _pydantic.ConfigDict
+    Field = _pydantic.Field
+    ValidationError = _pydantic.ValidationError
+    field_validator = _pydantic.field_validator
+
+# Type aliases matching RFC 7159 JSON structure
+type JsonPrimitive = str | int | float | bool | None
 
 type JsonValue = JsonPrimitive | list[JsonValue] | dict[str, JsonValue]
 

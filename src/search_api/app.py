@@ -35,7 +35,6 @@ import uuid
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Final, cast
 
-from fastapi import FastAPI, Header, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
@@ -60,6 +59,7 @@ from kgfoundry_common.navmap_loader import load_nav_metadata
 from kgfoundry_common.observability import MetricsProvider, observe_duration
 from kgfoundry_common.schema_helpers import load_schema
 from kgfoundry_common.settings import RuntimeSettings
+from kgfoundry_common.typing import gate_import
 from search_api.fastapi_helpers import (
     DEFAULT_TIMEOUT_SECONDS,
     typed_dependency,
@@ -72,6 +72,7 @@ from search_api.service import apply_kg_boosts
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Mapping
 
+    from fastapi import FastAPI, Header, HTTPException
     from starlette.requests import Request as StarletteRequest
     from starlette.responses import Response
     from starlette.types import ASGIApp
@@ -82,6 +83,11 @@ if TYPE_CHECKING:
     )
     from kgfoundry_common.problem_details import JsonValue
     from search_api.schemas import SearchRequest
+else:  # pragma: no cover - runtime import guarded
+    _fastapi = gate_import("fastapi", "Search API application")
+    FastAPI = _fastapi.FastAPI
+    Header = _fastapi.Header
+    HTTPException = _fastapi.HTTPException
 
 __all__ = [
     "CorrelationIDMiddleware",
@@ -104,6 +110,11 @@ DEPENDENCY_TIMEOUT_SECONDS = 5.0
 AuthorizationHeader = Annotated[str | None, Header(default=None)]
 
 API_KEYS: set[str] = set()  # NOTE: load from env SEARCH_API_KEYS when secrets wiring is ready
+
+
+class AuthorizationError(HTTPException):
+    """Specialized HTTP exception for auth failures to improve doc clarity."""
+
 
 # [nav:anchor app]
 app = FastAPI(title="kgfoundry Search API", version="0.2.0")
@@ -376,14 +387,14 @@ def _validate_authorization_header(authorization: str | None) -> None:
 
     Raises
     ------
-    HTTPException
+    AuthorizationError
         If authorization header is missing, invalid, or API key is invalid.
     """
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid Bearer token")
+        raise AuthorizationError(status_code=401, detail="Missing or invalid Bearer token")
     token = authorization.split(" ", 1)[1]
     if token not in API_KEYS:
-        raise HTTPException(status_code=401, detail="Invalid API key")
+        raise AuthorizationError(status_code=401, detail="Invalid API key")
 
 
 async def auth(authorization: AuthorizationHeader) -> None:

@@ -30,6 +30,10 @@ FastAPI service exposing search endpoints, aggregation helpers, and Problem Deta
 
 ::: search_api.faiss_adapter._as_optional_str
 
+### search_api.faiss_adapter._duckdb_module
+
+::: search_api.faiss_adapter._duckdb_module
+
 ### search_api.faiss_adapter._is_faiss_index
 
 ::: search_api.faiss_adapter._is_faiss_index
@@ -44,7 +48,7 @@ FastAPI service exposing search endpoints, aggregation helpers, and Problem Deta
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `collections.abc.Callable`, `collections.abc.Sequence`, `dataclasses.dataclass`, `duckdb`, `importlib`, `kgfoundry_common.errors.IndexBuildError`, `kgfoundry_common.errors.VectorSearchError`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.numpy_typing.FloatMatrix`, `kgfoundry_common.numpy_typing.FloatVector`, `kgfoundry_common.numpy_typing.IntVector`, `kgfoundry_common.numpy_typing.normalize_l2`, `kgfoundry_common.numpy_typing.topk_indices`, `logging`, `numpy`, `numpy.typing`, `numpy.typing.NDArray`, `pathlib.Path`, `registry.duckdb_helpers.fetch_all`, `registry.duckdb_helpers.fetch_one`, `search_api.faiss_gpu.GpuContext`, `search_api.faiss_gpu.clone_index_to_gpu`, `search_api.faiss_gpu.configure_search_parameters`, `search_api.faiss_gpu.detect_gpu_context`, `search_api.types.FaissIndexProtocol`, `search_api.types.FaissModuleProtocol`, `typing.ClassVar`, `typing.Final`, `typing.TYPE_CHECKING`, `typing.TypeGuard`, `typing.cast`
+**Imports:** `__future__.annotations`, `collections.abc.Callable`, `collections.abc.Sequence`, `dataclasses.dataclass`, `functools.lru_cache`, `importlib`, `kgfoundry_common.errors.IndexBuildError`, `kgfoundry_common.errors.VectorSearchError`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.numpy_typing.FloatMatrix`, `kgfoundry_common.numpy_typing.FloatVector`, `kgfoundry_common.numpy_typing.IntVector`, `kgfoundry_common.numpy_typing.normalize_l2`, `kgfoundry_common.numpy_typing.topk_indices`, `kgfoundry_common.typing.gate_import`, `logging`, `numpy`, `numpy.typing`, `numpy.typing.NDArray`, `pathlib.Path`, `registry.duckdb_helpers.fetch_all`, `registry.duckdb_helpers.fetch_one`, `search_api.faiss_gpu.GpuContext`, `search_api.faiss_gpu.clone_index_to_gpu`, `search_api.faiss_gpu.configure_search_parameters`, `search_api.faiss_gpu.detect_gpu_context`, `search_api.types.FaissIndexProtocol`, `search_api.types.FaissModuleProtocol`, `types.ModuleType`, `typing.ClassVar`, `typing.Final`, `typing.TYPE_CHECKING`, `typing.TypeGuard`, `typing.cast`
 
 **Imported by:** [search_api](../search_api.md)
 
@@ -54,8 +58,8 @@ FastAPI service exposing search endpoints, aggregation helpers, and Problem Deta
 - [search_api.faiss_adapter.FaissAdapter][]
 - [search_api.faiss_adapter.FaissAdapterConfig][]
 - [search_api.faiss_adapter._as_optional_str][]
+- [search_api.faiss_adapter._duckdb_module][]
 - [search_api.faiss_adapter._is_faiss_index][]
-- [search_api.faiss_adapter._load_faiss_module][]
 
 ## Inheritance
 
@@ -79,8 +83,8 @@ direction: right
 "search_api.faiss_adapter" -> "collections.abc.Sequence"
 "dataclasses.dataclass": "dataclasses.dataclass"
 "search_api.faiss_adapter" -> "dataclasses.dataclass"
-"duckdb": "duckdb"
-"search_api.faiss_adapter" -> "duckdb"
+"functools.lru_cache": "functools.lru_cache"
+"search_api.faiss_adapter" -> "functools.lru_cache"
 "importlib": "importlib"
 "search_api.faiss_adapter" -> "importlib"
 "kgfoundry_common.errors.IndexBuildError": "kgfoundry_common.errors.IndexBuildError"
@@ -99,6 +103,8 @@ direction: right
 "search_api.faiss_adapter" -> "kgfoundry_common.numpy_typing.normalize_l2"
 "kgfoundry_common.numpy_typing.topk_indices": "kgfoundry_common.numpy_typing.topk_indices"
 "search_api.faiss_adapter" -> "kgfoundry_common.numpy_typing.topk_indices"
+"kgfoundry_common.typing.gate_import": "kgfoundry_common.typing.gate_import"
+"search_api.faiss_adapter" -> "kgfoundry_common.typing.gate_import"
 "logging": "logging"
 "search_api.faiss_adapter" -> "logging"
 "numpy": "numpy"
@@ -125,6 +131,8 @@ direction: right
 "search_api.faiss_adapter" -> "search_api.types.FaissIndexProtocol"
 "search_api.types.FaissModuleProtocol": "search_api.types.FaissModuleProtocol"
 "search_api.faiss_adapter" -> "search_api.types.FaissModuleProtocol"
+"types.ModuleType": "types.ModuleType"
+"search_api.faiss_adapter" -> "types.ModuleType"
 "typing.ClassVar": "typing.ClassVar"
 "search_api.faiss_adapter" -> "typing.ClassVar"
 "typing.Final": "typing.Final"

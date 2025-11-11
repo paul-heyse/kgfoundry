@@ -224,11 +224,11 @@ def get_project_settings(env: Mapping[str, str] | None = None) -> ProjectSetting
 
 _BaseModel: type[object] | None
 try:
-    from pydantic import BaseModel as _PydanticBaseModel
+    _pydantic = importlib.import_module("pydantic")
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
     _BaseModel = None
 else:
-    _BaseModel = cast("type[object]", _PydanticBaseModel)
+    _BaseModel = cast("type[object]", _pydantic.BaseModel)
 
 _auto_docstrings: ModuleType | None
 try:

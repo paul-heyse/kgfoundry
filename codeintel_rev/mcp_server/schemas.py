@@ -236,6 +236,8 @@ class MethodInfo(TypedDict, total=False):
         Optional free-form notes about retrieval decisions (e.g., gating reasons).
     explainability : dict[str, list[dict[str, object]]]
         Optional structured explainability payload keyed by channel.
+    rerank : dict[str, object]
+        Optional metadata describing the reranker decision (provider, reason).
     """
 
     retrieval: list[str]
@@ -243,6 +245,7 @@ class MethodInfo(TypedDict, total=False):
     stages: list[StageInfo]
     notes: list[str]
     explainability: dict[str, list[dict[str, object]]]
+    rerank: dict[str, object]
 
 
 class StageInfo(TypedDict, total=False):

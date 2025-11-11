@@ -40,7 +40,7 @@ Typed models shared across kgfoundry services
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.pydantic.BaseModel`, `pydantic.ConfigDict`, `pydantic.Field`, `typing.ClassVar`, `typing.Literal`
+**Imports:** `__future__.annotations`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.pydantic.BaseModel`, `kgfoundry_common.typing.gate_import`, `pydantic.ConfigDict`, `pydantic.Field`, `typing.ClassVar`, `typing.Literal`, `typing.TYPE_CHECKING`
 
 ## Autorefs Examples
 
@@ -74,6 +74,8 @@ direction: right
 "kgfoundry_common.models" -> "kgfoundry_common.navmap_loader.load_nav_metadata"
 "kgfoundry_common.pydantic.BaseModel": "kgfoundry_common.pydantic.BaseModel"
 "kgfoundry_common.models" -> "kgfoundry_common.pydantic.BaseModel"
+"kgfoundry_common.typing.gate_import": "kgfoundry_common.typing.gate_import"
+"kgfoundry_common.models" -> "kgfoundry_common.typing.gate_import"
 "pydantic.ConfigDict": "pydantic.ConfigDict"
 "kgfoundry_common.models" -> "pydantic.ConfigDict"
 "pydantic.Field": "pydantic.Field"
@@ -82,6 +84,8 @@ direction: right
 "kgfoundry_common.models" -> "typing.ClassVar"
 "typing.Literal": "typing.Literal"
 "kgfoundry_common.models" -> "typing.Literal"
+"typing.TYPE_CHECKING": "typing.TYPE_CHECKING"
+"kgfoundry_common.models" -> "typing.TYPE_CHECKING"
 "kgfoundry_common": "kgfoundry_common" { link: "https://github.com/paul-heyse/kgfoundry/blob/main/src/kgfoundry_common/__init__.py" }
 "kgfoundry_common" -> "kgfoundry_common.models" { style: dashed }
 ```

@@ -18,21 +18,15 @@ import pyarrow.parquet as pq
 
 from kgfoundry_common.errors import DeserializationError
 from kgfoundry_common.navmap_loader import load_nav_metadata
+from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from types import ModuleType
 
     from pandas import DataFrame
 
 else:
     DataFrame = Any
-
-pd: ModuleType | None
-try:
-    import pandas as pd
-except ImportError:  # pragma: no cover - optional dependency
-    pd = None
 
 __all__ = [
     "ChunkDocTags",
@@ -511,10 +505,11 @@ def read_table_to_dataframe(
     >>> # df = read_table_to_dataframe("data.parquet")
     >>> # assert len(df) > 0
     """
-    if pd is None:
+    try:
+        gate_import("pandas", "Parquet DataFrame conversion")
+    except ImportError as exc:
         msg = "pandas is required for DataFrame conversion"
-        raise ImportError(msg)
-
+        raise ImportError(msg) from exc
     table = read_table(path, schema=schema, validate_schema=validate_schema)
     return table.to_pandas()
 

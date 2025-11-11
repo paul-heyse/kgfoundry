@@ -31,6 +31,7 @@
       "kgfoundry_common.numpy_typing.FloatVector",
       "kgfoundry_common.numpy_typing.IntVector",
       "kgfoundry_common.numpy_typing.normalize_l2",
+      "kgfoundry_common.typing.gate_import",
       "logging",
       "numpy",
       "numpy.typing",

@@ -7,15 +7,16 @@ from __future__ import annotations
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
+from functools import lru_cache
 from pathlib import Path
+from types import ModuleType
 from typing import TYPE_CHECKING, Final, cast
-
-import duckdb
 
 from kgfoundry_common.errors import RegistryError
 from kgfoundry_common.logging import get_logger, with_fields
 from kgfoundry_common.navmap_loader import load_nav_metadata
 from kgfoundry_common.observability import MetricsProvider, observe_duration
+from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -59,6 +60,18 @@ logger = get_logger(__name__)
 metrics = MetricsProvider.default()
 
 
+@lru_cache(maxsize=1)
+def _duckdb_module() -> ModuleType:
+    """Return duckdb module resolved lazily to respect typing gates.
+
+    Returns
+    -------
+    ModuleType
+        Imported :mod:`duckdb` module reference.
+    """
+    return cast("ModuleType", gate_import("duckdb", "DuckDB registry helpers"))
+
+
 # [nav:anchor connect]
 def connect(
     db_path: Path | str,
@@ -83,9 +96,10 @@ def connect(
         Configured DuckDB connection.
     """
     database_path = Path(db_path)
+    duckdb_module = _duckdb_module()
     if not read_only:
         database_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = duckdb.connect(str(database_path), read_only=read_only)
+    conn = duckdb_module.connect(str(database_path), read_only=read_only)
     effective_pragmas: dict[str, object] = {"threads": DEFAULT_THREADS}
     if pragmas:
         effective_pragmas.update({key.lower(): value for key, value in pragmas.items()})
@@ -286,6 +300,8 @@ def execute(
     sql_preview = _format_sql(sql)
     query_params = _format_params(params)
 
+    duckdb_module = _duckdb_module()
+
     with (
         with_fields(
             logger,
@@ -299,7 +315,7 @@ def execute(
         try:
             _set_timeout(conn, opts.timeout_s)
             relation = conn.execute(sql) if params is None else conn.execute(sql, params)
-        except duckdb.Error as exc:
+        except duckdb_module.Error as exc:
             observer.error()
             log.exception(
                 "DuckDB query failed",

@@ -31,6 +31,7 @@
       "contextlib.suppress",
       "copy",
       "functools.cache",
+      "functools.lru_cache",
       "importlib",
       "importlib.import_module",
       "json",
@@ -45,6 +46,7 @@
       "tools.RegistryInterfaceModel",
       "tools.RegistryOperationModel",
       "tools.ToolingMetadataModel",
+      "types.ModuleType",
       "typing.Any",
       "typing.TYPE_CHECKING",
       "typing.cast"

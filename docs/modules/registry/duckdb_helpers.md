@@ -22,6 +22,10 @@ Typed DuckDB helper utilities for parameterized queries and logging.
 
 ::: registry.duckdb_helpers._coerce_options
 
+### registry.duckdb_helpers._duckdb_module
+
+::: registry.duckdb_helpers._duckdb_module
+
 ### registry.duckdb_helpers._ensure_parameterized
 
 ::: registry.duckdb_helpers._ensure_parameterized
@@ -64,7 +68,7 @@ Typed DuckDB helper utilities for parameterized queries and logging.
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `collections.abc.Iterable`, `collections.abc.Mapping`, `collections.abc.Sequence`, `dataclasses.dataclass`, `dataclasses.replace`, `duckdb`, `duckdb.DuckDBPyConnection`, `kgfoundry_common.errors.RegistryError`, `kgfoundry_common.logging.get_logger`, `kgfoundry_common.logging.with_fields`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.observability.MetricsProvider`, `kgfoundry_common.observability.observe_duration`, `pathlib.Path`, `time`, `typing.Final`, `typing.TYPE_CHECKING`, `typing.cast`
+**Imports:** `__future__.annotations`, `collections.abc.Iterable`, `collections.abc.Mapping`, `collections.abc.Sequence`, `dataclasses.dataclass`, `dataclasses.replace`, `duckdb.DuckDBPyConnection`, `functools.lru_cache`, `kgfoundry_common.errors.RegistryError`, `kgfoundry_common.logging.get_logger`, `kgfoundry_common.logging.with_fields`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.observability.MetricsProvider`, `kgfoundry_common.observability.observe_duration`, `kgfoundry_common.typing.gate_import`, `pathlib.Path`, `time`, `types.ModuleType`, `typing.Final`, `typing.TYPE_CHECKING`, `typing.cast`
 
 **Imported by:** [registry.duckdb_registry](duckdb_registry.md), [registry.helper](helper.md), [registry.migrate](migrate.md)
 
@@ -72,8 +76,8 @@ Typed DuckDB helper utilities for parameterized queries and logging.
 
 - [registry.duckdb_helpers.DuckDBQueryOptions][]
 - [registry.duckdb_helpers._coerce_options][]
+- [registry.duckdb_helpers._duckdb_module][]
 - [registry.duckdb_helpers._ensure_parameterized][]
-- [registry.duckdb_helpers._format_params][]
 
 ## Inheritance
 
@@ -99,10 +103,10 @@ direction: right
 "registry.duckdb_helpers" -> "dataclasses.dataclass"
 "dataclasses.replace": "dataclasses.replace"
 "registry.duckdb_helpers" -> "dataclasses.replace"
-"duckdb": "duckdb"
-"registry.duckdb_helpers" -> "duckdb"
 "duckdb.DuckDBPyConnection": "duckdb.DuckDBPyConnection"
 "registry.duckdb_helpers" -> "duckdb.DuckDBPyConnection"
+"functools.lru_cache": "functools.lru_cache"
+"registry.duckdb_helpers" -> "functools.lru_cache"
 "kgfoundry_common.errors.RegistryError": "kgfoundry_common.errors.RegistryError"
 "registry.duckdb_helpers" -> "kgfoundry_common.errors.RegistryError"
 "kgfoundry_common.logging.get_logger": "kgfoundry_common.logging.get_logger"
@@ -115,10 +119,14 @@ direction: right
 "registry.duckdb_helpers" -> "kgfoundry_common.observability.MetricsProvider"
 "kgfoundry_common.observability.observe_duration": "kgfoundry_common.observability.observe_duration"
 "registry.duckdb_helpers" -> "kgfoundry_common.observability.observe_duration"
+"kgfoundry_common.typing.gate_import": "kgfoundry_common.typing.gate_import"
+"registry.duckdb_helpers" -> "kgfoundry_common.typing.gate_import"
 "pathlib.Path": "pathlib.Path"
 "registry.duckdb_helpers" -> "pathlib.Path"
 "time": "time"
 "registry.duckdb_helpers" -> "time"
+"types.ModuleType": "types.ModuleType"
+"registry.duckdb_helpers" -> "types.ModuleType"
 "typing.Final": "typing.Final"
 "registry.duckdb_helpers" -> "typing.Final"
 "typing.TYPE_CHECKING": "typing.TYPE_CHECKING"

@@ -32,7 +32,7 @@ Typed FastAPI helper utilities with structured logging and timeouts.
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `asyncio`, `collections.abc.Callable`, `fastapi.Depends`, `fastapi.FastAPI`, `fastapi.Request`, `fastapi.params.Depends`, `kgfoundry_common.logging.get_correlation_id`, `kgfoundry_common.logging.get_logger`, `kgfoundry_common.logging.with_fields`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `starlette.middleware.base.BaseHTTPMiddleware`, `starlette.requests.Request`, `starlette.responses.Response`, `starlette.types.ASGIApp`, `time`, `typing`, `typing.TYPE_CHECKING`, `typing.cast`
+**Imports:** `__future__.annotations`, `asyncio`, `collections.abc.Callable`, `fastapi.Depends`, `fastapi.FastAPI`, `fastapi.Request`, `fastapi.params.Depends`, `kgfoundry_common.logging.get_correlation_id`, `kgfoundry_common.logging.get_logger`, `kgfoundry_common.logging.with_fields`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.typing.gate_import`, `starlette.middleware.base.BaseHTTPMiddleware`, `starlette.requests.Request`, `starlette.responses.Response`, `starlette.types.ASGIApp`, `time`, `typing`, `typing.TYPE_CHECKING`, `typing.cast`
 
 ## Autorefs Examples
 
@@ -67,6 +67,8 @@ direction: right
 "kgfoundry_common.fastapi_helpers" -> "kgfoundry_common.logging.with_fields"
 "kgfoundry_common.navmap_loader.load_nav_metadata": "kgfoundry_common.navmap_loader.load_nav_metadata"
 "kgfoundry_common.fastapi_helpers" -> "kgfoundry_common.navmap_loader.load_nav_metadata"
+"kgfoundry_common.typing.gate_import": "kgfoundry_common.typing.gate_import"
+"kgfoundry_common.fastapi_helpers" -> "kgfoundry_common.typing.gate_import"
 "starlette.middleware.base.BaseHTTPMiddleware": "starlette.middleware.base.BaseHTTPMiddleware"
 "kgfoundry_common.fastapi_helpers" -> "starlette.middleware.base.BaseHTTPMiddleware"
 "starlette.requests.Request": "starlette.requests.Request"

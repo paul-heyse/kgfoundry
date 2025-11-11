@@ -9,12 +9,18 @@ implementation specifics.
 
 from __future__ import annotations
 
-from typing import ClassVar, Literal
-
-from pydantic import ConfigDict, Field
+from typing import TYPE_CHECKING, ClassVar, Literal
 
 from kgfoundry_common.navmap_loader import load_nav_metadata
 from kgfoundry_common.pydantic import BaseModel
+from kgfoundry_common.typing import gate_import
+
+if TYPE_CHECKING:
+    from pydantic import ConfigDict, Field
+else:  # pragma: no cover - runtime import guarded
+    _pydantic = gate_import("pydantic", "common document models")
+    ConfigDict = _pydantic.ConfigDict
+    Field = _pydantic.Field
 
 __all__ = [
     "Chunk",

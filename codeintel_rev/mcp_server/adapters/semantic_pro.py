@@ -26,7 +26,9 @@ from codeintel_rev.mcp_server.schemas import (
 )
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
 from codeintel_rev.observability.otel import as_span
-from codeintel_rev.observability.timeline import current_timeline
+from codeintel_rev.observability.timeline import Timeline, current_timeline
+from codeintel_rev.rerank.base import RerankRequest, RerankResult, ScoredDoc
+from codeintel_rev.rerank.xtr import XTRReranker
 from codeintel_rev.retrieval.gating import StageGateConfig, should_run_secondary_stage
 from codeintel_rev.retrieval.telemetry import (
     StageTiming,
@@ -45,12 +47,21 @@ from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
-    from codeintel_rev.config.settings import XTRConfig
+    from codeintel_rev.config.settings import RerankConfig, XTRConfig
     from codeintel_rev.io.xtr_manager import XTRIndex
 
 SNIPPET_PREVIEW_CHARS = 500
 COMPONENT_NAME = "codeintel_mcp"
 LOGGER = get_logger(__name__)
+
+
+class RerankOptionPayload(TypedDict, total=False):
+    """User-facing payload for overruling rerank behavior."""
+
+    enabled: bool
+    top_k: int
+    provider: str
+    explain: bool
 
 
 class SemanticProOptions(TypedDict, total=False):
@@ -62,6 +73,28 @@ class SemanticProOptions(TypedDict, total=False):
     stage_weights: dict[str, float]
     explain: bool
     xtr_k: int
+    rerank: RerankOptionPayload
+
+
+@dataclass(frozen=True)
+class RerankRuntimeOptions:
+    """Runtime overrides for optional reranker stage."""
+
+    enabled: bool = False
+    top_k: int | None = None
+    provider: str | None = None
+    explain: bool | None = None
+
+
+@dataclass(slots=True, frozen=True)
+class RerankPlan:
+    """Concrete rerank execution plan derived from settings + overrides."""
+
+    enabled: bool
+    top_k: int
+    provider: str
+    explain: bool
+    reason: str | None = None
 
 
 @dataclass(frozen=True)
@@ -74,6 +107,7 @@ class SemanticProRuntimeOptions:
     stage_weights: dict[str, float] = field(default_factory=dict)
     explain: bool = True
     xtr_k: int | None = None
+    rerank: RerankRuntimeOptions | None = None
 
 
 WideSearchHandle = tuple[Future["WarpOutcome"], ThreadPoolExecutor]
@@ -102,6 +136,14 @@ class HydrationPlan:
     effective_limit: int
     options: SemanticProRuntimeOptions
     observation: Observation
+
+
+@dataclass(slots=True, frozen=True)
+class HydrationOutcome:
+    """Result of DuckDB hydration and optional LLM rerank."""
+
+    records: list[dict]
+    timings: list[StageTiming]
 
 
 def build_runtime_options(
@@ -166,6 +208,15 @@ def build_runtime_options(
                 "Ignoring non-numeric xtr_k override",
                 extra={"value": xtr_k_value},
             )
+    rerank_payload = options.get("rerank")
+    rerank_runtime = None
+    if isinstance(rerank_payload, dict):
+        rerank_runtime = RerankRuntimeOptions(
+            enabled=bool(rerank_payload.get("enabled", True)),
+            top_k=_coerce_positive_int(rerank_payload.get("top_k")),
+            provider=rerank_payload.get("provider"),
+            explain=rerank_payload.get("explain"),
+        )
     return SemanticProRuntimeOptions(
         use_coderank=options.get("use_coderank", True),
         use_warp=options.get("use_warp", True),
@@ -173,6 +224,7 @@ def build_runtime_options(
         stage_weights=dict(options.get("stage_weights", {})),
         explain=options.get("explain", True),
         xtr_k=parsed_xtr_k,
+        rerank=rerank_runtime,
     )
 
 
@@ -367,33 +419,41 @@ def _semantic_search_pro_sync(
             ),
             stage_timings=stage_timings,
         )
+        fused, rerank_metadata = _maybe_apply_rerank_stage(
+            context=context,
+            query=query,
+            fused=fused,
+            options=options,
+            stage_timings=stage_timings,
+        )
 
         if not fused.docs:
             observation.mark_success()
-            method = _build_method(
-                MethodContext(
-                    findings_count=0,
-                    requested_limit=limit,
-                    effective_limit=effective_limit,
-                    start_time=start_time,
-                    channels=fused.channels,
-                    stages=tuple(stage_timings),
-                    notes=tuple(warp_outcome.notes),
-                    explainability=_build_method_explainability(warp_outcome.explainability),
-                )
-            )
-            extras = _assemble_extras(
-                method=method,
-                limits=limits + fused.warnings,
-                scope=scope,
-            )
             return _make_envelope(
                 answer=f"No results found for: {query}",
                 findings=[],
-                extras=extras,
+                extras=_assemble_extras(
+                    method=_build_method(
+                        MethodContext(
+                            findings_count=0,
+                            requested_limit=limit,
+                            effective_limit=effective_limit,
+                            start_time=start_time,
+                            channels=fused.channels,
+                            stages=tuple(stage_timings),
+                            notes=tuple(warp_outcome.notes),
+                            explainability=_build_method_explainability(
+                                warp_outcome.explainability
+                            ),
+                            rerank=rerank_metadata,
+                        )
+                    ),
+                    limits=limits + fused.warnings,
+                    scope=scope,
+                ),
             )
 
-        records, hydration_stages = _hydrate_and_rerank_records(
+        hydration_result = _hydrate_and_rerank_records(
             HydrationPlan(
                 context=context,
                 query=query,
@@ -404,10 +464,10 @@ def _semantic_search_pro_sync(
                 observation=observation,
             )
         )
-        stage_timings.extend(hydration_stages)
+        stage_timings.extend(hydration_result.timings)
 
         findings = _build_findings(
-            records=records,
+            records=hydration_result.records,
             docs=fused.docs,
             contribution_map=fused.contributions,
             explain=options.explain,
@@ -415,28 +475,26 @@ def _semantic_search_pro_sync(
         merge_explainability_into_findings(findings, warp_outcome.explainability)
         observation.mark_success()
         _append_budget_notes(COMPONENT_NAME, stage_timings, limits)
-        method = _build_method(
-            MethodContext(
-                findings_count=len(findings),
-                requested_limit=limit,
-                effective_limit=effective_limit,
-                start_time=start_time,
-                channels=fused.channels,
-                stages=tuple(stage_timings),
-                notes=tuple(warp_outcome.notes),
-                explainability=_build_method_explainability(warp_outcome.explainability),
-            )
-        )
-        extras = _assemble_extras(
-            method=method,
-            limits=limits + fused.warnings,
-            scope=scope,
-        )
-
         return _make_envelope(
             answer=f"Found {len(findings)} semantic_pro results for: {query}",
             findings=findings,
-            extras=extras,
+            extras=_assemble_extras(
+                method=_build_method(
+                    MethodContext(
+                        findings_count=len(findings),
+                        requested_limit=limit,
+                        effective_limit=effective_limit,
+                        start_time=start_time,
+                        channels=fused.channels,
+                        stages=tuple(stage_timings),
+                        notes=tuple(warp_outcome.notes),
+                        explainability=_build_method_explainability(warp_outcome.explainability),
+                        rerank=rerank_metadata,
+                    )
+                ),
+                limits=limits + fused.warnings,
+                scope=scope,
+            ),
         )
 
 
@@ -650,6 +708,165 @@ def _run_fusion_stage(
         )
     stage_timings.append(fusion_timer.snapshot())
     return fused
+
+
+def _maybe_apply_rerank_stage(
+    *,
+    context: ApplicationContext,
+    query: str,
+    fused: HybridSearchResult,
+    options: SemanticProRuntimeOptions,
+    stage_timings: list[StageTiming],
+) -> tuple[HybridSearchResult, dict[str, object] | None]:
+    plan = _build_rerank_plan(context.settings.rerank, options.rerank)
+    metadata: dict[str, object] = {
+        "provider": plan.provider,
+        "top_k": plan.top_k,
+        "enabled": False,
+    }
+    timeline = current_timeline()
+    if not plan.enabled:
+        metadata["reason"] = plan.reason or "disabled"
+        _emit_rerank_decision(timeline, metadata)
+        return fused, metadata
+
+    reranker = _resolve_reranker(context, plan.provider)
+    if reranker is None:
+        metadata["reason"] = "capability_off"
+        _emit_rerank_decision(timeline, metadata)
+        return fused, metadata
+
+    scored_docs = [
+        ScoredDoc(doc_id=_safe_int(doc.doc_id), score=float(doc.score)) for doc in fused.docs
+    ]
+    if not scored_docs:
+        metadata["reason"] = "no_candidates"
+        _emit_rerank_decision(timeline, metadata)
+        return fused, metadata
+
+    effective_top_k = min(plan.top_k, len(scored_docs))
+    metadata.update(
+        {
+            "enabled": True,
+            "candidates": len(scored_docs),
+            "top_k": effective_top_k,
+        }
+    )
+    _emit_rerank_decision(timeline, metadata)
+    if timeline is not None:
+        timeline.event(
+            "rerank.start",
+            "rerank",
+            attrs={"provider": plan.provider, "top_k": effective_top_k},
+        )
+    with track_stage("rerank_xtr") as rerank_timer:
+        results = reranker.rescore(
+            RerankRequest(
+                query=query,
+                docs=scored_docs,
+                top_k=effective_top_k,
+                explain=plan.explain,
+            )
+        )
+    stage_timings.append(rerank_timer.snapshot())
+    if timeline is not None:
+        timeline.event(
+            "rerank.end",
+            "rerank",
+            attrs={"provider": plan.provider, "returned": len(results)},
+        )
+    reordered = _reorder_docs(fused, results)
+    metadata["reordered"] = reordered.changes
+    return reordered.result, metadata
+
+
+@dataclass(slots=True, frozen=True)
+class _RerankOutcome:
+    result: HybridSearchResult
+    changes: int
+
+
+def _reorder_docs(
+    fused: HybridSearchResult,
+    results: Sequence[RerankResult],
+) -> _RerankOutcome:
+    doc_map = {_safe_int(doc.doc_id): doc for doc in fused.docs}
+    score_map = {res.doc_id: res.score for res in results}
+    ordered_ids: list[int] = []
+    seen: set[int] = set()
+    for res in results:
+        if res.doc_id in seen or res.doc_id not in doc_map:
+            continue
+        ordered_ids.append(res.doc_id)
+        seen.add(res.doc_id)
+    for doc in fused.docs:
+        cid = _safe_int(doc.doc_id)
+        if cid not in seen:
+            ordered_ids.append(cid)
+            seen.add(cid)
+    updated_docs = [
+        HybridResultDoc(
+            doc_id=doc_map[cid].doc_id,
+            score=score_map.get(cid, doc_map[cid].score),
+        )
+        for cid in ordered_ids
+    ]
+    original_positions = {_safe_int(doc.doc_id): idx for idx, doc in enumerate(fused.docs)}
+    new_positions = {cid: idx for idx, cid in enumerate(ordered_ids)}
+    changes = sum(
+        1
+        for cid, original_idx in original_positions.items()
+        if new_positions.get(cid, original_idx) != original_idx
+    )
+    updated_result = HybridSearchResult(
+        docs=tuple(updated_docs),
+        contributions=fused.contributions,
+        channels=fused.channels,
+        warnings=fused.warnings,
+    )
+    return _RerankOutcome(result=updated_result, changes=changes)
+
+
+def _emit_rerank_decision(timeline: Timeline | None, attrs: dict[str, object]) -> None:
+    if timeline is None:
+        return
+    timeline.event("rerank.decision", "rerank", attrs=attrs)
+
+
+def _build_rerank_plan(
+    config: RerankConfig,
+    override: RerankRuntimeOptions | None,
+) -> RerankPlan:
+    enabled = override.enabled if override is not None else config.enabled
+    reason: str | None = None
+    if not enabled:
+        reason = "disabled_option" if override is not None else "disabled_config"
+    top_k_override = override.top_k if override is not None else None
+    explain_override = override.explain if override is not None else None
+    top_k = top_k_override or config.top_k or 50
+    explain = bool(explain_override) if explain_override is not None else config.explain
+    return RerankPlan(
+        enabled=enabled,
+        top_k=max(1, top_k),
+        provider="xtr",
+        explain=explain,
+        reason=reason,
+    )
+
+
+def _resolve_reranker(
+    context: ApplicationContext,
+    provider: str,
+) -> XTRReranker | None:
+    if provider != "xtr" or not context.settings.xtr.enable:
+        return None
+    try:
+        index = context.get_xtr_index()
+    except RuntimeUnavailableError:
+        return None
+    if index is None or not index.ready:
+        return None
+    return XTRReranker(index)
 
 
 def _maybe_schedule_xtr_wide(
@@ -972,7 +1189,7 @@ def _hydrate_records(
         return catalog.query_by_ids(chunk_ids)
 
 
-def _hydrate_and_rerank_records(plan: HydrationPlan) -> tuple[list[dict], list[StageTiming]]:
+def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
     """Hydrate DuckDB records and optionally rerank them using CodeRankLLM.
 
     Extended Summary
@@ -1078,7 +1295,7 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> tuple[list[dict], list[S
             decision=StageDecision(should_run=True, reason="executed"),
         )
 
-    return records[:effective_limit], snapshots
+    return HydrationOutcome(records=records[:effective_limit], timings=snapshots)
 
 
 def _maybe_rerank(
@@ -1313,6 +1530,8 @@ def _build_method(context: MethodContext) -> MethodInfo:
         method["notes"] = list(context.notes)
     if context.explainability:
         method["explainability"] = context.explainability
+    if context.rerank:
+        method["rerank"] = context.rerank
     return method
 
 
@@ -1407,6 +1626,14 @@ def _clamp_limit(requested: int, max_results: int, notes: list[str]) -> int:
     return min(effective, max_results)
 
 
+def _coerce_positive_int(value: object) -> int | None:
+    try:
+        parsed = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
 def _dedupe_preserve_order(ids: list[int]) -> list[int]:
     seen: set[int] = set()
     ordered: list[int] = []
@@ -1453,3 +1680,4 @@ class MethodContext:
     stages: Sequence[StageTiming] | None
     notes: tuple[str, ...] | None = None
     explainability: dict[str, list[dict[str, Any]]] | None = None
+    rerank: dict[str, object] | None = None

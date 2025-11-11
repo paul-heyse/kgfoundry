@@ -7,6 +7,7 @@ Canonical typing façade for kgfoundry.
 ## Hierarchy
 
 - **Parent:** [kgfoundry_common](../kgfoundry_common.md)
+- **Children:** [kgfoundry_common.typing.heavy_deps](typing/heavy_deps.md)
 
 ## Sections
 
@@ -50,7 +51,7 @@ Canonical typing façade for kgfoundry.
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `collections.abc.Callable`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `packaging.version.parse`, `typing.NoReturn`, `typing.Protocol`, `typing.TYPE_CHECKING`, `typing.cast`, `warnings`
+**Imports:** `__future__.annotations`, `collections.abc.Callable`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.typing.heavy_deps.EXTRAS_HINT`, `kgfoundry_common.typing.heavy_deps.HEAVY_DEPS`, `packaging.version.parse`, `typing.NoReturn`, `typing.Protocol`, `typing.TYPE_CHECKING`, `typing.cast`, `warnings`
 
 ## Autorefs Examples
 
@@ -79,6 +80,10 @@ direction: right
 "kgfoundry_common.typing" -> "collections.abc.Callable"
 "kgfoundry_common.navmap_loader.load_nav_metadata": "kgfoundry_common.navmap_loader.load_nav_metadata"
 "kgfoundry_common.typing" -> "kgfoundry_common.navmap_loader.load_nav_metadata"
+"kgfoundry_common.typing.heavy_deps.EXTRAS_HINT": "kgfoundry_common.typing.heavy_deps.EXTRAS_HINT"
+"kgfoundry_common.typing" -> "kgfoundry_common.typing.heavy_deps.EXTRAS_HINT"
+"kgfoundry_common.typing.heavy_deps.HEAVY_DEPS": "kgfoundry_common.typing.heavy_deps.HEAVY_DEPS"
+"kgfoundry_common.typing" -> "kgfoundry_common.typing.heavy_deps.HEAVY_DEPS"
 "packaging.version.parse": "packaging.version.parse"
 "kgfoundry_common.typing" -> "packaging.version.parse"
 "typing.NoReturn": "typing.NoReturn"
@@ -93,5 +98,7 @@ direction: right
 "kgfoundry_common.typing" -> "warnings"
 "kgfoundry_common": "kgfoundry_common" { link: "https://github.com/paul-heyse/kgfoundry/blob/main/src/kgfoundry_common/__init__.py" }
 "kgfoundry_common" -> "kgfoundry_common.typing" { style: dashed }
+"kgfoundry_common.typing.heavy_deps": "kgfoundry_common.typing.heavy_deps" { link: "https://github.com/paul-heyse/kgfoundry/blob/main/src/kgfoundry_common/typing/heavy_deps.py" }
+"kgfoundry_common.typing" -> "kgfoundry_common.typing.heavy_deps" { style: dashed }
 ```
 

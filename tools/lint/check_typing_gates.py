@@ -68,6 +68,11 @@ if TYPE_CHECKING:
 from tools._shared.logging import get_logger
 
 try:  # pragma: no cover - executed in tooling context
+    from kgfoundry_common.typing.heavy_deps import EXTRAS_HINT as _EXTRAS_HINT
+except ImportError:  # pragma: no cover - when package not importable
+    _EXTRAS_HINT: dict[str, str] = {}
+
+try:  # pragma: no cover - executed in tooling context
     from codeintel_rev.typing import HEAVY_DEPS as _HEAVY_DEPS_SOURCE
 except ImportError:  # pragma: no cover - when package not importable
     _HEAVY_DEPS_SOURCE: dict[str, str | None] = {}
@@ -85,6 +90,7 @@ _DEFAULT_HEAVY_MODULES = {
     "fastapi",
     "httpx",
     "onnxruntime",
+    "pyserini",
 }
 
 HEAVY_MODULES = set(_DEFAULT_HEAVY_MODULES)
@@ -323,10 +329,25 @@ class TypeGateVisitor(ast.NodeVisitor):
             Suggestion message for fixing the violation.
         """
         module_root = module.split(".", maxsplit=1)[0]
-        return (
+        base = (
             f"Guard {module_root} import behind TYPE_CHECKING block, or use "
             f"gate_import('{module_root}', 'purpose') for runtime access"
         )
+        extra_hint = _format_install_hint(module_root)
+        if extra_hint:
+            return f"{base}. Install via {extra_hint}"
+        return base
+
+
+def _format_install_hint(module_root: str) -> str | None:
+    hint = _EXTRAS_HINT.get(module_root)
+    if not hint:
+        return None
+    if " or " in hint:
+        return " or ".join(
+            f"pip install codeintel-rev[{option.strip()}]" for option in hint.split(" or ")
+        )
+    return f"pip install codeintel-rev[{hint}]"
 
 
 def check_file(

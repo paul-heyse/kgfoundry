@@ -15,6 +15,7 @@ from codeintel_rev.config.settings import (
     IndexConfig,
     PathsConfig,
     RedisConfig,
+    RerankConfig,
     ServerLimits,
     Settings,
     SpladeConfig,
@@ -89,6 +90,7 @@ def _build_context(repo_root: Path) -> ApplicationContext:
         coderank=CodeRankConfig(),
         warp=WarpConfig(),
         xtr=XTRConfig(),
+        rerank=RerankConfig(),
         coderank_llm=CodeRankLLMConfig(),
     )
 

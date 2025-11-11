@@ -32,12 +32,12 @@ from dataclasses import dataclass
 from operator import attrgetter
 from typing import TYPE_CHECKING, Protocol, TypedDict, cast
 
-import numpy as np
-
 from kgfoundry_common.navmap_loader import load_nav_metadata
 from kgfoundry_common.problem_details import JsonValue
+from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
+    import numpy as np
     from numpy.typing import NDArray
 
 
@@ -68,6 +68,7 @@ if TYPE_CHECKING:
     type VectorArray = npt.NDArray[np.float32]
     type IndexArray = npt.NDArray[np.int64]
 else:  # pragma: no cover - runtime fallback for doc generation
+    np = gate_import("numpy", "search API type aliases")
     VectorArray = np.ndarray
     IndexArray = np.ndarray
 

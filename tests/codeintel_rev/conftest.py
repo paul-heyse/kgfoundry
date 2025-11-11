@@ -23,6 +23,7 @@ from codeintel_rev.config.settings import (
     IndexConfig,
     PathsConfig,
     RedisConfig,
+    RerankConfig,
     ServerLimits,
     Settings,
     SpladeConfig,
@@ -127,6 +128,7 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
         coderank=CodeRankConfig(),
         warp=WarpConfig(),
         xtr=XTRConfig(),
+        rerank=RerankConfig(),
         coderank_llm=CodeRankLLMConfig(),
     )
 

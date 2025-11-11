@@ -5,10 +5,17 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Final, TypedDict
 
-from pydantic import BaseModel, ConfigDict, Field
+from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
+    from pydantic import BaseModel, ConfigDict, Field
+
     from tools.navmap.models import ModuleMeta, NavIndex, SymbolMeta
+else:
+    _pydantic = gate_import("pydantic", "navmap document models")
+    BaseModel = _pydantic.BaseModel
+    ConfigDict = _pydantic.ConfigDict
+    Field = _pydantic.Field
 
 NAVMAP_SCHEMA: Final[str] = "navmap_document.json"
 NAVMAP_SCHEMA_ID: Final[str] = "https://kgfoundry.dev/schema/tools/navmap-document.json"

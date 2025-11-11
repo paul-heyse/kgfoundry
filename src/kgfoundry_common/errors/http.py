@@ -16,19 +16,22 @@ Examples
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
-
-from fastapi.responses import JSONResponse
+from typing import TYPE_CHECKING, cast
 
 from kgfoundry_common.errors.exceptions import KgFoundryError
 from kgfoundry_common.fastapi_helpers import typed_exception_handler
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.navmap_loader import load_nav_metadata
+from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
     from fastapi import FastAPI, Request
+    from fastapi.responses import JSONResponse
 
     from kgfoundry_common.problem_details import ProblemDetails
+else:  # pragma: no cover - runtime import guarded
+    _fastapi_responses = gate_import("fastapi.responses", "Problem Details JSON serialization")
+    JSONResponse = cast("type[JSONResponse]", _fastapi_responses.JSONResponse)
 
 
 __all__ = [

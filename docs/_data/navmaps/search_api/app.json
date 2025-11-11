@@ -65,6 +65,7 @@
       "kgfoundry_common.settings.RuntimeSettings",
       "kgfoundry_common.settings.SearchConfig",
       "kgfoundry_common.settings.SparseEmbeddingConfig",
+      "kgfoundry_common.typing.gate_import",
       "pathlib.Path",
       "search_api.fastapi_helpers.DEFAULT_TIMEOUT_SECONDS",
       "search_api.fastapi_helpers.typed_dependency",

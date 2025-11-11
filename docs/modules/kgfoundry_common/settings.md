@@ -50,7 +50,7 @@ Typed runtime configuration with fail-fast validation
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `kgfoundry_common.errors.SettingsError`, `kgfoundry_common.logging.get_logger`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `pydantic.Field`, `pydantic_settings.BaseSettings`, `pydantic_settings.SettingsConfigDict`, `typing.Any`, `typing.ClassVar`, `typing.cast`
+**Imports:** `__future__.annotations`, `kgfoundry_common.errors.SettingsError`, `kgfoundry_common.logging.get_logger`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.typing.gate_import`, `pydantic.Field`, `pydantic_settings.BaseSettings`, `pydantic_settings.SettingsConfigDict`, `typing.Any`, `typing.ClassVar`, `typing.TYPE_CHECKING`, `typing.cast`
 
 ## Autorefs Examples
 
@@ -89,6 +89,8 @@ direction: right
 "kgfoundry_common.settings" -> "kgfoundry_common.logging.get_logger"
 "kgfoundry_common.navmap_loader.load_nav_metadata": "kgfoundry_common.navmap_loader.load_nav_metadata"
 "kgfoundry_common.settings" -> "kgfoundry_common.navmap_loader.load_nav_metadata"
+"kgfoundry_common.typing.gate_import": "kgfoundry_common.typing.gate_import"
+"kgfoundry_common.settings" -> "kgfoundry_common.typing.gate_import"
 "pydantic.Field": "pydantic.Field"
 "kgfoundry_common.settings" -> "pydantic.Field"
 "pydantic_settings.BaseSettings": "pydantic_settings.BaseSettings"
@@ -99,6 +101,8 @@ direction: right
 "kgfoundry_common.settings" -> "typing.Any"
 "typing.ClassVar": "typing.ClassVar"
 "kgfoundry_common.settings" -> "typing.ClassVar"
+"typing.TYPE_CHECKING": "typing.TYPE_CHECKING"
+"kgfoundry_common.settings" -> "typing.TYPE_CHECKING"
 "typing.cast": "typing.cast"
 "kgfoundry_common.settings" -> "typing.cast"
 "kgfoundry_common": "kgfoundry_common" { link: "https://github.com/paul-heyse/kgfoundry/blob/main/src/kgfoundry_common/__init__.py" }

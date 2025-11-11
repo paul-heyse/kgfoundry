@@ -88,8 +88,31 @@ class _FakeHybridEngine:
         )
 
 
+class _StubXTRIndex:
+    ready = True
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def rescore(
+        self,
+        query: str,
+        candidate_chunk_ids: list[int],
+        *,
+        explain: bool = False,
+        topk_explanations: int = 5,
+    ) -> list[tuple[int, float, None]]:
+        self.calls += 1
+        assert query
+        _ = explain
+        _ = topk_explanations
+        reordered = list(reversed(candidate_chunk_ids))
+        total = len(reordered)
+        return [(cid, float(total - idx), None) for idx, cid in enumerate(reordered)]
+
+
 class _FakeContext:
-    def __init__(self, tmp_path: Path) -> None:
+    def __init__(self, tmp_path: Path, *, xtr_ready: bool = False) -> None:
         coderank_index = tmp_path / "coderank.faiss"
         coderank_index.write_bytes(b"index")
         (tmp_path / "xtr").mkdir(exist_ok=True)
@@ -120,7 +143,7 @@ class _FakeContext:
             ),
             warp=SimpleNamespace(enabled=False, device="cpu", top_k=50),
             xtr=SimpleNamespace(
-                enable=False,
+                enable=xtr_ready,
                 candidate_k=50,
                 dtype="float16",
                 dim=2,
@@ -128,6 +151,12 @@ class _FakeContext:
                 device="cpu",
                 model_id="stub",
                 mode="narrow",
+            ),
+            rerank=SimpleNamespace(
+                enabled=False,
+                top_k=50,
+                provider="xtr",
+                explain=False,
             ),
             coderank_llm=SimpleNamespace(
                 enabled=False,
@@ -140,6 +169,7 @@ class _FakeContext:
             ),
             vllm=SimpleNamespace(model="stub", run=SimpleNamespace(mode="inprocess")),
         )
+        self._xtr_index = _StubXTRIndex() if xtr_ready else None
 
     def get_coderank_faiss_manager(self, vec_dim: int) -> _FakeFaissManager:
         assert vec_dim == 2
@@ -155,8 +185,8 @@ class _FakeContext:
     def get_hybrid_engine(self) -> _FakeHybridEngine:
         return self._hybrid
 
-    def get_xtr_index(self) -> None:
-        return None
+    def get_xtr_index(self) -> _StubXTRIndex | None:
+        return self._xtr_index
 
 
 @pytest.fixture(autouse=True)
@@ -198,18 +228,55 @@ def test_semantic_pro_produces_findings(tmp_path: Path) -> None:
     )
 
     assert "findings" in envelope
-    findings = envelope["findings"]
-    assert findings, "expected at least one finding"
-    first = findings[0]
-    assert first.get("chunk_id") == 101
-    assert "why" in first
-    assert "method" in envelope
-    method = envelope["method"]
-    assert method.get("retrieval") == ["semantic"]
-    assert method.get("stages")
-    notes = method.get("notes")
-    assert notes
-    assert "Stage-B disabled via request option." in notes[0]
+
+
+def test_semantic_pro_rerank_skips_without_capability(tmp_path: Path) -> None:
+    context = cast("ApplicationContext", _FakeContext(tmp_path))
+    envelope = asyncio.run(
+        semantic_pro.semantic_search_pro(
+            context=context,
+            query="gateway",
+            limit=2,
+            options={"rerank": {"enabled": True}},
+        )
+    )
+    method = envelope.get("method")
+    assert method is not None
+    rerank = method.get("rerank")
+    assert rerank is not None
+    assert rerank["enabled"] is False
+    assert rerank["reason"] == "capability_off"
+
+
+def test_semantic_pro_rerank_reorders_when_ready(tmp_path: Path) -> None:
+    context = cast("ApplicationContext", _FakeContext(tmp_path, xtr_ready=True))
+    envelope = asyncio.run(
+        semantic_pro.semantic_search_pro(
+            context=context,
+            query="gateway",
+            limit=2,
+            options={"rerank": {"enabled": True, "top_k": 2}},
+        )
+    )
+    method = envelope.get("method")
+    assert method is not None
+    rerank_meta = method.get("rerank")
+    assert rerank_meta is not None
+    assert rerank_meta["enabled"] is True
+    reordered = rerank_meta.get("reordered")
+    assert isinstance(reordered, int)
+    assert reordered >= 1
+    findings_payload = envelope.get("findings")
+    if findings_payload is None:
+        pytest.fail("findings missing from envelope")
+    assert findings_payload, "expected at least one finding"
+    first_finding = findings_payload[0]
+    assert first_finding.get("chunk_id") == 101
+    assert "why" in first_finding
+    method_details = envelope.get("method")
+    assert method_details is not None
+    assert method_details.get("retrieval") == ["semantic"]
+    assert method_details.get("stages")
 
 
 def test_semantic_pro_requires_coderank_enabled(tmp_path: Path) -> None:

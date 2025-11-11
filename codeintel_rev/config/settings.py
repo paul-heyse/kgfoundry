@@ -79,6 +79,17 @@ def _build_xtr_config() -> XTRConfig:
     )
 
 
+def _build_rerank_config() -> RerankConfig:
+    provider = os.environ.get("RERANK_PROVIDER", "xtr").lower()
+    provider_literal: Literal["xtr"] = "xtr"
+    return RerankConfig(
+        enabled=os.environ.get("RERANK_ENABLED", "0").lower() in {"1", "true", "yes"},
+        top_k=int(os.environ.get("RERANK_TOP_K", "50")),
+        provider=provider_literal if provider == "xtr" else "xtr",
+        explain=os.environ.get("RERANK_EXPLAIN", "0").lower() in {"1", "true", "yes"},
+    )
+
+
 class CodeRankConfig(msgspec.Struct, frozen=True):
     """Configuration for the CodeRank dense retriever.
 
@@ -156,6 +167,15 @@ class XTRConfig(msgspec.Struct, frozen=True):
     dtype: Literal["float16", "float32"] = "float16"
     enable: bool = False
     mode: Literal["narrow", "wide"] = "narrow"
+
+
+class RerankConfig(msgspec.Struct, frozen=True):
+    """Configuration for optional late-interaction reranking."""
+
+    enabled: bool = False
+    top_k: int = 50
+    provider: Literal["xtr"] = "xtr"
+    explain: bool = False
 
 
 class CodeRankLLMConfig(msgspec.Struct, frozen=True):
@@ -590,6 +610,8 @@ class Settings(msgspec.Struct, frozen=True):
         WARP/XTR late-interaction configuration.
     xtr : XTRConfig
         Token-level index and scoring configuration.
+    rerank : RerankConfig
+        Late-interaction reranker configuration.
     coderank_llm : CodeRankLLMConfig
         CodeRank listwise reranker configuration.
     """
@@ -605,6 +627,7 @@ class Settings(msgspec.Struct, frozen=True):
     coderank: CodeRankConfig
     warp: WarpConfig
     xtr: XTRConfig
+    rerank: RerankConfig
     coderank_llm: CodeRankLLMConfig
 
 
@@ -943,6 +966,7 @@ def load_settings() -> Settings:
             budget_ms=int(os.environ.get("WARP_BUDGET_MS", "180")),
         ),
         xtr=_build_xtr_config(),
+        rerank=_build_rerank_config(),
         coderank_llm=CodeRankLLMConfig(
             model_id=os.environ.get("CODERANK_LLM_MODEL_ID", "nomic-ai/CodeRankLLM"),
             device=os.environ.get("CODERANK_LLM_DEVICE", "cpu"),
@@ -962,6 +986,7 @@ __all__ = [
     "IndexConfig",
     "PathsConfig",
     "RedisConfig",
+    "RerankConfig",
     "ServerLimits",
     "Settings",
     "SpladeConfig",

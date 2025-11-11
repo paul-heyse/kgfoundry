@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from kgfoundry_common.typing import HEAVY_DEPS as _BASE_HEAVY_DEPS
 from kgfoundry_common.typing import gate_import as _base_gate_import
 
 if TYPE_CHECKING:
@@ -33,16 +34,8 @@ __all__ = [
 ]
 
 
-HEAVY_DEPS: dict[str, str | None] = {
-    "numpy": "1.26",
-    "faiss": None,
-    "duckdb": None,
-    "torch": None,
-    "httpx": None,
-    "onnxruntime": None,
-    "lucene": None,
-}
-"""Registry of heavy optional dependencies and their minimum supported versions."""
+HEAVY_DEPS = _BASE_HEAVY_DEPS
+"""Re-exported heavy dependency registry (single source of truth)."""
 
 
 def gate_import(
@@ -58,6 +51,4 @@ def gate_import(
     object
         Imported module or attribute returned by the shared gate helper.
     """
-    root = module_name.split(".", maxsplit=1)[0]
-    resolved_min = min_version if min_version is not None else HEAVY_DEPS.get(root)
-    return _base_gate_import(module_name, purpose, min_version=resolved_min)
+    return _base_gate_import(module_name, purpose, min_version=min_version)

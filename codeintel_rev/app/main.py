@@ -173,6 +173,12 @@ async def _initialize_context(
         contains all configuration and long-lived clients. The readiness probe
         monitors the health of dependent services and resources.
 
+    Raises
+    ------
+    TypeError
+        Raised when `ApplicationContext.create` does not accept the
+        ``runtime_observer`` parameter (older interface).
+
     Notes
     -----
     Time complexity depends on runtime pre-loading configuration. GPU warmup and

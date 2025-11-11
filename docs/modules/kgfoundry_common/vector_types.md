@@ -42,7 +42,7 @@ Typed vector contracts and validation helpers for vector ingestion.
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `collections.abc.Iterable`, `collections.abc.Mapping`, `collections.abc.Sequence`, `dataclasses.dataclass`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `numpy`, `numpy.typing`, `typing.Final`, `typing.NewType`, `typing.TYPE_CHECKING`, `typing.cast`
+**Imports:** `__future__.annotations`, `collections.abc.Iterable`, `collections.abc.Mapping`, `collections.abc.Sequence`, `dataclasses.dataclass`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.typing.gate_import`, `numpy`, `numpy.typing`, `typing.Final`, `typing.NewType`, `typing.TYPE_CHECKING`, `typing.cast`
 
 ## Autorefs Examples
 
@@ -79,6 +79,8 @@ direction: right
 "kgfoundry_common.vector_types" -> "dataclasses.dataclass"
 "kgfoundry_common.navmap_loader.load_nav_metadata": "kgfoundry_common.navmap_loader.load_nav_metadata"
 "kgfoundry_common.vector_types" -> "kgfoundry_common.navmap_loader.load_nav_metadata"
+"kgfoundry_common.typing.gate_import": "kgfoundry_common.typing.gate_import"
+"kgfoundry_common.vector_types" -> "kgfoundry_common.typing.gate_import"
 "numpy": "numpy"
 "kgfoundry_common.vector_types" -> "numpy"
 "numpy.typing": "numpy.typing"

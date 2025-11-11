@@ -29,16 +29,27 @@ from typing import (
     cast,
 )
 
-from pydantic import AliasChoices, Field, ValidationError, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.navmap_loader import load_nav_metadata
 from kgfoundry_common.types import JsonPrimitive, JsonValue
+from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
     import functools
     from collections.abc import Sequence
+
+    from pydantic import AliasChoices, Field, ValidationError, field_validator
+    from pydantic_settings import BaseSettings, SettingsConfigDict
+else:
+    _pydantic = gate_import("pydantic", "app configuration helpers")
+    AliasChoices = _pydantic.AliasChoices
+    Field = _pydantic.Field
+    ValidationError = _pydantic.ValidationError
+    field_validator = _pydantic.field_validator
+
+    _pydantic_settings = gate_import("pydantic_settings", "app configuration helpers")
+    BaseSettings = _pydantic_settings.BaseSettings
+    SettingsConfigDict = _pydantic_settings.SettingsConfigDict
 
 
 __all__ = [

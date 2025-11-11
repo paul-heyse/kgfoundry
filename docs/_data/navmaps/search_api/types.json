@@ -38,6 +38,7 @@
       "dataclasses.dataclass",
       "kgfoundry_common.navmap_loader.load_nav_metadata",
       "kgfoundry_common.problem_details.JsonValue",
+      "kgfoundry_common.typing.gate_import",
       "numpy",
       "numpy.typing",
       "numpy.typing.NDArray",

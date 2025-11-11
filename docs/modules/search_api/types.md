@@ -102,7 +102,7 @@ FastAPI service exposing search endpoints, aggregation helpers, and Problem Deta
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `collections.abc.Callable`, `collections.abc.Mapping`, `collections.abc.Sequence`, `contextlib.suppress`, `dataclasses.dataclass`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.problem_details.JsonValue`, `numpy`, `numpy.typing`, `numpy.typing.NDArray`, `operator.attrgetter`, `typing.Protocol`, `typing.TYPE_CHECKING`, `typing.TypedDict`, `typing.cast`
+**Imports:** `__future__.annotations`, `collections.abc.Callable`, `collections.abc.Mapping`, `collections.abc.Sequence`, `contextlib.suppress`, `dataclasses.dataclass`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.problem_details.JsonValue`, `kgfoundry_common.typing.gate_import`, `numpy`, `numpy.typing`, `numpy.typing.NDArray`, `operator.attrgetter`, `typing.Protocol`, `typing.TYPE_CHECKING`, `typing.TypedDict`, `typing.cast`
 
 **Imported by:** [search_api](../search_api.md)
 
@@ -165,6 +165,8 @@ direction: right
 "search_api.types" -> "kgfoundry_common.navmap_loader.load_nav_metadata"
 "kgfoundry_common.problem_details.JsonValue": "kgfoundry_common.problem_details.JsonValue"
 "search_api.types" -> "kgfoundry_common.problem_details.JsonValue"
+"kgfoundry_common.typing.gate_import": "kgfoundry_common.typing.gate_import"
+"search_api.types" -> "kgfoundry_common.typing.gate_import"
 "numpy": "numpy"
 "search_api.types" -> "numpy"
 "numpy.typing": "numpy.typing"

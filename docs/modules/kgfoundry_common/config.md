@@ -44,7 +44,7 @@ Typed configuration management via pydantic_settings
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `base64`, `collections.abc.Mapping`, `collections.abc.Sequence`, `functools`, `functools.lru_cache`, `kgfoundry_common.logging.get_logger`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.types.JsonPrimitive`, `kgfoundry_common.types.JsonValue`, `pydantic.AliasChoices`, `pydantic.Field`, `pydantic.ValidationError`, `pydantic.field_validator`, `pydantic_settings.BaseSettings`, `pydantic_settings.SettingsConfigDict`, `typing.ClassVar`, `typing.Final`, `typing.Literal`, `typing.Self`, `typing.TYPE_CHECKING`, `typing.TypedDict`, `typing.Unpack`, `typing.cast`
+**Imports:** `__future__.annotations`, `base64`, `collections.abc.Mapping`, `collections.abc.Sequence`, `functools`, `functools.lru_cache`, `kgfoundry_common.logging.get_logger`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.types.JsonPrimitive`, `kgfoundry_common.types.JsonValue`, `kgfoundry_common.typing.gate_import`, `pydantic.AliasChoices`, `pydantic.Field`, `pydantic.ValidationError`, `pydantic.field_validator`, `pydantic_settings.BaseSettings`, `pydantic_settings.SettingsConfigDict`, `typing.ClassVar`, `typing.Final`, `typing.Literal`, `typing.Self`, `typing.TYPE_CHECKING`, `typing.TypedDict`, `typing.Unpack`, `typing.cast`
 
 ## Autorefs Examples
 
@@ -91,6 +91,8 @@ direction: right
 "kgfoundry_common.config" -> "kgfoundry_common.types.JsonPrimitive"
 "kgfoundry_common.types.JsonValue": "kgfoundry_common.types.JsonValue"
 "kgfoundry_common.config" -> "kgfoundry_common.types.JsonValue"
+"kgfoundry_common.typing.gate_import": "kgfoundry_common.typing.gate_import"
+"kgfoundry_common.config" -> "kgfoundry_common.typing.gate_import"
 "pydantic.AliasChoices": "pydantic.AliasChoices"
 "kgfoundry_common.config" -> "pydantic.AliasChoices"
 "pydantic.Field": "pydantic.Field"

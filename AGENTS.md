@@ -117,6 +117,7 @@ For all code blocks that you make edits to, please check for pyright, pyrefly, a
 
 * Emit **structured logs**, **Prometheus metrics**, and **OpenTelemetry traces** at boundaries.
 * Minimum: request/operation name, duration, status, error type, correlation/trace ID.
+* Semantic Pro telemetry now emits `rerank.*` spans and reports `method.rerank` metadata so XTR reordering decisions are debuggable.
 * **Verify:** a failing path produces (1) an error log with context, (2) a counter increment, and (3) a trace span with error status.
 
 ##### 10) Security & supply-chain
@@ -181,6 +182,17 @@ For all code blocks that you make edits to, please check for pyright, pyrefly, a
 - **Do not** duplicate tool configs across files. `pyrightconfig.jsonc` and `pyrefly.toml` are canonical; `pyproject.toml` is canonical for Ruff and packaging.
 - **Admin surfaces:** set `CODEINTEL_ADMIN=1` locally to enable `/admin/index` endpoints for staging/publishing lifecycle changes. Leave unset in most environments.
 
+### Install profiles (extras)
+
+| Profile | Command | Includes | Notes |
+| --- | --- | --- | --- |
+| Minimal | `pip install codeintel-rev[minimal]` | FastAPI, msgspec, uvicorn | Baseline HTTP + serialization stack. |
+| Full CPU | `pip install codeintel-rev[all]` | Minimal + FAISS CPU + DuckDB + SPLADE + XTR | Matches CI "full" job; safest default on CPU hosts. |
+| GPU | `pip install codeintel-rev[all,faiss-gpu]` | Full CPU + FAISS GPU bindings | Requires CUDA 12.x toolchain; pairs with `uv sync --extra gpu`. |
+| Targeted | `pip install codeintel-rev[faiss-cpu]`, etc. | Individual extras (`faiss-cpu`, `duckdb`, `splade`, `xtr`) | Use when trimming runtime images to feature-specific subsets. |
+
+`src/kgfoundry_common/typing/heavy_deps.py` is the single source of truth for heavy modules and install hints; the `gate_import()` helper and typing-gates checker both pull from this registry.
+
 ---
 
 ## Source‑of‑Truth Index
@@ -235,6 +247,8 @@ Read these first when editing configs or debugging local vs CI drift:
 ## Typing Gates (Postponed Annotations & TYPE_CHECKING Hygiene)
 
 **Purpose**: Prevent runtime imports of heavy optional dependencies (numpy, fastapi, FAISS) when they're only used in type hints. This ensures tooling stays lightweight and import-clean.
+
+> Heavy dependency metadata (module names, min versions, install extras) lives in `src/kgfoundry_common/typing/heavy_deps.py`. Update that file whenever a new gated dependency is introduced.
 
 ### 1. Postponed Annotations (PEP 563)
 

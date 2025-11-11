@@ -16,14 +16,23 @@ Examples
 
 from __future__ import annotations
 
-from typing import Any, ClassVar, cast
-
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from kgfoundry_common.errors import SettingsError
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.navmap_loader import load_nav_metadata
+from kgfoundry_common.typing import gate_import
+
+if TYPE_CHECKING:
+    from pydantic import Field
+    from pydantic_settings import BaseSettings, SettingsConfigDict
+else:  # pragma: no cover - runtime import guarded
+    _pydantic = gate_import("pydantic", "runtime settings validation")
+    Field = _pydantic.Field
+
+    _pydantic_settings = gate_import("pydantic_settings", "runtime settings validation")
+    BaseSettings = _pydantic_settings.BaseSettings
+    SettingsConfigDict = _pydantic_settings.SettingsConfigDict
 
 __all__ = [
     "FaissConfig",

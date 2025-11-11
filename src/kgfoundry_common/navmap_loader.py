@@ -9,12 +9,14 @@ import json
 import sys
 from collections.abc import Callable, Generator, Mapping, Sequence
 from contextlib import suppress
-from functools import cache
+from functools import cache, lru_cache
 from importlib import import_module
 from pathlib import Path
+from types import ModuleType
 from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
+    from pydantic import BaseModel, ConfigDict, Field, model_validator
     from tools import (
         AugmentMetadataModel,
         OperationOverrideModel,
@@ -22,8 +24,33 @@ if TYPE_CHECKING:
         RegistryOperationModel,
         ToolingMetadataModel,
     )
+else:  # pragma: no cover - runtime import guarded
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+    @lru_cache(maxsize=1)
+    def _pydantic_module() -> ModuleType:
+        """Return pydantic module without introducing circular imports.
+
+        Returns
+        -------
+        ModuleType
+            Imported :mod:`pydantic` module reference.
+
+        Raises
+        ------
+        ImportError
+            If :mod:`pydantic` is not installed in the current environment.
+        """
+        try:
+            return importlib.import_module("pydantic")
+        except ImportError as exc:  # pragma: no cover - optional dependency
+            msg = "pydantic is required for navigation metadata handling"
+            raise ImportError(msg) from exc
+
+    _pydantic = _pydantic_module()
+    BaseModel = _pydantic.BaseModel
+    ConfigDict = _pydantic.ConfigDict
+    Field = _pydantic.Field
+    model_validator = _pydantic.model_validator
 
 JsonValue = str | int | float | bool | dict[str, "JsonValue"] | list["JsonValue"] | None
 type NavMetadataIterator = Generator[tuple[str, JsonValue]]

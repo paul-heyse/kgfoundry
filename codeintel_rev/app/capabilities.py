@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Final, cast
 
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.prometheus import GaugeLike, build_gauge
+from kgfoundry_common.typing.heavy_deps import EXTRAS_HINT
 
 if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
@@ -62,12 +63,27 @@ _CAPABILITY_GAUGES: Final[dict[str, GaugeLike]] = {
     "torch_importable": _build_capability_gauge(
         "torch_importable", "torch module import succeeded"
     ),
+    "lucene_importable": _build_capability_gauge(
+        "lucene_importable", "Pyserini Lucene module import succeeded"
+    ),
+    "onnxruntime_importable": _build_capability_gauge(
+        "onnxruntime_importable", "onnxruntime module import succeeded"
+    ),
     "faiss_gpu_available": _build_capability_gauge(
         "faiss_gpu_available", "FAISS GPU symbols detected"
     ),
 }
 
 __all__ = ["Capabilities"]
+
+
+_CAPABILITY_HINT_ATTRS: Final[dict[str, str]] = {
+    "faiss": "faiss_importable",
+    "duckdb": "duckdb_importable",
+    "torch": "torch_importable",
+    "onnxruntime": "onnxruntime_importable",
+    "lucene": "lucene_importable",
+}
 
 
 def _import_optional(module_name: str) -> ModuleType | None:
@@ -148,6 +164,8 @@ class Capabilities:
     duckdb_importable: bool = False
     httpx_importable: bool = False
     torch_importable: bool = False
+    lucene_importable: bool = False
+    onnxruntime_importable: bool = False
     faiss_gpu_available: bool = False
     faiss_gpu_disabled_reason: str | None = None
     active_index_version: str | None = None
@@ -175,6 +193,11 @@ class Capabilities:
         """
         return self.duckdb and self.scip_index
 
+    @property
+    def has_reranker(self) -> bool:
+        """Return ``True`` when XTR reranking is available."""
+        return self.xtr_index_present and self.torch_importable
+
     def model_dump(self) -> dict[str, object]:
         """Return a JSON-serializable payload suitable for `/capz` responses.
 
@@ -195,6 +218,8 @@ class Capabilities:
             "duckdb_importable": self.duckdb_importable,
             "httpx_importable": self.httpx_importable,
             "torch_importable": self.torch_importable,
+            "lucene_importable": self.lucene_importable,
+            "onnxruntime_importable": self.onnxruntime_importable,
             "faiss_gpu_available": self.faiss_gpu_available,
             "faiss_gpu_disabled_reason": self.faiss_gpu_disabled_reason,
             "has_semantic": self.has_semantic,
@@ -202,6 +227,14 @@ class Capabilities:
             "active_index_version": self.active_index_version,
             "versions_available": self.versions_available,
         }
+        hints: dict[str, str] = {}
+        for hint_key, attr in _CAPABILITY_HINT_ATTRS.items():
+            if not bool(getattr(self, attr, False)):
+                suggestion = EXTRAS_HINT.get(hint_key)
+                if suggestion:
+                    hints[hint_key] = suggestion
+        if hints:
+            payload["hints"] = hints
         _record_metrics(payload)
         return payload
 
@@ -231,6 +264,8 @@ class Capabilities:
         duckdb_module = _import_optional("duckdb")
         httpx_module = _import_optional("httpx")
         torch_module = _import_optional("torch")
+        lucene_module = _import_optional("pyserini.search.lucene")
+        onnxruntime_module = _import_optional("onnxruntime")
         faiss_gpu_available, faiss_gpu_reason = _probe_faiss_gpu(faiss_module)
         active_version: str | None = None
         version_count = 0
@@ -254,6 +289,8 @@ class Capabilities:
             duckdb_importable=duckdb_module is not None,
             httpx_importable=httpx_module is not None,
             torch_importable=torch_module is not None,
+            lucene_importable=lucene_module is not None,
+            onnxruntime_importable=onnxruntime_module is not None,
             faiss_gpu_available=faiss_gpu_available,
             faiss_gpu_disabled_reason=faiss_gpu_reason,
             active_index_version=active_version,

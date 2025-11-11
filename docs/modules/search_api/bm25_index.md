@@ -26,6 +26,10 @@ FastAPI service exposing search endpoints, aggregation helpers, and Problem Deta
 
 ::: search_api.bm25_index._as_str
 
+### search_api.bm25_index._duckdb_module
+
+::: search_api.bm25_index._duckdb_module
+
 ### search_api.bm25_index._validate_parquet_path
 
 ::: search_api.bm25_index._validate_parquet_path
@@ -36,7 +40,7 @@ FastAPI service exposing search endpoints, aggregation helpers, and Problem Deta
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `collections.abc.Iterable`, `dataclasses.dataclass`, `duckdb`, `kgfoundry_common.errors.ConfigurationError`, `kgfoundry_common.errors.DeserializationError`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.problem_details.JsonValue`, `kgfoundry_common.safe_pickle_v2.UnsafeSerializationError`, `kgfoundry_common.safe_pickle_v2.load_unsigned_legacy`, `kgfoundry_common.serialization.deserialize_json`, `kgfoundry_common.serialization.serialize_json`, `math`, `os`, `pathlib.Path`, `re`, `registry.duckdb_helpers.fetch_all`, `registry.duckdb_helpers.fetch_one`, `typing.TYPE_CHECKING`, `typing.cast`
+**Imports:** `__future__.annotations`, `collections.abc.Iterable`, `dataclasses.dataclass`, `functools.lru_cache`, `kgfoundry_common.errors.ConfigurationError`, `kgfoundry_common.errors.DeserializationError`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.problem_details.JsonValue`, `kgfoundry_common.safe_pickle_v2.UnsafeSerializationError`, `kgfoundry_common.safe_pickle_v2.load_unsigned_legacy`, `kgfoundry_common.serialization.deserialize_json`, `kgfoundry_common.serialization.serialize_json`, `kgfoundry_common.typing.gate_import`, `math`, `os`, `pathlib.Path`, `re`, `registry.duckdb_helpers.fetch_all`, `registry.duckdb_helpers.fetch_one`, `types.ModuleType`, `typing.TYPE_CHECKING`, `typing.cast`
 
 **Imported by:** [search_api](../search_api.md)
 
@@ -45,8 +49,8 @@ FastAPI service exposing search endpoints, aggregation helpers, and Problem Deta
 - [search_api.bm25_index.BM25Doc][]
 - [search_api.bm25_index.BM25Index][]
 - [search_api.bm25_index._as_str][]
+- [search_api.bm25_index._duckdb_module][]
 - [search_api.bm25_index._validate_parquet_path][]
-- [search_api.bm25_index.toks][]
 
 ## Inheritance
 
@@ -67,8 +71,8 @@ direction: right
 "search_api.bm25_index" -> "collections.abc.Iterable"
 "dataclasses.dataclass": "dataclasses.dataclass"
 "search_api.bm25_index" -> "dataclasses.dataclass"
-"duckdb": "duckdb"
-"search_api.bm25_index" -> "duckdb"
+"functools.lru_cache": "functools.lru_cache"
+"search_api.bm25_index" -> "functools.lru_cache"
 "kgfoundry_common.errors.ConfigurationError": "kgfoundry_common.errors.ConfigurationError"
 "search_api.bm25_index" -> "kgfoundry_common.errors.ConfigurationError"
 "kgfoundry_common.errors.DeserializationError": "kgfoundry_common.errors.DeserializationError"
@@ -85,6 +89,8 @@ direction: right
 "search_api.bm25_index" -> "kgfoundry_common.serialization.deserialize_json"
 "kgfoundry_common.serialization.serialize_json": "kgfoundry_common.serialization.serialize_json"
 "search_api.bm25_index" -> "kgfoundry_common.serialization.serialize_json"
+"kgfoundry_common.typing.gate_import": "kgfoundry_common.typing.gate_import"
+"search_api.bm25_index" -> "kgfoundry_common.typing.gate_import"
 "math": "math"
 "search_api.bm25_index" -> "math"
 "os": "os"
@@ -97,6 +103,8 @@ direction: right
 "search_api.bm25_index" -> "registry.duckdb_helpers.fetch_all"
 "registry.duckdb_helpers.fetch_one": "registry.duckdb_helpers.fetch_one"
 "search_api.bm25_index" -> "registry.duckdb_helpers.fetch_one"
+"types.ModuleType": "types.ModuleType"
+"search_api.bm25_index" -> "types.ModuleType"
 "typing.TYPE_CHECKING": "typing.TYPE_CHECKING"
 "search_api.bm25_index" -> "typing.TYPE_CHECKING"
 "typing.cast": "typing.cast"

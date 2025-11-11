@@ -3,23 +3,42 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 import pytest
+from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.config_context import resolve_application_paths
 from codeintel_rev.config.settings import load_settings
 from codeintel_rev.io.hybrid_search import ChannelHit, HybridSearchEngine
+from codeintel_rev.plugins.channels import Channel
+from codeintel_rev.plugins.registry import ChannelRegistry
 
 
-class _StubProvider:
-    def __init__(self, hits: Sequence[ChannelHit]) -> None:
-        self.hits = list(hits)
+class _StubChannel(Channel):
+    def __init__(
+        self,
+        name: str,
+        hits: Sequence[ChannelHit],
+        *,
+        requires: frozenset[str] | None = None,
+        cost: float = 1.0,
+    ) -> None:
+        self.name = name
+        self.cost = cost
+        self.requires = requires or frozenset()
+        self._hits = list(hits)
         self.calls = 0
 
-    def search(self, query: str, top_k: int) -> list[ChannelHit]:
+    def search(self, query: str, limit: int) -> list[ChannelHit]:
         self.calls += 1
         assert query  # sanity check
-        return list(self.hits[:top_k])
+        return list(self._hits[:limit])
 
 
-def _build_engine(monkeypatch: pytest.MonkeyPatch, tmp_path) -> HybridSearchEngine:
+def _build_engine(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+    *,
+    channels: Sequence[_StubChannel] | None = None,
+    capabilities: Capabilities | None = None,
+) -> HybridSearchEngine:
     monkeypatch.setenv("HYBRID_ENABLE_BM25", "1")
     monkeypatch.setenv("HYBRID_ENABLE_SPLADE", "1")
     monkeypatch.setenv("BM25_INDEX_DIR", str(tmp_path / "bm25"))
@@ -28,24 +47,42 @@ def _build_engine(monkeypatch: pytest.MonkeyPatch, tmp_path) -> HybridSearchEngi
     monkeypatch.setenv("SPLADE_ONNX_DIR", str(tmp_path / "splade-onnx"))
     settings = load_settings()
     paths = resolve_application_paths(settings)
-    return HybridSearchEngine(settings, paths)
+    registry = ChannelRegistry.from_channels(channels or [])
+    return HybridSearchEngine(
+        settings,
+        paths,
+        capabilities=capabilities or Capabilities(),
+        registry=registry,
+    )
 
 
 def test_hybrid_search_engine_rrf_fuses_channels(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
-    engine = _build_engine(monkeypatch, tmp_path)
-    stub_bm25 = _StubProvider(
+    bm25_stub = _StubChannel(
+        "bm25",
         [
             ChannelHit(doc_id="102", score=7.0),
             ChannelHit(doc_id="201", score=6.0),
-        ]
+        ],
+        requires=frozenset({"warp_index_present", "lucene_importable"}),
     )
-    stub_splade = _StubProvider(
+    splade_stub = _StubChannel(
+        "splade",
         [
             ChannelHit(doc_id="101", score=4.2),
-        ]
+        ],
+        requires=frozenset({"lucene_importable", "onnxruntime_importable"}),
     )
-    monkeypatch.setattr(engine, "_create_bm25_provider", lambda: stub_bm25)
-    monkeypatch.setattr(engine, "_create_splade_provider", lambda: stub_splade)
+    caps = Capabilities(
+        warp_index_present=True,
+        lucene_importable=True,
+        onnxruntime_importable=True,
+    )
+    engine = _build_engine(
+        monkeypatch,
+        tmp_path,
+        channels=[bm25_stub, splade_stub],
+        capabilities=caps,
+    )
 
     result = engine.search(
         "hybrid query",
@@ -59,8 +96,8 @@ def test_hybrid_search_engine_rrf_fuses_channels(monkeypatch: pytest.MonkeyPatch
     assert result.warnings == []
     assert ("semantic", 1, 0.5) in result.contributions["101"]
     assert ("splade", 1, 4.2) in result.contributions["101"]
-    assert stub_bm25.calls == 1
-    assert stub_splade.calls == 1
+    assert bm25_stub.calls == 1
+    assert splade_stub.calls == 1
 
 
 def test_hybrid_search_engine_respects_channel_flags(
@@ -75,13 +112,15 @@ def test_hybrid_search_engine_respects_channel_flags(
 
     settings = load_settings()
     paths = resolve_application_paths(settings)
-    engine = HybridSearchEngine(settings, paths)
-
-    def _unexpected_call() -> None:
-        pytest.fail("Channel loader should not be invoked when disabled")
-
-    monkeypatch.setattr(engine, "_create_bm25_provider", _unexpected_call)
-    monkeypatch.setattr(engine, "_create_splade_provider", _unexpected_call)
+    bm25_stub = _StubChannel("bm25", [], requires=frozenset({"warp_index_present"}))
+    splade_stub = _StubChannel("splade", [], requires=frozenset({"lucene_importable"}))
+    registry = ChannelRegistry.from_channels([bm25_stub, splade_stub])
+    engine = HybridSearchEngine(
+        settings,
+        paths,
+        capabilities=Capabilities(warp_index_present=True, lucene_importable=True),
+        registry=registry,
+    )
 
     result = engine.search(
         "query",
@@ -92,6 +131,8 @@ def test_hybrid_search_engine_respects_channel_flags(
     assert [doc.doc_id for doc in result.docs] == ["42"]
     assert result.channels == ["semantic"]
     assert result.warnings == []
+    assert bm25_stub.calls == 0
+    assert splade_stub.calls == 0
 
 
 def test_hybrid_search_engine_accepts_extra_channels(
@@ -105,7 +146,8 @@ def test_hybrid_search_engine_accepts_extra_channels(
     monkeypatch.setenv("SPLADE_ONNX_DIR", str(tmp_path / "splade-onnx"))
     settings = load_settings()
     paths = resolve_application_paths(settings)
-    engine = HybridSearchEngine(settings, paths)
+    registry = ChannelRegistry.from_channels([])
+    engine = HybridSearchEngine(settings, paths, capabilities=Capabilities(), registry=registry)
 
     result = engine.search(
         "query",
@@ -118,3 +160,22 @@ def test_hybrid_search_engine_accepts_extra_channels(
     assert result.channels == ["semantic", "warp"]
     assert result.docs[0].doc_id == "999"
     assert ("warp", 1, 5.0) in result.contributions["999"]
+
+
+def test_hybrid_channel_skips_missing_capability(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    splade_stub = _StubChannel(
+        "splade",
+        [ChannelHit(doc_id="5", score=2.0)],
+        requires=frozenset({"lucene_importable"}),
+    )
+    engine = _build_engine(
+        monkeypatch,
+        tmp_path,
+        channels=[splade_stub],
+        capabilities=Capabilities(lucene_importable=False),
+    )
+
+    result = engine.search("query", semantic_hits=[(5, 0.1)], limit=1)
+
+    assert result.channels == ["semantic"]
+    assert splade_stub.calls == 0

@@ -48,7 +48,7 @@ Utilities for writing embedding vectors and chunks to Parquet
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `collections.abc.Iterable`, `datetime`, `kgfoundry_common.errors.DeserializationError`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `pandas`, `pandas.DataFrame`, `pathlib.Path`, `pyarrow`, `pyarrow.parquet`, `types.ModuleType`, `typing.Any`, `typing.NotRequired`, `typing.TYPE_CHECKING`, `typing.TypedDict`
+**Imports:** `__future__.annotations`, `collections.abc.Iterable`, `datetime`, `kgfoundry_common.errors.DeserializationError`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.typing.gate_import`, `pandas.DataFrame`, `pathlib.Path`, `pyarrow`, `pyarrow.parquet`, `typing.Any`, `typing.NotRequired`, `typing.TYPE_CHECKING`, `typing.TypedDict`
 
 ## Autorefs Examples
 
@@ -87,8 +87,8 @@ direction: right
 "kgfoundry_common.parquet_io" -> "kgfoundry_common.errors.DeserializationError"
 "kgfoundry_common.navmap_loader.load_nav_metadata": "kgfoundry_common.navmap_loader.load_nav_metadata"
 "kgfoundry_common.parquet_io" -> "kgfoundry_common.navmap_loader.load_nav_metadata"
-"pandas": "pandas"
-"kgfoundry_common.parquet_io" -> "pandas"
+"kgfoundry_common.typing.gate_import": "kgfoundry_common.typing.gate_import"
+"kgfoundry_common.parquet_io" -> "kgfoundry_common.typing.gate_import"
 "pandas.DataFrame": "pandas.DataFrame"
 "kgfoundry_common.parquet_io" -> "pandas.DataFrame"
 "pathlib.Path": "pathlib.Path"
@@ -97,8 +97,6 @@ direction: right
 "kgfoundry_common.parquet_io" -> "pyarrow"
 "pyarrow.parquet": "pyarrow.parquet"
 "kgfoundry_common.parquet_io" -> "pyarrow.parquet"
-"types.ModuleType": "types.ModuleType"
-"kgfoundry_common.parquet_io" -> "types.ModuleType"
 "typing.Any": "typing.Any"
 "kgfoundry_common.parquet_io" -> "typing.Any"
 "typing.NotRequired": "typing.NotRequired"

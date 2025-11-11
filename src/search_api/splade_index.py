@@ -11,15 +11,18 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Final
-
-import duckdb
+from types import ModuleType
+from typing import TYPE_CHECKING, Final, cast
 
 from kgfoundry_common.navmap_loader import load_nav_metadata
+from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from duckdb import DuckDBPyConnection
 
 
 __all__ = [
@@ -32,6 +35,18 @@ __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
 TOKEN = re.compile(r"[A-Za-z0-9]+")
 PARQUET_ROW_WIDTH: Final = 4
+
+
+@lru_cache(maxsize=1)
+def _duckdb_module() -> ModuleType:
+    """Return duckdb module resolved lazily for SPLADE index ingestion.
+
+    Returns
+    -------
+    ModuleType
+        Imported :mod:`duckdb` module reference.
+    """
+    return cast("ModuleType", gate_import("duckdb", "splade index loading"))
 
 
 # [nav:anchor tok]
@@ -120,7 +135,8 @@ class SpladeIndex:
         if not Path(self.db_path).exists():
             return
 
-        connection: duckdb.DuckDBPyConnection = duckdb.connect(self.db_path)
+        duckdb_module = _duckdb_module()
+        connection: DuckDBPyConnection = duckdb_module.connect(self.db_path)
         try:
             root = self._resolve_chunks_root(connection, chunks_root)
             rows = self._read_chunk_rows(connection, root) if root is not None else []
@@ -131,9 +147,7 @@ class SpladeIndex:
         self._recompute_document_frequencies()
 
     @staticmethod
-    def _resolve_chunks_root(
-        connection: duckdb.DuckDBPyConnection, override: str | None
-    ) -> str | None:
+    def _resolve_chunks_root(connection: DuckDBPyConnection, override: str | None) -> str | None:
         if override:
             return override
         dataset: tuple[object, ...] | None = connection.execute(
@@ -149,7 +163,7 @@ class SpladeIndex:
 
     @staticmethod
     def _read_chunk_rows(
-        connection: duckdb.DuckDBPyConnection, root: str
+        connection: DuckDBPyConnection, root: str
     ) -> list[tuple[object, object, object, object]]:
         root_path = Path(root)
         parquet_pattern = str(root_path / "*" / "*.parquet")

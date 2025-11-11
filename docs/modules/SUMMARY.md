@@ -55,6 +55,7 @@
     * [subprocess_utils](kgfoundry_common/subprocess_utils.md)
     * [types](kgfoundry_common/types.md)
     * [typing](kgfoundry_common/typing.md)
+        * [heavy_deps](kgfoundry_common/typing/heavy_deps.md)
     * [vector_types](kgfoundry_common/vector_types.md)
 * [linking](linking.md)
     * [calibration](linking/calibration.md)

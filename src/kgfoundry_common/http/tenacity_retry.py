@@ -7,10 +7,12 @@ tenacity library for retry logic.
 from __future__ import annotations
 
 from collections.abc import Callable
+from collections.abc import Callable as TypingCallable
 from contextvars import ContextVar
 from dataclasses import dataclass
+from functools import lru_cache
+from typing import TYPE_CHECKING, cast
 
-from numpy.random import default_rng
 from tenacity import (
     Retrying,
     retry_if_exception,
@@ -22,8 +24,26 @@ from tenacity.wait import wait_base
 from kgfoundry_common.http.errors import HttpStatusError
 from kgfoundry_common.http.policy import RetryPolicyDoc
 from kgfoundry_common.http.types import RetryStrategy
+from kgfoundry_common.typing import gate_import
+
+if TYPE_CHECKING:
+    from numpy.random import Generator
 
 _RANDOM_SEED: ContextVar[int | None] = ContextVar("_random_seed", default=None)
+
+
+@lru_cache(maxsize=1)
+def _default_rng_factory() -> TypingCallable[[int | None], Generator]:
+    """Return cached numpy random factory resolved lazily.
+
+    Returns
+    -------
+    collections.abc.Callable[[int | None], Generator]
+        Callable that yields :class:`numpy.random.Generator` instances.
+    """
+    module = gate_import("numpy.random", "tenacity retry jitter generation")
+    factory = module.default_rng
+    return cast("TypingCallable[[int | None], Generator]", factory)
 
 
 def _get_random_seed() -> int | None:
@@ -140,7 +160,8 @@ def _rand() -> float:
     retry attempts to avoid thundering herd problems.
     """
     seed = _get_random_seed()
-    rng = default_rng(seed) if seed is not None else default_rng()
+    factory = _default_rng_factory()
+    rng = factory(seed) if seed is not None else factory()
     return float(rng.random())
 
 

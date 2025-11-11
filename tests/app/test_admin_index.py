@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from codeintel_rev.app.routers import index_admin
+from codeintel_rev.runtime.factory_adjustment import DefaultFactoryAdjuster
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from codeintel_rev.runtime.factory_adjustment import DefaultFactoryAdjuster
 from tests.app._context_factory import build_application_context
 
 

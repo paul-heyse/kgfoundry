@@ -16,18 +16,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import yaml
-from pydantic import (
-    AliasChoices,
-    BaseModel,
-    ConfigDict,
-    Field,
-    ValidationError,
-    ValidationInfo,
-    field_validator,
-    model_validator,
-)
 from pydantic_core import PydanticCustomError
 
+from kgfoundry_common.typing import gate_import
 from tools._shared.logging import get_logger
 from tools._shared.problem_details import (
     ProblemDetailsParams,
@@ -35,10 +26,30 @@ from tools._shared.problem_details import (
 )
 
 if TYPE_CHECKING:
+    from pydantic import (
+        AliasChoices,
+        BaseModel,
+        ConfigDict,
+        Field,
+        ValidationError,
+        ValidationInfo,
+        field_validator,
+        model_validator,
+    )
+
     from kgfoundry_common.types import JsonValue
     from tools._shared.problem_details import ProblemDetailsDict
 else:  # pragma: no cover - runtime fallback for typing aliases
     JsonValue = object
+    _pydantic = gate_import("pydantic", "augment registry modeling")
+    AliasChoices = _pydantic.AliasChoices
+    BaseModel = _pydantic.BaseModel
+    ConfigDict = _pydantic.ConfigDict
+    Field = _pydantic.Field
+    ValidationError = _pydantic.ValidationError
+    ValidationInfo = _pydantic.ValidationInfo
+    field_validator = _pydantic.field_validator
+    model_validator = _pydantic.model_validator
 
 LOGGER = get_logger(__name__)
 

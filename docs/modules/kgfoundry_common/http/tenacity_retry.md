@@ -32,6 +32,10 @@ Tenacity-based retry strategy implementation.
 
 *Bases:* RetryStrategy
 
+### kgfoundry_common.http.tenacity_retry._default_rng_factory
+
+::: kgfoundry_common.http.tenacity_retry._default_rng_factory
+
 ### kgfoundry_common.http.tenacity_retry._get_random_seed
 
 ::: kgfoundry_common.http.tenacity_retry._get_random_seed
@@ -58,16 +62,16 @@ Tenacity-based retry strategy implementation.
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `collections.abc.Callable`, `contextvars.ContextVar`, `dataclasses.dataclass`, `kgfoundry_common.http.errors.HttpStatusError`, `kgfoundry_common.http.policy.RetryPolicyDoc`, `kgfoundry_common.http.types.RetryStrategy`, `numpy.random.default_rng`, `tenacity.Retrying`, `tenacity.retry_if_exception`, `tenacity.stop_after_attempt`, `tenacity.stop_after_delay`, `tenacity.wait.wait_base`
+**Imports:** `__future__.annotations`, `collections.abc.Callable`, `contextvars.ContextVar`, `dataclasses.dataclass`, `functools.lru_cache`, `kgfoundry_common.http.errors.HttpStatusError`, `kgfoundry_common.http.policy.RetryPolicyDoc`, `kgfoundry_common.http.types.RetryStrategy`, `kgfoundry_common.typing.gate_import`, `numpy.random.Generator`, `tenacity.Retrying`, `tenacity.retry_if_exception`, `tenacity.stop_after_attempt`, `tenacity.stop_after_delay`, `tenacity.wait.wait_base`, `typing.TYPE_CHECKING`, `typing.cast`
 
 ## Autorefs Examples
 
 - [kgfoundry_common.http.tenacity_retry.TenacityRetryStrategy][]
 - [kgfoundry_common.http.tenacity_retry.WaitRetryAfterOrJitter][]
 - [kgfoundry_common.http.tenacity_retry._MethodStrategy][]
+- [kgfoundry_common.http.tenacity_retry._default_rng_factory][]
 - [kgfoundry_common.http.tenacity_retry._get_random_seed][]
 - [kgfoundry_common.http.tenacity_retry._parse_retry_after][]
-- [kgfoundry_common.http.tenacity_retry._rand][]
 
 ## Inheritance
 
@@ -96,14 +100,18 @@ direction: right
 "kgfoundry_common.http.tenacity_retry" -> "contextvars.ContextVar"
 "dataclasses.dataclass": "dataclasses.dataclass"
 "kgfoundry_common.http.tenacity_retry" -> "dataclasses.dataclass"
+"functools.lru_cache": "functools.lru_cache"
+"kgfoundry_common.http.tenacity_retry" -> "functools.lru_cache"
 "kgfoundry_common.http.errors.HttpStatusError": "kgfoundry_common.http.errors.HttpStatusError"
 "kgfoundry_common.http.tenacity_retry" -> "kgfoundry_common.http.errors.HttpStatusError"
 "kgfoundry_common.http.policy.RetryPolicyDoc": "kgfoundry_common.http.policy.RetryPolicyDoc"
 "kgfoundry_common.http.tenacity_retry" -> "kgfoundry_common.http.policy.RetryPolicyDoc"
 "kgfoundry_common.http.types.RetryStrategy": "kgfoundry_common.http.types.RetryStrategy"
 "kgfoundry_common.http.tenacity_retry" -> "kgfoundry_common.http.types.RetryStrategy"
-"numpy.random.default_rng": "numpy.random.default_rng"
-"kgfoundry_common.http.tenacity_retry" -> "numpy.random.default_rng"
+"kgfoundry_common.typing.gate_import": "kgfoundry_common.typing.gate_import"
+"kgfoundry_common.http.tenacity_retry" -> "kgfoundry_common.typing.gate_import"
+"numpy.random.Generator": "numpy.random.Generator"
+"kgfoundry_common.http.tenacity_retry" -> "numpy.random.Generator"
 "tenacity.Retrying": "tenacity.Retrying"
 "kgfoundry_common.http.tenacity_retry" -> "tenacity.Retrying"
 "tenacity.retry_if_exception": "tenacity.retry_if_exception"
@@ -114,6 +122,10 @@ direction: right
 "kgfoundry_common.http.tenacity_retry" -> "tenacity.stop_after_delay"
 "tenacity.wait.wait_base": "tenacity.wait.wait_base"
 "kgfoundry_common.http.tenacity_retry" -> "tenacity.wait.wait_base"
+"typing.TYPE_CHECKING": "typing.TYPE_CHECKING"
+"kgfoundry_common.http.tenacity_retry" -> "typing.TYPE_CHECKING"
+"typing.cast": "typing.cast"
+"kgfoundry_common.http.tenacity_retry" -> "typing.cast"
 "kgfoundry_common.http": "kgfoundry_common.http" { link: "https://github.com/paul-heyse/kgfoundry/blob/main/src/kgfoundry_common/http/__init__.py" }
 "kgfoundry_common.http" -> "kgfoundry_common.http.tenacity_retry" { style: dashed }
 ```

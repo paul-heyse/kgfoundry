@@ -15,10 +15,8 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import TYPE_CHECKING, Final, TypeVar
 
-from pydantic import Field, ValidationError, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
-
 from kgfoundry_common.errors.exceptions import SettingsError as CoreSettingsError
+from kgfoundry_common.typing import gate_import
 from tools._shared.problem_details import (
     ProblemDetailsParams,
     build_problem_details,
@@ -27,10 +25,27 @@ from tools._shared.problem_details import (
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
+    from pydantic import Field, ValidationError, field_validator
+    from pydantic_settings import BaseSettings, SettingsConfigDict
+
     from tools._shared.problem_details import (
         JsonValue,
         ProblemDetailsDict,
     )
+else:
+    from tools._shared.problem_details import (
+        JsonValue,
+        ProblemDetailsDict,
+    )
+
+    _pydantic = gate_import("pydantic", "tool settings helpers")
+    Field = _pydantic.Field
+    ValidationError = _pydantic.ValidationError
+    field_validator = _pydantic.field_validator
+
+    _pydantic_settings = gate_import("pydantic_settings", "tool settings helpers")
+    BaseSettings = _pydantic_settings.BaseSettings
+    SettingsConfigDict = _pydantic_settings.SettingsConfigDict
 
 __all__: Final[list[str]] = [
     "SettingsError",

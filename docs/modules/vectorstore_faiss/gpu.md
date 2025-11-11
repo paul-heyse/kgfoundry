@@ -32,7 +32,7 @@ GPU-aware FAISS index helpers backed by the shared search API facade.
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `collections.abc.Sequence`, `dataclasses.dataclass`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.numpy_typing.FloatMatrix`, `kgfoundry_common.numpy_typing.FloatVector`, `kgfoundry_common.numpy_typing.IntVector`, `kgfoundry_common.numpy_typing.normalize_l2`, `logging`, `numpy`, `numpy.typing`, `search_api.faiss_gpu.GpuContext`, `search_api.faiss_gpu.clone_index_to_gpu`, `search_api.faiss_gpu.configure_search_parameters`, `search_api.faiss_gpu.detect_gpu_context`, `search_api.types.FaissIndexProtocol`, `search_api.types.FaissModuleProtocol`, `typing.TYPE_CHECKING`, `typing.cast`, `weakref.WeakKeyDictionary`
+**Imports:** `__future__.annotations`, `collections.abc.Sequence`, `dataclasses.dataclass`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `kgfoundry_common.numpy_typing.FloatMatrix`, `kgfoundry_common.numpy_typing.FloatVector`, `kgfoundry_common.numpy_typing.IntVector`, `kgfoundry_common.numpy_typing.normalize_l2`, `kgfoundry_common.typing.gate_import`, `logging`, `numpy`, `numpy.typing`, `search_api.faiss_gpu.GpuContext`, `search_api.faiss_gpu.clone_index_to_gpu`, `search_api.faiss_gpu.configure_search_parameters`, `search_api.faiss_gpu.detect_gpu_context`, `search_api.types.FaissIndexProtocol`, `search_api.types.FaissModuleProtocol`, `typing.TYPE_CHECKING`, `typing.cast`, `weakref.WeakKeyDictionary`
 
 ## Autorefs Examples
 
@@ -70,6 +70,8 @@ direction: right
 "vectorstore_faiss.gpu" -> "kgfoundry_common.numpy_typing.IntVector"
 "kgfoundry_common.numpy_typing.normalize_l2": "kgfoundry_common.numpy_typing.normalize_l2"
 "vectorstore_faiss.gpu" -> "kgfoundry_common.numpy_typing.normalize_l2"
+"kgfoundry_common.typing.gate_import": "kgfoundry_common.typing.gate_import"
+"vectorstore_faiss.gpu" -> "kgfoundry_common.typing.gate_import"
 "logging": "logging"
 "vectorstore_faiss.gpu" -> "logging"
 "numpy": "numpy"

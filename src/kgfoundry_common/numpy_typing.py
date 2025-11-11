@@ -6,11 +6,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Final, cast
 
-import numpy as np
-
 from kgfoundry_common.navmap_loader import load_nav_metadata
+from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    import numpy as np
     import numpy.typing as npt
 
     type FloatMatrix = npt.NDArray[np.float32]
@@ -18,6 +18,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     type IntVector = npt.NDArray[np.int64]
     type Float64Matrix = npt.NDArray[np.float64]
 else:  # pragma: no cover - runtime fallback
+    np = gate_import("numpy", "numpy typing helpers")
     FloatMatrix = np.ndarray
     FloatVector = np.ndarray
     IntVector = np.ndarray

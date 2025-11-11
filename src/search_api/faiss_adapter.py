@@ -8,11 +8,10 @@ import importlib
 import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
+from types import ModuleType
 from typing import TYPE_CHECKING, ClassVar, Final, TypeGuard, cast
-
-import duckdb
-import numpy as np
 
 from kgfoundry_common.errors import IndexBuildError, VectorSearchError
 from kgfoundry_common.navmap_loader import load_nav_metadata
@@ -20,6 +19,7 @@ from kgfoundry_common.numpy_typing import (
     normalize_l2,
     topk_indices,
 )
+from kgfoundry_common.typing import gate_import
 from registry.duckdb_helpers import fetch_all, fetch_one
 from search_api.faiss_gpu import (
     clone_index_to_gpu,
@@ -28,6 +28,7 @@ from search_api.faiss_gpu import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
+    import numpy as np
     import numpy.typing as npt
     from numpy.typing import NDArray
 
@@ -46,6 +47,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     type StrArray = npt.NDArray[np.str_]
     type VecArray = npt.NDArray[np.float32]
 else:  # pragma: no cover - runtime fallback
+    np = gate_import("numpy", "FAISS adapter vector helpers")
     FloatArray = np.ndarray
     IntArray = np.ndarray
     StrArray = np.ndarray
@@ -63,6 +65,18 @@ __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def _duckdb_module() -> ModuleType:
+    """Return duckdb module resolved lazily for FAISS adapter usage.
+
+    Returns
+    -------
+    ModuleType
+        Imported :mod:`duckdb` module reference.
+    """
+    return cast("ModuleType", gate_import("duckdb", "FAISS adapter index hydration"))
 
 
 def _is_faiss_index(candidate: object) -> TypeGuard[FaissIndexProtocol]:
@@ -632,9 +646,10 @@ class FaissAdapter:
             msg = f"DuckDB registry not found: {candidate}"
             raise VectorSearchError(msg)
 
+        duckdb_module = _duckdb_module()
         try:
-            con = duckdb.connect(str(candidate))
-        except duckdb.Error:
+            con = duckdb_module.connect(str(candidate))
+        except duckdb_module.Error:
             return self._load_from_parquet(candidate)
 
         try:
@@ -642,7 +657,7 @@ class FaissAdapter:
                 con,
                 "SELECT parquet_root FROM dense_runs ORDER BY created_at DESC LIMIT 1",
             )
-        except duckdb.Error as exc:  # pragma: no cover - defensive fallback
+        except duckdb_module.Error as exc:  # pragma: no cover - defensive fallback
             msg = f"Failed to query dense_runs: {exc}"
             raise VectorSearchError(msg) from exc
         finally:
@@ -683,14 +698,15 @@ class FaissAdapter:
             msg = f"Parquet source not found: {resolved}"
             raise VectorSearchError(msg)
 
-        con = duckdb.connect(database=":memory:")
+        duckdb_module = _duckdb_module()
+        con = duckdb_module.connect(database=":memory:")
         try:
             rows = fetch_all(
                 con,
                 "SELECT chunk_id, vector FROM read_parquet(?, union_by_name=true)",
                 [str(resolved)],
             )
-        except duckdb.Error as exc:
+        except duckdb_module.Error as exc:
             msg = f"Failed to load vectors from {resolved}: {exc}"
             raise VectorSearchError(msg) from exc
         finally:

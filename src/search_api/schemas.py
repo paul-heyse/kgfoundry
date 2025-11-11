@@ -12,15 +12,19 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING, ClassVar
 
-from pydantic import ConfigDict, Field
-
 from kgfoundry_common.navmap_loader import load_nav_metadata
 from kgfoundry_common.pydantic import BaseModel
+from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
+    from pydantic import ConfigDict, Field
+
     from kgfoundry_common.types import JsonValue
 else:
     JsonValue = importlib.import_module("kgfoundry_common.types").JsonValue
+    _pydantic = gate_import("pydantic", "search API schemas")
+    ConfigDict = _pydantic.ConfigDict
+    Field = _pydantic.Field
 
 __all__ = [
     "SearchRequest",

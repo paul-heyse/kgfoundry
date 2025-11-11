@@ -94,6 +94,10 @@ Shared utilities and data structures used across KgFoundry services and tools.
 
 ::: kgfoundry_common.navmap_loader._operation_overrides_for_interface
 
+### kgfoundry_common.navmap_loader._pydantic_module
+
+::: kgfoundry_common.navmap_loader._pydantic_module
+
 ### kgfoundry_common.navmap_loader._registry_operation_candidates
 
 ::: kgfoundry_common.navmap_loader._registry_operation_candidates
@@ -140,7 +144,7 @@ Shared utilities and data structures used across KgFoundry services and tools.
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `collections.abc.Callable`, `collections.abc.Generator`, `collections.abc.Mapping`, `collections.abc.Sequence`, `contextlib.suppress`, `copy`, `functools.cache`, `importlib`, `importlib.import_module`, `json`, `pathlib.Path`, `pydantic.BaseModel`, `pydantic.ConfigDict`, `pydantic.Field`, `pydantic.model_validator`, `sys`, `tools.AugmentMetadataModel`, `tools.OperationOverrideModel`, `tools.RegistryInterfaceModel`, `tools.RegistryOperationModel`, `tools.ToolingMetadataModel`, `typing.Any`, `typing.TYPE_CHECKING`, `typing.cast`
+**Imports:** `__future__.annotations`, `collections.abc.Callable`, `collections.abc.Generator`, `collections.abc.Mapping`, `collections.abc.Sequence`, `contextlib.suppress`, `copy`, `functools.cache`, `functools.lru_cache`, `importlib`, `importlib.import_module`, `json`, `pathlib.Path`, `pydantic.BaseModel`, `pydantic.ConfigDict`, `pydantic.Field`, `pydantic.model_validator`, `sys`, `tools.AugmentMetadataModel`, `tools.OperationOverrideModel`, `tools.RegistryInterfaceModel`, `tools.RegistryOperationModel`, `tools.ToolingMetadataModel`, `types.ModuleType`, `typing.Any`, `typing.TYPE_CHECKING`, `typing.cast`
 
 ## Autorefs Examples
 
@@ -187,6 +191,8 @@ direction: right
 "kgfoundry_common.navmap_loader" -> "copy"
 "functools.cache": "functools.cache"
 "kgfoundry_common.navmap_loader" -> "functools.cache"
+"functools.lru_cache": "functools.lru_cache"
+"kgfoundry_common.navmap_loader" -> "functools.lru_cache"
 "importlib": "importlib"
 "kgfoundry_common.navmap_loader" -> "importlib"
 "importlib.import_module": "importlib.import_module"
@@ -215,6 +221,8 @@ direction: right
 "kgfoundry_common.navmap_loader" -> "tools.RegistryOperationModel"
 "tools.ToolingMetadataModel": "tools.ToolingMetadataModel"
 "kgfoundry_common.navmap_loader" -> "tools.ToolingMetadataModel"
+"types.ModuleType": "types.ModuleType"
+"kgfoundry_common.navmap_loader" -> "types.ModuleType"
 "typing.Any": "typing.Any"
 "kgfoundry_common.navmap_loader" -> "typing.Any"
 "typing.TYPE_CHECKING": "typing.TYPE_CHECKING"
