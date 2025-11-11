@@ -5,6 +5,7 @@ from __future__ import annotations
 from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.runtime.cells import (
     RuntimeCellCloseResult,
+    RuntimeCellInitContext,
     RuntimeCellInitResult,
     RuntimeCellObserver,
 )
@@ -18,27 +19,58 @@ class TimelineRuntimeObserver(RuntimeCellObserver):
     def __init__(self, fallback: Timeline | None = None) -> None:
         self._fallback = fallback
 
-    def _timeline(self) -> Timeline | None:
+    def _timeline(self, context: RuntimeCellInitContext | None = None) -> Timeline | None:
+        if context and context.timeline is not None:
+            return context.timeline
         return current_timeline() or self._fallback
 
-    def on_init_start(self, *, cell: str) -> None:
+    def on_init_start(
+        self,
+        *,
+        cell: str,
+        generation: int,
+        context: RuntimeCellInitContext | None = None,
+    ) -> None:
         """Record runtime initialization start."""
-        timeline = self._timeline()
+        timeline = self._timeline(context)
         if timeline is not None:
-            timeline.event("runtime.init.start", cell)
+            attrs: dict[str, object] = {"generation": generation}
+            if context is not None:
+                if context.session_id is not None:
+                    attrs["session_id"] = context.session_id
+                if context.capability_stamp is not None:
+                    attrs["capability_stamp"] = context.capability_stamp
+            timeline.event("runtime.init.start", cell, attrs=attrs)
 
     def on_init_end(self, event: RuntimeCellInitResult) -> None:
         """Record runtime initialization completion."""
-        timeline = self._timeline()
-        if timeline is not None:
+        timeline = self._timeline(event.context)
+        if timeline is None:
+            return
+        attrs: dict[str, object] = {
+            "duration_ms": int(event.duration_ms),
+            "generation": event.generation,
+        }
+        context = event.context
+        if context is not None:
+            if context.session_id is not None:
+                attrs["session_id"] = context.session_id
+            if context.capability_stamp is not None:
+                attrs["capability_stamp"] = context.capability_stamp
+        if event.error is not None:
+            attrs["error"] = type(event.error).__name__
+        if event.status == "error":
+            timeline.event(
+                "runtime.init.err",
+                event.cell,
+                status="error",
+                attrs=attrs,
+            )
+        else:
             timeline.event(
                 "runtime.init.end",
                 event.cell,
-                status=event.status,
-                attrs={
-                    "duration_ms": int(event.duration_ms),
-                    "error": type(event.error).__name__ if event.error else None,
-                },
+                attrs=attrs,
             )
 
     def on_close_end(self, event: RuntimeCellCloseResult) -> None:

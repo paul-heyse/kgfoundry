@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from importlib import import_module
+from docs._types import griffe as _griffe
 
-_griffe = import_module("docs._types.griffe")
 GriffeFacade = _griffe.GriffeFacade
 GriffeNode = _griffe.GriffeNode
 LoaderFacade = _griffe.LoaderFacade

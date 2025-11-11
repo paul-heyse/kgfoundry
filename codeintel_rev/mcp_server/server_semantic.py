@@ -7,6 +7,7 @@ from codeintel_rev.mcp_server.adapters import semantic_pro as semantic_pro_adapt
 from codeintel_rev.mcp_server.error_handling import handle_adapter_errors
 from codeintel_rev.mcp_server.schemas import AnswerEnvelope
 from codeintel_rev.mcp_server.server import get_context, mcp
+from codeintel_rev.mcp_server.telemetry import tool_operation_scope
 
 
 @mcp.tool()
@@ -26,7 +27,12 @@ async def semantic_search(
         Structured semantic search response.
     """
     context = get_context()
-    return await semantic_adapter.semantic_search(context, query, limit)
+    with tool_operation_scope(
+        "search.semantic",
+        query_chars=len(query),
+        limit=limit,
+    ):
+        return await semantic_adapter.semantic_search(context, query, limit)
 
 
 @mcp.tool()
@@ -48,9 +54,14 @@ async def semantic_search_pro(
         Structured response including fusion metadata.
     """
     context = get_context()
-    return await semantic_pro_adapter.semantic_search_pro(
-        context,
-        query=query,
+    with tool_operation_scope(
+        "search.semantic_pro",
+        query_chars=len(query),
         limit=limit,
-        options=options,
-    )
+    ):
+        return await semantic_pro_adapter.semantic_search_pro(
+            context,
+            query=query,
+            limit=limit,
+            options=options,
+        )

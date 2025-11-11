@@ -6,6 +6,7 @@ from codeintel_rev.runtime.cells import (
     NullRuntimeCellObserver,
     RuntimeCell,
     RuntimeCellCloseResult,
+    RuntimeCellInitContext,
     RuntimeCellInitResult,
     RuntimeCellObserver,
 )
@@ -22,6 +23,7 @@ __all__ = [
     "NullRuntimeCellObserver",
     "RuntimeCell",
     "RuntimeCellCloseResult",
+    "RuntimeCellInitContext",
     "RuntimeCellInitResult",
     "RuntimeCellObserver",
 ]

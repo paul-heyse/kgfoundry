@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from importlib import import_module
-
-_alignment = import_module("docs._types.alignment")
-_artifacts = import_module("docs._types.artifacts")
+from docs._types import alignment as _alignment
+from docs._types import artifacts as _artifacts
 
 SYMBOL_DELTA_CHANGE_FIELDS = _alignment.SYMBOL_DELTA_CHANGE_FIELDS
 SYMBOL_DELTA_PAYLOAD_FIELDS = _alignment.SYMBOL_DELTA_PAYLOAD_FIELDS

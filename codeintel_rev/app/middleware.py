@@ -51,7 +51,6 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 
 from __future__ import annotations
 
-import contextvars
 import uuid
 from typing import TYPE_CHECKING
 
@@ -59,6 +58,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, DispatchFunction
 from starlette.types import ASGIApp
 
 from codeintel_rev.observability.timeline import bind_timeline, new_timeline
+from codeintel_rev.runtime.request_context import capability_stamp_var, session_id_var
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -68,18 +68,6 @@ if TYPE_CHECKING:
     from starlette.responses import Response
 
 LOGGER = get_logger(__name__)
-
-# Thread-local storage for session ID
-# FastMCP doesn't expose Request in tool functions, so we use ContextVar
-# for thread-safe session ID access in adapters
-session_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "session_id",
-    default=None,
-)
-capability_stamp_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "capability_stamp",
-    default=None,
-)
 
 
 def get_session_id() -> str:

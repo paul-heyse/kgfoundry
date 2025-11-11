@@ -281,6 +281,24 @@ def current_timeline() -> Timeline | None:
     return _timeline_var.get()
 
 
+def current_or_new_timeline(
+    *,
+    session_id: str | None = None,
+    force: bool = False,
+) -> Timeline:
+    """Return the active timeline or create a new one when missing.
+
+    Returns
+    -------
+    Timeline
+        Timeline bound to the request or a freshly created fallback.
+    """
+    timeline = current_timeline()
+    if timeline is not None:
+        return timeline
+    return new_timeline(session_id, force=force)
+
+
 @contextmanager
 def bind_timeline(timeline: Timeline | None) -> Iterator[None]:
     """Bind ``timeline`` to the current async/task context.

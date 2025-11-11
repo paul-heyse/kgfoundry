@@ -144,7 +144,6 @@ def _test_faiss_gpu_resources() -> tuple[bool, str]:
 
 
 @lru_cache(maxsize=1)
-@lru_cache(maxsize=1)
 def warmup_gpu() -> dict[str, bool | str]:
     """Perform GPU warmup sequence to verify GPU availability and functionality.
 

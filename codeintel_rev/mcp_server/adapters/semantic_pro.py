@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
 from collections.abc import Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -11,7 +10,7 @@ from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 
-from codeintel_rev.app.middleware import get_capability_stamp, get_session_id
+from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.io.hybrid_search import ChannelHit
 from codeintel_rev.io.rerank_coderankllm import CodeRankListwiseReranker
@@ -25,7 +24,6 @@ from codeintel_rev.mcp_server.schemas import (
     StageInfo,
 )
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
-from codeintel_rev.observability.otel import as_span
 from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.rerank.base import RerankRequest, RerankResult, ScoredDoc
 from codeintel_rev.rerank.xtr import XTRReranker
@@ -52,6 +50,7 @@ if TYPE_CHECKING:
 
 SNIPPET_PREVIEW_CHARS = 500
 COMPONENT_NAME = "codeintel_mcp"
+RERANK_STAGE_NAME = "coderank_llm"
 LOGGER = get_logger(__name__)
 
 
@@ -323,36 +322,15 @@ async def semantic_search_pro(
         raise VectorSearchError(msg)
     runtime_options = build_runtime_options(options)
     session_id = get_session_id()
-    capability_stamp = get_capability_stamp()
-    timeline = current_timeline()
-    operation_attrs: dict[str, object] = {
-        "session_id": session_id,
-        "limit": limit,
-        "query_chars": len(query),
-        "query_sha256": hashlib.sha256(query.encode("utf-8")).hexdigest(),
-    }
-    if capability_stamp:
-        operation_attrs["capability_stamp"] = capability_stamp
-    if timeline is not None:
-        operation_attrs["run_id"] = timeline.run_id
-    options_summary = _summarize_options(runtime_options)
-    if options_summary:
-        operation_attrs["options"] = options_summary
-    operation_scope = (
-        timeline.operation("mcp.tool.semantic_search_pro", **operation_attrs)
-        if timeline is not None
-        else as_span("mcp.tool.semantic_search_pro", **operation_attrs)
+    scope = await get_effective_scope(context, session_id)
+    return await asyncio.to_thread(
+        _semantic_search_pro_sync,
+        context,
+        query,
+        limit,
+        scope,
+        runtime_options,
     )
-    with operation_scope:
-        scope = await get_effective_scope(context, session_id)
-        return await asyncio.to_thread(
-            _semantic_search_pro_sync,
-            context,
-            query,
-            limit,
-            scope,
-            runtime_options,
-        )
 
 
 def _semantic_search_pro_sync(
@@ -1242,6 +1220,18 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
     options = plan.options
     observation = plan.observation
     ordered_ids = _dedupe_preserve_order([_safe_int(doc.doc_id) for doc in fused.docs])
+    timeline = current_timeline()
+    requested = len(ordered_ids)
+    if timeline is not None:
+        timeline.event(
+            "hydration.start",
+            "duckdb",
+            attrs={
+                "requested": requested,
+                "effective_limit": effective_limit,
+                "asked": requested,
+            },
+        )
     try:
         with track_stage("duckdb_hydration") as hydration_timer:
             records = _hydrate_records(
@@ -1253,33 +1243,53 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
             )
         snapshots = [hydration_timer.snapshot()]
     except (RuntimeError, OSError) as exc:
+        if timeline is not None:
+            timeline.event(
+                "hydration.end",
+                "duckdb",
+                status="error",
+                message=str(exc),
+                attrs={"requested": requested, "returned": 0, "missing": requested},
+            )
         observation.mark_error()
         msg = "DuckDB hydration failed"
         raise VectorSearchError(msg, cause=exc) from exc
+    else:
+        if timeline is not None:
+            returned = len(records)
+            timeline.event(
+                "hydration.end",
+                "duckdb",
+                attrs={
+                    "requested": requested,
+                    "returned": returned,
+                    "missing": max(requested - returned, 0),
+                    "effective_limit": effective_limit,
+                },
+            )
 
     rerank_cfg = context.settings.coderank_llm
-    rerank_stage_name = "coderank_llm"
     if not options.use_reranker:
         record_stage_decision(
             COMPONENT_NAME,
-            rerank_stage_name,
+            RERANK_STAGE_NAME,
             decision=StageDecision(should_run=False, reason="disabled_option"),
         )
     elif not rerank_cfg.enabled:
         record_stage_decision(
             COMPONENT_NAME,
-            rerank_stage_name,
+            RERANK_STAGE_NAME,
             decision=StageDecision(should_run=False, reason="disabled_config"),
         )
     elif not records:
         record_stage_decision(
             COMPONENT_NAME,
-            rerank_stage_name,
+            RERANK_STAGE_NAME,
             decision=StageDecision(should_run=False, reason="no_candidates"),
         )
     else:
         with track_stage(
-            rerank_stage_name,
+            RERANK_STAGE_NAME,
             budget_ms=rerank_cfg.budget_ms,
         ) as rerank_timer:
             records = _maybe_rerank(
@@ -1291,7 +1301,7 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
         snapshots.append(rerank_timer.snapshot())
         record_stage_decision(
             COMPONENT_NAME,
-            rerank_stage_name,
+            RERANK_STAGE_NAME,
             decision=StageDecision(should_run=True, reason="executed"),
         )
 

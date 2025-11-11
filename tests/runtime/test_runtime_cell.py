@@ -6,9 +6,11 @@ import threading
 import time
 
 import pytest
+from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.runtime import (
     RuntimeCell,
     RuntimeCellCloseResult,
+    RuntimeCellInitContext,
     RuntimeCellInitResult,
     RuntimeCellObserver,
 )
@@ -23,7 +25,14 @@ class RecordingObserver(RuntimeCellObserver):
         self.init_events: list[dict[str, object]] = []
         self.close_events: list[dict[str, object]] = []
 
-    def on_init_start(self, *, cell: str) -> None:
+    def on_init_start(
+        self,
+        *,
+        cell: str,
+        generation: int,
+        context: RuntimeCellInitContext | None = None,
+    ) -> None:
+        _ = (generation, context)
         with self._lock:
             self.init_started.append(cell)
 
@@ -38,6 +47,7 @@ class RecordingObserver(RuntimeCellObserver):
                     "payload_type": (
                         type(event.payload).__name__ if event.payload is not None else None
                     ),
+                    "generation": event.generation,
                 }
             )
 
@@ -83,6 +93,7 @@ def test_runtime_cell_initializes_once_under_high_concurrency() -> None:
     assert factory_calls == 1
     assert len(observer.init_started) == 1
     assert observer.init_events[-1]["status"] == "ok"
+    assert observer.init_events[-1]["generation"] == 1
 
 
 def test_runtime_cell_init_failure_is_reported_and_retriable() -> None:
@@ -106,6 +117,8 @@ def test_runtime_cell_init_failure_is_reported_and_retriable() -> None:
     assert calls == ["fail", "success"]
     assert observer.init_events[0]["status"] == "error"
     assert observer.init_events[-1]["status"] == "ok"
+    assert observer.init_events[0]["generation"] == 1
+    assert observer.init_events[-1]["generation"] == 2
 
 
 def test_runtime_cell_can_reinitialize_after_close() -> None:
@@ -116,6 +129,35 @@ def test_runtime_cell_can_reinitialize_after_close() -> None:
     second = cell.get_or_initialize(list)
     assert first is not second
     assert observer.close_events[-1]["status"] == "ok"
+
+
+def test_runtime_cell_invalidate_triggers_new_generation() -> None:
+    observer = RecordingObserver()
+    cell: RuntimeCell[list[int]] = RuntimeCell(observer=observer)
+    first = cell.get_or_initialize(list)
+    cell.invalidate()
+    second = cell.get_or_initialize(list)
+    assert first is not second
+    assert observer.init_events[-1]["generation"] == 2
+
+
+def test_runtime_cell_record_failure_short_circuits_and_recovers() -> None:
+    cell: RuntimeCell[int] = RuntimeCell()
+    calls = {"count": 0}
+
+    def factory() -> int:
+        calls["count"] += 1
+        return 7
+
+    failure = RuntimeUnavailableError("cooldown", runtime="test-runtime")
+    cell.record_failure(failure, ttl_seconds=0.05)
+    with pytest.raises(RuntimeUnavailableError):
+        cell.get_or_initialize(factory)
+    assert calls["count"] == 0
+    time.sleep(0.06)
+    result = cell.get_or_initialize(factory)
+    assert result == 7
+    assert calls["count"] == 1
 
 
 def test_runtime_cell_seed_constraints(monkeypatch: pytest.MonkeyPatch) -> None:

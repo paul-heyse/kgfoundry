@@ -53,8 +53,6 @@ from pathlib import Path
 from threading import Lock
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
-import redis.asyncio as redis_asyncio
-
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.scope_store import ScopeStore
 from codeintel_rev.config.settings import Settings, load_settings
@@ -81,6 +79,8 @@ from kgfoundry_common.logging import get_logger
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    import redis.asyncio as _redis_asyncio
+
     from codeintel_rev.app.scope_store import SupportsAsyncRedis
     from codeintel_rev.io.faiss_manager import FAISSManager
     from codeintel_rev.io.hybrid_search import HybridSearchEngine
@@ -91,6 +91,7 @@ else:  # pragma: no cover - runtime only; annotations are postponed
     XTRIndex = Any
 
 LOGGER = get_logger(__name__)
+_RUNTIME_FAILURE_TTL_S = 15.0
 
 __all__ = ["ApplicationContext", "ResolvedPaths", "resolve_application_paths"]
 
@@ -722,6 +723,10 @@ class ApplicationContext:
         )
 
         # Initialize scope store for session-scoped query constraints
+        redis_asyncio = cast(
+            "_redis_asyncio",
+            gate_import("redis.asyncio", "Session scope store requires redis extra"),
+        )
         redis_client = redis_asyncio.from_url(settings.redis.url)
         # redis.asyncio.Redis implements SupportsAsyncRedis protocol, but pyright
         # doesn't recognize it without explicit cast
@@ -901,7 +906,8 @@ class ApplicationContext:
 
         try:
             index = cell.get_or_initialize(_factory)
-        except RuntimeUnavailableError:
+        except RuntimeUnavailableError as exc:
+            cell.record_failure(exc, _RUNTIME_FAILURE_TTL_S)
             cell.close()
             raise
         except (OSError, RuntimeError, ValueError) as exc:

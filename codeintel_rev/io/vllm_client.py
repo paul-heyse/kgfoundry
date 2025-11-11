@@ -295,7 +295,7 @@ class VLLMClient:
         batch_size = len(texts)
         if timeline is not None:
             timeline.event(
-                "embed.start",
+                "vllm.embed.start",
                 "vllm",
                 attrs={
                     "mode": mode,
@@ -318,7 +318,7 @@ class VLLMClient:
         except Exception as exc:
             if timeline is not None:
                 timeline.event(
-                    "embed.end",
+                    "vllm.embed.end",
                     "vllm",
                     status="error",
                     message=str(exc),
@@ -338,7 +338,7 @@ class VLLMClient:
         if timeline is not None:
             elapsed_ms = int(1000 * (perf_counter() - start))
             timeline.event(
-                "embed.end",
+                "vllm.embed.end",
                 "vllm",
                 attrs={
                     "duration_ms": elapsed_ms,

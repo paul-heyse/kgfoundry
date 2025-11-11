@@ -94,6 +94,7 @@ def test_capz_endpoint_refresh(tmp_path, monkeypatch) -> None:
         body = resp.json()
         assert body["faiss_index_present"] is True
         assert "active_index_version" in body
+        assert "stamp" in body
 
         refreshed_resp = client.get("/capz", params={"refresh": "true"})
         assert refreshed_resp.status_code == 200

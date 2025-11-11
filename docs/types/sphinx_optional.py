@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from importlib import import_module
+from docs._types import sphinx_optional as _sphinx_optional
 
-_sphinx_optional = import_module("docs._types.sphinx_optional")
 AstroidManagerFacade = _sphinx_optional.AstroidManagerFacade
 AutoapiParserFacade = _sphinx_optional.AutoapiParserFacade
 MissingDependencyError = _sphinx_optional.MissingDependencyError
