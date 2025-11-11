@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import os
 import signal
+import threading
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager, suppress
 from time import perf_counter
@@ -292,7 +293,8 @@ async def lifespan(
         app.state.capability_stamp = capabilities.stamp()
         app.mount("/mcp", build_http_app(capabilities))
         init_telemetry(app)
-        if os.name != "nt":
+        main_thread = threading.current_thread() is threading.main_thread()
+        if os.name != "nt" and main_thread:
             previous_sighup = signal.getsignal(signal.SIGHUP)
 
             def _handle_hup(
@@ -315,7 +317,12 @@ async def lifespan(
         )
         raise
     finally:
-        if hup_handler_installed and previous_sighup is not None and os.name != "nt":
+        if (
+            hup_handler_installed
+            and previous_sighup is not None
+            and os.name != "nt"
+            and threading.current_thread() is threading.main_thread()
+        ):
             with suppress(ValueError):  # pragma: no cover - defensive
                 signal.signal(signal.SIGHUP, previous_sighup)
         await _shutdown_context(context, readiness)

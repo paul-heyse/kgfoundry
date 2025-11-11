@@ -113,7 +113,7 @@ class RuntimeCell[T]:
         *,
         name: str | None = None,
         observer: RuntimeCellObserver | None = None,
-        max_waiters: int = 32,
+        max_waiters: int = 0,
         wait_timeout_ms: int = 1500,
     ) -> None:
         self._lock = RLock()
