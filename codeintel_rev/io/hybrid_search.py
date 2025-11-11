@@ -6,12 +6,22 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
+from time import perf_counter
 from typing import TYPE_CHECKING
 
 from codeintel_rev.evaluation.hybrid_pool import Hit, HybridPoolEvaluator
+from codeintel_rev.observability import metrics as retrieval_metrics
 from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.plugins.channels import Channel, ChannelContext, ChannelError
 from codeintel_rev.plugins.registry import ChannelRegistry
+from codeintel_rev.retrieval.boosters import RecencyConfig, apply_recency_boost
+from codeintel_rev.retrieval.gating import (
+    StageGateConfig,
+    analyze_query,
+    decide_budgets,
+    describe_budget_decision,
+)
+from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
 from codeintel_rev.retrieval.types import (
     ChannelHit,
     HybridResultDoc,
@@ -23,81 +33,103 @@ if TYPE_CHECKING:
     from codeintel_rev.app.capabilities import Capabilities
     from codeintel_rev.app.config_context import ResolvedPaths
     from codeintel_rev.config.settings import Settings, SpladeConfig
+    from codeintel_rev.io.duckdb_manager import DuckDBManager
 
 LOGGER = get_logger(__name__)
 
 
 class BM25SearchProvider:
-    """Thin wrapper around Pyserini's LuceneSearcher for BM25 retrieval.
+    """Pyserini-backed BM25 searcher with optional RM3 heuristics."""
 
-    This class provides a simple interface to Pyserini's Lucene-based BM25 search
-    implementation. BM25 (Best Matching 25) is a probabilistic ranking function
-    that scores documents based on term frequency, inverse document frequency,
-    and document length normalization. It's particularly effective for keyword
-    and exact-match queries in code search scenarios.
-
-    The provider initializes a Lucene searcher with the specified BM25 parameters
-    (k1 and b) which control term frequency saturation and length normalization
-    respectively. The searcher is thread-safe and can be reused for multiple
-    queries.
-
-    Parameters
-    ----------
-    index_dir : Path
-        Directory path containing the Lucene BM25 index. The index must be created
-        using Pyserini's indexing tools and contain document vectors suitable for
-        BM25 retrieval.
-    k1 : float
-        BM25 term frequency saturation parameter. Controls how quickly term
-        frequency saturates. Typical values range from 1.2 to 2.0. Higher values
-        give more weight to term frequency.
-    b : float
-        BM25 length normalization parameter. Controls the degree of document length
-        normalization. Values range from 0.0 (no normalization) to 1.0 (full
-        normalization). Typical value is 0.75.
-
-    Raises
-    ------
-    FileNotFoundError
-        If the BM25 index directory does not exist or is not accessible.
-    """
-
-    def __init__(self, index_dir: Path, *, k1: float, b: float) -> None:
+    def __init__(
+        self,
+        index_dir: Path,
+        *,
+        k1: float,
+        b: float,
+        rm3_params: RM3Params | None = None,
+        heuristics: RM3Heuristics | None = None,
+        enable_rm3: bool = False,
+        auto_rm3: bool = False,
+    ) -> None:
         if not index_dir.exists():
             msg = f"BM25 index not found: {index_dir}"
             raise FileNotFoundError(msg)
         self._index_dir = index_dir
-        lucene_module = import_module("pyserini.search.lucene")
-        lucene_searcher_cls = lucene_module.LuceneSearcher
-        self._searcher = lucene_searcher_cls(str(index_dir))
-        self._searcher.set_bm25(k1, b)
+        self._lucene_module = import_module("pyserini.search.lucene")
+        self._lucene_searcher_cls = self._lucene_module.LuceneSearcher
+        self._k1 = float(k1)
+        self._b = float(b)
+        self._rm3_params = rm3_params or RM3Params()
+        self._heuristics = heuristics if auto_rm3 else None
+        self._rm3_enabled_default = enable_rm3
+        self._auto_rm3 = auto_rm3
 
-    def search(self, query: str, top_k: int) -> list[ChannelHit]:
-        """Return top-k BM25 hits for ``query``.
+        self._base_searcher = self._create_searcher()
+        self._rm3_searcher = None
 
-        Executes a BM25 search query against the Lucene index and returns the
-        top-k most relevant documents. The search uses the configured BM25
-        parameters (k1, b) set during initialization. Results are ranked by
-        BM25 relevance score in descending order.
+    def _create_searcher(self) -> object:
+        searcher = self._lucene_searcher_cls(str(self._index_dir))
+        try:
+            searcher.set_bm25(self._k1, self._b)
+        except TypeError:
+            searcher.set_bm25(k1=self._k1, b=self._b)
+        return searcher
+
+    def _ensure_rm3_searcher(self) -> object:
+        if self._rm3_searcher is not None:
+            return self._rm3_searcher
+        searcher = self._create_searcher()
+        params = self._rm3_params
+        try:
+            searcher.set_rm3(params.fb_docs, params.fb_terms, params.orig_weight)
+        except TypeError:
+            searcher.set_rm3(
+                fb_docs=params.fb_docs,
+                fb_terms=params.fb_terms,
+                original_query_weight=params.orig_weight,
+            )
+        self._rm3_searcher = searcher
+        return searcher
+
+    def _should_use_rm3(self, query: str) -> bool:
+        if self._rm3_enabled_default and not self._auto_rm3:
+            return True
+        if not self._auto_rm3:
+            return False
+        if self._heuristics is None:
+            return self._rm3_enabled_default
+        return self._heuristics.should_enable(query)
+
+    def search(self, query: str, top_k: int, *, force_rm3: bool | None = None) -> list[ChannelHit]:
+        """Return BM25 hits for ``query``, optionally applying RM3 when heuristics fire.
 
         Parameters
         ----------
         query : str
-            Search query string. Can contain multiple terms separated by spaces.
-            BM25 will score documents based on term frequency and inverse document
-            frequency for each term in the query.
+            Search query string.
         top_k : int
-            Maximum number of results to return. The searcher will return the
-            top-k highest-scoring documents. Must be a positive integer.
+            Maximum number of results to return. Must be positive.
+        force_rm3 : bool | None, optional
+            Optional override to force RM3 usage. If None, uses heuristics to decide.
+            Defaults to None.
 
         Returns
         -------
         list[ChannelHit]
-            List of ranked BM25 results, ordered by relevance score (highest first).
-            Each ChannelHit contains a document ID and BM25 score. Returns empty
-            list if no documents match the query or if top_k is 0.
+            List of search results with document IDs and BM25 scores, sorted by
+            relevance descending. Returns empty list if top_k <= 0.
         """
-        hits = self._searcher.search(query, k=top_k)
+        if top_k <= 0:
+            return []
+        use_rm3 = self._should_use_rm3(query)
+        if force_rm3 is not None:
+            use_rm3 = force_rm3
+        if use_rm3:
+            searcher = self._ensure_rm3_searcher()
+        else:
+            searcher = self._base_searcher
+        hits = searcher.search(query, k=top_k)
         return [ChannelHit(doc_id=hit.docid, score=float(hit.score)) for hit in hits]
 
 
@@ -172,6 +204,9 @@ class SpladeSearchProvider:
         self._searcher = lucene_impact_searcher_cls(str(index_dir))
         self._quantization = config.quantization
         self._max_terms = config.max_terms
+        self._max_query_terms = max(0, config.max_query_terms)
+        self._prune_below = max(0.0, float(config.prune_below))
+        self._static_prune_pct = min(max(0.0, float(config.static_prune_pct)), 1.0)
 
     def search(self, query: str, top_k: int) -> list[ChannelHit]:
         """Return SPLADE impact hits for ``query``.
@@ -205,15 +240,32 @@ class SpladeSearchProvider:
         decoded = self._encoder.decode(embeddings, top_k=None)
         if not decoded or not decoded[0]:
             return []
-        bow = self._build_bow(decoded[0])
+        filtered_pairs = self._filter_pairs(decoded[0])
+        if not filtered_pairs:
+            return []
+        bow = self._build_bow(filtered_pairs)
         if not bow:
             return []
         hits = self._searcher.search(bow, k=top_k)
         return [ChannelHit(doc_id=hit.docid, score=float(hit.score)) for hit in hits]
 
+    def _filter_pairs(self, pairs: Sequence[tuple[str, float]]) -> list[tuple[str, float]]:
+        filtered = [(token, weight) for token, weight in pairs if weight > 0]
+        if self._prune_below > 0.0:
+            filtered = [
+                (token, weight) for token, weight in filtered if weight >= self._prune_below
+            ]
+        if self._static_prune_pct > 0.0 and filtered:
+            keep = max(1, int(round(len(filtered) * (1.0 - self._static_prune_pct))))
+            filtered = sorted(filtered, key=lambda item: item[1], reverse=True)[:keep]
+        if self._max_query_terms > 0:
+            filtered = filtered[: self._max_query_terms]
+        return filtered
+
     def _build_bow(self, pairs: Sequence[tuple[str, float]]) -> str:
         tokens: list[str] = []
-        remaining = self._max_terms
+        query_cap = self._max_query_terms or self._max_terms
+        remaining = min(self._max_terms, query_cap) if query_cap else self._max_terms
         for token, weight in pairs:
             if weight <= 0 or remaining <= 0:
                 continue
@@ -264,10 +316,12 @@ class HybridSearchEngine:
         *,
         capabilities: Capabilities | None = None,
         registry: ChannelRegistry | None = None,
+        duckdb_manager: DuckDBManager | None = None,
     ) -> None:
         self._settings = settings
         self._paths = paths
         self._capabilities = capabilities
+        self._duckdb_manager = duckdb_manager
         if registry is None:
             channel_context = ChannelContext(
                 settings=settings,
@@ -281,6 +335,81 @@ class HybridSearchEngine:
         self._pooler = self._make_pooler()
         self._explain_last: dict[str, object] = {}
 
+    def _make_stage_gate_config(self) -> StageGateConfig:
+        default_depths = dict(self._settings.index.hybrid_prefetch)
+        default_depths.setdefault("semantic", self._settings.index.hybrid_top_k_per_channel)
+        default_depths.setdefault("bm25", self._settings.index.hybrid_top_k_per_channel)
+        default_depths.setdefault("splade", self._settings.index.hybrid_top_k_per_channel)
+
+        literal_depths = dict(default_depths)
+        literal_depths["bm25"] = max(5, int(literal_depths.get("bm25", 0) * 1.5) or 0)
+        literal_depths["splade"] = max(5, int(literal_depths.get("splade", 0) * 0.6) or 0)
+
+        vague_depths = dict(default_depths)
+        vague_depths["semantic"] = max(10, int(vague_depths.get("semantic", 0) * 1.3) or 0)
+        vague_depths["splade"] = max(10, int(vague_depths.get("splade", 0) * 1.4) or 0)
+
+        prf_cfg = self._settings.index.prf
+        bm25_cfg = self._settings.bm25
+        return StageGateConfig(
+            default_depths=default_depths,
+            literal_depths=literal_depths,
+            vague_depths=vague_depths,
+            rrf_k_default=self._settings.index.rrf_k,
+            rrf_k_literal=max(10, self._settings.index.rrf_k // 2),
+            rrf_k_vague=max(self._settings.index.rrf_k + 30, self._settings.index.rrf_k),
+            rm3_auto=prf_cfg.enable_auto,
+            rm3_min_len=prf_cfg.short_query_max_terms,
+            rm3_max_len=max(prf_cfg.short_query_max_terms * 3, prf_cfg.short_query_max_terms),
+            rm3_fb_docs=bm25_cfg.rm3_fb_docs,
+            rm3_fb_terms=bm25_cfg.rm3_fb_terms,
+            rm3_original_weight=bm25_cfg.rm3_original_query_weight,
+        )
+
+    def _recency_config(self) -> RecencyConfig:
+        return RecencyConfig(
+            enabled=self._settings.index.recency_enabled,
+            half_life_days=self._settings.index.recency_half_life_days,
+            max_boost=self._settings.index.recency_max_boost,
+            table=self._settings.index.recency_table,
+        )
+
+    def _rrf_fuse(
+        self,
+        runs: Mapping[str, Sequence[ChannelHit]],
+        *,
+        limit: int,
+        rrf_k: int,
+    ) -> tuple[list[HybridResultDoc], dict[str, list[tuple[str, int, float]]]]:
+        aggregated: dict[str, float] = {}
+        for channel, hits in runs.items():
+            for rank, hit in enumerate(hits, start=1):
+                doc_id = str(hit.doc_id)
+                aggregated.setdefault(doc_id, 0.0)
+                aggregated[doc_id] += 1.0 / (rrf_k + rank)
+        ranked = sorted(aggregated.items(), key=lambda item: item[1], reverse=True)[:limit]
+        docs = [HybridResultDoc(doc_id=doc_id, score=score) for doc_id, score in ranked]
+        contributions = self._build_contribution_map(runs)
+        contributions_for_docs = {doc.doc_id: contributions.get(doc.doc_id, []) for doc in docs}
+        return docs, contributions_for_docs
+
+    def _build_debug_bundle(
+        self,
+        query: str,
+        budget_info: Mapping[str, object],
+        channels: Mapping[str, Sequence[ChannelHit]],
+        rrf_k: int,
+    ) -> dict[str, object]:
+        return {
+            "query": query,
+            "budget": dict(budget_info),
+            "per_channel_top": {
+                name: [{"doc_id": hit.doc_id, "score": float(hit.score)} for hit in hits[:10]]
+                for name, hits in channels.items()
+            },
+            "rrf_k": rrf_k,
+        }
+
     def search(
         self,
         query: str,
@@ -289,56 +418,44 @@ class HybridSearchEngine:
         limit: int,
         options: HybridSearchOptions | None = None,
     ) -> HybridSearchResult:
-        """Fuse dense and sparse retrieval results for ``query``.
-
-        This method combines results from multiple retrieval channels (semantic/FAISS,
-        BM25, SPLADE) using Reciprocal Rank Fusion (RRF) to produce a unified ranked
-        list. RRF is a rank aggregation technique that combines multiple ranked lists
-        without requiring score normalization, making it ideal for fusing different
-        retrieval modalities with incompatible score ranges.
-
-        The method gathers hits from all enabled channels (semantic is always included,
-        BM25 and SPLADE are optional based on settings), then applies RRF fusion to
-        produce the final ranked results. Channel contributions are tracked for
-        transparency and debugging.
-
-        Parameters
-        ----------
-        query : str
-            Search query string. Used for sparse retrieval channels (BM25, SPLADE)
-            which perform keyword-based or learned sparse matching. The semantic
-            channel uses pre-computed embeddings, so the query text is only used
-            for sparse channels.
-        semantic_hits : Sequence[tuple[int, float]]
-            Ordered dense results expressed as ``(doc_id, score)`` pairs.
-        limit : int
-            Maximum number of final results to return after RRF fusion. The fusion
-            process ranks all documents from all channels, then returns the top
-            'limit' documents. Must be a positive integer.
-        options : HybridSearchOptions | None
-            Optional bundle controlling extra channels, channel weights, and
-            FAISS runtime metadata for explainability.
-
-        Returns
-        -------
-        HybridSearchResult
-            Fused retrieval output containing:
-            - docs: Final ranked list of documents (top 'limit' after RRF fusion)
-            - contributions: Per-document breakdown of which channels contributed
-              each document (useful for understanding fusion behavior)
-            - channels: List of active channel identifiers that contributed results
-            - warnings: Any warnings generated during channel retrieval (e.g., index
-              unavailable, encoding failures)
-        """
+        """Fuse dense and sparse retrieval results for ``query`` using adaptive budgets."""
         timeline = current_timeline()
-        runs, warnings = self._gather_channel_hits(query, semantic_hits)
+        retrieval_metrics.QUERIES_TOTAL.labels(kind="search").inc()
+        gate_cfg = self._make_stage_gate_config()
+        profile = analyze_query(query, gate_cfg)
+        retrieval_metrics.QUERY_AMBIGUITY.observe(profile.ambiguity_score)
+        budget_decision = decide_budgets(profile, gate_cfg)
+        budget_info = describe_budget_decision(profile, budget_decision)
+        retrieval_metrics.RRF_K.set(float(budget_decision.rrf_k))
+        retrieval_metrics.observe_budget_depths(budget_decision.per_channel_depths.items())
+        if timeline is not None:
+            timeline.event(
+                "hybrid.query_profile",
+                "query_profile",
+                attrs=budget_info,
+            )
+
+        runs, warnings = self._gather_channel_hits(
+            query,
+            semantic_hits,
+            channel_limits=budget_decision.per_channel_depths,
+        )
+
         opts = options or HybridSearchOptions()
-        pooler, weights_used = self._select_pooler(opts)
-        if opts.extra_channels:
-            for name, hits in opts.extra_channels.items():
-                if not hits:
-                    continue
+        extra_channels = opts.extra_channels or {}
+        extra_channel_names = tuple(extra_channels.keys())
+        weights_used = self._resolve_pool_weights(opts.weights, extra_channel_names)
+        needs_custom_pooler = bool(extra_channel_names) or opts.weights is not None
+        pooler = (
+            self._pooler
+            if not needs_custom_pooler
+            else self._make_pooler(opts.weights, extra_channels=extra_channel_names)
+        )
+        for name, hits in extra_channels.items():
+            if hits:
                 runs[name] = list(hits)
+
+        active_channels = [channel for channel, hits in runs.items() if hits] or ["semantic"]
         if timeline is not None and runs:
             total_candidates = sum(len(hits) for hits in runs.values())
             timeline.event(
@@ -346,15 +463,16 @@ class HybridSearchEngine:
                 "fusion",
                 attrs={
                     "channels": list(runs.keys()),
-                    "rrf_k": self._settings.index.rrf_k,
+                    "rrf_k": budget_decision.rrf_k,
                     "total": total_candidates,
                 },
             )
-        contributions = self._build_contribution_map(runs)
-        flattened = self._flatten_hits_for_pool(runs)
-        active_channels = [channel for channel, hits in runs.items() if hits] or ["semantic"]
+
+        docs: list[HybridResultDoc]
+        contributions_for_docs: dict[str, list[tuple[str, int, float]]]
         runtime = opts.tuning or HybridSearchTuning()
-        if not flattened:
+
+        if not runs:
             method = self._compose_method_metadata(
                 active_channels,
                 warnings,
@@ -365,6 +483,8 @@ class HybridSearchEngine:
                     nprobe=runtime.nprobe,
                     weights=weights_used,
                 ),
+                fusion={"type": "rrf" if self._settings.index.hybrid_use_rrf else "pool"},
+                budget=budget_info,
             )
             self._explain_last = method
             return HybridSearchResult(
@@ -375,36 +495,86 @@ class HybridSearchEngine:
                 method=method,
             )
 
-        pooled_hits = pooler.pool(flattened, k=limit)
-        docs = [
-            HybridResultDoc(doc_id=pooled.doc_id, score=pooled.blended_score)
-            for pooled in pooled_hits
-        ]
-        contributions_for_docs = {doc.doc_id: contributions.get(doc.doc_id, []) for doc in docs}
-        method = self._compose_method_metadata(
-            active_channels,
-            warnings,
-            stats=_MethodStats(
-                fused_count=len(docs),
+        if self._settings.index.hybrid_use_rrf:
+            start_rrf = perf_counter()
+            docs, contributions_for_docs = self._rrf_fuse(
+                runs,
                 limit=limit,
-                faiss_k=runtime.k,
-                nprobe=runtime.nprobe,
-                weights=weights_used,
-            ),
-        )
-        self._explain_last = method
-        if timeline is not None:
-            total_candidates = sum(len(hits) for hits in runs.values())
-            timeline.event(
-                "hybrid.fuse.end",
-                "fusion",
-                attrs={
-                    "returned": len(docs),
-                    "channels": active_channels,
-                    "rrf_k": self._settings.index.rrf_k,
-                    "total": total_candidates,
-                },
+                rrf_k=budget_decision.rrf_k,
             )
+            retrieval_metrics.RRF_DURATION_SECONDS.observe(perf_counter() - start_rrf)
+            method = self._compose_method_metadata(
+                active_channels,
+                warnings,
+                stats=_MethodStats(
+                    fused_count=len(docs),
+                    limit=limit,
+                    faiss_k=runtime.k,
+                    nprobe=runtime.nprobe,
+                    weights=weights_used,
+                ),
+                fusion={"type": "rrf", "K": budget_decision.rrf_k},
+                budget=budget_info,
+            )
+            if timeline is not None:
+                timeline.event(
+                    "hybrid.fuse.rrf",
+                    "fusion",
+                    attrs={"rrf_k": budget_decision.rrf_k, "returned": len(docs)},
+                )
+        else:
+            flattened = self._flatten_hits_for_pool(runs)
+            contributions = self._build_contribution_map(runs)
+            if flattened:
+                pooled_hits = pooler.pool(flattened, k=limit)
+                docs = [
+                    HybridResultDoc(doc_id=pooled.doc_id, score=pooled.blended_score)
+                    for pooled in pooled_hits
+                ]
+                contributions_for_docs = {
+                    doc.doc_id: contributions.get(doc.doc_id, []) for doc in docs
+                }
+            else:
+                docs = []
+                contributions_for_docs = {}
+            method = self._compose_method_metadata(
+                active_channels,
+                warnings,
+                stats=_MethodStats(
+                    fused_count=len(docs),
+                    limit=limit,
+                    faiss_k=runtime.k,
+                    nprobe=runtime.nprobe,
+                    weights=weights_used,
+                ),
+                fusion={"type": "pool"},
+                budget=budget_info,
+            )
+            if timeline is not None:
+                timeline.event(
+                    "hybrid.fuse.pool",
+                    "fusion",
+                    attrs={"returned": len(docs)},
+                )
+
+        recency_cfg = self._recency_config()
+        boost_count = 0
+        if recency_cfg.enabled and docs:
+            docs, boost_count = apply_recency_boost(
+                docs,
+                recency_cfg,
+                duckdb_manager=self._duckdb_manager,
+            )
+            if boost_count:
+                retrieval_metrics.RECENCY_BOOSTED_TOTAL.inc(boost_count)
+
+        debug_bundle = self._build_debug_bundle(query, budget_info, runs, budget_decision.rrf_k)
+        retrieval_metrics.DEBUG_BUNDLE_TOTAL.inc()
+        if timeline is not None:
+            timeline.event("hybrid.debug_bundle", "debug", attrs={"bundle": debug_bundle})
+
+        retrieval_metrics.RESULTS_TOTAL.inc(len(docs))
+        self._explain_last = method
         return HybridSearchResult(
             docs=docs,
             contributions=contributions_for_docs,
@@ -417,6 +587,8 @@ class HybridSearchEngine:
         self,
         query: str,
         semantic_hits: Sequence[tuple[int, float]],
+        *,
+        channel_limits: Mapping[str, int] | None = None,
     ) -> tuple[dict[str, list[ChannelHit]], list[str]]:
         """Collect per-channel search hits and warnings for ``query``.
 
@@ -453,7 +625,10 @@ class HybridSearchEngine:
         warnings: list[str] = []
         timeline = current_timeline()
 
-        semantic_channel_hits = self._build_semantic_channel_hits(semantic_hits)
+        semantic_limit = channel_limits.get("semantic") if channel_limits else None
+        semantic_channel_hits = self._build_semantic_channel_hits(
+            semantic_hits, limit=semantic_limit
+        )
         if semantic_channel_hits:
             runs["semantic"] = semantic_channel_hits
         if timeline is not None:
@@ -463,9 +638,12 @@ class HybridSearchEngine:
                 attrs={"hits": len(semantic_channel_hits)},
             )
 
-        channel_limit = self._settings.index.hybrid_top_k_per_channel
+        default_limit = self._settings.index.hybrid_top_k_per_channel
         for channel in self._registry.channels():
-            hits, warning = self._collect_channel_hits(channel, query, channel_limit, timeline)
+            limit = default_limit
+            if channel_limits and channel.name in channel_limits:
+                limit = channel_limits[channel.name]
+            hits, warning = self._collect_channel_hits(channel, query, limit, timeline)
             if warning:
                 warnings.append(warning)
             if hits:
@@ -474,9 +652,13 @@ class HybridSearchEngine:
         return runs, warnings
 
     def _channel_disabled_reason(self, channel: Channel) -> str | None:
-        if channel.name == "bm25" and not self._settings.index.enable_bm25_channel:
+        if channel.name == "bm25" and (
+            not self._settings.index.enable_bm25_channel or not self._settings.bm25.enabled
+        ):
             return "disabled"
-        if channel.name == "splade" and not self._settings.index.enable_splade_channel:
+        if channel.name == "splade" and (
+            not self._settings.index.enable_splade_channel or not self._settings.splade.enabled
+        ):
             return "disabled"
         return None
 
@@ -508,10 +690,12 @@ class HybridSearchEngine:
                 {"reason": "capability_off", "missing": sorted(missing)},
             )
             return [], None
+        start = perf_counter()
         try:
             hits = list(channel.search(query, limit))
         except ChannelError as exc:
             warning = str(exc)
+            retrieval_metrics.QUERY_ERRORS_TOTAL.labels(kind="search", channel=channel.name).inc()
             self._emit_channel_skip(
                 channel.name,
                 timeline,
@@ -521,12 +705,15 @@ class HybridSearchEngine:
         except (OSError, RuntimeError, ValueError, ImportError) as exc:  # pragma: no cover
             warning = f"{channel.name} channel failed: {exc}"
             LOGGER.warning(warning, exc_info=exc)
+            retrieval_metrics.QUERY_ERRORS_TOTAL.labels(kind="search", channel=channel.name).inc()
             self._emit_channel_skip(
                 channel.name,
                 timeline,
                 {"reason": "provider_error", "message": str(exc)},
             )
             return [], warning
+        duration = perf_counter() - start
+        retrieval_metrics.CHANNEL_LATENCY_SECONDS.labels(channel=channel.name).observe(duration)
         self._emit_channel_run(channel, hits, timeline)
         return hits, None
 
@@ -573,8 +760,14 @@ class HybridSearchEngine:
             return candidate
         return (self._paths.repo_root / candidate).resolve()
 
-    def _build_semantic_channel_hits(self, hits: Sequence[tuple[int, float]]) -> list[ChannelHit]:
-        top_k = min(len(hits), self._settings.index.hybrid_top_k_per_channel) or len(hits)
+    def _build_semantic_channel_hits(
+        self,
+        hits: Sequence[tuple[int, float]],
+        *,
+        limit: int | None = None,
+    ) -> list[ChannelHit]:
+        limit = limit or self._settings.index.hybrid_top_k_per_channel
+        top_k = min(len(hits), limit) or len(hits)
         return [
             ChannelHit(doc_id=str(chunk_id), score=float(score)) for chunk_id, score in hits[:top_k]
         ]
@@ -656,6 +849,8 @@ class HybridSearchEngine:
         active_channels: Sequence[str],
         warnings: Sequence[str],
         stats: _MethodStats,
+        fusion: Mapping[str, object] | None = None,
+        budget: Mapping[str, object] | None = None,
     ) -> dict[str, object]:
         default_k = stats.faiss_k or self._settings.index.default_k
         default_nprobe = stats.nprobe or self._settings.index.default_nprobe
@@ -671,12 +866,17 @@ class HybridSearchEngine:
         }
         retrieval = list(dict.fromkeys(active_channels or ["semantic"]))
         notes = list(dict.fromkeys(warnings)) if warnings else []
-        return {
+        method = {
             "retrieval": retrieval,
             "coverage": coverage,
             "notes": notes,
             "explainability": explainability,
         }
+        if fusion is not None:
+            method["fusion"] = dict(fusion)
+        if budget is not None:
+            method["budget"] = dict(budget)
+        return method
 
 
 __all__ = [

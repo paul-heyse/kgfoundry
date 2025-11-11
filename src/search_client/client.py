@@ -139,14 +139,29 @@ class SupportsHttp(Protocol):
 class RequestsHttp(SupportsHttp):
     """HTTP adapter that delegates HTTP verbs to :mod:`requests`.
 
+    Extended Summary
+    ----------------
     Thin wrapper around the `requests` library that implements the SupportsHttp
     protocol. This adapter exists to make the high-level client easy to test
-    by swapping in alternative transports.
+    by swapping in alternative transports. Delegates GET and POST requests to
+    an underlying requests.Session instance.
+
+    Parameters
+    ----------
+    session : requests.Session | None, optional
+        Pre-configured requests.Session instance. If None, creates a new Session.
+        Defaults to None.
 
     Notes
     -----
-    This thin wrapper exists to make the high-level client easy to test by swapping
-    in alternative transports.
+    Time O(1) for initialization. This thin wrapper exists to make the high-level
+    client easy to test by swapping in alternative transports. The session is
+    reused across requests for connection pooling and cookie persistence.
+
+    Examples
+    --------
+    >>> http = RequestsHttp()
+    >>> response = http.get("https://api.example.com/health", timeout=5.0)
     """
 
     def __init__(self, session: requests.Session | None = None) -> None:
@@ -221,24 +236,42 @@ _DEFAULT_HTTP: Final[SupportsHttp] = RequestsHttp()
 class KGFoundryClient:
     """High-level client for the kgfoundry Search API.
 
+    Extended Summary
+    ----------------
     Provides a convenient interface for interacting with the kgfoundry Search API,
     including search, health checks, and knowledge graph concept queries. Supports
-    authentication via API keys and configurable timeouts.
-
-    Instantiates the client with connection details. Initializes the client with
-    API endpoint, authentication, and timeout configuration. The base_url is
-    normalized by removing trailing slashes.
+    authentication via API keys and configurable timeouts. All requests return
+    RFC 9457 Problem Details JSON on error, which are automatically parsed and
+    raised as appropriate exceptions.
 
     Parameters
     ----------
     base_url : str, optional
-        Base URL of the Search API service. Defaults to "http://localhost:8080".
+        Base URL of the Search API service. Trailing slashes are automatically
+        removed. Defaults to "http://localhost:8080".
     api_key : str | None, optional
-        API key for Bearer token authentication. Defaults to None (no auth).
+        API key for authentication. If provided, included in Authorization header
+        as "Bearer {api_key}". Defaults to None.
     timeout : float, optional
-        Default request timeout in seconds. Defaults to 30.0.
+        Request timeout in seconds for all HTTP requests. Applies to both connect
+        and read timeouts. Defaults to 30.0.
     http : SupportsHttp | None, optional
-        HTTP adapter implementation. If None, uses RequestsHttp. Defaults to None.
+        HTTP adapter implementation. If None, uses RequestsHttp with default
+        session. Useful for testing or custom HTTP implementations. Defaults to None.
+
+    Notes
+    -----
+    Time O(1) for initialization. The base_url is normalized by removing trailing
+    slashes. All methods handle HTTP errors and Problem Details responses,
+    converting them to appropriate Python exceptions. The client is thread-safe
+    if the underlying HTTP adapter is thread-safe.
+
+    Examples
+    --------
+    >>> client = KGFoundryClient(base_url="https://api.example.com", api_key="secret")
+    >>> results = client.search("vector database", k=10)
+    >>> len(results) <= 10
+    True
     """
 
     def __init__(

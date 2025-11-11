@@ -201,6 +201,42 @@ class ResponseValidationMiddleware(BaseHTTPMiddleware):
         enabled: bool = False,
         schema_path: Path | None = None,
     ) -> None:
+        """Initialize response validation middleware.
+
+        Extended Summary
+        ----------------
+        Constructs middleware that validates JSON responses from the /search
+        endpoint against a JSON Schema. If validation fails, returns RFC 9457
+        Problem Details error responses. Schema loading is deferred until first
+        request if enabled=True, and failures to load the schema disable
+        validation gracefully.
+
+        Parameters
+        ----------
+        app : FastAPI
+            Next ASGI application in the middleware chain (typically FastAPI app).
+        enabled : bool, optional
+            Whether to enable response validation. If False, middleware passes
+            through all responses unchanged. Defaults to False.
+        schema_path : Path | None, optional
+            Path to JSON Schema file for response validation. If None, defaults
+            to schema/search/search_response.json relative to repository root.
+            Defaults to None.
+
+        Notes
+        -----
+        Time O(1) for initialization; schema loading is O(file size) if enabled.
+        Side effects: loads schema file if enabled and path exists. If schema
+        loading fails, validation is disabled and a warning is logged. The middleware
+        only validates /search endpoint responses with application/json content type.
+
+        Examples
+        --------
+        >>> from fastapi import FastAPI
+        >>> from search_api.app import ResponseValidationMiddleware
+        >>> app = FastAPI()
+        >>> middleware = ResponseValidationMiddleware(app, enabled=True)
+        """
         super().__init__(cast("ASGIApp", app))
         self.enabled = enabled
         if schema_path is None:

@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.app.middleware import get_session_id
-from codeintel_rev.io.faiss_manager import FAISSManager, SearchRuntimeOverrides
+from codeintel_rev.io.faiss_manager import SearchRuntimeOverrides
 from codeintel_rev.io.hybrid_search import HybridSearchOptions, HybridSearchTuning
 from codeintel_rev.io.vllm_client import VLLMClient
 from codeintel_rev.mcp_server.common.observability import Observation, observe_duration
@@ -231,12 +231,6 @@ def _semantic_search_sync(
 ) -> AnswerEnvelope:
     start_time = perf_counter()
     with observe_duration("semantic_search", COMPONENT_NAME) as observation:
-        scope_flags = _ScopeFilterFlags.from_scope(scope)
-
-        tuning_overrides, tuning_warnings = _normalize_scope_faiss_tuning(
-            scope.get("faiss_tuning") if scope else None
-        )
-
         LOGGER.debug(
             "Semantic search with scope",
             extra={
@@ -250,38 +244,8 @@ def _semantic_search_sync(
             },
         )
 
-        budget = _build_search_budget(context, limit, observation)
-        limits_metadata = [*budget.limits_metadata]
-
-        multiplier = max(1, context.settings.limits.semantic_overfetch_multiplier)
-        fanout = _calculate_faiss_fanout(
-            budget.effective_limit,
-            budget.max_results,
-            multiplier,
-            scope_flags,
-        )
-        if fanout.faiss_k < fanout.faiss_k_target:
-            limits_metadata.append(
-                f"FAISS fan-out clamped to {fanout.faiss_k} (max_results={budget.max_results})."
-            )
-        limits_metadata.extend(tuning_warnings)
-
-        LOGGER.debug(
-            "Computed FAISS fan-out",
-            extra={
-                "requested_limit": limit,
-                "effective_limit": budget.effective_limit,
-                "faiss_k": fanout.faiss_k,
-                "faiss_k_target": fanout.faiss_k_target,
-                "multiplier": multiplier,
-                "has_scope_filters": scope_flags.has_filters,
-                "has_include_globs": scope_flags.has_include_globs,
-                "has_exclude_globs": scope_flags.has_exclude_globs,
-                "has_languages": scope_flags.has_languages,
-            },
-        )
-
-        faiss_nprobe = int(tuning_overrides.get("nprobe", context.settings.index.faiss_nprobe))
+        plan = _build_semantic_search_plan(context, scope, limit, observation)
+        limits_metadata = list(plan.limits_metadata)
         query_vector = _embed_query_or_raise(
             context.vllm_client,
             query,
@@ -291,10 +255,10 @@ def _semantic_search_sync(
         faiss_request = _FaissSearchRequest(
             context=context,
             query_vector=query_vector,
-            limit=fanout.faiss_k,
-            nprobe=faiss_nprobe,
+            limit=plan.fanout.faiss_k,
+            nprobe=plan.nprobe,
             observation=observation,
-            tuning_overrides=tuning_overrides,
+            tuning_overrides=plan.tuning_overrides,
         )
         result_ids, result_scores = _run_faiss_search_or_raise(faiss_request)
 
@@ -304,9 +268,9 @@ def _semantic_search_sync(
                 query,
                 result_ids,
                 result_scores,
-                budget.effective_limit,
-                fanout.faiss_k,
-                faiss_nprobe,
+                plan.effective_limit,
+                plan.fanout.faiss_k,
+                plan.nprobe,
             ),
             limits_metadata,
             ("semantic", "faiss"),
@@ -324,9 +288,9 @@ def _semantic_search_sync(
 
         _warn_scope_filter_reduction(
             scope,
-            scope_flags,
+            plan.scope_flags,
             len(findings),
-            budget.effective_limit,
+            plan.effective_limit,
             len(result_ids),
         )
         _annotate_hybrid_contributions(
@@ -339,7 +303,7 @@ def _semantic_search_sync(
             _MethodContext(
                 len(findings),
                 limit,
-                budget.effective_limit,
+                plan.effective_limit,
                 start_time,
                 hybrid_result.retrieval_channels,
                 hybrid_result.method,
@@ -438,7 +402,25 @@ def _build_semantic_search_plan(
     requested_limit: int,
     observation: Observation,
 ) -> _SemanticSearchPlan:
-    """Construct FAISS fan-out and tuning plan for a semantic search."""
+    """Construct FAISS fan-out and tuning plan for a semantic search.
+
+    Parameters
+    ----------
+    context : ApplicationContext
+        Application context containing settings and configuration.
+    scope : ScopeIn | None
+        Optional scope dictionary with filters and tuning overrides.
+    requested_limit : int
+        Requested number of results from the search.
+    observation : Observation
+        Observation context for metrics and tracing.
+
+    Returns
+    -------
+    _SemanticSearchPlan
+        Search plan containing scope flags, tuning overrides, limits metadata,
+        effective limit, FAISS fan-out parameters, and nprobe setting.
+    """
     scope_flags = _ScopeFilterFlags.from_scope(scope)
     tuning_overrides, tuning_warnings = _normalize_scope_faiss_tuning(
         scope.get("faiss_tuning") if scope else None

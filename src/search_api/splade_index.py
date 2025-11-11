@@ -102,20 +102,42 @@ class SpladeDoc:
 class SpladeIndex:
     """In-memory SPLADE index for tests and tutorials.
 
+    Extended Summary
+    ----------------
     Simple in-memory search index that loads document chunks from a DuckDB
     catalog and builds document frequency (DF) indexes for sparse retrieval.
     Used primarily for testing and tutorials as an example SPLADE index.
+    Constructs a SPLADE index instance and immediately loads document
+    chunks from the DuckDB catalog. The index builds in-memory document
+    frequency (DF) structures for sparse retrieval during tests and tutorials.
+    If the database file does not exist or contains no chunks dataset, the
+    index remains empty but functional. The sparse_root parameter is retained
+    for interface compatibility but currently unused.
 
     Parameters
     ----------
     db_path : str
-        Path to DuckDB catalog database file.
+        Path to DuckDB catalog database file. Must exist for documents
+        to be loaded.
     chunks_dataset_root : str | None, optional
-        Optional override path to chunks dataset root. If None, uses the
-        latest chunks dataset from the catalog. Defaults to None.
+        Optional override path to chunks dataset root directory. If None,
+        queries the catalog for the latest chunks dataset. Defaults to None.
     sparse_root : str | None, optional
         Optional sparse embeddings root (retained for interface compatibility).
-        Currently unused. Defaults to None.
+        Currently unused and ignored. Defaults to None.
+
+    Notes
+    -----
+    Initialization triggers synchronous I/O to load documents and build
+    indexes. Time complexity is O(n * m) where n is the number of documents
+    and m is the average tokens per document. Memory usage is O(v) for DF
+    where v is vocabulary size, plus O(n) for document storage.
+
+    Examples
+    --------
+    >>> index = SpladeIndex(db_path="/tmp/catalog.duckdb")
+    >>> len(index.docs) >= 0
+    True
     """
 
     def __init__(
@@ -132,6 +154,36 @@ class SpladeIndex:
         self._load(chunks_dataset_root)
 
     def _load(self, chunks_root: str | None) -> None:
+        """Load documents from DuckDB catalog and build document frequency index.
+
+        Extended Summary
+        ----------------
+        Connects to the DuckDB database, resolves the chunks dataset root path
+        (either from parameter or catalog query), reads all chunk rows from
+        parquet files, populates the documents list, and recomputes document
+        frequencies. This method orchestrates the I/O-heavy initialization work
+        for the SPLADE index.
+
+        Parameters
+        ----------
+        chunks_root : str | None
+            Optional override path to chunks dataset root. If None, queries the
+            catalog for the latest chunks dataset.
+
+        Notes
+        -----
+        Time O(n) where n is the total number of chunks. Memory O(n) for document
+        storage plus O(v) for vocabulary. Performs synchronous I/O via DuckDB
+        connection. If the database file does not exist, the method returns early
+        leaving the index empty.
+
+        Examples
+        --------
+        >>> index = SpladeIndex(db_path="/tmp/catalog.duckdb")
+        >>> # _load is called automatically during __init__
+        >>> index.N >= 0
+        True
+        """
         if not Path(self.db_path).exists():
             return
 
@@ -148,6 +200,49 @@ class SpladeIndex:
 
     @staticmethod
     def _resolve_chunks_root(connection: DuckDBPyConnection, override: str | None) -> str | None:
+        """Resolve chunks dataset root path from override or catalog query.
+
+        Extended Summary
+        ----------------
+        Returns the override path if provided, otherwise queries the DuckDB
+        catalog for the most recently created chunks dataset and returns its
+        parquet_root path. This enables flexible dataset selection while
+        defaulting to the latest dataset when no override is specified.
+
+        Parameters
+        ----------
+        connection : DuckDBPyConnection
+            Active DuckDB connection to the catalog database. Must have read
+            access to the datasets table.
+        override : str | None
+            Optional override path to chunks dataset root. If provided, returned
+            unchanged. If None, queries the catalog.
+
+        Returns
+        -------
+        str | None
+            Path to chunks dataset root directory, or None if no override
+            provided and no chunks dataset exists in the catalog.
+
+        Raises
+        ------
+        TypeError
+            If the parquet_root value in the database is not a string.
+
+        Notes
+        -----
+        Time O(1) for override path; O(1) for catalog query assuming indexed
+        datasets table. Performs a single SQL query when override is None.
+        No side effects.
+
+        Examples
+        --------
+        >>> # Requires active DuckDB connection
+        >>> # root = SpladeIndex._resolve_chunks_root(connection, "/custom/path")
+        >>> # assert root == "/custom/path"
+        >>> # root = SpladeIndex._resolve_chunks_root(connection, None)
+        >>> # assert root is None or isinstance(root, str)
+        """
         if override:
             return override
         dataset: tuple[object, ...] | None = connection.execute(
@@ -165,6 +260,44 @@ class SpladeIndex:
     def _read_chunk_rows(
         connection: DuckDBPyConnection, root: str
     ) -> list[tuple[object, object, object, object]]:
+        """Read chunk rows from parquet files under the root directory.
+
+        Extended Summary
+        ----------------
+        Executes a DuckDB query to read all parquet files matching the chunks
+        pattern and returns raw row tuples. Filters rows to ensure they have
+        at least PARQUET_ROW_WIDTH columns (chunk_id, doc_id, section, text).
+        This method performs the I/O work of loading chunk data before
+        normalization and document creation.
+
+        Parameters
+        ----------
+        connection : DuckDBPyConnection
+            Active DuckDB connection for executing parquet read queries.
+        root : str
+            Root directory containing parquet files in subdirectories.
+            Pattern matches "*/*.parquet" under this root.
+
+        Returns
+        -------
+        list[tuple[object, object, object, object]]
+            List of row tuples with (chunk_id, doc_id, section, text) values.
+            Values are raw database objects (may be str, None, or other types).
+
+        Notes
+        -----
+        Time O(n) where n is the total number of chunks across all parquet
+        files. Memory O(n) for storing all rows in memory. Performs I/O via
+        DuckDB's read_parquet function. The union_by_name parameter allows
+        reading parquet files with varying schemas. Rows with fewer than
+        PARQUET_ROW_WIDTH columns are skipped.
+
+        Examples
+        --------
+        >>> # Requires active DuckDB connection and valid root path
+        >>> # rows = SpladeIndex._read_chunk_rows(connection, "/data/chunks")
+        >>> # assert all(len(row) == 4 for row in rows)
+        """
         root_path = Path(root)
         parquet_pattern = str(root_path / "*" / "*.parquet")
         sql = """
@@ -183,6 +316,35 @@ class SpladeIndex:
         return typed_rows
 
     def _populate_docs(self, rows: list[tuple[object, object, object, object]]) -> None:
+        """Populate documents list from raw chunk row tuples.
+
+        Extended Summary
+        ----------------
+        Converts raw database row tuples into SpladeDoc instances and appends
+        them to the documents list. Normalizes values to strings and provides
+        defaults for missing doc_id values ("urn:doc:fixture"). This method
+        transforms raw I/O data into structured document objects for indexing.
+
+        Parameters
+        ----------
+        rows : list[tuple[object, object, object, object]]
+            List of row tuples with (chunk_id, doc_id, section, text) values.
+            Values are converted to strings with defaults for None/empty doc_id.
+
+        Notes
+        -----
+        Time O(n) where n is the number of rows. Memory O(n) for document
+        storage. Mutates self.docs by appending new documents. No I/O or
+        external side effects.
+
+        Examples
+        --------
+        >>> index = SpladeIndex(db_path="/tmp/catalog.duckdb")
+        >>> rows = [("chunk1", "doc1", "section1", "text1")]
+        >>> index._populate_docs(rows)
+        >>> len(index.docs) == 1
+        True
+        """
         for chunk_id_val, doc_id_val, section_val, text_val in rows:
             doc = SpladeDoc(
                 chunk_id=str(chunk_id_val),
@@ -193,6 +355,31 @@ class SpladeIndex:
             self.docs.append(doc)
 
     def _recompute_document_frequencies(self) -> None:
+        """Recompute document frequency (DF) counts for all terms.
+
+        Extended Summary
+        ----------------
+        Clears the existing DF dictionary and rebuilds it by tokenizing each
+        document's text and counting how many documents contain each unique term.
+        Also updates self.N to the current document count. This method builds
+        the core lexical index structure used for TF-IDF scoring during search.
+
+        Notes
+        -----
+        Time O(n * m) where n is the number of documents and m is the average
+        tokens per document. Memory O(v) where v is vocabulary size. Mutates
+        self.N and self.df. No I/O or external side effects.
+
+        Examples
+        --------
+        >>> index = SpladeIndex(db_path="/tmp/catalog.duckdb")
+        >>> index.docs = [SpladeDoc("c1", "d1", "", "hello world")]
+        >>> index._recompute_document_frequencies()
+        >>> index.N == 1
+        True
+        >>> "hello" in index.df
+        True
+        """
         self.N = len(self.docs)
         self.df.clear()
         for doc in self.docs:

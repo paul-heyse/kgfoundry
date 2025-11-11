@@ -23,6 +23,26 @@ DEFAULT_RRF_WEIGHTS: dict[str, float] = {
 }
 
 
+def _env_bool(key: str, default: bool = False) -> bool:
+    """Return a boolean flag parsed from environment variables.
+
+    Parameters
+    ----------
+    key : str
+        Environment variable name to read.
+    default : bool, optional
+        Default value if the environment variable is not set. Defaults to False.
+
+    Returns
+    -------
+    bool
+        Boolean value parsed from the environment variable. Returns True if the
+        value is "1", "true", or "yes" (case-insensitive), False otherwise.
+    """
+    default_str = "1" if default else "0"
+    return os.environ.get(key, default_str).strip().lower() in {"1", "true", "yes"}
+
+
 def _parse_int_with_suffix(value: str, default: int) -> int:
     """Return an integer, accepting 1k-style suffixes (k=1_000).
 
@@ -936,8 +956,55 @@ def load_settings() -> Settings:
     repo_root = os.environ.get("REPO_ROOT", str(Path.cwd()))
 
     vllm = _build_vllm_config()
+    paths = _build_paths_config(repo_root)
 
-    paths = PathsConfig(
+    rrf_weights = _load_rrf_weights()
+    hybrid_prefetch = _load_hybrid_prefetch()
+    hybrid_weights_override = _load_hybrid_weights_override()
+    prf_config = _build_prf_config()
+    (
+        bm25_enabled,
+        splade_enabled,
+        bm25_k1,
+        bm25_b,
+    ) = _load_hybrid_channel_settings()
+
+    index = _build_index_config(
+        rrf_weights=rrf_weights,
+        hybrid_prefetch=hybrid_prefetch,
+        hybrid_weights_override=hybrid_weights_override,
+        prf_config=prf_config,
+        bm25_enabled=bm25_enabled,
+        splade_enabled=splade_enabled,
+        bm25_k1=bm25_k1,
+        bm25_b=bm25_b,
+    )
+
+    limits = _build_server_limits()
+    redis = _build_redis_config()
+    duckdb_config = _build_duckdb_config()
+    eval_config = _build_eval_config()
+
+    return Settings(
+        vllm=vllm,
+        paths=paths,
+        index=index,
+        limits=limits,
+        redis=redis,
+        duckdb=duckdb_config,
+        bm25=_build_bm25_config(bm25_enabled, bm25_k1, bm25_b, prf_config),
+        splade=_build_splade_config(splade_enabled),
+        coderank=_build_coderank_config(),
+        warp=_build_warp_config(),
+        xtr=_build_xtr_config(),
+        rerank=_build_rerank_config(),
+        coderank_llm=_build_coderank_llm_config(),
+        eval=eval_config,
+    )
+
+
+def _build_paths_config(repo_root: str) -> PathsConfig:
+    return PathsConfig(
         repo_root=repo_root,
         data_dir=os.environ.get("DATA_DIR", "data"),
         vectors_dir=os.environ.get("VECTORS_DIR", "data/vectors"),
@@ -948,45 +1015,140 @@ def load_settings() -> Settings:
         scip_index=os.environ.get("SCIP_INDEX", "index.scip"),
         coderank_vectors_dir=os.environ.get("CODERANK_VECTORS_DIR", "data/coderank_vectors"),
         coderank_faiss_index=os.environ.get(
-            "CODERANK_FAISS_INDEX", "data/faiss/coderank.ivfpq.faiss"
+            "CODERANK_FAISS_INDEX",
+            "data/faiss/coderank.ivfpq.faiss",
         ),
         warp_index_dir=os.environ.get("WARP_INDEX_DIR", "indexes/warp_xtr"),
         xtr_dir=os.environ.get("XTR_DIR", "data/xtr"),
     )
 
-    rrf_weights_env = os.environ.get("RRF_WEIGHTS_JSON")
-    rrf_weights = DEFAULT_RRF_WEIGHTS
-    if rrf_weights_env:
-        try:
-            parsed = json.loads(rrf_weights_env)
-            if isinstance(parsed, dict):
-                rrf_weights = {str(channel): float(weight) for channel, weight in parsed.items()}
-        except (json.JSONDecodeError, TypeError, ValueError):
-            rrf_weights = DEFAULT_RRF_WEIGHTS
 
-    index = IndexConfig(
+def _load_rrf_weights() -> dict[str, float]:
+    weights = dict(DEFAULT_RRF_WEIGHTS)
+    payload = os.environ.get("RRF_WEIGHTS_JSON")
+    if not payload:
+        return weights
+    try:
+        parsed = json.loads(payload)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return weights
+    if isinstance(parsed, dict):
+        parsed_weights: dict[str, float] = {}
+        for channel, weight in parsed.items():
+            try:
+                parsed_weights[str(channel)] = float(weight)
+            except (TypeError, ValueError):
+                continue
+        if parsed_weights:
+            return parsed_weights
+    return weights
+
+
+def _load_hybrid_prefetch() -> dict[str, int]:
+    default_prefetch = {"semantic": 200, "bm25": 200, "splade": 200}
+    payload = os.environ.get("HYBRID_PREFETCH_JSON")
+    if not payload:
+        return default_prefetch
+    try:
+        parsed = json.loads(payload)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return default_prefetch
+    if isinstance(parsed, dict):
+        parsed_dict: dict[str, int] = {}
+        for key, value in parsed.items():
+            try:
+                parsed_dict[str(key)] = int(value)
+            except (TypeError, ValueError):
+                continue
+        if parsed_dict:
+            return parsed_dict
+    return default_prefetch
+
+
+def _load_hybrid_weights_override() -> dict[str, float]:
+    payload = os.environ.get("HYBRID_WEIGHTS_OVERRIDE_JSON")
+    if not payload:
+        return {}
+    try:
+        parsed = json.loads(payload)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return {}
+    if isinstance(parsed, dict):
+        weights: dict[str, float] = {}
+        for channel, weight in parsed.items():
+            try:
+                weights[str(channel)] = float(weight)
+            except (TypeError, ValueError):
+                continue
+        return weights
+    return {}
+
+
+def _build_prf_config() -> PRFConfig:
+    return PRFConfig(
+        enable_auto=_env_bool("BM25_PRF_ENABLE_AUTO", True),
+        fb_docs=int(os.environ.get("BM25_PRF_FB_DOCS", "10")),
+        fb_terms=int(os.environ.get("BM25_PRF_FB_TERMS", "10")),
+        orig_weight=float(os.environ.get("BM25_PRF_ORIG_WEIGHT", "0.5")),
+        short_query_max_terms=int(os.environ.get("BM25_PRF_SHORT_QUERY_MAX_TERMS", "3")),
+        symbol_like_regex=os.environ.get("BM25_PRF_SYMBOL_REGEX"),
+        head_terms_csv=os.environ.get("BM25_PRF_HEAD_TERMS_CSV"),
+    )
+
+
+def _load_hybrid_channel_settings() -> tuple[bool, bool, float, float]:
+    bm25_enabled = _env_bool("HYBRID_ENABLE_BM25", True)
+    splade_enabled = _env_bool("HYBRID_ENABLE_SPLADE", True)
+    bm25_k1 = float(os.environ.get("BM25_K1", "0.9"))
+    bm25_b = float(os.environ.get("BM25_B", "0.4"))
+    return bm25_enabled, splade_enabled, bm25_k1, bm25_b
+
+
+def _build_index_config(
+    *,
+    rrf_weights: dict[str, float],
+    hybrid_prefetch: dict[str, int],
+    hybrid_weights_override: dict[str, float],
+    prf_config: PRFConfig,
+    bm25_enabled: bool,
+    splade_enabled: bool,
+    bm25_k1: float,
+    bm25_b: float,
+) -> IndexConfig:
+    recency_enabled = _env_bool("INDEX_RECENCY_ENABLED")
+    recency_half_life_days = float(os.environ.get("INDEX_RECENCY_HALF_LIFE_DAYS", "30.0"))
+    recency_max_boost = float(os.environ.get("INDEX_RECENCY_MAX_BOOST", "0.15"))
+    recency_table = os.environ.get("INDEX_RECENCY_TABLE", "chunks")
+    return IndexConfig(
         vec_dim=int(os.environ.get("VEC_DIM", "2560")),
         chunk_budget=int(os.environ.get("CHUNK_BUDGET", "2200")),
         faiss_nlist=int(os.environ.get("FAISS_NLIST", "8192")),
         faiss_nprobe=int(os.environ.get("FAISS_NPROBE", "128")),
-        bm25_k1=float(os.environ.get("BM25_K1", "0.9")),
-        bm25_b=float(os.environ.get("BM25_B", "0.4")),
+        bm25_k1=bm25_k1,
+        bm25_b=bm25_b,
         rrf_k=int(os.environ.get("RRF_K", "60")),
-        enable_bm25_channel=os.environ.get("HYBRID_ENABLE_BM25", "1").lower()
-        in {"1", "true", "yes"},
-        enable_splade_channel=os.environ.get("HYBRID_ENABLE_SPLADE", "1").lower()
-        in {"1", "true", "yes"},
+        enable_bm25_channel=bm25_enabled,
+        enable_splade_channel=splade_enabled,
         hybrid_top_k_per_channel=int(os.environ.get("HYBRID_TOP_K_PER_CHANNEL", "50")),
-        use_cuvs=os.environ.get("USE_CUVS", "1").lower() in {"1", "true", "yes"},
-        faiss_preload=os.environ.get("FAISS_PRELOAD", "0").lower() in {"1", "true", "yes"},
-        duckdb_materialize=os.environ.get("DUCKDB_MATERIALIZE", "0").lower()
-        in {"1", "true", "yes"},
+        use_cuvs=_env_bool("USE_CUVS", True),
+        faiss_preload=_env_bool("FAISS_PRELOAD"),
+        duckdb_materialize=_env_bool("DUCKDB_MATERIALIZE"),
         preview_max_chars=int(os.environ.get("PREVIEW_MAX_CHARS", "240")),
         compaction_threshold=float(os.environ.get("FAISS_COMPACTION_THRESHOLD", "0.05")),
         rrf_weights=rrf_weights,
+        hybrid_prefetch=hybrid_prefetch,
+        hybrid_use_rrf=_env_bool("HYBRID_USE_RRF", True),
+        hybrid_weights_override=hybrid_weights_override,
+        prf=prf_config,
+        recency_enabled=recency_enabled,
+        recency_half_life_days=recency_half_life_days,
+        recency_max_boost=recency_max_boost,
+        recency_table=recency_table,
     )
 
-    limits = ServerLimits(
+
+def _build_server_limits() -> ServerLimits:
+    return ServerLimits(
         max_results=int(os.environ.get("MAX_RESULTS", "1000")),
         query_timeout_s=float(os.environ.get("QUERY_TIMEOUT_S", "30.0")),
         rate_limit_qps=float(os.environ.get("RATE_LIMIT_QPS", "10.0")),
@@ -994,113 +1156,147 @@ def load_settings() -> Settings:
         semantic_overfetch_multiplier=int(os.environ.get("SEMANTIC_OVERFETCH_MULTIPLIER", "2")),
     )
 
-    redis_defaults = RedisConfig()
-    redis = RedisConfig(
-        url=os.environ.get("REDIS_URL", redis_defaults.url),
-        scope_l1_size=int(os.environ.get("REDIS_SCOPE_L1_SIZE", str(redis_defaults.scope_l1_size))),
+
+def _build_redis_config() -> RedisConfig:
+    defaults = RedisConfig()
+    return RedisConfig(
+        url=os.environ.get("REDIS_URL", defaults.url),
+        scope_l1_size=int(os.environ.get("REDIS_SCOPE_L1_SIZE", str(defaults.scope_l1_size))),
         scope_l1_ttl_seconds=float(
-            os.environ.get("REDIS_SCOPE_L1_TTL_SECONDS", str(redis_defaults.scope_l1_ttl_seconds))
+            os.environ.get("REDIS_SCOPE_L1_TTL_SECONDS", str(defaults.scope_l1_ttl_seconds))
         ),
         scope_l2_ttl_seconds=int(
-            os.environ.get("REDIS_SCOPE_L2_TTL_SECONDS", str(redis_defaults.scope_l2_ttl_seconds))
+            os.environ.get("REDIS_SCOPE_L2_TTL_SECONDS", str(defaults.scope_l2_ttl_seconds))
         ),
     )
 
-    duckdb_defaults = DuckDBConfig()
-    duckdb_pool_env = os.environ.get("DUCKDB_POOL_SIZE")
-    duckdb_pool_size = (
+
+def _build_duckdb_config() -> DuckDBConfig:
+    defaults = DuckDBConfig()
+    pool_env = os.environ.get("DUCKDB_POOL_SIZE")
+    pool_size = (
         None
-        if duckdb_pool_env is None or not duckdb_pool_env.strip() or duckdb_pool_env.strip() == "0"
-        else int(duckdb_pool_env)
+        if pool_env is None or not pool_env.strip() or pool_env.strip() == "0"
+        else int(pool_env)
     )
-    duckdb_config = DuckDBConfig(
-        threads=int(os.environ.get("DUCKDB_THREADS", str(duckdb_defaults.threads))),
-        enable_object_cache=os.environ.get("DUCKDB_OBJECT_CACHE", "1").lower()
-        in {
-            "1",
-            "true",
-            "yes",
-        },
-        log_queries=os.environ.get("DUCKDB_LOG_QUERIES", "0").lower()
-        in {
-            "1",
-            "true",
-            "yes",
-        },
-        pool_size=duckdb_pool_size,
+    return DuckDBConfig(
+        threads=int(os.environ.get("DUCKDB_THREADS", str(defaults.threads))),
+        enable_object_cache=_env_bool("DUCKDB_OBJECT_CACHE", True),
+        log_queries=_env_bool("DUCKDB_LOG_QUERIES"),
+        pool_size=pool_size,
     )
-    eval_config = EvalConfig(
-        enabled=os.environ.get("EVAL_ENABLED", "0").lower() in {"1", "true", "yes"},
+
+
+def _build_eval_config() -> EvalConfig:
+    return EvalConfig(
+        enabled=_env_bool("EVAL_ENABLED"),
         queries_path=os.environ.get("EVAL_QUERIES_PATH"),
         output_dir=os.environ.get("EVAL_OUTPUT_DIR", "artifacts/eval"),
         k_values=_parse_int_list(os.environ.get("EVAL_K_VALUES"), (5, 10, 20)),
         max_queries=_optional_int(os.environ.get("EVAL_MAX_QUERIES")),
         oracle_top_k=int(os.environ.get("EVAL_ORACLE_TOP_K", "50")),
-        xtr_as_oracle=os.environ.get("EVAL_XTR_AS_ORACLE", "0").lower() in {"1", "true", "yes"},
+        xtr_as_oracle=_env_bool("EVAL_XTR_AS_ORACLE"),
     )
 
-    return Settings(
-        vllm=vllm,
-        paths=paths,
-        index=index,
-        limits=limits,
-        redis=redis,
-        duckdb=duckdb_config,
-        bm25=BM25Config(
-            corpus_json_dir=os.environ.get("BM25_JSONL_DIR", "data/jsonl"),
-            index_dir=os.environ.get("BM25_INDEX_DIR", "indexes/bm25"),
-            threads=int(os.environ.get("BM25_THREADS", "8")),
+
+def _build_bm25_config(
+    enabled: bool,
+    bm25_k1: float,
+    bm25_b: float,
+    prf_config: PRFConfig,
+) -> BM25Config:
+    return BM25Config(
+        corpus_json_dir=os.environ.get("BM25_JSONL_DIR", "data/jsonl"),
+        index_dir=os.environ.get("BM25_INDEX_DIR", "indexes/bm25"),
+        threads=int(os.environ.get("BM25_THREADS", "8")),
+        enabled=enabled,
+        k1=bm25_k1,
+        b=bm25_b,
+        rm3_enabled=_env_bool("BM25_RM3_ENABLED"),
+        rm3_fb_docs=int(os.environ.get("BM25_RM3_FB_DOCS", str(prf_config.fb_docs))),
+        rm3_fb_terms=int(os.environ.get("BM25_RM3_FB_TERMS", str(prf_config.fb_terms))),
+        rm3_original_query_weight=float(
+            os.environ.get(
+                "BM25_RM3_ORIG_WEIGHT",
+                str(prf_config.orig_weight),
+            )
         ),
-        splade=SpladeConfig(
-            model_id=os.environ.get("SPLADE_MODEL_ID", "naver/splade-v3"),
-            model_dir=os.environ.get("SPLADE_MODEL_DIR", "models/splade-v3"),
-            onnx_dir=os.environ.get("SPLADE_ONNX_DIR", "models/splade-v3/onnx"),
-            onnx_file=os.environ.get("SPLADE_ONNX_FILE", "model_qint8.onnx"),
-            vectors_dir=os.environ.get("SPLADE_VECTORS_DIR", "data/splade_vectors"),
-            index_dir=os.environ.get("SPLADE_INDEX_DIR", "indexes/splade_v3_impact"),
-            provider=os.environ.get("SPLADE_PROVIDER", "CPUExecutionProvider"),
-            quantization=int(os.environ.get("SPLADE_QUANTIZATION", "100")),
-            max_terms=int(os.environ.get("SPLADE_MAX_TERMS", "3000")),
-            max_clause_count=int(os.environ.get("SPLADE_MAX_CLAUSE", "4096")),
-            batch_size=int(os.environ.get("SPLADE_BATCH_SIZE", "32")),
-            threads=int(os.environ.get("SPLADE_THREADS", "8")),
+        analyzer=(
+            analyzer
+            if (analyzer := os.environ.get("BM25_ANALYZER", "code").lower()) in {"code", "standard"}
+            else "code"
         ),
-        coderank=CodeRankConfig(
-            model_id=os.environ.get("CODERANK_MODEL_ID", "nomic-ai/CodeRankEmbed"),
-            trust_remote_code=os.environ.get("CODERANK_TRUST_REMOTE_CODE", "1").lower()
-            in {"1", "true", "yes"},
-            device=os.environ.get("CODERANK_DEVICE", "cpu"),
-            batch_size=int(os.environ.get("CODERANK_BATCH", "128")),
-            normalize=os.environ.get("CODERANK_NORMALIZE", "1").lower() in {"1", "true", "yes"},
-            query_prefix=os.environ.get(
-                "CODERANK_QUERY_PREFIX",
-                "Represent this query for searching relevant code: ",
-            ),
-            top_k=int(os.environ.get("CODERANK_TOP_K", "200")),
-            budget_ms=int(os.environ.get("CODERANK_BUDGET_MS", "120")),
-            min_stage2_margin=float(os.environ.get("CODERANK_MARGIN_THRESHOLD", "0.1")),
-            min_stage2_candidates=int(os.environ.get("CODERANK_MIN_STAGE2", "40")),
+        stopwords=tuple(
+            word.strip() for word in os.environ.get("BM25_STOPWORDS", "").split(",") if word.strip()
         ),
-        warp=WarpConfig(
-            index_dir=os.environ.get("WARP_INDEX_DIR", "indexes/warp_xtr"),
-            model_id=os.environ.get("WARP_MODEL_ID", "intfloat/e5-multivector-large"),
-            device=os.environ.get("WARP_DEVICE", "cpu"),
-            top_k=int(os.environ.get("WARP_TOP_K", "200")),
-            enabled=os.environ.get("WARP_ENABLED", "0").lower() in {"1", "true", "yes"},
-            budget_ms=int(os.environ.get("WARP_BUDGET_MS", "180")),
+    )
+
+
+def _build_splade_config(enabled: bool) -> SpladeConfig:
+    return SpladeConfig(
+        model_id=os.environ.get("SPLADE_MODEL_ID", "naver/splade-v3"),
+        model_dir=os.environ.get("SPLADE_MODEL_DIR", "models/splade-v3"),
+        onnx_dir=os.environ.get("SPLADE_ONNX_DIR", "models/splade-v3/onnx"),
+        onnx_file=os.environ.get("SPLADE_ONNX_FILE", "model_qint8.onnx"),
+        vectors_dir=os.environ.get("SPLADE_VECTORS_DIR", "data/splade_vectors"),
+        index_dir=os.environ.get("SPLADE_INDEX_DIR", "indexes/splade_v3_impact"),
+        provider=os.environ.get("SPLADE_PROVIDER", "CPUExecutionProvider"),
+        quantization=int(os.environ.get("SPLADE_QUANTIZATION", "100")),
+        max_terms=int(os.environ.get("SPLADE_MAX_TERMS", "3000")),
+        max_clause_count=int(os.environ.get("SPLADE_MAX_CLAUSE", "4096")),
+        batch_size=int(os.environ.get("SPLADE_BATCH_SIZE", "32")),
+        threads=int(os.environ.get("SPLADE_THREADS", "8")),
+        enabled=enabled,
+        max_query_terms=int(os.environ.get("SPLADE_MAX_QUERY_TERMS", "64")),
+        prune_below=float(os.environ.get("SPLADE_PRUNE_BELOW", "0.0")),
+        analyzer=(
+            splade_analyzer
+            if (splade_analyzer := os.environ.get("SPLADE_ANALYZER", "wordpiece").lower())
+            in {"wordpiece", "code"}
+            else "wordpiece"
         ),
-        xtr=_build_xtr_config(),
-        rerank=_build_rerank_config(),
-        coderank_llm=CodeRankLLMConfig(
-            model_id=os.environ.get("CODERANK_LLM_MODEL_ID", "nomic-ai/CodeRankLLM"),
-            device=os.environ.get("CODERANK_LLM_DEVICE", "cpu"),
-            max_new_tokens=int(os.environ.get("CODERANK_LLM_MAX_NEW_TOKENS", "256")),
-            temperature=float(os.environ.get("CODERANK_LLM_TEMPERATURE", "0.0")),
-            top_p=float(os.environ.get("CODERANK_LLM_TOP_P", "1.0")),
-            enabled=os.environ.get("CODERANK_LLM_ENABLED", "0").lower() in {"1", "true", "yes"},
-            budget_ms=int(os.environ.get("CODERANK_LLM_BUDGET_MS", "300")),
+        static_prune_pct=float(os.environ.get("SPLADE_STATIC_PRUNE_PCT", "0.0")),
+    )
+
+
+def _build_coderank_config() -> CodeRankConfig:
+    return CodeRankConfig(
+        model_id=os.environ.get("CODERANK_MODEL_ID", "nomic-ai/CodeRankEmbed"),
+        trust_remote_code=_env_bool("CODERANK_TRUST_REMOTE_CODE", True),
+        device=os.environ.get("CODERANK_DEVICE", "cpu"),
+        batch_size=int(os.environ.get("CODERANK_BATCH", "128")),
+        normalize=_env_bool("CODERANK_NORMALIZE", True),
+        query_prefix=os.environ.get(
+            "CODERANK_QUERY_PREFIX",
+            "Represent this query for searching relevant code: ",
         ),
-        eval=eval_config,
+        top_k=int(os.environ.get("CODERANK_TOP_K", "200")),
+        budget_ms=int(os.environ.get("CODERANK_BUDGET_MS", "120")),
+        min_stage2_margin=float(os.environ.get("CODERANK_MARGIN_THRESHOLD", "0.1")),
+        min_stage2_candidates=int(os.environ.get("CODERANK_MIN_STAGE2", "40")),
+    )
+
+
+def _build_warp_config() -> WarpConfig:
+    return WarpConfig(
+        index_dir=os.environ.get("WARP_INDEX_DIR", "indexes/warp_xtr"),
+        model_id=os.environ.get("WARP_MODEL_ID", "intfloat/e5-multivector-large"),
+        device=os.environ.get("WARP_DEVICE", "cpu"),
+        top_k=int(os.environ.get("WARP_TOP_K", "200")),
+        enabled=_env_bool("WARP_ENABLED"),
+        budget_ms=int(os.environ.get("WARP_BUDGET_MS", "180")),
+    )
+
+
+def _build_coderank_llm_config() -> CodeRankLLMConfig:
+    return CodeRankLLMConfig(
+        model_id=os.environ.get("CODERANK_LLM_MODEL_ID", "nomic-ai/CodeRankLLM"),
+        device=os.environ.get("CODERANK_LLM_DEVICE", "cpu"),
+        max_new_tokens=int(os.environ.get("CODERANK_LLM_MAX_NEW_TOKENS", "256")),
+        temperature=float(os.environ.get("CODERANK_LLM_TEMPERATURE", "0.0")),
+        top_p=float(os.environ.get("CODERANK_LLM_TOP_P", "1.0")),
+        enabled=_env_bool("CODERANK_LLM_ENABLED"),
+        budget_ms=int(os.environ.get("CODERANK_LLM_BUDGET_MS", "300")),
     )
 
 
@@ -1109,6 +1305,7 @@ __all__ = [
     "CodeRankConfig",
     "CodeRankLLMConfig",
     "IndexConfig",
+    "PRFConfig",
     "PathsConfig",
     "RedisConfig",
     "RerankConfig",

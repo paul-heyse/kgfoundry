@@ -52,6 +52,13 @@ from kgfoundry_common.typing.heavy_deps import EXTRAS_HINT, HEAVY_DEPS
 
 
 class _Comparable(Protocol):
+    """Protocol for objects that support comparison operators.
+
+    This protocol defines the interface for objects that can be compared using
+    standard comparison operators (<, <=, >, >=). Used internally for version
+    parsing and comparison operations.
+    """
+
     def __lt__(self, other: _Comparable, /) -> bool:
         """Protocol stub for ``self < other``."""
         _protocol_stub("__lt__", self, other)

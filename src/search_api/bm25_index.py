@@ -153,6 +153,41 @@ def _validate_parquet_path(
 
 
 def _as_str(value: object) -> str:
+    """Convert a value to a string, handling None and non-string types.
+
+    Extended Summary
+    ----------------
+    Normalizes database query results to strings for consistent processing in
+    BM25 index loading. Handles None values by returning empty strings,
+    preserves string values unchanged, and converts other types via str().
+    This helper ensures type safety when reading from DuckDB which may return
+    various types (str, None, int, etc.) for text fields.
+
+    Parameters
+    ----------
+    value : object
+        Value to convert. May be str, None, or any other type.
+
+    Returns
+    -------
+    str
+        String representation of the value. Empty string if value is None.
+
+    Notes
+    -----
+    Time O(1) for strings and None; O(n) for other types where n is the
+    string representation length. This function is internal to BM25 index
+    loading and should not be used outside this module.
+
+    Examples
+    --------
+    >>> _as_str("hello")
+    'hello'
+    >>> _as_str(None)
+    ''
+    >>> _as_str(123)
+    '123'
+    """
     if isinstance(value, str):
         return value
     if value is None:
@@ -274,6 +309,44 @@ class BM25Index:
     """
 
     def __init__(self, k1: float = 0.9, b: float = 0.4) -> None:
+        """Initialize BM25 index with ranking parameters.
+
+        Extended Summary
+        ----------------
+        Constructs an empty BM25 index instance with configurable ranking
+        parameters. The index starts with no documents and must be populated
+        via :meth:`build_from_duckdb` or :meth:`load` before use. Parameters
+        k1 and b control term frequency saturation and document length
+        normalization in the BM25 scoring formula.
+
+        Parameters
+        ----------
+        k1 : float, optional
+            Term frequency saturation parameter. Controls how quickly term
+            frequency saturates in scoring. Higher values (e.g., 1.2-2.0) allow
+            more influence from repeated query terms. Lower values (e.g., 0.5-0.9)
+            saturate quickly, reducing the impact of term repetition. Defaults to 0.9.
+        b : float, optional
+            Document length normalization parameter. Controls the degree of length
+            normalization. Values closer to 1.0 normalize more aggressively,
+            penalizing longer documents. Values closer to 0.0 reduce normalization.
+            Defaults to 0.4.
+
+        Notes
+        -----
+        Time O(1). The index is initially empty (no documents, no term frequencies).
+        After initialization, documents must be added via build_from_duckdb() or
+        load() before search operations will work. The parameters k1 and b are
+        stored and used in all subsequent scoring operations.
+
+        Examples
+        --------
+        >>> index = BM25Index(k1=1.2, b=0.75)
+        >>> index.k1
+        1.2
+        >>> len(index.docs)
+        0
+        """
         self.k1 = k1
         self.b = b
         self.docs: list[BM25Doc] = []
@@ -553,12 +626,92 @@ class BM25Index:
 
     @staticmethod
     def _coerce_payload(raw: object) -> dict[str, JsonValue]:
+        """Coerce raw deserialized object to typed payload dictionary.
+
+        Extended Summary
+        ----------------
+        Validates and casts a deserialized object to a dictionary with string
+        keys and JSON-compatible values. Returns empty dictionary if input is
+        not a dict, ensuring type safety for payload processing. This helper
+        normalizes deserialized data (from JSON or pickle) into a consistent
+        dictionary format for index reconstruction.
+
+        Parameters
+        ----------
+        raw : object
+            Raw deserialized object from JSON or pickle. May be dict, list, or
+            other types.
+
+        Returns
+        -------
+        dict[str, JsonValue]
+            Typed payload dictionary. Empty dict if input is not a dictionary.
+
+        Notes
+        -----
+        Time O(1). This function is internal to BM25 index loading and should
+        not be used outside this module. The cast preserves type information
+        for static type checkers while allowing runtime flexibility.
+
+        Examples
+        --------
+        >>> BM25Index._coerce_payload({"k1": 0.9, "b": 0.4})
+        {'k1': 0.9, 'b': 0.4}
+        >>> BM25Index._coerce_payload([])
+        {}
+        >>> BM25Index._coerce_payload(None)
+        {}
+        """
         if not isinstance(raw, dict):
             return {}
         return cast("dict[str, JsonValue]", raw)
 
     @classmethod
     def _load_payload(cls, metadata_path: Path, schema_path: Path) -> dict[str, JsonValue]:
+        """Load and validate index metadata payload from JSON or legacy pickle.
+
+        Extended Summary
+        ----------------
+        Attempts to deserialize index metadata from JSON with schema validation.
+        If JSON loading fails and the file has a .pkl extension, falls back to
+        legacy pickle format (with validation). This method provides backward
+        compatibility with older BM25 index serializations while preferring the
+        safer JSON format.
+
+        Parameters
+        ----------
+        metadata_path : Path
+            Path to metadata file (JSON or pickle). If .pkl extension, legacy
+            format is attempted on JSON failure.
+        schema_path : Path
+            Path to JSON Schema file for validation (used for JSON format only).
+
+        Returns
+        -------
+        dict[str, JsonValue]
+            Validated payload dictionary with index metadata (k1, b, N, avgdl,
+            df, docs).
+
+        Raises
+        ------
+        DeserializationError
+            If JSON deserialization fails (and file is not .pkl) or if legacy
+            pickle validation fails. Wraps underlying serialization errors with
+            context.
+
+        Notes
+        -----
+        Time O(file size). Side effects: reads file from disk. JSON format is
+        preferred; pickle fallback is only used for .pkl files when JSON fails.
+        All payloads are validated and coerced via _coerce_payload().
+
+        Examples
+        --------
+        >>> schema = Path("schema/models/bm25_metadata.v1.json")
+        >>> payload = BM25Index._load_payload(Path("index.json"), schema)
+        >>> "k1" in payload
+        True
+        """
         try:
             return cls._coerce_payload(deserialize_json(metadata_path, schema_path))
         except DeserializationError:
@@ -568,6 +721,43 @@ class BM25Index:
 
     @classmethod
     def _load_legacy_payload(cls, metadata_path: Path) -> dict[str, JsonValue]:
+        """Load legacy pickle format with validation.
+
+        Extended Summary
+        ----------------
+        Deserializes BM25 index metadata from legacy pickle format with
+        security validation. Uses load_unsigned_legacy() to validate pickle
+        contents and prevent code execution attacks. Converts validated pickle
+        data to typed payload dictionary.
+
+        Parameters
+        ----------
+        metadata_path : Path
+            Path to .pkl file containing legacy BM25 index metadata.
+
+        Returns
+        -------
+        dict[str, JsonValue]
+            Validated payload dictionary with index metadata.
+
+        Raises
+        ------
+        DeserializationError
+            If pickle validation fails (unsafe content detected) or file cannot
+            be read. Wraps UnsafeSerializationError with context.
+
+        Notes
+        -----
+        Time O(file size). Side effects: reads and validates pickle file. This
+        method is only called for .pkl files when JSON loading fails. The
+        pickle format is deprecated in favor of JSON + schema validation.
+
+        Examples
+        --------
+        >>> payload = BM25Index._load_legacy_payload(Path("legacy_index.pkl"))
+        >>> isinstance(payload, dict)
+        True
+        """
         with metadata_path.open("rb") as handle:
             try:
                 legacy_payload_raw: object = load_unsigned_legacy(handle)
@@ -578,6 +768,45 @@ class BM25Index:
 
     @classmethod
     def _index_from_payload(cls, payload: dict[str, JsonValue]) -> BM25Index:
+        """Reconstruct BM25 index instance from validated payload dictionary.
+
+        Extended Summary
+        ----------------
+        Creates a BM25Index instance and populates it with metadata from a
+        validated payload dictionary. Extracts ranking parameters (k1, b),
+        collection statistics (N, avgdl), document frequencies (df), and
+        document list (docs) with defensive type coercion. Missing or invalid
+        values use sensible defaults (k1=0.9, b=0.4, N=0, avgdl=0.0).
+
+        Parameters
+        ----------
+        payload : dict[str, JsonValue]
+            Validated payload dictionary containing index metadata. Expected
+            keys: "k1" (float), "b" (float), "N" (int), "avgdl" (float),
+            "df" (dict[str, int]), "docs" (list[dict]).
+
+        Returns
+        -------
+        BM25Index
+            Fully reconstructed BM25 index instance with all metadata loaded.
+            Documents are reconstructed via _docs_from_payload().
+
+        Notes
+        -----
+        Time O(n + m) where n is the number of documents and m is the number
+        of unique terms in df. Side effects: creates new index instance and
+        populates instance attributes. Type coercion handles JSON number types
+        (int/float) gracefully, defaulting to safe values for invalid types.
+
+        Examples
+        --------
+        >>> payload = {"k1": 1.2, "b": 0.75, "N": 100, "avgdl": 50.0, "df": {}, "docs": []}
+        >>> index = BM25Index._index_from_payload(payload)
+        >>> index.k1 == 1.2
+        True
+        >>> index.N == 100
+        True
+        """
         k1_val = payload.get("k1", 0.9)
         b_val = payload.get("b", 0.4)
         index = cls(
@@ -601,6 +830,54 @@ class BM25Index:
 
     @staticmethod
     def _docs_from_payload(raw_docs: object) -> list[BM25Doc]:
+        """Reconstruct BM25Doc instances from raw payload list.
+
+        Extended Summary
+        ----------------
+        Validates and converts a list of document dictionaries into BM25Doc
+        instances. Handles type coercion for all fields (chunk_id, doc_id, title,
+        section, tf, dl) with defensive defaults. Skips invalid entries (non-dict
+        items) rather than failing, ensuring robust deserialization.
+
+        Parameters
+        ----------
+        raw_docs : object
+            Raw document list from payload. May be list of dicts, non-list, or
+            None. Each dict should contain: "chunk_id" (str), "doc_id" (str),
+            "title" (str), "section" (str), "tf" (dict[str, float]), "dl" (float).
+
+        Returns
+        -------
+        list[BM25Doc]
+            List of reconstructed BM25Doc instances. Empty list if input is not
+            a list or contains no valid entries.
+
+        Notes
+        -----
+        Time O(n * m) where n is the number of documents and m is the average
+        number of terms per document. This function is internal to BM25 index
+        loading and should not be used outside this module. Invalid entries
+        (non-dict items) are silently skipped to ensure partial recovery from
+        corrupted payloads.
+
+        Examples
+        --------
+        >>> raw = [
+        ...     {
+        ...         "chunk_id": "c1",
+        ...         "doc_id": "d1",
+        ...         "title": "Title",
+        ...         "section": "",
+        ...         "tf": {"hello": 2.0},
+        ...         "dl": 2.0,
+        ...     }
+        ... ]
+        >>> docs = BM25Index._docs_from_payload(raw)
+        >>> len(docs) == 1
+        True
+        >>> docs[0].chunk_id == "c1"
+        True
+        """
         if not isinstance(raw_docs, list):
             return []
 

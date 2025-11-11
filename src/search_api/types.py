@@ -324,15 +324,29 @@ class FaissModuleProtocol(Protocol):
 class GpuResourcesProtocol(Protocol):
     """Protocol for FAISS GPU resources.
 
+    Extended Summary
+    ----------------
     This protocol describes the StandardGpuResources interface used for GPU
     index operations. Implementations manage GPU memory and resources.
+    Constructs a GPU resources instance for managing GPU memory and
+    resources during FAISS index operations. This protocol method
+    defines the initialization contract for GPU resource implementations
+    used when cloning CPU indexes to GPU or performing GPU-accelerated
+    search operations.
+
+    Notes
+    -----
+    This is a protocol method stub. Implementations should initialize
+    GPU resources (e.g., CUDA contexts, memory pools) as needed for
+    their specific GPU backend. Time O(1) for initialization; may
+    allocate GPU memory pools.
 
     Examples
     --------
     >>> from kgfoundry.search_api.types import GpuResourcesProtocol
     >>> class MockGpuResources:
     ...     def __init__(self) -> None:
-    ...         pass
+    ...         self.initialized = True
     >>> resources: GpuResourcesProtocol = MockGpuResources()
     """
 
@@ -710,12 +724,83 @@ class _LegacyFaissModule(Protocol):
 
 
 def _labels_or_default(labelnames: Sequence[str] | None) -> Sequence[str]:
+    """Convert label names to tuple, defaulting to empty tuple if None.
+
+    Extended Summary
+    ----------------
+    Normalizes optional label name sequences to immutable tuples for use in
+    metrics and observability contexts. This helper ensures consistent tuple
+    types for label handling in Prometheus metrics and OpenTelemetry spans,
+    avoiding None checks downstream.
+
+    Parameters
+    ----------
+    labelnames : Sequence[str] | None
+        Optional sequence of label names. If None, returns empty tuple.
+
+    Returns
+    -------
+    Sequence[str]
+        Tuple of label names, or empty tuple if input is None.
+
+    Notes
+    -----
+    Time O(n) where n is the length of labelnames. Memory O(n) for tuple
+    creation. No side effects. Returns immutable tuple for safety.
+
+    Examples
+    --------
+    >>> _labels_or_default(["label1", "label2"])
+    ('label1', 'label2')
+    >>> _labels_or_default(None)
+    ()
+    >>> _labels_or_default([])
+    ()
+    """
     return tuple(labelnames) if labelnames is not None else ()
 
 
 def _legacy_index_flat_ip(
     module: _LegacyFaissModule,
 ) -> Callable[[int], FaissIndexProtocol]:
+    """Extract IndexFlatIP constructor from legacy FAISS module.
+
+    Extended Summary
+    ----------------
+    Retrieves the IndexFlatIP constructor function from a legacy FAISS module
+    and validates it is callable. This adapter function bridges the gap between
+    legacy UPPER_CASE FAISS API names and the PEP 8 protocol interface. Used
+    internally by _FaissModuleAdapter to provide consistent method names.
+
+    Parameters
+    ----------
+    module : _LegacyFaissModule
+        Legacy FAISS module with UPPER_CASE attribute names. Must have
+        IndexFlatIP attribute.
+
+    Returns
+    -------
+    Callable[[int], FaissIndexProtocol]
+        Constructor function that takes dimension (int) and returns a
+        FaissIndexProtocol instance.
+
+    Raises
+    ------
+    TypeError
+        If the IndexFlatIP attribute is not callable.
+
+    Notes
+    -----
+    Time O(1). Performs attribute access and callable check. No side effects.
+    This function enables type-safe access to legacy FAISS constructors.
+
+    Examples
+    --------
+    >>> # Requires legacy FAISS module
+    >>> # constructor = _legacy_index_flat_ip(legacy_module)
+    >>> # index = constructor(256)
+    >>> # assert isinstance(index, FaissIndexProtocol)
+    """
     attr_any: object = attrgetter("IndexFlatIP")(module)
     if not callable(attr_any):  # pragma: no cover - defensive guard for type checkers
         msg = "Legacy FAISS module attribute 'IndexFlatIP' must be callable"
@@ -726,6 +811,45 @@ def _legacy_index_flat_ip(
 def _legacy_index_id_map2(
     module: _LegacyFaissModule,
 ) -> Callable[[FaissIndexProtocol], FaissIndexProtocol]:
+    """Extract IndexIDMap2 wrapper function from legacy FAISS module.
+
+    Extended Summary
+    ----------------
+    Retrieves the IndexIDMap2 wrapper function from a legacy FAISS module and
+    validates it is callable. This adapter function bridges the gap between
+    legacy UPPER_CASE FAISS API names and the PEP 8 protocol interface. Used
+    internally by _FaissModuleAdapter to provide consistent method names for
+    wrapping indexes with 64-bit ID mapping.
+
+    Parameters
+    ----------
+    module : _LegacyFaissModule
+        Legacy FAISS module with UPPER_CASE attribute names. Must have
+        IndexIDMap2 attribute.
+
+    Returns
+    -------
+    Callable[[FaissIndexProtocol], FaissIndexProtocol]
+        Wrapper function that takes a base index and returns an index with
+        64-bit ID mapping.
+
+    Raises
+    ------
+    TypeError
+        If the IndexIDMap2 attribute is not callable.
+
+    Notes
+    -----
+    Time O(1). Performs attribute access and callable check. No side effects.
+    This function enables type-safe access to legacy FAISS wrappers.
+
+    Examples
+    --------
+    >>> # Requires legacy FAISS module and base index
+    >>> # wrapper = _legacy_index_id_map2(legacy_module)
+    >>> # wrapped_index = wrapper(base_index)
+    >>> # assert isinstance(wrapped_index, FaissIndexProtocol)
+    """
     attr_any: object = attrgetter("IndexIDMap2")(module)
     if not callable(attr_any):  # pragma: no cover - defensive guard for type checkers
         msg = "Legacy FAISS module attribute 'IndexIDMap2' must be callable"
@@ -734,6 +858,47 @@ def _legacy_index_id_map2(
 
 
 def _legacy_normalize_l2(module: _LegacyFaissModule) -> Callable[[VectorArray], None]:
+    """Extract normalize_L2 function from legacy FAISS module.
+
+    Extended Summary
+    ----------------
+    Retrieves the normalize_L2 normalization function from a legacy FAISS module
+    and validates it is callable. This adapter function bridges the gap between
+    legacy UPPER_CASE FAISS API names and the PEP 8 protocol interface. Used
+    internally by _FaissModuleAdapter to provide consistent method names for
+    in-place vector normalization.
+
+    Parameters
+    ----------
+    module : _LegacyFaissModule
+        Legacy FAISS module with UPPER_CASE attribute names. Must have
+        normalize_L2 attribute.
+
+    Returns
+    -------
+    Callable[[VectorArray], None]
+        Normalization function that takes a vector array and normalizes it to
+        unit L2 norm in-place. Returns None.
+
+    Raises
+    ------
+    TypeError
+        If the normalize_L2 attribute is not callable.
+
+    Notes
+    -----
+    Time O(1). Performs attribute access and callable check. No side effects.
+    The returned function mutates input vectors in-place. This function enables
+    type-safe access to legacy FAISS normalization.
+
+    Examples
+    --------
+    >>> # Requires legacy FAISS module and vector array
+    >>> # normalizer = _legacy_normalize_l2(legacy_module)
+    >>> # vectors = np.array([[1.0, 2.0]], dtype=np.float32)
+    >>> # normalizer(vectors)
+    >>> # assert np.allclose(np.linalg.norm(vectors, axis=1), 1.0)
+    """
     attr_any: object = attrgetter("normalize_L2")(module)
     if not callable(attr_any):  # pragma: no cover - defensive guard for type checkers
         msg = "Legacy FAISS module attribute 'normalize_L2' must be callable"
@@ -744,12 +909,32 @@ def _legacy_normalize_l2(module: _LegacyFaissModule) -> Callable[[VectorArray], 
 class _FaissModuleAdapter:
     """Adapter that exposes PEP 8 method names for FAISS modules.
 
-    Initializes adapter with legacy FAISS module.
+    Extended Summary
+    ----------------
+    Constructs an adapter instance that wraps a legacy FAISS module with
+    UPPER_CASE method names and exposes them via PEP 8 snake_case names.
+    This adapter enables type-safe access to FAISS functionality while
+    maintaining compatibility with legacy code that uses UPPER_CASE names.
 
     Parameters
     ----------
     module : _LegacyFaissModule
-        Legacy FAISS module with UPPER_CASE names.
+        Legacy FAISS module with UPPER_CASE attribute names (e.g.,
+        IndexFlatIP, IndexIDMap2, normalize_L2). The module must satisfy
+        the _LegacyFaissModule protocol.
+
+    Notes
+    -----
+    Time O(1). Stores module reference for later attribute access. No
+    side effects. The adapter provides both PEP 8 methods (index_flat_ip)
+    and legacy attribute access (IndexFlatIP) for backward compatibility.
+
+    Examples
+    --------
+    >>> # Requires legacy FAISS module
+    >>> # adapter = _FaissModuleAdapter(legacy_module)
+    >>> # index = adapter.index_flat_ip(256)
+    >>> # assert isinstance(index, FaissIndexProtocol)
     """
 
     def __init__(self, module: _LegacyFaissModule) -> None:

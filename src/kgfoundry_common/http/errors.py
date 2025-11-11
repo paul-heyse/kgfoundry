@@ -36,6 +36,7 @@ class HttpStatusError(HttpError):
         body_excerpt: str | None = None,
         headers: dict[str, str] | None = None,
     ) -> None:
+        """Initialize the exception. See class docstring for full details."""
         super().__init__(f"HTTP {status}: {body_excerpt or ''}")
         self.status = status
         self.headers = headers or {}

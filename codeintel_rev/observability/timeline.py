@@ -213,7 +213,7 @@ class Timeline:
         This method creates a scoped context manager that tracks operation execution.
         Events are emitted at context entry and exit with duration in milliseconds.
         Time complexity: O(1) for scope creation, O(1) for event emission.
-    """
+        """
         return _TimelineScope(self, "operation", name, attrs)
 
     def step(self, name: str, **attrs: object) -> _TimelineScope:
@@ -247,7 +247,7 @@ class Timeline:
         Events are emitted at context entry and exit with duration in milliseconds.
         Steps are nested within operations for hierarchical observability. Time
         complexity: O(1) for scope creation, O(1) for event emission.
-    """
+        """
         return _TimelineScope(self, "step", name, attrs)
 
 

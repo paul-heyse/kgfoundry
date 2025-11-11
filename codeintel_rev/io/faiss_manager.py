@@ -657,7 +657,6 @@ class FAISSManager:
             ),
         )
 
-
     def save_cpu_index(self) -> None:
         """Save CPU index to disk for persistence.
 
@@ -925,9 +924,10 @@ class FAISSManager:
 
         Raises
         ------
-        RuntimeError
+        VectorSearchError
             If FAISS search fails (e.g., index missing, invalid parameters, internal
-            FAISS errors).
+            FAISS errors). Wraps underlying exceptions (including RuntimeError from
+            helper methods) with search context.
 
         Notes
         -----
@@ -1209,9 +1209,7 @@ class FAISSManager:
         the combined candidate set. Time complexity: O(search_k * log n)
         for HNSW, O(nprobe * search_k) for IVF-family indexes.
         """
-        with as_span(
-            "faiss.search", k=search_k, nprobe=params.nprobe, use_gpu=params.use_gpu
-        ):
+        with as_span("faiss.search", k=search_k, nprobe=params.nprobe, use_gpu=params.use_gpu):
             self._apply_runtime_parameters(
                 nprobe=params.nprobe,
                 ef_search=params.ef_search,

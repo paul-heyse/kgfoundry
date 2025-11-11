@@ -77,7 +77,17 @@ class SpanProcessorProtocol(Protocol):
 class TracerProviderProtocol(Protocol):
     """Tracer provider constructor and helpers used in fixtures."""
 
-    def __init__(self, *args: object, **kwargs: object) -> None: ...
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        """Initialize the tracer provider.
+
+        Parameters
+        ----------
+        *args : object
+            Positional arguments passed to the provider constructor.
+        **kwargs : object
+            Keyword arguments passed to the provider constructor.
+        """
+        ...
 
     def get_tracer(
         self,
@@ -141,6 +151,20 @@ class TraceRuntime:
 
 
 def _safe_getattr(module: object, name: str) -> object | None:
+    """Safely get attribute from module, returning None if missing.
+
+    Parameters
+    ----------
+    module : object
+        Module object to query.
+    name : str
+        Attribute name to retrieve.
+
+    Returns
+    -------
+    object | None
+        Attribute value if present, None if AttributeError is raised.
+    """
     try:
         return cast("object", getattr(module, name))
     except AttributeError:  # pragma: no cover - defensive

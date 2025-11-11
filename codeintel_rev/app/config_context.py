@@ -1183,7 +1183,12 @@ class ApplicationContext:
             capabilities = Capabilities.from_context(self)
         except RuntimeLifecycleError:  # pragma: no cover - defensive logging
             LOGGER.warning("capabilities.detect_failed", exc_info=True)
-        return engine_cls(self.settings, self.paths, capabilities=capabilities)
+        return engine_cls(
+            self.settings,
+            self.paths,
+            capabilities=capabilities,
+            duckdb_manager=self.duckdb_manager,
+        )
 
     def ensure_faiss_ready(self) -> tuple[bool, list[str], str | None]:
         """Load FAISS index (once) and attempt GPU clone.

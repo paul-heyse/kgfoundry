@@ -8,6 +8,7 @@ from threading import Lock
 
 from codeintel_rev.io.hybrid_search import BM25SearchProvider, SpladeSearchProvider
 from codeintel_rev.plugins.channels import Channel, ChannelContext, ChannelError
+from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
 from codeintel_rev.retrieval.types import ChannelHit
 from kgfoundry_common.logging import get_logger
 
@@ -113,14 +114,44 @@ class _BM25Channel(Channel):
             return self._provider
         if self._provider_error is not None:
             return None
+        if not self._settings.bm25.enabled:
+            self._provider_error = "BM25 channel disabled by configuration"
+            self._skip_reason = "disabled"
+            return None
         with self._lock:
             if self._provider is not None:
                 return self._provider
             try:
+                bm25_settings = self._settings.bm25
+                prf_settings = self._settings.index.prf
+                rm3_params = RM3Params(
+                    fb_docs=bm25_settings.rm3_fb_docs,
+                    fb_terms=bm25_settings.rm3_fb_terms,
+                    orig_weight=bm25_settings.rm3_original_query_weight,
+                )
+                heuristics: RM3Heuristics | None = None
+                if prf_settings.enable_auto:
+                    head_terms: list[str] = []
+                    if prf_settings.head_terms_csv:
+                        head_terms = [
+                            term.strip()
+                            for term in prf_settings.head_terms_csv.split(",")
+                            if term.strip()
+                        ]
+                    heuristics = RM3Heuristics(
+                        short_query_max_terms=prf_settings.short_query_max_terms,
+                        symbol_like_regex=prf_settings.symbol_like_regex,
+                        head_terms=head_terms,
+                        default_params=rm3_params,
+                    )
                 provider = self._provider_cls(
                     index_dir=_resolve_path(self._paths.repo_root, self._settings.bm25.index_dir),
                     k1=self._settings.index.bm25_k1,
                     b=self._settings.index.bm25_b,
+                    rm3_params=rm3_params,
+                    heuristics=heuristics,
+                    enable_rm3=bm25_settings.rm3_enabled,
+                    auto_rm3=prf_settings.enable_auto,
                 )
             except (OSError, RuntimeError, ValueError, ImportError) as exc:
                 self._provider_error = f"BM25 initialization failed: {exc}"
@@ -167,6 +198,10 @@ class _SpladeChannel(Channel):
         if self._provider is not None:
             return self._provider
         if self._provider_error is not None:
+            return None
+        if not self._settings.splade.enabled:
+            self._provider_error = "SPLADE channel disabled by configuration"
+            self._skip_reason = "disabled"
             return None
         with self._lock:
             if self._provider is not None:

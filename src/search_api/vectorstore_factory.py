@@ -73,6 +73,47 @@ _BUILD_DURATION: HistogramLike = build_histogram(
 def _ingestion_extra(
     *, correlation_id: str | None = None, **extra_fields: object
 ) -> dict[str, object]:
+    """Build structured logging extra dictionary for ingestion operations.
+
+    Extended Summary
+    ----------------
+    Constructs a dictionary of extra fields for structured logging in ingestion
+    operations. Adds correlation_id if provided, sets default "stage" field to
+    "ingestion", and includes any additional extra_fields. This helper ensures
+    consistent log structure across all ingestion operations (build, save,
+    load_or_build).
+
+    Parameters
+    ----------
+    correlation_id : str | None, optional
+        Correlation identifier for request tracing. If provided, added to the
+        returned dictionary. Defaults to None.
+    **extra_fields : object
+        Additional key-value pairs to include in the logging extra dictionary.
+        All values are preserved as-is.
+
+    Returns
+    -------
+    dict[str, object]
+        Dictionary with "stage" set to "ingestion", optional "correlation_id",
+        and all extra_fields. Ready for use as logging.Logger extra parameter.
+
+    Notes
+    -----
+    Time O(n) where n is the number of extra_fields. This function is internal
+    to the vectorstore factory and should not be used outside this module.
+    The returned dictionary is mutable and can be modified by callers.
+
+    Examples
+    --------
+    >>> extra = _ingestion_extra(correlation_id="abc123", operation="build")
+    >>> extra["stage"]
+    'ingestion'
+    >>> extra["correlation_id"]
+    'abc123'
+    >>> extra["operation"]
+    'build'
+    """
     base = dict(extra_fields)
     if correlation_id:
         base["correlation_id"] = correlation_id
@@ -81,6 +122,40 @@ def _ingestion_extra(
 
 
 def _observe_metrics(operation: str, status: str, duration_seconds: float) -> None:
+    """Record Prometheus metrics for ingestion operations.
+
+    Extended Summary
+    ----------------
+    Emits Prometheus counter and histogram metrics for FAISS vector ingestion
+    operations. Records operation name, status (success/error), and duration
+    for observability and monitoring. Metrics are labeled with stage="ingestion"
+    and operation name for filtering and aggregation.
+
+    Parameters
+    ----------
+    operation : str
+        Operation name (e.g., "build", "save", "load_or_build"). Used as a
+        label for metric filtering.
+    status : str
+        Operation status ("success" or "error"). Used as a label for the
+        counter metric.
+    duration_seconds : float
+        Operation duration in seconds. Recorded in the histogram metric for
+        latency analysis.
+
+    Notes
+    -----
+    Time O(1). Side effects: increments Prometheus counter and records histogram
+    observation. This function is internal to the vectorstore factory and should
+    not be used outside this module. Metrics are exported via Prometheus
+    exposition format for scraping.
+
+    Examples
+    --------
+    >>> _observe_metrics("build", "success", 12.5)
+    >>> # Counter kgfoundry_vector_ingestion_total{stage="ingestion", operation="build", status="success"} incremented
+    >>> # Histogram kgfoundry_vector_ingestion_duration_seconds{stage="ingestion", operation="build"} observes 12.5
+    """
     labels = {"stage": _METRIC_STAGE_LABEL, "operation": operation, "status": status}
     _BUILD_COUNTER.labels(**labels).inc()
     _BUILD_DURATION.labels(stage=_METRIC_STAGE_LABEL, operation=operation).observe(duration_seconds)

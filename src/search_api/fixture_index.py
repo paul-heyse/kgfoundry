@@ -50,6 +50,39 @@ def _duckdb_module() -> ModuleType:
 
 
 def _as_str(value: object) -> str:
+    """Convert a value to a string, handling None and non-string types.
+
+    Extended Summary
+    ----------------
+    This helper function normalizes database query results to strings for
+    consistent processing in fixture index loading. It handles None values
+    by returning empty strings, preserving string values unchanged, and
+    converting other types via str().
+
+    Parameters
+    ----------
+    value : object
+        Value to convert. May be str, None, or any other type.
+
+    Returns
+    -------
+    str
+        String representation of the value. Empty string if value is None.
+
+    Notes
+    -----
+    Time O(1) for strings and None; O(n) for other types where n is the
+    string representation length. No I/O or side effects.
+
+    Examples
+    --------
+    >>> _as_str("hello")
+    'hello'
+    >>> _as_str(None)
+    ''
+    >>> _as_str(42)
+    '42'
+    """
     if isinstance(value, str):
         return value
     if value is None:
@@ -119,17 +152,38 @@ class FixtureDoc:
 class FixtureIndex:
     """In-memory fixture index for tests and tutorials.
 
+    Extended Summary
+    ----------------
     Simple in-memory search index that loads document chunks from a DuckDB
     catalog and builds term frequency (TF) and document frequency (DF)
     indexes for basic text search. Used primarily for testing and tutorials.
+    Constructs a fixture index instance and immediately loads document
+    chunks from the DuckDB catalog. The index builds in-memory TF-IDF
+    structures for fast lexical search during tests and tutorials. If the
+    database file does not exist or contains no chunks dataset, the index
+    remains empty but functional.
 
     Parameters
     ----------
     root : str, optional
-        Root directory path for data files. Defaults to "/data".
+        Root directory path for data files. Used for resolving relative
+        paths in the catalog. Defaults to "/data".
     db_path : str, optional
-        Path to DuckDB catalog database file. Defaults to
-        "/data/catalog/catalog.duckdb".
+        Path to DuckDB catalog database file. Must exist for documents
+        to be loaded. Defaults to "/data/catalog/catalog.duckdb".
+
+    Notes
+    -----
+    Initialization triggers synchronous I/O to load documents and build
+    indexes. Time complexity is O(n * m) where n is the number of documents
+    and m is the average tokens per document. Memory usage is O(n * m) for
+    TF structures and O(v) for DF where v is vocabulary size.
+
+    Examples
+    --------
+    >>> index = FixtureIndex(root="/tmp/test_data")
+    >>> len(index.docs) >= 0
+    True
     """
 
     def __init__(self, root: str = "/data", db_path: str = "/data/catalog/catalog.duckdb") -> None:
@@ -162,6 +216,44 @@ class FixtureIndex:
 
     @staticmethod
     def _latest_chunks_root(connection: DuckDBPyConnection) -> Path | None:
+        """Resolve the latest chunks dataset root path from the catalog.
+
+        Extended Summary
+        ----------------
+        Queries the DuckDB catalog to find the most recently created chunks
+        dataset and returns its parquet_root path. This enables the fixture
+        index to load the current dataset without hardcoding paths. Returns
+        None if no chunks dataset exists in the catalog.
+
+        Parameters
+        ----------
+        connection : DuckDBPyConnection
+            Active DuckDB connection to the catalog database. Must have read
+            access to the datasets table.
+
+        Returns
+        -------
+        Path | None
+            Path to the latest chunks dataset root directory, or None if no
+            chunks dataset exists.
+
+        Raises
+        ------
+        TypeError
+            If the parquet_root value in the database is not a string.
+
+        Notes
+        -----
+        Time O(1) assuming indexed datasets table. Performs a single SQL
+        query with no side effects. The query orders by created_at DESC and
+        limits to 1 row for efficiency.
+
+        Examples
+        --------
+        >>> # Requires active DuckDB connection
+        >>> # root = FixtureIndex._latest_chunks_root(connection)
+        >>> # assert root is None or isinstance(root, Path)
+        """
         dataset_row = fetch_one(
             connection,
             """
@@ -181,6 +273,43 @@ class FixtureIndex:
 
     @staticmethod
     def _iter_fixture_docs(connection: DuckDBPyConnection, root_path: Path) -> Iterator[FixtureDoc]:
+        """Iterate over document chunks loaded from parquet files.
+
+        Extended Summary
+        ----------------
+        Reads all parquet files matching the chunks pattern and joins with
+        document metadata to yield FixtureDoc instances. Handles missing
+        or null values by providing defaults (empty strings, "Fixture" title,
+        "urn:doc:fixture" doc_id). This method performs the I/O-heavy work
+        of loading chunks into memory for indexing.
+
+        Parameters
+        ----------
+        connection : DuckDBPyConnection
+            Active DuckDB connection for executing parquet read queries.
+        root_path : Path
+            Root directory containing parquet files in subdirectories.
+            Pattern matches "*/*.parquet" under this root.
+
+        Yields
+        ------
+        FixtureDoc
+            Document chunk with chunk_id, doc_id, title, section, and text.
+            All fields are normalized to strings with defaults for missing values.
+
+        Notes
+        -----
+        Time O(n) where n is the total number of chunks across all parquet
+        files. Memory O(1) per chunk (streaming). Performs I/O via DuckDB's
+        read_parquet function. The union_by_name parameter allows reading
+        parquet files with varying schemas.
+
+        Examples
+        --------
+        >>> # Requires active DuckDB connection and valid root_path
+        >>> # docs = list(FixtureIndex._iter_fixture_docs(connection, Path("/data/chunks")))
+        >>> # assert all(isinstance(doc, FixtureDoc) for doc in docs)
+        """
         parquet_pattern = str(root_path / "*" / "*.parquet")
         rows: Sequence[tuple[object, ...]] = fetch_all(
             connection,

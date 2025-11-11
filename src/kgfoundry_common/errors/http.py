@@ -102,6 +102,20 @@ def register_problem_details_handler(app: FastAPI) -> None:
     """Register FastAPI exception handler for KgFoundryError."""
 
     async def _handler(request: Request, exc: KgFoundryError) -> JSONResponse:
+        """Handle KgFoundryError exceptions and convert to Problem Details response.
+
+        Parameters
+        ----------
+        request : Request
+            FastAPI request object.
+        exc : KgFoundryError
+            Exception to convert to Problem Details.
+
+        Returns
+        -------
+        JSONResponse
+            Problem Details JSON response.
+        """
         return await asyncio.to_thread(problem_details_response, exc, request)
 
     typed_exception_handler(

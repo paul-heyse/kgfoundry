@@ -69,6 +69,39 @@ _FAISS_GPU_CACHE = WeakKeyDictionary()
 
 
 def _get_gpu_state(index: FaissGpuIndex) -> _FaissGpuIndexState:
+    """Retrieve cached GPU state for a FaissGpuIndex instance.
+
+    Extended Summary
+    ----------------
+    Looks up cached GPU context and prepared index state for a FaissGpuIndex
+    instance. Returns default empty state if no cache entry exists. This cache
+    enables idempotent GPU index preparation by reusing prepared GPU indices
+    across multiple prepare() calls.
+
+    Parameters
+    ----------
+    index : FaissGpuIndex
+        FaissGpuIndex instance to look up. Used as a weak key in the cache.
+
+    Returns
+    -------
+    _FaissGpuIndexState
+        Cached GPU state with context and prepared index, or empty state if
+        not found in cache.
+
+    Notes
+    -----
+    Time O(1) average case. Uses WeakKeyDictionary so cache entries are
+    automatically garbage collected when the index instance is no longer
+    referenced. This function is internal to the GPU index facade and should
+    not be used outside this module.
+
+    Examples
+    --------
+    >>> state = _get_gpu_state(gpu_index)
+    >>> state.context is None or isinstance(state.context, GpuContext)
+    True
+    """
     return _FAISS_GPU_CACHE.get(index, _FaissGpuIndexState())
 
 
@@ -78,6 +111,40 @@ def _set_gpu_state(
     context: GpuContext | None,
     prepared: FaissIndexProtocol | None,
 ) -> None:
+    """Cache GPU state for a FaissGpuIndex instance.
+
+    Extended Summary
+    ----------------
+    Stores GPU context and prepared index state in the weak-key cache for a
+    FaissGpuIndex instance. This enables idempotent GPU index preparation by
+    allowing subsequent prepare() calls to reuse the cached GPU index instead
+    of re-cloning from CPU.
+
+    Parameters
+    ----------
+    index : FaissGpuIndex
+        FaissGpuIndex instance to cache state for. Used as a weak key.
+    context : GpuContext | None
+        GPU context detected for this index. None if GPU is unavailable or
+        disabled.
+    prepared : FaissIndexProtocol | None
+        Prepared GPU index (or CPU index fallback). None if index has not
+        been prepared yet.
+
+    Notes
+    -----
+    Time O(1). Side effects: modifies the weak-key cache. Cache entries are
+    automatically garbage collected when the index instance is no longer
+    referenced. This function is internal to the GPU index facade and should
+    not be used outside this module.
+
+    Examples
+    --------
+    >>> _set_gpu_state(gpu_index, context=gpu_ctx, prepared=gpu_idx)
+    >>> state = _get_gpu_state(gpu_index)
+    >>> state.index is gpu_idx
+    True
+    """
     _FAISS_GPU_CACHE[index] = _FaissGpuIndexState(context=context, index=prepared)
 
 

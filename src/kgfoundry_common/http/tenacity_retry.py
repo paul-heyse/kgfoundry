@@ -243,6 +243,18 @@ def _should_retry_exception(method: str, policy: RetryPolicyDoc) -> Callable[[Ba
     status_sets = policy.retry_status
 
     def _pred(e: BaseException) -> bool:
+        """Predicate function to determine if exception should be retried.
+
+        Parameters
+        ----------
+        e : BaseException
+            Exception to evaluate for retry eligibility.
+
+        Returns
+        -------
+        bool
+            True if the exception should trigger a retry, False otherwise.
+        """
         if method.upper() not in allowed_methods:
             return False
         # idempotency guard for non-idempotent methods
@@ -269,9 +281,34 @@ def _should_retry_exception(method: str, policy: RetryPolicyDoc) -> Callable[[Ba
 
 @dataclass(frozen=True)
 class _MethodStrategy(RetryStrategy[object]):
+    """Internal retry strategy wrapper for method-specific retry logic.
+
+    Attributes
+    ----------
+    retrying : Retrying
+        Configured Tenacity Retrying instance.
+    """
+
     retrying: Retrying
 
     def run(self, fn: Callable[[], object]) -> object:
+        """Execute function with retry logic.
+
+        Parameters
+        ----------
+        fn : Callable[[], object]
+            Function to execute with retries.
+
+        Returns
+        -------
+        object
+            Result of function execution.
+
+        Raises
+        ------
+        Exception
+            Any exception raised by the function after retries are exhausted.
+        """
         return self.retrying(fn)
 
 
@@ -285,6 +322,7 @@ class TenacityRetryStrategy(RetryStrategy[object]):
     """
 
     def __init__(self, policy: RetryPolicyDoc) -> None:
+        """Initialize the retry strategy. See class docstring for full details."""
         self.policy = policy
 
     def run(self, fn: Callable[[], object]) -> object:

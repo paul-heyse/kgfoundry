@@ -104,6 +104,41 @@ def _is_faiss_index(candidate: object) -> TypeGuard[FaissIndexProtocol]:
 
 
 def _as_optional_str(value: object) -> str:
+    """Convert a value to a string, handling None and non-string types.
+
+    Extended Summary
+    ----------------
+    Normalizes database query results to strings for consistent processing in
+    FAISS adapter index loading. Handles None values by returning empty strings,
+    preserves string values unchanged, and converts other types via str().
+    This helper ensures type safety when reading from DuckDB which may return
+    various types (str, None, int, etc.) for text fields.
+
+    Parameters
+    ----------
+    value : object
+        Value to convert. May be str, None, or any other type.
+
+    Returns
+    -------
+    str
+        String representation of the value. Empty string if value is None.
+
+    Notes
+    -----
+    Time O(1) for strings and None; O(n) for other types where n is the
+    string representation length. This function is internal to FAISS adapter
+    index loading and should not be used outside this module.
+
+    Examples
+    --------
+    >>> _as_optional_str("hello")
+    'hello'
+    >>> _as_optional_str(None)
+    ''
+    >>> _as_optional_str(123)
+    '123'
+    """
     if isinstance(value, str):
         return value
     if value is None:
@@ -117,6 +152,35 @@ LoadLibraryFn = Callable[..., None]
 
 
 def _load_libcuvs() -> LoadLibraryFn | None:
+    """Attempt to load cuVS library loader function for GPU acceleration.
+
+    Extended Summary
+    ----------------
+    Tries to import cuVS library modules (libcuvs or libcuvs_cu13) and extract
+    the load_library function. cuVS provides GPU-accelerated vector search
+    operations that can be used as a drop-in replacement for FAISS GPU
+    operations. This function enables optional GPU acceleration when cuVS is
+    available, falling back gracefully to CPU/FAISS when it is not.
+
+    Returns
+    -------
+    LoadLibraryFn | None
+        Callable load_library function if cuVS module is found and provides it,
+        None otherwise. The function can be called to initialize cuVS runtime.
+
+    Notes
+    -----
+    Time O(1) amortized after first call (uses lru_cache). Side effects: may
+    attempt to import optional modules. This function is called at module load
+    time to detect cuVS availability. Failures are logged at debug level and
+    do not prevent FAISS adapter from functioning (falls back to CPU/FAISS).
+
+    Examples
+    --------
+    >>> loader = _load_libcuvs()
+    >>> if loader is not None:
+    ...     loader()  # Initialize cuVS runtime
+    """
     module_names = ("libcuvs", "libcuvs_cu13")
     module = None
     for name in module_names:
@@ -151,6 +215,36 @@ else:  # pragma: no cover - optional dependency
 
 
 def _load_faiss_module() -> FaissModuleProtocol | None:
+    """Attempt to load FAISS module for vector search operations.
+
+    Extended Summary
+    ----------------
+    Tries to import the FAISS (Facebook AI Similarity Search) module which
+    provides efficient vector similarity search implementations. FAISS is an
+    optional dependency; if unavailable, the adapter falls back to CPU-based
+    search using NumPy. This function enables graceful degradation when FAISS
+    is not installed or fails to load.
+
+    Returns
+    -------
+    FaissModuleProtocol | None
+        FAISS module instance if import succeeds, None otherwise. The module
+        provides index construction and search methods.
+
+    Notes
+    -----
+    Time O(1) amortized after first call (uses lru_cache). Side effects: may
+    attempt to import optional FAISS module. Failures are logged at debug level
+    and do not prevent adapter from functioning (falls back to NumPy-based
+    search). This function is called at module load time to detect FAISS
+    availability.
+
+    Examples
+    --------
+    >>> faiss_module = _load_faiss_module()
+    >>> if faiss_module is not None:
+    ...     index = faiss_module.IndexFlatIP(128)
+    """
     try:  # pragma: no cover - optional dependency
         module = importlib.import_module("faiss")
     except (
@@ -191,7 +285,46 @@ class FaissAdapterConfig:
 
 # [nav:anchor FaissAdapter]
 class FaissAdapter:
-    """Build FAISS indexes with optional GPU acceleration and CPU fallback."""
+    """Build FAISS indexes with optional GPU acceleration and CPU fallback.
+
+    Extended Summary
+    ----------------
+    Provides a typed interface for building and querying FAISS vector indexes
+    with support for GPU acceleration (via FAISS GPU or cuVS) and graceful
+    CPU fallback. Loads vectors from DuckDB catalog, builds indexes using
+    configurable factory strings (e.g., "OPQ64,IVF8192,PQ64"), and provides
+    search operations with ID mapping. Supports both modern config-based API
+    and legacy keyword arguments for backward compatibility.
+
+    Parameters
+    ----------
+    db_path : str
+        Path to DuckDB database file containing vectors dataset and metadata.
+    config : FaissAdapterConfig | None, optional
+        Configuration object with factory, metric, nprobe, GPU settings.
+        If None, uses default config or legacy_options. Defaults to None.
+    **legacy_options : object
+        Legacy keyword arguments for backward compatibility. Valid keys:
+        factory (str), metric (str), nprobe (int), use_gpu (bool),
+        use_cuvs (bool), gpu_devices (Sequence[int] | None). Cannot be used
+        together with config parameter.
+
+    Notes
+    -----
+    Time O(1) for initialization. The index is not built until build() is called.
+    GPU acceleration requires FAISS GPU or cuVS libraries and appropriate CUDA
+    runtime. Falls back to CPU/NumPy search if GPU libraries are unavailable.
+    Configuration validation ensures factory/metric compatibility and prevents
+    mixing config and legacy_options.
+
+    Examples
+    --------
+    >>> adapter = FaissAdapter(
+    ...     "/data/catalog.duckdb", config=FaissAdapterConfig(factory="Flat", metric="ip")
+    ... )
+    >>> adapter.build()
+    >>> results = adapter.search(vectors, k=10)
+    """
 
     _CONFIG_FIELDS: ClassVar[set[str]] = {
         "factory",
@@ -235,6 +368,32 @@ class FaissAdapter:
     def _resolve_config(
         cls, config: FaissAdapterConfig | None, legacy_options: dict[str, object]
     ) -> FaissAdapterConfig:
+        """Resolve configuration from config object or legacy keyword arguments.
+
+        Extended Summary
+        ----------------
+        Validates that config and legacy_options are not mixed, then returns
+        the appropriate configuration. If config is provided, returns it directly.
+        Otherwise, validates legacy_options keys and converts them to a config
+        object. If neither is provided, returns default config.
+
+        Parameters
+        ----------
+        config : FaissAdapterConfig | None
+            Modern config object. If provided, used directly.
+        legacy_options : dict[str, object]
+            Legacy keyword arguments dictionary. Validated and converted to config.
+
+        Returns
+        -------
+        FaissAdapterConfig
+            Resolved configuration object ready for use.
+
+        Notes
+        -----
+        Time O(n) where n is the number of legacy_options keys. This method
+        enforces the API contract that config and legacy_options cannot be mixed.
+        """
         cls._ensure_config_not_mixed(config, legacy_options)
         if config is not None:
             return config
@@ -248,6 +407,32 @@ class FaissAdapter:
     def _ensure_config_not_mixed(
         cls, config: FaissAdapterConfig | None, legacy_options: dict[str, object]
     ) -> None:
+        """Ensure config and legacy_options are not provided simultaneously.
+
+        Extended Summary
+        ----------------
+        Validates that the caller has not provided both a modern config object
+        and legacy keyword arguments. This prevents API confusion and ensures
+        clear configuration precedence.
+
+        Parameters
+        ----------
+        config : FaissAdapterConfig | None
+            Modern config object (may be None).
+        legacy_options : dict[str, object]
+            Legacy keyword arguments dictionary (may be empty).
+
+        Raises
+        ------
+        TypeError
+            If both config and legacy_options are provided (non-None config and
+            non-empty legacy_options).
+
+        Notes
+        -----
+        Time O(1). This validation ensures API clarity and prevents ambiguous
+        configuration precedence.
+        """
         if config is None or not legacy_options:
             return
         unexpected = ", ".join(sorted(legacy_options))
@@ -258,6 +443,29 @@ class FaissAdapter:
 
     @classmethod
     def _validate_legacy_keys(cls, legacy_options: dict[str, object]) -> None:
+        """Validate that legacy_options contains only known configuration keys.
+
+        Extended Summary
+        ----------------
+        Checks that all keys in legacy_options are valid configuration fields
+        (factory, metric, nprobe, use_gpu, use_cuvs, gpu_devices). Raises
+        TypeError if any unexpected keys are found.
+
+        Parameters
+        ----------
+        legacy_options : dict[str, object]
+            Legacy keyword arguments dictionary to validate.
+
+        Raises
+        ------
+        TypeError
+            If legacy_options contains keys not in _CONFIG_FIELDS.
+
+        Notes
+        -----
+        Time O(n) where n is the number of keys in legacy_options. This
+        validation provides clear error messages for typos or invalid options.
+        """
         unexpected_keys = set(legacy_options) - cls._CONFIG_FIELDS
         if not unexpected_keys:
             return
@@ -267,6 +475,35 @@ class FaissAdapter:
 
     @classmethod
     def _config_from_legacy_options(cls, legacy_options: dict[str, object]) -> FaissAdapterConfig:
+        """Convert legacy keyword arguments to FaissAdapterConfig.
+
+        Extended Summary
+        ----------------
+        Extracts configuration values from legacy_options dictionary, applies
+        type coercion for each field, and constructs a FaissAdapterConfig instance.
+        Uses default values from base config for missing fields. This method
+        bridges the legacy keyword argument API to the modern config-based API.
+
+        Parameters
+        ----------
+        legacy_options : dict[str, object]
+            Legacy keyword arguments dictionary. Expected keys: factory (str),
+            metric (str), nprobe (int), use_gpu (bool), use_cuvs (bool),
+            gpu_devices (Sequence[int] | None).
+
+        Returns
+        -------
+        FaissAdapterConfig
+            Configuration object with coerced values from legacy_options.
+
+        Notes
+        -----
+        Time O(n) where n is the number of fields. Type coercion ensures type
+        safety while allowing flexible input types (e.g., int/float for nprobe).
+        Missing fields use defaults from FaissAdapterConfig(). TypeError may be
+        raised by helper methods (_coerce_str, _coerce_int, _coerce_bool,
+        _coerce_gpu_devices) if field values cannot be coerced to expected types.
+        """
         base = FaissAdapterConfig()
         options = {
             field: legacy_options[field] for field in cls._CONFIG_FIELDS if field in legacy_options
@@ -289,6 +526,45 @@ class FaissAdapter:
 
     @staticmethod
     def _coerce_str(value: object, name: str) -> str:
+        """Coerce value to string with validation.
+
+        Extended Summary
+        ----------------
+        Validates that value is a string and returns it unchanged. Raises
+        TypeError if value is not a string, providing a clear error message
+        with the field name.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce. Must be a string.
+        name : str
+            Field name for error messages (e.g., "factory", "metric").
+
+        Returns
+        -------
+        str
+            String value unchanged.
+
+        Raises
+        ------
+        TypeError
+            If value is not a string.
+
+        Notes
+        -----
+        Time O(1). This method provides strict type validation for string
+        configuration fields, ensuring type safety in config construction.
+
+        Examples
+        --------
+        >>> FaissAdapter._coerce_str("OPQ64", "factory")
+        'OPQ64'
+        >>> FaissAdapter._coerce_str(123, "factory")
+        Traceback (most recent call last):
+            ...
+        TypeError: factory must be a string
+        """
         if isinstance(value, str):
             return value
         message = f"{name} must be a string"
@@ -296,6 +572,45 @@ class FaissAdapter:
 
     @staticmethod
     def _coerce_int(value: object, name: str) -> int:
+        """Coerce value to integer with validation.
+
+        Extended Summary
+        ----------------
+        Validates that value is an integer and returns it unchanged. Raises
+        TypeError if value is not an integer, providing a clear error message
+        with the field name.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce. Must be an integer.
+        name : str
+            Field name for error messages (e.g., "nprobe").
+
+        Returns
+        -------
+        int
+            Integer value unchanged.
+
+        Raises
+        ------
+        TypeError
+            If value is not an integer.
+
+        Notes
+        -----
+        Time O(1). This method provides strict type validation for integer
+        configuration fields, ensuring type safety in config construction.
+
+        Examples
+        --------
+        >>> FaissAdapter._coerce_int(64, "nprobe")
+        64
+        >>> FaissAdapter._coerce_int("64", "nprobe")
+        Traceback (most recent call last):
+            ...
+        TypeError: nprobe must be an integer
+        """
         if isinstance(value, int):
             return value
         message = f"{name} must be an integer"
@@ -303,6 +618,45 @@ class FaissAdapter:
 
     @staticmethod
     def _coerce_bool(value: object, name: str) -> bool:
+        """Coerce value to boolean with validation.
+
+        Extended Summary
+        ----------------
+        Validates that value is a boolean and returns it unchanged. Raises
+        TypeError if value is not a boolean, providing a clear error message
+        with the field name.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce. Must be a boolean.
+        name : str
+            Field name for error messages (e.g., "use_gpu", "use_cuvs").
+
+        Returns
+        -------
+        bool
+            Boolean value unchanged.
+
+        Raises
+        ------
+        TypeError
+            If value is not a boolean.
+
+        Notes
+        -----
+        Time O(1). This method provides strict type validation for boolean
+        configuration fields, ensuring type safety in config construction.
+
+        Examples
+        --------
+        >>> FaissAdapter._coerce_bool(True, "use_gpu")
+        True
+        >>> FaissAdapter._coerce_bool(1, "use_gpu")
+        Traceback (most recent call last):
+            ...
+        TypeError: use_gpu must be a boolean
+        """
         if isinstance(value, bool):
             return value
         message = f"{name} must be a boolean"
@@ -310,6 +664,46 @@ class FaissAdapter:
 
     @staticmethod
     def _coerce_gpu_devices(value: object) -> tuple[int, ...] | None:
+        """Coerce value to GPU device tuple or None.
+
+        Extended Summary
+        ----------------
+        Validates and converts value to a tuple of GPU device IDs. Returns None
+        if value is None. Converts sequence elements to integers. Raises TypeError
+        if value is not None and not a sequence.
+
+        Parameters
+        ----------
+        value : object
+            Value to coerce. May be None, sequence of integers, or other types.
+
+        Returns
+        -------
+        tuple[int, ...] | None
+            Tuple of GPU device IDs, or None if value is None.
+
+        Raises
+        ------
+        TypeError
+            If value is not None and not a sequence, or if sequence elements
+            cannot be converted to integers.
+
+        Notes
+        -----
+        Time O(n) where n is the length of the sequence. This method handles
+        GPU device specification for multi-GPU setups, converting various input
+        formats (list, tuple, etc.) to a consistent tuple[int, ...] type.
+
+        Examples
+        --------
+        >>> FaissAdapter._coerce_gpu_devices([0, 1])
+        (0, 1)
+        >>> FaissAdapter._coerce_gpu_devices(None)
+        >>> FaissAdapter._coerce_gpu_devices("invalid")
+        Traceback (most recent call last):
+            ...
+        TypeError: gpu_devices must be a sequence of integers or None
+        """
         if value is None:
             return None
         if not isinstance(value, Sequence):

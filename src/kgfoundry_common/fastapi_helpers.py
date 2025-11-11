@@ -98,6 +98,27 @@ def typed_dependency[**P, T](
     """
 
     async def _instrumented(*args: P.args, **kwargs: P.kwargs) -> T:
+        """Instrumented dependency wrapper with logging and timeout.
+
+        Parameters
+        ----------
+        *args : P.args
+            Positional arguments passed to the dependency function.
+        **kwargs : P.kwargs
+            Keyword arguments passed to the dependency function.
+
+        Returns
+        -------
+        T
+            Result from the dependency function.
+
+        Raises
+        ------
+        asyncio.TimeoutError
+            If the dependency execution exceeds the timeout.
+        Exception
+            Any exception raised by the dependency function is propagated.
+        """
         correlation_id = get_correlation_id()
         with with_fields(logger, operation=name, correlation_id=correlation_id) as log:
             start = time.perf_counter()
@@ -137,6 +158,27 @@ def typed_exception_handler[E: Exception](
     """Register ``handler`` for ``exception_type`` with logging and timeouts."""
 
     async def _wrapped(request: Request, exc: E) -> Response:
+        """Wrapped exception handler with logging and timeout.
+
+        Parameters
+        ----------
+        request : Request
+            FastAPI request object.
+        exc : E
+            Exception instance to handle.
+
+        Returns
+        -------
+        Response
+            HTTP response from the exception handler.
+
+        Raises
+        ------
+        asyncio.TimeoutError
+            If the handler execution exceeds the timeout.
+        Exception
+            Any exception raised by the handler is propagated.
+        """
         correlation_id = get_correlation_id()
         with with_fields(logger, operation=name, correlation_id=correlation_id) as log:
             start = time.perf_counter()
@@ -194,6 +236,13 @@ def typed_middleware(
         """
 
         def __init__(self, app: ASGIApp) -> None:
+            """Initialize the instrumented middleware.
+
+            Parameters
+            ----------
+            app : ASGIApp
+                ASGI application instance to wrap.
+            """
             self._delegate = middleware_class(app, *factory_args, **options)
             super().__init__(app)
 
@@ -202,6 +251,27 @@ def typed_middleware(
             request: StarletteRequest,
             call_next: Callable[[StarletteRequest], t.Awaitable[Response]],
         ) -> Response:
+            """Dispatch request through middleware with logging and timeout.
+
+            Parameters
+            ----------
+            request : StarletteRequest
+                Incoming HTTP request.
+            call_next : Callable[[StarletteRequest], t.Awaitable[Response]]
+                Next middleware or application handler in the chain.
+
+            Returns
+            -------
+            Response
+                HTTP response from the next handler.
+
+            Raises
+            ------
+            asyncio.TimeoutError
+                If the middleware execution exceeds the timeout.
+            Exception
+                Any exception raised by the next handler is propagated.
+            """
             correlation_id = get_correlation_id()
             with with_fields(logger, operation=name, correlation_id=correlation_id) as log:
                 start = time.perf_counter()
