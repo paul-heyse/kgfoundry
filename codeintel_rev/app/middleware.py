@@ -58,6 +58,7 @@ from typing import TYPE_CHECKING
 from starlette.middleware.base import BaseHTTPMiddleware, DispatchFunction
 from starlette.types import ASGIApp
 
+from codeintel_rev.observability.timeline import bind_timeline, new_timeline
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -73,6 +74,10 @@ LOGGER = get_logger(__name__)
 # for thread-safe session ID access in adapters
 session_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "session_id",
+    default=None,
+)
+capability_stamp_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "capability_stamp",
     default=None,
 )
 
@@ -126,6 +131,18 @@ def get_session_id() -> str:
         )
         raise RuntimeError(msg)
     return session_id
+
+
+def get_capability_stamp() -> str | None:
+    """Return the capability stamp associated with the current request.
+
+    Returns
+    -------
+    str | None
+        Stable capability hash when initialized, otherwise ``None`` if the
+        stamp has not been stored in the current context.
+    """
+    return capability_stamp_var.get()
 
 
 class SessionScopeMiddleware(BaseHTTPMiddleware):
@@ -231,14 +248,26 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
 
         # Store in request.state (FastAPI convention)
         request.state.session_id = session_id
+        timeline = new_timeline(session_id)
+        request.state.timeline = timeline
+
+        capability_stamp = getattr(request.app.state, "capability_stamp", None)
 
         # Store in ContextVar (for adapter access)
-        token = session_id_var.set(session_id)
+        session_token = session_id_var.set(session_id)
+        capability_token = capability_stamp_var.set(capability_stamp)
         try:
-            # Invoke next handler
-            return await call_next(request)
+            with bind_timeline(timeline):
+                return await call_next(request)
         finally:
-            session_id_var.reset(token)
+            session_id_var.reset(session_token)
+            capability_stamp_var.reset(capability_token)
 
 
-__all__ = ["SessionScopeMiddleware", "get_session_id", "session_id_var"]
+__all__ = [
+    "SessionScopeMiddleware",
+    "capability_stamp_var",
+    "get_capability_stamp",
+    "get_session_id",
+    "session_id_var",
+]

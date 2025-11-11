@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from collections.abc import Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -10,7 +11,7 @@ from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING, Any, TypedDict, cast
 
-from codeintel_rev.app.middleware import get_session_id
+from codeintel_rev.app.middleware import get_capability_stamp, get_session_id
 from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.io.hybrid_search import ChannelHit
 from codeintel_rev.io.rerank_coderankllm import CodeRankListwiseReranker
@@ -24,6 +25,8 @@ from codeintel_rev.mcp_server.schemas import (
     StageInfo,
 )
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
+from codeintel_rev.observability.otel import as_span
+from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.retrieval.gating import StageGateConfig, should_run_secondary_stage
 from codeintel_rev.retrieval.telemetry import (
     StageTiming,
@@ -173,6 +176,19 @@ def build_runtime_options(
     )
 
 
+def _summarize_options(options: SemanticProRuntimeOptions) -> dict[str, object]:
+    summary: dict[str, object] = {
+        "use_coderank": options.use_coderank,
+        "use_warp": options.use_warp,
+        "use_reranker": options.use_reranker,
+    }
+    if options.stage_weights:
+        summary["stage_weights"] = options.stage_weights
+    if options.xtr_k is not None:
+        summary["xtr_k"] = options.xtr_k
+    return summary
+
+
 async def semantic_search_pro(
     context: ApplicationContext,
     *,
@@ -255,15 +271,36 @@ async def semantic_search_pro(
         raise VectorSearchError(msg)
     runtime_options = build_runtime_options(options)
     session_id = get_session_id()
-    scope = await get_effective_scope(context, session_id)
-    return await asyncio.to_thread(
-        _semantic_search_pro_sync,
-        context,
-        query,
-        limit,
-        scope,
-        runtime_options,
+    capability_stamp = get_capability_stamp()
+    timeline = current_timeline()
+    operation_attrs: dict[str, object] = {
+        "session_id": session_id,
+        "limit": limit,
+        "query_chars": len(query),
+        "query_sha256": hashlib.sha256(query.encode("utf-8")).hexdigest(),
+    }
+    if capability_stamp:
+        operation_attrs["capability_stamp"] = capability_stamp
+    if timeline is not None:
+        operation_attrs["run_id"] = timeline.run_id
+    options_summary = _summarize_options(runtime_options)
+    if options_summary:
+        operation_attrs["options"] = options_summary
+    operation_scope = (
+        timeline.operation("mcp.tool.semantic_search_pro", **operation_attrs)
+        if timeline is not None
+        else as_span("mcp.tool.semantic_search_pro", **operation_attrs)
     )
+    with operation_scope:
+        scope = await get_effective_scope(context, session_id)
+        return await asyncio.to_thread(
+            _semantic_search_pro_sync,
+            context,
+            query,
+            limit,
+            scope,
+            runtime_options,
+        )
 
 
 def _semantic_search_pro_sync(

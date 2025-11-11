@@ -79,6 +79,7 @@ def test_app_readyz_endpoint_healthy() -> None:
         data = response.json()
         assert "ready" in data
         assert "checks" in data
+        assert "active_index_version" in data
         # Note: vLLM check may fail if service is not running, but that's OK
         # The important thing is that the endpoint works and returns structured data
 
@@ -122,6 +123,7 @@ def test_app_readyz_shows_unhealthy_resources(
         data = response.json()
         assert "ready" in data
         assert "checks" in data
+        assert "active_index_version" in data
         # FAISS check should be unhealthy
         assert "faiss_index" in data["checks"]
         assert data["checks"]["faiss_index"]["healthy"] is False

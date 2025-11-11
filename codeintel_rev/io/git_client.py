@@ -48,6 +48,7 @@ from typing import TYPE_CHECKING, cast
 import git
 import git.exc
 
+from codeintel_rev.observability.timeline import current_timeline
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -246,6 +247,11 @@ class GitClient:
         Line numbers are 1-indexed to match editor conventions and Git's
         output format. Internally, GitPython uses 0-indexed lines.
         """
+        line_count = max(0, end_line - start_line + 1)
+        timeline = current_timeline()
+        if timeline is not None:
+            timeline.event("git.blame.start", path, attrs={"n_lines": line_count})
+
         try:
             # GitPython's blame_incremental yields (commit, line_numbers) tuples
             blame_iter = self.repo.blame_incremental(
@@ -306,6 +312,8 @@ class GitClient:
             },
         )
 
+        if timeline is not None:
+            timeline.event("git.blame.end", path, attrs={"n_lines": len(entries)})
         return entries
 
     def file_history(
@@ -377,6 +385,10 @@ class GitClient:
         not work perfectly. Consider using Git's --follow flag via subprocess
         if rename tracking is critical.
         """
+        timeline = current_timeline()
+        if timeline is not None:
+            timeline.event("git.history.start", path, attrs={"max": limit})
+
         try:
             # iter_commits with paths parameter gets commits affecting that file
             commits_iter = self.repo.iter_commits(
@@ -418,6 +430,8 @@ class GitClient:
             extra={"path": path, "limit": limit, "commits_count": len(commits)},
         )
 
+        if timeline is not None:
+            timeline.event("git.history.end", path, attrs={"n_commits": len(commits)})
         return commits
 
 

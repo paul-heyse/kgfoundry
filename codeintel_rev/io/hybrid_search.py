@@ -8,6 +8,7 @@ from pathlib import Path
 from threading import Lock
 from typing import TYPE_CHECKING
 
+from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.retrieval.fusion import fuse_weighted_rrf
 from codeintel_rev.retrieval.types import (
     ChannelHit,
@@ -224,6 +225,22 @@ class SpladeSearchProvider:
         return " ".join(tokens)
 
 
+def _classify_skip_reason(exc: Exception) -> str:
+    """Map exceptions to canonical channel skip reasons.
+
+    Returns
+    -------
+    str
+        Canonical skip reason label.
+    """
+    if isinstance(exc, FileNotFoundError):
+        return "missing_assets"
+    message = str(exc).lower()
+    if "capability" in message or "disabled" in message:
+        return "capability_off"
+    return "provider_error"
+
+
 class HybridSearchEngine:
     """Combine dense (FAISS) and sparse channels (BM25, SPLADE) via RRF."""
 
@@ -234,6 +251,8 @@ class HybridSearchEngine:
         self._splade_provider: SpladeSearchProvider | None = None
         self._bm25_error: str | None = None
         self._splade_error: str | None = None
+        self._bm25_skip_reason: str | None = None
+        self._splade_skip_reason: str | None = None
         self._bm25_lock = Lock()
         self._splade_lock = Lock()
 
@@ -290,12 +309,24 @@ class HybridSearchEngine:
             - warnings: Any warnings generated during channel retrieval (e.g., index
               unavailable, encoding failures)
         """
+        timeline = current_timeline()
         runs, warnings = self._gather_channel_hits(query, semantic_hits)
         if extra_channels:
             for name, hits in extra_channels.items():
                 if not hits:
                     continue
                 runs[name] = list(hits)
+        if timeline is not None and runs:
+            total_candidates = sum(len(hits) for hits in runs.values())
+            timeline.event(
+                "hybrid.fuse.start",
+                "fusion",
+                attrs={
+                    "channels": list(runs.keys()),
+                    "rrf_k": self._settings.index.rrf_k,
+                    "total": total_candidates,
+                },
+            )
         if not runs:
             return HybridSearchResult(
                 docs=[],
@@ -318,12 +349,25 @@ class HybridSearchEngine:
                 limit=limit,
             )
         active_channels = [channel for channel, hits in runs.items() if hits]
-        return HybridSearchResult(
+        result = HybridSearchResult(
             docs=docs,
             contributions={doc.doc_id: contributions.get(doc.doc_id, []) for doc in docs},
             channels=active_channels,
             warnings=warnings,
         )
+        if timeline is not None:
+            total_candidates = sum(len(hits) for hits in runs.values())
+            timeline.event(
+                "hybrid.fuse.end",
+                "fusion",
+                attrs={
+                    "returned": len(result.docs),
+                    "channels": active_channels,
+                    "rrf_k": self._settings.index.rrf_k,
+                    "total": total_candidates,
+                },
+            )
+        return result
 
     def _gather_channel_hits(
         self,
@@ -363,15 +407,26 @@ class HybridSearchEngine:
         """
         runs: dict[str, list[ChannelHit]] = {}
         warnings: list[str] = []
+        timeline = current_timeline()
 
         semantic_channel_hits = self._build_semantic_channel_hits(semantic_hits)
         if semantic_channel_hits:
             runs["semantic"] = semantic_channel_hits
+        if timeline is not None:
+            timeline.event(
+                "hybrid.semantic.run",
+                "semantic",
+                attrs={"hits": len(semantic_channel_hits)},
+            )
 
         if self._settings.index.enable_bm25_channel:
-            self._maybe_add_bm25_hits(query, runs, warnings)
+            self._maybe_add_bm25_hits(query, runs, warnings, timeline)
+        elif timeline is not None:
+            timeline.event("hybrid.bm25.skip", "bm25", attrs={"reason": "disabled"})
         if self._settings.index.enable_splade_channel:
-            self._maybe_add_splade_hits(query, runs, warnings)
+            self._maybe_add_splade_hits(query, runs, warnings, timeline)
+        elif timeline is not None:
+            timeline.event("hybrid.splade.skip", "splade", attrs={"reason": "disabled"})
 
         return runs, warnings
 
@@ -380,12 +435,19 @@ class HybridSearchEngine:
         query: str,
         runs: dict[str, list[ChannelHit]],
         warnings: list[str],
+        timeline: Timeline | None,
     ) -> None:
         """Populate BM25 hits when the channel is available."""
         provider = self._ensure_bm25_provider()
         if provider is None:
             if self._bm25_error:
                 warnings.append(self._bm25_error)
+            if timeline is not None:
+                timeline.event(
+                    "hybrid.bm25.skip",
+                    "bm25",
+                    attrs={"reason": self._bm25_skip_reason or "provider_error"},
+                )
             return
 
         try:
@@ -397,22 +459,38 @@ class HybridSearchEngine:
             msg = f"BM25 channel unavailable: {exc}"
             warnings.append(msg)
             LOGGER.warning(msg, exc_info=exc)
+            self._bm25_skip_reason = "provider_error"
+            if timeline is not None:
+                timeline.event(
+                    "hybrid.bm25.skip",
+                    "bm25",
+                    attrs={"reason": "provider_error", "message": str(exc)},
+                )
             return
 
         if hits:
             runs["bm25"] = hits
+        if timeline is not None:
+            timeline.event("hybrid.bm25.run", "bm25", attrs={"hits": len(hits)})
 
     def _maybe_add_splade_hits(
         self,
         query: str,
         runs: dict[str, list[ChannelHit]],
         warnings: list[str],
+        timeline: Timeline | None,
     ) -> None:
         """Populate SPLADE hits when the channel is available."""
         provider = self._ensure_splade_provider()
         if provider is None:
             if self._splade_error:
                 warnings.append(self._splade_error)
+            if timeline is not None:
+                timeline.event(
+                    "hybrid.splade.skip",
+                    "splade",
+                    attrs={"reason": self._splade_skip_reason or "provider_error"},
+                )
             return
 
         try:
@@ -424,10 +502,19 @@ class HybridSearchEngine:
             msg = f"SPLADE channel unavailable: {exc}"
             warnings.append(msg)
             LOGGER.warning(msg, exc_info=exc)
+            self._splade_skip_reason = "provider_error"
+            if timeline is not None:
+                timeline.event(
+                    "hybrid.splade.skip",
+                    "splade",
+                    attrs={"reason": "provider_error", "message": str(exc)},
+                )
             return
 
         if hits:
             runs["splade"] = hits
+        if timeline is not None:
+            timeline.event("hybrid.splade.run", "splade", attrs={"hits": len(hits)})
 
     def _ensure_bm25_provider(self) -> BM25SearchProvider | None:
         if self._bm25_provider is not None:
@@ -441,9 +528,11 @@ class HybridSearchEngine:
                 provider = self._create_bm25_provider()
             except (RuntimeError, OSError, ValueError, ImportError) as exc:
                 self._bm25_error = f"BM25 initialization failed: {exc}"
+                self._bm25_skip_reason = _classify_skip_reason(exc)
                 LOGGER.warning("Failed to initialize BM25 search provider", exc_info=exc)
                 return None
             self._bm25_provider = provider
+            self._bm25_skip_reason = None
             return provider
 
     def _ensure_splade_provider(self) -> SpladeSearchProvider | None:
@@ -458,9 +547,11 @@ class HybridSearchEngine:
                 provider = self._create_splade_provider()
             except (RuntimeError, OSError, ValueError, ImportError) as exc:
                 self._splade_error = f"SPLADE initialization failed: {exc}"
+                self._splade_skip_reason = _classify_skip_reason(exc)
                 LOGGER.warning("Failed to initialize SPLADE search provider", exc_info=exc)
                 return None
             self._splade_provider = provider
+            self._splade_skip_reason = None
             return provider
 
     def _create_bm25_provider(self) -> BM25SearchProvider:

@@ -38,6 +38,31 @@ _rng = np.random.default_rng(42)
 _UNIT_TEST_VEC_DIM = 256
 
 
+def _nlist_value(index: Any) -> int | None:
+    """Return nlist from nested FAISS index implementations.
+
+    Returns
+    -------
+    int | None
+        Extracted ``nlist`` value or ``None`` when unavailable.
+    """
+    current: Any | None = index
+    for _ in range(6):
+        if current is None:
+            break
+        candidate = current
+        if hasattr(faiss_module, "downcast_index"):
+            try:
+                candidate = faiss_module.downcast_index(current)
+            except (AttributeError, RuntimeError):
+                candidate = current
+        nlist = getattr(candidate, "nlist", None)
+        if nlist is not None:
+            return int(nlist)
+        current = getattr(candidate, "index", None)
+    return None
+
+
 @pytest.fixture
 def tmp_index_path(tmp_path: Path) -> Path:
     """Create a temporary index path for testing.
@@ -237,7 +262,7 @@ def test_medium_corpus_ivf_flat_nlist(tmp_index_path: Path) -> None:
     # Verify nlist is calculated correctly
     expected_nlist = min(int(np.sqrt(n_vectors)), n_vectors // 39)
     expected_nlist = max(expected_nlist, 100)
-    assert underlying_any.nlist == expected_nlist
+    assert _nlist_value(underlying_any) == expected_nlist
 
 
 @pytest.mark.gpu
@@ -274,7 +299,8 @@ def test_large_corpus_ivf_pq_nlist(tmp_index_path: Path) -> None:
     # Verify nlist is calculated correctly
     expected_nlist = int(np.sqrt(n_vectors))
     expected_nlist = max(expected_nlist, 1024)
-    assert underlying_any.nlist == expected_nlist
+    nlist_value = _nlist_value(underlying_any)
+    assert nlist_value == expected_nlist, f"Expected nlist {expected_nlist}, got {nlist_value}"
 
 
 def test_memory_estimation_small_corpus(tmp_index_path: Path) -> None:

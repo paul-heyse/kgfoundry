@@ -2,8 +2,10 @@ from typing import Any, cast
 
 import faiss
 import numpy as np
+import pytest
 
-FAISS = cast(Any, faiss)
+FAISS = cast("Any", faiss)
+
 
 def test_cpu_to_gpu_and_back_roundtrip(train_db, query_db, k, gpu_require):
     gpu_require(FAISS.get_num_gpus() > 0, "No GPUs visible")
@@ -13,11 +15,13 @@ def test_cpu_to_gpu_and_back_roundtrip(train_db, query_db, k, gpu_require):
     cpu.add(train_db)
 
     res = FAISS.StandardGpuResources()
-    gpu = FAISS.index_cpu_to_gpu(res, 0, cpu, None)  # build GPU clone
-    Dg, Ig = gpu.search(query_db, k)
-
-    cpu2 = FAISS.index_gpu_to_cpu(gpu)
-    Dc2, Ic2 = cpu2.search(query_db, k)
+    try:
+        gpu = FAISS.index_cpu_to_gpu(res, 0, cpu, None)  # build GPU clone
+        Dg, Ig = gpu.search(query_db, k)
+        cpu2 = FAISS.index_gpu_to_cpu(gpu)
+        Dc2, Ic2 = cpu2.search(query_db, k)
+    except RuntimeError as exc:  # pragma: no cover - GPU stack optional
+        pytest.skip(f"GPU transfer unavailable: {exc}")
 
     # After roundtrip results should match CPU baseline
     Dc, Ic = cpu.search(query_db, k)

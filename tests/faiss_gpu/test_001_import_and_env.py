@@ -1,10 +1,9 @@
 import importlib.util as u
-
 from typing import Any, cast
 
 import faiss
 
-FAISS = cast(Any, faiss)
+FAISS = cast("Any", faiss)
 
 
 def test_gpu_wrapper_present_and_device_visible(gpu_require):

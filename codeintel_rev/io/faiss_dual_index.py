@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import json
+from contextlib import suppress
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from types import ModuleType
@@ -475,17 +476,27 @@ class FAISSDualIndexManager:
 
     @staticmethod
     def _configure_direct_map(index: faiss.Index, faiss_module: ModuleType) -> None:
-        direct_map = getattr(index, "direct_map", None)
-        direct_map_type = getattr(faiss_module, "DirectMap", None)
-        if direct_map is None or direct_map_type is None:
-            return
         try:
-            direct_map.set_type(faiss_module.DirectMap.Array)
-        except AttributeError:
-            LOGGER.debug(
-                "faiss_direct_map_set_type_failed",
-                extra={"index": type(index).__name__},
-            )
+            concrete = faiss_module.downcast_index(index)
+        except (AttributeError, RuntimeError):
+            concrete = index
+        direct_map = getattr(concrete, "direct_map", None)
+        direct_map_type = getattr(faiss_module, "DirectMap", None)
+        if direct_map is not None and direct_map_type is not None:
+            try:
+                direct_map.set_type(faiss_module.DirectMap.Array)
+            except (AttributeError, TypeError):
+                LOGGER.debug(
+                    "faiss_direct_map_set_type_failed",
+                    extra={"index": type(index).__name__},
+                )
+        make_direct_map = getattr(concrete, "make_direct_map", None)
+        if callable(make_direct_map):
+            with suppress(AttributeError, RuntimeError):
+                make_direct_map()
+        base_index = getattr(index, "index", None)
+        if base_index is not None:
+            FAISSDualIndexManager._configure_direct_map(base_index, faiss_module)
 
     def _load_manifest(self) -> None:
         manifest_path = self._index_dir / "primary.manifest.json"

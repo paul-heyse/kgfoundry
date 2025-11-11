@@ -6,9 +6,11 @@ import os
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from threading import RLock
+from threading import Condition, RLock
 from typing import Literal, Protocol, TypeVar, final, runtime_checkable
 
+from codeintel_rev.errors import RuntimeLifecycleError, RuntimeUnavailableError
+from codeintel_rev.runtime.factory_adjustment import FactoryAdjuster, NoopFactoryAdjuster
 from kgfoundry_common.logging import get_logger
 
 T = TypeVar("T")
@@ -89,203 +91,109 @@ class NullRuntimeCellObserver:
 
 @final
 class RuntimeCell[T]:
-    """Thread-safe lazy holder for mutable runtime state.
+    """Thread-safe lazy holder for mutable runtime state with single-flight init."""
 
-    Extended Summary
-    ----------------
-    The cell stores a single payload created on demand via :meth:`get_or_initialize`.
-    Test suites can inject fakes via :meth:`seed` when ``PYTEST_CURRENT_TEST`` or
-    ``KGFOUNDRY_ALLOW_RUNTIME_SEED=1`` is set. The :meth:`close` method resets the
-    cell and best-effort invokes ``close()``/``__exit__`` on the payload. The cell
-    uses a reentrant lock to ensure thread-safe initialization and disposal, making
-    it suitable for use in multi-threaded environments where runtime resources need
-    to be lazily initialized and safely cleaned up.
-
-    Parameters
-    ----------
-    name : str | None, optional
-        Optional identifier used in debug logging and observer callbacks. Defaults
-        to ``"runtime"``.
-    observer : RuntimeCellObserver | None, optional
-        Observer instance that receives lifecycle callbacks (on_init_start,
-        on_init_end, on_close_end). Used for instrumentation, monitoring, and
-        diagnostics. If None (default), uses NullRuntimeCellObserver which
-        suppresses all callbacks. Defaults to None.
-    """
-
-    __slots__ = ("_initialized", "_lock", "_name", "_observer", "_value")
+    __slots__ = (
+        "_adjuster",
+        "_condition",
+        "_initialized",
+        "_last_error",
+        "_lock",
+        "_max_waiters",
+        "_name",
+        "_observer",
+        "_state",
+        "_value",
+        "_wait_timeout_s",
+        "_waiters",
+    )
 
     def __init__(
         self,
         *,
         name: str | None = None,
         observer: RuntimeCellObserver | None = None,
+        max_waiters: int = 32,
+        wait_timeout_ms: int = 1500,
     ) -> None:
         self._lock = RLock()
+        self._condition = Condition(self._lock)
         self._value: T | None = None
         self._initialized = False
         self._name = name or "runtime"
         self._observer: RuntimeCellObserver = observer or NullRuntimeCellObserver()
+        self._state: Literal["empty", "initializing", "ready", "failed", "closed"] = "empty"
+        self._last_error: Exception | None = None
+        self._max_waiters = max_waiters
+        self._wait_timeout_s = max(0, wait_timeout_ms) / 1000.0
+        self._waiters = 0
+        self._adjuster: FactoryAdjuster = NoopFactoryAdjuster()
 
     def __repr__(self) -> str:
-        """
-        Return a concise representation without exposing payload internals.
+        """Return a concise representation without exposing payload internals.
 
         Returns
         -------
         str
-            Debug-friendly representation that omits the payload itself.
+            Debug-friendly representation.
         """
-        return f"RuntimeCell(name={self._name!r}, initialized={self._initialized})"
+        return f"RuntimeCell(name={self._name!r}, state={self._state})"
 
     def __bool__(self) -> bool:
-        """
-        Return ``True`` when the cell currently holds a value.
+        """Return ``True`` when the cell currently holds a value.
 
         Returns
         -------
         bool
-            ``True`` if a payload exists; otherwise ``False``.
+            ``True`` when a payload is cached.
         """
         return self.peek() is not None
 
     def peek(self) -> T | None:
-        """
-        Return the current payload without triggering initialization.
+        """Return the cached payload without triggering initialization.
 
         Returns
         -------
         T | None
-            The cached payload if present; otherwise ``None``.
+            Cached payload when present, otherwise ``None``.
         """
         with self._lock:
             return self._value
 
     def configure_observer(self, observer: RuntimeCellObserver) -> None:
-        """Attach an observer that receives lifecycle callbacks.
-
-        Parameters
-        ----------
-        observer : RuntimeCellObserver
-            Observer instance. May be swapped once during context wiring.
-        """
-        with self._lock:
+        """Attach an observer that receives lifecycle callbacks."""
+        with self._condition:
             self._observer = observer
 
+    def configure_adjuster(
+        self,
+        adjuster: FactoryAdjuster,
+    ) -> None:
+        """Attach a factory adjuster that can wrap the initializer."""
+        with self._condition:
+            self._adjuster = adjuster
+
     def get_or_initialize(self, factory: Callable[[], T]) -> T:
-        """
-        Return the payload, invoking ``factory`` exactly once when empty.
-
-        Extended Summary
-        ----------------
-        This method implements thread-safe lazy initialization using double-checked
-        locking. If the cell already contains a payload, it returns immediately.
-        Otherwise, it acquires a lock, checks again (to handle race conditions),
-        and invokes the factory function to create the payload. The factory is
-        called exactly once, even under concurrent access. Observer callbacks are
-        invoked before and after initialization, providing instrumentation hooks
-        for monitoring and diagnostics.
-
-        Parameters
-        ----------
-        factory : Callable[[], T]
-            Callable that builds the runtime payload. Must be a zero-argument function
-            that returns an instance of type T. The factory is invoked only when the
-            cell is empty, and its return value is cached for subsequent calls.
+        """Return or initialize the payload with single-flight semantics.
 
         Returns
         -------
         T
-            Existing payload if present, otherwise the value returned by ``factory``.
-            The payload is cached for subsequent calls, ensuring the factory is
-            invoked at most once.
-
-        Raises
-        ------
-        Exception
-            Any exception raised by the factory function is logged with context
-            (cell name, exception type, error message) and re-raised to the caller.
-            The cell remains in an uninitialized state after a factory failure,
-            allowing retry on subsequent calls.
-
-        Notes
-        -----
-        Time complexity O(1) for cached payload access; O(F) for initialization
-        where F is the cost of the factory function. Space complexity O(1) aside
-        from the payload itself. The method performs I/O if the factory performs
-        I/O (e.g., loading files, establishing network connections). Thread-safe
-        due to reentrant lock acquisition. The method is idempotent - multiple
-        concurrent calls with the same factory converge to a single initialization.
-
-        Any exception raised by the factory function is logged with context (cell
-        name, exception type, error message) and re-raised to the caller. The cell
-        remains in an uninitialized state after a factory failure, allowing retry
-        on subsequent calls.
-
-        Examples
-        --------
-        >>> cell = RuntimeCell(name="my-runtime")
-        >>> def create_client():
-        ...     return MyClient()
-        >>> client = cell.get_or_initialize(create_client)
-        >>> assert client is not None
-        >>> # Subsequent calls return the same instance
-        >>> assert cell.get_or_initialize(create_client) is client
+            Cached payload instance.
         """
-        value = self._value
-        if value is not None:
-            return value
-
-        with self._lock:
-            if self._value is not None:
-                return self._value
-            start = time.monotonic()
-            self._observer.on_init_start(cell=self._name)
-            try:
-                created = factory()
-            except Exception as exc:
-                duration_ms = (time.monotonic() - start) * 1000
-                LOGGER.warning(
-                    "runtime_cell_init_failed",
-                    extra={
-                        "cell_type": self._name,
-                        "status": "error",
-                        "exc_type": type(exc).__name__,
-                        "error_message": str(exc),
-                    },
-                )
-                self._observer.on_init_end(
-                    RuntimeCellInitResult(
-                        cell=self._name,
-                        payload=None,
-                        status="error",
-                        duration_ms=duration_ms,
-                        error=exc,
-                    )
-                )
-                raise
-            self._value = created
-            self._initialized = True
-            duration_ms = (time.monotonic() - start) * 1000
-            LOGGER.debug(
-                "runtime_cell_initialized",
-                extra={
-                    "cell_type": self._name,
-                    "payload_type": type(created).__name__,
-                    "duration_ms": duration_ms,
-                    "status": "ok",
-                },
-            )
-            self._observer.on_init_end(
-                RuntimeCellInitResult(
-                    cell=self._name,
-                    payload=created,
-                    status="ok",
-                    duration_ms=duration_ms,
-                    error=None,
-                )
-            )
-            return created
+        adjusted_factory = self._adjust_factory(factory)
+        deadline = time.monotonic() + (self._wait_timeout_s or 0)
+        while True:
+            with self._condition:
+                if self._state == "ready" and self._value is not None:
+                    return self._value
+                if self._state == "initializing":
+                    self._wait_for_initializer(deadline)
+                    continue
+                if self._state in {"failed", "empty", "closed"}:
+                    self._state = "initializing"
+                    break
+        return self._run_initializer(adjusted_factory)
 
     def seed(self, value: T) -> None:
         """
@@ -305,12 +213,15 @@ class RuntimeCell[T]:
         if not _seed_allowed():
             raise RuntimeError(_SEED_GUARD_MESSAGE)
 
-        with self._lock:
+        with self._condition:
             if self._value is not None:
-                already_msg = "RuntimeCell is already initialized"
-                raise RuntimeError(already_msg)
+                message = "RuntimeCell is already initialized"
+                raise RuntimeError(message)
             self._value = value
             self._initialized = True
+            self._state = "ready"
+            self._last_error = None
+            self._condition.notify_all()
 
     def close(self, *, silent: bool = True) -> None:
         """Clear the payload and attempt to release runtime resources.
@@ -364,10 +275,13 @@ class RuntimeCell[T]:
         to the caller. The specific exception types listed in Raises are the most
         common, but other exception types may also be propagated.
         """
-        with self._lock:
+        with self._condition:
             current = self._value
             self._value = None
             self._initialized = False
+            self._state = "empty"
+            self._last_error = None
+            self._condition.notify_all()
 
         start = time.monotonic()
         if current is None:
@@ -484,6 +398,99 @@ class RuntimeCell[T]:
 
             return _run_exit, False
         return None, False
+
+    def _adjust_factory(self, factory: Callable[[], T]) -> Callable[[], T]:
+        return self._adjuster.adjust(cell=self._name, factory=factory)
+
+    def _wait_for_initializer(self, deadline: float) -> None:
+        if self._max_waiters and self._waiters >= self._max_waiters:
+            message = "runtime warming_up"
+            raise RuntimeUnavailableError(message, runtime=self._name)
+        self._waiters += 1
+        try:
+            while self._state == "initializing":
+                timeout = None
+                if self._wait_timeout_s:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        message = "runtime warming_up"
+                        raise RuntimeUnavailableError(message, runtime=self._name)
+                    timeout = remaining
+                self._condition.wait(timeout=timeout)
+        finally:
+            self._waiters -= 1
+        if self._state == "failed" and self._last_error is not None:
+            message = f"{self._name} initialization failed"
+            raise RuntimeLifecycleError(
+                message,
+                runtime=self._name,
+                cause=self._last_error,
+            ) from self._last_error
+
+    def _run_initializer(self, factory: Callable[[], T]) -> T:
+        start = time.monotonic()
+        self._observer.on_init_start(cell=self._name)
+        try:
+            created = factory()
+        except Exception as exc:
+            duration_ms = (time.monotonic() - start) * 1000
+            self._handle_init_failure(exc, duration_ms)
+            raise
+        duration_ms = (time.monotonic() - start) * 1000
+        self._handle_init_success(created, duration_ms)
+        return created
+
+    def _handle_init_success(self, payload: T, duration_ms: float) -> None:
+        with self._condition:
+            self._value = payload
+            self._initialized = True
+            self._state = "ready"
+            self._last_error = None
+            self._condition.notify_all()
+        LOGGER.debug(
+            "runtime_cell_initialized",
+            extra={
+                "cell_type": self._name,
+                "payload_type": type(payload).__name__,
+                "duration_ms": duration_ms,
+                "status": "ok",
+            },
+        )
+        self._observer.on_init_end(
+            RuntimeCellInitResult(
+                cell=self._name,
+                payload=payload,
+                status="ok",
+                duration_ms=duration_ms,
+                error=None,
+            )
+        )
+
+    def _handle_init_failure(self, exc: Exception, duration_ms: float) -> None:
+        with self._condition:
+            self._value = None
+            self._initialized = False
+            self._state = "failed"
+            self._last_error = exc
+            self._condition.notify_all()
+        LOGGER.warning(
+            "runtime_cell_init_failed",
+            extra={
+                "cell_type": self._name,
+                "status": "error",
+                "exc_type": type(exc).__name__,
+                "error_message": str(exc),
+            },
+        )
+        self._observer.on_init_end(
+            RuntimeCellInitResult(
+                cell=self._name,
+                payload=None,
+                status="error",
+                duration_ms=duration_ms,
+                error=exc,
+            )
+        )
 
 
 __all__ = [

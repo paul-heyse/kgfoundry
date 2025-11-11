@@ -9,8 +9,16 @@ from codeintel_rev.runtime.cells import (
     RuntimeCellInitResult,
     RuntimeCellObserver,
 )
+from codeintel_rev.runtime.factory_adjustment import (
+    DefaultFactoryAdjuster,
+    FactoryAdjuster,
+    NoopFactoryAdjuster,
+)
 
 __all__ = [
+    "DefaultFactoryAdjuster",
+    "FactoryAdjuster",
+    "NoopFactoryAdjuster",
     "NullRuntimeCellObserver",
     "RuntimeCell",
     "RuntimeCellCloseResult",

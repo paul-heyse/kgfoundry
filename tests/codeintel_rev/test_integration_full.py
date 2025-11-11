@@ -86,6 +86,7 @@ def test_app_readyz_endpoint_healthy() -> None:
         data = response.json()
         assert "ready" in data
         assert "checks" in data
+        assert "active_index_version" in data
         # All checks should be healthy with valid config
         checks = data["checks"]
         assert checks.get("repo_root", {}).get("healthy") is True

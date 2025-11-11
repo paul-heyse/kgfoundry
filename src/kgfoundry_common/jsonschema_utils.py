@@ -11,7 +11,7 @@ re-export the typed surfaces for internal use.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from jsonschema import validate as _jsonschema_validate
 from jsonschema.exceptions import SchemaError as _SchemaError
@@ -96,7 +96,6 @@ def create_draft202012_validator(
         Typed validator instance.
     """
     concrete_schema = {str(key): value for key, value in schema.items()}
-    # pyrefly incorrectly flags this as protocol instantiation, but _Draft202012Validator
-    # is the concrete class from jsonschema.validators, not the Protocol
-    instance = _Draft202012Validator(concrete_schema)  # type: ignore[assignment]
+    validator_ctor = cast("Any", _Draft202012Validator)
+    instance = validator_ctor(concrete_schema)
     return cast("Draft202012ValidatorProtocol", instance)

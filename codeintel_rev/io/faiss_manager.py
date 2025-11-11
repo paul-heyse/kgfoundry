@@ -10,10 +10,13 @@ from __future__ import annotations
 import importlib
 from collections.abc import Callable
 from pathlib import Path
+from time import perf_counter
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, cast
 
 from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.observability.otel import as_span
+from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.typing import NDArrayF32, NDArrayI64, gate_import
 from kgfoundry_common.logging import get_logger
 
@@ -274,7 +277,9 @@ class FAISSManager:
         )
 
         # Wrap in IDMap for ID management
-        self.cpu_index = faiss.IndexIDMap2(cpu_index)
+        cpu_id_map = faiss.IndexIDMap2(cpu_index)
+        self._configure_direct_map(cpu_id_map)
+        self.cpu_index = cpu_id_map
 
     def estimate_memory_usage(self, n_vectors: int) -> dict[str, int]:
         """Estimate memory usage in bytes for a given number of vectors.
@@ -558,20 +563,26 @@ class FAISSManager:
     @staticmethod
     def _configure_direct_map(index: _faiss.Index) -> None:
         """Ensure FAISS direct maps are array-backed for reconstruction."""
-        direct_map = getattr(index, "direct_map", None)
+        FAISSManager._set_direct_map_type(index)
+        base_index = getattr(index, "index", None)
+        if base_index is not None:
+            FAISSManager._set_direct_map_type(base_index)
+
+    @staticmethod
+    def _set_direct_map_type(index: _faiss.Index) -> None:
         try:
-            direct_map_enum = faiss.DirectMap  # type: ignore[attr-defined]
-        except AttributeError:
-            return
-        if direct_map is None:
-            return
-        try:
-            direct_map.set_type(direct_map_enum.Array)
-        except AttributeError:
-            LOGGER.debug(
-                "Failed to set FAISS direct map type",
-                extra=_log_extra(index_type=type(index).__name__),
-            )
+            concrete = faiss.downcast_index(index)
+        except (AttributeError, RuntimeError):
+            concrete = index
+        make_direct_map = getattr(concrete, "make_direct_map", None)
+        if callable(make_direct_map):
+            try:
+                make_direct_map()
+            except (AttributeError, RuntimeError) as exc:
+                LOGGER.debug(
+                    "FAISS make_direct_map failed",
+                    extra=_log_extra(index_type=type(index).__name__, error=str(exc)),
+                )
 
     def save_cpu_index(self) -> None:
         """Save CPU index to disk for persistence.
@@ -617,7 +628,9 @@ class FAISSManager:
             msg = f"Index not found: {self.index_path}"
             raise FileNotFoundError(msg)
 
-        self.cpu_index = faiss.read_index(str(self.index_path))
+        cpu_index = faiss.read_index(str(self.index_path))
+        self._configure_direct_map(cpu_index)
+        self.cpu_index = cpu_index
 
     def save_secondary_index(self) -> None:
         """Save secondary index to disk.
@@ -827,28 +840,68 @@ class FAISSManager:
         `search_secondary()`) if no index is available or if search fails
         (e.g., dimension mismatch, invalid nprobe value).
         """
-        # Search primary index
-        primary_dists, primary_ids = self.search_primary(query, k, nprobe)
-
-        # Search secondary index if it exists
-        if self.secondary_index is not None:
-            secondary_dists, secondary_ids = self.search_secondary(query, k)
-            # Merge results by score
-            merged_dists, merged_ids = self._merge_results(
-                primary_dists, primary_ids, secondary_dists, secondary_ids, k
+        timeline = current_timeline()
+        use_gpu = bool(self.gpu_index)
+        if timeline is not None:
+            timeline.event(
+                "faiss.search.start",
+                "faiss",
+                attrs={
+                    "k": k,
+                    "nprobe": nprobe,
+                    "use_gpu": use_gpu,
+                    "has_secondary": bool(self.secondary_index),
+                },
             )
-            LOGGER.debug(
-                "Dual-index search completed",
-                extra=_log_extra(
-                    primary_results=primary_dists.shape[1],
-                    secondary_results=secondary_dists.shape[1],
-                    merged_results=merged_dists.shape[1],
-                ),
-            )
-            return merged_dists, merged_ids
+        start = perf_counter()
 
-        # No secondary index - return primary results only
-        return primary_dists, primary_ids
+        try:
+            with as_span("faiss.search", k=k, nprobe=nprobe, use_gpu=use_gpu):
+                primary_dists, primary_ids = self.search_primary(query, k, nprobe)
+
+                # Search secondary index if it exists
+                if self.secondary_index is not None:
+                    secondary_dists, secondary_ids = self.search_secondary(query, k)
+                    # Merge results by score
+                    merged_dists, merged_ids = self._merge_results(
+                        primary_dists, primary_ids, secondary_dists, secondary_ids, k
+                    )
+                    LOGGER.debug(
+                        "Dual-index search completed",
+                        extra=_log_extra(
+                            primary_results=primary_dists.shape[1],
+                            secondary_results=secondary_dists.shape[1],
+                            merged_results=merged_dists.shape[1],
+                        ),
+                    )
+                    result = (merged_dists, merged_ids)
+                else:
+                    result = (primary_dists, primary_ids)
+        except Exception as exc:
+            if timeline is not None:
+                timeline.event(
+                    "faiss.search.end",
+                    "faiss",
+                    status="error",
+                    message=str(exc),
+                    attrs={"k": k, "nprobe": nprobe, "use_gpu": use_gpu},
+                )
+            raise
+
+        if timeline is not None:
+            elapsed_ms = int(1000 * (perf_counter() - start))
+            timeline.event(
+                "faiss.search.end",
+                "faiss",
+                attrs={
+                    "duration_ms": elapsed_ms,
+                    "rows": int(result[0].shape[0]),
+                    "k": k,
+                    "nprobe": nprobe,
+                    "use_gpu": use_gpu,
+                },
+            )
+        return result
 
     def search_primary(
         self, query: NDArrayF32, k: int, nprobe: int
@@ -1148,6 +1201,7 @@ class FAISSManager:
         if n_vectors == 0:
             return np.empty((0, self.vec_dim), dtype=np.float32), np.empty(0, dtype=np.int64)
 
+        self._configure_direct_map(index)
         vectors = np.empty((n_vectors, self.vec_dim), dtype=np.float32)
         ids = np.empty(n_vectors, dtype=np.int64)
 
@@ -1166,10 +1220,11 @@ class FAISSManager:
             raise TypeError(msg)
         at_callable = cast("Callable[[int], int]", id_map_obj.at)
 
+        base_index = getattr(index, "index", index)
         for i in range(n_vectors):
             try:
                 stored_id = int(at_callable(i))
-                vectors[i] = index.reconstruct(stored_id)
+                vectors[i] = base_index.reconstruct(i)
                 ids[i] = stored_id
             except (AttributeError, RuntimeError) as exc:
                 msg = f"Failed to extract vector at index {i}: {exc}"

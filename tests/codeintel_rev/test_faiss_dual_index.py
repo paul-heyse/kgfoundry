@@ -60,10 +60,12 @@ def _build_flat_index(vec_dim: int, count: int) -> Any:
     Any
         Flat inner-product index containing ``count`` normalized vectors.
     """
-    index = faiss_module.IndexFlatIP(vec_dim)
+    base = faiss_module.IndexFlatIP(vec_dim)
+    index = faiss_module.IndexIDMap2(base)
     vectors = _rng.standard_normal((count, vec_dim)).astype(np.float32)
     faiss_module.normalize_L2(vectors)
-    index.add(vectors)
+    ids = np.arange(count, dtype=np.int64)
+    index.add_with_ids(vectors, ids)
     return index
 
 
@@ -185,7 +187,7 @@ async def test_gpu_secondary_clone_reuses_cloner_options(
     """GPU cloning shares cloner options across primary and secondary indexes."""
     vec_dim = 8
     primary = _build_flat_index(vec_dim, 4)
-    secondary = faiss_module.IndexFlatIP(vec_dim)
+    secondary = faiss_module.IndexIDMap2(faiss_module.IndexFlatIP(vec_dim))
 
     settings = IndexConfig(vec_dim=vec_dim, use_cuvs=True)
     manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
@@ -229,7 +231,7 @@ async def test_gpu_secondary_clone_reuses_cloner_options(
 async def test_search_primary_only(tmp_path: Path) -> None:
     """Search returns primary results when no secondary index exists."""
     vec_dim = 8
-    primary = faiss_module.IndexFlatIP(vec_dim)
+    primary = faiss_module.IndexIDMap2(faiss_module.IndexFlatIP(vec_dim))
     primary_vectors = np.eye(vec_dim, dtype=np.float32)
     faiss_module.normalize_L2(primary_vectors)
     primary_ids = np.arange(vec_dim, dtype=np.int64)
@@ -257,11 +259,11 @@ async def test_search_merges_secondary(tmp_path: Path) -> None:
     base_vectors = np.eye(vec_dim, dtype=np.float32)
     faiss_module.normalize_L2(base_vectors)
 
-    primary = faiss_module.IndexFlatIP(vec_dim)
+    primary = faiss_module.IndexIDMap2(faiss_module.IndexFlatIP(vec_dim))
     primary.add_with_ids(base_vectors[:2], np.array([10, 11], dtype=np.int64))
     faiss_module.write_index(primary, str(tmp_path / "primary.faiss"))
 
-    secondary = faiss_module.IndexFlatIP(vec_dim)
+    secondary = faiss_module.IndexIDMap2(faiss_module.IndexFlatIP(vec_dim))
     secondary.add_with_ids(base_vectors[2:3], np.array([99], dtype=np.int64))
     faiss_module.write_index(secondary, str(tmp_path / "secondary.faiss"))
 

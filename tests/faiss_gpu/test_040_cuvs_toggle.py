@@ -3,7 +3,8 @@ from typing import Any, cast
 import faiss
 import pytest
 
-FAISS = cast(Any, faiss)
+FAISS = cast("Any", faiss)
+
 
 def test_ivfflat_cuvs_enabled_if_available(train_db, query_db, k, gpu_require):
     gpu_require(FAISS.get_num_gpus() > 0, "No GPUs visible")

@@ -7,8 +7,11 @@ from __future__ import annotations
 
 import asyncio
 import os
+import signal
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager, suppress
+from time import perf_counter
+from types import FrameType
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,8 +23,13 @@ from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.gpu_warmup import warmup_gpu
 from codeintel_rev.app.middleware import SessionScopeMiddleware
 from codeintel_rev.app.readiness import ReadinessProbe
+from codeintel_rev.app.routers import index_admin
 from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.mcp_server.server import app_context, build_http_app
+from codeintel_rev.observability.otel import as_span, init_telemetry
+from codeintel_rev.observability.runtime_observer import TimelineRuntimeObserver
+from codeintel_rev.observability.timeline import bind_timeline, new_timeline
+from codeintel_rev.runtime.cells import RuntimeCellObserver
 from kgfoundry_common.errors import ConfigurationError
 from kgfoundry_common.logging import get_logger
 
@@ -134,6 +142,8 @@ def _preload_hybrid_if_configured(context: ApplicationContext) -> None:
 
 async def _initialize_context(
     app: FastAPI,
+    *,
+    runtime_observer: RuntimeCellObserver | None = None,
 ) -> tuple[ApplicationContext, ReadinessProbe]:
     """Initialize application context, readiness probe, and optional runtimes.
 
@@ -151,6 +161,9 @@ async def _initialize_context(
     app : FastAPI
         FastAPI application instance. Used to store application context and
         readiness probe in app.state for access by request handlers.
+    runtime_observer : RuntimeCellObserver | None, optional
+        Observer attached to runtime cells for instrumentation. Defaults to a
+        no-op observer when not provided.
 
     Returns
     -------
@@ -179,7 +192,13 @@ async def _initialize_context(
     >>> assert context is not None
     >>> assert readiness is not None
     """
-    context = ApplicationContext.create()
+    try:
+        context = ApplicationContext.create(runtime_observer=runtime_observer)
+    except TypeError as exc:
+        if "runtime_observer" in str(exc):
+            context = ApplicationContext.create()
+        else:  # pragma: no cover - defensive
+            raise
     app.state.context = context
     _log_gpu_warmup(warmup_gpu())
     readiness = ReadinessProbe(context)
@@ -261,11 +280,33 @@ async def lifespan(
     context: ApplicationContext | None = None
     readiness: ReadinessProbe | None = None
 
+    startup_timeline = new_timeline("startup", force=True)
+    observer = TimelineRuntimeObserver(startup_timeline)
+    hup_handler_installed = False
+    previous_sighup = None
     try:
-        context, readiness = await _initialize_context(app)
+        with bind_timeline(startup_timeline):
+            context, readiness = await _initialize_context(app, runtime_observer=observer)
         capabilities = Capabilities.from_context(context)
         app.state.capabilities = capabilities
+        app.state.capability_stamp = capabilities.stamp()
         app.mount("/mcp", build_http_app(capabilities))
+        init_telemetry(app)
+        if os.name != "nt":
+            previous_sighup = signal.getsignal(signal.SIGHUP)
+
+            def _handle_hup(
+                signum: int, frame: FrameType | None
+            ) -> None:  # pragma: no cover - signal path
+                _ = (signum, frame)
+                LOGGER.info("SIGHUP received - reloading index-backed runtimes")
+                try:
+                    context.reload_indices()
+                except (RuntimeError, OSError, ValueError):
+                    LOGGER.warning("signal.hup.reload_failed", exc_info=True)
+
+            signal.signal(signal.SIGHUP, _handle_hup)
+            hup_handler_installed = True
         yield
     except ConfigurationError as exc:
         LOGGER.exception(
@@ -274,6 +315,9 @@ async def lifespan(
         )
         raise
     finally:
+        if hup_handler_installed and previous_sighup is not None and os.name != "nt":
+            with suppress(ValueError):  # pragma: no cover - defensive
+                signal.signal(signal.SIGHUP, previous_sighup)
         await _shutdown_context(context, readiness)
 
 
@@ -297,6 +341,9 @@ app.add_middleware(
 
 # Session scope middleware (must be registered after CORS to avoid preflight conflicts)
 app.add_middleware(SessionScopeMiddleware)
+
+if os.getenv("CODEINTEL_ADMIN", "").strip().lower() in {"1", "true", "yes", "on"}:
+    app.include_router(index_admin.router)
 
 
 @app.middleware("http")
@@ -326,7 +373,33 @@ async def set_mcp_context(
     if context is not None:
         app_context.set(context)
 
-    return await call_next(request)
+    timeline = getattr(request.state, "timeline", None)
+    start = perf_counter()
+    try:
+        with as_span("http.request", path=request.url.path, method=request.method):
+            response = await call_next(request)
+    except Exception as exc:
+        if timeline is not None:
+            timeline.event(
+                "http.request",
+                request.url.path,
+                status="error",
+                message=str(exc),
+                attrs={"method": request.method},
+            )
+        raise
+    if timeline is not None:
+        duration_ms = int((perf_counter() - start) * 1000)
+        timeline.event(
+            "http.request",
+            request.url.path,
+            attrs={
+                "method": request.method,
+                "status_code": response.status_code,
+                "duration_ms": duration_ms,
+            },
+        )
+    return response
 
 
 @app.middleware("http")
@@ -399,7 +472,17 @@ async def readyz(request: Request) -> JSONResponse:
     results = await readiness.refresh()
     payload = {name: result.as_payload() for name, result in results.items()}
     overall_ready = all(result.healthy for result in results.values())
-    return JSONResponse({"ready": overall_ready, "checks": payload})
+    context: ApplicationContext | None = getattr(request.app.state, "context", None)
+    active_version = None
+    if context is not None:
+        with suppress(RuntimeError):
+            active_version = context.index_manager.current_version()
+    response_payload = {
+        "ready": overall_ready,
+        "checks": payload,
+        "active_index_version": active_version,
+    }
+    return JSONResponse(response_payload)
 
 
 @app.get("/capz")
@@ -421,7 +504,11 @@ async def capz(request: Request, *, refresh: bool = False) -> JSONResponse:
     if refresh or capabilities is None:
         capabilities = Capabilities.from_context(context)
         request.app.state.capabilities = capabilities
-    return JSONResponse(capabilities.model_dump())
+        request.app.state.capability_stamp = capabilities.stamp()
+    payload = capabilities.model_dump()
+    stamp: str = getattr(request.app.state, "capability_stamp", capabilities.stamp(payload))
+    payload["stamp"] = stamp
+    return JSONResponse(payload)
 
 
 @app.get("/sse")

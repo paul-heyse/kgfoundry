@@ -53,12 +53,21 @@ def test_capabilities_snapshot_reports_paths(tmp_path, monkeypatch) -> None:
     payload = snapshot.model_dump()
     assert payload["duckdb_catalog_present"] is True
     assert payload["faiss_gpu_disabled_reason"] is None
+    assert payload["active_index_version"] is None
+    assert payload["versions_available"] == 0
 
 
 def test_capz_endpoint_refresh(tmp_path, monkeypatch) -> None:
     ctx = build_application_context(tmp_path)
     initial = Capabilities(faiss_index=True, duckdb=True, scip_index=True, vllm_client=True)
-    refreshed = Capabilities(faiss_index=False, duckdb=False, scip_index=False, vllm_client=False)
+    refreshed = Capabilities(
+        faiss_index=False,
+        duckdb=False,
+        scip_index=False,
+        vllm_client=False,
+        active_index_version="v2",
+        versions_available=2,
+    )
 
     def _fake_from_context(_cls: type[Capabilities], _context: object) -> Capabilities:
         return refreshed
@@ -77,8 +86,13 @@ def test_capz_endpoint_refresh(tmp_path, monkeypatch) -> None:
     with TestClient(app) as client:
         resp = client.get("/capz")
         assert resp.status_code == 200
-        assert resp.json()["faiss_index_present"] is True
+        body = resp.json()
+        assert body["faiss_index_present"] is True
+        assert "active_index_version" in body
 
         refreshed_resp = client.get("/capz", params={"refresh": "true"})
         assert refreshed_resp.status_code == 200
-        assert refreshed_resp.json()["faiss_index_present"] is False
+        body = refreshed_resp.json()
+        assert body["faiss_index_present"] is False
+        assert body["active_index_version"] == "v2"
+        assert body["versions_available"] == 2

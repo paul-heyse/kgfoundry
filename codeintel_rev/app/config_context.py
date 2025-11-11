@@ -46,6 +46,7 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 from __future__ import annotations
 
 import importlib
+import os
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -57,6 +58,7 @@ import redis.asyncio as redis_asyncio
 from codeintel_rev.app.scope_store import ScopeStore
 from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.errors import RuntimeUnavailableError
+from codeintel_rev.indexing.index_lifecycle import IndexLifecycleManager
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
@@ -65,6 +67,11 @@ from codeintel_rev.runtime import (
     NullRuntimeCellObserver,
     RuntimeCell,
     RuntimeCellObserver,
+)
+from codeintel_rev.runtime.factory_adjustment import (
+    DefaultFactoryAdjuster,
+    FactoryAdjuster,
+    NoopFactoryAdjuster,
 )
 from codeintel_rev.typing import gate_import
 from kgfoundry_common.errors import ConfigurationError
@@ -85,6 +92,51 @@ else:  # pragma: no cover - runtime only; annotations are postponed
 LOGGER = get_logger(__name__)
 
 __all__ = ["ApplicationContext", "ResolvedPaths", "resolve_application_paths"]
+
+
+def _infer_index_root(paths: ResolvedPaths) -> Path:
+    """Return the directory that stores versioned index assets.
+
+    Returns
+    -------
+    Path
+        Directory containing the lifecycle manifest and versions.
+    """
+    env_override = os.getenv("CODEINTEL_INDEXES_DIR")
+    if env_override:
+        return Path(env_override).expanduser().resolve()
+    faiss_parent = paths.faiss_index.parent
+    if faiss_parent.name == "current":
+        return faiss_parent.parent
+    return faiss_parent
+
+
+def _build_factory_adjuster(settings: Settings) -> FactoryAdjuster:
+    """Return a DefaultFactoryAdjuster derived from settings.
+
+    Returns
+    -------
+    FactoryAdjuster
+        Adjuster informed by ``settings.index`` defaults.
+    """
+    try:
+        rrf_weights = getattr(settings.index, "rrf_weights", {})
+        return DefaultFactoryAdjuster(
+            faiss_nprobe=getattr(settings.index, "faiss_nprobe", None),
+            hybrid_rrf_k=getattr(settings.index, "rrf_k", None),
+            hybrid_bm25_weight=rrf_weights.get("bm25"),
+            hybrid_splade_weight=rrf_weights.get("splade"),
+        )
+    except (AttributeError, TypeError, ValueError):  # pragma: no cover - defensive
+        return NoopFactoryAdjuster()
+
+
+_FROZEN_SETATTR = object.__setattr__
+
+
+def _assign_frozen(instance: object, name: str, value: object) -> None:
+    """Assign attribute on a frozen dataclass instance."""
+    _FROZEN_SETATTR(instance, name, value)
 
 
 def _import_faiss_manager_cls() -> type[FAISSManager]:
@@ -459,6 +511,12 @@ class _ContextRuntimeState:
         self.coderank_faiss.configure_observer(observer)
         self.xtr.configure_observer(observer)
 
+    def attach_adjuster(self, adjuster: FactoryAdjuster) -> None:
+        """Attach a factory adjuster to each runtime cell."""
+        self.hybrid.configure_adjuster(adjuster)
+        self.coderank_faiss.configure_adjuster(adjuster)
+        self.xtr.configure_adjuster(adjuster)
+
     def iter_cells(self) -> tuple[tuple[str, RuntimeCell[Any]], ...]:
         """Return ordered tuples of runtime cell names and instances.
 
@@ -561,19 +619,29 @@ class ApplicationContext:
     runtime_observer: RuntimeCellObserver = field(
         default_factory=NullRuntimeCellObserver, repr=False
     )
+    factory_adjuster: FactoryAdjuster = field(default_factory=NoopFactoryAdjuster, repr=False)
     _runtime: _ContextRuntimeState = field(
         default_factory=_ContextRuntimeState, init=False, repr=False
     )
+    index_manager: IndexLifecycleManager = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         """Attach the configured observer to all runtime cells."""
         self._runtime.attach_observer(self.runtime_observer)
+        self._runtime.attach_adjuster(self.factory_adjuster)
+        index_root = _infer_index_root(self.paths)
+        _assign_frozen(self, "index_manager", IndexLifecycleManager(index_root))
+        LOGGER.debug(
+            "Initialized index lifecycle manager",
+            extra={"index_root": str(index_root)},
+        )
 
     @classmethod
     def create(
         cls,
         *,
         runtime_observer: RuntimeCellObserver | None = None,
+        factory_adjuster: FactoryAdjuster | None = None,
     ) -> ApplicationContext:
         """Create application context from environment variables.
 
@@ -595,6 +663,9 @@ class ApplicationContext:
             (hybrid engine, FAISS manager, XTR index). Used for instrumentation,
             monitoring, and diagnostics. If None (default), uses NullRuntimeCellObserver
             which suppresses all callbacks. Defaults to None.
+        factory_adjuster : FactoryAdjuster | None, optional
+            Optional adjuster applied to runtime factories. When ``None``, a default
+            adjuster derived from ``settings.index`` is used.
 
         Returns
         -------
@@ -681,6 +752,7 @@ class ApplicationContext:
 
         observer = runtime_observer or NullRuntimeCellObserver()
 
+        adjuster = factory_adjuster or _build_factory_adjuster(settings)
         return cls(
             settings=settings,
             paths=paths,
@@ -691,6 +763,7 @@ class ApplicationContext:
             git_client=git_client,
             async_git_client=async_git_client,
             runtime_observer=observer,
+            factory_adjuster=adjuster,
         )
 
     def _iter_runtime_cells(self) -> tuple[tuple[str, RuntimeCell[Any]], ...]:
@@ -702,6 +775,34 @@ class ApplicationContext:
             Tuple of runtime cell name/value pairs.
         """
         return self._runtime.iter_cells()
+
+    def reload_indices(self) -> None:
+        """Close runtime cells so they reopen against the active index version."""
+        LOGGER.info("Reloading runtime cells after index lifecycle change")
+        for name, cell in self._iter_runtime_cells():
+            try:
+                cell.close()
+            except (RuntimeError, OSError, ValueError):  # pragma: no cover - defensive logging
+                LOGGER.warning("runtime.reload_failed", extra={"cell": name}, exc_info=True)
+        faiss_state = self._runtime.faiss
+        with faiss_state.lock:
+            faiss_state.loaded = False
+            faiss_state.gpu_attempted = False
+        self.faiss_manager.cpu_index = None
+        self.faiss_manager.gpu_index = None
+        self.faiss_manager.secondary_gpu_index = None
+        self.faiss_manager.gpu_resources = None
+
+    def apply_factory_adjuster(self, adjuster: FactoryAdjuster) -> None:
+        """Update runtime tuning knobs and reset cells to pick up changes."""
+        LOGGER.info("Applying runtime factory adjuster")
+        _assign_frozen(self, "factory_adjuster", adjuster)
+        self._runtime.attach_adjuster(adjuster)
+        for name, cell in self._iter_runtime_cells():
+            try:
+                cell.close()
+            except (RuntimeError, OSError, ValueError):  # pragma: no cover - defensive
+                LOGGER.warning("runtime.adjuster.reset_failed", extra={"cell": name}, exc_info=True)
 
     def get_hybrid_engine(self) -> HybridSearchEngine:
         """Return the hybrid search engine, instantiating it lazily.

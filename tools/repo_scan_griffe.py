@@ -16,6 +16,12 @@ except ImportError:  # pragma: no cover - optional dependency at runtime
     griffe = None  # type: ignore[assignment]
     Docstring = None  # type: ignore[assignment]
     GriffeError = RuntimeError  # type: ignore[assignment]
+    AliasResolutionError = RuntimeError  # type: ignore[assignment]
+else:
+    try:  # pragma: no cover - optional dependency
+        from griffe.exceptions import AliasResolutionError  # type: ignore[attr-defined]
+    except (ImportError, AttributeError):
+        AliasResolutionError = GriffeError  # type: ignore[assignment]
 
 type DocstringStyle = Literal["google", "numpy", "sphinx", "auto"]
 
@@ -104,7 +110,17 @@ def _iter_objects(root: GriffeModule) -> Iterator[GriffeObject]:
         # Include declared (non-inherited) members
         for member in obj.members.values():
             if getattr(member, "is_alias", False):
-                target = getattr(member, "target", None)
+                try:
+                    target = getattr(member, "target", None)
+                except (
+                    AttributeError,
+                    KeyError,
+                    AliasResolutionError,
+                ):  # pragma: no cover - defensive
+                    LOGGER.debug(
+                        "Skipping alias %s due to resolution error", getattr(member, "path", member)
+                    )
+                    continue
                 if target is not None:
                     stack.append(cast("GriffeObject", target))
                 continue
@@ -408,11 +424,50 @@ def collect_api_symbols_with_griffe(
         try:
             module = griffe.load(name, search_paths=search_paths)
             modules.append(cast("GriffeModule", module))
-        except (GriffeError, ImportError, ModuleNotFoundError, OSError, FileNotFoundError) as exc:
+        except (
+            GriffeError,
+            ImportError,
+            ModuleNotFoundError,
+            OSError,
+            FileNotFoundError,
+            KeyError,
+        ) as exc:
             LOGGER.debug("Skipping package %s due to load error: %s", name, exc)
             continue
 
     symbols: list[ApiSymbol] = []
     for module in modules:
-        symbols.extend(_build_symbol(obj, docstyle=docstyle) for obj in _iter_objects(module))
+        try:
+            iterator = _iter_objects(module)
+            objects = list(iterator)
+        except (
+            AttributeError,
+            KeyError,
+            ValueError,
+            RuntimeError,
+            AliasResolutionError,
+        ) as exc:  # pragma: no cover - defensive
+            LOGGER.debug(
+                "Skipping module %s due to traversal error: %s",
+                getattr(module, "path", module),
+                exc,
+            )
+            continue
+        for obj in objects:
+            current_obj = obj
+            try:
+                symbols.append(_build_symbol(current_obj, docstyle=docstyle))
+            except (
+                AttributeError,
+                KeyError,
+                ValueError,
+                RuntimeError,
+                AliasResolutionError,
+            ) as exc:  # pragma: no cover - defensive
+                LOGGER.debug(
+                    "Skipping symbol %s due to build error: %s",
+                    getattr(current_obj, "path", current_obj),
+                    exc,
+                )
+    return symbols
     return symbols

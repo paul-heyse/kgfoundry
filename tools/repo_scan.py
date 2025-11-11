@@ -39,6 +39,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from kgfoundry_common.subprocess_utils import SubprocessError, run_subprocess
+from tools._shared.process import ToolExecutionError
 from tools.repo_scan_griffe import DocstringStyle, collect_api_symbols_with_griffe
 from tools.repo_scan_libcst import collect_imports_with_libcst
 
@@ -1056,7 +1057,7 @@ def collect_git_meta(repo_root: Path, scope_paths: list[Path]) -> dict[str, GitM
             cwd=repo_root,
             timeout=GIT_COMMAND_TIMEOUT,
         )
-    except SubprocessError as exc:
+    except (SubprocessError, ToolExecutionError) as exc:
         logger.debug("git log unavailable during repo scan", exc_info=exc)
         return meta
 
@@ -1082,7 +1083,7 @@ def _is_git_repo(repo_root: Path) -> bool:
             cwd=repo_root,
             timeout=GIT_COMMAND_TIMEOUT,
         )
-    except SubprocessError:
+    except (SubprocessError, ToolExecutionError):
         return False
     return True
 
@@ -1919,6 +1920,11 @@ def _execute_scan(args: argparse.Namespace) -> tuple[dict[str, Any], list[tuple[
         sys.exit(2)
 
     repo_root = Path(args.repo_root).resolve() if args.repo_root else scan_root
+    if args.repo_root and not repo_root.exists():
+        logger.warning(
+            "Repo root %s not found; falling back to scan root %s", args.repo_root, scan_root
+        )
+        repo_root = scan_root
     strip_prefixes = tuple(args.strip_prefix)
     include_subdirs = tuple(args.include_subdir or [])
     reports = _collect_module_reports(

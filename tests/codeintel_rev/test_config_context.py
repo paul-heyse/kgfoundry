@@ -12,6 +12,7 @@ from codeintel_rev.app.config_context import (
     resolve_application_paths,
 )
 from codeintel_rev.config.settings import load_settings
+from codeintel_rev.runtime.factory_adjustment import DefaultFactoryAdjuster
 
 from kgfoundry_common.errors import ConfigurationError
 
@@ -214,3 +215,24 @@ def test_application_context_open_catalog(tmp_path: Path, monkeypatch: pytest.Mo
         assert catalog.db_path == duckdb_path
         with catalog.connection() as conn:
             assert conn.execute("SELECT 1").fetchone() == (1,)
+
+
+def test_build_factory_adjuster_from_settings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Verify the default factory adjuster mirrors index settings."""
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    data_dir = repo_root / "data"
+    vectors = data_dir / "vectors"
+    faiss_dir = data_dir / "faiss"
+    data_dir.mkdir()
+    vectors.mkdir()
+    faiss_dir.mkdir()
+    (faiss_dir / "code.ivfpq.faiss").touch()
+    (data_dir / "catalog.duckdb").touch()
+    monkeypatch.setenv("REPO_ROOT", str(repo_root))
+    context = ApplicationContext.create()
+    assert isinstance(context.factory_adjuster, DefaultFactoryAdjuster)
+    expected = getattr(context.settings.index, "faiss_nprobe", None)
+    assert context.factory_adjuster.faiss_nprobe == expected

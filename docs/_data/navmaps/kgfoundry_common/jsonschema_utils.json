@@ -32,6 +32,7 @@
       "jsonschema.validate",
       "jsonschema.validators.Draft202012Validator",
       "kgfoundry_common.navmap_loader.load_nav_metadata",
+      "typing.Any",
       "typing.Protocol",
       "typing.TYPE_CHECKING",
       "typing.cast"

@@ -4,7 +4,8 @@ import faiss
 import numpy as np
 import pytest
 
-FAISS = cast(Any, faiss)
+FAISS = cast("Any", faiss)
+
 
 def test_multi_gpu_all_gpus(train_db, query_db, k):
     ng = FAISS.get_num_gpus()

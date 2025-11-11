@@ -78,7 +78,7 @@ if cst is not None:
                 )
             )
 
-        def visit_If(self, node: libcst_types.If) -> bool | None:  # noqa: N802
+        def visit_if(self, node: libcst_types.If) -> bool | None:
             """Track entry into TYPE_CHECKING guard blocks.
 
             Returns
@@ -90,12 +90,12 @@ if cst is not None:
                 self._type_check_guard_depth += 1
             return True
 
-        def leave_If(self, original_node: libcst_types.If) -> None:  # noqa: N802
+        def leave_if(self, original_node: libcst_types.If) -> None:
             """Track exit from TYPE_CHECKING guard blocks."""
             if self._is_type_check_guard(original_node.test):
                 self._type_check_guard_depth = max(0, self._type_check_guard_depth - 1)
 
-        def visit_Import(self, node: libcst_types.Import) -> bool | None:  # noqa: N802
+        def visit_import(self, node: libcst_types.Import) -> bool | None:
             """Record modules imported via ``import ...``.
 
             Returns
@@ -113,7 +113,7 @@ if cst is not None:
                     self._add_import(import_name)
             return True
 
-        def visit_ImportFrom(self, node: libcst_types.ImportFrom) -> bool | None:  # noqa: N802
+        def visit_import_from(self, node: libcst_types.ImportFrom) -> bool | None:
             """Record modules imported via ``from ... import ...``.
 
             Returns
@@ -126,7 +126,7 @@ if cst is not None:
             self._record_from_aliases(module_name, aliases)
             return True
 
-        def visit_Assign(self, node: libcst_types.Assign) -> bool | None:  # noqa: N802
+        def visit_assign(self, node: libcst_types.Assign) -> bool | None:
             """Capture ``__all__`` literal assignments.
 
             Returns
@@ -254,6 +254,12 @@ if cst is not None:
                 if isinstance(text, str):
                     exports.append(text)
             return tuple(exports)
+
+    ImportCollector.visit_If = ImportCollector.visit_if
+    ImportCollector.leave_If = ImportCollector.leave_if
+    ImportCollector.visit_Import = ImportCollector.visit_import
+    ImportCollector.visit_ImportFrom = ImportCollector.visit_import_from
+    ImportCollector.visit_Assign = ImportCollector.visit_assign
 
 
 else:

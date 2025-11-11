@@ -1,0 +1,312 @@
+"""Index lifecycle management for FAISS/DuckDB/SCIP artifacts.
+
+This module provides a small, platform-agnostic manager that stages new index
+versions, publishes them atomically, and exposes helpers used by the FastAPI
+app, CLI, and admin endpoints. Versions are stored under a common ``base_dir``
+with the following layout::
+
+    base_dir/
+        versions/<version>/...
+        versions/<version>.staging/...
+        CURRENT          # text file with the active version id
+        current -> versions/<version>  (best-effort symlink)
+
+The manager does not mutate the application configuration; instead it flips the
+``CURRENT`` pointer (and optional ``current`` symlink). Runtime components read
+through stable paths such as ``.../current/faiss.index`` and reload when
+``ApplicationContext.reload_indices()`` closes their runtime cells.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import json
+import shutil
+import time
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+from codeintel_rev.errors import RuntimeLifecycleError
+from kgfoundry_common.logging import get_logger
+
+LOGGER = get_logger(__name__)
+_RUNTIME = "index-lifecycle"
+
+
+@dataclass(slots=True, frozen=True)
+class IndexAssets:
+    """File-system assets that must advance together for one index version."""
+
+    faiss_index: Path
+    duckdb_path: Path
+    scip_index: Path
+    bm25_dir: Path | None = None
+    splade_dir: Path | None = None
+    xtr_dir: Path | None = None
+
+    def ensure_exists(self) -> None:
+        """Validate that all required files and directories are present.
+
+        Raises
+        ------
+        RuntimeLifecycleError
+            If a required path is missing.
+        """
+        required: Iterable[tuple[str, Path | None]] = (
+            ("faiss_index", self.faiss_index),
+            ("duckdb_path", self.duckdb_path),
+            ("scip_index", self.scip_index),
+        )
+        for label, path in required:
+            if path is None or not path.exists():
+                message = f"{label} missing: {path}"
+                raise RuntimeLifecycleError(message, runtime=_RUNTIME)
+        optional: Iterable[tuple[str, Path | None]] = (
+            ("bm25_dir", self.bm25_dir),
+            ("splade_dir", self.splade_dir),
+            ("xtr_dir", self.xtr_dir),
+        )
+        for label, path in optional:
+            if path is not None and not path.exists():
+                message = f"{label} missing: {path}"
+                raise RuntimeLifecycleError(message, runtime=_RUNTIME)
+
+
+@dataclass(slots=True, frozen=True)
+class VersionMeta:
+    """Metadata recorded for each version directory."""
+
+    version: str
+    created_ts: float
+    attrs: Mapping[str, Any] = field(default_factory=dict)
+
+    def to_json(self) -> str:
+        """Return a JSON payload suitable for writing to disk.
+
+        Returns
+        -------
+        str
+            JSON representation of the manifest.
+        """
+        return json.dumps(
+            {
+                "version": self.version,
+                "created_ts": self.created_ts,
+                "attrs": dict(self.attrs),
+            },
+            sort_keys=True,
+        )
+
+
+class IndexLifecycleManager:
+    """Manage staged/published index versions under a base directory."""
+
+    def __init__(self, base_dir: Path) -> None:
+        self.base_dir = base_dir
+        self.versions_dir = self.base_dir / "versions"
+        self.current_file = self.base_dir / "CURRENT"
+        self.current_link = self.base_dir / "current"
+        self.versions_dir.mkdir(parents=True, exist_ok=True)
+
+    # ------------------------------------------------------------------ helpers
+    def current_version(self) -> str | None:
+        """Return the currently published version identifier.
+
+        Returns
+        -------
+        str | None
+            Version identifier or ``None`` when unset.
+        """
+        try:
+            content = self.current_file.read_text(encoding="utf-8").strip()
+        except FileNotFoundError:
+            return None
+        return content or None
+
+    def current_dir(self) -> Path | None:
+        """Return the directory backing the active version.
+
+        Returns
+        -------
+        Path | None
+            Directory containing the current manifest, if present.
+        """
+        version = self.current_version()
+        if not version:
+            return None
+        candidate = self.versions_dir / version
+        if candidate.exists():
+            return candidate
+        return None
+
+    def list_versions(self) -> list[str]:
+        """Return the list of committed versions (excludes staging dirs).
+
+        Returns
+        -------
+        list[str]
+            Sorted set of published version identifiers.
+        """
+        versions = [
+            entry.name
+            for entry in self.versions_dir.glob("*")
+            if entry.is_dir() and not entry.name.endswith(".staging")
+        ]
+        versions.sort()
+        return versions
+
+    def read_assets(self) -> IndexAssets | None:
+        """Return paths for active assets or ``None`` when unset.
+
+        Returns
+        -------
+        IndexAssets | None
+            Asset set for the active version, if any.
+
+        Raises
+        ------
+        RuntimeLifecycleError
+            If the manifest is missing or inconsistent.
+        """
+        active_dir = self.current_dir()
+        if active_dir is None:
+            return None
+        manifest_path = active_dir / "version.json"
+        if not manifest_path.exists():
+            message = f"manifest missing: {manifest_path}"
+            raise RuntimeLifecycleError(message, runtime=_RUNTIME)
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assets = IndexAssets(
+            faiss_index=active_dir / "faiss.index",
+            duckdb_path=active_dir / "catalog.duckdb",
+            scip_index=active_dir / "code.scip",
+            bm25_dir=self._maybe_dir(active_dir / "bm25"),
+            splade_dir=self._maybe_dir(active_dir / "splade"),
+            xtr_dir=self._maybe_dir(active_dir / "xtr"),
+        )
+        assets.ensure_exists()
+        if payload.get("version") != self.current_version():
+            LOGGER.warning(
+                "index.version_manifest_mismatch",
+                extra={
+                    "manifest_version": payload.get("version"),
+                    "current_version": self.current_version(),
+                },
+            )
+        return assets
+
+    # ------------------------------------------------------------------ writes
+    def prepare(
+        self,
+        version: str,
+        assets: IndexAssets,
+        *,
+        attrs: Mapping[str, Any] | None = None,
+    ) -> Path:
+        """Copy assets into a staging directory for ``version``.
+
+        Returns
+        -------
+        Path
+            Directory containing the staged assets.
+
+        Raises
+        ------
+        RuntimeLifecycleError
+            If validation fails or staging already exists.
+        """
+        if not version:
+            message = "version id missing"
+            raise RuntimeLifecycleError(message, runtime=_RUNTIME)
+        assets.ensure_exists()
+        staging_dir = self.versions_dir / f"{version}.staging"
+        if staging_dir.exists():
+            message = f"staging already exists: {staging_dir}"
+            raise RuntimeLifecycleError(message, runtime=_RUNTIME)
+        staging_dir.mkdir(parents=True, exist_ok=False)
+        self._copy_file(assets.faiss_index, staging_dir / "faiss.index")
+        self._copy_file(assets.duckdb_path, staging_dir / "catalog.duckdb")
+        self._copy_file(assets.scip_index, staging_dir / "code.scip")
+        self._copy_tree(assets.bm25_dir, staging_dir / "bm25")
+        self._copy_tree(assets.splade_dir, staging_dir / "splade")
+        self._copy_tree(assets.xtr_dir, staging_dir / "xtr")
+        meta = VersionMeta(version=version, created_ts=time.time(), attrs=attrs or {})
+        (staging_dir / "version.json").write_text(meta.to_json(), encoding="utf-8")
+        LOGGER.info(
+            "index.prepare.complete",
+            extra={"version": version, "dir": str(staging_dir)},
+        )
+        return staging_dir
+
+    def publish(self, version: str) -> Path:
+        """Atomically promote a staged directory to active ``version``.
+
+        Returns
+        -------
+        Path
+            Directory containing the published assets.
+
+        Raises
+        ------
+        RuntimeLifecycleError
+            If the requested staging area is missing.
+        """
+        staging_dir = self.versions_dir / f"{version}.staging"
+        if not staging_dir.exists():
+            message = f"staging not found for version {version}"
+            raise RuntimeLifecycleError(message, runtime=_RUNTIME)
+        final_dir = self.versions_dir / version
+        staging_dir.replace(final_dir)
+        self._write_current_pointer(version, final_dir)
+        LOGGER.info(
+            "index.publish.complete",
+            extra={"version": version, "dir": str(final_dir)},
+        )
+        return final_dir
+
+    def rollback(self, version: str) -> None:
+        """Point the ``CURRENT`` pointer at an existing version.
+
+        Raises
+        ------
+        RuntimeLifecycleError
+            If the requested version is unavailable.
+        """
+        candidate = self.versions_dir / version
+        if not candidate.exists():
+            message = f"version not found: {candidate}"
+            raise RuntimeLifecycleError(message, runtime=_RUNTIME)
+        self._write_current_pointer(version, candidate)
+        LOGGER.info("index.rollback.complete", extra={"version": version})
+
+    # ------------------------------------------------------------------ internals
+    def _write_current_pointer(self, version: str, target_dir: Path) -> None:
+        tmp = self.current_file.with_suffix(".tmp")
+        tmp.write_text(version, encoding="utf-8")
+        Path(tmp).replace(self.current_file)
+        with contextlib.suppress(OSError):
+            if self.current_link.is_symlink() or self.current_link.exists():
+                self.current_link.unlink()
+            self.current_link.symlink_to(target_dir, target_is_directory=True)
+
+    @staticmethod
+    def _maybe_dir(path: Path) -> Path | None:
+        return path if path.exists() else None
+
+    @staticmethod
+    def _copy_file(src: Path, dst: Path) -> None:
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+
+    @staticmethod
+    def _copy_tree(src: Path | None, dst: Path) -> None:
+        if src is None:
+            return
+        if not src.exists():
+            return
+        shutil.copytree(src, dst, dirs_exist_ok=False)
+
+
+__all__ = ["IndexAssets", "IndexLifecycleManager", "VersionMeta"]

@@ -179,6 +179,7 @@ For all code blocks that you make edits to, please check for pyright, pyrefly, a
 
 - **Remote container / devcontainer:** follow [Link Policy for Remote Editors](#link-policy-for-remote-editors) so deep links open correctly from generated artifacts.
 - **Do not** duplicate tool configs across files. `pyrightconfig.jsonc` and `pyrefly.toml` are canonical; `pyproject.toml` is canonical for Ruff and packaging.
+- **Admin surfaces:** set `CODEINTEL_ADMIN=1` locally to enable `/admin/index` endpoints for staging/publishing lifecycle changes. Leave unset in most environments.
 
 ---
 
@@ -505,6 +506,11 @@ uv run vulture src tools stubs --min-confidence 90
 
 # All pre-commit hooks
 uvx pre-commit run --all-files
+
+# Index lifecycle helpers
+codeintel indexctl status --root indexes
+codeintel indexctl stage --version v1 --faiss path/to/faiss --duckdb path/to/catalog.duckdb --scip path/to/index.scip
+codeintel indexctl publish --version v1
 ```
 
 > **Note:** Drop `SKIP_GPU_WARMUP=1` on CUDA-capable hosts or CI jobs that require GPU warm-up coverage.

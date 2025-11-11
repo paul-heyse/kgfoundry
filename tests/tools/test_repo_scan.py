@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -16,6 +15,7 @@ def _run_repo_scan_cli(
     scan_root: Path,
     tmp_path: Path,
     extra_args: list[str] | None = None,
+    repo_root_override: str | None = None,
 ) -> tuple[dict[str, Any], Path, Path | None]:
     """Invoke repo_scan.main() and capture JSON, DOT, and enriched graph paths.
 
@@ -40,11 +40,12 @@ def _run_repo_scan_cli(
             break
     if not enriched_specified:
         enriched_path = tmp_path / "graph_enriched.dot"
+    repo_root_arg = repo_root_override or str(scan_root)
     argv = [
         "repo_scan.py",
         str(scan_root),
         "--repo-root",
-        str(scan_root),
+        repo_root_arg,
         "--out-json",
         str(json_path),
         "--out-dot",
@@ -194,17 +195,19 @@ def test_repo_scan_main_generates_expected_payload(
         encoding="utf-8",
     )
 
-    payload, dot_path, enriched_path = _run_repo_scan_cli(monkeypatch, scan_root, tmp_path)
+    # Disable Griffe here to keep the smoke test independent of optional deps.
+    payload, dot_path, enriched_path = _run_repo_scan_cli(
+        monkeypatch,
+        scan_root,
+        tmp_path,
+        ["--no-griffe"],
+    )
     modules = {entry["module"]: entry for entry in payload["modules"]}
 
     assert payload["summary"] == {"files": 4, "parsed_ok": 4, "tests": 1}
     assert modules["pkg"]["doc"]["module_doc"] is True
     assert modules["pkg.mod_a"]["typing"]["functions"] >= 1
-    griffe_available = importlib.util.find_spec("griffe") is not None
-    if griffe_available:
-        assert payload["api_symbols"]
-    else:
-        assert payload["api_symbols"] == []
+    assert payload["api_symbols"] == []
     assert payload["external_deps"] == []
 
     edge_set = {tuple(edge) for edge in payload["import_edges"]}
@@ -253,7 +256,7 @@ def test_repo_scan_with_libcst_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         encoding="utf-8",
     )
 
-    payload, _, _ = _run_repo_scan_cli(monkeypatch, scan_root, tmp_path)
+    payload, _, _ = _run_repo_scan_cli(monkeypatch, scan_root, tmp_path, ["--no-griffe"])
     modules = {entry["module"]: entry for entry in payload["modules"]}
     module_report = modules["pkg.mod"]
     assert module_report["imports_cst"] is not None
@@ -266,7 +269,7 @@ def test_repo_scan_with_libcst_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         monkeypatch,
         scan_root,
         tmp_path,
-        ["--no-libcst"],
+        ["--no-libcst", "--no-griffe"],
     )
     modules_disabled = {entry["module"]: entry for entry in payload_disabled["modules"]}
     assert modules_disabled["pkg.mod"]["imports_cst"] is None
@@ -328,3 +331,21 @@ def test_repo_scan_with_griffe_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         ["--no-griffe"],
     )
     assert payload_disabled["api_symbols"] == []
+
+
+def test_repo_scan_handles_missing_repo_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CLI should fall back gracefully when --repo-root points to nowhere."""
+    scan_root = tmp_path / "scan"
+    (scan_root / "pkg").mkdir(parents=True, exist_ok=True)
+    (scan_root / "pkg" / "__init__.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+    payload, _, _ = _run_repo_scan_cli(
+        monkeypatch,
+        scan_root,
+        tmp_path,
+        ["--no-griffe"],
+        repo_root_override=str(scan_root / "nonexistent"),
+    )
+    assert payload["summary"]["files"] == 1

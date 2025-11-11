@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib
 import importlib.util
+import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +17,8 @@ from kgfoundry_common.prometheus import GaugeLike, build_gauge
 
 if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
+
+from codeintel_rev.errors import RuntimeLifecycleError
 
 LOGGER = get_logger(__name__)
 
@@ -146,6 +150,8 @@ class Capabilities:
     torch_importable: bool = False
     faiss_gpu_available: bool = False
     faiss_gpu_disabled_reason: str | None = None
+    active_index_version: str | None = None
+    versions_available: int = 0
 
     @property
     def has_semantic(self) -> bool:
@@ -193,9 +199,23 @@ class Capabilities:
             "faiss_gpu_disabled_reason": self.faiss_gpu_disabled_reason,
             "has_semantic": self.has_semantic,
             "has_symbols": self.has_symbols,
+            "active_index_version": self.active_index_version,
+            "versions_available": self.versions_available,
         }
         _record_metrics(payload)
         return payload
+
+    def stamp(self, payload: dict[str, object] | None = None) -> str:
+        """Return a stable hash representing the current capability snapshot.
+
+        Returns
+        -------
+        str
+            Hex-encoded SHA-256 digest of the capability payload.
+        """
+        snapshot = payload or self.model_dump()
+        encoded = json.dumps(snapshot, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
     @classmethod
     def from_context(cls, context: ApplicationContext) -> Capabilities:
@@ -212,6 +232,15 @@ class Capabilities:
         httpx_module = _import_optional("httpx")
         torch_module = _import_optional("torch")
         faiss_gpu_available, faiss_gpu_reason = _probe_faiss_gpu(faiss_module)
+        active_version: str | None = None
+        version_count = 0
+        index_manager = getattr(context, "index_manager", None)
+        if index_manager is not None:
+            try:
+                active_version = index_manager.current_version()
+                version_count = len(index_manager.list_versions())
+            except RuntimeLifecycleError:
+                active_version = None
 
         snapshot = cls(
             faiss_index=_path_exists(getattr(paths, "faiss_index", None)) and bool(faiss_module),
@@ -227,6 +256,8 @@ class Capabilities:
             torch_importable=torch_module is not None,
             faiss_gpu_available=faiss_gpu_available,
             faiss_gpu_disabled_reason=faiss_gpu_reason,
+            active_index_version=active_version,
+            versions_available=version_count,
         )
 
         payload = snapshot.model_dump()

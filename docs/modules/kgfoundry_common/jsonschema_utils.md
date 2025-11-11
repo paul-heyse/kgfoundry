@@ -36,7 +36,7 @@ Typed facades for jsonschema usage across the codebase.
 
 ## Relationships
 
-**Imports:** `__future__.annotations`, `collections.abc.Iterable`, `collections.abc.Mapping`, `collections.abc.Sequence`, `jsonschema.exceptions.SchemaError`, `jsonschema.exceptions.ValidationError`, `jsonschema.validate`, `jsonschema.validators.Draft202012Validator`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `typing.Protocol`, `typing.TYPE_CHECKING`, `typing.cast`
+**Imports:** `__future__.annotations`, `collections.abc.Iterable`, `collections.abc.Mapping`, `collections.abc.Sequence`, `jsonschema.exceptions.SchemaError`, `jsonschema.exceptions.ValidationError`, `jsonschema.validate`, `jsonschema.validators.Draft202012Validator`, `kgfoundry_common.navmap_loader.load_nav_metadata`, `typing.Any`, `typing.Protocol`, `typing.TYPE_CHECKING`, `typing.cast`
 
 ## Autorefs Examples
 
@@ -79,6 +79,8 @@ direction: right
 "kgfoundry_common.jsonschema_utils" -> "jsonschema.validators.Draft202012Validator"
 "kgfoundry_common.navmap_loader.load_nav_metadata": "kgfoundry_common.navmap_loader.load_nav_metadata"
 "kgfoundry_common.jsonschema_utils" -> "kgfoundry_common.navmap_loader.load_nav_metadata"
+"typing.Any": "typing.Any"
+"kgfoundry_common.jsonschema_utils" -> "typing.Any"
 "typing.Protocol": "typing.Protocol"
 "kgfoundry_common.jsonschema_utils" -> "typing.Protocol"
 "typing.TYPE_CHECKING": "typing.TYPE_CHECKING"

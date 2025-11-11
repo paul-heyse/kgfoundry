@@ -8,12 +8,15 @@ from __future__ import annotations
 import asyncio
 from functools import lru_cache
 from importlib import import_module
+from time import perf_counter
 from types import ModuleType
 from typing import TYPE_CHECKING, cast
 
 import msgspec
 
 from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.observability.otel import as_span
+from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.typing import NDArrayF32, gate_import
 from kgfoundry_common.logging import get_logger
 
@@ -281,16 +284,47 @@ class VLLMClient:
         engine is thread-safe. Empty batches return shape (0, embedding_dim).
         """
         np_module = _get_numpy()
+        timeline = current_timeline()
         if not texts:
             return np_module.empty(
                 (0, self.config.embedding_dim),
                 dtype=np_module.float32,
             )
 
-        if self._local_engine is not None:
-            vectors = self._local_engine.embed_batch(texts)
-        else:
-            vectors = self._embed_batch_http(texts)
+        mode = self._mode
+        batch_size = len(texts)
+        if timeline is not None:
+            timeline.event(
+                "embed.start",
+                "vllm",
+                attrs={
+                    "mode": mode,
+                    "n_texts": batch_size,
+                    "dim": self.config.embedding_dim,
+                },
+            )
+        start = perf_counter()
+        try:
+            with as_span(
+                "vllm.embed_batch",
+                mode=mode,
+                n_texts=batch_size,
+                dim=self.config.embedding_dim,
+            ):
+                if self._local_engine is not None:
+                    vectors = self._local_engine.embed_batch(texts)
+                else:
+                    vectors = self._embed_batch_http(texts)
+        except Exception as exc:
+            if timeline is not None:
+                timeline.event(
+                    "embed.end",
+                    "vllm",
+                    status="error",
+                    message=str(exc),
+                    attrs={"mode": mode, "n_texts": batch_size},
+                )
+            raise
 
         LOGGER.debug(
             "Batch embedding completed",
@@ -301,6 +335,18 @@ class VLLMClient:
                 "mode": self._mode,
             },
         )
+        if timeline is not None:
+            elapsed_ms = int(1000 * (perf_counter() - start))
+            timeline.event(
+                "embed.end",
+                "vllm",
+                attrs={
+                    "duration_ms": elapsed_ms,
+                    "dim": vectors.shape[1] if vectors.size else 0,
+                    "mode": mode,
+                    "n_texts": batch_size,
+                },
+            )
         return vectors
 
     def _embed_batch_http(self, texts: Sequence[str]) -> NDArrayF32:

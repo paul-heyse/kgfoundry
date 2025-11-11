@@ -24,6 +24,7 @@ from codeintel_rev.mcp_server.scope_utils import (
     LANGUAGE_EXTENSIONS,
     path_matches_glob,
 )
+from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.prometheus import build_histogram
@@ -321,6 +322,16 @@ class DuckDBCatalog:
         if not ids:
             return []
 
+        timeline = current_timeline()
+        start_time = None
+        if timeline is not None:
+            start_time = perf_counter()
+            timeline.event(
+                "duckdb.hydrate.start",
+                "catalog",
+                attrs={"asked_for": len(ids)},
+            )
+
         sql = """
             SELECT c.*
             FROM chunks AS c
@@ -334,7 +345,21 @@ class DuckDBCatalog:
             relation = conn.execute(sql, params)
             rows = relation.fetchall()
             cols = [desc[0] for desc in relation.description]
-        return [dict(zip(cols, row, strict=True)) for row in rows]
+        payload = [dict(zip(cols, row, strict=True)) for row in rows]
+        if timeline is not None:
+            duration_ms = (
+                int((perf_counter() - start_time) * 1000) if start_time is not None else None
+            )
+            timeline.event(
+                "duckdb.hydrate.end",
+                "catalog",
+                attrs={
+                    "returned": len(payload),
+                    "missing": max(0, len(ids) - len(payload)),
+                    "duration_ms": duration_ms,
+                },
+            )
+        return payload
 
     def query_by_filters(
         self,

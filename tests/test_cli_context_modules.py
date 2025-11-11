@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import importlib
+from typing import Any, cast
+
 import pytest
 from docs import cli_context as docs_cli_context
 from src.download import cli_context as download_context
@@ -9,11 +12,11 @@ from tools.docstring_builder import cli_context as docstrings_context
 from tools.navmap import cli_context as navmap_context
 
 try:
-    from codeintel import (
-        cli_context as codeintel_context,  # type: ignore[reportAttributeAccessIssue]
-    )
+    codeintel_module = importlib.import_module("codeintel.cli_context")
 except ImportError:
     codeintel_context = None
+else:
+    codeintel_context = cast("Any", codeintel_module)
 
 
 def _assert_settings(module, settings: CLIToolSettings) -> None:
