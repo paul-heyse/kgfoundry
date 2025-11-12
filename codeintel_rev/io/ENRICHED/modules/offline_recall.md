@@ -13,7 +13,7 @@ Offline recall evaluator leveraging FAISS + DuckDB catalogs.
 - from **collections.abc** import Iterable, Sequence
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
-- from **typing** import TYPE_CHECKING, cast
+- from **typing** import TYPE_CHECKING
 - from **(absolute)** import numpy
 - from **codeintel_rev.config.settings** import EvalConfig, PathsConfig, Settings
 - from **codeintel_rev.io.duckdb_manager** import DuckDBManager
@@ -26,20 +26,12 @@ Offline recall evaluator leveraging FAISS + DuckDB catalogs.
 
 ## Definitions
 
+- variable: `LOGGER` (line 27)
 - class: `EvalQuery` (line 31)
 - class: `OfflineRecallEvaluator` (line 40)
-- function: `__init__` (line 43)
-- function: `run` (line 59)
-- function: `_resolve_output_dir` (line 133)
-- function: `_load_queries` (line 141)
-- function: `_synthesize_queries` (line 166)
-- function: `_build_question` (line 185)
-- function: `_embed_query` (line 192)
-- function: `_write_artifacts` (line 197)
-- function: `_record_metrics` (line 216)
-- function: `_prepare_queries` (line 221)
-- function: `_evaluate_query` (line 231)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 2
+- **fan_out**: 8
+- **cycle_group**: 42

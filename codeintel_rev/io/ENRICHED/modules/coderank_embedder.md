@@ -20,19 +20,14 @@ Pooled wrapper around the CodeRank embedding SentenceTransformer.
 
 ## Definitions
 
+- variable: `np` (line 17)
+- variable: `SentenceTransformer` (line 18)
 - class: `SupportsCodeRankSettings` (line 21)
-- function: `model_id` (line 25)
-- function: `device` (line 30)
-- function: `trust_remote_code` (line 35)
-- function: `query_prefix` (line 40)
-- function: `normalize` (line 45)
-- function: `batch_size` (line 50)
+- variable: `LOGGER` (line 55)
 - class: `CodeRankEmbedder` (line 58)
-- function: `__init__` (line 69)
-- function: `encode_queries` (line 77)
-- function: `encode_codes` (line 108)
-- function: `_ensure_model` (line 139)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 0
+- **fan_out**: 2
+- **cycle_group**: 65

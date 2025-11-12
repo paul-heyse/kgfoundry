@@ -20,17 +20,12 @@ from __future__ import annotations
 import argparse
 import sys
 import traceback
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
 from codeintel_rev._lazy_imports import LazyModule
-from codeintel_rev.typing import gate_import
+from codeintel_rev.typing import FaissModule, NumpyModule, TorchModule, gate_import
 
-if TYPE_CHECKING:
-    import faiss as _faiss
-    import numpy as np
-    import torch as _torch
-else:
-    np = cast("np", LazyModule("numpy", "GPU diagnostics random probes"))
+np = cast("NumpyModule", LazyModule("numpy", "GPU diagnostics random probes"))
 
 
 def check_torch(device_index: int = 0) -> tuple[bool, dict[str, object]]:
@@ -48,7 +43,7 @@ def check_torch(device_index: int = 0) -> tuple[bool, dict[str, object]]:
     """
     info: dict[str, object] = {}
     try:
-        torch = cast("_torch", gate_import("torch", "GPU diagnostics (torch)"))
+        torch = cast("TorchModule", gate_import("torch", "GPU diagnostics (torch)"))
     except ImportError as exc:
         return False, {"error": f"torch import failed: {exc}"}
 
@@ -103,7 +98,7 @@ def check_faiss() -> tuple[bool, dict[str, object]]:
     """
     info: dict[str, object] = {}
     try:
-        faiss = cast("_faiss", gate_import("faiss", "GPU diagnostics (faiss)"))
+        faiss = cast("FaissModule", gate_import("faiss", "GPU diagnostics (faiss)"))
     except ImportError as exc:
         return False, {"error": f"faiss import failed: {exc}"}
 

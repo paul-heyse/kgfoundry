@@ -120,9 +120,9 @@ class SCIPCoverageEvaluator:
 
         Returns
         -------
-        dict[str, object]
-            Summary dictionary with coverage metrics. Contains at least "total"
-            key with symbol count. Returns {"total": 0} if no symbols found.
+        CoverageSummary
+            Summary dataclass with coverage metrics including total symbol count,
+            coverage percentage, and per-symbol retrieval results.
 
         Notes
         -----

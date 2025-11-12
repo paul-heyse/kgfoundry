@@ -32,6 +32,16 @@ variables change or when they need fresh dependencies.
 - function: `get_service_context` (line 47)
 - function: `reset_service_context` (line 71)
 
+## Dependency Graph
+
+- **fan_in**: 0
+- **fan_out**: 1
+- **cycle_group**: 77
+
+## Declared Exports (__all__)
+
+get_service_context, reset_service_context
+
 ## Tags
 
-overlay-needed, public-api
+public-api

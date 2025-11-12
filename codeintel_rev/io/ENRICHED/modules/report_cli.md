@@ -18,10 +18,12 @@ CLI for rendering session timelines as Markdown diagnostics.
 
 ## Definitions
 
+- variable: `GLYPHS` (line 12)
+- variable: `STAGE_EVENT_MAP` (line 13)
+- variable: `HASH_PREVIEW_LEN` (line 19)
 - function: `_load_events` (line 22)
 - function: `_group_events_by_run` (line 37)
 - function: `_select_run_events` (line 46)
-- function: `_last_ts` (line 51)
 - function: `_format_attrs` (line 59)
 - function: `_build_operation_chain` (line 72)
 - function: `_find_event` (line 87)
@@ -39,6 +41,8 @@ CLI for rendering session timelines as Markdown diagnostics.
 - function: `_render_report` (line 234)
 - function: `main` (line 292)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 0
+- **fan_out**: 1
+- **cycle_group**: 11

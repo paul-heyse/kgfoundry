@@ -18,16 +18,14 @@ Lightweight helpers for loading and querying SCIP JSON indices.
 ## Definitions
 
 - function: `_loads` (line 17)
-- class: `Occurrence` (line 31)
-- class: `SymbolInfo` (line 40)
-- class: `Document` (line 50)
-- class: `SCIPIndex` (line 59)
-- function: `load` (line 66)
-- function: `by_file` (line 89)
-- function: `symbol_to_files` (line 99)
-- function: `file_symbol_kinds` (line 113)
-- function: `_parse_document` (line 129)
+- class: `Occurrence` (line 37)
+- class: `SymbolInfo` (line 46)
+- class: `Document` (line 56)
+- class: `SCIPIndex` (line 65)
+- function: `_parse_document` (line 142)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 3
+- **fan_out**: 1
+- **cycle_group**: 1

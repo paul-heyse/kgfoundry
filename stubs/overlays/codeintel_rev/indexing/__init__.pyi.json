@@ -1,0 +1,14 @@
+{
+  "module": "indexing.__init__",
+  "source": "/home/paul/kgfoundry/codeintel_rev/indexing/__init__.py",
+  "exports_resolved": {},
+  "has_all": [
+    "IndexAssets",
+    "IndexLifecycleManager"
+  ],
+  "defs": [],
+  "parse_ok": true,
+  "errors": [],
+  "type_errors": 0,
+  "forced": true
+}

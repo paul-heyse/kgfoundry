@@ -20,6 +20,8 @@ Symbol MCP tool registrations (pure move from server.py).
 - function: `definition_at` (line 108)
 - function: `references_at` (line 189)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 0
+- **fan_out**: 4
+- **cycle_group**: 79

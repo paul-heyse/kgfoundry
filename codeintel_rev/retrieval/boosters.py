@@ -104,11 +104,7 @@ def _fetch_commit_ts_duckdb(
     chunk_col = _safe_identifier(cfg.chunk_id_column)
     commit_col = _safe_identifier(cfg.commit_ts_column)
     table_name = _safe_identifier(cfg.table)
-    error_types: tuple[type[Exception], ...]
-    if duckdb is not None:
-        error_types = (duckdb.Error, RuntimeError, ValueError)
-    else:
-        error_types = (RuntimeError, ValueError)
+    rows: list[tuple[Any, float | None]] = []
     try:
         normalized_ids = _normalize_ids(id_list)
         if not normalized_ids:
@@ -125,8 +121,12 @@ def _fetch_commit_ts_duckdb(
             finally:
                 conn.execute("DROP TABLE IF EXISTS recency_ids")
                 conn.execute("DROP VIEW IF EXISTS recency_source")
-    except error_types:
+    except (RuntimeError, ValueError):
         return {}
+    except Exception as exc:  # pragma: no cover - defensive cascade
+        if duckdb is not None and isinstance(exc, duckdb.Error):
+            return {}
+        raise
     result: dict[str, float] = {}
     for chunk_id, commit_ts in rows:
         if commit_ts is None:
@@ -153,9 +153,10 @@ def apply_recency_boost(
         Ranked documents to boost.
     cfg : RecencyConfig
         Recency boosting configuration.
-    duckdb_manager : DuckDBManager | None, optional
+    duckdb_manager : DuckDBManagerType | None, optional
         DuckDB manager used to look up commit timestamps when ``commit_ts_lookup``
-        is not provided.
+        is not provided. Must be an instance of ``DuckDBManager`` when DuckDB
+        is available, or None when DuckDB is not installed.
     commit_ts_lookup : Callable[[Iterable[str]], Mapping[str, float]] | None, optional
         Custom lookup function that maps chunk IDs to commit timestamps.
 
@@ -172,9 +173,12 @@ def apply_recency_boost(
     if lookup is None:
         if duckdb_manager is None or DuckDBManager is None:
             return docs, 0
+        assert duckdb_manager is not None
+        assert DuckDBManager is not None
+        concrete_manager = duckdb_manager
 
         def _lookup(ids: Iterable[str]) -> Mapping[str, float]:
-            return _fetch_commit_ts_duckdb(duckdb_manager, ids, cfg)
+            return _fetch_commit_ts_duckdb(concrete_manager, ids, cfg)
 
         lookup = _lookup
 

@@ -77,56 +77,43 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 - from **kgfoundry_common.errors** import ConfigurationError
 - from **kgfoundry_common.logging** import get_logger
 - from **collections.abc** import Iterator
-- from **(absolute)** import asyncio
 - from **codeintel_rev.app.scope_store** import SupportsAsyncRedis
 - from **codeintel_rev.io.hybrid_search** import HybridSearchEngine
 - from **codeintel_rev.io.xtr_manager** import XTRIndex
 
 ## Definitions
 
-- function: `_infer_index_root` (line 101)
-- function: `_build_factory_adjuster` (line 131)
-- function: `_assign_frozen` (line 167)
-- function: `_faiss_module` (line 172)
-- function: `_import_faiss_manager_cls` (line 188)
-- function: `_import_faiss_runtime_opts_cls` (line 200)
-- function: `_faiss_runtime_options_from_index` (line 212)
-- function: `_import_hybrid_engine_cls` (line 253)
-- function: `_import_xtr_index_cls` (line 270)
-- function: `_require_dependency` (line 287)
-- function: `_ensure_path_exists` (line 346)
-- class: `ResolvedPaths` (line 406)
-- function: `resolve_application_paths` (line 462)
-- function: `_resolve` (line 523)
-- class: `_FaissRuntimeState` (line 578)
-- function: `__init__` (line 583)
-- class: `_ContextRuntimeState` (line 590)
-- function: `attach_observer` (line 602)
-- function: `attach_adjuster` (line 608)
-- function: `iter_cells` (line 614)
-- class: `ApplicationContext` (line 630)
-- function: `__post_init__` (line 731)
-- function: `create` (line 744)
-- function: `_iter_runtime_cells` (line 887)
-- function: `reload_indices` (line 897)
-- function: `_update_index_version_metrics` (line 915)
-- function: `apply_factory_adjuster` (line 924)
-- function: `get_hybrid_engine` (line 935)
-- function: `_factory` (line 949)
-- function: `get_offline_recall_evaluator` (line 958)
-- function: `get_coderank_faiss_manager` (line 989)
-- function: `_factory` (line 1022)
-- function: `get_xtr_index` (line 1035)
-- function: `_factory` (line 1057)
-- function: `_build_coderank_faiss_manager` (line 1082)
-- function: `_build_xtr_index` (line 1150)
-- function: `_build_hybrid_engine` (line 1186)
-- function: `ensure_faiss_ready` (line 1207)
-- function: `open_catalog` (line 1281)
-- function: `with_overrides` (line 1327)
-- function: `_component_value` (line 1394)
-- function: `close_all_runtimes` (line 1409)
+- variable: `HybridSearchEngine` (line 90)
+- variable: `XTRIndex` (line 91)
+- variable: `LOGGER` (line 93)
+- function: `_infer_index_root` (line 99)
+- function: `_build_factory_adjuster` (line 129)
+- function: `_assign_frozen` (line 165)
+- function: `_faiss_module` (line 170)
+- function: `_import_faiss_manager_cls` (line 186)
+- function: `_import_faiss_runtime_opts_cls` (line 198)
+- function: `_faiss_runtime_options_from_index` (line 210)
+- function: `_import_hybrid_engine_cls` (line 251)
+- function: `_import_xtr_index_cls` (line 268)
+- function: `_require_dependency` (line 285)
+- function: `_ensure_path_exists` (line 344)
+- class: `ResolvedPaths` (line 404)
+- function: `resolve_application_paths` (line 460)
+- variable: `T` (line 573)
+- class: `_FaissRuntimeState` (line 576)
+- class: `_ContextRuntimeState` (line 588)
+- class: `ApplicationContext` (line 628)
+
+## Dependency Graph
+
+- **fan_in**: 20
+- **fan_out**: 18
+- **cycle_group**: 42
+
+## Declared Exports (__all__)
+
+ApplicationContext, ResolvedPaths, resolve_application_paths
 
 ## Tags
 
-overlay-needed, public-api
+public-api

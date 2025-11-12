@@ -24,7 +24,6 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     import httpx
-    import numpy as np
 
     from codeintel_rev.config.settings import VLLMConfig
     from codeintel_rev.io.vllm_engine import InprocessVLLMEmbedder
@@ -63,7 +62,7 @@ def _get_numpy() -> ModuleType:
     facade compliance and prevent eager NumPy loading.
     """
     return cast(
-        "np",
+        "ModuleType",
         gate_import(
             "numpy",
             "Embedding batching operations in VLLMClient",

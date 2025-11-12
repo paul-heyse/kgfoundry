@@ -25,31 +25,29 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 - from **kgfoundry_common.logging** import get_logger
 - from **collections.abc** import Sequence
 - from **(absolute)** import httpx
-- from **(absolute)** import numpy
 - from **codeintel_rev.config.settings** import VLLMConfig
 - from **codeintel_rev.io.vllm_engine** import InprocessVLLMEmbedder
 
 ## Definitions
 
-- function: `_get_numpy` (line 38)
-- class: `EmbeddingRequest` (line 74)
-- class: `EmbeddingData` (line 102)
-- class: `EmbeddingResponse` (line 127)
-- class: `VLLMClient` (line 158)
-- function: `__init__` (line 209)
-- function: `_initialize_local_engine` (line 224)
-- function: `_initialize_http_client` (line 233)
-- function: `embed_batch` (line 252)
-- function: `_embed_batch_http` (line 361)
-- function: `embed_single` (line 388)
-- function: `embed_chunks` (line 412)
-- function: `embed_batch_async` (line 465)
-- function: `close` (line 545)
-- function: `aclose` (line 569)
-- function: `_embed_batch_async_local` (line 582)
-- function: `_ensure_async_http_client` (line 593)
-- function: `_require_http_client` (line 611)
+- variable: `httpx` (line 31)
+- variable: `LOGGER` (line 33)
+- function: `_get_numpy` (line 37)
+- class: `EmbeddingRequest` (line 73)
+- class: `EmbeddingData` (line 101)
+- class: `EmbeddingResponse` (line 126)
+- class: `VLLMClient` (line 157)
+
+## Dependency Graph
+
+- **fan_in**: 4
+- **fan_out**: 6
+- **cycle_group**: 36
+
+## Declared Exports (__all__)
+
+EmbeddingData, EmbeddingRequest, EmbeddingResponse, VLLMClient
 
 ## Tags
 
-overlay-needed, public-api
+public-api

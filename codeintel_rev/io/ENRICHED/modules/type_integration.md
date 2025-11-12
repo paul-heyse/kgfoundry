@@ -20,13 +20,15 @@ Helpers for collecting Pyright/Pyrefly error summaries.
 - class: `TypeFileSummary` (line 14)
 - class: `TypeSummary` (line 23)
 - function: `_run_command_async` (line 29)
-- function: `_try_run` (line 61)
-- function: `collect_pyright` (line 79)
-- function: `collect_pyrefly` (line 110)
-- function: `_parse_pyrefly_jsonl` (line 134)
-- function: `_parse_pyrefly_json` (line 143)
-- function: `_apply_pyrefly_record` (line 150)
+- function: `_try_run` (line 74)
+- function: `collect_pyright` (line 104)
+- function: `collect_pyrefly` (line 143)
+- function: `_parse_pyrefly_jsonl` (line 174)
+- function: `_parse_pyrefly_json` (line 183)
+- function: `_apply_pyrefly_record` (line 190)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 1
+- **fan_out**: 0
+- **cycle_group**: 7

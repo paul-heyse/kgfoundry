@@ -18,9 +18,12 @@ Command-line entry point for offline FAISS recall evaluation.
 
 ## Definitions
 
+- variable: `LOGGER` (line 14)
 - function: `build_parser` (line 17)
 - function: `main` (line 41)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 0
+- **fan_out**: 1
+- **cycle_group**: 52

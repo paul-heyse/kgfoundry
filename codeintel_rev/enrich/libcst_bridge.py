@@ -15,7 +15,7 @@ from libcst.helpers import (  # type: ignore[import-not-found]
 )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ImportEntry:
     """Normalized metadata for a single import statement."""
 
@@ -26,7 +26,7 @@ class ImportEntry:
     level: int
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class DefEntry:
     """Top-level function/class definition summary."""
 
@@ -35,7 +35,7 @@ class DefEntry:
     lineno: int
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ModuleIndex:
     """Aggregate module metadata returned by :func:`index_module`."""
 
@@ -51,10 +51,15 @@ class ModuleIndex:
 def _extract_module_docstring(node: cst.Module) -> str | None:
     """Return the module docstring if present.
 
+    Parameters
+    ----------
+    node : cst.Module
+        LibCST module node to extract docstring from.
+
     Returns
     -------
     str | None
-        Module docstring text when available.
+        Module docstring text when available, or None if no docstring exists.
     """
     if not node.body:
         return None
@@ -75,6 +80,12 @@ def _extract_module_docstring(node: cst.Module) -> str | None:
 
 def _literal_string_values(node: cst.BaseExpression) -> Iterator[str]:
     """Yield literal string values from constant containers.
+
+    Parameters
+    ----------
+    node : cst.BaseExpression
+        LibCST expression node (list, tuple, set, or string literal) containing
+        literal string values to extract.
 
     Yields
     ------
@@ -115,15 +126,23 @@ class _IndexVisitor(cst.CSTVisitor):
         self.defs: list[DefEntry] = []
         self.exports: set[str] = set()
         self.docstring: str | None = None
+        self._class_depth = 0
+        self._function_depth = 0
 
     def on_visit(self, node: cst.CSTNode) -> bool:
         """Capture relevant node metadata and continue traversal.
 
+        Parameters
+        ----------
+        node : cst.CSTNode
+            LibCST node being visited during AST traversal.
+
         Returns
         -------
-        bool | None
-            Always returns True to continue traversal.
+        bool
+            Always returns True to continue traversal of child nodes.
         """
+        is_top_level = self._class_depth == 0 and self._function_depth == 0
         if isinstance(node, cst.Module):
             self.docstring = _extract_module_docstring(node)
         elif isinstance(node, cst.Import):
@@ -131,12 +150,24 @@ class _IndexVisitor(cst.CSTVisitor):
         elif isinstance(node, cst.ImportFrom):
             self._handle_import_from(node)
         elif isinstance(node, cst.FunctionDef):
-            self._handle_function_def(node)
+            if is_top_level:
+                self._handle_function_def(node)
+            self._function_depth += 1
         elif isinstance(node, cst.ClassDef):
-            self._handle_class_def(node)
-        elif isinstance(node, cst.Assign):
+            if is_top_level:
+                self._handle_class_def(node)
+            self._class_depth += 1
+        elif isinstance(node, cst.Assign) and is_top_level:
             self._handle_assign(node)
+        elif isinstance(node, cst.AnnAssign) and is_top_level:
+            self._handle_ann_assign(node)
         return True
+
+    def on_leave(self, original_node: cst.CSTNode) -> None:
+        if isinstance(original_node, cst.FunctionDef):
+            self._function_depth = max(0, self._function_depth - 1)
+        elif isinstance(original_node, cst.ClassDef):
+            self._class_depth = max(0, self._class_depth - 1)
 
     def _handle_import(self, node: cst.Import) -> None:
         names: list[str] = []
@@ -187,7 +218,7 @@ class _IndexVisitor(cst.CSTVisitor):
         try:
             pos = self.get_metadata(cst_metadata.PositionProvider, node)
             lineno = getattr(getattr(pos, "start", None), "line", 0)
-        except Exception:  # pragma: no cover - metadata may be unavailable
+        except (KeyError, AttributeError, TypeError):  # pragma: no cover - metadata may be missing
             lineno = 0
         self.defs.append(DefEntry(kind="function", name=node.name.value, lineno=lineno))
 
@@ -195,18 +226,43 @@ class _IndexVisitor(cst.CSTVisitor):
         try:
             pos = self.get_metadata(cst_metadata.PositionProvider, node)
             lineno = getattr(getattr(pos, "start", None), "line", 0)
-        except Exception:  # pragma: no cover - metadata may be unavailable
+        except (KeyError, AttributeError, TypeError):  # pragma: no cover - metadata may be missing
             lineno = 0
         self.defs.append(DefEntry(kind="class", name=node.name.value, lineno=lineno))
 
     def _handle_assign(self, node: cst.Assign) -> None:
+        lineno = _lineno(self, node)
         for target in node.targets:
-            if isinstance(target.target, cst.Name) and target.target.value == "__all__":
+            if not isinstance(target.target, cst.Name):
+                continue
+            name = target.target.value
+            if name == "__all__":
                 self.exports.update(_literal_string_values(node.value))
+                continue
+            if name.startswith("_"):
+                continue
+            self.defs.append(DefEntry(kind="variable", name=name, lineno=lineno))
+
+    def _handle_ann_assign(self, node: cst.AnnAssign) -> None:
+        lineno = _lineno(self, node)
+        target = node.target
+        if isinstance(target, cst.Name):
+            name = target.value
+            if name == "__all__" or name.startswith("_"):
+                return
+            self.defs.append(DefEntry(kind="variable", name=name, lineno=lineno))
 
 
 def index_module(path: str, code: str) -> ModuleIndex:
     """Return parsed module metadata, falling back to a stub on parse failure.
+
+    Parameters
+    ----------
+    path : str
+        File path of the module being indexed (used for error reporting and
+        metadata). May be absolute or relative.
+    code : str
+        Source code content of the module to parse and index.
 
     Returns
     -------
@@ -233,3 +289,26 @@ def index_module(path: str, code: str) -> ModuleIndex:
         exports=visitor.exports,
         docstring=visitor.docstring,
     )
+
+
+def _lineno(visitor: _IndexVisitor, node: cst.CSTNode) -> int:
+    """Return the starting line number for ``node`` when metadata is available.
+
+    Parameters
+    ----------
+    visitor : _IndexVisitor
+        LibCST visitor instance that provides metadata access via
+        ``get_metadata()``.
+    node : cst.CSTNode
+        LibCST node to extract line number from.
+
+    Returns
+    -------
+    int
+        1-based line number or 0 when metadata is unavailable.
+    """
+    try:
+        pos = visitor.get_metadata(cst_metadata.PositionProvider, node)
+        return getattr(getattr(pos, "start", None), "line", 0)
+    except (KeyError, AttributeError, TypeError):  # pragma: no cover
+        return 0

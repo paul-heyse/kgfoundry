@@ -9,7 +9,7 @@ project-excludes = [
     "src/kgfoundry_common/http/**",
     "codeintel_rev/patches/**",
 ]
-search-path = ["src", "stubs", "."]
+search-path = [".", "src", "stubs"]
 python-version = "3.13.9"
 
 # Type-check behavior

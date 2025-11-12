@@ -25,19 +25,19 @@ Usage:
 - from **(absolute)** import argparse
 - from **(absolute)** import sys
 - from **(absolute)** import traceback
-- from **typing** import TYPE_CHECKING, cast
+- from **typing** import cast
 - from **codeintel_rev._lazy_imports** import LazyModule
-- from **codeintel_rev.typing** import gate_import
-- from **(absolute)** import faiss
-- from **(absolute)** import numpy
-- from **(absolute)** import torch
+- from **codeintel_rev.typing** import FaissModule, NumpyModule, TorchModule, gate_import
 
 ## Definitions
 
-- function: `check_torch` (line 36)
-- function: `check_faiss` (line 96)
-- function: `main` (line 149)
+- variable: `np` (line 28)
+- function: `check_torch` (line 31)
+- function: `check_faiss` (line 91)
+- function: `main` (line 144)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 0
+- **fan_out**: 2
+- **cycle_group**: 88

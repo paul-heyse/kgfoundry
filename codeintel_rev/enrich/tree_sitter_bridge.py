@@ -27,10 +27,17 @@ except ImportError:  # pragma: no cover
 def _lang_for_ext(ext: str) -> Language | None:
     """Resolve a Tree-sitter language for ``ext``.
 
+    Parameters
+    ----------
+    ext : str
+        File extension (e.g., ".py", ".json") to resolve a language for.
+        The extension is normalized to lowercase before lookup.
+
     Returns
     -------
     Language | None
-        Tree-sitter language object when available.
+        Tree-sitter language object when available, or None if no language
+        binding exists for the extension.
     """
     normalized = ext.lower()
     if _get_language is not None:
@@ -75,10 +82,21 @@ class TSOutline:
 def build_outline(path: str | Path, content: bytes) -> TSOutline | None:
     """Produce a best-effort outline for ``path``'s contents.
 
+    Parameters
+    ----------
+    path : str | Path
+        File system path used to determine the language (via extension).
+        The path itself is not read; only the extension is used.
+    content : bytes
+        Source code content to parse and extract outline from. Must be
+        valid UTF-8 encoded text.
+
     Returns
     -------
     TSOutline | None
-        Outline description when a language binding exists.
+        Outline description when a language binding exists, containing
+        function and class definitions with byte offsets. Returns None
+        if no language binding is available for the file extension.
     """
     language = _lang_for_ext(Path(path).suffix)
     if language is None:
@@ -114,6 +132,14 @@ def build_outline(path: str | Path, content: bytes) -> TSOutline | None:
 
 def _extract_identifier(content: bytes, node: Node | None) -> str:
     """Return the identifier name for ``node`` if available.
+
+    Parameters
+    ----------
+    content : bytes
+        Source code bytes containing the identifier text.
+    node : Node | None
+        Tree-sitter node to extract identifier from. When None, returns
+        an empty string.
 
     Returns
     -------

@@ -1,0 +1,16 @@
+{
+  "package": "codeintel_rev",
+  "generated": [
+    "codeintel_rev/indexing/__init__.py",
+    "codeintel_rev/observability/__init__.py",
+    "codeintel_rev/runtime/__init__.py",
+    "codeintel_rev/cli/xtr.py",
+    "codeintel_rev/cli/__init__.py",
+    "codeintel_rev/mcp_server/retrieval/__init__.py",
+    "codeintel_rev/mcp_server/__init__.py",
+    "codeintel_rev/retrieval/fusion/__init__.py",
+    "codeintel_rev/retrieval/__init__.py"
+  ],
+  "removed": 0,
+  "activated": true
+}

@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     import faiss as _faiss
     import numpy as np
 else:
-    np = cast(Any, LazyModule("numpy", "FAISS manager vector operations"))
+    np = cast("Any", LazyModule("numpy", "FAISS manager vector operations"))
 
 LOGGER = get_logger(__name__)
 logger = LOGGER  # Alias for compatibility
@@ -70,7 +70,7 @@ class _LazyFaissProxy:
         """
         if self._module is None:
             imported = gate_import("faiss", "FAISS manager operations")
-            self._module = cast(ModuleType, imported)
+            self._module = cast("ModuleType", imported)
         return self._module
 
     def __getattr__(self, name: str) -> object:
@@ -96,7 +96,7 @@ class _LazyFaissProxy:
 
 
 _FAISS_PROXY = _LazyFaissProxy()
-faiss = cast(Any, _FAISS_PROXY)
+faiss = cast("Any", _FAISS_PROXY)
 
 
 def _faiss_module() -> ModuleType:
@@ -588,7 +588,7 @@ class FAISSManager:
         ):
             raw = getattr(id_map_obj, attr, None)
             if callable(raw):
-                return builder(cast(Callable[[int], object], raw))
+                return builder(cast("Callable[[int], object]", raw))
 
         existing_ids = self._build_existing_ids_set(cpu_index, id_map_obj)
         return lambda id_val: int(id_val) in existing_ids
@@ -718,7 +718,7 @@ class FAISSManager:
             at_raw = getattr(id_map_obj, "at", None)
             if not callable(at_raw):
                 return set()
-            at_callable = cast(Callable[[int], int], at_raw)
+            at_callable = cast("Callable[[int], int]", at_raw)
             return {int(at_callable(idx)) for idx in range(n_total)}
         except (AttributeError, TypeError, ValueError):
             return set()
@@ -729,7 +729,8 @@ class FAISSManager:
         unique_indices: list[int] = []
         seen_in_batch: set[int] = set()
 
-        for offset, id_val in enumerate(new_ids.tolist()):
+        flat_ids = new_ids.reshape(-1)
+        for offset, id_val in enumerate(flat_ids):
             id_int = int(id_val)
             if id_int in seen_in_batch:
                 continue
@@ -868,7 +869,7 @@ class FAISSManager:
             n_vectors = self.secondary_index.ntotal
             id_map_obj = getattr(self.secondary_index, "id_map", None)
             if id_map_obj is not None and callable(getattr(id_map_obj, "at", None)):
-                at_callable = cast(Callable[[int], int], id_map_obj.at)
+                at_callable = cast("Callable[[int], int]", id_map_obj.at)
                 self.incremental_ids = {at_callable(i) for i in range(n_vectors)}
             else:
                 self.incremental_ids = set(range(n_vectors))
@@ -1654,7 +1655,7 @@ class FAISSManager:
         if id_map_obj is None or not callable(getattr(id_map_obj, "at", None)):
             msg = f"Index type {type(index).__name__} has invalid id_map interface."
             raise TypeError(msg)
-        at_callable = cast(Callable[[int], int], id_map_obj.at)
+        at_callable = cast("Callable[[int], int]", id_map_obj.at)
 
         base_index = getattr(index, "index", index)
         for i in range(n_vectors):
@@ -2141,7 +2142,7 @@ class FAISSManager:
             )
             return {}
         try:
-            profile = cast(dict[str, float | str], json.loads(raw))
+            profile = cast("dict[str, float | str]", json.loads(raw))
         except json.JSONDecodeError as exc:
             LOGGER.warning(
                 "Failed to parse FAISS autotune profile",

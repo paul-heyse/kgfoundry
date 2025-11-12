@@ -26,35 +26,21 @@ FAISS dual-index utilities and metadata helpers.
 
 ## Definitions
 
+- variable: `np` (line 24)
+- variable: `LOGGER` (line 26)
 - class: `IndexManifest` (line 32)
-- function: `from_file` (line 49)
-- function: `to_file` (line 82)
 - class: `FAISSDualIndexManager` (line 89)
-- function: `__init__` (line 92)
-- function: `set_test_indexes` (line 108)
-- function: `gpu_enabled` (line 130)
-- function: `gpu_disabled_reason` (line 135)
-- function: `primary_index` (line 140)
-- function: `secondary_index` (line 145)
-- function: `manifest` (line 150)
-- function: `ensure_ready` (line 154)
-- function: `close` (line 197)
-- function: `search` (line 208)
-- function: `add_incremental` (line 285)
-- function: `needs_compaction` (line 376)
-- function: `_reset_gpu_state` (line 398)
-- function: `_import_faiss` (line 405)
-- function: `_load_primary_index` (line 416)
-- function: `_load_secondary_index` (line 455)
-- function: `_wrap_with_idmap` (line 469)
-- function: `_configure_direct_map` (line 478)
-- function: `_load_manifest` (line 501)
-- function: `try_gpu_clone` (line 516)
-- function: `_build_gpu_cloner_options` (line 576)
-- function: `_clone_index_to_gpu` (line 595)
-- function: `_select_primary_index` (line 631)
-- function: `_select_secondary_index` (line 639)
+
+## Dependency Graph
+
+- **fan_in**: 0
+- **fan_out**: 3
+- **cycle_group**: 68
+
+## Declared Exports (__all__)
+
+FAISSDualIndexManager, IndexManifest
 
 ## Tags
 
-overlay-needed, public-api
+public-api

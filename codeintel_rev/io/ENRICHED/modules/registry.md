@@ -17,14 +17,21 @@ Entry-point driven registry for retrieval channels.
 
 ## Definitions
 
+- variable: `LOGGER` (line 12)
 - class: `ChannelRegistry` (line 19)
-- function: `__init__` (line 22)
-- function: `discover` (line 26)
-- function: `from_channels` (line 72)
-- function: `channels` (line 102)
 - function: `_iter_entry_points` (line 113)
 - function: `_load_factory` (line 140)
 
+## Dependency Graph
+
+- **fan_in**: 1
+- **fan_out**: 2
+- **cycle_group**: 42
+
+## Declared Exports (__all__)
+
+ChannelRegistry
+
 ## Tags
 
-overlay-needed, public-api
+public-api

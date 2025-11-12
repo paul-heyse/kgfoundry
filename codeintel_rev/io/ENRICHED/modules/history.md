@@ -22,9 +22,20 @@ better performance (50-80ms latency reduction) and reliability.
 
 ## Definitions
 
+- variable: `LOGGER` (line 21)
 - function: `blame_range` (line 24)
 - function: `file_history` (line 119)
 
+## Dependency Graph
+
+- **fan_in**: 0
+- **fan_out**: 4
+- **cycle_group**: 93
+
+## Declared Exports (__all__)
+
+blame_range, file_history
+
 ## Tags
 
-overlay-needed, public-api
+public-api

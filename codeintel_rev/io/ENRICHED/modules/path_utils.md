@@ -16,6 +16,8 @@ Path safety utilities for repository-scoped operations.
 - class: `PathOutsideRepositoryError` (line 8)
 - function: `resolve_within_repo` (line 12)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 5
+- **fan_out**: 0
+- **cycle_group**: 45

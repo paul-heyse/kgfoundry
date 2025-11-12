@@ -59,6 +59,7 @@ GitPython documentation : https://gitpython.readthedocs.io/
 
 ## Definitions
 
+- variable: `LOGGER` (line 58)
 - function: `_string_attr` (line 61)
 - function: `_commit_iso_date` (line 66)
 - function: `_author_field` (line 76)
@@ -66,15 +67,18 @@ GitPython documentation : https://gitpython.readthedocs.io/
 - function: `_normalize_line_numbers` (line 89)
 - function: `_coerce_blame_tuple` (line 102)
 - class: `GitClient` (line 117)
-- function: `repo` (line 168)
-- function: `with_cached_repo` (line 212)
-- function: `blame_range` (line 229)
-- function: `file_history` (line 367)
 - class: `AsyncGitClient` (line 486)
-- function: `__init__` (line 533)
-- function: `blame_range` (line 536)
-- function: `file_history` (line 575)
+
+## Dependency Graph
+
+- **fan_in**: 1
+- **fan_out**: 3
+- **cycle_group**: 41
+
+## Declared Exports (__all__)
+
+AsyncGitClient, GitClient
 
 ## Tags
 
-overlay-needed, public-api
+public-api

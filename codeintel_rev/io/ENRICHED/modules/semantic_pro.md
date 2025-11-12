@@ -38,11 +38,16 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 
 ## Definitions
 
+- variable: `SNIPPET_PREVIEW_CHARS` (line 55)
+- variable: `COMPONENT_NAME` (line 56)
+- variable: `RERANK_STAGE_NAME` (line 57)
+- variable: `LOGGER` (line 58)
 - class: `RerankOptionPayload` (line 61)
 - class: `SemanticProOptions` (line 70)
 - class: `RerankRuntimeOptions` (line 83)
 - class: `RerankPlan` (line 93)
 - class: `SemanticProRuntimeOptions` (line 104)
+- variable: `WideSearchHandle` (line 116)
 - class: `StageOnePlan` (line 120)
 - class: `HydrationPlan` (line 132)
 - class: `HydrationOutcome` (line 145)
@@ -89,6 +94,8 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 - class: `FusionRequest` (line 1709)
 - class: `MethodContext` (line 1723)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 0
+- **fan_out**: 18
+- **cycle_group**: 91

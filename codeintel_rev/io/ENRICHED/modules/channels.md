@@ -19,12 +19,23 @@ Channel plugin contracts for hybrid retrieval.
 
 ## Definitions
 
+- variable: `Capabilities` (line 16)
+- variable: `ResolvedPaths` (line 17)
+- variable: `Settings` (line 18)
 - class: `ChannelContext` (line 24)
 - class: `Channel` (line 32)
-- function: `search` (line 39)
 - class: `ChannelError` (line 44)
-- function: `__init__` (line 47)
+
+## Dependency Graph
+
+- **fan_in**: 3
+- **fan_out**: 5
+- **cycle_group**: 42
+
+## Declared Exports (__all__)
+
+Channel, ChannelContext, ChannelError
 
 ## Tags
 
-overlay-needed, public-api
+public-api

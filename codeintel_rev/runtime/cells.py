@@ -205,7 +205,7 @@ class RuntimeCell[T]:
         with self._condition:
             self._adjuster = adjuster
 
-    def get_or_initialize(self, factory: Callable[[], T]) -> T:
+    def get_or_initialize(self, factory: Callable[[], T]) -> T:  # noqa: DOC503
         """Return or initialize the payload with single-flight semantics.
 
         Extended Summary
@@ -234,13 +234,15 @@ class RuntimeCell[T]:
         ------
         RuntimeError
             Raised when generation tracking becomes inconsistent (defensive check).
-        Exception
+        BaseException
             Any exception stored in the cell from a previous failure is re-raised during
             cooldown periods. The specific exception type depends on the error that
             triggered the cooldown (e.g., RuntimeUnavailableError, RuntimeLifecycleError).
-            Note: pydoclint's static analysis sees 'cooldown_error' as a variable name
-            rather than recognizing it as an Exception instance that is re-raised. This
-            is a limitation of static analysis - the code correctly raises Exception types.
+            The exception is stored in `_cooldown_error` and re-raised via the
+            `cooldown_error` variable (of type `BaseException | None`) when cooldown
+            periods are active. Note: pydoclint's static analysis sees `cooldown_error`
+            as a variable name rather than recognizing it as a BaseException instance
+            that is re-raised; this is a limitation of static analysis.
 
         Notes
         -----
@@ -454,17 +456,19 @@ class RuntimeCell[T]:
     def _resolve_disposer(value: T) -> tuple[Callable[[], None] | None, bool]:
         closer = getattr(value, "close", None)
         if callable(closer):
+            close_callable = closer
 
             def _run_close() -> None:
-                closer()
+                close_callable()
 
             return _run_close, True
 
         exit_fn = getattr(value, "__exit__", None)
         if callable(exit_fn):
+            exit_callable = exit_fn
 
             def _run_exit() -> None:
-                exit_fn(None, None, None)
+                exit_callable(None, None, None)
 
             return _run_exit, False
         return None, False

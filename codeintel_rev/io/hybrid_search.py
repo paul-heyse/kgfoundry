@@ -1017,7 +1017,7 @@ class HybridSearchEngine:
             f"Hybrid pool fused {stats.fused_count}/{max(1, stats.limit)} results "
             f"(faiss k={default_k}, nprobe={default_nprobe})"
         )
-        explainability = {
+        explainability: dict[str, object] = {
             "pool": {
                 "weights": dict(stats.weights),
                 "sim_threshold": getattr(self._settings.index, "semantic_min_score", 0.0),
@@ -1025,7 +1025,7 @@ class HybridSearchEngine:
         }
         retrieval = list(dict.fromkeys(active_channels or ["semantic"]))
         notes = list(dict.fromkeys(warnings)) if warnings else []
-        method = {
+        method: dict[str, object] = {
             "retrieval": retrieval,
             "coverage": coverage,
             "notes": notes,

@@ -30,18 +30,25 @@ In-process vLLM embedding engine for Stage-0 retrieval.
 
 ## Definitions
 
+- variable: `np` (line 28)
+- variable: `transformers` (line 29)
+- variable: `vllm` (line 30)
+- variable: `vllm_config` (line 31)
+- variable: `vllm_inputs` (line 32)
+- variable: `LOGGER` (line 34)
 - class: `_InprocessVLLMRuntime` (line 37)
-- function: `__init__` (line 42)
-- function: `close` (line 46)
 - class: `InprocessVLLMEmbedder` (line 60)
-- function: `__post_init__` (line 96)
-- function: `embed_batch` (line 108)
-- function: `close` (line 164)
-- function: `_load_tokenizer` (line 168)
-- function: `_load_engine` (line 175)
-- function: `_initialize_runtime` (line 191)
-- function: `_runtime` (line 205)
+
+## Dependency Graph
+
+- **fan_in**: 1
+- **fan_out**: 5
+- **cycle_group**: 35
+
+## Declared Exports (__all__)
+
+InprocessVLLMEmbedder
 
 ## Tags
 
-overlay-needed, public-api
+public-api

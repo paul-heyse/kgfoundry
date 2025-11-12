@@ -22,6 +22,7 @@ All configuration loaded from environment variables with sensible defaults.
 
 ## Definitions
 
+- variable: `DEFAULT_RRF_WEIGHTS` (line 19)
 - class: `_HybridChannelSettings` (line 28)
 - function: `_env_bool` (line 35)
 - function: `_parse_int_with_suffix` (line 55)
@@ -43,7 +44,6 @@ All configuration loaded from environment variables with sensible defaults.
 - class: `SpladeConfig` (line 451)
 - class: `PathsConfig` (line 519)
 - class: `IndexConfig` (line 587)
-- function: `__post_init__` (line 653)
 - class: `ServerLimits` (line 661)
 - class: `RedisConfig` (line 707)
 - class: `Settings` (line 728)
@@ -67,6 +67,16 @@ All configuration loaded from environment variables with sensible defaults.
 - function: `_build_warp_config` (line 1307)
 - function: `_build_coderank_llm_config` (line 1318)
 
+## Dependency Graph
+
+- **fan_in**: 21
+- **fan_out**: 2
+- **cycle_group**: 27
+
+## Declared Exports (__all__)
+
+BM25Config, CodeRankConfig, CodeRankLLMConfig, IndexConfig, PRFConfig, PathsConfig, RedisConfig, RerankConfig, ServerLimits, Settings, SpladeConfig, VLLMConfig, VLLMRunMode, WarpConfig, XTRConfig, load_settings
+
 ## Tags
 
-overlay-needed, public-api, reexport-hub
+public-api, reexport-hub

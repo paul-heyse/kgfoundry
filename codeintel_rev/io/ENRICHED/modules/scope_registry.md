@@ -68,14 +68,19 @@ codeintel_rev.mcp_server.scope_utils : Scope merging and filtering utilities
 
 ## Definitions
 
+- variable: `LOGGER` (line 66)
 - class: `ScopeRegistry` (line 81)
-- function: `__init__` (line 133)
-- function: `set_scope` (line 140)
-- function: `get_scope` (line 188)
-- function: `clear_scope` (line 250)
-- function: `prune_expired` (line 293)
-- function: `get_session_count` (line 375)
+
+## Dependency Graph
+
+- **fan_in**: 0
+- **fan_out**: 2
+- **cycle_group**: 13
+
+## Declared Exports (__all__)
+
+ScopeRegistry
 
 ## Tags
 
-overlay-needed, public-api
+public-api

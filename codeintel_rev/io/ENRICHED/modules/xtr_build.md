@@ -25,13 +25,17 @@ Utilities for building and verifying XTR token indexes.
 
 ## Definitions
 
+- variable: `np` (line 22)
+- variable: `LOGGER` (line 24)
 - class: `XTRBuildSummary` (line 28)
 - function: `_iter_chunk_text` (line 39)
 - function: `_gather_chunk_vectors` (line 86)
 - function: `_write_token_matrix` (line 157)
 - function: `build_xtr_index` (line 227)
-- function: `main` (line 330)
+- function: `main` (line 333)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 1
+- **fan_out**: 6
+- **cycle_group**: 60

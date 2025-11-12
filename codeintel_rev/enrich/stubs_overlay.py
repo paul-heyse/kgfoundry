@@ -1,315 +1,512 @@
 # SPDX-License-Identifier: MIT
-"""Overlay generation utilities for the enrichment CLI."""
+"""Targeted overlay generation with opt-in activation."""
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+import platform
+from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 from codeintel_rev.enrich.libcst_bridge import DefEntry, ImportEntry, ModuleIndex, index_module
 from codeintel_rev.enrich.output_writers import write_json
-from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
+from codeintel_rev.enrich.scip_reader import SCIPIndex
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
+class OverlayPolicy:
+    """Controls when an overlay is generated and how it is written."""
+
+    overlays_root: Path = Path("stubs/overlays")
+    include_public_defs: bool = False
+    inject_module_getattr_any: bool = True
+    when_star_imports: bool = True
+    when_has_all: bool = True
+    when_type_errors: bool = False
+    min_type_errors: int = 25
+    max_overlays: int = 200
+
+
+@dataclass(frozen=True, slots=True)
 class OverlayResult:
-    """Result metadata for an overlay generation attempt."""
+    """Summary of overlay creation for a single module."""
 
-    pyi_path: Path | None
-    exports_resolved: dict[str, set[str]]
+    pyi_path: Path
     created: bool
+    reason: str
+    exports_resolved: Mapping[str, list[str]]
 
 
-def generate_overlay_for_file(
+def generate_overlay_for_file(  # noqa: PLR0913
     py_file: Path,
     package_root: Path,
+    *,
     scip: SCIPIndex | None,
+    policy: OverlayPolicy,
+    type_error_counts: Mapping[str, int] | None = None,
+    force: bool = False,
 ) -> OverlayResult:
-    """Create a `.pyi` overlay for py_file when public surface warrants it.
-
-    Extended Summary
-    ----------------
-    Analyzes a Python source file to determine if it warrants a type stub overlay
-    based on public API surface (exports, star imports, public definitions).
-    When warranted, generates a `.pyi` stub file in the stubs/ directory
-    mirroring the source structure, along with a JSON sidecar containing
-    metadata. This enables type checkers to understand module boundaries
-    without requiring full type annotations in source.
+    """Generate a .pyi overlay for ``py_file`` when it meets the policy gates.
 
     Parameters
     ----------
     py_file : Path
-        Absolute path to the Python source file to analyze. Must exist and
-        be readable.
-
+        Path to the Python source file for which to generate an overlay.
+        May be absolute or relative to ``package_root``.
     package_root : Path
-        Root directory of the package being analyzed. Used to compute relative
-        paths and determine stub output locations. Must be a parent of py_file.
-
+        Root directory of the package containing ``py_file``. Used to
+        compute relative module paths and overlay destination paths.
     scip : SCIPIndex | None
-        Optional SCIP index for resolving star imports. When provided, enables
-        accurate re-export resolution by looking up symbols from imported
-        modules. If None, star imports are not resolved.
+        Optional SCIP index for resolving star import re-exports. When
+        provided, star imports are expanded using symbol information
+        from the index.
+    policy : OverlayPolicy
+        Policy controlling when overlays are generated and how they are
+        written. Includes gates for star imports, ``__all__`` definitions,
+        and type error thresholds.
+    type_error_counts : Mapping[str, int] | None, optional
+        Optional mapping of module keys to type error counts. Used to
+        determine if a module should receive an overlay based on error
+        thresholds. Defaults to None.
+    force : bool, optional
+        When True, bypasses policy gates and forces overlay creation.
 
     Returns
     -------
     OverlayResult
-        Metadata describing the overlay generation result. Contains pyi_path
-        (None if no overlay was created), exports_resolved (dict mapping module
-        names to sets of exported symbols), and created (bool indicating if
-        a new file was written or an existing one was updated).
-
-    Notes
-    -----
-    Time O(n + m) where n is file size and m is number of symbols to resolve;
-    memory O(n + m) for parsed structures and overlay text. Performs file I/O
-    (read source, write stub and sidecar), LibCST parsing, and SCIP lookups.
-    No global state mutations. Overlays are idempotent: existing stubs are
-    only overwritten if content differs.
-
-    Examples
-    --------
-    >>> from pathlib import Path
-    >>> from codeintel_rev.enrich.scip_reader import SCIPIndex
-    >>> # Requires valid source file and package root
-    >>> # result = generate_overlay_for_file(py_file, root, None)
-    >>> # assert isinstance(result, OverlayResult)
+        Metadata describing whether an overlay was created, including
+        the destination path, creation reason, and resolved exports.
     """
-    repo_root = _infer_repo_root(package_root)
-    relative_path = _safe_relative(py_file, repo_root)
-    code = py_file.read_text(encoding="utf-8", errors="ignore")
-    module_index = index_module(str(relative_path), code)
-    module_name = _module_name_from_path(py_file, repo_root)
+    source = py_file if py_file.is_absolute() else package_root / py_file
+    if not source.exists():
+        return OverlayResult(
+            pyi_path=_overlay_path(policy.overlays_root, package_root, py_file),
+            created=False,
+            reason="missing-source",
+            exports_resolved={},
+        )
 
-    scip_by_file = scip.by_file() if scip else {}
-    star_exports = _collect_star_reexports(module_name, module_index.imports, scip_by_file)
-    public_defs = [d for d in module_index.defs if _is_public_def(d)]
-    should_overlay = bool(star_exports or module_index.exports or public_defs)
+    rel_key = _normalized_module_key(package_root, source)
+    error_count = 0
+    if type_error_counts:
+        error_count = type_error_counts.get(rel_key, type_error_counts.get(str(source), 0))
 
-    if not should_overlay:
-        return OverlayResult(pyi_path=None, exports_resolved=star_exports, created=False)
+    module = index_module(str(source), source.read_text(encoding="utf-8", errors="ignore"))
 
-    overlay_text = _build_overlay_text(module_index, public_defs, star_exports)
-    stubs_root = repo_root / "stubs"
-    pyi_path = stubs_root / relative_path.with_suffix(".pyi")
-    pyi_path.parent.mkdir(parents=True, exist_ok=True)
-    if pyi_path.exists():
-        current = pyi_path.read_text(encoding="utf-8")
-        if current == overlay_text:
-            created = True
-        else:
-            pyi_path.write_text(overlay_text, encoding="utf-8")
-            created = True
-    else:
-        pyi_path.write_text(overlay_text, encoding="utf-8")
-        created = True
+    has_star = any(entry.is_star for entry in module.imports)
+    has_all = bool(module.exports)
 
-    _write_sidecar(
-        pyi_path=pyi_path,
+    should_for_star = policy.when_star_imports and has_star
+    should_for_all = policy.when_has_all and has_all and not module.defs
+    should_for_errors = policy.when_type_errors and (error_count >= policy.min_type_errors)
+
+    if not force and not (should_for_star or should_for_all or should_for_errors):
+        return OverlayResult(
+            pyi_path=_overlay_path(policy.overlays_root, package_root, py_file),
+            created=False,
+            reason="not-eligible",
+            exports_resolved={},
+        )
+
+    star_targets: MutableMapping[str, list[str]] = {}
+    if has_star and scip is not None:
+        for entry in module.imports:
+            if entry.is_star and entry.module:
+                names = _collect_star_reexports(scip, entry)
+                if names:
+                    star_targets[entry.module] = sorted(names)
+
+    module_name = _module_name_from_path(package_root, source)
+    overlay_text = _build_overlay_text(
         module_name=module_name,
-        source_path=str(relative_path),
-        module_index=module_index,
-        star_exports=star_exports,
+        module=module,
+        star_targets=star_targets,
+        import_reexports=_collect_import_reexports(module),
+        include_public_defs=policy.include_public_defs,
+        inject_getattr_any=policy.inject_module_getattr_any,
     )
-    return OverlayResult(pyi_path=pyi_path, exports_resolved=star_exports, created=created)
+
+    pyi_path = _overlay_path(policy.overlays_root, package_root, py_file)
+    pyi_path.parent.mkdir(parents=True, exist_ok=True)
+    pyi_path.write_text(overlay_text, encoding="utf-8")
+
+    sidecar = pyi_path.with_suffix(".pyi.json")
+    write_json(
+        sidecar,
+        {
+            "module": module_name,
+            "source": str(source),
+            "exports_resolved": dict(star_targets),
+            "has_all": sorted(module.exports) if module.exports else [],
+            "defs": [{"kind": d.kind, "name": d.name, "lineno": d.lineno} for d in module.defs],
+            "parse_ok": module.parse_ok,
+            "errors": module.errors,
+            "type_errors": error_count,
+            "forced": force,
+        },
+    )
+
+    return OverlayResult(
+        pyi_path=pyi_path,
+        created=True,
+        reason="generated",
+        exports_resolved=star_targets,
+    )
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+def activate_overlays(
+    modules: Sequence[str],
+    *,
+    overlays_root: Path,
+    stubs_root: Path = Path("stubs"),
+    copy_on_windows: bool = True,
+) -> int:
+    """Activate overlays by linking or copying into ``stubs_root``.
 
+    Parameters
+    ----------
+    modules : Sequence[str]
+        Sequence of module names (dotted paths) to activate. Each module
+        name is converted to a relative path under ``overlays_root``.
+    overlays_root : Path
+        Root directory containing generated overlay files (.pyi).
+    stubs_root : Path, optional
+        Destination directory for activated overlays. Overlays are linked
+        (or copied on Windows) into this directory. Defaults to Path("stubs").
+    copy_on_windows : bool, optional
+        When True (default), copies overlay files on Windows instead of
+        creating symlinks. On Unix systems, symlinks are always used.
 
-def _infer_repo_root(root: Path) -> Path:
-    root = root.resolve()
-    if (root / "__init__.py").exists():
-        return root.parent
-    return root
-
-
-def _safe_relative(path: Path, base: Path) -> Path:
-    try:
-        return path.resolve().relative_to(base.resolve())
-    except ValueError:
-        return Path(path.name)
-
-
-def _module_name_from_path(py_file: Path, repo_root: Path) -> str:
-    rel = _safe_relative(py_file, repo_root)
-    parts = list(rel.parts)
-    if not parts:
-        return py_file.stem
-    if parts[-1] == "__init__.py":
-        parts = parts[:-1]
-    else:
-        parts[-1] = Path(parts[-1]).stem
-    return ".".join(parts) if parts else py_file.stem
-
-
-def _collect_star_reexports(
-    this_module: str,
-    imports: Iterable[ImportEntry],
-    scip_by_file: Mapping[str, Document],
-) -> dict[str, set[str]]:
-    resolved: dict[str, set[str]] = {}
-    if not scip_by_file:
-        return resolved
-    package_hint = this_module.split(".", 1)[0]
-    for imp in imports:
-        if not imp.is_star:
+    Returns
+    -------
+    int
+        Number of overlays that were successfully activated.
+    """
+    activated = 0
+    for rel in modules:
+        rel_path = Path(rel).with_suffix(".pyi")
+        src = overlays_root / rel_path
+        if not src.exists():
             continue
-        target = _resolve_target_module(this_module, imp)
-        if not target:
+        dst = stubs_root / rel_path
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        if dst.exists() or dst.is_symlink():
+            dst.unlink()
+        try:
+            if copy_on_windows and _is_windows():
+                dst.write_bytes(src.read_bytes())
+            else:
+                dst.symlink_to(src)
+        except OSError:
+            dst.write_bytes(src.read_bytes())
+        activated += 1
+    return activated
+
+
+def deactivate_all(*, overlays_root: Path, stubs_root: Path = Path("stubs")) -> int:
+    """Remove overlays under ``stubs_root`` that originated from ``overlays_root``.
+
+    Parameters
+    ----------
+    overlays_root : Path
+        Root directory containing source overlay files. Only overlays that
+        match files in this directory are removed from ``stubs_root``.
+    stubs_root : Path, optional
+        Directory containing activated overlays to remove. Defaults to
+        Path("stubs").
+
+    Returns
+    -------
+    int
+        Number of overlays removed from ``stubs_root``.
+    """
+    removed = 0
+    if not stubs_root.exists():
+        return removed
+    for stub in stubs_root.rglob("*.pyi"):
+        rel = stub.relative_to(stubs_root)
+        candidate = overlays_root / rel
+        try:
+            if stub.is_symlink():
+                target = stub.readlink()
+                if target == candidate:
+                    stub.unlink()
+                    removed += 1
+            elif stub.exists() and candidate.exists():
+                if stub.read_bytes() == candidate.read_bytes():
+                    stub.unlink()
+                    removed += 1
+        except OSError:
             continue
-        names, resolved_target = _names_from_scip(target, scip_by_file, package_hint)
-        if not names:
+    return removed
+
+
+def _overlay_path(overlays_root: Path, package_root: Path, py_file: Path) -> Path:
+    """Return the overlay destination path for ``py_file``.
+
+    Parameters
+    ----------
+    overlays_root : Path
+        Root directory for overlay files.
+    package_root : Path
+        Root directory of the package containing ``py_file``.
+    py_file : Path
+        Python source file path (may be absolute or relative to ``package_root``).
+
+    Returns
+    -------
+    Path
+        Target .pyi path under ``overlays_root``, preserving the relative
+        structure from ``package_root``.
+    """
+    target = py_file if py_file.is_absolute() else package_root / py_file
+    rel = target.relative_to(package_root)
+    return overlays_root / rel.with_suffix(".pyi")
+
+
+def _normalized_module_key(package_root: Path, py_file: Path) -> str:
+    """Return a normalized module key used for lookups.
+
+    Parameters
+    ----------
+    package_root : Path
+        Root directory of the package.
+    py_file : Path
+        Python source file path (may be absolute or relative to ``package_root``).
+
+    Returns
+    -------
+    str
+        Forward-slash separated path relative to ``package_root``, normalized
+        for use as a lookup key in type error mappings.
+    """
+    rel = py_file if py_file.is_absolute() else package_root / py_file
+    return str(rel.relative_to(package_root)).replace("\\", "/")
+
+
+def _module_name_from_path(package_root: Path, py_file: Path) -> str:
+    """Return the dotted module name for ``py_file``.
+
+    Parameters
+    ----------
+    package_root : Path
+        Root directory of the package.
+    py_file : Path
+        Python source file path (may be absolute or relative to ``package_root``).
+
+    Returns
+    -------
+    str
+        Dotted module name (e.g., "package.submodule") derived from the
+        relative path from ``package_root`` to ``py_file``.
+    """
+    rel = py_file if py_file.is_absolute() else package_root / py_file
+    rel = rel.relative_to(package_root).with_suffix("")
+    return ".".join(rel.parts)
+
+
+def _collect_star_reexports(scip: SCIPIndex, entry: ImportEntry) -> list[str]:
+    """Return candidate names that a star import might re-export.
+
+    Parameters
+    ----------
+    scip : SCIPIndex
+        SCIP index containing symbol information for resolving re-exports.
+    entry : ImportEntry
+        Import entry representing a star import (``from module import *``).
+        The ``module`` attribute must be set to the target module name.
+
+    Returns
+    -------
+    list[str]
+        Sorted list of names resolved from the SCIP index that may be
+        re-exported by the star import.
+    """
+    names: set[str] = set()
+    target = entry.module or ""
+    for symbol in scip.symbol_to_files():
+        if f"`{target}`" not in symbol:
             continue
-        key = resolved_target or target
-        resolved.setdefault(key, set()).update(names)
-    return resolved
+        simple = _extract_simple_name(symbol)
+        if simple:
+            names.add(simple)
+    return sorted(names)
 
 
-def _resolve_target_module(this_module: str, imp: ImportEntry) -> str | None:
-    if imp.level == 0:
-        return imp.module
-    parts = this_module.split(".")
-    if len(parts) < imp.level:
-        return None
-    prefix = parts[: len(parts) - imp.level]
-    if imp.module:
-        prefix.extend(imp.module.split("."))
-    target = ".".join(part for part in prefix if part)
-    return target or None
+def _extract_simple_name(symbol: str) -> str | None:
+    """Extract a plausible leaf identifier from a SCIP symbol string.
+
+    Parameters
+    ----------
+    symbol : str
+        SCIP symbol string (e.g., "package/module#Class.method()") from
+        which to extract the leaf identifier.
+
+    Returns
+    -------
+    str | None
+        Leaf identifier (e.g., "method") if one can be inferred from
+        ``symbol``, or None if extraction fails.
+    """
+    cleaned = symbol.strip().strip("`")
+    for raw_chunk in reversed(cleaned.split("/")):
+        candidate = raw_chunk.strip("`")
+        if not candidate:
+            continue
+        base = candidate.split("#")[0]
+        base = base.split("()")[0].rstrip(".")
+        if base and base.replace("_", "").replace(".", "").isalnum():
+            return base
+    return None
 
 
-def _names_from_scip(
+def _build_overlay_text(  # noqa: PLR0913
+    *,
     module_name: str,
-    scip_by_file: Mapping[str, Document],
-    package_hint: str | None,
-) -> tuple[set[str], str | None]:
-    modules_to_try = [module_name]
-    if package_hint and "." not in module_name:
-        modules_to_try.append(f"{package_hint}.{module_name}")
-    for candidate_module in modules_to_try:
-        candidates = _candidate_file_paths_for_module(candidate_module)
-        names: set[str] = set()
-        for candidate in candidates:
-            doc = scip_by_file.get(candidate)
-            if not doc:
-                continue
-            for sym in doc.symbols:
-                name = _simple_name_from_scip_symbol(sym.symbol)
-                if name and not _is_private(name):
-                    names.add(name)
-            if names:
-                return names, candidate_module
-    return set(), None
-
-
-def _candidate_file_paths_for_module(module_name: str) -> list[str]:
-    parts = [p for p in module_name.split(".") if p]
-    candidates: list[str] = []
-    prefixes = [
-        parts,
-        parts[1:] if len(parts) > 1 else [],
-    ]
-    seen: set[str] = set()
-    for prefix in prefixes:
-        if not prefix:
-            continue
-        base = "/".join(prefix)
-        for stem in (
-            f"{base}.py",
-            f"{base}/__init__.py",
-            f"src/{base}.py",
-            f"src/{base}/__init__.py",
-        ):
-            if stem not in seen:
-                candidates.append(stem)
-                seen.add(stem)
-    return candidates
-
-
-def _simple_name_from_scip_symbol(symbol: str) -> str | None:
-    if not symbol:
-        return None
-    tail = symbol.rsplit("/", 1)[-1]
-    for delimiter in ("#", "?", "."):
-        if delimiter in tail:
-            tail = tail.split(delimiter, 1)[0]
-    tail = tail.strip("`")
-    return tail or None
-
-
-def _is_private(name: str) -> bool:
-    return name.startswith("_")
-
-
-def _is_public_def(entry: DefEntry) -> bool:
-    return entry.kind in {"function", "class"} and not _is_private(entry.name)
-
-
-def _pyi_header(*, import_any: bool) -> list[str]:
-    lines = ["from __future__ import annotations"]
-    if import_any:
-        lines.append("from typing import Any")
-    lines.append("")
-    lines.append("# Auto-generated overlay. Edit as needed for more precise types.")
-    lines.append("")
-    return lines
-
-
-def _build_overlay_text(
-    module_index: ModuleIndex,
-    public_defs: list[DefEntry],
-    star_exports: dict[str, set[str]],
+    module: ModuleIndex,
+    star_targets: Mapping[str, list[str]],
+    import_reexports: list[str],
+    include_public_defs: bool,
+    inject_getattr_any: bool,
 ) -> str:
-    needs_any = any(entry.kind == "function" for entry in public_defs)
-    lines = _pyi_header(import_any=needs_any)
-    emitted_reexport = False
-    for mod_name in sorted(star_exports):
-        exports = star_exports[mod_name]
-        if not exports:
-            continue
-        spec = ", ".join(sorted(f"{name} as {name}" for name in exports))
-        lines.append(f"from {mod_name} import {spec}")
-        emitted_reexport = True
-    if emitted_reexport:
+    """Render overlay text from the collected module metadata.
+
+    Parameters
+    ----------
+    module_name : str
+        Dotted module name used in the overlay header comment.
+    module : ModuleIndex
+        Parsed module metadata containing imports, definitions, exports,
+        and docstring information.
+    star_targets : Mapping[str, list[str]]
+        Mapping of imported module names to lists of resolved re-export
+        names. Used to expand star imports in the overlay.
+    import_reexports : list[str]
+        Explicit re-export lines derived from ``__all__`` plus import statements.
+    include_public_defs : bool
+        When True, includes stub definitions for public functions and
+        classes in the overlay.
+    inject_getattr_any : bool
+        When True, adds a ``__getattr__`` function returning ``Any`` to
+        the overlay, allowing dynamic attribute access.
+
+    Returns
+    -------
+    str
+        Completed overlay text content (Python stub file format) ready
+        to write to a .pyi file.
+    """
+    lines: list[str] = [
+        f"# Auto-generated overlay for {module_name}. Edit as needed for precise types.",
+        "from __future__ import annotations",
+        "from typing import Any",
+        "",
+    ]
+
+    lines.extend(_render_star_exports(star_targets))
+    if import_reexports:
+        lines.extend(import_reexports)
         lines.append("")
-    for entry in public_defs:
-        if entry.kind == "function":
-            lines.append(
-                f"def {entry.name}(*args: Any, **kwargs: Any) -> Any: ...  # line {entry.lineno}"
-            )
-        elif entry.kind == "class":
-            lines.append(f"class {entry.name}: ...  # line {entry.lineno}")
-    if public_defs:
+    if include_public_defs:
+        lines.extend(_render_public_defs(module.defs))
+    if module.exports:
+        exports = ", ".join(f"'{name}'" for name in sorted(module.exports))
+        lines.append(f"__all__ = [{exports}]")
         lines.append("")
-    public_names: set[str] = {name for name in module_index.exports if not _is_private(name)}
-    for names in star_exports.values():
-        public_names.update({name for name in names if not _is_private(name)})
-    public_names.update(entry.name for entry in public_defs)
-    if public_names:
-        sorted_names = ", ".join(f'"{name}"' for name in sorted(public_names))
-        lines.append(f"__all__ = [{sorted_names}]")
+    if inject_getattr_any:
+        lines.append("def __getattr__(name: str) -> Any: ...")
+        lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _write_sidecar(
-    pyi_path: Path,
-    module_name: str,
-    source_path: str,
-    module_index: ModuleIndex,
-    star_exports: dict[str, set[str]],
-) -> None:
-    sidecar = pyi_path.with_suffix(".pyi.json")
-    payload = {
-        "module": module_name,
-        "source": source_path,
-        "exports_resolved": {k: sorted(v) for k, v in star_exports.items()},
-        "has_all": sorted(module_index.exports),
-        "defs": [{"kind": d.kind, "name": d.name, "lineno": d.lineno} for d in module_index.defs],
-        "parse_ok": module_index.parse_ok,
-        "errors": module_index.errors,
-    }
-    write_json(sidecar, payload)
+def _render_star_exports(star_targets: Mapping[str, list[str]]) -> list[str]:
+    """Return overlay lines for expanded star imports.
+
+    Parameters
+    ----------
+    star_targets : Mapping[str, list[str]]
+        Mapping of imported module names to lists of resolved re-export names.
+        Used to generate ``from module import name as name`` lines in the overlay.
+
+    Returns
+    -------
+    list[str]
+        Lines to embed into the overlay (may be empty when nothing resolved).
+    """
+    lines: list[str] = []
+    for imported_mod, names in star_targets.items():
+        lines.extend(f"from {imported_mod} import {name} as {name}" for name in names)
+    if lines:
+        lines.append("")
+    return lines
+
+
+def _render_public_defs(defs: Sequence[DefEntry]) -> list[str]:
+    """Return overlay lines for public defs when requested.
+
+    Parameters
+    ----------
+    defs : Sequence[DefEntry]
+        Sequence of definition entries (functions and classes) to render as
+        stub definitions in the overlay.
+
+    Returns
+    -------
+    list[str]
+        Minimal definitions representing the module's public API (function
+        and class stubs with ``Any`` types).
+    """
+    rendered: list[str] = []
+    for definition in defs:
+        if definition.kind == "function":
+            rendered.append(f"def {definition.name}(*args: Any, **kwargs: Any) -> Any: ...")
+        elif definition.kind == "class":
+            rendered.append(f"class {definition.name}:")
+            rendered.append("    def __getattr__(self, name: str) -> Any: ...")
+        elif definition.kind == "variable":
+            rendered.append(f"{definition.name}: Any = ...")
+    if rendered:
+        rendered.append("")
+    return rendered
+
+
+def _collect_import_reexports(module: ModuleIndex) -> list[str]:
+    """Return re-export lines for explicit imports that are listed in ``__all__``.
+
+    Parameters
+    ----------
+    module : ModuleIndex
+        Parsed module metadata containing imports and exports. The function
+        checks which imported names are listed in ``module.exports`` (``__all__``)
+        and generates re-export lines for them.
+
+    Returns
+    -------
+    list[str]
+        ``from module import name as alias`` lines to include in the overlay.
+        Returns an empty list if the module has no exports or no matching imports.
+    """
+    if not module.exports:
+        return []
+    export_set = set(module.exports)
+    lines: list[str] = []
+    for entry in module.imports:
+        if entry.is_star or not entry.module:
+            continue
+        for name in entry.names:
+            alias = entry.aliases.get(name, name)
+            if alias not in export_set:
+                continue
+            lines.append(f"from {entry.module} import {name} as {alias}")
+    return lines
+
+
+def _is_windows() -> bool:
+    """Return True when running on Windows.
+
+    Returns
+    -------
+    bool
+        True when the current platform is Windows.
+    """
+    return platform.system().lower().startswith("win")

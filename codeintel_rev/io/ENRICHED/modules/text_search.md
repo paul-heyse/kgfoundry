@@ -28,8 +28,13 @@ Fast text search with regex support.
 
 ## Definitions
 
+- variable: `SEARCH_TIMEOUT_SECONDS` (line 33)
+- variable: `MAX_PREVIEW_CHARS` (line 34)
+- variable: `GREP_SPLIT_PARTS` (line 35)
+- variable: `COMMAND_NOT_FOUND_RETURN_CODE` (line 36)
+- variable: `COMPONENT_NAME` (line 37)
+- variable: `LOGGER` (line 38)
 - class: `TextSearchOptions` (line 42)
-- function: `from_overrides` (line 65)
 - function: `_bool_override` (line 117)
 - function: `_sequence_override` (line 144)
 - function: `_int_override` (line 177)
@@ -40,6 +45,16 @@ Fast text search with regex support.
 - function: `_build_ripgrep_command` (line 488)
 - function: `_parse_ripgrep_output` (line 528)
 
+## Dependency Graph
+
+- **fan_in**: 0
+- **fan_out**: 6
+- **cycle_group**: 92
+
+## Declared Exports (__all__)
+
+search_text
+
 ## Tags
 
-overlay-needed, public-api
+public-api

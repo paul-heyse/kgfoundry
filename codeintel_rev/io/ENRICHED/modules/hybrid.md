@@ -21,6 +21,16 @@ Fuses results from BM25, SPLADE, and FAISS using Reciprocal Rank Fusion.
 - function: `reciprocal_rank_fusion` (line 54)
 - function: `create_hit_list` (line 102)
 
+## Dependency Graph
+
+- **fan_in**: 0
+- **fan_out**: 1
+- **cycle_group**: 76
+
+## Declared Exports (__all__)
+
+SearchHit, create_hit_list, reciprocal_rank_fusion
+
 ## Tags
 
-overlay-needed, public-api
+public-api

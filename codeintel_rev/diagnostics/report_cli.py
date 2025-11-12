@@ -57,7 +57,7 @@ def _select_run_events(events: list[dict[str, Any]]) -> tuple[str | None, list[d
 
 
 def _format_attrs(attrs: dict[str, Any], keys: Iterable[str]) -> str:
-    parts = []
+    parts: list[str] = []
     for key in keys:
         value = attrs.get(key)
         if value is None:

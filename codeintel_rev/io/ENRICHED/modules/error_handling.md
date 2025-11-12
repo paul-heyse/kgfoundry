@@ -74,14 +74,25 @@ Error envelope structure:
 
 ## Definitions
 
+- variable: `LOGGER` (line 72)
+- variable: `COMPONENT_NAME` (line 73)
+- variable: `F` (line 75)
 - class: `ProblemMapping` (line 111)
+- variable: `EXCEPTION_TO_ERROR_CODE` (line 152)
 - function: `format_error_response` (line 168)
 - function: `convert_exception_to_envelope` (line 226)
 - function: `handle_adapter_errors` (line 411)
-- function: `decorator` (line 532)
-- function: `async_wrapper` (line 560)
-- function: `sync_wrapper` (line 621)
+
+## Dependency Graph
+
+- **fan_in**: 3
+- **fan_out**: 3
+- **cycle_group**: 46
+
+## Declared Exports (__all__)
+
+EXCEPTION_TO_ERROR_CODE, convert_exception_to_envelope, format_error_response, handle_adapter_errors
 
 ## Tags
 
-overlay-needed, public-api
+public-api

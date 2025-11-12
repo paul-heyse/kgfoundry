@@ -20,6 +20,16 @@ Reciprocal Rank Fusion utilities (legacy compatibility wrappers).
 - function: `_normalize_channel_hits` (line 108)
 - function: `_to_int` (line 154)
 
+## Dependency Graph
+
+- **fan_in**: 0
+- **fan_out**: 3
+- **cycle_group**: 64
+
+## Declared Exports (__all__)
+
+weighted_rrf
+
 ## Tags
 
-overlay-needed, public-api
+public-api

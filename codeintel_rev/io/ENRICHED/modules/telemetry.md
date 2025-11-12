@@ -18,6 +18,16 @@ Telemetry helpers for MCP tools.
 
 - function: `tool_operation_scope` (line 15)
 
+## Dependency Graph
+
+- **fan_in**: 3
+- **fan_out**: 2
+- **cycle_group**: 47
+
+## Declared Exports (__all__)
+
+tool_operation_scope
+
 ## Tags
 
-overlay-needed, public-api
+public-api

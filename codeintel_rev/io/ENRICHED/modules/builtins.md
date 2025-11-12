@@ -20,19 +20,24 @@ Built-in retrieval channel implementations (BM25, SPLADE).
 
 ## Definitions
 
+- variable: `LOGGER` (line 15)
 - function: `bm25_factory` (line 20)
 - function: `splade_factory` (line 52)
 - class: `_BM25Channel` (line 85)
-- function: `__init__` (line 90)
-- function: `search` (line 99)
-- function: `_ensure_provider` (line 154)
 - class: `_SpladeChannel` (line 214)
-- function: `__init__` (line 219)
-- function: `search` (line 228)
-- function: `_ensure_provider` (line 285)
 - function: `_resolve_path` (line 319)
 - function: `_classify_skip_reason` (line 326)
 
+## Dependency Graph
+
+- **fan_in**: 0
+- **fan_out**: 4
+- **cycle_group**: 72
+
+## Declared Exports (__all__)
+
+bm25_factory, splade_factory
+
 ## Tags
 
-overlay-needed, public-api
+public-api

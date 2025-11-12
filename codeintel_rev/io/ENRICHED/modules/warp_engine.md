@@ -18,18 +18,16 @@ Adapter for the optional WARP/XTR late interaction executor.
 
 ## Definitions
 
+- variable: `LOGGER` (line 15)
 - class: `WarpExecutorProtocol` (line 18)
-- function: `search` (line 21)
+- variable: `WarpExecutorFactory` (line 32)
 - class: `WarpUnavailableError` (line 35)
 - class: `WarpEngine` (line 39)
-- function: `__init__` (line 42)
-- function: `rerank` (line 51)
-- function: `_load_executor_cls` (line 109)
-- function: `_import_warp_executor_module` (line 130)
-- function: `_ensure_executor` (line 135)
 - function: `_safe_int` (line 166)
 - function: `_safe_float` (line 190)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 1
+- **fan_out**: 1
+- **cycle_group**: 67

@@ -44,10 +44,13 @@ The FAISS index type is automatically selected based on corpus size:
 
 ## Definitions
 
+- variable: `np` (line 58)
+- variable: `logger` (line 61)
+- variable: `EMBED_PREVIEW_CHARS` (line 63)
+- variable: `TRAINING_LIMIT` (line 64)
 - class: `PipelinePaths` (line 68)
 - function: `main` (line 78)
 - function: `_resolve_paths` (line 153)
-- function: `_resolve` (line 168)
 - function: `_load_scip_index` (line 183)
 - function: `_group_definitions_by_file` (line 210)
 - function: `_chunk_repository` (line 231)
@@ -60,8 +63,9 @@ The FAISS index type is automatically selected based on corpus size:
 - function: `_run_offline_evaluation` (line 586)
 - function: `_initialize_duckdb` (line 621)
 - function: `_write_symbols` (line 651)
-- function: `_chunk_for` (line 661)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 0
+- **fan_out**: 12
+- **cycle_group**: 58

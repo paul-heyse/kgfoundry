@@ -6,7 +6,7 @@ import json
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -50,8 +50,7 @@ class OfflineRecallEvaluator:
         duckdb_manager: DuckDBManager,
     ) -> None:
         self._settings = settings
-        repo_root_value = cast("str | Path", paths.repo_root)
-        self._repo_root = Path(repo_root_value)
+        self._repo_root = Path(paths.repo_root)
         self._faiss = faiss_manager
         self._vllm = vllm_client
         self._symbol_catalog = SymbolCatalog(duckdb_manager)
@@ -246,7 +245,7 @@ class OfflineRecallEvaluator:
             else:
                 recall = len(positives.intersection(retrieved[:k])) / float(len(positives))
             recall_per_k[k] = recall
-        record = {
+        record: dict[str, object] = {
             "qid": query.qid,
             "text": query.text,
             "positives": list(query.positives),

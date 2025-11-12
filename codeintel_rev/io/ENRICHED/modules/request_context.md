@@ -17,6 +17,21 @@ can exchange session metadata without introducing circular imports between the
 - from **(absolute)** import contextvars
 - from **typing** import Final
 
+## Definitions
+
+- variable: `session_id_var` (line 18)
+- variable: `capability_stamp_var` (line 25)
+
+## Dependency Graph
+
+- **fan_in**: 2
+- **fan_out**: 1
+- **cycle_group**: 16
+
+## Declared Exports (__all__)
+
+capability_stamp_var, session_id_var
+
 ## Tags
 
-overlay-needed, public-api
+public-api

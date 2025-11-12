@@ -18,9 +18,18 @@ Shared retrieval dataclasses for multi-stage pipelines.
 - class: `HybridResultDoc` (line 18)
 - class: `HybridSearchResult` (line 26)
 - class: `StageSignals` (line 37)
-- function: `margin` (line 45)
 - class: `StageDecision` (line 59)
+
+## Dependency Graph
+
+- **fan_in**: 9
+- **fan_out**: 0
+- **cycle_group**: 23
+
+## Declared Exports (__all__)
+
+ChannelHit, HybridResultDoc, HybridSearchResult, StageDecision, StageSignals
 
 ## Tags
 
-overlay-needed, public-api
+public-api

@@ -70,12 +70,21 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 
 ## Definitions
 
+- variable: `LOGGER` (line 70)
 - function: `get_session_id` (line 73)
 - function: `get_capability_stamp` (line 124)
 - class: `SessionScopeMiddleware` (line 136)
-- function: `__init__` (line 191)
-- function: `dispatch` (line 195)
+
+## Dependency Graph
+
+- **fan_in**: 6
+- **fan_out**: 3
+- **cycle_group**: 17
+
+## Declared Exports (__all__)
+
+SessionScopeMiddleware, capability_stamp_var, get_capability_stamp, get_session_id, session_id_var
 
 ## Tags
 
-overlay-needed, public-api
+public-api

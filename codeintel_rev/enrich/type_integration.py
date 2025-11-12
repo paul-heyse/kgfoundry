@@ -33,10 +33,23 @@ async def _run_command_async(
 ) -> tuple[int, str, str]:
     """Run a command asynchronously and capture stdout/stderr.
 
+    Parameters
+    ----------
+    cmd : Sequence[str]
+        Command to execute as a sequence of strings (program name followed
+        by arguments). No shell expansion is performed.
+    cwd : str | None
+        Working directory for the command execution. When None, uses the
+        current working directory.
+    time_limit : int
+        Maximum execution time in seconds. Commands exceeding this limit
+        are killed and return a timeout error.
+
     Returns
     -------
     tuple[int, str, str]
-        Return code, stdout, and stderr content.
+        Return code, stdout, and stderr content. Return code is 1 on timeout
+        or when the process return code is None.
     """
     process = await asyncio.create_subprocess_exec(
         *cmd,
@@ -65,10 +78,22 @@ def _try_run(
 ) -> tuple[int, str, str]:
     """Run the asynchronous helper in a synchronous context.
 
+    Parameters
+    ----------
+    cmd : Sequence[str]
+        Command to execute as a sequence of strings (program name followed
+        by arguments). No shell expansion is performed.
+    cwd : str | None, optional
+        Working directory for the command execution. When None, uses the
+        current working directory. Defaults to None.
+    time_limit : int, optional
+        Maximum execution time in seconds. Defaults to 300 (5 minutes).
+
     Returns
     -------
     tuple[int, str, str]
-        Execution result triple (code, stdout, stderr).
+        Execution result triple (code, stdout, stderr). Return code is 127
+        on process launch failures (OSError, RuntimeError).
     """
     try:
         return asyncio.run(_run_command_async(cmd, cwd, time_limit))
@@ -79,10 +104,18 @@ def _try_run(
 def collect_pyright(path: str | None = None) -> TypeSummary | None:
     """Run Pyright (or BasedPyright) and summarize diagnostics.
 
+    Parameters
+    ----------
+    path : str | None, optional
+        Working directory for running Pyright. When None, uses the current
+        working directory. Defaults to None.
+
     Returns
     -------
     TypeSummary | None
-        Summary of diagnostics, if any were produced.
+        Summary of diagnostics, if any were produced. Returns None if
+        Pyright/BasedPyright is not available, execution fails, or no
+        diagnostics are found.
     """
     for exe in ("pyright", "basedpyright"):
         code, stdout, _stderr = _try_run([exe, "--outputjson"], cwd=path)
@@ -110,10 +143,17 @@ def collect_pyright(path: str | None = None) -> TypeSummary | None:
 def collect_pyrefly(report_path: str | None) -> TypeSummary | None:
     """Parse a Pyrefly JSON/JSONL report produced by CI.
 
+    Parameters
+    ----------
+    report_path : str | None
+        File system path to the Pyrefly report file (JSON or JSONL format).
+        When None or when the file does not exist, returns None.
+
     Returns
     -------
     TypeSummary | None
-        Parsed summary when the report exists.
+        Parsed summary when the report exists and can be parsed. Returns None
+        if the path is None, the file does not exist, or parsing fails.
     """
     if not report_path:
         return None

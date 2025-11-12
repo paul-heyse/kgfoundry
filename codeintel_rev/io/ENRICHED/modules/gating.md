@@ -26,6 +26,16 @@ Adaptive gating helpers for multi-stage retrieval pipelines.
 - function: `decide_budgets` (line 296)
 - function: `describe_budget_decision` (line 343)
 
+## Dependency Graph
+
+- **fan_in**: 2
+- **fan_out**: 1
+- **cycle_group**: 26
+
+## Declared Exports (__all__)
+
+BudgetDecision, QueryProfile, StageGateConfig, analyze_query, decide_budgets, describe_budget_decision, should_run_secondary_stage
+
 ## Tags
 
-overlay-needed, public-api
+public-api

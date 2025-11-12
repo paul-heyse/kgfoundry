@@ -1,0 +1,1 @@
+/home/paul/kgfoundry/stubs/overlays/codeintel_rev/cli/__init__.pyi

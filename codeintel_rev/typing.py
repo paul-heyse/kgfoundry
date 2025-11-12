@@ -8,7 +8,7 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from kgfoundry_common.typing import HEAVY_DEPS as _BASE_HEAVY_DEPS
 from kgfoundry_common.typing import gate_import as _base_gate_import
@@ -27,9 +27,12 @@ else:  # pragma: no cover
 
 __all__ = [
     "HEAVY_DEPS",
+    "FaissModule",
     "NDArrayAny",
     "NDArrayF32",
     "NDArrayI64",
+    "NumpyModule",
+    "TorchModule",
     "gate_import",
 ]
 
@@ -79,3 +82,149 @@ def gate_import(
     complexity: O(1) for cached imports, O(import_time) for first-time imports.
     """
     return _base_gate_import(module_name, purpose, min_version=min_version)
+
+
+class TorchDeviceProperties(Protocol):
+    """Subset of torch.cuda device properties accessed by diagnostics."""
+
+    total_memory: int
+
+
+class TorchCudaAPI(Protocol):
+    """Minimal CUDA API surface used throughout the codebase."""
+
+    def is_available(self) -> bool: ...
+
+    def device_count(self) -> int: ...
+
+    def current_device(self) -> int: ...
+
+    def get_device_name(self, index: int) -> str: ...
+
+    def get_device_capability(self, index: int) -> tuple[int, int]: ...
+
+    def get_device_properties(self, index: int) -> TorchDeviceProperties: ...
+
+    def synchronize(self) -> None: ...
+
+    def init(self) -> None: ...
+
+
+class TorchTensor(Protocol):
+    """Tensor operations invoked inside diagnostics."""
+
+    def __matmul__(self, other: TorchTensor) -> TorchTensor: ...
+
+    @property
+    def T(self) -> TorchTensor: ...
+
+    def sum(self) -> TorchTensor: ...
+
+    def item(self) -> float: ...
+
+
+class TorchModule(Protocol):
+    """Subset of torch's module-level API we rely on."""
+
+    cuda: TorchCudaAPI
+
+    def device(self, name: str) -> object:
+        """Create a device object from name string."""
+        ...
+
+    def randn(self, *shape: int, device: object | None = None) -> TorchTensor:
+        """Generate random tensor with standard normal distribution."""
+        ...
+
+    def matmul(self, left: TorchTensor, right: TorchTensor) -> TorchTensor:
+        """Matrix multiplication of two tensors."""
+        ...
+
+
+class FaissStandardGpuResources(Protocol):
+    """GPU resource handle for FAISS."""
+
+
+
+class FaissGpuClonerOptions(Protocol):
+    """Options controlling FAISS GPU cloning behavior."""
+
+    use_cuvs: bool
+
+    def __init__(self) -> None: ...
+
+
+class FaissIndex(Protocol):
+    """Minimal FAISS index surface used in diagnostics."""
+
+    ntotal: int
+
+
+class FaissGpuIndexFlatIP(FaissIndex, Protocol):
+    """GPU FAISS index used for smoke testing."""
+
+    def add(self, vectors: NDArrayF32) -> None:
+        """Add vectors to the index."""
+        ...
+
+    def search(self, queries: NDArrayF32, k: int) -> tuple[NDArrayF32, NDArrayI64]:
+        """Search for k nearest neighbors."""
+        ...
+
+
+class FaissModule(Protocol):
+    """Subset of the FAISS module accessed via gate_import."""
+
+    class _ResourceCtor(Protocol):
+        def __call__(self) -> FaissStandardGpuResources: ...
+
+    class _IndexCtor(Protocol):
+        def __call__(self, resources: FaissStandardGpuResources, dim: int) -> FaissGpuIndexFlatIP: ...
+
+    StandardGpuResources: _ResourceCtor
+    GpuClonerOptions: type[FaissGpuClonerOptions]
+    GpuIndexFlatIP: _IndexCtor
+    GpuIndexCagra: object | None
+
+    def get_num_gpus(self) -> int:
+        """Return the number of available GPUs."""
+        ...
+
+    def normalize_L2(self, vectors: NDArrayF32) -> None:
+        """Normalize vectors using L2 norm in-place."""
+        ...
+
+    def index_cpu_to_gpu(
+        self,
+        resources: FaissStandardGpuResources,
+        device: int,
+        index: FaissIndex,
+        options: FaissGpuClonerOptions | None = None,
+    ) -> FaissIndex:
+        """Clone CPU index to GPU."""
+        ...
+
+
+class NumpyRandomState(Protocol):
+    """Random state wrapper for numpy.random."""
+
+    def randn(self, *shape: int) -> NDArrayF32: ...
+
+
+class NumpyRandomNamespace(Protocol):
+    """Namespace for numpy.random helpers."""
+
+    def RandomState(self, seed: int) -> NumpyRandomState: ...
+
+
+class NumpyLinalgNamespace(Protocol):
+    """Namespace for numpy.linalg helpers."""
+
+    def norm(self, array: NDArrayF32, axis: int, keepdims: bool) -> NDArrayF32: ...
+
+
+class NumpyModule(Protocol):
+    """Enough of numpy's surface for lazy imports."""
+
+    random: NumpyRandomNamespace
+    linalg: NumpyLinalgNamespace

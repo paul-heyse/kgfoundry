@@ -19,6 +19,17 @@ CLI helpers for building Lucene indexes and flipping lifecycle pointers.
 
 ## Definitions
 
+- variable: `JsonDirOption` (line 15)
+- variable: `IndexDirOption` (line 23)
+- variable: `VectorsDirOption` (line 31)
+- variable: `ThreadsOption` (line 39)
+- variable: `MaxClauseOption` (line 48)
+- variable: `OverwriteFlag` (line 57)
+- variable: `VersionArgument` (line 65)
+- variable: `BaseDirOption` (line 69)
+- variable: `Bm25DirOption` (line 77)
+- variable: `SpladeDirOption` (line 81)
+- variable: `app` (line 86)
 - function: `_bm25_manager` (line 93)
 - function: `_splade_manager` (line 104)
 - function: `build_bm25_index` (line 116)
@@ -26,6 +37,12 @@ CLI helpers for building Lucene indexes and flipping lifecycle pointers.
 - function: `publish_lucene_assets` (line 167)
 - function: `main` (line 186)
 
+## Dependency Graph
+
+- **fan_in**: 0
+- **fan_out**: 5
+- **cycle_group**: 86
+
 ## Tags
 
-cli, overlay-needed
+cli

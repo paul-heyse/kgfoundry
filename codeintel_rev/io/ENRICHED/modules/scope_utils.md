@@ -68,12 +68,24 @@ codeintel_rev.app.middleware : get_session_id for retrieving session ID
 
 ## Definitions
 
+- variable: `LOGGER` (line 66)
+- variable: `LANGUAGE_EXTENSIONS` (line 77)
 - function: `get_effective_scope` (line 116)
 - function: `merge_scope_filters` (line 160)
 - function: `apply_path_filters` (line 235)
 - function: `apply_language_filter` (line 324)
 - function: `path_matches_glob` (line 418)
 
+## Dependency Graph
+
+- **fan_in**: 5
+- **fan_out**: 3
+- **cycle_group**: 42
+
+## Declared Exports (__all__)
+
+LANGUAGE_EXTENSIONS, apply_language_filter, apply_path_filters, get_effective_scope, merge_scope_filters, path_matches_glob
+
 ## Tags
 
-overlay-needed, public-api
+public-api

@@ -35,9 +35,12 @@ the FAISS index, then hydrating results from DuckDB.
 
 ## Definitions
 
+- variable: `httpx` (line 39)
+- variable: `np` (line 40)
+- variable: `SNIPPET_PREVIEW_CHARS` (line 42)
+- variable: `COMPONENT_NAME` (line 43)
+- variable: `LOGGER` (line 44)
 - class: `_ScopeFilterFlags` (line 48)
-- function: `from_scope` (line 56)
-- function: `has_filters` (line 77)
 - class: `_FaissFanout` (line 83)
 - class: `_HybridSearchState` (line 91)
 - class: `_HybridResult` (line 103)
@@ -68,6 +71,16 @@ the FAISS index, then hydrating results from DuckDB.
 - function: `_success_extras` (line 1199)
 - function: `_build_response_extras` (line 1223)
 
+## Dependency Graph
+
+- **fan_in**: 0
+- **fan_out**: 10
+- **cycle_group**: 89
+
+## Declared Exports (__all__)
+
+semantic_search
+
 ## Tags
 
-overlay-needed, public-api
+public-api

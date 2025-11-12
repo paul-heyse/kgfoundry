@@ -25,12 +25,23 @@ for efficient vector storage and querying via DuckDB.
 
 ## Definitions
 
+- variable: `np` (line 26)
 - function: `get_chunks_schema` (line 29)
 - class: `ParquetWriteOptions` (line 59)
 - function: `write_chunks_parquet` (line 67)
 - function: `read_chunks_parquet` (line 145)
 - function: `extract_embeddings` (line 161)
 
+## Dependency Graph
+
+- **fan_in**: 1
+- **fan_out**: 3
+- **cycle_group**: 57
+
+## Declared Exports (__all__)
+
+ParquetWriteOptions, extract_embeddings, get_chunks_schema, read_chunks_parquet, write_chunks_parquet
+
 ## Tags
 
-overlay-needed, public-api
+public-api

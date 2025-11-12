@@ -28,31 +28,32 @@ Lightweight per-session timeline recording utilities.
 
 ## Definitions
 
+- variable: `LOGGER` (line 23)
 - function: `_env_float` (line 32)
 - function: `_env_int` (line 43)
 - function: `_clamp` (line 54)
 - function: `_diagnostics_dir` (line 62)
 - function: `_max_field_len` (line 68)
 - class: `_FlightRecorder` (line 72)
-- function: `should_sample` (line 78)
-- function: `_current_file` (line 123)
-- function: `_rotate_if_needed` (line 128)
-- function: `write` (line 140)
 - function: `_scrub_value` (line 180)
 - function: `_scrub_attrs` (line 201)
 - class: `Timeline` (line 206)
-- function: `event` (line 213)
-- function: `operation` (line 247)
-- function: `step` (line 280)
 - class: `_TimelineScope` (line 315)
-- function: `__init__` (line 320)
-- function: `__enter__` (line 332)
-- function: `__exit__` (line 343)
 - function: `new_timeline` (line 368)
 - function: `current_timeline` (line 403)
 - function: `current_or_new_timeline` (line 414)
 - function: `bind_timeline` (line 455)
 
+## Dependency Graph
+
+- **fan_in**: 11
+- **fan_out**: 2
+- **cycle_group**: 15
+
+## Declared Exports (__all__)
+
+Timeline, bind_timeline, current_timeline, new_timeline
+
 ## Tags
 
-overlay-needed, public-api
+public-api

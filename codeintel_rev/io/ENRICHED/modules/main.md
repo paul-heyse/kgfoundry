@@ -41,6 +41,7 @@ Provides health/readiness endpoints, CORS, and streaming support.
 
 ## Definitions
 
+- variable: `LOGGER` (line 38)
 - function: `_preload_faiss_index` (line 41)
 - function: `_env_flag` (line 72)
 - function: `_log_gpu_warmup` (line 89)
@@ -50,16 +51,25 @@ Provides health/readiness endpoints, CORS, and streaming support.
 - function: `_initialize_context` (line 145)
 - function: `_shutdown_context` (line 222)
 - function: `lifespan` (line 245)
-- function: `_handle_hup` (line 307)
-- function: `metrics_endpoint` (line 361)
-- function: `set_mcp_context` (line 377)
-- function: `disable_nginx_buffering` (line 446)
-- function: `healthz` (line 482)
-- function: `readyz` (line 494)
-- function: `capz` (line 529)
-- function: `sse_demo` (line 572)
-- function: `event_generator` (line 581)
+- variable: `app` (line 341)
+- function: `metrics_endpoint` (line 364)
+- function: `set_mcp_context` (line 380)
+- function: `disable_nginx_buffering` (line 449)
+- function: `healthz` (line 485)
+- function: `readyz` (line 497)
+- function: `capz` (line 532)
+- function: `sse_demo` (line 575)
+
+## Dependency Graph
+
+- **fan_in**: 0
+- **fan_out**: 12
+- **cycle_group**: 51
+
+## Declared Exports (__all__)
+
+app
 
 ## Tags
 
-fastapi, overlay-needed, public-api
+fastapi, public-api

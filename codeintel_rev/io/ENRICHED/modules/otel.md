@@ -21,8 +21,9 @@ Optional OpenTelemetry bootstrap helpers.
 
 ## Definitions
 
+- variable: `LOGGER` (line 16)
+- variable: `SpanAttribute` (line 18)
 - class: `_TelemetryState` (line 21)
-- function: `__init__` (line 26)
 - class: `SupportsState` (line 32)
 - class: `_TraceHandles` (line 39)
 - function: `_env_flag` (line 51)
@@ -36,6 +37,16 @@ Optional OpenTelemetry bootstrap helpers.
 - function: `as_span` (line 191)
 - function: `record_span_event` (line 219)
 
+## Dependency Graph
+
+- **fan_in**: 4
+- **fan_out**: 1
+- **cycle_group**: 14
+
+## Declared Exports (__all__)
+
+as_span, init_telemetry, record_span_event, telemetry_enabled
+
 ## Tags
 
-overlay-needed, public-api
+public-api

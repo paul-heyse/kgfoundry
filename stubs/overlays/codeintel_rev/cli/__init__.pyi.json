@@ -1,0 +1,22 @@
+{
+  "module": "cli.__init__",
+  "source": "/home/paul/kgfoundry/codeintel_rev/cli/__init__.py",
+  "exports_resolved": {},
+  "has_all": [],
+  "defs": [
+    {
+      "kind": "variable",
+      "name": "app",
+      "lineno": 9
+    },
+    {
+      "kind": "function",
+      "name": "main",
+      "lineno": 20
+    }
+  ],
+  "parse_ok": true,
+  "errors": [],
+  "type_errors": 0,
+  "forced": true
+}

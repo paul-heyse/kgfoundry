@@ -18,11 +18,18 @@ Typer CLI for building, verifying, and probing XTR artifacts.
 
 ## Definitions
 
+- variable: `app` (line 14)
 - function: `build` (line 31)
 - function: `verify` (line 44)
 - function: `search` (line 70)
 - function: `main` (line 158)
 
+## Dependency Graph
+
+- **fan_in**: 1
+- **fan_out**: 5
+- **cycle_group**: 80
+
 ## Tags
 
-cli, overlay-needed
+cli

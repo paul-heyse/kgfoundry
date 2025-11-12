@@ -26,6 +26,8 @@ Implements full MCP tool catalog for code intelligence.
 
 ## Definitions
 
+- variable: `mcp` (line 24)
+- variable: `app_context` (line 29)
 - function: `get_context` (line 34)
 - function: `set_scope` (line 62)
 - function: `list_paths` (line 85)
@@ -37,6 +39,16 @@ Implements full MCP tool catalog for code intelligence.
 - function: `prompt_code_review` (line 336)
 - function: `build_http_app` (line 352)
 
+## Dependency Graph
+
+- **fan_in**: 3
+- **fan_out**: 6
+- **cycle_group**: 49
+
+## Declared Exports (__all__)
+
+app_context, build_http_app, get_context, mcp
+
 ## Tags
 
-overlay-needed, public-api
+public-api

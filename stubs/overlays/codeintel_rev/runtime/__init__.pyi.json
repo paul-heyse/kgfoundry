@@ -1,0 +1,21 @@
+{
+  "module": "runtime.__init__",
+  "source": "/home/paul/kgfoundry/codeintel_rev/runtime/__init__.py",
+  "exports_resolved": {},
+  "has_all": [
+    "DefaultFactoryAdjuster",
+    "FactoryAdjuster",
+    "NoopFactoryAdjuster",
+    "NullRuntimeCellObserver",
+    "RuntimeCell",
+    "RuntimeCellCloseResult",
+    "RuntimeCellInitContext",
+    "RuntimeCellInitResult",
+    "RuntimeCellObserver"
+  ],
+  "defs": [],
+  "parse_ok": true,
+  "errors": [],
+  "type_errors": 0,
+  "forced": true
+}

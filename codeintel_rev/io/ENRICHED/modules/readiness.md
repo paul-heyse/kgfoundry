@@ -63,26 +63,15 @@ codeintel_rev.app.main : FastAPI application with /readyz endpoint
 
 ## Definitions
 
+- variable: `duckdb` (line 61)
+- variable: `httpx` (line 62)
+- variable: `LOGGER` (line 64)
+- variable: `HTTP_HEALTH_TIMEOUT_S` (line 65)
 - class: `CheckResult` (line 71)
-- function: `as_payload` (line 95)
 - class: `ReadinessProbe` (line 109)
-- function: `__init__` (line 150)
-- function: `initialize` (line 155)
-- function: `refresh` (line 168)
-- function: `shutdown` (line 196)
-- function: `snapshot` (line 209)
-- function: `_run_checks` (line 237)
-- function: `check_directory` (line 288)
-- function: `check_file` (line 326)
-- function: `_check_duckdb_catalog` (line 376)
-- function: `_check_xtr_artifacts` (line 422)
-- function: `_duckdb_table_exists` (line 445)
-- function: `_duckdb_index_exists` (line 469)
-- function: `_check_search_tools` (line 492)
-- function: `check_vllm_connection` (line 515)
-- function: `_check_vllm_inprocess` (line 528)
-- function: `_check_vllm_http` (line 553)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 1
+- **fan_out**: 3
+- **cycle_group**: 43

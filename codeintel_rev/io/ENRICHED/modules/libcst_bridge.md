@@ -23,17 +23,13 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 - class: `DefEntry` (line 30)
 - class: `ModuleIndex` (line 39)
 - function: `_extract_module_docstring` (line 51)
-- function: `_literal_string_values` (line 76)
-- class: `_IndexVisitor` (line 108)
-- function: `__init__` (line 113)
-- function: `on_visit` (line 119)
-- function: `_handle_import` (line 141)
-- function: `_handle_import_from` (line 157)
-- function: `_handle_function_def` (line 186)
-- function: `_handle_class_def` (line 194)
-- function: `_handle_assign` (line 202)
-- function: `index_module` (line 208)
+- function: `_literal_string_values` (line 81)
+- class: `_IndexVisitor` (line 119)
+- function: `index_module` (line 256)
+- function: `_lineno` (line 294)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 2
+- **fan_out**: 0
+- **cycle_group**: 3

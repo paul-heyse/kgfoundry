@@ -137,8 +137,8 @@ class WarpEngine:
 
         Returns
         -------
-        object
-            The initialized WARP executor instance.
+        WarpExecutorProtocol
+            The initialized WARP executor instance conforming to the protocol.
 
         Raises
         ------

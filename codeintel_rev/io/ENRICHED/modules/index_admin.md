@@ -23,6 +23,8 @@ Admin endpoints for staging, publishing, and rolling back index versions.
 
 ## Definitions
 
+- variable: `LOGGER` (line 19)
+- variable: `router` (line 20)
 - function: `_require_admin` (line 25)
 - function: `_context` (line 31)
 - function: `_persist_session_tuning` (line 38)
@@ -37,6 +39,16 @@ Admin endpoints for staging, publishing, and rolling back index versions.
 - function: `faiss_runtime_tuning_endpoint` (line 494)
 - function: `faiss_runtime_reset_endpoint` (line 573)
 
+## Dependency Graph
+
+- **fan_in**: 0
+- **fan_out**: 6
+- **cycle_group**: 94
+
+## Declared Exports (__all__)
+
+router
+
 ## Tags
 
-fastapi, overlay-needed, public-api
+fastapi, public-api

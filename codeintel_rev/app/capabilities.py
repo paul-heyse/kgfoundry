@@ -243,7 +243,7 @@ class Capabilities:
         dict[str, object]
             Structured capability payload.
         """
-        payload = {
+        payload: dict[str, object] = {
             "faiss_index_present": self.faiss_index,
             "duckdb_catalog_present": self.duckdb,
             "scip_index_present": self.scip_index,

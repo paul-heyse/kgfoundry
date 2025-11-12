@@ -17,6 +17,16 @@ Helpers for working with msgspec-based settings structs.
 - function: `replace_settings` (line 10)
 - function: `replace_struct` (line 45)
 
+## Dependency Graph
+
+- **fan_in**: 0
+- **fan_out**: 1
+- **cycle_group**: 59
+
+## Declared Exports (__all__)
+
+replace_settings, replace_struct
+
 ## Tags
 
-overlay-needed, public-api
+public-api

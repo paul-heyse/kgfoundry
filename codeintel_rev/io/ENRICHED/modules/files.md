@@ -28,6 +28,7 @@ Provides file listing, reading, and scope configuration.
 
 ## Definitions
 
+- variable: `LOGGER` (line 35)
 - class: `FileListFilters` (line 39)
 - class: `DirectoryFilters` (line 49)
 - function: `set_scope` (line 58)
@@ -45,6 +46,16 @@ Provides file listing, reading, and scope configuration.
 - function: `_collect_language_extensions` (line 678)
 - function: `_matches_language` (line 697)
 
+## Dependency Graph
+
+- **fan_in**: 0
+- **fan_out**: 7
+- **cycle_group**: 90
+
+## Declared Exports (__all__)
+
+list_paths, open_file, set_scope
+
 ## Tags
 
-overlay-needed, public-api
+public-api

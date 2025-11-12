@@ -1,0 +1,1 @@
+/home/paul/kgfoundry/stubs/overlays/codeintel_rev/retrieval/fusion/__init__.pyi

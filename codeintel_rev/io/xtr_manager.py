@@ -6,12 +6,12 @@ import json
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, Protocol, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.config.settings import XTRConfig
 from codeintel_rev.runtime import RuntimeCell
-from codeintel_rev.typing import NDArrayF32, gate_import
+from codeintel_rev.typing import NDArrayF32, TorchModule, gate_import
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -165,7 +165,7 @@ class XTRIndex:
         """
         tokenizer, model = self._ensure_encoder()
         torch_module = gate_import("torch", "XTR query encoding")
-        device = self._resolve_device(cast("TorchDeviceModule", torch_module))
+        device = self._resolve_device(cast("TorchModule", torch_module))
         torch_any = cast("Any", torch_module)
         with torch_any.inference_mode():
             inputs = tokenizer(
@@ -436,7 +436,7 @@ class XTRIndex:
         auto_model_cls = transformers.AutoModel
         tokenizer = auto_tokenizer_cls.from_pretrained(self.config.model_id)
         model = auto_model_cls.from_pretrained(self.config.model_id)
-        torch_module = cast("TorchDeviceModule", gate_import("torch", "XTR encoder device"))
+        torch_module = cast("TorchModule", gate_import("torch", "XTR encoder device"))
         device = self._resolve_device(torch_module)
         model.to(device)
         model.eval()
@@ -444,12 +444,12 @@ class XTRIndex:
         state.model = model
         return tokenizer, model
 
-    def _resolve_device(self, torch_module: TorchDeviceModule) -> object:
+    def _resolve_device(self, torch_module: TorchModule) -> object:
         """Resolve the runtime torch.device honoring config preferences.
 
         Parameters
         ----------
-        torch_module : TorchDeviceModule
+        torch_module : TorchModule
             Torch module instance used to check CUDA availability and create
             device objects.
 
@@ -614,59 +614,3 @@ class XTRIndex:
 
     def _current_state(self) -> _XTRIndexRuntime | None:
         return self._cell.peek()
-
-
-class TorchDeviceModule(Protocol):
-    """Subset of torch API required for device resolution."""
-
-    class _CudaAPI(Protocol):
-        """Protocol subset of torch.cuda API for device resolution.
-
-        Extended Summary
-        ----------------
-        This Protocol defines the minimal torch.cuda API surface needed for CUDA
-        device detection and enumeration. It provides type-safe access to CUDA
-        availability checks and device counting without requiring a full torch
-        import at type-checking time. Used by XTR index device resolution to
-        determine GPU availability and select appropriate device assignments.
-
-        Methods
-        -------
-        is_available() -> bool
-            Check if CUDA is available on this system. Returns True if CUDA
-            runtime is available and at least one GPU device is accessible,
-            False otherwise. Used to determine if GPU execution is possible.
-
-        device_count() -> int
-            Return the number of CUDA devices available. Returns 0 if CUDA is
-            unavailable or no devices are present. Used to validate device ordinal
-            specifications and select valid GPU devices.
-        """
-
-        def is_available(self) -> bool:
-            """Check if CUDA is available on this system.
-
-            Returns
-            -------
-            bool
-                True if CUDA runtime is available and at least one GPU device
-                is accessible, False otherwise.
-            """
-            ...
-
-        def device_count(self) -> int:
-            """Return the number of CUDA devices available.
-
-            Returns
-            -------
-            int
-                Number of CUDA devices (GPUs) available. Returns 0 if CUDA is
-                unavailable or no devices are present.
-            """
-            ...
-
-    cuda: _CudaAPI
-
-    def device(self, name: str) -> object:
-        """Return a torch.device handle."""
-        ...

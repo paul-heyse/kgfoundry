@@ -310,6 +310,9 @@ async def lifespan(
                 _ = (signum, frame)
                 LOGGER.info("SIGHUP received - reloading index-backed runtimes")
                 try:
+                    if context is None:
+                        LOGGER.warning("SIGHUP received before context initialization")
+                        return
                     context.reload_indices()
                 except (RuntimeError, OSError, ValueError):
                     LOGGER.warning("signal.hup.reload_failed", exc_info=True)

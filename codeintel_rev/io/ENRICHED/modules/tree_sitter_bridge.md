@@ -20,11 +20,13 @@ Tree-sitter outline helpers used for enrichment artifacts.
 ## Definitions
 
 - function: `_lang_for_ext` (line 27)
-- class: `OutlineNode` (line 58)
-- class: `TSOutline` (line 68)
-- function: `build_outline` (line 75)
-- function: `_extract_identifier` (line 115)
+- class: `OutlineNode` (line 65)
+- class: `TSOutline` (line 75)
+- function: `build_outline` (line 82)
+- function: `_extract_identifier` (line 133)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 1
+- **fan_out**: 1
+- **cycle_group**: 6

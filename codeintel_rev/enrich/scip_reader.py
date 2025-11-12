@@ -17,10 +17,16 @@ except ImportError:  # pragma: no cover
 def _loads(payload: bytes) -> object:
     """Deserialize JSON bytes using orjson when available.
 
+    Parameters
+    ----------
+    payload : bytes
+        JSON-encoded bytes to deserialize. Must be valid UTF-8 when orjson
+        is unavailable (falls back to stdlib json).
+
     Returns
     -------
     object
-        Parsed JSON payload.
+        Parsed JSON payload (typically a dict or list).
     """
     if _orjson is not None:
         return _orjson.loads(payload)
@@ -66,10 +72,17 @@ class SCIPIndex:
     def load(cls, path: str | Path) -> SCIPIndex:
         """Load the index from ``path`` (JSON file).
 
+        Parameters
+        ----------
+        path : str | Path
+            File system path to the SCIP JSON index file. May be absolute
+            or relative to the current working directory.
+
         Returns
         -------
         SCIPIndex
-            Parsed index containing documents and external symbols.
+            Parsed index containing documents and external symbols. Returns
+            an empty index if the file is missing or malformed.
         """
         raw_blob = _loads(Path(path).read_bytes())
         if not isinstance(raw_blob, dict):
@@ -128,6 +141,13 @@ class SCIPIndex:
 
 def _parse_document(record: dict[str, Any]) -> Document:
     """Convert a raw SCIP document record into a :class:`Document`.
+
+    Parameters
+    ----------
+    record : dict[str, Any]
+        Raw SCIP document dictionary containing keys like "relativePath",
+        "occurrences", "symbols", etc. The dictionary may use snake_case
+        or camelCase keys (both formats are supported).
 
     Returns
     -------

@@ -1,0 +1,13 @@
+{
+  "module": "retrieval.fusion.__init__",
+  "source": "/home/paul/kgfoundry/codeintel_rev/retrieval/fusion/__init__.py",
+  "exports_resolved": {},
+  "has_all": [
+    "fuse_weighted_rrf"
+  ],
+  "defs": [],
+  "parse_ok": true,
+  "errors": [],
+  "type_errors": 0,
+  "forced": true
+}

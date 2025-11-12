@@ -26,19 +26,24 @@ Capability snapshot helpers for conditional tool registration and /capz.
 
 ## Definitions
 
+- variable: `LOGGER` (line 24)
 - function: `_build_capability_gauge` (line 27)
 - function: `_import_optional` (line 89)
 - function: `_probe_faiss_gpu` (line 124)
 - function: `_path_exists` (line 161)
 - function: `_record_metrics` (line 183)
 - class: `Capabilities` (line 190)
-- function: `has_semantic` (line 212)
-- function: `has_symbols` (line 223)
-- function: `has_reranker` (line 234)
-- function: `model_dump` (line 238)
-- function: `stamp` (line 278)
-- function: `from_context` (line 304)
+
+## Dependency Graph
+
+- **fan_in**: 5
+- **fan_out**: 3
+- **cycle_group**: 42
+
+## Declared Exports (__all__)
+
+Capabilities
 
 ## Tags
 
-overlay-needed, public-api
+public-api

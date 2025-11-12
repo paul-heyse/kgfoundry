@@ -17,12 +17,17 @@ Heuristics for toggling RM3 pseudo-relevance feedback per query.
 
 - class: `RM3Params` (line 13)
 - class: `RM3Heuristics` (line 21)
-- function: `__init__` (line 65)
-- function: `_tokenize` (line 85)
-- function: `_looks_symbolic` (line 88)
-- function: `should_enable` (line 91)
-- function: `parameters` (line 114)
+
+## Dependency Graph
+
+- **fan_in**: 2
+- **fan_out**: 0
+- **cycle_group**: 22
+
+## Declared Exports (__all__)
+
+RM3Heuristics, RM3Params
 
 ## Tags
 
-overlay-needed, public-api
+public-api

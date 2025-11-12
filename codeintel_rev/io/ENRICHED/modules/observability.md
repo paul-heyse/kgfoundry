@@ -42,15 +42,22 @@ Graceful degradation when metrics are unavailable:
 
 ## Definitions
 
+- variable: `LOGGER` (line 43)
 - function: `_supports_histogram_labels` (line 46)
 - class: `_NoopObservation` (line 69)
-- function: `mark_error` (line 72)
-- function: `mark_success` (line 75)
 - class: `Observation` (line 79)
-- function: `mark_error` (line 82)
-- function: `mark_success` (line 85)
 - function: `observe_duration` (line 90)
+
+## Dependency Graph
+
+- **fan_in**: 3
+- **fan_out**: 1
+- **cycle_group**: 87
+
+## Declared Exports (__all__)
+
+Observation, observe_duration
 
 ## Tags
 
-overlay-needed, public-api
+public-api

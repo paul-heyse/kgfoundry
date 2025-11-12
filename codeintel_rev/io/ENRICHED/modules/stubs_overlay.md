@@ -3,37 +3,40 @@
 ## Docstring
 
 ```
-Overlay generation utilities for the enrichment CLI.
+Targeted overlay generation with opt-in activation.
 ```
 
 ## Imports
 
 - from **__future__** import annotations
-- from **collections.abc** import Iterable, Mapping
+- from **(absolute)** import platform
+- from **collections.abc** import Mapping, MutableMapping, Sequence
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
 - from **codeintel_rev.enrich.libcst_bridge** import DefEntry, ImportEntry, ModuleIndex, index_module
 - from **codeintel_rev.enrich.output_writers** import write_json
-- from **codeintel_rev.enrich.scip_reader** import Document, SCIPIndex
+- from **codeintel_rev.enrich.scip_reader** import SCIPIndex
 
 ## Definitions
 
-- class: `OverlayResult` (line 16)
-- function: `generate_overlay_for_file` (line 24)
-- function: `_infer_repo_root` (line 123)
-- function: `_safe_relative` (line 130)
-- function: `_module_name_from_path` (line 137)
-- function: `_collect_star_reexports` (line 149)
-- function: `_resolve_target_module` (line 172)
-- function: `_names_from_scip` (line 185)
-- function: `_candidate_file_paths_for_module` (line 209)
-- function: `_simple_name_from_scip_symbol` (line 233)
-- function: `_is_private` (line 244)
-- function: `_is_public_def` (line 248)
-- function: `_pyi_header` (line 252)
-- function: `_build_overlay_text` (line 262)
-- function: `_write_sidecar` (line 298)
+- class: `OverlayPolicy` (line 17)
+- class: `OverlayResult` (line 31)
+- function: `generate_overlay_for_file` (line 40)
+- function: `activate_overlays` (line 157)
+- function: `deactivate_all` (line 206)
+- function: `_overlay_path` (line 244)
+- function: `_normalized_module_key` (line 267)
+- function: `_module_name_from_path` (line 287)
+- function: `_collect_star_reexports` (line 308)
+- function: `_extract_simple_name` (line 336)
+- function: `_build_overlay_text` (line 363)
+- function: `_render_star_exports` (line 422)
+- function: `_render_public_defs` (line 444)
+- function: `_collect_import_reexports` (line 473)
+- function: `_is_windows` (line 504)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 1
+- **fan_out**: 3
+- **cycle_group**: 5

@@ -19,13 +19,11 @@ Listwise reranking using the CodeRankLLM checkpoint.
 
 ## Definitions
 
+- variable: `LOGGER` (line 16)
 - class: `CodeRankListwiseReranker` (line 33)
-- function: `__init__` (line 41)
-- function: `rerank` (line 56)
-- function: `_ensure_model` (line 113)
-- function: `_build_prompt` (line 143)
-- function: `_parse_rankings` (line 151)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 1
+- **fan_out**: 1
+- **cycle_group**: 71

@@ -1,0 +1,11 @@
+{
+  "module": "mcp_server.__init__",
+  "source": "/home/paul/kgfoundry/codeintel_rev/mcp_server/__init__.py",
+  "exports_resolved": {},
+  "has_all": [],
+  "defs": [],
+  "parse_ok": true,
+  "errors": [],
+  "type_errors": 0,
+  "forced": true
+}

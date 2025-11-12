@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: MIT
-"""CLI entrypoint for repo enrichment and overlay generation."""
+"""CLI entrypoint for repo enrichment and targeted overlay generation."""
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, MutableMapping
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -11,10 +11,16 @@ from typing import Any
 
 import typer
 
-from codeintel_rev.enrich.libcst_bridge import ImportEntry, index_module
+from codeintel_rev.enrich.libcst_bridge import index_module
 from codeintel_rev.enrich.output_writers import write_json, write_jsonl, write_markdown_module
 from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
-from codeintel_rev.enrich.stubs_overlay import generate_overlay_for_file
+from codeintel_rev.enrich.stitch import stitch_records
+from codeintel_rev.enrich.stubs_overlay import (
+    OverlayPolicy,
+    activate_overlays,
+    deactivate_all,
+    generate_overlay_for_file,
+)
 from codeintel_rev.enrich.tagging import ModuleTraits, infer_tags, load_rules
 from codeintel_rev.enrich.tree_sitter_bridge import build_outline
 from codeintel_rev.enrich.type_integration import TypeSummary, collect_pyrefly, collect_pyright
@@ -26,24 +32,81 @@ except ImportError:  # pragma: no cover - optional dependency
 
 EXPORT_HUB_THRESHOLD = 10
 
-ROOT_OPTION = typer.Option(Path(), "--root", help="Repo or subfolder to scan.")
-SCIP_OPTION = typer.Option(..., "--scip", exists=True, help="Path to SCIP index.json")
-OUT_OPTION = typer.Option(
+ROOT = typer.Option(Path(), "--root", help="Repo or subfolder to scan.")
+SCIP = typer.Option(..., "--scip", exists=True, help="Path to SCIP index.json")
+OUT = typer.Option(
     Path("codeintel_rev/io/ENRICHED"),
     "--out",
     help="Output directory for enrichment artifacts.",
 )
-PYREFLY_OPTION = typer.Option(
+PYREFLY = typer.Option(
     None,
     "--pyrefly-json",
     help="Optional path to a Pyrefly JSON/JSONL report.",
 )
-TAGS_OPTION = typer.Option(None, "--tags-yaml", help="Optional tagging rules YAML.")
+TAGS = typer.Option(None, "--tags-yaml", help="Optional tagging rules YAML.")
 
-app = typer.Typer(
-    add_completion=False,
-    help="Combine SCIP + LibCST + Tree-sitter + type checker signals into a repo map.",
+DEFAULT_MIN_ERRORS = 25
+DEFAULT_MAX_OVERLAYS = 200
+DEFAULT_INCLUDE_PUBLIC_DEFS = False
+DEFAULT_INJECT_GETATTR_ANY = True
+DEFAULT_DRY_RUN = False
+DEFAULT_ACTIVATE = True
+DEFAULT_DEACTIVATE = False
+DEFAULT_USE_TYPE_ERROR_OVERLAYS = False
+
+STUBS = typer.Option(
+    Path("stubs"),
+    "--stubs",
+    help="Pyright stubPath root (matches pyrightconfig.json).",
 )
+OVERLAYS_ROOT = typer.Option(
+    Path("stubs/overlays"),
+    "--overlays-root",
+    help="Directory for generated overlays.",
+)
+MIN_ERRORS = typer.Option(
+    DEFAULT_MIN_ERRORS,
+    "--min-errors",
+    help="Generate overlays when a module has at least this many type errors.",
+)
+MAX_OVERLAYS = typer.Option(
+    DEFAULT_MAX_OVERLAYS,
+    "--max-overlays",
+    help="Maximum overlays to generate in one run.",
+)
+INCLUDE_PUBLIC_DEFS = typer.Option(
+    DEFAULT_INCLUDE_PUBLIC_DEFS,
+    "--include-public-defs/--no-include-public-defs",
+    help="Include placeholder defs/classes in overlays.",
+)
+INJECT_GETATTR_ANY = typer.Option(
+    DEFAULT_INJECT_GETATTR_ANY,
+    "--inject-getattr-any/--no-inject-getattr-any",
+    help="Inject def __getattr__(name: str) -> Any.",
+)
+DRY_RUN = typer.Option(
+    DEFAULT_DRY_RUN,
+    "--dry-run/--no-dry-run",
+    help="Plan overlay actions without writing files.",
+)
+ACTIVATE = typer.Option(
+    DEFAULT_ACTIVATE,
+    "--activate/--no-activate",
+    help="Activate overlays into --stubs via symlink/copy.",
+)
+DEACTIVATE = typer.Option(
+    DEFAULT_DEACTIVATE,
+    "--deactivate-all/--no-deactivate-all",
+    help="Remove previously activated overlays before generating new ones.",
+)
+TYPE_ERROR_OVERLAYS = typer.Option(
+    DEFAULT_USE_TYPE_ERROR_OVERLAYS,
+    "--type-error-overlays/--no-type-error-overlays",
+    help="Allow overlays for modules exceeding --min-errors type error threshold.",
+)
+
+app = typer.Typer(add_completion=False, help="Repo enrichment utilities (scan + overlays).")
 
 
 @dataclass(slots=True, frozen=True)
@@ -65,7 +128,7 @@ class ModuleRecord:
 
 @dataclass(frozen=True)
 class ScipContext:
-    """Convenience wrapper around SCIP lookup helpers."""
+    """Cache of SCIP lookups used during scanning."""
 
     index: SCIPIndex
     by_file: Mapping[str, Document]
@@ -73,351 +136,36 @@ class ScipContext:
 
 @dataclass(frozen=True)
 class TypeSignals:
-    """Aggregate Pyright and Pyrefly summaries."""
+    """Pyright/Pyrefly summaries."""
 
     pyright: TypeSummary | None
     pyrefly: TypeSummary | None
 
 
 def _iter_files(root: Path) -> Iterable[Path]:
-    """Yield Python files under root while skipping hidden paths.
-
-    Extended Summary
-    ----------------
-    Recursively traverses the directory tree starting from root and yields
-    all Python source files (.py), excluding any paths containing hidden
-    directories (those starting with '.'). This function is used by the
-    enrichment pipeline to discover modules for analysis.
-
-    Parameters
-    ----------
-    root : Path
-        Directory root to scan recursively. Must exist and be readable.
-
-    Yields
-    ------
-    Path
-        Source file path ready for analysis. Paths are absolute and point
-        to valid Python source files.
-
-    Notes
-    -----
-    Time O(n) where n is the number of files in the tree; memory O(1) aside
-    from the iterator state. No I/O beyond directory traversal; no global state.
-    Hidden paths are determined by checking if any component in the path
-    starts with '.'.
-
-    Examples
-    --------
-    >>> from pathlib import Path
-    >>> files = list(_iter_files(Path("codeintel_rev")))
-    >>> len(files) > 0
-    True
-    >>> all(f.suffix == ".py" for f in files)
-    True
-    """
     for candidate in root.rglob("*.py"):
         if any(part.startswith(".") for part in candidate.parts):
             continue
         yield candidate
 
 
-def _collect_imported_modules(imports: Sequence[ImportEntry]) -> list[str]:
-    """Return module names referenced by explicit or star imports.
-
-    Extended Summary
-    ----------------
-    Extracts module names from LibCST import entries, handling both explicit
-    module imports and star imports with aliases. Used during enrichment to
-    build the dependency graph and infer module tags based on imported
-    dependencies.
-
-    Parameters
-    ----------
-    imports : Sequence[ImportEntry]
-        Import entries extracted from LibCST parsing. Each entry contains
-        module name, imported names, aliases, and star-import flags.
-
-    Returns
-    -------
-    list[str]
-        Ordered list of imported module names. Explicit module imports appear
-        first, followed by aliased names from star imports.
-
-    Notes
-    -----
-    Time O(n) where n is the number of import entries; memory O(m) where m
-    is the total number of imported names. No I/O, no global state. Star
-    imports without explicit module names contribute their aliased names
-    to the result.
-
-    Examples
-    --------
-    >>> from codeintel_rev.enrich.libcst_bridge import ImportEntry
-    >>> entries = [
-    ...     ImportEntry(module="os", names=[], aliases={}, is_star=False, level=0),
-    ...     ImportEntry(module=None, names=["foo", "bar"], aliases={}, is_star=True, level=0),
-    ... ]
-    >>> modules = _collect_imported_modules(entries)
-    >>> "os" in modules
-    True
-    """
-    modules = [entry.module for entry in imports if entry.module]
-    modules.extend(alias for entry in imports if entry.module is None for alias in entry.names)
-    return modules
-
-
-def _max_type_errors(rel_path: str, type_signals: TypeSignals) -> int:
-    """Return the conservative type error count for a module.
-
-    Extended Summary
-    ----------------
-    Computes the maximum type error count across Pyright and Pyrefly checkers
-    for a given module. This conservative approach ensures that modules with
-    type issues are properly tagged even if only one checker reports errors.
-    Used during enrichment to infer quality tags and prioritize overlay
-    generation.
-
-    Parameters
-    ----------
-    rel_path : str
-        Module path relative to the scan root. Must match keys used in
-        type_signals summaries.
-
-    type_signals : TypeSignals
-        Aggregated Pyright and Pyrefly summaries. Either summary may be None
-        if the corresponding checker was not run or failed.
-
-    Returns
-    -------
-    int
-        Maximum error count reported by either checker. Returns 0 if the
-        module is not found in either summary or both summaries are None.
-
-    Notes
-    -----
-    Time O(1) dictionary lookup; memory O(1). No I/O, no global state.
-    Missing modules in summaries are treated as having zero errors.
-
-    Examples
-    --------
-    >>> signals = TypeSignals(pyright=None, pyrefly=None)
-    >>> _max_type_errors("test.py", signals)
-    0
-    """
-    pyrefly = type_signals.pyrefly
-    pyrefly_count = (
-        pyrefly.by_file[rel_path].error_count if pyrefly and rel_path in pyrefly.by_file else 0
-    )
-    pyright = type_signals.pyright
-    pyright_count = (
-        pyright.by_file[rel_path].error_count if pyright and rel_path in pyright.by_file else 0
-    )
-    return max(pyrefly_count, pyright_count)
-
-
-def _outline_nodes(module_path: str, code: str) -> list[dict[str, Any]]:
-    """Serialize Tree-sitter outline nodes for the module.
-
-    Extended Summary
-    ----------------
-    Parses the module source code using Tree-sitter and extracts structural
-    outline information (function and class definitions) with byte offsets.
-    This enables downstream tools to navigate and understand module structure
-    without re-parsing. Used during enrichment to populate module metadata.
-
-    Parameters
-    ----------
-    module_path : str
-        Relative module path supplied to Tree-sitter for context. Used for
-        error reporting and language detection.
-
-    code : str
-        Source code content as a UTF-8 string. Must be valid Python syntax
-        for accurate parsing.
-
-    Returns
-    -------
-    list[dict[str, Any]]
-        List of outline entries, each containing 'kind' (function/class),
-        'name', 'start' (byte offset), and 'end' (byte offset). Returns empty
-        list if parsing fails or no definitions are found.
-
-    Notes
-    -----
-    Time O(n) where n is code length (Tree-sitter parsing); memory O(m) where
-    m is the number of definitions. No I/O beyond parsing; no global state.
-    May raise exceptions if tree-sitter parsing fails due to API mismatches
-    or missing language bindings.
-
-    Examples
-    --------
-    >>> # Returns a list when parsing succeeds
-    >>> try:
-    ...     result = _outline_nodes("test.py", "def foo(): pass")
-    ...     isinstance(result, list)
-    ... except Exception:
-    ...     True  # tree-sitter may be unavailable
-    True
-    """
-    outline = build_outline(module_path, code.encode("utf-8"))
-    if not outline:
-        return []
-    return [
-        {"kind": node.kind, "name": node.name, "start": node.start_byte, "end": node.end_byte}
-        for node in outline.nodes
-    ]
-
-
-def _build_module_row(
-    fp: Path,
-    root: Path,
-    scip_ctx: ScipContext,
-    type_signals: TypeSignals,
-    rules: dict[str, Any],
-) -> tuple[dict[str, Any], list[tuple[str, str]]]:
-    """Produce a serialized module row and associated SCIP symbol edges.
-
-    Extended Summary
-    ----------------
-    Orchestrates the enrichment pipeline for a single module by combining
-    LibCST parsing, Tree-sitter outlining, SCIP symbol resolution, type
-    checker signals, and tag inference. This is the core transformation
-    function that converts raw source files into structured module records
-    and symbol graph edges for downstream analysis and indexing.
-
-    Parameters
-    ----------
-    fp : Path
-        Absolute path to the Python source file to process. Must exist and
-        be readable.
-
-    root : Path
-        Repository root directory used to compute relative paths. Must be
-        a parent of fp.
-
-    scip_ctx : ScipContext
-        SCIP index context providing symbol lookup and document mapping.
-        Used to resolve star imports and extract symbol definitions.
-
-    type_signals : TypeSignals
-        Aggregated Pyright and Pyrefly type checker summaries. Used to
-        compute error counts for quality tagging.
-
-    rules : dict[str, Any]
-        Tagging rules dictionary loaded from YAML. Controls how modules
-        are tagged based on imports, exports, and error counts.
-
-    Returns
-    -------
-    tuple[dict[str, Any], list[tuple[str, str]]]
-        Pair of (module row dict, symbol edges). The module row contains
-        path, docstring, imports, defs, exports, outline_nodes, scip_symbols,
-        parse_ok, errors, tags, and type_errors. Symbol edges are tuples of
-        (symbol_id, relative_file_path) for graph construction.
-
-    Notes
-    -----
-    Time O(n + m) where n is file size and m is number of symbols; memory
-    O(n + m) for parsed structures. Performs file I/O, LibCST parsing,
-    Tree-sitter parsing, and SCIP lookups. No global state mutations.
-    Parse errors are captured in the errors list rather than propagated.
-
-    Examples
-    --------
-    >>> from pathlib import Path
-    >>> from codeintel_rev.enrich.scip_reader import SCIPIndex
-    >>> # Requires valid SCIP index and test file
-    >>> # row, edges = _build_module_row(fp, root, scip_ctx, signals, {})
-    >>> # assert isinstance(row, dict)
-    >>> # assert isinstance(edges, list)
-    """
-    rel_path = str(fp.relative_to(root))
-    code = fp.read_text(encoding="utf-8", errors="ignore")
-    module_index = index_module(rel_path, code)
-    overlay = generate_overlay_for_file(fp, root, scip_ctx.index)
-    outline_nodes = _outline_nodes(module_index.path, code)
-
-    imported_modules = _collect_imported_modules(module_index.imports)
-    is_reexport_hub = any(entry.is_star for entry in module_index.imports) or (
-        len(module_index.exports) >= EXPORT_HUB_THRESHOLD
-    )
-    type_errors = _max_type_errors(rel_path, type_signals)
-
-    traits = ModuleTraits(
-        imported_modules=imported_modules,
-        has_all=bool(module_index.exports),
-        is_reexport_hub=is_reexport_hub,
-        type_error_count=type_errors,
-    )
-    tagging = infer_tags(path=rel_path, traits=traits, rules=rules)
-    if overlay.created:
-        tagging.tags.add("overlay-needed")
-
-    scip_doc = scip_ctx.by_file.get(rel_path)
-    scip_symbols = sorted(
-        {sym.symbol for sym in (scip_doc.symbols if scip_doc else []) if sym.symbol}
-    )
-    symbol_edges = [(symbol, rel_path) for symbol in scip_symbols]
-
-    row = ModuleRecord(
-        path=rel_path,
-        docstring=module_index.docstring,
-        imports=[
-            {
-                "module": entry.module,
-                "names": entry.names,
-                "aliases": entry.aliases,
-                "is_star": entry.is_star,
-                "level": entry.level,
-            }
-            for entry in module_index.imports
-        ],
-        defs=[
-            {"kind": entry.kind, "name": entry.name, "lineno": entry.lineno}
-            for entry in module_index.defs
-        ],
-        exports=sorted(module_index.exports),
-        outline_nodes=outline_nodes,
-        scip_symbols=scip_symbols,
-        parse_ok=module_index.parse_ok,
-        errors=module_index.errors,
-        tags=sorted(tagging.tags),
-        type_errors=type_errors,
-    )
-    return asdict(row), symbol_edges
-
-
-def _write_tag_index(out: Path, tag_index: dict[str, list[str]]) -> None:
-    """Persist the YAML tag index when PyYAML is available."""
-    if yaml_module is None:
-        return
-    tags_path = out / "tags"
-    tags_path.mkdir(parents=True, exist_ok=True)
-    serialized = yaml_module.safe_dump(tag_index, sort_keys=True)
-    if serialized is None:
-        return
-    if isinstance(serialized, bytes):
-        serialized = serialized.decode("utf-8")
-    (tags_path / "tags_index.yaml").write_text(serialized, encoding="utf-8")
-
-
-@app.command()
-def main(
-    root: Path = ROOT_OPTION,
-    scip: Path = SCIP_OPTION,
-    out: Path = OUT_OPTION,
-    pyrefly_json: Path | None = PYREFLY_OPTION,
-    tags_yaml: Path | None = TAGS_OPTION,
+@app.command("scan")
+def scan(
+    root: Path = ROOT,
+    scip: Path = SCIP,
+    out: Path = OUT,
+    pyrefly_json: Path | None = PYREFLY,
+    tags_yaml: Path | None = TAGS,
 ) -> None:
-    """Run the enrichment pipeline."""
+    """Build LibCST/SCIP/type-signal enriched artifacts."""
     out.mkdir(parents=True, exist_ok=True)
     scip_index = SCIPIndex.load(scip)
     scip_ctx = ScipContext(index=scip_index, by_file=scip_index.by_file())
 
-    pyright_summary = collect_pyright(str(root))
-    pyrefly_summary = collect_pyrefly(str(pyrefly_json) if pyrefly_json else None)
-    type_signals = TypeSignals(pyright=pyright_summary, pyrefly=pyrefly_summary)
+    type_signals = TypeSignals(
+        pyright=collect_pyright(str(root)),
+        pyrefly=collect_pyrefly(str(pyrefly_json) if pyrefly_json else None),
+    )
     rules = load_rules(str(tags_yaml) if tags_yaml else None)
 
     module_rows: list[dict[str, Any]] = []
@@ -425,20 +173,17 @@ def main(
     tag_index: dict[str, list[str]] = {}
 
     for fp in _iter_files(root):
-        row_dict, file_symbol_edges = _build_module_row(
-            fp=fp,
-            root=root,
-            scip_ctx=scip_ctx,
-            type_signals=type_signals,
-            rules=rules,
-        )
+        row_dict, edges = _build_module_row(fp, root, scip_ctx, type_signals, rules)
         module_rows.append(row_dict)
-        symbol_edges.extend(file_symbol_edges)
+        symbol_edges.extend(edges)
         for tag in row_dict["tags"]:
             tag_index.setdefault(tag, []).append(row_dict["path"])
-
-        module_md_path = out / "modules" / (Path(row_dict["path"]).with_suffix(".md").name)
-        write_markdown_module(module_md_path, row_dict)
+    module_rows = stitch_records(module_rows, scip_index, package_prefix=root.name)
+    for row in module_rows:
+        write_markdown_module(
+            out / "modules" / (Path(row["path"]).with_suffix(".md").name),
+            row,
+        )
 
     write_jsonl(out / "modules" / "modules.jsonl", module_rows)
     write_json(
@@ -451,11 +196,323 @@ def main(
             "root": str(root),
             "module_count": len(module_rows),
             "symbol_edge_count": len(symbol_edges),
-            "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
+            "generated_at": datetime.now(tz=UTC).isoformat(timespec="seconds"),
             "tags": tag_index,
         },
     )
     _write_tag_index(out, tag_index)
+    typer.echo(f"[scan] Wrote {len(module_rows)} module rows to {out}")
+
+
+@app.command("overlays")
+def overlays(  # noqa: PLR0913, PLR0914, C901 - CLI surface intentionally exposes many knobs
+    root: Path = ROOT,
+    scip: Path = SCIP,
+    pyrefly_json: Path | None = PYREFLY,
+    *,
+    stubs_root: Path = STUBS,
+    overlays_root: Path = OVERLAYS_ROOT,
+    min_errors: int = MIN_ERRORS,
+    max_overlays: int = MAX_OVERLAYS,
+    include_public_defs: bool = INCLUDE_PUBLIC_DEFS,
+    inject_getattr_any: bool = INJECT_GETATTR_ANY,
+    dry_run: bool = DRY_RUN,
+    activate: bool = ACTIVATE,
+    deactivate_all_first: bool = DEACTIVATE,
+    type_error_overlays: bool = TYPE_ERROR_OVERLAYS,
+) -> None:
+    """Generate targeted overlays and optionally activate them into the stub path."""
+    root_resolved = root.resolve()
+    package_name = root_resolved.name
+    overlays_target_root = (overlays_root / package_name).resolve()
+    stubs_target_root = (stubs_root / package_name).resolve()
+    overlays_target_root.mkdir(parents=True, exist_ok=True)
+    stubs_target_root.parent.mkdir(parents=True, exist_ok=True)
+
+    scip_index = SCIPIndex.load(scip)
+
+    type_counts: dict[str, int] = {}
+    type_signals = TypeSignals(
+        pyright=collect_pyright(str(root)),
+        pyrefly=collect_pyrefly(str(pyrefly_json) if pyrefly_json else None),
+    )
+    for summary in (type_signals.pyrefly, type_signals.pyright):
+        if not summary:
+            continue
+        for file_path, record in summary.by_file.items():
+            _register_type_count(type_counts, file_path, record.error_count, root_resolved)
+
+    policy = OverlayPolicy(
+        overlays_root=overlays_target_root,
+        include_public_defs=include_public_defs,
+        inject_module_getattr_any=inject_getattr_any,
+        when_type_errors=type_error_overlays,
+        min_type_errors=min_errors,
+        max_overlays=max_overlays,
+    )
+
+    removed = 0
+    if deactivate_all_first:
+        removed = deactivate_all(overlays_root=overlays_target_root, stubs_root=stubs_target_root)
+
+    generated: list[str] = []
+    generated_set: set[str] = set()
+    manifest_entries: list[str] = []
+    package_overlays: set[str] = set()
+    for fp in _iter_files(root_resolved):
+        rel = _normalized_rel_path(fp, root_resolved)
+        result = generate_overlay_for_file(
+            py_file=fp,
+            package_root=root_resolved,
+            scip=scip_index,
+            policy=policy,
+            type_error_counts=type_counts,
+        )
+        if result.created and rel not in generated_set:
+            generated.append(rel)
+            generated_set.add(rel)
+            manifest_entries.append(f"{package_name}/{rel}")
+            if len(generated) >= policy.max_overlays or _ensure_package_overlays(
+                rel_path=Path(rel),
+                generated=generated,
+                generated_set=generated_set,
+                manifest_entries=manifest_entries,
+                package_name=package_name,
+                package_overlays=package_overlays,
+                root=root_resolved,
+                scip_index=scip_index,
+                policy=policy,
+                type_error_counts=type_counts,
+            ):
+                break
+        if len(generated) >= policy.max_overlays:
+            break
+
+    if dry_run:
+        typer.echo(
+            f"[overlays] DRY RUN: would generate {len(generated)} overlays (removed {removed})."
+        )
+        return
+
+    typer.echo(
+        f"[overlays] Generated {len(generated)} overlays into {overlays_root} (removed {removed})."
+    )
+    if activate and generated:
+        activated = activate_overlays(
+            generated,
+            overlays_root=overlays_target_root,
+            stubs_root=stubs_target_root,
+        )
+        typer.echo(f"[overlays] Activated {activated} overlays into {stubs_root}.")
+
+    manifest_path = overlays_target_root / "overlays_manifest.json"
+    write_json(
+        manifest_path,
+        {
+            "package": package_name,
+            "generated": manifest_entries,
+            "removed": removed,
+            "activated": bool(activate and generated),
+        },
+    )
+    typer.echo(f"[overlays] Manifest written to {manifest_path}")
+
+
+def _build_module_row(
+    fp: Path,
+    root: Path,
+    scip_ctx: ScipContext,
+    type_signals: TypeSignals,
+    rules: Mapping[str, Any],
+) -> tuple[dict[str, Any], list[tuple[str, str]]]:
+    rel = _normalized_rel_path(fp, root)
+    code = fp.read_text(encoding="utf-8", errors="ignore")
+    idx = index_module(rel, code)
+
+    outline = build_outline(rel, code.encode("utf-8"))
+    outline_nodes = []
+    if outline:
+        outline_nodes.extend(
+            {
+                "kind": node.kind,
+                "name": node.name,
+                "start": node.start_byte,
+                "end": node.end_byte,
+            }
+            for node in outline.nodes
+        )
+
+    imported_modules = [entry.module for entry in idx.imports if entry.module]
+    imported_modules.extend(
+        name for entry in idx.imports if entry.module is None for name in entry.names
+    )
+    is_reexport_hub = (
+        any(entry.is_star for entry in idx.imports) or len(idx.exports) >= EXPORT_HUB_THRESHOLD
+    )
+
+    type_errors = _max_type_errors(rel, type_signals)
+
+    traits = ModuleTraits(
+        imported_modules=imported_modules,
+        has_all=bool(idx.exports),
+        is_reexport_hub=is_reexport_hub,
+        type_error_count=type_errors,
+    )
+    tagging = infer_tags(path=rel, traits=traits, rules=rules)
+
+    scip_doc = scip_ctx.by_file.get(rel)
+    scip_symbols = sorted(
+        {symbol.symbol for symbol in (scip_doc.symbols if scip_doc else []) if symbol.symbol}
+    )
+    symbol_edges = [(symbol, rel) for symbol in scip_symbols]
+
+    row = ModuleRecord(
+        path=rel,
+        docstring=idx.docstring,
+        imports=[
+            {
+                "module": entry.module,
+                "names": entry.names,
+                "aliases": entry.aliases,
+                "is_star": entry.is_star,
+                "level": entry.level,
+            }
+            for entry in idx.imports
+        ],
+        defs=[{"kind": d.kind, "name": d.name, "lineno": d.lineno} for d in idx.defs],
+        exports=sorted(idx.exports),
+        outline_nodes=outline_nodes,
+        scip_symbols=scip_symbols,
+        parse_ok=idx.parse_ok,
+        errors=idx.errors,
+        tags=sorted(tagging.tags),
+        type_errors=type_errors,
+    )
+    return asdict(row), symbol_edges
+
+
+def _ensure_package_overlays(  # noqa: PLR0913
+    *,
+    rel_path: Path,
+    generated: list[str],
+    generated_set: set[str],
+    manifest_entries: list[str],
+    package_name: str,
+    package_overlays: set[str],
+    root: Path,
+    scip_index: SCIPIndex,
+    policy: OverlayPolicy,
+    type_error_counts: Mapping[str, int],
+) -> bool:
+    """Ensure package ``__init__`` overlays exist for ancestors of ``rel_path``.
+
+    Parameters
+    ----------
+    rel_path : Path
+        Relative path to a Python file. Package overlays are created for
+        all ancestor directories containing ``__init__.py`` files.
+    generated : list[str]
+        Mutable list of generated overlay paths (relative keys). New overlays
+        are appended to this list.
+    generated_set : set[str]
+        Set of generated overlay paths for fast membership testing. Updated
+        in parallel with ``generated``.
+    manifest_entries : list[str]
+        Mutable list of manifest entry strings. New entries are appended
+        in the format ``{package_name}/{rel_key}``.
+    package_name : str
+        Package name prefix for manifest entries.
+    package_overlays : set[str]
+        Set of package overlay paths that have already been processed. Used
+        to avoid duplicate work when traversing ancestor directories.
+    root : Path
+        Root directory of the package. Used to resolve absolute paths for
+        ``__init__.py`` files.
+    scip_index : SCIPIndex
+        SCIP index for resolving star import re-exports in package overlays.
+    policy : OverlayPolicy
+        Policy controlling overlay generation (max_overlays, etc.).
+    type_error_counts : Mapping[str, int]
+        Mapping of module keys to type error counts. Used to determine
+        eligibility for overlay generation.
+
+    Returns
+    -------
+    bool
+        True when the overlay budget (``policy.max_overlays``) was exhausted
+        while creating package overlays. False otherwise.
+    """
+    current = rel_path.parent
+    root_marker = Path()
+    limit = policy.max_overlays
+    while current != root_marker:
+        init_rel = current / "__init__.py"
+        rel_key = str(init_rel).replace("\\", "/")
+        if rel_key in package_overlays:
+            current = current.parent
+            continue
+        package_overlays.add(rel_key)
+        init_abs = root / init_rel
+        if not init_abs.exists():
+            current = current.parent
+            continue
+        result = generate_overlay_for_file(
+            py_file=init_abs,
+            package_root=root,
+            scip=scip_index,
+            policy=policy,
+            type_error_counts=type_error_counts,
+            force=True,
+        )
+        if result.created:
+            if rel_key not in generated_set:
+                generated.append(rel_key)
+                generated_set.add(rel_key)
+                manifest_entries.append(f"{package_name}/{rel_key}")
+            if len(generated) >= limit:
+                return True
+        current = current.parent
+    return False
+
+
+def _max_type_errors(rel: str, type_signals: TypeSignals) -> int:
+    max_errors = 0
+    if type_signals.pyrefly and rel in type_signals.pyrefly.by_file:
+        max_errors = type_signals.pyrefly.by_file[rel].error_count
+    if type_signals.pyright and rel in type_signals.pyright.by_file:
+        max_errors = max(max_errors, type_signals.pyright.by_file[rel].error_count)
+    return max_errors
+
+
+def _normalized_rel_path(path: Path, root: Path) -> str:
+    return str(path.relative_to(root)).replace("\\", "/")
+
+
+def _write_tag_index(out: Path, tag_index: Mapping[str, list[str]]) -> None:
+    if yaml_module is None:
+        return
+    tags_path = out / "tags"
+    tags_path.mkdir(parents=True, exist_ok=True)
+    (tags_path / "tags_index.yaml").write_text(
+        yaml_module.safe_dump(tag_index, sort_keys=True),  # type: ignore[union-attr]
+        encoding="utf-8",
+    )
+
+
+def _register_type_count(
+    mapping: MutableMapping[str, int],
+    file_path: str,
+    count: int,
+    root: Path,
+) -> None:
+    candidates = {file_path.replace("\\", "/")}
+    try:
+        rel = Path(file_path).resolve().relative_to(root)
+        candidates.add(str(rel).replace("\\", "/"))
+    except (ValueError, FileNotFoundError):
+        pass
+    for key in candidates:
+        mapping[key] = max(mapping.get(key, 0), count)
 
 
 if __name__ == "__main__":

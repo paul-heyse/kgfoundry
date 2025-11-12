@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 
 from codeintel_rev.enrich.scip_reader import Document, SCIPIndex, SymbolInfo
-from codeintel_rev.enrich.stubs_overlay import generate_overlay_for_file
+from codeintel_rev.enrich.stubs_overlay import OverlayPolicy, generate_overlay_for_file
 
 
 def _scip_symbol(module: str, name: str) -> str:
@@ -39,7 +39,12 @@ def test_generate_overlay_creates_stub_with_reexports(tmp_path: Path) -> None:
         ]
     )
 
-    result = generate_overlay_for_file(module_path, package_root, scip)
+    result = generate_overlay_for_file(
+        module_path,
+        package_root,
+        scip=scip,
+        policy=OverlayPolicy(),
+    )
 
     assert result.created
     assert result.pyi_path is not None
@@ -69,7 +74,12 @@ def test_generate_overlay_skips_private_only_module(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    result = generate_overlay_for_file(module_path, package_root, scip=None)
+    result = generate_overlay_for_file(
+        module_path,
+        package_root,
+        scip=None,
+        policy=OverlayPolicy(),
+    )
 
     assert not result.created
     assert result.pyi_path is None

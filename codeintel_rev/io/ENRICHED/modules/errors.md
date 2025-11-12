@@ -43,21 +43,24 @@ Raising Git operation error:
 ## Definitions
 
 - class: `FileOperationError` (line 40)
-- function: `__init__` (line 80)
 - class: `FileReadError` (line 95)
 - class: `InvalidLineRangeError` (line 142)
-- function: `__init__` (line 192)
 - class: `PathNotFoundError` (line 214)
-- function: `__init__` (line 217)
 - class: `PathNotDirectoryError` (line 233)
-- function: `__init__` (line 236)
 - class: `GitOperationError` (line 255)
-- function: `__init__` (line 312)
 - class: `RuntimeLifecycleError` (line 334)
-- function: `__init__` (line 337)
 - class: `RuntimeUnavailableError` (line 353)
-- function: `__init__` (line 356)
+
+## Dependency Graph
+
+- **fan_in**: 11
+- **fan_out**: 0
+- **cycle_group**: 28
+
+## Declared Exports (__all__)
+
+FileOperationError, FileReadError, GitOperationError, InvalidLineRangeError, PathNotDirectoryError, PathNotFoundError, RuntimeLifecycleError, RuntimeUnavailableError
 
 ## Tags
 
-overlay-needed, public-api
+public-api

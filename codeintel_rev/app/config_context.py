@@ -83,8 +83,6 @@ from kgfoundry_common.logging import get_logger
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
-    import redis.asyncio as _redis_asyncio
-
     from codeintel_rev.app.scope_store import SupportsAsyncRedis
     from codeintel_rev.io.hybrid_search import HybridSearchEngine
     from codeintel_rev.io.xtr_manager import XTRIndex
@@ -179,7 +177,7 @@ def _faiss_module() -> ModuleType:
     """
     cached = globals().get("_FAISS_MODULE")
     if cached is not None:
-        return cast(ModuleType, cached)
+        return cast("ModuleType", cached)
     module = importlib.import_module("codeintel_rev.io.faiss_manager")
     globals()["_FAISS_MODULE"] = module
     return module
@@ -194,7 +192,7 @@ def _import_faiss_manager_cls() -> type[FAISSManager]:
         Resolved manager class.
     """
     module = _faiss_module()
-    return cast(type[FAISSManager], module.FAISSManager)
+    return cast("type[FAISSManager]", module.FAISSManager)
 
 
 def _import_faiss_runtime_opts_cls() -> type:
@@ -220,7 +218,7 @@ def _faiss_runtime_options_from_index(index_cfg: IndexConfig) -> FAISSRuntimeOpt
 
     Returns
     -------
-    object
+    FAISSRuntimeOptions
         Instance of ``FAISSRuntimeOptions`` matching ``index_cfg`` parameters.
         The returned object is used to configure FAISS manager runtime behavior.
 
@@ -260,7 +258,7 @@ def _import_hybrid_engine_cls() -> type[HybridSearchEngine]:
     """
     existing = globals().get("HybridSearchEngine")
     if existing is not None and existing is not Any:
-        return cast(type[HybridSearchEngine], existing)
+        return cast("type[HybridSearchEngine]", existing)
     module = importlib.import_module("codeintel_rev.io.hybrid_search")
     engine_cls = module.HybridSearchEngine
     globals()["HybridSearchEngine"] = engine_cls
@@ -277,7 +275,7 @@ def _import_xtr_index_cls() -> type[XTRIndex]:
     """
     existing = globals().get("XTRIndex")
     if existing is not None and existing is not Any:
-        return cast(type[XTRIndex], existing)
+        return cast("type[XTRIndex]", existing)
     module = importlib.import_module("codeintel_rev.io.xtr_manager")
     index_cls = module.XTRIndex
     globals()["XTRIndex"] = index_cls
@@ -620,9 +618,9 @@ class _ContextRuntimeState:
             Ordered collection of runtime cell name/value pairs.
         """
         return (
-            ("hybrid", cast(RuntimeCell[Any], self.hybrid)),
-            ("coderank-faiss", cast(RuntimeCell[Any], self.coderank_faiss)),
-            ("xtr", cast(RuntimeCell[Any], self.xtr)),
+            ("hybrid", cast("RuntimeCell[Any]", self.hybrid)),
+            ("coderank-faiss", cast("RuntimeCell[Any]", self.coderank_faiss)),
+            ("xtr", cast("RuntimeCell[Any]", self.xtr)),
         )
 
 
@@ -804,6 +802,13 @@ class ApplicationContext:
         Details with context fields for debugging (repo_root value, source environment
         variable) and causes application startup to fail.
 
+        Raises
+        ------
+        ConfigurationError
+            Raised when index configuration is invalid (e.g., ``nlist`` is None) or
+            when path resolution fails. The exception includes RFC 9457 Problem Details
+            with context fields for debugging.
+
         See Also
         --------
         load_settings : Loads Settings from environment variables
@@ -818,7 +823,11 @@ class ApplicationContext:
         vllm_client = VLLMClient(settings.vllm)
         faiss_manager_cls = _import_faiss_manager_cls()
         runtime_opts = _faiss_runtime_options_from_index(settings.index)
-        nlist = cast(int, settings.index.nlist)
+        nlist_value = settings.index.nlist
+        if nlist_value is None:
+            msg = "IndexConfig.nlist cannot be None during context creation"
+            raise ConfigurationError(msg)
+        nlist = nlist_value
         faiss_manager = faiss_manager_cls(
             index_path=paths.faiss_index,
             vec_dim=settings.index.vec_dim,
@@ -836,14 +845,14 @@ class ApplicationContext:
 
         # Initialize scope store for session-scoped query constraints
         redis_asyncio = cast(
-            "_redis_asyncio",
+            "ModuleType",
             gate_import("redis.asyncio", "Session scope store requires redis extra"),
         )
         redis_client = redis_asyncio.from_url(settings.redis.url)
         # redis.asyncio.Redis implements SupportsAsyncRedis protocol, but pyright
         # doesn't recognize it without explicit cast
         scope_store = ScopeStore(
-            cast(SupportsAsyncRedis, redis_client),
+            cast("SupportsAsyncRedis", redis_client),
             l1_maxsize=settings.redis.scope_l1_size,
             l1_ttl_seconds=settings.redis.scope_l1_ttl_seconds,
             l2_ttl_seconds=settings.redis.scope_l2_ttl_seconds,
@@ -1118,6 +1127,12 @@ class ApplicationContext:
         if the index path does not exist, or from `_require_dependency()`
         if the FAISS library cannot be imported.
 
+        Raises
+        ------
+        ConfigurationError
+            Raised when index configuration is invalid (e.g., ``nlist`` is None).
+            The exception includes context about the missing configuration value.
+
         See Also
         --------
         ApplicationContext._build_xtr_index : Similar pattern for XTR index
@@ -1129,7 +1144,11 @@ class ApplicationContext:
         _require_dependency("faiss", runtime=runtime, purpose="CodeRank FAISS manager")
         manager_cls = _import_faiss_manager_cls()
         runtime_opts = _faiss_runtime_options_from_index(self.settings.index)
-        nlist = cast(int, self.settings.index.nlist)
+        nlist_value = self.settings.index.nlist
+        if nlist_value is None:
+            msg = "IndexConfig.nlist cannot be None when building CodeRank FAISS manager"
+            raise ConfigurationError(msg)
+        nlist = nlist_value
         manager = manager_cls(
             index_path=index_path,
             vec_dim=vec_dim,
@@ -1392,7 +1411,7 @@ class ApplicationContext:
             raise ValueError(message)
 
         def _component_value[TOverride](name: str, default: TOverride) -> TOverride:
-            return cast(TOverride, components.get(name, default))
+            return cast("TOverride", components.get(name, default))
 
         return ApplicationContext(
             settings=settings or self.settings,

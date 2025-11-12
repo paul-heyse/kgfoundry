@@ -1,0 +1,14 @@
+{
+  "module": "cli.xtr",
+  "source": "/home/paul/kgfoundry/codeintel_rev/cli/xtr.py",
+  "exports_resolved": {},
+  "has_all": [
+    "app",
+    "main"
+  ],
+  "defs": [],
+  "parse_ok": true,
+  "errors": [],
+  "type_errors": 0,
+  "forced": false
+}

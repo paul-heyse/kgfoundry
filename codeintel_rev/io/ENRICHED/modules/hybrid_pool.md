@@ -22,10 +22,17 @@ Feature-normalized hybrid pooling utilities.
 - function: `_minmax_norm` (line 51)
 - function: `_softmax_norm` (line 62)
 - class: `HybridPoolEvaluator` (line 71)
-- function: `__init__` (line 74)
-- function: `pool` (line 85)
-- function: `_record_pool_metrics` (line 158)
+
+## Dependency Graph
+
+- **fan_in**: 1
+- **fan_out**: 1
+- **cycle_group**: 20
+
+## Declared Exports (__all__)
+
+Hit, HybridPoolEvaluator, PooledHit
 
 ## Tags
 
-overlay-needed, public-api
+public-api

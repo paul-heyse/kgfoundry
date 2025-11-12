@@ -38,28 +38,23 @@ through stable paths such as ``.../current/faiss.index`` and reload when
 
 ## Definitions
 
+- variable: `LOGGER` (line 34)
 - class: `LuceneAssets` (line 39)
-- function: `iter_dirs` (line 45)
 - function: `link_current_lucene` (line 59)
 - class: `IndexAssets` (line 72)
-- function: `ensure_exists` (line 82)
 - class: `VersionMeta` (line 111)
-- function: `to_json` (line 118)
 - class: `IndexLifecycleManager` (line 136)
-- function: `__init__` (line 139)
-- function: `current_version` (line 147)
-- function: `current_dir` (line 161)
-- function: `list_versions` (line 177)
-- function: `read_assets` (line 193)
-- function: `prepare` (line 234)
-- function: `publish` (line 308)
-- function: `rollback` (line 358)
-- function: `link_lucene_assets` (line 395)
-- function: `_write_current_pointer` (line 435)
-- function: `_maybe_dir` (line 445)
-- function: `_copy_file` (line 449)
-- function: `_copy_tree` (line 454)
+
+## Dependency Graph
+
+- **fan_in**: 5
+- **fan_out**: 2
+- **cycle_group**: 39
+
+## Declared Exports (__all__)
+
+IndexAssets, IndexLifecycleManager, LuceneAssets, VersionMeta, link_current_lucene
 
 ## Tags
 
-overlay-needed, public-api
+public-api

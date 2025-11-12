@@ -21,6 +21,8 @@ Semantic MCP tool registrations (pure move from server.py).
 - function: `semantic_search` (line 18)
 - function: `semantic_search_pro` (line 69)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 0
+- **fan_out**: 5
+- **cycle_group**: 78

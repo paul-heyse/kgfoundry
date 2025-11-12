@@ -23,43 +23,28 @@ Thread-safe runtime cell primitive for mutable subsystems.
 
 ## Definitions
 
+- variable: `T` (line 18)
+- variable: `LOGGER` (line 20)
+- variable: `InitStatus` (line 26)
+- variable: `CloseStatus` (line 27)
 - class: `RuntimeCellCloseResult` (line 31)
 - class: `RuntimeCellInitContext` (line 43)
 - class: `RuntimeCellInitResult` (line 52)
 - function: `_seed_allowed` (line 64)
 - class: `RuntimeCellObserver` (line 71)
-- function: `on_init_start` (line 74)
-- function: `on_init_end` (line 83)
-- function: `on_close_end` (line 86)
 - class: `NullRuntimeCellObserver` (line 90)
-- function: `on_init_start` (line 95)
-- function: `on_init_end` (line 105)
-- function: `on_close_end` (line 110)
 - class: `RuntimeCell` (line 117)
-- function: `__init__` (line 139)
-- function: `__repr__` (line 164)
-- function: `__bool__` (line 174)
-- function: `peek` (line 184)
-- function: `configure_observer` (line 195)
-- function: `configure_adjuster` (line 200)
-- function: `get_or_initialize` (line 208)
-- function: `seed` (line 281)
-- function: `close` (line 311)
-- function: `invalidate` (line 437)
-- function: `record_failure` (line 441)
-- function: `_resolve_disposer` (line 454)
-- function: `_run_close` (line 458)
-- function: `_run_exit` (line 466)
-- function: `_adjust_factory` (line 472)
-- function: `_capture_init_context` (line 476)
-- function: `_next_generation_locked` (line 488)
-- function: `_clear_cooldown_locked` (line 492)
-- function: `_cooldown_error_locked` (line 496)
-- function: `_wait_for_initializer` (line 505)
-- function: `_run_initializer` (line 530)
-- function: `_handle_init_success` (line 549)
-- function: `_handle_init_failure` (line 585)
+
+## Dependency Graph
+
+- **fan_in**: 3
+- **fan_out**: 5
+- **cycle_group**: 33
+
+## Declared Exports (__all__)
+
+NullRuntimeCellObserver, RuntimeCell, RuntimeCellCloseResult, RuntimeCellInitContext, RuntimeCellInitResult, RuntimeCellObserver
 
 ## Tags
 
-overlay-needed, public-api
+public-api

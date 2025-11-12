@@ -18,13 +18,9 @@ DuckDB symbol catalog writer.
 - class: `SymbolDefRow` (line 12)
 - class: `SymbolOccurrenceRow` (line 30)
 - class: `SymbolCatalog` (line 45)
-- function: `__init__` (line 48)
-- function: `ensure_schema` (line 51)
-- function: `upsert_symbol_defs` (line 125)
-- function: `bulk_insert_occurrences` (line 168)
-- function: `bulk_insert_chunk_symbols` (line 176)
-- function: `fetch_symbol_defs` (line 188)
 
-## Tags
+## Dependency Graph
 
-overlay-needed
+- **fan_in**: 3
+- **fan_out**: 1
+- **cycle_group**: 38

@@ -35,14 +35,13 @@ SPLADE artifact management, encoding, and Lucene impact index builders.
 ## Definitions
 
 - class: `_SparseEncoderProtocol` (line 30)
-- function: `encode_document` (line 53)
-- function: `encode_query` (line 86)
-- function: `decode` (line 117)
-- function: `save_pretrained` (line 161)
 - class: `_OptimizerFunction` (line 190)
-- function: `__call__` (line 191)
 - class: `_QuantizerFunction` (line 201)
-- function: `__call__` (line 202)
+- variable: `GENERATOR_NAME` (line 230)
+- variable: `ARTIFACT_METADATA_FILENAME` (line 231)
+- variable: `ENCODING_METADATA_FILENAME` (line 232)
+- variable: `INDEX_METADATA_FILENAME` (line 233)
+- variable: `logger` (line 238)
 - class: `SpladeArtifactMetadata` (line 241)
 - class: `SpladeExportSummary` (line 256)
 - class: `SpladeEncodingMetadata` (line 263)
@@ -72,24 +71,19 @@ SPLADE artifact management, encoding, and Lucene impact index builders.
 - function: `_quantize_export` (line 805)
 - function: `_persist_export_metadata` (line 871)
 - class: `SpladeArtifactsManager` (line 921)
-- function: `__init__` (line 924)
-- function: `model_dir` (line 931)
-- function: `onnx_dir` (line 942)
-- function: `export_onnx` (line 952)
 - class: `SpladeEncoderService` (line 1006)
-- function: `__init__` (line 1009)
-- function: `vectors_dir` (line 1016)
-- function: `_resolve_vectors_dir` (line 1026)
-- function: `_initialise_encoder` (line 1056)
-- function: `_build_encoder` (line 1124)
-- function: `encode_corpus` (line 1128)
-- function: `benchmark_queries` (line 1201)
 - class: `SpladeIndexManager` (line 1287)
-- function: `__init__` (line 1290)
-- function: `vectors_dir` (line 1297)
-- function: `index_dir` (line 1308)
-- function: `build_index` (line 1318)
+
+## Dependency Graph
+
+- **fan_in**: 3
+- **fan_out**: 3
+- **cycle_group**: 66
+
+## Declared Exports (__all__)
+
+SpladeArtifactMetadata, SpladeArtifactsManager, SpladeBuildOptions, SpladeEncodeOptions, SpladeEncodingMetadata, SpladeEncodingSummary, SpladeExportOptions, SpladeExportSummary, SpladeIndexManager, SpladeIndexMetadata
 
 ## Tags
 
-overlay-needed, public-api, reexport-hub
+public-api, reexport-hub

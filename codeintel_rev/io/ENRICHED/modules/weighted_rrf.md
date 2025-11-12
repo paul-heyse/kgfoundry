@@ -16,6 +16,16 @@ Weighted reciprocal rank fusion utilities.
 
 - function: `fuse_weighted_rrf` (line 10)
 
+## Dependency Graph
+
+- **fan_in**: 1
+- **fan_out**: 1
+- **cycle_group**: 62
+
+## Declared Exports (__all__)
+
+fuse_weighted_rrf
+
 ## Tags
 
-overlay-needed, public-api
+public-api

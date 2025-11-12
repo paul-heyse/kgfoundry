@@ -32,10 +32,19 @@ Example failure payload::
 
 ## Definitions
 
+- variable: `LOGGER` (line 29)
+- variable: `APP` (line 30)
+- variable: `PROBLEM_INSTANCE` (line 31)
 - function: `xtr_open` (line 53)
 - function: `_exit_with_problem` (line 165)
 - function: `main` (line 182)
 
+## Dependency Graph
+
+- **fan_in**: 0
+- **fan_out**: 5
+- **cycle_group**: 95
+
 ## Tags
 
-cli, overlay-needed
+cli

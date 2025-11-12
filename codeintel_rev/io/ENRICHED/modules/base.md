@@ -19,8 +19,17 @@ Shared reranker interfaces and request/response types.
 - class: `RerankResult` (line 21)
 - class: `RerankRequest` (line 29)
 - class: `Reranker` (line 38)
-- function: `rescore` (line 44)
+
+## Dependency Graph
+
+- **fan_in**: 2
+- **fan_out**: 1
+- **cycle_group**: 73
+
+## Declared Exports (__all__)
+
+RerankRequest, RerankResult, Reranker, ScoredDoc
 
 ## Tags
 
-overlay-needed, public-api
+public-api
