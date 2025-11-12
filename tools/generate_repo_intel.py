@@ -450,6 +450,20 @@ def collect_cst(py_files: list[Path]) -> None:
     )  # :contentReference[oaicite:8]{index=8}
 
     def to_obj(node: object, posmap: Mapping[cst.CSTNode, CodeRange]) -> JSONType:
+        """Convert a CST node to a JSON-serializable object with position metadata.
+
+        Parameters
+        ----------
+        node : object
+            CST node or primitive value to convert.
+        posmap : Mapping[cst.CSTNode, CodeRange]
+            Mapping of CST nodes to their code ranges.
+
+        Returns
+        -------
+        JSONType
+            JSON-serializable representation of the node with position information.
+        """
         if isinstance(node, cst.CSTNode):
             out: dict[str, JSONType] = {"type": node.__class__.__name__}
             rng = posmap.get(node)

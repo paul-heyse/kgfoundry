@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, MutableMapping
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -14,7 +14,6 @@ import typer
 from codeintel_rev.enrich.libcst_bridge import index_module
 from codeintel_rev.enrich.output_writers import write_json, write_jsonl, write_markdown_module
 from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
-from codeintel_rev.enrich.stitch import stitch_records
 from codeintel_rev.enrich.stubs_overlay import (
     OverlayPolicy,
     activate_overlays,
@@ -24,6 +23,9 @@ from codeintel_rev.enrich.stubs_overlay import (
 from codeintel_rev.enrich.tagging import ModuleTraits, infer_tags, load_rules
 from codeintel_rev.enrich.tree_sitter_bridge import build_outline
 from codeintel_rev.enrich.type_integration import TypeSummary, collect_pyrefly, collect_pyright
+from codeintel_rev.export_resolver import build_module_name_map, resolve_exports
+from codeintel_rev.graph_builder import build_import_graph, write_import_graph
+from codeintel_rev.uses_builder import build_use_graph, write_use_graph
 
 try:  # pragma: no cover - optional dependency
     import yaml as yaml_module  # type: ignore[import-not-found]
@@ -109,23 +111,6 @@ TYPE_ERROR_OVERLAYS = typer.Option(
 app = typer.Typer(add_completion=False, help="Repo enrichment utilities (scan + overlays).")
 
 
-@dataclass(slots=True, frozen=True)
-class ModuleRecord:
-    """Serializable row stored in modules.jsonl."""
-
-    path: str
-    docstring: str | None
-    imports: list[dict[str, Any]]
-    defs: list[dict[str, Any]]
-    exports: list[str]
-    outline_nodes: list[dict[str, Any]]
-    scip_symbols: list[str]
-    parse_ok: bool
-    errors: list[str]
-    tags: list[str]
-    type_errors: int
-
-
 @dataclass(frozen=True)
 class ScipContext:
     """Cache of SCIP lookups used during scanning."""
@@ -178,12 +163,8 @@ def scan(
         symbol_edges.extend(edges)
         for tag in row_dict["tags"]:
             tag_index.setdefault(tag, []).append(row_dict["path"])
-    module_rows = stitch_records(module_rows, scip_index, package_prefix=root.name)
-    for row in module_rows:
-        write_markdown_module(
-            out / "modules" / (Path(row["path"]).with_suffix(".md").name),
-            row,
-        )
+    package_prefix = root.name or None
+    _augment_module_rows(module_rows, scip_index, out, package_prefix)
 
     write_jsonl(out / "modules" / "modules.jsonl", module_rows)
     write_json(
@@ -366,10 +347,10 @@ def _build_module_row(
     )
     symbol_edges = [(symbol, rel) for symbol in scip_symbols]
 
-    row = ModuleRecord(
-        path=rel,
-        docstring=idx.docstring,
-        imports=[
+    row = {
+        "path": rel,
+        "docstring": idx.docstring,
+        "imports": [
             {
                 "module": entry.module,
                 "names": entry.names,
@@ -379,16 +360,64 @@ def _build_module_row(
             }
             for entry in idx.imports
         ],
-        defs=[{"kind": d.kind, "name": d.name, "lineno": d.lineno} for d in idx.defs],
-        exports=sorted(idx.exports),
-        outline_nodes=outline_nodes,
-        scip_symbols=scip_symbols,
-        parse_ok=idx.parse_ok,
-        errors=idx.errors,
-        tags=sorted(tagging.tags),
-        type_errors=type_errors,
-    )
-    return asdict(row), symbol_edges
+        "defs": [{"kind": d.kind, "name": d.name, "lineno": d.lineno} for d in idx.defs],
+        "exports": sorted(idx.exports),
+        "outline_nodes": outline_nodes,
+        "scip_symbols": scip_symbols,
+        "parse_ok": idx.parse_ok,
+        "errors": idx.errors,
+        "tags": sorted(tagging.tags),
+        "type_errors": type_errors,
+        "doc_summary": idx.doc_summary,
+        "doc_metrics": idx.doc_metrics,
+        "doc_items": idx.doc_items,
+        "annotation_ratio": idx.annotation_ratio,
+        "untyped_defs": idx.untyped_defs,
+        "side_effects": idx.side_effects,
+        "raises": idx.raises,
+        "complexity": idx.complexity,
+    }
+    return row, symbol_edges
+
+
+def _augment_module_rows(
+    module_rows: list[dict[str, Any]],
+    scip_index: SCIPIndex,
+    out: Path,
+    package_prefix: str | None,
+) -> None:
+    """Attach graph/usage/export metadata and emit module artifacts."""
+    module_name_map = build_module_name_map(module_rows, package_prefix)
+    import_graph = build_import_graph(module_rows, package_prefix)
+    use_graph = build_use_graph(scip_index)
+
+    write_import_graph(import_graph, out / "graphs" / "imports.parquet")
+    write_use_graph(use_graph, out / "graphs" / "uses.parquet")
+
+    for row in module_rows:
+        exports_resolved, reexports = resolve_exports(
+            row,
+            module_name_map,
+            package_prefix=package_prefix,
+        )
+        if exports_resolved:
+            row["exports_resolved"] = exports_resolved
+        if reexports:
+            row["reexports"] = reexports
+        path = row["path"]
+        row["fan_in"] = import_graph.fan_in.get(path, 0)
+        row["fan_out"] = import_graph.fan_out.get(path, 0)
+        row["cycle_group"] = import_graph.cycle_group.get(path, -1)
+        internal_imports = sorted(import_graph.edges.get(path, set()))
+        if internal_imports:
+            row["imports_internal"] = internal_imports
+        uses = use_graph.uses_by_file.get(path, set())
+        row["used_by_files"] = len(uses)
+        row["used_by_symbols"] = use_graph.symbol_usage.get(path, 0)
+        write_markdown_module(
+            out / "modules" / (Path(path).with_suffix(".md").name),
+            row,
+        )
 
 
 def _ensure_package_overlays(  # noqa: PLR0913

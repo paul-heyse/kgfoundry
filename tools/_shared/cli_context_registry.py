@@ -94,6 +94,20 @@ class CLIContextRegistry:
         self._context_cache: dict[str, CLIToolingContext] = {}
 
     def register(self, key: str, definition: CLIContextDefinition) -> None:
+        """Register a CLI context definition.
+
+        Parameters
+        ----------
+        key : str
+            Registry key identifying the CLI context.
+        definition : CLIContextDefinition
+            CLI context metadata definition to register.
+
+        Raises
+        ------
+        ValueError
+            If the key is invalid or a conflicting definition already exists.
+        """
         key = self._clean_key(key)
         existing = self._definitions.get(key)
         if existing is not None:
@@ -112,9 +126,43 @@ class CLIContextRegistry:
         self._context_cache.pop(key, None)
 
     def definition_for(self, key: str) -> CLIContextDefinition:
+        """Retrieve a CLI context definition by key.
+
+        Parameters
+        ----------
+        key : str
+            Registry key identifying the CLI context.
+
+        Returns
+        -------
+        CLIContextDefinition
+            The registered CLI context definition.
+
+        Raises
+        ------
+        KeyError
+            If the key is not found in the registry. Raised by ``_normalise_key``.
+        """
         return self._definitions[self._normalise_key(key)]
 
     def settings_for(self, key: str) -> CLIToolSettings:
+        """Retrieve or create CLI tool settings for a registered context.
+
+        Parameters
+        ----------
+        key : str
+            Registry key identifying the CLI context.
+
+        Returns
+        -------
+        CLIToolSettings
+            Cached or newly created CLI tool settings.
+
+        Raises
+        ------
+        KeyError
+            If the key is not found in the registry.
+        """
         key = self._normalise_key(key)
         try:
             return self._settings_cache[key]
@@ -134,6 +182,23 @@ class CLIContextRegistry:
             return settings
 
     def context_for(self, key: str) -> CLIToolingContext:
+        """Retrieve or create a CLI tooling context for a registered CLI.
+
+        Parameters
+        ----------
+        key : str
+            Registry key identifying the CLI context.
+
+        Returns
+        -------
+        CLIToolingContext
+            Cached or newly created CLI tooling context.
+
+        Raises
+        ------
+        KeyError
+            If the key is not found in the registry.
+        """
         key = self._normalise_key(key)
         try:
             return self._context_cache[key]
@@ -143,12 +208,63 @@ class CLIContextRegistry:
             return context
 
     def augment_for(self, key: str) -> AugmentMetadataModel:
+        """Retrieve augment metadata for a registered CLI.
+
+        Parameters
+        ----------
+        key : str
+            Registry key identifying the CLI context.
+
+        Returns
+        -------
+        AugmentMetadataModel
+            Augment metadata from the CLI tooling context.
+
+        Raises
+        ------
+        KeyError
+            If the key is not found in the registry.
+        """
         return self.context_for(key).augment
 
     def registry_for(self, key: str) -> RegistryMetadataModel:
+        """Retrieve registry metadata for a registered CLI.
+
+        Parameters
+        ----------
+        key : str
+            Registry key identifying the CLI context.
+
+        Returns
+        -------
+        RegistryMetadataModel
+            Registry metadata from the CLI tooling context.
+
+        Raises
+        ------
+        KeyError
+            If the key is not found in the registry.
+        """
         return self.context_for(key).registry
 
     def interface_for(self, key: str) -> RegistryInterfaceModel:
+        """Retrieve interface metadata for a registered CLI.
+
+        Parameters
+        ----------
+        key : str
+            Registry key identifying the CLI context.
+
+        Returns
+        -------
+        RegistryInterfaceModel
+            Interface metadata matching the CLI's interface ID.
+
+        Raises
+        ------
+        KeyError
+            If the key is not found or the interface ID is missing from registry.
+        """
         definition = self.definition_for(key)
         interface = self.registry_for(key).interface(definition.interface_id)
         if interface is None:
@@ -157,6 +273,23 @@ class CLIContextRegistry:
         return interface
 
     def tooling_metadata_for(self, key: str) -> ToolingMetadataModel:
+        """Retrieve combined tooling metadata for a registered CLI.
+
+        Parameters
+        ----------
+        key : str
+            Registry key identifying the CLI context.
+
+        Returns
+        -------
+        ToolingMetadataModel
+            Combined augment and registry metadata.
+
+        Raises
+        ------
+        KeyError
+            If the key is not found in the registry.
+        """
         context = self.context_for(key)
         return ToolingMetadataModel(augment=context.augment, registry=context.registry)
 
@@ -167,6 +300,27 @@ class CLIContextRegistry:
         subcommand: str,
         tokens: Sequence[str] | None = None,
     ) -> OperationOverrideModel | None:
+        """Retrieve operation override metadata for a subcommand.
+
+        Parameters
+        ----------
+        key : str
+            Registry key identifying the CLI context.
+        subcommand : str
+            Subcommand name to look up.
+        tokens : Sequence[str] | None, optional
+            Optional token sequence for override matching.
+
+        Returns
+        -------
+        OperationOverrideModel | None
+            Operation override if found, otherwise None.
+
+        Raises
+        ------
+        KeyError
+            If the key is not found in the registry.
+        """
         definition = self.definition_for(key)
         operation_id = definition.operation_map.get(subcommand)
         if operation_id is None:
@@ -207,34 +361,167 @@ REGISTRY = CLIContextRegistry()
 
 
 def register_cli(key: str, definition: CLIContextDefinition) -> None:
+    """Register a CLI context definition in the global registry.
+
+    Parameters
+    ----------
+    key : str
+        Registry key identifying the CLI context.
+    definition : CLIContextDefinition
+        CLI context metadata definition to register.
+
+    Raises
+    ------
+    ValueError
+        If the key is invalid or a conflicting definition already exists.
+    """
     REGISTRY.register(key, definition)
 
 
 def definition_for(key: str) -> CLIContextDefinition:
+    """Retrieve a CLI context definition by key from the global registry.
+
+    Parameters
+    ----------
+    key : str
+        Registry key identifying the CLI context.
+
+    Returns
+    -------
+    CLIContextDefinition
+        The registered CLI context definition.
+
+    Raises
+    ------
+    KeyError
+        If the key is not found in the registry.
+    """
     return REGISTRY.definition_for(key)
 
 
 def settings_for(key: str) -> CLIToolSettings:
+    """Retrieve CLI tool settings for a registered context from the global registry.
+
+    Parameters
+    ----------
+    key : str
+        Registry key identifying the CLI context.
+
+    Returns
+    -------
+    CLIToolSettings
+        Cached or newly created CLI tool settings.
+
+    Raises
+    ------
+    KeyError
+        If the key is not found in the registry.
+    """
     return REGISTRY.settings_for(key)
 
 
 def context_for(key: str) -> CLIToolingContext:
+    """Retrieve a CLI tooling context for a registered CLI from the global registry.
+
+    Parameters
+    ----------
+    key : str
+        Registry key identifying the CLI context.
+
+    Returns
+    -------
+    CLIToolingContext
+        Cached or newly created CLI tooling context.
+
+    Raises
+    ------
+    KeyError
+        If the key is not found in the registry.
+    """
     return REGISTRY.context_for(key)
 
 
 def augment_for(key: str) -> AugmentMetadataModel:
+    """Retrieve augment metadata for a registered CLI from the global registry.
+
+    Parameters
+    ----------
+    key : str
+        Registry key identifying the CLI context.
+
+    Returns
+    -------
+    AugmentMetadataModel
+        Augment metadata from the CLI tooling context.
+
+    Raises
+    ------
+    KeyError
+        If the key is not found in the registry.
+    """
     return REGISTRY.augment_for(key)
 
 
 def registry_for(key: str) -> RegistryMetadataModel:
+    """Retrieve registry metadata for a registered CLI from the global registry.
+
+    Parameters
+    ----------
+    key : str
+        Registry key identifying the CLI context.
+
+    Returns
+    -------
+    RegistryMetadataModel
+        Registry metadata from the CLI tooling context.
+
+    Raises
+    ------
+    KeyError
+        If the key is not found in the registry.
+    """
     return REGISTRY.registry_for(key)
 
 
 def interface_for(key: str) -> RegistryInterfaceModel:
+    """Retrieve interface metadata for a registered CLI from the global registry.
+
+    Parameters
+    ----------
+    key : str
+        Registry key identifying the CLI context.
+
+    Returns
+    -------
+    RegistryInterfaceModel
+        Interface metadata matching the CLI's interface ID.
+
+    Raises
+    ------
+    KeyError
+        If the key is not found or the interface ID is missing from registry.
+    """
     return REGISTRY.interface_for(key)
 
 
 def tooling_metadata_for(key: str) -> ToolingMetadataModel:
+    """Retrieve combined tooling metadata for a registered CLI from the global registry.
+
+    Parameters
+    ----------
+    key : str
+        Registry key identifying the CLI context.
+
+    Returns
+    -------
+    ToolingMetadataModel
+        Combined augment and registry metadata.
+
+    Raises
+    ------
+    KeyError
+        If the key is not found in the registry.
+    """
     return REGISTRY.tooling_metadata_for(key)
 
 
@@ -244,4 +531,25 @@ def operation_override_for(
     subcommand: str,
     tokens: Sequence[str] | None = None,
 ) -> OperationOverrideModel | None:
+    """Retrieve operation override metadata for a subcommand from the global registry.
+
+    Parameters
+    ----------
+    key : str
+        Registry key identifying the CLI context.
+    subcommand : str
+        Subcommand name to look up.
+    tokens : Sequence[str] | None, optional
+        Optional token sequence for override matching.
+
+    Returns
+    -------
+    OperationOverrideModel | None
+        Operation override if found, otherwise None.
+
+    Raises
+    ------
+    KeyError
+        If the key is not found in the registry.
+    """
     return REGISTRY.operation_override_for(key, subcommand=subcommand, tokens=tokens)

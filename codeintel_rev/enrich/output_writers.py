@@ -137,6 +137,98 @@ def _format_reexports(record: dict[str, object]) -> list[str]:
     return lines
 
 
+def _format_doc_metrics(record: dict[str, object]) -> list[str]:
+    lines: list[str] = []
+    summary = record.get("doc_summary")
+    if isinstance(summary, str) and summary.strip():
+        lines.append(f"- **summary**: {summary.strip()}")
+    metrics = record.get("doc_metrics")
+    if isinstance(metrics, Mapping):
+        for key in ("has_summary", "param_parity", "examples_present"):
+            value = metrics.get(key)
+            if isinstance(value, bool):
+                label = key.replace("_", " ")
+                lines.append(f"- {label}: {'yes' if value else 'no'}")
+    return lines
+
+
+def _format_typedness(record: dict[str, object]) -> list[str]:
+    lines: list[str] = []
+    ratio = record.get("annotation_ratio")
+    if isinstance(ratio, Mapping):
+        params_ratio = ratio.get("params")
+        returns_ratio = ratio.get("returns")
+        if isinstance(params_ratio, (int, float)):
+            lines.append(f"- params annotated: {params_ratio:.2f}")
+        if isinstance(returns_ratio, (int, float)):
+            lines.append(f"- returns annotated: {returns_ratio:.2f}")
+    untyped = record.get("untyped_defs")
+    if isinstance(untyped, int):
+        lines.append(f"- untyped defs: {untyped}")
+    type_errors = record.get("type_errors")
+    if isinstance(type_errors, int):
+        lines.append(f"- type errors: {type_errors}")
+    return lines
+
+
+def _format_side_effects(record: dict[str, object]) -> list[str]:
+    flags = record.get("side_effects")
+    if not isinstance(flags, Mapping):
+        return []
+    truthy = [name for name, value in flags.items() if bool(value)]
+    if not truthy:
+        return ["- none detected"]
+    return [f"- {name.replace('_', ' ')}" for name in sorted(truthy)]
+
+
+def _format_raises(record: dict[str, object]) -> list[str]:
+    raises = record.get("raises")
+    if isinstance(raises, list):
+        entries = [name for name in raises if isinstance(name, str)]
+        if entries:
+            return [", ".join(entries)]
+    return []
+
+
+def _format_complexity(record: dict[str, object]) -> list[str]:
+    complexity = record.get("complexity")
+    if not isinstance(complexity, Mapping):
+        return []
+    lines: list[str] = []
+    for key in ("branches", "cyclomatic", "loc"):
+        value = complexity.get(key)
+        if isinstance(value, int):
+            lines.append(f"- {key}: {value}")
+    return lines
+
+
+def _format_doc_items(record: dict[str, object], limit: int = 10) -> list[str]:
+    items = record.get("doc_items")
+    if not isinstance(items, list):
+        return []
+    lines: list[str] = []
+    for entry in items[:limit]:
+        if not isinstance(entry, Mapping):
+            continue
+        name = entry.get("name")
+        kind = entry.get("kind")
+        summary = entry.get("doc_summary") or ""
+        has_summary = entry.get("doc_has_summary")
+        parity = entry.get("doc_param_parity")
+        examples = entry.get("doc_examples_present")
+        parts = []
+        if isinstance(has_summary, bool):
+            parts.append(f"summary={'yes' if has_summary else 'no'}")
+        if isinstance(parity, bool):
+            parts.append(f"params={'ok' if parity else 'mismatch'}")
+        if isinstance(examples, bool):
+            parts.append(f"examples={'yes' if examples else 'no'}")
+        descriptor = ", ".join(parts)
+        summary_text = f" — {summary}" if summary else ""
+        lines.append(f"- `{name}` ({kind}): {descriptor}{summary_text}")
+    return lines
+
+
 def write_markdown_module(path: str | Path, record: dict[str, object]) -> None:
     """Emit a human-friendly Markdown summary for a module record."""
     target = Path(path)
@@ -151,6 +243,12 @@ def write_markdown_module(path: str | Path, record: dict[str, object]) -> None:
     _append_section(sections, "Declared Exports (__all__)", _format_exports(record))
     _append_section(sections, "Resolved Star Imports", _format_exports_resolved(record))
     _append_section(sections, "Re-exports", _format_reexports(record))
+    _append_section(sections, "Doc Metrics", _format_doc_metrics(record))
+    _append_section(sections, "Typedness", _format_typedness(record))
+    _append_section(sections, "Side Effects", _format_side_effects(record))
+    _append_section(sections, "Raises", _format_raises(record))
+    _append_section(sections, "Complexity", _format_complexity(record))
+    _append_section(sections, "Doc Coverage", _format_doc_items(record))
 
     tags = record.get("tags") or []
     if isinstance(tags, list) and tags:

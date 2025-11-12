@@ -524,6 +524,7 @@ runtime-evaluated-base-classes = [
 "codeintel_rev/runtime/cells.py" = ["DOC502"]  # Exception re-raised via bare `raise` from factory/disposer
 "tools/repo_scan.py" = ["BLE001"]  # Best-effort file counting; any I/O error is acceptable
 "tools/_shared/cli_runtime.py" = ["DOC502"]  # Exception re-raised via variable `raise error`; types already documented
+"tools/_shared/cli_context_registry.py" = ["DOC502"]  # Exceptions raised through helper methods (_normalise_key, REGISTRY methods); correctly documented
 "tools/_shared/metrics.py" = ["DOC502"]
 "tools/docs/observability.py" = ["DOC502"]
 "tools/navmap/observability.py" = ["DOC502"]

@@ -205,7 +205,7 @@ class RuntimeCell[T]:
         with self._condition:
             self._adjuster = adjuster
 
-    def get_or_initialize(self, factory: Callable[[], T]) -> T:  # noqa: DOC503
+    def get_or_initialize(self, factory: Callable[[], T]) -> T:
         """Return or initialize the payload with single-flight semantics.
 
         Extended Summary

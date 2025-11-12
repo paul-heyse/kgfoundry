@@ -1378,6 +1378,13 @@ def _dfs_finish_order(graph: dict[str, list[str]]) -> list[str]:
     order: list[str] = []
 
     def dfs(node: str) -> None:
+        """Perform depth-first search traversal starting from a node.
+
+        Parameters
+        ----------
+        node : str
+            Starting node for the DFS traversal.
+        """
         seen.add(node)
         for neighbor in graph.get(node, []):
             if neighbor not in seen:

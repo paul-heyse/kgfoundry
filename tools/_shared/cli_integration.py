@@ -71,8 +71,34 @@ def cli_operation(
     def deco(
         fn: Callable[Concatenate[CliContext, EnvelopeBuilder, P], R],
     ) -> Callable[P, R]:
+        """Decorate a function to inject CLI context and envelope builder.
+
+        Parameters
+        ----------
+        fn : Callable[Concatenate[CliContext, EnvelopeBuilder, P], R]
+            Function to wrap that accepts CLI context and envelope builder.
+
+        Returns
+        -------
+        Callable[P, R]
+            Wrapped function that receives context and envelope builder automatically.
+        """
         @functools.wraps(fn)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            """Execute the wrapped function with CLI context and envelope builder.
+
+            Parameters
+            ----------
+            *args : P.args
+                Positional arguments passed to the wrapped function.
+            **kwargs : P.kwargs
+                Keyword arguments passed to the wrapped function.
+
+            Returns
+            -------
+            R
+                Return value from the wrapped function.
+            """
             route = current_route()
             cfg = CliRunConfig(
                 command_path=route,

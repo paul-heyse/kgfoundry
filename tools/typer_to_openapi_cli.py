@@ -442,21 +442,61 @@ class _OperationDescriptor:
 
     @property
     def kebab_tokens(self) -> tuple[str, ...]:
+        """Return command tokens converted to kebab-case.
+
+        Returns
+        -------
+        tuple[str, ...]
+            Tokens in kebab-case format (e.g., "build-artifacts").
+        """
         return tuple(snake_to_kebab(token) for token in self.tokens)
 
     @property
     def path(self) -> str:
+        """Return the OpenAPI path for this CLI operation.
+
+        Returns
+        -------
+        str
+            Path string prefixed with "/cli/" and tokens in kebab-case.
+        """
         return "/cli/" + "/".join(snake_to_kebab(token) for token in self.tokens)
 
     @property
     def operation_id(self) -> str:
+        """Return the OpenAPI operation ID for this CLI command.
+
+        Returns
+        -------
+        str
+            Operation ID prefixed with "cli." and using dot-separated tokens.
+        """
         return "cli." + ".".join(self.tokens)
 
     @property
     def default_tag(self) -> str:
+        """Return the default OpenAPI tag for this operation.
+
+        Returns
+        -------
+        str
+            First token from the command tokens, used as the default tag.
+        """
         return self.tokens[0]
 
     def summary(self, op_meta: JSONMapping) -> str:
+        """Extract or generate a summary string for the operation.
+
+        Parameters
+        ----------
+        op_meta : JSONMapping
+            Operation metadata dictionary that may contain a "summary" key.
+
+        Returns
+        -------
+        str
+            Summary string from metadata, short help, first line of help text, or default.
+        """
         summary_value = op_meta.get("summary") or self.short_help
         if summary_value:
             return str(summary_value).strip()
@@ -465,6 +505,18 @@ class _OperationDescriptor:
         return "Run CLI command"
 
     def description(self, op_meta: JSONMapping) -> str:
+        """Extract or generate a description string for the operation.
+
+        Parameters
+        ----------
+        op_meta : JSONMapping
+            Operation metadata dictionary that may contain a "description" key.
+
+        Returns
+        -------
+        str
+            Description string from metadata or full help text.
+        """
         return str(op_meta.get("description") or self.help_text)
 
 

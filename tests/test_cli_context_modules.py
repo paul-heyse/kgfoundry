@@ -1,3 +1,9 @@
+"""Tests for CLI context module helpers.
+
+This module verifies that CLI context helpers work correctly for registered
+CLI modules, including download, orchestration, and optional codeintel modules.
+"""
+
 from __future__ import annotations
 
 import importlib
@@ -17,18 +23,35 @@ else:
 
 
 def _assert_settings(module, settings: CLIToolSettings) -> None:
+    """Assert that settings match the module's CLI configuration.
+
+    Parameters
+    ----------
+    module
+        Module object containing CLI_INTERFACE_ID and CLI_TITLE attributes.
+    settings : CLIToolSettings
+        Settings object to validate.
+    """
     assert isinstance(settings, CLIToolSettings)
     assert settings.interface_id == module.CLI_INTERFACE_ID
     assert settings.title == module.CLI_TITLE
 
 
 def _assert_context(context: CLIToolingContext) -> None:
+    """Assert that context has required attributes.
+
+    Parameters
+    ----------
+    context : CLIToolingContext
+        Context object to validate.
+    """
     assert isinstance(context, CLIToolingContext)
     assert hasattr(context, "augment")
     assert hasattr(context, "registry")
 
 
 def test_download_cli_context_helpers() -> None:
+    """Test download CLI context helper functions."""
     settings = download_context.get_cli_settings()
     _assert_settings(download_context, settings)
 
@@ -40,6 +63,7 @@ def test_download_cli_context_helpers() -> None:
 
 
 def test_orchestration_cli_context_helpers() -> None:
+    """Test orchestration CLI context helper functions."""
     settings = orchestration_context.get_cli_settings()
     _assert_settings(orchestration_context, settings)
 
