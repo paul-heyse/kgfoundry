@@ -540,8 +540,7 @@ codeintel indexctl publish --version v1
 
 - **Ruff vs Black conflicts**: We use **Ruff only**; remove Black changes, re-run Ruff.
 - **Third‑party typing gaps**: prefer small typed facades (`Protocol`, `TypedDict`) or `stubs/` alongside the stub configuration in `pyrightconfig.jsonc`, not `Any`.
-- **Docs drift keeps appearing**: run `make artifacts` from a **clean** tree; ensure `docs/_build/**` isn’t ignored; commit regenerated files.
-- **Editor links open wrong path**: verify `PATH_MAP` and `EDITOR_URI_TEMPLATE`; rebuild artifacts.
+- **Editor links open wrong path**: verify `PATH_MAP` and `EDITOR_URI_TEMPLATE` configuration.
 - **Slow CI**: check cache restore logs for `uv`, `ruff`, `pyright`. If keys miss, verify `uv.lock` & Python version detection step.
 
 ---

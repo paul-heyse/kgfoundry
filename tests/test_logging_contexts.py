@@ -11,11 +11,11 @@ import logging
 from io import StringIO
 from typing import TYPE_CHECKING, cast
 
-from tools.docstring_builder.models import (
-    CLI_SCHEMA_ID,
-    CLI_SCHEMA_VERSION,
-    make_cli_result,
-    make_error_report,
+from tools._shared.cli import (
+    CLI_ENVELOPE_SCHEMA_ID,
+    CLI_ENVELOPE_SCHEMA_VERSION,
+    CliErrorEntry,
+    new_cli_envelope,
 )
 
 from kgfoundry_common.logging import (
@@ -29,12 +29,9 @@ from kgfoundry_common.logging import (
 from tests.helpers import assert_frozen_attribute
 
 if TYPE_CHECKING:
-    from tools.docstring_builder.models import CliResultOptionalFields
-
     from kgfoundry_common.problem_details import ProblemDetails
 else:  # pragma: no cover - runtime stand-in for typing alias
     ProblemDetails = dict[str, object]
-    CliResultOptionalFields = dict[str, object]
 
 
 class TestLogContextExtraImmutability:
@@ -194,75 +191,57 @@ class TestSafeAccessorPatterns:
         assert "operation" in data
 
 
-class TestErrorReportConstructor:
-    """Test safe construction of ErrorReport with Required/NotRequired fields."""
+class TestCliErrorEntryConstructor:
+    """Test safe construction of CliErrorEntry."""
 
-    def test_make_error_report_with_required_fields(self) -> None:
-        """Helper ensures all required fields are set."""
-        error = make_error_report(file="test.py", status="error", message="Failed to build")
+    def test_cli_error_entry_with_required_fields(self) -> None:
+        """CliErrorEntry ensures all required fields are set."""
+        error = CliErrorEntry(status="error", message="Failed to build")
 
-        assert error["file"] == "test.py"
-        assert error["status"] == "error"
-        assert error["message"] == "Failed to build"
-        assert "problem" not in error
+        assert error.status == "error"
+        assert error.message == "Failed to build"
+        assert error.file is None or isinstance(error.file, str)
 
-    def test_make_error_report_with_optional_problem(self) -> None:
-        """Optional problem field can be included."""
-        problem = cast(
-            "ProblemDetails",
-            {
-                "type": "https://kgfoundry.dev/problems/internal-error",
-                "title": "Internal Error",
-                "status": 500,
-                "detail": "Failed",
-            },
-        )
-        error = make_error_report(
-            file="test.py",
-            status="error",
-            message="Failed",
-            problem=problem,
-        )
+    def test_cli_error_entry_with_optional_file(self) -> None:
+        """Optional file field can be included."""
+        error = CliErrorEntry(status="error", message="Failed", file="test.py")
 
-        assert error.get("problem") == problem
+        assert error.file == "test.py"
+        assert error.status == "error"
+        assert error.message == "Failed"
 
 
-class TestCliResultConstructor:
-    """Test safe construction of CliResult with explicit required/optional fields."""
+class TestCliEnvelopeConstructor:
+    """Test safe construction of CliEnvelope with explicit required/optional fields."""
 
-    def test_make_cli_result_minimal(self) -> None:
+    def test_new_cli_envelope_minimal(self) -> None:
         """Helper with minimal required fields only."""
-        result = make_cli_result(status="success", command="build")
+        envelope = new_cli_envelope(command="build", status="success")
 
-        assert result["schemaVersion"] == CLI_SCHEMA_VERSION
-        assert result["schemaId"] == CLI_SCHEMA_ID
-        assert result["status"] == "success"
-        assert result["command"] == "build"
-        assert "generatedAt" in result
-        # Optional fields should not be present
-        assert "subcommand" not in result
+        assert envelope.schema_version == CLI_ENVELOPE_SCHEMA_VERSION
+        assert envelope.schema_id == CLI_ENVELOPE_SCHEMA_ID
+        assert envelope.status == "success"
+        assert envelope.command == "build"
+        assert envelope.generated_at is not None
+        # Optional fields should have defaults
+        assert not envelope.subcommand
 
-    def test_make_cli_result_with_optionals(self) -> None:
-        """Helper includes optional fields when provided."""
-        optional: CliResultOptionalFields = {
-            "subcommand": "docstrings",
-            "durationSeconds": 1.5,
-        }
-        result = make_cli_result(status="success", command="build", optional=optional)
+    def test_new_cli_envelope_with_subcommand(self) -> None:
+        """Helper includes subcommand when provided."""
+        envelope = new_cli_envelope(command="build", status="success", subcommand="docstrings")
 
-        assert result["status"] == "success"
-        assert result.get("subcommand") == "docstrings"
-        assert result.get("durationSeconds") == 1.5
+        assert envelope.status == "success"
+        assert envelope.subcommand == "docstrings"
 
-    def test_make_cli_result_datetime_generated(self) -> None:
+    def test_new_cli_envelope_datetime_generated(self) -> None:
         """Helper automatically generates current timestamp."""
-        result = make_cli_result(status="success", command="build")
+        envelope = new_cli_envelope(command="build", status="success")
 
         # generatedAt is ISO format string
-        assert isinstance(result["generatedAt"], str)
-        assert "T" in result["generatedAt"]  # ISO format
+        assert isinstance(envelope.generated_at, str)
+        assert "T" in envelope.generated_at  # ISO format
         # UTC timezone indicated by +00:00 or Z suffix
-        assert result["generatedAt"].endswith(("+00:00", "Z"))
+        assert envelope.generated_at.endswith(("+00:00", "Z"))
 
 
 class TestObservabilityIntegration:

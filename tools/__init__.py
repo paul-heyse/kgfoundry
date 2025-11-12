@@ -110,11 +110,6 @@ if TYPE_CHECKING:
 
     from tools import (
         codemods,
-        docs,
-        docstring_builder,
-        gen_readmes,
-        generate_pr_summary,
-        navmap,
     )
 
 logging.getLogger(__name__).addHandler(logging.NullHandler())
@@ -202,11 +197,6 @@ PUBLIC_EXPORTS: Final[Mapping[str, object]] = MappingProxyType(_PUBLIC_EXPORTS)
 _MODULE_EXPORTS: dict[str, str] = {
     "cli_context_registry": "tools.cli_context_registry",
     "codemods": "tools.codemods",
-    "docs": "tools.docs",
-    "docstring_builder": "tools.docstring_builder",
-    "gen_readmes": "tools.gen_readmes",
-    "generate_pr_summary": "tools.generate_pr_summary",
-    "navmap": "tools.navmap",
 }
 
 MODULE_EXPORTS: Final[Mapping[str, str]] = MappingProxyType(_MODULE_EXPORTS)
@@ -258,16 +248,11 @@ __all__: tuple[str, ...] = (
     "cli_operation",
     "cli_run",
     "codemods",
-    "docs",
-    "docstring_builder",
     "emitter",
-    "gen_readmes",
-    "generate_pr_summary",
     "get_logger",
     "get_process_runner",
     "get_runtime_settings",
     "logging",
-    "navmap",
     "new_cli_envelope",
     "normalize_route",
     "normalize_token",

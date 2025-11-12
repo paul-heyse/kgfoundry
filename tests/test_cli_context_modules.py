@@ -4,12 +4,9 @@ import importlib
 from typing import Any, cast
 
 import pytest
-from docs import cli_context as docs_cli_context
 from src.download import cli_context as download_context
 from src.orchestration import cli_context as orchestration_context
 from tools import CLIToolingContext, CLIToolSettings, OperationOverrideModel
-from tools.docstring_builder import cli_context as docstrings_context
-from tools.navmap import cli_context as navmap_context
 
 try:
     codeintel_module = importlib.import_module("codeintel.cli_context")
@@ -65,36 +62,3 @@ def test_codeintel_cli_context_helpers() -> None:
 
     override = codeintel_context.get_operation_override("symbols")
     assert override is None or isinstance(override, OperationOverrideModel)
-
-
-def test_navmap_cli_context_helpers() -> None:
-    settings = navmap_context.get_cli_settings()
-    _assert_settings(navmap_context, settings)
-
-    context = navmap_context.get_cli_context()
-    _assert_context(context)
-
-    assert navmap_context.get_operation_override("unknown") is None
-
-
-def test_docstrings_cli_context_helpers() -> None:
-    settings = docstrings_context.get_cli_settings()
-    _assert_settings(docstrings_context, settings)
-
-    context = docstrings_context.get_cli_context()
-    _assert_context(context)
-
-    override = docstrings_context.get_operation_override("generate")
-    assert override is None or isinstance(override, OperationOverrideModel)
-
-
-def test_docs_scripts_cli_multi_command_support() -> None:
-    default_settings = docs_cli_context.get_cli_settings()
-    _assert_settings(docs_cli_context, default_settings)
-
-    symbol_settings = docs_cli_context.get_cli_settings("docs-build-symbol-index")
-    assert symbol_settings.bin_name == "docs-build-symbol-index"
-    assert symbol_settings.interface_id == "docs-symbol-index-cli"
-
-    with pytest.raises(KeyError):
-        docs_cli_context.get_cli_settings("unknown-docs-cli")

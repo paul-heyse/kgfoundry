@@ -2,23 +2,22 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from pathlib import Path
 
-from tools.make_importlinter import main as generate_importlinter
-
-if TYPE_CHECKING:
-    from pathlib import Path
+# make_importlinter module removed - import-linter config is now static
+# See importlinter.cfg and tools/lint/importlinter.typing.ini
 
 
 def run() -> Path:
-    """Generate the configuration and run import-linter in check mode.
+    """Return path to static import-linter configuration.
 
     Returns
     -------
     Path
-        Path to the generated import-linter configuration file.
+        Path to the import-linter configuration file.
     """
-    return generate_importlinter(check=True)
+    # Static config file location
+    return Path("importlinter.cfg")
 
 
 if __name__ == "__main__":  # pragma: no cover

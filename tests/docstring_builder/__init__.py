@@ -1,1 +1,0 @@
-"""Docstring builder test package."""
