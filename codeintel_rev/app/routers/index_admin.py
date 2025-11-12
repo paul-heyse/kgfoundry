@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TypedDict
+from typing import TypedDict, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.errors import RuntimeLifecycleError
 from codeintel_rev.indexing.index_lifecycle import IndexAssets
+from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.runtime.factory_adjustment import DefaultFactoryAdjuster
 from kgfoundry_common.logging import get_logger
 
@@ -37,13 +38,14 @@ def _context(request: Request) -> ApplicationContext:
 async def _persist_session_tuning(
     ctx: ApplicationContext, session_id: str, overrides: dict[str, float | int]
 ) -> dict[str, float | int]:
-    scope = await ctx.scope_store.get(session_id) or {}
-    updated_scope = dict(scope)
-    existing = dict(updated_scope.get("faiss_tuning") or {})
-    existing.update(overrides)
-    updated_scope["faiss_tuning"] = existing
-    await ctx.scope_store.set(session_id, updated_scope)
-    return existing
+    scope = await ctx.scope_store.get(session_id)
+    scope_dict = cast("ScopeIn", {} if scope is None else dict(scope))
+    tuning = dict(cast("dict[str, float]", scope_dict.get("faiss_tuning") or {}))
+    normalized_overrides = {key: float(value) for key, value in overrides.items()}
+    tuning.update(normalized_overrides)
+    scope_dict["faiss_tuning"] = tuning
+    await ctx.scope_store.set(session_id, scope_dict)
+    return dict(normalized_overrides)
 
 
 @router.get("/status")
@@ -480,7 +482,7 @@ async def faiss_runtime_reset_endpoint(
     if session_id:
         scope = await ctx.scope_store.get(session_id)
         if scope:
-            updated = dict(scope)
+            updated = cast("ScopeIn", dict(scope))
             updated.pop("faiss_tuning", None)
             await ctx.scope_store.set(session_id, updated)
         return JSONResponse({"session_id": session_id, "faiss_tuning": None})

@@ -36,6 +36,39 @@ _RUNTIME = "index-lifecycle"
 
 
 @dataclass(slots=True, frozen=True)
+class LuceneAssets:
+    """Lucene index directories that should flip atomically."""
+
+    bm25_dir: Path | None = None
+    splade_dir: Path | None = None
+
+    def iter_dirs(self) -> Iterable[tuple[str, Path]]:
+        """Yield component name/path pairs for present Lucene assets.
+
+        Yields
+        ------
+        tuple[str, Path]
+            Component identifier and source directory.
+        """
+        if self.bm25_dir is not None:
+            yield ("bm25", self.bm25_dir)
+        if self.splade_dir is not None:
+            yield ("splade", self.splade_dir)
+
+
+def link_current_lucene(base_dir: Path, version: str, assets: LuceneAssets) -> None:
+    """Copy Lucene assets into a version directory and flip the CURRENT pointer.
+
+    Notes
+    -----
+    This helper delegates to :meth:`IndexLifecycleManager.link_lucene_assets` and
+    will surface any lifecycle errors raised by that method.
+    """
+    manager = IndexLifecycleManager(base_dir)
+    manager.link_lucene_assets(version, assets)
+
+
+@dataclass(slots=True, frozen=True)
 class IndexAssets:
     """File-system assets that must advance together for one index version."""
 
@@ -359,6 +392,45 @@ class IndexLifecycleManager:
         self._write_current_pointer(version, candidate)
         LOGGER.info("index.rollback.complete", extra={"version": version})
 
+    def link_lucene_assets(self, version: str, assets: LuceneAssets) -> Path:
+        """Publish Lucene-only assets under ``version`` and flip CURRENT pointer.
+
+        Parameters
+        ----------
+        version : str
+            Version identifier that should become active.
+        assets : LuceneAssets
+            Collection of Lucene directories to copy into the lifecycle root.
+
+        Returns
+        -------
+        Path
+            Path to the published version directory.
+
+        Raises
+        ------
+        RuntimeLifecycleError
+            If any of the source directories are missing.
+        """
+        target_dir = self.versions_dir / version
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        for name, src in assets.iter_dirs():
+            if not src.exists():
+                message = f"lucene source missing: {src}"
+                raise RuntimeLifecycleError(message, runtime=_RUNTIME)
+            dst = target_dir / f"lucene_{name}"
+            if dst.exists():
+                shutil.rmtree(dst)
+            shutil.copytree(src, dst)
+
+        self._write_current_pointer(version, target_dir)
+        LOGGER.info(
+            "index.link_lucene_assets",
+            extra={"version": version, "assets": [name for name, _ in assets.iter_dirs()]},
+        )
+        return target_dir
+
     # ------------------------------------------------------------------ internals
     def _write_current_pointer(self, version: str, target_dir: Path) -> None:
         tmp = self.current_file.with_suffix(".tmp")
@@ -387,4 +459,10 @@ class IndexLifecycleManager:
         shutil.copytree(src, dst, dirs_exist_ok=False)
 
 
-__all__ = ["IndexAssets", "IndexLifecycleManager", "VersionMeta"]
+__all__ = [
+    "IndexAssets",
+    "IndexLifecycleManager",
+    "LuceneAssets",
+    "VersionMeta",
+    "link_current_lucene",
+]

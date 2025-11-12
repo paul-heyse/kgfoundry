@@ -74,6 +74,19 @@ def _thaw(target: object, **updates: object) -> None:
 
 @dataclass(slots=True, frozen=True)
 class _ObservabilityCache:
+    """Internal cache for observability singletons.
+
+    Caches provider and registry instances to avoid repeated initialization.
+    Used internally by default() and get_metrics_registry() methods.
+
+    Attributes
+    ----------
+    provider : MetricsProvider | None
+        Cached metrics provider instance, or None if not yet initialized.
+    registry : MetricsRegistry | None
+        Cached metrics registry instance, or None if not yet initialized.
+    """
+
     provider: MetricsProvider | None = None
     registry: MetricsRegistry | None = None
 
@@ -121,6 +134,7 @@ class MetricsProvider:
     _registry: CollectorRegistry | None = field(default=None, repr=False)
 
     def __init__(self, registry: CollectorRegistry | None = None) -> None:
+        """Initialize the metrics provider. See class docstring for full details."""
         resolved_registry = cast("CollectorRegistry | None", registry or get_default_registry())
         histogram = build_histogram(
             "kgfoundry_operation_duration_seconds",
@@ -216,6 +230,7 @@ class MetricsRegistry:
         namespace: str = "kgfoundry",
         registry: CollectorRegistry | None = None,
     ) -> None:
+        """Initialize the metrics registry. See class docstring for full details."""
         resolved_registry = cast("CollectorRegistry | None", registry or get_default_registry())
         metric_prefix = namespace.replace("-", "_")
         labels = ("operation", "status")
@@ -311,6 +326,19 @@ class _DurationObservationContext:
         component: str,
         correlation_id: str | None,
     ) -> None:
+        """Initialize the duration observation context.
+
+        Parameters
+        ----------
+        metrics : MetricsProvider
+            Metrics provider instance for recording observations.
+        operation : str
+            Operation name being observed.
+        component : str
+            Component name executing the operation.
+        correlation_id : str | None
+            Correlation ID for tracing across services.
+        """
         self._observation = DurationObservation(
             metrics=metrics,
             operation=operation,
@@ -319,6 +347,13 @@ class _DurationObservationContext:
         )
 
     def __enter__(self) -> DurationObservation:
+        """Enter the observation context and return the observation instance.
+
+        Returns
+        -------
+        DurationObservation
+            Observation instance for marking success/error and recording metrics.
+        """
         return self._observation
 
     def __exit__(
@@ -327,6 +362,22 @@ class _DurationObservationContext:
         exc: BaseException | None,
         _tb: types.TracebackType | None,
     ) -> bool:
+        """Exit the observation context and finalize metrics.
+
+        Parameters
+        ----------
+        exc_type : type[BaseException] | None
+            Exception type if raised, None otherwise.
+        exc : BaseException | None
+            Exception instance if raised, None otherwise.
+        _tb : types.TracebackType | None
+            Exception traceback if raised, None otherwise.
+
+        Returns
+        -------
+        bool
+            False to propagate exceptions (does not suppress).
+        """
         if exc_type is not None:
             self._observation.mark_error()
         _finalise_observation(self._observation)
@@ -373,6 +424,22 @@ def observe_duration(
 
 
 def _finalise_observation(observation: DurationObservation) -> None:
+    """Finalize observation by recording metrics and structured logs.
+
+    Records the operation duration, increments counters, and logs structured
+    log entries with correlation ID, operation name, status, and duration.
+
+    Parameters
+    ----------
+    observation : DurationObservation
+        Observation instance to finalize. Must have status set (success or error).
+
+    Notes
+    -----
+    This function is called automatically when exiting the observation context.
+    It records Prometheus metrics (counter and histogram) and emits structured
+    log entries with operation metadata.
+    """
     duration = observation.duration_seconds()
     observation.metrics.runs_total.labels(
         component=observation.component,

@@ -20,8 +20,9 @@ class _StubFAISSManager:
         runtime: object | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
         del query, nprobe, runtime
-        ids = np.array([[101]], dtype=np.int64)
-        distances = np.array([[0.9]], dtype=np.float32)
+        result_k = max(1, int(k or 1))
+        ids = np.full((1, result_k), 101, dtype=np.int64)
+        distances = np.full((1, result_k), 0.9, dtype=np.float32)
         return distances, ids
 
 
@@ -75,7 +76,7 @@ def test_scip_coverage_reports_full_metrics(tmp_path: Path) -> None:
     duckdb_manager = _prepare_catalog(Path(paths.duckdb_path))
     evaluator = SCIPCoverageEvaluator(
         settings=settings,
-        paths=paths,
+        repo_root=paths.repo_root,
         duckdb_manager=duckdb_manager,
         faiss_manager=_StubFAISSManager(),
         vllm_client=_StubVLLMClient(),

@@ -6,6 +6,7 @@ import json
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -19,6 +20,9 @@ from codeintel_rev.metrics.registry import (
     OFFLINE_EVAL_RECALL_AT_K,
 )
 from kgfoundry_common.logging import get_logger
+
+if TYPE_CHECKING:
+    from codeintel_rev.app.config_context import ResolvedPaths
 
 LOGGER = get_logger(__name__)
 
@@ -40,13 +44,14 @@ class OfflineRecallEvaluator:
         self,
         *,
         settings: Settings,
-        paths: PathsConfig,
+        paths: PathsConfig | ResolvedPaths,
         faiss_manager: FAISSManager,
         vllm_client: VLLMClient,
         duckdb_manager: DuckDBManager,
     ) -> None:
         self._settings = settings
-        self._paths = paths
+        repo_root_value = cast("str | Path", paths.repo_root)
+        self._repo_root = Path(repo_root_value)
         self._faiss = faiss_manager
         self._vllm = vllm_client
         self._symbol_catalog = SymbolCatalog(duckdb_manager)
@@ -128,7 +133,7 @@ class OfflineRecallEvaluator:
     def _resolve_output_dir(self, raw: str | Path) -> Path:
         path = Path(raw)
         if not path.is_absolute():
-            path = Path(self._paths.repo_root) / path
+            path = self._repo_root / path
         path.mkdir(parents=True, exist_ok=True)
         return path
 

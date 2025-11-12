@@ -44,6 +44,18 @@ logger = get_logger(__name__)
 
 
 def _load_cloudpickle_dumps() -> Callable[[object], bytes] | None:
+    """Load cloudpickle.dumps function if available.
+
+    Attempts to import cloudpickle from either the shim module or the
+    standard cloudpickle package. Returns the dumps function if found,
+    None otherwise.
+
+    Returns
+    -------
+    Callable[[object], bytes] | None
+        cloudpickle.dumps function if available, None if cloudpickle
+        is not installed.
+    """
     candidate_modules = (
         "kgfoundry_common.cloudpickle_shim",
         "cloudpickle",
@@ -103,11 +115,18 @@ class UnsafeSerializationError(ValueError):
     """
 
     def __init__(self, message: str, reason: str | None = None) -> None:
+        """Initialize the unsafe serialization error. See class docstring for full details."""
         super().__init__(message)
         self.reason = reason
 
 
 class _UnpicklerProtocol(Protocol):
+    """Protocol for unpickler interface used by safe pickle implementation.
+
+    This protocol defines the interface for unpickler instances that can
+    deserialize pickle streams with allow-list validation.
+    """
+
     def __init__(
         self,
         file: BinaryIO,
@@ -116,7 +135,23 @@ class _UnpicklerProtocol(Protocol):
         encoding: str = ...,
         errors: str = ...,
         buffers: object | None = ...,
-    ) -> None: ...
+    ) -> None:
+        """Initialize unpickler with file handle.
+
+        Parameters
+        ----------
+        file : BinaryIO
+            Binary file handle to read from.
+        fix_imports : bool, optional
+            Whether to fix imports for Python 2 compatibility.
+        encoding : str, optional
+            Text encoding for Python 2 compatibility.
+        errors : str, optional
+            Error handling mode for encoding.
+        buffers : object | None, optional
+            Buffer protocol support.
+        """
+        ...
 
     def load(self) -> object:
         """Load and return unpickled object.
@@ -147,6 +182,19 @@ class _UnpicklerProtocol(Protocol):
 
 
 class _PickleModule(Protocol):
+    """Protocol for pickle module interface.
+
+    This protocol defines the interface for pickle modules (stdlib or cloudpickle)
+    used for serialization. Provides Unpickler class and PicklingError exception.
+
+    Attributes
+    ----------
+    Unpickler : type[_UnpicklerProtocol]
+        Unpickler class for deserialization.
+    PicklingError : type[Exception]
+        Exception type raised on pickling errors.
+    """
+
     Unpickler: type[_UnpicklerProtocol]
 
     PicklingError: type[Exception]
@@ -192,7 +240,23 @@ if TYPE_CHECKING:
             encoding: str = ...,
             errors: str = ...,
             buffers: object | None = ...,
-        ) -> None: ...
+        ) -> None:
+            """Initialize stdlib unpickler with file handle.
+
+            Parameters
+            ----------
+            file : BinaryIO
+                Binary file handle to read from.
+            fix_imports : bool, optional
+                Whether to fix imports for Python 2 compatibility.
+            encoding : str, optional
+                Text encoding for Python 2 compatibility.
+            errors : str, optional
+                Error handling mode for encoding.
+            buffers : object | None, optional
+                Buffer protocol support.
+            """
+            ...
 
         def load(self) -> object:
             """Load and return unpickled object.
@@ -225,6 +289,13 @@ if TYPE_CHECKING:
 else:  # pragma: no cover - runtime import keeps Ruff S403 quiet
 
     def _load_stdlib_pickle() -> _PickleModule:
+        """Load stdlib pickle module.
+
+        Returns
+        -------
+        _PickleModule
+            Pickle module instance with Unpickler and PicklingError.
+        """
         module_name = "_pickle"
         return cast("_PickleModule", import_module(module_name))
 
@@ -263,6 +334,7 @@ class _SafeUnpickler(_StdlibUnpickler):
         errors: str = "strict",
         buffers: object | None = None,
     ) -> None:
+        """Initialize the safe unpickler. See class docstring for full details."""
         super().__init__(
             file,
             fix_imports=fix_imports,
@@ -408,6 +480,7 @@ class SignedPickleWrapper:
     """
 
     def __init__(self, signing_key: bytes) -> None:
+        """Initialize the signed pickle wrapper. See class docstring for full details."""
         if len(signing_key) < _MIN_SIGNING_KEY_BYTES:
             logger.warning("Signing key < 32 bytes; consider using a longer key")
         self.signing_key = signing_key

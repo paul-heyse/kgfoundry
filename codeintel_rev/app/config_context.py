@@ -62,9 +62,10 @@ from codeintel_rev.evaluation.offline_recall import OfflineRecallEvaluator
 from codeintel_rev.indexing.index_lifecycle import IndexLifecycleManager
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.duckdb_manager import DuckDBManager
-from codeintel_rev.io.faiss_manager import FAISSManager
+from codeintel_rev.io.faiss_manager import FAISSManager, FAISSRuntimeOptions
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.vllm_client import VLLMClient
+from codeintel_rev.observability import metrics as retrieval_metrics
 from codeintel_rev.runtime import (
     NullRuntimeCellObserver,
     RuntimeCell,
@@ -208,7 +209,7 @@ def _import_faiss_runtime_opts_cls() -> type:
     return module.FAISSRuntimeOptions
 
 
-def _faiss_runtime_options_from_index(index_cfg: IndexConfig) -> object:
+def _faiss_runtime_options_from_index(index_cfg: IndexConfig) -> FAISSRuntimeOptions:
     """Materialize FAISS runtime options from the structured index config.
 
     Parameters
@@ -737,6 +738,7 @@ class ApplicationContext:
             "Initialized index lifecycle manager",
             extra={"index_root": str(index_root)},
         )
+        self._update_index_version_metrics()
 
     @classmethod
     def create(
@@ -816,10 +818,11 @@ class ApplicationContext:
         vllm_client = VLLMClient(settings.vllm)
         faiss_manager_cls = _import_faiss_manager_cls()
         runtime_opts = _faiss_runtime_options_from_index(settings.index)
+        nlist = cast("int", settings.index.nlist)
         faiss_manager = faiss_manager_cls(
             index_path=paths.faiss_index,
             vec_dim=settings.index.vec_dim,
-            nlist=settings.index.nlist,
+            nlist=nlist,
             use_cuvs=settings.index.use_cuvs,
             runtime=runtime_opts,
         )
@@ -828,7 +831,7 @@ class ApplicationContext:
                 "faiss.compile",
                 extra={"opts": faiss_manager.get_compile_options(), "component": "app_start"},
             )
-        except Exception:  # noqa: BLE001
+        except Exception:  # lint-ignore[BLE001]
             LOGGER.debug("Unable to fetch FAISS compile options at startup", exc_info=True)
 
         # Initialize scope store for session-scoped query constraints
@@ -907,6 +910,16 @@ class ApplicationContext:
         self.faiss_manager.gpu_index = None
         self.faiss_manager.secondary_gpu_index = None
         self.faiss_manager.gpu_resources = None
+        self._update_index_version_metrics()
+
+    def _update_index_version_metrics(self) -> None:
+        """Expose the active index version via Prometheus gauges."""
+        version: str | None = None
+        with suppress(RuntimeLifecycleError):
+            version = self.index_manager.current_version()
+        retrieval_metrics.set_index_version("faiss", version)
+        retrieval_metrics.set_index_version("bm25", version)
+        retrieval_metrics.set_index_version("splade", version)
 
     def apply_factory_adjuster(self, adjuster: FactoryAdjuster) -> None:
         """Update runtime tuning knobs and reset cells to pick up changes."""
@@ -1116,10 +1129,11 @@ class ApplicationContext:
         _require_dependency("faiss", runtime=runtime, purpose="CodeRank FAISS manager")
         manager_cls = _import_faiss_manager_cls()
         runtime_opts = _faiss_runtime_options_from_index(self.settings.index)
+        nlist = cast("int", self.settings.index.nlist)
         manager = manager_cls(
             index_path=index_path,
             vec_dim=vec_dim,
-            nlist=self.settings.index.nlist,
+            nlist=nlist,
             use_cuvs=self.settings.index.use_cuvs,
             runtime=runtime_opts,
         )
@@ -1129,7 +1143,7 @@ class ApplicationContext:
                 "faiss.compile",
                 extra={"opts": manager.get_compile_options(), "component": runtime},
             )
-        except Exception:  # noqa: BLE001
+        except Exception:  # lint-ignore[BLE001]
             LOGGER.debug("Unable to fetch FAISS compile options", exc_info=True)
         return manager
 

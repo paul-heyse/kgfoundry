@@ -7,7 +7,7 @@ GPU is reachable and functional before expensive operations begin.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, SupportsInt, cast
 
 from codeintel_rev.metrics.registry import GPU_AVAILABLE, GPU_TEMP_SCRATCH_BYTES
 from codeintel_rev.typing import gate_import
@@ -144,7 +144,8 @@ def _test_faiss_gpu_resources() -> tuple[bool, str, int | None]:
         get_temp = getattr(resources, "getTempMemory", None)
         if callable(get_temp):
             try:
-                scratch_bytes = int(get_temp())
+                raw_value = get_temp()
+                scratch_bytes = int(cast("SupportsInt", raw_value))
             except (RuntimeError, ValueError, TypeError):  # pragma: no cover - defensive
                 scratch_bytes = None
         LOGGER.info("FAISS GPU resource initialization test passed")

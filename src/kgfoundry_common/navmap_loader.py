@@ -166,6 +166,18 @@ class NavSymbolModel(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _collect_extras(cls, value: object) -> object:
+        """Collect unknown fields into extras dictionary.
+
+        Parameters
+        ----------
+        value : object
+            Raw input value (dict or other object).
+
+        Returns
+        -------
+        object
+            Value with unknown fields moved to extras dictionary.
+        """
         if not isinstance(value, Mapping):
             return value
         data = dict(value)
@@ -183,6 +195,14 @@ class NavSymbolModel(BaseModel):
 
     @model_validator(mode="after")
     def _normalise(self) -> NavSymbolModel:
+        """Normalize tags and problem_details by removing duplicates.
+
+        Returns
+        -------
+        NavSymbolModel
+            Self if no changes needed, or new instance with deduplicated
+            tags and problem_details tuples.
+        """
         tags = tuple(dict.fromkeys(self.tags))
         problem_details = tuple(dict.fromkeys(self.problem_details))
         if tags == self.tags and problem_details == self.problem_details:
@@ -202,6 +222,14 @@ class NavSectionModel(BaseModel):
 
     @model_validator(mode="after")
     def _ensure_tuple(self) -> NavSectionModel:
+        """Ensure symbols tuple has no duplicates.
+
+        Returns
+        -------
+        NavSectionModel
+            Self if no changes needed, or new instance with deduplicated
+            symbols tuple.
+        """
         symbols = tuple(dict.fromkeys(self.symbols))
         if symbols == self.symbols:
             return self
@@ -226,6 +254,18 @@ class NavModuleMeta(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _collect_extras(cls, value: object) -> object:
+        """Collect unknown fields into extras dictionary.
+
+        Parameters
+        ----------
+        value : object
+            Raw input value (dict or other object).
+
+        Returns
+        -------
+        object
+            Value with unknown fields moved to extras dictionary.
+        """
         if not isinstance(value, Mapping):
             return value
         data = dict(value)
@@ -246,6 +286,14 @@ class NavModuleMeta(BaseModel):
 
     @model_validator(mode="after")
     def _normalise(self) -> NavModuleMeta:
+        """Normalize tags by removing duplicates.
+
+        Returns
+        -------
+        NavModuleMeta
+            Self if no changes needed, or new instance with deduplicated
+            tags tuple.
+        """
         tags = tuple(dict.fromkeys(self.tags))
         if tags == self.tags:
             return self
@@ -268,6 +316,18 @@ class NavMetadataModel(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _collect_extras(cls, value: object) -> object:
+        """Collect unknown fields into extras dictionary.
+
+        Parameters
+        ----------
+        value : object
+            Raw input value (dict or other object).
+
+        Returns
+        -------
+        object
+            Value with unknown fields moved to extras dictionary.
+        """
         if not isinstance(value, Mapping):
             return value
         data = dict(value)
@@ -286,6 +346,14 @@ class NavMetadataModel(BaseModel):
 
     @model_validator(mode="after")
     def _normalise(self) -> NavMetadataModel:
+        """Normalize exports by removing duplicates.
+
+        Returns
+        -------
+        NavMetadataModel
+            Self if no changes needed, or new instance with deduplicated
+            exports tuple.
+        """
         exports = tuple(dict.fromkeys(self.exports))
         if exports == self.exports:
             return self
@@ -370,10 +438,43 @@ class NavMetadataModel(BaseModel):
 
 
 def _slugify(value: str) -> str:
+    """Convert string to URL-friendly slug.
+
+    Normalizes a string by lowercasing, replacing slashes with hyphens,
+    and joining words with hyphens.
+
+    Parameters
+    ----------
+    value : str
+        String to convert to slug.
+
+    Returns
+    -------
+    str
+        URL-friendly slug (lowercase, hyphen-separated).
+    """
     return "-".join(value.strip().lower().replace("/", "-").split())
 
 
 def _default_nav_payload(package: str, exports: Sequence[str]) -> dict[str, Any]:
+    """Build default navigation payload structure.
+
+    Creates a default navigation metadata structure with package name as title,
+    normalized exports, a default "public-api" section, and empty symbols.
+
+    Parameters
+    ----------
+    package : str
+        Package name to use as title.
+    exports : Sequence[str]
+        Public export names to include in exports and symbols.
+
+    Returns
+    -------
+    dict[str, Any]
+        Default navigation payload dictionary with title, exports, sections,
+        module_meta, and symbols fields.
+    """
     normalized_exports = list(dict.fromkeys(str(item) for item in exports))
     return {
         "title": package,
@@ -393,6 +494,25 @@ def _default_nav_payload(package: str, exports: Sequence[str]) -> dict[str, Any]
 def _to_nav_metadata(
     package: str, raw: Mapping[str, Any], exports: Sequence[str]
 ) -> NavMetadataModel:
+    """Convert raw navigation data to typed NavMetadataModel.
+
+    Merges raw navigation data with default payload structure, normalizes
+    exports and symbols, and validates the result as a NavMetadataModel.
+
+    Parameters
+    ----------
+    package : str
+        Package name for default payload generation.
+    raw : Mapping[str, Any]
+        Raw navigation metadata dictionary from sidecar or runtime.
+    exports : Sequence[str]
+        Public export names to use if raw data doesn't specify exports.
+
+    Returns
+    -------
+    NavMetadataModel
+        Validated navigation metadata model with merged defaults and raw data.
+    """
     sidecar_exports = raw.get("exports") if isinstance(raw.get("exports"), Sequence) else None
     export_candidates = (
         list(dict.fromkeys(str(item) for item in sidecar_exports))
@@ -418,6 +538,23 @@ def _to_nav_metadata(
 
 
 def _registry_operation_candidates(operation: RegistryOperationModel, key: str) -> list[str]:
+    """Generate candidate symbol names for a registry operation.
+
+    Creates candidate symbol names from the operation key and operation_id,
+    normalizing hyphens to underscores for Python identifier compatibility.
+
+    Parameters
+    ----------
+    operation : RegistryOperationModel
+        Registry operation model with operation_id.
+    key : str
+        Operation key from registry.
+
+    Returns
+    -------
+    list[str]
+        List of candidate symbol names (normalized, non-empty).
+    """
     raw_id = operation.operation_id or key
     tokens = [
         key.replace("-", "_"),
@@ -427,10 +564,36 @@ def _registry_operation_candidates(operation: RegistryOperationModel, key: str) 
 
 
 def _augment_operation_candidates(operation_id: str) -> list[str]:
+    """Generate candidate symbol name from augment operation ID.
+
+    Extracts the last component from a dotted operation ID and normalizes
+    hyphens to underscores for Python identifier compatibility.
+
+    Parameters
+    ----------
+    operation_id : str
+        Augment operation ID (may be dotted, e.g., "api.v1.search").
+
+    Returns
+    -------
+    list[str]
+        List containing a single candidate symbol name.
+    """
     return [operation_id.rsplit(".", maxsplit=1)[-1].replace("-", "_")]
 
 
 def _load_cli_tooling_metadata() -> ToolingMetadataModel | None:
+    """Load CLI tooling metadata from augment and registry files.
+
+    Dynamically imports the tools module and loads tooling metadata from
+    the configured augment and registry YAML files. Returns None if the
+    tools module is unavailable or if files are missing/invalid.
+
+    Returns
+    -------
+    ToolingMetadataModel | None
+        Loaded tooling metadata if available, None otherwise.
+    """
     try:
         tools_module = import_module("tools")
     except ImportError:  # pragma: no cover - optional dependency
@@ -462,10 +625,36 @@ def _load_cli_tooling_metadata() -> ToolingMetadataModel | None:
 
 @cache
 def _cached_cli_tooling_metadata() -> ToolingMetadataModel | None:
+    """Return cached CLI tooling metadata.
+
+    Caches the result of _load_cli_tooling_metadata() to avoid repeated
+    file I/O and parsing operations.
+
+    Returns
+    -------
+    ToolingMetadataModel | None
+        Cached tooling metadata if available, None otherwise.
+    """
     return _load_cli_tooling_metadata()
 
 
 def _candidate_modules(package: str) -> list[str]:
+    """Generate candidate module names for package matching.
+
+    Creates a list of parent module names by progressively removing
+    the rightmost components. Used to match packages to registry interfaces.
+
+    Parameters
+    ----------
+    package : str
+        Fully qualified package name (e.g., "kgfoundry_common.errors").
+
+    Returns
+    -------
+    list[str]
+        List of candidate module names from most specific to least specific
+        (e.g., ["kgfoundry_common.errors", "kgfoundry_common"]).
+    """
     parts = package.split(".")
     return [".".join(parts[:index]) for index in range(len(parts), 0, -1)]
 
@@ -473,6 +662,22 @@ def _candidate_modules(package: str) -> list[str]:
 def _resolve_interface_for_package(
     package: str,
 ) -> tuple[ToolingMetadataModel, RegistryInterfaceModel] | None:
+    """Resolve registry interface for a package.
+
+    Matches a package name to a registry interface by checking candidate
+    module names against interface module fields. Returns the matching
+    interface and its metadata if found.
+
+    Parameters
+    ----------
+    package : str
+        Fully qualified package name to resolve interface for.
+
+    Returns
+    -------
+    tuple[ToolingMetadataModel, RegistryInterfaceModel] | None
+        Tuple of (metadata, interface) if a match is found, None otherwise.
+    """
     metadata = _cached_cli_tooling_metadata()
     if metadata is None:
         with suppress(AttributeError):  # pragma: no cover - python <3.9 safeguard
@@ -493,6 +698,23 @@ def _operation_overrides_for_interface(
     augment: AugmentMetadataModel,
     interface_operations: Sequence[RegistryOperationModel],
 ) -> dict[str, OperationOverrideModel]:
+    """Build operation override map for an interface.
+
+    Filters augment operation overrides to those relevant to the interface's
+    operations, keyed by symbol candidate names.
+
+    Parameters
+    ----------
+    augment : AugmentMetadataModel
+        Augment metadata with operation overrides.
+    interface_operations : Sequence[RegistryOperationModel]
+        Operations from the registry interface.
+
+    Returns
+    -------
+    dict[str, OperationOverrideModel]
+        Dictionary mapping symbol names to operation override models.
+    """
     overrides: dict[str, OperationOverrideModel] = {}
     relevant_ids = {
         (operation.operation_id or "")
@@ -509,6 +731,21 @@ def _operation_overrides_for_interface(
 def _registry_operations_for_interface(
     interface: RegistryInterfaceModel,
 ) -> dict[str, RegistryOperationModel]:
+    """Build operation map for an interface keyed by symbol candidates.
+
+    Creates a mapping from symbol candidate names to registry operation
+    models, handling multiple candidates per operation.
+
+    Parameters
+    ----------
+    interface : RegistryInterfaceModel
+        Registry interface with operations.
+
+    Returns
+    -------
+    dict[str, RegistryOperationModel]
+        Dictionary mapping symbol names to registry operation models.
+    """
     operations: dict[str, RegistryOperationModel] = {}
     for key, operation in interface.operations.items():
         for candidate in _registry_operation_candidates(operation, key):
@@ -517,6 +754,21 @@ def _registry_operations_for_interface(
 
 
 def _cli_module_meta(interface: RegistryInterfaceModel) -> NavModuleMeta:
+    """Extract module metadata from registry interface.
+
+    Converts a registry interface to NavModuleMeta, extracting known fields
+    and placing unknown fields in extras.
+
+    Parameters
+    ----------
+    interface : RegistryInterfaceModel
+        Registry interface to extract metadata from.
+
+    Returns
+    -------
+    NavModuleMeta
+        Module metadata model with interface fields and extras.
+    """
     payload = interface.to_payload()
     known = {
         "id",
@@ -545,6 +797,18 @@ def _cli_module_meta(interface: RegistryInterfaceModel) -> NavModuleMeta:
 
 
 def _first_non_empty(*candidates: str | None) -> str | None:
+    """Return the first non-empty string from candidates.
+
+    Parameters
+    ----------
+    *candidates : str | None
+        Candidate strings to check (may include None).
+
+    Returns
+    -------
+    str | None
+        First non-empty string found, or None if all are empty/None.
+    """
     for candidate in candidates:
         if candidate:
             return candidate
@@ -552,6 +816,19 @@ def _first_non_empty(*candidates: str | None) -> str | None:
 
 
 def _first_non_empty_sequence(*candidates: Sequence[str] | None) -> tuple[str, ...]:
+    """Return the first non-empty sequence from candidates, deduplicated.
+
+    Parameters
+    ----------
+    *candidates : Sequence[str] | None
+        Candidate sequences to check (may include None).
+
+    Returns
+    -------
+    tuple[str, ...]
+        First non-empty sequence as a deduplicated tuple, or empty tuple
+        if all are empty/None.
+    """
     for candidate in candidates:
         if candidate:
             return tuple(dict.fromkeys(candidate))
@@ -562,6 +839,24 @@ def _build_symbol_metadata(
     registry_op: RegistryOperationModel | None,
     override: OperationOverrideModel | None,
 ) -> NavSymbolModel:
+    """Build symbol metadata from registry operation and override.
+
+    Merges fields from registry operation and override, with override
+    taking precedence. Extracts extras and special fields (examples,
+    env, code_samples) from override payload.
+
+    Parameters
+    ----------
+    registry_op : RegistryOperationModel | None
+        Registry operation model (may be None).
+    override : OperationOverrideModel | None
+        Operation override model (may be None).
+
+    Returns
+    -------
+    NavSymbolModel
+        Symbol metadata model with merged fields from both sources.
+    """
     summary = _first_non_empty(
         override.summary if override else None,
         registry_op.summary if registry_op else None,
@@ -608,6 +903,25 @@ def _symbols_from_cli(
     registry_ops: Mapping[str, RegistryOperationModel],
     overrides: Mapping[str, OperationOverrideModel],
 ) -> dict[str, NavSymbolModel]:
+    """Build symbol metadata dictionary from CLI sources.
+
+    Creates NavSymbolModel instances for each export, merging registry
+    operations and overrides.
+
+    Parameters
+    ----------
+    exports : Sequence[str]
+        Public export names to build symbols for.
+    registry_ops : Mapping[str, RegistryOperationModel]
+        Registry operations keyed by symbol name.
+    overrides : Mapping[str, OperationOverrideModel]
+        Operation overrides keyed by symbol name.
+
+    Returns
+    -------
+    dict[str, NavSymbolModel]
+        Dictionary mapping symbol names to their metadata models.
+    """
     symbols: dict[str, NavSymbolModel] = {}
     for symbol in dict.fromkeys(exports):
         registry_op = registry_ops.get(symbol)
@@ -620,6 +934,22 @@ def _section_symbols(
     symbol_tags: Mapping[str, tuple[str, ...]],
     tag_group_tags: Sequence[str],
 ) -> list[str]:
+    """Filter symbols that match tag group tags.
+
+    Returns symbols whose tags intersect with the tag group's tags.
+
+    Parameters
+    ----------
+    symbol_tags : Mapping[str, tuple[str, ...]]
+        Dictionary mapping symbol names to their tag tuples.
+    tag_group_tags : Sequence[str]
+        Tags from the tag group to match against.
+
+    Returns
+    -------
+    list[str]
+        List of symbol names that have at least one matching tag.
+    """
     collected: list[str] = []
     tag_set = set(tag_group_tags)
     for symbol, tags in symbol_tags.items():
@@ -632,6 +962,24 @@ def _sections_from_cli(
     augment: AugmentMetadataModel,
     symbols: Mapping[str, NavSymbolModel],
 ) -> tuple[NavSectionModel, ...]:
+    """Build navigation sections from CLI augment metadata.
+
+    Creates sections from tag groups in augment metadata, assigning symbols
+    to sections based on tag matching. Remaining symbols are placed in a
+    default "public-api" section.
+
+    Parameters
+    ----------
+    augment : AugmentMetadataModel
+        Augment metadata with tag groups.
+    symbols : Mapping[str, NavSymbolModel]
+        Symbol metadata dictionary keyed by symbol name.
+
+    Returns
+    -------
+    tuple[NavSectionModel, ...]
+        Tuple of section models with assigned symbols.
+    """
     section_models: list[NavSectionModel] = []
     remaining_symbols = list(symbols)
     for tag_group in augment.tag_groups:
@@ -664,6 +1012,24 @@ def _sections_from_cli(
 
 
 def _cli_nav_metadata(package: str, exports: Sequence[str]) -> NavMetadataModel | None:
+    """Build navigation metadata from CLI tooling contracts.
+
+    Resolves registry interface for the package and constructs navigation
+    metadata using registry operations, augment overrides, and tag groups.
+    Returns None if no interface is found.
+
+    Parameters
+    ----------
+    package : str
+        Fully qualified package name.
+    exports : Sequence[str]
+        Public export names.
+
+    Returns
+    -------
+    NavMetadataModel | None
+        Navigation metadata model if interface is found, None otherwise.
+    """
     resolved = _resolve_interface_for_package(package)
     if resolved is None:
         return None
@@ -695,6 +1061,23 @@ def _cli_nav_metadata(package: str, exports: Sequence[str]) -> NavMetadataModel 
 
 
 def _sidecar_nav_metadata(package: str, exports: Sequence[str]) -> NavMetadataModel:
+    """Build navigation metadata from sidecar files or runtime navmap.
+
+    Loads navigation data from package sidecar files (_nav.json) or runtime
+    __navmap__ attribute, falling back to default payload if neither exists.
+
+    Parameters
+    ----------
+    package : str
+        Fully qualified package name.
+    exports : Sequence[str]
+        Public export names for default payload generation.
+
+    Returns
+    -------
+    NavMetadataModel
+        Navigation metadata model from sidecar/runtime or defaults.
+    """
     data = _load_sidecar_data(package)
     if not data:
         data = _load_runtime_nav(package)

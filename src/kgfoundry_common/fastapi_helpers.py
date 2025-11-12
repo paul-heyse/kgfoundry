@@ -114,10 +114,8 @@ def typed_dependency[**P, T](
 
         Raises
         ------
-        asyncio.TimeoutError
+        TimeoutError
             If the dependency execution exceeds the timeout.
-        Exception
-            Any exception raised by the dependency function is propagated.
         """
         correlation_id = get_correlation_id()
         with with_fields(logger, operation=name, correlation_id=correlation_id) as log:
@@ -128,6 +126,13 @@ def typed_dependency[**P, T](
                     dependency(*args, **kwargs),
                     timeout_seconds=timeout,
                 )
+            except TimeoutError:
+                duration_ms = (time.perf_counter() - start) * 1000.0
+                log.exception(
+                    "dependency.timeout",
+                    extra={"status": "timeout", "duration_ms": duration_ms},
+                )
+                raise
             except Exception:  # pragma: no cover - propagated to caller
                 duration_ms = (time.perf_counter() - start) * 1000.0
                 log.exception(
@@ -158,7 +163,7 @@ def typed_exception_handler[E: Exception](
     """Register ``handler`` for ``exception_type`` with logging and timeouts."""
 
     async def _wrapped(request: Request, exc: E) -> Response:
-        """Wrapped exception handler with logging and timeout.
+        """Wrap exception handler with logging and timeout.
 
         Parameters
         ----------
@@ -174,10 +179,8 @@ def typed_exception_handler[E: Exception](
 
         Raises
         ------
-        asyncio.TimeoutError
+        TimeoutError
             If the handler execution exceeds the timeout.
-        Exception
-            Any exception raised by the handler is propagated.
         """
         correlation_id = get_correlation_id()
         with with_fields(logger, operation=name, correlation_id=correlation_id) as log:
@@ -195,6 +198,13 @@ def typed_exception_handler[E: Exception](
                     handler(request, exc),
                     timeout_seconds=timeout,
                 )
+            except TimeoutError:
+                duration_ms = (time.perf_counter() - start) * 1000.0
+                log.exception(
+                    "exception_handler.timeout",
+                    extra={"status": "timeout", "duration_ms": duration_ms},
+                )
+                raise
             except Exception:  # pragma: no cover - FastAPI surfaces this
                 duration_ms = (time.perf_counter() - start) * 1000.0
                 log.exception(
@@ -267,10 +277,8 @@ def typed_middleware(
 
             Raises
             ------
-            asyncio.TimeoutError
+            TimeoutError
                 If the middleware execution exceeds the timeout.
-            Exception
-                Any exception raised by the next handler is propagated.
             """
             correlation_id = get_correlation_id()
             with with_fields(logger, operation=name, correlation_id=correlation_id) as log:
@@ -281,6 +289,13 @@ def typed_middleware(
                         self._delegate.dispatch(request, call_next),
                         timeout_seconds=timeout,
                     )
+                except TimeoutError:
+                    duration_ms = (time.perf_counter() - start) * 1000.0
+                    log.exception(
+                        "middleware.timeout",
+                        extra={"status": "timeout", "duration_ms": duration_ms},
+                    )
+                    raise
                 except Exception:  # pragma: no cover - propagated to caller
                     duration_ms = (time.perf_counter() - start) * 1000.0
                     log.exception(

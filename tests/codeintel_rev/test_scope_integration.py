@@ -12,6 +12,7 @@ from codeintel_rev.config.settings import (
     BM25Config,
     CodeRankConfig,
     CodeRankLLMConfig,
+    EvalConfig,
     IndexConfig,
     PathsConfig,
     RedisConfig,
@@ -78,6 +79,7 @@ def _build_context(repo_root: Path) -> ApplicationContext:
         index=IndexConfig(vec_dim=2560, chunk_budget=2200, faiss_nlist=8192, use_cuvs=True),
         vllm=VLLMConfig(base_url="http://localhost:8001/v1", batch_size=32),
         limits=ServerLimits(),
+        eval=EvalConfig(),
         redis=RedisConfig(
             url="redis://127.0.0.1:6379/0",
             scope_l1_size=64,

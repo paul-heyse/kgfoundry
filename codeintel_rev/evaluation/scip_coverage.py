@@ -6,14 +6,14 @@ import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol, TypedDict
 
 import numpy as np
 
-from codeintel_rev.config.settings import PathsConfig, Settings
+from codeintel_rev.config.settings import Settings
 from codeintel_rev.io.duckdb_manager import DuckDBManager
-from codeintel_rev.io.faiss_manager import FAISSManager
+from codeintel_rev.io.faiss_manager import SearchRuntimeOverrides
 from codeintel_rev.io.symbol_catalog import SymbolCatalog, SymbolDefRow
-from codeintel_rev.io.vllm_client import VLLMClient
 from codeintel_rev.metrics.registry import (
     SCIP_CHUNK_COVERAGE_RATIO,
     SCIP_INDEX_COVERAGE_RATIO,
@@ -22,6 +22,29 @@ from codeintel_rev.metrics.registry import (
 from kgfoundry_common.logging import get_logger
 
 LOGGER = get_logger(__name__)
+
+
+class SupportsFaissSearch(Protocol):
+    """Protocol capturing the subset of FAISS search methods required here."""
+
+    def search(
+        self,
+        query: np.ndarray,
+        k: int | None = None,
+        *,
+        nprobe: int | None = None,
+        runtime: SearchRuntimeOverrides | None = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Return distances and ids for ``query``."""
+        ...
+
+
+class SupportsEmbedSingle(Protocol):
+    """Protocol describing embedder behaviour used by the evaluator."""
+
+    def embed_single(self, text: str) -> Sequence[float] | np.ndarray:
+        """Return an embedding vector for ``text``."""
+        ...
 
 
 @dataclass(slots=True, frozen=True)
@@ -35,6 +58,16 @@ class CoverageResult:
     retrieved: bool
 
 
+class CoverageSummary(TypedDict):
+    """Typed summary payload returned by ``SCIPCoverageEvaluator``."""
+
+    total: int
+    chunk_coverage: float
+    index_coverage: float
+    retrieval_coverage: float
+    k: int
+
+
 class SCIPCoverageEvaluator:
     """Evaluate chunk/index/retrieval coverage across SCIP function definitions."""
 
@@ -42,13 +75,13 @@ class SCIPCoverageEvaluator:
         self,
         *,
         settings: Settings,
-        paths: PathsConfig,
+        repo_root: str | Path,
         duckdb_manager: DuckDBManager,
-        faiss_manager: FAISSManager,
-        vllm_client: VLLMClient,
+        faiss_manager: SupportsFaissSearch,
+        vllm_client: SupportsEmbedSingle,
     ) -> None:
         self._settings = settings
-        self._paths = paths
+        self._repo_root = Path(repo_root)
         self._duckdb = duckdb_manager
         self._faiss = faiss_manager
         self._vllm = vllm_client
@@ -60,7 +93,7 @@ class SCIPCoverageEvaluator:
         k: int = 10,
         limit: int | None = None,
         output_dir: Path | None = None,
-    ) -> dict[str, object]:
+    ) -> CoverageSummary:
         """Execute the coverage evaluation and return summary metrics.
 
         Extended Summary
@@ -101,7 +134,14 @@ class SCIPCoverageEvaluator:
         defs = self._symbol_catalog.fetch_symbol_defs(limit=limit)
         if not defs:
             LOGGER.warning("scip_coverage.no_symbols")
-            return {"total": 0}
+            empty_summary: CoverageSummary = {
+                "total": 0,
+                "chunk_coverage": 0.0,
+                "index_coverage": 0.0,
+                "retrieval_coverage": 0.0,
+                "k": k,
+            }
+            return empty_summary
 
         chunk_ids = [row.chunk_id for row in defs if row.chunk_id is not None]
         chunk_presence = self._lookup_chunk_ids(chunk_ids)
@@ -119,7 +159,7 @@ class SCIPCoverageEvaluator:
             retrieval_hits += int(result.retrieved)
 
         total = len(defs)
-        summary = {
+        summary: CoverageSummary = {
             "total": total,
             "chunk_coverage": chunk_hits / total if total else 0.0,
             "index_coverage": index_hits / total if total else 0.0,
@@ -127,7 +167,8 @@ class SCIPCoverageEvaluator:
             "k": k,
         }
         self._record_metrics(summary)
-        self._write_artifacts(per_symbol, summary, output_dir or self._settings.eval.output_dir)
+        resolved_output = output_dir or self._settings.eval.output_dir
+        self._write_artifacts(per_symbol, summary, resolved_output)
         LOGGER.info(
             "scip_coverage.completed",
             extra={"summary": summary, "output_dir": output_dir or self._settings.eval.output_dir},
@@ -162,22 +203,22 @@ class SCIPCoverageEvaluator:
         return base
 
     @staticmethod
-    def _record_metrics(summary: dict[str, object]) -> None:
-        SCIP_CHUNK_COVERAGE_RATIO.set(float(summary["chunk_coverage"]))
-        SCIP_INDEX_COVERAGE_RATIO.set(float(summary["index_coverage"]))
+    def _record_metrics(summary: CoverageSummary) -> None:
+        SCIP_CHUNK_COVERAGE_RATIO.set(summary["chunk_coverage"])
+        SCIP_INDEX_COVERAGE_RATIO.set(summary["index_coverage"])
         SCIP_RETRIEVAL_COVERAGE_RATIO.labels(k=str(summary["k"])).set(
-            float(summary["retrieval_coverage"])
+            summary["retrieval_coverage"]
         )
 
     def _write_artifacts(
         self,
         per_symbol: Sequence[CoverageResult],
-        summary: dict[str, object],
+        summary: CoverageSummary,
         output_dir: Path | str,
     ) -> None:
         base = Path(output_dir)
         if not base.is_absolute():
-            base = Path(self._paths.repo_root) / base
+            base = self._repo_root / base
         base.mkdir(parents=True, exist_ok=True)
         (base / "coverage_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
         detail_path = base / "coverage_details.jsonl"

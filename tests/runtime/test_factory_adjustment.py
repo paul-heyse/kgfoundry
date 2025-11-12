@@ -11,7 +11,7 @@ class _DummyFaiss:
     nprobe: int = 1
 
     def set_nprobe(self, value: int) -> None:
-        self.nprobe = value
+        object.__setattr__(self, "nprobe", value)
 
 
 def test_noop_adjuster_keeps_factory() -> None:

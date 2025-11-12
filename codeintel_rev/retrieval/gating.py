@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import re
-from typing import Mapping, NamedTuple
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 
 from codeintel_rev.retrieval.types import StageDecision, StageSignals
 
@@ -42,6 +42,20 @@ class StageGateConfig:
         r"[a-z0-9_]+(?:\.[a-z0-9_]+)+",
         r"[A-Za-z0-9_\-/\.]+",
     )
+
+_LITERAL_CODE_RATIO = 0.5
+_LITERAL_DIGIT_RATIO = 0.2
+_LITERAL_SYMBOL_RATIO = 0.03
+_VAGUE_LENGTH_THRESHOLD = 5
+_VAGUE_CODE_RATIO = 0.3
+_AMBIGUITY_SHORT_LENGTH = 3
+_AMBIGUITY_LOW_CODE_RATIO = 0.3
+_AMBIGUITY_HIGH_OOV_RATIO = 0.6
+_AMBIGUITY_SHORT_BOOST = 0.6
+_AMBIGUITY_OOV_BOOST = 0.3
+_AMBIGUITY_LITERAL_PENALTY = 0.4
+_RM3_AMBIGUITY_THRESHOLD = 0.3
+_AMBIGUITY_VAGUE_THRESHOLD = 0.5
 
 
 def should_run_secondary_stage(
@@ -106,7 +120,8 @@ def should_run_secondary_stage(
     return StageDecision(should_run=True, reason="within_budget", notes=tuple(notes))
 
 
-class QueryProfile(NamedTuple):
+@dataclass(frozen=True)
+class QueryProfile:
     """Query characteristics profile for adaptive retrieval gating.
 
     Extended Summary
@@ -157,7 +172,8 @@ class QueryProfile(NamedTuple):
     ambiguity_score: float
 
 
-class BudgetDecision(NamedTuple):
+@dataclass(frozen=True)
+class BudgetDecision:
     """Retrieval budget decision for multi-stage search pipelines.
 
     Extended Summary
@@ -245,16 +261,22 @@ def analyze_query(query: str, cfg: StageGateConfig) -> QueryProfile:
     symbol_ratio = len(_SYMBOL_RE.findall(query)) / max(1, len(query))
     oov_ratio = 1.0 - code_token_ratio
 
-    looks_literal = (code_token_ratio > 0.5) or (digit_ratio > 0.2) or (symbol_ratio > 0.03)
-    looks_vague = not looks_literal and (length <= 5 and code_token_ratio < 0.3)
+    looks_literal = (
+        (code_token_ratio > _LITERAL_CODE_RATIO)
+        or (digit_ratio > _LITERAL_DIGIT_RATIO)
+        or (symbol_ratio > _LITERAL_SYMBOL_RATIO)
+    )
+    looks_vague = not looks_literal and (
+        length <= _VAGUE_LENGTH_THRESHOLD and code_token_ratio < _VAGUE_CODE_RATIO
+    )
 
     ambiguity = 0.0
-    if length <= 3 and code_token_ratio < 0.3:
-        ambiguity += 0.6
-    if oov_ratio > 0.6:
-        ambiguity += 0.3
+    if length <= _AMBIGUITY_SHORT_LENGTH and code_token_ratio < _AMBIGUITY_LOW_CODE_RATIO:
+        ambiguity += _AMBIGUITY_SHORT_BOOST
+    if oov_ratio > _AMBIGUITY_HIGH_OOV_RATIO:
+        ambiguity += _AMBIGUITY_OOV_BOOST
     if looks_literal:
-        ambiguity -= 0.4
+        ambiguity -= _AMBIGUITY_LITERAL_PENALTY
     ambiguity = max(0.0, min(1.0, ambiguity))
 
     return QueryProfile(
@@ -301,19 +323,21 @@ def decide_budgets(profile: QueryProfile, cfg: StageGateConfig) -> BudgetDecisio
     if profile.looks_literal:
         depths = dict(cfg.literal_depths)
         rrf_k = cfg.rrf_k_literal
-    elif profile.looks_vague or profile.ambiguity_score >= 0.5:
+    elif profile.looks_vague or profile.ambiguity_score >= _AMBIGUITY_VAGUE_THRESHOLD:
         depths = dict(cfg.vague_depths)
         rrf_k = cfg.rrf_k_vague
     else:
         depths = dict(cfg.default_depths)
         rrf_k = cfg.rrf_k_default
 
-    rm3_enabled = False
-    if cfg.rm3_auto:
-        if cfg.rm3_min_len <= profile.length <= cfg.rm3_max_len and (
-            profile.ambiguity_score >= 0.3 or cfg.rm3_enable_on_ambiguity
-        ):
-            rm3_enabled = True
+    rm3_enabled = bool(
+        cfg.rm3_auto
+        and cfg.rm3_min_len <= profile.length <= cfg.rm3_max_len
+        and (
+            profile.ambiguity_score >= _RM3_AMBIGUITY_THRESHOLD
+            or cfg.rm3_enable_on_ambiguity
+        )
+    )
 
     return BudgetDecision(depths, rrf_k, rm3_enabled)
 

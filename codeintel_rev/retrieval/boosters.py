@@ -2,18 +2,31 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Iterable, Mapping, Callable
+import re
 import time
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import dataclass
+from typing import Any
 
 from codeintel_rev.retrieval.types import HybridResultDoc
 
 try:
+    import duckdb  # type: ignore[import-untyped]
+except ImportError:  # pragma: no cover - optional dependency
+    duckdb = None  # type: ignore[assignment]
+
+try:
     from codeintel_rev.io.duckdb_manager import DuckDBManager
-except Exception:  # pragma: no cover - optional dependency
+except ImportError:  # pragma: no cover - optional dependency
     DuckDBManager = None  # type: ignore[assignment]
 
+DuckConnection = (
+    duckdb.DuckDBPyConnection if duckdb is not None else Any  # type: ignore[assignment]
+)
+
 __all__ = ["RecencyConfig", "apply_recency_boost"]
+
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 @dataclass(frozen=True)
@@ -38,8 +51,43 @@ def _exp_decay(age_days: float, half_life_days: float) -> float:
     return 0.5 ** (age_days / half_life_days)
 
 
+def _safe_identifier(value: str) -> str:
+    if not _IDENTIFIER_RE.match(value):
+        msg = f"Invalid identifier: {value}"
+        raise ValueError(msg)
+    return value
+
+
+def _normalize_ids(source: Iterable[str]) -> list[int]:
+    normalized: list[int] = []
+    for identifier in source:
+        try:
+            normalized.append(int(identifier))
+        except (TypeError, ValueError):
+            continue
+    return normalized
+
+
+def _create_recency_view(
+    conn: DuckConnection,
+    table_name: str,
+    chunk_col: str,
+    commit_col: str,
+) -> None:
+    relation = (
+        conn.table(table_name)
+        .project(f"{chunk_col} AS recency_chunk_id, {commit_col} AS recency_commit_ts")
+    )
+    relation.create_view("recency_source", replace=True)
+
+
+def _populate_id_table(conn: DuckConnection, ids: Sequence[int]) -> None:
+    conn.execute("CREATE TEMPORARY TABLE recency_ids(id BIGINT)")
+    conn.executemany("INSERT INTO recency_ids VALUES (?)", [(identifier,) for identifier in ids])
+
+
 def _fetch_commit_ts_duckdb(
-    manager: "DuckDBManager",
+    manager: DuckDBManager,
     ids: Iterable[str],
     cfg: RecencyConfig,
 ) -> Mapping[str, float]:
@@ -48,16 +96,31 @@ def _fetch_commit_ts_duckdb(
     id_list = list(ids)
     if not id_list:
         return {}
+    chunk_col = _safe_identifier(cfg.chunk_id_column)
+    commit_col = _safe_identifier(cfg.commit_ts_column)
+    table_name = _safe_identifier(cfg.table)
+    error_types: tuple[type[Exception], ...]
+    if duckdb is not None:
+        error_types = (duckdb.Error, RuntimeError, ValueError)
+    else:
+        error_types = (RuntimeError, ValueError)
     try:
+        normalized_ids = _normalize_ids(id_list)
+        if not normalized_ids:
+            return {}
         with manager.connection() as conn:
-            qmarks = ",".join(["?"] * len(id_list))
-            query = (
-                f"SELECT {cfg.chunk_id_column}, {cfg.commit_ts_column} "
-                f"FROM {cfg.table} "
-                f"WHERE {cfg.chunk_id_column} IN ({qmarks})"
-            )
-            rows = conn.execute(query, id_list).fetchall()
-    except Exception:
+            _create_recency_view(conn, table_name, chunk_col, commit_col)
+            try:
+                _populate_id_table(conn, normalized_ids)
+                rows = conn.execute(
+                    "SELECT recency_chunk_id, recency_commit_ts "
+                    "FROM recency_source "
+                    "WHERE recency_chunk_id IN (SELECT id FROM recency_ids)"
+                ).fetchall()
+            finally:
+                conn.execute("DROP TABLE IF EXISTS recency_ids")
+                conn.execute("DROP VIEW IF EXISTS recency_source")
+    except error_types:
         return {}
     result: dict[str, float] = {}
     for chunk_id, commit_ts in rows:
@@ -74,11 +137,29 @@ def apply_recency_boost(
     docs: list[HybridResultDoc],
     cfg: RecencyConfig,
     *,
-    duckdb_manager: "DuckDBManager | None" = None,
+    duckdb_manager: DuckDBManager | None = None,
     commit_ts_lookup: Callable[[Iterable[str]], Mapping[str, float]] | None = None,
 ) -> tuple[list[HybridResultDoc], int]:
-    """Return a new doc list with an exponential recency boost applied."""
+    """Return a new doc list with an exponential recency boost applied.
 
+    Parameters
+    ----------
+    docs : list[HybridResultDoc]
+        Ranked documents to boost.
+    cfg : RecencyConfig
+        Recency boosting configuration.
+    duckdb_manager : DuckDBManager | None, optional
+        DuckDB manager used to look up commit timestamps when ``commit_ts_lookup``
+        is not provided.
+    commit_ts_lookup : Callable[[Iterable[str]], Mapping[str, float]] | None, optional
+        Custom lookup function that maps chunk IDs to commit timestamps.
+
+    Returns
+    -------
+    tuple[list[HybridResultDoc], int]
+        Boosted documents (preserving order) and the number of documents whose
+        scores changed due to the recency multiplier.
+    """
     if not cfg.enabled or not docs:
         return docs, 0
 
@@ -113,4 +194,3 @@ def apply_recency_boost(
             boost_count += 1
         boosted.append(HybridResultDoc(doc_id=doc.doc_id, score=new_score))
     return boosted, boost_count
-

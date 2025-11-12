@@ -1,0 +1,90 @@
+name: retrieval-regression
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "17 5 * * *"
+  pull_request:
+    paths:
+      - "codeintel_rev/**"
+      - "tools/recall_harness.py"
+      - ".github/workflows/retrieval-regression.yml"
+
+jobs:
+  recall-harness:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements*.txt') }}
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+          pip install pyserini==0.36.0
+
+      - name: Resolve inputs
+        id: resolve
+        run: |
+          echo "BM25_INDEX=${BM25_INDEX:-}" >> "$GITHUB_OUTPUT"
+          echo "QUERIES_FILE=${QUERIES_JSONL:-}" >> "$GITHUB_OUTPUT"
+          echo "QRELS_FILE=${QRELS_TSV:-}" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: Check inputs
+        if: steps.resolve.outputs.BM25_INDEX == '' || steps.resolve.outputs.QUERIES_FILE == '' || steps.resolve.outputs.QRELS_FILE == ''
+        run: |
+          echo "Harness inputs not fully provided; skipping run."
+          exit 0
+
+      - name: Run recall harness
+        if: steps.resolve.outputs.BM25_INDEX != '' && steps.resolve.outputs.QUERIES_FILE != '' && steps.resolve.outputs.QRELS_FILE != ''
+        run: |
+          mkdir -p runs/ci
+          python tools/recall_harness.py \
+            --bm25-index "${{ steps.resolve.outputs.BM25_INDEX }}" \
+            --queries "${{ steps.resolve.outputs.QUERIES_FILE }}" \
+            --qrels "${{ steps.resolve.outputs.QRELS_FILE }}" \
+            --out runs/ci/report.csv \
+            --k-list "10,25,50" \
+            --sweep-k1 "0.6,0.9,1.2" \
+            --sweep-b "0.2,0.4,0.75" \
+            --rm3 auto
+
+      - name: Upload results
+        if: steps.resolve.outputs.BM25_INDEX != '' && steps.resolve.outputs.QUERIES_FILE != '' && steps.resolve.outputs.QRELS_FILE != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: recall-harness
+          path: runs/ci/report.csv
+
+      - name: Guardrail (recall@10 >= 0.60)
+        if: steps.resolve.outputs.BM25_INDEX != '' && steps.resolve.outputs.QUERIES_FILE != '' && steps.resolve.outputs.QRELS_FILE != ''
+        run: |
+          python - <<'PYCODE'
+          import csv
+          import sys
+
+          with open("runs/ci/report.csv", newline="") as handle:
+              reader = csv.DictReader(handle)
+              recalls = [float(row["recall@10"]) for row in reader if row.get("recall@10")]
+          if not recalls:
+              print("No recall rows found.", file=sys.stderr)
+              sys.exit(1)
+          avg = sum(recalls) / len(recalls)
+          print(f"Average recall@10: {avg:.3f}")
+          if avg < 0.60:
+              sys.exit(1)
+          PYCODE
+

@@ -37,7 +37,7 @@ from codeintel_rev.metrics.registry import (
     set_factory_id,
 )
 from codeintel_rev.observability.otel import as_span
-from codeintel_rev.observability.timeline import current_timeline
+from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.typing import NDArrayF32, NDArrayI64, gate_import
 from kgfoundry_common.errors import VectorSearchError
 from kgfoundry_common.logging import get_logger
@@ -190,6 +190,17 @@ class _SearchExecutionParams:
     use_gpu: bool
 
 
+@dataclass(frozen=True, slots=True)
+class _SearchPlan:
+    """Resolved parameters, query buffer, and timeline metadata for a search."""
+
+    queries: NDArrayF32
+    k: int
+    search_k: int
+    params: _SearchExecutionParams
+    timeline: Timeline | None
+
+
 class FAISSManager:
     """FAISS index manager with adaptive indexing, GPU support, and incremental updates.
 
@@ -287,7 +298,7 @@ class FAISSManager:
         self.secondary_index_path = (
             index_path.parent / f"{index_path.stem}.secondary{index_path.suffix}"
         )
-        self._tuned_parameters: dict[str, float] | None = None
+        self._tuned_parameters: dict[str, float | str] | None = None
         self._last_latency_ms: float | None = None
         self.autotune_profile_path = Path(f"{self.index_path}.tune.json")
         self._runtime_overrides: dict[str, float] = {}
@@ -925,9 +936,9 @@ class FAISSManager:
         Raises
         ------
         VectorSearchError
-            If FAISS search fails (e.g., index missing, invalid parameters, internal
-            FAISS errors). Wraps underlying exceptions (including RuntimeError from
-            helper methods) with search context.
+            If the FAISS search fails on CPU or GPU (e.g., index unavailable,
+            GPU failure, invalid parameters). The error contains context about
+            the index path and GPU usage for observability.
 
         Notes
         -----
@@ -941,53 +952,34 @@ class FAISSManager:
         rebuilding the primary index. Time complexity depends on index type:
         O(n) for Flat, O(nprobe * k) for IVF-family, O(log n * ef_search) for HNSW.
         """
-        k_eff = k if k is not None else self.default_k
-        runtime = runtime or SearchRuntimeOverrides()
-        (
-            nprobe_eff,
-            ef_eff,
-            k_factor_eff,
-            quantizer_ef,
-        ) = self._resolve_search_knobs(
-            override_nprobe=nprobe,
-            override_ef=runtime.ef_search,
-            override_k_factor=runtime.k_factor,
-            override_quantizer=runtime.quantizer_ef_search,
-        )
-        search_k = max(k_eff, math.ceil(k_eff * max(1.0, k_factor_eff)))
-        timeline = current_timeline()
-        use_gpu = bool(self.gpu_index)
+        plan = self._prepare_search_plan(query, k, nprobe, runtime)
+        timeline = plan.timeline
         FAISS_SEARCH_TOTAL.inc()
-        FAISS_SEARCH_LAST_K.set(float(k_eff))
-        if nprobe_eff is not None:
-            FAISS_SEARCH_NPROBE.set(float(nprobe_eff))
-        if ef_eff is not None:
-            HNSW_SEARCH_EF.set(float(ef_eff))
+        FAISS_SEARCH_LAST_K.set(float(plan.k))
+        if plan.params.nprobe is not None:
+            FAISS_SEARCH_NPROBE.set(float(plan.params.nprobe))
+        if plan.params.ef_search is not None:
+            HNSW_SEARCH_EF.set(float(plan.params.ef_search))
         if timeline is not None:
             timeline.event(
                 "faiss.search.start",
                 "faiss",
                 attrs={
-                    "k": k_eff,
-                    "nprobe": nprobe_eff,
-                    "use_gpu": use_gpu,
+                    "k": plan.k,
+                    "nprobe": plan.params.nprobe,
+                    "use_gpu": plan.params.use_gpu,
                     "has_secondary": bool(self.secondary_index),
                 },
             )
-        start = perf_counter()
 
+        start = perf_counter()
         try:
             distances, identifiers = self._execute_dual_search(
-                query=query,
-                search_k=search_k,
-                params=_SearchExecutionParams(
-                    nprobe=nprobe_eff if nprobe_eff is not None else self.default_nprobe,
-                    ef_search=ef_eff,
-                    quantizer_ef_search=quantizer_ef,
-                    use_gpu=use_gpu,
-                ),
+                query=plan.queries,
+                search_k=plan.search_k,
+                params=plan.params,
             )
-            result = (distances[:, :k_eff], identifiers[:, :k_eff])
+            result = (distances[:, : plan.k], identifiers[:, : plan.k])
         except Exception as exc:
             if timeline is not None:
                 timeline.event(
@@ -995,7 +987,11 @@ class FAISSManager:
                     "faiss",
                     status="error",
                     message=str(exc),
-                    attrs={"k": k_eff, "nprobe": nprobe_eff, "use_gpu": use_gpu},
+                    attrs={
+                        "k": plan.k,
+                        "nprobe": plan.params.nprobe,
+                        "use_gpu": plan.params.use_gpu,
+                    },
                 )
             FAISS_SEARCH_ERRORS_TOTAL.inc()
             msg = "FAISS search failed"
@@ -1004,28 +1000,100 @@ class FAISSManager:
                 cause=exc,
                 context={
                     "index_path": str(self.index_path),
-                    "use_gpu": use_gpu,
-                    "search_k": k_eff,
+                    "use_gpu": plan.params.use_gpu,
+                    "search_k": plan.k,
                 },
             ) from exc
 
         elapsed_total = (perf_counter() - start) * 1000.0
         if timeline is not None:
-            elapsed_ms = int(elapsed_total)
             timeline.event(
                 "faiss.search.end",
                 "faiss",
                 attrs={
-                    "duration_ms": elapsed_ms,
+                    "duration_ms": int(elapsed_total),
                     "rows": result[0].shape[0],
-                    "k": k_eff,
-                    "nprobe": nprobe_eff,
-                    "use_gpu": use_gpu,
+                    "k": plan.k,
+                    "nprobe": plan.params.nprobe,
+                    "use_gpu": plan.params.use_gpu,
                 },
             )
         self._last_latency_ms = elapsed_total
         FAISS_SEARCH_LAST_MS.set(elapsed_total)
         return result
+
+    def _prepare_search_plan(
+        self,
+        query: NDArrayF32,
+        k: int | None,
+        nprobe: int | None,
+        runtime: SearchRuntimeOverrides | None,
+    ) -> _SearchPlan:
+        """Normalize query and resolve runtime knobs for a FAISS search.
+
+        Extended Summary
+        ----------------
+        This helper method prepares a search plan by normalizing the query vector
+        (L2 normalization), resolving effective k and search_k values, and applying
+        runtime tuning overrides. It consolidates all search parameters into a
+        _SearchPlan dataclass for consistent execution. Used internally by search()
+        to prepare search parameters before executing FAISS queries.
+
+        Parameters
+        ----------
+        query : NDArrayF32
+            Query vector(s) to normalize and search. Shape (n_queries, vec_dim) or
+            (vec_dim,). Normalized to unit length using L2 normalization.
+        k : int | None
+            Requested number of results. If None, uses default_k from settings.
+        nprobe : int | None
+            Optional override for number of IVF cells to probe. If None, uses
+            default_nprobe or runtime overrides.
+        runtime : SearchRuntimeOverrides | None
+            Optional runtime tuning overrides (ef_search, quantizer_ef_search, k_factor).
+            Applied to resolve final search parameters.
+
+        Returns
+        -------
+        _SearchPlan
+            Search plan containing normalized queries, effective k, search_k (with
+            k_factor applied), and execution parameters (nprobe, ef_search, GPU flag).
+            The plan is ready for use in FAISS search execution.
+
+        Notes
+        -----
+        This method performs L2 normalization on query vectors and resolves all
+        search parameters including k_factor expansion. Time complexity: O(n_queries * vec_dim)
+        for normalization plus O(1) for parameter resolution.
+        """
+        self._require_cpu_index()
+        normalized = self._ensure_2d(query).copy().astype(np.float32)
+        faiss.normalize_L2(normalized)
+        k_eff = max(1, int(k or self.default_k))
+        runtime = runtime or SearchRuntimeOverrides()
+        nprobe_eff, ef_eff, k_factor, quantizer_ef = self._resolve_search_knobs(
+            override_nprobe=nprobe,
+            override_ef=runtime.ef_search,
+            override_k_factor=runtime.k_factor,
+            override_quantizer=runtime.quantizer_ef_search,
+        )
+        search_k = max(k_eff, math.ceil(k_eff * max(1.0, k_factor)))
+        resolved_nprobe = nprobe_eff if nprobe_eff is not None else self.default_nprobe
+        if resolved_nprobe is None:
+            resolved_nprobe = 1
+        params = _SearchExecutionParams(
+            nprobe=resolved_nprobe,
+            ef_search=ef_eff,
+            quantizer_ef_search=quantizer_ef,
+            use_gpu=bool(self.use_gpu and self.gpu_index is not None),
+        )
+        return _SearchPlan(
+            queries=normalized,
+            k=k_eff,
+            search_k=search_k,
+            params=params,
+            timeline=current_timeline(),
+        )
 
     def get_runtime_tuning(self) -> dict[str, object]:
         """Return the effective runtime tuning parameters and overrides.
@@ -1275,7 +1343,7 @@ class FAISSManager:
         # Search secondary index (flat, no nprobe needed)
         return self.secondary_index.search(query_norm, k)
 
-    def _primary_index_impl(self) -> _faiss.Index:
+    def primary_index_impl(self) -> _faiss.Index:
         """Return the underlying FAISS index implementation for primary CPU index.
 
         Returns
@@ -1577,18 +1645,7 @@ class FAISSManager:
         set_compile_flags_id(options)
         return options
 
-    @staticmethod
-    def has_cagra() -> bool:
-        """Return True when the GPU build exposes CAGRA/cuVS helpers.
-
-        Returns
-        -------
-        bool
-            ``True`` if cuVS bindings are present.
-        """
-        return hasattr(faiss, "GpuIndexCagra")
-
-    def search_with_params(
+    def _search_with_params(
         self,
         query: NDArrayF32,
         k: int,
@@ -1688,29 +1745,31 @@ class FAISSManager:
         faiss.normalize_L2(xt)
         sweep = sweep or ["nprobe=16", "nprobe=32", "nprobe=64", "nprobe=96", "nprobe=128"]
         truth_ids = self._brute_force_truth_ids(xq, xt, min(k, xt.shape[0]))
-        best: dict[str, float] = {
-            "recall_at_k": 0.0,
-            "latency_ms": float("inf"),
-            "param_str": "",
-        }
+        best_recall = 0.0
+        best_latency = float("inf")
+        best_param = ""
         for spec in sweep:
             latency_ms, (_, ids) = self._timed_search_with_params(xq, k, spec)
             recall = self._estimate_recall(ids, truth_ids)
-            is_better = recall > best["recall_at_k"] or (
-                math.isclose(recall, best["recall_at_k"]) and latency_ms < best["latency_ms"]
+            is_better = recall > best_recall or (
+                math.isclose(recall, best_recall) and latency_ms < best_latency
             )
             if is_better:
-                best.update(
-                    {
-                        "recall_at_k": float(recall),
-                        "latency_ms": float(latency_ms),
-                        "param_str": spec,
-                    }
-                )
-        if not best["param_str"]:
-            return best
-        profile = dict(best)
-        for token in best["param_str"].split(","):
+                best_recall = float(recall)
+                best_latency = float(latency_ms)
+                best_param = spec
+        if not best_param:
+            return {
+                "recall_at_k": best_recall,
+                "latency_ms": best_latency,
+                "param_str": best_param,
+            }
+        profile: dict[str, float | str] = {
+            "recall_at_k": best_recall,
+            "latency_ms": best_latency,
+            "param_str": best_param,
+        }
+        for token in best_param.split(","):
             if "=" not in token:
                 continue
             key, raw_value = token.split("=", 1)
@@ -2006,7 +2065,7 @@ class FAISSManager:
         self, queries: NDArrayF32, k: int, param_str: str
     ) -> tuple[float, tuple[NDArrayF32, NDArrayI64]]:
         start = perf_counter()
-        result = self.search_with_params(queries, k, param_str=param_str)
+        result = self._search_with_params(queries, k, param_str=param_str)
         elapsed = (perf_counter() - start) * 1000.0
         return elapsed, result
 

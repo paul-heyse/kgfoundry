@@ -43,6 +43,12 @@ MAX_TIMEOUT: Final[int] = 3600
 
 
 class _PopenFactory(Protocol):
+    """Protocol for subprocess.Popen factory callable.
+
+    This protocol defines the interface for creating subprocess instances
+    with text I/O streams. Used internally for type-safe subprocess creation.
+    """
+
     def __call__(
         self,
         args: Sequence[str],
@@ -114,12 +120,34 @@ TextProcess = _TextProcess
 
 
 class _ToolRunResultProtocol(Protocol):
+    """Protocol for tool execution result.
+
+    This protocol defines the interface for subprocess execution results
+    returned by run_tool implementations.
+
+    Attributes
+    ----------
+    stdout : str
+        Captured standard output from the process.
+    stderr : str
+        Captured standard error from the process.
+    returncode : int
+        Process exit code.
+    """
+
     stdout: str
     stderr: str
     returncode: int
 
 
 class _AllowListPolicyProtocol(Protocol):
+    """Protocol for executable allow-list policy.
+
+    This protocol defines the interface for resolving executable paths
+    through an allow-list policy to ensure only trusted executables
+    are executed.
+    """
+
     def resolve(self, executable: str, command: Sequence[str]) -> Path:
         """Resolve executable path using allow-list policy.
 
@@ -139,6 +167,12 @@ class _AllowListPolicyProtocol(Protocol):
 
 
 class _EnvironmentPolicyProtocol(Protocol):
+    """Protocol for environment variable policy.
+
+    This protocol defines the interface for building environment variable
+    mappings with sanitization and override support.
+    """
+
     def build(self, overrides: Mapping[str, str] | None) -> Mapping[str, str]:
         """Build environment mapping with overrides.
 
@@ -156,11 +190,30 @@ class _EnvironmentPolicyProtocol(Protocol):
 
 
 class _ProcessRunnerProtocol(Protocol):
+    """Protocol for process runner with policies.
+
+    This protocol defines the interface for process runners that combine
+    allow-list and environment policies for secure subprocess execution.
+
+    Attributes
+    ----------
+    allowlist : _AllowListPolicyProtocol
+        Allow-list policy for executable resolution.
+    environment : _EnvironmentPolicyProtocol
+        Environment variable policy for sanitization.
+    """
+
     allowlist: _AllowListPolicyProtocol
     environment: _EnvironmentPolicyProtocol
 
 
 class _RunToolCallable(Protocol):
+    """Protocol for run_tool callable.
+
+    This protocol defines the interface for executing tool commands with
+    timeout, working directory, and environment variable support.
+    """
+
     def __call__(
         self,
         command: Sequence[str],
@@ -194,6 +247,12 @@ class _RunToolCallable(Protocol):
 
 
 class _GetProcessRunnerCallable(Protocol):
+    """Protocol for get_process_runner callable.
+
+    This protocol defines the interface for obtaining process runner instances
+    with configured allow-list and environment policies.
+    """
+
     def __call__(self) -> _ProcessRunnerProtocol:
         """Get process runner instance.
 
@@ -206,18 +265,54 @@ class _GetProcessRunnerCallable(Protocol):
 
 
 class _ToolsSurface(Protocol):
+    """Protocol for tools module surface.
+
+    This protocol defines the interface for the tools module facade used
+    for subprocess execution. Provides error types and execution functions.
+
+    Attributes
+    ----------
+    ToolExecutionError : type[Exception]
+        Exception type raised on tool execution failures.
+    run_tool : _RunToolCallable
+        Function for executing tool commands.
+    get_process_runner : _GetProcessRunnerCallable
+        Function for obtaining process runner instances.
+    """
+
     ToolExecutionError: type[Exception]
     run_tool: _RunToolCallable
     get_process_runner: _GetProcessRunnerCallable
 
 
 class _ToolExecutionErrorSurface(Protocol):
+    """Protocol for tool execution error interface.
+
+    This protocol defines the interface for tool execution errors returned
+    by the tools module. Includes Problem Details and execution context.
+
+    Attributes
+    ----------
+    problem : Mapping[str, object] | None
+        Problem Details dictionary with error information.
+    returncode : int | None
+        Process exit code if available.
+    stderr : str
+        Captured standard error output.
+    """
+
     problem: Mapping[str, object] | None
     returncode: int | None
     stderr: str
 
 
 class _ToolExecutionErrorConstructor(Protocol):
+    """Protocol for tool execution error constructor.
+
+    This protocol defines the interface for constructing tool execution
+    errors with command context and optional Problem Details.
+    """
+
     def __call__(self, message: str, *, command: Sequence[str], **kwargs: object) -> Exception:
         """Create tool execution error.
 
@@ -239,6 +334,24 @@ class _ToolExecutionErrorConstructor(Protocol):
 
 
 def _load_tools_surface() -> _ToolsSurface:
+    """Load tools module surface for subprocess execution.
+
+    Dynamically imports the tools module and returns its surface interface
+    for subprocess execution. Used to avoid importing heavy dependencies
+    at module import time.
+
+    Returns
+    -------
+    _ToolsSurface
+        Tools module surface with ToolExecutionError, run_tool, and
+        get_process_runner.
+
+    Raises
+    ------
+    RuntimeError
+        If the tools module cannot be imported. Includes installation
+        guidance in the error message.
+    """
     try:
         module = import_module("tools")
     except ImportError as exc:
@@ -256,6 +369,21 @@ def _raise_tool_execution_error(
     *,
     command: Sequence[str],
 ) -> NoReturn:
+    """Raise tool execution error with command context.
+
+    Constructs and raises a ToolExecutionError from the tools surface
+    with the provided message and command context.
+
+    Parameters
+    ----------
+    tools_surface : _ToolsSurface
+        Tools module surface for error construction.
+    message : str
+        Error message describing the failure.
+    command : Sequence[str]
+        Command that failed execution.
+
+    """
     tool_error = cast("_ToolExecutionErrorConstructor", tools_surface.ToolExecutionError)
     raise tool_error(message, command=list(command))
 
@@ -287,6 +415,7 @@ class SubprocessTimeoutError(TimeoutError):
         command: list[str] | None = None,
         timeout_seconds: int | None = None,
     ) -> None:
+        """Initialize the timeout error. See class docstring for full details."""
         super().__init__(message)
         self.command = command
         self.timeout_seconds = timeout_seconds
@@ -309,6 +438,7 @@ class SubprocessError(RuntimeError):
     def __init__(
         self, message: str, returncode: int | None = None, stderr: str | None = None
     ) -> None:
+        """Initialize the subprocess error. See class docstring for full details."""
         super().__init__(message)
         self.returncode = returncode
         self.stderr = stderr
@@ -435,6 +565,21 @@ def run_subprocess(
 
 
 def _is_timeout_error(error: _ToolExecutionErrorSurface) -> bool:
+    """Check if error represents a timeout condition.
+
+    Examines the error's Problem Details type or error message to determine
+    if the failure was due to a timeout.
+
+    Parameters
+    ----------
+    error : _ToolExecutionErrorSurface
+        Tool execution error to examine.
+
+    Returns
+    -------
+    bool
+        True if the error represents a timeout, False otherwise.
+    """
     problem = cast("Mapping[str, object] | None", getattr(error, "problem", None))
     if problem is not None:
         raw_type = problem.get("type")

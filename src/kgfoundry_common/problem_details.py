@@ -279,6 +279,29 @@ def _first_arg(args: tuple[object, ...], *, func_name: str) -> object:
 
 
 def _coerce_problem_details_params(*args: object, **kwargs: object) -> ProblemDetailsParams:
+    """Coerce arguments to ProblemDetailsParams dataclass.
+
+    Validates and normalizes arguments for build_problem_details(), supporting
+    both dataclass and positional/keyword argument calling styles.
+
+    Parameters
+    ----------
+    *args : object
+        Either a single ProblemDetailsParams instance or positional arguments
+        (problem_type, title, status, detail, instance).
+    **kwargs : object
+        Optional keyword arguments: code, extensions.
+
+    Returns
+    -------
+    ProblemDetailsParams
+        Normalized parameters dataclass instance.
+
+    Notes
+    -----
+    Raises :class:`TypeError` via helper functions when arguments are invalid,
+    missing required fields, or contain unexpected keyword arguments.
+    """
     if len(args) > 0 and isinstance(args[0], ProblemDetailsParams):
         if len(args) > 1 or kwargs:
             _type_error("build_problem_details() received unexpected extra arguments")
@@ -320,6 +343,31 @@ def _coerce_problem_details_params(*args: object, **kwargs: object) -> ProblemDe
 
 
 def _coerce_exception_params(*args: object, **kwargs: object) -> ExceptionProblemDetailsParams:
+    """Coerce arguments to ExceptionProblemDetailsParams dataclass.
+
+    Validates and normalizes arguments for problem_from_exception(), extracting
+    the exception message as the detail field and supporting both dataclass and
+    positional/keyword argument calling styles.
+
+    Parameters
+    ----------
+    *args : object
+        Either a single ExceptionProblemDetailsParams instance or positional
+        arguments starting with an Exception instance.
+    **kwargs : object
+        Optional keyword arguments: code, extensions. Note that 'detail' cannot
+        be provided as it is extracted from the exception.
+
+    Returns
+    -------
+    ExceptionProblemDetailsParams
+        Normalized parameters dataclass instance with exception and base params.
+
+    Notes
+    -----
+    Raises :class:`TypeError` via helper functions when arguments are invalid,
+    missing required fields, or 'detail' is provided as a keyword argument.
+    """
     if len(args) > 0 and isinstance(args[0], ExceptionProblemDetailsParams):
         if len(args) > 1 or kwargs:
             _type_error("problem_from_exception() received unexpected extra arguments")

@@ -380,7 +380,7 @@ def _build_faiss_index(
     faiss_mgr = FAISSManager(
         index_path=paths.faiss_index,
         vec_dim=index_config.vec_dim,
-        nlist=index_config.nlist,
+        nlist=_resolve_nlist(index_config),
         use_cuvs=index_config.use_cuvs,
         runtime=runtime_opts,
     )
@@ -445,7 +445,7 @@ def _update_faiss_index_incremental(
     faiss_mgr = FAISSManager(
         index_path=paths.faiss_index,
         vec_dim=index_config.vec_dim,
-        nlist=index_config.nlist,
+        nlist=_resolve_nlist(index_config),
         use_cuvs=index_config.use_cuvs,
         runtime=runtime_opts,
     )
@@ -566,6 +566,24 @@ def _runtime_options_from_index(index_config: IndexConfig) -> FAISSRuntimeOption
     )
 
 
+def _resolve_nlist(index_config: IndexConfig) -> int:
+    """Return an integer ``nlist`` value with legacy fallback.
+
+    Parameters
+    ----------
+    index_config : IndexConfig
+        Index configuration possibly containing explicit ``nlist``.
+
+    Returns
+    -------
+    int
+        ``nlist`` resolved from configuration, falling back to legacy field.
+    """
+    if index_config.nlist is not None:
+        return index_config.nlist
+    return index_config.faiss_nlist
+
+
 def _run_offline_evaluation(
     settings: Settings,
     paths: PipelinePaths,
@@ -581,7 +599,7 @@ def _run_offline_evaluation(
     faiss_mgr = FAISSManager(
         index_path=paths.faiss_index,
         vec_dim=settings.index.vec_dim,
-        nlist=settings.index.nlist,
+        nlist=_resolve_nlist(settings.index),
         use_cuvs=settings.index.use_cuvs,
         runtime=runtime_opts,
     )
@@ -593,7 +611,12 @@ def _run_offline_evaluation(
         vllm_client=vllm_client,
         duckdb_manager=duckdb_manager,
     )
-    evaluator.run(queries_path=queries_path, output_dir=settings.eval.output_dir)
+    output_dir = (
+        Path(settings.eval.output_dir)
+        if settings.eval.output_dir and settings.eval.output_dir.strip()
+        else None
+    )
+    evaluator.run(queries_path=queries_path, output_dir=output_dir)
 
 
 def _initialize_duckdb(paths: PipelinePaths, *, materialize: bool) -> int:

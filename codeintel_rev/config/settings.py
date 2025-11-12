@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 import msgspec
 
@@ -23,7 +24,15 @@ DEFAULT_RRF_WEIGHTS: dict[str, float] = {
 }
 
 
-def _env_bool(key: str, default: bool = False) -> bool:
+@dataclass(frozen=True)
+class _HybridChannelSettings:
+    bm25_enabled: bool
+    splade_enabled: bool
+    bm25_k1: float
+    bm25_b: float
+
+
+def _env_bool(key: str, *, default: bool = False) -> bool:
     """Return a boolean flag parsed from environment variables.
 
     Parameters
@@ -471,6 +480,21 @@ class SpladeConfig(msgspec.Struct, frozen=True):
         Default encoding batch size for CLI utilities. Defaults to ``32``.
     threads : int
         Default thread count used for Lucene impact index builds. Defaults to ``8``.
+    enabled : bool
+        Whether the SPLADE channel is enabled. Defaults to ``True``. When disabled,
+        the SPLADE channel is skipped during hybrid search.
+    max_query_terms : int
+        Maximum number of query terms to retain when expanding SPLADE queries.
+        Defaults to ``64``.
+    prune_below : float
+        Minimum score threshold for pruning query terms. Terms with scores below
+        this threshold are excluded. Defaults to ``0.0`` (no pruning).
+    analyzer : Literal["wordpiece", "code"]
+        Tokenizer analyzer type. "wordpiece" uses standard WordPiece tokenization,
+        "code" uses code-aware tokenization. Defaults to ``"wordpiece"``.
+    static_prune_pct : float
+        Static pruning percentage applied during query expansion. Defaults to ``0.0``
+        (no static pruning).
     """
 
     model_id: str = "naver/splade-v3"
@@ -962,22 +986,14 @@ def load_settings() -> Settings:
     hybrid_prefetch = _load_hybrid_prefetch()
     hybrid_weights_override = _load_hybrid_weights_override()
     prf_config = _build_prf_config()
-    (
-        bm25_enabled,
-        splade_enabled,
-        bm25_k1,
-        bm25_b,
-    ) = _load_hybrid_channel_settings()
+    channel_settings = _load_hybrid_channel_settings()
 
     index = _build_index_config(
         rrf_weights=rrf_weights,
         hybrid_prefetch=hybrid_prefetch,
         hybrid_weights_override=hybrid_weights_override,
         prf_config=prf_config,
-        bm25_enabled=bm25_enabled,
-        splade_enabled=splade_enabled,
-        bm25_k1=bm25_k1,
-        bm25_b=bm25_b,
+        channel_settings=channel_settings,
     )
 
     limits = _build_server_limits()
@@ -992,8 +1008,13 @@ def load_settings() -> Settings:
         limits=limits,
         redis=redis,
         duckdb=duckdb_config,
-        bm25=_build_bm25_config(bm25_enabled, bm25_k1, bm25_b, prf_config),
-        splade=_build_splade_config(splade_enabled),
+        bm25=_build_bm25_config(
+            enabled=channel_settings.bm25_enabled,
+            bm25_k1=channel_settings.bm25_k1,
+            bm25_b=channel_settings.bm25_b,
+            prf_config=prf_config,
+        ),
+        splade=_build_splade_config(enabled=channel_settings.splade_enabled),
         coderank=_build_coderank_config(),
         warp=_build_warp_config(),
         xtr=_build_xtr_config(),
@@ -1086,7 +1107,7 @@ def _load_hybrid_weights_override() -> dict[str, float]:
 
 def _build_prf_config() -> PRFConfig:
     return PRFConfig(
-        enable_auto=_env_bool("BM25_PRF_ENABLE_AUTO", True),
+        enable_auto=_env_bool("BM25_PRF_ENABLE_AUTO", default=True),
         fb_docs=int(os.environ.get("BM25_PRF_FB_DOCS", "10")),
         fb_terms=int(os.environ.get("BM25_PRF_FB_TERMS", "10")),
         orig_weight=float(os.environ.get("BM25_PRF_ORIG_WEIGHT", "0.5")),
@@ -1096,12 +1117,13 @@ def _build_prf_config() -> PRFConfig:
     )
 
 
-def _load_hybrid_channel_settings() -> tuple[bool, bool, float, float]:
-    bm25_enabled = _env_bool("HYBRID_ENABLE_BM25", True)
-    splade_enabled = _env_bool("HYBRID_ENABLE_SPLADE", True)
-    bm25_k1 = float(os.environ.get("BM25_K1", "0.9"))
-    bm25_b = float(os.environ.get("BM25_B", "0.4"))
-    return bm25_enabled, splade_enabled, bm25_k1, bm25_b
+def _load_hybrid_channel_settings() -> _HybridChannelSettings:
+    return _HybridChannelSettings(
+        bm25_enabled=_env_bool("HYBRID_ENABLE_BM25", default=True),
+        splade_enabled=_env_bool("HYBRID_ENABLE_SPLADE", default=True),
+        bm25_k1=float(os.environ.get("BM25_K1", "0.9")),
+        bm25_b=float(os.environ.get("BM25_B", "0.4")),
+    )
 
 
 def _build_index_config(
@@ -1110,10 +1132,7 @@ def _build_index_config(
     hybrid_prefetch: dict[str, int],
     hybrid_weights_override: dict[str, float],
     prf_config: PRFConfig,
-    bm25_enabled: bool,
-    splade_enabled: bool,
-    bm25_k1: float,
-    bm25_b: float,
+    channel_settings: _HybridChannelSettings,
 ) -> IndexConfig:
     recency_enabled = _env_bool("INDEX_RECENCY_ENABLED")
     recency_half_life_days = float(os.environ.get("INDEX_RECENCY_HALF_LIFE_DAYS", "30.0"))
@@ -1124,20 +1143,20 @@ def _build_index_config(
         chunk_budget=int(os.environ.get("CHUNK_BUDGET", "2200")),
         faiss_nlist=int(os.environ.get("FAISS_NLIST", "8192")),
         faiss_nprobe=int(os.environ.get("FAISS_NPROBE", "128")),
-        bm25_k1=bm25_k1,
-        bm25_b=bm25_b,
+        bm25_k1=channel_settings.bm25_k1,
+        bm25_b=channel_settings.bm25_b,
         rrf_k=int(os.environ.get("RRF_K", "60")),
-        enable_bm25_channel=bm25_enabled,
-        enable_splade_channel=splade_enabled,
+        enable_bm25_channel=channel_settings.bm25_enabled,
+        enable_splade_channel=channel_settings.splade_enabled,
         hybrid_top_k_per_channel=int(os.environ.get("HYBRID_TOP_K_PER_CHANNEL", "50")),
-        use_cuvs=_env_bool("USE_CUVS", True),
+        use_cuvs=_env_bool("USE_CUVS", default=True),
         faiss_preload=_env_bool("FAISS_PRELOAD"),
         duckdb_materialize=_env_bool("DUCKDB_MATERIALIZE"),
         preview_max_chars=int(os.environ.get("PREVIEW_MAX_CHARS", "240")),
         compaction_threshold=float(os.environ.get("FAISS_COMPACTION_THRESHOLD", "0.05")),
         rrf_weights=rrf_weights,
         hybrid_prefetch=hybrid_prefetch,
-        hybrid_use_rrf=_env_bool("HYBRID_USE_RRF", True),
+        hybrid_use_rrf=_env_bool("HYBRID_USE_RRF", default=True),
         hybrid_weights_override=hybrid_weights_override,
         prf=prf_config,
         recency_enabled=recency_enabled,
@@ -1181,7 +1200,7 @@ def _build_duckdb_config() -> DuckDBConfig:
     )
     return DuckDBConfig(
         threads=int(os.environ.get("DUCKDB_THREADS", str(defaults.threads))),
-        enable_object_cache=_env_bool("DUCKDB_OBJECT_CACHE", True),
+        enable_object_cache=_env_bool("DUCKDB_OBJECT_CACHE", default=True),
         log_queries=_env_bool("DUCKDB_LOG_QUERIES"),
         pool_size=pool_size,
     )
@@ -1199,12 +1218,28 @@ def _build_eval_config() -> EvalConfig:
     )
 
 
+def _resolve_bm25_analyzer(raw: str | None) -> Literal["code", "standard"]:
+    normalized = (raw or "code").strip().lower()
+    if normalized not in {"code", "standard"}:
+        normalized = "code"
+    return cast("Literal['code', 'standard']", normalized)
+
+
+def _resolve_splade_analyzer(raw: str | None) -> Literal["wordpiece", "code"]:
+    normalized = (raw or "wordpiece").strip().lower()
+    if normalized not in {"wordpiece", "code"}:
+        normalized = "wordpiece"
+    return cast("Literal['wordpiece', 'code']", normalized)
+
+
 def _build_bm25_config(
+    *,
     enabled: bool,
     bm25_k1: float,
     bm25_b: float,
     prf_config: PRFConfig,
 ) -> BM25Config:
+    analyzer_value = _resolve_bm25_analyzer(os.environ.get("BM25_ANALYZER", "code"))
     return BM25Config(
         corpus_json_dir=os.environ.get("BM25_JSONL_DIR", "data/jsonl"),
         index_dir=os.environ.get("BM25_INDEX_DIR", "indexes/bm25"),
@@ -1221,18 +1256,15 @@ def _build_bm25_config(
                 str(prf_config.orig_weight),
             )
         ),
-        analyzer=(
-            analyzer
-            if (analyzer := os.environ.get("BM25_ANALYZER", "code").lower()) in {"code", "standard"}
-            else "code"
-        ),
+        analyzer=analyzer_value,
         stopwords=tuple(
             word.strip() for word in os.environ.get("BM25_STOPWORDS", "").split(",") if word.strip()
         ),
     )
 
 
-def _build_splade_config(enabled: bool) -> SpladeConfig:
+def _build_splade_config(*, enabled: bool) -> SpladeConfig:
+    analyzer_value = _resolve_splade_analyzer(os.environ.get("SPLADE_ANALYZER", "wordpiece"))
     return SpladeConfig(
         model_id=os.environ.get("SPLADE_MODEL_ID", "naver/splade-v3"),
         model_dir=os.environ.get("SPLADE_MODEL_DIR", "models/splade-v3"),
@@ -1249,12 +1281,7 @@ def _build_splade_config(enabled: bool) -> SpladeConfig:
         enabled=enabled,
         max_query_terms=int(os.environ.get("SPLADE_MAX_QUERY_TERMS", "64")),
         prune_below=float(os.environ.get("SPLADE_PRUNE_BELOW", "0.0")),
-        analyzer=(
-            splade_analyzer
-            if (splade_analyzer := os.environ.get("SPLADE_ANALYZER", "wordpiece").lower())
-            in {"wordpiece", "code"}
-            else "wordpiece"
-        ),
+        analyzer=analyzer_value,
         static_prune_pct=float(os.environ.get("SPLADE_STATIC_PRUNE_PCT", "0.0")),
     )
 
@@ -1262,10 +1289,10 @@ def _build_splade_config(enabled: bool) -> SpladeConfig:
 def _build_coderank_config() -> CodeRankConfig:
     return CodeRankConfig(
         model_id=os.environ.get("CODERANK_MODEL_ID", "nomic-ai/CodeRankEmbed"),
-        trust_remote_code=_env_bool("CODERANK_TRUST_REMOTE_CODE", True),
+        trust_remote_code=_env_bool("CODERANK_TRUST_REMOTE_CODE", default=True),
         device=os.environ.get("CODERANK_DEVICE", "cpu"),
         batch_size=int(os.environ.get("CODERANK_BATCH", "128")),
-        normalize=_env_bool("CODERANK_NORMALIZE", True),
+        normalize=_env_bool("CODERANK_NORMALIZE", default=True),
         query_prefix=os.environ.get(
             "CODERANK_QUERY_PREFIX",
             "Represent this query for searching relevant code: ",

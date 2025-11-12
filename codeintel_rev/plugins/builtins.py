@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from threading import Lock
 
-from codeintel_rev.io.hybrid_search import BM25SearchProvider, SpladeSearchProvider
+from codeintel_rev.io.hybrid_search import BM25Rm3Config, BM25SearchProvider, SpladeSearchProvider
 from codeintel_rev.plugins.channels import Channel, ChannelContext, ChannelError
 from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
 from codeintel_rev.retrieval.types import ChannelHit
@@ -148,10 +148,12 @@ class _BM25Channel(Channel):
                     index_dir=_resolve_path(self._paths.repo_root, self._settings.bm25.index_dir),
                     k1=self._settings.index.bm25_k1,
                     b=self._settings.index.bm25_b,
-                    rm3_params=rm3_params,
-                    heuristics=heuristics,
-                    enable_rm3=bm25_settings.rm3_enabled,
-                    auto_rm3=prf_settings.enable_auto,
+                    rm3=BM25Rm3Config(
+                        params=rm3_params,
+                        heuristics=heuristics,
+                        enable_rm3=bm25_settings.rm3_enabled,
+                        auto_rm3=prf_settings.enable_auto,
+                    ),
                 )
             except (OSError, RuntimeError, ValueError, ImportError) as exc:
                 self._provider_error = f"BM25 initialization failed: {exc}"

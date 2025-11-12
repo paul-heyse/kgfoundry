@@ -14,14 +14,18 @@ __all__ = [
     "BUDGET_DEPTH",
     "CHANNEL_LATENCY_SECONDS",
     "DEBUG_BUNDLE_TOTAL",
+    "INDEX_VERSION_INFO",
     "QUERIES_TOTAL",
     "QUERY_AMBIGUITY",
     "QUERY_ERRORS_TOTAL",
+    "RECALL_AT_K",
     "RECENCY_BOOSTED_TOTAL",
     "RESULTS_TOTAL",
     "RRF_DURATION_SECONDS",
     "RRF_K",
     "observe_budget_depths",
+    "record_recall",
+    "set_index_version",
 ]
 
 
@@ -50,6 +54,12 @@ CHANNEL_LATENCY_SECONDS = build_histogram(
     ("channel",),
     unit="seconds",
     buckets=(0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0),
+)
+
+INDEX_VERSION_INFO = build_gauge(
+    "codeintel_rev_index_version_info",
+    "Active index version information",
+    ("component",),
 )
 
 RRF_K = build_gauge(
@@ -84,8 +94,41 @@ RECENCY_BOOSTED_TOTAL = build_counter(
     "Documents receiving recency boost",
 )
 
+RECALL_AT_K = build_gauge(
+    "codeintel_rev_recall_at_k",
+    "Offline recall@k for golden queries",
+    ("k",),
+)
+
 
 def observe_budget_depths(depths: Iterable[tuple[str, int]]) -> None:
     """Record per-channel depth decisions."""
     for channel, depth in depths:
         BUDGET_DEPTH.labels(channel=channel).set(float(depth))
+
+
+def record_recall(k: int, value: float) -> None:
+    """Record recall@k values produced by offline harnesses."""
+    RECALL_AT_K.labels(k=str(k)).set(float(value))
+
+
+def set_index_version(component: str, version: str | None) -> None:
+    """Expose the current index version for dashboards.
+
+    Parameters
+    ----------
+    component : str
+        Component identifier ("faiss", "bm25", "splade").
+    version : str | None
+        Version string reported by the lifecycle manager. When the version
+        cannot be parsed as a numeric value the gauge is set to ``0``.
+    """
+    numeric_value = 0.0
+    if version:
+        digits = "".join(char for char in version if char.isdigit())
+        if digits:
+            try:
+                numeric_value = float(digits[:15])
+            except ValueError:
+                numeric_value = 0.0
+    INDEX_VERSION_INFO.labels(component=component).set(numeric_value)

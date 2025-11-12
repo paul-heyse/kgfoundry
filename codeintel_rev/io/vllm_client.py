@@ -275,15 +275,22 @@ class VLLMClient:
             embedding_dim matches the configured model's output dimensionality. Dtype is
             float32. Each row corresponds to the embedding of the corresponding input text.
 
+        Raises
+        ------
+        Exception
+            Exceptions from the embedding operation are caught and re-raised unchanged.
+            Common exceptions include network errors (HTTP mode), model loading errors
+            (local mode), timeout errors, and encoding/decoding errors. Transport
+            exceptions from HTTPX or the in-process engine propagate unchanged so callers
+            can apply their own retry or problem-details handling.
+
         Notes
         -----
         Time complexity O(N * T) where N is batch size and T is average token count per
         text, plus network latency for HTTP mode. Space complexity O(N * embedding_dim)
         for the result matrix. The method performs network I/O in HTTP mode or GPU
         computation in local mode. Thread-safe if the underlying HTTP client or local
-        engine is thread-safe. Empty batches return shape (0, embedding_dim). Transport
-        exceptions from HTTPX or the in-process engine propagate unchanged so callers
-        can apply their own retry or problem-details handling.
+        engine is thread-safe. Empty batches return shape (0, embedding_dim).
         """
         np_module = _get_numpy()
         timeline = current_timeline()

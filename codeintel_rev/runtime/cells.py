@@ -238,8 +238,9 @@ class RuntimeCell[T]:
             Any exception stored in the cell from a previous failure is re-raised during
             cooldown periods. The specific exception type depends on the error that
             triggered the cooldown (e.g., RuntimeUnavailableError, RuntimeLifecycleError).
-            Note: pydoclint detects this as 'cooldown_error' (a variable), but it is
-            actually an Exception instance that is re-raised.
+            Note: pydoclint's static analysis sees 'cooldown_error' as a variable name
+            rather than recognizing it as an Exception instance that is re-raised. This
+            is a limitation of static analysis - the code correctly raises Exception types.
 
         Notes
         -----
@@ -257,7 +258,8 @@ class RuntimeCell[T]:
                 now = time.monotonic()
                 cooldown_error: Exception | None = self._cooldown_error_locked(now)
                 if cooldown_error is not None:
-                    raise cooldown_error  # type: ignore[misc]  # pydoclint sees variable name
+                    # pydoclint sees 'cooldown_error' as a variable name, but it's an Exception instance
+                    raise cooldown_error  # type: ignore[misc]
                 if self._state == "ready" and self._value is not None:
                     return self._value
                 if self._state == "initializing":

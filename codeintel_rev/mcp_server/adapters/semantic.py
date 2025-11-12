@@ -135,6 +135,13 @@ class _SemanticSearchPlan:
 class _MethodContext:
     """Inputs required to build method metadata."""
 
+    findings_count: int
+    requested_limit: int
+    effective_limit: int
+    start_time: float
+    retrieval_channels: Sequence[str]
+    hybrid_method: MethodInfo | None = None
+
 
 @dataclass(frozen=True)
 class _FaissSearchRequest:
@@ -146,13 +153,6 @@ class _FaissSearchRequest:
     nprobe: int
     observation: Observation
     tuning_overrides: Mapping[str, float | int] | None = None
-
-    findings_count: int
-    requested_limit: int
-    effective_limit: int
-    start_time: float
-    retrieval_channels: Sequence[str]
-    hybrid_method: MethodInfo | None = None
 
 
 async def semantic_search(

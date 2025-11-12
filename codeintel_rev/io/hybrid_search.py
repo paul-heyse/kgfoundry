@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from codeintel_rev.evaluation.hybrid_pool import Hit, HybridPoolEvaluator
 from codeintel_rev.observability import metrics as retrieval_metrics
@@ -16,6 +16,7 @@ from codeintel_rev.plugins.channels import Channel, ChannelContext, ChannelError
 from codeintel_rev.plugins.registry import ChannelRegistry
 from codeintel_rev.retrieval.boosters import RecencyConfig, apply_recency_boost
 from codeintel_rev.retrieval.gating import (
+    BudgetDecision,
     StageGateConfig,
     analyze_query,
     decide_budgets,
@@ -38,6 +39,16 @@ if TYPE_CHECKING:
 LOGGER = get_logger(__name__)
 
 
+@dataclass(slots=True, frozen=True)
+class BM25Rm3Config:
+    """Bundle RM3 parameters and heuristics for BM25 search."""
+
+    params: RM3Params | None = None
+    heuristics: RM3Heuristics | None = None
+    enable_rm3: bool = False
+    auto_rm3: bool = False
+
+
 class BM25SearchProvider:
     """Pyserini-backed BM25 searcher with optional RM3 heuristics."""
 
@@ -47,28 +58,26 @@ class BM25SearchProvider:
         *,
         k1: float,
         b: float,
-        rm3_params: RM3Params | None = None,
-        heuristics: RM3Heuristics | None = None,
-        enable_rm3: bool = False,
-        auto_rm3: bool = False,
+        rm3: BM25Rm3Config | None = None,
     ) -> None:
         if not index_dir.exists():
             msg = f"BM25 index not found: {index_dir}"
             raise FileNotFoundError(msg)
+        rm3_cfg = rm3 or BM25Rm3Config()
         self._index_dir = index_dir
         self._lucene_module = import_module("pyserini.search.lucene")
         self._lucene_searcher_cls = self._lucene_module.LuceneSearcher
         self._k1 = float(k1)
         self._b = float(b)
-        self._rm3_params = rm3_params or RM3Params()
-        self._heuristics = heuristics if auto_rm3 else None
-        self._rm3_enabled_default = enable_rm3
-        self._auto_rm3 = auto_rm3
+        self._rm3_params = rm3_cfg.params or RM3Params()
+        self._heuristics = rm3_cfg.heuristics if rm3_cfg.auto_rm3 else None
+        self._rm3_enabled_default = rm3_cfg.enable_rm3
+        self._auto_rm3 = rm3_cfg.auto_rm3
 
-        self._base_searcher = self._create_searcher()
-        self._rm3_searcher = None
+        self._base_searcher: Any = self._create_searcher()
+        self._rm3_searcher: Any | None = None
 
-    def _create_searcher(self) -> object:
+    def _create_searcher(self) -> Any:
         searcher = self._lucene_searcher_cls(str(self._index_dir))
         try:
             searcher.set_bm25(self._k1, self._b)
@@ -76,7 +85,7 @@ class BM25SearchProvider:
             searcher.set_bm25(k1=self._k1, b=self._b)
         return searcher
 
-    def _ensure_rm3_searcher(self) -> object:
+    def _ensure_rm3_searcher(self) -> Any:
         if self._rm3_searcher is not None:
             return self._rm3_searcher
         searcher = self._create_searcher()
@@ -125,10 +134,7 @@ class BM25SearchProvider:
         use_rm3 = self._should_use_rm3(query)
         if force_rm3 is not None:
             use_rm3 = force_rm3
-        if use_rm3:
-            searcher = self._ensure_rm3_searcher()
-        else:
-            searcher = self._base_searcher
+        searcher = self._ensure_rm3_searcher() if use_rm3 else self._base_searcher
         hits = searcher.search(query, k=top_k)
         return [ChannelHit(doc_id=hit.docid, score=float(hit.score)) for hit in hits]
 
@@ -256,7 +262,7 @@ class SpladeSearchProvider:
                 (token, weight) for token, weight in filtered if weight >= self._prune_below
             ]
         if self._static_prune_pct > 0.0 and filtered:
-            keep = max(1, int(round(len(filtered) * (1.0 - self._static_prune_pct))))
+            keep = max(1, round(len(filtered) * (1.0 - self._static_prune_pct)))
             filtered = sorted(filtered, key=lambda item: item[1], reverse=True)[:keep]
         if self._max_query_terms > 0:
             filtered = filtered[: self._max_query_terms]
@@ -304,6 +310,35 @@ class _MethodStats:
     faiss_k: int | None
     nprobe: int | None
     weights: Mapping[str, float]
+
+
+@dataclass(slots=True, frozen=True)
+class _FusionContext:
+    """All inputs required to fuse dense and sparse channel runs."""
+
+    query: str
+    runs: dict[str, list[ChannelHit]]
+    warnings: Sequence[str]
+    limit: int
+    options: HybridSearchOptions
+    budget_decision: BudgetDecision
+    budget_info: Mapping[str, object]
+    timeline: Timeline | None
+
+
+@dataclass(slots=True, frozen=True)
+class _FusionWork:
+    """Resolved fusion parameters after pooler/weights are selected."""
+
+    runs: Mapping[str, Sequence[ChannelHit]]
+    warnings: Sequence[str]
+    limit: int
+    runtime: HybridSearchTuning
+    weights_used: Mapping[str, float]
+    active_channels: Sequence[str]
+    budget_info: Mapping[str, object]
+    budget_decision: BudgetDecision
+    timeline: Timeline | None
 
 
 class HybridSearchEngine:
@@ -374,6 +409,26 @@ class HybridSearchEngine:
             table=self._settings.index.recency_table,
         )
 
+    @staticmethod
+    def _profile_query(
+        query: str,
+        gate_cfg: StageGateConfig,
+        timeline: Timeline | None,
+    ) -> tuple[BudgetDecision, dict[str, object]]:
+        profile = analyze_query(query, gate_cfg)
+        retrieval_metrics.QUERY_AMBIGUITY.observe(profile.ambiguity_score)
+        decision = decide_budgets(profile, gate_cfg)
+        budget_info = describe_budget_decision(profile, decision)
+        retrieval_metrics.RRF_K.set(float(decision.rrf_k))
+        retrieval_metrics.observe_budget_depths(decision.per_channel_depths.items())
+        if timeline is not None:
+            timeline.event(
+                "hybrid.query_profile",
+                "query_profile",
+                attrs=budget_info,
+            )
+        return decision, budget_info
+
     def _rrf_fuse(
         self,
         runs: Mapping[str, Sequence[ChannelHit]],
@@ -382,7 +437,7 @@ class HybridSearchEngine:
         rrf_k: int,
     ) -> tuple[list[HybridResultDoc], dict[str, list[tuple[str, int, float]]]]:
         aggregated: dict[str, float] = {}
-        for channel, hits in runs.items():
+        for hits in runs.values():
             for rank, hit in enumerate(hits, start=1):
                 doc_id = str(hit.doc_id)
                 aggregated.setdefault(doc_id, 0.0)
@@ -393,8 +448,8 @@ class HybridSearchEngine:
         contributions_for_docs = {doc.doc_id: contributions.get(doc.doc_id, []) for doc in docs}
         return docs, contributions_for_docs
 
+    @staticmethod
     def _build_debug_bundle(
-        self,
         query: str,
         budget_info: Mapping[str, object],
         channels: Mapping[str, Sequence[ChannelHit]],
@@ -410,6 +465,195 @@ class HybridSearchEngine:
             "rrf_k": rrf_k,
         }
 
+    def _fuse_runs(self, ctx: _FusionContext) -> HybridSearchResult:
+        pooler, weights_used = self._select_pooler(ctx.options)
+        runs = self._apply_extra_channels(ctx.runs, ctx.options.extra_channels)
+        active_channels = self._resolve_active_channels(runs)
+        runtime = ctx.options.tuning or HybridSearchTuning()
+        self._record_fusion_start(runs, ctx.timeline, ctx.budget_decision.rrf_k)
+        work = _FusionWork(
+            runs=runs,
+            warnings=ctx.warnings,
+            limit=ctx.limit,
+            runtime=runtime,
+            weights_used=weights_used,
+            active_channels=active_channels,
+            budget_info=ctx.budget_info,
+            budget_decision=ctx.budget_decision,
+            timeline=ctx.timeline,
+        )
+        docs, contributions_for_docs, method = self._execute_fusion(
+            work=work,
+            pooler=pooler,
+        )
+        docs, boost_count = self._apply_recency_boost_if_needed(docs)
+        if boost_count:
+            retrieval_metrics.RECENCY_BOOSTED_TOTAL.inc(boost_count)
+        debug_bundle = self._build_debug_bundle(
+            ctx.query, ctx.budget_info, runs, ctx.budget_decision.rrf_k
+        )
+        retrieval_metrics.DEBUG_BUNDLE_TOTAL.inc()
+        if ctx.timeline is not None:
+            ctx.timeline.event("hybrid.debug_bundle", "debug", attrs={"bundle": debug_bundle})
+        retrieval_metrics.RESULTS_TOTAL.inc(len(docs))
+        self._explain_last = method
+        return HybridSearchResult(
+            docs=docs,
+            contributions=contributions_for_docs,
+            channels=active_channels,
+            warnings=ctx.warnings,
+            method=method,
+        )
+
+    @staticmethod
+    def _apply_extra_channels(
+        runs: dict[str, list[ChannelHit]],
+        extra_channels: Mapping[str, Sequence[ChannelHit]] | None,
+    ) -> dict[str, list[ChannelHit]]:
+        if not extra_channels:
+            return runs
+        updated = dict(runs)
+        for name, hits in extra_channels.items():
+            if hits:
+                updated[name] = list(hits)
+        return updated
+
+    @staticmethod
+    def _resolve_active_channels(runs: Mapping[str, Sequence[ChannelHit]]) -> list[str]:
+        return [channel for channel, hits in runs.items() if hits] or ["semantic"]
+
+    @staticmethod
+    def _record_fusion_start(
+        runs: Mapping[str, Sequence[ChannelHit]],
+        timeline: Timeline | None,
+        rrf_k: int,
+    ) -> None:
+        if timeline is None or not runs:
+            return
+        total_candidates = sum(len(hits) for hits in runs.values())
+        timeline.event(
+            "hybrid.fuse.start",
+            "fusion",
+            attrs={
+                "channels": list(runs.keys()),
+                "rrf_k": rrf_k,
+                "total": total_candidates,
+            },
+        )
+
+    def _execute_fusion(
+        self,
+        *,
+        work: _FusionWork,
+        pooler: HybridPoolEvaluator,
+    ) -> tuple[list[HybridResultDoc], dict[str, list[tuple[str, int, float]]], dict[str, object]]:
+        stats = self._method_stats(0, work.limit, work.runtime, work.weights_used)
+        fusion_type = "rrf" if self._settings.index.hybrid_use_rrf else "pool"
+        if not work.runs:
+            method = self._compose_method_metadata(
+                work.active_channels,
+                work.warnings,
+                stats=stats,
+                fusion={"type": fusion_type},
+                budget=work.budget_info,
+            )
+            return [], {}, method
+
+        if self._settings.index.hybrid_use_rrf:
+            docs, contributions_for_docs = self._run_rrf(
+                work.runs,
+                limit=work.limit,
+                rrf_k=work.budget_decision.rrf_k,
+                timeline=work.timeline,
+            )
+            method = self._compose_method_metadata(
+                work.active_channels,
+                work.warnings,
+                stats=self._method_stats(len(docs), work.limit, work.runtime, work.weights_used),
+                fusion={"type": "rrf", "K": work.budget_decision.rrf_k},
+                budget=work.budget_info,
+            )
+            return docs, contributions_for_docs, method
+
+        docs, contributions_for_docs = self._run_pool(
+            work.runs,
+            pooler=pooler,
+            limit=work.limit,
+            timeline=work.timeline,
+        )
+        method = self._compose_method_metadata(
+            work.active_channels,
+            work.warnings,
+            stats=self._method_stats(len(docs), work.limit, work.runtime, work.weights_used),
+            fusion={"type": "pool"},
+            budget=work.budget_info,
+        )
+        return docs, contributions_for_docs, method
+
+    def _run_rrf(
+        self,
+        runs: Mapping[str, Sequence[ChannelHit]],
+        *,
+        limit: int,
+        rrf_k: int,
+        timeline: Timeline | None,
+    ) -> tuple[list[HybridResultDoc], dict[str, list[tuple[str, int, float]]]]:
+        start_rrf = perf_counter()
+        docs, contributions_for_docs = self._rrf_fuse(
+            runs,
+            limit=limit,
+            rrf_k=rrf_k,
+        )
+        retrieval_metrics.RRF_DURATION_SECONDS.observe(perf_counter() - start_rrf)
+        if timeline is not None:
+            timeline.event(
+                "hybrid.fuse.rrf",
+                "fusion",
+                attrs={"rrf_k": rrf_k, "returned": len(docs)},
+            )
+        return docs, contributions_for_docs
+
+    def _run_pool(
+        self,
+        runs: Mapping[str, Sequence[ChannelHit]],
+        *,
+        pooler: HybridPoolEvaluator,
+        limit: int,
+        timeline: Timeline | None,
+    ) -> tuple[list[HybridResultDoc], dict[str, list[tuple[str, int, float]]]]:
+        flattened = self._flatten_hits_for_pool(runs)
+        contributions = self._build_contribution_map(runs)
+        if not flattened:
+            if timeline is not None:
+                timeline.event("hybrid.fuse.pool", "fusion", attrs={"returned": 0})
+            return [], {}
+        pooled_hits = pooler.pool(flattened, k=limit)
+        docs = [
+            HybridResultDoc(doc_id=pooled.doc_id, score=pooled.blended_score)
+            for pooled in pooled_hits
+        ]
+        contributions_for_docs = {doc.doc_id: contributions.get(doc.doc_id, []) for doc in docs}
+        if timeline is not None:
+            timeline.event(
+                "hybrid.fuse.pool",
+                "fusion",
+                attrs={"returned": len(docs)},
+            )
+        return docs, contributions_for_docs
+
+    def _apply_recency_boost_if_needed(
+        self,
+        docs: list[HybridResultDoc],
+    ) -> tuple[list[HybridResultDoc], int]:
+        recency_cfg = self._recency_config()
+        if not recency_cfg.enabled or not docs:
+            return docs, 0
+        return apply_recency_boost(
+            docs,
+            recency_cfg,
+            duckdb_manager=self._duckdb_manager,
+        )
+
     def search(
         self,
         query: str,
@@ -418,170 +662,47 @@ class HybridSearchEngine:
         limit: int,
         options: HybridSearchOptions | None = None,
     ) -> HybridSearchResult:
-        """Fuse dense and sparse retrieval results for ``query`` using adaptive budgets."""
+        """Fuse dense and sparse retrieval results for ``query`` using adaptive budgets.
+
+        Parameters
+        ----------
+        query : str
+            Natural language or code search query.
+        semantic_hits : Sequence[tuple[int, float]]
+            Dense FAISS hits expressed as ``(chunk_id, score)`` pairs.
+        limit : int
+            Maximum number of fused results to return.
+        options : HybridSearchOptions | None, optional
+            Optional overrides for channel weights, additional channels, and FAISS
+            runtime metadata.
+
+        Returns
+        -------
+        HybridSearchResult
+            Structured result set containing fused documents, per-document channel
+            contributions, warnings, and explainability metadata.
+        """
         timeline = current_timeline()
         retrieval_metrics.QUERIES_TOTAL.labels(kind="search").inc()
         gate_cfg = self._make_stage_gate_config()
-        profile = analyze_query(query, gate_cfg)
-        retrieval_metrics.QUERY_AMBIGUITY.observe(profile.ambiguity_score)
-        budget_decision = decide_budgets(profile, gate_cfg)
-        budget_info = describe_budget_decision(profile, budget_decision)
-        retrieval_metrics.RRF_K.set(float(budget_decision.rrf_k))
-        retrieval_metrics.observe_budget_depths(budget_decision.per_channel_depths.items())
-        if timeline is not None:
-            timeline.event(
-                "hybrid.query_profile",
-                "query_profile",
-                attrs=budget_info,
-            )
-
+        budget_decision, budget_info = self._profile_query(query, gate_cfg, timeline)
         runs, warnings = self._gather_channel_hits(
             query,
             semantic_hits,
             channel_limits=budget_decision.per_channel_depths,
         )
-
         opts = options or HybridSearchOptions()
-        extra_channels = opts.extra_channels or {}
-        extra_channel_names = tuple(extra_channels.keys())
-        weights_used = self._resolve_pool_weights(opts.weights, extra_channel_names)
-        needs_custom_pooler = bool(extra_channel_names) or opts.weights is not None
-        pooler = (
-            self._pooler
-            if not needs_custom_pooler
-            else self._make_pooler(opts.weights, extra_channels=extra_channel_names)
-        )
-        for name, hits in extra_channels.items():
-            if hits:
-                runs[name] = list(hits)
-
-        active_channels = [channel for channel, hits in runs.items() if hits] or ["semantic"]
-        if timeline is not None and runs:
-            total_candidates = sum(len(hits) for hits in runs.values())
-            timeline.event(
-                "hybrid.fuse.start",
-                "fusion",
-                attrs={
-                    "channels": list(runs.keys()),
-                    "rrf_k": budget_decision.rrf_k,
-                    "total": total_candidates,
-                },
-            )
-
-        docs: list[HybridResultDoc]
-        contributions_for_docs: dict[str, list[tuple[str, int, float]]]
-        runtime = opts.tuning or HybridSearchTuning()
-
-        if not runs:
-            method = self._compose_method_metadata(
-                active_channels,
-                warnings,
-                stats=_MethodStats(
-                    fused_count=0,
-                    limit=limit,
-                    faiss_k=runtime.k,
-                    nprobe=runtime.nprobe,
-                    weights=weights_used,
-                ),
-                fusion={"type": "rrf" if self._settings.index.hybrid_use_rrf else "pool"},
-                budget=budget_info,
-            )
-            self._explain_last = method
-            return HybridSearchResult(
-                docs=[],
-                contributions={},
-                channels=active_channels,
-                warnings=warnings,
-                method=method,
-            )
-
-        if self._settings.index.hybrid_use_rrf:
-            start_rrf = perf_counter()
-            docs, contributions_for_docs = self._rrf_fuse(
-                runs,
-                limit=limit,
-                rrf_k=budget_decision.rrf_k,
-            )
-            retrieval_metrics.RRF_DURATION_SECONDS.observe(perf_counter() - start_rrf)
-            method = self._compose_method_metadata(
-                active_channels,
-                warnings,
-                stats=_MethodStats(
-                    fused_count=len(docs),
-                    limit=limit,
-                    faiss_k=runtime.k,
-                    nprobe=runtime.nprobe,
-                    weights=weights_used,
-                ),
-                fusion={"type": "rrf", "K": budget_decision.rrf_k},
-                budget=budget_info,
-            )
-            if timeline is not None:
-                timeline.event(
-                    "hybrid.fuse.rrf",
-                    "fusion",
-                    attrs={"rrf_k": budget_decision.rrf_k, "returned": len(docs)},
-                )
-        else:
-            flattened = self._flatten_hits_for_pool(runs)
-            contributions = self._build_contribution_map(runs)
-            if flattened:
-                pooled_hits = pooler.pool(flattened, k=limit)
-                docs = [
-                    HybridResultDoc(doc_id=pooled.doc_id, score=pooled.blended_score)
-                    for pooled in pooled_hits
-                ]
-                contributions_for_docs = {
-                    doc.doc_id: contributions.get(doc.doc_id, []) for doc in docs
-                }
-            else:
-                docs = []
-                contributions_for_docs = {}
-            method = self._compose_method_metadata(
-                active_channels,
-                warnings,
-                stats=_MethodStats(
-                    fused_count=len(docs),
-                    limit=limit,
-                    faiss_k=runtime.k,
-                    nprobe=runtime.nprobe,
-                    weights=weights_used,
-                ),
-                fusion={"type": "pool"},
-                budget=budget_info,
-            )
-            if timeline is not None:
-                timeline.event(
-                    "hybrid.fuse.pool",
-                    "fusion",
-                    attrs={"returned": len(docs)},
-                )
-
-        recency_cfg = self._recency_config()
-        boost_count = 0
-        if recency_cfg.enabled and docs:
-            docs, boost_count = apply_recency_boost(
-                docs,
-                recency_cfg,
-                duckdb_manager=self._duckdb_manager,
-            )
-            if boost_count:
-                retrieval_metrics.RECENCY_BOOSTED_TOTAL.inc(boost_count)
-
-        debug_bundle = self._build_debug_bundle(query, budget_info, runs, budget_decision.rrf_k)
-        retrieval_metrics.DEBUG_BUNDLE_TOTAL.inc()
-        if timeline is not None:
-            timeline.event("hybrid.debug_bundle", "debug", attrs={"bundle": debug_bundle})
-
-        retrieval_metrics.RESULTS_TOTAL.inc(len(docs))
-        self._explain_last = method
-        return HybridSearchResult(
-            docs=docs,
-            contributions=contributions_for_docs,
-            channels=active_channels,
+        ctx = _FusionContext(
+            query=query,
+            runs=runs,
             warnings=warnings,
-            method=method,
+            limit=limit,
+            options=opts,
+            budget_decision=budget_decision,
+            budget_info=budget_info,
+            timeline=timeline,
         )
+        return self._fuse_runs(ctx)
 
     def _gather_channel_hits(
         self,
@@ -610,6 +731,10 @@ class HybridSearchEngine:
             relevant for sparse channels.
         semantic_hits : Sequence[tuple[int, float]]
             Dense retrieval hits expressed as ``(doc_id, score)`` pairs.
+        channel_limits : Mapping[str, int] | None, optional
+            Optional per-channel depth overrides derived from budget decisions.
+            Keys correspond to channel names (e.g., "semantic", "bm25"). When
+            provided, each channel fetches at most the specified number of hits.
 
         Returns
         -------
@@ -818,6 +943,21 @@ class HybridSearchEngine:
         else:
             pooler = self._pooler
         return pooler, weights
+
+    @staticmethod
+    def _method_stats(
+        fused_count: int,
+        limit: int,
+        runtime: HybridSearchTuning,
+        weights: Mapping[str, float],
+    ) -> _MethodStats:
+        return _MethodStats(
+            fused_count=fused_count,
+            limit=limit,
+            faiss_k=runtime.k,
+            nprobe=runtime.nprobe,
+            weights=weights,
+        )
 
     @staticmethod
     def _flatten_hits_for_pool(runs: Mapping[str, Sequence[ChannelHit]]) -> list[Hit]:

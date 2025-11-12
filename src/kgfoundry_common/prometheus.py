@@ -133,11 +133,33 @@ else:  # pragma: no cover - runtime fallback when dependency missing
 
 
 class _CounterCallKwargs(TypedDict, total=False):
+    """TypedDict for Counter constructor keyword arguments.
+
+    Attributes
+    ----------
+    registry : CollectorRegistry
+        Prometheus registry instance.
+    unit : str
+        Unit identifier for the metric.
+    """
+
     registry: CollectorRegistry
     unit: str
 
 
 class _HistogramCallKwargs(TypedDict, total=False):
+    """TypedDict for Histogram constructor keyword arguments.
+
+    Attributes
+    ----------
+    registry : CollectorRegistry
+        Prometheus registry instance.
+    unit : str
+        Unit identifier for the metric.
+    buckets : tuple[float, ...]
+        Histogram bucket boundaries.
+    """
+
     registry: CollectorRegistry
     unit: str
     buckets: tuple[float, ...]
@@ -183,6 +205,13 @@ class HistogramLike(Protocol):
 
 
 class _CounterConstructor(Protocol):
+    """Protocol for Counter constructor callable.
+
+    This protocol defines the interface for constructing Prometheus Counter
+    metrics. Used internally for type-safe metric construction with fallback
+    to no-op stubs when Prometheus is unavailable.
+    """
+
     def __call__(
         self,
         name: str,
@@ -219,6 +248,13 @@ class _CounterConstructor(Protocol):
 
 
 class _GaugeConstructor(Protocol):
+    """Protocol for Gauge constructor callable.
+
+    This protocol defines the interface for constructing Prometheus Gauge
+    metrics. Used internally for type-safe metric construction with fallback
+    to no-op stubs when Prometheus is unavailable.
+    """
+
     def __call__(
         self,
         name: str,
@@ -255,6 +291,13 @@ class _GaugeConstructor(Protocol):
 
 
 class _HistogramConstructor(Protocol):
+    """Protocol for Histogram constructor callable.
+
+    This protocol defines the interface for constructing Prometheus Histogram
+    metrics. Used internally for type-safe metric construction with fallback
+    to no-op stubs when Prometheus is unavailable.
+    """
+
     def __call__(self, *args: object, **kwargs: object) -> HistogramLike:
         """Construct a Histogram metric.
 
@@ -394,6 +437,18 @@ else:  # pragma: no cover - exercised when dependency present
 
 
 def _labels_or_default(labelnames: Sequence[str] | None) -> Sequence[str]:
+    """Convert labelnames to tuple, defaulting to empty tuple if None.
+
+    Parameters
+    ----------
+    labelnames : Sequence[str] | None
+        Label names sequence, or None for no labels.
+
+    Returns
+    -------
+    Sequence[str]
+        Tuple of label names, or empty tuple if labelnames is None.
+    """
     return tuple(labelnames) if labelnames is not None else ()
 
 
@@ -436,6 +491,18 @@ _DOCUMENTATION_POSITION = 1
 
 
 def _histogram_type_error(message: str) -> NoReturn:
+    """Raise TypeError with the provided message.
+
+    Parameters
+    ----------
+    message : str
+        Error message describing the type error.
+
+    Raises
+    ------
+    TypeError
+        Always raises with the provided message.
+    """
     raise TypeError(message)
 
 

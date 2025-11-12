@@ -354,6 +354,8 @@ class _BaseStubFAISSManager:
             Number of results to return.
         nprobe : int, optional
             Number of probes. Defaults to 128.
+        runtime : object | None, optional
+            Runtime override bundle captured for verification in tests.
 
         Returns
         -------

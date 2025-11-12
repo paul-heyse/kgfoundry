@@ -304,10 +304,6 @@ class _MethodStrategy(RetryStrategy[object]):
         object
             Result of function execution.
 
-        Raises
-        ------
-        Exception
-            Any exception raised by the function after retries are exhausted.
         """
         return self.retrying(fn)
 

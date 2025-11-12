@@ -109,9 +109,7 @@ class RM3Heuristics:
             return True
         if self._looks_symbolic(query):
             return False
-        if any(token in self._head_terms for token in tokens):
-            return True
-        return False
+        return any(token in self._head_terms for token in tokens)
 
     def parameters(self) -> RM3Params:
         """Return the RM3 parameters associated with this heuristic.

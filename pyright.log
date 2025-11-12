@@ -1,0 +1,219 @@
+/home/paul/kgfoundry/codeintel_rev/app/config_context.py
+  /home/paul/kgfoundry/codeintel_rev/app/config_context.py:981:19 - error: Argument of type "ResolvedPaths" cannot be assigned to parameter "paths" of type "PathsConfig" in function "__init__"
+    "ResolvedPaths" is not assignable to "PathsConfig" (reportArgumentType)
+/home/paul/kgfoundry/codeintel_rev/app/routers/index_admin.py
+  /home/paul/kgfoundry/codeintel_rev/app/routers/index_admin.py:46:43 - error: Argument of type "dict[str, object]" cannot be assigned to parameter "scope" of type "ScopeIn" in function "set"
+    "dict[str, object]" is not assignable to "ScopeIn" (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/app/routers/index_admin.py:486:51 - error: Argument of type "dict[str, object]" cannot be assigned to parameter "scope" of type "ScopeIn" in function "set"
+    "dict[str, object]" is not assignable to "ScopeIn" (reportArgumentType)
+/home/paul/kgfoundry/codeintel_rev/bin/index_all.py
+  /home/paul/kgfoundry/codeintel_rev/bin/index_all.py:383:15 - error: Argument of type "int | None" cannot be assigned to parameter "nlist" of type "int" in function "__init__"
+    Type "int | None" is not assignable to type "int"
+      "None" is not assignable to "int" (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/bin/index_all.py:448:15 - error: Argument of type "int | None" cannot be assigned to parameter "nlist" of type "int" in function "__init__"
+    Type "int | None" is not assignable to type "int"
+      "None" is not assignable to "int" (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/bin/index_all.py:584:15 - error: Argument of type "int | None" cannot be assigned to parameter "nlist" of type "int" in function "__init__"
+    Type "int | None" is not assignable to type "int"
+      "None" is not assignable to "int" (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/bin/index_all.py:596:57 - error: Argument of type "str" cannot be assigned to parameter "output_dir" of type "Path | None" in function "run"
+    Type "str" is not assignable to type "Path | None"
+      "str" is not assignable to "Path"
+      "str" is not assignable to "None" (reportArgumentType)
+/home/paul/kgfoundry/codeintel_rev/config/settings.py
+  /home/paul/kgfoundry/codeintel_rev/config/settings.py:1244:18 - error: Argument of type "str" cannot be assigned to parameter "analyzer" of type "Literal['code', 'standard']" in function "__init__"
+    Type "str" is not assignable to type "Literal['code', 'standard']"
+      "str" is not assignable to type "Literal['code']"
+      "str" is not assignable to type "Literal['standard']" (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/config/settings.py:1272:18 - error: Argument of type "str" cannot be assigned to parameter "analyzer" of type "Literal['wordpiece', 'code']" in function "__init__"
+    Type "str" is not assignable to type "Literal['wordpiece', 'code']"
+      "str" is not assignable to type "Literal['wordpiece']"
+      "str" is not assignable to type "Literal['code']" (reportArgumentType)
+/home/paul/kgfoundry/codeintel_rev/evaluation/scip_coverage.py
+  /home/paul/kgfoundry/codeintel_rev/evaluation/scip_coverage.py:166:45 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+    Type "object" is not assignable to type "ConvertibleToFloat"
+      "object" is not assignable to "str"
+      "object" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "object" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "object" is incompatible with protocol "SupportsIndex"
+        "__index__" is not present (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/evaluation/scip_coverage.py:167:45 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+    Type "object" is not assignable to type "ConvertibleToFloat"
+      "object" is not assignable to "str"
+      "object" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "object" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "object" is incompatible with protocol "SupportsIndex"
+        "__index__" is not present (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/evaluation/scip_coverage.py:169:19 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+    Type "object" is not assignable to type "ConvertibleToFloat"
+      "object" is not assignable to "str"
+      "object" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "object" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "object" is incompatible with protocol "SupportsIndex"
+        "__index__" is not present (reportArgumentType)
+/home/paul/kgfoundry/codeintel_rev/io/faiss_manager.py
+  /home/paul/kgfoundry/codeintel_rev/io/faiss_manager.py:1751:26 - error: Type "dict[str, float | str]" is not assignable to declared type "dict[str, float]"
+    "Literal['']" is not assignable to "float" (reportAssignmentType)
+  /home/paul/kgfoundry/codeintel_rev/io/faiss_manager.py:1760:17 - error: No overloads for "update" match the provided arguments (reportCallIssue)
+  /home/paul/kgfoundry/codeintel_rev/io/faiss_manager.py:1761:21 - error: Argument of type "dict[str, float | str]" cannot be assigned to parameter "m" of type "Iterable[tuple[str, float]]" in function "update"
+    "Literal['recall_at_k']" is not assignable to "tuple[str, float]"
+    "Literal['latency_ms']" is not assignable to "tuple[str, float]"
+    "Literal['param_str']" is not assignable to "tuple[str, float]" (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/io/faiss_manager.py:1770:40 - error: Cannot access attribute "split" for class "float"
+    Attribute "split" is unknown (reportAttributeAccessIssue)
+/home/paul/kgfoundry/codeintel_rev/io/hybrid_search.py
+  /home/paul/kgfoundry/codeintel_rev/io/hybrid_search.py:94:22 - error: Cannot access attribute "set_rm3" for class "object"
+    Attribute "set_rm3" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/io/hybrid_search.py:96:22 - error: Cannot access attribute "set_rm3" for class "object"
+    Attribute "set_rm3" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/io/hybrid_search.py:138:25 - error: Cannot access attribute "search" for class "object"
+    Attribute "search" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/io/hybrid_search.py:504:22 - error: Argument of type "Sequence[str]" cannot be assigned to parameter "warnings" of type "list[str]" in function "__init__"
+    "Sequence[str]" is not assignable to "list[str]" (reportArgumentType)
+/home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:150:5 - error: Fields without default values cannot appear after fields with default values (reportGeneralTypeIssues)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:151:5 - error: Fields without default values cannot appear after fields with default values (reportGeneralTypeIssues)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:152:5 - error: Fields without default values cannot appear after fields with default values (reportGeneralTypeIssues)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:153:5 - error: Fields without default values cannot appear after fields with default values (reportGeneralTypeIssues)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:154:5 - error: Fields without default values cannot appear after fields with default values (reportGeneralTypeIssues)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:255:25 - error: Arguments missing for parameters "findings_count", "requested_limit", "effective_limit", "start_time", "retrieval_channels" (reportCallIssue)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:304:17 - error: Expected 0 positional arguments (reportCallIssue)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:624:20 - error: Argument of type "Mapping[str, object] | None" cannot be assigned to parameter "method" of type "MethodInfo | None" in function "_build_hybrid_result"
+    Type "Mapping[str, object] | None" is not assignable to type "MethodInfo | None"
+      Type "Mapping[str, object]" is not assignable to type "MethodInfo | None"
+        "Mapping[str, object]" is not assignable to "MethodInfo"
+        "Mapping[str, object]" is not assignable to "None" (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:631:16 - error: Argument of type "Mapping[str, object] | None" cannot be assigned to parameter "method" of type "MethodInfo | None" in function "_build_hybrid_result"
+    Type "Mapping[str, object] | None" is not assignable to type "MethodInfo | None"
+      Type "Mapping[str, object]" is not assignable to type "MethodInfo | None"
+        "Mapping[str, object]" is not assignable to "MethodInfo"
+        "Mapping[str, object]" is not assignable to "None" (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:982:30 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+    Type "object" is not assignable to type "ConvertibleToFloat"
+      "object" is not assignable to "str"
+      "object" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "object" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "object" is incompatible with protocol "SupportsIndex"
+        "__index__" is not present (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:982:30 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "object" is not assignable to type "ConvertibleToInt"
+      "object" is not assignable to "str"
+      "object" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "object" is incompatible with protocol "SupportsInt"
+        "__int__" is not present
+      "object" is incompatible with protocol "SupportsIndex"
+        "__index__" is not present
+    ... (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:982:30 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "object" is not assignable to type "ConvertibleToInt"
+      "object" is not assignable to "str"
+      "object" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "object" is incompatible with protocol "SupportsInt"
+        "__int__" is not present
+      "object" is incompatible with protocol "SupportsIndex"
+        "__index__" is not present (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:1237:17 - error: Cannot access attribute "findings_count" for class "_MethodContext"
+    Attribute "findings_count" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:1238:17 - error: Cannot access attribute "requested_limit" for class "_MethodContext"
+    Attribute "requested_limit" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:1239:17 - error: Cannot access attribute "effective_limit" for class "_MethodContext"
+    Attribute "effective_limit" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:1240:17 - error: Cannot access attribute "start_time" for class "_MethodContext"
+    Attribute "start_time" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:1241:17 - error: Cannot access attribute "retrieval_channels" for class "_MethodContext"
+    Attribute "retrieval_channels" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:1243:16 - error: Cannot access attribute "hybrid_method" for class "_MethodContext"
+    Attribute "hybrid_method" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:1244:39 - error: Type "dict[Unknown, Unknown]" is not assignable to declared type "MethodInfo"
+    "dict[Unknown, Unknown]" is not assignable to "MethodInfo" (reportAssignmentType)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:1244:52 - error: Cannot access attribute "hybrid_method" for class "_MethodContext"
+    Attribute "hybrid_method" is unknown (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:1245:48 - error: Could not access item in TypedDict
+    "coverage" is not a required key in "MethodInfo", so access may result in runtime exception (reportTypedDictNotRequiredAccess)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:1246:49 - error: Could not access item in TypedDict
+    "retrieval" is not a required key in "MethodInfo", so access may result in runtime exception (reportTypedDictNotRequiredAccess)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic.py:1248:40 - error: Could not access item in TypedDict
+    "notes" is not a required key in "MethodInfo", so access may result in runtime exception (reportTypedDictNotRequiredAccess)
+/home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic_pro.py
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic_pro.py:434:43 - error: Argument of type "Mapping[str, object] | None" cannot be assigned to parameter "hybrid_method" of type "MethodInfo | None" in function "__init__"
+    Type "Mapping[str, object] | None" is not assignable to type "MethodInfo | None"
+      Type "Mapping[str, object]" is not assignable to type "MethodInfo | None"
+        "Mapping[str, object]" is not assignable to "MethodInfo"
+        "Mapping[str, object]" is not assignable to "None" (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic_pro.py:479:39 - error: Argument of type "Mapping[str, object] | None" cannot be assigned to parameter "hybrid_method" of type "MethodInfo | None" in function "__init__"
+    Type "Mapping[str, object] | None" is not assignable to type "MethodInfo | None"
+      Type "Mapping[str, object]" is not assignable to type "MethodInfo | None"
+        "Mapping[str, object]" is not assignable to "MethodInfo"
+        "Mapping[str, object]" is not assignable to "None" (reportArgumentType)
+  /home/paul/kgfoundry/codeintel_rev/mcp_server/adapters/semantic_pro.py:1552:30 - error: Type "dict[str, object]" is not assignable to declared type "MethodInfo"
+    "dict[str, object]" is not assignable to "MethodInfo" (reportAssignmentType)
+/home/paul/kgfoundry/codeintel_rev/observability/otel.py
+  /home/paul/kgfoundry/codeintel_rev/observability/otel.py:164:16 - error: Cannot assign to attribute "initialized" for class "_TelemetryState"
+    Attribute "initialized" is read-only (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/observability/otel.py:165:16 - error: Cannot assign to attribute "tracing_enabled" for class "_TelemetryState"
+    Attribute "tracing_enabled" is read-only (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/observability/otel.py:172:16 - error: Cannot assign to attribute "initialized" for class "_TelemetryState"
+    Attribute "initialized" is read-only (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/observability/otel.py:173:16 - error: Cannot assign to attribute "tracing_enabled" for class "_TelemetryState"
+    Attribute "tracing_enabled" is read-only (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/observability/otel.py:180:12 - error: Cannot assign to attribute "trace_module" for class "_TelemetryState"
+    Attribute "trace_module" is read-only
+    Attribute "trace_module" is read-only (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/observability/otel.py:181:12 - error: Cannot assign to attribute "tracing_enabled" for class "_TelemetryState"
+    Attribute "tracing_enabled" is read-only (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/codeintel_rev/observability/otel.py:182:12 - error: Cannot assign to attribute "initialized" for class "_TelemetryState"
+    Attribute "initialized" is read-only (reportAttributeAccessIssue)
+/home/paul/kgfoundry/codeintel_rev/retrieval/boosters.py
+  /home/paul/kgfoundry/codeintel_rev/retrieval/boosters.py:72:11 - error: Variable not allowed in type expression (reportInvalidTypeForm)
+  /home/paul/kgfoundry/codeintel_rev/retrieval/boosters.py:84:30 - error: Variable not allowed in type expression (reportInvalidTypeForm)
+  /home/paul/kgfoundry/codeintel_rev/retrieval/boosters.py:90:14 - error: Variable not allowed in type expression (reportInvalidTypeForm)
+  /home/paul/kgfoundry/codeintel_rev/retrieval/boosters.py:140:21 - error: Variable not allowed in type expression (reportInvalidTypeForm)
+/home/paul/kgfoundry/tests/app/test_admin_index.py
+  /home/paul/kgfoundry/tests/app/test_admin_index.py:62:23 - error: Cannot assign to attribute "scope_store" for class "ApplicationContext"
+    "_ScopeStoreStub" is not assignable to "ScopeStore" (reportAttributeAccessIssue)
+  /home/paul/kgfoundry/tests/app/test_admin_index.py:81:23 - error: Cannot assign to attribute "scope_store" for class "ApplicationContext"
+    "_ScopeStoreStub" is not assignable to "ScopeStore" (reportAttributeAccessIssue)
+/home/paul/kgfoundry/tests/codeintel_rev/conftest.py
+  /home/paul/kgfoundry/tests/codeintel_rev/conftest.py:95:16 - error: Argument missing for parameter "eval" (reportCallIssue)
+/home/paul/kgfoundry/tests/codeintel_rev/test_faiss_manager.py
+  /home/paul/kgfoundry/tests/codeintel_rev/test_faiss_manager.py:93:12 - error: "__getitem__" method not defined on type "object" (reportIndexIssue)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_faiss_manager.py:94:12 - error: "__getitem__" method not defined on type "object" (reportIndexIssue)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_faiss_manager.py:95:12 - error: "__getitem__" method not defined on type "object" (reportIndexIssue)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_faiss_manager.py:96:12 - error: "__getitem__" method not defined on type "object" (reportIndexIssue)
+/home/paul/kgfoundry/tests/codeintel_rev/test_offline_eval.py
+  /home/paul/kgfoundry/tests/codeintel_rev/test_offline_eval.py:104:23 - error: Argument of type "_StubFAISSManager" cannot be assigned to parameter "faiss_manager" of type "FAISSManager" in function "__init__"
+    "_StubFAISSManager" is not assignable to "FAISSManager" (reportArgumentType)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_offline_eval.py:105:21 - error: Argument of type "_StubVLLMClient" cannot be assigned to parameter "vllm_client" of type "VLLMClient" in function "__init__"
+    "_StubVLLMClient" is not assignable to "VLLMClient" (reportArgumentType)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_offline_eval.py:111:12 - error: "__getitem__" method not defined on type "object" (reportIndexIssue)
+/home/paul/kgfoundry/tests/codeintel_rev/test_scip_coverage.py
+  /home/paul/kgfoundry/tests/codeintel_rev/test_scip_coverage.py:81:23 - error: Argument of type "_StubFAISSManager" cannot be assigned to parameter "faiss_manager" of type "FAISSManager" in function "__init__"
+    "_StubFAISSManager" is not assignable to "FAISSManager" (reportArgumentType)
+  /home/paul/kgfoundry/tests/codeintel_rev/test_scip_coverage.py:82:21 - error: Argument of type "_StubVLLMClient" cannot be assigned to parameter "vllm_client" of type "VLLMClient" in function "__init__"
+    "_StubVLLMClient" is not assignable to "VLLMClient" (reportArgumentType)
+/home/paul/kgfoundry/tests/codeintel_rev/test_scope_integration.py
+  /home/paul/kgfoundry/tests/codeintel_rev/test_scope_integration.py:65:16 - error: Argument missing for parameter "eval" (reportCallIssue)
+/home/paul/kgfoundry/tests/runtime/test_factory_adjustment.py
+  /home/paul/kgfoundry/tests/runtime/test_factory_adjustment.py:14:14 - error: Cannot assign to attribute "nprobe" for class "_DummyFaiss*"
+    Attribute "nprobe" is read-only (reportAttributeAccessIssue)
+/home/paul/kgfoundry/tools/recall_harness.py
+  /home/paul/kgfoundry/tools/recall_harness.py:262:39 - error: Argument of type "object" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+    Type "object" is not assignable to type "ConvertibleToFloat"
+      "object" is not assignable to "str"
+      "object" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "object" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "object" is incompatible with protocol "SupportsIndex"
+        "__index__" is not present (reportArgumentType)
+72 errors, 0 warnings, 0 informations
