@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -28,16 +28,18 @@ class StitchCounters:
     module_matches: int = 0
     scip_matches: int = 0
 
-    def merge(self, other: StitchCounters) -> None:
-        """Merge counters from another instance into this one.
+    def merge(self, other: StitchCounters) -> StitchCounters:
+        """Return a new StitchCounters instance with merged totals.
 
-        Parameters
-        ----------
-        other : StitchCounters
-            Counter instance to merge from.
+        Returns
+        -------
+        StitchCounters
+            Accumulated counters that include ``other``'s values.
         """
-        self.module_matches += other.module_matches
-        self.scip_matches += other.scip_matches
+        return StitchCounters(
+            module_matches=self.module_matches + other.module_matches,
+            scip_matches=self.scip_matches + other.scip_matches,
+        )
 
 
 @dataclass(slots=True, frozen=True)
@@ -216,24 +218,35 @@ def stitch_nodes(
     stitched: list[NodeRecord] = []
     for node in nodes:
         stitch = node.stitch or StitchInfo(evidence=[])
+        current = StitchInfo(
+            module_id=stitch.module_id,
+            scip_symbol=stitch.scip_symbol,
+            evidence=list(stitch.evidence),
+            confidence=stitch.confidence,
+            candidates=list(stitch.candidates) if stitch.candidates else None,
+        )
         module_row = module_lookup.get(_normalize_path(node.path))
         if module_row:
-            stitch.module_id = module_row.module_id
-            stitch.evidence.append("module-path")
-            counters.module_matches += 1
+            module_evidence = [*current.evidence, "module-path"]
+            current = replace(current, module_id=module_row.module_id, evidence=module_evidence)
+            counters = counters.merge(StitchCounters(module_matches=1))
         if scip_resolver:
             result = scip_resolver.match(node, debug=debug)
             if result:
                 symbol, evidence, confidence, candidates = result
-                stitch.scip_symbol = symbol
-                stitch.evidence.extend(evidence)
-                stitch.confidence = confidence
-                if candidates is not None:
-                    stitch.candidates = candidates
-                counters.scip_matches += 1
-        if stitch.evidence or stitch.module_id or stitch.scip_symbol:
-            node.stitch = stitch
-        stitched.append(node)
+                scip_evidence = [*current.evidence, *evidence]
+                current = replace(
+                    current,
+                    scip_symbol=symbol,
+                    evidence=scip_evidence,
+                    confidence=confidence,
+                    candidates=list(candidates) if candidates is not None else None,
+                )
+                counters = counters.merge(StitchCounters(scip_matches=1))
+        if current.evidence or current.module_id or current.scip_symbol:
+            stitched.append(replace(node, stitch=current))
+        else:
+            stitched.append(node)
     return stitched, counters
 
 

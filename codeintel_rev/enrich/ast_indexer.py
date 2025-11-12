@@ -5,9 +5,10 @@ from __future__ import annotations
 
 import ast
 import logging
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import cast
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -239,8 +240,9 @@ def collect_ast_nodes_from_tree(path: str, tree: ast.AST) -> list[AstNodeRow]:
         Rows ready for serialization.
     """
     module = _module_name_from_path(path)
+    module_node = cast("ast.Module", tree)
     rows: list[AstNodeRow] = []
-    docstring = ast.get_docstring(tree, clean=True)
+    docstring = ast.get_docstring(module_node, clean=True)
     rows.append(
         AstNodeRow(
             path=path,
@@ -267,7 +269,11 @@ def collect_ast_nodes_from_tree(path: str, tree: ast.AST) -> list[AstNodeRow]:
         node_type = info.node.__class__.__name__
         decorators: tuple[str, ...] = ()
         bases: tuple[str, ...] = ()
-        node_doc = ast.get_docstring(info.node, clean=True) if hasattr(info.node, "body") else None
+        node_doc = (
+            ast.get_docstring(info.node, clean=True)
+            if isinstance(info.node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+            else None
+        )
         if isinstance(info.node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             decorators = tuple(
                 value
@@ -384,16 +390,14 @@ def write_ast_parquet(
     pq.write_table(metric_table, out_dir / "ast_metrics.parquet")
 
 
-def _table_from_rows(rows: Sequence[object], schema: pa.Schema) -> pa.Table:
+RowType = AstNodeRow | AstMetricsRow
+
+
+def _table_from_rows(rows: Sequence[RowType], schema: pa.Schema) -> pa.Table:
     if not rows:
         empty_arrays = [pa.array([], type=field.type) for field in schema]
         return pa.Table.from_arrays(empty_arrays, schema=schema)
-    as_dicts: list[dict[str, object]] = []
-    for row in rows:
-        if hasattr(row, "as_record"):
-            as_dicts.append(row.as_record())  # type: ignore[assignment]
-        else:
-            as_dicts.append(asdict(row))  # pragma: no cover - fallback
+    as_dicts = [row.as_record() for row in rows]
     return pa.Table.from_pylist(as_dicts, schema=schema)
 
 
@@ -427,83 +431,83 @@ class _MetricsVisitor(ast.NodeVisitor):  # noqa: PLR0904 - visitor needs dedicat
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         self.func_count += 1
-        super().visit_FunctionDef(node)
+        self.generic_visit(node)
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
         self.func_count += 1
-        super().visit_AsyncFunctionDef(node)
+        self.generic_visit(node)
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         self.class_count += 1
-        super().visit_ClassDef(node)
+        self.generic_visit(node)
 
     def visit_Assign(self, node: ast.Assign) -> None:
         self.assign_count += 1
-        super().visit_Assign(node)
+        self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         self.assign_count += 1
-        super().visit_AnnAssign(node)
+        self.generic_visit(node)
 
     def visit_AugAssign(self, node: ast.AugAssign) -> None:
         self.assign_count += 1
-        super().visit_AugAssign(node)
+        self.generic_visit(node)
 
     def visit_NamedExpr(self, node: ast.NamedExpr) -> None:
         self.assign_count += 1
-        super().visit_NamedExpr(node)
+        self.generic_visit(node)
 
     def visit_Import(self, node: ast.Import) -> None:
         self.import_count += 1
-        super().visit_Import(node)
+        self.generic_visit(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
         self.import_count += 1
-        super().visit_ImportFrom(node)
+        self.generic_visit(node)
 
     def visit_ListComp(self, node: ast.ListComp) -> None:
-        self._with_branch(super().visit_ListComp, node)
+        self._with_branch(self.generic_visit, node)
 
     def visit_SetComp(self, node: ast.SetComp) -> None:
-        self._with_branch(super().visit_SetComp, node)
+        self._with_branch(self.generic_visit, node)
 
     def visit_DictComp(self, node: ast.DictComp) -> None:
-        self._with_branch(super().visit_DictComp, node)
+        self._with_branch(self.generic_visit, node)
 
     def visit_GeneratorExp(self, node: ast.GeneratorExp) -> None:
-        self._with_branch(super().visit_GeneratorExp, node)
+        self._with_branch(self.generic_visit, node)
 
     def visit_BoolOp(self, node: ast.BoolOp) -> None:
-        self._with_branch(super().visit_BoolOp, node)
+        self._with_branch(self.generic_visit, node)
 
     def visit_If(self, node: ast.If) -> None:
-        self._with_branch(super().visit_If, node)
+        self._with_branch(self.generic_visit, node)
 
     def visit_IfExp(self, node: ast.IfExp) -> None:
-        self._with_branch(super().visit_IfExp, node)
+        self._with_branch(self.generic_visit, node)
 
     def visit_For(self, node: ast.For) -> None:
-        self._with_branch(super().visit_For, node)
+        self._with_branch(self.generic_visit, node)
 
     def visit_AsyncFor(self, node: ast.AsyncFor) -> None:
-        self._with_branch(super().visit_AsyncFor, node)
+        self._with_branch(self.generic_visit, node)
 
     def visit_While(self, node: ast.While) -> None:
-        self._with_branch(super().visit_While, node)
+        self._with_branch(self.generic_visit, node)
 
     def visit_Try(self, node: ast.Try) -> None:
-        self._with_branch(super().visit_Try, node)
+        self._with_branch(self.generic_visit, node)
 
     def visit_With(self, node: ast.With) -> None:
-        self._with_branch(super().visit_With, node)
+        self._with_branch(self.generic_visit, node)
 
     def visit_AsyncWith(self, node: ast.AsyncWith) -> None:
-        self._with_branch(super().visit_AsyncWith, node)
+        self._with_branch(self.generic_visit, node)
 
     def visit_Match(self, node: ast.Match) -> None:
-        self._with_branch(super().visit_Match, node)
+        self._with_branch(self.generic_visit, node)
 
-    def _with_branch(self, visitor: callable, node: ast.AST) -> None:
+    def _with_branch(self, visitor: Callable[[ast.AST], None], node: ast.AST) -> None:
         self.branch_nodes += 1
         self._current_nesting += 1
         self.max_nesting = max(self.max_nesting, self._current_nesting)

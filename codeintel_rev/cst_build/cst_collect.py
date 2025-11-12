@@ -43,6 +43,33 @@ class CollectorConfig:
     text_preview_skip_bytes: int = 2_000_000
 
 
+@dataclass(slots=True)
+class _CollectorStatsBuilder:
+    """Mutable builder used while collecting CST stats."""
+
+    files_indexed: int = 0
+    node_rows: int = 0
+    parse_errors: int = 0
+    qname_hits: int = 0
+    scope_resolved: int = 0
+
+    def snapshot(self) -> CollectorStats:
+        """Return an immutable CollectorStats instance.
+
+        Returns
+        -------
+        CollectorStats
+            Frozen stats object ready for serialization.
+        """
+        return CollectorStats(
+            files_indexed=self.files_indexed,
+            node_rows=self.node_rows,
+            parse_errors=self.parse_errors,
+            qname_hits=self.qname_hits,
+            scope_resolved=self.scope_resolved,
+        )
+
+
 @final
 class CSTCollector:
     """Collect LibCST node records for a repository."""
@@ -103,34 +130,37 @@ class CSTCollector:
         tuple[list[NodeRecord], CollectorStats]
             Tuple containing the list of parsed node records and collection statistics.
         """
-        stats = CollectorStats(files_indexed=1)
+        stats_builder = _CollectorStatsBuilder(files_indexed=1)
         rel_path = self._relative_path(path)
         try:
             file_size = path.stat().st_size
             code = path.read_text(encoding="utf-8")
         except OSError as exc:  # pragma: no cover - hardened path
-            stats.parse_errors = 1
-            return [_build_parse_error_node(rel_path, str(exc))], stats
-        wrapper = self._wrap_module(rel_path, code, stats)
+            stats_builder.parse_errors = 1
+            return [_build_parse_error_node(rel_path, str(exc))], stats_builder.snapshot()
+        wrapper = self._wrap_module(rel_path, code, stats_builder)
         if wrapper is None:
-            return [_build_parse_error_node(rel_path, "Failed to build metadata wrapper.")], stats
+            return (
+                [_build_parse_error_node(rel_path, "Failed to build metadata wrapper.")],
+                stats_builder.snapshot(),
+            )
         nodes = list(
             self._emit_nodes(
                 rel_path=rel_path,
                 code=code,
                 wrapper=wrapper,
                 skip_preview=file_size > self._config.text_preview_skip_bytes,
-                stats=stats,
+                stats_builder=stats_builder,
             )
         )
-        stats.node_rows = len(nodes)
-        return nodes, stats
+        stats_builder.node_rows = len(nodes)
+        return nodes, stats_builder.snapshot()
 
     def _wrap_module(
         self,
         rel_path: str,
         code: str,
-        stats: CollectorStats,
+        stats_builder: _CollectorStatsBuilder,
     ) -> cst_metadata.MetadataWrapper | None:
         if self._manager is not None:
             try:
@@ -144,7 +174,7 @@ class CSTCollector:
             return cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
         except cst.ParserSyntaxError as exc:
             logger.warning("LibCST failed to parse %s: %s", rel_path, exc)
-            stats.parse_errors = 1
+            stats_builder.parse_errors = 1
             return None
 
     def _emit_nodes(
@@ -154,7 +184,7 @@ class CSTCollector:
         code: str,
         wrapper: cst_metadata.MetadataWrapper,
         skip_preview: bool,
-        stats: CollectorStats,
+        stats_builder: _CollectorStatsBuilder,
     ) -> Iterable[NodeRecord]:
         """Yield NodeRecord rows for ``rel_path``.
 
@@ -182,9 +212,9 @@ class CSTCollector:
             qnames = _normalize_qnames(qname_entries, module_name)
             scope_label = _scope(scope_map, node)
             if qnames:
-                stats.qname_hits += 1
+                stats_builder.qname_hits += 1
             if scope_label:
-                stats.scope_resolved += 1
+                stats_builder.scope_resolved += 1
             record = NodeRecord(
                 path=rel_path,
                 node_id=_node_id(rel_path, node.__class__.__name__, _node_name(node), span),

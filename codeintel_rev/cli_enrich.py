@@ -995,8 +995,13 @@ def _write_ast_outputs(result: PipelineResult, out: Path, *, emit_ast: bool) -> 
         if candidate.is_file():
             files.append(candidate)
     nodes, metrics = _collect_ast_artifacts(result.root, files)
-    write_ast_parquet(nodes, metrics, out_dir=out / "ast")
-    typer.echo(f"[ast] Wrote AST nodes ({len(nodes)}) and metrics ({len(metrics)}) tables.")
+    ast_dir = out / "ast"
+    write_ast_parquet(nodes, metrics, out_dir=ast_dir)
+    _write_ast_jsonl(ast_dir / "ast_nodes.jsonl", nodes)
+    _write_ast_jsonl(ast_dir / "ast_metrics.jsonl", metrics)
+    typer.echo(
+        f"[ast] Wrote AST nodes ({len(nodes)}) and metrics ({len(metrics)}) tables + JSONL."
+    )
 
 
 def _write_modules_json(out: Path, module_rows: list[dict[str, Any]]) -> None:
@@ -1064,6 +1069,11 @@ def _collect_ast_artifacts(
         node_rows.extend(collect_ast_nodes_from_tree(rel, tree))
         metric_rows.append(compute_ast_metrics(rel, tree))
     return node_rows, metric_rows
+
+
+def _write_ast_jsonl(path: Path, rows: Iterable[AstNodeRow | AstMetricsRow]) -> None:
+    """Persist AST artifacts to JSONL for portability."""
+    write_jsonl(path, [row.as_record() for row in rows])
 
 
 def _normalize_type_signal_map(

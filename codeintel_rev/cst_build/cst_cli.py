@@ -181,14 +181,14 @@ def main(ctx: click.Context, **_: object) -> None:
             click.secho(f"[{idx}/{len(files)}] indexing {rel_path}", fg="blue")
             writer.observe_file(rel_path)
             nodes, file_stats = collector.collect_file(file_path)
-            aggregate_stats.merge(file_stats)
+            aggregate_stats = aggregate_stats.merge(file_stats)
             stitched_nodes, file_stitch = stitch_nodes(
                 nodes,
                 module_lookup=module_lookup,
                 scip_resolver=scip_resolver,
                 debug=options.debug_joins,
             )
-            stitch_totals.merge(file_stitch)
+            stitch_totals = stitch_totals.merge(file_stitch)
             writer.write_nodes(stitched_nodes)
         write_index(
             options.out,

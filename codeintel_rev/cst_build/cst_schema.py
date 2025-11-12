@@ -153,13 +153,21 @@ class CollectorStats:
     qname_hits: int = 0
     scope_resolved: int = 0
 
-    def merge(self, other: CollectorStats) -> None:
-        """Merge counters from ``other`` in place."""
-        self.files_indexed += other.files_indexed
-        self.node_rows += other.node_rows
-        self.parse_errors += other.parse_errors
-        self.qname_hits += other.qname_hits
-        self.scope_resolved += other.scope_resolved
+    def merge(self, other: CollectorStats) -> CollectorStats:
+        """Return a new CollectorStats representing the merged totals.
+
+        Returns
+        -------
+        CollectorStats
+            Accumulated counters including values from ``other``.
+        """
+        return CollectorStats(
+            files_indexed=self.files_indexed + other.files_indexed,
+            node_rows=self.node_rows + other.node_rows,
+            parse_errors=self.parse_errors + other.parse_errors,
+            qname_hits=self.qname_hits + other.qname_hits,
+            scope_resolved=self.scope_resolved + other.scope_resolved,
+        )
 
     def to_dict(self) -> dict[str, int]:
         """Return JSON payload for provider stats.

@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import ast
 import json
-from pathlib import Path
 import textwrap
+from pathlib import Path
 
 import duckdb
 from codeintel_rev.enrich.ast_indexer import (
@@ -69,9 +69,9 @@ def test_ast_collection_and_duckdb_join(tmp_path: Path) -> None:
         nodes_path = (ast_dir / "ast_nodes.parquet").as_posix().replace("'", "''")
         con.execute(f"CREATE TABLE modules AS SELECT * FROM read_json_auto('{modules_path}');")
         con.execute(f"CREATE TABLE ast_nodes AS SELECT * FROM read_parquet('{nodes_path}');")
-        joined = con.execute("SELECT COUNT(*) FROM ast_nodes JOIN modules USING(path);").fetchone()[
-            0
-        ]
+        result = con.execute("SELECT COUNT(*) FROM ast_nodes JOIN modules USING(path);").fetchone()
+        assert result is not None
+        joined = result[0]
     finally:
         con.close()
 

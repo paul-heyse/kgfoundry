@@ -5,14 +5,18 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
-try:  # pragma: no cover - dependency optional at import time
+if TYPE_CHECKING:
     import pyarrow as pa
     import pyarrow.parquet as pq
-except ModuleNotFoundError:  # pragma: no cover
-    pa = None  # type: ignore[assignment]
-    pq = None  # type: ignore[assignment]
+else:  # pragma: no cover - dependency optional at import time
+    try:
+        import pyarrow as pa  # type: ignore[no-redef]
+        import pyarrow.parquet as pq  # type: ignore[no-redef]
+    except ModuleNotFoundError:
+        pa = None  # type: ignore[assignment]
+        pq = None  # type: ignore[assignment]
 
 Source = Literal["faiss", "bm25", "splade", "ann", "oracle"]
 

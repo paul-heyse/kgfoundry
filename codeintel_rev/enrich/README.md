@@ -32,12 +32,12 @@ Outputs (defaults under `codeintel_rev/io/ENRICHED/`):
 - `graphs/symbol_graph.json` – symbol ↔ file edge list (from SCIP, de‑duplicated)
 - `tags/tags_index.yaml` – per‑module tags, plus global tag catalog
 - `../io/CST/` – repo‑wide LibCST dataset built via `codeintel-cst` (see `docs/cst_data.md`)
-- `ast/ast_nodes.parquet` – Python AST nodes w/ qualnames, decorators, bases, docstrings
-- `ast/ast_metrics.parquet` – per-file counts (functions/classes/imports), branch metrics, cyclomatic/cognitive complexity
+- `ast/ast_nodes.parquet` / `ast/ast_nodes.jsonl` – Python AST nodes w/ qualnames, decorators, bases, docstrings
+- `ast/ast_metrics.parquet` / `ast/ast_metrics.jsonl` – per-file counts (functions/classes/imports), branch metrics, cyclomatic/cognitive complexity
 
 ## Data artifacts
 
-The AST layer adds two Parquet tables that slot directly into DuckDB/Polars/Pandas workflows:
+The AST layer adds two tables (Parquet + JSONL mirrors) that slot directly into DuckDB/Polars/Pandas workflows:
 
 | Table | Purpose | Key columns |
 | ----- | ------- | ----------- |
