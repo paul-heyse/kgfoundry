@@ -237,6 +237,38 @@ class _ChunkAccumulator:
         self,
         symbols_with_positions: Sequence[tuple[SymbolDef, int, int]],
     ) -> list[Chunk]:
+        """Build chunks from sorted symbol definitions using greedy packing.
+
+        This method orchestrates the chunking process by creating a mutable
+        builder instance and iteratively adding symbols to it. The builder
+        greedily packs symbols up to the configured character budget, splitting
+        large symbols on blank lines when necessary. After all symbols are
+        processed, the builder finalizes and returns the complete list of chunks.
+
+        Parameters
+        ----------
+        symbols_with_positions : Sequence[tuple[SymbolDef, int, int]]
+            Sequence of (symbol definition, start character offset, end character
+            offset) tuples. Symbols should be pre-sorted by start position to
+            ensure correct chunk ordering. Character offsets are absolute positions
+            within the source file text.
+
+        Returns
+        -------
+        list[Chunk]
+            List of chunks generated from the symbol definitions. Chunks are
+            ordered by their position in the source file and respect symbol
+            boundaries. Each chunk includes precise byte offsets, line numbers,
+            text content, and associated symbol identifiers.
+
+        Notes
+        -----
+        This method delegates the actual chunking logic to `_ChunkBuilder`, which
+        handles greedy packing, budget management, and large symbol splitting.
+        Time complexity: O(n) where n is the number of symbols, assuming symbol
+        addition is O(1) amortized. The method performs no I/O operations and
+        is thread-safe if called with distinct accumulator instances.
+        """
         builder = _ChunkBuilder(config=self)
         for symbol, start, end in symbols_with_positions:
             builder.add_symbol(symbol, start, end)
@@ -262,6 +294,38 @@ class _ChunkBuilder:
         self._current_symbols: list[str] = []
 
     def add_symbol(self, symbol: SymbolDef, start: int, end: int) -> None:
+        """Add a symbol to the current chunk or start a new chunk if needed.
+
+        This method implements greedy chunk packing by attempting to merge the
+        new symbol into the current chunk if it fits within the character budget.
+        If merging would exceed the budget, the current chunk is finalized and
+        a new chunk is started. Large symbols that exceed the budget alone are
+        split across multiple chunks on blank line boundaries.
+
+        Parameters
+        ----------
+        symbol : SymbolDef
+            SCIP symbol definition to add. The symbol's range (start, end) is
+            used to determine chunk boundaries and the symbol identifier is stored
+            in the chunk's symbols tuple.
+        start : int
+            Starting character offset (0-indexed) of the symbol within the
+            source file. Used to compute chunk boundaries and byte offsets.
+        end : int
+            Ending character offset (exclusive, 0-indexed) of the symbol. Used
+            to compute chunk boundaries and determine if the symbol fits in the
+            current chunk.
+
+        Notes
+        -----
+        The method mutates the builder's internal state (_current_start_char,
+        _current_end_char, _current_symbols) and may trigger chunk finalization
+        (_flush_current) or large symbol splitting (_split_large_symbol). Time
+        complexity: O(1) for normal symbol addition, O(n) for large symbol
+        splitting where n is the number of blank-line-separated segments. The
+        method performs no I/O operations and is not thread-safe (designed for
+        single-threaded use within a single builder instance).
+        """
         if self._current_start_char is None or self._current_end_char is None:
             self._start_chunk(start, end, symbol.symbol)
             return
@@ -281,6 +345,31 @@ class _ChunkBuilder:
         self._start_chunk(start, end, symbol.symbol)
 
     def finalize(self) -> list[Chunk]:
+        """Finalize chunk building and return the complete list of chunks.
+
+        This method completes the chunking process by flushing any remaining
+        in-progress chunk (if one exists) and returning the accumulated list
+        of chunks. After finalization, the builder's internal state is cleared
+        and the chunks list is ready for use in indexing or search operations.
+
+        Returns
+        -------
+        list[Chunk]
+            Complete list of chunks generated during the building process. Chunks
+            are ordered by their position in the source file and include all
+            symbols that were added via add_symbol(). The list may be empty if
+            no symbols were added, but typically contains at least one chunk per
+            file with symbol definitions.
+
+        Notes
+        -----
+        This method should be called exactly once after all symbols have been
+        added. Calling finalize() multiple times will flush the current chunk
+        multiple times, potentially creating duplicate chunks. Time complexity:
+        O(1) amortized if the current chunk is already finalized, O(k) where k
+        is the number of symbols in the current chunk if flushing is needed.
+        The method performs no I/O operations and is not thread-safe.
+        """
         self._flush_current()
         return self._chunks
 

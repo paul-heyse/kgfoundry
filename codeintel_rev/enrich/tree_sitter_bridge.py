@@ -1,78 +1,130 @@
 # SPDX-License-Identifier: MIT
+"""Tree-sitter outline helpers used for enrichment artifacts."""
+
 from __future__ import annotations
 
+import importlib
+import importlib.util
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
-from tree_sitter import Language, Parser  # type: ignore[import-not-found]
+from tree_sitter import Language, Node, Parser  # type: ignore[import-not-found]
 
-try:
-    # Prefer the language pack for robust multi-language coverage
-    from tree_sitter_languages import (
-        get_language as _get_language,  # type: ignore[import-not-found]
-    )
+_languages_spec = importlib.util.find_spec("tree_sitter_languages")
+if _languages_spec is not None:  # pragma: no cover
+    _languages_module = importlib.import_module("tree_sitter_languages")
+    _get_language: Any | None = getattr(_languages_module, "get_language", None)
+else:  # pragma: no cover
+    _get_language = None
 
-    def _lang_for_ext(ext: str) -> Language | None:
-        name = {
+try:  # pragma: no cover - optional dependency
+    from tree_sitter_python import language as _python_language  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover
+    _python_language = None  # type: ignore[assignment]
+
+
+def _lang_for_ext(ext: str) -> Language | None:
+    """Resolve a Tree-sitter language for ``ext``.
+
+    Returns
+    -------
+    Language | None
+        Tree-sitter language object when available.
+    """
+    normalized = ext.lower()
+    if _get_language is not None:
+        name_map = {
             ".py": "python",
             ".json": "json",
             ".yaml": "yaml",
             ".yml": "yaml",
             ".toml": "toml",
             ".md": "markdown",
-        }.get(ext.lower())
-        return _get_language(name) if name else None
-except Exception:  # pragma: no cover
-    # Fallback: rely on python only
-    from tree_sitter_python import language as _py_lang  # type: ignore[import-not-found]
+        }
+        target = name_map.get(normalized)
+        if target:
+            language_obj = _get_language(target)
+            if isinstance(language_obj, Language):
+                return language_obj
+    if normalized == ".py" and _python_language is not None:
+        language_obj = _python_language()
+        if isinstance(language_obj, Language):
+            return language_obj
+    return None
 
-    def _lang_for_ext(ext: str) -> Language | None:
-        return _py_lang() if ext.lower() == ".py" else None
 
-
-@dataclass
+@dataclass(slots=True, frozen=True)
 class OutlineNode:
+    """Serializable view of a function/class definition."""
+
     kind: str
     name: str
     start_byte: int
     end_byte: int
 
 
-@dataclass
+@dataclass(slots=True, frozen=True)
 class TSOutline:
+    """Bundle of outline nodes plus the originating Tree-sitter language."""
+
     language: str
     nodes: list[OutlineNode] = field(default_factory=list)
 
 
 def build_outline(path: str | Path, content: bytes) -> TSOutline | None:
-    p = Path(path)
-    lang = _lang_for_ext(p.suffix)
-    if not lang:
+    """Produce a best-effort outline for ``path``'s contents.
+
+    Returns
+    -------
+    TSOutline | None
+        Outline description when a language binding exists.
+    """
+    language = _lang_for_ext(Path(path).suffix)
+    if language is None:
         return None
-    parser = Parser()
-    parser.set_language(lang)
+    parser: Any = Parser()
+    parser.set_language(language)
     tree = parser.parse(content)
 
-    # Light-weight visitor for Python; for other languages we just return an empty outline
-    outline = TSOutline(language=str(lang))
+    outline = TSOutline(language=str(language))
     cursor = tree.walk()
-    stack = [cursor.node]
-
+    current_node = getattr(cursor, "node", None)
+    if current_node is None:
+        return outline
+    stack = [current_node]
     while stack:
         node = stack.pop()
-        # Python-focused outline (best-effort; extend as needed)
-        if node.type in {"function_definition", "class_definition"}:
-            # Heuristic: first child with type 'identifier' is the name
-            name = ""
-            for ch in node.children:
-                if ch.type == "identifier":
-                    name = content[ch.start_byte : ch.end_byte].decode("utf-8", "ignore")
-                    break
+        if node is None:
+            continue
+        node_type = getattr(node, "type", "")
+        if node_type in {"function_definition", "class_definition"}:
             outline.nodes.append(
                 OutlineNode(
-                    kind=node.type, name=name, start_byte=node.start_byte, end_byte=node.end_byte
+                    kind=node_type,
+                    name=_extract_identifier(content, node),
+                    start_byte=getattr(node, "start_byte", 0),
+                    end_byte=getattr(node, "end_byte", 0),
                 )
             )
-        # DFS
-        stack.extend(reversed(node.children))
+        children = list(getattr(node, "children", [])) if hasattr(node, "children") else []
+        stack.extend(reversed(children))
     return outline
+
+
+def _extract_identifier(content: bytes, node: Node | None) -> str:
+    """Return the identifier name for ``node`` if available.
+
+    Returns
+    -------
+    str
+        Identifier name or an empty string when not found.
+    """
+    if node is None:
+        return ""
+    for child in getattr(node, "children", []):
+        if getattr(child, "type", "") == "identifier":
+            start = getattr(child, "start_byte", 0)
+            end = getattr(child, "end_byte", start)
+            return content[start:end].decode("utf-8", "ignore")
+    return ""

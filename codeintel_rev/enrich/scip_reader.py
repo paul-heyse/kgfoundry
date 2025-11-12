@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: MIT
+"""Lightweight helpers for loading and querying SCIP JSON indices."""
+
 from __future__ import annotations
 
 import json
@@ -6,105 +8,154 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-try:
-    import orjson as _json  # type: ignore[import-not-found]
-
-    def _loads(b: bytes) -> Any:
-        return _json.loads(b)
-except Exception:  # pragma: no cover - runtime fallback
-
-    def _loads(b: bytes) -> Any:
-        return json.loads(b.decode("utf-8"))
+try:  # pragma: no cover - optional dependency
+    import orjson as _orjson  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover
+    _orjson = None  # type: ignore[assignment]
 
 
-@dataclass
+def _loads(payload: bytes) -> object:
+    """Deserialize JSON bytes using orjson when available.
+
+    Returns
+    -------
+    object
+        Parsed JSON payload.
+    """
+    if _orjson is not None:
+        return _orjson.loads(payload)
+    return json.loads(payload.decode("utf-8"))
+
+
+@dataclass(slots=True, frozen=True)
 class Occurrence:
+    """Symbol occurrence entry extracted from the SCIP schema."""
+
     symbol: str
     range: list[int] | None = None
     roles: list[str] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True, frozen=True)
 class SymbolInfo:
+    """Symbol metadata bundled with a document."""
+
     symbol: str
     documentation: list[str] = field(default_factory=list)
     kind: str | None = None
     relationships: list[dict[str, Any]] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True, frozen=True)
 class Document:
+    """SCIP document entry (per source file)."""
+
     path: str
     occurrences: list[Occurrence] = field(default_factory=list)
     symbols: list[SymbolInfo] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True, frozen=True)
 class SCIPIndex:
+    """In-memory representation of a SCIP dataset."""
+
     documents: list[Document] = field(default_factory=list)
     external_symbols: dict[str, SymbolInfo] = field(default_factory=dict)
 
     @classmethod
     def load(cls, path: str | Path) -> SCIPIndex:
+        """Load the index from ``path`` (JSON file).
+
+        Returns
+        -------
+        SCIPIndex
+            Parsed index containing documents and external symbols.
         """
-        Load a SCIP index from a JSON file. Tolerates minor schema variations.
-        """
-        p = Path(path)
-        data = _loads(p.read_bytes())
-        docs = []
-        for d in data.get("documents", []):
-            rel = d.get("relativePath") or d.get("relative_path") or d.get("path", "")
-            occs = []
-            for o in d.get("occurrences", []):
-                occs.append(
-                    Occurrence(
-                        symbol=o.get("symbol", ""),
-                        range=o.get("range"),
-                        roles=[
-                            r
-                            for r in (o.get("symbolRoles") or o.get("roles") or [])
-                            if isinstance(r, str)
-                        ],
-                    )
-                )
-            syms = []
-            for s in d.get("symbols", []):
-                syms.append(
-                    SymbolInfo(
-                        symbol=s.get("symbol", ""),
-                        documentation=list(s.get("documentation", [])),
-                        kind=s.get("kind"),
-                        relationships=list(s.get("relationships", [])),
-                    )
-                )
-            docs.append(Document(path=rel, occurrences=occs, symbols=syms))
-        ext = {}
-        for s in data.get("externalSymbols", []):
-            ext[s.get("symbol", "")] = SymbolInfo(
-                symbol=s.get("symbol", ""),
-                documentation=list(s.get("documentation", [])),
-                kind=s.get("kind"),
-                relationships=list(s.get("relationships", [])),
+        raw_blob = _loads(Path(path).read_bytes())
+        if not isinstance(raw_blob, dict):
+            return cls()
+        documents = [_parse_document(doc_record) for doc_record in raw_blob.get("documents", [])]
+        external = {
+            entry.get("symbol", ""): SymbolInfo(
+                symbol=entry.get("symbol", ""),
+                documentation=list(entry.get("documentation", [])),
+                kind=entry.get("kind"),
+                relationships=list(entry.get("relationships", [])),
             )
-        return cls(documents=docs, external_symbols=ext)
+            for entry in raw_blob.get("externalSymbols", [])
+        }
+        return cls(documents=documents, external_symbols=external)
 
     def by_file(self) -> dict[str, Document]:
-        return {d.path: d for d in self.documents}
+        """Return a mapping of relative path → SCIP document.
+
+        Returns
+        -------
+        dict[str, Document]
+            Mapping of file paths to SCIP documents.
+        """
+        return {doc.path: doc for doc in self.documents}
 
     def symbol_to_files(self) -> dict[str, list[str]]:
+        """Return occurrences grouped by symbol.
+
+        Returns
+        -------
+        dict[str, list[str]]
+            Mapping of symbol identifiers to file paths.
+        """
         mapping: dict[str, list[str]] = {}
-        for d in self.documents:
-            for o in d.occurrences:
-                mapping.setdefault(o.symbol, []).append(d.path)
+        for doc in self.documents:
+            for occurrence in doc.occurrences:
+                mapping.setdefault(occurrence.symbol, []).append(doc.path)
         return mapping
 
     def file_symbol_kinds(self) -> dict[str, dict[str, str]]:
-        out: dict[str, dict[str, str]] = {}
-        for d in self.documents:
-            kinds = {}
-            for s in d.symbols:
-                if s.symbol and s.kind:
-                    kinds[s.symbol] = s.kind
+        """Return symbol-kind maps per file.
+
+        Returns
+        -------
+        dict[str, dict[str, str]]
+            Mapping of file paths to symbol-kind dictionaries.
+        """
+        result: dict[str, dict[str, str]] = {}
+        for doc in self.documents:
+            kinds = {symbol.symbol: symbol.kind for symbol in doc.symbols if symbol.kind}
             if kinds:
-                out[d.path] = kinds
-        return out
+                result[doc.path] = kinds
+        return result
+
+
+def _parse_document(record: dict[str, Any]) -> Document:
+    """Convert a raw SCIP document record into a :class:`Document`.
+
+    Returns
+    -------
+    Document
+        Parsed document extracted from the raw SCIP payload.
+    """
+    relative_path = (
+        record.get("relativePath") or record.get("relative_path") or record.get("path", "")
+    )
+    occurrences = [
+        Occurrence(
+            symbol=occurrence.get("symbol", ""),
+            range=occurrence.get("range"),
+            roles=[
+                role
+                for role in (occurrence.get("symbolRoles") or occurrence.get("roles") or [])
+                if isinstance(role, str)
+            ],
+        )
+        for occurrence in record.get("occurrences", [])
+    ]
+    symbols = [
+        SymbolInfo(
+            symbol=symbol.get("symbol", ""),
+            documentation=list(symbol.get("documentation", [])),
+            kind=symbol.get("kind"),
+            relationships=list(symbol.get("relationships", [])),
+        )
+        for symbol in record.get("symbols", [])
+    ]
+    return Document(path=relative_path, occurrences=occurrences, symbols=symbols)

@@ -102,6 +102,51 @@ async def status_endpoint(
 
 
 class PublishBody(TypedDict):
+    """Request body schema for index publication endpoint.
+
+    Extended Summary
+    ----------------
+    This TypedDict defines the structure for publishing a new index version via
+    the /admin/index/publish endpoint. It specifies all required and optional
+    index asset paths (FAISS, DuckDB, SCIP, BM25, SPLADE, XTR) that must be
+    staged before publication. The publication process validates these paths,
+    stages them in a versioned directory, and updates the CURRENT symlink to
+    activate the new version.
+
+    Attributes
+    ----------
+    version : str
+        Version identifier for the new index (e.g., "v1.2.3"). Must be unique
+        and follow semantic versioning conventions. Used to create the versioned
+        directory structure.
+    faiss_index : str
+        Path to the FAISS vector index directory. Required. Must exist and be
+        readable. Contains the vector index files for dense retrieval.
+    duckdb_path : str
+        Path to the DuckDB catalog database file. Required. Must exist and be
+        readable. Contains symbol metadata and chunk catalog for hybrid search.
+    scip_index : str
+        Path to the SCIP index file (JSON or protobuf). Required. Must exist and
+        be readable. Contains symbol definitions and cross-references for code
+        intelligence.
+    bm25_dir : str | None
+        Optional path to the BM25 sparse index directory. If None, BM25 retrieval
+        is unavailable for this version. Used for keyword-based sparse retrieval.
+    splade_dir : str | None
+        Optional path to the SPLADE sparse index directory. If None, SPLADE
+        retrieval is unavailable for this version. Used for learned sparse retrieval.
+    xtr_dir : str | None
+        Optional path to the XTR token index directory. If None, XTR reranking
+        is unavailable for this version. Used for late-interaction reranking.
+
+    Notes
+    -----
+    All paths are resolved relative to the repository root. Required paths (faiss_index,
+    duckdb_path, scip_index) are validated during staging. Optional paths are validated
+    only if provided. The publication process is atomic: if any required asset fails
+    validation, the entire operation is rolled back.
+    """
+
     version: str
     faiss_index: str
     duckdb_path: str
@@ -112,6 +157,47 @@ class PublishBody(TypedDict):
 
 
 class TuningBody(TypedDict, total=False):
+    """Request body schema for runtime tuning endpoint.
+
+    Extended Summary
+    ----------------
+    This TypedDict defines optional runtime tuning parameters that can be applied
+    to the application context's factory adjuster. All fields are optional (total=False),
+    allowing partial updates to specific tuning knobs. Tuning parameters affect how
+    runtime cells (FAISS manager, hybrid search engine) are created and configured.
+    Changes take effect immediately for new runtime cell instances.
+
+    Attributes
+    ----------
+    faiss_nprobe : int, optional
+        FAISS IVF nprobe parameter override. Controls the number of IVF clusters
+        probed during search. Higher values improve recall but increase latency.
+        Applied to FAISS manager factory configuration.
+    faiss_gpu_preference : bool, optional
+        GPU preference flag for FAISS operations. If True, prefers GPU execution
+        when CUDA is available. If False, forces CPU execution. Applied to FAISS
+        manager factory configuration.
+    hybrid_rrf_k : int, optional
+        Reciprocal Rank Fusion k parameter for hybrid search. Controls the
+        fusion algorithm's rank aggregation behavior. Higher k values give more
+        weight to top-ranked results. Applied to hybrid search engine configuration.
+    hybrid_bm25_weight : float, optional
+        BM25 weight in hybrid search fusion. Must be non-negative. Controls the
+        contribution of BM25 scores to the final hybrid ranking. Applied to hybrid
+        search engine configuration.
+    hybrid_splade_weight : float, optional
+        SPLADE weight in hybrid search fusion. Must be non-negative. Controls the
+        contribution of SPLADE scores to the final hybrid ranking. Applied to hybrid
+        search engine configuration.
+
+    Notes
+    -----
+    All fields are optional. Only non-None values are applied to the factory adjuster.
+    Tuning changes affect future runtime cell creation but do not modify existing cells.
+    For immediate effect, combine with index reload operations. Weight parameters should
+    be normalized appropriately for the fusion algorithm.
+    """
+
     faiss_nprobe: int
     faiss_gpu_preference: bool
     hybrid_rrf_k: int
@@ -120,6 +206,49 @@ class TuningBody(TypedDict, total=False):
 
 
 class FaissRuntimeTuningBody(TypedDict, total=False):
+    """Request body schema for FAISS runtime tuning endpoint.
+
+    Extended Summary
+    ----------------
+    This TypedDict defines optional FAISS runtime tuning parameters that can be
+    applied either globally (affecting all searches) or session-specifically (stored
+    in scope metadata for a particular session). All fields are optional (total=False),
+    allowing partial updates to specific tuning knobs. Runtime tuning overrides take
+    precedence over factory defaults and autotune profiles.
+
+    Attributes
+    ----------
+    nprobe : int, optional
+        IVF nprobe override for FAISS search. Controls the number of IVF clusters
+        probed during approximate nearest neighbor search. Higher values improve recall
+        but increase latency. Applied as a runtime override to the FAISS manager.
+    ef_search : int, optional
+        HNSW ef_search parameter override. Controls the size of the candidate set
+        during HNSW graph traversal. Higher values improve recall but increase latency.
+        Only applicable to HNSW indexes. Applied as a runtime override.
+    quantizer_ef_search : int, optional
+        IVF quantizer ef_search parameter override. Controls the quantizer search
+        depth for IVF indexes with HNSW quantizers. Higher values improve quantizer
+        accuracy but increase latency. Applied as a runtime override.
+    k_factor : float, optional
+        Search k factor multiplier. Multiplies the requested k value before performing
+        search, then returns the top-k results. Used to improve recall by searching
+        more candidates than requested. Must be >= 1.0. Applied as a runtime override.
+    session_id : str, optional
+        Optional session identifier for session-scoped tuning. If provided, tuning
+        parameters are persisted in the scope store and applied to searches for that
+        session. If None, parameters are applied globally to the FAISS manager runtime
+        overrides. Session-scoped tuning takes precedence over global tuning.
+
+    Notes
+    -----
+    All fields are optional. Only non-None values are applied. When session_id is
+    provided, tuning is stored in scope metadata and persists across requests for
+    that session. Global tuning affects all searches immediately. Runtime overrides
+    take precedence over factory defaults and autotune profiles. The k_factor must
+    be >= 1.0 or validation will fail.
+    """
+
     nprobe: int
     ef_search: int
     quantizer_ef_search: int

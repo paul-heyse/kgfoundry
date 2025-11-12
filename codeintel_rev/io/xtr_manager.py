@@ -620,8 +620,50 @@ class TorchDeviceModule(Protocol):
     """Subset of torch API required for device resolution."""
 
     class _CudaAPI(Protocol):
-        def is_available(self) -> bool: ...
-        def device_count(self) -> int: ...
+        """Protocol subset of torch.cuda API for device resolution.
+
+        Extended Summary
+        ----------------
+        This Protocol defines the minimal torch.cuda API surface needed for CUDA
+        device detection and enumeration. It provides type-safe access to CUDA
+        availability checks and device counting without requiring a full torch
+        import at type-checking time. Used by XTR index device resolution to
+        determine GPU availability and select appropriate device assignments.
+
+        Methods
+        -------
+        is_available() -> bool
+            Check if CUDA is available on this system. Returns True if CUDA
+            runtime is available and at least one GPU device is accessible,
+            False otherwise. Used to determine if GPU execution is possible.
+
+        device_count() -> int
+            Return the number of CUDA devices available. Returns 0 if CUDA is
+            unavailable or no devices are present. Used to validate device ordinal
+            specifications and select valid GPU devices.
+        """
+
+        def is_available(self) -> bool:
+            """Check if CUDA is available on this system.
+
+            Returns
+            -------
+            bool
+                True if CUDA runtime is available and at least one GPU device
+                is accessible, False otherwise.
+            """
+            ...
+
+        def device_count(self) -> int:
+            """Return the number of CUDA devices available.
+
+            Returns
+            -------
+            int
+                Number of CUDA devices (GPUs) available. Returns 0 if CUDA is
+                unavailable or no devices are present.
+            """
+            ...
 
     cuda: _CudaAPI
 

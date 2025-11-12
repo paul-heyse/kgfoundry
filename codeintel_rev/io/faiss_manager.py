@@ -46,7 +46,7 @@ if TYPE_CHECKING:
     import faiss as _faiss
     import numpy as np
 else:
-    np = cast("np", LazyModule("numpy", "FAISS manager vector operations"))
+    np = cast(Any, LazyModule("numpy", "FAISS manager vector operations"))
 
 LOGGER = get_logger(__name__)
 logger = LOGGER  # Alias for compatibility
@@ -70,7 +70,7 @@ class _LazyFaissProxy:
         """
         if self._module is None:
             imported = gate_import("faiss", "FAISS manager operations")
-            self._module = cast("_faiss", imported)
+            self._module = cast(ModuleType, imported)
         return self._module
 
     def __getattr__(self, name: str) -> object:
@@ -96,7 +96,7 @@ class _LazyFaissProxy:
 
 
 _FAISS_PROXY = _LazyFaissProxy()
-faiss = cast("Any", _FAISS_PROXY)
+faiss = cast(Any, _FAISS_PROXY)
 
 
 def _faiss_module() -> ModuleType:
@@ -588,14 +588,59 @@ class FAISSManager:
         ):
             raw = getattr(id_map_obj, attr, None)
             if callable(raw):
-                return builder(cast("Callable[[int], object]", raw))
+                return builder(cast(Callable[[int], object], raw))
 
         existing_ids = self._build_existing_ids_set(cpu_index, id_map_obj)
         return lambda id_val: int(id_val) in existing_ids
 
     @staticmethod
     def _wrap_bool_contains(raw: Callable[[int], object]) -> Callable[[int], bool]:
+        """Wrap a raw contains function that returns a boolean-like value.
+
+        This helper function wraps FAISS ID map contains methods that return
+        boolean-like values (bool, int, etc.) and ensures they always return
+        a proper boolean. The wrapper handles type conversion and exception
+        handling to provide a robust contains check for ID lookups.
+
+        Parameters
+        ----------
+        raw : Callable[[int], object]
+            Raw contains function from FAISS ID map that accepts an integer ID
+            and returns a boolean-like value (bool, int, etc.). The function
+            may raise TypeError or ValueError for invalid inputs.
+
+        Returns
+        -------
+        Callable[[int], bool]
+            Wrapped contains function that always returns a bool. Returns False
+            if the raw function raises an exception or returns a falsy value,
+            True if the raw function returns a truthy value.
+
+        Notes
+        -----
+        This wrapper is used to normalize FAISS ID map contains() methods that
+        may return different types (bool, int) across FAISS versions. The
+        wrapper ensures consistent boolean return values for duplicate checking
+        in update_index(). Time complexity: O(1) per call, plus the cost of
+        the underlying FAISS contains operation (typically O(1) for hash-based
+        ID maps). The wrapper is thread-safe if the underlying raw function is
+        thread-safe.
+        """
+
         def contains(id_val: int) -> bool:
+            """Check if an ID exists in the FAISS index.
+
+            Parameters
+            ----------
+            id_val : int
+                Document/chunk ID to check for existence in the index.
+
+            Returns
+            -------
+            bool
+                True if the ID exists in the index, False otherwise (including
+                when the check fails due to type errors or invalid inputs).
+            """
             try:
                 return bool(raw(int(id_val)))
             except (TypeError, ValueError):
@@ -605,7 +650,52 @@ class FAISSManager:
 
     @staticmethod
     def _wrap_index_contains(raw: Callable[[int], object]) -> Callable[[int], bool]:
+        """Wrap a raw contains function that returns an index position.
+
+        This helper function wraps FAISS ID map contains methods that return
+        index positions (non-negative integers) when an ID is found, or
+        negative values when not found. The wrapper converts the result to a
+        boolean by checking if the returned index is non-negative.
+
+        Parameters
+        ----------
+        raw : Callable[[int], object]
+            Raw contains function from FAISS ID map that accepts an integer ID
+            and returns an index position (int >= 0 if found, < 0 if not found).
+            The function may raise TypeError or ValueError for invalid inputs.
+
+        Returns
+        -------
+        Callable[[int], bool]
+            Wrapped contains function that returns True if the ID exists (index
+            >= 0), False otherwise. Returns False if the raw function raises an
+            exception or returns a value that coerces to a negative integer.
+
+        Notes
+        -----
+        This wrapper is used to normalize FAISS ID map contains() methods that
+        return index positions rather than booleans. The wrapper uses _coerce_to_int
+        to safely convert the result and checks for non-negative values. Time
+        complexity: O(1) per call, plus the cost of the underlying FAISS contains
+        operation. The wrapper is thread-safe if the underlying raw function is
+        thread-safe.
+        """
+
         def contains(id_val: int) -> bool:
+            """Check if an ID exists in the FAISS index by index position.
+
+            Parameters
+            ----------
+            id_val : int
+                Document/chunk ID to check for existence in the index.
+
+            Returns
+            -------
+            bool
+                True if the ID exists (raw function returns index >= 0), False
+                otherwise (including when the check fails or returns a negative
+                index).
+            """
             try:
                 result = raw(int(id_val))
             except (TypeError, ValueError):
@@ -628,7 +718,7 @@ class FAISSManager:
             at_raw = getattr(id_map_obj, "at", None)
             if not callable(at_raw):
                 return set()
-            at_callable = cast("Callable[[int], int]", at_raw)
+            at_callable = cast(Callable[[int], int], at_raw)
             return {int(at_callable(idx)) for idx in range(n_total)}
         except (AttributeError, TypeError, ValueError):
             return set()
@@ -778,7 +868,7 @@ class FAISSManager:
             n_vectors = self.secondary_index.ntotal
             id_map_obj = getattr(self.secondary_index, "id_map", None)
             if id_map_obj is not None and callable(getattr(id_map_obj, "at", None)):
-                at_callable = cast("Callable[[int], int]", id_map_obj.at)
+                at_callable = cast(Callable[[int], int], id_map_obj.at)
                 self.incremental_ids = {at_callable(i) for i in range(n_vectors)}
             else:
                 self.incremental_ids = set(range(n_vectors))
@@ -1564,7 +1654,7 @@ class FAISSManager:
         if id_map_obj is None or not callable(getattr(id_map_obj, "at", None)):
             msg = f"Index type {type(index).__name__} has invalid id_map interface."
             raise TypeError(msg)
-        at_callable = cast("Callable[[int], int]", id_map_obj.at)
+        at_callable = cast(Callable[[int], int], id_map_obj.at)
 
         base_index = getattr(index, "index", index)
         for i in range(n_vectors):
@@ -2051,7 +2141,7 @@ class FAISSManager:
             )
             return {}
         try:
-            profile = cast("dict[str, float | str]", json.loads(raw))
+            profile = cast(dict[str, float | str], json.loads(raw))
         except json.JSONDecodeError as exc:
             LOGGER.warning(
                 "Failed to parse FAISS autotune profile",

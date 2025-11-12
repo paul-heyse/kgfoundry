@@ -352,6 +352,42 @@ def get_top_level_definitions(definitions: list[SymbolDef]) -> list[SymbolDef]:
 
     # Check if def1 contains def2
     def contains(def1: SymbolDef, def2: SymbolDef) -> bool:
+        """Check if def1's range contains def2's range (proper containment).
+
+        Extended Summary
+        ----------------
+        Determines whether def1's source code range properly contains def2's range,
+        meaning def2 is nested inside def1. This is used to filter out nested
+        definitions (e.g., methods inside classes, inner functions) to identify
+        only top-level definitions. Proper containment means def1's range encloses
+        def2's range but they are not identical.
+
+        Parameters
+        ----------
+        def1 : SymbolDef
+            Outer symbol definition candidate. Its range is checked to see if it
+            contains def2's range.
+        def2 : SymbolDef
+            Inner symbol definition candidate. Its range is checked to see if it
+            is contained within def1's range.
+
+        Returns
+        -------
+        bool
+            True if def1's range properly contains def2's range (def2 is nested
+            inside def1), False otherwise. Returns False if ranges are identical
+            or def2 is not contained.
+
+        Notes
+        -----
+        Time complexity O(1) - simple range comparison. Space complexity O(1).
+        No I/O or side effects. Proper containment means:
+        - def1.start_line <= def2.start_line
+        - def1.end_line >= def2.end_line
+        - Ranges are not identical (different start/end positions)
+        This ensures nested definitions (methods, inner functions) are filtered
+        out, leaving only top-level definitions.
+        """
         r1, r2 = def1.range, def2.range
         return (
             r1.start_line <= r2.start_line

@@ -54,7 +54,7 @@ Error envelope structure:
 from __future__ import annotations
 
 import inspect
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from functools import wraps
 from http import HTTPStatus
@@ -109,6 +109,41 @@ _USER_EXCEPTIONS = (
 
 @dataclass(frozen=True)
 class ProblemMapping:
+    """Mapping from exception type to RFC 9457 Problem Details metadata.
+
+    Extended Summary
+    ----------------
+    This dataclass encapsulates the mapping between Python exception types and
+    RFC 9457 Problem Details fields (code, title, status). It is used by the
+    error handling infrastructure to convert exceptions into standardized Problem
+    Details responses. The mapping is immutable and used as a lookup key in
+    EXCEPTION_TO_ERROR_CODE to determine appropriate HTTP status codes and error
+    codes for different exception types.
+
+    Attributes
+    ----------
+    code : str
+        Machine-readable error code identifier (e.g., "path-not-found",
+        "invalid-parameter"). Used in Problem Details "code" field and for
+        structured logging. Should be kebab-case and descriptive.
+    title : str
+        Human-readable error title (e.g., "Path Not Found", "Invalid Parameter").
+        Used in Problem Details "title" field. Should be title-case and concise.
+    status : int
+        HTTP status code (e.g., 404, 400, 500). Must be a valid HTTP status code
+        (100-599). Used in Problem Details "status" field and HTTP response
+        status. Common values: 400 (Bad Request), 404 (Not Found), 500 (Internal
+        Server Error).
+
+    Notes
+    -----
+    This mapping is used by format_error_response() to convert exceptions into
+    Problem Details. The code should match the problem type URI suffix (e.g.,
+    "path-not-found" maps to "https://kgfoundry.dev/problems/path-not-found").
+    Status codes follow RFC 7231 semantics: 4xx for client errors, 5xx for server
+    errors.
+    """
+
     code: str
     title: str
     status: int
@@ -495,12 +530,79 @@ def handle_adapter_errors(
     """
 
     def decorator(func: F) -> F:
+        """Inner decorator function that wraps the adapter function.
+
+        Extended Summary
+        ----------------
+        This inner function is returned by handle_adapter_errors() and wraps the
+        actual adapter function (func) with exception handling. It detects whether
+        func is async or sync and creates the appropriate wrapper. The wrapper
+        catches all user exceptions, converts them to error envelopes, and returns
+        the envelope instead of re-raising. This ensures consistent error responses
+        at the MCP boundary.
+
+        Parameters
+        ----------
+        func : F
+            The adapter function to wrap. Can be sync or async. Must return a
+            dict-compatible result on success.
+
+        Returns
+        -------
+        F
+            Wrapped function with the same signature as func but with automatic
+            exception handling. The wrapper preserves function metadata (name,
+            docstring, annotations) for FastMCP schema generation.
+        """
         if inspect.iscoroutinefunction(func):
 
             @wraps(func)
             async def async_wrapper(*args: object, **kwargs: object) -> dict[str, object]:
+                """Async wrapper that catches exceptions and converts to error envelopes.
+
+                Extended Summary
+                ----------------
+                This wrapper function handles async adapter functions by awaiting
+                the function call and catching all user exceptions. On success,
+                returns the function result. On exception, converts the exception
+                to a Problem Details error envelope and returns it. System-level
+                exceptions (KeyboardInterrupt, SystemExit, GeneratorExit) are
+                re-raised to allow proper shutdown.
+
+                Parameters
+                ----------
+                *args : object
+                    Positional arguments passed to the wrapped function.
+                **kwargs : object
+                    Keyword arguments passed to the wrapped function.
+
+                Returns
+                -------
+                dict[str, object]
+                    Function result dict on success, or error envelope dict on
+                    exception. The error envelope includes empty_result fields,
+                    error message, and Problem Details.
+
+                Raises
+                ------
+                KeyboardInterrupt
+                    Re-raised to allow proper keyboard interrupt handling.
+                SystemExit
+                    Re-raised to allow proper system shutdown.
+                GeneratorExit
+                    Re-raised to allow proper generator cleanup.
+
+                Notes
+                -----
+                This wrapper ensures all async adapter exceptions are caught and
+                converted to error envelopes. The function signature is preserved
+                for FastMCP schema generation. Time complexity: O(1) wrapper overhead
+                plus the wrapped function's complexity.
+                """
                 try:
-                    result = await func(*args, **kwargs)
+                    # Type cast needed because pyrefly can't infer awaitability from inspect check
+                    coro = cast("Awaitable[dict[str, object]]", func(*args, **kwargs))
+                    result = await coro
                     return cast("dict[str, object]", result)
                 except (KeyboardInterrupt, SystemExit, GeneratorExit):
                     # Re-raise system-level exceptions - these should propagate
@@ -517,6 +619,47 @@ def handle_adapter_errors(
 
         @wraps(func)
         def sync_wrapper(*args: object, **kwargs: object) -> dict[str, object]:
+            """Sync wrapper that catches exceptions and converts to error envelopes.
+
+            Extended Summary
+            ----------------
+            This wrapper function handles sync adapter functions by calling the
+            function and catching all user exceptions. On success, returns the
+            function result. On exception, converts the exception to a Problem
+            Details error envelope and returns it. System-level exceptions
+            (KeyboardInterrupt, SystemExit, GeneratorExit) are re-raised to allow
+            proper shutdown.
+
+            Parameters
+            ----------
+            *args : object
+                Positional arguments passed to the wrapped function.
+            **kwargs : object
+                Keyword arguments passed to the wrapped function.
+
+            Returns
+            -------
+            dict[str, object]
+                Function result dict on success, or error envelope dict on
+                exception. The error envelope includes empty_result fields,
+                error message, and Problem Details.
+
+            Raises
+            ------
+            KeyboardInterrupt
+                Re-raised to allow proper keyboard interrupt handling.
+            SystemExit
+                Re-raised to allow proper system shutdown.
+            GeneratorExit
+                Re-raised to allow proper generator cleanup.
+
+            Notes
+            -----
+            This wrapper ensures all sync adapter exceptions are caught and
+            converted to error envelopes. The function signature is preserved
+            for FastMCP schema generation. Time complexity: O(1) wrapper overhead
+            plus the wrapped function's complexity.
+            """
             try:
                 result = func(*args, **kwargs)
                 return cast("dict[str, object]", result)

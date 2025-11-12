@@ -1,0 +1,5 @@
+# patches/Supporting Documentation/BM25+SPLADEv3-patchfiles/tools_recall_harness.py
+
+## Parse Errors / Notes
+
+- LibCST parse failed: ParserSyntaxError('parser error: error at 2:0: expected one of +, -, ..., AWAIT, False, NAME, NUMBER, None, True, ~', lines=[...], raw_line=3, raw_column=0)

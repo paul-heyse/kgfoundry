@@ -52,6 +52,29 @@ class _TimerRuntime:
         self.stopped = False
 
     def stop(self) -> float:
+        """Stop the timer and compute elapsed duration.
+
+        Extended Summary
+        ----------------
+        This method stops the timer by computing the elapsed time since start
+        and marking the timer as stopped. The duration is computed in milliseconds
+        using high-resolution monotonic time for accuracy. If the timer is already
+        stopped, returns the previously computed duration (idempotent). Used by
+        _StageTimer to capture stage execution times for telemetry.
+
+        Returns
+        -------
+        float
+            Elapsed duration in milliseconds. Returns the previously computed
+            duration if the timer was already stopped (idempotent operation).
+
+        Notes
+        -----
+        Time complexity O(1) - single time calculation. Space complexity O(1).
+        Uses time.perf_counter() for high-resolution monotonic time. The method is
+        idempotent: calling stop() multiple times returns the same duration. Thread-safe
+        if used within a single thread context (not designed for concurrent access).
+        """
         if self.stopped:
             return self.duration_ms
         self.duration_ms = (perf_counter() - self.started_at) * 1000.0
@@ -66,9 +89,53 @@ class _StageTimer:
     _runtime: _TimerRuntime = field(default_factory=_TimerRuntime, init=False, repr=False)
 
     def stop(self) -> None:
+        """Stop the stage timer and finalize duration measurement.
+
+        Extended Summary
+        ----------------
+        This method stops the underlying timer runtime, finalizing the duration
+        measurement. The timer is automatically stopped when exiting the track_stage()
+        context manager, but can be manually stopped earlier if needed. After stopping,
+        the timer can still be converted to StageTiming via snapshot(). Used to
+        explicitly finalize timing measurements before context exit.
+
+        Notes
+        -----
+        Time complexity O(1) - delegates to runtime stop(). Space complexity O(1).
+        The method is idempotent: calling stop() multiple times is safe. The timer
+        is automatically stopped by track_stage() context manager on exit, so manual
+        stopping is typically unnecessary.
+        """
         self._runtime.stop()
 
     def snapshot(self) -> StageTiming:
+        """Capture a timing snapshot with budget comparison.
+
+        Extended Summary
+        ----------------
+        This method creates a StageTiming snapshot containing the stage name, elapsed
+        duration, budget (if set), and whether the budget was exceeded. The snapshot
+        is used for telemetry and observability, enabling performance monitoring and
+        budget-based gating decisions. The timer is stopped (if not already stopped)
+        before creating the snapshot to ensure accurate duration measurement.
+
+        Returns
+        -------
+        StageTiming
+            Immutable timing snapshot containing:
+            - name: Stage identifier
+            - duration_ms: Elapsed time in milliseconds
+            - budget_ms: Optional time budget in milliseconds
+            - exceeded_budget: Boolean indicating if duration exceeded budget
+
+        Notes
+        -----
+        Time complexity O(1) - single stop() call plus object creation. Space
+        complexity O(1) for the StageTiming object. The method stops the timer if
+        not already stopped, ensuring accurate duration measurement. Budget comparison
+        is performed using simple numeric comparison (duration > budget_ms). The snapshot
+        is immutable and can be safely stored or passed to telemetry functions.
+        """
         duration = self._runtime.stop()
         exceeded = bool(self.budget_ms is not None and duration > self.budget_ms)
         return StageTiming(

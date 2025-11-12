@@ -15,7 +15,7 @@ from codeintel_rev.enrich.libcst_bridge import ImportEntry, index_module
 from codeintel_rev.enrich.output_writers import write_json, write_jsonl, write_markdown_module
 from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
 from codeintel_rev.enrich.stubs_overlay import generate_overlay_for_file
-from codeintel_rev.enrich.tagging import infer_tags, load_rules
+from codeintel_rev.enrich.tagging import ModuleTraits, infer_tags, load_rules
 from codeintel_rev.enrich.tree_sitter_bridge import build_outline
 from codeintel_rev.enrich.type_integration import TypeSummary, collect_pyrefly, collect_pyright
 
@@ -46,7 +46,7 @@ app = typer.Typer(
 )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ModuleRecord:
     """Serializable row stored in modules.jsonl."""
 
@@ -80,12 +80,41 @@ class TypeSignals:
 
 
 def _iter_files(root: Path) -> Iterable[Path]:
-    """Yield Python files under ``root`` while skipping hidden paths.
+    """Yield Python files under root while skipping hidden paths.
+
+    Extended Summary
+    ----------------
+    Recursively traverses the directory tree starting from root and yields
+    all Python source files (.py), excluding any paths containing hidden
+    directories (those starting with '.'). This function is used by the
+    enrichment pipeline to discover modules for analysis.
+
+    Parameters
+    ----------
+    root : Path
+        Directory root to scan recursively. Must exist and be readable.
 
     Yields
     ------
     Path
-        Source file ready for analysis.
+        Source file path ready for analysis. Paths are absolute and point
+        to valid Python source files.
+
+    Notes
+    -----
+    Time O(n) where n is the number of files in the tree; memory O(1) aside
+    from the iterator state. No I/O beyond directory traversal; no global state.
+    Hidden paths are determined by checking if any component in the path
+    starts with '.'.
+
+    Examples
+    --------
+    >>> from pathlib import Path
+    >>> files = list(_iter_files(Path("codeintel_rev")))
+    >>> len(files) > 0
+    True
+    >>> all(f.suffix == ".py" for f in files)
+    True
     """
     for candidate in root.rglob("*.py"):
         if any(part.startswith(".") for part in candidate.parts):
@@ -96,15 +125,42 @@ def _iter_files(root: Path) -> Iterable[Path]:
 def _collect_imported_modules(imports: Sequence[ImportEntry]) -> list[str]:
     """Return module names referenced by explicit or star imports.
 
+    Extended Summary
+    ----------------
+    Extracts module names from LibCST import entries, handling both explicit
+    module imports and star imports with aliases. Used during enrichment to
+    build the dependency graph and infer module tags based on imported
+    dependencies.
+
     Parameters
     ----------
-    imports
-        Import entries extracted from LibCST.
+    imports : Sequence[ImportEntry]
+        Import entries extracted from LibCST parsing. Each entry contains
+        module name, imported names, aliases, and star-import flags.
 
     Returns
     -------
     list[str]
-        Ordered list of imported module names.
+        Ordered list of imported module names. Explicit module imports appear
+        first, followed by aliased names from star imports.
+
+    Notes
+    -----
+    Time O(n) where n is the number of import entries; memory O(m) where m
+    is the total number of imported names. No I/O, no global state. Star
+    imports without explicit module names contribute their aliased names
+    to the result.
+
+    Examples
+    --------
+    >>> from codeintel_rev.enrich.libcst_bridge import ImportEntry
+    >>> entries = [
+    ...     ImportEntry(module="os", names=[], aliases={}, is_star=False, level=0),
+    ...     ImportEntry(module=None, names=["foo", "bar"], aliases={}, is_star=True, level=0),
+    ... ]
+    >>> modules = _collect_imported_modules(entries)
+    >>> "os" in modules
+    True
     """
     modules = [entry.module for entry in imports if entry.module]
     modules.extend(alias for entry in imports if entry.module is None for alias in entry.names)
@@ -114,17 +170,40 @@ def _collect_imported_modules(imports: Sequence[ImportEntry]) -> list[str]:
 def _max_type_errors(rel_path: str, type_signals: TypeSignals) -> int:
     """Return the conservative type error count for a module.
 
+    Extended Summary
+    ----------------
+    Computes the maximum type error count across Pyright and Pyrefly checkers
+    for a given module. This conservative approach ensures that modules with
+    type issues are properly tagged even if only one checker reports errors.
+    Used during enrichment to infer quality tags and prioritize overlay
+    generation.
+
     Parameters
     ----------
-    rel_path
-        Module path relative to the scan root.
-    type_signals
-        Aggregated Pyright and Pyrefly summaries.
+    rel_path : str
+        Module path relative to the scan root. Must match keys used in
+        type_signals summaries.
+
+    type_signals : TypeSignals
+        Aggregated Pyright and Pyrefly summaries. Either summary may be None
+        if the corresponding checker was not run or failed.
 
     Returns
     -------
     int
-        Maximum error count reported by either checker.
+        Maximum error count reported by either checker. Returns 0 if the
+        module is not found in either summary or both summaries are None.
+
+    Notes
+    -----
+    Time O(1) dictionary lookup; memory O(1). No I/O, no global state.
+    Missing modules in summaries are treated as having zero errors.
+
+    Examples
+    --------
+    >>> signals = TypeSignals(pyright=None, pyrefly=None)
+    >>> _max_type_errors("test.py", signals)
+    0
     """
     pyrefly = type_signals.pyrefly
     pyrefly_count = (
@@ -140,17 +219,46 @@ def _max_type_errors(rel_path: str, type_signals: TypeSignals) -> int:
 def _outline_nodes(module_path: str, code: str) -> list[dict[str, Any]]:
     """Serialize Tree-sitter outline nodes for the module.
 
+    Extended Summary
+    ----------------
+    Parses the module source code using Tree-sitter and extracts structural
+    outline information (function and class definitions) with byte offsets.
+    This enables downstream tools to navigate and understand module structure
+    without re-parsing. Used during enrichment to populate module metadata.
+
     Parameters
     ----------
-    module_path
-        Relative module path supplied to Tree-sitter.
-    code
-        Source code.
+    module_path : str
+        Relative module path supplied to Tree-sitter for context. Used for
+        error reporting and language detection.
+
+    code : str
+        Source code content as a UTF-8 string. Must be valid Python syntax
+        for accurate parsing.
 
     Returns
     -------
     list[dict[str, Any]]
-        Outline entries capturing start/end byte offsets.
+        List of outline entries, each containing 'kind' (function/class),
+        'name', 'start' (byte offset), and 'end' (byte offset). Returns empty
+        list if parsing fails or no definitions are found.
+
+    Notes
+    -----
+    Time O(n) where n is code length (Tree-sitter parsing); memory O(m) where
+    m is the number of definitions. No I/O beyond parsing; no global state.
+    May raise exceptions if tree-sitter parsing fails due to API mismatches
+    or missing language bindings.
+
+    Examples
+    --------
+    >>> # Returns a list when parsing succeeds
+    >>> try:
+    ...     result = _outline_nodes("test.py", "def foo(): pass")
+    ...     isinstance(result, list)
+    ... except Exception:
+    ...     True  # tree-sitter may be unavailable
+    True
     """
     outline = build_outline(module_path, code.encode("utf-8"))
     if not outline:
@@ -170,10 +278,59 @@ def _build_module_row(
 ) -> tuple[dict[str, Any], list[tuple[str, str]]]:
     """Produce a serialized module row and associated SCIP symbol edges.
 
+    Extended Summary
+    ----------------
+    Orchestrates the enrichment pipeline for a single module by combining
+    LibCST parsing, Tree-sitter outlining, SCIP symbol resolution, type
+    checker signals, and tag inference. This is the core transformation
+    function that converts raw source files into structured module records
+    and symbol graph edges for downstream analysis and indexing.
+
+    Parameters
+    ----------
+    fp : Path
+        Absolute path to the Python source file to process. Must exist and
+        be readable.
+
+    root : Path
+        Repository root directory used to compute relative paths. Must be
+        a parent of fp.
+
+    scip_ctx : ScipContext
+        SCIP index context providing symbol lookup and document mapping.
+        Used to resolve star imports and extract symbol definitions.
+
+    type_signals : TypeSignals
+        Aggregated Pyright and Pyrefly type checker summaries. Used to
+        compute error counts for quality tagging.
+
+    rules : dict[str, Any]
+        Tagging rules dictionary loaded from YAML. Controls how modules
+        are tagged based on imports, exports, and error counts.
+
     Returns
     -------
     tuple[dict[str, Any], list[tuple[str, str]]]
-        Pair of module row dict and `(symbol, file)` edges.
+        Pair of (module row dict, symbol edges). The module row contains
+        path, docstring, imports, defs, exports, outline_nodes, scip_symbols,
+        parse_ok, errors, tags, and type_errors. Symbol edges are tuples of
+        (symbol_id, relative_file_path) for graph construction.
+
+    Notes
+    -----
+    Time O(n + m) where n is file size and m is number of symbols; memory
+    O(n + m) for parsed structures. Performs file I/O, LibCST parsing,
+    Tree-sitter parsing, and SCIP lookups. No global state mutations.
+    Parse errors are captured in the errors list rather than propagated.
+
+    Examples
+    --------
+    >>> from pathlib import Path
+    >>> from codeintel_rev.enrich.scip_reader import SCIPIndex
+    >>> # Requires valid SCIP index and test file
+    >>> # row, edges = _build_module_row(fp, root, scip_ctx, signals, {})
+    >>> # assert isinstance(row, dict)
+    >>> # assert isinstance(edges, list)
     """
     rel_path = str(fp.relative_to(root))
     code = fp.read_text(encoding="utf-8", errors="ignore")
@@ -187,14 +344,13 @@ def _build_module_row(
     )
     type_errors = _max_type_errors(rel_path, type_signals)
 
-    tagging = infer_tags(
-        path=rel_path,
+    traits = ModuleTraits(
         imported_modules=imported_modules,
         has_all=bool(module_index.exports),
         is_reexport_hub=is_reexport_hub,
         type_error_count=type_errors,
-        rules=rules,
     )
+    tagging = infer_tags(path=rel_path, traits=traits, rules=rules)
     if overlay.created:
         tagging.tags.add("overlay-needed")
 

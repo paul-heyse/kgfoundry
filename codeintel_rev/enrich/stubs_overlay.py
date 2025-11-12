@@ -26,21 +26,55 @@ def generate_overlay_for_file(
     package_root: Path,
     scip: SCIPIndex | None,
 ) -> OverlayResult:
-    """Create a `.pyi` overlay for ``py_file`` when public surface warrants it.
+    """Create a `.pyi` overlay for py_file when public surface warrants it.
+
+    Extended Summary
+    ----------------
+    Analyzes a Python source file to determine if it warrants a type stub overlay
+    based on public API surface (exports, star imports, public definitions).
+    When warranted, generates a `.pyi` stub file in the stubs/ directory
+    mirroring the source structure, along with a JSON sidecar containing
+    metadata. This enables type checkers to understand module boundaries
+    without requiring full type annotations in source.
 
     Parameters
     ----------
-    py_file
-        Source module to analyze.
-    package_root
-        Root directory used to mirror stub paths.
-    scip
-        Optional SCIP index for resolving star imports.
+    py_file : Path
+        Absolute path to the Python source file to analyze. Must exist and
+        be readable.
+
+    package_root : Path
+        Root directory of the package being analyzed. Used to compute relative
+        paths and determine stub output locations. Must be a parent of py_file.
+
+    scip : SCIPIndex | None
+        Optional SCIP index for resolving star imports. When provided, enables
+        accurate re-export resolution by looking up symbols from imported
+        modules. If None, star imports are not resolved.
 
     Returns
     -------
     OverlayResult
-        Metadata describing the overlay that was generated.
+        Metadata describing the overlay generation result. Contains pyi_path
+        (None if no overlay was created), exports_resolved (dict mapping module
+        names to sets of exported symbols), and created (bool indicating if
+        a new file was written or an existing one was updated).
+
+    Notes
+    -----
+    Time O(n + m) where n is file size and m is number of symbols to resolve;
+    memory O(n + m) for parsed structures and overlay text. Performs file I/O
+    (read source, write stub and sidecar), LibCST parsing, and SCIP lookups.
+    No global state mutations. Overlays are idempotent: existing stubs are
+    only overwritten if content differs.
+
+    Examples
+    --------
+    >>> from pathlib import Path
+    >>> from codeintel_rev.enrich.scip_reader import SCIPIndex
+    >>> # Requires valid source file and package root
+    >>> # result = generate_overlay_for_file(py_file, root, None)
+    >>> # assert isinstance(result, OverlayResult)
     """
     repo_root = _infer_repo_root(package_root)
     relative_path = _safe_relative(py_file, repo_root)

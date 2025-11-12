@@ -1,8 +1,7 @@
-project-includes = ["src", "tests", "tools", "codeintel"]
+project-includes = ["src", "tests", "tools", "codeintel_rev"]
 project-excludes = [
     "**/tests/fixtures*",
     "**/build/",
-    "docs/_build/**",
     "site/**",
     "**/.venv/**",
     "**/__pycache__/**",

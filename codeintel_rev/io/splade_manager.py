@@ -28,17 +28,164 @@ if TYPE_CHECKING:
     from codeintel_rev.config.settings import Settings
 
     class _SparseEncoderProtocol(Protocol):
-        def encode_document(self, sentences: Sequence[str]) -> Sequence[object]: ...
+        """Protocol defining the interface for SPLADE sparse encoders.
 
-        def encode_query(self, queries: Sequence[str]) -> Sequence[object]: ...
+        This protocol describes the methods that SPLADE encoder implementations
+        must provide for encoding documents and queries, decoding sparse vectors,
+        and saving model artifacts. Used for type checking and dependency
+        injection in SPLADE encoding operations.
+
+        Methods
+        -------
+        encode_document(sentences: Sequence[str]) -> Sequence[object]
+            Encode document texts into sparse vector embeddings.
+
+        encode_query(queries: Sequence[str]) -> Sequence[object]
+            Encode query texts into sparse vector embeddings.
+
+        decode(embeddings: object, top_k: int | None = None) -> Sequence[Sequence[tuple[str, float]]]
+            Decode sparse vector embeddings into token-weight pairs.
+
+        save_pretrained(output_path: str) -> None
+            Save the encoder model to disk for later loading.
+        """
+
+        def encode_document(self, sentences: Sequence[str]) -> Sequence[object]:
+            """Encode document texts into sparse vector embeddings.
+
+            This method processes a batch of document texts and produces sparse
+            vector embeddings suitable for retrieval. The embeddings are typically
+            high-dimensional sparse vectors where each dimension corresponds to a
+            vocabulary token and the value represents the token's importance weight.
+
+            Parameters
+            ----------
+            sentences : Sequence[str]
+                Batch of document texts to encode. Each string represents one
+                document from the corpus. The encoder processes the batch together
+                for efficiency.
+
+            Returns
+            -------
+            Sequence[object]
+                Sparse vector embeddings for the input documents. The exact type
+                depends on the encoder implementation (typically numpy arrays or
+                PyTorch tensors). Each embedding represents one input document
+                and can be decoded into token-weight pairs using decode().
+
+            Notes
+            -----
+            The embeddings produced by this method are optimized for document
+            indexing and retrieval. They typically have different characteristics
+            than query embeddings (produced by encode_query()) to optimize for
+            different use cases. Time complexity: O(batch_size * avg_doc_length)
+            for encoding, plus model inference overhead.
+            """
+            ...
+
+        def encode_query(self, queries: Sequence[str]) -> Sequence[object]:
+            """Encode query texts into sparse vector embeddings.
+
+            This method processes a batch of query texts and produces sparse
+            vector embeddings optimized for query-time retrieval. Query embeddings
+            are designed to match against document embeddings produced by
+            encode_document() for semantic search.
+
+            Parameters
+            ----------
+            queries : Sequence[str]
+                Batch of query texts to encode. Each string represents one search
+                query. The encoder processes the batch together for efficiency.
+
+            Returns
+            -------
+            Sequence[object]
+                Sparse vector embeddings for the input queries. The exact type
+                depends on the encoder implementation (typically numpy arrays or
+                PyTorch tensors). Each embedding represents one input query and
+                can be decoded into token-weight pairs using decode().
+
+            Notes
+            -----
+            Query embeddings are optimized for retrieval against document embeddings.
+            They may have different sparsity patterns or weight distributions than
+            document embeddings to improve query-document matching. Time complexity:
+            O(batch_size * avg_query_length) for encoding, plus model inference overhead.
+            """
+            ...
 
         def decode(
             self,
             embeddings: object,
             top_k: int | None = None,
-        ) -> Sequence[Sequence[tuple[str, float]]]: ...
+        ) -> Sequence[Sequence[tuple[str, float]]]:
+            """Decode sparse vector embeddings into token-weight pairs.
 
-        def save_pretrained(self, output_path: str) -> None: ...
+            This method converts sparse vector embeddings back into human-readable
+            token-weight pairs. Each embedding is decoded into a sequence of
+            (token, weight) tuples representing the most important tokens and their
+            relevance scores. Optionally filters to top-k tokens by weight.
+
+            Parameters
+            ----------
+            embeddings : object
+                Sparse vector embeddings to decode. Typically numpy arrays or
+                PyTorch tensors produced by encode_document() or encode_query().
+                The embeddings should be in the format expected by the encoder
+                implementation.
+            top_k : int | None, optional
+                Maximum number of top tokens to return per embedding. If None,
+                returns all non-zero tokens. If specified, returns only the
+                top-k tokens by weight (descending order). Defaults to None.
+
+            Returns
+            -------
+            Sequence[Sequence[tuple[str, float]]]
+                Decoded token-weight pairs for each input embedding. Outer sequence
+                has one entry per input embedding. Inner sequence contains
+                (token, weight) tuples sorted by weight (descending). Tokens are
+                vocabulary strings; weights are floating-point relevance scores
+                (typically non-negative, higher is more relevant).
+
+            Notes
+            -----
+            The decode operation is typically used for:
+            - Inspecting which tokens contribute most to an embedding
+            - Converting embeddings to quantized token dictionaries for indexing
+            - Debugging and understanding model behavior
+            Time complexity: O(n_embeddings * embedding_dim) for full decoding,
+            O(n_embeddings * top_k * log(embedding_dim)) if top_k is specified.
+            """
+            ...
+
+        def save_pretrained(self, output_path: str) -> None:
+            """Save the encoder model to disk for later loading.
+
+            This method persists the encoder's model weights, configuration, and
+            vocabulary to disk so it can be loaded later without retraining. The
+            saved model can be loaded by instantiating a new encoder with the
+            same model identifier or path.
+
+            Parameters
+            ----------
+            output_path : str
+                Directory path where the model should be saved. The method creates
+                this directory if it doesn't exist and writes model files (weights,
+                config, vocabulary) into it. The path should be writable and have
+                sufficient disk space for the model artifacts.
+
+            Notes
+            -----
+            The saved model includes all components necessary for encoding:
+            - Model weights (PyTorch state dict or ONNX format)
+            - Tokenizer configuration and vocabulary
+            - Model configuration (architecture, hyperparameters)
+            The saved model can be loaded later using the same encoder class
+            constructor with the output_path as the model identifier. Time
+            complexity: O(model_size) for writing model files to disk. The method
+            performs I/O operations and may take several seconds for large models.
+            """
+            ...
 
     class _OptimizerFunction(Protocol):
         def __call__(

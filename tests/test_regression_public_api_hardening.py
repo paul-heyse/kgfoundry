@@ -7,7 +7,6 @@ import tempfile
 from typing import cast
 
 # DocstringBuilderCache removed - tests for cache protocols moved to test_logging_cache
-
 from kgfoundry_common.errors import ConfigurationError, KgFoundryError
 from kgfoundry_common.logging import LoggingCache, get_logging_cache
 from kgfoundry_common.problem_details import build_configuration_problem
@@ -151,7 +150,6 @@ class TestConfigurationModelValidation:
 
 class TestNewPublicAPI:
     """Regression tests for new public API patterns."""
-
 
     def test_logging_cache_protocol_accessible(self) -> None:
         """Verify LoggingCache Protocol is publicly accessible."""

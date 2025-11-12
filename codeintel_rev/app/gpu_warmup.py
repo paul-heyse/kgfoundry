@@ -7,7 +7,7 @@ GPU is reachable and functional before expensive operations begin.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import TYPE_CHECKING, SupportsInt, cast
+from typing import TYPE_CHECKING, Any, SupportsInt, cast
 
 from codeintel_rev.metrics.registry import GPU_AVAILABLE, GPU_TEMP_SCRATCH_BYTES
 from codeintel_rev.typing import gate_import
@@ -16,6 +16,9 @@ from kgfoundry_common.logging import get_logger
 if TYPE_CHECKING:
     import faiss as _faiss
     import torch as _torch
+else:
+    _faiss = Any  # type: ignore[assignment]
+    _torch = Any  # type: ignore[assignment]
 
 LOGGER = get_logger(__name__)
 
@@ -35,7 +38,7 @@ def _check_cuda_availability() -> tuple[bool, str]:
         (is_available, status_message)
     """
     try:
-        torch = cast("_torch", gate_import("torch", "CUDA availability checks for warmup"))
+        torch = cast(_torch, gate_import("torch", "CUDA availability checks for warmup"))
     except ImportError:
         LOGGER.warning("PyTorch not available - skipping CUDA check")
         return False, "PyTorch not installed"
@@ -71,7 +74,7 @@ def _check_faiss_gpu_support() -> tuple[bool, str]:
         (is_available, status_message)
     """
     try:
-        faiss = cast("_faiss", gate_import("faiss", "FAISS GPU capability checks"))
+        faiss = cast(_faiss, gate_import("faiss", "FAISS GPU capability checks"))
     except ImportError:
         LOGGER.warning("FAISS not available - skipping GPU check")
         return False, "FAISS not installed"
@@ -104,7 +107,7 @@ def _test_torch_gpu_operations() -> tuple[bool, str]:
         (test_passed, status_message)
     """
     try:
-        torch = cast("_torch", gate_import("torch", "Torch GPU smoke test"))
+        torch = cast(_torch, gate_import("torch", "Torch GPU smoke test"))
     except ImportError:
         return False, "PyTorch not installed"
     except (RuntimeError, OSError, AttributeError) as exc:
@@ -130,7 +133,7 @@ def _test_faiss_gpu_resources() -> tuple[bool, str, int | None]:
         Tuple of (test_passed, status_message, scratch_bytes).
     """
     try:
-        faiss = cast("_faiss", gate_import("faiss", "FAISS GPU resource smoke test"))
+        faiss = cast(_faiss, gate_import("faiss", "FAISS GPU resource smoke test"))
     except ImportError:
         return False, "FAISS not installed", None
     except (RuntimeError, AttributeError, OSError) as exc:
@@ -145,7 +148,7 @@ def _test_faiss_gpu_resources() -> tuple[bool, str, int | None]:
         if callable(get_temp):
             try:
                 raw_value = get_temp()
-                scratch_bytes = int(cast("SupportsInt", raw_value))
+                scratch_bytes = int(cast(SupportsInt, raw_value))
             except (RuntimeError, ValueError, TypeError):  # pragma: no cover - defensive
                 scratch_bytes = None
         LOGGER.info("FAISS GPU resource initialization test passed")
@@ -209,7 +212,7 @@ def warmup_gpu() -> dict[str, bool | str]:
     if not faiss_gpu_available and results["details"] == "GPU warmup not attempted":
         results["details"] = faiss_msg
     try:
-        faiss_mod = cast("_faiss", gate_import("faiss", "FAISS cuVS probe"))
+        faiss_mod = cast(_faiss, gate_import("faiss", "FAISS cuVS probe"))
         results["faiss_cuvs_available"] = bool(getattr(faiss_mod, "GpuIndexCagra", None))
     except ImportError:
         results["faiss_cuvs_available"] = False

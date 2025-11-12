@@ -76,6 +76,39 @@ class _FlightRecorder:
 
     @staticmethod
     def should_sample(*, force: bool = False) -> bool:
+        """Determine whether to sample this timeline based on sampling rate.
+
+        Extended Summary
+        ----------------
+        This method implements probabilistic sampling for timeline events based on
+        the configured sampling rate (CODEINTEL_DIAG_SAMPLE environment variable).
+        Sampling reduces I/O overhead and storage costs while maintaining statistical
+        representativeness. The method uses cryptographically secure random number
+        generation to ensure unbiased sampling decisions. Used by new_timeline() to
+        determine if a timeline should record events.
+
+        Parameters
+        ----------
+        force : bool, optional
+            If True, forces sampling regardless of sampling rate (default: False).
+            Used for debugging and critical paths that must always be recorded.
+
+        Returns
+        -------
+        bool
+            True if this timeline should be sampled (events will be recorded),
+            False if sampling should be skipped (events will be discarded). Returns
+            True if force=True, True if sampling rate >= 1.0, False if sampling
+            rate <= 0.0, otherwise probabilistic based on sampling rate.
+
+        Notes
+        -----
+        Time complexity O(1) - single random number generation. Space complexity O(1).
+        Uses secrets.randbelow() for cryptographically secure random sampling. The
+        sampling decision is deterministic per timeline instance (sampled status is
+        set once during timeline creation). Sampling rate is clamped to [0.0, 1.0]
+        at module load time.
+        """
         if force:
             return True
         if _SAMPLE_RATE >= 1.0:
@@ -105,6 +138,34 @@ class _FlightRecorder:
 
     @classmethod
     def write(cls, payload: dict[str, Any]) -> None:
+        """Append a JSONL event record to the current timeline file.
+
+        Extended Summary
+        ----------------
+        This method writes a timeline event to the append-only JSONL file for the
+        current date. It performs automatic file rotation when the file exceeds
+        MAX_BYTES, ensuring files don't grow unbounded. The method is thread-safe
+        using a global lock to prevent concurrent write conflicts. Events are written
+        as compact JSON (no whitespace) with UTF-8 encoding. Used by Timeline.event()
+        to persist structured observability data.
+
+        Parameters
+        ----------
+        payload : dict[str, Any]
+            Event payload dictionary containing timeline event data. Must be
+            JSON-serializable. Common fields include: ts (timestamp), type (event
+            type), name (event name), status, session_id, run_id, message, attrs.
+            The payload is scrubbed before serialization to prevent PII leakage.
+
+        Notes
+        -----
+        Time complexity O(n) where n is payload size (JSON serialization + file I/O).
+        Space complexity O(n) for JSON string. Performs file I/O with thread-safe
+        locking. File rotation is atomic (rename operation). Errors are logged but
+        do not propagate (defensive design to prevent timeline failures from affecting
+        application). The method uses append mode to ensure events are never lost
+        due to concurrent writes.
+        """
         data = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
         try:
             with _LOG_LOCK:

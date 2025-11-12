@@ -579,6 +579,29 @@ async def sse_demo() -> StreamingResponse:
     """
 
     async def event_generator() -> AsyncIterator[bytes]:
+        r"""Generate Server-Sent Events (SSE) stream for demo purposes.
+
+        This generator function produces a simple SSE stream containing a ready
+        event followed by 5 data events with incremental counters. Each data
+        event is sent with a 0.5 second delay to demonstrate streaming behavior.
+        The stream follows the SSE format: "event: <name>\ndata: <payload>\n\n"
+        for named events, or "data: <payload>\n\n" for data-only events.
+
+        Yields
+        ------
+        bytes
+            SSE-formatted event chunks. Each chunk is a complete SSE message
+            terminated with double newlines. The first chunk is a ready event,
+            followed by 5 data events containing incremental counters (0-4).
+
+        Notes
+        -----
+        This is a demo endpoint for testing SSE streaming functionality. The
+        generator demonstrates proper SSE formatting and async streaming behavior.
+        Time complexity: O(1) per event, total duration ~2.5 seconds (5 events
+        * 0.5s delay). The function performs async I/O (asyncio.sleep) and yields
+        control to the event loop between events.
+        """
         yield b"event: ready\ndata: {}\n\n"
         for i in range(5):
             yield f"data: {i}\n\n".encode()

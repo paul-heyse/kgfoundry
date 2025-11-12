@@ -97,6 +97,48 @@ class _BM25Channel(Channel):
         self._lock = Lock()
 
     def search(self, query: str, limit: int) -> Sequence[ChannelHit]:
+        """Perform BM25 search and return ranked document hits.
+
+        Extended Summary
+        ----------------
+        This method executes BM25 (Best Matching 25) keyword-based search using the
+        built-in BM25 provider. It ensures the provider is initialized, performs the
+        search operation, and returns ranked results. BM25 is a sparse retrieval
+        method that ranks documents based on term frequency and inverse document
+        frequency, providing effective keyword matching for code search. Used in
+        hybrid search pipelines to complement dense vector search with keyword
+        signals.
+
+        Parameters
+        ----------
+        query : str
+            Search query string. Will be tokenized and processed by the BM25 provider.
+            Supports natural language queries and code-like queries (identifiers,
+            keywords).
+        limit : int
+            Maximum number of results to return. Must be positive. Results are
+            ranked by BM25 score in descending order.
+
+        Returns
+        -------
+        Sequence[ChannelHit]
+            Ranked sequence of channel hits containing document IDs and BM25 scores.
+            Results are sorted by score descending. Length is min(limit, total_documents).
+
+        Raises
+        ------
+        ChannelError
+            If the BM25 provider is unavailable (disabled, initialization failed,
+            missing assets) or if search execution fails (provider errors, I/O errors).
+
+        Notes
+        -----
+        Time complexity O(n * m) where n is query terms and m is documents matching
+        query terms. Space complexity O(k) where k is limit (result storage). Performs
+        I/O to read BM25 index files. Thread-safe if provider is initialized (provider
+        initialization is protected by lock). The method lazily initializes the provider
+        on first search call. Returns empty sequence if limit <= 0.
+        """
         provider = self._ensure_provider()
         if provider is None:
             raise ChannelError(
@@ -184,6 +226,50 @@ class _SpladeChannel(Channel):
         self._lock = Lock()
 
     def search(self, query: str, limit: int) -> Sequence[ChannelHit]:
+        """Perform SPLADE search and return ranked document hits.
+
+        Extended Summary
+        ----------------
+        This method executes SPLADE (Sparse Lexical and Expansion) learned sparse
+        retrieval using the built-in SPLADE provider. It ensures the provider is
+        initialized, encodes the query into a high-dimensional sparse vector, performs
+        sparse retrieval against the SPLADE index, and returns ranked results. SPLADE
+        provides better semantic matching than BM25 while maintaining sparse retrieval
+        efficiency. Used in hybrid search pipelines to complement dense vector search
+        with learned sparse signals.
+
+        Parameters
+        ----------
+        query : str
+            Search query string. Will be tokenized, encoded into sparse vector, and
+            matched against the SPLADE index. Supports natural language queries with
+            semantic understanding.
+        limit : int
+            Maximum number of results to return. Must be positive. Results are
+            ranked by SPLADE score in descending order.
+
+        Returns
+        -------
+        Sequence[ChannelHit]
+            Ranked sequence of channel hits containing document IDs and SPLADE scores.
+            Results are sorted by score descending. Length is min(limit, total_documents).
+
+        Raises
+        ------
+        ChannelError
+            If the SPLADE provider is unavailable (disabled, initialization failed,
+            missing assets) or if search execution fails (provider errors, ONNX runtime
+            errors, I/O errors).
+
+        Notes
+        -----
+        Time complexity O(n * m) where n is query tokens and m is documents in index.
+        Space complexity O(k) where k is limit (result storage). Performs I/O to read
+        SPLADE index files and ONNX model inference for query encoding. Thread-safe if
+        provider is initialized (provider initialization is protected by lock). The method
+        lazily initializes the provider on first search call. Returns empty sequence if
+        limit <= 0.
+        """
         provider = self._ensure_provider()
         if provider is None:
             raise ChannelError(

@@ -1,0 +1,30 @@
+# enrich/tree_sitter_bridge.py
+
+## Docstring
+
+```
+Tree-sitter outline helpers used for enrichment artifacts.
+```
+
+## Imports
+
+- from **__future__** import annotations
+- from **(absolute)** import importlib
+- from **(absolute)** import util
+- from **dataclasses** import dataclass, field
+- from **pathlib** import Path
+- from **typing** import Any
+- from **tree_sitter** import Language, Node, Parser
+- from **tree_sitter_python** import language
+
+## Definitions
+
+- function: `_lang_for_ext` (line 27)
+- class: `OutlineNode` (line 58)
+- class: `TSOutline` (line 68)
+- function: `build_outline` (line 75)
+- function: `_extract_identifier` (line 115)
+
+## Tags
+
+overlay-needed

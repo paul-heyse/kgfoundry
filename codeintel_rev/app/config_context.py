@@ -179,7 +179,7 @@ def _faiss_module() -> ModuleType:
     """
     cached = globals().get("_FAISS_MODULE")
     if cached is not None:
-        return cast("ModuleType", cached)
+        return cast(ModuleType, cached)
     module = importlib.import_module("codeintel_rev.io.faiss_manager")
     globals()["_FAISS_MODULE"] = module
     return module
@@ -194,7 +194,7 @@ def _import_faiss_manager_cls() -> type[FAISSManager]:
         Resolved manager class.
     """
     module = _faiss_module()
-    return cast("type[FAISSManager]", module.FAISSManager)
+    return cast(type[FAISSManager], module.FAISSManager)
 
 
 def _import_faiss_runtime_opts_cls() -> type:
@@ -260,7 +260,7 @@ def _import_hybrid_engine_cls() -> type[HybridSearchEngine]:
     """
     existing = globals().get("HybridSearchEngine")
     if existing is not None and existing is not Any:
-        return cast("type[HybridSearchEngine]", existing)
+        return cast(type[HybridSearchEngine], existing)
     module = importlib.import_module("codeintel_rev.io.hybrid_search")
     engine_cls = module.HybridSearchEngine
     globals()["HybridSearchEngine"] = engine_cls
@@ -277,7 +277,7 @@ def _import_xtr_index_cls() -> type[XTRIndex]:
     """
     existing = globals().get("XTRIndex")
     if existing is not None and existing is not Any:
-        return cast("type[XTRIndex]", existing)
+        return cast(type[XTRIndex], existing)
     module = importlib.import_module("codeintel_rev.io.xtr_manager")
     index_cls = module.XTRIndex
     globals()["XTRIndex"] = index_cls
@@ -620,9 +620,9 @@ class _ContextRuntimeState:
             Ordered collection of runtime cell name/value pairs.
         """
         return (
-            ("hybrid", cast("RuntimeCell[Any]", self.hybrid)),
-            ("coderank-faiss", cast("RuntimeCell[Any]", self.coderank_faiss)),
-            ("xtr", cast("RuntimeCell[Any]", self.xtr)),
+            ("hybrid", cast(RuntimeCell[Any], self.hybrid)),
+            ("coderank-faiss", cast(RuntimeCell[Any], self.coderank_faiss)),
+            ("xtr", cast(RuntimeCell[Any], self.xtr)),
         )
 
 
@@ -818,7 +818,7 @@ class ApplicationContext:
         vllm_client = VLLMClient(settings.vllm)
         faiss_manager_cls = _import_faiss_manager_cls()
         runtime_opts = _faiss_runtime_options_from_index(settings.index)
-        nlist = cast("int", settings.index.nlist)
+        nlist = cast(int, settings.index.nlist)
         faiss_manager = faiss_manager_cls(
             index_path=paths.faiss_index,
             vec_dim=settings.index.vec_dim,
@@ -843,7 +843,7 @@ class ApplicationContext:
         # redis.asyncio.Redis implements SupportsAsyncRedis protocol, but pyright
         # doesn't recognize it without explicit cast
         scope_store = ScopeStore(
-            cast("SupportsAsyncRedis", redis_client),
+            cast(SupportsAsyncRedis, redis_client),
             l1_maxsize=settings.redis.scope_l1_size,
             l1_ttl_seconds=settings.redis.scope_l1_ttl_seconds,
             l2_ttl_seconds=settings.redis.scope_l2_ttl_seconds,
@@ -1129,7 +1129,7 @@ class ApplicationContext:
         _require_dependency("faiss", runtime=runtime, purpose="CodeRank FAISS manager")
         manager_cls = _import_faiss_manager_cls()
         runtime_opts = _faiss_runtime_options_from_index(self.settings.index)
-        nlist = cast("int", self.settings.index.nlist)
+        nlist = cast(int, self.settings.index.nlist)
         manager = manager_cls(
             index_path=index_path,
             vec_dim=vec_dim,
@@ -1392,7 +1392,7 @@ class ApplicationContext:
             raise ValueError(message)
 
         def _component_value[TOverride](name: str, default: TOverride) -> TOverride:
-            return cast("TOverride", components.get(name, default))
+            return cast(TOverride, components.get(name, default))
 
         return ApplicationContext(
             settings=settings or self.settings,

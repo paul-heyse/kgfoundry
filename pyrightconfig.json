@@ -16,7 +16,6 @@
     "build",
     "dist",
     "node_modules",
-    "docs/_build/**",
     "site/**",
     "faiss/**",
     "src/kgfoundry.egg-info/**",
