@@ -18,11 +18,15 @@ LOGGER = get_logger(__name__)
 SpanAttribute = str | int | float | bool
 
 
-@dataclass(slots=True, frozen=True)
 class _TelemetryState:
-    initialized: bool = False
-    tracing_enabled: bool = False
-    trace_module: ModuleType | None = None
+    """Mutable telemetry state shared across module functions."""
+
+    __slots__ = ("initialized", "trace_module", "tracing_enabled")
+
+    def __init__(self) -> None:
+        self.initialized = False
+        self.tracing_enabled = False
+        self.trace_module: ModuleType | None = None
 
 
 class SupportsState(Protocol):

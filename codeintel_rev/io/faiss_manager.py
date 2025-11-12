@@ -1999,7 +1999,7 @@ class FAISSManager:
                 return candidate
             if profile:
                 prof_val = profile.get(profile_key)
-                if prof_val is not None:
+                if isinstance(prof_val, (int, float)):
                     return prof_val
             return default
 
@@ -2037,7 +2037,7 @@ class FAISSManager:
         quantizer_ef = int(quantizer_candidate) if quantizer_candidate is not None else None
         return nprobe_eff, ef_eff, k_factor, quantizer_ef
 
-    def _load_tuned_profile(self) -> dict[str, float]:
+    def _load_tuned_profile(self) -> dict[str, float | str]:
         if self._tuned_parameters is not None:
             return self._tuned_parameters
         if not self.autotune_profile_path.exists():
@@ -2051,7 +2051,7 @@ class FAISSManager:
             )
             return {}
         try:
-            profile = json.loads(raw)
+            profile = cast("dict[str, float | str]", json.loads(raw))
         except json.JSONDecodeError as exc:
             LOGGER.warning(
                 "Failed to parse FAISS autotune profile",

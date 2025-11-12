@@ -207,7 +207,9 @@ def _short_summary(doc: Docstring | None) -> str | None:
     """
     if not doc:
         return None
-    value = (doc.value or "").strip()
+    raw_value = doc.value or ""
+    text = raw_value if isinstance(raw_value, str) else str(raw_value)
+    value = text.strip()
     if not value:
         return None
     return value.splitlines()[0]

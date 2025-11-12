@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, ClassVar, Protocol, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Protocol, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.typing import NDArrayF32, gate_import
@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from sentence_transformers import SentenceTransformer
 else:
     np = cast("np", LazyModule("numpy", "CodeRank embeddings"))
+    SentenceTransformer = Any
 
 
 class SupportsCodeRankSettings(Protocol):
@@ -161,14 +162,15 @@ class CodeRankEmbedder:
             if sentence_transformer_cls is None:
                 msg = "sentence_transformers does not expose SentenceTransformer"
                 raise RuntimeError(msg)
-            model = sentence_transformer_cls(  # type: ignore[call-arg]
+            model_instance = sentence_transformer_cls(
                 self.model_id,
                 trust_remote_code=self.trust_remote_code,
                 device=self.device,
             )
+            model = cast("SentenceTransformer", model_instance)
             LOGGER.info(
                 "Loaded CodeRank model",
                 extra={"model_id": self.model_id, "device": self.device},
             )
-            self._MODEL_CACHE[cache_key] = cast("SentenceTransformer", model)
-            return cast("SentenceTransformer", model)
+            self._MODEL_CACHE[cache_key] = model
+            return model

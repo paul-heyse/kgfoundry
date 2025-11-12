@@ -831,7 +831,7 @@ class ApplicationContext:
                 "faiss.compile",
                 extra={"opts": faiss_manager.get_compile_options(), "component": "app_start"},
             )
-        except Exception:  # lint-ignore[BLE001]
+        except (RuntimeError, OSError, ValueError):
             LOGGER.debug("Unable to fetch FAISS compile options at startup", exc_info=True)
 
         # Initialize scope store for session-scoped query constraints
@@ -1143,7 +1143,7 @@ class ApplicationContext:
                 "faiss.compile",
                 extra={"opts": manager.get_compile_options(), "component": runtime},
             )
-        except Exception:  # lint-ignore[BLE001]
+        except (RuntimeError, OSError, ValueError):
             LOGGER.debug("Unable to fetch FAISS compile options", exc_info=True)
         return manager
 

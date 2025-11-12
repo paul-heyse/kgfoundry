@@ -7,6 +7,7 @@ with precise ranges for chunking and code intelligence.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -18,6 +19,47 @@ if TYPE_CHECKING:
 
 
 RANGE_TUPLE_LENGTH = 4
+
+
+def _range_from_list(rng: Sequence[object]) -> tuple[int, int, int, int] | None:
+    if len(rng) != RANGE_TUPLE_LENGTH:
+        return None
+    normalized: list[int] = []
+    for value in rng:
+        if not isinstance(value, (int, float)):
+            return None
+        normalized.append(int(value))
+    sl, sc, el, ec = normalized
+    return (sl, sc, el, ec)
+
+
+def _parse_occurrence(record: dict) -> tuple[str, tuple[int, int, int, int], int] | None:
+    symbol = record.get("symbol", "")
+    if not symbol:
+        return None
+    rng = record.get("range") or record.get("enclosingRange")
+    range_tuple: tuple[int, int, int, int] | None = None
+    if isinstance(rng, list):
+        range_tuple = _range_from_list(rng)
+    elif isinstance(rng, dict):
+        start = rng.get("start", {})
+        end = rng.get("end", {})
+        range_tuple = (
+            start.get("line", 0),
+            start.get("character", 0),
+            end.get("line", 0),
+            end.get("character", 0),
+        )
+    if range_tuple is None:
+        return None
+    roles = record.get("symbolRoles") or record.get("symbol_roles") or 0
+    if isinstance(roles, list):
+        role_val = 0
+        for r in roles:
+            if r in {1, "DEFINITION"}:
+                role_val |= 1
+        roles = role_val
+    return symbol, range_tuple, int(roles)
 
 
 @dataclass(frozen=True)
@@ -226,35 +268,10 @@ def parse_scip_json(json_path: Path) -> SCIPIndex:
 
         occurrences = []
         for occ in doc_data.get("occurrences", []):
-            symbol = occ.get("symbol", "")
-            if not symbol:
+            parsed = _parse_occurrence(occ)
+            if parsed is None:
                 continue
-
-            # Parse range - can be array [sl, sc, el, ec] or object {start, end}
-            rng = occ.get("range") or occ.get("enclosingRange")
-            if isinstance(rng, list) and len(rng) == RANGE_TUPLE_LENGTH:
-                range_tuple = tuple(rng)  # type: ignore[arg-type]
-            elif isinstance(rng, dict):
-                start = rng.get("start", {})
-                end = rng.get("end", {})
-                range_tuple = (
-                    start.get("line", 0),
-                    start.get("character", 0),
-                    end.get("line", 0),
-                    end.get("character", 0),
-                )
-            else:
-                continue
-
-            roles = occ.get("symbolRoles") or occ.get("symbol_roles") or 0
-            if isinstance(roles, list):
-                # Convert role array to bitmask
-                role_val = 0
-                for r in roles:
-                    if r in {1, "DEFINITION"}:
-                        role_val |= 1
-                roles = role_val
-
+            symbol, range_tuple, roles = parsed
             occurrences.append(Occurrence(symbol=symbol, range=range_tuple, roles=roles))
 
         if relative_path:

@@ -301,12 +301,14 @@ def _semantic_search_sync(
 
         extras = _build_response_extras(
             _MethodContext(
-                len(findings),
-                limit,
-                plan.effective_limit,
-                start_time,
-                hybrid_result.retrieval_channels,
-                hybrid_result.method,
+                findings_count=len(findings),
+                requested_limit=limit,
+                effective_limit=plan.effective_limit,
+                start_time=start_time,
+                retrieval_channels=hybrid_result.retrieval_channels,
+                hybrid_method=(
+                    cast("MethodInfo", dict(hybrid_result.method)) if hybrid_result.method else None
+                ),
             ),
             limits_metadata,
             scope,
@@ -599,6 +601,9 @@ def _resolve_hybrid_results(
     )
     if hybrid_result.warnings:
         limits_metadata.extend(hybrid_result.warnings)
+    method_payload = (
+        cast("MethodInfo", dict(hybrid_result.method)) if hybrid_result.method else None
+    )
 
     fused_ids: list[int] = []
     fused_scores: list[float] = []
@@ -621,14 +626,14 @@ def _resolve_hybrid_results(
             limit=state.effective_limit,
             contribution_map=fused_contributions,
             retrieval_channels=channels_out,
-            method=hybrid_result.method,
+            method=method_payload,
         )
     return _build_hybrid_result(
         (hydration_ids, hydration_scores),
         limit=state.effective_limit,
         contribution_map=contribution_map,
         retrieval_channels=channels_out,
-        method=hybrid_result.method,
+        method=method_payload,
     )
 
 
@@ -978,6 +983,9 @@ def _normalize_scope_faiss_tuning(
             warnings.append(f"Ignored unsupported faiss_tuning.{key} override.")
             continue
         caster = float if normalized == "k_factor" else int
+        if not isinstance(value, (int, float, str)):
+            warnings.append(f"Ignored invalid faiss_tuning.{key} override.")
+            continue
         try:
             coerced = caster(value)
         except (TypeError, ValueError):
@@ -1241,11 +1249,16 @@ def _build_response_extras(
         context.retrieval_channels,
     )
     if context.hybrid_method:
-        method_metadata: MethodInfo = dict(context.hybrid_method)
-        method_metadata.setdefault("coverage", base_method["coverage"])
-        method_metadata.setdefault("retrieval", base_method["retrieval"])
-        if "notes" not in method_metadata and base_method.get("notes"):
-            method_metadata["notes"] = base_method["notes"]
+        method_metadata = cast("MethodInfo", dict(context.hybrid_method))
+        coverage = base_method.get("coverage")
+        retrieval = base_method.get("retrieval")
+        if coverage is not None and "coverage" not in method_metadata:
+            method_metadata["coverage"] = coverage
+        if retrieval is not None and "retrieval" not in method_metadata:
+            method_metadata["retrieval"] = retrieval
+        base_notes = base_method.get("notes")
+        if base_notes and "notes" not in method_metadata:
+            method_metadata["notes"] = base_notes
     else:
         method_metadata = base_method
     extras = _success_extras(limits, method_metadata)

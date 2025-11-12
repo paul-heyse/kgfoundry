@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import threading
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, ClassVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from codeintel_rev.typing import gate_import
 from kgfoundry_common.logging import get_logger
@@ -79,17 +79,24 @@ class CodeRankListwiseReranker:
             return []
         tokenizer, model = self._ensure_model()
         prompt = self._build_prompt(query, candidates)
-        inputs = tokenizer(prompt, return_tensors="pt")
-        inputs = {k: v.to(self.device) for k, v in inputs.items()}
-        do_sample = self.temperature > 0.0
+        tokenizer_outputs = tokenizer(prompt, return_tensors="pt")
+        inputs = {k: tensor.to(self.device) for k, tensor in tokenizer_outputs.items()}
+        input_ids = inputs.get("input_ids")
+        if input_ids is None:
+            msg = "Tokenizer output missing input_ids for CodeRankLLM."
+            raise RuntimeError(msg)
+        generation_kwargs: dict[str, Any] = {
+            "input_ids": input_ids,
+            "max_new_tokens": self.max_new_tokens,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "do_sample": self.temperature > 0.0,
+        }
+        attention_mask = inputs.get("attention_mask")
+        if attention_mask is not None:
+            generation_kwargs["attention_mask"] = attention_mask
         try:
-            output_ids = model.generate(  # type: ignore[call-arg]
-                **inputs,
-                max_new_tokens=self.max_new_tokens,
-                temperature=self.temperature,
-                top_p=self.top_p,
-                do_sample=do_sample,
-            )
+            output_ids = cast("Any", model).generate(**generation_kwargs)
         except Exception as exc:
             msg = f"CodeRankLLM generation failed: {exc}"
             raise RuntimeError(msg) from exc

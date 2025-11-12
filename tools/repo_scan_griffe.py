@@ -2,26 +2,43 @@
 
 from __future__ import annotations
 
+import importlib
 import logging
 import sys
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import ModuleType
 from typing import TYPE_CHECKING, Any, Literal, cast
 
+griffe: ModuleType | None
+Docstring: type[Any] | None
+GriffeError: type[Exception]
+AliasResolutionError: type[Exception]
+
 try:
-    import griffe
-    from griffe import Docstring, GriffeError
+    import griffe as griffe_module
+    from griffe import Docstring as GriffeDocstring
+    from griffe import GriffeError as GriffeBaseError
 except ImportError:  # pragma: no cover - optional dependency at runtime
-    griffe = None  # type: ignore[assignment]
-    Docstring = None  # type: ignore[assignment]
-    GriffeError = RuntimeError  # type: ignore[assignment]
-    AliasResolutionError = RuntimeError  # type: ignore[assignment]
+    griffe = None
+    Docstring = None
+    GriffeError = RuntimeError
+    AliasResolutionError = RuntimeError
 else:
+    griffe = griffe_module
+    Docstring = GriffeDocstring
+    GriffeError = GriffeBaseError
     try:  # pragma: no cover - optional dependency
-        from griffe.exceptions import AliasResolutionError  # type: ignore[attr-defined]
+        exceptions_mod = importlib.import_module("griffe.exceptions")
     except (ImportError, AttributeError):
-        AliasResolutionError = GriffeError  # type: ignore[assignment]
+        AliasResolutionError = GriffeError
+    else:
+        alias_error = getattr(exceptions_mod, "AliasResolutionError", None)
+        if isinstance(alias_error, type) and issubclass(alias_error, Exception):
+            AliasResolutionError = cast("type[Exception]", alias_error)
+        else:
+            AliasResolutionError = GriffeError
 
 type DocstringStyle = Literal["google", "numpy", "sphinx", "auto"]
 
@@ -122,9 +139,9 @@ def _iter_objects(root: GriffeModule) -> Iterator[GriffeObject]:
                     )
                     continue
                 if target is not None:
-                    stack.append(cast("GriffeObject", target))
+                    stack.append(target)
                 continue
-            stack.append(cast("GriffeObject", member))
+            stack.append(member)
 
 
 def _param_kind(p: object) -> str:
@@ -237,10 +254,13 @@ def _parse_doc_sections(
     if not text or griffe is None or Docstring is None:
         return ([], None, [])
     try:
-        sections = Docstring(text).parse(style)
+        sections_raw = Docstring(text).parse(style)
     except (GriffeError, ValueError) as exc:  # pragma: no cover - parser errors are rare
         LOGGER.debug("Failed to parse docstring with style %s: %s", style, exc)
         return ([], None, [])
+    if not isinstance(sections_raw, Iterable):
+        return ([], None, [])
+    sections = list(sections_raw)
 
     params: list[ApiParam] = []
     returns: ApiReturn | None = None

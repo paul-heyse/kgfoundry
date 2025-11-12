@@ -256,10 +256,9 @@ class RuntimeCell[T]:
         while True:
             with self._condition:
                 now = time.monotonic()
-                cooldown_error: Exception | None = self._cooldown_error_locked(now)
+                cooldown_error: BaseException | None = self._cooldown_error_locked(now)
                 if cooldown_error is not None:
-                    # pydoclint sees 'cooldown_error' as a variable name, but it's an Exception instance
-                    raise cooldown_error  # type: ignore[misc]
+                    raise cooldown_error
                 if self._state == "ready" and self._value is not None:
                     return self._value
                 if self._state == "initializing":

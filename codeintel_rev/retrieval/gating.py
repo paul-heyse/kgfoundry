@@ -43,6 +43,7 @@ class StageGateConfig:
         r"[A-Za-z0-9_\-/\.]+",
     )
 
+
 _LITERAL_CODE_RATIO = 0.5
 _LITERAL_DIGIT_RATIO = 0.2
 _LITERAL_SYMBOL_RATIO = 0.03
@@ -333,10 +334,7 @@ def decide_budgets(profile: QueryProfile, cfg: StageGateConfig) -> BudgetDecisio
     rm3_enabled = bool(
         cfg.rm3_auto
         and cfg.rm3_min_len <= profile.length <= cfg.rm3_max_len
-        and (
-            profile.ambiguity_score >= _RM3_AMBIGUITY_THRESHOLD
-            or cfg.rm3_enable_on_ambiguity
-        )
+        and (profile.ambiguity_score >= _RM3_AMBIGUITY_THRESHOLD or cfg.rm3_enable_on_ambiguity)
     )
 
     return BudgetDecision(depths, rrf_k, rm3_enabled)

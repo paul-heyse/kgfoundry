@@ -20,6 +20,7 @@ class RecordingFAISSManager:
         vec_dim: int,
         nlist: int,
         use_cuvs: bool,
+        runtime: object | None = None,
     ) -> None:
         self.index_path = index_path
         self.vec_dim = vec_dim
@@ -31,10 +32,21 @@ class RecordingFAISSManager:
         self.gpu_disabled_reason = None
         self.load_calls = 0
         self.clone_calls = 0
+        self.runtime = runtime
 
     def load_cpu_index(self) -> None:
         """Record CPU index load attempts."""
         self.load_calls += 1
+
+    def get_compile_options(self) -> dict[str, str]:
+        """Return fake compile options for logging.
+
+        Returns
+        -------
+        dict[str, str]
+            Static compile option payload for assertions.
+        """
+        return {"arch": "stub"}
 
     def clone_to_gpu(self) -> bool:
         """Record GPU clone attempts and report disabled GPU.
@@ -94,7 +106,9 @@ def test_service_context_resolves_paths(tmp_path: Path, monkeypatch: pytest.Monk
     expected_faiss_path.touch()
     expected_vectors_dir.mkdir(parents=True, exist_ok=True)
 
-    monkeypatch.setattr(config_context, "FAISSManager", RecordingFAISSManager)
+    monkeypatch.setattr(
+        config_context, "_import_faiss_manager_cls", lambda: RecordingFAISSManager
+    )
     monkeypatch.setattr(config_context, "DuckDBCatalog", RecordingDuckDBCatalog)
     monkeypatch.setattr(config_context, "VLLMClient", DummyVLLMClient)
 

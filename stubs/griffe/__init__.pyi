@@ -1,0 +1,54 @@
+class Docstring:
+    value: object
+
+    def __init__(self, text: str, /, *args: object, **kwargs: object) -> None: ...
+
+    def parse(self, style: object, /) -> object: ...
+
+
+class Object:
+    members: dict[str, Object]
+    is_function: bool
+    is_class: bool
+    is_module: bool
+    path: str
+    name: str
+
+
+class Module(Object): ...
+
+
+class Alias(Object): ...
+
+
+class GriffeLoader:
+    def __init__(self, *args: object, **kwargs: object) -> None: ...
+
+    def load(self, package: str, /, *args: object, **kwargs: object) -> Module: ...
+
+    def expand_exports(self, module: Module, /, *args: object, **kwargs: object) -> None: ...
+
+    def expand_wildcards(self, module: Module, /, *args: object, **kwargs: object) -> None: ...
+
+    def resolve_aliases(self, *args: object, **kwargs: object) -> None: ...
+
+
+class GriffeError(Exception): ...
+
+
+class BuiltinModuleError(Exception): ...
+
+
+class CyclicAliasError(Exception): ...
+
+
+class AliasResolutionError(Exception): ...
+
+
+def load(*args: object, **kwargs: object) -> Module: ...
+
+
+def load_module(*args: object, **kwargs: object) -> Module: ...
+
+
+def load_extensions(*args: object, **kwargs: object) -> None: ...

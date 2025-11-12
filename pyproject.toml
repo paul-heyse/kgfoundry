@@ -159,7 +159,7 @@ dependencies = [
     "pandera>=0.20.0",
     "griffe",
     "jinja2>=3.1.4",
-    "libcst>=1.4.0",
+    "libcst[all]>=1.4.0",
     "doq", # generate docstring skeletons
     "pyment", # fill/convert to preferred style (Google/NumPy/reST)
     "docstr-coverage>=2.3.2", # enforce docstring coverage
@@ -256,6 +256,7 @@ dependencies = [
     "dot>=0.3.0",
     "grimp>=3.13",
     "tree-sitter-language-pack>=0.10.0",
+    "pyre-check>=0.9.25",
 ]
 
 [project.scripts]

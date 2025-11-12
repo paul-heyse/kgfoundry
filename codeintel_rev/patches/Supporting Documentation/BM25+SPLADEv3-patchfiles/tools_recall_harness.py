@@ -93,9 +93,9 @@
 +    lucene = import_module("pyserini.search.lucene")
 +    s = lucene.LuceneSearcher(str(index_dir))
 +    try:
-+        s.set_bm25(k1, b)  # type: ignore[attr-defined]
++        s.set_bm25(k1, b)
 +    except TypeError:
-+        s.set_bm25(k1=k1, b=b)  # type: ignore[attr-defined]
++        s.set_bm25(k1=k1, b=b)
 +    return s
 +
 +
@@ -103,9 +103,9 @@
 +    if p is None:
 +        return
 +    try:
-+        searcher.set_rm3(p.fb_docs, p.fb_terms, p.orig_weight)  # type: ignore[attr-defined]
++        searcher.set_rm3(p.fb_docs, p.fb_terms, p.orig_weight)
 +    except TypeError:
-+        searcher.set_rm3(  # type: ignore[attr-defined]
++        searcher.set_rm3(
 +            fb_docs=p.fb_docs, fb_terms=p.fb_terms, original_query_weight=p.orig_weight
 +        )
 +

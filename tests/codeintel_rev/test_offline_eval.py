@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pytest
 from codeintel_rev.config.settings import EvalConfig, PathsConfig, load_settings
 from codeintel_rev.evaluation.offline_recall import OfflineRecallEvaluator
 from codeintel_rev.io.duckdb_manager import DuckDBManager
+from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.symbol_catalog import SymbolCatalog, SymbolDefRow
+from codeintel_rev.io.vllm_client import VLLMClient
 from msgspec import structs
 
 
@@ -101,13 +105,13 @@ def test_offline_eval_synthesizes_queries(tmp_path: Path) -> None:
     evaluator = OfflineRecallEvaluator(
         settings=settings,
         paths=paths,
-        faiss_manager=_StubFAISSManager([101, 202]),
-        vllm_client=_StubVLLMClient(settings.index.vec_dim),
+        faiss_manager=cast("FAISSManager", _StubFAISSManager([101, 202])),
+        vllm_client=cast("VLLMClient", _StubVLLMClient(settings.index.vec_dim)),
         duckdb_manager=duckdb_manager,
     )
     result = evaluator.run()
     assert result["queries"] == 1
-    summary = result["summary"]
+    summary = cast("Mapping[int, float]", result["summary"])
     assert summary[5] == pytest.approx(1.0)
     summary_path = tmp_path / "artifacts" / "summary.json"
     assert summary_path.exists()

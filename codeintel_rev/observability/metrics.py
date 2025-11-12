@@ -51,7 +51,7 @@ RRF_DURATION_SECONDS = build_histogram(
 CHANNEL_LATENCY_SECONDS = build_histogram(
     "codeintel_rev_channel_duration_seconds",
     "Per-channel search latency (seconds)",
-    ("channel",),
+    labelnames=("channel",),
     unit="seconds",
     buckets=(0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.0),
 )

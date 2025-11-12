@@ -431,7 +431,9 @@ def _semantic_search_pro_sync(
                                 warp_outcome.explainability
                             ),
                             rerank=rerank_metadata,
-                            hybrid_method=fused.method,
+                            hybrid_method=(
+                                cast("MethodInfo", dict(fused.method)) if fused.method else None
+                            ),
                         )
                     ),
                     limits=limits + fused.warnings,
@@ -476,7 +478,9 @@ def _semantic_search_pro_sync(
                         notes=tuple(warp_outcome.notes),
                         explainability=_build_method_explainability(warp_outcome.explainability),
                         rerank=rerank_metadata,
-                        hybrid_method=fused.method,
+                        hybrid_method=(
+                            cast("MethodInfo", dict(fused.method)) if fused.method else None
+                        ),
                     )
                 ),
                 limits=limits + fused.warnings,
@@ -1549,9 +1553,13 @@ def _build_method(context: MethodContext) -> MethodInfo:
         "coverage": coverage,
     }
     if context.hybrid_method:
-        method: MethodInfo = dict(context.hybrid_method)
-        method.setdefault("coverage", base["coverage"])
-        method.setdefault("retrieval", base["retrieval"])
+        method = cast("MethodInfo", dict(context.hybrid_method))
+        coverage = base.get("coverage")
+        retrieval = base.get("retrieval")
+        if coverage is not None and "coverage" not in method:
+            method["coverage"] = coverage
+        if retrieval is not None and "retrieval" not in method:
+            method["retrieval"] = retrieval
     else:
         method = base
     if context.stages:
@@ -1666,8 +1674,10 @@ def _clamp_limit(requested: int, max_results: int, notes: list[str]) -> int:
 
 
 def _coerce_positive_int(value: object) -> int | None:
+    if not isinstance(value, (int, float, str)):
+        return None
     try:
-        parsed = int(value)  # type: ignore[arg-type]
+        parsed = int(value)
     except (TypeError, ValueError):
         return None
     return parsed if parsed > 0 else None

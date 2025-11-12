@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Protocol, cast
 
 from codeintel_rev.typing import gate_import
 from kgfoundry_common.logging import get_logger
@@ -14,7 +14,22 @@ if TYPE_CHECKING:
 
 LOGGER = get_logger(__name__)
 
-WarpExecutorFactory = Callable[[str, str], object]
+
+class WarpExecutorProtocol(Protocol):
+    """Protocol describing the WARP executor search surface."""
+
+    def search(
+        self,
+        *,
+        query: str,
+        candidates: Sequence[int],
+        top_k: int,
+    ) -> Sequence[object]:
+        """Return ranked candidate tuples."""
+        ...
+
+
+WarpExecutorFactory = Callable[[str, str], WarpExecutorProtocol]
 
 
 class WarpUnavailableError(RuntimeError):
@@ -30,8 +45,8 @@ class WarpEngine:
             msg = f"WARP index directory not found: {self.index_dir}"
             raise WarpUnavailableError(msg)
         self.device = device
-        self._executor_cls = self._load_executor_cls()
-        self._executor = None
+        self._executor_cls: WarpExecutorFactory = self._load_executor_cls()
+        self._executor: WarpExecutorProtocol | None = None
 
     def rerank(
         self,
@@ -67,7 +82,7 @@ class WarpEngine:
             return []
         executor = self._ensure_executor()
         try:
-            results = executor.search(  # type: ignore[attr-defined]
+            results = executor.search(
                 query=query,
                 candidates=[int(cid) for cid in candidate_ids],
                 top_k=int(top_k),
@@ -85,8 +100,9 @@ class WarpEngine:
                 doc_id_value = _safe_int(item.get("doc_id"))
                 score_value = _safe_float(item.get("score", 0.0))
                 normalized.append((doc_id_value, score_value))
-            else:
-                doc_id, score = item
+            elif isinstance(item, Sequence) and len(item) >= 2:
+                doc_id = item[0]
+                score = item[1]
                 normalized.append((_safe_int(doc_id), _safe_float(score)))
         return normalized
 
@@ -116,7 +132,7 @@ class WarpEngine:
         module = gate_import("xtr_warp.executor", purpose)
         return cast("ModuleType", module)
 
-    def _ensure_executor(self) -> object:
+    def _ensure_executor(self) -> WarpExecutorProtocol:
         """Ensure the WARP executor is initialized and return it.
 
         Returns
@@ -129,10 +145,11 @@ class WarpEngine:
         WarpUnavailableError
             If executor initialization fails.
         """
-        if self._executor is not None:
-            return self._executor
+        cached = self._executor
+        if cached is not None:
+            return cached
         try:
-            self._executor = self._executor_cls(  # type: ignore[call-arg]
+            self._executor = self._executor_cls(
                 str(self.index_dir),
                 self.device,
             )

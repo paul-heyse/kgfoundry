@@ -20,6 +20,7 @@ from codeintel_rev.config.settings import (
     BM25Config,
     CodeRankConfig,
     CodeRankLLMConfig,
+    EvalConfig,
     IndexConfig,
     PathsConfig,
     RedisConfig,
@@ -116,6 +117,7 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
             batch_size=32,
         ),
         limits=ServerLimits(),
+        eval=EvalConfig(),
         redis=RedisConfig(
             url="redis://127.0.0.1:6379/0",
             scope_l1_size=64,

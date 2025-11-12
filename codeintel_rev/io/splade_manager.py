@@ -38,6 +38,8 @@ if TYPE_CHECKING:
             top_k: int | None = None,
         ) -> Sequence[Sequence[tuple[str, float]]]: ...
 
+        def save_pretrained(self, output_path: str) -> None: ...
+
     class _OptimizerFunction(Protocol):
         def __call__(
             self,
@@ -62,18 +64,20 @@ if TYPE_CHECKING:
 
 
 try:  # pragma: no cover - optional dependency
-    from sentence_transformers import SparseEncoder
+    from sentence_transformers import SparseEncoder as _SparseEncoderClass
 except ImportError:  # pragma: no cover - handled at runtime
-    SparseEncoder = None  # type: ignore[misc]
+    _SparseEncoderClass = None
 
 try:  # pragma: no cover - optional dependency
     from sentence_transformers import (
-        export_dynamic_quantized_onnx_model,
-        export_optimized_onnx_model,
+        export_dynamic_quantized_onnx_model as _export_dynamic_quantized_onnx_model,
+    )
+    from sentence_transformers import (
+        export_optimized_onnx_model as _export_optimized_onnx_model,
     )
 except ImportError:  # pragma: no cover - handled at runtime
-    export_dynamic_quantized_onnx_model = None  # type: ignore[misc]
-    export_optimized_onnx_model = None  # type: ignore[misc]
+    _export_dynamic_quantized_onnx_model = None
+    _export_optimized_onnx_model = None
 
 
 GENERATOR_NAME = "codeintel_rev.io.splade_manager"
@@ -232,25 +236,25 @@ class _ExportContext:
 
 
 def _require_sparse_encoder() -> type:
-    if SparseEncoder is None:  # pragma: no cover - defensive
+    if _SparseEncoderClass is None:  # pragma: no cover - defensive
         msg = (
             "sentence-transformers with SparseEncoder support is required for SPLADE "
             "operations. Install the 'sentence-transformers[onnx]' extra."
         )
         raise RuntimeError(msg)
-    return SparseEncoder  # type: ignore[return-value]
+    return _SparseEncoderClass
 
 
 def _require_export_helpers() -> tuple[_OptimizerFunction, _QuantizerFunction]:
-    if export_optimized_onnx_model is None or export_dynamic_quantized_onnx_model is None:
+    if _export_optimized_onnx_model is None or _export_dynamic_quantized_onnx_model is None:
         msg = (
             "SPLADE export helpers are unavailable. Upgrade sentence-transformers to a "
             "version providing export_optimized_onnx_model and "
             "export_dynamic_quantized_onnx_model."
         )
         raise RuntimeError(msg)
-    return cast("_OptimizerFunction", export_optimized_onnx_model), cast(
-        "_QuantizerFunction", export_dynamic_quantized_onnx_model
+    return cast("_OptimizerFunction", _export_optimized_onnx_model), cast(
+        "_QuantizerFunction", _export_dynamic_quantized_onnx_model
     )
 
 
@@ -828,7 +832,10 @@ class SpladeArtifactsManager:
             },
         )
 
-        encoder = sparse_encoder_cls(model_id, backend="onnx", model_kwargs={"provider": provider})
+        encoder = cast(
+            "_SparseEncoderProtocol",
+            sparse_encoder_cls(model_id, backend="onnx", model_kwargs={"provider": provider}),
+        )
         encoder.save_pretrained(str(model_dir))
         ctx = _ExportContext(
             model_id=model_id,
@@ -960,12 +967,12 @@ class SpladeEncoderService:
                 selected_relative = relative_path
                 break
 
-        encoder = sparse_encoder_cls(
+        encoder_instance = sparse_encoder_cls(
             str(model_dir),
             backend="onnx",
             model_kwargs=model_kwargs,
         )
-        return encoder, selected_relative
+        return cast("_SparseEncoderProtocol", encoder_instance), selected_relative
 
     def _build_encoder(self, *, provider: str, onnx_file: str | None) -> _SparseEncoderProtocol:
         encoder, _ = self._initialise_encoder(provider=provider, onnx_file=onnx_file)

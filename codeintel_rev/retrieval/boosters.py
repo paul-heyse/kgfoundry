@@ -6,23 +6,29 @@ import re
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from codeintel_rev.retrieval.types import HybridResultDoc
 
 try:
-    import duckdb  # type: ignore[import-untyped]
+    import duckdb
 except ImportError:  # pragma: no cover - optional dependency
-    duckdb = None  # type: ignore[assignment]
+    duckdb = None
+
+if TYPE_CHECKING:
+    from codeintel_rev.io.duckdb_manager import DuckDBManager as DuckDBManagerType
+else:  # pragma: no cover - typing only
+    DuckDBManagerType = Any
 
 try:
     from codeintel_rev.io.duckdb_manager import DuckDBManager
 except ImportError:  # pragma: no cover - optional dependency
-    DuckDBManager = None  # type: ignore[assignment]
+    DuckDBManager = None
 
-DuckConnection = (
-    duckdb.DuckDBPyConnection if duckdb is not None else Any  # type: ignore[assignment]
-)
+if TYPE_CHECKING:
+    from duckdb import DuckDBPyConnection as DuckConnection
+else:  # pragma: no cover - typing only
+    DuckConnection = Any
 
 __all__ = ["RecencyConfig", "apply_recency_boost"]
 
@@ -74,9 +80,8 @@ def _create_recency_view(
     chunk_col: str,
     commit_col: str,
 ) -> None:
-    relation = (
-        conn.table(table_name)
-        .project(f"{chunk_col} AS recency_chunk_id, {commit_col} AS recency_commit_ts")
+    relation = conn.table(table_name).project(
+        f"{chunk_col} AS recency_chunk_id, {commit_col} AS recency_commit_ts"
     )
     relation.create_view("recency_source", replace=True)
 
@@ -87,7 +92,7 @@ def _populate_id_table(conn: DuckConnection, ids: Sequence[int]) -> None:
 
 
 def _fetch_commit_ts_duckdb(
-    manager: DuckDBManager,
+    manager: DuckDBManagerType,
     ids: Iterable[str],
     cfg: RecencyConfig,
 ) -> Mapping[str, float]:
@@ -137,7 +142,7 @@ def apply_recency_boost(
     docs: list[HybridResultDoc],
     cfg: RecencyConfig,
     *,
-    duckdb_manager: DuckDBManager | None = None,
+    duckdb_manager: DuckDBManagerType | None = None,
     commit_ts_lookup: Callable[[Iterable[str]], Mapping[str, float]] | None = None,
 ) -> tuple[list[HybridResultDoc], int]:
     """Return a new doc list with an exponential recency boost applied.

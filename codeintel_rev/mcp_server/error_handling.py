@@ -498,9 +498,10 @@ def handle_adapter_errors(
         if inspect.iscoroutinefunction(func):
 
             @wraps(func)
-            async def async_wrapper(*args: object, **kwargs: object) -> dict:
+            async def async_wrapper(*args: object, **kwargs: object) -> dict[str, object]:
                 try:
-                    return await func(*args, **kwargs)  # type: ignore[return-value]
+                    result = await func(*args, **kwargs)
+                    return cast("dict[str, object]", result)
                 except (KeyboardInterrupt, SystemExit, GeneratorExit):
                     # Re-raise system-level exceptions - these should propagate
                     raise
@@ -515,9 +516,10 @@ def handle_adapter_errors(
             return cast("F", async_wrapper)
 
         @wraps(func)
-        def sync_wrapper(*args: object, **kwargs: object) -> dict:
+        def sync_wrapper(*args: object, **kwargs: object) -> dict[str, object]:
             try:
-                return func(*args, **kwargs)  # type: ignore[return-value]
+                result = func(*args, **kwargs)
+                return cast("dict[str, object]", result)
             except (KeyboardInterrupt, SystemExit, GeneratorExit):
                 # Re-raise system-level exceptions - these should propagate
                 raise

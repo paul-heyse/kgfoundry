@@ -41,6 +41,7 @@ GitPython documentation : https://gitpython.readthedocs.io/
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -55,6 +56,58 @@ if TYPE_CHECKING:
     from codeintel_rev.mcp_server.schemas import GitBlameEntry
 
 LOGGER = get_logger(__name__)
+
+
+def _string_attr(obj: object, attr: str) -> str:
+    value = getattr(obj, attr, "")
+    return str(value) if value is not None else ""
+
+
+def _commit_iso_date(commit: object) -> str:
+    authored = getattr(commit, "authored_datetime", None)
+    if authored is None:
+        return ""
+    iso = getattr(authored, "isoformat", None)
+    if callable(iso):
+        return str(iso())
+    return str(authored)
+
+
+def _author_field(commit: object, field: str) -> str:
+    author = getattr(commit, "author", None)
+    if author is None:
+        return ""
+    value = getattr(author, field, "")
+    return str(value) if value is not None else ""
+
+
+def _short_sha(commit: object) -> str:
+    sha = _string_attr(commit, "hexsha")
+    return sha[:8] if sha else ""
+
+
+def _normalize_line_numbers(raw: object) -> list[int]:
+    if isinstance(raw, Sequence):
+        values: list[int] = []
+        for num in raw:
+            if not isinstance(num, (int, float)):
+                return []
+            values.append(int(num))
+        return values
+    if isinstance(raw, (int, float)):
+        return [int(raw)]
+    return []
+
+
+def _coerce_blame_tuple(blame_tuple: Sequence[object]) -> tuple[object, list[int]] | None:
+    tuple_min_length = 2
+    if len(blame_tuple) < tuple_min_length:
+        return None
+    commit = blame_tuple[0]
+    line_numbers = _normalize_line_numbers(blame_tuple[1])
+    if not line_numbers:
+        return None
+    return commit, line_numbers
 
 
 _SET_GITCLIENT_ATTR = object.__setattr__
@@ -253,11 +306,10 @@ class GitClient:
             timeline.event("git.blame.start", path, attrs={"n_lines": line_count})
 
         try:
-            # GitPython's blame_incremental yields (commit, line_numbers) tuples
-            blame_iter = self.repo.blame_incremental(
+            blame_iter_raw = self.repo.blame_incremental(
                 rev="HEAD",
                 file=path,
-                L=f"{start_line},{end_line}",  # Git line range format
+                L=f"{start_line},{end_line}",
             )
         except git.exc.GitCommandError as exc:
             # Check if error is "does not exist" (file not found)
@@ -277,28 +329,24 @@ class GitClient:
             raise
 
         entries: list[GitBlameEntry] = []
+        blame_iter = cast("Iterable[Sequence[object]]", blame_iter_raw)
         # blame_incremental returns iterator of (commit, line_numbers) tuples
         # line_numbers is a list of line numbers (1-indexed)
         # Tuple may have more than 2 elements, so we index instead of unpacking
-        tuple_min_length = 2
-        for blame_tuple in blame_iter:  # type: ignore[assignment]
-            # Handle tuple format: (commit, lines, ...)
-            if len(blame_tuple) >= tuple_min_length:
-                commit = blame_tuple[0]
-                line_nums = blame_tuple[1]
-            else:
-                # Fallback: try to unpack directly
-                commit, line_nums = blame_tuple  # type: ignore[assignment]
-
-            for line_num in line_nums:
+        for blame_tuple in blame_iter:
+            normalized = _coerce_blame_tuple(blame_tuple)
+            if normalized is None:
+                continue
+            commit, line_numbers = normalized
+            for line_num in line_numbers:
                 # Filter to requested range (GitPython may return extra lines)
                 if start_line <= line_num <= end_line:
                     entry: GitBlameEntry = {
-                        "line": line_num,
-                        "commit": commit.hexsha[:8],  # type: ignore[attr-defined]  # Short SHA (8 chars)
-                        "author": commit.author.name,  # type: ignore[attr-defined]  # Unicode-safe
-                        "date": commit.authored_datetime.isoformat(),  # type: ignore[attr-defined]  # ISO 8601
-                        "message": commit.summary,  # type: ignore[attr-defined]  # First line of commit message
+                        "line": int(line_num),
+                        "commit": _short_sha(commit),
+                        "author": _author_field(commit, "name"),
+                        "date": _commit_iso_date(commit),
+                        "message": _string_attr(commit, "summary"),
                     }
                     entries.append(entry)
 
@@ -413,17 +461,17 @@ class GitClient:
             )
             raise
 
-        commits: list[dict] = []
-        for commit in commits_iter:  # type: ignore[assignment]
-            commit_dict = {
-                "sha": commit.hexsha[:8],  # type: ignore[attr-defined]  # Short SHA
-                "full_sha": commit.hexsha,  # type: ignore[attr-defined]  # Full SHA (40 chars)
-                "author": commit.author.name,  # type: ignore[attr-defined]  # Unicode-safe
-                "email": commit.author.email,  # type: ignore[attr-defined]
-                "date": commit.authored_datetime.isoformat(),  # type: ignore[attr-defined]  # ISO 8601 with timezone
-                "message": commit.summary,  # type: ignore[attr-defined]  # First line only
+        commits = [
+            {
+                "sha": _short_sha(commit),
+                "full_sha": _string_attr(commit, "hexsha"),
+                "author": _author_field(commit, "name"),
+                "email": _author_field(commit, "email"),
+                "date": _commit_iso_date(commit),
+                "message": _string_attr(commit, "summary"),
             }
-            commits.append(commit_dict)
+            for commit in cast("Iterable[object]", commits_iter)
+        ]
 
         LOGGER.debug(
             "Git history completed",

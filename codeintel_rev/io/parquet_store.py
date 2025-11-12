@@ -184,7 +184,7 @@ def extract_embeddings(table: pa.Table) -> NDArrayF32:
 
     fixed_array = cast("pa.FixedSizeListArray", dense_array)
     # Convert list_size (which is a _Size type) to int for numpy.reshape
-    vec_dim: int = fixed_array.type.list_size  # type: ignore[assignment]
+    vec_dim = int(getattr(fixed_array.type, "list_size", 0))
     flat_values = fixed_array.values.to_numpy(zero_copy_only=False)
     return flat_values.reshape(-1, vec_dim)
 

@@ -21,9 +21,9 @@ if TYPE_CHECKING:
     type NDArrayI64 = npt.NDArray[np.int64]
     type NDArrayAny = npt.NDArray[Any]
 else:  # pragma: no cover
-    NDArrayF32 = Any  # type: ignore[assignment]
-    NDArrayI64 = Any  # type: ignore[assignment]
-    NDArrayAny = Any  # type: ignore[assignment]
+    NDArrayF32 = Any
+    NDArrayI64 = Any
+    NDArrayAny = Any
 
 __all__ = [
     "HEAVY_DEPS",

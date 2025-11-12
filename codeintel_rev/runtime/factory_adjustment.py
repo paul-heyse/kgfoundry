@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from types import TracebackType
-from typing import Any, Protocol, TypeVar
+from typing import Any, Protocol, TypeVar, cast
 
 T = TypeVar("T")
 
@@ -141,16 +141,19 @@ class DefaultFactoryAdjuster:
         def _wrapped() -> T:
             obj: Any = base()
             if self.faiss_nprobe is not None:
-                if hasattr(obj, "set_nprobe"):
+                setter = getattr(obj, "set_nprobe", None)
+                if callable(setter):
                     with SuppressException():
-                        obj.set_nprobe(self.faiss_nprobe)  # type: ignore[attr-defined]
+                        setter(self.faiss_nprobe)
                 elif hasattr(obj, "nprobe"):
                     with SuppressException():
                         obj.nprobe = self.faiss_nprobe
-            if self.faiss_gpu_preference is not None and hasattr(obj, "set_gpu_preference"):
-                with SuppressException():
-                    obj.set_gpu_preference(self.faiss_gpu_preference)  # type: ignore[attr-defined]
-            return obj  # type: ignore[return-value]
+            if self.faiss_gpu_preference is not None:
+                gpu_setter = getattr(obj, "set_gpu_preference", None)
+                if callable(gpu_setter):
+                    with SuppressException():
+                        gpu_setter(self.faiss_gpu_preference)
+            return cast("T", obj)
 
         return _wrapped
 
@@ -177,16 +180,22 @@ class DefaultFactoryAdjuster:
 
         def _wrapped() -> T:
             obj: Any = base()
-            if self.hybrid_rrf_k is not None and hasattr(obj, "set_rrf_k"):
-                with SuppressException():
-                    obj.set_rrf_k(self.hybrid_rrf_k)  # type: ignore[attr-defined]
-            if self.hybrid_bm25_weight is not None and hasattr(obj, "set_bm25_weight"):
-                with SuppressException():
-                    obj.set_bm25_weight(self.hybrid_bm25_weight)  # type: ignore[attr-defined]
-            if self.hybrid_splade_weight is not None and hasattr(obj, "set_splade_weight"):
-                with SuppressException():
-                    obj.set_splade_weight(self.hybrid_splade_weight)  # type: ignore[attr-defined]
-            return obj  # type: ignore[return-value]
+            if self.hybrid_rrf_k is not None:
+                rrk_setter = getattr(obj, "set_rrf_k", None)
+                if callable(rrk_setter):
+                    with SuppressException():
+                        rrk_setter(self.hybrid_rrf_k)
+            if self.hybrid_bm25_weight is not None:
+                bm25_setter = getattr(obj, "set_bm25_weight", None)
+                if callable(bm25_setter):
+                    with SuppressException():
+                        bm25_setter(self.hybrid_bm25_weight)
+            if self.hybrid_splade_weight is not None:
+                splade_setter = getattr(obj, "set_splade_weight", None)
+                if callable(splade_setter):
+                    with SuppressException():
+                        splade_setter(self.hybrid_splade_weight)
+            return cast("T", obj)
 
         return _wrapped
 

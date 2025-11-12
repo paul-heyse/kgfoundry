@@ -22,7 +22,7 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.config.settings import (
@@ -477,16 +477,15 @@ def _update_faiss_index_incremental(
     existing_ids = set(faiss_mgr.incremental_ids)
 
     # Get IDs from primary index if possible
-    if faiss_mgr.cpu_index is not None:
+    cpu_index = cast("Any", faiss_mgr.cpu_index)
+    if cpu_index is not None:
         try:
-            primary_n = faiss_mgr.cpu_index.ntotal  # type: ignore[attr-defined]
-            if hasattr(faiss_mgr.cpu_index, "id_map"):
-                primary_ids = {
-                    faiss_mgr.cpu_index.id_map.at(i)  # type: ignore[attr-defined]
-                    for i in range(primary_n)
-                }
+            primary_n = int(getattr(cpu_index, "ntotal", 0))
+            id_map = getattr(cpu_index, "id_map", None)
+            if id_map is not None:
+                primary_ids = {int(id_map.at(i)) for i in range(primary_n)}
                 existing_ids.update(primary_ids)
-        except (AttributeError, RuntimeError) as exc:
+        except (AttributeError, RuntimeError, TypeError, ValueError) as exc:
             logger.warning("Could not extract IDs from primary index: %s", exc)
 
     # Filter to new chunks only

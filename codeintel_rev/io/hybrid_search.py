@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Protocol
 
 from codeintel_rev.evaluation.hybrid_pool import Hit, HybridPoolEvaluator
 from codeintel_rev.observability import metrics as retrieval_metrics
@@ -37,6 +37,25 @@ if TYPE_CHECKING:
     from codeintel_rev.io.duckdb_manager import DuckDBManager
 
 LOGGER = get_logger(__name__)
+
+
+class _LuceneHit(Protocol):
+    docid: str
+    score: float
+
+
+class _LuceneSearcher(Protocol):
+    def set_bm25(self, *args: object, **kwargs: object) -> None:
+        """Configure BM25 parameters for the searcher."""
+        ...
+
+    def set_rm3(self, *args: object, **kwargs: object) -> None:
+        """Configure RM3 pseudo-relevance feedback parameters."""
+        ...
+
+    def search(self, query: str, k: int) -> Sequence[_LuceneHit]:
+        """Execute search and return Lucene hits."""
+        ...
 
 
 @dataclass(slots=True, frozen=True)
@@ -74,10 +93,10 @@ class BM25SearchProvider:
         self._rm3_enabled_default = rm3_cfg.enable_rm3
         self._auto_rm3 = rm3_cfg.auto_rm3
 
-        self._base_searcher: Any = self._create_searcher()
-        self._rm3_searcher: Any | None = None
+        self._base_searcher: _LuceneSearcher = self._create_searcher()
+        self._rm3_searcher: _LuceneSearcher | None = None
 
-    def _create_searcher(self) -> Any:
+    def _create_searcher(self) -> _LuceneSearcher:
         searcher = self._lucene_searcher_cls(str(self._index_dir))
         try:
             searcher.set_bm25(self._k1, self._b)
@@ -85,7 +104,7 @@ class BM25SearchProvider:
             searcher.set_bm25(k1=self._k1, b=self._b)
         return searcher
 
-    def _ensure_rm3_searcher(self) -> Any:
+    def _ensure_rm3_searcher(self) -> _LuceneSearcher:
         if self._rm3_searcher is not None:
             return self._rm3_searcher
         searcher = self._create_searcher()
@@ -501,7 +520,7 @@ class HybridSearchEngine:
             docs=docs,
             contributions=contributions_for_docs,
             channels=active_channels,
-            warnings=ctx.warnings,
+            warnings=list(ctx.warnings),
             method=method,
         )
 

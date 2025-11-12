@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import replace
+from typing import cast
 from unittest.mock import MagicMock
 
 from codeintel_rev.app.routers import index_admin
+from codeintel_rev.app.scope_store import ScopeStore
 from codeintel_rev.runtime.factory_adjustment import DefaultFactoryAdjuster
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -59,7 +62,8 @@ def test_admin_faiss_runtime_status_endpoint(tmp_path, monkeypatch) -> None:
 def test_admin_faiss_runtime_session_override(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("CODEINTEL_ADMIN", "1")
     ctx = build_application_context(tmp_path)
-    ctx.scope_store = _ScopeStoreStub()
+    stub = _ScopeStoreStub()
+    ctx = replace(ctx, scope_store=cast("ScopeStore", stub))
     app = FastAPI()
     app.state.context = ctx
     app.include_router(index_admin.router)
@@ -70,7 +74,7 @@ def test_admin_faiss_runtime_session_override(tmp_path, monkeypatch) -> None:
         )
         assert resp.status_code == 200
         assert resp.json()["faiss_tuning"]["nprobe"] == 48
-        assert ctx.scope_store.data["abc"]["faiss_tuning"]["nprobe"] == 48
+        assert stub.data["abc"]["faiss_tuning"]["nprobe"] == 48
 
 
 def test_admin_faiss_runtime_reset_session(tmp_path, monkeypatch) -> None:
@@ -78,7 +82,7 @@ def test_admin_faiss_runtime_reset_session(tmp_path, monkeypatch) -> None:
     ctx = build_application_context(tmp_path)
     stub = _ScopeStoreStub()
     stub.data["abc"] = {"faiss_tuning": {"nprobe": 64}, "languages": ["python"]}
-    ctx.scope_store = stub
+    ctx = replace(ctx, scope_store=cast("ScopeStore", stub))
     app = FastAPI()
     app.state.context = ctx
     app.include_router(index_admin.router)

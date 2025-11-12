@@ -179,14 +179,14 @@ class SCIPCoverageEvaluator:
         if not chunk_ids:
             return set()
         with self._duckdb.connection() as conn:
-            conn.register("_tmp_chunk_ids", [{"chunk_id": cid} for cid in chunk_ids])
             rows = conn.execute(
                 """
                 SELECT c.id
                 FROM chunks AS c
-                INNER JOIN _tmp_chunk_ids AS t
+                INNER JOIN UNNEST(?) AS t(chunk_id)
                   ON c.id = t.chunk_id
-                """
+                """,
+                [list(chunk_ids)],
             ).fetchall()
         return {int(row[0]) for row in rows}
 
@@ -206,9 +206,7 @@ class SCIPCoverageEvaluator:
     def _record_metrics(summary: CoverageSummary) -> None:
         SCIP_CHUNK_COVERAGE_RATIO.set(summary["chunk_coverage"])
         SCIP_INDEX_COVERAGE_RATIO.set(summary["index_coverage"])
-        SCIP_RETRIEVAL_COVERAGE_RATIO.labels(k=str(summary["k"])).set(
-            summary["retrieval_coverage"]
-        )
+        SCIP_RETRIEVAL_COVERAGE_RATIO.labels(k=str(summary["k"])).set(summary["retrieval_coverage"])
 
     def _write_artifacts(
         self,
