@@ -41,17 +41,30 @@ BM25 indexing workflow helpers.
 - function: `_detect_pyserini_version` (line 428)
 - function: `_directory_size` (line 444)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 3
 - **fan_out**: 3
-- **cycle_group**: 85
+- **cycle_group**: 98
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 5
+- recent churn 90: 5
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 BM25BuildOptions, BM25CorpusMetadata, BM25CorpusSummary, BM25IndexManager, BM25IndexMetadata
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: BM25 indexing workflow helpers.
 - has summary: yes
@@ -70,7 +83,7 @@ BM25BuildOptions, BM25CorpusMetadata, BM25CorpusSummary, BM25IndexManager, BM25I
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.44
 

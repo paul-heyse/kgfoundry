@@ -59,6 +59,7 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 - from **threading** import Lock
 - from **types** import ModuleType
 - from **typing** import TYPE_CHECKING, Any, Protocol, TypeVar, cast
+- from **(absolute)** import codeintel_rev.observability.metrics
 - from **codeintel_rev.app.capabilities** import Capabilities
 - from **codeintel_rev.app.scope_store** import ScopeStore
 - from **codeintel_rev.config.settings** import IndexConfig, Settings, load_settings
@@ -70,7 +71,6 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 - from **codeintel_rev.io.faiss_manager** import FAISSManager, FAISSRuntimeOptions
 - from **codeintel_rev.io.git_client** import AsyncGitClient, GitClient
 - from **codeintel_rev.io.vllm_client** import VLLMClient
-- from **(absolute)** import codeintel_rev.observability.metrics
 - from **codeintel_rev.runtime** import NullRuntimeCellObserver, RuntimeCell, RuntimeCellObserver
 - from **codeintel_rev.runtime.factory_adjustment** import DefaultFactoryAdjuster, FactoryAdjuster, NoopFactoryAdjuster
 - from **codeintel_rev.typing** import gate_import
@@ -109,17 +109,30 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 - class: `_ContextRuntimeState` (line 686)
 - class: `ApplicationContext` (line 726)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 20
 - **fan_out**: 17
-- **cycle_group**: 52
+- **cycle_group**: 65
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 32
+- recent churn 90: 32
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 ApplicationContext, ResolvedPaths, resolve_application_paths
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Application-level configuration context manager.
 - has summary: yes
@@ -142,7 +155,7 @@ ApplicationContext, ResolvedPaths, resolve_application_paths
 
 - app/hypercorn.toml
 
-## Hotspot Score
+## Hotspot
 
 - score: 3.25
 
@@ -155,7 +168,7 @@ ApplicationContext, ResolvedPaths, resolve_application_paths
 
 - branches: 62
 - cyclomatic: 63
-- loc: 1503
+- loc: 1504
 
 ## Doc Coverage
 

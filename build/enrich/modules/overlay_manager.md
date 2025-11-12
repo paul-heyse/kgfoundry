@@ -22,13 +22,26 @@ Targeted overlay manager for opt-in stub generation.
 - function: `activate_generated_overlays` (line 96)
 - function: `_safe_int` (line 130)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 1
 - **cycle_group**: 7
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 3
+- recent churn 90: 3
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Targeted overlay manager for opt-in stub generation.
 - has summary: yes
@@ -47,9 +60,9 @@ Targeted overlay manager for opt-in stub generation.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
-- score: 1.71
+- score: 1.69
 
 ## Side Effects
 
@@ -57,9 +70,9 @@ Targeted overlay manager for opt-in stub generation.
 
 ## Complexity
 
-- branches: 17
-- cyclomatic: 18
-- loc: 152
+- branches: 16
+- cyclomatic: 17
+- loc: 155
 
 ## Doc Coverage
 
@@ -67,7 +80,7 @@ Targeted overlay manager for opt-in stub generation.
 - `select_overlay_candidates` (function): summary=yes, params=ok, examples=no — Return overlay candidates based on re-exports and typedness.
 - `generate_overlay_stub` (function): summary=yes, params=ok, examples=no — Write a re-export-only stub for ``plan``.
 - `activate_generated_overlays` (function): summary=yes, params=ok, examples=no — Symlink generated overlays into the primary stub path.
-- `_safe_int` (function): summary=yes, params=mismatch, examples=no — Return a best-effort integer conversion.
+- `_safe_int` (function): summary=yes, params=ok, examples=no — Return a best-effort integer conversion.
 
 ## Tags
 

@@ -21,13 +21,26 @@ Resolve exports and re-exports for module records.
 - function: `is_reexport_hub` (line 97)
 - function: `_public_names` (line 116)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 17
+- **cycle_group**: 22
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 2
+- recent churn 90: 2
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Resolve exports and re-exports for module records.
 - has summary: yes
@@ -46,7 +59,7 @@ Resolve exports and re-exports for module records.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.17
 

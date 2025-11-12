@@ -29,13 +29,26 @@ Token-level XTR index manager with late-interaction scoring utilities.
 - class: `_XTRIndexRuntime` (line 37)
 - class: `XTRIndex` (line 61)
 
-## Dependency Graph
+## Graph Metrics
 
-- **fan_in**: 6
+- **fan_in**: 8
 - **fan_out**: 4
-- **cycle_group**: 42
+- **cycle_group**: 57
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 7
+- recent churn 90: 7
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Token-level XTR index manager with late-interaction scoring utilities.
 - has summary: yes
@@ -54,9 +67,9 @@ Token-level XTR index manager with late-interaction scoring utilities.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
-- score: 2.67
+- score: 2.73
 
 ## Side Effects
 

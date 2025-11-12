@@ -26,17 +26,30 @@ better performance (50-80ms latency reduction) and reliability.
 - function: `blame_range` (line 24)
 - function: `file_history` (line 119)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 4
-- **cycle_group**: 118
+- **cycle_group**: 131
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 11
+- recent churn 90: 11
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 blame_range, file_history
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Git history adapter for blame and log operations.
 - has summary: yes
@@ -55,7 +68,7 @@ blame_range, file_history
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.77
 

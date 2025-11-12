@@ -32,17 +32,30 @@ TypedDict provides automatic JSON Schema generation for FastMCP tools.
 - class: `FileHistoryResponse` (line 476)
 - class: `SearchTextResponse` (line 491)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 11
 - **fan_out**: 1
-- **cycle_group**: 25
+- **cycle_group**: 36
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 9
+- recent churn 90: 9
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 AnswerEnvelope, BaseErrorFields, BlameRangeResponse, FileHistoryResponse, Finding, GitBlameEntry, ListPathsResponse, Location, Match, MethodInfo, OpenFileResponse, ScopeIn, SearchTextResponse, SymbolInfo
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: MCP server schemas using TypedDict for FastMCP compatibility.
 - has summary: yes
@@ -61,7 +74,7 @@ AnswerEnvelope, BaseErrorFields, BlameRangeResponse, FileHistoryResponse, Findin
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.78
 

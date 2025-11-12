@@ -21,15 +21,28 @@ SCIP-based symbol use graph helpers.
 - function: `build_use_graph` (line 23)
 - function: `write_use_graph` (line 59)
 - function: `_is_definition` (line 85)
-- function: `_write_parquet` (line 91)
+- function: `_write_parquet` (line 105)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 15
+- **cycle_group**: 17
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 4
+- recent churn 90: 4
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: SCIP-based symbol use graph helpers.
 - has summary: yes
@@ -48,7 +61,7 @@ SCIP-based symbol use graph helpers.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.95
 
@@ -60,15 +73,15 @@ SCIP-based symbol use graph helpers.
 
 - branches: 15
 - cyclomatic: 16
-- loc: 100
+- loc: 127
 
 ## Doc Coverage
 
 - `UseGraph` (class): summary=yes, examples=no — Definition-to-use relationships summarised by file.
 - `build_use_graph` (function): summary=yes, params=ok, examples=no — Build a use graph from SCIP occurrences.
 - `write_use_graph` (function): summary=yes, params=ok, examples=no — Persist use graph edges to Parquet (or JSONL fallback).
-- `_is_definition` (function): summary=no, examples=no
-- `_write_parquet` (function): summary=yes, params=mismatch, examples=no — Write records via polars when available.
+- `_is_definition` (function): summary=yes, params=ok, examples=no — Check if any role indicates a definition.
+- `_write_parquet` (function): summary=yes, params=ok, examples=no — Write records via polars when available.
 
 ## Tags
 

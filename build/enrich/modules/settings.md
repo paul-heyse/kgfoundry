@@ -43,41 +43,54 @@ All configuration loaded from environment variables with sensible defaults.
 - class: `PRFConfig` (line 439)
 - class: `SpladeConfig` (line 451)
 - class: `PathsConfig` (line 519)
-- class: `IndexConfig` (line 587)
-- class: `ServerLimits` (line 661)
-- class: `RedisConfig` (line 707)
-- class: `Settings` (line 728)
-- function: `load_settings` (line 793)
-- function: `_build_paths_config` (line 1027)
-- function: `_load_rrf_weights` (line 1047)
-- function: `_load_hybrid_prefetch` (line 1068)
-- function: `_load_hybrid_weights_override` (line 1089)
-- function: `_build_prf_config` (line 1108)
-- function: `_load_hybrid_channel_settings` (line 1120)
-- function: `_build_index_config` (line 1129)
-- function: `_build_server_limits` (line 1169)
-- function: `_build_redis_config` (line 1179)
-- function: `_build_duckdb_config` (line 1193)
-- function: `_build_eval_config` (line 1209)
-- function: `_resolve_bm25_analyzer` (line 1221)
-- function: `_resolve_splade_analyzer` (line 1228)
-- function: `_build_bm25_config` (line 1235)
-- function: `_build_splade_config` (line 1266)
-- function: `_build_coderank_config` (line 1289)
-- function: `_build_warp_config` (line 1307)
-- function: `_build_coderank_llm_config` (line 1318)
+- class: `IndexConfig` (line 592)
+- class: `ServerLimits` (line 666)
+- class: `RedisConfig` (line 712)
+- class: `Settings` (line 733)
+- function: `load_settings` (line 798)
+- function: `_build_paths_config` (line 1034)
+- function: `_load_rrf_weights` (line 1055)
+- function: `_load_hybrid_prefetch` (line 1076)
+- function: `_load_hybrid_weights_override` (line 1097)
+- function: `_build_prf_config` (line 1116)
+- function: `_load_hybrid_channel_settings` (line 1128)
+- function: `_build_index_config` (line 1137)
+- function: `_build_server_limits` (line 1177)
+- function: `_build_redis_config` (line 1187)
+- function: `_build_duckdb_config` (line 1201)
+- function: `_build_eval_config` (line 1217)
+- function: `_resolve_bm25_analyzer` (line 1229)
+- function: `_resolve_splade_analyzer` (line 1236)
+- function: `_build_bm25_config` (line 1243)
+- function: `_build_splade_config` (line 1274)
+- function: `_build_coderank_config` (line 1297)
+- function: `_build_warp_config` (line 1315)
+- function: `_build_coderank_llm_config` (line 1326)
 
-## Dependency Graph
+## Graph Metrics
 
-- **fan_in**: 21
+- **fan_in**: 22
 - **fan_out**: 2
-- **cycle_group**: 34
+- **cycle_group**: 51
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 26
+- recent churn 90: 26
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 BM25Config, CodeRankConfig, CodeRankLLMConfig, IndexConfig, PRFConfig, PathsConfig, RedisConfig, RerankConfig, ServerLimits, Settings, SpladeConfig, VLLMConfig, VLLMRunMode, WarpConfig, XTRConfig, load_settings
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Configuration settings using msgspec for fast, validated config.
 - has summary: yes
@@ -96,9 +109,9 @@ BM25Config, CodeRankConfig, CodeRankLLMConfig, IndexConfig, PRFConfig, PathsConf
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
-- score: 2.97
+- score: 2.99
 
 ## Side Effects
 
@@ -108,7 +121,7 @@ BM25Config, CodeRankConfig, CodeRankLLMConfig, IndexConfig, PRFConfig, PathsConf
 
 - branches: 45
 - cyclomatic: 46
-- loc: 1348
+- loc: 1356
 
 ## Doc Coverage
 

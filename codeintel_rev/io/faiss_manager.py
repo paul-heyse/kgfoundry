@@ -2352,7 +2352,6 @@ class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
             sanitized["k_factor"] = kf_val
         return sanitized
 
-
     def _resolve_search_knobs(
         self,
         override_nprobe: int | None,

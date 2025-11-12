@@ -22,17 +22,30 @@ Factory adjustment hooks for RuntimeCell initialization.
 - class: `DefaultFactoryAdjuster` (line 75)
 - class: `SuppressException` (line 225)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 4
 - **fan_out**: 1
-- **cycle_group**: 39
+- **cycle_group**: 52
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 3
+- recent churn 90: 3
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 DefaultFactoryAdjuster, FactoryAdjuster, NoopFactoryAdjuster
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Factory adjustment hooks for RuntimeCell initialization.
 - has summary: yes
@@ -51,7 +64,7 @@ DefaultFactoryAdjuster, FactoryAdjuster, NoopFactoryAdjuster
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.19
 

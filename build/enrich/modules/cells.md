@@ -35,17 +35,30 @@ Thread-safe runtime cell primitive for mutable subsystems.
 - class: `NullRuntimeCellObserver` (line 90)
 - class: `RuntimeCell` (line 117)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 3
 - **fan_out**: 5
-- **cycle_group**: 40
+- **cycle_group**: 53
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 11
+- recent churn 90: 11
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 NullRuntimeCellObserver, RuntimeCell, RuntimeCellCloseResult, RuntimeCellInitContext, RuntimeCellInitResult, RuntimeCellObserver
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Thread-safe runtime cell primitive for mutable subsystems.
 - has summary: yes
@@ -64,7 +77,7 @@ NullRuntimeCellObserver, RuntimeCell, RuntimeCellCloseResult, RuntimeCellInitCon
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.58
 

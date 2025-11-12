@@ -32,17 +32,30 @@ variables change or when they need fresh dependencies.
 - function: `get_service_context` (line 47)
 - function: `reset_service_context` (line 71)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 96
+- **cycle_group**: 109
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 10
+- recent churn 90: 10
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 get_service_context, reset_service_context
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Cached application context for MCP tool adapters.
 - has summary: yes
@@ -61,7 +74,7 @@ get_service_context, reset_service_context
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.36
 

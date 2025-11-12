@@ -22,17 +22,30 @@ can exchange session metadata without introducing circular imports between the
 - variable: `session_id_var` (line 18)
 - variable: `capability_stamp_var` (line 25)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 27
+- **cycle_group**: 40
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 1
+- recent churn 90: 1
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 capability_stamp_var, session_id_var
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Shared request-scoped context variables for runtime components.
 - has summary: yes
@@ -51,7 +64,7 @@ capability_stamp_var, session_id_var
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.31
 

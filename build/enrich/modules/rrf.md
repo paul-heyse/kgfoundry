@@ -20,17 +20,30 @@ Reciprocal Rank Fusion utilities (legacy compatibility wrappers).
 - function: `_normalize_channel_hits` (line 108)
 - function: `_to_int` (line 154)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 3
-- **cycle_group**: 80
+- **cycle_group**: 93
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 3
+- recent churn 90: 3
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 weighted_rrf
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Reciprocal Rank Fusion utilities (legacy compatibility wrappers).
 - has summary: yes
@@ -49,7 +62,7 @@ weighted_rrf
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.76
 

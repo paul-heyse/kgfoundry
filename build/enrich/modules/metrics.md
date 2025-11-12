@@ -30,17 +30,30 @@ Prometheus metrics for hybrid retrieval.
 - function: `record_recall` (line 110)
 - function: `set_index_version` (line 115)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 0
-- **cycle_group**: 37
+- **cycle_group**: 45
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 3
+- recent churn 90: 3
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 BUDGET_DEPTH, CHANNEL_LATENCY_SECONDS, DEBUG_BUNDLE_TOTAL, INDEX_VERSION_INFO, QUERIES_TOTAL, QUERY_AMBIGUITY, QUERY_ERRORS_TOTAL, RECALL_AT_K, RECENCY_BOOSTED_TOTAL, RESULTS_TOTAL, RRF_DURATION_SECONDS, RRF_K, observe_budget_depths, record_recall, set_index_version
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Prometheus metrics for hybrid retrieval.
 - has summary: yes
@@ -59,7 +72,7 @@ BUDGET_DEPTH, CHANNEL_LATENCY_SECONDS, DEBUG_BUNDLE_TOTAL, INDEX_VERSION_INFO, Q
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.52
 

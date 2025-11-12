@@ -69,17 +69,30 @@ GitPython documentation : https://gitpython.readthedocs.io/
 - class: `GitClient` (line 117)
 - class: `AsyncGitClient` (line 486)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 36
+- **cycle_group**: 64
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 7
+- recent churn 90: 7
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 AsyncGitClient, GitClient
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Typed Git operations wrapper using GitPython.
 - has summary: yes
@@ -98,7 +111,7 @@ AsyncGitClient, GitClient
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.22
 

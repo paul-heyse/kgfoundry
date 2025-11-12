@@ -46,17 +46,30 @@ Provides file listing, reading, and scope configuration.
 - function: `_collect_language_extensions` (line 678)
 - function: `_matches_language` (line 697)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 7
-- **cycle_group**: 115
+- **cycle_group**: 128
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 20
+- recent churn 90: 20
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 list_paths, open_file, set_scope
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: File and scope management adapter.
 - has summary: yes
@@ -75,7 +88,7 @@ list_paths, open_file, set_scope
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.56
 

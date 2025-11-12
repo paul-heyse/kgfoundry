@@ -45,17 +45,30 @@ Fast text search with regex support.
 - function: `_build_ripgrep_command` (line 488)
 - function: `_parse_ripgrep_output` (line 528)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 6
-- **cycle_group**: 117
+- **cycle_group**: 130
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 25
+- recent churn 90: 25
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 search_text
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Text search adapter using ripgrep.
 - has summary: yes
@@ -74,7 +87,7 @@ search_text
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.53
 

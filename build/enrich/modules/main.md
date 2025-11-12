@@ -60,17 +60,30 @@ Provides health/readiness endpoints, CORS, and streaming support.
 - function: `capz` (line 532)
 - function: `sse_demo` (line 575)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 12
-- **cycle_group**: 61
+- **cycle_group**: 74
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 24
+- recent churn 90: 24
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 app
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: FastAPI application with MCP server mount.
 - has summary: yes
@@ -93,7 +106,7 @@ app
 
 - app/hypercorn.toml
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.72
 

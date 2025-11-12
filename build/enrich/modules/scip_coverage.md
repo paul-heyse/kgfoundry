@@ -31,13 +31,26 @@ SCIP symbol coverage evaluator.
 - class: `CoverageSummary` (line 61)
 - class: `SCIPCoverageEvaluator` (line 71)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 6
-- **cycle_group**: 64
+- **cycle_group**: 80
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 4
+- recent churn 90: 4
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: SCIP symbol coverage evaluator.
 - has summary: yes
@@ -56,7 +69,7 @@ SCIP symbol coverage evaluator.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.26
 

@@ -44,17 +44,30 @@ Lightweight per-session timeline recording utilities.
 - function: `current_or_new_timeline` (line 414)
 - function: `bind_timeline` (line 455)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 11
 - **fan_out**: 2
-- **cycle_group**: 29
+- **cycle_group**: 39
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 5
+- recent churn 90: 5
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 Timeline, bind_timeline, current_timeline, new_timeline
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Lightweight per-session timeline recording utilities.
 - has summary: yes
@@ -73,7 +86,7 @@ Timeline, bind_timeline, current_timeline, new_timeline
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.69
 

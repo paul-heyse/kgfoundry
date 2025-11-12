@@ -16,13 +16,26 @@ Path safety utilities for repository-scoped operations.
 - class: `PathOutsideRepositoryError` (line 8)
 - function: `resolve_within_repo` (line 12)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 5
 - **fan_out**: 0
-- **cycle_group**: 56
+- **cycle_group**: 66
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 1
+- recent churn 90: 1
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Path safety utilities for repository-scoped operations.
 - has summary: yes
@@ -41,7 +54,7 @@ Path safety utilities for repository-scoped operations.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.80
 

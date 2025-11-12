@@ -24,13 +24,26 @@ Rule-based tagging helpers for enrichment outputs.
 - function: `infer_tags` (line 85)
 - function: `_rule_matches` (line 124)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 10
+- **cycle_group**: 13
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 4
+- recent churn 90: 4
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Rule-based tagging helpers for enrichment outputs.
 - has summary: yes
@@ -54,7 +67,7 @@ Rule-based tagging helpers for enrichment outputs.
 - enrich/tagging_rules.yaml
 - enrich/README.md
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.91
 

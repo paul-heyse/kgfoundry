@@ -26,17 +26,30 @@ Adaptive gating helpers for multi-stage retrieval pipelines.
 - function: `decide_budgets` (line 296)
 - function: `describe_budget_decision` (line 343)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 48
+- **cycle_group**: 61
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 5
+- recent churn 90: 5
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 BudgetDecision, QueryProfile, StageGateConfig, analyze_query, decide_budgets, describe_budget_decision, should_run_secondary_stage
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Adaptive gating helpers for multi-stage retrieval pipelines.
 - has summary: yes
@@ -55,7 +68,7 @@ BudgetDecision, QueryProfile, StageGateConfig, analyze_query, decide_budgets, de
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.09
 

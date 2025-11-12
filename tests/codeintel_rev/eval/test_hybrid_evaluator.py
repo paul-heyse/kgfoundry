@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
 import pyarrow.parquet as pq
-
 from codeintel_rev.eval.hybrid_evaluator import EvalConfig, HybridPoolEvaluator
 
 
@@ -32,9 +32,14 @@ class _FakeManager:
             101: np.array([0.0, 1.0], dtype=np.float32),
         }
 
-    def search(self, query: np.ndarray, k: int, nprobe: int | None = None):
-        ids = np.array([[100, 101]], dtype=np.int64)
-        scores = np.array([[0.9, 0.1]], dtype=np.float32)
+    def search(
+        self,
+        _query: np.ndarray,
+        k: int,
+        _nprobe: int | None = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        ids = np.array([[100, 101]], dtype=np.int64)[:, :k]
+        scores = np.array([[0.9, 0.1]], dtype=np.float32)[:, :k]
         return scores, ids
 
     def reconstruct_batch(self, ids: list[int] | np.ndarray) -> np.ndarray:
@@ -44,8 +49,16 @@ class _FakeManager:
 class _FakeXTRIndex:
     ready = True
 
-    def rescore(self, query: str, candidate_chunk_ids: list[int], explain: bool = False):
-        return [(candidate_chunk_ids[0], 2.0, None)]
+    def rescore(
+        self,
+        _query: str,
+        candidate_chunk_ids: Sequence[int],
+        *,
+        explain: bool = False,
+    ) -> list[tuple[int, float, None]]:
+        if not candidate_chunk_ids:
+            return []
+        return [(candidate_chunk_ids[0], 2.0 if not explain else 1.5, None)]
 
 
 def _config(tmp_path: Path, **overrides: object) -> EvalConfig:

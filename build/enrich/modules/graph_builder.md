@@ -1,39 +1,42 @@
-# graph_builder.py
+# enrich/graph_builder.py
 
 ## Docstring
 
 ```
-Import graph builder utilities.
+Re-export graph builder utilities within the enrich package.
 ```
 
 ## Imports
 
 - from **__future__** import annotations
-- from **dataclasses** import dataclass
-- from **pathlib** import Path
-- from **typing** import Any, cast
-- from **codeintel_rev.module_utils** import import_targets_for_entry, module_name_candidates, normalize_module_name
-- from **codeintel_rev.typing** import PolarsModule, gate_import
+- from **codeintel_rev.graph_builder** import ImportGraph, build_import_graph, write_import_graph
 
-## Definitions
-
-- class: `ImportGraph` (line 19)
-- function: `build_import_graph` (line 28)
-- function: `write_import_graph` (line 83)
-- function: `_tarjan_scc` (line 100)
-- function: `_write_parquet` (line 135)
-
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
-- **fan_out**: 2
-- **cycle_group**: 5
+- **fan_out**: 1
+- **cycle_group**: 18
 
-## Doc Metrics
+## Ownership
 
-- **summary**: Import graph builder utilities.
+- bus factor: 0.00
+- recent churn 30: 0
+- recent churn 90: 0
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Declared Exports (__all__)
+
+ImportGraph, build_import_graph, write_import_graph
+
+## Doc Health
+
+- **summary**: Re-export graph builder utilities within the enrich package.
 - has summary: yes
-- param parity: no
+- param parity: yes
 - examples present: no
 
 ## Typedness
@@ -48,28 +51,25 @@ Import graph builder utilities.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Config References
 
-- score: 2.09
+- enrich/tagging_rules.yaml
+- enrich/README.md
+
+## Hotspot
+
+- score: 1.19
 
 ## Side Effects
 
-- filesystem
+- none detected
 
 ## Complexity
 
-- branches: 25
-- cyclomatic: 26
-- loc: 143
-
-## Doc Coverage
-
-- `ImportGraph` (class): summary=yes, examples=no — Graph representation of intra-repo imports.
-- `build_import_graph` (function): summary=yes, params=ok, examples=no — Build an import graph across repo modules.
-- `write_import_graph` (function): summary=yes, params=mismatch, examples=no — Write import edges to Parquet (or JSONL fallback).
-- `_tarjan_scc` (function): summary=no, examples=no
-- `_write_parquet` (function): summary=yes, params=mismatch, examples=no — Persist records to Parquet via polars when available.
+- branches: 0
+- cyclomatic: 1
+- loc: 13
 
 ## Tags
 
-low-coverage
+low-coverage, public-api

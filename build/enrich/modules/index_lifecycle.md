@@ -45,17 +45,30 @@ through stable paths such as ``.../current/faiss.index`` and reload when
 - class: `VersionMeta` (line 111)
 - class: `IndexLifecycleManager` (line 136)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 5
 - **fan_out**: 2
-- **cycle_group**: 35
+- **cycle_group**: 58
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 3
+- recent churn 90: 3
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 IndexAssets, IndexLifecycleManager, LuceneAssets, VersionMeta, link_current_lucene
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Index lifecycle management for FAISS/DuckDB/SCIP artifacts.
 - has summary: yes
@@ -74,7 +87,7 @@ IndexAssets, IndexLifecycleManager, LuceneAssets, VersionMeta, link_current_luce
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.42
 

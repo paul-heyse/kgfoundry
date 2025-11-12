@@ -15,8 +15,8 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 - from **pathlib** import Path
 - from **time** import perf_counter
 - from **typing** import TYPE_CHECKING, Protocol
-- from **codeintel_rev.evaluation.hybrid_pool** import Hit, HybridPoolEvaluator
 - from **(absolute)** import codeintel_rev.observability.metrics
+- from **codeintel_rev.evaluation.hybrid_pool** import Hit, HybridPoolEvaluator
 - from **codeintel_rev.observability.timeline** import Timeline, current_timeline
 - from **codeintel_rev.plugins.channels** import Channel, ChannelContext, ChannelError
 - from **codeintel_rev.plugins.registry** import ChannelRegistry
@@ -45,17 +45,30 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 - class: `_FusionWork` (line 349)
 - class: `HybridSearchEngine` (line 363)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 5
 - **fan_out**: 14
-- **cycle_group**: 52
+- **cycle_group**: 65
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 15
+- recent churn 90: 15
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 BM25SearchProvider, ChannelHit, HybridResultDoc, HybridSearchEngine, HybridSearchOptions, HybridSearchResult, HybridSearchTuning, SpladeSearchProvider
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 - has summary: yes
@@ -74,7 +87,7 @@ BM25SearchProvider, ChannelHit, HybridResultDoc, HybridSearchEngine, HybridSearc
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 3.14
 

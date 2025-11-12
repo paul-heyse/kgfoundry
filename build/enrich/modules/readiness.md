@@ -70,13 +70,26 @@ codeintel_rev.app.main : FastAPI application with /readyz endpoint
 - class: `CheckResult` (line 71)
 - class: `ReadinessProbe` (line 109)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 53
+- **cycle_group**: 73
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 11
+- recent churn 90: 11
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Application readiness checks for Kubernetes health probes.
 - has summary: yes
@@ -99,7 +112,7 @@ codeintel_rev.app.main : FastAPI application with /readyz endpoint
 
 - app/hypercorn.toml
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.27
 

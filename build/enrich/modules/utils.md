@@ -17,17 +17,30 @@ Helpers for working with msgspec-based settings structs.
 - function: `replace_settings` (line 10)
 - function: `replace_struct` (line 45)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 71
+- **cycle_group**: 84
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 2
+- recent churn 90: 2
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 replace_settings, replace_struct
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Helpers for working with msgspec-based settings structs.
 - has summary: yes
@@ -46,7 +59,7 @@ replace_settings, replace_struct
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.03
 

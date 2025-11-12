@@ -22,13 +22,26 @@ Command-line entry point for offline FAISS recall evaluation.
 - function: `build_parser` (line 17)
 - function: `main` (line 41)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 63
+- **cycle_group**: 79
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 1
+- recent churn 90: 1
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Command-line entry point for offline FAISS recall evaluation.
 - has summary: yes
@@ -47,7 +60,7 @@ Command-line entry point for offline FAISS recall evaluation.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.24
 

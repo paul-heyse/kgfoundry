@@ -20,17 +20,30 @@ Shared retrieval dataclasses for multi-stage pipelines.
 - class: `StageSignals` (line 37)
 - class: `StageDecision` (line 59)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 9
 - **fan_out**: 0
-- **cycle_group**: 47
+- **cycle_group**: 59
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 2
+- recent churn 90: 2
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 ChannelHit, HybridResultDoc, HybridSearchResult, StageDecision, StageSignals
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Shared retrieval dataclasses for multi-stage pipelines.
 - has summary: yes
@@ -49,7 +62,7 @@ ChannelHit, HybridResultDoc, HybridSearchResult, StageDecision, StageSignals
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.88
 

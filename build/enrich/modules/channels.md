@@ -26,17 +26,30 @@ Channel plugin contracts for hybrid retrieval.
 - class: `Channel` (line 32)
 - class: `ChannelError` (line 44)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 3
 - **fan_out**: 5
-- **cycle_group**: 52
+- **cycle_group**: 65
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 2
+- recent churn 90: 2
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 Channel, ChannelContext, ChannelError
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Channel plugin contracts for hybrid retrieval.
 - has summary: yes
@@ -55,7 +68,7 @@ Channel, ChannelContext, ChannelError
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.75
 

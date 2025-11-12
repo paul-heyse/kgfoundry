@@ -51,17 +51,30 @@ Raising Git operation error:
 - class: `RuntimeLifecycleError` (line 334)
 - class: `RuntimeUnavailableError` (line 353)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 11
 - **fan_out**: 0
-- **cycle_group**: 19
+- **cycle_group**: 24
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 4
+- recent churn 90: 4
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 FileOperationError, FileReadError, GitOperationError, InvalidLineRangeError, PathNotDirectoryError, PathNotFoundError, RuntimeLifecycleError, RuntimeUnavailableError
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: CodeIntel-specific exception hierarchy with Problem Details support.
 - has summary: yes
@@ -80,7 +93,7 @@ FileOperationError, FileReadError, GitOperationError, InvalidLineRangeError, Pat
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.08
 

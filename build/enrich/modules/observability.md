@@ -48,17 +48,30 @@ Graceful degradation when metrics are unavailable:
 - class: `Observation` (line 79)
 - function: `observe_duration` (line 90)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 3
 - **fan_out**: 1
-- **cycle_group**: 109
+- **cycle_group**: 122
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 3
+- recent churn 90: 3
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 Observation, observe_duration
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Unified observability helpers for CodeIntel MCP adapters.
 - has summary: yes
@@ -77,7 +90,7 @@ Observation, observe_duration
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.81
 

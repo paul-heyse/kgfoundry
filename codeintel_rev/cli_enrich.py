@@ -30,6 +30,7 @@ from codeintel_rev.enrich.ast_indexer import (
     stable_module_path,
     write_ast_parquet,
 )
+from codeintel_rev.enrich.graph_builder import ImportGraph, build_import_graph, write_import_graph
 from codeintel_rev.enrich.libcst_bridge import index_module
 from codeintel_rev.enrich.output_writers import (
     write_json,
@@ -37,13 +38,14 @@ from codeintel_rev.enrich.output_writers import (
     write_markdown_module,
     write_parquet,
 )
+from codeintel_rev.enrich.ownership import OwnershipIndex, compute_ownership
 from codeintel_rev.enrich.pathnorm import (
     detect_repo_root,
     module_name_from_path,
     stable_id_for_path,
-    to_repo_relative,
 )
 from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
+from codeintel_rev.enrich.slices_builder import build_slice_record, write_slice
 from codeintel_rev.enrich.stubs_overlay import (
     OverlayPolicy,
     activate_overlays,
@@ -52,9 +54,6 @@ from codeintel_rev.enrich.stubs_overlay import (
 )
 from codeintel_rev.enrich.tagging import ModuleTraits, infer_tags, load_rules
 from codeintel_rev.enrich.tree_sitter_bridge import build_outline
-from codeintel_rev.enrich.graph_builder import ImportGraph, build_import_graph, write_import_graph
-from codeintel_rev.enrich.ownership import OwnershipIndex, compute_ownership
-from codeintel_rev.enrich.slices_builder import build_slice_record, write_slice
 from codeintel_rev.export_resolver import build_module_name_map, resolve_exports
 from codeintel_rev.risk_hotspots import compute_hotspot_score
 from codeintel_rev.typedness import FileTypeSignals, collect_type_signals
@@ -175,11 +174,13 @@ TYPE_ERROR_OVERLAYS = typer.Option(
     "--type-error-overlays/--no-type-error-overlays",
     help="Allow overlays for modules exceeding --min-errors type error threshold.",
 )
-OWNERS = typer.Option(
-    True,
-    "--owners/--no-owners",
-    help="Compute Git ownership analytics and enrich module rows.",
-)
+OwnersOption = Annotated[
+    bool,
+    typer.Option(
+        "--owners/--no-owners",
+        help="Compute Git ownership analytics and enrich module rows.",
+    ),
+]
 HISTORY_WINDOW = typer.Option(
     DEFAULT_OWNER_HISTORY_DAYS,
     "--history-window-days",
@@ -190,11 +191,13 @@ COMMITS_WINDOW_OPTION = typer.Option(
     "--commits-window",
     help="Maximum commits per file sampled when computing bus factor.",
 )
-EMIT_SLICES = typer.Option(
-    False,
-    "--emit-slices/--no-emit-slices",
-    help="Emit optional slice packs (JSON + Markdown) for selected modules.",
-)
+EmitSlicesOption = Annotated[
+    bool,
+    typer.Option(
+        "--emit-slices/--no-emit-slices",
+        help="Emit optional slice packs (JSON + Markdown) for selected modules.",
+    ),
+]
 MAX_FILE_BYTES = typer.Option(
     DEFAULT_MAX_FILE_BYTES,
     "--max-file-bytes",
@@ -348,10 +351,10 @@ def run_all(  # noqa: PLR0913, PLR0917
             help="Emit Parquet datasets with AST nodes and metrics.",
         ),
     ] = DEFAULT_EMIT_AST,
-    owners: bool = OWNERS,
+    owners: OwnersOption = True,
     history_window_days: int = HISTORY_WINDOW,
     commits_window: int = COMMITS_WINDOW_OPTION,
-    emit_slices: bool = EMIT_SLICES,
+    emit_slices: EmitSlicesOption = False,
     slices_filter: SlicesFilterOption = None,
     max_file_bytes: int = MAX_FILE_BYTES,
 ) -> None:
@@ -404,10 +407,10 @@ def scan(  # noqa: PLR0913, PLR0917
             help="Emit Parquet datasets with AST nodes and metrics.",
         ),
     ] = DEFAULT_EMIT_AST,
-    owners: bool = OWNERS,
+    owners: OwnersOption = True,
     history_window_days: int = HISTORY_WINDOW,
     commits_window: int = COMMITS_WINDOW_OPTION,
-    emit_slices: bool = EMIT_SLICES,
+    emit_slices: EmitSlicesOption = False,
     slices_filter: SlicesFilterOption = None,
     max_file_bytes: int = MAX_FILE_BYTES,
 ) -> None:
@@ -1114,10 +1117,7 @@ def _apply_ownership(
     commits_window: int,
 ) -> OwnershipIndex:
     churn_windows = (30, max(1, history_window_days))
-    repo_paths = [
-        str(row.get("repo_path") or row.get("path") or "")
-        for row in result.module_rows
-    ]
+    repo_paths = [str(row.get("repo_path") or row.get("path") or "") for row in result.module_rows]
     ownership = compute_ownership(
         result.repo_root,
         repo_paths,
@@ -1163,9 +1163,7 @@ def _write_slices_output(
     slice_records: list[dict[str, Any]] = []
     index_rows: list[dict[str, Any]] = []
     for row in module_rows:
-        tags = {
-            tag for tag in row.get("tags") or [] if isinstance(tag, str)
-        }
+        tags = {tag for tag in row.get("tags") or [] if isinstance(tag, str)}
         if filters and not tags.intersection(filters):
             continue
         slice_record = build_slice_record(row)
@@ -1242,9 +1240,7 @@ def _write_ast_outputs(result: PipelineResult, out: Path, *, emit_ast: bool) -> 
     write_ast_parquet(nodes, metrics, out_dir=ast_dir)
     _write_ast_jsonl(ast_dir / "ast_nodes.jsonl", nodes)
     _write_ast_jsonl(ast_dir / "ast_metrics.jsonl", metrics)
-    typer.echo(
-        f"[ast] Wrote AST nodes ({len(nodes)}) and metrics ({len(metrics)}) tables + JSONL."
-    )
+    typer.echo(f"[ast] Wrote AST nodes ({len(nodes)}) and metrics ({len(metrics)}) tables + JSONL.")
 
 
 def _write_modules_json(out: Path, module_rows: list[dict[str, Any]]) -> None:
@@ -1267,6 +1263,7 @@ def _write_repo_map(out: Path, result: PipelineResult) -> None:
         out / "repo_map.json",
         {
             "root": str(result.root),
+            "repo_root": str(result.repo_root),
             "module_count": len(result.module_rows),
             "symbol_edge_count": len(result.symbol_edges),
             "coverage_records": len(result.coverage_rows),

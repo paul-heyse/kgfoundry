@@ -28,17 +28,30 @@ Built-in retrieval channel implementations (BM25, SPLADE).
 - function: `_resolve_path` (line 319)
 - function: `_classify_skip_reason` (line 326)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 4
-- **cycle_group**: 88
+- **cycle_group**: 101
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 5
+- recent churn 90: 5
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 bm25_factory, splade_factory
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Built-in retrieval channel implementations (BM25, SPLADE).
 - has summary: yes
@@ -57,7 +70,7 @@ bm25_factory, splade_factory
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.19
 

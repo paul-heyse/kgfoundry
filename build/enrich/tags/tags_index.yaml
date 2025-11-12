@@ -1,5 +1,3 @@
-docs-missing:
-- patches/Supporting Documentation/BM25+SPLADEv3-patchfiles/tools_recall_harness.py
 fastapi:
 - app/main.py
 - app/routers/index_admin.py
@@ -19,6 +17,12 @@ low-coverage:
 - __init__.py
 - export_resolver.py
 - _lazy_imports.py
+- cst_build/cst_serialize.py
+- cst_build/cst_schema.py
+- cst_build/cst_collect.py
+- cst_build/cst_cli.py
+- cst_build/__init__.py
+- cst_build/cst_resolve.py
 - diagnostics/report_cli.py
 - diagnostics/__init__.py
 - ops/__init__.py
@@ -31,6 +35,9 @@ low-coverage:
 - app/__init__.py
 - app/capabilities.py
 - app/readiness.py
+- eval/pool_writer.py
+- eval/hybrid_evaluator.py
+- eval/__init__.py
 - bin/eval_offline.py
 - bin/eval_coverage.py
 - bin/index_all.py
@@ -47,10 +54,15 @@ low-coverage:
 - metrics/__init__.py
 - enrich/tree_sitter_bridge.py
 - enrich/scip_reader.py
+- enrich/graph_builder.py
 - enrich/output_writers.py
 - enrich/tagging.py
+- enrich/ast_indexer.py
 - enrich/type_integration.py
+- enrich/slices_builder.py
+- enrich/ownership.py
 - enrich/libcst_bridge.py
+- enrich/pathnorm.py
 - enrich/stubs_overlay.py
 - enrich/__init__.py
 - observability/runtime_observer.py
@@ -137,6 +149,7 @@ low-coverage:
 public-api:
 - typing.py
 - errors.py
+- cst_build/__init__.py
 - app/scope_registry.py
 - app/middleware.py
 - app/gpu_warmup.py
@@ -144,6 +157,9 @@ public-api:
 - app/main.py
 - app/scope_store.py
 - app/capabilities.py
+- eval/pool_writer.py
+- eval/hybrid_evaluator.py
+- eval/__init__.py
 - config/settings.py
 - config/utils.py
 - indexing/scip_reader.py
@@ -151,6 +167,11 @@ public-api:
 - indexing/__init__.py
 - indexing/cast_chunker.py
 - metrics/registry.py
+- enrich/graph_builder.py
+- enrich/ast_indexer.py
+- enrich/slices_builder.py
+- enrich/ownership.py
+- enrich/pathnorm.py
 - observability/metrics.py
 - observability/otel.py
 - observability/__init__.py
@@ -205,6 +226,7 @@ public-api:
 reexport-hub:
 - config/settings.py
 - metrics/registry.py
+- enrich/ast_indexer.py
 - observability/metrics.py
 - io/splade_manager.py
 - io/__init__.py

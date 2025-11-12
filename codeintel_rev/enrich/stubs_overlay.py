@@ -422,7 +422,9 @@ def _build_overlay_text(  # noqa: PLR0913
     for names in star_targets.values():
         overlay_exports.update(names)
     if include_public_defs:
-        overlay_exports.update(def_entry.name for def_entry in module.defs if not def_entry.name.startswith("_"))
+        overlay_exports.update(
+            def_entry.name for def_entry in module.defs if not def_entry.name.startswith("_")
+        )
     if overlay_exports:
         exports = ", ".join(f'"{name}"' for name in sorted(overlay_exports))
         lines.append(f"__all__ = [{exports}]")

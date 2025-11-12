@@ -24,13 +24,26 @@ Config awareness helpers (YAML/TOML/JSON/Markdown).
 - function: `_extract_json_keys` (line 86)
 - function: `_extract_markdown_headings` (line 112)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
 - **cycle_group**: 6
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 1
+- recent churn 90: 1
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Config awareness helpers (YAML/TOML/JSON/Markdown).
 - has summary: yes
@@ -49,7 +62,7 @@ Config awareness helpers (YAML/TOML/JSON/Markdown).
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.94
 

@@ -1,0 +1,221 @@
+# SPDX-License-Identifier: MIT
+"""Ownership, churn, and bus-factor analytics sourced from Git history."""
+
+from __future__ import annotations
+
+import subprocess
+from collections import Counter
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from fnmatch import fnmatch
+from pathlib import Path
+
+try:  # pragma: no cover - optional dependency
+    from git import Repo as GitRepo
+except Exception:  # pragma: no cover
+    GitRepo = None
+
+__all__ = ["FileOwnership", "OwnershipIndex", "compute_ownership"]
+
+
+@dataclass(slots=True, frozen=True)
+class FileOwnership:
+    """Aggregated ownership metadata for a single file."""
+
+    path: str
+    owner: str | None = None
+    primary_authors: tuple[str, ...] = field(default_factory=tuple)
+    bus_factor: float = 0.0
+    churn_by_window: dict[int, int] = field(default_factory=dict)
+
+
+@dataclass(slots=True, frozen=True)
+class OwnershipIndex:
+    """Collection of :class:`FileOwnership` entries keyed by relative path."""
+
+    by_file: dict[str, FileOwnership] = field(default_factory=dict)
+    churn_windows: tuple[int, ...] = field(default_factory=lambda: (30, 90))
+
+
+def compute_ownership(
+    repo_root: Path,
+    rel_paths: Sequence[str],
+    *,
+    commits_window: int = 50,
+    churn_windows: Sequence[int] = (30, 90),
+) -> OwnershipIndex:
+    """Return ownership metrics for ``rel_paths`` relative to ``repo_root``."""
+    unique_paths = sorted({path for path in rel_paths if path})
+    windows = _normalize_windows(churn_windows)
+    if not unique_paths:
+        return OwnershipIndex(churn_windows=windows)
+    repo = _try_open_repo(repo_root)
+    if repo is not None:
+        records = _stats_via_gitpython(
+            repo=repo,
+            repo_root=repo_root,
+            rel_paths=unique_paths,
+            commits_window=commits_window,
+            windows=windows,
+        )
+    else:
+        records = _stats_via_subprocess(
+            repo_root=repo_root,
+            rel_paths=unique_paths,
+            commits_window=commits_window,
+            windows=windows,
+        )
+    return OwnershipIndex(by_file=records, churn_windows=windows)
+
+
+def _normalize_windows(values: Sequence[int]) -> tuple[int, ...]:
+    sanitized = {max(1, int(value)) for value in values if int(value) > 0}
+    if not sanitized:
+        sanitized = {30}
+    return tuple(sorted(sanitized))
+
+
+def _try_open_repo(repo_root: Path) -> GitRepo | None:
+    if GitRepo is None:  # pragma: no cover - GitPython not installed
+        return None
+    try:
+        return GitRepo(str(repo_root))
+    except Exception:  # pragma: no cover - repo open failures
+        return None
+
+
+def _stats_via_gitpython(
+    *,
+    repo: GitRepo,
+    repo_root: Path,
+    rel_paths: Sequence[str],
+    commits_window: int,
+    windows: tuple[int, ...],
+) -> dict[str, FileOwnership]:
+    commit_limit = max(1, commits_window)
+    now = datetime.now(tz=UTC)
+    cutoffs = {window: now - timedelta(days=window) for window in windows}
+    rows: dict[str, FileOwnership] = {}
+    for rel in rel_paths:
+        try:
+            commits = list(repo.iter_commits(paths=rel, max_count=commit_limit))
+        except Exception:  # pragma: no cover - rare git failure
+            commits = []
+        authors = [_author_name(commit) for commit in commits if _author_name(commit)]
+        churn_counts = dict.fromkeys(windows, 0)
+        for commit in commits:
+            committed = datetime.fromtimestamp(commit.committed_date, tz=UTC)
+            for window, cutoff in cutoffs.items():
+                if committed >= cutoff:
+                    churn_counts[window] += 1
+        owner = _codeowners_lookup(repo_root, rel) or (authors[0] if authors else None)
+        rows[rel] = FileOwnership(
+            path=rel,
+            owner=owner,
+            primary_authors=tuple(_top_k(authors, k=3)),
+            bus_factor=_bus_factor(authors),
+            churn_by_window=churn_counts,
+        )
+    return rows
+
+
+def _stats_via_subprocess(
+    *,
+    repo_root: Path,
+    rel_paths: Sequence[str],
+    commits_window: int,
+    windows: tuple[int, ...],
+) -> dict[str, FileOwnership]:
+    commit_limit = max(1, commits_window)
+    now = datetime.now(tz=UTC)
+    cutoffs = {window: now - timedelta(days=window) for window in windows}
+    result: dict[str, FileOwnership] = {}
+    for rel in rel_paths:
+        authors = _run_git(
+            ["git", "log", f"-n{commit_limit}", "--pretty=%an", "--", rel], repo_root
+        )
+        authors = authors[:commit_limit]
+        churn_counts: dict[int, int] = {}
+        for window, cutoff in cutoffs.items():
+            lines = _run_git(
+                ["git", "log", f"--since={cutoff.isoformat()}", "--pretty=%h", "--", rel],
+                repo_root,
+            )
+            churn_counts[window] = len(lines)
+        owner = _codeowners_lookup(repo_root, rel) or (authors[0] if authors else None)
+        result[rel] = FileOwnership(
+            path=rel,
+            owner=owner,
+            primary_authors=tuple(_top_k(authors, k=3)),
+            bus_factor=_bus_factor(authors),
+            churn_by_window=churn_counts,
+        )
+    return result
+
+
+def _run_git(cmd: list[str], repo_root: Path) -> list[str]:
+    try:
+        process = subprocess.run(
+            cmd,
+            cwd=str(repo_root),
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, ValueError):  # pragma: no cover - git missing
+        return []
+    if process.returncode != 0 or not process.stdout:
+        return []
+    return [line.strip() for line in process.stdout.splitlines() if line.strip()]
+
+
+def _author_name(commit: object) -> str | None:
+    author = getattr(commit, "author", None)
+    name = getattr(author, "name", None)
+    if isinstance(name, str) and name.strip():
+        return name.strip()
+    return None
+
+
+def _top_k(items: Sequence[str], k: int) -> list[str]:
+    counter = Counter(items)
+    return [name for name, _count in counter.most_common(k)]
+
+
+def _bus_factor(authors: Sequence[str]) -> float:
+    if not authors:
+        return 0.0
+    counter = Counter(authors)
+    return round(max(counter.values()) / max(1, sum(counter.values())), 3)
+
+
+def _codeowners_lookup(repo_root: Path, rel_path: str) -> str | None:
+    for candidate in (".github/CODEOWNERS", "CODEOWNERS", ".gitlab/CODEOWNERS"):
+        path = repo_root / candidate
+        if not path.exists():
+            continue
+        try:
+            content = path.read_text(encoding="utf-8")
+        except OSError:  # pragma: no cover - limited readability
+            continue
+        for line in content.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            pattern, *owners = parts
+            if owners and _glob_like_match(rel_path, pattern):
+                return owners[0]
+    return None
+
+
+def _glob_like_match(path: str, pattern: str) -> bool:
+    normalized_pattern = pattern.strip()
+    if not normalized_pattern:
+        return False
+    if normalized_pattern.startswith("/"):
+        normalized_pattern = normalized_pattern[1:]
+    return fnmatch(path, normalized_pattern) or fnmatch(path, f"./{normalized_pattern}")

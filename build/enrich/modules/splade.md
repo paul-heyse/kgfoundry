@@ -48,13 +48,26 @@ Command-line interface for SPLADE artifact management.
 - function: `bench` (line 369)
 - function: `main` (line 480)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 3
-- **cycle_group**: 105
+- **cycle_group**: 118
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 4
+- recent churn 90: 4
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Command-line interface for SPLADE artifact management.
 - has summary: yes
@@ -73,7 +86,7 @@ Command-line interface for SPLADE artifact management.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.73
 

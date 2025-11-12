@@ -23,17 +23,30 @@ Feature-normalized hybrid pooling utilities.
 - function: `_softmax_norm` (line 62)
 - class: `HybridPoolEvaluator` (line 71)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 51
+- **cycle_group**: 63
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 1
+- recent churn 90: 1
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 Hit, HybridPoolEvaluator, PooledHit
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Feature-normalized hybrid pooling utilities.
 - has summary: yes
@@ -52,7 +65,7 @@ Hit, HybridPoolEvaluator, PooledHit
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.82
 

@@ -9,11 +9,11 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 ## Imports
 
 - from **__future__** import annotations
-- from **collections.abc** import Iterator
+- from **collections.abc** import Iterator, Sequence
 - from **contextlib** import suppress
 - from **dataclasses** import dataclass, field
 - from **pathlib** import Path
-- from **typing** import Any
+- from **typing** import Any, cast
 - from **(absolute)** import libcst
 - from **libcst** import metadata
 - from **libcst.helpers** import get_full_name_for_node
@@ -32,18 +32,31 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 - function: `_analyze_docstring` (line 179)
 - function: `_iter_params` (line 205)
 - function: `_exception_name` (line 220)
-- function: `_infer_side_effects` (line 237)
-- class: `_IndexVisitor` (line 259)
-- function: `index_module` (line 545)
-- function: `_lineno` (line 592)
+- function: `_infer_side_effects` (line 250)
+- class: `_IndexVisitor` (line 272)
+- function: `index_module` (line 561)
+- function: `_lineno` (line 608)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 4
 - **fan_out**: 1
 - **cycle_group**: 2
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 9
+- recent churn 90: 9
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: LibCST-powered index utilities (imports, defs, exports, docstrings).
 - has summary: yes
@@ -67,7 +80,7 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 - enrich/tagging_rules.yaml
 - enrich/README.md
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.72
 
@@ -81,7 +94,7 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 
 - branches: 128
 - cyclomatic: 129
-- loc: 613
+- loc: 629
 
 ## Doc Coverage
 
@@ -94,7 +107,7 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 - `_summarize_docstring` (function): summary=no, examples=no
 - `_analyze_docstring` (function): summary=no, examples=no
 - `_iter_params` (function): summary=no, examples=no
-- `_exception_name` (function): summary=no, examples=no
+- `_exception_name` (function): summary=yes, params=ok, examples=no — Extract exception name from LibCST expression node.
 
 ## Tags
 

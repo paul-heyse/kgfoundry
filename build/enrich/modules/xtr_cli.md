@@ -24,13 +24,26 @@ Typer CLI for building, verifying, and probing XTR artifacts.
 - function: `search` (line 70)
 - function: `main` (line 158)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 5
-- **cycle_group**: 102
+- **cycle_group**: 115
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 5
+- recent churn 90: 5
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Typer CLI for building, verifying, and probing XTR artifacts.
 - has summary: yes
@@ -49,7 +62,7 @@ Typer CLI for building, verifying, and probing XTR artifacts.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.12
 

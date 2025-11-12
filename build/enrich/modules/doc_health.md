@@ -16,13 +16,26 @@ Docstring summarization helpers.
 
 - function: `summarize_doc_health` (line 11)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 2
 - **cycle_group**: 3
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 1
+- recent churn 90: 1
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Docstring summarization helpers.
 - has summary: yes
@@ -41,7 +54,7 @@ Docstring summarization helpers.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.19
 

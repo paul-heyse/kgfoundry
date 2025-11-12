@@ -18,6 +18,7 @@ corpus size for optimal performance.
 - from **(absolute)** import math
 - from **collections.abc** import Callable, Mapping, Sequence
 - from **dataclasses** import dataclass
+- from **datetime** import UTC, datetime
 - from **pathlib** import Path
 - from **threading** import RLock
 - from **time** import perf_counter
@@ -32,37 +33,57 @@ corpus size for optimal performance.
 - from **kgfoundry_common.logging** import get_logger
 - from **(absolute)** import faiss
 - from **(absolute)** import numpy
+- from **codeintel_rev.io.duckdb_catalog** import DuckDBCatalog
+- from **(absolute)** import pyarrow
+- from **(absolute)** import pyarrow.parquet
 
 ## Definitions
 
-- variable: `np` (line 49)
-- variable: `LOGGER` (line 51)
-- variable: `logger` (line 52)
-- class: `_LazyFaissProxy` (line 55)
-- variable: `faiss` (line 99)
-- function: `_faiss_module` (line 102)
-- function: `_has_faiss_gpu_support` (line 113)
-- function: `_log_extra` (line 136)
-- class: `FAISSRuntimeOptions` (line 154)
-- class: `SearchRuntimeOverrides` (line 175)
-- class: `_SearchExecutionParams` (line 184)
-- class: `_SearchPlan` (line 194)
-- class: `FAISSManager` (line 204)
-- function: `_coerce_to_int` (line 2271)
-- function: `_configure_direct_map` (line 2294)
-- function: `_set_direct_map_type` (line 2302)
+- variable: `np` (line 52)
+- variable: `pa` (line 58)
+- variable: `pq` (line 59)
+- variable: `LOGGER` (line 61)
+- variable: `logger` (line 62)
+- class: `_LazyFaissProxy` (line 65)
+- variable: `faiss` (line 109)
+- function: `_faiss_module` (line 112)
+- function: `_has_faiss_gpu_support` (line 123)
+- function: `_log_extra` (line 146)
+- class: `FAISSRuntimeOptions` (line 164)
+- class: `SearchRuntimeOverrides` (line 185)
+- class: `_SearchExecutionParams` (line 194)
+- class: `_SearchPlan` (line 204)
+- class: `_FAISSIdMapMixin` (line 214)
+- class: `_FAISSMetadataMixin` (line 342)
+- class: `FAISSManager` (line 472)
+- function: `_coerce_to_int` (line 2568)
+- function: `_configure_direct_map` (line 2591)
+- function: `_set_direct_map_type` (line 2599)
 
-## Dependency Graph
+## Graph Metrics
 
-- **fan_in**: 5
-- **fan_out**: 5
-- **cycle_group**: 44
+- **fan_in**: 7
+- **fan_out**: 6
+- **cycle_group**: 65
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 36
+- recent churn 90: 36
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 FAISSManager
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: FAISS manager for GPU-accelerated vector search.
 - has summary: yes
@@ -81,9 +102,9 @@ FAISSManager
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
-- score: 3.04
+- score: 3.19
 
 ## Side Effects
 
@@ -91,9 +112,9 @@ FAISSManager
 
 ## Complexity
 
-- branches: 163
-- cyclomatic: 164
-- loc: 2320
+- branches: 200
+- cyclomatic: 201
+- loc: 2617
 
 ## Doc Coverage
 
@@ -105,8 +126,8 @@ FAISSManager
 - `SearchRuntimeOverrides` (class): summary=yes, examples=no — Per-search overrides for HNSW/quantizer parameters.
 - `_SearchExecutionParams` (class): summary=yes, examples=no — Runtime parameters applied during dual search execution.
 - `_SearchPlan` (class): summary=yes, examples=no — Resolved parameters, query buffer, and timeline metadata for a search.
-- `FAISSManager` (class): summary=yes, examples=no — FAISS index manager with adaptive indexing, GPU support, and incremental updates.
-- `_coerce_to_int` (function): summary=yes, params=ok, examples=no — Safely round arbitrary objects to integers for index comparisons.
+- `_FAISSIdMapMixin` (class): summary=yes, examples=no — Mixin providing ID map export helpers.
+- `_FAISSMetadataMixin` (class): summary=yes, examples=no — Mixin for runtime override metadata helpers.
 
 ## Tags
 

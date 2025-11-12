@@ -29,17 +29,30 @@ GPU is reachable and functional before expensive operations begin.
 - function: `_test_faiss_gpu_resources` (line 123)
 - function: `warmup_gpu` (line 155)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 32
+- **cycle_group**: 43
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 18
+- recent churn 90: 18
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 warmup_gpu
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: GPU warmup and initialization sequence.
 - has summary: yes
@@ -62,7 +75,7 @@ warmup_gpu
 
 - app/hypercorn.toml
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.12
 

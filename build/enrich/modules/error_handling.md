@@ -83,17 +83,30 @@ Error envelope structure:
 - function: `convert_exception_to_envelope` (line 226)
 - function: `handle_adapter_errors` (line 411)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 3
 - **fan_out**: 3
-- **cycle_group**: 57
+- **cycle_group**: 67
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 12
+- recent churn 90: 12
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 EXCEPTION_TO_ERROR_CODE, convert_exception_to_envelope, format_error_response, handle_adapter_errors
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Centralized error handling for CodeIntel MCP server.
 - has summary: yes
@@ -112,7 +125,7 @@ EXCEPTION_TO_ERROR_CODE, convert_exception_to_envelope, format_error_response, h
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.21
 

@@ -19,13 +19,26 @@ Typedness utilities that build on Pyrefly/Pyright summaries.
 - function: `collect_type_signals` (line 25)
 - function: `annotation_ratio` (line 67)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 9
+- **cycle_group**: 12
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 1
+- recent churn 90: 1
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Typedness utilities that build on Pyrefly/Pyright summaries.
 - has summary: yes
@@ -44,7 +57,7 @@ Typedness utilities that build on Pyrefly/Pyright summaries.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.69
 

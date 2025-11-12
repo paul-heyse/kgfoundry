@@ -20,13 +20,26 @@ Symbol MCP tool registrations (pure move from server.py).
 - function: `definition_at` (line 108)
 - function: `references_at` (line 189)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 4
-- **cycle_group**: 98
+- **cycle_group**: 111
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 3
+- recent churn 90: 3
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Symbol MCP tool registrations (pure move from server.py).
 - has summary: yes
@@ -45,7 +58,7 @@ Symbol MCP tool registrations (pure move from server.py).
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.06
 

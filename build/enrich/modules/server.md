@@ -39,17 +39,30 @@ Implements full MCP tool catalog for code intelligence.
 - function: `prompt_code_review` (line 336)
 - function: `build_http_app` (line 352)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 3
 - **fan_out**: 6
-- **cycle_group**: 58
+- **cycle_group**: 70
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 13
+- recent churn 90: 13
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 app_context, build_http_app, get_context, mcp
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: FastMCP server with QueryScope tools.
 - has summary: yes
@@ -68,7 +81,7 @@ app_context, build_http_app, get_context, mcp
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.30
 

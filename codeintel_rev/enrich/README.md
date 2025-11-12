@@ -30,6 +30,8 @@ Outputs (defaults under `codeintel_rev/io/ENRICHED/`):
 - `modules/*.jsonl` – one JSON object per line (module summaries)
 - `modules/*.md` – human‑readable module briefs (imports/exports/defs/tags)
 - `graphs/symbol_graph.json` – symbol ↔ file edge list (from SCIP, de‑duplicated)
+- `analytics/ownership.parquet` – Git ownership + churn analytics (owner, primary authors, bus factor, churn windows)
+- `slices/` – optional LLM slice packs (`slices/<slice_id>/{slice.json,context.md}` + `slices/index.parquet` + `slices/slices.jsonl`)
 - `tags/tags_index.yaml` – per‑module tags, plus global tag catalog
 - `../io/CST/` – repo‑wide LibCST dataset built via `codeintel-cst` (see `docs/cst_data.md`)
 - `ast/ast_nodes.parquet` / `ast/ast_nodes.jsonl` – Python AST nodes w/ qualnames, decorators, bases, docstrings
@@ -43,6 +45,8 @@ The AST layer adds two tables (Parquet + JSONL mirrors) that slot directly into 
 | ----- | ------- | ----------- |
 | `ast/ast_nodes.parquet` | Function/class/module inventory with qualnames and locations | `path`, `module`, `qualname`, `node_type`, `parent_qualname`, `decorators`, `bases`, `docstring`, `is_public` |
 | `ast/ast_metrics.parquet` | File-level metrics derived from the Python `ast` module | `path`, `func_count`, `class_count`, `assign_count`, `import_count`, `branch_nodes`, `cyclomatic`, `cognitive`, `max_nesting`, `statements` |
+| `analytics/ownership.parquet` | Git ownership + churn snapshots per file | `path`, `owner`, `primary_authors`, `bus_factor`, `recent_churn_30`, `recent_churn_90` (or custom window) |
+| `slices/index.parquet` | Catalog of emitted slice packs (opt-in) | `slice_id`, `path`, `module_name` |
 
 Execute `python tools/run_duckdb_demo.py` to load the default script (`tools/demo_duckdb_ast.sql`) and print representative query results. The SQL file shows how to join AST data with `modules.jsonl` (LibCST) and the SCIP symbol graph. Example query:
 

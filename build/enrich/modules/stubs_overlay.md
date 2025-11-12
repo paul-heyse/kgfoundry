@@ -21,27 +21,40 @@ Targeted overlay generation with opt-in activation.
 
 - class: `OverlayPolicy` (line 17)
 - class: `OverlayResult` (line 31)
-- function: `generate_overlay_for_file` (line 40)
-- function: `activate_overlays` (line 157)
-- function: `deactivate_all` (line 206)
-- function: `_overlay_path` (line 244)
-- function: `_normalized_module_key` (line 267)
-- function: `_module_name_from_path` (line 287)
-- function: `_collect_star_reexports` (line 308)
-- function: `_extract_simple_name` (line 336)
-- function: `_build_overlay_text` (line 363)
-- function: `_render_star_exports` (line 422)
-- function: `_render_public_defs` (line 444)
-- function: `_collect_import_reexports` (line 473)
-- function: `_is_windows` (line 504)
+- function: `generate_overlay_for_file` (line 41)
+- function: `activate_overlays` (line 158)
+- function: `deactivate_all` (line 207)
+- function: `_overlay_path` (line 245)
+- function: `_normalized_module_key` (line 269)
+- function: `_module_name_from_path` (line 289)
+- function: `_collect_star_reexports` (line 313)
+- function: `_extract_simple_name` (line 344)
+- function: `_build_overlay_text` (line 372)
+- function: `_render_star_exports` (line 438)
+- function: `_render_public_defs` (line 463)
+- function: `_collect_import_reexports` (line 494)
+- function: `_is_windows` (line 525)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 14
+- **cycle_group**: 20
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 7
+- recent churn 90: 7
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Targeted overlay generation with opt-in activation.
 - has summary: yes
@@ -65,9 +78,9 @@ Targeted overlay generation with opt-in activation.
 - enrich/tagging_rules.yaml
 - enrich/README.md
 
-## Hotspot Score
+## Hotspot
 
-- score: 2.43
+- score: 2.47
 
 ## Side Effects
 
@@ -75,9 +88,9 @@ Targeted overlay generation with opt-in activation.
 
 ## Complexity
 
-- branches: 61
-- cyclomatic: 62
-- loc: 513
+- branches: 69
+- cyclomatic: 70
+- loc: 534
 
 ## Doc Coverage
 

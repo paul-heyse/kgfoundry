@@ -34,17 +34,30 @@ Capability snapshot helpers for conditional tool registration and /capz.
 - function: `_record_metrics` (line 183)
 - class: `Capabilities` (line 190)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 5
 - **fan_out**: 3
-- **cycle_group**: 52
+- **cycle_group**: 65
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 6
+- recent churn 90: 6
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 Capabilities
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Capability snapshot helpers for conditional tool registration and /capz.
 - has summary: yes
@@ -67,7 +80,7 @@ Capabilities
 
 - app/hypercorn.toml
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.39
 

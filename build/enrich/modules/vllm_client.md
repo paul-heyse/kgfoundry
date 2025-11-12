@@ -38,17 +38,30 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 - class: `EmbeddingResponse` (line 126)
 - class: `VLLMClient` (line 157)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 4
 - **fan_out**: 6
-- **cycle_group**: 46
+- **cycle_group**: 56
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 20
+- recent churn 90: 20
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 EmbeddingData, EmbeddingRequest, EmbeddingResponse, VLLMClient
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: vLLM embedding client using msgspec for fast serialization.
 - has summary: yes
@@ -67,7 +80,7 @@ EmbeddingData, EmbeddingRequest, EmbeddingResponse, VLLMClient
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.56
 

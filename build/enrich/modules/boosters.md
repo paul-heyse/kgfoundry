@@ -13,7 +13,7 @@ Score boosters applied after fusion.
 - from **(absolute)** import time
 - from **collections.abc** import Callable, Iterable, Mapping, Sequence
 - from **dataclasses** import dataclass
-- from **typing** import TYPE_CHECKING, Any, cast
+- from **typing** import TYPE_CHECKING, Any
 - from **codeintel_rev.retrieval.types** import HybridResultDoc
 - from **(absolute)** import duckdb
 - from **codeintel_rev.io.duckdb_manager** import DuckDBManager
@@ -36,17 +36,30 @@ Score boosters applied after fusion.
 - function: `_fetch_commit_ts_duckdb` (line 94)
 - function: `apply_recency_boost` (line 141)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 49
+- **cycle_group**: 60
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 7
+- recent churn 90: 7
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 RecencyConfig, apply_recency_boost
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Score boosters applied after fusion.
 - has summary: yes
@@ -65,7 +78,7 @@ RecencyConfig, apply_recency_boost
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.21
 
@@ -77,7 +90,7 @@ RecencyConfig, apply_recency_boost
 
 - branches: 28
 - cyclomatic: 29
-- loc: 205
+- loc: 204
 
 ## Doc Coverage
 

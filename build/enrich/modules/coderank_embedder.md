@@ -26,13 +26,26 @@ Pooled wrapper around the CodeRank embedding SentenceTransformer.
 - variable: `LOGGER` (line 55)
 - class: `CodeRankEmbedder` (line 58)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 81
+- **cycle_group**: 94
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 6
+- recent churn 90: 6
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Pooled wrapper around the CodeRank embedding SentenceTransformer.
 - has summary: yes
@@ -51,7 +64,7 @@ Pooled wrapper around the CodeRank embedding SentenceTransformer.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.68
 

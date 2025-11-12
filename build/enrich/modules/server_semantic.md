@@ -21,13 +21,26 @@ Semantic MCP tool registrations (pure move from server.py).
 - function: `semantic_search` (line 18)
 - function: `semantic_search_pro` (line 69)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 5
-- **cycle_group**: 97
+- **cycle_group**: 110
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 3
+- recent churn 90: 3
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Semantic MCP tool registrations (pure move from server.py).
 - has summary: yes
@@ -46,7 +59,7 @@ Semantic MCP tool registrations (pure move from server.py).
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.68
 

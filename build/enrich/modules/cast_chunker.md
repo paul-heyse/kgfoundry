@@ -36,17 +36,30 @@ the character budget, splitting large symbols on blank lines.
 - class: `ChunkOptions` (line 538)
 - function: `_apply_call_site_overlap` (line 546)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 2
-- **cycle_group**: 67
+- **cycle_group**: 48
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 13
+- recent churn 90: 13
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 Chunk, chunk_file, line_starts, range_to_bytes
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: cAST chunking using SCIP symbol ranges.
 - has summary: yes
@@ -65,7 +78,7 @@ Chunk, chunk_file, line_starts, range_to_bytes
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.29
 

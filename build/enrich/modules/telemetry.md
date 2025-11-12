@@ -18,17 +18,30 @@ Telemetry helpers for MCP tools.
 
 - function: `tool_operation_scope` (line 15)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 3
 - **fan_out**: 2
-- **cycle_group**: 54
+- **cycle_group**: 69
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 2
+- recent churn 90: 2
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 tool_operation_scope
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Telemetry helpers for MCP tools.
 - has summary: yes
@@ -47,7 +60,7 @@ tool_operation_scope
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.80
 

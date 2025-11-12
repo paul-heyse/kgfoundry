@@ -37,13 +37,26 @@ CLI helpers for building Lucene indexes and flipping lifecycle pointers.
 - function: `publish_lucene_assets` (line 167)
 - function: `main` (line 186)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 5
-- **cycle_group**: 107
+- **cycle_group**: 120
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 1
+- recent churn 90: 1
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: CLI helpers for building Lucene indexes and flipping lifecycle pointers.
 - has summary: yes
@@ -62,7 +75,7 @@ CLI helpers for building Lucene indexes and flipping lifecycle pointers.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.85
 

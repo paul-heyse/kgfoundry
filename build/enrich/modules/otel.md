@@ -37,17 +37,30 @@ Optional OpenTelemetry bootstrap helpers.
 - function: `as_span` (line 191)
 - function: `record_span_event` (line 219)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 4
 - **fan_out**: 1
-- **cycle_group**: 28
+- **cycle_group**: 38
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 4
+- recent churn 90: 4
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 as_span, init_telemetry, record_span_event, telemetry_enabled
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Optional OpenTelemetry bootstrap helpers.
 - has summary: yes
@@ -66,7 +79,7 @@ as_span, init_telemetry, record_span_event, telemetry_enabled
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.33
 

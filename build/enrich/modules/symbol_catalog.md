@@ -19,13 +19,26 @@ DuckDB symbol catalog writer.
 - class: `SymbolOccurrenceRow` (line 30)
 - class: `SymbolCatalog` (line 45)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 3
 - **fan_out**: 1
-- **cycle_group**: 43
+- **cycle_group**: 50
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 4
+- recent churn 90: 4
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: DuckDB symbol catalog writer.
 - has summary: yes
@@ -44,7 +57,7 @@ DuckDB symbol catalog writer.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.94
 

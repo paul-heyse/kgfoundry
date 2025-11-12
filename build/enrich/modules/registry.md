@@ -22,17 +22,30 @@ Entry-point driven registry for retrieval channels.
 - function: `_iter_entry_points` (line 113)
 - function: `_load_factory` (line 140)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 52
+- **cycle_group**: 65
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 2
+- recent churn 90: 2
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 ChannelRegistry
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Entry-point driven registry for retrieval channels.
 - has summary: yes
@@ -51,7 +64,7 @@ ChannelRegistry
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.79
 

@@ -39,13 +39,26 @@ Example failure payload::
 - function: `_exit_with_problem` (line 165)
 - function: `main` (line 182)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 5
-- **cycle_group**: 122
+- **cycle_group**: 135
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 2
+- recent churn 90: 2
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Fail-fast probe for XTR artifacts.
 - has summary: yes
@@ -64,7 +77,7 @@ Example failure payload::
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.03
 

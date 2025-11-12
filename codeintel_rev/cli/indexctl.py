@@ -21,6 +21,7 @@ from kgfoundry_common.logging import get_logger
 
 LOGGER = get_logger(__name__)
 app = typer.Typer(help="Manage versioned FAISS/DuckDB/SCIP assets.", no_args_is_help=True)
+DEFAULT_XTR_ORACLE = False
 
 
 @lru_cache(maxsize=1)
@@ -133,7 +134,7 @@ def _load_xtr_index(settings: Settings) -> XTRIndex | None:
     index = XTRIndex(root=root, config=settings.xtr)
     try:
         index.open()
-    except Exception as exc:  # pragma: no cover - defensive logging
+    except (OSError, RuntimeError, ValueError) as exc:  # pragma: no cover - defensive logging
         LOGGER.warning("Failed to open XTR index", extra={"root": str(root), "error": str(exc)})
         return None
     if not index.ready:
@@ -301,7 +302,8 @@ def _write_tuning_audit(manager: FAISSManager, tuning: dict[str, object]) -> Pat
 def eval_command(
     k: Annotated[int, typer.Option("--k", min=1, help="Top-K for recall computation.")] = 10,
     k_factor: Annotated[
-        float, typer.Option("--k-factor", min=1.0, help="Candidate expansion factor for ANN search.")
+        float,
+        typer.Option("--k-factor", min=1.0, help="Candidate expansion factor for ANN search."),
     ] = 2.0,
     nprobe: Annotated[int | None, typer.Option("--nprobe", help="Override FAISS nprobe.")] = None,
     xtr_oracle: Annotated[
@@ -310,7 +312,7 @@ def eval_command(
             "--xtr-oracle/--no-xtr-oracle",
             help="Also rescore each query using the XTR token index when available.",
         ),
-    ] = False,
+    ] = DEFAULT_XTR_ORACLE,
 ) -> None:
     """Run ANN vs Flat evaluation and optionally rescore with XTR."""
     settings = _get_settings()

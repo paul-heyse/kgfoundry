@@ -26,13 +26,26 @@ Adapter for the optional WARP/XTR late interaction executor.
 - function: `_safe_int` (line 167)
 - function: `_safe_float` (line 191)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 83
+- **cycle_group**: 96
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 9
+- recent churn 90: 9
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Adapter for the optional WARP/XTR late interaction executor.
 - has summary: yes
@@ -51,7 +64,7 @@ Adapter for the optional WARP/XTR late interaction executor.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.84
 

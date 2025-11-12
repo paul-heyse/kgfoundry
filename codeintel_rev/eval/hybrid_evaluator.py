@@ -50,6 +50,17 @@ class EvalReport:
     xtr_records: int
 
 
+@dataclass(slots=True)
+class _EvalState:
+    fetch_k: int
+    search_k: int
+    pool_rows: list[PoolRow]
+    xtr_index: XTRIndex | None
+    ann_hits: int = 0
+    oracle_matches: int = 0
+    xtr_rows: int = 0
+
+
 class HybridPoolEvaluator:
     """Compare ANN retrieval against Flat and optional XTR oracles, persisting pools."""
 
@@ -66,7 +77,13 @@ class HybridPoolEvaluator:
         self._text_cache: dict[int, str] = {}
 
     def run(self, config: EvalConfig) -> EvalReport:
-        """Execute the evaluation and persist per-query pools + metrics."""
+        """Execute the evaluation and persist per-query pools + metrics.
+
+        Returns
+        -------
+        EvalReport
+            Structured summary containing query counts, recall, and oracle stats.
+        """
         sample_limit = config.max_queries if config.max_queries is not None else 64
         queries = self._catalog.sample_query_vectors(limit=sample_limit)
         if not queries:
@@ -85,14 +102,58 @@ class HybridPoolEvaluator:
             write_pool([], config.pool_path)
             return empty_report
 
+        pool_rows, ann_hits, oracle_matches, xtr_rows = self._evaluate_queries(queries, config)
+
+        recall = oracle_matches / max(ann_hits, 1)
+        config.pool_path.parent.mkdir(parents=True, exist_ok=True)
+        write_pool(pool_rows, config.pool_path)
+
+        report = EvalReport(
+            queries=len(queries),
+            k=max(config.k, 1),
+            k_factor=config.k_factor,
+            nprobe=config.nprobe,
+            recall_at_k=recall,
+            oracle_matches=oracle_matches,
+            ann_hits=ann_hits,
+            xtr_records=xtr_rows,
+        )
+        self._write_metrics(config.metrics_path, report)
+        LOGGER.info(
+            "Hybrid evaluation completed",
+            extra={
+                "queries": report.queries,
+                "k": report.k,
+                "k_factor": report.k_factor,
+                "nprobe": report.nprobe,
+                "recall_at_k": report.recall_at_k,
+                "pool_rows": len(pool_rows),
+                "pool_path": str(config.pool_path),
+                "metrics_path": str(config.metrics_path),
+                "xtr_records": report.xtr_records,
+            },
+        )
+        return report
+
+    def _evaluate_queries(
+        self,
+        queries: Sequence[tuple[int, np.ndarray]],
+        config: EvalConfig,
+    ) -> tuple[list[PoolRow], int, int, int]:
         fetch_k = max(config.k, 1)
         search_k = max(int(fetch_k * max(config.k_factor, 1.0)), fetch_k)
         ann_hits = 0
         oracle_matches = 0
         xtr_rows = 0
         pool_rows: list[PoolRow] = []
-        xtr_ready = bool(config.use_xtr_oracle and self._xtr_index and getattr(self._xtr_index, "ready", False))
-        if config.use_xtr_oracle and not xtr_ready:
+        xtr_index = (
+            self._xtr_index
+            if config.use_xtr_oracle
+            and self._xtr_index
+            and getattr(self._xtr_index, "ready", False)
+            else None
+        )
+        if config.use_xtr_oracle and xtr_index is None:
             LOGGER.warning("Requested XTR oracle but index is unavailable or not ready.")
 
         for query_id, raw_vec in queries:
@@ -125,7 +186,7 @@ class HybridPoolEvaluator:
                 scores=oracle_scores[0].tolist(),
             )
 
-            if xtr_ready:
+            if xtr_index is not None:
                 text = self._get_query_text(int(query_id))
                 xtr_ids, xtr_scores = self._score_with_xtr(text, ann_ids_list, fetch_k)
                 if xtr_ids:
@@ -138,36 +199,7 @@ class HybridPoolEvaluator:
                     )
                     xtr_rows += len(xtr_ids)
 
-        recall = oracle_matches / max(ann_hits, 1)
-        config.pool_path.parent.mkdir(parents=True, exist_ok=True)
-        write_pool(pool_rows, config.pool_path)
-
-        report = EvalReport(
-            queries=len(queries),
-            k=fetch_k,
-            k_factor=config.k_factor,
-            nprobe=config.nprobe,
-            recall_at_k=recall,
-            oracle_matches=oracle_matches,
-            ann_hits=ann_hits,
-            xtr_records=xtr_rows,
-        )
-        self._write_metrics(config.metrics_path, report)
-        LOGGER.info(
-            "Hybrid evaluation completed",
-            extra={
-                "queries": report.queries,
-                "k": report.k,
-                "k_factor": report.k_factor,
-                "nprobe": report.nprobe,
-                "recall_at_k": report.recall_at_k,
-                "pool_rows": len(pool_rows),
-                "pool_path": str(config.pool_path),
-                "metrics_path": str(config.metrics_path),
-                "xtr_records": report.xtr_records,
-            },
-        )
-        return report
+        return pool_rows, ann_hits, oracle_matches, xtr_rows
 
     def _flat_rerank(
         self,

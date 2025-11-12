@@ -20,17 +20,30 @@ Shared reranker interfaces and request/response types.
 - class: `RerankRequest` (line 29)
 - class: `Reranker` (line 38)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 90
+- **cycle_group**: 103
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 1
+- recent churn 90: 1
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 RerankRequest, RerankResult, Reranker, ScoredDoc
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Shared reranker interfaces and request/response types.
 - has summary: yes
@@ -49,7 +62,7 @@ RerankRequest, RerankResult, Reranker, ScoredDoc
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.31
 

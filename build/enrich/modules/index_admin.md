@@ -40,17 +40,30 @@ Admin endpoints for staging, publishing, and rolling back index versions.
 - function: `faiss_runtime_tuning_endpoint` (line 497)
 - function: `faiss_runtime_reset_endpoint` (line 576)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 6
-- **cycle_group**: 120
+- **cycle_group**: 133
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 5
+- recent churn 90: 5
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 router
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Admin endpoints for staging, publishing, and rolling back index versions.
 - has summary: yes
@@ -73,7 +86,7 @@ router
 
 - app/hypercorn.toml
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.19
 

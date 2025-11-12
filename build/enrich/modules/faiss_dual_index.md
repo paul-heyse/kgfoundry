@@ -31,17 +31,30 @@ FAISS dual-index utilities and metadata helpers.
 - class: `IndexManifest` (line 32)
 - class: `FAISSDualIndexManager` (line 89)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 3
-- **cycle_group**: 84
+- **cycle_group**: 97
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 12
+- recent churn 90: 12
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 FAISSDualIndexManager, IndexManifest
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: FAISS dual-index utilities and metadata helpers.
 - has summary: yes
@@ -60,7 +73,7 @@ FAISSDualIndexManager, IndexManifest
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.38
 

@@ -71,17 +71,30 @@ the FAISS index, then hydrating results from DuckDB.
 - function: `_success_extras` (line 1199)
 - function: `_build_response_extras` (line 1223)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 10
-- **cycle_group**: 114
+- **cycle_group**: 127
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 34
+- recent churn 90: 34
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 semantic_search
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Semantic search adapter using FAISS GPU and DuckDB.
 - has summary: yes
@@ -100,7 +113,7 @@ semantic_search
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.81
 

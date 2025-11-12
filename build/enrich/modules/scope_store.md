@@ -30,17 +30,30 @@ Scope store utilities for session state management.
 - class: `ScopeStoreMetrics` (line 275)
 - class: `ScopeStore` (line 378)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 2
-- **cycle_group**: 38
+- **cycle_group**: 46
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 6
+- recent churn 90: 6
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 AsyncSingleFlight, LRUCache, ScopeStore, ScopeStoreMetrics
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Scope store utilities for session state management.
 - has summary: yes
@@ -63,7 +76,7 @@ AsyncSingleFlight, LRUCache, ScopeStore, ScopeStoreMetrics
 
 - app/hypercorn.toml
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.33
 

@@ -27,13 +27,26 @@ Helpers for collecting Pyright/Pyrefly error summaries.
 - function: `_parse_pyrefly_json` (line 183)
 - function: `_apply_pyrefly_record` (line 190)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 0
-- **cycle_group**: 8
+- **cycle_group**: 11
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 3
+- recent churn 90: 3
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Helpers for collecting Pyright/Pyrefly error summaries.
 - has summary: yes
@@ -57,7 +70,7 @@ Helpers for collecting Pyright/Pyrefly error summaries.
 - enrich/tagging_rules.yaml
 - enrich/README.md
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.79
 

@@ -25,19 +25,32 @@ Thread-safe DuckDB connection manager.
 - class: `DuckDBConfig` (line 24)
 - class: `DuckDBManager` (line 52)
 - class: `DuckDBQueryOptions` (line 172)
-- class: `DuckDBQueryBuilder` (line 182)
+- class: `DuckDBQueryBuilder` (line 187)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 9
 - **fan_out**: 2
-- **cycle_group**: 33
+- **cycle_group**: 44
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 6
+- recent churn 90: 6
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 DuckDBConfig, DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Thread-safe DuckDB connection manager.
 - has summary: yes
@@ -56,9 +69,9 @@ DuckDBConfig, DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
-- score: 2.68
+- score: 2.71
 
 ## Side Effects
 
@@ -67,9 +80,9 @@ DuckDBConfig, DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 
 ## Complexity
 
-- branches: 43
-- cyclomatic: 44
-- loc: 347
+- branches: 48
+- cyclomatic: 49
+- loc: 379
 
 ## Doc Coverage
 

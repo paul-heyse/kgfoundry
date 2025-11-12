@@ -36,13 +36,26 @@ Usage:
 - function: `check_faiss` (line 91)
 - function: `main` (line 144)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 112
+- **cycle_group**: 125
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 8
+- recent churn 90: 8
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: GPU diagnostics script for PyTorch and FAISS.
 - has summary: yes
@@ -61,7 +74,7 @@ Usage:
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.87
 

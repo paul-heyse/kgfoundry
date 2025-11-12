@@ -74,17 +74,30 @@ SPLADE artifact management, encoding, and Lucene impact index builders.
 - class: `SpladeEncoderService` (line 1006)
 - class: `SpladeIndexManager` (line 1287)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 3
 - **fan_out**: 3
-- **cycle_group**: 82
+- **cycle_group**: 95
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 11
+- recent churn 90: 11
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 SpladeArtifactMetadata, SpladeArtifactsManager, SpladeBuildOptions, SpladeEncodeOptions, SpladeEncodingMetadata, SpladeEncodingSummary, SpladeExportOptions, SpladeExportSummary, SpladeIndexManager, SpladeIndexMetadata
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: SPLADE artifact management, encoding, and Lucene impact index builders.
 - has summary: yes
@@ -103,7 +116,7 @@ SpladeArtifactMetadata, SpladeArtifactsManager, SpladeBuildOptions, SpladeEncode
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.63
 

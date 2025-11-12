@@ -24,13 +24,26 @@ Command-line entry point for SCIP function coverage evaluation.
 - function: `build_parser` (line 19)
 - function: `main` (line 46)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 3
-- **cycle_group**: 65
+- **cycle_group**: 81
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 2
+- recent churn 90: 2
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Command-line entry point for SCIP function coverage evaluation.
 - has summary: yes
@@ -49,7 +62,7 @@ Command-line entry point for SCIP function coverage evaluation.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.43
 

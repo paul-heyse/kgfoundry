@@ -75,17 +75,30 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 - function: `get_capability_stamp` (line 124)
 - class: `SessionScopeMiddleware` (line 136)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 6
 - **fan_out**: 3
-- **cycle_group**: 30
+- **cycle_group**: 41
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 10
+- recent churn 90: 10
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 SessionScopeMiddleware, capability_stamp_var, get_capability_stamp, get_session_id, session_id_var
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Session management middleware for CodeIntel MCP.
 - has summary: yes
@@ -108,7 +121,7 @@ SessionScopeMiddleware, capability_stamp_var, get_capability_stamp, get_session_
 
 - app/hypercorn.toml
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.05
 

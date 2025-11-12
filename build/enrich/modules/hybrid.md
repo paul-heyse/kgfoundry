@@ -21,17 +21,30 @@ Fuses results from BM25, SPLADE, and FAISS using Reciprocal Rank Fusion.
 - function: `reciprocal_rank_fusion` (line 54)
 - function: `create_hit_list` (line 102)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 94
+- **cycle_group**: 107
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 2
+- recent churn 90: 2
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 SearchHit, create_hit_list, reciprocal_rank_fusion
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Hybrid retrieval with RRF fusion.
 - has summary: yes
@@ -50,7 +63,7 @@ SearchHit, create_hit_list, reciprocal_rank_fusion
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.36
 

@@ -94,13 +94,26 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 - class: `FusionRequest` (line 1709)
 - class: `MethodContext` (line 1723)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 18
-- **cycle_group**: 116
+- **cycle_group**: 129
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 13
+- recent churn 90: 13
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 - has summary: yes
@@ -119,7 +132,7 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 3.24
 

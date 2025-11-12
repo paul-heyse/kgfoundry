@@ -18,17 +18,30 @@ Heuristics for toggling RM3 pseudo-relevance feedback per query.
 - class: `RM3Params` (line 13)
 - class: `RM3Heuristics` (line 21)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 0
-- **cycle_group**: 50
+- **cycle_group**: 62
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 2
+- recent churn 90: 2
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 RM3Heuristics, RM3Params
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Heuristics for toggling RM3 pseudo-relevance feedback per query.
 - has summary: yes
@@ -47,7 +60,7 @@ RM3Heuristics, RM3Params
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.65
 
