@@ -87,6 +87,25 @@ def test_query_builder_preserve_order() -> None:
     assert params["ids"] == [3, 1]
 
 
+def test_query_builder_join_flags() -> None:
+    """Query builder adds optional joins when requested."""
+    builder = DuckDBQueryBuilder()
+    options = DuckDBQueryOptions(
+        join_modules=True,
+        join_symbols=True,
+        join_faiss=True,
+        join_ast=True,
+        join_cst=True,
+    )
+    sql, _ = builder.build_filter_query(chunk_ids=[1], options=options)
+
+    assert "LEFT JOIN modules USING" in sql
+    assert "LEFT JOIN v_chunk_symbols" in sql
+    assert "LEFT JOIN faiss_idmap" in sql
+    assert "LEFT JOIN ast_nodes" in sql
+    assert "LEFT JOIN cst_nodes" in sql
+
+
 def test_connection_pool_reuses_connections(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

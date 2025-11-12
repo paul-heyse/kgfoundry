@@ -12,6 +12,7 @@ import json
 import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import RLock
 from time import perf_counter
@@ -277,8 +278,12 @@ class _FAISSIdMapMixin:
         idmap = self.get_idmap_array()
         rows = np.arange(idmap.shape[0], dtype=np.int64)
         table = pa.Table.from_arrays(
-            [pa.array(rows), pa.array(idmap)],
-            names=["faiss_row", "external_id"],
+            [
+                pa.array(rows),
+                pa.array(idmap),
+                pa.array(["primary"] * len(rows)),
+            ],
+            names=["faiss_row", "external_id", "source"],
         )
         out_path.parent.mkdir(parents=True, exist_ok=True)
         pq.write_table(table, out_path, compression="zstd", use_dictionary=True)
@@ -334,7 +339,120 @@ class _FAISSIdMapMixin:
         return vectors
 
 
-class FAISSManager(_FAISSIdMapMixin):
+class _FAISSMetadataMixin:
+    """Mixin for runtime override metadata helpers."""
+
+    def set_search_parameters(self, param_str: str) -> dict[str, object]:
+        """Apply FAISS ParameterSpace string and persist overrides."""
+        faiss_spec, sanitized = self._prepare_parameter_string(param_str)
+        if faiss_spec:
+            try:
+                faiss.ParameterSpace().set_index_parameters(self._active_index(), faiss_spec)
+            except (AttributeError, RuntimeError, ValueError) as exc:
+                msg = f"Unable to apply FAISS parameters: {faiss_spec}"
+                raise ValueError(msg) from exc
+        with self._tuning_lock:
+            self._runtime_overrides.update(sanitized)
+        self._write_meta_snapshot(
+            parameter_space=self._format_parameter_string(self._runtime_overrides)
+        )
+        return self.get_runtime_tuning()
+
+    def _prepare_parameter_string(self, param_str: str) -> tuple[str | None, dict[str, float]]:
+        if not param_str or not param_str.strip():
+            msg = "Parameter string must be non-empty."
+            raise ValueError(msg)
+        faiss_pairs: list[str] = []
+        working: dict[str, float] = {}
+        for chunk in param_str.split(","):
+            key, sep, raw_value = chunk.partition("=")
+            key = key.strip()
+            value = raw_value.strip()
+            if not key or not sep or not value:
+                msg = f"Invalid parameter fragment: '{chunk}'"
+                raise ValueError(msg)
+            try:
+                numeric_value = float(value)
+            except ValueError as exc:
+                msg = f"Parameter '{key}' value '{value}' is not numeric"
+                raise ValueError(msg) from exc
+            if key == "k_factor":
+                working["k_factor"] = numeric_value
+                continue
+            if key not in {"nprobe", "efSearch", "quantizer_efSearch"}:
+                msg = f"Unsupported FAISS parameter '{key}'"
+                raise ValueError(msg)
+            working[key] = numeric_value
+            faiss_pairs.append(f"{key}={value}")
+        sanitized = self._sanitize_runtime_overrides(
+            nprobe=working.get("nprobe"),
+            ef_search=working.get("efSearch"),
+            quantizer_ef_search=working.get("quantizer_efSearch"),
+            k_factor=working.get("k_factor"),
+        )
+        if not sanitized:
+            msg = "Parameter string must include at least one supported override."
+            raise ValueError(msg)
+        return (",".join(faiss_pairs) if faiss_pairs else None, sanitized)
+
+    def _format_parameter_string(self, overrides: Mapping[str, float]) -> str | None:
+        ordered = []
+        for key in ("nprobe", "efSearch", "quantizer_efSearch", "k_factor"):
+            if key not in overrides:
+                continue
+            value = overrides[key]
+            if key == "k_factor":
+                ordered.append(f"{key}={value}")
+            else:
+                ordered.append(f"{key}={int(value)}")
+        return ",".join(ordered) if ordered else None
+
+    def _meta_snapshot(self) -> dict[str, object]:
+        snapshot: dict[str, object]
+        if self._meta_path.exists():
+            try:
+                snapshot = json.loads(self._meta_path.read_text())
+            except json.JSONDecodeError:
+                snapshot = {}
+        else:
+            snapshot = {}
+        snapshot.update(
+            {
+                "index_path": str(self.index_path),
+                "vec_dim": self.vec_dim,
+                "faiss_family": self.faiss_family,
+                "default_parameters": {
+                    "nprobe": self.default_nprobe,
+                    "efSearch": self.hnsw_ef_search,
+                    "quantizer_efSearch": None,
+                    "k_factor": self.refine_k_factor,
+                },
+            }
+        )
+        return snapshot
+
+    def _write_meta_snapshot(
+        self,
+        *,
+        factory: str | None = None,
+        vector_count: int | None = None,
+        parameter_space: str | None = None,
+    ) -> None:
+        meta = self._meta_snapshot()
+        if factory is not None:
+            meta["factory"] = factory
+        if vector_count is not None:
+            meta["vector_count"] = int(vector_count)
+        if parameter_space is not None:
+            meta["parameter_space"] = parameter_space
+        meta["runtime_overrides"] = dict(self._runtime_overrides)
+        meta["compile_options"] = self.get_compile_options()
+        meta["updated_at"] = datetime.now(UTC).isoformat()
+        self._meta_path.parent.mkdir(parents=True, exist_ok=True)
+        self._meta_path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+
+
+class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
     """FAISS index manager with adaptive indexing, GPU support, and incremental updates.
 
     Uses a dual-index architecture for fast incremental updates.
@@ -434,6 +552,7 @@ class FAISSManager(_FAISSIdMapMixin):
         self._tuned_parameters: dict[str, float | str] | None = None
         self._last_latency_ms: float | None = None
         self.autotune_profile_path = Path(f"{self.index_path}.tune.json")
+        self._meta_path = Path(f"{self.index_path}.meta.json")
         self._runtime_overrides: dict[str, float] = {}
         self._tuning_lock = RLock()
 
@@ -473,6 +592,8 @@ class FAISSManager(_FAISSIdMapMixin):
         >>> # Uses IndexFlatIP for 1000 vectors (small corpus)
         """
         faiss.normalize_L2(vectors)
+        with self._tuning_lock:
+            self._runtime_overrides.clear()
 
         build_start = perf_counter()
         n_vectors = len(vectors)
@@ -518,7 +639,11 @@ class FAISSManager(_FAISSIdMapMixin):
         cpu_id_map = faiss.IndexIDMap2(cpu_index)
         _configure_direct_map(cpu_id_map)
         self.cpu_index = cpu_id_map
-        self._record_factory_choice(cpu_index, factory_label)
+        self._record_factory_choice(
+            cpu_id_map,
+            factory_label,
+            parameter_space=self._format_parameter_string(self._runtime_overrides),
+        )
         FAISS_BUILD_TOTAL.inc()
         FAISS_BUILD_SECONDS_LAST.set(perf_counter() - build_start)
 
@@ -945,6 +1070,10 @@ class FAISSManager(_FAISSIdMapMixin):
         FAISS_INDEX_DIM.set(self.vec_dim)
         FAISS_INDEX_GPU_ENABLED.set(0)
         self._load_tuned_profile()
+        self._write_meta_snapshot(
+            vector_count=cpu_index.ntotal,
+            parameter_space=self._format_parameter_string(self._runtime_overrides),
+        )
 
     def save_secondary_index(self) -> None:
         """Save secondary index to disk.
@@ -1392,6 +1521,9 @@ class FAISSManager(_FAISSIdMapMixin):
         with self._tuning_lock:
             self._runtime_overrides.update(sanitized)
         self._maybe_apply_runtime_parameters(sanitized)
+        self._write_meta_snapshot(
+            parameter_space=self._format_parameter_string(self._runtime_overrides)
+        )
         return self.get_runtime_tuning()
 
     def reset_runtime_tuning(self) -> dict[str, object]:
@@ -2102,7 +2234,12 @@ class FAISSManager(_FAISSIdMapMixin):
             return f"HNSW{self.hnsw_m}"
         return "Flat"
 
-    def _record_factory_choice(self, index: _faiss.Index, label: str | None = None) -> None:
+    def _record_factory_choice(
+        self,
+        index: _faiss.Index,
+        label: str | None = None,
+        parameter_space: str | None = None,
+    ) -> None:
         try:
             name = label or type(self._downcast_index(index)).__name__
         except (AttributeError, RuntimeError):
@@ -2110,6 +2247,11 @@ class FAISSManager(_FAISSIdMapMixin):
         extra = _log_extra(index_type=name, vec_dim=self.vec_dim, nlist=self.nlist)
         LOGGER.info("FAISS index configured", extra=extra)
         set_factory_id(name)
+        self._write_meta_snapshot(
+            factory=name,
+            vector_count=index.ntotal,
+            parameter_space=parameter_space,
+        )
 
     def _apply_runtime_parameters(
         self,
@@ -2189,6 +2331,7 @@ class FAISSManager(_FAISSIdMapMixin):
                 raise ValueError(msg)
             sanitized["k_factor"] = kf_val
         return sanitized
+
 
     def _resolve_search_knobs(
         self,

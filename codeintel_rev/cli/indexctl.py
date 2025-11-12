@@ -120,7 +120,9 @@ def _duckdb_catalog(path_override: Path | None = None) -> DuckDBCatalog:
     settings = _get_settings()
     db_path = (path_override or Path(settings.paths.duckdb_path)).expanduser().resolve()
     vectors_dir = Path(settings.paths.vectors_dir).expanduser().resolve()
-    return DuckDBCatalog(db_path=db_path, vectors_dir=vectors_dir)
+    catalog = DuckDBCatalog(db_path=db_path, vectors_dir=vectors_dir)
+    catalog.set_idmap_path(Path(settings.paths.faiss_idmap_path).expanduser().resolve())
+    return catalog
 
 
 @app.command("status")
@@ -196,6 +198,7 @@ def export_idmap_command(
     if duckdb is not None:
         catalog = _duckdb_catalog(duckdb)
         stats = catalog.refresh_faiss_idmap_mat_if_changed(destination)
+        catalog.ensure_faiss_idmap_views(destination)
         typer.echo(
             f"Materialized join rows={stats['rows']} "
             f"checksum={stats['checksum']} refreshed={stats['refreshed']}"
@@ -210,6 +213,7 @@ def materialize_join_command(
     """Refresh DuckDB's materialized FAISS join if the ID map sidecar changed."""
     catalog = _duckdb_catalog(duckdb)
     stats = catalog.refresh_faiss_idmap_mat_if_changed(idmap.expanduser().resolve())
+    catalog.ensure_faiss_idmap_views(idmap)
     typer.echo(f"Refreshed={stats['refreshed']} rows={stats['rows']} checksum={stats['checksum']}")
 
 
@@ -228,15 +232,30 @@ def tune_command(
         "--k-factor",
         help="Candidate expansion factor for runtime refine.",
     ),
+    params: str | None = typer.Option(
+        None,
+        "--params",
+        help="FAISS ParameterSpace string (e.g. 'nprobe=64,efSearch=128,k_factor=2').",
+    ),
 ) -> None:
     """Apply runtime tuning overrides (nprobe/efSearch/k-factor) and persist audit JSON."""
     manager = _faiss_manager(index)
-    tuning = manager.apply_runtime_tuning(
-        nprobe=nprobe,
-        ef_search=ef_search,
-        quantizer_ef_search=quantizer_ef_search,
-        k_factor=k_factor,
-    )
+    if params:
+        if any(v is not None for v in (nprobe, ef_search, quantizer_ef_search, k_factor)):
+            raise typer.BadParameter(
+                "Cannot combine --params with individual tuning flags (nprobe/ef-search/etc.)."
+            )
+        try:
+            tuning = manager.set_search_parameters(params)
+        except ValueError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+    else:
+        tuning = manager.apply_runtime_tuning(
+            nprobe=nprobe,
+            ef_search=ef_search,
+            quantizer_ef_search=quantizer_ef_search,
+            k_factor=k_factor,
+        )
     audit_path = manager.index_path.with_suffix(".audit.json").expanduser().resolve()
     audit_path.parent.mkdir(parents=True, exist_ok=True)
     audit_path.write_text(json.dumps(tuning, indent=2) + "\n", encoding="utf-8")

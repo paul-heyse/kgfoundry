@@ -51,11 +51,17 @@ def get_chunks_schema(vec_dim: int) -> pa.Schema:
             pa.field("preview", pa.string()),
             pa.field("content", pa.string()),
             pa.field("lang", pa.string()),
-            pa.field("content_hash", pa.string()),
+            pa.field("content_hash", pa.uint64()),
             pa.field("symbols", pa.list_(pa.string())),
-            pa.field("embedding", pa.list_(pa.float32(), vec_dim)),
+            pa.field(
+                "embedding",
+                pa.list_(pa.field("item", pa.float32()), list_size=vec_dim),
+            ),
         ]
     )
+
+
+EMBEDDINGS_RANK: int = 2
 
 
 @dataclass(slots=True, frozen=True)
@@ -65,6 +71,18 @@ class ParquetWriteOptions:
     start_id: int = 0
     vec_dim: int = 2560
     preview_max_chars: int = 240
+
+
+def _hash_content(text: str) -> int:
+    """Return stable 64-bit hash of chunk content.
+
+    Returns
+    -------
+    int
+        Unsigned 64-bit hash derived from the UTF-8 encoded chunk body.
+    """
+    encoded = text.encode("utf-8", errors="ignore")
+    return xxhash.xxh64_intdigest(encoded) & 0xFFFFFFFFFFFFFFFF
 
 
 def write_chunks_parquet(
@@ -100,11 +118,20 @@ def write_chunks_parquet(
         msg = f"Chunks ({len(chunks)}) and embeddings ({len(embeddings)}) length mismatch"
         raise ValueError(msg)
 
+    vec_dim = int(options.vec_dim)
+    if embeddings.ndim != EMBEDDINGS_RANK:
+        msg = f"Embeddings must be 2D (got shape {embeddings.shape})"
+        raise ValueError(msg)
+    if embeddings.shape[1] != vec_dim:
+        msg = f"Embedding dimension mismatch: expected {vec_dim}, got {embeddings.shape[1]}"
+        raise ValueError(msg)
+
     # Convert embeddings to FixedSizeList
-    embeddings_flat = embeddings.astype(np.float32).ravel()
+    embeddings_view = np.asarray(embeddings, dtype=np.float32)
+    embeddings_flat = embeddings_view.ravel()
     embedding_array = pa.FixedSizeListArray.from_arrays(
         pa.array(embeddings_flat, type=pa.float32()),
-        options.vec_dim,
+        vec_dim,
     )
 
     # Create table
@@ -119,11 +146,11 @@ def write_chunks_parquet(
             "preview": [chunk.text[: options.preview_max_chars] for chunk in chunks],
             "content": [chunk.text for chunk in chunks],
             "lang": [chunk.language for chunk in chunks],
-            "content_hash": [xxhash.xxh64_hexdigest(chunk.text.encode("utf-8")) for chunk in chunks],
+            "content_hash": [_hash_content(chunk.text) for chunk in chunks],
             "symbols": [list(chunk.symbols) for chunk in chunks],
             "embedding": embedding_array,
         },
-        schema=get_chunks_schema(options.vec_dim),
+        schema=get_chunks_schema(vec_dim),
     )
 
     # Write with compression

@@ -51,11 +51,16 @@ def _log_extra(**kwargs: object) -> dict[str, object]:
     """
     return {"component": "duckdb_catalog", **kwargs}
 
+
 # Prometheus metrics for scope filtering
 _scope_filter_duration_seconds = build_histogram(
     "codeintel_scope_filter_duration_seconds",
     "Time to apply scope filters",
     labelnames=("filter_type",),
+)
+_catalog_view_bootstrap_seconds = build_histogram(
+    "codeintel_duckdb_view_bootstrap_seconds",
+    "Time spent ensuring DuckDB catalog views are installed",
 )
 
 _EMPTY_CHUNKS_SELECT = """
@@ -132,6 +137,9 @@ class DuckDBCatalog:
         self._init_lock = Lock()
         self._views_ready = False
         self._log_queries = log_queries if log_queries is not None else manager.config.log_queries
+        self._root_dir = vectors_dir.parent.resolve()
+        default_idmap = (self._root_dir / "faiss/faiss_idmap.parquet").resolve()
+        self._idmap_path = default_idmap
 
     def open(self) -> None:
         """Ensure catalog views are initialized."""
@@ -200,61 +208,124 @@ class DuckDBCatalog:
 
     def _ensure_views(self, conn: duckdb.DuckDBPyConnection) -> None:
         """Create required views and tables to hydrate chunk metadata."""
+        start = perf_counter()
+        try:
+            self._install_chunks_view(conn)
+            self._install_optional_views(conn)
+            self._ensure_idmap_tables(conn)
+            self._ensure_faiss_idmap_view(conn, None)
+            self._ensure_faiss_join_view(conn)
+        finally:
+            _catalog_view_bootstrap_seconds.observe(max(perf_counter() - start, 0.0))
+
+    def _install_chunks_view(self, conn: duckdb.DuckDBPyConnection) -> None:
         chunks_ready = self._relation_exists(conn, "chunks")
+        if chunks_ready:
+            return
+        parquet_pattern = str(self.vectors_dir / "**/*.parquet")
+        parquet_exists = any(self.vectors_dir.rglob("*.parquet"))
 
-        if not chunks_ready:
-            parquet_pattern = str(self.vectors_dir / "**/*.parquet")
-            parquet_exists = any(self.vectors_dir.rglob("*.parquet"))
-
-            if self.materialize:
-                if parquet_exists:
-                    sql = """
-                        CREATE OR REPLACE TABLE chunks_materialized AS
-                        SELECT * FROM read_parquet(?)
-                        """
-                    self._log_query(sql, [parquet_pattern])
-                    conn.execute(sql, [parquet_pattern])
-                else:
-                    sql = f"CREATE OR REPLACE TABLE chunks_materialized AS {_EMPTY_CHUNKS_SELECT}"
-                    self._log_query(sql, None)
-                    conn.execute(sql)
-
-                view_sql = "CREATE OR REPLACE VIEW chunks AS SELECT * FROM chunks_materialized"
-                self._log_query(view_sql, None)
-                conn.execute(view_sql)
-
-                index_sql = "CREATE INDEX IF NOT EXISTS idx_chunks_materialized_uri ON chunks_materialized(uri)"
-                self._log_query(index_sql, None)
-                conn.execute(index_sql)
-                LOGGER.info(
-                    "Materialized DuckDB chunks table",
-                    extra={
-                        "materialized": True,
-                        "parquet_found": parquet_exists,
-                        "db_path": str(self.db_path),
-                    },
-                )
+        if self.materialize:
+            if parquet_exists:
+                sql = """
+                    CREATE OR REPLACE TABLE chunks_materialized AS
+                    SELECT * FROM read_parquet(?)
+                    """
+                self._log_query(sql, [parquet_pattern])
+                conn.execute(sql, [parquet_pattern])
             else:
-                if parquet_exists:
-                    sql = "SELECT * FROM read_parquet(?)"
-                    self._log_query(sql, [parquet_pattern])
-                    relation = conn.sql(sql, params=[parquet_pattern])
-                    relation.create_view("chunks", replace=True)
-                else:
-                    sql = f"CREATE OR REPLACE VIEW chunks AS {_EMPTY_CHUNKS_SELECT}"
-                    self._log_query(sql, None)
-                    conn.execute(sql)
-                LOGGER.debug(
-                    "Configured DuckDB chunks view",
-                    extra={
-                        "materialized": False,
-                        "parquet_found": parquet_exists,
-                        "db_path": str(self.db_path),
-                    },
-                )
+                sql = f"CREATE OR REPLACE TABLE chunks_materialized AS {_EMPTY_CHUNKS_SELECT}"
+                self._log_query(sql, None)
+                conn.execute(sql)
 
-        self._ensure_idmap_tables(conn)
-        self._ensure_faiss_join_view(conn)
+            view_sql = "CREATE OR REPLACE VIEW chunks AS SELECT * FROM chunks_materialized"
+            self._log_query(view_sql, None)
+            conn.execute(view_sql)
+
+            index_sql = (
+                "CREATE INDEX IF NOT EXISTS idx_chunks_materialized_uri ON chunks_materialized(uri)"
+            )
+            self._log_query(index_sql, None)
+            conn.execute(index_sql)
+            LOGGER.info(
+                "Materialized DuckDB chunks table",
+                extra={
+                    "materialized": True,
+                    "parquet_found": parquet_exists,
+                    "db_path": str(self.db_path),
+                },
+            )
+            return
+
+        if parquet_exists:
+            sql = "SELECT * FROM read_parquet(?)"
+            self._log_query(sql, [parquet_pattern])
+            relation = conn.sql(sql, params=[parquet_pattern])
+            relation.create_view("chunks", replace=True)
+        else:
+            sql = f"CREATE OR REPLACE VIEW chunks AS {_EMPTY_CHUNKS_SELECT}"
+            self._log_query(sql, None)
+            conn.execute(sql)
+        LOGGER.debug(
+            "Configured DuckDB chunks view",
+            extra={
+                "materialized": False,
+                "parquet_found": parquet_exists,
+                "db_path": str(self.db_path),
+            },
+        )
+
+    def _install_optional_views(self, conn: duckdb.DuckDBPyConnection) -> None:
+        self._install_parquet_view(conn, "modules", self._root_dir / "modules/modules.parquet")
+        self._install_parquet_view(
+            conn,
+            "scip_occurrences",
+            self._root_dir / "scip/scip_occurrences.parquet",
+        )
+        self._install_parquet_view(conn, "ast_nodes", self._root_dir / "ast/ast_nodes.parquet")
+        self._install_parquet_view(conn, "cst_nodes", self._root_dir / "cst/cst_nodes.parquet")
+        self._install_chunk_symbols_view(conn)
+
+    def _install_parquet_view(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        view_name: str,
+        source: Path,
+    ) -> bool:
+        if not source.exists():
+            return False
+        sql = "SELECT * FROM read_parquet(?)"
+        params = [str(source)]
+        self._log_query(sql, params)
+        relation = conn.sql(sql, params=params)
+        relation.create_view(view_name, replace=True)
+        LOGGER.info(
+            "Configured DuckDB view",
+            extra=_log_extra(view=view_name, source=str(source)),
+        )
+        return True
+
+    @staticmethod
+    def _install_chunk_symbols_view(conn: duckdb.DuckDBPyConnection) -> None:
+        try:
+            conn.execute(
+                """
+                CREATE OR REPLACE VIEW v_chunk_symbols AS
+                SELECT
+                    c.id AS chunk_id,
+                    symbol
+                FROM chunks AS c,
+                     LATERAL UNNEST(
+                        COALESCE(c.symbols, []::VARCHAR[])
+                     ) AS t(symbol)
+                """
+            )
+            LOGGER.info("Configured DuckDB view", extra=_log_extra(view="v_chunk_symbols"))
+        except duckdb.Error as exc:  # pragma: no cover - defensive fallback for legacy schemas
+            LOGGER.debug(
+                "Skipping v_chunk_symbols view",
+                extra=_log_extra(error=str(exc)),
+            )
 
     @staticmethod
     def _ensure_idmap_tables(conn: duckdb.DuckDBPyConnection) -> None:
@@ -263,10 +334,12 @@ class DuckDBCatalog:
             """
             CREATE TABLE IF NOT EXISTS faiss_idmap_mat (
                 faiss_row   BIGINT,
-                external_id BIGINT
+                external_id BIGINT,
+                source      TEXT
             )
             """
         )
+        conn.execute("ALTER TABLE faiss_idmap_mat ADD COLUMN IF NOT EXISTS source TEXT")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS faiss_idmap_mat_meta (
@@ -285,12 +358,69 @@ class DuckDBCatalog:
             CREATE OR REPLACE VIEW v_faiss_join AS
             SELECT
                 c.*,
-                f.faiss_row
+                f.faiss_row,
+                f.source AS faiss_source
             FROM chunks AS c
-            LEFT JOIN faiss_idmap_mat AS f
+            LEFT JOIN faiss_idmap AS f
               ON f.external_id = c.id
             """
         )
+
+    def _ensure_faiss_idmap_view(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        override_path: Path | None,
+    ) -> None:
+        path = override_path or self._idmap_path
+        if path.exists():
+            sql = "SELECT * FROM read_parquet(?)"
+            params = [str(path)]
+            self._log_query(sql, params)
+            relation = conn.sql(sql, params=params)
+            relation.create_view("faiss_idmap", replace=True)
+            LOGGER.info(
+                "Configured DuckDB view",
+                extra=_log_extra(view="faiss_idmap", source=str(path)),
+            )
+            return
+
+        if self._relation_exists(conn, "faiss_idmap_mat"):
+            conn.execute(
+                """
+                CREATE OR REPLACE VIEW faiss_idmap AS
+                SELECT
+                    faiss_row,
+                    external_id,
+                    COALESCE(source, 'materialized') AS source
+                FROM faiss_idmap_mat
+                """
+            )
+            LOGGER.info(
+                "Configured DuckDB view",
+                extra=_log_extra(view="faiss_idmap", source="faiss_idmap_mat"),
+            )
+            return
+
+        conn.execute(
+            """
+            CREATE OR REPLACE VIEW faiss_idmap AS
+            SELECT
+                CAST(NULL AS BIGINT) AS faiss_row,
+                CAST(NULL AS BIGINT) AS external_id,
+                CAST(NULL AS TEXT)  AS source
+            WHERE 1 = 0
+            """
+        )
+
+    def ensure_faiss_idmap_views(self, idmap_path: Path | None = None) -> None:
+        """Install/refresh FAISS id map views from a specific Parquet file."""
+        with self.connection() as conn:
+            self._ensure_faiss_idmap_view(conn, idmap_path)
+            self._ensure_faiss_join_view(conn)
+
+    def set_idmap_path(self, path: Path) -> None:
+        """Override the FAISS id map path used for view installation."""
+        self._idmap_path = path.resolve()
 
     @staticmethod
     def _relation_exists(conn: duckdb.DuckDBPyConnection, name: str) -> bool:
@@ -392,7 +522,14 @@ class DuckDBCatalog:
 
             conn.execute("DELETE FROM faiss_idmap_mat")
             conn.execute(
-                "INSERT INTO faiss_idmap_mat SELECT * FROM read_parquet(?)",
+                """
+                INSERT INTO faiss_idmap_mat (faiss_row, external_id, source)
+                SELECT
+                    faiss_row,
+                    external_id,
+                    COALESCE(source, 'parquet') AS source
+                FROM read_parquet(?)
+                """,
                 [str(idmap_parquet)],
             )
             count_row = conn.execute("SELECT COUNT(*) FROM faiss_idmap_mat").fetchone()
@@ -405,8 +542,12 @@ class DuckDBCatalog:
                 [checksum, row_count],
             )
             stats = {"refreshed": True, "checksum": checksum, "rows": row_count}
+            self._ensure_faiss_idmap_view(conn, idmap_parquet)
+            self._ensure_faiss_join_view(conn)
 
-        LOGGER.info("faiss_idmap_materialized", extra=_log_extra(rows=stats["rows"], checksum=checksum))
+        LOGGER.info(
+            "faiss_idmap_materialized", extra=_log_extra(rows=stats["rows"], checksum=checksum)
+        )
         return stats
 
     def sample_query_vectors(self, limit: int = 64) -> list[tuple[int, np.ndarray]]:
@@ -921,9 +1062,11 @@ class DuckDBCatalog:
             list if chunk has no symbols or chunk_id doesn't exist.
         """
         with self.connection() as conn:
-            relation = conn.execute(
-                "SELECT symbol FROM chunk_symbols WHERE chunk_id = ?", [chunk_id]
-            )
+            if self._relation_exists(conn, "v_chunk_symbols"):
+                sql = "SELECT symbol FROM v_chunk_symbols WHERE chunk_id = ?"
+            else:
+                sql = "SELECT symbol FROM chunk_symbols WHERE chunk_id = ?"
+            relation = conn.execute(sql, [chunk_id])
             rows = relation.fetchall()
         return [row[0] for row in rows]
 

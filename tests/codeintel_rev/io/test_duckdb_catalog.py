@@ -43,7 +43,14 @@ def test_relation_exists_returns_false_for_missing_relation() -> None:
 def _write_idmap(path: Path, size: int) -> None:
     rows = pa.array(range(size), type=pa.int64())
     externals = pa.array(range(10_000, 10_000 + size), type=pa.int64())
-    pq.write_table(pa.table([rows, externals], names=["faiss_row", "external_id"]), path)
+    sources = pa.array(["primary"] * size, type=pa.string())
+    pq.write_table(
+        pa.table(
+            [rows, externals, sources],
+            names=["faiss_row", "external_id", "source"],
+        ),
+        path,
+    )
 
 
 def test_refresh_idmap_guard(tmp_path: Path) -> None:

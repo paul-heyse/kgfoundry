@@ -177,6 +177,11 @@ class DuckDBQueryOptions:
     languages: Sequence[str] | None = None
     select_columns: Sequence[str] | None = None
     preserve_order: bool = False
+    join_modules: bool = False
+    join_symbols: bool = False
+    join_faiss: bool = False
+    join_ast: bool = False
+    join_cst: bool = False
 
 
 class DuckDBQueryBuilder:
@@ -239,6 +244,8 @@ class DuckDBQueryBuilder:
         where_clauses: list[str] = []
         order_clause: str | None = None
 
+        join_lines.extend(self._build_join_clauses(opts))
+
         if opts.preserve_order:
             join_lines.extend(
                 [
@@ -271,6 +278,31 @@ class DuckDBQueryBuilder:
 
         sql = "\n".join(sql_lines)
         return sql, params
+
+    @staticmethod
+    def _build_join_clauses(opts: DuckDBQueryOptions) -> list[str]:
+        joins: list[str] = []
+        if opts.join_modules:
+            joins.append("LEFT JOIN modules USING(uri)")
+        if opts.join_symbols:
+            joins.append("LEFT JOIN v_chunk_symbols AS sym ON sym.chunk_id = c.id")
+        if opts.join_faiss:
+            joins.append("LEFT JOIN faiss_idmap AS fid ON fid.external_id = c.id")
+        if opts.join_ast:
+            joins.append(
+                "LEFT JOIN ast_nodes AS ast "
+                "ON ast.uri = c.uri "
+                "AND ast.start_byte <= c.end_byte "
+                "AND ast.end_byte >= c.start_byte"
+            )
+        if opts.join_cst:
+            joins.append(
+                "LEFT JOIN cst_nodes AS cst "
+                "ON cst.uri = c.uri "
+                "AND cst.start_byte <= c.end_byte "
+                "AND cst.end_byte >= c.start_byte"
+            )
+        return joins
 
     def _build_where_clauses(
         self,

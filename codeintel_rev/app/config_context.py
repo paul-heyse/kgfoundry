@@ -1393,6 +1393,7 @@ class ApplicationContext:
             manager=self.duckdb_manager,
             log_queries=self.settings.duckdb.log_queries,
         )
+        catalog.set_idmap_path(self.paths.faiss_idmap_path)
         try:
             catalog.open()
             yield catalog
