@@ -6,7 +6,7 @@ from __future__ import annotations
 import ast
 import logging
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from fnmatch import fnmatch
 from pathlib import Path
@@ -31,7 +31,18 @@ from codeintel_rev.enrich.ast_indexer import (
     write_ast_parquet,
 )
 from codeintel_rev.enrich.libcst_bridge import index_module
-from codeintel_rev.enrich.output_writers import write_json, write_jsonl, write_markdown_module
+from codeintel_rev.enrich.output_writers import (
+    write_json,
+    write_jsonl,
+    write_markdown_module,
+    write_parquet,
+)
+from codeintel_rev.enrich.pathnorm import (
+    detect_repo_root,
+    module_name_from_path,
+    stable_id_for_path,
+    to_repo_relative,
+)
 from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
 from codeintel_rev.enrich.stubs_overlay import (
     OverlayPolicy,
@@ -41,8 +52,10 @@ from codeintel_rev.enrich.stubs_overlay import (
 )
 from codeintel_rev.enrich.tagging import ModuleTraits, infer_tags, load_rules
 from codeintel_rev.enrich.tree_sitter_bridge import build_outline
+from codeintel_rev.enrich.graph_builder import ImportGraph, build_import_graph, write_import_graph
+from codeintel_rev.enrich.ownership import OwnershipIndex, compute_ownership
+from codeintel_rev.enrich.slices_builder import build_slice_record, write_slice
 from codeintel_rev.export_resolver import build_module_name_map, resolve_exports
-from codeintel_rev.graph_builder import ImportGraph, build_import_graph, write_import_graph
 from codeintel_rev.risk_hotspots import compute_hotspot_score
 from codeintel_rev.typedness import FileTypeSignals, collect_type_signals
 from codeintel_rev.uses_builder import UseGraph, build_use_graph, write_use_graph
@@ -91,6 +104,14 @@ OnlyPatternsOption = Annotated[
     ),
 ]
 
+SlicesFilterOption = Annotated[
+    list[str] | None,
+    typer.Option(
+        "--slices-filter",
+        help="Tag filters (repeatable) selecting modules when emitting slices.",
+    ),
+]
+
 DEFAULT_MIN_ERRORS = 25
 DEFAULT_MAX_OVERLAYS = 200
 DEFAULT_INCLUDE_PUBLIC_DEFS = False
@@ -100,6 +121,9 @@ DEFAULT_ACTIVATE = True
 DEFAULT_DEACTIVATE = False
 DEFAULT_USE_TYPE_ERROR_OVERLAYS = False
 DEFAULT_EMIT_AST = True
+DEFAULT_MAX_FILE_BYTES = 2_000_000
+DEFAULT_OWNER_HISTORY_DAYS = 90
+DEFAULT_COMMITS_WINDOW = 50
 
 STUBS = typer.Option(
     Path("stubs"),
@@ -151,6 +175,31 @@ TYPE_ERROR_OVERLAYS = typer.Option(
     "--type-error-overlays/--no-type-error-overlays",
     help="Allow overlays for modules exceeding --min-errors type error threshold.",
 )
+OWNERS = typer.Option(
+    True,
+    "--owners/--no-owners",
+    help="Compute Git ownership analytics and enrich module rows.",
+)
+HISTORY_WINDOW = typer.Option(
+    DEFAULT_OWNER_HISTORY_DAYS,
+    "--history-window-days",
+    help="Length (in days) of the long-term churn window (default: 90).",
+)
+COMMITS_WINDOW_OPTION = typer.Option(
+    DEFAULT_COMMITS_WINDOW,
+    "--commits-window",
+    help="Maximum commits per file sampled when computing bus factor.",
+)
+EMIT_SLICES = typer.Option(
+    False,
+    "--emit-slices/--no-emit-slices",
+    help="Emit optional slice packs (JSON + Markdown) for selected modules.",
+)
+MAX_FILE_BYTES = typer.Option(
+    DEFAULT_MAX_FILE_BYTES,
+    "--max-file-bytes",
+    help="Skip parsing files larger than this byte threshold.",
+)
 
 app = typer.Typer(add_completion=False, help="Repo enrichment utilities (scan + overlays).")
 
@@ -171,6 +220,9 @@ class ScanInputs:
     type_signals: Mapping[str, FileTypeSignals]
     coverage_map: Mapping[str, Mapping[str, float]]
     tagging_rules: Mapping[str, Any]
+    repo_root: Path
+    max_file_bytes: int
+    package_prefix: str | None
 
 
 @dataclass(slots=True, frozen=True)
@@ -178,6 +230,7 @@ class PipelineResult:
     """Aggregate artifact bundle produced by a pipeline run."""
 
     root: Path
+    repo_root: Path
     module_rows: list[dict[str, Any]]
     symbol_edges: list[tuple[str, str]]
     import_graph: ImportGraph
@@ -209,8 +262,10 @@ def _run_pipeline(  # noqa: PLR0913, PLR0914
     tags_yaml: Path | None,
     coverage_xml: Path,
     only: list[str] | None,
+    max_file_bytes: int = DEFAULT_MAX_FILE_BYTES,
 ) -> PipelineResult:
     root_resolved = root.resolve()
+    repo_root = detect_repo_root(root_resolved)
     scip_index = SCIPIndex.load(scip)
     scip_ctx = ScipContext(index=scip_index, by_file=scip_index.by_file())
 
@@ -233,6 +288,9 @@ def _run_pipeline(  # noqa: PLR0913, PLR0914
         type_signals=type_signal_lookup,
         coverage_map=coverage_lookup,
         tagging_rules=rules,
+        repo_root=repo_root,
+        max_file_bytes=max_file_bytes,
+        package_prefix=root_resolved.name or None,
     )
     module_rows: list[dict[str, Any]] = []
     symbol_edges: list[tuple[str, str]] = []
@@ -261,6 +319,7 @@ def _run_pipeline(  # noqa: PLR0913, PLR0914
 
     return PipelineResult(
         root=root_resolved,
+        repo_root=repo_root,
         module_rows=module_rows,
         symbol_edges=symbol_edges,
         import_graph=import_graph,
@@ -289,6 +348,12 @@ def run_all(  # noqa: PLR0913, PLR0917
             help="Emit Parquet datasets with AST nodes and metrics.",
         ),
     ] = DEFAULT_EMIT_AST,
+    owners: bool = OWNERS,
+    history_window_days: int = HISTORY_WINDOW,
+    commits_window: int = COMMITS_WINDOW_OPTION,
+    emit_slices: bool = EMIT_SLICES,
+    slices_filter: SlicesFilterOption = None,
+    max_file_bytes: int = MAX_FILE_BYTES,
 ) -> None:
     """Run the full enrichment pipeline and emit all artifacts."""
     out.mkdir(parents=True, exist_ok=True)
@@ -299,7 +364,17 @@ def run_all(  # noqa: PLR0913, PLR0917
         tags_yaml=tags_yaml,
         coverage_xml=coverage_xml,
         only=only,
+        max_file_bytes=max_file_bytes,
     )
+    if owners:
+        _apply_ownership(
+            result,
+            out,
+            history_window_days=history_window_days,
+            commits_window=commits_window,
+        )
+    if emit_slices:
+        _write_slices_output(result.module_rows, out, slices_filter=slices_filter)
     _write_exports_outputs(result, out)
     _write_graph_outputs(result, out)
     _write_uses_output(result, out)
@@ -329,6 +404,12 @@ def scan(  # noqa: PLR0913, PLR0917
             help="Emit Parquet datasets with AST nodes and metrics.",
         ),
     ] = DEFAULT_EMIT_AST,
+    owners: bool = OWNERS,
+    history_window_days: int = HISTORY_WINDOW,
+    commits_window: int = COMMITS_WINDOW_OPTION,
+    emit_slices: bool = EMIT_SLICES,
+    slices_filter: SlicesFilterOption = None,
+    max_file_bytes: int = MAX_FILE_BYTES,
 ) -> None:
     """Backward-compatible alias for ``all``."""
     typer.echo("[scan] Deprecated alias for `all`; running full pipeline.")
@@ -341,6 +422,12 @@ def scan(  # noqa: PLR0913, PLR0917
         coverage_xml=coverage_xml,
         only=only,
         emit_ast=emit_ast,
+        owners=owners,
+        history_window_days=history_window_days,
+        commits_window=commits_window,
+        emit_slices=emit_slices,
+        slices_filter=slices_filter,
+        max_file_bytes=max_file_bytes,
     )
 
 
@@ -354,6 +441,12 @@ def exports(  # noqa: PLR0913, PLR0917
     tags_yaml: Path | None = TAGS,
     coverage_xml: Path = COVERAGE_XML,
     only: OnlyPatternsOption = None,
+    owners: bool = OWNERS,
+    history_window_days: int = HISTORY_WINDOW,
+    commits_window: int = COMMITS_WINDOW_OPTION,
+    emit_slices: bool = EMIT_SLICES,
+    slices_filter: SlicesFilterOption = None,
+    max_file_bytes: int = MAX_FILE_BYTES,
 ) -> None:
     """Emit modules.jsonl, repo map, tag index, and Markdown module sheets."""
     out.mkdir(parents=True, exist_ok=True)
@@ -364,7 +457,17 @@ def exports(  # noqa: PLR0913, PLR0917
         tags_yaml=tags_yaml,
         coverage_xml=coverage_xml,
         only=only,
+        max_file_bytes=max_file_bytes,
     )
+    if owners:
+        _apply_ownership(
+            result,
+            out,
+            history_window_days=history_window_days,
+            commits_window=commits_window,
+        )
+    if emit_slices:
+        _write_slices_output(result.module_rows, out, slices_filter=slices_filter)
     _write_exports_outputs(result, out)
     typer.echo(f"[exports] Wrote module artifacts for {len(result.module_rows)} modules.")
 
@@ -379,6 +482,7 @@ def graph(  # noqa: PLR0913, PLR0917
     tags_yaml: Path | None = TAGS,
     coverage_xml: Path = COVERAGE_XML,
     only: OnlyPatternsOption = None,
+    max_file_bytes: int = MAX_FILE_BYTES,
 ) -> None:
     """Emit symbol and import graph artifacts."""
     out.mkdir(parents=True, exist_ok=True)
@@ -389,6 +493,7 @@ def graph(  # noqa: PLR0913, PLR0917
         tags_yaml=tags_yaml,
         coverage_xml=coverage_xml,
         only=only,
+        max_file_bytes=max_file_bytes,
     )
     _write_graph_outputs(result, out)
     typer.echo("[graph] Wrote symbol and import graphs.")
@@ -404,6 +509,7 @@ def uses(  # noqa: PLR0913, PLR0917
     tags_yaml: Path | None = TAGS,
     coverage_xml: Path = COVERAGE_XML,
     only: OnlyPatternsOption = None,
+    max_file_bytes: int = MAX_FILE_BYTES,
 ) -> None:
     """Emit the definition-to-use graph derived from SCIP."""
     out.mkdir(parents=True, exist_ok=True)
@@ -414,6 +520,7 @@ def uses(  # noqa: PLR0913, PLR0917
         tags_yaml=tags_yaml,
         coverage_xml=coverage_xml,
         only=only,
+        max_file_bytes=max_file_bytes,
     )
     _write_uses_output(result, out)
     typer.echo("[uses] Wrote uses graph.")
@@ -429,6 +536,7 @@ def typedness(  # noqa: PLR0913, PLR0917
     tags_yaml: Path | None = TAGS,
     coverage_xml: Path = COVERAGE_XML,
     only: OnlyPatternsOption = None,
+    max_file_bytes: int = MAX_FILE_BYTES,
 ) -> None:
     """Emit typedness analytics (errors, annotation ratios, untyped defs)."""
     out.mkdir(parents=True, exist_ok=True)
@@ -439,6 +547,7 @@ def typedness(  # noqa: PLR0913, PLR0917
         tags_yaml=tags_yaml,
         coverage_xml=coverage_xml,
         only=only,
+        max_file_bytes=max_file_bytes,
     )
     _write_typedness_output(result, out)
     typer.echo("[typedness] Wrote typedness analytics.")
@@ -454,6 +563,7 @@ def doc(  # noqa: PLR0913, PLR0917
     tags_yaml: Path | None = TAGS,
     coverage_xml: Path = COVERAGE_XML,
     only: OnlyPatternsOption = None,
+    max_file_bytes: int = MAX_FILE_BYTES,
 ) -> None:
     """Emit doc health analytics for module docstrings."""
     out.mkdir(parents=True, exist_ok=True)
@@ -464,6 +574,7 @@ def doc(  # noqa: PLR0913, PLR0917
         tags_yaml=tags_yaml,
         coverage_xml=coverage_xml,
         only=only,
+        max_file_bytes=max_file_bytes,
     )
     _write_doc_output(result, out)
     typer.echo("[doc] Wrote doc health analytics.")
@@ -479,6 +590,7 @@ def coverage(  # noqa: PLR0913, PLR0917
     tags_yaml: Path | None = TAGS,
     coverage_xml: Path = COVERAGE_XML,
     only: OnlyPatternsOption = None,
+    max_file_bytes: int = MAX_FILE_BYTES,
 ) -> None:
     """Emit coverage analytics table."""
     out.mkdir(parents=True, exist_ok=True)
@@ -489,6 +601,7 @@ def coverage(  # noqa: PLR0913, PLR0917
         tags_yaml=tags_yaml,
         coverage_xml=coverage_xml,
         only=only,
+        max_file_bytes=max_file_bytes,
     )
     _write_coverage_output(result, out)
     typer.echo("[coverage] Wrote coverage analytics.")
@@ -504,6 +617,7 @@ def config(  # noqa: PLR0913, PLR0917
     tags_yaml: Path | None = TAGS,
     coverage_xml: Path = COVERAGE_XML,
     only: OnlyPatternsOption = None,
+    max_file_bytes: int = MAX_FILE_BYTES,
 ) -> None:
     """Emit config index (YAML/TOML/JSON/Markdown references)."""
     out.mkdir(parents=True, exist_ok=True)
@@ -514,6 +628,7 @@ def config(  # noqa: PLR0913, PLR0917
         tags_yaml=tags_yaml,
         coverage_xml=coverage_xml,
         only=only,
+        max_file_bytes=max_file_bytes,
     )
     _write_config_output(result, out)
     typer.echo("[config] Wrote config index.")
@@ -529,6 +644,7 @@ def hotspots(  # noqa: PLR0913, PLR0917
     tags_yaml: Path | None = TAGS,
     coverage_xml: Path = COVERAGE_XML,
     only: OnlyPatternsOption = None,
+    max_file_bytes: int = MAX_FILE_BYTES,
 ) -> None:
     """Emit hotspot analytics (complexity x churn x centrality)."""
     out.mkdir(parents=True, exist_ok=True)
@@ -539,6 +655,7 @@ def hotspots(  # noqa: PLR0913, PLR0917
         tags_yaml=tags_yaml,
         coverage_xml=coverage_xml,
         only=only,
+        max_file_bytes=max_file_bytes,
     )
     _write_hotspot_output(result, out)
     typer.echo("[hotspots] Wrote hotspot analytics.")
@@ -667,6 +784,55 @@ def _build_module_row(
     inputs: ScanInputs,
 ) -> tuple[dict[str, Any], list[tuple[str, str]]]:
     rel = _normalized_rel_path(fp, root)
+    repo_path = _normalized_rel_path(fp, inputs.repo_root)
+    module_name = module_name_from_path(inputs.repo_root, fp, inputs.package_prefix)
+    stable_id = stable_id_for_path(repo_path)
+    scip_doc = inputs.scip_ctx.by_file.get(rel)
+    scip_symbols = sorted(
+        {symbol.symbol for symbol in (scip_doc.symbols if scip_doc else []) if symbol.symbol}
+    )
+    symbol_edges = [(symbol, rel) for symbol in scip_symbols]
+
+    try:
+        file_size = fp.stat().st_size
+    except OSError:
+        file_size = None
+
+    if file_size is not None and file_size > inputs.max_file_bytes:
+        row = {
+            "path": rel,
+            "repo_path": repo_path,
+            "module_name": module_name,
+            "stable_id": stable_id,
+            "docstring": None,
+            "doc_has_summary": False,
+            "doc_param_parity": True,
+            "doc_examples_present": False,
+            "imports": [],
+            "defs": [],
+            "exports": [],
+            "exports_declared": [],
+            "outline_nodes": [],
+            "scip_symbols": scip_symbols,
+            "parse_ok": False,
+            "errors": [
+                f"file-too-large>{file_size}>{inputs.max_file_bytes}",
+            ],
+            "tags": [],
+            "type_errors": 0,
+            "type_error_count": 0,
+            "doc_summary": None,
+            "doc_metrics": {
+                "has_summary": False,
+                "param_parity": True,
+                "examples_present": False,
+            },
+            "doc_items": [],
+            "annotation_ratio": {"params": 1.0, "returns": 1.0},
+            "untyped_defs": 0,
+        }
+        return row, symbol_edges
+
     code = fp.read_text(encoding="utf-8", errors="ignore")
     idx = index_module(rel, code)
 
@@ -688,14 +854,11 @@ def _build_module_row(
 
     coverage_entry = inputs.coverage_map.get(rel, {})
 
-    scip_doc = inputs.scip_ctx.by_file.get(rel)
-    scip_symbols = sorted(
-        {symbol.symbol for symbol in (scip_doc.symbols if scip_doc else []) if symbol.symbol}
-    )
-    symbol_edges = [(symbol, rel) for symbol in scip_symbols]
-
     row = {
         "path": rel,
+        "repo_path": repo_path,
+        "module_name": module_name,
+        "stable_id": stable_id,
         "docstring": idx.docstring,
         "doc_has_summary": bool(idx.doc_metrics.get("has_summary")),
         "doc_param_parity": bool(idx.doc_metrics.get("param_parity")),
@@ -941,6 +1104,86 @@ def _write_graph_outputs(result: PipelineResult, out: Path) -> None:
 
 def _write_uses_output(result: PipelineResult, out: Path) -> None:
     write_use_graph(result.use_graph, out / "graphs" / "uses.parquet")
+
+
+def _apply_ownership(
+    result: PipelineResult,
+    out: Path,
+    *,
+    history_window_days: int,
+    commits_window: int,
+) -> OwnershipIndex:
+    churn_windows = (30, max(1, history_window_days))
+    repo_paths = [
+        str(row.get("repo_path") or row.get("path") or "")
+        for row in result.module_rows
+    ]
+    ownership = compute_ownership(
+        result.repo_root,
+        repo_paths,
+        commits_window=max(1, commits_window),
+        churn_windows=churn_windows,
+    )
+    for row in result.module_rows:
+        key = str(row.get("repo_path") or row.get("path") or "")
+        entry = ownership.by_file.get(key)
+        if entry is None:
+            continue
+        row["owner"] = entry.owner
+        row["primary_authors"] = list(entry.primary_authors)
+        row["bus_factor"] = entry.bus_factor
+        for window, churn in entry.churn_by_window.items():
+            row[f"recent_churn_{window}"] = churn
+    _write_ownership_output(ownership, out)
+    return ownership
+
+
+def _write_ownership_output(ownership: OwnershipIndex, out: Path) -> None:
+    rows: list[dict[str, Any]] = []
+    for path, entry in ownership.by_file.items():
+        record: dict[str, Any] = {
+            "path": path,
+            "owner": entry.owner,
+            "primary_authors": list(entry.primary_authors),
+            "bus_factor": entry.bus_factor,
+        }
+        for window, churn in entry.churn_by_window.items():
+            record[f"recent_churn_{window}"] = churn
+        rows.append(record)
+    write_parquet(out / "analytics" / "ownership.parquet", rows)
+
+
+def _write_slices_output(
+    module_rows: list[dict[str, Any]],
+    out: Path,
+    *,
+    slices_filter: list[str] | None = None,
+) -> None:
+    filters = tuple(filter(None, slices_filter or []))
+    slice_records: list[dict[str, Any]] = []
+    index_rows: list[dict[str, Any]] = []
+    for row in module_rows:
+        tags = {
+            tag for tag in row.get("tags") or [] if isinstance(tag, str)
+        }
+        if filters and not tags.intersection(filters):
+            continue
+        slice_record = build_slice_record(row)
+        slice_dict = asdict(slice_record)
+        write_slice(out, slice_record)
+        slice_records.append(slice_dict)
+        index_rows.append(
+            {
+                "slice_id": slice_record.slice_id,
+                "path": slice_record.path,
+                "module_name": slice_record.module_name,
+            }
+        )
+    if not slice_records:
+        return
+    slices_dir = out / "slices"
+    write_parquet(slices_dir / "index.parquet", index_rows)
+    write_jsonl(slices_dir / "slices.jsonl", slice_records)
 
 
 def _write_typedness_output(result: PipelineResult, out: Path) -> None:

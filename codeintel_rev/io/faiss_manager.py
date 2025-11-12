@@ -343,7 +343,23 @@ class _FAISSMetadataMixin:
     """Mixin for runtime override metadata helpers."""
 
     def set_search_parameters(self, param_str: str) -> dict[str, object]:
-        """Apply FAISS ParameterSpace string and persist overrides."""
+        """Apply FAISS ParameterSpace string and persist overrides.
+
+        Parameters
+        ----------
+        param_str : str
+            ParameterSpace specification (e.g., ``"nprobe=64,efSearch=128"``).
+
+        Returns
+        -------
+        dict[str, object]
+            Runtime tuning snapshot (see :meth:`get_runtime_tuning`).
+
+        Raises
+        ------
+        ValueError
+            If the parameter string is empty or contains unsupported keys.
+        """
         faiss_spec, sanitized = self._prepare_parameter_string(param_str)
         if faiss_spec:
             try:
@@ -395,7 +411,8 @@ class _FAISSMetadataMixin:
             raise ValueError(msg)
         return (",".join(faiss_pairs) if faiss_pairs else None, sanitized)
 
-    def _format_parameter_string(self, overrides: Mapping[str, float]) -> str | None:
+    @staticmethod
+    def _format_parameter_string(overrides: Mapping[str, float]) -> str | None:
         ordered = []
         for key in ("nprobe", "efSearch", "quantizer_efSearch", "k_factor"):
             if key not in overrides:
@@ -643,6 +660,7 @@ class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
             cpu_id_map,
             factory_label,
             parameter_space=self._format_parameter_string(self._runtime_overrides),
+            vector_count=n_vectors,
         )
         FAISS_BUILD_TOTAL.inc()
         FAISS_BUILD_SECONDS_LAST.set(perf_counter() - build_start)
@@ -2239,6 +2257,7 @@ class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
         index: _faiss.Index,
         label: str | None = None,
         parameter_space: str | None = None,
+        vector_count: int | None = None,
     ) -> None:
         try:
             name = label or type(self._downcast_index(index)).__name__
@@ -2247,9 +2266,10 @@ class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
         extra = _log_extra(index_type=name, vec_dim=self.vec_dim, nlist=self.nlist)
         LOGGER.info("FAISS index configured", extra=extra)
         set_factory_id(name)
+        effective_count = index.ntotal if vector_count is None else int(vector_count)
         self._write_meta_snapshot(
             factory=name,
-            vector_count=index.ntotal,
+            vector_count=effective_count,
             parameter_space=parameter_space,
         )
 

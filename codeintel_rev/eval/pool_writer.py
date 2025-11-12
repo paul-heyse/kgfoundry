@@ -18,7 +18,7 @@ else:  # pragma: no cover - dependency optional at import time
         pa = None  # type: ignore[assignment]
         pq = None  # type: ignore[assignment]
 
-Source = Literal["faiss", "bm25", "splade", "ann", "oracle"]
+Source = Literal["faiss", "bm25", "splade", "ann", "oracle", "xtr"]
 
 
 @dataclass(frozen=True)

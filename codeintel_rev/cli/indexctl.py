@@ -12,10 +12,11 @@ import click
 import typer
 
 from codeintel_rev.config.settings import Settings, load_settings
-from codeintel_rev.eval.hybrid_evaluator import HybridPoolEvaluator
+from codeintel_rev.eval.hybrid_evaluator import EvalConfig, HybridPoolEvaluator
 from codeintel_rev.indexing.index_lifecycle import IndexAssets, IndexLifecycleManager
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.faiss_manager import FAISSManager
+from codeintel_rev.io.xtr_manager import XTRIndex
 from kgfoundry_common.logging import get_logger
 
 LOGGER = get_logger(__name__)
@@ -125,6 +126,28 @@ def _duckdb_catalog(path_override: Path | None = None) -> DuckDBCatalog:
     return catalog
 
 
+def _load_xtr_index(settings: Settings) -> XTRIndex | None:
+    if not settings.xtr.enable:
+        return None
+    root = Path(settings.paths.xtr_dir).expanduser().resolve()
+    index = XTRIndex(root=root, config=settings.xtr)
+    try:
+        index.open()
+    except Exception as exc:  # pragma: no cover - defensive logging
+        LOGGER.warning("Failed to open XTR index", extra={"root": str(root), "error": str(exc)})
+        return None
+    if not index.ready:
+        LOGGER.warning("XTR index not ready", extra={"root": str(root)})
+        return None
+    return index
+
+
+def _eval_paths(settings: Settings) -> tuple[Path, Path]:
+    out_dir = Path(settings.eval.output_dir).expanduser().resolve()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    return out_dir / "last_eval_pool.parquet", out_dir / "metrics.json"
+
+
 @app.command("status")
 def status_command() -> None:
     """Print the active version and available versions."""
@@ -232,58 +255,78 @@ def tune_command(
         "--k-factor",
         help="Candidate expansion factor for runtime refine.",
     ),
-    params: str | None = typer.Option(
-        None,
-        "--params",
-        help="FAISS ParameterSpace string (e.g. 'nprobe=64,efSearch=128,k_factor=2').",
-    ),
 ) -> None:
     """Apply runtime tuning overrides (nprobe/efSearch/k-factor) and persist audit JSON."""
     manager = _faiss_manager(index)
-    if params:
-        if any(v is not None for v in (nprobe, ef_search, quantizer_ef_search, k_factor)):
-            raise typer.BadParameter(
-                "Cannot combine --params with individual tuning flags (nprobe/ef-search/etc.)."
-            )
-        try:
-            tuning = manager.set_search_parameters(params)
-        except ValueError as exc:
-            raise typer.BadParameter(str(exc)) from exc
-    else:
-        tuning = manager.apply_runtime_tuning(
-            nprobe=nprobe,
-            ef_search=ef_search,
-            quantizer_ef_search=quantizer_ef_search,
-            k_factor=k_factor,
-        )
-    audit_path = manager.index_path.with_suffix(".audit.json").expanduser().resolve()
-    audit_path.parent.mkdir(parents=True, exist_ok=True)
-    audit_path.write_text(json.dumps(tuning, indent=2) + "\n", encoding="utf-8")
+    tuning = manager.apply_runtime_tuning(
+        nprobe=nprobe,
+        ef_search=ef_search,
+        quantizer_ef_search=quantizer_ef_search,
+        k_factor=k_factor,
+    )
+    audit_path = _write_tuning_audit(manager, tuning)
     typer.echo(f"Wrote runtime tuning snapshot -> {audit_path}")
 
 
-@app.command("eval-hybrid")
-def eval_hybrid_command(
-    *,
-    k: int = typer.Option(10, "--k", min=1, help="Top-K for recall computation."),
-    k_factor: float = typer.Option(
-        2.0,
-        "--k-factor",
-        min=1.0,
-        help="Candidate expansion factor for ANN search.",
-    ),
+@app.command("tune-params")
+def tune_params_command(
+    params: Annotated[str, typer.Argument(help="FAISS ParameterSpace string (e.g. 'nprobe=64').")],
     index: IndexOption = None,
-    duckdb: DuckOption = None,
-    out: OutOption = None,
 ) -> None:
-    """Evaluate ANN vs Flat recall and optionally persist pooled candidates."""
-    settings = _get_settings()
-    output_dir = Path(settings.eval.output_dir).expanduser().resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
-    out_path = (out or (output_dir / "last_eval_pool.parquet")).expanduser().resolve()
+    """Apply FAISS ParameterSpace string (nprobe/efSearch/quantizer/k_factor).
 
+    Raises
+    ------
+    typer.BadParameter
+        If the ParameterSpace string includes unsupported keys.
+    """
     manager = _faiss_manager(index)
-    catalog = _duckdb_catalog(duckdb)
-    evaluator = HybridPoolEvaluator(catalog, manager)
-    report = evaluator.run(k=k, k_factor=k_factor, out_parquet=out_path)
-    typer.echo(json.dumps(report, indent=2))
+    try:
+        tuning = manager.set_search_parameters(params)
+    except ValueError as exc:
+        msg = str(exc)
+        raise typer.BadParameter(msg) from exc
+    audit_path = _write_tuning_audit(manager, tuning)
+    typer.echo(f"Wrote runtime tuning snapshot -> {audit_path}")
+
+
+def _write_tuning_audit(manager: FAISSManager, tuning: dict[str, object]) -> Path:
+    audit_path = manager.index_path.with_suffix(".audit.json").expanduser().resolve()
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    audit_path.write_text(json.dumps(tuning, indent=2) + "\n", encoding="utf-8")
+    return audit_path
+
+
+@app.command("eval")
+def eval_command(
+    k: Annotated[int, typer.Option("--k", min=1, help="Top-K for recall computation.")] = 10,
+    k_factor: Annotated[
+        float, typer.Option("--k-factor", min=1.0, help="Candidate expansion factor for ANN search.")
+    ] = 2.0,
+    nprobe: Annotated[int | None, typer.Option("--nprobe", help="Override FAISS nprobe.")] = None,
+    xtr_oracle: Annotated[
+        bool,
+        typer.Option(
+            "--xtr-oracle/--no-xtr-oracle",
+            help="Also rescore each query using the XTR token index when available.",
+        ),
+    ] = False,
+) -> None:
+    """Run ANN vs Flat evaluation and optionally rescore with XTR."""
+    settings = _get_settings()
+    manager = _faiss_manager()
+    catalog = _duckdb_catalog()
+    xtr_index = _load_xtr_index(settings) if xtr_oracle else None
+    pool_path, metrics_path = _eval_paths(settings)
+    config = EvalConfig(
+        k=k,
+        k_factor=k_factor,
+        nprobe=nprobe,
+        max_queries=settings.eval.max_queries,
+        use_xtr_oracle=bool(xtr_index and xtr_oracle),
+        pool_path=pool_path,
+        metrics_path=metrics_path,
+    )
+    evaluator = HybridPoolEvaluator(catalog, manager, xtr_index=xtr_index)
+    report = evaluator.run(config)
+    typer.echo(json.dumps(report.__dict__, indent=2))

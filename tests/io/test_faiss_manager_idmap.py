@@ -8,7 +8,6 @@ from pathlib import Path
 import numpy as np
 import pyarrow.parquet as pq
 import pytest
-
 from codeintel_rev.io.faiss_manager import FAISSManager, FAISSRuntimeOptions
 
 
@@ -84,5 +83,5 @@ def test_set_search_parameters_rejects_unknown_keys(tmp_path: Path) -> None:
     vectors = np.random.RandomState(9).randn(64, vec_dim).astype(np.float32)
     manager = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim, use_cuvs=False)
     manager.build_index(vectors)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unsupported"):
         manager.set_search_parameters("bad_param=1")

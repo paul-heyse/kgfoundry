@@ -53,6 +53,22 @@ def write_jsonl(path: str | Path, rows: Iterable[dict[str, object]]) -> None:
             handle.write("\n")
 
 
+def write_parquet(path: str | Path, rows: Iterable[dict[str, object]]) -> None:
+    """Persist ``rows`` to Parquet, falling back to JSONL when PyArrow is missing."""
+    records = list(rows)
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        import pyarrow as pa  # type: ignore[import-not-found]
+        import pyarrow.parquet as pq  # type: ignore[import-not-found]
+    except Exception:  # pragma: no cover - PyArrow unavailable
+        fallback = target if target.suffix == ".jsonl" else Path(f"{target}.jsonl")
+        write_jsonl(fallback, records)
+        return
+    table = pa.Table.from_pylist(records)
+    pq.write_table(table, target)
+
+
 def _append_section(sections: list[str], title: str, lines: list[str]) -> None:
     if not lines:
         return
@@ -102,6 +118,39 @@ def _format_graph_metrics(record: dict[str, object]) -> list[str]:
         value = record.get(label)
         if isinstance(value, int):
             lines.append(f"- **{label}**: {value}")
+    return lines
+
+
+def _format_ownership(record: dict[str, object]) -> list[str]:
+    lines: list[str] = []
+    owner = record.get("owner")
+    if isinstance(owner, str) and owner:
+        lines.append(f"- owner: {owner}")
+    authors = record.get("primary_authors")
+    if isinstance(authors, list) and authors:
+        joined = ", ".join(str(author) for author in authors if isinstance(author, str))
+        if joined:
+            lines.append(f"- primary authors: {joined}")
+    bus_factor = record.get("bus_factor")
+    if isinstance(bus_factor, (int, float)):
+        lines.append(f"- bus factor: {float(bus_factor):.2f}")
+    churn_keys = ("recent_churn_30", "recent_churn_90", "churn_30d", "churn_90d")
+    for key in churn_keys:
+        value = record.get(key)
+        if isinstance(value, int):
+            label = key.replace("_", " ")
+            lines.append(f"- {label}: {value}")
+    return lines
+
+
+def _format_usage(record: dict[str, object]) -> list[str]:
+    lines: list[str] = []
+    used_by_files = record.get("used_by_files")
+    used_by_symbols = record.get("used_by_symbols")
+    if isinstance(used_by_files, int):
+        lines.append(f"- used by files: {used_by_files}")
+    if isinstance(used_by_symbols, int):
+        lines.append(f"- used by symbols: {used_by_symbols}")
     return lines
 
 
@@ -264,15 +313,17 @@ def write_markdown_module(path: str | Path, record: dict[str, object]) -> None:
         sections.extend(["## Docstring\n", f"```\n{docstring.strip()}\n```\n"])
     _append_section(sections, "Imports", _format_imports(record))
     _append_section(sections, "Definitions", _format_definitions(record))
-    _append_section(sections, "Dependency Graph", _format_graph_metrics(record))
+    _append_section(sections, "Graph Metrics", _format_graph_metrics(record))
+    _append_section(sections, "Ownership", _format_ownership(record))
+    _append_section(sections, "Usage", _format_usage(record))
     _append_section(sections, "Declared Exports (__all__)", _format_exports(record))
     _append_section(sections, "Resolved Star Imports", _format_exports_resolved(record))
     _append_section(sections, "Re-exports", _format_reexports(record))
-    _append_section(sections, "Doc Metrics", _format_doc_metrics(record))
+    _append_section(sections, "Doc Health", _format_doc_metrics(record))
     _append_section(sections, "Typedness", _format_typedness(record))
     _append_section(sections, "Coverage", _format_coverage(record))
     _append_section(sections, "Config References", _format_config_refs(record))
-    _append_section(sections, "Hotspot Score", _format_hotspot(record))
+    _append_section(sections, "Hotspot", _format_hotspot(record))
     _append_section(sections, "Side Effects", _format_side_effects(record))
     _append_section(sections, "Raises", _format_raises(record))
     _append_section(sections, "Complexity", _format_complexity(record))
