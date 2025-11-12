@@ -265,6 +265,7 @@ docs-validate-artifacts = "docs.toolchain:validate_artifacts"
 docs-symbol-delta = "docs.toolchain:symbol_delta"
 tools-build-navmap = "tools.cli:build_navmap"
 docs-serve-mkdocs = "tools.mkdocs_suite.serve:main"
+codeintel-enrich = "codeintel_rev.cli_enrich:app"
 codeintel = "codeintel_rev.cli:main"
 
 

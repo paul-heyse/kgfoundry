@@ -106,9 +106,7 @@ def test_service_context_resolves_paths(tmp_path: Path, monkeypatch: pytest.Monk
     expected_faiss_path.touch()
     expected_vectors_dir.mkdir(parents=True, exist_ok=True)
 
-    monkeypatch.setattr(
-        config_context, "_import_faiss_manager_cls", lambda: RecordingFAISSManager
-    )
+    monkeypatch.setattr(config_context, "_import_faiss_manager_cls", lambda: RecordingFAISSManager)
     monkeypatch.setattr(config_context, "DuckDBCatalog", RecordingDuckDBCatalog)
     monkeypatch.setattr(config_context, "VLLMClient", DummyVLLMClient)
 

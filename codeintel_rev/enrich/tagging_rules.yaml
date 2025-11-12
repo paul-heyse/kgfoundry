@@ -1,0 +1,16 @@
+# Extend or override default tagging rules.
+# Each key is a tag name; values describe conditions (all are optional).
+# - any_import: list of module names; if any present in imports, tag applies
+# - path_regex: regex against file path
+# - has_all: true if module defines __all__
+# - is_reexport_hub: true if module has star import or large __all__
+# - type_errors_gt: integer threshold; true if type errors > N
+api:
+  any_import: [fastapi, typer]
+  reason: "User-facing interface (FastAPI/Typer)"
+io-bound:
+  any_import: [httpx, requests, boto3, psycopg, sqlalchemy, redis]
+  reason: "Likely IO-heavy module"
+observability:
+  any_import: [prometheus_client]
+  reason: "Exposes metrics"
