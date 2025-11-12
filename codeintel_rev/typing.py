@@ -8,8 +8,9 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from os import PathLike
-from typing import TYPE_CHECKING, Any, Mapping, Protocol, Sequence
+from typing import TYPE_CHECKING, Any, Protocol
 
 from kgfoundry_common.typing import HEAVY_DEPS as _BASE_HEAVY_DEPS
 from kgfoundry_common.typing import gate_import as _base_gate_import
@@ -242,4 +243,17 @@ class PolarsDataFrame(Protocol):
 class PolarsModule(Protocol):
     """Minimal polars API used within optional export helpers."""
 
-    def DataFrame(self, data: Sequence[Mapping[str, object]]) -> PolarsDataFrame: ...
+    def DataFrame(self, data: Sequence[Mapping[str, object]]) -> PolarsDataFrame:
+        """Create a DataFrame from a sequence of mappings.
+
+        Parameters
+        ----------
+        data : Sequence[Mapping[str, object]]
+            Sequence of dictionary-like objects to convert to a DataFrame.
+
+        Returns
+        -------
+        PolarsDataFrame
+            DataFrame instance containing the provided data.
+        """
+        ...

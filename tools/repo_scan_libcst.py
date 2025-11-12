@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import importlib.util
 import logging
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 try:
     import libcst as cst
@@ -306,7 +306,7 @@ def collect_imports_with_libcst(path: Path, module_name: str) -> CSTImports:
         return CSTImports(str(path), module_name, (), (), (), (), has_parse_errors=True)
 
     collector = ImportCollector(module_name)
-    module.visit(cast(libcst_types.CSTVisitor, collector))
+    module.visit(cast("libcst_types.CSTVisitor", collector))
 
     return CSTImports(
         file=str(path),

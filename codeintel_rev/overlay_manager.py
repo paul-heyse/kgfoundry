@@ -130,10 +130,15 @@ def activate_generated_overlays(
 def _safe_int(value: object | None) -> int:
     """Return a best-effort integer conversion.
 
+    Parameters
+    ----------
+    value : object | None
+        Value to convert to integer. Supports int, float, str, bool, or None.
+
     Returns
     -------
     int
-        Normalized integer representation; 0 when conversion fails.
+        Normalized integer representation; 0 when conversion fails or value is None.
     """
     if value is None:
         return 0

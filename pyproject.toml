@@ -267,6 +267,7 @@ tools-build-navmap = "tools.cli:build_navmap"
 docs-serve-mkdocs = "tools.mkdocs_suite.serve:main"
 codeintel-enrich = "codeintel_rev.cli_enrich:app"
 codeintel = "codeintel_rev.cli:main"
+codeintel-cst = "codeintel_rev.cst_build.cst_cli:main"
 
 
 [project.optional-dependencies]

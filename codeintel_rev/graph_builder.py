@@ -132,10 +132,25 @@ def _tarjan_scc(edges: dict[str, set[str]]) -> dict[str, int]:
         if node not in order:
             strongconnect(node)
     return assignment
+
+
 def _write_parquet(records: list[dict[str, str]], target: Path) -> bool:
-    """Persist records to Parquet via polars when available."""
+    """Persist records to Parquet via polars when available.
+
+    Parameters
+    ----------
+    records : list[dict[str, str]]
+        List of dictionary records to write.
+    target : Path
+        File system path for the output Parquet file.
+
+    Returns
+    -------
+    bool
+        True if polars is available and write succeeded, False otherwise.
+    """
     try:
-        polars = cast(PolarsModule, gate_import("polars", "import graph export"))
+        polars = cast("PolarsModule", gate_import("polars", "import graph export"))
     except ImportError:
         return False
     polars.DataFrame(records).write_parquet(str(target))

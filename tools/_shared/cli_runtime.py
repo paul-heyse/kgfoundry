@@ -659,6 +659,10 @@ def cli_run(cfg: CliRunConfig) -> Iterator[tuple[CliContext, EnvelopeBuilder]]:
         Re-raised immediately if raised by user code (system-level exception).
     KeyboardInterrupt
         Re-raised immediately if raised by user code (system-level exception).
+    Exception
+        Any exception raised by user code inside the context is caught and
+        processed. If ``cfg.exit_on_error`` is ``False``, the exception is
+        re-raised after cleanup. If ``True``, it is converted to ``SystemExit(1)``.
 
     Notes
     -----

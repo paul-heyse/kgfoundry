@@ -54,6 +54,7 @@ from threading import Lock
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
 
+import codeintel_rev.observability.metrics as _retrieval_metrics
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.scope_store import ScopeStore
 from codeintel_rev.config.settings import IndexConfig, Settings, load_settings
@@ -65,7 +66,6 @@ from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager, FAISSRuntimeOptions
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.vllm_client import VLLMClient
-import codeintel_rev.observability.metrics as _retrieval_metrics
 from codeintel_rev.runtime import (
     NullRuntimeCellObserver,
     RuntimeCell,

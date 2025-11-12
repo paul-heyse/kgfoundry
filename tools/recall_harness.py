@@ -10,9 +10,9 @@ from dataclasses import dataclass
 from itertools import product
 from pathlib import Path
 
+import codeintel_rev.observability.metrics as retrieval_metrics
 from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.io.hybrid_search import BM25Rm3Config, BM25SearchProvider
-import codeintel_rev.observability.metrics as retrieval_metrics
 from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
 from codeintel_rev.retrieval.types import ChannelHit
 

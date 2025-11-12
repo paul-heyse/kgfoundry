@@ -283,10 +283,6 @@ class ModuleReport:
         Import targets referenced by the module.
     public_api : list[str]
         Exported functions/classes as inferred by :func:`collect_public_api`.
-    public_api_details : list[dict[str, str]]
-        Signature/doc summaries for public API symbols.
-    raises : dict[str, list[str]]
-        Mapping of function names to exceptions raised.
     doc : DocStats
         Docstring coverage counters.
     typing : TypeHintStats
@@ -301,6 +297,16 @@ class ModuleReport:
         Optional marker describing parse failures.
     imports_cst : dict[str, Any] | None
         Optional LibCST-derived import/export snapshot.
+    test_count : int
+        Number of test functions found for this module. Defaults to 0.
+    has_tests : bool
+        Whether this module has associated test functions. Defaults to False.
+    public_api_without_tests : list[str]
+        List of public API symbols that lack test coverage. Defaults to empty list.
+    public_api_details : list[dict[str, str]]
+        Signature/doc summaries for public API symbols. Defaults to empty list.
+    raises : dict[str, list[str]]
+        Mapping of function names to exceptions raised. Defaults to empty dict.
     """
 
     module: str
@@ -505,6 +511,11 @@ def _doc_one_liner(text: str | None) -> str:
 def _format_parameters(args: ast.arguments) -> list[str]:
     """Render human-friendly parameter strings for ``args``.
 
+    Parameters
+    ----------
+    args : ast.arguments
+        AST arguments node containing positional, keyword-only, and variadic parameters.
+
     Returns
     -------
     list[str]
@@ -540,6 +551,15 @@ def _format_parameters(args: ast.arguments) -> list[str]:
 def _format_arg(arg: ast.arg, default: ast.AST | None, prefix: str = "") -> str:
     """Format a single argument with annotation/defaults.
 
+    Parameters
+    ----------
+    arg : ast.arg
+        AST argument node to format.
+    default : ast.AST | None
+        Optional default value AST node.
+    prefix : str, optional
+        Prefix string for variadic arguments (e.g., "*" or "**"). Defaults to "".
+
     Returns
     -------
     str
@@ -559,6 +579,11 @@ def _format_arg(arg: ast.arg, default: ast.AST | None, prefix: str = "") -> str:
 def _function_signature(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
     """Return a repr-style signature string for ``fn``.
 
+    Parameters
+    ----------
+    fn : ast.FunctionDef | ast.AsyncFunctionDef
+        AST function or async function definition node.
+
     Returns
     -------
     str
@@ -572,6 +597,11 @@ def _function_signature(fn: ast.FunctionDef | ast.AsyncFunctionDef) -> str:
 
 def _class_signature(cls: ast.ClassDef) -> str:
     """Return a class signature showing its bases.
+
+    Parameters
+    ----------
+    cls : ast.ClassDef
+        AST class definition node.
 
     Returns
     -------
@@ -588,6 +618,15 @@ def collect_public_api_details(
     allowed_names: set[str],
 ) -> list[dict[str, str]]:
     """Emit signature/doc summaries for public API members.
+
+    Parameters
+    ----------
+    tree : ast.Module
+        AST module node to analyze.
+    module_path : Path
+        File system path to the module source file.
+    allowed_names : set[str]
+        Set of symbol names that are considered public API exports.
 
     Returns
     -------
@@ -623,6 +662,11 @@ def collect_public_api_details(
 def _exception_name(expr: ast.AST | None) -> str | None:
     """Return the fully qualified exception name referenced by ``expr``.
 
+    Parameters
+    ----------
+    expr : ast.AST | None
+        AST expression node representing an exception type, or None.
+
     Returns
     -------
     str | None
@@ -649,6 +693,11 @@ def _exception_name(expr: ast.AST | None) -> str | None:
 
 def collect_function_raises(tree: ast.Module) -> dict[str, list[str]]:
     """Map function names to the exceptions they raise.
+
+    Parameters
+    ----------
+    tree : ast.Module
+        AST module node to analyze for raise statements.
 
     Returns
     -------
@@ -1266,6 +1315,13 @@ def _apply_test_metadata(
 ) -> list[ModuleReport]:
     """Attach test counts/flags to module reports.
 
+    Parameters
+    ----------
+    reports : list[ModuleReport]
+        List of module reports to update with test metadata.
+    test_map : dict[str, list[str]]
+        Mapping of module names to lists of test function names.
+
     Returns
     -------
     list[ModuleReport]
@@ -1309,6 +1365,13 @@ def write_dot(edges: list[tuple[str, str]], out_path: Path) -> None:
 def summarize_graph(reports: list[ModuleReport], edges: list[tuple[str, str]]) -> dict[str, Any]:
     """Return graph analytics for downstream consumption.
 
+    Parameters
+    ----------
+    reports : list[ModuleReport]
+        List of module reports representing graph nodes.
+    edges : list[tuple[str, str]]
+        List of (source_module, target_module) tuples representing import edges.
+
     Returns
     -------
     dict[str, Any]
@@ -1349,6 +1412,13 @@ def _strongly_connected_components(
 ) -> list[list[str]]:
     """Compute strongly connected components using Kosaraju's algorithm.
 
+    Parameters
+    ----------
+    nodes : Iterable[str]
+        Collection of node identifiers in the graph.
+    edges : list[tuple[str, str]]
+        List of (source, target) tuples representing directed edges.
+
     Returns
     -------
     list[list[str]]
@@ -1378,6 +1448,11 @@ def _strongly_connected_components(
 
 def _dfs_finish_order(graph: dict[str, list[str]]) -> list[str]:
     """Return nodes ordered by DFS finish time.
+
+    Parameters
+    ----------
+    graph : dict[str, list[str]]
+        Adjacency list representation of the directed graph.
 
     Returns
     -------
@@ -1414,6 +1489,15 @@ def _collect_component(
 ) -> list[str]:
     """Collect nodes reachable in the reverse graph from ``start``.
 
+    Parameters
+    ----------
+    reverse_graph : dict[str, list[str]]
+        Adjacency list of the reversed graph (edges point from target to source).
+    start : str
+        Starting node identifier for the component collection.
+    seen : set[str]
+        Set of nodes already visited (modified in-place).
+
     Returns
     -------
     list[str]
@@ -1435,6 +1519,17 @@ def _pagerank(
     nodes: Iterable[str], edges: list[tuple[str, str]], damping: float = 0.85, iters: int = 25
 ) -> dict[str, float]:
     """Compute a simple PageRank over the provided nodes.
+
+    Parameters
+    ----------
+    nodes : Iterable[str]
+        Collection of node identifiers in the graph.
+    edges : list[tuple[str, str]]
+        List of (source, target) tuples representing directed edges.
+    damping : float, optional
+        Damping factor for PageRank algorithm. Defaults to 0.85.
+    iters : int, optional
+        Number of iterations to run. Defaults to 25.
 
     Returns
     -------

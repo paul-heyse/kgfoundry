@@ -116,6 +116,8 @@ def typed_dependency[**P, T](
         ------
         TimeoutError
             If the dependency execution exceeds the timeout.
+        Exception
+            Any exception raised by the dependency function is re-raised after logging.
         """
         correlation_id = get_correlation_id()
         with with_fields(logger, operation=name, correlation_id=correlation_id) as log:
@@ -181,6 +183,8 @@ def typed_exception_handler[E: Exception](
         ------
         TimeoutError
             If the handler execution exceeds the timeout.
+        Exception
+            Any exception raised by the handler function is re-raised after logging.
         """
         correlation_id = get_correlation_id()
         with with_fields(logger, operation=name, correlation_id=correlation_id) as log:
@@ -279,6 +283,8 @@ def typed_middleware(
             ------
             TimeoutError
                 If the middleware execution exceeds the timeout.
+            Exception
+                Any exception raised by the next handler is re-raised after logging.
             """
             correlation_id = get_correlation_id()
             with with_fields(logger, operation=name, correlation_id=correlation_id) as log:

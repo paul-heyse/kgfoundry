@@ -383,6 +383,13 @@ def _raise_tool_execution_error(
     command : Sequence[str]
         Command that failed execution.
 
+    Raises
+    ------
+    RuntimeError
+        ToolExecutionError instance (subclass of RuntimeError) constructed
+        from the tools surface with the provided message and command context.
+        The exact type depends on the tools module implementation.
+
     """
     tool_error = cast("_ToolExecutionErrorConstructor", tools_surface.ToolExecutionError)
     raise tool_error(message, command=list(command))

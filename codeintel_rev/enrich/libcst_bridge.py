@@ -218,6 +218,19 @@ def _iter_params(params: cst.Parameters) -> Iterator[cst.Param]:
 
 
 def _exception_name(expr: cst.BaseExpression | None) -> str | None:
+    """Extract exception name from LibCST expression node.
+
+    Parameters
+    ----------
+    expr : cst.BaseExpression | None
+        LibCST expression node representing an exception type, or None.
+
+    Returns
+    -------
+    str | None
+        Dot-separated exception name (e.g., "ValueError" or "kgfoundry.errors.KgFoundryError"),
+        or None if the expression cannot be resolved to a name.
+    """
     if expr is None:
         return None
     if isinstance(expr, cst.Name):

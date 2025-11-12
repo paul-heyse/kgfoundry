@@ -60,7 +60,7 @@ def _parse_int(value: float | str | None) -> int:
 
     Parameters
     ----------
-    value : int | float | str | None
+    value : float | str | None
         Value to convert to integer.
 
     Returns

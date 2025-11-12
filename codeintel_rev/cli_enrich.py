@@ -1194,7 +1194,7 @@ def _write_tag_index(out: Path, tag_index: Mapping[str, list[str]]) -> None:
     safe_dump = getattr(yaml_module, "safe_dump", None)
     if not callable(safe_dump):
         return
-    dump_fn = cast(_YamlDumpFn, safe_dump)
+    dump_fn = cast("_YamlDumpFn", safe_dump)
     tags_path = out / "tags"
     tags_path.mkdir(parents=True, exist_ok=True)
     (tags_path / "tags_index.yaml").write_text(

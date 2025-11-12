@@ -31,6 +31,7 @@ Outputs (defaults under `codeintel_rev/io/ENRICHED/`):
 - `modules/*.md` – human‑readable module briefs (imports/exports/defs/tags)
 - `graphs/symbol_graph.json` – symbol ↔ file edge list (from SCIP, de‑duplicated)
 - `tags/tags_index.yaml` – per‑module tags, plus global tag catalog
+- `../io/CST/` – repo‑wide LibCST dataset built via `codeintel-cst` (see `docs/cst_data.md`)
 
 ## Operational notes
 
@@ -44,3 +45,27 @@ Outputs (defaults under `codeintel_rev/io/ENRICHED/`):
   refactors (e.g., `refactor:io-bound`, `api:public`, `risk:reexport-hub`, `status:needs-types`).
 
 See in‑file docstrings for more details.
+
+## LibCST dataset (`codeintel-cst`)
+
+The enrichment CLI now ships with a dedicated CST pipeline that emits node-level JSONL with
+LibCST metadata pre-stitched to modules and SCIP. Run it whenever you regenerate
+`modules.jsonl` so stitching stays in sync:
+
+```bash
+codeintel-cst \
+  --root codeintel_rev \
+  --scip codeintel_rev/index.scip.json \
+  --modules build/enrich/modules/modules.jsonl \
+  --out io/CST
+```
+
+Artifacts (documented in `docs/cst_data.md`) land under `io/CST/` and include:
+
+- `cst_nodes.jsonl.gz` – gzip-compressed repo-wide node feed
+- `module_nodes/*.jsonl` – per-module slices (matching module paths)
+- `index.json` – build metadata, provider stats, and stitch counts
+- `joins/stitched_examples.md` – random sample of CST ↔ SCIP joins for QA
+
+Use `--fail-on-parse-error` to make parse failures fatal during CI and `--include/--exclude`
+for scoped indexing during debugging.

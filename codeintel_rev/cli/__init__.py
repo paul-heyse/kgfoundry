@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import typer
 
-from . import bm25, indexctl, splade, xtr
+from codeintel_rev.cli import bm25, indexctl, splade, xtr
 
 app = typer.Typer(
     help="CodeIntel operational commands.",

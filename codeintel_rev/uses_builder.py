@@ -83,15 +83,42 @@ def write_use_graph(use_graph: UseGraph, path: str | Path) -> None:
 
 
 def _is_definition(roles: list[str]) -> bool:
+    """Check if any role indicates a definition.
+
+    Parameters
+    ----------
+    roles : list[str]
+        List of role strings to check.
+
+    Returns
+    -------
+    bool
+        True if any role contains "definition" or ends with "def", False otherwise.
+    """
     for role in roles:
         normalized = role.lower()
         if "definition" in normalized or normalized.endswith("def"):
             return True
     return False
+
+
 def _write_parquet(records: list[dict[str, str]], target: Path) -> bool:
-    """Write records via polars when available."""
+    """Write records via polars when available.
+
+    Parameters
+    ----------
+    records : list[dict[str, str]]
+        List of dictionary records to write.
+    target : Path
+        File system path for the output Parquet file.
+
+    Returns
+    -------
+    bool
+        True if polars is available and write succeeded, False otherwise.
+    """
     try:
-        polars = cast(PolarsModule, gate_import("polars", "use graph export"))
+        polars = cast("PolarsModule", gate_import("polars", "use graph export"))
     except ImportError:
         return False
     data_frame = polars.DataFrame(records)
