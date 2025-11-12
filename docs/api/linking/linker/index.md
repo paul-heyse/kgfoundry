@@ -1,3 +1,0 @@
-# `linking.linker`
-
-::: linking.linker

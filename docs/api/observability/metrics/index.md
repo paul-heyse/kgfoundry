@@ -1,3 +1,0 @@
-# `observability.metrics`
-
-::: observability.metrics

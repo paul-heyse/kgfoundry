@@ -1,3 +1,0 @@
-# `ontology.loader`
-
-::: ontology.loader

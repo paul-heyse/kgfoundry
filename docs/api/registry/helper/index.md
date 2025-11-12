@@ -1,3 +1,0 @@
-# `registry.helper`
-
-::: registry.helper

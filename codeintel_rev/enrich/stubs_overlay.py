@@ -1,13 +1,15 @@
 # SPDX-License-Identifier: MIT
+"""Overlay generation utilities for the enrichment CLI."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from .libcst_bridge import DefEntry, ImportEntry, ModuleIndex, index_module
-from .output_writers import write_json
-from .scip_reader import Document, SCIPIndex
+from codeintel_rev.enrich.libcst_bridge import DefEntry, ImportEntry, ModuleIndex, index_module
+from codeintel_rev.enrich.output_writers import write_json
+from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
 
 
 @dataclass(frozen=True)
@@ -24,7 +26,22 @@ def generate_overlay_for_file(
     package_root: Path,
     scip: SCIPIndex | None,
 ) -> OverlayResult:
-    """Create a `.pyi` overlay for ``py_file`` when public surface warrants it."""
+    """Create a `.pyi` overlay for ``py_file`` when public surface warrants it.
+
+    Parameters
+    ----------
+    py_file
+        Source module to analyze.
+    package_root
+        Root directory used to mirror stub paths.
+    scip
+        Optional SCIP index for resolving star imports.
+
+    Returns
+    -------
+    OverlayResult
+        Metadata describing the overlay that was generated.
+    """
     repo_root = _infer_repo_root(package_root)
     relative_path = _safe_relative(py_file, repo_root)
     code = py_file.read_text(encoding="utf-8", errors="ignore")
@@ -39,7 +56,7 @@ def generate_overlay_for_file(
     if not should_overlay:
         return OverlayResult(pyi_path=None, exports_resolved=star_exports, created=False)
 
-    overlay_text = _build_overlay_text(module_name, module_index, public_defs, star_exports)
+    overlay_text = _build_overlay_text(module_index, public_defs, star_exports)
     stubs_root = repo_root / "stubs"
     pyi_path = stubs_root / relative_path.with_suffix(".pyi")
     pyi_path.parent.mkdir(parents=True, exist_ok=True)
@@ -103,13 +120,14 @@ def _collect_star_reexports(
     resolved: dict[str, set[str]] = {}
     if not scip_by_file:
         return resolved
+    package_hint = this_module.split(".", 1)[0]
     for imp in imports:
         if not imp.is_star:
             continue
         target = _resolve_target_module(this_module, imp)
         if not target:
             continue
-        names = _names_from_scip(target, scip_by_file)
+        names = _names_from_scip(target, scip_by_file, package_hint)
         if not names:
             continue
         resolved.setdefault(target, set()).update(names)
@@ -129,8 +147,14 @@ def _resolve_target_module(this_module: str, imp: ImportEntry) -> str | None:
     return target or None
 
 
-def _names_from_scip(module_name: str, scip_by_file: Mapping[str, Document]) -> set[str]:
+def _names_from_scip(
+    module_name: str,
+    scip_by_file: Mapping[str, Document],
+    package_hint: str | None,
+) -> set[str]:
     candidates = _candidate_file_paths_for_module(module_name)
+    if package_hint and "." not in module_name:
+        candidates.extend(_candidate_file_paths_for_module(f"{package_hint}.{module_name}"))
     names: set[str] = set()
     for candidate in candidates:
         doc = scip_by_file.get(candidate)
@@ -188,7 +212,7 @@ def _is_public_def(entry: DefEntry) -> bool:
     return entry.kind in {"function", "class"} and not _is_private(entry.name)
 
 
-def _pyi_header(import_any: bool) -> list[str]:
+def _pyi_header(*, import_any: bool) -> list[str]:
     lines = ["from __future__ import annotations"]
     if import_any:
         lines.append("from typing import Any")
@@ -199,7 +223,6 @@ def _pyi_header(import_any: bool) -> list[str]:
 
 
 def _build_overlay_text(
-    module_name: str,
     module_index: ModuleIndex,
     public_defs: list[DefEntry],
     star_exports: dict[str, set[str]],
@@ -225,9 +248,9 @@ def _build_overlay_text(
             lines.append(f"class {entry.name}: ...  # line {entry.lineno}")
     if public_defs:
         lines.append("")
-    public_names: set[str] = set(n for n in module_index.exports if not _is_private(n))
+    public_names: set[str] = {name for name in module_index.exports if not _is_private(name)}
     for names in star_exports.values():
-        public_names.update(name for name in names if not _is_private(name))
+        public_names.update({name for name in names if not _is_private(name)})
     public_names.update(entry.name for entry in public_defs)
     if public_names:
         sorted_names = ", ".join(f'"{name}"' for name in sorted(public_names))

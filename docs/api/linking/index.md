@@ -1,3 +1,0 @@
-# `linking`
-
-::: linking

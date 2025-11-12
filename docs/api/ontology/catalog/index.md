@@ -1,3 +1,0 @@
-# `ontology.catalog`
-
-::: ontology.catalog

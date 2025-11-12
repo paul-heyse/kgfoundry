@@ -1,3 +1,0 @@
-# `download.harvester`
-
-::: download.harvester

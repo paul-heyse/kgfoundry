@@ -1,9 +1,0 @@
-{
-  "type": "https://kgfoundry.dev/problems/tool-timeout",
-  "title": "Tool execution timed out",
-  "status": 504,
-  "detail": "Command 'git' timed out after 10.0 seconds",
-  "instance": "urn:tool:git:timeout",
-  "command": ["git", "rev-parse", "--short", "HEAD"],
-  "timeout": 10.0
-}

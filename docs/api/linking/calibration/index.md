@@ -1,3 +1,0 @@
-# `linking.calibration`
-
-::: linking.calibration

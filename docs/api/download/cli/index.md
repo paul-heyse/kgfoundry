@@ -1,3 +1,0 @@
-# `download.cli`
-
-::: download.cli
