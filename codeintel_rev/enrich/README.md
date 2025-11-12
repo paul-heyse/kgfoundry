@@ -32,6 +32,33 @@ Outputs (defaults under `codeintel_rev/io/ENRICHED/`):
 - `graphs/symbol_graph.json` – symbol ↔ file edge list (from SCIP, de‑duplicated)
 - `tags/tags_index.yaml` – per‑module tags, plus global tag catalog
 - `../io/CST/` – repo‑wide LibCST dataset built via `codeintel-cst` (see `docs/cst_data.md`)
+- `ast/ast_nodes.parquet` – Python AST nodes w/ qualnames, decorators, bases, docstrings
+- `ast/ast_metrics.parquet` – per-file counts (functions/classes/imports), branch metrics, cyclomatic/cognitive complexity
+
+## Data artifacts
+
+The AST layer adds two Parquet tables that slot directly into DuckDB/Polars/Pandas workflows:
+
+| Table | Purpose | Key columns |
+| ----- | ------- | ----------- |
+| `ast/ast_nodes.parquet` | Function/class/module inventory with qualnames and locations | `path`, `module`, `qualname`, `node_type`, `parent_qualname`, `decorators`, `bases`, `docstring`, `is_public` |
+| `ast/ast_metrics.parquet` | File-level metrics derived from the Python `ast` module | `path`, `func_count`, `class_count`, `assign_count`, `import_count`, `branch_nodes`, `cyclomatic`, `cognitive`, `max_nesting`, `statements` |
+
+Execute `python tools/run_duckdb_demo.py` to load the default script (`tools/demo_duckdb_ast.sql`) and print representative query results. The SQL file shows how to join AST data with `modules.jsonl` (LibCST) and the SCIP symbol graph. Example query:
+
+```sql
+WITH exports AS (
+  SELECT path, UNNEST(exports) AS exported
+  FROM read_json_auto('codeintel_rev/io/ENRICHED/modules/modules.jsonl')
+  WHERE array_length(exports) > 0
+)
+SELECT n.path, n.qualname, n.name, n.node_type
+FROM read_parquet('codeintel_rev/io/ENRICHED/ast/ast_nodes.parquet') n
+JOIN exports e ON e.path = n.path AND (n.name = e.exported OR n.qualname LIKE e.exported || '%')
+ORDER BY n.path, n.qualname;
+```
+
+This surfaces AST definitions that are exported via `__all__`, which makes it easy to reconcile LibCST-derived exports with the AST inventory you just captured.
 
 ## Operational notes
 

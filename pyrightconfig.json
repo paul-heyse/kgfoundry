@@ -1,5 +1,5 @@
 {
-  "typeCheckingMode": "standard",
+  "typeCheckingMode": "basic",
   "pythonVersion": "3.13",
   "pythonPlatform": "Linux",
   "venvPath": ".",

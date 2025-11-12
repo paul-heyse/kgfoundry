@@ -37,7 +37,8 @@ class OverlayResult:
     exports_resolved: Mapping[str, set[str]]
 
 
-def generate_overlay_for_file(  # lint-ignore[PLR0913]: overlay policy requires multiple explicit parameters
+# lint-ignore: PLR0913 overlay policy requires multiple explicit parameters
+def generate_overlay_for_file(  # noqa: PLR0913
     py_file: Path,
     package_root: Path,
     *,
@@ -367,7 +368,8 @@ def _extract_simple_name(symbol: str) -> str | None:
     return None
 
 
-def _build_overlay_text(  # lint-ignore[PLR0913]: builder needs structured arguments for readability
+# lint-ignore: PLR0913 builder needs structured arguments for readability
+def _build_overlay_text(  # noqa: PLR0913
     *,
     module_name: str,
     module: ModuleIndex,

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import ast
+import logging
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -19,6 +21,15 @@ import typer
 
 from codeintel_rev.config_indexer import index_config_files
 from codeintel_rev.coverage_ingest import collect_coverage
+from codeintel_rev.enrich.ast_indexer import (
+    AstMetricsRow,
+    AstNodeRow,
+    collect_ast_nodes_from_tree,
+    compute_ast_metrics,
+    empty_metrics_row,
+    stable_module_path,
+    write_ast_parquet,
+)
 from codeintel_rev.enrich.libcst_bridge import index_module
 from codeintel_rev.enrich.output_writers import write_json, write_jsonl, write_markdown_module
 from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
@@ -40,6 +51,9 @@ try:  # pragma: no cover - optional dependency
     import yaml as yaml_module
 except ImportError:  # pragma: no cover - optional dependency
     yaml_module = None
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class _YamlDumpFn(Protocol):
@@ -85,6 +99,7 @@ DEFAULT_DRY_RUN = False
 DEFAULT_ACTIVATE = True
 DEFAULT_DEACTIVATE = False
 DEFAULT_USE_TYPE_ERROR_OVERLAYS = False
+DEFAULT_EMIT_AST = True
 
 STUBS = typer.Option(
     Path("stubs"),
@@ -185,7 +200,8 @@ def _iter_files(root: Path, patterns: tuple[str, ...] | None = None) -> Iterable
         yield candidate
 
 
-def _run_pipeline(  # lint-ignore[PLR0913,PLR0914]: pipeline orchestration requires many parameters
+# lint-ignore: PLR0913,PLR0914 pipeline orchestration requires many parameters
+def _run_pipeline(  # noqa: PLR0913, PLR0914
     *,
     root: Path,
     scip: Path,
@@ -257,7 +273,8 @@ def _run_pipeline(  # lint-ignore[PLR0913,PLR0914]: pipeline orchestration requi
 
 
 @app.command("all")
-def run_all(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
+# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
+def run_all(  # noqa: PLR0913, PLR0917
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -265,6 +282,13 @@ def run_all(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     tags_yaml: Path | None = TAGS,
     coverage_xml: Path = COVERAGE_XML,
     only: OnlyPatternsOption = None,
+    emit_ast: Annotated[
+        bool,
+        typer.Option(
+            "--emit-ast/--no-emit-ast",
+            help="Emit Parquet datasets with AST nodes and metrics.",
+        ),
+    ] = DEFAULT_EMIT_AST,
 ) -> None:
     """Run the full enrichment pipeline and emit all artifacts."""
     out.mkdir(parents=True, exist_ok=True)
@@ -284,11 +308,13 @@ def run_all(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     _write_coverage_output(result, out)
     _write_config_output(result, out)
     _write_hotspot_output(result, out)
+    _write_ast_outputs(result, out, emit_ast=emit_ast)
     typer.echo(f"[all] Completed enrichment for {len(result.module_rows)} modules.")
 
 
 @app.command("scan")
-def scan(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
+# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
+def scan(  # noqa: PLR0913, PLR0917
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -296,6 +322,13 @@ def scan(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     tags_yaml: Path | None = TAGS,
     coverage_xml: Path = COVERAGE_XML,
     only: OnlyPatternsOption = None,
+    emit_ast: Annotated[
+        bool,
+        typer.Option(
+            "--emit-ast/--no-emit-ast",
+            help="Emit Parquet datasets with AST nodes and metrics.",
+        ),
+    ] = DEFAULT_EMIT_AST,
 ) -> None:
     """Backward-compatible alias for ``all``."""
     typer.echo("[scan] Deprecated alias for `all`; running full pipeline.")
@@ -307,11 +340,13 @@ def scan(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
         tags_yaml=tags_yaml,
         coverage_xml=coverage_xml,
         only=only,
+        emit_ast=emit_ast,
     )
 
 
 @app.command("exports")
-def exports(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
+# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
+def exports(  # noqa: PLR0913, PLR0917
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -335,7 +370,8 @@ def exports(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
 
 
 @app.command("graph")
-def graph(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
+# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
+def graph(  # noqa: PLR0913, PLR0917
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -359,7 +395,8 @@ def graph(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
 
 
 @app.command("uses")
-def uses(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
+# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
+def uses(  # noqa: PLR0913, PLR0917
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -383,7 +420,8 @@ def uses(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
 
 
 @app.command("typedness")
-def typedness(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
+# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
+def typedness(  # noqa: PLR0913, PLR0917
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -407,7 +445,8 @@ def typedness(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple kno
 
 
 @app.command("doc")
-def doc(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
+# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
+def doc(  # noqa: PLR0913, PLR0917
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -431,7 +470,8 @@ def doc(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
 
 
 @app.command("coverage")
-def coverage(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
+# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
+def coverage(  # noqa: PLR0913, PLR0917
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -455,7 +495,8 @@ def coverage(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knob
 
 
 @app.command("config")
-def config(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
+# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
+def config(  # noqa: PLR0913, PLR0917
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -479,7 +520,8 @@ def config(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
 
 
 @app.command("hotspots")
-def hotspots(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
+# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
+def hotspots(  # noqa: PLR0913, PLR0917
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -503,7 +545,8 @@ def hotspots(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knob
 
 
 @app.command("overlays")
-def overlays(  # lint-ignore[PLR0913,PLR0914]: CLI surface intentionally exposes many knobs
+# lint-ignore: PLR0913,PLR0914 CLI surface intentionally exposes many knobs
+def overlays(  # noqa: PLR0913, PLR0914
     root: Path = ROOT,
     scip: Path = SCIP,
     pyrefly_json: Path | None = PYREFLY,
@@ -940,6 +983,22 @@ def _write_hotspot_output(result: PipelineResult, out: Path) -> None:
     _write_tabular_records(out / "analytics" / "hotspots.parquet", result.hotspot_rows)
 
 
+def _write_ast_outputs(result: PipelineResult, out: Path, *, emit_ast: bool) -> None:
+    if not emit_ast:
+        return
+    files: list[Path] = []
+    for row in result.module_rows:
+        path = row.get("path")
+        if not isinstance(path, str):
+            continue
+        candidate = result.root / path
+        if candidate.is_file():
+            files.append(candidate)
+    nodes, metrics = _collect_ast_artifacts(result.root, files)
+    write_ast_parquet(nodes, metrics, out_dir=out / "ast")
+    typer.echo(f"[ast] Wrote AST nodes ({len(nodes)}) and metrics ({len(metrics)}) tables.")
+
+
 def _write_modules_json(out: Path, module_rows: list[dict[str, Any]]) -> None:
     write_jsonl(out / "modules" / "modules.jsonl", module_rows)
 
@@ -982,6 +1041,29 @@ def _write_tabular_records(parquet_path: Path, rows: list[dict[str, Any]]) -> No
     if pl is not None and rows:
         pl.DataFrame(rows).write_parquet(parquet_path)
     write_jsonl(parquet_path.with_suffix(".jsonl"), rows)
+
+
+def _collect_ast_artifacts(
+    root: Path, files: Iterable[Path]
+) -> tuple[list[AstNodeRow], list[AstMetricsRow]]:
+    node_rows: list[AstNodeRow] = []
+    metric_rows: list[AstMetricsRow] = []
+    for fp in files:
+        rel = _normalized_rel_path(fp, root)
+        try:
+            code = fp.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            LOGGER.exception("Failed to read %s for AST emission", rel)
+            continue
+        try:
+            tree = ast.parse(code, filename=rel, type_comments=True)
+        except SyntaxError:
+            LOGGER.exception("Failed to parse %s for AST emission", rel)
+            metric_rows.append(empty_metrics_row(rel))
+            continue
+        node_rows.extend(collect_ast_nodes_from_tree(rel, tree))
+        metric_rows.append(compute_ast_metrics(rel, tree))
+    return node_rows, metric_rows
 
 
 def _normalize_type_signal_map(
@@ -1101,7 +1183,8 @@ def _should_mark_overlay(row: Mapping[str, Any]) -> bool:
     )
 
 
-def _ensure_package_overlays(  # lint-ignore[PLR0913]: helper wires overlay paths atomically
+# lint-ignore: PLR0913 helper wires overlay paths atomically
+def _ensure_package_overlays(  # noqa: PLR0913
     *,
     rel_path: Path,
     generated: list[str],
@@ -1186,7 +1269,7 @@ def _ensure_package_overlays(  # lint-ignore[PLR0913]: helper wires overlay path
 
 
 def _normalized_rel_path(path: Path, root: Path) -> str:
-    return str(path.relative_to(root)).replace("\\", "/")
+    return stable_module_path(root, path)
 
 
 def _write_tag_index(out: Path, tag_index: Mapping[str, list[str]]) -> None:

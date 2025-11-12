@@ -119,7 +119,8 @@ class TorchTensor(Protocol):
     def __matmul__(self, other: TorchTensor) -> TorchTensor: ...
 
     @property
-    def T(self) -> TorchTensor: ...  # lint-ignore[N802]: matches torch.Tensor API
+    # lint-ignore: N802 matches torch.Tensor API
+    def T(self) -> TorchTensor: ...  # noqa: N802
 
     def sum(self) -> TorchTensor: ...
 
@@ -194,7 +195,8 @@ class FaissModule(Protocol):
         """Return the number of available GPUs."""
         ...
 
-    def normalize_L2(self, vectors: NDArrayF32) -> None:  # lint-ignore[N802]: FAISS API uses camelCase
+    # lint-ignore: N802 FAISS API uses camelCase
+    def normalize_L2(self, vectors: NDArrayF32) -> None:  # noqa: N802
         """Normalize vectors using L2 norm in-place."""
         ...
 
@@ -218,13 +220,15 @@ class NumpyRandomState(Protocol):
 class NumpyRandomNamespace(Protocol):
     """Namespace for numpy.random helpers."""
 
-    def RandomState(self, seed: int) -> NumpyRandomState: ...  # lint-ignore[N802]: mirrors numpy API
+    # lint-ignore: N802 mirrors numpy API
+    def RandomState(self, seed: int) -> NumpyRandomState: ...  # noqa: N802
 
 
 class NumpyLinalgNamespace(Protocol):
     """Namespace for numpy.linalg helpers."""
 
-    def norm(self, array: NDArrayF32, axis: int, keepdims: bool) -> NDArrayF32: ...  # lint-ignore[FBT001]: signature mirrors numpy
+    # lint-ignore: FBT001 signature mirrors numpy
+    def norm(self, array: NDArrayF32, axis: int, keepdims: bool) -> NDArrayF32: ...  # noqa: FBT001
 
 
 class NumpyModule(Protocol):
@@ -243,7 +247,8 @@ class PolarsDataFrame(Protocol):
 class PolarsModule(Protocol):
     """Minimal polars API used within optional export helpers."""
 
-    def DataFrame(self, data: Sequence[Mapping[str, object]]) -> PolarsDataFrame:  # lint-ignore[N802]: preserves polars constructor name
+    # lint-ignore: N802 preserves polars constructor name
+    def DataFrame(self, data: Sequence[Mapping[str, object]]) -> PolarsDataFrame:  # noqa: N802
         """Create a DataFrame from a sequence of mappings.
 
         Parameters

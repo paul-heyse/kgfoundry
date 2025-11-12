@@ -216,10 +216,18 @@ def materialize_join_command(
 @app.command("tune")
 def tune_command(
     index: IndexOption = None,
-    nprobe: Annotated[int | None, typer.Option("--nprobe")] = None,
-    ef_search: Annotated[int | None, typer.Option("--ef-search")] = None,
-    quantizer_ef_search: Annotated[int | None, typer.Option("--quantizer-ef-search")] = None,
-    k_factor: Annotated[float | None, typer.Option("--k-factor")] = None,
+    nprobe: int | None = typer.Option(None, "--nprobe", help="Override FAISS nprobe."),
+    ef_search: int | None = typer.Option(None, "--ef-search", help="Override HNSW efSearch."),
+    quantizer_ef_search: int | None = typer.Option(
+        None,
+        "--quantizer-ef-search",
+        help="Override quantizer efSearch when available.",
+    ),
+    k_factor: float | None = typer.Option(
+        None,
+        "--k-factor",
+        help="Candidate expansion factor for runtime refine.",
+    ),
 ) -> None:
     """Apply runtime tuning overrides (nprobe/efSearch/k-factor) and persist audit JSON."""
     manager = _faiss_manager(index)
@@ -238,11 +246,13 @@ def tune_command(
 @app.command("eval-hybrid")
 def eval_hybrid_command(
     *,
-    k: Annotated[int, typer.Option("--k", min=1, help="Top-K for recall computation.")] = 10,
-    k_factor: Annotated[
-        float,
-        typer.Option("--k-factor", min=1.0, help="Candidate expansion factor for ANN search."),
-    ] = 2.0,
+    k: int = typer.Option(10, "--k", min=1, help="Top-K for recall computation."),
+    k_factor: float = typer.Option(
+        2.0,
+        "--k-factor",
+        min=1.0,
+        help="Candidate expansion factor for ANN search.",
+    ),
     index: IndexOption = None,
     duckdb: DuckOption = None,
     out: OutOption = None,

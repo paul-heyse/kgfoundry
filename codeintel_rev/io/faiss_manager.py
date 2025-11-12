@@ -229,7 +229,8 @@ class _FAISSIdMapMixin:
             If the ID map interface is invalid.
         """
         manager = cast("FAISSManager", self)
-        cpu_index = manager.require_cpu_index()
+        # lint-ignore: SLF001 mixin intentionally reuses FAISSManager internals
+        cpu_index = manager._require_cpu_index()  # noqa: SLF001
         id_map_obj = getattr(cpu_index, "id_map", None)
         if id_map_obj is None:
             msg = (
@@ -320,7 +321,8 @@ class _FAISSIdMapMixin:
         manager = cast("FAISSManager", self)
         if not ids:
             return np.empty((0, manager.vec_dim), dtype=np.float32)
-        cpu_index = manager.require_cpu_index()
+        # lint-ignore: SLF001 mixin intentionally reuses FAISSManager internals
+        cpu_index = manager._require_cpu_index()  # noqa: SLF001
         _configure_direct_map(cpu_index)
         vectors = np.empty((len(ids), manager.vec_dim), dtype=np.float32)
         for pos, chunk_id in enumerate(ids):
@@ -610,7 +612,7 @@ class FAISSManager(_FAISSIdMapMixin):
             If the index has not been built yet. Call build_index() first.
         """
         try:
-            cpu_index = self.require_cpu_index()
+            cpu_index = self._require_cpu_index()
         except RuntimeError as exc:
             msg = "Cannot add vectors: FAISS index has not been built or loaded."
             raise RuntimeError(msg) from exc
@@ -704,7 +706,7 @@ class FAISSManager(_FAISSIdMapMixin):
 
     def _build_primary_contains(self) -> Callable[[int], bool]:
         try:
-            cpu_index = self.require_cpu_index()
+            cpu_index = self._require_cpu_index()
         except RuntimeError:
             return lambda _id: False
 
@@ -906,7 +908,7 @@ class FAISSManager(_FAISSIdMapMixin):
             If the index has not been built yet. Call build_index() first.
         """
         try:
-            cpu_index = self.require_cpu_index()
+            cpu_index = self._require_cpu_index()
         except RuntimeError as exc:
             msg = "Cannot save index: FAISS index has not been built or loaded."
             raise RuntimeError(msg) from exc
@@ -1057,7 +1059,7 @@ class FAISSManager(_FAISSIdMapMixin):
             return False
 
         try:
-            cpu_index = self.require_cpu_index()
+            cpu_index = self._require_cpu_index()
         except RuntimeError as exc:
             msg = "Cannot clone index to GPU before building or loading it."
             raise RuntimeError(msg) from exc
@@ -1290,7 +1292,7 @@ class FAISSManager(_FAISSIdMapMixin):
         search parameters including k_factor expansion. Time complexity: O(n_queries * vec_dim)
         for normalization plus O(1) for parameter resolution.
         """
-        self.require_cpu_index()
+        self._require_cpu_index()
         normalized = self._ensure_2d(query).copy().astype(np.float32)
         faiss.normalize_L2(normalized)
         k_eff = max(1, int(k or self.default_k))
@@ -1575,7 +1577,7 @@ class FAISSManager(_FAISSIdMapMixin):
         _faiss.Index
             Downcast FAISS index representing the current primary structure.
         """
-        cpu_index = self.require_cpu_index()
+        cpu_index = self._require_cpu_index()
         base = getattr(cpu_index, "index", cpu_index)
         return self._downcast_index(base)
 
@@ -1692,7 +1694,7 @@ class FAISSManager(_FAISSIdMapMixin):
             return
 
         try:
-            cpu_index = self.require_cpu_index()
+            cpu_index = self._require_cpu_index()
         except RuntimeError as exc:
             msg = "Cannot merge indexes: primary index not available."
             raise RuntimeError(msg) from exc
@@ -1830,10 +1832,6 @@ class FAISSManager(_FAISSIdMapMixin):
         except OSError as exc:  # pragma: no cover - shared object load failures
             msg = "Failed to load cuVS shared libraries"
             raise RuntimeError(msg) from exc
-
-    def require_cpu_index(self) -> _faiss.Index:
-        """Return the CPU index, raising when unavailable."""
-        return self._require_cpu_index()
 
     def _require_cpu_index(self) -> _faiss.Index:
         """Return the CPU index if initialized.

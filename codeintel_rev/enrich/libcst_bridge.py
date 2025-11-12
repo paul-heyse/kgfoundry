@@ -309,7 +309,8 @@ class _IndexVisitor(cst.CSTVisitor):
         }
         self._untyped_defs = 0
 
-    def on_visit(self, node: cst.CSTNode) -> bool:  # lint-ignore[C901,PLR0912]: visitor must handle many node shapes
+    # lint-ignore: C901,PLR0912 visitor must handle many node shapes
+    def on_visit(self, node: cst.CSTNode) -> bool:  # noqa: C901, PLR0912
         branch_nodes: tuple[type[cst.CSTNode], ...] = (
             cst.If,
             cst.For,
@@ -409,7 +410,8 @@ class _IndexVisitor(cst.CSTVisitor):
             ImportEntry(module=None, names=names, aliases=aliases, is_star=False, level=0)
         )
 
-    def _handle_import_from(self, node: cst.ImportFrom) -> None:  # lint-ignore[C901]: parsing import variants requires branching
+    # lint-ignore: C901 parsing import variants requires branching
+    def _handle_import_from(self, node: cst.ImportFrom) -> None:  # noqa: C901
         is_star = isinstance(node.names, cst.ImportStar)
         names: list[str] = []
         aliases: dict[str, str] = {}
