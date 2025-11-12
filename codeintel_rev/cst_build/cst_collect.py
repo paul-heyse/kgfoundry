@@ -9,11 +9,12 @@ from dataclasses import dataclass
 from hashlib import blake2s
 from pathlib import Path
 from textwrap import shorten
-from typing import ClassVar, final
+from typing import Any, ClassVar, cast, final
 
 import libcst as cst
 from libcst import metadata as cst_metadata
 from libcst.metadata import FullRepoManager
+from libcst.metadata.base_provider import BaseMetadataProvider
 from libcst.metadata.scope_provider import (
     ClassScope,
     ComprehensionScope,
@@ -31,6 +32,7 @@ from codeintel_rev.cst_build.cst_schema import (
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass(slots=True, frozen=True)
 class CollectorConfig:
     """Configurable knobs for CST extraction."""
@@ -45,7 +47,7 @@ class CollectorConfig:
 class CSTCollector:
     """Collect LibCST node records for a repository."""
 
-    _PROVIDERS: ClassVar[tuple[type[object], ...]] = (
+    _PROVIDERS: ClassVar[tuple[type[BaseMetadataProvider], ...]] = (
         cst_metadata.ParentNodeProvider,
         cst_metadata.PositionProvider,
         cst_metadata.ScopeProvider,
@@ -62,7 +64,7 @@ class CSTCollector:
     ) -> None:
         self._root = root.resolve()
         self._config = config or CollectorConfig()
-        self._manager = None
+        self._manager: FullRepoManager | None = None
         if use_full_repo_manager:
             self._manager = self._build_repo_manager(files)
 
@@ -134,7 +136,9 @@ class CSTCollector:
             try:
                 return self._manager.get_metadata_wrapper_for_path(rel_path)
             except KeyError:
-                logger.debug("FullRepoManager missing %s; falling back to per-file parsing", rel_path)
+                logger.debug(
+                    "FullRepoManager missing %s; falling back to per-file parsing", rel_path
+                )
         try:
             module = cst.parse_module(code)
             return cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
@@ -166,7 +170,7 @@ class CSTCollector:
         module = wrapper.module
         module_doc = _extract_module_doc(module, self._config.max_doc_chars)
         module_name = _module_name_from_path(rel_path)
-        stack = [module]
+        stack: list[cst.CSTNode] = [module]
         while stack:
             node = stack.pop()
             stack.extend(reversed(list(node.children)))
@@ -211,7 +215,6 @@ class CSTCollector:
         except ValueError:
             rel = path.resolve()
         return rel.as_posix()
-
 
 
 def index_file(path: Path) -> list[NodeRecord]:
@@ -261,10 +264,8 @@ def _should_emit(node: cst.CSTNode) -> bool:
     return isinstance(node, interesting)
 
 
-def _resolve_span(
-    position_map: Mapping[cst.CSTNode, cst_metadata.Position], node: cst.CSTNode
-) -> Span:
-    position = _resolve_lazy(position_map[node])
+def _resolve_span(position_map: Mapping[cst.CSTNode, object], node: cst.CSTNode) -> Span:
+    position = cast("Any", position_map[node])
     return Span(
         start_line=position.start.line,
         start_col=position.start.column,
@@ -334,7 +335,7 @@ def _import_alias_name(node: cst.CSTNode) -> str | None:
 
 def _parent_chain(
     node: cst.CSTNode,
-    parent_map: dict[cst.CSTNode, cst.CSTNode],
+    parent_map: Mapping[cst.CSTNode, cst.CSTNode],
     depth: int,
 ) -> list[str]:
     chain: list[str] = []
@@ -413,12 +414,13 @@ def _preview_text(code: str, span: Span, max_chars: int, *, skip: bool) -> str |
 
 def _decorators(module: cst.Module, node: cst.CSTNode) -> list[str] | None:
     decorators: list[str] = []
-    decorator_nodes: list[cst.Decorator] = []
+    decorator_nodes: Sequence[cst.Decorator] = ()
     if isinstance(node, (cst.FunctionDef, cst.ClassDef)):
         decorator_nodes = node.decorators
-    if not decorator_nodes:
+    nodes_seq = list(decorator_nodes)
+    if not nodes_seq:
         return None
-    for deco in decorator_nodes:
+    for deco in nodes_seq:
         try:
             decorators.append(module.code_for_node(deco.decorator))
         except ValueError:
@@ -530,10 +532,10 @@ def _is_public(node: cst.CSTNode, parents: list[str]) -> bool | None:
 
 
 def _resolve_lazy(value: object) -> object:
-    if value.__class__.__name__ == "LazyValue":  # pragma: no cover - lib internals
+    if callable(value):
         try:
             return value()
-        except (TypeError, AttributeError):
+        except (TypeError, AttributeError):  # pragma: no cover - defensive
             return value
     return value
 
@@ -546,9 +548,14 @@ def _qualified_name_entries(
     except KeyError:
         return []
     entries: list[tuple[str, str]] = []
+    if not isinstance(qnames, Iterable):
+        return entries
     for qname in qnames:
-        source = getattr(qname.source, "name", str(qname.source))
-        entries.append((qname.name, source))
+        name = getattr(qname, "name", None)
+        source_attr = getattr(qname, "source", None)
+        if name is None or source_attr is None:
+            continue
+        entries.append((name, getattr(source_attr, "name", str(source_attr))))
     return entries
 
 

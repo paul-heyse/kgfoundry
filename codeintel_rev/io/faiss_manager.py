@@ -45,8 +45,17 @@ from kgfoundry_common.logging import get_logger
 if TYPE_CHECKING:
     import faiss as _faiss
     import numpy as np
+
+    from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 else:
     np = cast("Any", LazyModule("numpy", "FAISS manager vector operations"))
+
+try:  # optional heavy dependency
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+except ModuleNotFoundError:  # pragma: no cover - optional runtime extra
+    pa = None
+    pq = None
 
 LOGGER = get_logger(__name__)
 logger = LOGGER  # Alias for compatibility
@@ -201,7 +210,129 @@ class _SearchPlan:
     timeline: Timeline | None
 
 
-class FAISSManager:
+class _FAISSIdMapMixin:
+    """Mixin providing ID map export helpers."""
+
+    def get_idmap_array(self) -> NDArrayI64:
+        """Return the mapping from FAISS row IDs to external chunk IDs.
+
+        Returns
+        -------
+        NDArrayI64
+            Array where ``array[row]`` equals the external chunk ID.
+
+        Raises
+        ------
+        RuntimeError
+            If the primary index is not wrapped with IndexIDMap2.
+        TypeError
+            If the ID map interface is invalid.
+        """
+        manager = cast("FAISSManager", self)
+        cpu_index = manager.require_cpu_index()
+        id_map_obj = getattr(cpu_index, "id_map", None)
+        if id_map_obj is None:
+            msg = (
+                "Primary index is not wrapped with IndexIDMap2; chunk hydration "
+                "requires faiss.IndexIDMap2"
+            )
+            raise RuntimeError(msg)
+        vector_to_array = getattr(faiss, "vector_to_array", None)
+        if callable(vector_to_array):
+            array = vector_to_array(id_map_obj)
+            return np.asarray(array, dtype=np.int64)
+        ntotal = cpu_index.ntotal
+        ids = np.empty(ntotal, dtype=np.int64)
+        at_callable = getattr(id_map_obj, "at", None)
+        if not callable(at_callable):
+            msg = "FAISS id_map does not expose vector_to_array() or at() helpers."
+            raise TypeError(msg)
+        id_accessor = cast("Callable[[int], int]", at_callable)
+        for row in range(ntotal):
+            ids[row] = int(id_accessor(row))
+        return ids
+
+    def export_idmap(self, out_path: Path) -> int:
+        """Persist ``{faiss_row -> external_id}`` to Parquet and return row count.
+
+        Parameters
+        ----------
+        out_path : Path
+            Destination path for the Parquet sidecar.
+
+        Returns
+        -------
+        int
+            Number of ID rows exported.
+
+        Raises
+        ------
+        RuntimeError
+            If pyarrow is not available at runtime.
+        """
+        if pa is None or pq is None:  # pragma: no cover - optional dependency
+            msg = "pyarrow is required to export ID maps"
+            raise RuntimeError(msg)
+        idmap = self.get_idmap_array()
+        rows = np.arange(idmap.shape[0], dtype=np.int64)
+        table = pa.Table.from_arrays(
+            [pa.array(rows), pa.array(idmap)],
+            names=["faiss_row", "external_id"],
+        )
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        pq.write_table(table, out_path, compression="zstd", use_dictionary=True)
+        LOGGER.info(
+            "Exported FAISS ID map",
+            extra=_log_extra(path=str(out_path), rows=int(idmap.shape[0])),
+        )
+        return int(idmap.shape[0])
+
+    def hydrate_by_ids(self, catalog: DuckDBCatalog, ids: Sequence[int]) -> list[dict]:
+        """Hydrate chunk metadata for ``ids`` via the provided DuckDB catalog.
+
+        Returns
+        -------
+        list[dict]
+            Hydrated chunk rows from DuckDB.
+        """
+        if not ids:
+            return []
+        manager = cast("FAISSManager", self)
+        LOGGER.debug(
+            "Hydrating chunk metadata",
+            extra=_log_extra(count=len(ids), index=str(manager.index_path)),
+        )
+        return catalog.query_by_ids(list(ids))
+
+    def reconstruct_batch(self, ids: Sequence[int]) -> NDArrayF32:
+        """Reconstruct vectors for a batch of external chunk IDs.
+
+        Returns
+        -------
+        NDArrayF32
+            Array of reconstructed vectors with shape ``(len(ids), vec_dim)``.
+
+        Raises
+        ------
+        RuntimeError
+            If the index does not support vector reconstruction.
+        """
+        manager = cast("FAISSManager", self)
+        if not ids:
+            return np.empty((0, manager.vec_dim), dtype=np.float32)
+        cpu_index = manager.require_cpu_index()
+        _configure_direct_map(cpu_index)
+        vectors = np.empty((len(ids), manager.vec_dim), dtype=np.float32)
+        for pos, chunk_id in enumerate(ids):
+            try:
+                vectors[pos] = cpu_index.reconstruct(int(chunk_id))
+            except (AttributeError, RuntimeError) as exc:
+                msg = f"Unable to reconstruct FAISS vector for chunk_id {chunk_id}"
+                raise RuntimeError(msg) from exc
+        return vectors
+
+
+class FAISSManager(_FAISSIdMapMixin):
     """FAISS index manager with adaptive indexing, GPU support, and incremental updates.
 
     Uses a dual-index architecture for fast incremental updates.
@@ -479,7 +610,7 @@ class FAISSManager:
             If the index has not been built yet. Call build_index() first.
         """
         try:
-            cpu_index = self._require_cpu_index()
+            cpu_index = self.require_cpu_index()
         except RuntimeError as exc:
             msg = "Cannot add vectors: FAISS index has not been built or loaded."
             raise RuntimeError(msg) from exc
@@ -573,7 +704,7 @@ class FAISSManager:
 
     def _build_primary_contains(self) -> Callable[[int], bool]:
         try:
-            cpu_index = self._require_cpu_index()
+            cpu_index = self.require_cpu_index()
         except RuntimeError:
             return lambda _id: False
 
@@ -775,7 +906,7 @@ class FAISSManager:
             If the index has not been built yet. Call build_index() first.
         """
         try:
-            cpu_index = self._require_cpu_index()
+            cpu_index = self.require_cpu_index()
         except RuntimeError as exc:
             msg = "Cannot save index: FAISS index has not been built or loaded."
             raise RuntimeError(msg) from exc
@@ -804,6 +935,8 @@ class FAISSManager:
             raise FileNotFoundError(msg)
 
         cpu_index = faiss.read_index(str(self.index_path))
+        if not isinstance(cpu_index, faiss.IndexIDMap2):
+            cpu_index = faiss.IndexIDMap2(cpu_index)
         _configure_direct_map(cpu_index)
         self.cpu_index = cpu_index
         FAISS_INDEX_SIZE_VECTORS.set(cpu_index.ntotal)
@@ -924,7 +1057,7 @@ class FAISSManager:
             return False
 
         try:
-            cpu_index = self._require_cpu_index()
+            cpu_index = self.require_cpu_index()
         except RuntimeError as exc:
             msg = "Cannot clone index to GPU before building or loading it."
             raise RuntimeError(msg) from exc
@@ -1157,7 +1290,7 @@ class FAISSManager:
         search parameters including k_factor expansion. Time complexity: O(n_queries * vec_dim)
         for normalization plus O(1) for parameter resolution.
         """
-        self._require_cpu_index()
+        self.require_cpu_index()
         normalized = self._ensure_2d(query).copy().astype(np.float32)
         faiss.normalize_L2(normalized)
         k_eff = max(1, int(k or self.default_k))
@@ -1442,7 +1575,7 @@ class FAISSManager:
         _faiss.Index
             Downcast FAISS index representing the current primary structure.
         """
-        cpu_index = self._require_cpu_index()
+        cpu_index = self.require_cpu_index()
         base = getattr(cpu_index, "index", cpu_index)
         return self._downcast_index(base)
 
@@ -1559,7 +1692,7 @@ class FAISSManager:
             return
 
         try:
-            cpu_index = self._require_cpu_index()
+            cpu_index = self.require_cpu_index()
         except RuntimeError as exc:
             msg = "Cannot merge indexes: primary index not available."
             raise RuntimeError(msg) from exc
@@ -1697,6 +1830,10 @@ class FAISSManager:
         except OSError as exc:  # pragma: no cover - shared object load failures
             msg = "Failed to load cuVS shared libraries"
             raise RuntimeError(msg) from exc
+
+    def require_cpu_index(self) -> _faiss.Index:
+        """Return the CPU index, raising when unavailable."""
+        return self._require_cpu_index()
 
     def _require_cpu_index(self) -> _faiss.Index:
         """Return the CPU index if initialized.

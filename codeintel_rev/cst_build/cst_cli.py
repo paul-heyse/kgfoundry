@@ -1,15 +1,14 @@
 # SPDX-License-Identifier: MIT
-"""Typer CLI for building CST datasets."""
+"""CLI entrypoint for CST dataset builds."""
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Sequence
 from dataclasses import dataclass
 from fnmatch import fnmatch
 from pathlib import Path
 
 import click
-import typer
 
 from codeintel_rev.cst_build.cst_collect import CSTCollector
 from codeintel_rev.cst_build.cst_resolve import (
@@ -21,24 +20,14 @@ from codeintel_rev.cst_build.cst_resolve import (
 from codeintel_rev.cst_build.cst_schema import CollectorStats
 from codeintel_rev.cst_build.cst_serialize import DatasetWriter, write_index, write_join_examples
 
-app = typer.Typer(add_completion=False, help="Build LibCST-backed datasets and stitching audits.")
-
-ROOT_DEFAULT = Path("codeintel_rev")
-SCIP_DEFAULT = Path("codeintel_rev/index.scip.json")
-MODULES_DEFAULT = Path("build/enrich/modules/modules.jsonl")
-OUT_DEFAULT = Path("io/CST")
-
-_DIR_PATH = click.Path(path_type=Path, dir_okay=True, file_okay=False)
-_FILE_PATH = click.Path(path_type=Path, dir_okay=False, file_okay=True, writable=False)
-
 
 @dataclass(slots=True, frozen=True)
 class CLIOptions:
-    """Materialized CLI arguments after Click parsing."""
+    """Normalized command-line options."""
 
     root: Path
-    scip: Path | None
-    modules: Path | None
+    scip: Path
+    modules: Path
     out: Path
     include: tuple[str, ...]
     exclude: tuple[str, ...]
@@ -47,180 +36,140 @@ class CLIOptions:
     debug_joins: bool
 
 
-def _store_option(ctx: click.Context, param: click.Parameter, value: object) -> object:
-    """Store option value in Click context for later retrieval.
+ROOT_DEFAULT = Path("codeintel_rev")
+SCIP_DEFAULT = Path("codeintel_rev/index.scip.json")
+MODULES_DEFAULT = Path("build/enrich/modules/modules.jsonl")
+OUT_DEFAULT = Path("io/CST")
 
-    Callback function used by Click decorators to store parsed option values
-    in the context object dictionary.
+
+def _build_options(ctx: click.Context) -> CLIOptions:
+    """Extract and normalize CLI options from Click context.
 
     Parameters
     ----------
     ctx : click.Context
-        Click context object containing the option storage dictionary.
-    param : click.Parameter
-        Click parameter object containing the option name.
-    value : Any
-        Parsed option value to store.
-
-    Returns
-    -------
-    Any
-        The value passed in, returned unchanged.
-    """
-    ctx.ensure_object(dict)[param.name] = value
-    return value
-
-
-def _options_from_context(ctx: typer.Context) -> CLIOptions:
-    """Extract CLI options from Typer context and construct CLIOptions.
-
-    Parameters
-    ----------
-    ctx : typer.Context
-        Typer context object containing stored option values.
+        Click context object containing parsed command-line parameters.
 
     Returns
     -------
     CLIOptions
-        Materialized CLI options dataclass with resolved paths and defaults.
+        Normalized dataclass instance containing all CLI options with resolved paths.
     """
-    raw = ctx.ensure_object(dict)
+    params = ctx.params
     return CLIOptions(
-        root=Path(raw.get("root", ROOT_DEFAULT)).resolve(),
-        scip=raw.get("scip"),
-        modules=raw.get("modules"),
-        out=Path(raw.get("out", OUT_DEFAULT)),
-        include=tuple(raw.get("include") or ()),
-        exclude=tuple(raw.get("exclude") or ()),
-        limit=raw.get("limit"),
-        fail_on_parse_error=bool(raw.get("fail_on_parse_error", False)),
-        debug_joins=bool(raw.get("debug_joins", False)),
+        root=Path(params["root"]).resolve(),
+        scip=Path(params["scip"]).resolve(),
+        modules=Path(params["modules"]).resolve(),
+        out=Path(params["out"]).resolve(),
+        include=tuple(params.get("include") or ()),
+        exclude=tuple(params.get("exclude") or ()),
+        limit=params.get("limit"),
+        fail_on_parse_error=bool(params.get("fail_on_parse_error")),
+        debug_joins=bool(params.get("debug_joins")),
     )
 
 
-@app.command()
+@click.command()
 @click.pass_context
 @click.option(
     "--root",
-    type=_DIR_PATH,
+    type=click.Path(file_okay=False, dir_okay=True, exists=True, path_type=Path),
     default=ROOT_DEFAULT,
     show_default=True,
-    expose_value=False,
-    callback=_store_option,
     help="Repo root to scan.",
 )
 @click.option(
     "--scip",
-    type=_FILE_PATH,
+    type=click.Path(file_okay=True, dir_okay=False, exists=True, path_type=Path),
     default=SCIP_DEFAULT,
     show_default=True,
-    expose_value=False,
-    callback=_store_option,
     help="Path to SCIP index JSON.",
 )
 @click.option(
     "--modules",
-    type=_FILE_PATH,
+    type=click.Path(file_okay=True, dir_okay=False, exists=True, path_type=Path),
     default=MODULES_DEFAULT,
     show_default=True,
-    expose_value=False,
-    callback=_store_option,
     help="Path to modules.jsonl produced by codeintel-enrich.",
 )
 @click.option(
     "--out",
-    type=_DIR_PATH,
+    type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
     default=OUT_DEFAULT,
     show_default=True,
-    expose_value=False,
-    callback=_store_option,
     help="Output directory for CST artifacts.",
 )
 @click.option(
     "--include",
     "include",
     multiple=True,
-    expose_value=False,
-    callback=_store_option,
+    show_default=False,
     help="Glob pattern(s) limiting files relative to --root (repeatable).",
 )
 @click.option(
     "--exclude",
     "exclude",
     multiple=True,
-    expose_value=False,
-    callback=_store_option,
+    show_default=False,
     help="Glob pattern(s) to skip files (repeatable).",
 )
 @click.option(
     "--limit",
     type=int,
-    expose_value=False,
-    callback=_store_option,
+    default=None,
+    show_default=False,
     help="Maximum number of files to process (debugging).",
 )
 @click.option(
     "--fail-on-parse-error/--no-fail-on-parse-error",
     default=False,
-    expose_value=False,
-    callback=_store_option,
+    show_default=True,
     help="Exit with non-zero status when LibCST parsing fails.",
 )
 @click.option(
     "--debug-joins/--no-debug-joins",
     default=False,
-    expose_value=False,
-    callback=_store_option,
+    show_default=True,
     help="Capture stitch candidate details for debugging.",
 )
-def main(ctx: typer.Context) -> None:
-    """Entry point invoked by Typer.
+def main(ctx: click.Context, **_: object) -> None:
+    """Entry point invoked by the console script.
+
+    Scans the repository root for Python files, collects CST nodes, stitches them
+    to module and SCIP symbols, and writes dataset artifacts to the output directory.
 
     Parameters
     ----------
-    ctx : typer.Context
-        Typer context object containing parsed CLI options.
-
-    Notes
-    -----
-    This function delegates to :func:`_run_pipeline`, which may raise
-    ``typer.Exit`` if no files match or parse errors occur with
-    ``--fail-on-parse-error`` enabled.
-    """
-    _run_pipeline(_options_from_context(ctx))
-
-
-def _run_pipeline(options: CLIOptions) -> None:
-    """Execute the CST collection and stitching pipeline.
-
-    Parameters
-    ----------
-    options : CLIOptions
-        Materialized CLI options containing root path, output directory,
-        filters, and processing flags.
+    ctx : click.Context
+        Click context object containing parsed command-line options.
+    **_
+        Additional keyword arguments (unused, required by Click decorator).
+        Type: object
 
     Raises
     ------
-    typer.Exit
-        Exit code 1 if no Python files match the provided filters, or if
-        parse errors occur and options.fail_on_parse_error is True.
+    click.exceptions.Exit
+        Exit code 1 when no files match or when parse errors occur while
+        ``--fail-on-parse-error`` is enabled.
     """
+    options = _build_options(ctx)
     files = list(_iter_py_files(options.root, options.include, options.exclude))
     if options.limit is not None:
         files = files[: options.limit]
     if not files:
-        typer.secho("No Python files matched the provided filters.", fg=typer.colors.YELLOW)
-        raise typer.Exit(code=1)
+        click.secho("No Python files matched the provided filters.", fg="yellow")
+        raise click.exceptions.Exit(1)
     module_lookup = load_modules(options.modules)
     if not module_lookup:
-        typer.secho(
+        click.secho(
             "Warning: modules.jsonl not found or empty; module stitching disabled.",
-            fg=typer.colors.YELLOW,
+            fg="yellow",
         )
     scip_resolver = load_scip_index(options.scip)
     if not scip_resolver:
-        typer.secho(
-            "Warning: SCIP index not found; SCIP stitching disabled.", fg=typer.colors.YELLOW
+        click.secho(
+            "Warning: SCIP index not found; SCIP stitching disabled.",
+            fg="yellow",
         )
     collector = CSTCollector(options.root, files)
     aggregate_stats = CollectorStats()
@@ -229,7 +178,7 @@ def _run_pipeline(options: CLIOptions) -> None:
     with DatasetWriter(options.out) as writer:
         for idx, file_path in enumerate(files, 1):
             rel_path = file_path.resolve().relative_to(options.root).as_posix()
-            typer.secho(f"[{idx}/{len(files)}] indexing {rel_path}", fg=typer.colors.BLUE)
+            click.secho(f"[{idx}/{len(files)}] indexing {rel_path}", fg="blue")
             writer.observe_file(rel_path)
             nodes, file_stats = collector.collect_file(file_path)
             aggregate_stats.merge(file_stats)
@@ -250,32 +199,52 @@ def _run_pipeline(options: CLIOptions) -> None:
         )
         samples = writer.samples
         write_join_examples(options.out, samples)
-        typer.secho(
+        click.secho(
             f"codeintel-cst complete: {writer.node_count} nodes across {aggregate_stats.files_indexed} files.",
-            fg=typer.colors.GREEN,
+            fg="green",
         )
         if samples:
-            typer.secho("Sample stitched joins:", fg=typer.colors.MAGENTA)
+            click.secho("Sample stitched joins:", fg="magenta")
             for sample in samples[:3]:
                 span = sample.span.to_dict()
                 symbol = sample.stitch.scip_symbol if sample.stitch else ""
-                typer.echo(
+                click.echo(
                     f"- {sample.path} [{span['start']}→{span['end']}] {sample.kind} "
                     f"{sample.name or ''} → {symbol}"
                 )
     if options.fail_on_parse_error and aggregate_stats.parse_errors:
-        typer.secho(
-            f"Encountered {aggregate_stats.parse_errors} parse errors. Failing per --fail-on-parse-error.",
-            fg=typer.colors.RED,
+        click.secho(
+            "Encountered parse errors. Failing per --fail-on-parse-error.",
+            fg="red",
         )
-        raise typer.Exit(code=1)
+        raise click.exceptions.Exit(1)
 
 
-def _iter_py_files(
-    root: Path, include: Iterable[str] | None, exclude: Iterable[str] | None
-) -> Iterable[Path]:
+def _iter_py_files(root: Path, include: Sequence[str], exclude: Sequence[str]) -> list[Path]:
+    """Discover Python files matching include/exclude glob patterns.
+
+    Recursively scans the root directory for .py files and filters them based on
+    include and exclude glob patterns. Patterns are matched against relative paths
+    from the root directory.
+
+    Parameters
+    ----------
+    root : Path
+        Root directory to scan for Python files.
+    include : Sequence[str]
+        Glob patterns that files must match to be included. Empty sequence means
+        all files are included (subject to exclude patterns).
+    exclude : Sequence[str]
+        Glob patterns that exclude files from the result set.
+
+    Returns
+    -------
+    list[Path]
+        Sorted list of absolute paths to Python files matching the filters.
+    """
     include_patterns = tuple(include or ())
     exclude_patterns = tuple(exclude or ())
+    files: list[Path] = []
     for candidate in sorted(root.rglob("*.py"), key=lambda item: item.as_posix()):
         rel_parts = candidate.resolve().relative_to(root).parts
         if any(part.startswith(".") for part in rel_parts):
@@ -285,8 +254,9 @@ def _iter_py_files(
             continue
         if exclude_patterns and any(fnmatch(rel, pattern) for pattern in exclude_patterns):
             continue
-        yield candidate
+        files.append(candidate)
+    return files
 
 
 if __name__ == "__main__":  # pragma: no cover
-    app()
+    main()

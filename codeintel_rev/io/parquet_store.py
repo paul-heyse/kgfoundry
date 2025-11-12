@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, cast
 
 import pyarrow as pa
 import pyarrow.parquet as pq
+import xxhash
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.typing import NDArrayF32
@@ -50,6 +51,8 @@ def get_chunks_schema(vec_dim: int) -> pa.Schema:
             pa.field("preview", pa.string()),
             pa.field("content", pa.string()),
             pa.field("lang", pa.string()),
+            pa.field("content_hash", pa.string()),
+            pa.field("symbols", pa.list_(pa.string())),
             pa.field("embedding", pa.list_(pa.float32(), vec_dim)),
         ]
     )
@@ -97,17 +100,6 @@ def write_chunks_parquet(
         msg = f"Chunks ({len(chunks)}) and embeddings ({len(embeddings)}) length mismatch"
         raise ValueError(msg)
 
-    # Prepare data
-    ids = list(range(options.start_id, options.start_id + len(chunks)))
-    uris = [c.uri for c in chunks]
-    start_lines = [c.start_line for c in chunks]
-    end_lines = [c.end_line for c in chunks]
-    start_bytes = [c.start_byte for c in chunks]
-    end_bytes = [c.end_byte for c in chunks]
-    previews = [c.text[: options.preview_max_chars] for c in chunks]
-    contents = [c.text for c in chunks]
-    languages = [c.language for c in chunks]
-
     # Convert embeddings to FixedSizeList
     embeddings_flat = embeddings.astype(np.float32).ravel()
     embedding_array = pa.FixedSizeListArray.from_arrays(
@@ -118,15 +110,17 @@ def write_chunks_parquet(
     # Create table
     table = pa.table(
         {
-            "id": ids,
-            "uri": uris,
-            "start_line": start_lines,
-            "end_line": end_lines,
-            "start_byte": start_bytes,
-            "end_byte": end_bytes,
-            "preview": previews,
-            "content": contents,
-            "lang": languages,
+            "id": list(range(options.start_id, options.start_id + len(chunks))),
+            "uri": [chunk.uri for chunk in chunks],
+            "start_line": [chunk.start_line for chunk in chunks],
+            "end_line": [chunk.end_line for chunk in chunks],
+            "start_byte": [chunk.start_byte for chunk in chunks],
+            "end_byte": [chunk.end_byte for chunk in chunks],
+            "preview": [chunk.text[: options.preview_max_chars] for chunk in chunks],
+            "content": [chunk.text for chunk in chunks],
+            "lang": [chunk.language for chunk in chunks],
+            "content_hash": [xxhash.xxh64_hexdigest(chunk.text.encode("utf-8")) for chunk in chunks],
+            "symbols": [list(chunk.symbols) for chunk in chunks],
             "embedding": embedding_array,
         },
         schema=get_chunks_schema(options.vec_dim),

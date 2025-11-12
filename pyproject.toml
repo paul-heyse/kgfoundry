@@ -527,6 +527,7 @@ runtime-evaluated-base-classes = [
 "tools/_shared/cli_runtime.py" = ["DOC502"]  # Exception re-raised via variable `raise error`; types already documented
 "tools/_shared/cli_context_registry.py" = ["DOC502"]  # Exceptions raised through helper methods (_normalise_key, REGISTRY methods); correctly documented
 "codeintel_rev/app/config_context.py" = ["DOC502"]  # ConfigurationError raised indirectly through resolve_application_paths(); correctly documented
+"src/kgfoundry_common/fastapi_helpers.py" = ["DOC502"]  # Exceptions re-raised via bare `raise` after logging; correctly documented in docstrings
 "tools/_shared/metrics.py" = ["DOC502"]
 "tools/docs/observability.py" = ["DOC502"]
 "tools/navmap/observability.py" = ["DOC502"]
@@ -741,6 +742,8 @@ emit-build-options    = true  # include only/no-binary flags if you use them
 
 [tool.pydoclint]
 exclude = "codeintel_rev/patches"
+# DOC105: `**_` parameter type annotation limitation in Click decorators
+# The type annotation matches the signature, but pydoclint cannot parse underscore-prefixed kwargs
 
 [tool.pydocstyle]
 convention = "numpy"

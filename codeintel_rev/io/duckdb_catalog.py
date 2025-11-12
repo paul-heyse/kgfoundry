@@ -6,13 +6,14 @@ chunk retrieval and joins.
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 from time import perf_counter
-from typing import TYPE_CHECKING, Self, cast
+from typing import TYPE_CHECKING, Any, Self, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.io.duckdb_manager import (
@@ -20,6 +21,7 @@ from codeintel_rev.io.duckdb_manager import (
     DuckDBQueryBuilder,
     DuckDBQueryOptions,
 )
+from codeintel_rev.io.parquet_store import extract_embeddings
 from codeintel_rev.mcp_server.scope_utils import (
     LANGUAGE_EXTENSIONS,
     path_matches_glob,
@@ -37,6 +39,17 @@ else:
     np = cast("np", LazyModule("numpy", "DuckDB catalog embeddings"))
 
 LOGGER = get_logger(__name__)
+
+
+def _log_extra(**kwargs: object) -> dict[str, object]:
+    """Return structured log extras for catalog events.
+
+    Returns
+    -------
+    dict[str, object]
+        Structured logging payload.
+    """
+    return {"component": "duckdb_catalog", **kwargs}
 
 # Prometheus metrics for scope filtering
 _scope_filter_duration_seconds = build_histogram(
@@ -186,61 +199,98 @@ class DuckDBCatalog:
         )
 
     def _ensure_views(self, conn: duckdb.DuckDBPyConnection) -> None:
-        """Create views over Parquet directories if they do not already exist."""
-        if self._relation_exists(conn, "chunks"):
-            return
+        """Create required views and tables to hydrate chunk metadata."""
+        chunks_ready = self._relation_exists(conn, "chunks")
 
-        parquet_pattern = str(self.vectors_dir / "**/*.parquet")
-        parquet_exists = any(self.vectors_dir.rglob("*.parquet"))
+        if not chunks_ready:
+            parquet_pattern = str(self.vectors_dir / "**/*.parquet")
+            parquet_exists = any(self.vectors_dir.rglob("*.parquet"))
 
-        if self.materialize:
-            if parquet_exists:
-                sql = """
-                    CREATE OR REPLACE TABLE chunks_materialized AS
-                    SELECT * FROM read_parquet(?)
-                    """
-                self._log_query(sql, [parquet_pattern])
-                conn.execute(sql, [parquet_pattern])
+            if self.materialize:
+                if parquet_exists:
+                    sql = """
+                        CREATE OR REPLACE TABLE chunks_materialized AS
+                        SELECT * FROM read_parquet(?)
+                        """
+                    self._log_query(sql, [parquet_pattern])
+                    conn.execute(sql, [parquet_pattern])
+                else:
+                    sql = f"CREATE OR REPLACE TABLE chunks_materialized AS {_EMPTY_CHUNKS_SELECT}"
+                    self._log_query(sql, None)
+                    conn.execute(sql)
+
+                view_sql = "CREATE OR REPLACE VIEW chunks AS SELECT * FROM chunks_materialized"
+                self._log_query(view_sql, None)
+                conn.execute(view_sql)
+
+                index_sql = "CREATE INDEX IF NOT EXISTS idx_chunks_materialized_uri ON chunks_materialized(uri)"
+                self._log_query(index_sql, None)
+                conn.execute(index_sql)
+                LOGGER.info(
+                    "Materialized DuckDB chunks table",
+                    extra={
+                        "materialized": True,
+                        "parquet_found": parquet_exists,
+                        "db_path": str(self.db_path),
+                    },
+                )
             else:
-                sql = f"CREATE OR REPLACE TABLE chunks_materialized AS {_EMPTY_CHUNKS_SELECT}"
-                self._log_query(sql, None)
-                conn.execute(sql)
+                if parquet_exists:
+                    sql = "SELECT * FROM read_parquet(?)"
+                    self._log_query(sql, [parquet_pattern])
+                    relation = conn.sql(sql, params=[parquet_pattern])
+                    relation.create_view("chunks", replace=True)
+                else:
+                    sql = f"CREATE OR REPLACE VIEW chunks AS {_EMPTY_CHUNKS_SELECT}"
+                    self._log_query(sql, None)
+                    conn.execute(sql)
+                LOGGER.debug(
+                    "Configured DuckDB chunks view",
+                    extra={
+                        "materialized": False,
+                        "parquet_found": parquet_exists,
+                        "db_path": str(self.db_path),
+                    },
+                )
 
-            view_sql = "CREATE OR REPLACE VIEW chunks AS SELECT * FROM chunks_materialized"
-            self._log_query(view_sql, None)
-            conn.execute(view_sql)
+        self._ensure_idmap_tables(conn)
+        self._ensure_faiss_join_view(conn)
 
-            index_sql = (
-                "CREATE INDEX IF NOT EXISTS idx_chunks_materialized_uri ON chunks_materialized(uri)"
+    @staticmethod
+    def _ensure_idmap_tables(conn: duckdb.DuckDBPyConnection) -> None:
+        """Ensure IDMap materialization tables exist for joins and checksums."""
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS faiss_idmap_mat (
+                faiss_row   BIGINT,
+                external_id BIGINT
             )
-            self._log_query(index_sql, None)
-            conn.execute(index_sql)
-            LOGGER.info(
-                "Materialized DuckDB chunks table",
-                extra={
-                    "materialized": True,
-                    "parquet_found": parquet_exists,
-                    "db_path": str(self.db_path),
-                },
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS faiss_idmap_mat_meta (
+                checksum   TEXT NOT NULL,
+                row_count  BIGINT NOT NULL,
+                updated_at TIMESTAMP NOT NULL
             )
-        else:
-            if parquet_exists:
-                sql = "SELECT * FROM read_parquet(?)"
-                self._log_query(sql, [parquet_pattern])
-                relation = conn.sql(sql, params=[parquet_pattern])
-                relation.create_view("chunks", replace=True)
-            else:
-                sql = f"CREATE OR REPLACE VIEW chunks AS {_EMPTY_CHUNKS_SELECT}"
-                self._log_query(sql, None)
-                conn.execute(sql)
-            LOGGER.debug(
-                "Configured DuckDB chunks view",
-                extra={
-                    "materialized": False,
-                    "parquet_found": parquet_exists,
-                    "db_path": str(self.db_path),
-                },
-            )
+            """
+        )
+
+    @staticmethod
+    def _ensure_faiss_join_view(conn: duckdb.DuckDBPyConnection) -> None:
+        """Expose chunks joined with FAISS ID map for deterministic hydration."""
+        conn.execute(
+            """
+            CREATE OR REPLACE VIEW v_faiss_join AS
+            SELECT
+                c.*,
+                f.faiss_row
+            FROM chunks AS c
+            LEFT JOIN faiss_idmap_mat AS f
+              ON f.external_id = c.id
+            """
+        )
 
     @staticmethod
     def _relation_exists(conn: duckdb.DuckDBPyConnection, name: str) -> bool:
@@ -293,6 +343,108 @@ class DuckDBCatalog:
             ``True`` when the relation exists in schema ``main``.
         """
         return DuckDBCatalog._relation_exists(conn, name)
+
+    @staticmethod
+    def _file_checksum(path: Path) -> str:
+        """Return SHA-256 checksum for ``path``.
+
+        Returns
+        -------
+        str
+            Hex digest representing the file contents.
+        """
+        digest = hashlib.sha256()
+        with path.open("rb") as handle:
+            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                if not chunk:
+                    break
+                digest.update(chunk)
+        return digest.hexdigest()
+
+    def refresh_faiss_idmap_mat_if_changed(self, idmap_parquet: Path) -> dict[str, Any]:
+        """Materialize FAISS ID map when the Parquet sidecar content changes.
+
+        Parameters
+        ----------
+        idmap_parquet : Path
+            Parquet file containing ``faiss_row`` and ``external_id`` columns.
+
+        Returns
+        -------
+        dict[str, Any]
+            Summary dictionary with ``refreshed``, ``checksum``, and ``rows`` keys.
+        """
+        checksum = self._file_checksum(idmap_parquet)
+        stats: dict[str, Any]
+        with self._manager.connection() as conn:
+            self._ensure_views(conn)
+            row = conn.execute(
+                """
+                SELECT checksum, row_count
+                  FROM faiss_idmap_mat_meta
+              ORDER BY updated_at DESC
+                 LIMIT 1
+                """
+            ).fetchone()
+            if row and row[0] == checksum:
+                rows = int(row[1])
+                return {"refreshed": False, "checksum": checksum, "rows": rows}
+
+            conn.execute("DELETE FROM faiss_idmap_mat")
+            conn.execute(
+                "INSERT INTO faiss_idmap_mat SELECT * FROM read_parquet(?)",
+                [str(idmap_parquet)],
+            )
+            count_row = conn.execute("SELECT COUNT(*) FROM faiss_idmap_mat").fetchone()
+            row_count = int(count_row[0]) if count_row and count_row[0] is not None else 0
+            conn.execute(
+                """
+                INSERT INTO faiss_idmap_mat_meta(checksum, row_count, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                """,
+                [checksum, row_count],
+            )
+            stats = {"refreshed": True, "checksum": checksum, "rows": row_count}
+
+        LOGGER.info("faiss_idmap_materialized", extra=_log_extra(rows=stats["rows"], checksum=checksum))
+        return stats
+
+    def sample_query_vectors(self, limit: int = 64) -> list[tuple[int, np.ndarray]]:
+        """Return (chunk_id, vector) samples for offline evaluation.
+
+        Parameters
+        ----------
+        limit : int, optional
+            Maximum number of vectors to return, by default 64.
+
+        Returns
+        -------
+        list[tuple[int, numpy.ndarray]]
+            Chunk identifiers paired with embedding vectors.
+        """
+        if limit <= 0:
+            return []
+        with self.connection() as conn:
+            result = conn.execute(
+                """
+                SELECT id, embedding
+                  FROM chunks
+                 WHERE embedding IS NOT NULL
+                 LIMIT ?
+                """,
+                [int(limit)],
+            )
+            table = result.fetch_arrow_table()
+
+        vectors = extract_embeddings(table)
+        ids = table.column("id").to_pylist()
+
+        samples: list[tuple[int, np.ndarray]] = []
+        for idx, chunk_id in enumerate(ids):
+            if chunk_id is None:
+                continue
+            samples.append((int(chunk_id), vectors[idx]))
+        return samples
 
     def query_by_ids(self, ids: Sequence[int]) -> list[dict]:
         """Query chunks by their unique IDs.

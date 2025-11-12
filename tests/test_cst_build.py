@@ -52,8 +52,9 @@ def test_index_file_smoke(tmp_path: Path) -> None:
     for required in ("Module", "ClassDef", "FunctionDef", "For", "Return"):
         assert required in kinds
     module_node = next(node for node in nodes if node.kind == "Module")
-    assert module_node.doc
-    assert module_node.doc.get("module").startswith("Top-level")
+    assert module_node.doc is not None
+    module_doc = module_node.doc.get("module", "")
+    assert module_doc.startswith("Top-level")
     helper_node = next(
         node for node in nodes if node.kind == "FunctionDef" and node.name == "helper"
     )
@@ -90,8 +91,9 @@ def test_qualified_names_and_call_targets(tmp_path: Path) -> None:
     assert any(name.endswith("Greeter.greet") for name in method_node.qnames)
     assert any(name.startswith("pkg.greeter.") for name in method_node.qnames)
     call_node = next(node for node in nodes if node.kind == "Call" and node.name == "greet")
-    assert call_node.call_target_qnames
-    assert any(name.startswith("pkg.greeter.") for name in call_node.call_target_qnames)
+    targets = call_node.call_target_qnames or []
+    assert targets
+    assert any(name.startswith("pkg.greeter.") for name in targets)
 
 
 def test_stitching_links_module_and_scip(tmp_path: Path) -> None:
@@ -125,6 +127,7 @@ def test_stitching_links_module_and_scip(tmp_path: Path) -> None:
     updated = next(node for node in stitched if node.kind == "FunctionDef" and node.name == "add")
     assert updated.stitch is not None
     assert updated.stitch.module_id == "module::pkg.sample"
+    assert updated.stitch.scip_symbol is not None
     assert updated.stitch.scip_symbol.endswith("add#")
     assert counters.module_matches >= 1
     assert counters.scip_matches >= 1
@@ -147,4 +150,6 @@ def test_schema_payload_contains_required_fields(tmp_path: Path) -> None:
     payload = nodes[0].to_dict()
     for key in ("path", "node_id", "kind", "span", "parents", "scope", "qnames"):
         assert key in payload
-    assert isinstance(payload["span"]["start"], list)
+    span = payload.get("span")
+    assert isinstance(span, dict)
+    assert isinstance(span.get("start"), list)

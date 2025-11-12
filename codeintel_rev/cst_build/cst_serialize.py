@@ -42,9 +42,10 @@ class DatasetWriter:
             Active writer bound to the destination directory.
         """
         self._out_dir.mkdir(parents=True, exist_ok=True)
-        self._stack = ExitStack()
+        stack = ExitStack()
+        self._stack = stack
         self._all_path = self._out_dir / "cst_nodes.jsonl.gz"
-        self._gz = self._stack.enter_context(gzip.open(self._all_path, "wt", encoding="utf-8"))
+        self._gz = stack.enter_context(gzip.open(self._all_path, "wt", encoding="utf-8"))
         self._module_dir.mkdir(parents=True, exist_ok=True)
         return self
 
@@ -120,7 +121,11 @@ class DatasetWriter:
         if handle is None:
             target = self._module_dir / f"{slug}.jsonl"
             target.parent.mkdir(parents=True, exist_ok=True)
-            handle = self._stack.enter_context(target.open("w", encoding="utf-8"))
+            stack = self._stack
+            if stack is None:
+                message = "DatasetWriter is not initialized; use context manager."
+                raise RuntimeError(message)
+            handle = stack.enter_context(target.open("w", encoding="utf-8"))
             self._module_handles[slug] = handle
         handle.write(payload)
         handle.write("\n")

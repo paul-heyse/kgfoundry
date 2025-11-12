@@ -313,7 +313,7 @@ class _ToolExecutionErrorConstructor(Protocol):
     errors with command context and optional Problem Details.
     """
 
-    def __call__(self, message: str, *, command: Sequence[str], **kwargs: object) -> Exception:
+    def __call__(self, message: str, *, command: Sequence[str], **kwargs: object) -> RuntimeError:
         """Create tool execution error.
 
         Parameters
@@ -385,14 +385,17 @@ def _raise_tool_execution_error(
 
     Raises
     ------
-    RuntimeError
-        ToolExecutionError instance (subclass of RuntimeError) constructed
-        from the tools surface with the provided message and command context.
-        The exact type depends on the tools module implementation.
-
+    TypeError
+        If the constructed error is not a RuntimeError subclass.
     """
-    tool_error = cast("_ToolExecutionErrorConstructor", tools_surface.ToolExecutionError)
-    raise tool_error(message, command=list(command))
+    tool_error_constructor = cast(
+        "_ToolExecutionErrorConstructor", tools_surface.ToolExecutionError
+    )
+    error_instance = tool_error_constructor(message, command=list(command))
+    if not isinstance(error_instance, RuntimeError):
+        msg = "ToolExecutionError must be a subclass of RuntimeError"
+        raise TypeError(msg)
+    raise error_instance
 
 
 _subprocess_module = import_module("sub" + "process")

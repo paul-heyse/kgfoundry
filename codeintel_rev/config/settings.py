@@ -545,6 +545,10 @@ class PathsConfig(msgspec.Struct, frozen=True):
         Path to the FAISS IVF-PQ index file (CPU version). This is the persisted
         index that can be loaded and cloned to GPU. Defaults to
         "data/faiss/code.ivfpq.faiss".
+    faiss_idmap_path : str
+        Path to the FAISS ID map Parquet sidecar. This file stores the mapping
+        from FAISS row IDs to external chunk IDs for deterministic hydration.
+        Defaults to "data/faiss/faiss_idmap.parquet".
     lucene_dir : str
         Directory for Lucene/BM25 indexes. Used for sparse retrieval methods like
         BM25 keyword search. Defaults to "data/lucene".
@@ -574,6 +578,7 @@ class PathsConfig(msgspec.Struct, frozen=True):
     data_dir: str = "data"
     vectors_dir: str = "data/vectors"
     faiss_index: str = "data/faiss/code.ivfpq.faiss"
+    faiss_idmap_path: str = "data/faiss/faiss_idmap.parquet"
     lucene_dir: str = "data/lucene"
     splade_dir: str = "data/splade"
     duckdb_path: str = "data/catalog.duckdb"
@@ -836,6 +841,8 @@ def load_settings() -> Settings:
         Vector storage directory (default: "data/vectors").
     FAISS_INDEX : str, optional
         FAISS index file path (default: "data/faiss/code.ivfpq.faiss").
+    FAISS_IDMAP_PATH : str, optional
+        Path to the FAISS ID map Parquet sidecar (default: "data/faiss/faiss_idmap.parquet").
     LUCENE_DIR : str, optional
         Lucene index directory (default: "data/lucene").
     SPLADE_DIR : str, optional
@@ -1030,6 +1037,7 @@ def _build_paths_config(repo_root: str) -> PathsConfig:
         data_dir=os.environ.get("DATA_DIR", "data"),
         vectors_dir=os.environ.get("VECTORS_DIR", "data/vectors"),
         faiss_index=os.environ.get("FAISS_INDEX", "data/faiss/code.ivfpq.faiss"),
+        faiss_idmap_path=os.environ.get("FAISS_IDMAP_PATH", "data/faiss/faiss_idmap.parquet"),
         lucene_dir=os.environ.get("LUCENE_DIR", "data/lucene"),
         splade_dir=os.environ.get("SPLADE_DIR", "data/splade"),
         duckdb_path=os.environ.get("DUCKDB_PATH", "data/catalog.duckdb"),

@@ -15,16 +15,6 @@ class DocSnippet(TypedDict, total=False):
     module: str
     def_: str
 
-    def __repr__(self) -> str:  # pragma: no cover - diagnostic
-        """Return string representation of the doc snippet.
-
-        Returns
-        -------
-        str
-            String representation showing the doc snippet dictionary.
-        """
-        return f"DocSnippet({dict(self)!r})"
-
 
 class ImportMetadata(TypedDict, total=False):
     """Normalized import metadata for Import/ImportFrom nodes."""
@@ -67,7 +57,7 @@ class Span:
         }
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class StitchInfo:
     """Join metadata linking nodes to module records and SCIP symbols."""
 
@@ -98,7 +88,7 @@ class StitchInfo:
         return payload
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class NodeRecord:
     """Single CST node row ready for serialization."""
 
@@ -153,7 +143,7 @@ class NodeRecord:
         return payload
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class CollectorStats:
     """Aggregated counters for provider usage."""
 

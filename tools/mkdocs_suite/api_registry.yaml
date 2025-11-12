@@ -1,0 +1,7 @@
+interfaces:
+  mkdocs:
+    commands: []
+  download-cli:
+    commands: []
+  orchestration-cli:
+    commands: []

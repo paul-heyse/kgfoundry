@@ -173,8 +173,7 @@ def apply_recency_boost(
     if lookup is None:
         if duckdb_manager is None or DuckDBManager is None:
             return docs, 0
-        assert duckdb_manager is not None
-        concrete_manager: DuckDBManagerType = duckdb_manager
+        concrete_manager = duckdb_manager
 
         def _lookup(ids: Iterable[str]) -> Mapping[str, float]:
             return _fetch_commit_ts_duckdb(concrete_manager, ids, cfg)

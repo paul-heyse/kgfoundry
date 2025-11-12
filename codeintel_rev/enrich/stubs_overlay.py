@@ -18,7 +18,7 @@ class OverlayPolicy:
     """Controls when an overlay is generated and how it is written."""
 
     overlays_root: Path = Path("stubs/overlays")
-    include_public_defs: bool = False
+    include_public_defs: bool = True
     inject_module_getattr_any: bool = True
     when_star_imports: bool = True
     when_has_all: bool = True
@@ -31,13 +31,13 @@ class OverlayPolicy:
 class OverlayResult:
     """Summary of overlay creation for a single module."""
 
-    pyi_path: Path
+    pyi_path: Path | None
     created: bool
     reason: str
-    exports_resolved: Mapping[str, list[str]]
+    exports_resolved: Mapping[str, set[str]]
 
 
-def generate_overlay_for_file(  # noqa: PLR0913
+def generate_overlay_for_file(  # lint-ignore[PLR0913]: overlay policy requires multiple explicit parameters
     py_file: Path,
     package_root: Path,
     *,
@@ -80,7 +80,7 @@ def generate_overlay_for_file(  # noqa: PLR0913
     source = py_file if py_file.is_absolute() else package_root / py_file
     if not source.exists():
         return OverlayResult(
-            pyi_path=_overlay_path(policy.overlays_root, package_root, py_file),
+            pyi_path=None,
             created=False,
             reason="missing-source",
             exports_resolved={},
@@ -102,25 +102,25 @@ def generate_overlay_for_file(  # noqa: PLR0913
 
     if not force and not (should_for_star or should_for_all or should_for_errors):
         return OverlayResult(
-            pyi_path=_overlay_path(policy.overlays_root, package_root, py_file),
+            pyi_path=None,
             created=False,
             reason="not-eligible",
             exports_resolved={},
         )
 
-    star_targets: MutableMapping[str, list[str]] = {}
+    star_targets: MutableMapping[str, set[str]] = {}
     if has_star and scip is not None:
         for entry in module.imports:
             if entry.is_star and entry.module:
                 names = _collect_star_reexports(scip, entry)
                 if names:
-                    star_targets[entry.module] = sorted(names)
+                    star_targets[entry.module] = names
 
     module_name = _module_name_from_path(package_root, source)
     overlay_text = _build_overlay_text(
         module_name=module_name,
         module=module,
-        star_targets=star_targets,
+        star_targets={key: sorted(names) for key, names in star_targets.items()},
         import_reexports=_collect_import_reexports(module),
         include_public_defs=policy.include_public_defs,
         inject_getattr_any=policy.inject_module_getattr_any,
@@ -136,7 +136,7 @@ def generate_overlay_for_file(  # noqa: PLR0913
         {
             "module": module_name,
             "source": str(source),
-            "exports_resolved": dict(star_targets),
+            "exports_resolved": {key: sorted(names) for key, names in star_targets.items()},
             "has_all": sorted(module.exports) if module.exports else [],
             "defs": [{"kind": d.kind, "name": d.name, "lineno": d.lineno} for d in module.defs],
             "parse_ok": module.parse_ok,
@@ -261,7 +261,8 @@ def _overlay_path(overlays_root: Path, package_root: Path, py_file: Path) -> Pat
     """
     target = py_file if py_file.is_absolute() else package_root / py_file
     rel = target.relative_to(package_root)
-    return overlays_root / rel.with_suffix(".pyi")
+    root = overlays_root if overlays_root.is_absolute() else package_root.parent / overlays_root
+    return root / rel.with_suffix(".pyi")
 
 
 def _normalized_module_key(package_root: Path, py_file: Path) -> str:
@@ -300,12 +301,15 @@ def _module_name_from_path(package_root: Path, py_file: Path) -> str:
         Dotted module name (e.g., "package.submodule") derived from the
         relative path from ``package_root`` to ``py_file``.
     """
-    rel = py_file if py_file.is_absolute() else package_root / py_file
-    rel = rel.relative_to(package_root).with_suffix("")
-    return ".".join(rel.parts)
+    full_path = py_file if py_file.is_absolute() else package_root / py_file
+    rel = full_path.relative_to(package_root).with_suffix("")
+    parts: list[str] = [package_root.name, *rel.parts]
+    if parts and parts[-1] == "__init__":
+        parts = parts[:-1]
+    return ".".join(part for part in parts if part)
 
 
-def _collect_star_reexports(scip: SCIPIndex, entry: ImportEntry) -> list[str]:
+def _collect_star_reexports(scip: SCIPIndex, entry: ImportEntry) -> set[str]:
     """Return candidate names that a star import might re-export.
 
     Parameters
@@ -318,19 +322,22 @@ def _collect_star_reexports(scip: SCIPIndex, entry: ImportEntry) -> list[str]:
 
     Returns
     -------
-    list[str]
-        Sorted list of names resolved from the SCIP index that may be
-        re-exported by the star import.
+    set[str]
+        Names resolved from the SCIP index that may be re-exported by the
+        star import.
     """
     names: set[str] = set()
     target = entry.module or ""
-    for symbol in scip.symbol_to_files():
+    symbols = list(scip.symbol_to_files().keys())
+    for doc in scip.documents:
+        symbols.extend(sym.symbol for sym in doc.symbols)
+    for symbol in symbols:
         if f"`{target}`" not in symbol:
             continue
         simple = _extract_simple_name(symbol)
         if simple:
             names.add(simple)
-    return sorted(names)
+    return names
 
 
 def _extract_simple_name(symbol: str) -> str | None:
@@ -360,7 +367,7 @@ def _extract_simple_name(symbol: str) -> str | None:
     return None
 
 
-def _build_overlay_text(  # noqa: PLR0913
+def _build_overlay_text(  # lint-ignore[PLR0913]: builder needs structured arguments for readability
     *,
     module_name: str,
     module: ModuleIndex,
@@ -409,8 +416,13 @@ def _build_overlay_text(  # noqa: PLR0913
         lines.append("")
     if include_public_defs:
         lines.extend(_render_public_defs(module.defs))
-    if module.exports:
-        exports = ", ".join(f"'{name}'" for name in sorted(module.exports))
+    overlay_exports: set[str] = set(module.exports)
+    for names in star_targets.values():
+        overlay_exports.update(names)
+    if include_public_defs:
+        overlay_exports.update(def_entry.name for def_entry in module.defs if not def_entry.name.startswith("_"))
+    if overlay_exports:
+        exports = ", ".join(f'"{name}"' for name in sorted(overlay_exports))
         lines.append(f"__all__ = [{exports}]")
         lines.append("")
     if inject_getattr_any:
@@ -435,7 +447,10 @@ def _render_star_exports(star_targets: Mapping[str, list[str]]) -> list[str]:
     """
     lines: list[str] = []
     for imported_mod, names in star_targets.items():
-        lines.extend(f"from {imported_mod} import {name} as {name}" for name in names)
+        if not names:
+            continue
+        aliased = ", ".join(f"{name} as {name}" for name in names)
+        lines.append(f"from {imported_mod} import {aliased}")
     if lines:
         lines.append("")
     return lines
@@ -458,6 +473,8 @@ def _render_public_defs(defs: Sequence[DefEntry]) -> list[str]:
     """
     rendered: list[str] = []
     for definition in defs:
+        if definition.name.startswith("_"):
+            continue
         if definition.kind == "function":
             rendered.append(f"def {definition.name}(*args: Any, **kwargs: Any) -> Any: ...")
         elif definition.kind == "class":

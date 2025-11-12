@@ -2,18 +2,37 @@
 
 from __future__ import annotations
 
+import json
 import os
+from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 
 import click
 import typer
 
+from codeintel_rev.config.settings import Settings, load_settings
+from codeintel_rev.eval.hybrid_evaluator import HybridPoolEvaluator
 from codeintel_rev.indexing.index_lifecycle import IndexAssets, IndexLifecycleManager
+from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.io.faiss_manager import FAISSManager
 from kgfoundry_common.logging import get_logger
 
 LOGGER = get_logger(__name__)
 app = typer.Typer(help="Manage versioned FAISS/DuckDB/SCIP assets.", no_args_is_help=True)
+
+
+@lru_cache(maxsize=1)
+def _get_settings() -> Settings:
+    """Load settings once and reuse for subsequent commands.
+
+    Returns
+    -------
+    Settings
+        Cached settings object.
+    """
+    return load_settings()
+
 
 RootOption = Annotated[Path | None, typer.Option("--root", help="Index lifecycle root directory.")]
 ExtraOption = Annotated[
@@ -26,6 +45,10 @@ ExtraOption = Annotated[
 ]
 VersionArg = Annotated[str, typer.Argument(help="Version identifier.")]
 PathArg = Annotated[Path, typer.Argument(help="Path to an asset on disk.")]
+IndexOption = Annotated[Path | None, typer.Option("--index", help="Path to FAISS index file.")]
+IdMapOption = Annotated[Path, typer.Option("--idmap", help="Path to FAISS ID map Parquet.")]
+DuckOption = Annotated[Path | None, typer.Option("--duckdb", help="Path to DuckDB catalog file.")]
+OutOption = Annotated[Path | None, typer.Option("--out", help="Output path override.")]
 
 
 @app.callback()
@@ -77,6 +100,27 @@ def _parse_extras(extras: list[str]) -> dict[str, Path]:
         key, value = entry.split("=", maxsplit=1)
         parsed[key.strip().lower()] = Path(value).expanduser().resolve()
     return parsed
+
+
+def _faiss_manager(index_override: Path | None = None) -> FAISSManager:
+    settings = _get_settings()
+    index_path = (index_override or Path(settings.paths.faiss_index)).expanduser().resolve()
+    nlist = int(settings.index.nlist or settings.index.faiss_nlist)
+    manager = FAISSManager(
+        index_path=index_path,
+        vec_dim=settings.index.vec_dim,
+        nlist=nlist,
+        use_cuvs=settings.index.use_cuvs,
+    )
+    manager.load_cpu_index()
+    return manager
+
+
+def _duckdb_catalog(path_override: Path | None = None) -> DuckDBCatalog:
+    settings = _get_settings()
+    db_path = (path_override or Path(settings.paths.duckdb_path)).expanduser().resolve()
+    vectors_dir = Path(settings.paths.vectors_dir).expanduser().resolve()
+    return DuckDBCatalog(db_path=db_path, vectors_dir=vectors_dir)
 
 
 @app.command("status")
@@ -135,3 +179,82 @@ def list_command() -> None:
         return
     for version in versions:
         typer.echo(version)
+
+
+@app.command("export-idmap")
+def export_idmap_command(
+    index: IndexOption = None,
+    out: OutOption = None,
+    duckdb: DuckOption = None,
+) -> None:
+    """Export FAISS ID map to Parquet and optionally refresh DuckDB materialization."""
+    settings = _get_settings()
+    manager = _faiss_manager(index)
+    destination = (out or Path(settings.paths.faiss_idmap_path)).expanduser().resolve()
+    rows = manager.export_idmap(destination)
+    typer.echo(f"Exported {rows} FAISS rows -> {destination}")
+    if duckdb is not None:
+        catalog = _duckdb_catalog(duckdb)
+        stats = catalog.refresh_faiss_idmap_mat_if_changed(destination)
+        typer.echo(
+            f"Materialized join rows={stats['rows']} "
+            f"checksum={stats['checksum']} refreshed={stats['refreshed']}"
+        )
+
+
+@app.command("materialize-join")
+def materialize_join_command(
+    idmap: IdMapOption,
+    duckdb: DuckOption = None,
+) -> None:
+    """Refresh DuckDB's materialized FAISS join if the ID map sidecar changed."""
+    catalog = _duckdb_catalog(duckdb)
+    stats = catalog.refresh_faiss_idmap_mat_if_changed(idmap.expanduser().resolve())
+    typer.echo(f"Refreshed={stats['refreshed']} rows={stats['rows']} checksum={stats['checksum']}")
+
+
+@app.command("tune")
+def tune_command(
+    index: IndexOption = None,
+    nprobe: Annotated[int | None, typer.Option("--nprobe")] = None,
+    ef_search: Annotated[int | None, typer.Option("--ef-search")] = None,
+    quantizer_ef_search: Annotated[int | None, typer.Option("--quantizer-ef-search")] = None,
+    k_factor: Annotated[float | None, typer.Option("--k-factor")] = None,
+) -> None:
+    """Apply runtime tuning overrides (nprobe/efSearch/k-factor) and persist audit JSON."""
+    manager = _faiss_manager(index)
+    tuning = manager.apply_runtime_tuning(
+        nprobe=nprobe,
+        ef_search=ef_search,
+        quantizer_ef_search=quantizer_ef_search,
+        k_factor=k_factor,
+    )
+    audit_path = manager.index_path.with_suffix(".audit.json").expanduser().resolve()
+    audit_path.parent.mkdir(parents=True, exist_ok=True)
+    audit_path.write_text(json.dumps(tuning, indent=2) + "\n", encoding="utf-8")
+    typer.echo(f"Wrote runtime tuning snapshot -> {audit_path}")
+
+
+@app.command("eval-hybrid")
+def eval_hybrid_command(
+    *,
+    k: Annotated[int, typer.Option("--k", min=1, help="Top-K for recall computation.")] = 10,
+    k_factor: Annotated[
+        float,
+        typer.Option("--k-factor", min=1.0, help="Candidate expansion factor for ANN search."),
+    ] = 2.0,
+    index: IndexOption = None,
+    duckdb: DuckOption = None,
+    out: OutOption = None,
+) -> None:
+    """Evaluate ANN vs Flat recall and optionally persist pooled candidates."""
+    settings = _get_settings()
+    output_dir = Path(settings.eval.output_dir).expanduser().resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    out_path = (out or (output_dir / "last_eval_pool.parquet")).expanduser().resolve()
+
+    manager = _faiss_manager(index)
+    catalog = _duckdb_catalog(duckdb)
+    evaluator = HybridPoolEvaluator(catalog, manager)
+    report = evaluator.run(k=k, k_factor=k_factor, out_parquet=out_path)
+    typer.echo(json.dumps(report, indent=2))

@@ -21,7 +21,7 @@ class ModuleRow:
     raw: Mapping[str, Any]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class StitchCounters:
     """Aggregate match counters used for index.json."""
 
@@ -51,7 +51,13 @@ class _SymbolCandidate:
 class SCIPResolver:
     """Best-effort matcher between CST spans and SCIP occurrences."""
 
-    _DEF_KINDS: ClassVar[set[str]] = {"FunctionDef", "AsyncFunctionDef", "ClassDef", "Assign", "AnnAssign"}
+    _DEF_KINDS: ClassVar[set[str]] = {
+        "FunctionDef",
+        "AsyncFunctionDef",
+        "ClassDef",
+        "Assign",
+        "AnnAssign",
+    }
     _USE_KINDS: ClassVar[set[str]] = {"Call", "Attribute", "Name"}
 
     def __init__(self, documents: Mapping[str, Document]) -> None:
@@ -101,7 +107,10 @@ class SCIPResolver:
         candidates = _collect_candidates(file_map, base_line)
         if not candidates and node.name:
             candidates = [
-                cand for line_candidates in file_map.values() for cand in line_candidates if cand.name_hint == node.name
+                cand
+                for line_candidates in file_map.values()
+                for cand in line_candidates
+                if cand.name_hint == node.name
             ]
         if not candidates:
             return None
@@ -255,7 +264,10 @@ def _select_best_candidate(
     base_line: int,
     normalized_qnames: set[str | None],
     candidates: list[_SymbolCandidate],
-) -> tuple[float, list[str], _SymbolCandidate, list[tuple[float, list[str], _SymbolCandidate]]] | None:
+) -> (
+    tuple[float, list[str], _SymbolCandidate, list[tuple[float, list[str], _SymbolCandidate]]]
+    | None
+):
     evaluated: list[tuple[float, list[str], _SymbolCandidate]] = []
     for candidate in candidates:
         score, evidence = _score_candidate(

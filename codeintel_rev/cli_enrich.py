@@ -45,6 +45,7 @@ except ImportError:  # pragma: no cover - optional dependency
 class _YamlDumpFn(Protocol):
     def __call__(self, data: Mapping[str, list[str]], *, sort_keys: bool = ...) -> str: ...
 
+
 EXPORT_HUB_THRESHOLD = 10
 OVERLAY_PARAM_THRESHOLD = 0.8
 OVERLAY_FAN_IN_THRESHOLD = 3
@@ -184,7 +185,7 @@ def _iter_files(root: Path, patterns: tuple[str, ...] | None = None) -> Iterable
         yield candidate
 
 
-def _run_pipeline(  # noqa: PLR0913, PLR0914
+def _run_pipeline(  # lint-ignore[PLR0913,PLR0914]: pipeline orchestration requires many parameters
     *,
     root: Path,
     scip: Path,
@@ -256,7 +257,7 @@ def _run_pipeline(  # noqa: PLR0913, PLR0914
 
 
 @app.command("all")
-def run_all(  # noqa: PLR0913, PLR0917 - CLI surface exposes multiple knobs
+def run_all(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -287,7 +288,7 @@ def run_all(  # noqa: PLR0913, PLR0917 - CLI surface exposes multiple knobs
 
 
 @app.command("scan")
-def scan(  # noqa: PLR0913, PLR0917
+def scan(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -310,7 +311,7 @@ def scan(  # noqa: PLR0913, PLR0917
 
 
 @app.command("exports")
-def exports(  # noqa: PLR0913, PLR0917
+def exports(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -334,7 +335,7 @@ def exports(  # noqa: PLR0913, PLR0917
 
 
 @app.command("graph")
-def graph(  # noqa: PLR0913, PLR0917
+def graph(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -358,7 +359,7 @@ def graph(  # noqa: PLR0913, PLR0917
 
 
 @app.command("uses")
-def uses(  # noqa: PLR0913, PLR0917
+def uses(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -382,7 +383,7 @@ def uses(  # noqa: PLR0913, PLR0917
 
 
 @app.command("typedness")
-def typedness(  # noqa: PLR0913, PLR0917
+def typedness(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -406,7 +407,7 @@ def typedness(  # noqa: PLR0913, PLR0917
 
 
 @app.command("doc")
-def doc(  # noqa: PLR0913, PLR0917
+def doc(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -430,7 +431,7 @@ def doc(  # noqa: PLR0913, PLR0917
 
 
 @app.command("coverage")
-def coverage(  # noqa: PLR0913, PLR0917
+def coverage(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -454,7 +455,7 @@ def coverage(  # noqa: PLR0913, PLR0917
 
 
 @app.command("config")
-def config(  # noqa: PLR0913, PLR0917
+def config(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -478,7 +479,7 @@ def config(  # noqa: PLR0913, PLR0917
 
 
 @app.command("hotspots")
-def hotspots(  # noqa: PLR0913, PLR0917
+def hotspots(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -502,7 +503,7 @@ def hotspots(  # noqa: PLR0913, PLR0917
 
 
 @app.command("overlays")
-def overlays(  # noqa: PLR0913, PLR0914 - CLI surface intentionally exposes many knobs
+def overlays(  # lint-ignore[PLR0913,PLR0914]: CLI surface intentionally exposes many knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     pyrefly_json: Path | None = PYREFLY,
@@ -1100,7 +1101,7 @@ def _should_mark_overlay(row: Mapping[str, Any]) -> bool:
     )
 
 
-def _ensure_package_overlays(  # noqa: PLR0913
+def _ensure_package_overlays(  # lint-ignore[PLR0913]: helper wires overlay paths atomically
     *,
     rel_path: Path,
     generated: list[str],

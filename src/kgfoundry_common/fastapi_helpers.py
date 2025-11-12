@@ -95,6 +95,10 @@ def typed_dependency[**P, T](
     -------
     object
         Dependency marker for use in Annotated parameters.
+
+    Notes
+    -----
+    Any exception raised by ``dependency`` is logged and re-raised unchanged.
     """
 
     async def _instrumented(*args: P.args, **kwargs: P.kwargs) -> T:
@@ -116,8 +120,6 @@ def typed_dependency[**P, T](
         ------
         TimeoutError
             If the dependency execution exceeds the timeout.
-        Exception
-            Any exception raised by the dependency function is re-raised after logging.
         """
         correlation_id = get_correlation_id()
         with with_fields(logger, operation=name, correlation_id=correlation_id) as log:
@@ -179,12 +181,14 @@ def typed_exception_handler[E: Exception](
         Response
             HTTP response from the exception handler.
 
+        Notes
+        -----
+        Exceptions raised by ``handler`` are logged and re-raised unchanged.
+
         Raises
         ------
         TimeoutError
             If the handler execution exceeds the timeout.
-        Exception
-            Any exception raised by the handler function is re-raised after logging.
         """
         correlation_id = get_correlation_id()
         with with_fields(logger, operation=name, correlation_id=correlation_id) as log:
@@ -283,8 +287,6 @@ def typed_middleware(
             ------
             TimeoutError
                 If the middleware execution exceeds the timeout.
-            Exception
-                Any exception raised by the next handler is re-raised after logging.
             """
             correlation_id = get_correlation_id()
             with with_fields(logger, operation=name, correlation_id=correlation_id) as log:
