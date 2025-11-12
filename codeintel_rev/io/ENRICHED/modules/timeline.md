@@ -48,11 +48,48 @@ Lightweight per-session timeline recording utilities.
 
 - **fan_in**: 11
 - **fan_out**: 2
-- **cycle_group**: 15
+- **cycle_group**: 22
 
 ## Declared Exports (__all__)
 
 Timeline, bind_timeline, current_timeline, new_timeline
+
+## Doc Metrics
+
+- **summary**: Lightweight per-session timeline recording utilities.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 36
+- cyclomatic: 37
+- loc: 491
+
+## Doc Coverage
+
+- `_env_float` (function): summary=no, examples=no
+- `_env_int` (function): summary=no, examples=no
+- `_clamp` (function): summary=no, examples=no
+- `_diagnostics_dir` (function): summary=no, examples=no
+- `_max_field_len` (function): summary=no, examples=no
+- `_FlightRecorder` (class): summary=yes, examples=no — Append-only JSONL recorder with sampling and rotation.
+- `_scrub_value` (function): summary=no, examples=no
+- `_scrub_attrs` (function): summary=no, examples=no
+- `Timeline` (class): summary=yes, examples=no — Append-only JSONL event recorder for a single session/run pair.
+- `_TimelineScope` (class): summary=yes, examples=no — Context manager that emits start/end events with duration.
 
 ## Tags
 

@@ -40,11 +40,48 @@ the character budget, splitting large symbols on blank lines.
 
 - **fan_in**: 2
 - **fan_out**: 2
-- **cycle_group**: 56
+- **cycle_group**: 61
 
 ## Declared Exports (__all__)
 
 Chunk, chunk_file, line_starts, range_to_bytes
+
+## Doc Metrics
+
+- **summary**: cAST chunking using SCIP symbol ranges.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 37
+- cyclomatic: 38
+- loc: 622
+
+## Doc Coverage
+
+- `Chunk` (class): summary=yes, examples=no — Code chunk with precise byte and line bounds.
+- `LineIndex` (class): summary=yes, examples=no — Line start bookkeeping for both character and byte positions.
+- `_utf8_length` (function): summary=yes, params=ok, examples=no — Return the UTF-8 encoded length for ``ch``.
+- `line_starts` (function): summary=yes, params=ok, examples=no — Compute character and byte offsets for each line start.
+- `_line_index_from_byte` (function): summary=yes, params=ok, examples=no — Return the zero-based line index containing ``byte_offset``.
+- `_char_index_for_line` (function): summary=yes, params=ok, examples=no — Map a line/character pair to an absolute character index.
+- `range_to_bytes` (function): summary=yes, params=ok, examples=no — Convert line/character range to byte offsets.
+- `_ChunkAccumulator` (class): summary=yes, examples=no — Immutable accumulator configuration; delegates mutation to a builder.
+- `_ChunkBuilder` (class): summary=yes, examples=no — Mutable helper that performs chunk assembly for a fixed configuration.
+- `chunk_file` (function): summary=yes, params=ok, examples=no — Chunk file using SCIP symbol boundaries.
 
 ## Tags
 

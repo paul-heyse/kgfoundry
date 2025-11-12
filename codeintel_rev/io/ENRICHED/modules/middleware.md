@@ -79,11 +79,41 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 
 - **fan_in**: 6
 - **fan_out**: 3
-- **cycle_group**: 17
+- **cycle_group**: 24
 
 ## Declared Exports (__all__)
 
 SessionScopeMiddleware, capability_stamp_var, get_capability_stamp, get_session_id, session_id_var
+
+## Doc Metrics
+
+- **summary**: Session management middleware for CodeIntel MCP.
+- has summary: yes
+- param parity: yes
+- examples present: yes
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 5
+- cyclomatic: 6
+- loc: 262
+
+## Doc Coverage
+
+- `get_session_id` (function): summary=yes, params=ok, examples=yes — Retrieve session ID from thread-local context.
+- `get_capability_stamp` (function): summary=yes, params=ok, examples=no — Return the capability stamp associated with the current request.
+- `SessionScopeMiddleware` (class): summary=yes, examples=yes — Middleware for session ID extraction and context storage.
 
 ## Tags
 

@@ -21,6 +21,13 @@ def build_module_name_map(
 ) -> dict[str, dict[str, Any]]:
     """Return mapping of module name → module row for quick lookup.
 
+    Parameters
+    ----------
+    rows : list[dict[str, Any]]
+        Module metadata rows to index by module name.
+    package_prefix : str | None, optional
+        Optional package prefix for module name normalization.
+
     Returns
     -------
     dict[str, dict[str, Any]]
@@ -41,6 +48,15 @@ def resolve_exports(
     package_prefix: str | None = None,
 ) -> tuple[dict[str, list[str]], dict[str, dict[str, str]]]:
     """Return exports resolved from star-imports and re-export metadata.
+
+    Parameters
+    ----------
+    row : Mapping[str, Any]
+        Module row containing imports and definitions.
+    modules_by_name : Mapping[str, Mapping[str, Any]]
+        Mapping of module names to their row dictionaries.
+    package_prefix : str | None, optional
+        Optional package prefix for module name resolution.
 
     Returns
     -------
@@ -79,7 +95,18 @@ def resolve_exports(
 
 
 def is_reexport_hub(row: Mapping[str, Any]) -> bool:
-    """Return True when a module behaves like a re-export hub."""
+    """Return True when a module behaves like a re-export hub.
+
+    Parameters
+    ----------
+    row : Mapping[str, Any]
+        Module row containing exports and imports metadata.
+
+    Returns
+    -------
+    bool
+        True when the module is considered a re-export hub.
+    """
     exports = row.get("exports") or []
     imports = row.get("imports") or []
     has_star = any(entry.get("is_star") for entry in imports if isinstance(entry, Mapping))
@@ -96,7 +123,11 @@ def _public_names(row: Mapping[str, Any]) -> list[str]:
             continue
         kind = definition.get("kind")
         name = definition.get("name")
-        if isinstance(name, str) and isinstance(kind, str) and kind in {"function", "class"}:
-            if not name.startswith("_"):
-                names.append(name)
+        if (
+            isinstance(name, str)
+            and isinstance(kind, str)
+            and kind in {"function", "class"}
+            and not name.startswith("_")
+        ):
+            names.append(name)
     return names

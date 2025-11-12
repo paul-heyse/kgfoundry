@@ -27,7 +27,6 @@ public-api:
 - indexing/__init__.py
 - indexing/cast_chunker.py
 - metrics/registry.py
-- enrich/stitch.py
 - observability/metrics.py
 - observability/otel.py
 - observability/__init__.py

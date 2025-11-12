@@ -35,11 +35,41 @@ FAISS dual-index utilities and metadata helpers.
 
 - **fan_in**: 0
 - **fan_out**: 3
-- **cycle_group**: 68
+- **cycle_group**: 78
 
 ## Declared Exports (__all__)
 
 FAISSDualIndexManager, IndexManifest
+
+## Doc Metrics
+
+- **summary**: FAISS dual-index utilities and metadata helpers.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+- subprocess
+
+## Complexity
+
+- branches: 70
+- cyclomatic: 71
+- loc: 645
+
+## Doc Coverage
+
+- `IndexManifest` (class): summary=yes, examples=no — Persisted metadata for FAISS dual-index deployments.
+- `FAISSDualIndexManager` (class): summary=yes, examples=no — Manage dual FAISS indexes with CPU/GPU coordination.
 
 ## Tags
 

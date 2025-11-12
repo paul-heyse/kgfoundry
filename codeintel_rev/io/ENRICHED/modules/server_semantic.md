@@ -25,4 +25,33 @@ Semantic MCP tool registrations (pure move from server.py).
 
 - **fan_in**: 0
 - **fan_out**: 5
-- **cycle_group**: 78
+- **cycle_group**: 91
+
+## Doc Metrics
+
+- **summary**: Semantic MCP tool registrations (pure move from server.py).
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 2
+- cyclomatic: 3
+- loc: 127
+
+## Doc Coverage
+
+- `semantic_search` (function): summary=yes, params=ok, examples=no — Semantic code search using embeddings.
+- `semantic_search_pro` (function): summary=yes, params=ok, examples=no — Two-stage semantic retrieval with optional late interaction and reranker.

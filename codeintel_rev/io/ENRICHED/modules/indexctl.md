@@ -41,7 +41,44 @@ Typer CLI for managing index lifecycle operations.
 
 - **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 83
+- **cycle_group**: 98
+
+## Doc Metrics
+
+- **summary**: Typer CLI for managing index lifecycle operations.
+- has summary: yes
+- param parity: no
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 10
+- cyclomatic: 11
+- loc: 138
+
+## Doc Coverage
+
+- `global_options` (function): summary=yes, params=mismatch, examples=no — Configure shared CLI options.
+- `_default_root` (function): summary=no, examples=no
+- `_resolve_root` (function): summary=no, examples=no
+- `_manager` (function): summary=no, examples=no
+- `_build_assets` (function): summary=no, examples=no
+- `_parse_extras` (function): summary=no, examples=no
+- `status_command` (function): summary=yes, params=ok, examples=no — Print the active version and available versions.
+- `stage_command` (function): summary=yes, params=mismatch, examples=no — Stage a new version by copying assets into the lifecycle root.
+- `publish_command` (function): summary=yes, params=mismatch, examples=no — Publish a previously staged version.
+- `rollback_command` (function): summary=yes, params=mismatch, examples=no — Rollback to a previously published version.
 
 ## Tags
 

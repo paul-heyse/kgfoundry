@@ -11,7 +11,7 @@ import logging
 from io import StringIO
 from typing import TYPE_CHECKING, cast
 
-from tools._shared.cli import (
+from tools.shared.cli import (
     CLI_ENVELOPE_SCHEMA_ID,
     CLI_ENVELOPE_SCHEMA_VERSION,
     CliErrorEntry,

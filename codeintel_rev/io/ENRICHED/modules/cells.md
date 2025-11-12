@@ -39,11 +39,49 @@ Thread-safe runtime cell primitive for mutable subsystems.
 
 - **fan_in**: 3
 - **fan_out**: 5
-- **cycle_group**: 33
+- **cycle_group**: 40
 
 ## Declared Exports (__all__)
 
 NullRuntimeCellObserver, RuntimeCell, RuntimeCellCloseResult, RuntimeCellInitContext, RuntimeCellInitResult, RuntimeCellObserver
+
+## Doc Metrics
+
+- **summary**: Thread-safe runtime cell primitive for mutable subsystems.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Raises
+
+cooldown_error
+
+## Complexity
+
+- branches: 45
+- cyclomatic: 46
+- loc: 632
+
+## Doc Coverage
+
+- `RuntimeCellCloseResult` (class): summary=yes, examples=no — Immutable payload describing close outcome.
+- `RuntimeCellInitContext` (class): summary=yes, examples=no — Request-scoped metadata captured during initialization.
+- `RuntimeCellInitResult` (class): summary=yes, examples=no — Immutable payload describing initialization outcome.
+- `_seed_allowed` (function): summary=no, examples=no
+- `RuntimeCellObserver` (class): summary=yes, examples=no — Protocol for observing RuntimeCell lifecycle events.
+- `NullRuntimeCellObserver` (class): summary=yes, examples=no — No-op observer used when instrumentation is disabled.
+- `RuntimeCell` (class): summary=yes, examples=no — Thread-safe lazy holder for mutable runtime state with single-flight init.
 
 ## Tags
 

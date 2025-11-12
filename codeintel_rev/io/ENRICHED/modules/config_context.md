@@ -107,12 +107,50 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 ## Dependency Graph
 
 - **fan_in**: 20
-- **fan_out**: 18
-- **cycle_group**: 42
+- **fan_out**: 17
+- **cycle_group**: 46
 
 ## Declared Exports (__all__)
 
 ApplicationContext, ResolvedPaths, resolve_application_paths
+
+## Doc Metrics
+
+- **summary**: Application-level configuration context manager.
+- has summary: yes
+- param parity: yes
+- examples present: yes
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+- network
+
+## Complexity
+
+- branches: 62
+- cyclomatic: 63
+- loc: 1447
+
+## Doc Coverage
+
+- `_infer_index_root` (function): summary=yes, params=ok, examples=no — Return the directory that stores versioned index assets.
+- `_build_factory_adjuster` (function): summary=yes, params=ok, examples=no — Return a DefaultFactoryAdjuster derived from settings.
+- `_assign_frozen` (function): summary=yes, params=mismatch, examples=no — Assign attribute on a frozen dataclass instance.
+- `_faiss_module` (function): summary=yes, params=ok, examples=no — Return the cached FAISS manager module.
+- `_import_faiss_manager_cls` (function): summary=yes, params=ok, examples=no — Import ``FAISSManager`` lazily to keep module import costs low.
+- `_import_faiss_runtime_opts_cls` (function): summary=yes, params=ok, examples=no — Return the FAISS runtime options dataclass.
+- `_faiss_runtime_options_from_index` (function): summary=yes, params=ok, examples=no — Materialize FAISS runtime options from the structured index config.
+- `_import_hybrid_engine_cls` (function): summary=yes, params=ok, examples=no — Import ``HybridSearchEngine`` lazily for runtime cell initialization.
+- `_import_xtr_index_cls` (function): summary=yes, params=ok, examples=no — Import ``XTRIndex`` lazily to avoid eager heavy dependencies.
+- `_require_dependency` (function): summary=yes, params=ok, examples=yes — Ensure a heavy dependency is available, raising RuntimeUnavailableError.
 
 ## Tags
 

@@ -19,7 +19,7 @@ from codeintel_rev.module_utils import (
 )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class ImportGraph:
     """Graph representation of intra-repo imports."""
 
@@ -34,6 +34,13 @@ def build_import_graph(
     package_prefix: str | None = None,
 ) -> ImportGraph:
     """Build an import graph across repo modules.
+
+    Parameters
+    ----------
+    rows : list[dict[str, Any]]
+        Module metadata rows containing import information.
+    package_prefix : str | None, optional
+        Optional package prefix for module name normalization.
 
     Returns
     -------
@@ -82,9 +89,7 @@ def write_import_graph(graph: ImportGraph, path: str | Path) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     records = [
-        {"src_path": src, "dst_path": dst}
-        for src, dests in graph.edges.items()
-        for dst in dests
+        {"src_path": src, "dst_path": dst} for src, dests in graph.edges.items() for dst in dests
     ]
     if not records:
         target.write_text("", encoding="utf-8")

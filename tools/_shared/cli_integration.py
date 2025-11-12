@@ -83,6 +83,7 @@ def cli_operation(
         Callable[P, R]
             Wrapped function that receives context and envelope builder automatically.
         """
+
         @functools.wraps(fn)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             """Execute the wrapped function with CLI context and envelope builder.

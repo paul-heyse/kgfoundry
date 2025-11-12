@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from types import ModuleType
 
 LOGGER = get_logger(__name__)
+_RESULT_FIELDS_MIN = 2
 
 
 class WarpExecutorProtocol(Protocol):
@@ -100,7 +101,7 @@ class WarpEngine:
                 doc_id_value = _safe_int(item.get("doc_id"))
                 score_value = _safe_float(item.get("score", 0.0))
                 normalized.append((doc_id_value, score_value))
-            elif isinstance(item, Sequence) and len(item) >= 2:
+            elif isinstance(item, Sequence) and len(item) >= _RESULT_FIELDS_MIN:
                 doc_id = item[0]
                 score = item[1]
                 normalized.append((_safe_int(doc_id), _safe_float(score)))

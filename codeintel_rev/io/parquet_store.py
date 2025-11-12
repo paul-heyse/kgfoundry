@@ -182,7 +182,7 @@ def extract_embeddings(table: pa.Table) -> NDArrayF32:
         msg = "Embedding column is not a FixedSizeListArray"
         raise TypeError(msg)
 
-    fixed_array = cast("pa.FixedSizeListArray", dense_array)
+    fixed_array = dense_array
     # Convert list_size (which is a _Size type) to int for numpy.reshape
     vec_dim = int(getattr(fixed_array.type, "list_size", 0))
     flat_values = fixed_array.values.to_numpy(zero_copy_only=False)

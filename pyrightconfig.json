@@ -21,7 +21,6 @@
     "src/kgfoundry.egg-info/**",
     "kgfoundry.egg-info/**",
     "src/kgfoundry_common/http/**",
-    "codeintel_rev/xtr-warp/**",
     "codeintel_rev/patches/**",
     "docs/**"
   ],

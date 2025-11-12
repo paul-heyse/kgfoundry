@@ -602,8 +602,7 @@ def handle_adapter_errors(
                 try:
                     # Type cast needed because pyrefly can't infer awaitability from inspect check
                     coro = cast("Awaitable[dict[str, object]]", func(*args, **kwargs))
-                    result = await coro
-                    return cast("dict[str, object]", result)
+                    return await coro
                 except (KeyboardInterrupt, SystemExit, GeneratorExit):
                     # Re-raise system-level exceptions - these should propagate
                     raise

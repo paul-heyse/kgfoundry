@@ -75,11 +75,50 @@ the FAISS index, then hydrating results from DuckDB.
 
 - **fan_in**: 0
 - **fan_out**: 10
-- **cycle_group**: 89
+- **cycle_group**: 108
 
 ## Declared Exports (__all__)
 
 semantic_search
+
+## Doc Metrics
+
+- **summary**: Semantic search adapter using FAISS GPU and DuckDB.
+- has summary: yes
+- param parity: yes
+- examples present: yes
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+- network
+- subprocess
+
+## Complexity
+
+- branches: 75
+- cyclomatic: 76
+- loc: 1271
+
+## Doc Coverage
+
+- `_ScopeFilterFlags` (class): summary=yes, examples=no — Aggregated boolean flags describing the active scope filters.
+- `_FaissFanout` (class): summary=yes, examples=no — FAISS fan-out plan produced for a semantic search request.
+- `_HybridSearchState` (class): summary=yes, examples=no — Encapsulate the outputs of FAISS prior to hybrid re-ranking.
+- `_HybridResult` (class): summary=yes, examples=no — Hydration payload returned after hybrid re-ranking.
+- `_SearchBudget` (class): summary=yes, examples=no — Typed representation of the effective limit and metadata.
+- `_SemanticSearchPlan` (class): summary=yes, examples=no — Bundled semantic search parameters derived from scope and settings.
+- `_MethodContext` (class): summary=yes, examples=no — Inputs required to build method metadata.
+- `_FaissSearchRequest` (class): summary=yes, examples=no — Container describing a FAISS search invocation.
+- `semantic_search` (function): summary=yes, params=ok, examples=yes — Perform semantic search using embeddings.
+- `_semantic_search_sync` (function): summary=no, examples=no
 
 ## Tags
 

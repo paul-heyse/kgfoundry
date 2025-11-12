@@ -50,11 +50,49 @@ Provides file listing, reading, and scope configuration.
 
 - **fan_in**: 0
 - **fan_out**: 7
-- **cycle_group**: 90
+- **cycle_group**: 109
 
 ## Declared Exports (__all__)
 
 list_paths, open_file, set_scope
+
+## Doc Metrics
+
+- **summary**: File and scope management adapter.
+- has summary: yes
+- param parity: no
+- examples present: yes
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+- subprocess
+
+## Complexity
+
+- branches: 49
+- cyclomatic: 50
+- loc: 715
+
+## Doc Coverage
+
+- `FileListFilters` (class): summary=yes, examples=no — Configuration for file listing filters.
+- `DirectoryFilters` (class): summary=yes, examples=no — Prepared filters used during directory traversal.
+- `set_scope` (function): summary=yes, params=ok, examples=yes — Set query scope for subsequent operations.
+- `list_paths` (function): summary=yes, params=mismatch, examples=yes — List files in repository (async with threadpool offload).
+- `_normalize_list_paths_arguments` (function): summary=no, examples=no
+- `_list_paths_sync` (function): summary=yes, params=ok, examples=no — List files in repository (synchronous implementation).
+- `_collect_filtered_paths` (function): summary=yes, params=ok, examples=no — Walk directories and apply include/exclude filters.
+- `_prune_directories` (function): summary=no, examples=no
+- `_create_file_entry` (function): summary=yes, params=ok, examples=no — Return a file entry dict when filters accept the file.
+- `open_file` (function): summary=yes, params=ok, examples=yes — Read file content with optional line slicing.
 
 ## Tags
 

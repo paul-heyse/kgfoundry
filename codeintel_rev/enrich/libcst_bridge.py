@@ -236,11 +236,15 @@ def _exception_name(expr: cst.BaseExpression | None) -> str | None:
 
 def _infer_side_effects(imports: set[str], code: str) -> dict[str, bool]:
     lowered = code.lower()
+
     def has_any(prefixes: tuple[str, ...]) -> bool:
         return any(mod.startswith(prefix) for prefix in prefixes for mod in imports)
 
     filesystem = has_any(("os", "pathlib", "shutil", "tarfile", "zipfile")) or "open(" in lowered
-    network = has_any(("http", "urllib", "requests", "httpx", "aiohttp", "socket")) or "requests." in lowered
+    network = (
+        has_any(("http", "urllib", "requests", "httpx", "aiohttp", "socket"))
+        or "requests." in lowered
+    )
     subprocess = has_any(("subprocess", "asyncio")) or "subprocess." in lowered
     database = has_any(("sqlite3", "duckdb", "psycopg", "sqlalchemy", "pymongo", "redis"))
 

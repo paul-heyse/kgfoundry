@@ -30,4 +30,36 @@ Adapter for the optional WARP/XTR late interaction executor.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 67
+- **cycle_group**: 77
+
+## Doc Metrics
+
+- **summary**: Adapter for the optional WARP/XTR late interaction executor.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 15
+- cyclomatic: 16
+- loc: 212
+
+## Doc Coverage
+
+- `WarpExecutorProtocol` (class): summary=yes, examples=no — Protocol describing the WARP executor search surface.
+- `WarpUnavailableError` (class): summary=yes, examples=no — Raised when the WARP executor or index artifacts are missing.
+- `WarpEngine` (class): summary=yes, examples=no — Encapsulates interactions with the optional ``xtr-warp`` executor.
+- `_safe_int` (function): summary=yes, params=ok, examples=no — Convert an object to int safely, falling back to the provided default.
+- `_safe_float` (function): summary=yes, params=ok, examples=no — Convert an object to float safely, falling back to the provided default.

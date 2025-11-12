@@ -30,11 +30,41 @@ Channel plugin contracts for hybrid retrieval.
 
 - **fan_in**: 3
 - **fan_out**: 5
-- **cycle_group**: 42
+- **cycle_group**: 46
 
 ## Declared Exports (__all__)
 
 Channel, ChannelContext, ChannelError
+
+## Doc Metrics
+
+- **summary**: Channel plugin contracts for hybrid retrieval.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 1
+- cyclomatic: 2
+- loc: 50
+
+## Doc Coverage
+
+- `ChannelContext` (class): summary=yes, examples=no — Context passed to channel factories when they are constructed.
+- `Channel` (class): summary=yes, examples=no — Retrieval channel plugin interface.
+- `ChannelError` (class): summary=yes, examples=no — Raised by channels when they cannot satisfy a search request.
 
 ## Tags
 

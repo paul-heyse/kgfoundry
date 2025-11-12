@@ -1,4 +1,11 @@
-# Auto-generated overlay for cli.__init__. Edit as needed for precise types.
-from typing import Any
+from codeintel_rev.cli import bm25 as bm25
+from codeintel_rev.cli import indexctl as indexctl
+from codeintel_rev.cli import splade as splade
+from codeintel_rev.cli import xtr as xtr
+from typer import Typer
 
-def __getattr__(name: str) -> Any: ...
+app: Typer
+
+def main() -> None: ...
+
+__all__ = ["app", "bm25", "indexctl", "main", "splade", "xtr"]

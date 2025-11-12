@@ -41,7 +41,40 @@ CLI helpers for building Lucene indexes and flipping lifecycle pointers.
 
 - **fan_in**: 0
 - **fan_out**: 5
-- **cycle_group**: 86
+- **cycle_group**: 101
+
+## Doc Metrics
+
+- **summary**: CLI helpers for building Lucene indexes and flipping lifecycle pointers.
+- has summary: yes
+- param parity: no
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 5
+- cyclomatic: 6
+- loc: 193
+
+## Doc Coverage
+
+- `_bm25_manager` (function): summary=yes, params=ok, examples=no — Return a BM25 index manager configured from the active settings.
+- `_splade_manager` (function): summary=yes, params=ok, examples=no — Return a SPLADE index manager configured from the active settings.
+- `build_bm25_index` (function): summary=yes, params=mismatch, examples=no — Build a Lucene BM25 index with positional/docvector/raw storage enabled.
+- `build_splade_impact_index` (function): summary=yes, params=mismatch, examples=no — Build a SPLADE Lucene impact index from JsonVectorCollection shards.
+- `publish_lucene_assets` (function): summary=yes, params=mismatch, examples=no — Copy Lucene assets into the lifecycle root and flip the CURRENT pointer.
+- `main` (function): summary=yes, params=ok, examples=no — Execute the build_indexes CLI.
 
 ## Tags
 

@@ -56,11 +56,48 @@ corpus size for optimal performance.
 
 - **fan_in**: 5
 - **fan_out**: 5
-- **cycle_group**: 37
+- **cycle_group**: 38
 
 ## Declared Exports (__all__)
 
 FAISSManager
+
+## Doc Metrics
+
+- **summary**: FAISS manager for GPU-accelerated vector search.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 163
+- cyclomatic: 164
+- loc: 2320
+
+## Doc Coverage
+
+- `_LazyFaissProxy` (class): summary=yes, examples=no — Deferred FAISS module loader to avoid import-time side effects.
+- `_faiss_module` (function): summary=yes, params=ok, examples=no — Return the lazily imported FAISS module.
+- `_has_faiss_gpu_support` (function): summary=yes, params=ok, examples=no — Return ``True`` when FAISS exposes GPU bindings, otherwise ``False``.
+- `_log_extra` (function): summary=yes, params=mismatch, examples=no — Build structured logging extras for FAISS manager events.
+- `FAISSRuntimeOptions` (class): summary=yes, examples=no — Runtime tuning options passed to :class:`FAISSManager`.
+- `SearchRuntimeOverrides` (class): summary=yes, examples=no — Per-search overrides for HNSW/quantizer parameters.
+- `_SearchExecutionParams` (class): summary=yes, examples=no — Runtime parameters applied during dual search execution.
+- `_SearchPlan` (class): summary=yes, examples=no — Resolved parameters, query buffer, and timeline metadata for a search.
+- `FAISSManager` (class): summary=yes, examples=no — FAISS index manager with adaptive indexing, GPU support, and incremental updates.
+- `_coerce_to_int` (function): summary=yes, params=ok, examples=no — Safely round arbitrary objects to integers for index comparisons.
 
 ## Tags
 

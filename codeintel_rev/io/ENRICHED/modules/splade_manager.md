@@ -78,11 +78,48 @@ SPLADE artifact management, encoding, and Lucene impact index builders.
 
 - **fan_in**: 3
 - **fan_out**: 3
-- **cycle_group**: 66
+- **cycle_group**: 76
 
 ## Declared Exports (__all__)
 
 SpladeArtifactMetadata, SpladeArtifactsManager, SpladeBuildOptions, SpladeEncodeOptions, SpladeEncodingMetadata, SpladeEncodingSummary, SpladeExportOptions, SpladeExportSummary, SpladeIndexManager, SpladeIndexMetadata
+
+## Doc Metrics
+
+- **summary**: SPLADE artifact management, encoding, and Lucene impact index builders.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 75
+- cyclomatic: 76
+- loc: 1437
+
+## Doc Coverage
+
+- `_SparseEncoderProtocol` (class): summary=yes, examples=no — Protocol defining the interface for SPLADE sparse encoders.
+- `_OptimizerFunction` (class): summary=no, examples=no
+- `_QuantizerFunction` (class): summary=no, examples=no
+- `SpladeArtifactMetadata` (class): summary=yes, examples=no — Metadata describing exported SPLADE ONNX artifacts.
+- `SpladeExportSummary` (class): summary=yes, examples=no — Summary returned after exporting SPLADE artifacts.
+- `SpladeEncodingMetadata` (class): summary=yes, examples=no — Metadata describing SPLADE vector encoding runs.
+- `SpladeEncodingSummary` (class): summary=yes, examples=no — Summary describing SPLADE encoding output.
+- `SpladeBenchmarkOptions` (class): summary=yes, examples=no — Options controlling SPLADE encoder latency benchmarks.
+- `SpladeBenchmarkSummary` (class): summary=yes, examples=no — Summary describing SPLADE encoder latency benchmarks.
+- `SpladeExportOptions` (class): summary=yes, examples=no — Options controlling SPLADE ONNX export behaviour.
 
 ## Tags
 

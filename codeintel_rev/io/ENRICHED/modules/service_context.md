@@ -36,11 +36,42 @@ variables change or when they need fresh dependencies.
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 77
+- **cycle_group**: 90
 
 ## Declared Exports (__all__)
 
 get_service_context, reset_service_context
+
+## Doc Metrics
+
+- **summary**: Cached application context for MCP tool adapters.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 4
+- cyclomatic: 5
+- loc: 80
+
+## Doc Coverage
+
+- `_get_cached_context` (function): summary=yes, params=ok, examples=no — Return the cached context instance, if any.
+- `_set_cached_context` (function): summary=yes, params=mismatch, examples=no — Update the cached context reference.
+- `get_service_context` (function): summary=yes, params=ok, examples=no — Return the cached :class:`ApplicationContext` instance.
+- `reset_service_context` (function): summary=yes, params=ok, examples=no — Clear the cached :class:`ApplicationContext`.
 
 ## Tags
 

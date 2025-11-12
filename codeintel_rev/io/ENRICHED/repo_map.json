@@ -1,8 +1,8 @@
 {
   "root": "codeintel_rev",
-  "module_count": 121,
+  "module_count": 124,
   "symbol_edge_count": 8175,
-  "generated_at": "2025-11-12T08:50:17+00:00",
+  "generated_at": "2025-11-12T09:30:59+00:00",
   "tags": {
     "public-api": [
       "typing.py",
@@ -21,7 +21,6 @@
       "indexing/__init__.py",
       "indexing/cast_chunker.py",
       "metrics/registry.py",
-      "enrich/stitch.py",
       "observability/metrics.py",
       "observability/otel.py",
       "observability/__init__.py",

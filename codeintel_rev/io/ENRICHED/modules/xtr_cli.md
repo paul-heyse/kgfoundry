@@ -28,7 +28,38 @@ Typer CLI for building, verifying, and probing XTR artifacts.
 
 - **fan_in**: 1
 - **fan_out**: 5
-- **cycle_group**: 80
+- **cycle_group**: 96
+
+## Doc Metrics
+
+- **summary**: Typer CLI for building, verifying, and probing XTR artifacts.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 12
+- cyclomatic: 13
+- loc: 165
+
+## Doc Coverage
+
+- `build` (function): summary=yes, params=ok, examples=no — Build token-level XTR artifacts from the DuckDB catalog.
+- `verify` (function): summary=yes, params=ok, examples=no — Verify that XTR artifacts can be opened.
+- `search` (function): summary=yes, params=ok, examples=no — Run a quick XTR search (wide or narrow depending on candidate ids).
+- `main` (function): summary=yes, params=ok, examples=no — Execute the Typer app.
 
 ## Tags
 

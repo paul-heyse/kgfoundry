@@ -11,7 +11,7 @@ Capability snapshot helpers for conditional tool registration and /capz.
 - from **__future__** import annotations
 - from **(absolute)** import hashlib
 - from **(absolute)** import importlib
-- from **(absolute)** import util
+- from **(absolute)** import importlib.util
 - from **(absolute)** import json
 - from **collections.abc** import Callable
 - from **dataclasses** import dataclass
@@ -38,11 +38,44 @@ Capability snapshot helpers for conditional tool registration and /capz.
 
 - **fan_in**: 5
 - **fan_out**: 3
-- **cycle_group**: 42
+- **cycle_group**: 46
 
 ## Declared Exports (__all__)
 
 Capabilities
+
+## Doc Metrics
+
+- **summary**: Capability snapshot helpers for conditional tool registration and /capz.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 23
+- cyclomatic: 24
+- loc: 369
+
+## Doc Coverage
+
+- `_build_capability_gauge` (function): summary=no, examples=no
+- `_import_optional` (function): summary=yes, params=ok, examples=no — Return imported module when available, otherwise ``None``.
+- `_probe_faiss_gpu` (function): summary=yes, params=ok, examples=no — Return FAISS GPU availability and optional reason for failure.
+- `_path_exists` (function): summary=yes, params=ok, examples=no — Return True when ``path`` is populated and exists on the filesystem.
+- `_record_metrics` (function): summary=yes, params=mismatch, examples=no — Update Prometheus gauges with the latest capability snapshot.
+- `Capabilities` (class): summary=yes, examples=no — Capability snapshot used for MCP tool gating and the /capz endpoint.
 
 ## Tags
 

@@ -40,11 +40,47 @@ Score boosters applied after fusion.
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 24
+- **cycle_group**: 36
 
 ## Declared Exports (__all__)
 
 RecencyConfig, apply_recency_boost
+
+## Doc Metrics
+
+- **summary**: Score boosters applied after fusion.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- database
+
+## Complexity
+
+- branches: 28
+- cyclomatic: 29
+- loc: 206
+
+## Doc Coverage
+
+- `RecencyConfig` (class): summary=yes, examples=no — Configuration parameters controlling recency boosts.
+- `_now` (function): summary=no, examples=no
+- `_exp_decay` (function): summary=no, examples=no
+- `_safe_identifier` (function): summary=no, examples=no
+- `_normalize_ids` (function): summary=no, examples=no
+- `_create_recency_view` (function): summary=no, examples=no
+- `_populate_id_table` (function): summary=no, examples=no
+- `_fetch_commit_ts_duckdb` (function): summary=no, examples=no
+- `apply_recency_boost` (function): summary=yes, params=ok, examples=no — Return a new doc list with an exponential recency boost applied.
 
 ## Tags
 

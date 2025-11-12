@@ -1,1 +1,0 @@
-/home/paul/kgfoundry/stubs/overlays/codeintel_rev/observability/__init__.pyi

@@ -20,11 +20,39 @@ Weighted reciprocal rank fusion utilities.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 62
+- **cycle_group**: 72
 
 ## Declared Exports (__all__)
 
 fuse_weighted_rrf
+
+## Doc Metrics
+
+- **summary**: Weighted reciprocal rank fusion utilities.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 5
+- cyclomatic: 6
+- loc: 91
+
+## Doc Coverage
+
+- `fuse_weighted_rrf` (function): summary=yes, params=ok, examples=no — Apply weighted RRF across runs and return fused docs plus contributions.
 
 ## Tags
 

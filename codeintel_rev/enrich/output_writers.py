@@ -229,6 +229,31 @@ def _format_doc_items(record: dict[str, object], limit: int = 10) -> list[str]:
     return lines
 
 
+def _format_coverage(record: dict[str, object]) -> list[str]:
+    lines: list[str] = []
+    covered_lines = record.get("covered_lines_ratio")
+    covered_defs = record.get("covered_defs_ratio")
+    if isinstance(covered_lines, (int, float)):
+        lines.append(f"- lines covered: {covered_lines:.2%}")
+    if isinstance(covered_defs, (int, float)):
+        lines.append(f"- defs covered: {covered_defs:.2%}")
+    return lines
+
+
+def _format_config_refs(record: dict[str, object]) -> list[str]:
+    refs = record.get("config_refs")
+    if not isinstance(refs, list) or not refs:
+        return []
+    return [f"- {ref}" for ref in refs if isinstance(ref, str)]
+
+
+def _format_hotspot(record: dict[str, object]) -> list[str]:
+    score = record.get("hotspot_score")
+    if not isinstance(score, (int, float)):
+        return []
+    return [f"- score: {score:.2f}"]
+
+
 def write_markdown_module(path: str | Path, record: dict[str, object]) -> None:
     """Emit a human-friendly Markdown summary for a module record."""
     target = Path(path)
@@ -245,6 +270,9 @@ def write_markdown_module(path: str | Path, record: dict[str, object]) -> None:
     _append_section(sections, "Re-exports", _format_reexports(record))
     _append_section(sections, "Doc Metrics", _format_doc_metrics(record))
     _append_section(sections, "Typedness", _format_typedness(record))
+    _append_section(sections, "Coverage", _format_coverage(record))
+    _append_section(sections, "Config References", _format_config_refs(record))
+    _append_section(sections, "Hotspot Score", _format_hotspot(record))
     _append_section(sections, "Side Effects", _format_side_effects(record))
     _append_section(sections, "Raises", _format_raises(record))
     _append_section(sections, "Complexity", _format_complexity(record))

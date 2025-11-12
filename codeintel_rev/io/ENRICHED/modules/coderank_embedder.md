@@ -30,4 +30,33 @@ Pooled wrapper around the CodeRank embedding SentenceTransformer.
 
 - **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 65
+- **cycle_group**: 75
+
+## Doc Metrics
+
+- **summary**: Pooled wrapper around the CodeRank embedding SentenceTransformer.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 8
+- cyclomatic: 9
+- loc: 177
+
+## Doc Coverage
+
+- `SupportsCodeRankSettings` (class): summary=yes, examples=no — Protocol describing the minimal settings required by the embedder.
+- `CodeRankEmbedder` (class): summary=yes, examples=no — Encode queries or code snippets with the CodeRank bi-encoder.

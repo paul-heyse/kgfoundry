@@ -1,0 +1,67 @@
+# coverage_ingest.py
+
+## Docstring
+
+```
+Coverage ingestion utilities (Cobertura-style XML).
+```
+
+## Imports
+
+- from **__future__** import annotations
+- from **pathlib** import Path
+- from **defusedxml** import ElementTree
+- from **xml.etree** import ElementTree
+
+## Definitions
+
+- function: `collect_coverage` (line 14)
+- function: `_parse_int` (line 58)
+
+## Dependency Graph
+
+- **fan_in**: 1
+- **fan_out**: 0
+- **cycle_group**: 9
+
+## Doc Metrics
+
+- **summary**: Coverage ingestion utilities (Cobertura-style XML).
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Coverage
+
+- lines covered: 0.00%
+- defs covered: 0.00%
+
+## Hotspot Score
+
+- score: 1.54
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 9
+- cyclomatic: 10
+- loc: 77
+
+## Doc Coverage
+
+- `collect_coverage` (function): summary=yes, params=ok, examples=no — Collect per-file coverage ratios from ``coverage.xml``.
+- `_parse_int` (function): summary=yes, params=ok, examples=no — Return integer conversion fallback to zero on failure.
+
+## Tags
+
+low-coverage

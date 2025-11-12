@@ -42,11 +42,44 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 
 - **fan_in**: 4
 - **fan_out**: 6
-- **cycle_group**: 36
+- **cycle_group**: 43
 
 ## Declared Exports (__all__)
 
 EmbeddingData, EmbeddingRequest, EmbeddingResponse, VLLMClient
+
+## Doc Metrics
+
+- **summary**: vLLM embedding client using msgspec for fast serialization.
+- has summary: yes
+- param parity: yes
+- examples present: yes
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- network
+- subprocess
+
+## Complexity
+
+- branches: 31
+- cyclomatic: 32
+- loc: 623
+
+## Doc Coverage
+
+- `_get_numpy` (function): summary=yes, params=ok, examples=no — Load numpy lazily when embeddings are computed.
+- `EmbeddingRequest` (class): summary=yes, examples=no — OpenAI-compatible embedding request payload.
+- `EmbeddingData` (class): summary=yes, examples=no — Single embedding result from a batch request.
+- `EmbeddingResponse` (class): summary=yes, examples=no — OpenAI-compatible embedding response payload.
+- `VLLMClient` (class): summary=yes, examples=yes — vLLM embedding client supporting HTTP or in-process execution.
 
 ## Tags
 

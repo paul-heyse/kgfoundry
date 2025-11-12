@@ -34,11 +34,41 @@ Prometheus metrics for hybrid retrieval.
 
 - **fan_in**: 0
 - **fan_out**: 0
-- **cycle_group**: 101
+- **cycle_group**: 71
 
 ## Declared Exports (__all__)
 
 BUDGET_DEPTH, CHANNEL_LATENCY_SECONDS, DEBUG_BUNDLE_TOTAL, INDEX_VERSION_INFO, QUERIES_TOTAL, QUERY_AMBIGUITY, QUERY_ERRORS_TOTAL, RECALL_AT_K, RECENCY_BOOSTED_TOTAL, RESULTS_TOTAL, RRF_DURATION_SECONDS, RRF_K, observe_budget_depths, record_recall, set_index_version
+
+## Doc Metrics
+
+- **summary**: Prometheus metrics for hybrid retrieval.
+- has summary: yes
+- param parity: no
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 4
+- cyclomatic: 5
+- loc: 135
+
+## Doc Coverage
+
+- `observe_budget_depths` (function): summary=yes, params=mismatch, examples=no — Record per-channel depth decisions.
+- `record_recall` (function): summary=yes, params=mismatch, examples=no — Record recall@k values produced by offline harnesses.
+- `set_index_version` (function): summary=yes, params=ok, examples=no — Expose the current index version for dashboards.
 
 ## Tags
 

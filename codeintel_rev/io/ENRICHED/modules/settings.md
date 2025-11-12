@@ -71,11 +71,48 @@ All configuration loaded from environment variables with sensible defaults.
 
 - **fan_in**: 21
 - **fan_out**: 2
-- **cycle_group**: 27
+- **cycle_group**: 30
 
 ## Declared Exports (__all__)
 
 BM25Config, CodeRankConfig, CodeRankLLMConfig, IndexConfig, PRFConfig, PathsConfig, RedisConfig, RerankConfig, ServerLimits, Settings, SpladeConfig, VLLMConfig, VLLMRunMode, WarpConfig, XTRConfig, load_settings
+
+## Doc Metrics
+
+- **summary**: Configuration settings using msgspec for fast, validated config.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 45
+- cyclomatic: 46
+- loc: 1348
+
+## Doc Coverage
+
+- `_HybridChannelSettings` (class): summary=no, examples=no
+- `_env_bool` (function): summary=yes, params=ok, examples=no — Return a boolean flag parsed from environment variables.
+- `_parse_int_with_suffix` (function): summary=yes, params=ok, examples=no — Return an integer, accepting 1k-style suffixes (k=1_000).
+- `_parse_int_list` (function): summary=yes, params=ok, examples=no — Return a tuple of integers from a comma-separated configuration string.
+- `_optional_int` (function): summary=yes, params=ok, examples=no — Convert an optional string to ``int`` when possible.
+- `_build_vllm_config` (function): summary=no, examples=no
+- `_build_xtr_config` (function): summary=no, examples=no
+- `_build_rerank_config` (function): summary=no, examples=no
+- `CodeRankConfig` (class): summary=yes, examples=no — Configuration for the CodeRank dense retriever.
+- `WarpConfig` (class): summary=yes, examples=no — Configuration for the WARP/XTR late-interaction reranker.
 
 ## Tags
 

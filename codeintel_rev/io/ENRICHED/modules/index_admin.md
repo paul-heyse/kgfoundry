@@ -43,11 +43,48 @@ Admin endpoints for staging, publishing, and rolling back index versions.
 
 - **fan_in**: 0
 - **fan_out**: 6
-- **cycle_group**: 94
+- **cycle_group**: 114
 
 ## Declared Exports (__all__)
 
 router
+
+## Doc Metrics
+
+- **summary**: Admin endpoints for staging, publishing, and rolling back index versions.
+- has summary: yes
+- param parity: no
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 16
+- cyclomatic: 17
+- loc: 623
+
+## Doc Coverage
+
+- `_require_admin` (function): summary=no, examples=no
+- `_context` (function): summary=no, examples=no
+- `_persist_session_tuning` (function): summary=no, examples=no
+- `status_endpoint` (function): summary=yes, params=mismatch, examples=no — Return the current index version and health.
+- `PublishBody` (class): summary=yes, examples=no — Request body schema for index publication endpoint.
+- `TuningBody` (class): summary=yes, examples=no — Request body schema for runtime tuning endpoint.
+- `FaissRuntimeTuningBody` (class): summary=yes, examples=no — Request body schema for FAISS runtime tuning endpoint.
+- `publish_endpoint` (function): summary=yes, params=mismatch, examples=no — Stage and publish a new index version, then reload runtimes.
+- `rollback_endpoint` (function): summary=yes, params=mismatch, examples=no — Flip ``CURRENT`` to a previously published version.
+- `tuning_endpoint` (function): summary=yes, params=mismatch, examples=no — Update runtime tuning knobs (nprobe, fusion weights, etc.).
 
 ## Tags
 

@@ -28,4 +28,37 @@ Lightweight helpers for loading and querying SCIP JSON indices.
 
 - **fan_in**: 3
 - **fan_out**: 1
-- **cycle_group**: 1
+- **cycle_group**: 3
+
+## Doc Metrics
+
+- **summary**: Lightweight helpers for loading and querying SCIP JSON indices.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 11
+- cyclomatic: 12
+- loc: 182
+
+## Doc Coverage
+
+- `_loads` (function): summary=yes, params=ok, examples=no — Deserialize JSON bytes using orjson when available.
+- `Occurrence` (class): summary=yes, examples=no — Symbol occurrence entry extracted from the SCIP schema.
+- `SymbolInfo` (class): summary=yes, examples=no — Symbol metadata bundled with a document.
+- `Document` (class): summary=yes, examples=no — SCIP document entry (per source file).
+- `SCIPIndex` (class): summary=yes, examples=no — In-memory representation of a SCIP dataset.
+- `_parse_document` (function): summary=yes, params=ok, examples=no — Convert a raw SCIP document record into a :class:`Document`.

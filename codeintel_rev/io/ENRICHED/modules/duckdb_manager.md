@@ -31,11 +31,43 @@ Thread-safe DuckDB connection manager.
 
 - **fan_in**: 9
 - **fan_out**: 2
-- **cycle_group**: 21
+- **cycle_group**: 29
 
 ## Declared Exports (__all__)
 
 DuckDBConfig, DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
+
+## Doc Metrics
+
+- **summary**: Thread-safe DuckDB connection manager.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- database
+- filesystem
+
+## Complexity
+
+- branches: 43
+- cyclomatic: 44
+- loc: 347
+
+## Doc Coverage
+
+- `DuckDBConfig` (class): summary=yes, examples=no — Configuration parameters controlling DuckDB connections.
+- `DuckDBManager` (class): summary=yes, examples=no — Factory for DuckDB connections with consistent pragmas.
+- `DuckDBQueryOptions` (class): summary=yes, examples=no — Options controlling DuckDB query generation.
+- `DuckDBQueryBuilder` (class): summary=yes, examples=no — Helper for building parameterized DuckDB queries with scope filters.
 
 ## Tags
 

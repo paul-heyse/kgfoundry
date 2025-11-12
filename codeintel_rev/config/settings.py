@@ -10,7 +10,7 @@ import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, cast
+from typing import Literal
 
 import msgspec
 
@@ -1220,16 +1220,16 @@ def _build_eval_config() -> EvalConfig:
 
 def _resolve_bm25_analyzer(raw: str | None) -> Literal["code", "standard"]:
     normalized = (raw or "code").strip().lower()
-    if normalized not in {"code", "standard"}:
-        normalized = "code"
-    return cast("Literal['code', 'standard']", normalized)
+    if normalized == "standard":
+        return "standard"
+    return "code"
 
 
 def _resolve_splade_analyzer(raw: str | None) -> Literal["wordpiece", "code"]:
     normalized = (raw or "wordpiece").strip().lower()
-    if normalized not in {"wordpiece", "code"}:
-        normalized = "wordpiece"
-    return cast("Literal['wordpiece', 'code']", normalized)
+    if normalized == "code":
+        return "code"
+    return "wordpiece"
 
 
 def _build_bm25_config(

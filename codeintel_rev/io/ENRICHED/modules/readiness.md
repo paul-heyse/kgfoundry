@@ -74,4 +74,36 @@ codeintel_rev.app.main : FastAPI application with /readyz endpoint
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 43
+- **cycle_group**: 47
+
+## Doc Metrics
+
+- **summary**: Application readiness checks for Kubernetes health probes.
+- has summary: yes
+- param parity: yes
+- examples present: yes
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- database
+- filesystem
+- network
+- subprocess
+
+## Complexity
+
+- branches: 35
+- cyclomatic: 36
+- loc: 605
+
+## Doc Coverage
+
+- `CheckResult` (class): summary=yes, examples=yes — Outcome of a single readiness check.
+- `ReadinessProbe` (class): summary=yes, examples=yes — Manages readiness checks across core dependencies.

@@ -75,11 +75,39 @@ codeintel_rev.mcp_server.scope_utils : Scope merging and filtering utilities
 
 - **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 13
+- **cycle_group**: 20
 
 ## Declared Exports (__all__)
 
 ScopeRegistry
+
+## Doc Metrics
+
+- **summary**: Session-scoped scope registry for CodeIntel MCP (legacy helper).
+- has summary: yes
+- param parity: yes
+- examples present: yes
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 12
+- cyclomatic: 13
+- loc: 402
+
+## Doc Coverage
+
+- `ScopeRegistry` (class): summary=yes, examples=yes — Thread-safe registry for session-scoped query scopes.
 
 ## Tags
 

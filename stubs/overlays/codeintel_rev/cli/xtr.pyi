@@ -1,9 +1,7 @@
-# Auto-generated overlay for cli.xtr. Edit as needed for precise types.
-from typing import Any
+from typer import Typer
 
-from codeintel_rev.mcp_server.retrieval.xtr_cli import app as app
-from codeintel_rev.mcp_server.retrieval.xtr_cli import main as main
+app: Typer
 
-__all__ = ['app', 'main']
+def main() -> None: ...
 
-def __getattr__(name: str) -> Any: ...
+__all__ = ["app", "main"]

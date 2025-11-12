@@ -81,6 +81,18 @@ class _CommandContext:
     start: float
 
     def extensions(self, extras: Mapping[str, object] | None = None) -> dict[str, JsonValue]:
+        """Build Problem Details extensions dictionary from context.
+
+        Parameters
+        ----------
+        extras : Mapping[str, object] | None, optional
+            Additional key-value pairs to include in the extensions dictionary.
+
+        Returns
+        -------
+        dict[str, JsonValue]
+            Extensions dictionary containing operation_id, correlation_id, and any extras.
+        """
         payload: dict[str, JsonValue] = {
             "operation_id": self.operation_id,
             "correlation_id": self.correlation_id,
@@ -432,6 +444,25 @@ def _validate_vector_payload(payload: object) -> None:
 
 
 def load_vector_batch_from_json(vectors_path: str) -> VectorBatch:
+    """Load and validate a vector batch from a JSON file.
+
+    Parameters
+    ----------
+    vectors_path : str
+        Path to JSON file containing vector batch data.
+
+    Returns
+    -------
+    VectorBatch
+        Validated vector batch object.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the vectors file does not exist.
+    VectorValidationError
+        If the payload structure is invalid or fails validation.
+    """
     vectors_file = Path(vectors_path)
     if not vectors_file.exists():
         msg = f"Vectors file not found: {vectors_path}"

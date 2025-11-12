@@ -34,4 +34,33 @@ Offline recall evaluator leveraging FAISS + DuckDB catalogs.
 
 - **fan_in**: 2
 - **fan_out**: 8
-- **cycle_group**: 42
+- **cycle_group**: 46
+
+## Doc Metrics
+
+- **summary**: Offline recall evaluator leveraging FAISS + DuckDB catalogs.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 25
+- cyclomatic: 26
+- loc: 256
+
+## Doc Coverage
+
+- `EvalQuery` (class): summary=yes, examples=no — Single offline evaluation query with known positives.
+- `OfflineRecallEvaluator` (class): summary=yes, examples=no — Compute recall@K for FAISS retrieval using curated or synthesized queries.

@@ -14,7 +14,7 @@ except ImportError:  # pragma: no cover
 from codeintel_rev.enrich.scip_reader import SCIPIndex
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class UseGraph:
     """Definition-to-use relationships summarised by file."""
 
@@ -24,7 +24,18 @@ class UseGraph:
 
 
 def build_use_graph(index: SCIPIndex) -> UseGraph:
-    """Build a use graph from SCIP occurrences."""
+    """Build a use graph from SCIP occurrences.
+
+    Parameters
+    ----------
+    index : SCIPIndex
+        SCIP index containing symbol definitions and occurrences.
+
+    Returns
+    -------
+    UseGraph
+        Definition-to-use relationships derived from the SCIP index.
+    """
     symbol_defs: dict[str, str] = {}
     for doc in index.documents:
         for occurrence in doc.occurrences:

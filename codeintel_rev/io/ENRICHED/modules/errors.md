@@ -55,11 +55,46 @@ Raising Git operation error:
 
 - **fan_in**: 11
 - **fan_out**: 0
-- **cycle_group**: 28
+- **cycle_group**: 13
 
 ## Declared Exports (__all__)
 
 FileOperationError, FileReadError, GitOperationError, InvalidLineRangeError, PathNotDirectoryError, PathNotFoundError, RuntimeLifecycleError, RuntimeUnavailableError
+
+## Doc Metrics
+
+- **summary**: CodeIntel-specific exception hierarchy with Problem Details support.
+- has summary: yes
+- param parity: yes
+- examples present: yes
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 4
+- cyclomatic: 5
+- loc: 399
+
+## Doc Coverage
+
+- `FileOperationError` (class): summary=yes, examples=yes — Base exception for file operation errors.
+- `FileReadError` (class): summary=yes, examples=yes — Raised when file cannot be read due to encoding or binary content.
+- `InvalidLineRangeError` (class): summary=yes, examples=yes — Raised when line range parameters are invalid.
+- `PathNotFoundError` (class): summary=yes, examples=no — Raised when a requested repository path does not exist.
+- `PathNotDirectoryError` (class): summary=yes, examples=no — Raised when a repository path is expected to be a directory but is not.
+- `GitOperationError` (class): summary=yes, examples=yes — Base exception for Git operation errors.
+- `RuntimeLifecycleError` (class): summary=yes, examples=no — Raised when a runtime fails to initialize or shut down.
+- `RuntimeUnavailableError` (class): summary=yes, examples=no — Raised when a runtime dependency is missing or disabled.
 
 ## Tags
 

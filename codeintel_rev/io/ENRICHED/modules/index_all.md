@@ -68,4 +68,41 @@ The FAISS index type is automatically selected based on corpus size:
 
 - **fan_in**: 0
 - **fan_out**: 12
-- **cycle_group**: 58
+- **cycle_group**: 63
+
+## Doc Metrics
+
+- **summary**: One-shot indexing: SCIP → chunk → embed → Parquet → FAISS.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 37
+- cyclomatic: 38
+- loc: 722
+
+## Doc Coverage
+
+- `PipelinePaths` (class): summary=yes, examples=no — Resolved filesystem paths for the indexing pipeline.
+- `main` (function): summary=yes, params=ok, examples=no — Run the end-to-end indexing pipeline.
+- `_resolve_paths` (function): summary=yes, params=ok, examples=no — Resolve and normalize key filesystem paths.
+- `_load_scip_index` (function): summary=yes, params=ok, examples=no — Load and parse the SCIP index from disk.
+- `_group_definitions_by_file` (function): summary=yes, params=ok, examples=no — Group symbol definitions by their relative file path.
+- `_chunk_repository` (function): summary=yes, params=ok, examples=no — Chunk all files referenced by the SCIP index.
+- `_embed_chunks` (function): summary=yes, params=ok, examples=no — Generate embeddings for the supplied chunks using vLLM.
+- `_write_parquet` (function): summary=yes, params=ok, examples=no — Persist chunk metadata and embeddings to Parquet.
+- `_build_faiss_index` (function): summary=yes, params=ok, examples=no — Train and persist the FAISS index with adaptive type selection.
+- `_update_faiss_index_incremental` (function): summary=yes, params=ok, examples=no — Update FAISS index incrementally by adding new chunks to secondary index.

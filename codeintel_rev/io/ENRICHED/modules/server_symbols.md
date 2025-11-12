@@ -24,4 +24,34 @@ Symbol MCP tool registrations (pure move from server.py).
 
 - **fan_in**: 0
 - **fan_out**: 4
-- **cycle_group**: 79
+- **cycle_group**: 92
+
+## Doc Metrics
+
+- **summary**: Symbol MCP tool registrations (pure move from server.py).
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 16
+- cyclomatic: 17
+- loc: 263
+
+## Doc Coverage
+
+- `symbol_search` (function): summary=yes, params=ok, examples=no — Search for symbols (functions, classes, etc).
+- `definition_at` (function): summary=yes, params=ok, examples=no — Find definition at position.
+- `references_at` (function): summary=yes, params=ok, examples=no — Find references at position.

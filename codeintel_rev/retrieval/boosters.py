@@ -6,7 +6,7 @@ import re
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from codeintel_rev.retrieval.types import HybridResultDoc
 
@@ -174,8 +174,7 @@ def apply_recency_boost(
         if duckdb_manager is None or DuckDBManager is None:
             return docs, 0
         assert duckdb_manager is not None
-        assert DuckDBManager is not None
-        concrete_manager = duckdb_manager
+        concrete_manager: DuckDBManagerType = duckdb_manager
 
         def _lookup(ids: Iterable[str]) -> Mapping[str, float]:
             return _fetch_commit_ts_duckdb(concrete_manager, ids, cfg)

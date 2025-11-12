@@ -194,6 +194,13 @@ class OperationOverrideModel(BaseModel):
         return {}
 
     def to_payload(self) -> dict[str, object]:
+        """Convert operation override model to dictionary payload.
+
+        Returns
+        -------
+        dict[str, object]
+            Dictionary representation suitable for serialization to YAML/JSON.
+        """
         payload: dict[str, object] = {}
         if self.summary:
             payload["summary"] = self.summary
@@ -249,6 +256,13 @@ class TagGroupModel(BaseModel):
         return tuple(ordered)
 
     def to_payload(self) -> dict[str, object]:
+        """Convert tag group model to dictionary payload.
+
+        Returns
+        -------
+        dict[str, object]
+            Dictionary representation with name and tags fields.
+        """
         payload: dict[str, object] = {"name": self.name, "tags": list(self.tags)}
         if self.description:
             payload["description"] = self.description
@@ -311,6 +325,20 @@ class AugmentMetadataModel(BaseModel):
         *,
         tokens: Sequence[str] | None = None,
     ) -> OperationOverrideModel | None:
+        """Retrieve operation override by operation ID or token sequence.
+
+        Parameters
+        ----------
+        operation_id : str
+            Operation identifier to look up.
+        tokens : Sequence[str] | None, optional
+            Optional token sequence for alternative lookup key.
+
+        Returns
+        -------
+        OperationOverrideModel | None
+            Operation override model if found, otherwise None.
+        """
         override = self.operations.get(operation_id)
         if override is not None:
             return override
@@ -326,6 +354,20 @@ class AugmentMetadataModel(BaseModel):
         *,
         tokens: Sequence[str] | None = None,
     ) -> Mapping[str, object] | None:
+        """Retrieve operation override payload by operation ID or token sequence.
+
+        Parameters
+        ----------
+        operation_id : str
+            Operation identifier to look up.
+        tokens : Sequence[str] | None, optional
+            Optional token sequence for alternative lookup key.
+
+        Returns
+        -------
+        Mapping[str, object] | None
+            Operation override payload dictionary if found, otherwise None.
+        """
         override = self.operation_override(operation_id, tokens=tokens)
         if override is None:
             return None
@@ -395,6 +437,18 @@ class RegistryOperationModel(BaseModel):
         return _ensure_str_sequence(value)
 
     def to_payload(self, default_operation_id: str) -> dict[str, object]:
+        """Convert registry operation model to dictionary payload.
+
+        Parameters
+        ----------
+        default_operation_id : str
+            Default operation ID to use if model's operation_id is None.
+
+        Returns
+        -------
+        dict[str, object]
+            Dictionary representation suitable for serialization.
+        """
         payload: dict[str, object] = {}
         operation_id = self.operation_id or default_operation_id
         payload["operation_id"] = operation_id
@@ -502,6 +556,13 @@ class RegistryInterfaceModel(BaseModel):
         return _ensure_str_sequence(value)
 
     def to_payload(self) -> dict[str, object]:
+        """Convert registry interface model to dictionary payload.
+
+        Returns
+        -------
+        dict[str, object]
+            Dictionary representation with identifier and optional metadata fields.
+        """
         payload: dict[str, object] = {
             "id": self.identifier,
         }
@@ -551,14 +612,45 @@ class RegistryMetadataModel(BaseModel):
         return value
 
     def interface(self, identifier: str) -> RegistryInterfaceModel | None:
+        """Retrieve interface model by identifier.
+
+        Parameters
+        ----------
+        identifier : str
+            Interface identifier to look up.
+
+        Returns
+        -------
+        RegistryInterfaceModel | None
+            Interface model if found, otherwise None.
+        """
         return self.interfaces.get(identifier)
 
     def to_payload(self) -> dict[str, object]:
+        """Convert registry metadata model to dictionary payload.
+
+        Returns
+        -------
+        dict[str, object]
+            Dictionary mapping interface identifiers to their payload dictionaries.
+        """
         return {
             identifier: interface.to_payload() for identifier, interface in self.interfaces.items()
         }
 
     def get_interface(self, identifier: str) -> Mapping[str, object] | None:
+        """Retrieve interface payload by identifier.
+
+        Parameters
+        ----------
+        identifier : str
+            Interface identifier to look up.
+
+        Returns
+        -------
+        Mapping[str, object] | None
+            Interface payload dictionary if found, otherwise None.
+        """
         interface_model = self.interface(identifier)
         if interface_model is None:
             return None
@@ -579,6 +671,20 @@ class ToolingMetadataModel(BaseModel):
         *,
         tokens: Sequence[str] | None = None,
     ) -> OperationOverrideModel | None:
+        """Retrieve operation override from augment metadata.
+
+        Parameters
+        ----------
+        operation_id : str
+            Operation identifier to look up.
+        tokens : Sequence[str] | None, optional
+            Optional token sequence for alternative lookup key.
+
+        Returns
+        -------
+        OperationOverrideModel | None
+            Operation override model if found, otherwise None.
+        """
         return self.augment.operation_override(operation_id, tokens=tokens)
 
     def get_operation(self, operation_id: str) -> Mapping[str, object] | None:

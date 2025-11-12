@@ -1,1 +1,0 @@
-/home/paul/kgfoundry/stubs/overlays/codeintel_rev/mcp_server/__init__.pyi

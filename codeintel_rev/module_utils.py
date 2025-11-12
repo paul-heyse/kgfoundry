@@ -9,6 +9,11 @@ from pathlib import Path
 def normalize_module_name(path: str) -> str:
     """Return a dotted module name for a repo-relative path.
 
+    Parameters
+    ----------
+    path : str
+        Repository-relative file path (e.g., ``src/app/config.py``).
+
     Returns
     -------
     str
@@ -29,6 +34,13 @@ def normalize_module_name(path: str) -> str:
 def module_name_candidates(path: str, package_prefix: str | None) -> set[str]:
     """Return candidate module names (with and without prefix).
 
+    Parameters
+    ----------
+    path : str
+        Repository-relative file path.
+    package_prefix : str | None
+        Optional package prefix to prepend to module names.
+
     Returns
     -------
     set[str]
@@ -46,6 +58,15 @@ def module_name_candidates(path: str, package_prefix: str | None) -> set[str]:
 
 def resolve_relative_module(current: str, module: str | None, level: int) -> str:
     """Resolve a relative import into an absolute dotted module name.
+
+    Parameters
+    ----------
+    current : str
+        Current module name (e.g., ``app.config``).
+    module : str | None
+        Module name from import statement, or None for relative-only imports.
+    level : int
+        Relative import level (number of dots, e.g., 1 for ``from . import x``).
 
     Returns
     -------
@@ -71,6 +92,17 @@ def import_targets_for_entry(
 ) -> set[str]:
     """Return candidate absolute module names for a single import entry.
 
+    Parameters
+    ----------
+    current_module : str
+        Current module name where the import occurs.
+    module : str | None
+        Module name from import statement, or None for relative-only imports.
+    names : list[str]
+        List of imported symbol names (for ``from X import Y, Z``).
+    level : int
+        Relative import level (number of dots).
+
     Returns
     -------
     set[str]
@@ -82,7 +114,9 @@ def import_targets_for_entry(
         targets.add(absolute)
     if not module and names:
         for name in names:
-            absolute_name = resolve_relative_module(current_module, name, level) if current_module else name
+            absolute_name = (
+                resolve_relative_module(current_module, name, level) if current_module else name
+            )
             if absolute_name:
                 targets.add(absolute_name)
     return targets

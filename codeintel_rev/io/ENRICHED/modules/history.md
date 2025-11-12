@@ -14,7 +14,7 @@ better performance (50-80ms latency reduction) and reliability.
 
 - from **__future__** import annotations
 - from **typing** import TYPE_CHECKING
-- from **(absolute)** import exc
+- from **(absolute)** import git.exc
 - from **codeintel_rev.errors** import GitOperationError, PathNotFoundError
 - from **codeintel_rev.io.path_utils** import resolve_within_repo
 - from **kgfoundry_common.logging** import get_logger
@@ -30,11 +30,40 @@ better performance (50-80ms latency reduction) and reliability.
 
 - **fan_in**: 0
 - **fan_out**: 4
-- **cycle_group**: 93
+- **cycle_group**: 112
 
 ## Declared Exports (__all__)
 
 blame_range, file_history
+
+## Doc Metrics
+
+- **summary**: Git history adapter for blame and log operations.
+- has summary: yes
+- param parity: yes
+- examples present: yes
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 5
+- cyclomatic: 6
+- loc: 204
+
+## Doc Coverage
+
+- `blame_range` (function): summary=yes, params=ok, examples=yes — Get git blame for line range using GitPython (async).
+- `file_history` (function): summary=yes, params=ok, examples=yes — Get commit history for file using GitPython (async).
 
 ## Tags
 

@@ -43,11 +43,48 @@ Implements full MCP tool catalog for code intelligence.
 
 - **fan_in**: 3
 - **fan_out**: 6
-- **cycle_group**: 49
+- **cycle_group**: 53
 
 ## Declared Exports (__all__)
 
 app_context, build_http_app, get_context, mcp
+
+## Doc Metrics
+
+- **summary**: FastMCP server with QueryScope tools.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 14
+- cyclomatic: 15
+- loc: 391
+
+## Doc Coverage
+
+- `get_context` (function): summary=yes, params=ok, examples=no — Extract ApplicationContext from context variable.
+- `set_scope` (function): summary=yes, params=ok, examples=no — Set query scope for subsequent operations.
+- `list_paths` (function): summary=yes, params=ok, examples=no — List files in scope (async).
+- `open_file` (function): summary=yes, params=ok, examples=no — Read file content.
+- `search_text` (function): summary=yes, params=ok, examples=no — Fast text search (ripgrep-like).
+- `blame_range` (function): summary=yes, params=ok, examples=no — Git blame for line range (async).
+- `file_history` (function): summary=yes, params=ok, examples=no — Get file commit history (async).
+- `file_resource` (function): summary=yes, params=ok, examples=no — Serve file content as resource.
+- `prompt_code_review` (function): summary=yes, params=ok, examples=no — Code review prompt template.
+- `build_http_app` (function): summary=yes, params=ok, examples=no — Return the FastMCP ASGI app with capability-gated tool registration.
 
 ## Tags
 

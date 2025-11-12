@@ -45,4 +45,41 @@ CLI for rendering session timelines as Markdown diagnostics.
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 11
+- **cycle_group**: 16
+
+## Doc Metrics
+
+- **summary**: CLI for rendering session timelines as Markdown diagnostics.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 52
+- cyclomatic: 53
+- loc: 343
+
+## Doc Coverage
+
+- `_load_events` (function): summary=no, examples=no
+- `_group_events_by_run` (function): summary=no, examples=no
+- `_select_run_events` (function): summary=no, examples=no
+- `_format_attrs` (function): summary=no, examples=no
+- `_build_operation_chain` (function): summary=no, examples=no
+- `_find_event` (function): summary=no, examples=no
+- `_find_last_success` (function): summary=no, examples=no
+- `_find_first_failure` (function): summary=no, examples=no
+- `_format_event_summary` (function): summary=no, examples=no
+- `_collect_stage_entries` (function): summary=no, examples=no

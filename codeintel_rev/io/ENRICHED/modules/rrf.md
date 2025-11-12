@@ -24,11 +24,41 @@ Reciprocal Rank Fusion utilities (legacy compatibility wrappers).
 
 - **fan_in**: 0
 - **fan_out**: 3
-- **cycle_group**: 64
+- **cycle_group**: 74
 
 ## Declared Exports (__all__)
 
 weighted_rrf
+
+## Doc Metrics
+
+- **summary**: Reciprocal Rank Fusion utilities (legacy compatibility wrappers).
+- has summary: yes
+- param parity: yes
+- examples present: yes
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 7
+- cyclomatic: 8
+- loc: 163
+
+## Doc Coverage
+
+- `weighted_rrf` (function): summary=yes, params=ok, examples=yes — Apply weighted Reciprocal Rank Fusion to channel hits.
+- `_normalize_channel_hits` (function): summary=yes, params=ok, examples=no — Normalize channel hit scores using the specified mode.
+- `_to_int` (function): summary=no, examples=no
 
 ## Tags
 

@@ -49,11 +49,49 @@ Fast text search with regex support.
 
 - **fan_in**: 0
 - **fan_out**: 6
-- **cycle_group**: 92
+- **cycle_group**: 111
 
 ## Declared Exports (__all__)
 
 search_text
+
+## Doc Metrics
+
+- **summary**: Text search adapter using ripgrep.
+- has summary: yes
+- param parity: no
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+- subprocess
+
+## Complexity
+
+- branches: 53
+- cyclomatic: 54
+- loc: 596
+
+## Doc Coverage
+
+- `TextSearchOptions` (class): summary=yes, examples=no — Parameters controlling ripgrep execution.
+- `_bool_override` (function): summary=yes, params=ok, examples=no — Return a boolean override for the given key.
+- `_sequence_override` (function): summary=yes, params=ok, examples=no — Return a sequence override if the value is a valid sequence of strings.
+- `_int_override` (function): summary=yes, params=ok, examples=no — Return an integer override for the given key.
+- `search_text` (function): summary=yes, params=mismatch, examples=no — Fast text search using ripgrep (async wrapper).
+- `_search_text_sync` (function): summary=no, examples=no
+- `_fallback_grep` (function): summary=yes, params=ok, examples=no — Fallback to basic grep if ripgrep unavailable.
+- `RipgrepCommandParams` (class): summary=yes, examples=no — Parameter bundle for constructing ripgrep commands.
+- `_build_ripgrep_command` (function): summary=yes, params=ok, examples=no — Assemble the ripgrep command arguments.
+- `_parse_ripgrep_output` (function): summary=yes, params=ok, examples=no — Parse ripgrep JSON output into structured matches.
 
 ## Tags
 

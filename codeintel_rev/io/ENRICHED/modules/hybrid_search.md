@@ -48,12 +48,49 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 ## Dependency Graph
 
 - **fan_in**: 5
-- **fan_out**: 15
-- **cycle_group**: 42
+- **fan_out**: 14
+- **cycle_group**: 46
 
 ## Declared Exports (__all__)
 
 BM25SearchProvider, ChannelHit, HybridResultDoc, HybridSearchEngine, HybridSearchOptions, HybridSearchResult, HybridSearchTuning, SpladeSearchProvider
+
+## Doc Metrics
+
+- **summary**: Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 103
+- cyclomatic: 104
+- loc: 1051
+
+## Doc Coverage
+
+- `_LuceneHit` (class): summary=no, examples=no
+- `_LuceneSearcher` (class): summary=no, examples=no
+- `BM25Rm3Config` (class): summary=yes, examples=no — Bundle RM3 parameters and heuristics for BM25 search.
+- `BM25SearchProvider` (class): summary=yes, examples=no — Pyserini-backed BM25 searcher with optional RM3 heuristics.
+- `SpladeSearchProvider` (class): summary=yes, examples=no — SPLADE query encoder and Lucene impact searcher for learned sparse retrieval.
+- `HybridSearchTuning` (class): summary=yes, examples=no — Runtime overrides for FAISS search metadata.
+- `HybridSearchOptions` (class): summary=yes, examples=no — Optional knobs influencing hybrid fusion.
+- `_MethodStats` (class): summary=no, examples=no
+- `_FusionContext` (class): summary=yes, examples=no — All inputs required to fuse dense and sparse channel runs.
+- `_FusionWork` (class): summary=yes, examples=no — Resolved fusion parameters after pooler/weights are selected.
 
 ## Tags
 

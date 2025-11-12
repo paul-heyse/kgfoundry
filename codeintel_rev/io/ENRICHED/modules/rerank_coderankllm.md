@@ -26,4 +26,32 @@ Listwise reranking using the CodeRankLLM checkpoint.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 71
+- **cycle_group**: 81
+
+## Doc Metrics
+
+- **summary**: Listwise reranking using the CodeRankLLM checkpoint.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 20
+- cyclomatic: 21
+- loc: 174
+
+## Doc Coverage
+
+- `CodeRankListwiseReranker` (class): summary=yes, examples=no — Listwise reranking helper built on CodeRankLLM.

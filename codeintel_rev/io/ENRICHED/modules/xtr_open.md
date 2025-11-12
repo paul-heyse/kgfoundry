@@ -43,7 +43,37 @@ Example failure payload::
 
 - **fan_in**: 0
 - **fan_out**: 5
-- **cycle_group**: 95
+- **cycle_group**: 116
+
+## Doc Metrics
+
+- **summary**: Fail-fast probe for XTR artifacts.
+- has summary: yes
+- param parity: yes
+- examples present: yes
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 11
+- cyclomatic: 12
+- loc: 189
+
+## Doc Coverage
+
+- `xtr_open` (function): summary=yes, params=ok, examples=yes — Validate that XTR artifacts are present and readable.
+- `_exit_with_problem` (function): summary=no, examples=no
+- `main` (function): summary=yes, params=ok, examples=no — Execute the Typer CLI.
 
 ## Tags
 

@@ -49,11 +49,43 @@ through stable paths such as ``.../current/faiss.index`` and reload when
 
 - **fan_in**: 5
 - **fan_out**: 2
-- **cycle_group**: 39
+- **cycle_group**: 32
 
 ## Declared Exports (__all__)
 
 IndexAssets, IndexLifecycleManager, LuceneAssets, VersionMeta, link_current_lucene
+
+## Doc Metrics
+
+- **summary**: Index lifecycle management for FAISS/DuckDB/SCIP artifacts.
+- has summary: yes
+- param parity: no
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 30
+- cyclomatic: 31
+- loc: 469
+
+## Doc Coverage
+
+- `LuceneAssets` (class): summary=yes, examples=no — Lucene index directories that should flip atomically.
+- `link_current_lucene` (function): summary=yes, params=mismatch, examples=no — Copy Lucene assets into a version directory and flip the CURRENT pointer.
+- `IndexAssets` (class): summary=yes, examples=no — File-system assets that must advance together for one index version.
+- `VersionMeta` (class): summary=yes, examples=no — Metadata recorded for each version directory.
+- `IndexLifecycleManager` (class): summary=yes, examples=no — Manage staged/published index versions under a base directory.
 
 ## Tags
 

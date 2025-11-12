@@ -55,7 +55,7 @@ from __future__ import annotations
 import time
 from copy import deepcopy
 from threading import RLock
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.prometheus import build_counter, build_gauge
@@ -167,7 +167,7 @@ class ScopeRegistry:
         is_new_session = False
         with self._lock:
             is_new_session = session_id not in self._scopes
-            immutable_scope = cast("ScopeIn", deepcopy(scope))
+            immutable_scope: ScopeIn = deepcopy(scope)
             self._scopes[session_id] = (immutable_scope, timestamp)
             session_count = len(self._scopes)
             if is_new_session:
@@ -233,7 +233,7 @@ class ScopeRegistry:
 
             # Return copy to prevent caller mutation
             # Cast is safe because scope is ScopeIn from _scopes dict
-            scope_copy = cast("ScopeIn", deepcopy(scope))
+            scope_copy: ScopeIn = deepcopy(scope)
 
             # Update metrics
             _scope_operations_total.labels(operation="get").inc()

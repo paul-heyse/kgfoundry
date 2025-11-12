@@ -273,11 +273,9 @@ def build_xtr_index(settings: Settings | None = None) -> XTRBuildSummary:
 
     xtr_dir = paths.xtr_dir
     xtr_dir.mkdir(parents=True, exist_ok=True)
-    index = XTRIndex(root=xtr_dir, config=settings.xtr)
-
     dtype = np.dtype(np.float32 if settings.xtr.dtype == "float32" else np.float16)
     buffers, chunk_ids, offsets, lengths, total_tokens = _gather_chunk_vectors(
-        index=index,
+        index=XTRIndex(root=xtr_dir, config=settings.xtr),
         catalog=catalog,
         dtype=dtype,
     )
@@ -294,14 +292,12 @@ def build_xtr_index(settings: Settings | None = None) -> XTRBuildSummary:
         total_tokens=total_tokens,
     )
 
-    doc_count = len(chunk_ids)
-    dim_value = settings.xtr.dim
     dtype_label = "float32" if dtype is np.float32 else "float16"
     meta = {
-        "dim": dim_value,
+        "dim": settings.xtr.dim,
         "dtype": dtype_label,
         "total_tokens": int(total_tokens),
-        "doc_count": doc_count,
+        "doc_count": len(chunk_ids),
         "chunk_ids": chunk_ids,
         "offsets": offsets,
         "lengths": lengths,
@@ -313,17 +309,17 @@ def build_xtr_index(settings: Settings | None = None) -> XTRBuildSummary:
     LOGGER.info(
         "xtr_build_complete",
         extra={
-            "doc_count": doc_count,
+            "doc_count": len(chunk_ids),
             "tokens": total_tokens,
-            "dim": dim_value,
+            "dim": settings.xtr.dim,
             "dtype": dtype_label,
             "root": str(xtr_dir),
         },
     )
     return XTRBuildSummary(
-        chunk_count=doc_count,
+        chunk_count=len(chunk_ids),
         token_count=total_tokens,
-        dim=dim_value,
+        dim=settings.xtr.dim,
         dtype=dtype_label,
         token_path=str(token_path),
         meta_path=str(meta_path),

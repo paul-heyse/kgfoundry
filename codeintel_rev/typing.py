@@ -116,7 +116,7 @@ class TorchTensor(Protocol):
     def __matmul__(self, other: TorchTensor) -> TorchTensor: ...
 
     @property
-    def T(self) -> TorchTensor: ...
+    def T(self) -> TorchTensor: ...  # noqa: N802 - matches torch.Tensor API
 
     def sum(self) -> TorchTensor: ...
 
@@ -143,7 +143,6 @@ class TorchModule(Protocol):
 
 class FaissStandardGpuResources(Protocol):
     """GPU resource handle for FAISS."""
-
 
 
 class FaissGpuClonerOptions(Protocol):
@@ -179,7 +178,9 @@ class FaissModule(Protocol):
         def __call__(self) -> FaissStandardGpuResources: ...
 
     class _IndexCtor(Protocol):
-        def __call__(self, resources: FaissStandardGpuResources, dim: int) -> FaissGpuIndexFlatIP: ...
+        def __call__(
+            self, resources: FaissStandardGpuResources, dim: int
+        ) -> FaissGpuIndexFlatIP: ...
 
     StandardGpuResources: _ResourceCtor
     GpuClonerOptions: type[FaissGpuClonerOptions]
@@ -190,7 +191,7 @@ class FaissModule(Protocol):
         """Return the number of available GPUs."""
         ...
 
-    def normalize_L2(self, vectors: NDArrayF32) -> None:
+    def normalize_L2(self, vectors: NDArrayF32) -> None:  # noqa: N802 - FAISS API
         """Normalize vectors using L2 norm in-place."""
         ...
 
@@ -214,13 +215,13 @@ class NumpyRandomState(Protocol):
 class NumpyRandomNamespace(Protocol):
     """Namespace for numpy.random helpers."""
 
-    def RandomState(self, seed: int) -> NumpyRandomState: ...
+    def RandomState(self, seed: int) -> NumpyRandomState: ...  # noqa: N802 - numpy API
 
 
 class NumpyLinalgNamespace(Protocol):
     """Namespace for numpy.linalg helpers."""
 
-    def norm(self, array: NDArrayF32, axis: int, keepdims: bool) -> NDArrayF32: ...
+    def norm(self, array: NDArrayF32, axis: int, keepdims: bool) -> NDArrayF32: ...  # noqa: FBT001 - mirrors numpy signature
 
 
 class NumpyModule(Protocol):

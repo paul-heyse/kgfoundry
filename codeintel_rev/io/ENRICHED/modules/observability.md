@@ -52,11 +52,42 @@ Graceful degradation when metrics are unavailable:
 
 - **fan_in**: 3
 - **fan_out**: 1
-- **cycle_group**: 87
+- **cycle_group**: 103
 
 ## Declared Exports (__all__)
 
 Observation, observe_duration
+
+## Doc Metrics
+
+- **summary**: Unified observability helpers for CodeIntel MCP adapters.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 6
+- cyclomatic: 7
+- loc: 142
+
+## Doc Coverage
+
+- `_supports_histogram_labels` (function): summary=yes, params=ok, examples=no — Return ``True`` when the histogram exposes label support.
+- `_NoopObservation` (class): summary=yes, examples=no — Fallback observation used when metrics cannot be recorded.
+- `Observation` (class): summary=yes, examples=no — Protocol describing the helpers provided by metrics observations.
+- `observe_duration` (function): summary=yes, params=ok, examples=no — Yield a metrics observation with graceful degradation.
 
 ## Tags
 

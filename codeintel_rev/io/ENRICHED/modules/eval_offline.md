@@ -26,4 +26,33 @@ Command-line entry point for offline FAISS recall evaluation.
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 52
+- **cycle_group**: 57
+
+## Doc Metrics
+
+- **summary**: Command-line entry point for offline FAISS recall evaluation.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 2
+- cyclomatic: 3
+- loc: 85
+
+## Doc Coverage
+
+- `build_parser` (function): summary=yes, params=ok, examples=no — Return an argument parser for the offline evaluator CLI.
+- `main` (function): summary=yes, params=ok, examples=no — Execute the evaluator using CLI arguments.

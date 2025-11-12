@@ -24,11 +24,42 @@ Shared reranker interfaces and request/response types.
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 73
+- **cycle_group**: 84
 
 ## Declared Exports (__all__)
 
 RerankRequest, RerankResult, Reranker, ScoredDoc
+
+## Doc Metrics
+
+- **summary**: Shared reranker interfaces and request/response types.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 0
+- cyclomatic: 1
+- loc: 47
+
+## Doc Coverage
+
+- `ScoredDoc` (class): summary=yes, examples=no — Document identifier + score pair.
+- `RerankResult` (class): summary=yes, examples=no — Result emitted by rerankers.
+- `RerankRequest` (class): summary=yes, examples=no — Structured rerank invocation.
+- `Reranker` (class): summary=yes, examples=no — Protocol implemented by pluggable rerankers.
 
 ## Tags
 

@@ -27,11 +27,43 @@ Feature-normalized hybrid pooling utilities.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 20
+- **cycle_group**: 35
 
 ## Declared Exports (__all__)
 
 Hit, HybridPoolEvaluator, PooledHit
+
+## Doc Metrics
+
+- **summary**: Feature-normalized hybrid pooling utilities.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 14
+- cyclomatic: 15
+- loc: 177
+
+## Doc Coverage
+
+- `Hit` (class): summary=yes, examples=no — Individual retrieval hit provided to the hybrid pool.
+- `PooledHit` (class): summary=yes, examples=no — Result after pooling with per-source component scores.
+- `_minmax_norm` (function): summary=no, examples=no
+- `_softmax_norm` (function): summary=no, examples=no
+- `HybridPoolEvaluator` (class): summary=yes, examples=no — Blend multi-channel hits with configurable normalization and weights.
 
 ## Tags
 

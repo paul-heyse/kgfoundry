@@ -80,11 +80,43 @@ codeintel_rev.app.middleware : get_session_id for retrieving session ID
 
 - **fan_in**: 5
 - **fan_out**: 3
-- **cycle_group**: 42
+- **cycle_group**: 46
 
 ## Declared Exports (__all__)
 
 LANGUAGE_EXTENSIONS, apply_language_filter, apply_path_filters, get_effective_scope, merge_scope_filters, path_matches_glob
+
+## Doc Metrics
+
+- **summary**: Scope filtering and merging utilities for CodeIntel MCP.
+- has summary: yes
+- param parity: yes
+- examples present: yes
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 16
+- cyclomatic: 17
+- loc: 487
+
+## Doc Coverage
+
+- `get_effective_scope` (function): summary=yes, params=ok, examples=yes — Retrieve session scope from the scope store.
+- `merge_scope_filters` (function): summary=yes, params=ok, examples=yes — Merge session scope with explicit adapter parameters.
+- `apply_path_filters` (function): summary=yes, params=ok, examples=yes — Filter paths using glob patterns.
+- `apply_language_filter` (function): summary=yes, params=ok, examples=yes — Filter paths by programming language.
+- `path_matches_glob` (function): summary=yes, params=ok, examples=yes — Test if path matches glob pattern.
 
 ## Tags
 

@@ -32,11 +32,44 @@ Built-in retrieval channel implementations (BM25, SPLADE).
 
 - **fan_in**: 0
 - **fan_out**: 4
-- **cycle_group**: 72
+- **cycle_group**: 82
 
 ## Declared Exports (__all__)
 
 bm25_factory, splade_factory
+
+## Doc Metrics
+
+- **summary**: Built-in retrieval channel implementations (BM25, SPLADE).
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 26
+- cyclomatic: 27
+- loc: 333
+
+## Doc Coverage
+
+- `bm25_factory` (function): summary=yes, params=ok, examples=no — Return the built-in BM25 channel.
+- `splade_factory` (function): summary=yes, params=ok, examples=no — Return the built-in SPLADE impact channel.
+- `_BM25Channel` (class): summary=no, examples=no
+- `_SpladeChannel` (class): summary=no, examples=no
+- `_resolve_path` (function): summary=no, examples=no
+- `_classify_skip_reason` (function): summary=no, examples=no
 
 ## Tags
 

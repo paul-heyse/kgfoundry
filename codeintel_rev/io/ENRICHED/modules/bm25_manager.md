@@ -45,11 +45,48 @@ BM25 indexing workflow helpers.
 
 - **fan_in**: 3
 - **fan_out**: 3
-- **cycle_group**: 69
+- **cycle_group**: 79
 
 ## Declared Exports (__all__)
 
 BM25BuildOptions, BM25CorpusMetadata, BM25CorpusSummary, BM25IndexManager, BM25IndexMetadata
+
+## Doc Metrics
+
+- **summary**: BM25 indexing workflow helpers.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 39
+- cyclomatic: 40
+- loc: 479
+
+## Doc Coverage
+
+- `BM25CorpusMetadata` (class): summary=yes, examples=no — Metadata describing a prepared BM25 corpus.
+- `BM25CorpusSummary` (class): summary=yes, examples=no — Summary information returned after preparing a corpus.
+- `BM25IndexMetadata` (class): summary=yes, examples=no — Metadata describing a built BM25 index.
+- `BM25BuildOptions` (class): summary=yes, examples=no — Options controlling BM25 index builds.
+- `BM25IndexManager` (class): summary=yes, examples=no — Manage BM25 corpus preparation and Lucene index builds.
+- `_write_struct` (function): summary=yes, params=mismatch, examples=no — Write a msgspec struct to JSON with UTF-8 encoding.
+- `_read_corpus_metadata` (function): summary=yes, params=ok, examples=no — Read corpus metadata from JSON file.
+- `_parse_corpus_line` (function): summary=yes, params=ok, examples=no — Parse and validate a JSONL line from the corpus source.
+- `_run_pyserini_index` (function): summary=yes, params=mismatch, examples=no — Execute the Pyserini index command and raise for failures.
+- `_detect_pyserini_version` (function): summary=yes, params=ok, examples=no — Return the installed Pyserini version or ``'unknown'`` if unavailable.
 
 ## Tags
 

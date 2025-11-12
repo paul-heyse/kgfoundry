@@ -10,7 +10,7 @@ from time import perf_counter
 from typing import TYPE_CHECKING, Protocol
 
 from codeintel_rev.evaluation.hybrid_pool import Hit, HybridPoolEvaluator
-from codeintel_rev.observability import metrics as retrieval_metrics
+import codeintel_rev.observability.metrics as retrieval_metrics
 from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.plugins.channels import Channel, ChannelContext, ChannelError
 from codeintel_rev.plugins.registry import ChannelRegistry

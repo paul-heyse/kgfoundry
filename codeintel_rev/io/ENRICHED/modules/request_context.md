@@ -26,11 +26,35 @@ can exchange session metadata without introducing circular imports between the
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 16
+- **cycle_group**: 23
 
 ## Declared Exports (__all__)
 
 capability_stamp_var, session_id_var
+
+## Doc Metrics
+
+- **summary**: Shared request-scoped context variables for runtime components.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 0
+- cyclomatic: 1
+- loc: 29
 
 ## Tags
 

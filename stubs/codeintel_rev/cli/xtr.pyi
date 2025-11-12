@@ -1,1 +1,7 @@
-/home/paul/kgfoundry/stubs/overlays/codeintel_rev/cli/xtr.pyi
+from typer import Typer
+
+app: Typer
+
+def main() -> None: ...
+
+__all__ = ["app", "main"]

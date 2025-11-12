@@ -52,7 +52,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
 
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.scope_store import ScopeStore
@@ -65,7 +65,7 @@ from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager, FAISSRuntimeOptions
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from codeintel_rev.io.vllm_client import VLLMClient
-from codeintel_rev.observability import metrics as retrieval_metrics
+import codeintel_rev.observability.metrics as _retrieval_metrics
 from codeintel_rev.runtime import (
     NullRuntimeCellObserver,
     RuntimeCell,
@@ -92,6 +92,13 @@ else:  # pragma: no cover - runtime only; annotations are postponed
 
 LOGGER = get_logger(__name__)
 _RUNTIME_FAILURE_TTL_S = 15.0
+
+
+class _RetrievalMetrics(Protocol):
+    def set_index_version(self, name: str, version: str | None) -> None: ...
+
+
+retrieval_metrics = cast("_RetrievalMetrics", _retrieval_metrics)
 
 __all__ = ["ApplicationContext", "ResolvedPaths", "resolve_application_paths"]
 
@@ -157,6 +164,97 @@ def _build_factory_adjuster(settings: Settings) -> FactoryAdjuster:
         )
     except (AttributeError, TypeError, ValueError):  # pragma: no cover - defensive
         return NoopFactoryAdjuster()
+
+
+def _build_faiss_manager(settings: Settings, paths: ResolvedPaths) -> FAISSManager:
+    """Construct and log the FAISS manager for the main index.
+
+    Parameters
+    ----------
+    settings : Settings
+        Application settings containing index configuration.
+    paths : ResolvedPaths
+        Resolved filesystem paths including FAISS index path.
+
+    Returns
+    -------
+    manager : FAISSManager
+        Configured FAISS manager instance.
+
+    Raises
+    ------
+    ConfigurationError
+        If IndexConfig.nlist is None during context creation.
+    """
+    faiss_manager_cls = _import_faiss_manager_cls()
+    runtime_opts = _faiss_runtime_options_from_index(settings.index)
+    nlist_value = settings.index.nlist
+    if nlist_value is None:
+        msg = "IndexConfig.nlist cannot be None during context creation"
+        raise ConfigurationError(msg)
+    manager = faiss_manager_cls(
+        index_path=paths.faiss_index,
+        vec_dim=settings.index.vec_dim,
+        nlist=nlist_value,
+        use_cuvs=settings.index.use_cuvs,
+        runtime=runtime_opts,
+    )
+    try:
+        LOGGER.info(
+            "faiss.compile",
+            extra={"opts": manager.get_compile_options(), "component": "app_start"},
+        )
+    except (RuntimeError, OSError, ValueError):
+        LOGGER.debug("Unable to fetch FAISS compile options at startup", exc_info=True)
+    return manager
+
+
+def _build_scope_store(settings: Settings) -> ScopeStore:
+    """Return the session scope store backed by redis.asyncio.
+
+    Parameters
+    ----------
+    settings : Settings
+        Application settings containing Redis configuration.
+
+    Returns
+    -------
+    store : ScopeStore
+        Configured scope store instance.
+    """
+    redis_asyncio = cast(
+        "ModuleType",
+        gate_import("redis.asyncio", "Session scope store requires redis extra"),
+    )
+    redis_client = redis_asyncio.from_url(settings.redis.url)
+    return ScopeStore(
+        cast("SupportsAsyncRedis", redis_client),
+        l1_maxsize=settings.redis.scope_l1_size,
+        l1_ttl_seconds=settings.redis.scope_l1_ttl_seconds,
+        l2_ttl_seconds=settings.redis.scope_l2_ttl_seconds,
+    )
+
+
+def _build_git_clients(paths: ResolvedPaths) -> tuple[GitClient, AsyncGitClient]:
+    """Initialize Git clients for blame and history operations.
+
+    Parameters
+    ----------
+    paths : ResolvedPaths
+        Resolved filesystem paths including repository root.
+
+    Returns
+    -------
+    clients : tuple[GitClient, AsyncGitClient]
+        Pair of synchronous and asynchronous Git clients.
+    """
+    git_client = GitClient(repo_path=paths.repo_root)
+    async_git_client = AsyncGitClient(git_client)
+    LOGGER.debug(
+        "Initialized Git clients",
+        extra={"repo_path": str(paths.repo_root)},
+    )
+    return git_client, async_git_client
 
 
 _FROZEN_SETATTR = object.__setattr__
@@ -821,51 +919,9 @@ class ApplicationContext:
         paths = resolve_application_paths(settings)
 
         vllm_client = VLLMClient(settings.vllm)
-        faiss_manager_cls = _import_faiss_manager_cls()
-        runtime_opts = _faiss_runtime_options_from_index(settings.index)
-        nlist_value = settings.index.nlist
-        if nlist_value is None:
-            msg = "IndexConfig.nlist cannot be None during context creation"
-            raise ConfigurationError(msg)
-        nlist = nlist_value
-        faiss_manager = faiss_manager_cls(
-            index_path=paths.faiss_index,
-            vec_dim=settings.index.vec_dim,
-            nlist=nlist,
-            use_cuvs=settings.index.use_cuvs,
-            runtime=runtime_opts,
-        )
-        try:
-            LOGGER.info(
-                "faiss.compile",
-                extra={"opts": faiss_manager.get_compile_options(), "component": "app_start"},
-            )
-        except (RuntimeError, OSError, ValueError):
-            LOGGER.debug("Unable to fetch FAISS compile options at startup", exc_info=True)
-
-        # Initialize scope store for session-scoped query constraints
-        redis_asyncio = cast(
-            "ModuleType",
-            gate_import("redis.asyncio", "Session scope store requires redis extra"),
-        )
-        redis_client = redis_asyncio.from_url(settings.redis.url)
-        # redis.asyncio.Redis implements SupportsAsyncRedis protocol, but pyright
-        # doesn't recognize it without explicit cast
-        scope_store = ScopeStore(
-            cast("SupportsAsyncRedis", redis_client),
-            l1_maxsize=settings.redis.scope_l1_size,
-            l1_ttl_seconds=settings.redis.scope_l1_ttl_seconds,
-            l2_ttl_seconds=settings.redis.scope_l2_ttl_seconds,
-        )
-
-        # Initialize Git clients for blame and history operations
-        git_client = GitClient(repo_path=paths.repo_root)
-        async_git_client = AsyncGitClient(git_client)
-        LOGGER.debug(
-            "Initialized Git clients",
-            extra={"repo_path": str(paths.repo_root)},
-        )
-
+        faiss_manager = _build_faiss_manager(settings, paths)
+        scope_store = _build_scope_store(settings)
+        git_client, async_git_client = _build_git_clients(paths)
         duckdb_manager = DuckDBManager(paths.duckdb_path, settings.duckdb)
 
         LOGGER.info(

@@ -22,11 +22,39 @@ Telemetry helpers for MCP tools.
 
 - **fan_in**: 3
 - **fan_out**: 2
-- **cycle_group**: 47
+- **cycle_group**: 52
 
 ## Declared Exports (__all__)
 
 tool_operation_scope
+
+## Doc Metrics
+
+- **summary**: Telemetry helpers for MCP tools.
+- has summary: yes
+- param parity: no
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 4
+- cyclomatic: 5
+- loc: 62
+
+## Doc Coverage
+
+- `tool_operation_scope` (function): summary=yes, params=mismatch, examples=no — Emit start/end events for an MCP tool and yield the active timeline.
 
 ## Tags
 

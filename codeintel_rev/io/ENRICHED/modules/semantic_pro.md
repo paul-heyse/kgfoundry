@@ -98,4 +98,42 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 
 - **fan_in**: 0
 - **fan_out**: 18
-- **cycle_group**: 91
+- **cycle_group**: 110
+
+## Doc Metrics
+
+- **summary**: Two-stage semantic search (CodeRank → optional WARP → optional reranker).
+- has summary: yes
+- param parity: yes
+- examples present: yes
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+- subprocess
+
+## Complexity
+
+- branches: 154
+- cyclomatic: 155
+- loc: 1736
+
+## Doc Coverage
+
+- `RerankOptionPayload` (class): summary=yes, examples=no — User-facing payload for overruling rerank behavior.
+- `SemanticProOptions` (class): summary=yes, examples=no — User-facing options for semantic_pro retrieval.
+- `RerankRuntimeOptions` (class): summary=yes, examples=no — Runtime overrides for optional reranker stage.
+- `RerankPlan` (class): summary=yes, examples=no — Concrete rerank execution plan derived from settings + overrides.
+- `SemanticProRuntimeOptions` (class): summary=yes, examples=no — Internal immutable representation of semantic_pro options.
+- `StageOnePlan` (class): summary=yes, examples=no — Container for Stage-1 orchestration inputs to reduce argument lists.
+- `HydrationPlan` (class): summary=yes, examples=no — Hydration plus rerank inputs passed as a cohesive plan.
+- `HydrationOutcome` (class): summary=yes, examples=no — Result of DuckDB hydration and optional LLM rerank.
+- `build_runtime_options` (function): summary=yes, params=ok, examples=yes — Normalize user-supplied options into an immutable dataclass.
+- `_summarize_options` (function): summary=no, examples=no

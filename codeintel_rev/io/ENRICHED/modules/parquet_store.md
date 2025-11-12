@@ -16,7 +16,7 @@ for efficient vector storage and querying via DuckDB.
 - from **pathlib** import Path
 - from **typing** import TYPE_CHECKING, cast
 - from **(absolute)** import pyarrow
-- from **(absolute)** import parquet
+- from **(absolute)** import pyarrow.parquet
 - from **codeintel_rev._lazy_imports** import LazyModule
 - from **codeintel_rev.typing** import NDArrayF32
 - from **collections.abc** import Sequence
@@ -36,11 +36,43 @@ for efficient vector storage and querying via DuckDB.
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 57
+- **cycle_group**: 62
 
 ## Declared Exports (__all__)
 
 ParquetWriteOptions, extract_embeddings, get_chunks_schema, read_chunks_parquet, write_chunks_parquet
+
+## Doc Metrics
+
+- **summary**: Parquet storage for chunks and vectors using Arrow.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 4
+- cyclomatic: 5
+- loc: 199
+
+## Doc Coverage
+
+- `get_chunks_schema` (function): summary=yes, params=ok, examples=no — Get Arrow schema for chunks table.
+- `ParquetWriteOptions` (class): summary=yes, examples=no — Configuration for Parquet persistence.
+- `write_chunks_parquet` (function): summary=yes, params=ok, examples=no — Write chunks and embeddings to Parquet.
+- `read_chunks_parquet` (function): summary=yes, params=ok, examples=no — Read chunks from Parquet file.
+- `extract_embeddings` (function): summary=yes, params=ok, examples=no — Extract embeddings from chunks table.
 
 ## Tags
 

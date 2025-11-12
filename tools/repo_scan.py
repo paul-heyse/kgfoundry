@@ -462,6 +462,11 @@ def collect_public_api(tree: ast.Module) -> list[str]:
 def _annotation_to_str(node: ast.AST | None) -> str:
     """Return the string representation of an annotation or default value.
 
+    Parameters
+    ----------
+    node : ast.AST | None
+        AST node representing a type annotation or default value.
+
     Returns
     -------
     str
@@ -477,6 +482,11 @@ def _annotation_to_str(node: ast.AST | None) -> str:
 
 def _doc_one_liner(text: str | None) -> str:
     """Return the first non-empty line from ``text``.
+
+    Parameters
+    ----------
+    text : str | None
+        Multi-line text string to extract first line from.
 
     Returns
     -------

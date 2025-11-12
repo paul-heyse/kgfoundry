@@ -5,7 +5,6 @@ project-excludes = [
     "site/**",
     "**/.venv/**",
     "**/__pycache__/**",
-    "codeintel/ts_languages/**",
     "src/kgfoundry_common/http/**",
     "codeintel_rev/patches/**",
 ]

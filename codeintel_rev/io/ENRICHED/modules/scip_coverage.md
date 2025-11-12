@@ -35,4 +35,36 @@ SCIP symbol coverage evaluator.
 
 - **fan_in**: 1
 - **fan_out**: 6
-- **cycle_group**: 53
+- **cycle_group**: 58
+
+## Doc Metrics
+
+- **summary**: SCIP symbol coverage evaluator.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 17
+- cyclomatic: 18
+- loc: 261
+
+## Doc Coverage
+
+- `SupportsFaissSearch` (class): summary=yes, examples=no — Protocol capturing the subset of FAISS search methods required here.
+- `SupportsEmbedSingle` (class): summary=yes, examples=no — Protocol describing embedder behaviour used by the evaluator.
+- `CoverageResult` (class): summary=yes, examples=no — Container for per-symbol coverage evaluation.
+- `CoverageSummary` (class): summary=yes, examples=no — Typed summary payload returned by ``SCIPCoverageEvaluator``.
+- `SCIPCoverageEvaluator` (class): summary=yes, examples=no — Evaluate chunk/index/retrieval coverage across SCIP function definitions.

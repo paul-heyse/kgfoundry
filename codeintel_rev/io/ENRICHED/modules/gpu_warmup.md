@@ -33,11 +33,43 @@ GPU is reachable and functional before expensive operations begin.
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 19
+- **cycle_group**: 26
 
 ## Declared Exports (__all__)
 
 warmup_gpu
+
+## Doc Metrics
+
+- **summary**: GPU warmup and initialization sequence.
+- has summary: yes
+- param parity: yes
+- examples present: yes
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 20
+- cyclomatic: 21
+- loc: 255
+
+## Doc Coverage
+
+- `_check_cuda_availability` (function): summary=yes, params=ok, examples=no — Check CUDA availability via PyTorch.
+- `_check_faiss_gpu_support` (function): summary=yes, params=ok, examples=no — Check FAISS GPU support.
+- `_test_torch_gpu_operations` (function): summary=yes, params=ok, examples=no — Test basic GPU tensor operations using PyTorch.
+- `_test_faiss_gpu_resources` (function): summary=yes, params=ok, examples=no — Test FAISS GPU resource initialization.
+- `warmup_gpu` (function): summary=yes, params=ok, examples=yes — Perform GPU warmup sequence to verify GPU availability and functionality.
 
 ## Tags
 

@@ -21,4 +21,32 @@ Helpers for lazily importing heavy optional dependencies.
 
 - **fan_in**: 15
 - **fan_out**: 1
-- **cycle_group**: 10
+- **cycle_group**: 15
+
+## Doc Metrics
+
+- **summary**: Helpers for lazily importing heavy optional dependencies.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 2
+- cyclomatic: 3
+- loc: 43
+
+## Doc Coverage
+
+- `LazyModule` (class): summary=yes, examples=no — Proxy object that imports a module only when accessed.

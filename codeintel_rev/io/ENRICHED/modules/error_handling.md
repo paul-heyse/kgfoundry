@@ -87,11 +87,42 @@ Error envelope structure:
 
 - **fan_in**: 3
 - **fan_out**: 3
-- **cycle_group**: 46
+- **cycle_group**: 51
 
 ## Declared Exports (__all__)
 
 EXCEPTION_TO_ERROR_CODE, convert_exception_to_envelope, format_error_response, handle_adapter_errors
+
+## Doc Metrics
+
+- **summary**: Centralized error handling for CodeIntel MCP server.
+- has summary: yes
+- param parity: yes
+- examples present: yes
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- network
+
+## Complexity
+
+- branches: 17
+- cyclomatic: 18
+- loc: 688
+
+## Doc Coverage
+
+- `ProblemMapping` (class): summary=yes, examples=no — Mapping from exception type to RFC 9457 Problem Details metadata.
+- `format_error_response` (function): summary=yes, params=ok, examples=no — Return Problem Details payload for the provided exception.
+- `convert_exception_to_envelope` (function): summary=yes, params=ok, examples=yes — Convert exception to unified error envelope with Problem Details.
+- `handle_adapter_errors` (function): summary=yes, params=ok, examples=yes — Convert adapter exceptions to unified error envelopes.
 
 ## Tags
 

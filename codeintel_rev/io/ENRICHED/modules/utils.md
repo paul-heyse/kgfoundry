@@ -21,11 +21,40 @@ Helpers for working with msgspec-based settings structs.
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 59
+- **cycle_group**: 65
 
 ## Declared Exports (__all__)
 
 replace_settings, replace_struct
+
+## Doc Metrics
+
+- **summary**: Helpers for working with msgspec-based settings structs.
+- has summary: yes
+- param parity: no
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 0
+- cyclomatic: 1
+- loc: 84
+
+## Doc Coverage
+
+- `replace_settings` (function): summary=yes, params=mismatch, examples=no — Return a new Settings instance with updates applied.
+- `replace_struct` (function): summary=yes, params=mismatch, examples=no — Clone a struct instance with the provided field overrides applied.
 
 ## Tags
 

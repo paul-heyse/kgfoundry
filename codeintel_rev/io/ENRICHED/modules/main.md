@@ -64,11 +64,49 @@ Provides health/readiness endpoints, CORS, and streaming support.
 
 - **fan_in**: 0
 - **fan_out**: 12
-- **cycle_group**: 51
+- **cycle_group**: 55
 
 ## Declared Exports (__all__)
 
 app
+
+## Doc Metrics
+
+- **summary**: FastAPI application with MCP server mount.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+- subprocess
+
+## Complexity
+
+- branches: 44
+- cyclomatic: 45
+- loc: 620
+
+## Doc Coverage
+
+- `_preload_faiss_index` (function): summary=yes, params=ok, examples=no — Pre-load FAISS index during startup to avoid first-request latency.
+- `_env_flag` (function): summary=yes, params=ok, examples=no — Return ``True`` when an environment flag is explicitly enabled.
+- `_log_gpu_warmup` (function): summary=yes, params=ok, examples=no — Log the GPU warmup status summary.
+- `_preload_faiss_if_configured` (function): summary=yes, params=mismatch, examples=no — Preload FAISS indexes when configured to do so.
+- `_preload_xtr_if_configured` (function): summary=yes, params=mismatch, examples=no — Preload XTR runtime when toggle is enabled.
+- `_preload_hybrid_if_configured` (function): summary=yes, params=mismatch, examples=no — Preload HybridSearchEngine when toggle is enabled.
+- `_initialize_context` (function): summary=yes, params=ok, examples=yes — Initialize application context, readiness probe, and optional runtimes.
+- `_shutdown_context` (function): summary=yes, params=mismatch, examples=no — Shut down mutable runtimes and readiness probes.
+- `lifespan` (function): summary=yes, params=ok, examples=no — Application lifespan manager with explicit configuration initialization.
+- `metrics_endpoint` (function): summary=yes, params=ok, examples=no — Expose Prometheus metrics for scraping.
 
 ## Tags
 

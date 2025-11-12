@@ -52,7 +52,7 @@ GitPython documentation : https://gitpython.readthedocs.io/
 - from **pathlib** import Path
 - from **typing** import TYPE_CHECKING, cast
 - from **(absolute)** import git
-- from **(absolute)** import exc
+- from **(absolute)** import git.exc
 - from **codeintel_rev.observability.timeline** import current_timeline
 - from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.mcp_server.schemas** import GitBlameEntry
@@ -73,11 +73,47 @@ GitPython documentation : https://gitpython.readthedocs.io/
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 41
+- **cycle_group**: 28
 
 ## Declared Exports (__all__)
 
 AsyncGitClient, GitClient
+
+## Doc Metrics
+
+- **summary**: Typed Git operations wrapper using GitPython.
+- has summary: yes
+- param parity: yes
+- examples present: yes
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+- subprocess
+
+## Complexity
+
+- branches: 29
+- cyclomatic: 30
+- loc: 612
+
+## Doc Coverage
+
+- `_string_attr` (function): summary=no, examples=no
+- `_commit_iso_date` (function): summary=no, examples=no
+- `_author_field` (function): summary=no, examples=no
+- `_short_sha` (function): summary=no, examples=no
+- `_normalize_line_numbers` (function): summary=no, examples=no
+- `_coerce_blame_tuple` (function): summary=no, examples=no
+- `GitClient` (class): summary=yes, examples=yes — Typed wrapper around GitPython for blame and history operations.
+- `AsyncGitClient` (class): summary=yes, examples=yes — Async wrapper around GitClient using asyncio.to_thread.
 
 ## Tags
 

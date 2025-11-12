@@ -34,11 +34,44 @@ Scope store utilities for session state management.
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 30
+- **cycle_group**: 31
 
 ## Declared Exports (__all__)
 
 AsyncSingleFlight, LRUCache, ScopeStore, ScopeStoreMetrics
+
+## Doc Metrics
+
+- **summary**: Scope store utilities for session state management.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- subprocess
+
+## Complexity
+
+- branches: 43
+- cyclomatic: 44
+- loc: 539
+
+## Doc Coverage
+
+- `SupportsAsyncRedis` (class): summary=yes, examples=no — Protocol describing the Redis operations required by ``ScopeStore``.
+- `_CacheRecord` (class): summary=yes, examples=no — Internal cache record containing a value and its insertion timestamp.
+- `LRUCache` (class): summary=yes, examples=no — Thread-safe least-recently-used cache with TTL-based eviction.
+- `AsyncSingleFlight` (class): summary=yes, examples=no — Deduplicate concurrent coroutine execution keyed by ``KeyT``.
+- `ScopeStoreMetrics` (class): summary=yes, examples=no — Runtime counters describing scope store cache performance.
+- `ScopeStore` (class): summary=yes, examples=no — Redis-backed scope store with L1/L2 caching and single-flight coalescing.
 
 ## Tags
 

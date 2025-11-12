@@ -12,7 +12,7 @@ from pathlib import Path
 
 from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.io.hybrid_search import BM25Rm3Config, BM25SearchProvider
-from codeintel_rev.observability import metrics as retrieval_metrics
+import codeintel_rev.observability.metrics as retrieval_metrics
 from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
 from codeintel_rev.retrieval.types import ChannelHit
 
@@ -34,6 +34,11 @@ class BM25SweepPlan:
 
 def _read_queries(path: Path) -> list[tuple[str, str]]:
     """Return query tuples (qid, query) from JSONL or CSV datasets.
+
+    Parameters
+    ----------
+    path : Path
+        Path to query file (JSONL or CSV format).
 
     Returns
     -------
@@ -67,6 +72,11 @@ def _read_queries(path: Path) -> list[tuple[str, str]]:
 def _read_qrels(path: Path) -> dict[str, set[str]]:
     """Return relevance judgements keyed by qid.
 
+    Parameters
+    ----------
+    path : Path
+        Path to relevance judgements file (TREC qrels or CSV format).
+
     Returns
     -------
     dict[str, set[str]]
@@ -95,6 +105,15 @@ def _read_qrels(path: Path) -> dict[str, set[str]]:
 def _recall_at_k(pred: Sequence[str], gold: set[str], k: int) -> float:
     """Return binary recall@k for ``pred`` against ``gold``.
 
+    Parameters
+    ----------
+    pred : Sequence[str]
+        Predicted document IDs in ranked order.
+    gold : set[str]
+        Set of relevant (ground truth) document IDs.
+    k : int
+        Number of top results to consider.
+
     Returns
     -------
     float
@@ -109,6 +128,15 @@ def _recall_at_k(pred: Sequence[str], gold: set[str], k: int) -> float:
 
 def _mrr_at_k(pred: Sequence[str], gold: set[str], k: int) -> float:
     """Return reciprocal rank for the first relevant doc within top-k.
+
+    Parameters
+    ----------
+    pred : Sequence[str]
+        Predicted document IDs in ranked order.
+    gold : set[str]
+        Set of relevant (ground truth) document IDs.
+    k : int
+        Number of top results to consider.
 
     Returns
     -------
@@ -125,6 +153,11 @@ def _mrr_at_k(pred: Sequence[str], gold: set[str], k: int) -> float:
 
 def _hits_to_ids(hits: Sequence[ChannelHit]) -> list[str]:
     """Convert channel hits to string doc IDs.
+
+    Parameters
+    ----------
+    hits : Sequence[ChannelHit]
+        Sequence of channel hit objects to extract IDs from.
 
     Returns
     -------
@@ -143,6 +176,17 @@ def _build_provider(
 ) -> BM25SearchProvider:
     """Return a configured BM25 search provider.
 
+    Parameters
+    ----------
+    index_path : Path
+        Path to BM25 index directory.
+    k1 : float
+        BM25 k1 parameter (term frequency saturation).
+    b : float
+        BM25 b parameter (length normalization).
+    rm3 : BM25Rm3Config
+        RM3 (relevance model) configuration.
+
     Returns
     -------
     BM25SearchProvider
@@ -158,6 +202,13 @@ def _build_provider(
 
 def _prepare_rm3_config(settings: Settings, rm3_mode: str) -> BM25Rm3Config:
     """Return RM3 configuration based on settings and sweep mode.
+
+    Parameters
+    ----------
+    settings : Settings
+        Application settings containing BM25 and PRF configuration.
+    rm3_mode : str
+        RM3 mode: "off", "on", or "auto".
 
     Returns
     -------
@@ -231,6 +282,15 @@ def _compute_metrics(
     k_values: Sequence[int],
 ) -> dict[str, float]:
     """Return recall and MRR metrics keyed by ``k``.
+
+    Parameters
+    ----------
+    doc_ids : Sequence[str]
+        Predicted document IDs in ranked order.
+    gold : set[str]
+        Set of relevant (ground truth) document IDs.
+    k_values : Sequence[int]
+        List of k values to compute metrics for (e.g., [1, 5, 10]).
 
     Returns
     -------

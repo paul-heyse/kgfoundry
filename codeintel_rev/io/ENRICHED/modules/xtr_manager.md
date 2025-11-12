@@ -33,4 +33,34 @@ Token-level XTR index manager with late-interaction scoring utilities.
 
 - **fan_in**: 6
 - **fan_out**: 4
-- **cycle_group**: 40
+- **cycle_group**: 44
+
+## Doc Metrics
+
+- **summary**: Token-level XTR index manager with late-interaction scoring utilities.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 46
+- cyclomatic: 47
+- loc: 617
+
+## Doc Coverage
+
+- `XTRMetadata` (class): summary=yes, examples=no — Metadata persisted alongside the token memmap.
+- `_XTRIndexRuntime` (class): summary=yes, examples=no — Mutable runtime artifacts for XTRIndex.
+- `XTRIndex` (class): summary=yes, examples=no — Memory-mapped XTR token index with query encoding + scoring helpers.

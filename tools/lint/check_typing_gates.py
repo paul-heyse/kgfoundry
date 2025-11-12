@@ -136,6 +136,8 @@ class TypeGateVisitor(ast.NodeVisitor):
     ----------
     filepath : Path
         Path to the file being analyzed.
+    heavy_modules : set[str]
+        Set of module names considered "heavy" (e.g., numpy, fastapi, faiss).
     """
 
     def __init__(self, filepath: Path, heavy_modules: set[str]) -> None:
@@ -429,6 +431,11 @@ def check_directory(
 def _has_type_checking_import(tree: ast.Module) -> bool:
     """Return True when module imports TYPE_CHECKING from typing.
 
+    Parameters
+    ----------
+    tree : ast.Module
+        Parsed AST module node to check for TYPE_CHECKING import.
+
     Returns
     -------
     bool
@@ -465,6 +472,11 @@ def _insert_type_checking_import(lines: list[str], tree: ast.Module) -> None:
 def _indent_block(block: list[str]) -> list[str]:
     """Indent the provided code block by four spaces.
 
+    Parameters
+    ----------
+    block : list[str]
+        List of code lines to indent.
+
     Returns
     -------
     list[str]
@@ -479,6 +491,15 @@ def apply_fixes(
     logger: LoggerAdapter | None = None,
 ) -> bool:
     """Guard fixable heavy imports behind TYPE_CHECKING blocks.
+
+    Parameters
+    ----------
+    filepath : Path
+        Path to the file to modify.
+    violations : list[TypeGateViolation]
+        List of violations to fix (only fixable heavy imports are processed).
+    logger : LoggerAdapter | None, optional
+        Optional logger for reporting modifications.
 
     Returns
     -------
@@ -515,6 +536,15 @@ def _apply_autofixes(
     logger: LoggerAdapter | None = None,
 ) -> tuple[list[TypeGateViolation], set[str]]:
     """Apply autofixes for fixable violations and return refreshed results.
+
+    Parameters
+    ----------
+    violations_by_path : dict[Path, list[TypeGateViolation]]
+        Dictionary mapping file paths to their violations.
+    heavy_modules : set[str]
+        Set of heavy module names for re-checking after fixes.
+    logger : LoggerAdapter | None, optional
+        Optional logger for reporting autofix operations.
 
     Returns
     -------

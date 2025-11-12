@@ -29,6 +29,12 @@ class ModuleTraits:
     has_all: bool
     is_reexport_hub: bool
     type_error_count: int = 0
+    fan_in: int = 0
+    fan_out: int = 0
+    hotspot_score: float = 0.0
+    covered_lines_ratio: float = 1.0
+    doc_has_summary: bool = True
+    doc_param_parity: bool = True
 
 
 _DEFAULT_RULES = {
@@ -40,6 +46,9 @@ _DEFAULT_RULES = {
     "reexport-hub": {"is_reexport_hub": True, "reason": "has star import or large __all__"},
     "public-api": {"has_all": True, "reason": "__all__ defines public API"},
     "needs-types": {"type_errors_gt": 0, "reason": "type checker reported errors"},
+    "hotspot": {"hotspot_ge": 6, "reason": "high hotspot score"},
+    "low-coverage": {"coverage_lt": 0.65, "reason": "coverage below target"},
+    "docs-missing": {"doc_summary_required": True, "reason": "doc summary missing or stale"},
 }
 
 
@@ -103,25 +112,54 @@ def infer_tags(
     rules = rules or _DEFAULT_RULES
     tags: set[str] = set()
     reasons: dict[str, str] = {}
-    impset = set(traits.imported_modules)
     for tag, rule in rules.items():
-        ok = False
-        imports_rule = rule.get("any_import")
-        if isinstance(imports_rule, list):
-            ok = any(isinstance(m, str) and m in impset for m in imports_rule)
-        pattern = rule.get("path_regex")
-        if not ok and isinstance(pattern, str):
-            ok = re.search(pattern, path) is not None
-        if not ok and bool(rule.get("has_all")):
-            ok = traits.has_all
-        if not ok and bool(rule.get("is_reexport_hub")):
-            ok = traits.is_reexport_hub
-        threshold = rule.get("type_errors_gt")
-        if not ok and isinstance(threshold, int):
-            ok = traits.type_error_count > threshold
-        if ok:
+        if _rule_matches(rule, path, traits):
             tags.add(tag)
             reason = rule.get("reason")
             if isinstance(reason, str):
                 reasons[tag] = reason
     return TagResult(path=path, tags=tags, reasons=reasons)
+
+
+def _rule_matches(rule: Mapping[str, Any], path: str, traits: ModuleTraits) -> bool:
+    impset = set(traits.imported_modules)
+    conditions: list[bool] = []
+
+    imports_rule = rule.get("any_import")
+    if isinstance(imports_rule, list):
+        conditions.append(any(isinstance(m, str) and m in impset for m in imports_rule))
+
+    pattern = rule.get("path_regex")
+    if isinstance(pattern, str):
+        conditions.append(re.search(pattern, path) is not None)
+
+    conditions.append(bool(rule.get("has_all")) and traits.has_all)
+    conditions.append(bool(rule.get("is_reexport_hub")) and traits.is_reexport_hub)
+
+    threshold = rule.get("type_errors_gt")
+    if isinstance(threshold, int):
+        conditions.append(traits.type_error_count > threshold)
+
+    fan_in_ge = rule.get("fan_in_ge")
+    if isinstance(fan_in_ge, int):
+        conditions.append(traits.fan_in >= fan_in_ge)
+
+    fan_out_ge = rule.get("fan_out_ge")
+    if isinstance(fan_out_ge, int):
+        conditions.append(traits.fan_out >= fan_out_ge)
+
+    hotspot_ge = rule.get("hotspot_ge")
+    if isinstance(hotspot_ge, (int, float)):
+        conditions.append(traits.hotspot_score >= float(hotspot_ge))
+
+    coverage_lt = rule.get("coverage_lt")
+    if isinstance(coverage_lt, (int, float)):
+        conditions.append(traits.covered_lines_ratio < float(coverage_lt))
+
+    if bool(rule.get("doc_summary_required")):
+        conditions.append(not traits.doc_has_summary)
+
+    if bool(rule.get("doc_param_parity_required")):
+        conditions.append(not traits.doc_param_parity)
+
+    return any(conditions)

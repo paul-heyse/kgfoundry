@@ -28,4 +28,33 @@ Command-line entry point for SCIP function coverage evaluation.
 
 - **fan_in**: 0
 - **fan_out**: 3
-- **cycle_group**: 54
+- **cycle_group**: 59
+
+## Doc Metrics
+
+- **summary**: Command-line entry point for SCIP function coverage evaluation.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 1
+- cyclomatic: 2
+- loc: 95
+
+## Doc Coverage
+
+- `build_parser` (function): summary=yes, params=ok, examples=no — Return an argument parser for the coverage evaluator CLI.
+- `main` (function): summary=yes, params=ok, examples=no — Execute the coverage evaluator with the provided CLI arguments.

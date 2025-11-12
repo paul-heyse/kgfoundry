@@ -20,8 +20,8 @@ In-process vLLM embedding engine for Stage-0 retrieval.
 - from **(absolute)** import numpy
 - from **(absolute)** import transformers
 - from **(absolute)** import vllm
-- from **(absolute)** import config
-- from **(absolute)** import inputs
+- from **(absolute)** import vllm.config
+- from **(absolute)** import vllm.inputs
 - from **transformers** import PreTrainedTokenizerBase
 - from **vllm** import LLM
 - from **vllm.config** import PoolerConfig
@@ -42,12 +42,41 @@ In-process vLLM embedding engine for Stage-0 retrieval.
 ## Dependency Graph
 
 - **fan_in**: 1
-- **fan_out**: 5
-- **cycle_group**: 35
+- **fan_out**: 4
+- **cycle_group**: 42
 
 ## Declared Exports (__all__)
 
 InprocessVLLMEmbedder
+
+## Doc Metrics
+
+- **summary**: In-process vLLM embedding engine for Stage-0 retrieval.
+- has summary: yes
+- param parity: yes
+- examples present: yes
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 11
+- cyclomatic: 12
+- loc: 214
+
+## Doc Coverage
+
+- `_InprocessVLLMRuntime` (class): summary=yes, examples=no — Mutable runtime backing the frozen embedder.
+- `InprocessVLLMEmbedder` (class): summary=yes, examples=yes — Embed text batches locally using vLLM.
 
 ## Tags
 

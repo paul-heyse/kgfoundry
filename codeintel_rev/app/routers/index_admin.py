@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from pathlib import Path
 from typing import TypedDict, cast
 
@@ -10,9 +11,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 
 from codeintel_rev.app.config_context import ApplicationContext
+from codeintel_rev.app.scope_store import ScopeIn
 from codeintel_rev.errors import RuntimeLifecycleError
 from codeintel_rev.indexing.index_lifecycle import IndexAssets
-from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.runtime.factory_adjustment import DefaultFactoryAdjuster
 from kgfoundry_common.logging import get_logger
 
@@ -37,13 +38,15 @@ def _context(request: Request) -> ApplicationContext:
 
 async def _persist_session_tuning(
     ctx: ApplicationContext, session_id: str, overrides: dict[str, float | int]
-) -> dict[str, float | int]:
+) -> dict[str, float]:
     scope = await ctx.scope_store.get(session_id)
-    scope_dict = cast("ScopeIn", {} if scope is None else dict(scope))
-    tuning = dict(cast("dict[str, float]", scope_dict.get("faiss_tuning") or {}))
-    normalized_overrides = {key: float(value) for key, value in overrides.items()}
-    tuning.update(normalized_overrides)
-    scope_dict["faiss_tuning"] = tuning
+    scope_dict = cast("ScopeIn", dict(scope or {}))
+    existing_tuning = scope_dict.get("faiss_tuning")
+    typed_existing = cast("Mapping[str, float] | None", existing_tuning)
+    current_tuning: dict[str, float] = dict(typed_existing or {})
+    normalized_overrides: dict[str, float] = {key: float(value) for key, value in overrides.items()}
+    current_tuning.update(normalized_overrides)
+    scope_dict["faiss_tuning"] = current_tuning
     await ctx.scope_store.set(session_id, scope_dict)
     return dict(normalized_overrides)
 

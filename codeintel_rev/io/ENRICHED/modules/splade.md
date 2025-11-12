@@ -52,7 +52,43 @@ Command-line interface for SPLADE artifact management.
 
 - **fan_in**: 0
 - **fan_out**: 3
-- **cycle_group**: 84
+- **cycle_group**: 99
+
+## Doc Metrics
+
+- **summary**: Command-line interface for SPLADE artifact management.
+- has summary: yes
+- param parity: no
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 6
+- cyclomatic: 7
+- loc: 487
+
+## Doc Coverage
+
+- `_create_artifacts_manager` (function): summary=yes, params=ok, examples=no — Construct an artifacts manager using the active settings.
+- `_create_encoder_service` (function): summary=yes, params=ok, examples=no — Construct an encoder service using the active settings.
+- `_create_index_manager` (function): summary=yes, params=ok, examples=no — Construct an index manager using the active settings.
+- `_add_metadata_artifact` (function): summary=yes, params=mismatch, examples=no — Attach metadata artifacts to CLI envelopes when available.
+- `export_onnx` (function): summary=yes, params=mismatch, examples=no — Export SPLADE ONNX artifacts (optimized and quantized).
+- `encode` (function): summary=yes, params=mismatch, examples=no — Encode a corpus into SPLADE JsonVectorCollection shards.
+- `build_index` (function): summary=yes, params=mismatch, examples=no — Build a SPLADE Lucene impact index from JsonVectorCollection shards.
+- `bench` (function): summary=yes, params=ok, examples=no — Benchmark SPLADE query encoding latency.
+- `main` (function): summary=yes, params=ok, examples=no — Run the SPLADE CLI directly.
 
 ## Tags
 

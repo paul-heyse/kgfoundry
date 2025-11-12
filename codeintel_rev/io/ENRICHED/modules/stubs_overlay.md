@@ -39,4 +39,41 @@ Targeted overlay generation with opt-in activation.
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 5
+- **cycle_group**: 7
+
+## Doc Metrics
+
+- **summary**: Targeted overlay generation with opt-in activation.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 61
+- cyclomatic: 62
+- loc: 513
+
+## Doc Coverage
+
+- `OverlayPolicy` (class): summary=yes, examples=no — Controls when an overlay is generated and how it is written.
+- `OverlayResult` (class): summary=yes, examples=no — Summary of overlay creation for a single module.
+- `generate_overlay_for_file` (function): summary=yes, params=ok, examples=no — Generate a .pyi overlay for ``py_file`` when it meets the policy gates.
+- `activate_overlays` (function): summary=yes, params=ok, examples=no — Activate overlays by linking or copying into ``stubs_root``.
+- `deactivate_all` (function): summary=yes, params=ok, examples=no — Remove overlays under ``stubs_root`` that originated from ``overlays_root``.
+- `_overlay_path` (function): summary=yes, params=ok, examples=no — Return the overlay destination path for ``py_file``.
+- `_normalized_module_key` (function): summary=yes, params=ok, examples=no — Return a normalized module key used for lookups.
+- `_module_name_from_path` (function): summary=yes, params=ok, examples=no — Return the dotted module name for ``py_file``.
+- `_collect_star_reexports` (function): summary=yes, params=ok, examples=no — Return candidate names that a star import might re-export.
+- `_extract_simple_name` (function): summary=yes, params=ok, examples=no — Extract a plausible leaf identifier from a SCIP symbol string.

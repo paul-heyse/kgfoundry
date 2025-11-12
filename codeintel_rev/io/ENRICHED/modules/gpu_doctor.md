@@ -40,4 +40,34 @@ Usage:
 
 - **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 88
+- **cycle_group**: 106
+
+## Doc Metrics
+
+- **summary**: GPU diagnostics script for PyTorch and FAISS.
+- has summary: yes
+- param parity: yes
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Side Effects
+
+- none detected
+
+## Complexity
+
+- branches: 17
+- cyclomatic: 18
+- loc: 197
+
+## Doc Coverage
+
+- `check_torch` (function): summary=yes, params=ok, examples=no — Check PyTorch CUDA availability and perform smoke test.
+- `check_faiss` (function): summary=yes, params=ok, examples=no — Check FAISS GPU availability and perform smoke test.
+- `main` (function): summary=yes, params=ok, examples=no — Run GPU diagnostics and print results.
