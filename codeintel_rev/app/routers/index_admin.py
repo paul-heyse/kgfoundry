@@ -286,6 +286,8 @@ async def publish_endpoint(
         - "bm25_dir": str | None, optional path to BM25 index directory
         - "splade_dir": str | None, optional path to SPLADE index directory
         - "xtr_dir": str | None, optional path to XTR index directory
+        - "faiss_idmap": str | None, optional path to faiss_idmap.parquet sidecar
+        - "tuning_profile": str | None, optional path to tuning.json profile
     request : Request
         FastAPI request object containing application state with context.
 
@@ -318,6 +320,8 @@ async def publish_endpoint(
         bm25_raw = body.get("bm25_dir")
         splade_raw = body.get("splade_dir")
         xtr_raw = body.get("xtr_dir")
+        idmap_raw = body.get("faiss_idmap")
+        tuning_raw = body.get("tuning_profile")
         assets = IndexAssets(
             faiss_index=Path(body["faiss_index"]),
             duckdb_path=Path(body["duckdb_path"]),
@@ -325,6 +329,8 @@ async def publish_endpoint(
             bm25_dir=Path(bm25_raw) if bm25_raw else None,
             splade_dir=Path(splade_raw) if splade_raw else None,
             xtr_dir=Path(xtr_raw) if xtr_raw else None,
+            faiss_idmap=Path(idmap_raw) if idmap_raw else None,
+            tuning_profile=Path(tuning_raw) if tuning_raw else None,
         )
         staging = mgr.prepare(body["version"], assets)
         final = mgr.publish(body["version"])

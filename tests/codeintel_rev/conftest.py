@@ -139,6 +139,7 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
         data_dir=repo_root / "data",
         vectors_dir=repo_root / "data" / "vectors",
         faiss_index=repo_root / "data" / "faiss" / "index.faiss",
+        faiss_idmap_path=repo_root / "data" / "faiss" / "faiss_idmap.parquet",
         duckdb_path=repo_root / "data" / "catalog.duckdb",
         scip_index=repo_root / "index.scip.json",
         coderank_vectors_dir=repo_root / "data" / "coderank_vectors",
@@ -154,6 +155,7 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
     paths.xtr_dir.mkdir(parents=True, exist_ok=True)
     paths.faiss_index.touch()
     paths.duckdb_path.touch()
+    paths.faiss_idmap_path.touch()
 
     vllm_client = MagicMock(spec=VLLMClient)
     vllm_client.embed_batch.return_value = np.zeros(

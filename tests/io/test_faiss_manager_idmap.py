@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 import pyarrow.parquet as pq
@@ -48,7 +50,7 @@ def test_build_index_writes_meta_snapshot(tmp_path: Path) -> None:
 
     meta_file = _meta_path(manager)
     assert meta_file.exists()
-    payload = json.loads(meta_file.read_text())
+    payload = cast("dict[str, Any]", json.loads(meta_file.read_text()))
     assert payload["vec_dim"] == vec_dim
     assert payload["vector_count"] == len(vectors)
     assert payload["runtime_overrides"] == {}
@@ -68,12 +70,13 @@ def test_set_search_parameters_updates_overrides(tmp_path: Path) -> None:
     manager.build_index(vectors)
 
     tuning = manager.set_search_parameters("nprobe=12,k_factor=1.5")
-    overrides = tuning["overrides"]
+    overrides = cast("Mapping[str, float]", tuning["overrides"])
     assert overrides["nprobe"] == 12
     assert overrides["k_factor"] == pytest.approx(1.5)
 
-    meta = json.loads(_meta_path(manager).read_text())
-    assert meta["runtime_overrides"]["nprobe"] == 12
+    meta = cast("dict[str, Any]", json.loads(_meta_path(manager).read_text()))
+    runtime_overrides = cast("dict[str, Any]", meta["runtime_overrides"])
+    assert runtime_overrides["nprobe"] == 12
     assert "parameter_space" in meta
     assert "nprobe=12" in meta["parameter_space"]
 

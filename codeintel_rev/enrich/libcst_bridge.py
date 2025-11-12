@@ -251,6 +251,33 @@ def _infer_side_effects(imports: set[str], code: str) -> dict[str, bool]:
     lowered = code.lower()
 
     def has_any(prefixes: tuple[str, ...]) -> bool:
+        """Check if any imported module matches the given prefixes.
+
+        This helper function checks whether any module in the imports set starts
+        with any of the provided prefixes. Used to detect side-effect categories
+        (filesystem, network, subprocess, database) based on imported module names.
+
+        Parameters
+        ----------
+        prefixes : tuple[str, ...]
+            Tuple of module name prefixes to check against (e.g., ("os", "pathlib")
+            for filesystem operations). The function checks if any imported module
+            starts with any of these prefixes.
+
+        Returns
+        -------
+        bool
+            True if any imported module name starts with any of the provided
+            prefixes, False otherwise. Returns False if imports is empty or no
+            matches are found.
+
+        Notes
+        -----
+        This is a nested helper function used within _infer_side_effects() to
+        categorize side effects. Time complexity: O(n * m) where n is the number
+        of imports and m is the number of prefixes, but typically very fast due
+        to short module names and small prefix sets.
+        """
         return any(mod.startswith(prefix) for prefix in prefixes for mod in imports)
 
     filesystem = has_any(("os", "pathlib", "shutil", "tarfile", "zipfile")) or "open(" in lowered
@@ -311,6 +338,36 @@ class _IndexVisitor(cst.CSTVisitor):
 
     # lint-ignore: C901,PLR0912 visitor must handle many node shapes
     def on_visit(self, node: cst.CSTNode) -> bool:  # noqa: C901, PLR0912
+        """Visit a LibCST node during AST traversal and collect metadata.
+
+        This method is called by LibCST for each node during AST traversal. It
+        handles various node types (Module, Import, ImportFrom, FunctionDef,
+        ClassDef, Assign, etc.) to extract imports, definitions, exports, docstrings,
+        complexity metrics, and exception information. The method tracks nesting
+        depth for classes and functions and increments branch counts for control
+        flow nodes.
+
+        Parameters
+        ----------
+        node : cst.CSTNode
+            LibCST node being visited during AST traversal. The method handles
+            multiple node types including statements, expressions, and definitions.
+
+        Returns
+        -------
+        bool
+            Always returns True to continue traversal of child nodes. Returning
+            False would stop traversal, which is not desired for this visitor.
+
+        Notes
+        -----
+        This method implements the LibCST visitor pattern and is called
+        automatically during wrapper.visit(). It mutates the visitor's internal
+        state (imports, defs, exports, complexity, etc.) as it traverses the AST.
+        Time complexity: O(1) per node visit, O(n) total for n nodes in the AST.
+        The method is not thread-safe and should be used with a single visitor
+        instance per AST traversal.
+        """
         branch_nodes: tuple[type[cst.CSTNode], ...] = (
             cst.If,
             cst.For,
@@ -359,12 +416,52 @@ class _IndexVisitor(cst.CSTVisitor):
         return True
 
     def on_leave(self, original_node: cst.CSTNode) -> None:
+        """Leave a LibCST node after visiting its children.
+
+        This method is called by LibCST after all children of a node have been
+        visited. It decrements nesting depth counters for FunctionDef and ClassDef
+        nodes to maintain accurate depth tracking for top-level detection.
+
+        Parameters
+        ----------
+        original_node : cst.CSTNode
+            LibCST node being left after traversal of its children. The method
+            checks for FunctionDef and ClassDef nodes to update nesting depth.
+
+        Notes
+        -----
+        This method implements the LibCST visitor pattern and is called
+        automatically during wrapper.visit() after children are processed. It
+        maintains nesting depth state for accurate top-level definition detection.
+        Time complexity: O(1) per node leave. The method is not thread-safe and
+        should be used with a single visitor instance per AST traversal.
+        """
         if isinstance(original_node, cst.FunctionDef):
             self._function_depth = max(0, self._function_depth - 1)
         elif isinstance(original_node, cst.ClassDef):
             self._class_depth = max(0, self._class_depth - 1)
 
     def finalize(self) -> None:
+        """Finalize visitor state after AST traversal completes.
+
+        This method computes final metrics and aggregates from the collected
+        visitor state. It calculates annotation ratios (params and returns),
+        finalizes complexity metrics (branches, cyclomatic complexity, LOC),
+        infers side effects from imported modules, and sorts exception names.
+        Should be called after wrapper.visit() completes to ensure all metrics
+        are properly computed.
+
+        Notes
+        -----
+        This method mutates the visitor's state to compute final metrics:
+        - annotation_ratio: percentage of annotated parameters and return types
+        - complexity: final branch count, cyclomatic complexity, and LOC
+        - side_effects: inferred side effects from imports and code patterns
+        - raises: sorted list of exception names found in raise statements
+        Time complexity: O(n) where n is the number of imports for side effect
+        inference, plus O(m log m) for sorting m exception names. The method
+        should be called exactly once after traversal completes.
+        """
         params_total = self._annotation_counts["params_total"]
         params_annotated = self._annotation_counts["params_annotated"]
         returns_total = self._annotation_counts["returns_total"]

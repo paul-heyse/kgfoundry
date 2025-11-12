@@ -12,6 +12,13 @@ try:  # pragma: no cover - optional dependency
 except ImportError:  # pragma: no cover - optional dependency
     orjson = None
 
+try:  # pragma: no cover - optional dependency
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+except ImportError:  # pragma: no cover - optional dependency
+    pa = None
+    pq = None
+
 
 def _dump_json(obj: object) -> str:
     """Serialize arbitrary objects to UTF-8 JSON with optional orjson accel.
@@ -58,10 +65,7 @@ def write_parquet(path: str | Path, rows: Iterable[dict[str, object]]) -> None:
     records = list(rows)
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        import pyarrow as pa  # type: ignore[import-not-found]
-        import pyarrow.parquet as pq  # type: ignore[import-not-found]
-    except Exception:  # pragma: no cover - PyArrow unavailable
+    if pa is None or pq is None:
         fallback = target if target.suffix == ".jsonl" else Path(f"{target}.jsonl")
         write_jsonl(fallback, records)
         return

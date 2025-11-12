@@ -78,6 +78,8 @@ class IndexAssets:
     bm25_dir: Path | None = None
     splade_dir: Path | None = None
     xtr_dir: Path | None = None
+    faiss_idmap: Path | None = None
+    tuning_profile: Path | None = None
 
     def ensure_exists(self) -> None:
         """Validate that all required files and directories are present.
@@ -100,6 +102,8 @@ class IndexAssets:
             ("bm25_dir", self.bm25_dir),
             ("splade_dir", self.splade_dir),
             ("xtr_dir", self.xtr_dir),
+            ("faiss_idmap", self.faiss_idmap),
+            ("tuning_profile", self.tuning_profile),
         )
         for label, path in optional:
             if path is not None and not path.exists():
@@ -218,6 +222,8 @@ class IndexLifecycleManager:
             bm25_dir=self._maybe_dir(active_dir / "bm25"),
             splade_dir=self._maybe_dir(active_dir / "splade"),
             xtr_dir=self._maybe_dir(active_dir / "xtr"),
+            faiss_idmap=self._maybe_file(active_dir / "faiss_idmap.parquet"),
+            tuning_profile=self._maybe_file(active_dir / "tuning.json"),
         )
         assets.ensure_exists()
         if payload.get("version") != self.current_version():
@@ -297,6 +303,8 @@ class IndexLifecycleManager:
         self._copy_tree(assets.bm25_dir, staging_dir / "bm25")
         self._copy_tree(assets.splade_dir, staging_dir / "splade")
         self._copy_tree(assets.xtr_dir, staging_dir / "xtr")
+        self._copy_optional_file(assets.faiss_idmap, staging_dir / "faiss_idmap.parquet")
+        self._copy_optional_file(assets.tuning_profile, staging_dir / "tuning.json")
         meta = VersionMeta(version=version, created_ts=time.time(), attrs=attrs or {})
         (staging_dir / "version.json").write_text(meta.to_json(), encoding="utf-8")
         LOGGER.info(
@@ -446,6 +454,10 @@ class IndexLifecycleManager:
         return path if path.exists() else None
 
     @staticmethod
+    def _maybe_file(path: Path) -> Path | None:
+        return path if path.exists() else None
+
+    @staticmethod
     def _copy_file(src: Path, dst: Path) -> None:
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
@@ -457,6 +469,15 @@ class IndexLifecycleManager:
         if not src.exists():
             return
         shutil.copytree(src, dst, dirs_exist_ok=False)
+
+    @staticmethod
+    def _copy_optional_file(src: Path | None, dst: Path) -> None:
+        if src is None:
+            return
+        if not src.exists():
+            return
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
 
 
 __all__ = [

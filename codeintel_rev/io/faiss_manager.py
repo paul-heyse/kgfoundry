@@ -23,6 +23,7 @@ from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.metrics.registry import (
     FAISS_BUILD_SECONDS_LAST,
     FAISS_BUILD_TOTAL,
+    FAISS_ANN_LATENCY_SECONDS,
     FAISS_INDEX_CODE_SIZE_BYTES,
     FAISS_INDEX_CUVS_ENABLED,
     FAISS_INDEX_DIM,
@@ -32,6 +33,8 @@ from codeintel_rev.metrics.registry import (
     FAISS_SEARCH_LAST_K,
     FAISS_SEARCH_LAST_MS,
     FAISS_SEARCH_NPROBE,
+    FAISS_REFINE_LATENCY_SECONDS,
+    FAISS_REFINE_KEPT_RATIO,
     FAISS_SEARCH_TOTAL,
     HNSW_SEARCH_EF,
     set_compile_flags_id,
@@ -173,7 +176,7 @@ class FAISSRuntimeOptions:
     hnsw_m: int = 32
     hnsw_ef_construction: int = 200
     hnsw_ef_search: int = 128
-    refine_k_factor: float = 1.0
+    refine_k_factor: float = 2.0
     use_gpu: bool = True
     gpu_clone_mode: str = "replicate"
     autotune_on_start: bool = False
@@ -230,8 +233,7 @@ class _FAISSIdMapMixin:
             If the ID map interface is invalid.
         """
         manager = cast("FAISSManager", self)
-        # lint-ignore: SLF001 mixin intentionally reuses FAISSManager internals
-        cpu_index = manager._require_cpu_index()  # noqa: SLF001
+        cpu_index = manager.require_cpu_index()
         id_map_obj = getattr(cpu_index, "id_map", None)
         if id_map_obj is None:
             msg = (
@@ -296,10 +298,36 @@ class _FAISSIdMapMixin:
     def hydrate_by_ids(self, catalog: DuckDBCatalog, ids: Sequence[int]) -> list[dict]:
         """Hydrate chunk metadata for ``ids`` via the provided DuckDB catalog.
 
+        This method queries the DuckDB catalog to retrieve full chunk metadata
+        (file paths, line numbers, text content, etc.) for a batch of chunk IDs.
+        The IDs correspond to external chunk identifiers stored in the FAISS index,
+        enabling retrieval of complete chunk information after vector search.
+
+        Parameters
+        ----------
+        catalog : DuckDBCatalog
+            DuckDB catalog instance providing query_by_ids() method for batch
+            chunk metadata retrieval. The catalog must be initialized and connected
+            to the same database containing chunk metadata.
+        ids : Sequence[int]
+            Sequence of external chunk IDs to hydrate. These IDs should match
+            the IDs stored in the FAISS index (from add_vectors() or update_index()).
+            Empty sequences return an empty list without querying the catalog.
+
         Returns
         -------
         list[dict]
-            Hydrated chunk rows from DuckDB.
+            List of hydrated chunk metadata dictionaries, one per ID. Each dictionary
+            contains chunk fields (id, uri, start_line, end_line, text, symbols, etc.)
+            as defined by the DuckDB catalog schema. The list may be shorter than
+            the input sequence if some IDs are not found in the catalog.
+
+        Notes
+        -----
+        This method performs database queries via the DuckDB catalog. Time complexity:
+        O(n) where n is the number of IDs, plus database query overhead. The method
+        logs debug information including the count of IDs and index path for
+        observability. Thread-safe if the catalog instance is thread-safe.
         """
         if not ids:
             return []
@@ -313,21 +341,46 @@ class _FAISSIdMapMixin:
     def reconstruct_batch(self, ids: Sequence[int]) -> NDArrayF32:
         """Reconstruct vectors for a batch of external chunk IDs.
 
+        This method reconstructs the original embedding vectors for a batch of
+        chunk IDs by querying the FAISS index. For quantized indexes (IVF-PQ),
+        reconstruction returns approximate vectors (dequantized from the codebook).
+        For flat indexes, reconstruction returns exact vectors. The method requires
+        that the index supports direct map access for reconstruction.
+
+        Parameters
+        ----------
+        ids : Sequence[int]
+            Sequence of external chunk IDs to reconstruct vectors for. These IDs
+            should match the IDs stored in the FAISS index. Empty sequences return
+            an empty array with shape (0, vec_dim).
+
         Returns
         -------
         NDArrayF32
             Array of reconstructed vectors with shape ``(len(ids), vec_dim)``.
+            Each row corresponds to one input ID. Vectors are float32 dtype and
+            normalized for cosine similarity (L2-normalized). For quantized indexes,
+            vectors are approximate reconstructions.
 
         Raises
         ------
         RuntimeError
-            If the index does not support vector reconstruction.
+            If the index does not support vector reconstruction (e.g., missing
+            direct map, unsupported index type, or reconstruction fails for a
+            specific ID). The error message includes the failing chunk ID for
+            debugging.
+
+        Notes
+        -----
+        This method requires that _configure_direct_map() has been called on
+        the index to enable reconstruction. Time complexity: O(len(ids) * vec_dim)
+        for reconstruction, plus index lookup overhead. The method performs no
+        I/O operations and is thread-safe if the FAISS index is thread-safe.
         """
         manager = cast("FAISSManager", self)
         if not ids:
             return np.empty((0, manager.vec_dim), dtype=np.float32)
-        # lint-ignore: SLF001 mixin intentionally reuses FAISSManager internals
-        cpu_index = manager._require_cpu_index()  # noqa: SLF001
+        cpu_index = manager.require_cpu_index()
         _configure_direct_map(cpu_index)
         vectors = np.empty((len(ids), manager.vec_dim), dtype=np.float32)
         for pos, chunk_id in enumerate(ids):
@@ -339,137 +392,9 @@ class _FAISSIdMapMixin:
         return vectors
 
 
-class _FAISSMetadataMixin:
-    """Mixin for runtime override metadata helpers."""
-
-    def set_search_parameters(self, param_str: str) -> dict[str, object]:
-        """Apply FAISS ParameterSpace string and persist overrides.
-
-        Parameters
-        ----------
-        param_str : str
-            ParameterSpace specification (e.g., ``"nprobe=64,efSearch=128"``).
-
-        Returns
-        -------
-        dict[str, object]
-            Runtime tuning snapshot (see :meth:`get_runtime_tuning`).
-
-        Raises
-        ------
-        ValueError
-            If the parameter string is empty or contains unsupported keys.
-        """
-        faiss_spec, sanitized = self._prepare_parameter_string(param_str)
-        if faiss_spec:
-            try:
-                faiss.ParameterSpace().set_index_parameters(self._active_index(), faiss_spec)
-            except (AttributeError, RuntimeError, ValueError) as exc:
-                msg = f"Unable to apply FAISS parameters: {faiss_spec}"
-                raise ValueError(msg) from exc
-        with self._tuning_lock:
-            self._runtime_overrides.update(sanitized)
-        self._write_meta_snapshot(
-            parameter_space=self._format_parameter_string(self._runtime_overrides)
-        )
-        return self.get_runtime_tuning()
-
-    def _prepare_parameter_string(self, param_str: str) -> tuple[str | None, dict[str, float]]:
-        if not param_str or not param_str.strip():
-            msg = "Parameter string must be non-empty."
-            raise ValueError(msg)
-        faiss_pairs: list[str] = []
-        working: dict[str, float] = {}
-        for chunk in param_str.split(","):
-            key, sep, raw_value = chunk.partition("=")
-            key = key.strip()
-            value = raw_value.strip()
-            if not key or not sep or not value:
-                msg = f"Invalid parameter fragment: '{chunk}'"
-                raise ValueError(msg)
-            try:
-                numeric_value = float(value)
-            except ValueError as exc:
-                msg = f"Parameter '{key}' value '{value}' is not numeric"
-                raise ValueError(msg) from exc
-            if key == "k_factor":
-                working["k_factor"] = numeric_value
-                continue
-            if key not in {"nprobe", "efSearch", "quantizer_efSearch"}:
-                msg = f"Unsupported FAISS parameter '{key}'"
-                raise ValueError(msg)
-            working[key] = numeric_value
-            faiss_pairs.append(f"{key}={value}")
-        sanitized = self._sanitize_runtime_overrides(
-            nprobe=working.get("nprobe"),
-            ef_search=working.get("efSearch"),
-            quantizer_ef_search=working.get("quantizer_efSearch"),
-            k_factor=working.get("k_factor"),
-        )
-        if not sanitized:
-            msg = "Parameter string must include at least one supported override."
-            raise ValueError(msg)
-        return (",".join(faiss_pairs) if faiss_pairs else None, sanitized)
-
-    @staticmethod
-    def _format_parameter_string(overrides: Mapping[str, float]) -> str | None:
-        ordered = []
-        for key in ("nprobe", "efSearch", "quantizer_efSearch", "k_factor"):
-            if key not in overrides:
-                continue
-            value = overrides[key]
-            if key == "k_factor":
-                ordered.append(f"{key}={value}")
-            else:
-                ordered.append(f"{key}={int(value)}")
-        return ",".join(ordered) if ordered else None
-
-    def _meta_snapshot(self) -> dict[str, object]:
-        snapshot: dict[str, object]
-        if self._meta_path.exists():
-            try:
-                snapshot = json.loads(self._meta_path.read_text())
-            except json.JSONDecodeError:
-                snapshot = {}
-        else:
-            snapshot = {}
-        snapshot.update(
-            {
-                "index_path": str(self.index_path),
-                "vec_dim": self.vec_dim,
-                "faiss_family": self.faiss_family,
-                "default_parameters": {
-                    "nprobe": self.default_nprobe,
-                    "efSearch": self.hnsw_ef_search,
-                    "quantizer_efSearch": None,
-                    "k_factor": self.refine_k_factor,
-                },
-            }
-        )
-        return snapshot
-
-    def _write_meta_snapshot(
-        self,
-        *,
-        factory: str | None = None,
-        vector_count: int | None = None,
-        parameter_space: str | None = None,
-    ) -> None:
-        meta = self._meta_snapshot()
-        if factory is not None:
-            meta["factory"] = factory
-        if vector_count is not None:
-            meta["vector_count"] = int(vector_count)
-        if parameter_space is not None:
-            meta["parameter_space"] = parameter_space
-        meta["runtime_overrides"] = dict(self._runtime_overrides)
-        meta["compile_options"] = self.get_compile_options()
-        meta["updated_at"] = datetime.now(UTC).isoformat()
-        self._meta_path.parent.mkdir(parents=True, exist_ok=True)
-        self._meta_path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
-
-
-class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
+class FAISSManager(
+    _FAISSIdMapMixin,
+):  # lint-ignore[PLR0904]: manager orchestrates multiple subsystems
     """FAISS index manager with adaptive indexing, GPU support, and incremental updates.
 
     Uses a dual-index architecture for fast incremental updates.
@@ -568,7 +493,8 @@ class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
         )
         self._tuned_parameters: dict[str, float | str] | None = None
         self._last_latency_ms: float | None = None
-        self.autotune_profile_path = Path(f"{self.index_path}.tune.json")
+        self.autotune_profile_path = self.index_path.with_name("tuning.json")
+        self._legacy_autotune_profile_path = self.index_path.with_suffix(".tune.json")
         self._meta_path = Path(f"{self.index_path}.meta.json")
         self._runtime_overrides: dict[str, float] = {}
         self._tuning_lock = RLock()
@@ -1266,6 +1192,7 @@ class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
         *,
         nprobe: int | None = None,
         runtime: SearchRuntimeOverrides | None = None,
+        catalog: "DuckDBCatalog" | None = None,
     ) -> tuple[NDArrayF32, NDArrayI64]:
         """Search for nearest neighbors using cosine similarity with dual-index support.
 
@@ -1296,6 +1223,9 @@ class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
             used during index construction. Only applies to IVF-family indexes.
         runtime : SearchRuntimeOverrides | None, optional
             Optional overrides controlling HNSW and refinement parameters.
+        catalog : DuckDBCatalog | None, optional
+            When provided and ``refine_k_factor`` > 1, candidate embeddings are
+            hydrated from DuckDB and reranked exactly before returning results.
 
         Returns
         -------
@@ -1346,12 +1276,22 @@ class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
             )
 
         start = perf_counter()
+        family_label = getattr(self, "faiss_family", "auto")
         try:
-            distances, identifiers = self._execute_dual_search(
-                query=plan.queries,
-                search_k=plan.search_k,
-                params=plan.params,
+            with FAISS_ANN_LATENCY_SECONDS.labels(str(family_label)).time():
+                distances, identifiers = self._execute_dual_search(
+                    query=plan.queries,
+                    search_k=plan.search_k,
+                    params=plan.params,
+                )
+            refined = self._maybe_refine_results(
+                catalog=catalog,
+                plan=plan,
+                distances=distances,
+                identifiers=identifiers,
             )
+            if refined is not None:
+                distances, identifiers = refined
             result = (distances[:, : plan.k], identifiers[:, : plan.k])
         except Exception as exc:
             if timeline is not None:
@@ -1563,13 +1503,10 @@ class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
         )
         return self.get_runtime_tuning()
 
-    def search_primary(
+    def _search_primary(
         self, query: NDArrayF32, k: int, nprobe: int
     ) -> tuple[NDArrayF32, NDArrayI64]:
         """Search the primary index (adaptive type: Flat/IVFFlat/IVF-PQ).
-
-        This method is public for testing and advanced use cases where
-        separate primary/secondary search results are needed.
 
         Parameters
         ----------
@@ -1659,10 +1596,10 @@ class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
                 ef_search=params.ef_search,
                 quantizer_ef_search=params.quantizer_ef_search,
             )
-            primary_dists, primary_ids = self.search_primary(query, search_k, params.nprobe)
+            primary_dists, primary_ids = self._search_primary(query, search_k, params.nprobe)
             if self.secondary_index is None:
                 return primary_dists, primary_ids
-            secondary_dists, secondary_ids = self.search_secondary(query, search_k)
+            secondary_dists, secondary_ids = self._search_secondary(query, search_k)
             merged_dists, merged_ids = self._merge_results(
                 primary_dists,
                 primary_ids,
@@ -1679,8 +1616,76 @@ class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
                 ),
             )
             return merged_dists, merged_ids
+    
+    def _maybe_refine_results(
+        self,
+        *,
+        catalog: "DuckDBCatalog" | None,
+        plan: _SearchPlan,
+        distances: NDArrayF32,
+        identifiers: NDArrayI64,
+    ) -> tuple[NDArrayF32, NDArrayI64] | None:
+        """Optionally refine ANN candidates with exact similarity search."""
+        if (
+            catalog is None
+            or plan.k <= 0
+            or plan.search_k <= plan.k
+            or self.refine_k_factor <= 1.0
+        ):
+            return None
+        try:
+            from codeintel_rev.retrieval.rerank_flat import exact_rerank
+        except ImportError as exc:  # pragma: no cover - defensive fallback
+            LOGGER.debug("Exact rerank unavailable", extra=_log_extra(error=str(exc)))
+            return None
 
-    def search_secondary(self, query: NDArrayF32, k: int) -> tuple[NDArrayF32, NDArrayI64]:
+        kept_ratio = plan.k / float(plan.search_k)
+        FAISS_REFINE_KEPT_RATIO.observe(kept_ratio)
+        try:
+            with FAISS_REFINE_LATENCY_SECONDS.time():
+                rerank_scores, rerank_ids = exact_rerank(
+                    catalog,
+                    plan.queries,
+                    identifiers[:, : plan.search_k],
+                    top_k=plan.k,
+                )
+        except Exception as exc:  # pragma: no cover - rerank is best-effort
+            LOGGER.warning(
+                "Exact rerank failed; falling back to ANN ordering",
+                extra=_log_extra(error=str(exc)),
+            )
+            return None
+        self._log_refine_delta(identifiers[:, : plan.k], rerank_ids)
+        return rerank_scores, rerank_ids
+
+    @staticmethod
+    def _log_refine_delta(ann_ids: NDArrayI64, refined_ids: NDArrayI64) -> None:
+        """Emit structured logs describing differences between ANN and refined hits."""
+        if ann_ids.shape != refined_ids.shape:
+            return
+        overlaps: list[float] = []
+        replacements: list[int] = []
+        k = ann_ids.shape[1]
+        for ann_row, ref_row in zip(ann_ids, refined_ids, strict=True):
+            ann_set = {int(chunk_id) for chunk_id in ann_row if chunk_id >= 0}
+            ref_set = {int(chunk_id) for chunk_id in ref_row if chunk_id >= 0}
+            if not ann_set and not ref_set:
+                continue
+            overlap = len(ann_set & ref_set)
+            overlaps.append(overlap / max(k, 1))
+            replacements.append(max(len(ref_set) - overlap, 0))
+        if not overlaps:
+            return
+        LOGGER.debug(
+            "faiss.refine.delta",
+            extra=_log_extra(
+                avg_overlap=round(sum(overlaps) / len(overlaps), 4),
+                avg_replacements=round(sum(replacements) / max(len(replacements), 1), 2),
+                k=k,
+            ),
+        )
+
+    def _search_secondary(self, query: NDArrayF32, k: int) -> tuple[NDArrayF32, NDArrayI64]:
         """Search the secondary index (flat, no training required).
 
         This method is public for testing and advanced use cases where
@@ -1719,7 +1724,7 @@ class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
         # Search secondary index (flat, no nprobe needed)
         return self.secondary_index.search(query_norm, k)
 
-    def primary_index_impl(self) -> _faiss.Index:
+    def _primary_index_impl(self) -> _faiss.Index:
         """Return the underlying FAISS index implementation for primary CPU index.
 
         Returns
@@ -2000,6 +2005,16 @@ class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
             msg = "Index not built"
             raise RuntimeError(msg)
         return self.cpu_index
+
+    def require_cpu_index(self) -> _faiss.Index:
+        """Return the CPU FAISS index via the public interface.
+
+        Returns
+        -------
+        _faiss.Index
+            Initialized CPU FAISS index.
+        """
+        return self._require_cpu_index()
 
     # ---------------------------------------------------------------------
     # Modern helper utilities (factory management, tuning, telemetry)
@@ -2352,6 +2367,134 @@ class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
             sanitized["k_factor"] = kf_val
         return sanitized
 
+    def set_search_parameters(self, param_str: str) -> dict[str, object]:
+        """Apply FAISS ParameterSpace string and persist overrides.
+
+        Parameters
+        ----------
+        param_str : str
+            Comma-separated FAISS ParameterSpace string
+            (e.g., ``"nprobe=64,efSearch=128"``).
+
+        Returns
+        -------
+        dict[str, object]
+            Runtime tuning snapshot as returned by :meth:`get_runtime_tuning`.
+
+        Raises
+        ------
+        ValueError
+            If the parameter string is invalid or FAISS rejects the override.
+        """
+        faiss_spec, sanitized = self._prepare_parameter_string(param_str)
+        if faiss_spec:
+            try:
+                faiss.ParameterSpace().set_index_parameters(self._active_index(), faiss_spec)
+            except (AttributeError, RuntimeError, ValueError) as exc:
+                msg = f"Unable to apply FAISS parameters: {faiss_spec}"
+                raise ValueError(msg) from exc
+        with self._tuning_lock:
+            self._runtime_overrides.update(sanitized)
+        self._write_meta_snapshot(
+            parameter_space=self._format_parameter_string(self._runtime_overrides)
+        )
+        return self.get_runtime_tuning()
+
+    def _prepare_parameter_string(self, param_str: str) -> tuple[str | None, dict[str, float]]:
+        if not param_str or not param_str.strip():
+            msg = "Parameter string must be non-empty."
+            raise ValueError(msg)
+        faiss_pairs: list[str] = []
+        int_params: dict[str, int] = {}
+        k_factor_value: float | None = None
+        for chunk in param_str.split(","):
+            key, sep, raw_value = chunk.partition("=")
+            key = key.strip()
+            value = raw_value.strip()
+            if not key or not sep or not value:
+                msg = f"Invalid parameter fragment: '{chunk}'"
+                raise ValueError(msg)
+            try:
+                numeric_value = float(value)
+            except ValueError as exc:
+                msg = f"Parameter '{key}' value '{value}' is not numeric"
+                raise ValueError(msg) from exc
+            if key == "k_factor":
+                k_factor_value = numeric_value
+                continue
+            if key not in {"nprobe", "efSearch", "quantizer_efSearch"}:
+                msg = f"Unsupported FAISS parameter '{key}'"
+                raise ValueError(msg)
+            int_params[key] = int(numeric_value)
+            faiss_pairs.append(f"{key}={value}")
+        sanitized = self._sanitize_runtime_overrides(
+            nprobe=int_params.get("nprobe"),
+            ef_search=int_params.get("efSearch"),
+            quantizer_ef_search=int_params.get("quantizer_efSearch"),
+            k_factor=k_factor_value,
+        )
+        if not sanitized:
+            msg = "Parameter string must include at least one supported override."
+            raise ValueError(msg)
+        return (",".join(faiss_pairs) if faiss_pairs else None, sanitized)
+
+    @staticmethod
+    def _format_parameter_string(overrides: Mapping[str, float]) -> str | None:
+        ordered: list[str] = []
+        for key in ("nprobe", "efSearch", "quantizer_efSearch", "k_factor"):
+            if key not in overrides:
+                continue
+            value = overrides[key]
+            if key == "k_factor":
+                ordered.append(f"{key}={value}")
+            else:
+                ordered.append(f"{key}={int(value)}")
+        return ",".join(ordered) if ordered else None
+
+    def _meta_snapshot(self) -> dict[str, object]:
+        snapshot: dict[str, object]
+        if self._meta_path.exists():
+            try:
+                snapshot = json.loads(self._meta_path.read_text())
+            except json.JSONDecodeError:
+                snapshot = {}
+        else:
+            snapshot = {}
+        snapshot.update(
+            {
+                "index_path": str(self.index_path),
+                "vec_dim": self.vec_dim,
+                "faiss_family": self.faiss_family,
+                "default_parameters": {
+                    "nprobe": self.default_nprobe,
+                    "efSearch": self.hnsw_ef_search,
+                    "quantizer_efSearch": None,
+                    "k_factor": self.refine_k_factor,
+                },
+            }
+        )
+        return snapshot
+
+    def _write_meta_snapshot(
+        self,
+        *,
+        factory: str | None = None,
+        vector_count: int | None = None,
+        parameter_space: str | None = None,
+    ) -> None:
+        meta = self._meta_snapshot()
+        if factory is not None:
+            meta["factory"] = factory
+        if vector_count is not None:
+            meta["vector_count"] = int(vector_count)
+        if parameter_space is not None:
+            meta["parameter_space"] = parameter_space
+        meta["runtime_overrides"] = dict(self._runtime_overrides)
+        meta["compile_options"] = self.get_compile_options()
+        meta["updated_at"] = datetime.now(UTC).isoformat()
+        self._meta_path.parent.mkdir(parents=True, exist_ok=True)
+        self._meta_path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
+
     def _resolve_search_knobs(
         self,
         override_nprobe: int | None,
@@ -2428,14 +2571,15 @@ class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
     def _load_tuned_profile(self) -> dict[str, float | str]:
         if self._tuned_parameters is not None:
             return self._tuned_parameters
-        if not self.autotune_profile_path.exists():
+        profile_path = self._profile_path_for_read()
+        if profile_path is None:
             return {}
         try:
-            raw = self.autotune_profile_path.read_text()
+            raw = profile_path.read_text()
         except OSError as exc:
             LOGGER.warning(
                 "Failed to load FAISS autotune profile",
-                extra=_log_extra(path=str(self.autotune_profile_path), error=str(exc)),
+                extra=_log_extra(path=str(profile_path), error=str(exc)),
             )
             return {}
         try:
@@ -2443,11 +2587,18 @@ class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
         except json.JSONDecodeError as exc:
             LOGGER.warning(
                 "Failed to parse FAISS autotune profile",
-                extra=_log_extra(path=str(self.autotune_profile_path), error=str(exc)),
+                extra=_log_extra(path=str(profile_path), error=str(exc)),
             )
             return {}
         self._tuned_parameters = profile
         return profile
+
+    def _profile_path_for_read(self) -> Path | None:
+        if self.autotune_profile_path.exists():
+            return self.autotune_profile_path
+        if self._legacy_autotune_profile_path.exists():
+            return self._legacy_autotune_profile_path
+        return None
 
     def _timed_search_with_params(
         self, queries: NDArrayF32, k: int, param_str: str
@@ -2515,7 +2666,7 @@ class FAISSManager(_FAISSIdMapMixin, _FAISSMetadataMixin):
         results from approximate search. Improves recall at the cost of higher
         latency. Time complexity: O(n_vectors * k) for Flat index.
         """
-        return self.search_primary(queries, k, self.default_nprobe)
+        return self._search_primary(queries, k, self.default_nprobe)
 
     @staticmethod
     def _downcast_index(index: _faiss.Index) -> _faiss.Index:

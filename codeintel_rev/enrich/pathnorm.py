@@ -15,7 +15,13 @@ __all__ = [
 
 
 def detect_repo_root(start: Path) -> Path:
-    """Return the closest ancestor containing a ``.git`` directory."""
+    """Return the closest ancestor containing a ``.git`` directory.
+
+    Returns
+    -------
+    Path
+        Resolved repository root, or ``start`` when no ``.git`` directory is found.
+    """
     candidate = start.resolve()
     for path in (candidate, *candidate.parents):
         if (path / ".git").exists():
@@ -24,7 +30,13 @@ def detect_repo_root(start: Path) -> Path:
 
 
 def to_repo_relative(path: Path, repo_root: Path) -> str:
-    """Return a POSIX path for ``path`` relative to ``repo_root``."""
+    """Return a POSIX path for ``path`` relative to ``repo_root``.
+
+    Returns
+    -------
+    str
+        Normalized POSIX path relative to the repository root.
+    """
     try:
         rel = path.resolve().relative_to(repo_root.resolve())
     except ValueError:  # pragma: no cover - defensive fallback
@@ -37,7 +49,13 @@ def module_name_from_path(
     path: Path,
     package_prefix: str | None = None,
 ) -> str:
-    """Derive a dotted module name for ``path`` relative to ``repo_root``."""
+    """Derive a dotted module name for ``path`` relative to ``repo_root``.
+
+    Returns
+    -------
+    str
+        Best-effort dotted module name (may be empty when outside the repo root).
+    """
     rel = Path(to_repo_relative(path, repo_root))
     parts = list(rel.parts)
     if not parts:
@@ -55,6 +73,12 @@ def module_name_from_path(
 
 
 def stable_id_for_path(rel_posix: str) -> str:
-    """Return a truncated SHA1 digest for ``rel_posix``."""
-    digest = sha1(rel_posix.encode("utf-8"))
+    """Return a truncated SHA1 digest for ``rel_posix``.
+
+    Returns
+    -------
+    str
+        First 12 hexadecimal characters of the digest for deterministic joins.
+    """
+    digest = sha1(rel_posix.encode("utf-8"))  # noqa: S324 - deterministic identifier
     return digest.hexdigest()[:12]

@@ -34,10 +34,11 @@ def build_index() -> None:
 
     duckdb_manager = DuckDBManager(paths.duckdb_path, settings.duckdb)
     catalog = DuckDBCatalog(
-        paths.duckdb_path,
-        paths.vectors_dir,
+        db_path=paths.duckdb_path,
+        vectors_dir=paths.vectors_dir,
         materialize=settings.index.duckdb_materialize,
         manager=duckdb_manager,
+        repo_root=paths.repo_root,
     )
     catalog.open()
     try:

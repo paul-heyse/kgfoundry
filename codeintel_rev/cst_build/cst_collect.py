@@ -43,7 +43,7 @@ class CollectorConfig:
     text_preview_skip_bytes: int = 2_000_000
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _CollectorStatsBuilder:
     """Mutable builder used while collecting CST stats."""
 
@@ -52,6 +52,18 @@ class _CollectorStatsBuilder:
     parse_errors: int = 0
     qname_hits: int = 0
     scope_resolved: int = 0
+
+    def increment_parse_errors(self, count: int = 1) -> None:
+        object.__setattr__(self, "parse_errors", self.parse_errors + count)  # noqa: PLC2801
+
+    def set_node_rows(self, count: int) -> None:
+        object.__setattr__(self, "node_rows", count)  # noqa: PLC2801
+
+    def increment_qname_hits(self) -> None:
+        object.__setattr__(self, "qname_hits", self.qname_hits + 1)  # noqa: PLC2801
+
+    def increment_scope_resolved(self) -> None:
+        object.__setattr__(self, "scope_resolved", self.scope_resolved + 1)  # noqa: PLC2801
 
     def snapshot(self) -> CollectorStats:
         """Return an immutable CollectorStats instance.
@@ -136,7 +148,7 @@ class CSTCollector:
             file_size = path.stat().st_size
             code = path.read_text(encoding="utf-8")
         except OSError as exc:  # pragma: no cover - hardened path
-            stats_builder.parse_errors = 1
+            stats_builder.increment_parse_errors()
             return [_build_parse_error_node(rel_path, str(exc))], stats_builder.snapshot()
         wrapper = self._wrap_module(rel_path, code, stats_builder)
         if wrapper is None:
@@ -153,7 +165,7 @@ class CSTCollector:
                 stats_builder=stats_builder,
             )
         )
-        stats_builder.node_rows = len(nodes)
+        stats_builder.set_node_rows(len(nodes))
         return nodes, stats_builder.snapshot()
 
     def _wrap_module(
@@ -174,7 +186,7 @@ class CSTCollector:
             return cst_metadata.MetadataWrapper(module, unsafe_skip_copy=True)
         except cst.ParserSyntaxError as exc:
             logger.warning("LibCST failed to parse %s: %s", rel_path, exc)
-            stats_builder.parse_errors = 1
+            stats_builder.increment_parse_errors()
             return None
 
     def _emit_nodes(
@@ -212,9 +224,9 @@ class CSTCollector:
             qnames = _normalize_qnames(qname_entries, module_name)
             scope_label = _scope(scope_map, node)
             if qnames:
-                stats_builder.qname_hits += 1
+                stats_builder.increment_qname_hits()
             if scope_label:
-                stats_builder.scope_resolved += 1
+                stats_builder.increment_scope_resolved()
             record = NodeRecord(
                 path=rel_path,
                 node_id=_node_id(rel_path, node.__class__.__name__, _node_name(node), span),

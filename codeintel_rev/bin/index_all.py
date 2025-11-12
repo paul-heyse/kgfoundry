@@ -634,9 +634,10 @@ def _initialize_duckdb(paths: PipelinePaths, *, materialize: bool) -> int:
         Number of chunk records registered in the catalog.
     """
     with DuckDBCatalog(
-        paths.duckdb_path,
-        paths.vectors_dir,
+        db_path=paths.duckdb_path,
+        vectors_dir=paths.vectors_dir,
         materialize=materialize,
+        repo_root=paths.repo_root,
     ) as catalog:
         count = catalog.count_chunks()
     logger.info(

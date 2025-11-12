@@ -101,6 +101,7 @@ def _build_context(repo_root: Path) -> ApplicationContext:
         data_dir=repo_root / "data",
         vectors_dir=repo_root / "data" / "vectors",
         faiss_index=repo_root / "data" / "faiss" / "index.faiss",
+        faiss_idmap_path=repo_root / "data" / "faiss" / "faiss_idmap.parquet",
         duckdb_path=repo_root / "data" / "catalog.duckdb",
         scip_index=repo_root / "index.scip.json",
         coderank_vectors_dir=repo_root / "data" / "coderank_vectors",

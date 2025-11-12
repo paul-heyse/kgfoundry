@@ -51,6 +51,29 @@ IndexOption = Annotated[Path | None, typer.Option("--index", help="Path to FAISS
 IdMapOption = Annotated[Path, typer.Option("--idmap", help="Path to FAISS ID map Parquet.")]
 DuckOption = Annotated[Path | None, typer.Option("--duckdb", help="Path to DuckDB catalog file.")]
 OutOption = Annotated[Path | None, typer.Option("--out", help="Output path override.")]
+ParamSpaceArg = Annotated[
+    str,
+    typer.Argument(help="FAISS ParameterSpace string (e.g. 'nprobe=64')."),
+]
+EvalTopKOption = Annotated[
+    int,
+    typer.Option("--k", min=1, help="Top-K for recall computation."),
+]
+EvalKFactorOption = Annotated[
+    float,
+    typer.Option("--k-factor", min=1.0, help="Candidate expansion factor for ANN search."),
+]
+EvalNProbeOption = Annotated[
+    int | None,
+    typer.Option("--nprobe", help="Override FAISS nprobe."),
+]
+EvalXtrOracleOption = Annotated[
+    bool,
+    typer.Option(
+        "--xtr-oracle/--no-xtr-oracle",
+        help="Also rescore each query using the XTR token index when available.",
+    ),
+]
 
 
 @app.callback()
@@ -82,6 +105,8 @@ def _build_assets(
     duckdb_path: Path,
     scip_index: Path,
     channels: dict[str, Path],
+    faiss_idmap: Path | None = None,
+    tuning_profile: Path | None = None,
 ) -> IndexAssets:
     return IndexAssets(
         faiss_index=faiss_index,
@@ -90,6 +115,8 @@ def _build_assets(
         bm25_dir=channels.get("bm25"),
         splade_dir=channels.get("splade"),
         xtr_dir=channels.get("xtr"),
+        faiss_idmap=faiss_idmap,
+        tuning_profile=tuning_profile,
     )
 
 
@@ -122,7 +149,12 @@ def _duckdb_catalog(path_override: Path | None = None) -> DuckDBCatalog:
     settings = _get_settings()
     db_path = (path_override or Path(settings.paths.duckdb_path)).expanduser().resolve()
     vectors_dir = Path(settings.paths.vectors_dir).expanduser().resolve()
-    catalog = DuckDBCatalog(db_path=db_path, vectors_dir=vectors_dir)
+    catalog = DuckDBCatalog(
+        db_path=db_path,
+        vectors_dir=vectors_dir,
+        repo_root=Path(settings.paths.repo_root).expanduser().resolve(),
+        materialize=settings.index.duckdb_materialize,
+    )
     catalog.set_idmap_path(Path(settings.paths.faiss_idmap_path).expanduser().resolve())
     return catalog
 
@@ -166,11 +198,32 @@ def stage_command(
     duckdb_path: PathArg,
     scip_index: PathArg,
     extras: ExtraOption,
+    faiss_idmap: Annotated[
+        Path | None,
+        typer.Option(
+            "--faiss-idmap",
+            help="Path to faiss_idmap.parquet sidecar to stage alongside faiss.index.",
+        ),
+    ] = None,
+    tuning_profile: Annotated[
+        Path | None,
+        typer.Option(
+            "--tuning",
+            help="Path to tuning.json profile to stage alongside faiss.index.",
+        ),
+    ] = None,
 ) -> None:
     """Stage a new version by copying assets into the lifecycle root."""
     mgr = _manager()
     channels = _parse_extras(list(extras))
-    staged_assets = _build_assets(faiss_index, duckdb_path, scip_index, channels)
+    staged_assets = _build_assets(
+        faiss_index,
+        duckdb_path,
+        scip_index,
+        channels,
+        faiss_idmap=faiss_idmap,
+        tuning_profile=tuning_profile,
+    )
     staging = mgr.prepare(version, staged_assets)
     typer.echo(f"Staged assets at {staging}")
 
@@ -271,7 +324,7 @@ def tune_command(
 
 @app.command("tune-params")
 def tune_params_command(
-    params: Annotated[str, typer.Argument(help="FAISS ParameterSpace string (e.g. 'nprobe=64').")],
+    params: ParamSpaceArg,
     index: IndexOption = None,
 ) -> None:
     """Apply FAISS ParameterSpace string (nprobe/efSearch/quantizer/k_factor).
@@ -300,19 +353,10 @@ def _write_tuning_audit(manager: FAISSManager, tuning: dict[str, object]) -> Pat
 
 @app.command("eval")
 def eval_command(
-    k: Annotated[int, typer.Option("--k", min=1, help="Top-K for recall computation.")] = 10,
-    k_factor: Annotated[
-        float,
-        typer.Option("--k-factor", min=1.0, help="Candidate expansion factor for ANN search."),
-    ] = 2.0,
-    nprobe: Annotated[int | None, typer.Option("--nprobe", help="Override FAISS nprobe.")] = None,
-    xtr_oracle: Annotated[
-        bool,
-        typer.Option(
-            "--xtr-oracle/--no-xtr-oracle",
-            help="Also rescore each query using the XTR token index when available.",
-        ),
-    ] = DEFAULT_XTR_ORACLE,
+    k: EvalTopKOption = 10,
+    k_factor: EvalKFactorOption = 2.0,
+    nprobe: EvalNProbeOption = None,
+    xtr_oracle: EvalXtrOracleOption = DEFAULT_XTR_ORACLE,
 ) -> None:
     """Run ANN vs Flat evaluation and optionally rescore with XTR."""
     settings = _get_settings()
@@ -331,4 +375,11 @@ def eval_command(
     )
     evaluator = HybridPoolEvaluator(catalog, manager, xtr_index=xtr_index)
     report = evaluator.run(config)
+    try:
+        catalog.ensure_pool_views(pool_path)
+    except Exception as exc:  # pragma: no cover - defensive logging
+        LOGGER.warning(
+            "Unable to expose pool coverage views",
+            extra={"pool_path": str(pool_path), "error": str(exc)},
+        )
     typer.echo(json.dumps(report.__dict__, indent=2))

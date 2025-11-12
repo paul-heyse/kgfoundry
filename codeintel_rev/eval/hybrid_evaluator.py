@@ -50,7 +50,7 @@ class EvalReport:
     xtr_records: int
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=False)
 class _EvalState:
     fetch_k: int
     search_k: int
@@ -140,12 +140,62 @@ class HybridPoolEvaluator:
         queries: Sequence[tuple[int, np.ndarray]],
         config: EvalConfig,
     ) -> tuple[list[PoolRow], int, int, int]:
+        state = self._build_eval_state(config)
+
+        for query_id, raw_vec in queries:
+            query_vec = np.asarray(raw_vec, dtype=np.float32).reshape(1, -1)
+            ann_scores, ann_ids = self._manager.search(
+                query_vec,
+                k=state.search_k,
+                nprobe=config.nprobe,
+                catalog=self._catalog,
+            )
+            ann_ids_list = ann_ids[0].tolist()
+            if not ann_ids_list:
+                continue
+
+            oracle_scores, oracle_ids = self._flat_rerank(query_vec, ann_ids_list, state.fetch_k)
+            oracle_cut = oracle_ids[0].tolist()
+            ann_cut = min(state.fetch_k, len(ann_ids_list))
+            state.oracle_matches += len(
+                set(ann_ids_list[:ann_cut]) & set(oracle_cut[: state.fetch_k])
+            )
+            state.ann_hits += ann_cut
+
+            qid = str(query_id)
+            self._extend_pool(
+                state.pool_rows,
+                query_id=qid,
+                source="faiss",
+                ids=ann_ids_list,
+                scores=ann_scores[0].tolist(),
+            )
+            self._extend_pool(
+                state.pool_rows,
+                query_id=qid,
+                source="oracle",
+                ids=oracle_cut,
+                scores=oracle_scores[0].tolist(),
+            )
+
+            if state.xtr_index is not None:
+                text = self._get_query_text(int(query_id))
+                xtr_ids, xtr_scores = self._score_with_xtr(text, ann_ids_list, state.fetch_k)
+                if xtr_ids:
+                    self._extend_pool(
+                        state.pool_rows,
+                        query_id=qid,
+                        source="xtr",
+                        ids=xtr_ids,
+                        scores=xtr_scores,
+                    )
+                    state.xtr_rows += len(xtr_ids)
+
+        return state.pool_rows, state.ann_hits, state.oracle_matches, state.xtr_rows
+
+    def _build_eval_state(self, config: EvalConfig) -> _EvalState:
         fetch_k = max(config.k, 1)
         search_k = max(int(fetch_k * max(config.k_factor, 1.0)), fetch_k)
-        ann_hits = 0
-        oracle_matches = 0
-        xtr_rows = 0
-        pool_rows: list[PoolRow] = []
         xtr_index = (
             self._xtr_index
             if config.use_xtr_oracle
@@ -155,51 +205,12 @@ class HybridPoolEvaluator:
         )
         if config.use_xtr_oracle and xtr_index is None:
             LOGGER.warning("Requested XTR oracle but index is unavailable or not ready.")
-
-        for query_id, raw_vec in queries:
-            query_vec = np.asarray(raw_vec, dtype=np.float32).reshape(1, -1)
-            ann_scores, ann_ids = self._manager.search(query_vec, k=search_k, nprobe=config.nprobe)
-            ann_ids_list = ann_ids[0].tolist()
-            if not ann_ids_list:
-                continue
-
-            oracle_scores, oracle_ids = self._flat_rerank(query_vec, ann_ids_list, fetch_k)
-            oracle_cut = oracle_ids[0].tolist()
-            ann_scores_list = ann_scores[0].tolist()
-            ann_cut = min(fetch_k, len(ann_ids_list))
-            oracle_matches += len(set(ann_ids_list[:ann_cut]) & set(oracle_cut[:fetch_k]))
-            ann_hits += ann_cut
-
-            qid = str(query_id)
-            self._extend_pool(
-                pool_rows,
-                query_id=qid,
-                source="faiss",
-                ids=ann_ids_list,
-                scores=ann_scores_list,
-            )
-            self._extend_pool(
-                pool_rows,
-                query_id=qid,
-                source="oracle",
-                ids=oracle_cut,
-                scores=oracle_scores[0].tolist(),
-            )
-
-            if xtr_index is not None:
-                text = self._get_query_text(int(query_id))
-                xtr_ids, xtr_scores = self._score_with_xtr(text, ann_ids_list, fetch_k)
-                if xtr_ids:
-                    self._extend_pool(
-                        pool_rows,
-                        query_id=qid,
-                        source="xtr",
-                        ids=xtr_ids,
-                        scores=xtr_scores,
-                    )
-                    xtr_rows += len(xtr_ids)
-
-        return pool_rows, ann_hits, oracle_matches, xtr_rows
+        return _EvalState(
+            fetch_k=fetch_k,
+            search_k=search_k,
+            pool_rows=[],
+            xtr_index=xtr_index,
+        )
 
     def _flat_rerank(
         self,

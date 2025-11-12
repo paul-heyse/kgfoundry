@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -30,6 +31,10 @@ class PoolRow:
     rank: int
     chunk_id: int
     score: float
+    explain_symbols: tuple[str, ...] = ()
+    explain_ast_kinds: tuple[str, ...] = ()
+    explain_cst_hits: tuple[str, ...] = ()
+    explanation_json: Mapping[str, object] | None = None
 
 
 def _empty_table() -> pa.Table:
@@ -55,8 +60,22 @@ def _empty_table() -> pa.Table:
             pa.array([], type=pa.int32()),
             pa.array([], type=pa.int64()),
             pa.array([], type=pa.float32()),
+            pa.array([], type=pa.list_(pa.string())),
+            pa.array([], type=pa.list_(pa.string())),
+            pa.array([], type=pa.list_(pa.string())),
+            pa.array([], type=pa.string()),
         ],
-        names=["query_id", "source", "rank", "chunk_id", "score"],
+        names=[
+            "query_id",
+            "source",
+            "rank",
+            "chunk_id",
+            "score",
+            "explain_symbols",
+            "explain_ast_kinds",
+            "explain_cst_hits",
+            "explanation_json",
+        ],
     )
 
 
@@ -102,8 +121,39 @@ def write_pool(rows: Iterable[PoolRow], out_path: Path, *, overwrite: bool = Tru
             pa.array([int(row.rank) for row in materialized], type=pa.int32()),
             pa.array([int(row.chunk_id) for row in materialized], type=pa.int64()),
             pa.array([float(row.score) for row in materialized], type=pa.float32()),
+            pa.array(
+                [list(row.explain_symbols) for row in materialized],
+                type=pa.list_(pa.string()),
+            ),
+            pa.array(
+                [list(row.explain_ast_kinds) for row in materialized],
+                type=pa.list_(pa.string()),
+            ),
+            pa.array(
+                [list(row.explain_cst_hits) for row in materialized],
+                type=pa.list_(pa.string()),
+            ),
+            pa.array(
+                [
+                    json.dumps(row.explanation_json, sort_keys=True)
+                    if row.explanation_json
+                    else None
+                    for row in materialized
+                ],
+                type=pa.string(),
+            ),
         ],
-        names=["query_id", "source", "rank", "chunk_id", "score"],
+        names=[
+            "query_id",
+            "source",
+            "rank",
+            "chunk_id",
+            "score",
+            "explain_symbols",
+            "explain_ast_kinds",
+            "explain_cst_hits",
+            "explanation_json",
+        ],
     )
     pq.write_table(table, out_path, compression="zstd", use_dictionary=True)
     return len(materialized)

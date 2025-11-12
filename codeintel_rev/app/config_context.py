@@ -95,7 +95,38 @@ _RUNTIME_FAILURE_TTL_S = 15.0
 
 
 class _RetrievalMetrics(Protocol):
-    def set_index_version(self, name: str, version: str | None) -> None: ...
+    """Protocol defining the interface for retrieval metrics collection.
+
+    This protocol describes the methods that retrieval metrics implementations
+    must provide for tracking index version information. Used for type checking
+    and dependency injection in application context initialization.
+    """
+
+    def set_index_version(self, name: str, version: str | None) -> None:
+        """Set the active version for a named index.
+
+        This method records the active version of an index (FAISS, DuckDB, etc.)
+        for metrics and observability purposes. The version information is used
+        to track index lifecycle changes and correlate metrics with specific
+        index versions.
+
+        Parameters
+        ----------
+        name : str
+            Name of the index (e.g., "faiss", "duckdb", "splade"). Used to
+            identify which index the version applies to.
+        version : str | None
+            Version identifier for the index (e.g., "v1.2.3", "2024-01-15").
+            If None, indicates that the index version is unknown or not available.
+
+        Notes
+        -----
+        This method is called during application context initialization when
+        indexes are loaded. The version information is stored in metrics for
+        later querying and analysis. Time complexity: O(1) for setting the
+        version. The method performs no I/O operations and should be thread-safe.
+        """
+        ...
 
 
 retrieval_metrics = cast("_RetrievalMetrics", _retrieval_metrics)
@@ -518,6 +549,8 @@ class ResolvedPaths:
         Absolute path to directory containing Parquet files with vector embeddings.
     faiss_index : Path
         Absolute path to FAISS IVF-PQ index file (CPU version).
+    faiss_idmap_path : Path
+        Absolute path to the FAISS ID map Parquet sidecar used for chunk hydration.
     duckdb_path : Path
         Absolute path to DuckDB catalog database file.
     scip_index : Path
@@ -547,6 +580,7 @@ class ResolvedPaths:
     data_dir: Path
     vectors_dir: Path
     faiss_index: Path
+    faiss_idmap_path: Path
     duckdb_path: Path
     scip_index: Path
     coderank_vectors_dir: Path
@@ -639,6 +673,7 @@ def resolve_application_paths(settings: Settings) -> ResolvedPaths:
         data_dir=_resolve(settings.paths.data_dir),
         vectors_dir=_resolve(settings.paths.vectors_dir),
         faiss_index=_resolve(settings.paths.faiss_index),
+        faiss_idmap_path=_resolve(settings.paths.faiss_idmap_path),
         duckdb_path=_resolve(settings.paths.duckdb_path),
         scip_index=_resolve(settings.paths.scip_index),
         coderank_vectors_dir=_resolve(settings.paths.coderank_vectors_dir),
@@ -653,6 +688,7 @@ def resolve_application_paths(settings: Settings) -> ResolvedPaths:
         paths.coderank_vectors_dir,
         paths.warp_index_dir,
         paths.xtr_dir,
+        paths.faiss_idmap_path.parent,
     ):
         try:
             directory.mkdir(parents=True, exist_ok=True)
@@ -1392,6 +1428,7 @@ class ApplicationContext:
             materialize=self.settings.index.duckdb_materialize,
             manager=self.duckdb_manager,
             log_queries=self.settings.duckdb.log_queries,
+            repo_root=self.paths.repo_root,
         )
         catalog.set_idmap_path(self.paths.faiss_idmap_path)
         try:

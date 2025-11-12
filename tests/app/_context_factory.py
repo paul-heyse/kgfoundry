@@ -11,6 +11,56 @@ if TYPE_CHECKING:
     from codeintel_rev.config.settings import Settings
 
 
+def _prepare_paths(tmp_path: Path) -> ResolvedPaths:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir(parents=True, exist_ok=True)
+    data_dir = repo_root / "data"
+    vectors_dir = data_dir / "vectors"
+    faiss_dir = data_dir / "faiss"
+    coderank_vectors = data_dir / "coderank_vectors"
+    warp_dir = repo_root / "warp"
+    xtr_dir = repo_root / "xtr"
+
+    for directory in (
+        data_dir,
+        vectors_dir,
+        faiss_dir,
+        coderank_vectors,
+        warp_dir,
+        xtr_dir,
+    ):
+        directory.mkdir(parents=True, exist_ok=True)
+
+    faiss_index = faiss_dir / "code.ivfpq.faiss"
+    faiss_idmap = faiss_dir / "faiss_idmap.parquet"
+    coderank_index = faiss_dir / "coderank.faiss"
+    duckdb_path = data_dir / "catalog.duckdb"
+    scip_index = data_dir / "index.scip"
+
+    for path in (
+        faiss_index,
+        coderank_index,
+        duckdb_path,
+        scip_index,
+        faiss_idmap,
+    ):
+        path.touch()
+
+    return ResolvedPaths(
+        repo_root=repo_root,
+        data_dir=data_dir,
+        vectors_dir=vectors_dir,
+        faiss_index=faiss_index,
+        faiss_idmap_path=faiss_idmap,
+        duckdb_path=duckdb_path,
+        scip_index=scip_index,
+        coderank_vectors_dir=coderank_vectors,
+        coderank_faiss_index=coderank_index,
+        warp_index_dir=warp_dir,
+        xtr_dir=xtr_dir,
+    )
+
+
 def build_application_context(
     tmp_path: Path,
     *,
@@ -36,45 +86,8 @@ def build_application_context(
     ApplicationContext
         Configured application context with mocked dependencies for testing.
     """
-    repo_root = tmp_path / "repo"
-    repo_root.mkdir(parents=True, exist_ok=True)
-    data_dir = repo_root / "data"
-    vectors_dir = data_dir / "vectors"
-    faiss_index = data_dir / "faiss" / "code.ivfpq.faiss"
-    coderank_index = data_dir / "faiss" / "coderank.faiss"
-    duckdb_path = data_dir / "catalog.duckdb"
-    scip_index = data_dir / "index.scip"
-    coderank_vectors = data_dir / "coderank_vectors"
-    warp_dir = repo_root / "warp"
-    xtr_dir = repo_root / "xtr"
-
-    for directory in (
-        data_dir,
-        vectors_dir,
-        faiss_index.parent,
-        coderank_vectors,
-        warp_dir,
-        xtr_dir,
-    ):
-        directory.mkdir(parents=True, exist_ok=True)
-
-    faiss_index.touch()
-    coderank_index.touch()
-    duckdb_path.touch()
-    scip_index.touch()
-
-    paths = ResolvedPaths(
-        repo_root=repo_root,
-        data_dir=data_dir,
-        vectors_dir=vectors_dir,
-        faiss_index=faiss_index,
-        duckdb_path=duckdb_path,
-        scip_index=scip_index,
-        coderank_vectors_dir=coderank_vectors,
-        coderank_faiss_index=coderank_index,
-        warp_index_dir=warp_dir,
-        xtr_dir=xtr_dir,
-    )
+    paths = _prepare_paths(tmp_path)
+    warp_dir = paths.warp_index_dir
 
     index_cfg = SimpleNamespace(
         faiss_nlist=64,

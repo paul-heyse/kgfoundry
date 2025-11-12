@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     import numpy as np
 
     from codeintel_rev.app.config_context import ApplicationContext
+    from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 else:
     httpx = cast("httpx", LazyModule("httpx", "semantic adapter HTTP error handling"))
     np = cast("np", LazyModule("numpy", "semantic adapter embeddings"))
@@ -153,6 +154,7 @@ class _FaissSearchRequest:
     nprobe: int
     observation: Observation
     tuning_overrides: Mapping[str, float | int] | None = None
+    catalog: "DuckDBCatalog" | None = None
 
 
 async def semantic_search(
@@ -252,36 +254,39 @@ def _semantic_search_sync(
             observation,
             context.settings.vllm.base_url,
         )
-        faiss_request = _FaissSearchRequest(
-            context=context,
-            query_vector=query_vector,
-            limit=plan.fanout.faiss_k,
-            nprobe=plan.nprobe,
-            observation=observation,
-            tuning_overrides=plan.tuning_overrides,
-        )
-        result_ids, result_scores = _run_faiss_search_or_raise(faiss_request)
+        with context.open_catalog() as catalog:
+            faiss_request = _FaissSearchRequest(
+                context=context,
+                query_vector=query_vector,
+                limit=plan.fanout.faiss_k,
+                nprobe=plan.nprobe,
+                observation=observation,
+                tuning_overrides=plan.tuning_overrides,
+                catalog=catalog,
+            )
+            result_ids, result_scores = _run_faiss_search_or_raise(faiss_request)
 
-        hybrid_result = _resolve_hybrid_results(
-            context,
-            _HybridSearchState(
-                query,
-                result_ids,
-                result_scores,
-                plan.effective_limit,
-                plan.fanout.faiss_k,
-                plan.nprobe,
-            ),
-            limits_metadata,
-            ("semantic", "faiss"),
-        )
+            hybrid_result = _resolve_hybrid_results(
+                context,
+                _HybridSearchState(
+                    query,
+                    result_ids,
+                    result_scores,
+                    plan.effective_limit,
+                    plan.fanout.faiss_k,
+                    plan.nprobe,
+                ),
+                limits_metadata,
+                ("semantic", "faiss"),
+            )
 
-        findings, hydrate_exc = _hydrate_findings(
-            context,
-            hybrid_result.hydration_ids,
-            hybrid_result.hydration_scores,
-            scope=scope,
-        )
+            findings, hydrate_exc = _hydrate_findings(
+                context,
+                hybrid_result.hydration_ids,
+                hybrid_result.hydration_scores,
+                scope=scope,
+                catalog=catalog,
+            )
         _ensure_hydration_success(hydrate_exc, observation, context)
 
         observation.mark_success()
@@ -923,6 +928,7 @@ def _run_faiss_search(
             k=request.limit,
             nprobe=final_nprobe,
             runtime=runtime,
+            catalog=request.catalog,
         )
     except RuntimeError as exc:
         return [], [], exc
@@ -1001,6 +1007,7 @@ def _hydrate_findings(
     scores: Sequence[float],
     *,
     scope: ScopeIn | None = None,
+    catalog: "DuckDBCatalog" | None = None,
 ) -> tuple[list[Finding], Exception | None]:
     """Hydrate FAISS search results from DuckDB.
 
@@ -1036,10 +1043,14 @@ def _hydrate_findings(
       unfiltered retrieval (backward compatible).
     - Filtering happens during DuckDB hydration (post-FAISS), so FAISS search
       may return more IDs than needed to compensate for filtering.
+    catalog provided : DuckDBCatalog | None
+        Existing DuckDB catalog to reuse. When ``None``, a new catalog instance
+        is opened via :meth:`ApplicationContext.open_catalog`.
     """
-    findings: list[Finding] = []
-    try:
-        with context.open_catalog() as catalog:
+
+    def _hydrate(active_catalog: "DuckDBCatalog") -> tuple[list[Finding], Exception | None]:
+        findings: list[Finding] = []
+        try:
             valid_ids = [int(chunk_id) for chunk_id in chunk_ids if chunk_id >= 0]
             if not valid_ids:
                 return [], None
@@ -1060,7 +1071,7 @@ def _hydrate_findings(
 
             # Apply scope filters if scope has path/language constraints
             if has_filters:
-                records = catalog.query_by_filters(
+                records = active_catalog.query_by_filters(
                     valid_ids,
                     include_globs=include_globs,
                     exclude_globs=exclude_globs,
@@ -1077,7 +1088,7 @@ def _hydrate_findings(
                     },
                 )
             else:
-                records = catalog.query_by_ids(valid_ids)
+                records = active_catalog.query_by_ids(valid_ids)
             chunk_by_id = {int(record["id"]): record for record in records if "id" in record}
 
             for chunk_id, score in zip(chunk_ids, scores, strict=True):
@@ -1103,10 +1114,14 @@ def _hydrate_findings(
                     "chunk_id": int(chunk_id),
                 }
                 findings.append(finding)
-    except (RuntimeError, OSError) as exc:
-        return findings, exc
+        except (RuntimeError, OSError) as exc:
+            return findings, exc
+        return findings, None
 
-    return findings, None
+    if catalog is not None:
+        return _hydrate(catalog)
+    with context.open_catalog() as owned_catalog:
+        return _hydrate(owned_catalog)
 
 
 def _build_method(

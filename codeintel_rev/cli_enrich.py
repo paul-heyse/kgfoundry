@@ -123,6 +123,8 @@ DEFAULT_EMIT_AST = True
 DEFAULT_MAX_FILE_BYTES = 2_000_000
 DEFAULT_OWNER_HISTORY_DAYS = 90
 DEFAULT_COMMITS_WINDOW = 50
+DEFAULT_ENABLE_OWNERS = True
+DEFAULT_EMIT_SLICES_FLAG = False
 
 STUBS = typer.Option(
     Path("stubs"),
@@ -351,10 +353,10 @@ def run_all(  # noqa: PLR0913, PLR0917
             help="Emit Parquet datasets with AST nodes and metrics.",
         ),
     ] = DEFAULT_EMIT_AST,
-    owners: OwnersOption = True,
+    owners: OwnersOption = DEFAULT_ENABLE_OWNERS,
     history_window_days: int = HISTORY_WINDOW,
     commits_window: int = COMMITS_WINDOW_OPTION,
-    emit_slices: EmitSlicesOption = False,
+    emit_slices: EmitSlicesOption = DEFAULT_EMIT_SLICES_FLAG,
     slices_filter: SlicesFilterOption = None,
     max_file_bytes: int = MAX_FILE_BYTES,
 ) -> None:
@@ -407,10 +409,10 @@ def scan(  # noqa: PLR0913, PLR0917
             help="Emit Parquet datasets with AST nodes and metrics.",
         ),
     ] = DEFAULT_EMIT_AST,
-    owners: OwnersOption = True,
+    owners: OwnersOption = DEFAULT_ENABLE_OWNERS,
     history_window_days: int = HISTORY_WINDOW,
     commits_window: int = COMMITS_WINDOW_OPTION,
-    emit_slices: EmitSlicesOption = False,
+    emit_slices: EmitSlicesOption = DEFAULT_EMIT_SLICES_FLAG,
     slices_filter: SlicesFilterOption = None,
     max_file_bytes: int = MAX_FILE_BYTES,
 ) -> None:
@@ -444,10 +446,10 @@ def exports(  # noqa: PLR0913, PLR0917
     tags_yaml: Path | None = TAGS,
     coverage_xml: Path = COVERAGE_XML,
     only: OnlyPatternsOption = None,
-    owners: bool = OWNERS,
+    owners: OwnersOption = DEFAULT_ENABLE_OWNERS,
     history_window_days: int = HISTORY_WINDOW,
     commits_window: int = COMMITS_WINDOW_OPTION,
-    emit_slices: bool = EMIT_SLICES,
+    emit_slices: EmitSlicesOption = DEFAULT_EMIT_SLICES_FLAG,
     slices_filter: SlicesFilterOption = None,
     max_file_bytes: int = MAX_FILE_BYTES,
 ) -> None:
@@ -788,13 +790,8 @@ def _build_module_row(
 ) -> tuple[dict[str, Any], list[tuple[str, str]]]:
     rel = _normalized_rel_path(fp, root)
     repo_path = _normalized_rel_path(fp, inputs.repo_root)
-    module_name = module_name_from_path(inputs.repo_root, fp, inputs.package_prefix)
     stable_id = stable_id_for_path(repo_path)
-    scip_doc = inputs.scip_ctx.by_file.get(rel)
-    scip_symbols = sorted(
-        {symbol.symbol for symbol in (scip_doc.symbols if scip_doc else []) if symbol.symbol}
-    )
-    symbol_edges = [(symbol, rel) for symbol in scip_symbols]
+    scip_symbols, symbol_edges = _scip_symbols_and_edges(rel, inputs)
 
     try:
         file_size = fp.stat().st_size
@@ -805,7 +802,7 @@ def _build_module_row(
         row = {
             "path": rel,
             "repo_path": repo_path,
-            "module_name": module_name,
+            "module_name": module_name_from_path(inputs.repo_root, fp, inputs.package_prefix),
             "stable_id": stable_id,
             "docstring": None,
             "doc_has_summary": False,
@@ -838,29 +835,14 @@ def _build_module_row(
 
     code = fp.read_text(encoding="utf-8", errors="ignore")
     idx = index_module(rel, code)
+    outline_nodes = _outline_nodes_for(rel, code)
 
-    outline = build_outline(rel, code.encode("utf-8"))
-    outline_nodes = []
-    if outline:
-        outline_nodes.extend(
-            {
-                "kind": node.kind,
-                "name": node.name,
-                "start": node.start_byte,
-                "end": node.end_byte,
-            }
-            for node in outline.nodes
-        )
-
-    type_signal = inputs.type_signals.get(rel)
-    type_errors = type_signal.total if type_signal else 0
-
-    coverage_entry = inputs.coverage_map.get(rel, {})
+    type_errors = _type_error_count(rel, inputs)
 
     row = {
         "path": rel,
         "repo_path": repo_path,
-        "module_name": module_name,
+        "module_name": module_name_from_path(inputs.repo_root, fp, inputs.package_prefix),
         "stable_id": stable_id,
         "docstring": idx.docstring,
         "doc_has_summary": bool(idx.doc_metrics.get("has_summary")),
@@ -894,12 +876,48 @@ def _build_module_row(
         "side_effects": idx.side_effects,
         "raises": idx.raises,
         "complexity": idx.complexity,
-        "covered_lines_ratio": float(coverage_entry.get("covered_lines_ratio", 0.0)),
-        "covered_defs_ratio": float(coverage_entry.get("covered_defs_ratio", 0.0)),
+        "covered_lines_ratio": _coverage_value(rel, inputs, "covered_lines_ratio"),
+        "covered_defs_ratio": _coverage_value(rel, inputs, "covered_defs_ratio"),
         "config_refs": [],
         "overlay_needed": False,
     }
     return row, symbol_edges
+
+
+def _scip_symbols_and_edges(
+    rel_path: str,
+    inputs: ScanInputs,
+) -> tuple[list[str], list[tuple[str, str]]]:
+    document = inputs.scip_ctx.by_file.get(rel_path)
+    symbols = sorted(
+        {symbol.symbol for symbol in (document.symbols if document else []) if symbol.symbol}
+    )
+    return symbols, [(symbol, rel_path) for symbol in symbols]
+
+
+def _outline_nodes_for(rel_path: str, code: str) -> list[dict[str, Any]]:
+    outline = build_outline(rel_path, code.encode("utf-8"))
+    if outline is None:
+        return []
+    return [
+        {
+            "kind": node.kind,
+            "name": node.name,
+            "start": node.start_byte,
+            "end": node.end_byte,
+        }
+        for node in outline.nodes
+    ]
+
+
+def _type_error_count(rel_path: str, inputs: ScanInputs) -> int:
+    signal = inputs.type_signals.get(rel_path)
+    return signal.total if signal else 0
+
+
+def _coverage_value(rel_path: str, inputs: ScanInputs, key: str) -> float:
+    entry = inputs.coverage_map.get(rel_path, {})
+    return float(entry.get(key, 0.0))
 
 
 def _augment_module_rows(

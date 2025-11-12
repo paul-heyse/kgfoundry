@@ -258,6 +258,59 @@ def _verify_duplicate_in_results(
     return primary_idx, secondary_idx
 
 
+def _normalize_query_vector(vector: np.ndarray) -> np.ndarray:
+    """Normalize query vector to shape ``(1, vec_dim)``.
+
+    Returns
+    -------
+    np.ndarray
+        Normalized float32 array with shape ``(1, vec_dim)``.
+    """
+    normalized = np.asarray(vector, dtype=np.float32)
+    if normalized.ndim == 1:
+        normalized = normalized.reshape(1, -1)
+    faiss_module.normalize_L2(normalized)
+    return normalized
+
+
+def _search_primary_vectors(
+    manager: FAISSManager, query: np.ndarray, *, k: int, nprobe: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Run a search against the primary FAISS index.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        Distances and IDs from the primary search.
+    """
+    cpu_index = manager.require_cpu_index()
+    if hasattr(cpu_index, "nprobe"):
+        cpu_index.nprobe = nprobe
+    return cpu_index.search(_normalize_query_vector(query), k)
+
+
+def _search_secondary_vectors(
+    manager: FAISSManager, query: np.ndarray, *, k: int
+) -> tuple[np.ndarray, np.ndarray]:
+    """Run a search against the secondary FAISS index.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        Distances and IDs from the secondary search.
+
+    Raises
+    ------
+    AssertionError
+        If a secondary index has not been created yet.
+    """
+    secondary = manager.secondary_index
+    if secondary is None:
+        msg = "Secondary index expected for dual search test"
+        raise AssertionError(msg)
+    return secondary.search(_normalize_query_vector(query), k)
+
+
 def _perform_dual_search(
     manager: FAISSManager, query: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -275,8 +328,8 @@ def _perform_dual_search(
     tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
         Primary distances, primary IDs, secondary distances, secondary IDs.
     """
-    primary_dists, primary_ids_result = manager.search_primary(query, k=3, nprobe=128)
-    secondary_dists, secondary_ids_result = manager.search_secondary(query, k=3)
+    primary_dists, primary_ids_result = _search_primary_vectors(manager, query, k=3, nprobe=128)
+    secondary_dists, secondary_ids_result = _search_secondary_vectors(manager, query, k=3)
     return primary_dists, primary_ids_result, secondary_dists, secondary_ids_result
 
 

@@ -63,6 +63,24 @@ def _nlist_value(index: Any) -> int | None:
     return None
 
 
+def _unwrap_primary_index(manager: FAISSManager) -> Any:
+    """Return the concrete FAISS index implementation for assertions.
+
+    Returns
+    -------
+    Any
+        Underlying FAISS index object (downcast when available).
+    """
+    cpu_index = manager.require_cpu_index()
+    candidate: Any = getattr(cpu_index, "index", cpu_index)
+    if hasattr(faiss_module, "downcast_index"):
+        try:
+            return faiss_module.downcast_index(candidate)
+        except (AttributeError, RuntimeError):
+            return candidate
+    return candidate
+
+
 @pytest.fixture
 def tmp_index_path(tmp_path: Path) -> Path:
     """Create a temporary index path for testing.
@@ -130,7 +148,7 @@ def test_adaptive_index_selection(tmp_index_path: Path, n_vectors: int, expected
 
     # Check index type by examining the underlying index structure
     assert isinstance(cpu_index, faiss_module.IndexIDMap2)
-    underlying = manager.primary_index_impl()
+    underlying = _unwrap_primary_index(manager)
     underlying_any = cast("Any", underlying)
 
     # Get type information for debugging
@@ -200,7 +218,7 @@ def test_small_corpus_flat_index(tmp_index_path: Path) -> None:
     assert manager.cpu_index is not None
     cpu_index = manager.cpu_index
     assert isinstance(cpu_index, faiss_module.IndexIDMap2)
-    underlying = manager.primary_index_impl()
+    underlying = _unwrap_primary_index(manager)
     # Check by type name since isinstance may not work with dynamic types
     assert "FlatIP" in type(underlying).__name__, (
         f"Expected FlatIP, got {type(underlying).__name__}"
@@ -252,7 +270,7 @@ def test_medium_corpus_ivf_flat_nlist(tmp_index_path: Path) -> None:
     cpu_index = manager.cpu_index
     assert faiss_module is not None
     assert isinstance(cpu_index, faiss_module.IndexIDMap2)
-    underlying = manager.primary_index_impl()
+    underlying = _unwrap_primary_index(manager)
     underlying_any = cast("Any", underlying)
     # Check by type name since isinstance may not work with dynamic types
     assert "IVFFlat" in type(underlying_any).__name__, (
@@ -293,7 +311,7 @@ def test_large_corpus_ivf_pq_nlist(tmp_index_path: Path) -> None:
     cpu_index = manager.cpu_index
     assert faiss_module is not None
     assert isinstance(cpu_index, faiss_module.IndexIDMap2)
-    underlying = manager.primary_index_impl()
+    underlying = _unwrap_primary_index(manager)
     underlying_any = cast("Any", underlying)
 
     # Verify nlist is calculated correctly

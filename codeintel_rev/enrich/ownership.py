@@ -3,18 +3,28 @@
 
 from __future__ import annotations
 
-import subprocess
+import subprocess  # noqa: S404
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from fnmatch import fnmatch
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 try:  # pragma: no cover - optional dependency
+    from git import Repo as _RuntimeGitRepo
+    from git import exc as git_exc
+except ImportError:  # pragma: no cover
+    _RuntimeGitRepo = None
+    git_exc = None
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
     from git import Repo as GitRepo
-except Exception:  # pragma: no cover
-    GitRepo = None
+else:
+    GitRepo = Any  # type: ignore[assignment]
+
+GitError = git_exc.GitError if git_exc is not None else Exception
 
 __all__ = ["FileOwnership", "OwnershipIndex", "compute_ownership"]
 
@@ -45,7 +55,13 @@ def compute_ownership(
     commits_window: int = 50,
     churn_windows: Sequence[int] = (30, 90),
 ) -> OwnershipIndex:
-    """Return ownership metrics for ``rel_paths`` relative to ``repo_root``."""
+    """Return ownership metrics for ``rel_paths`` relative to ``repo_root``.
+
+    Returns
+    -------
+    OwnershipIndex
+        Aggregated ownership/churn signals keyed by repo-relative path.
+    """
     unique_paths = sorted({path for path in rel_paths if path})
     windows = _normalize_windows(churn_windows)
     if not unique_paths:
@@ -77,11 +93,11 @@ def _normalize_windows(values: Sequence[int]) -> tuple[int, ...]:
 
 
 def _try_open_repo(repo_root: Path) -> GitRepo | None:
-    if GitRepo is None:  # pragma: no cover - GitPython not installed
+    if _RuntimeGitRepo is None:  # pragma: no cover - GitPython not installed
         return None
     try:
-        return GitRepo(str(repo_root))
-    except Exception:  # pragma: no cover - repo open failures
+        return _RuntimeGitRepo(str(repo_root))
+    except GitError:  # pragma: no cover - repo open failures
         return None
 
 
@@ -100,10 +116,14 @@ def _stats_via_gitpython(
     for rel in rel_paths:
         try:
             commits = list(repo.iter_commits(paths=rel, max_count=commit_limit))
-        except Exception:  # pragma: no cover - rare git failure
+        except (GitError, ValueError):  # pragma: no cover - rare git failure
             commits = []
-        authors = [_author_name(commit) for commit in commits if _author_name(commit)]
-        churn_counts = dict.fromkeys(windows, 0)
+        authors: list[str] = []
+        for commit in commits:
+            author_name = _author_name(commit)
+            if author_name:
+                authors.append(author_name)
+        churn_counts: dict[int, int] = dict.fromkeys(windows, 0)
         for commit in commits:
             committed = datetime.fromtimestamp(commit.committed_date, tz=UTC)
             for window, cutoff in cutoffs.items():
@@ -156,7 +176,7 @@ def _stats_via_subprocess(
 
 def _run_git(cmd: list[str], repo_root: Path) -> list[str]:
     try:
-        process = subprocess.run(
+        process = subprocess.run(  # noqa: S603 - fixed command + cwd
             cmd,
             cwd=str(repo_root),
             check=False,
@@ -199,13 +219,11 @@ def _codeowners_lookup(repo_root: Path, rel_path: str) -> str | None:
             content = path.read_text(encoding="utf-8")
         except OSError:  # pragma: no cover - limited readability
             continue
-        for line in content.splitlines():
-            line = line.strip()
-            if not line or line.startswith("#"):
+        for raw_line in content.splitlines():
+            stripped = raw_line.strip()
+            if not stripped or stripped.startswith("#"):
                 continue
-            parts = line.split()
-            if len(parts) < 2:
-                continue
+            parts = stripped.split()
             pattern, *owners = parts
             if owners and _glob_like_match(rel_path, pattern):
                 return owners[0]

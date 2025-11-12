@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from kgfoundry_common.prometheus import build_counter, build_gauge
+from kgfoundry_common.prometheus import build_counter, build_gauge, build_histogram
 
 FAISS_BUILD_TOTAL = build_counter("faiss_build_total", "Number of FAISS index builds.")
 FAISS_BUILD_SECONDS_LAST = build_gauge(
@@ -37,6 +37,19 @@ FAISS_SEARCH_LAST_MS = build_gauge(
 FAISS_SEARCH_LAST_K = build_gauge("faiss_search_last_k", "k used by the last FAISS search.")
 FAISS_SEARCH_NPROBE = build_gauge(
     "faiss_search_nprobe", "IVF nprobe value used for the most recent FAISS search."
+)
+FAISS_ANN_LATENCY_SECONDS = build_histogram(
+    "faiss_ann_latency_seconds",
+    "Latency for ANN (approximate) FAISS searches.",
+    labelnames=("family",),
+)
+FAISS_REFINE_LATENCY_SECONDS = build_histogram(
+    "faiss_refine_latency_seconds",
+    "Latency for exact rerank refinement over hydrated embeddings.",
+)
+FAISS_REFINE_KEPT_RATIO = build_histogram(
+    "faiss_refine_kept_ratio",
+    "Ratio of requested top-k to ANN candidate fan-out (measures overfetch).",
 )
 HNSW_SEARCH_EF = build_gauge(
     "hnsw_search_ef", "efSearch value applied during the most recent HNSW search."
@@ -151,6 +164,9 @@ __all__ = [
     "FAISS_INDEX_GPU_ENABLED",
     "FAISS_INDEX_SIZE_VECTORS",
     "FAISS_SEARCH_ERRORS_TOTAL",
+    "FAISS_ANN_LATENCY_SECONDS",
+    "FAISS_REFINE_LATENCY_SECONDS",
+    "FAISS_REFINE_KEPT_RATIO",
     "FAISS_SEARCH_LAST_K",
     "FAISS_SEARCH_LAST_MS",
     "FAISS_SEARCH_NPROBE",

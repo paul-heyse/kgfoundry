@@ -6,6 +6,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
+from hashlib import sha1
 from pathlib import Path
 from typing import Any
 
@@ -32,13 +33,11 @@ class SliceRecord:
     config_refs: list[str] = field(default_factory=list)
     owners: dict[str, Any] = field(default_factory=dict)
     extras: dict[str, Any] = field(default_factory=dict)
-    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    timestamp: str = field(default_factory=datetime.now(UTC).isoformat)
 
 
 def _slice_id(path: str, module_name: str | None) -> str:
-    from hashlib import sha1
-
-    digest = sha1(path.encode("utf-8"))
+    digest = sha1(path.encode("utf-8"))  # noqa: S324 - deterministic slice identifier
     if module_name:
         digest.update(b"|")
         digest.update(module_name.encode("utf-8"))
@@ -46,7 +45,13 @@ def _slice_id(path: str, module_name: str | None) -> str:
 
 
 def build_slice_record(module_row: Mapping[str, Any]) -> SliceRecord:
-    """Build a :class:`SliceRecord` from a module row dictionary."""
+    """Build a :class:`SliceRecord` from a module row dictionary.
+
+    Returns
+    -------
+    SliceRecord
+        Structured slice description derived from ``module_row``.
+    """
     path = str(module_row.get("path"))
     module_name = (
         module_row.get("module_name") if isinstance(module_row.get("module_name"), str) else None

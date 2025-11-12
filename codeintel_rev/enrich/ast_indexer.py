@@ -425,86 +425,259 @@ class _MetricsVisitor(ast.NodeVisitor):  # noqa: PLR0904 - visitor needs dedicat
         self._current_nesting = 0
 
     def generic_visit(self, node: ast.AST) -> None:
+        """Visit a generic AST node and increment statement counter if applicable.
+
+        This method is called for nodes that don't have a specific visitor method.
+        It increments the statement counter for statement nodes and then calls
+        the parent class's generic_visit to continue traversal.
+
+        Parameters
+        ----------
+        node : ast.AST
+            Generic AST node being visited. If the node is a statement, the
+            statement counter is incremented.
+        """
         if isinstance(node, ast.stmt):
             self.statements += 1
         super().generic_visit(node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        """Visit a function definition and increment function counter.
+
+        Parameters
+        ----------
+        node : ast.FunctionDef
+            AST node representing a function definition (e.g., ``def func(): ...``).
+        """
         self.func_count += 1
         self.generic_visit(node)
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        """Visit an async function definition and increment function counter.
+
+        Parameters
+        ----------
+        node : ast.AsyncFunctionDef
+            AST node representing an async function definition (e.g., ``async def func(): ...``).
+        """
         self.func_count += 1
         self.generic_visit(node)
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        """Visit a class definition and increment class counter.
+
+        Parameters
+        ----------
+        node : ast.ClassDef
+            AST node representing a class definition (e.g., ``class MyClass: ...``).
+        """
         self.class_count += 1
         self.generic_visit(node)
 
     def visit_Assign(self, node: ast.Assign) -> None:
+        """Visit an assignment statement and increment assignment counter.
+
+        Parameters
+        ----------
+        node : ast.Assign
+            AST node representing an assignment statement (e.g., ``x = 1``, ``a, b = 1, 2``).
+        """
         self.assign_count += 1
         self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        """Visit an annotated assignment and increment assignment counter.
+
+        Parameters
+        ----------
+        node : ast.AnnAssign
+            AST node representing an annotated assignment (e.g., ``x: int = 1``).
+        """
         self.assign_count += 1
         self.generic_visit(node)
 
     def visit_AugAssign(self, node: ast.AugAssign) -> None:
+        """Visit an augmented assignment and increment assignment counter.
+
+        Parameters
+        ----------
+        node : ast.AugAssign
+            AST node representing an augmented assignment (e.g., ``x += 1``, ``y *= 2``).
+        """
         self.assign_count += 1
         self.generic_visit(node)
 
     def visit_NamedExpr(self, node: ast.NamedExpr) -> None:
+        """Visit a named expression (walrus operator) and increment assignment counter.
+
+        Parameters
+        ----------
+        node : ast.NamedExpr
+            AST node representing a named expression (e.g., ``if (x := value): ...``).
+        """
         self.assign_count += 1
         self.generic_visit(node)
 
     def visit_Import(self, node: ast.Import) -> None:
+        """Visit an import statement and increment import counter.
+
+        Parameters
+        ----------
+        node : ast.Import
+            AST node representing an import statement (e.g., ``import os``).
+        """
         self.import_count += 1
         self.generic_visit(node)
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        """Visit a from-import statement and increment import counter.
+
+        Parameters
+        ----------
+        node : ast.ImportFrom
+            AST node representing a from-import statement (e.g., ``from os import path``).
+        """
         self.import_count += 1
         self.generic_visit(node)
 
     def visit_ListComp(self, node: ast.ListComp) -> None:
+        """Visit a list comprehension and increment branch counter.
+
+        Parameters
+        ----------
+        node : ast.ListComp
+            AST node representing a list comprehension (e.g., ``[x for x in range(10)]``).
+        """
         self._with_branch(self.generic_visit, node)
 
     def visit_SetComp(self, node: ast.SetComp) -> None:
+        """Visit a set comprehension and increment branch counter.
+
+        Parameters
+        ----------
+        node : ast.SetComp
+            AST node representing a set comprehension (e.g., ``{x for x in range(10)}``).
+        """
         self._with_branch(self.generic_visit, node)
 
     def visit_DictComp(self, node: ast.DictComp) -> None:
+        """Visit a dictionary comprehension and increment branch counter.
+
+        Parameters
+        ----------
+        node : ast.DictComp
+            AST node representing a dictionary comprehension (e.g., ``{k: v for k, v in items}``).
+        """
         self._with_branch(self.generic_visit, node)
 
     def visit_GeneratorExp(self, node: ast.GeneratorExp) -> None:
+        """Visit a generator expression and increment branch counter.
+
+        Parameters
+        ----------
+        node : ast.GeneratorExp
+            AST node representing a generator expression (e.g., ``(x for x in range(10))``).
+        """
         self._with_branch(self.generic_visit, node)
 
     def visit_BoolOp(self, node: ast.BoolOp) -> None:
+        """Visit a boolean operation and increment branch counter.
+
+        Parameters
+        ----------
+        node : ast.BoolOp
+            AST node representing a boolean operation (e.g., ``x and y``, ``a or b``).
+        """
         self._with_branch(self.generic_visit, node)
 
     def visit_If(self, node: ast.If) -> None:
+        """Visit an if statement and increment branch counter.
+
+        Parameters
+        ----------
+        node : ast.If
+            AST node representing an if statement (e.g., ``if condition: ...``).
+        """
         self._with_branch(self.generic_visit, node)
 
     def visit_IfExp(self, node: ast.IfExp) -> None:
+        """Visit a conditional expression and increment branch counter.
+
+        Parameters
+        ----------
+        node : ast.IfExp
+            AST node representing a conditional expression (e.g., ``x if condition else y``).
+        """
         self._with_branch(self.generic_visit, node)
 
     def visit_For(self, node: ast.For) -> None:
+        """Visit a for loop and increment branch counter.
+
+        Parameters
+        ----------
+        node : ast.For
+            AST node representing a for loop (e.g., ``for item in items: ...``).
+        """
         self._with_branch(self.generic_visit, node)
 
     def visit_AsyncFor(self, node: ast.AsyncFor) -> None:
+        """Visit an async for loop and increment branch counter.
+
+        Parameters
+        ----------
+        node : ast.AsyncFor
+            AST node representing an async for loop (e.g., ``async for item in async_iter: ...``).
+        """
         self._with_branch(self.generic_visit, node)
 
     def visit_While(self, node: ast.While) -> None:
+        """Visit a while loop and increment branch counter.
+
+        Parameters
+        ----------
+        node : ast.While
+            AST node representing a while loop (e.g., ``while condition: ...``).
+        """
         self._with_branch(self.generic_visit, node)
 
     def visit_Try(self, node: ast.Try) -> None:
+        """Visit a try statement and increment branch counter.
+
+        Parameters
+        ----------
+        node : ast.Try
+            AST node representing a try statement (e.g., ``try: ... except: ...``).
+        """
         self._with_branch(self.generic_visit, node)
 
     def visit_With(self, node: ast.With) -> None:
+        """Visit a with statement and increment branch counter.
+
+        Parameters
+        ----------
+        node : ast.With
+            AST node representing a with statement (e.g., ``with open(...) as f: ...``).
+        """
         self._with_branch(self.generic_visit, node)
 
     def visit_AsyncWith(self, node: ast.AsyncWith) -> None:
+        """Visit an async with statement and increment branch counter.
+
+        Parameters
+        ----------
+        node : ast.AsyncWith
+            AST node representing an async with statement (e.g., ``async with async_context: ...``).
+        """
         self._with_branch(self.generic_visit, node)
 
     def visit_Match(self, node: ast.Match) -> None:
+        """Visit a match statement and increment branch counter.
+
+        Parameters
+        ----------
+        node : ast.Match
+            AST node representing a match statement (e.g., ``match value: case ...``).
+        """
         self._with_branch(self.generic_visit, node)
 
     def _with_branch(self, visitor: Callable[[ast.AST], None], node: ast.AST) -> None:

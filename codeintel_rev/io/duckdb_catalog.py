@@ -126,6 +126,7 @@ class DuckDBCatalog:
         materialize: bool = False,
         manager: DuckDBManager | None = None,
         log_queries: bool | None = None,
+        repo_root: Path | None = None,
     ) -> None:
         self.db_path = db_path
         self.vectors_dir = vectors_dir
@@ -137,8 +138,9 @@ class DuckDBCatalog:
         self._init_lock = Lock()
         self._views_ready = False
         self._log_queries = log_queries if log_queries is not None else manager.config.log_queries
-        self._root_dir = vectors_dir.parent.resolve()
-        default_idmap = (self._root_dir / "faiss/faiss_idmap.parquet").resolve()
+        self._data_root = vectors_dir.parent.resolve()
+        self._repo_root = repo_root.resolve() if repo_root is not None else self._data_root.parent
+        default_idmap = (self._data_root / "faiss/faiss_idmap.parquet").resolve()
         self._idmap_path = default_idmap
 
     def open(self) -> None:
@@ -276,14 +278,19 @@ class DuckDBCatalog:
         )
 
     def _install_optional_views(self, conn: duckdb.DuckDBPyConnection) -> None:
-        self._install_parquet_view(conn, "modules", self._root_dir / "modules/modules.parquet")
+        modules_installed = self._install_parquet_view(
+            conn, "modules", self._data_root / "modules/modules.parquet"
+        )
+        if not modules_installed:
+            modules_json = self._repo_root / "build/enrich/modules/modules.jsonl"
+            self._install_json_view(conn, "modules", modules_json)
         self._install_parquet_view(
             conn,
             "scip_occurrences",
-            self._root_dir / "scip/scip_occurrences.parquet",
+            self._data_root / "scip/scip_occurrences.parquet",
         )
-        self._install_parquet_view(conn, "ast_nodes", self._root_dir / "ast/ast_nodes.parquet")
-        self._install_parquet_view(conn, "cst_nodes", self._root_dir / "cst/cst_nodes.parquet")
+        self._install_parquet_view(conn, "ast_nodes", self._data_root / "ast/ast_nodes.parquet")
+        self._install_parquet_view(conn, "cst_nodes", self._data_root / "cst/cst_nodes.parquet")
         self._install_chunk_symbols_view(conn)
 
     def _install_parquet_view(
@@ -301,6 +308,25 @@ class DuckDBCatalog:
         relation.create_view(view_name, replace=True)
         LOGGER.info(
             "Configured DuckDB view",
+            extra=_log_extra(view=view_name, source=str(source)),
+        )
+        return True
+
+    def _install_json_view(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        view_name: str,
+        source: Path,
+    ) -> bool:
+        if not source.exists():
+            return False
+        sql = "SELECT * FROM read_json_auto(?)"
+        params = [str(source)]
+        self._log_query(sql, params)
+        relation = conn.sql(sql, params=params)
+        relation.create_view(view_name, replace=True)
+        LOGGER.info(
+            "Configured DuckDB JSON view",
             extra=_log_extra(view=view_name, source=str(source)),
         )
         return True
@@ -421,6 +447,51 @@ class DuckDBCatalog:
     def set_idmap_path(self, path: Path) -> None:
         """Override the FAISS id map path used for view installation."""
         self._idmap_path = path.resolve()
+
+    def ensure_pool_views(self, pool_path: Path) -> None:
+        """Expose the latest evaluator pool and coverage join as DuckDB views."""
+        with self.connection() as conn:
+            sql = "SELECT * FROM read_parquet(?)"
+            params = [str(pool_path)]
+            self._log_query(sql, params)
+            relation = conn.sql(sql, params=params)
+            relation.create_view("v_faiss_pool", replace=True)
+            LOGGER.info(
+                "Configured DuckDB view",
+                extra=_log_extra(view="v_faiss_pool", source=str(pool_path)),
+            )
+            try:
+                conn.execute(
+                    """
+                    CREATE OR REPLACE VIEW v_pool_coverage AS
+                    SELECT
+                        pool.*,
+                        chunks.uri,
+                        chunks.lang,
+                        modules.repo_path AS module_repo_path,
+                        modules.module_name,
+                        modules.tags
+                    FROM v_faiss_pool AS pool
+                    LEFT JOIN chunks ON chunks.id = pool.chunk_id
+                    LEFT JOIN modules ON modules.repo_path = chunks.uri
+                    """
+                )
+            except duckdb.Error:
+                conn.execute(
+                    """
+                    CREATE OR REPLACE VIEW v_pool_coverage AS
+                    SELECT
+                        pool.*,
+                        chunks.uri,
+                        chunks.lang
+                    FROM v_faiss_pool AS pool
+                    LEFT JOIN chunks ON chunks.id = pool.chunk_id
+                    """
+                )
+            LOGGER.info(
+                "Configured DuckDB view",
+                extra=_log_extra(view="v_pool_coverage", source=str(pool_path)),
+            )
 
     @staticmethod
     def _relation_exists(conn: duckdb.DuckDBPyConnection, name: str) -> bool:
@@ -1112,7 +1183,7 @@ class DuckDBCatalog:
             cols = [desc[0] for desc in relation.description]
         return [dict(zip(cols, row, strict=True)) for row in rows]
 
-    def get_embeddings_by_ids(self, ids: Sequence[int]) -> NDArrayF32:
+    def get_embeddings_by_ids(self, ids: Sequence[int]) -> tuple[list[int], NDArrayF32]:
         """Extract embedding vectors for given chunk IDs.
 
         Retrieves the pre-computed embedding vectors for chunks, typically used
@@ -1132,16 +1203,15 @@ class DuckDBCatalog:
 
         Returns
         -------
-        NDArrayF32
-            Embedding vectors as a 2D NumPy array of shape (n_found, vec_dim)
-            where n_found <= len(ids). Dtype is float32 for memory efficiency.
-            Returns empty array (shape (0, vec_dim)) if no IDs provided or no
-            matches found. The array is ordered by the input ID sequence.
+        tuple[list[int], NDArrayF32]
+            Tuple of (resolved_ids, vectors) ordered by the input ID sequence.
+            ``resolved_ids`` contains the chunk IDs that were found. The vectors
+            array has shape ``(len(resolved_ids), vec_dim)`` and dtype float32.
 
         """
         if not ids:
             dim = self._embedding_dim()
-            return np.empty((0, dim), dtype=np.float32)
+            return [], np.empty((0, dim), dtype=np.float32)
 
         with self.connection() as conn:
             relation = conn.execute(
@@ -1157,21 +1227,23 @@ class DuckDBCatalog:
             rows = relation.fetchall()
         dim = self._embedding_dim()
         if not rows:
-            return np.empty((0, dim), dtype=np.float32)
+            return [], np.empty((0, dim), dtype=np.float32)
 
+        ordered_ids: list[int] = []
         embeddings: list[NDArrayF32] = []
-        for _, embedding, _ in rows:
-            if embedding is None:
+        for chunk_id, embedding, _ in rows:
+            if chunk_id is None or embedding is None:
                 continue
             array = np.asarray(embedding, dtype=np.float32)
             if array.ndim != 1:
                 continue
+            ordered_ids.append(int(chunk_id))
             embeddings.append(array)
 
         if not embeddings:
-            return np.empty((0, dim), dtype=np.float32)
+            return [], np.empty((0, dim), dtype=np.float32)
 
-        return np.vstack(embeddings)
+        return ordered_ids, np.vstack(embeddings)
 
     def count_chunks(self) -> int:
         """Count total number of chunks in the index.
