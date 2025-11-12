@@ -20,9 +20,9 @@ from codeintel_rev.enrich.tree_sitter_bridge import build_outline
 from codeintel_rev.enrich.type_integration import TypeSummary, collect_pyrefly, collect_pyright
 
 try:  # pragma: no cover - optional dependency
-    import yaml  # type: ignore[import-not-found]
+    import yaml as yaml_module  # type: ignore[import-not-found]
 except ImportError:  # pragma: no cover - optional dependency
-    yaml = None  # type: ignore[assignment]
+    yaml_module = None  # type: ignore[assignment]
 
 EXPORT_HUB_THRESHOLD = 10
 
@@ -234,14 +234,16 @@ def _build_module_row(
 
 def _write_tag_index(out: Path, tag_index: dict[str, list[str]]) -> None:
     """Persist the YAML tag index when PyYAML is available."""
-    if yaml is None:
+    if yaml_module is None:
         return
     tags_path = out / "tags"
     tags_path.mkdir(parents=True, exist_ok=True)
-    (tags_path / "tags_index.yaml").write_text(
-        yaml.safe_dump(tag_index, sort_keys=True),
-        encoding="utf-8",  # type: ignore[union-attr]
-    )
+    serialized = yaml_module.safe_dump(tag_index, sort_keys=True)
+    if serialized is None:
+        return
+    if isinstance(serialized, bytes):
+        serialized = serialized.decode("utf-8")
+    (tags_path / "tags_index.yaml").write_text(serialized, encoding="utf-8")
 
 
 @app.command()

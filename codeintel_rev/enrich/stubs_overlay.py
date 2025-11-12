@@ -127,10 +127,11 @@ def _collect_star_reexports(
         target = _resolve_target_module(this_module, imp)
         if not target:
             continue
-        names = _names_from_scip(target, scip_by_file, package_hint)
+        names, resolved_target = _names_from_scip(target, scip_by_file, package_hint)
         if not names:
             continue
-        resolved.setdefault(target, set()).update(names)
+        key = resolved_target or target
+        resolved.setdefault(key, set()).update(names)
     return resolved
 
 
@@ -151,22 +152,24 @@ def _names_from_scip(
     module_name: str,
     scip_by_file: Mapping[str, Document],
     package_hint: str | None,
-) -> set[str]:
-    candidates = _candidate_file_paths_for_module(module_name)
+) -> tuple[set[str], str | None]:
+    modules_to_try = [module_name]
     if package_hint and "." not in module_name:
-        candidates.extend(_candidate_file_paths_for_module(f"{package_hint}.{module_name}"))
-    names: set[str] = set()
-    for candidate in candidates:
-        doc = scip_by_file.get(candidate)
-        if not doc:
-            continue
-        for sym in doc.symbols:
-            name = _simple_name_from_scip_symbol(sym.symbol)
-            if name and not _is_private(name):
-                names.add(name)
-        if names:
-            break
-    return names
+        modules_to_try.append(f"{package_hint}.{module_name}")
+    for candidate_module in modules_to_try:
+        candidates = _candidate_file_paths_for_module(candidate_module)
+        names: set[str] = set()
+        for candidate in candidates:
+            doc = scip_by_file.get(candidate)
+            if not doc:
+                continue
+            for sym in doc.symbols:
+                name = _simple_name_from_scip_symbol(sym.symbol)
+                if name and not _is_private(name):
+                    names.add(name)
+            if names:
+                return names, candidate_module
+    return set(), None
 
 
 def _candidate_file_paths_for_module(module_name: str) -> list[str]:
