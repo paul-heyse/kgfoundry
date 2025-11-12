@@ -56,7 +56,7 @@ corpus size for optimal performance.
 
 - **fan_in**: 5
 - **fan_out**: 5
-- **cycle_group**: 47
+- **cycle_group**: 44
 
 ## Declared Exports (__all__)
 

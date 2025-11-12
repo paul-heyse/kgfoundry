@@ -49,7 +49,7 @@ through stable paths such as ``.../current/faiss.index`` and reload when
 
 - **fan_in**: 5
 - **fan_out**: 2
-- **cycle_group**: 51
+- **cycle_group**: 35
 
 ## Declared Exports (__all__)
 

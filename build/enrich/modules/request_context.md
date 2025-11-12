@@ -26,7 +26,7 @@ can exchange session metadata without introducing circular imports between the
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 29
+- **cycle_group**: 27
 
 ## Declared Exports (__all__)
 

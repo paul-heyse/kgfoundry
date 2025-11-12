@@ -7,15 +7,15 @@ import logging
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Callable, Protocol, cast
 
 try:
     import libcst as cst
     from libcst import ParserSyntaxError
     from libcst import matchers as m
 except ImportError:  # pragma: no cover - optional dependency at runtime
-    cst = None  # type: ignore[assignment]
-    ParserSyntaxError = Exception  # type: ignore[assignment]
+    cst = None
+    ParserSyntaxError = Exception
     m = None
 
 LOGGER = logging.getLogger(__name__)
@@ -24,6 +24,18 @@ if TYPE_CHECKING:
     import libcst as libcst_types
 else:  # pragma: no cover - typing-only shim
     libcst_types = cst if cst is not None else Any
+
+
+class _CollectorInstance(Protocol):
+    imports: set[str]
+    type_checking_imports: set[str]
+    star_imports: set[str]
+    exports: set[str]
+
+
+ImportCollectorFactory = Callable[[str], _CollectorInstance]
+
+ImportCollector: ImportCollectorFactory | None
 
 
 @dataclass(slots=True, frozen=True)
@@ -56,7 +68,7 @@ def _resolve_relative(module_name: str, level: int, attr: str | None) -> str | N
 
 if cst is not None:
 
-    class ImportCollector(cst.CSTVisitor):
+    class _ImportCollector(cst.CSTVisitor):
         """Collect imports/exports from a LibCST module."""
 
         def __init__(self, module_name: str) -> None:
@@ -255,15 +267,15 @@ if cst is not None:
                     exports.append(text)
             return tuple(exports)
 
-    ImportCollector.visit_If = ImportCollector.visit_if
-    ImportCollector.leave_If = ImportCollector.leave_if
-    ImportCollector.visit_Import = ImportCollector.visit_import
-    ImportCollector.visit_ImportFrom = ImportCollector.visit_import_from
-    ImportCollector.visit_Assign = ImportCollector.visit_assign
+    _ImportCollector.visit_If = _ImportCollector.visit_if
+    _ImportCollector.leave_If = _ImportCollector.leave_if
+    _ImportCollector.visit_Import = _ImportCollector.visit_import
+    _ImportCollector.visit_ImportFrom = _ImportCollector.visit_import_from
+    _ImportCollector.visit_Assign = _ImportCollector.visit_assign
 
-
+    ImportCollector = _ImportCollector
 else:
-    ImportCollector = None  # type: ignore[assignment]
+    ImportCollector = None
 
 
 def collect_imports_with_libcst(path: Path, module_name: str) -> CSTImports:
@@ -294,7 +306,7 @@ def collect_imports_with_libcst(path: Path, module_name: str) -> CSTImports:
         return CSTImports(str(path), module_name, (), (), (), (), has_parse_errors=True)
 
     collector = ImportCollector(module_name)
-    module.visit(collector)
+    module.visit(cast(libcst_types.CSTVisitor, collector))
 
     return CSTImports(
         file=str(path),

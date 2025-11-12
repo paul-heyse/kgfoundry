@@ -19,12 +19,12 @@ Adapter for the optional WARP/XTR late interaction executor.
 ## Definitions
 
 - variable: `LOGGER` (line 15)
-- class: `WarpExecutorProtocol` (line 18)
-- variable: `WarpExecutorFactory` (line 32)
-- class: `WarpUnavailableError` (line 35)
-- class: `WarpEngine` (line 39)
-- function: `_safe_int` (line 166)
-- function: `_safe_float` (line 190)
+- class: `WarpExecutorProtocol` (line 19)
+- variable: `WarpExecutorFactory` (line 33)
+- class: `WarpUnavailableError` (line 36)
+- class: `WarpEngine` (line 40)
+- function: `_safe_int` (line 167)
+- function: `_safe_float` (line 191)
 
 ## Dependency Graph
 
@@ -63,7 +63,7 @@ Adapter for the optional WARP/XTR late interaction executor.
 
 - branches: 15
 - cyclomatic: 16
-- loc: 212
+- loc: 213
 
 ## Doc Coverage
 

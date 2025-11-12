@@ -11,17 +11,17 @@ Import graph builder utilities.
 - from **__future__** import annotations
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
-- from **typing** import Any
-- from **(absolute)** import polars
+- from **typing** import Any, cast
 - from **codeintel_rev.module_utils** import import_targets_for_entry, module_name_candidates, normalize_module_name
+- from **codeintel_rev.typing** import PolarsModule, gate_import
 
 ## Definitions
 
-- variable: `pl` (line 13)
-- class: `ImportGraph` (line 23)
-- function: `build_import_graph` (line 32)
-- function: `write_import_graph` (line 87)
-- function: `_tarjan_scc` (line 107)
+- class: `ImportGraph` (line 19)
+- function: `build_import_graph` (line 28)
+- function: `write_import_graph` (line 83)
+- function: `_tarjan_scc` (line 100)
+- function: `_write_parquet` (line 135)
 
 ## Dependency Graph
 
@@ -60,7 +60,7 @@ Import graph builder utilities.
 
 - branches: 25
 - cyclomatic: 26
-- loc: 142
+- loc: 143
 
 ## Doc Coverage
 
@@ -68,6 +68,7 @@ Import graph builder utilities.
 - `build_import_graph` (function): summary=yes, params=ok, examples=no — Build an import graph across repo modules.
 - `write_import_graph` (function): summary=yes, params=mismatch, examples=no — Write import edges to Parquet (or JSONL fallback).
 - `_tarjan_scc` (function): summary=no, examples=no
+- `_write_parquet` (function): summary=yes, params=mismatch, examples=no — Persist records to Parquet via polars when available.
 
 ## Tags
 

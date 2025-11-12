@@ -31,7 +31,7 @@ Helpers for collecting Pyright/Pyrefly error summaries.
 
 - **fan_in**: 1
 - **fan_out**: 0
-- **cycle_group**: 13
+- **cycle_group**: 8
 
 ## Doc Metrics
 

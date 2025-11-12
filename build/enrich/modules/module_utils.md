@@ -55,7 +55,7 @@ Helpers for converting between module paths and dotted names.
 
 - branches: 18
 - cyclomatic: 19
-- loc: 121
+- loc: 123
 
 ## Doc Coverage
 

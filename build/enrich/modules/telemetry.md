@@ -22,7 +22,7 @@ Telemetry helpers for MCP tools.
 
 - **fan_in**: 3
 - **fan_out**: 2
-- **cycle_group**: 56
+- **cycle_group**: 54
 
 ## Declared Exports (__all__)
 

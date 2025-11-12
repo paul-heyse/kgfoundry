@@ -58,7 +58,7 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 - from **pathlib** import Path
 - from **threading** import Lock
 - from **types** import ModuleType
-- from **typing** import TYPE_CHECKING, Any, TypeVar, cast
+- from **typing** import TYPE_CHECKING, Any, Protocol, TypeVar, cast
 - from **codeintel_rev.app.capabilities** import Capabilities
 - from **codeintel_rev.app.scope_store** import ScopeStore
 - from **codeintel_rev.config.settings** import IndexConfig, Settings, load_settings
@@ -70,7 +70,7 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 - from **codeintel_rev.io.faiss_manager** import FAISSManager, FAISSRuntimeOptions
 - from **codeintel_rev.io.git_client** import AsyncGitClient, GitClient
 - from **codeintel_rev.io.vllm_client** import VLLMClient
-- from **codeintel_rev.observability** import metrics
+- from **(absolute)** import codeintel_rev.observability.metrics
 - from **codeintel_rev.runtime** import NullRuntimeCellObserver, RuntimeCell, RuntimeCellObserver
 - from **codeintel_rev.runtime.factory_adjustment** import DefaultFactoryAdjuster, FactoryAdjuster, NoopFactoryAdjuster
 - from **codeintel_rev.typing** import gate_import
@@ -86,23 +86,28 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 - variable: `HybridSearchEngine` (line 90)
 - variable: `XTRIndex` (line 91)
 - variable: `LOGGER` (line 93)
-- function: `_infer_index_root` (line 99)
-- function: `_build_factory_adjuster` (line 129)
-- function: `_assign_frozen` (line 165)
-- function: `_faiss_module` (line 170)
-- function: `_import_faiss_manager_cls` (line 186)
-- function: `_import_faiss_runtime_opts_cls` (line 198)
-- function: `_faiss_runtime_options_from_index` (line 210)
-- function: `_import_hybrid_engine_cls` (line 251)
-- function: `_import_xtr_index_cls` (line 268)
-- function: `_require_dependency` (line 285)
-- function: `_ensure_path_exists` (line 344)
-- class: `ResolvedPaths` (line 404)
-- function: `resolve_application_paths` (line 460)
-- variable: `T` (line 573)
-- class: `_FaissRuntimeState` (line 576)
-- class: `_ContextRuntimeState` (line 588)
-- class: `ApplicationContext` (line 628)
+- class: `_RetrievalMetrics` (line 97)
+- variable: `retrieval_metrics` (line 101)
+- function: `_infer_index_root` (line 106)
+- function: `_build_factory_adjuster` (line 136)
+- function: `_build_faiss_manager` (line 169)
+- function: `_build_scope_store` (line 212)
+- function: `_build_git_clients` (line 238)
+- function: `_assign_frozen` (line 263)
+- function: `_faiss_module` (line 268)
+- function: `_import_faiss_manager_cls` (line 284)
+- function: `_import_faiss_runtime_opts_cls` (line 296)
+- function: `_faiss_runtime_options_from_index` (line 308)
+- function: `_import_hybrid_engine_cls` (line 349)
+- function: `_import_xtr_index_cls` (line 366)
+- function: `_require_dependency` (line 383)
+- function: `_ensure_path_exists` (line 442)
+- class: `ResolvedPaths` (line 502)
+- function: `resolve_application_paths` (line 558)
+- variable: `T` (line 671)
+- class: `_FaissRuntimeState` (line 674)
+- class: `_ContextRuntimeState` (line 686)
+- class: `ApplicationContext` (line 726)
 
 ## Dependency Graph
 
@@ -150,20 +155,20 @@ ApplicationContext, ResolvedPaths, resolve_application_paths
 
 - branches: 62
 - cyclomatic: 63
-- loc: 1447
+- loc: 1503
 
 ## Doc Coverage
 
+- `_RetrievalMetrics` (class): summary=no, examples=no
 - `_infer_index_root` (function): summary=yes, params=ok, examples=no — Return the directory that stores versioned index assets.
 - `_build_factory_adjuster` (function): summary=yes, params=ok, examples=no — Return a DefaultFactoryAdjuster derived from settings.
+- `_build_faiss_manager` (function): summary=yes, params=ok, examples=no — Construct and log the FAISS manager for the main index.
+- `_build_scope_store` (function): summary=yes, params=ok, examples=no — Return the session scope store backed by redis.asyncio.
+- `_build_git_clients` (function): summary=yes, params=ok, examples=no — Initialize Git clients for blame and history operations.
 - `_assign_frozen` (function): summary=yes, params=mismatch, examples=no — Assign attribute on a frozen dataclass instance.
 - `_faiss_module` (function): summary=yes, params=ok, examples=no — Return the cached FAISS manager module.
 - `_import_faiss_manager_cls` (function): summary=yes, params=ok, examples=no — Import ``FAISSManager`` lazily to keep module import costs low.
 - `_import_faiss_runtime_opts_cls` (function): summary=yes, params=ok, examples=no — Return the FAISS runtime options dataclass.
-- `_faiss_runtime_options_from_index` (function): summary=yes, params=ok, examples=no — Materialize FAISS runtime options from the structured index config.
-- `_import_hybrid_engine_cls` (function): summary=yes, params=ok, examples=no — Import ``HybridSearchEngine`` lazily for runtime cell initialization.
-- `_import_xtr_index_cls` (function): summary=yes, params=ok, examples=no — Import ``XTRIndex`` lazily to avoid eager heavy dependencies.
-- `_require_dependency` (function): summary=yes, params=ok, examples=yes — Ensure a heavy dependency is available, raising RuntimeUnavailableError.
 
 ## Tags
 

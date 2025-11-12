@@ -73,7 +73,7 @@ GitPython documentation : https://gitpython.readthedocs.io/
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 49
+- **cycle_group**: 36
 
 ## Declared Exports (__all__)
 

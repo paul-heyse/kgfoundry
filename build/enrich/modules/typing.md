@@ -14,7 +14,8 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 ## Imports
 
 - from **__future__** import annotations
-- from **typing** import TYPE_CHECKING, Any, Protocol
+- from **os** import PathLike
+- from **typing** import TYPE_CHECKING, Any, Mapping, Protocol, Sequence
 - from **kgfoundry_common.typing** import HEAVY_DEPS
 - from **kgfoundry_common.typing** import gate_import
 - from **(absolute)** import numpy
@@ -22,34 +23,36 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 
 ## Definitions
 
-- variable: `NDArrayF32` (line 24)
-- variable: `NDArrayI64` (line 25)
-- variable: `NDArrayAny` (line 26)
-- variable: `HEAVY_DEPS` (line 40)
-- function: `gate_import` (line 44)
-- class: `TorchDeviceProperties` (line 87)
-- class: `TorchCudaAPI` (line 93)
-- class: `TorchTensor` (line 113)
-- class: `TorchModule` (line 126)
-- class: `FaissStandardGpuResources` (line 144)
-- class: `FaissGpuClonerOptions` (line 149)
-- class: `FaissIndex` (line 157)
-- class: `FaissGpuIndexFlatIP` (line 163)
-- class: `FaissModule` (line 175)
-- class: `NumpyRandomState` (line 208)
-- class: `NumpyRandomNamespace` (line 214)
-- class: `NumpyLinalgNamespace` (line 220)
-- class: `NumpyModule` (line 226)
+- variable: `NDArrayF32` (line 25)
+- variable: `NDArrayI64` (line 26)
+- variable: `NDArrayAny` (line 27)
+- variable: `HEAVY_DEPS` (line 42)
+- function: `gate_import` (line 46)
+- class: `TorchDeviceProperties` (line 89)
+- class: `TorchCudaAPI` (line 95)
+- class: `TorchTensor` (line 115)
+- class: `TorchModule` (line 128)
+- class: `FaissStandardGpuResources` (line 146)
+- class: `FaissGpuClonerOptions` (line 150)
+- class: `FaissIndex` (line 158)
+- class: `FaissGpuIndexFlatIP` (line 164)
+- class: `FaissModule` (line 176)
+- class: `NumpyRandomState` (line 211)
+- class: `NumpyRandomNamespace` (line 217)
+- class: `NumpyLinalgNamespace` (line 223)
+- class: `NumpyModule` (line 229)
+- class: `PolarsDataFrame` (line 236)
+- class: `PolarsModule` (line 242)
 
 ## Dependency Graph
 
-- **fan_in**: 71
+- **fan_in**: 72
 - **fan_out**: 0
 - **cycle_group**: 0
 
 ## Declared Exports (__all__)
 
-FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, TorchModule, gate_import
+FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, PolarsModule, TorchModule, gate_import
 
 ## Doc Metrics
 
@@ -76,13 +79,13 @@ FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, TorchM
 
 ## Side Effects
 
-- none detected
+- filesystem
 
 ## Complexity
 
 - branches: 1
 - cyclomatic: 2
-- loc: 231
+- loc: 246
 
 ## Doc Coverage
 

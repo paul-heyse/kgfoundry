@@ -33,9 +33,9 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 - function: `_iter_params` (line 205)
 - function: `_exception_name` (line 220)
 - function: `_infer_side_effects` (line 237)
-- class: `_IndexVisitor` (line 255)
-- function: `index_module` (line 541)
-- function: `_lineno` (line 588)
+- class: `_IndexVisitor` (line 259)
+- function: `index_module` (line 545)
+- function: `_lineno` (line 592)
 
 ## Dependency Graph
 
@@ -81,7 +81,7 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 
 - branches: 128
 - cyclomatic: 129
-- loc: 609
+- loc: 613
 
 ## Doc Coverage
 

@@ -32,9 +32,9 @@ Prometheus metrics for hybrid retrieval.
 
 ## Dependency Graph
 
-- **fan_in**: 0
+- **fan_in**: 2
 - **fan_out**: 0
-- **cycle_group**: 77
+- **cycle_group**: 37
 
 ## Declared Exports (__all__)
 
@@ -61,7 +61,7 @@ BUDGET_DEPTH, CHANNEL_LATENCY_SECONDS, DEBUG_BUNDLE_TOTAL, INDEX_VERSION_INFO, Q
 
 ## Hotspot Score
 
-- score: 1.08
+- score: 1.52
 
 ## Side Effects
 

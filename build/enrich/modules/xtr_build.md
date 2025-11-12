@@ -32,7 +32,7 @@ Utilities for building and verifying XTR token indexes.
 - function: `_gather_chunk_vectors` (line 86)
 - function: `_write_token_matrix` (line 157)
 - function: `build_xtr_index` (line 227)
-- function: `main` (line 333)
+- function: `main` (line 329)
 
 ## Dependency Graph
 
@@ -71,7 +71,7 @@ Utilities for building and verifying XTR token indexes.
 
 - branches: 18
 - cyclomatic: 19
-- loc: 349
+- loc: 345
 
 ## Doc Coverage
 

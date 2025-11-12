@@ -189,6 +189,7 @@ public-api:
 - mcp_server/error_handling.py
 - mcp_server/scope_utils.py
 - mcp_server/server.py
+- mcp_server/__init__.py
 - evaluation/hybrid_pool.py
 - cli/xtr.py
 - mcp_server/common/observability.py

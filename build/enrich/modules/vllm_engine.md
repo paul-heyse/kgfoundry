@@ -43,7 +43,7 @@ In-process vLLM embedding engine for Stage-0 retrieval.
 
 - **fan_in**: 1
 - **fan_out**: 4
-- **cycle_group**: 40
+- **cycle_group**: 45
 
 ## Declared Exports (__all__)
 

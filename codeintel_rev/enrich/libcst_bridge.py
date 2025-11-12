@@ -3,22 +3,22 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-import libcst as cst  # type: ignore[import-not-found]
-from libcst import metadata as cst_metadata  # type: ignore[import-not-found]
-from libcst.helpers import (  # type: ignore[import-not-found]
+import libcst as cst
+from libcst import metadata as cst_metadata
+from libcst.helpers import (
     get_full_name_for_node,
 )
 
 try:  # pragma: no cover - optional dependency
-    from docstring_parser import parse as parse_docstring  # type: ignore[import-not-found]
+    from docstring_parser import parse as parse_docstring
 except ImportError:  # pragma: no cover - optional dependency
-    parse_docstring = None  # type: ignore[assignment]
+    parse_docstring = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -401,7 +401,8 @@ class _IndexVisitor(cst.CSTVisitor):
         names: list[str] = []
         aliases: dict[str, str] = {}
         if not is_star:
-            for ref in node.names:  # type: ignore[union-attr]
+            alias_nodes = cast("Sequence[cst.ImportAlias]", node.names)
+            for ref in alias_nodes:
                 ident = ref.name
                 dotted = None
                 with suppress(Exception):

@@ -22,7 +22,7 @@ Coverage ingestion utilities (Cobertura-style XML).
 
 - **fan_in**: 1
 - **fan_out**: 0
-- **cycle_group**: 9
+- **cycle_group**: 12
 
 ## Doc Metrics
 

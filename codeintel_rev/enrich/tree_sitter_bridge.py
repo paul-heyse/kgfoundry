@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from tree_sitter import Language, Node, Parser  # type: ignore[import-not-found]
+from tree_sitter import Language, Node, Parser
 
 _languages_spec = importlib.util.find_spec("tree_sitter_languages")
 if _languages_spec is not None:  # pragma: no cover
@@ -19,9 +19,9 @@ else:  # pragma: no cover
     _get_language = None
 
 try:  # pragma: no cover - optional dependency
-    from tree_sitter_python import language as _python_language  # type: ignore[import-not-found]
+    from tree_sitter_python import language as _python_language
 except ImportError:  # pragma: no cover
-    _python_language = None  # type: ignore[assignment]
+    _python_language = None
 
 
 def _lang_for_ext(ext: str) -> Language | None:

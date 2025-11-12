@@ -33,7 +33,7 @@ Token-level XTR index manager with late-interaction scoring utilities.
 
 - **fan_in**: 6
 - **fan_out**: 4
-- **cycle_group**: 50
+- **cycle_group**: 42
 
 ## Doc Metrics
 

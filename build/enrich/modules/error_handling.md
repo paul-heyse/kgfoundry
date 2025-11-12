@@ -87,7 +87,7 @@ Error envelope structure:
 
 - **fan_in**: 3
 - **fan_out**: 3
-- **cycle_group**: 55
+- **cycle_group**: 57
 
 ## Declared Exports (__all__)
 
@@ -124,7 +124,7 @@ EXCEPTION_TO_ERROR_CODE, convert_exception_to_envelope, format_error_response, h
 
 - branches: 17
 - cyclomatic: 18
-- loc: 688
+- loc: 687
 
 ## Doc Coverage
 

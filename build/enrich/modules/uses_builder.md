@@ -11,22 +11,23 @@ SCIP-based symbol use graph helpers.
 - from **__future__** import annotations
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
-- from **(absolute)** import polars
+- from **typing** import cast
 - from **codeintel_rev.enrich.scip_reader** import SCIPIndex
+- from **codeintel_rev.typing** import PolarsModule, gate_import
 
 ## Definitions
 
-- variable: `pl` (line 12)
-- class: `UseGraph` (line 18)
-- function: `build_use_graph` (line 26)
-- function: `write_use_graph` (line 62)
-- function: `_is_definition` (line 89)
+- class: `UseGraph` (line 15)
+- function: `build_use_graph` (line 23)
+- function: `write_use_graph` (line 59)
+- function: `_is_definition` (line 85)
+- function: `_write_parquet` (line 91)
 
 ## Dependency Graph
 
 - **fan_in**: 1
-- **fan_out**: 1
-- **cycle_group**: 16
+- **fan_out**: 2
+- **cycle_group**: 15
 
 ## Doc Metrics
 
@@ -49,7 +50,7 @@ SCIP-based symbol use graph helpers.
 
 ## Hotspot Score
 
-- score: 1.84
+- score: 1.95
 
 ## Side Effects
 
@@ -59,7 +60,7 @@ SCIP-based symbol use graph helpers.
 
 - branches: 15
 - cyclomatic: 16
-- loc: 95
+- loc: 100
 
 ## Doc Coverage
 
@@ -67,6 +68,7 @@ SCIP-based symbol use graph helpers.
 - `build_use_graph` (function): summary=yes, params=ok, examples=no — Build a use graph from SCIP occurrences.
 - `write_use_graph` (function): summary=yes, params=ok, examples=no — Persist use graph edges to Parquet (or JSONL fallback).
 - `_is_definition` (function): summary=no, examples=no
+- `_write_parquet` (function): summary=yes, params=mismatch, examples=no — Write records via polars when available.
 
 ## Tags
 

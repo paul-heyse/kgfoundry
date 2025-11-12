@@ -3,6 +3,9 @@
     {
       "name": "kgfoundry",
       "path": "."
+    },
+    {
+      "path": "build"
     }
   ],
   "settings": {

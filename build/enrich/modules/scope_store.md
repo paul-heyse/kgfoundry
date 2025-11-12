@@ -32,9 +32,9 @@ Scope store utilities for session state management.
 
 ## Dependency Graph
 
-- **fan_in**: 1
+- **fan_in**: 2
 - **fan_out**: 2
-- **cycle_group**: 33
+- **cycle_group**: 38
 
 ## Declared Exports (__all__)
 
@@ -65,7 +65,7 @@ AsyncSingleFlight, LRUCache, ScopeStore, ScopeStoreMetrics
 
 ## Hotspot Score
 
-- score: 2.24
+- score: 2.33
 
 ## Side Effects
 

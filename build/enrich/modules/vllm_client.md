@@ -42,7 +42,7 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 
 - **fan_in**: 4
 - **fan_out**: 6
-- **cycle_group**: 41
+- **cycle_group**: 46
 
 ## Declared Exports (__all__)
 

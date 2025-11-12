@@ -16,7 +16,7 @@ All configuration loaded from environment variables with sensible defaults.
 - from **(absolute)** import os
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
-- from **typing** import Literal, cast
+- from **typing** import Literal
 - from **(absolute)** import msgspec
 - from **codeintel_rev.io.duckdb_manager** import DuckDBConfig
 
@@ -71,7 +71,7 @@ All configuration loaded from environment variables with sensible defaults.
 
 - **fan_in**: 21
 - **fan_out**: 2
-- **cycle_group**: 35
+- **cycle_group**: 34
 
 ## Declared Exports (__all__)
 

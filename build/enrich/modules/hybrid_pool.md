@@ -27,7 +27,7 @@ Feature-normalized hybrid pooling utilities.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 45
+- **cycle_group**: 51
 
 ## Declared Exports (__all__)
 

@@ -8,12 +8,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Protocol, cast
 
 try:  # pragma: no cover - optional dependency
-    import polars as pl  # type: ignore[import-not-found]
+    import polars as pl
 except ImportError:  # pragma: no cover - optional dependency
-    pl = None  # type: ignore[assignment]
+    pl = None
 
 import typer
 
@@ -37,9 +37,13 @@ from codeintel_rev.typedness import FileTypeSignals, collect_type_signals
 from codeintel_rev.uses_builder import UseGraph, build_use_graph, write_use_graph
 
 try:  # pragma: no cover - optional dependency
-    import yaml as yaml_module  # type: ignore[import-not-found]
+    import yaml as yaml_module
 except ImportError:  # pragma: no cover - optional dependency
-    yaml_module = None  # type: ignore[assignment]
+    yaml_module = None
+
+
+class _YamlDumpFn(Protocol):
+    def __call__(self, data: Mapping[str, list[str]], *, sort_keys: bool = ...) -> str: ...
 
 EXPORT_HUB_THRESHOLD = 10
 OVERLAY_PARAM_THRESHOLD = 0.8
@@ -975,7 +979,7 @@ def _write_symbol_graph(out: Path, symbol_edges: list[tuple[str, str]]) -> None:
 def _write_tabular_records(parquet_path: Path, rows: list[dict[str, Any]]) -> None:
     parquet_path.parent.mkdir(parents=True, exist_ok=True)
     if pl is not None and rows:
-        pl.DataFrame(rows).write_parquet(parquet_path)  # type: ignore[attr-defined]
+        pl.DataFrame(rows).write_parquet(parquet_path)
     write_jsonl(parquet_path.with_suffix(".jsonl"), rows)
 
 
@@ -1187,10 +1191,14 @@ def _normalized_rel_path(path: Path, root: Path) -> str:
 def _write_tag_index(out: Path, tag_index: Mapping[str, list[str]]) -> None:
     if yaml_module is None:
         return
+    safe_dump = getattr(yaml_module, "safe_dump", None)
+    if not callable(safe_dump):
+        return
+    dump_fn = cast(_YamlDumpFn, safe_dump)
     tags_path = out / "tags"
     tags_path.mkdir(parents=True, exist_ok=True)
     (tags_path / "tags_index.yaml").write_text(
-        yaml_module.safe_dump(tag_index, sort_keys=True),  # type: ignore[union-attr]
+        dump_fn(tag_index, sort_keys=True),
         encoding="utf-8",
     )
 

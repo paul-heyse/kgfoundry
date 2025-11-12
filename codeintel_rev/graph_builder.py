@@ -5,18 +5,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
-
-try:  # pragma: no cover - optional dependency
-    import polars as pl  # type: ignore[import-not-found]
-except ImportError:  # pragma: no cover
-    pl = None  # type: ignore[assignment]
+from typing import Any, cast
 
 from codeintel_rev.module_utils import (
     import_targets_for_entry,
     module_name_candidates,
     normalize_module_name,
 )
+from codeintel_rev.typing import PolarsModule, gate_import
 
 
 @dataclass(slots=True, frozen=True)
@@ -94,12 +90,11 @@ def write_import_graph(graph: ImportGraph, path: str | Path) -> None:
     if not records:
         target.write_text("", encoding="utf-8")
         return
-    if pl is not None:  # pragma: no cover - exercised in integration
-        pl.DataFrame(records).write_parquet(target)
-    else:  # fallback JSONL
-        with target.open("w", encoding="utf-8") as handle:
-            for record in records:
-                handle.write(f"{record}\n")
+    if _write_parquet(records, target):  # pragma: no cover - exercised in integration
+        return
+    with target.open("w", encoding="utf-8") as handle:
+        for record in records:
+            handle.write(f"{record}\n")
 
 
 def _tarjan_scc(edges: dict[str, set[str]]) -> dict[str, int]:
@@ -137,3 +132,11 @@ def _tarjan_scc(edges: dict[str, set[str]]) -> dict[str, int]:
         if node not in order:
             strongconnect(node)
     return assignment
+def _write_parquet(records: list[dict[str, str]], target: Path) -> bool:
+    """Persist records to Parquet via polars when available."""
+    try:
+        polars = cast(PolarsModule, gate_import("polars", "import graph export"))
+    except ImportError:
+        return False
+    polars.DataFrame(records).write_parquet(str(target))
+    return True

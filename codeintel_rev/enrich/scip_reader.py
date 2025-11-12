@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import Any
 
 try:  # pragma: no cover - optional dependency
-    import orjson as _orjson  # type: ignore[import-not-found]
+    import orjson as _orjson
 except ImportError:  # pragma: no cover
-    _orjson = None  # type: ignore[assignment]
+    _orjson = None
 
 
 def _loads(payload: bytes) -> object:

@@ -4,7 +4,7 @@
   "symbol_edge_count": 8175,
   "coverage_records": 130,
   "config_files": 135,
-  "generated_at": "2025-11-12T10:28:03+00:00",
+  "generated_at": "2025-11-12T13:40:08+00:00",
   "tags": {
     "low-coverage": [
       "risk_hotspots.py",
@@ -193,6 +193,7 @@
       "mcp_server/error_handling.py",
       "mcp_server/scope_utils.py",
       "mcp_server/server.py",
+      "mcp_server/__init__.py",
       "evaluation/hybrid_pool.py",
       "cli/xtr.py",
       "mcp_server/common/observability.py",

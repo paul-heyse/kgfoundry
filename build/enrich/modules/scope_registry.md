@@ -61,7 +61,7 @@ codeintel_rev.mcp_server.scope_utils : Scope merging and filtering utilities
 - from **(absolute)** import time
 - from **copy** import deepcopy
 - from **threading** import RLock
-- from **typing** import TYPE_CHECKING, cast
+- from **typing** import TYPE_CHECKING
 - from **kgfoundry_common.logging** import get_logger
 - from **kgfoundry_common.prometheus** import build_counter, build_gauge
 - from **codeintel_rev.mcp_server.schemas** import ScopeIn

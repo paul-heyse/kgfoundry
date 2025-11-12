@@ -48,7 +48,7 @@ Lightweight per-session timeline recording utilities.
 
 - **fan_in**: 11
 - **fan_out**: 2
-- **cycle_group**: 28
+- **cycle_group**: 29
 
 ## Declared Exports (__all__)
 

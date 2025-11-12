@@ -49,7 +49,7 @@ Targeted overlay manager for opt-in stub generation.
 
 ## Hotspot Score
 
-- score: 1.64
+- score: 1.71
 
 ## Side Effects
 
@@ -57,9 +57,9 @@ Targeted overlay manager for opt-in stub generation.
 
 ## Complexity
 
-- branches: 13
-- cyclomatic: 14
-- loc: 135
+- branches: 17
+- cyclomatic: 18
+- loc: 152
 
 ## Doc Coverage
 
@@ -67,7 +67,7 @@ Targeted overlay manager for opt-in stub generation.
 - `select_overlay_candidates` (function): summary=yes, params=ok, examples=no — Return overlay candidates based on re-exports and typedness.
 - `generate_overlay_stub` (function): summary=yes, params=ok, examples=no — Write a re-export-only stub for ``plan``.
 - `activate_generated_overlays` (function): summary=yes, params=ok, examples=no — Symlink generated overlays into the primary stub path.
-- `_safe_int` (function): summary=no, examples=no
+- `_safe_int` (function): summary=yes, params=mismatch, examples=no — Return a best-effort integer conversion.
 
 ## Tags
 

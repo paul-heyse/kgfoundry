@@ -16,7 +16,7 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 - from **time** import perf_counter
 - from **typing** import TYPE_CHECKING, Protocol
 - from **codeintel_rev.evaluation.hybrid_pool** import Hit, HybridPoolEvaluator
-- from **codeintel_rev.observability** import metrics
+- from **(absolute)** import codeintel_rev.observability.metrics
 - from **codeintel_rev.observability.timeline** import Timeline, current_timeline
 - from **codeintel_rev.plugins.channels** import Channel, ChannelContext, ChannelError
 - from **codeintel_rev.plugins.registry** import ChannelRegistry

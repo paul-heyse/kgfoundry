@@ -42,7 +42,7 @@ Serialization helpers for enrichment artifacts (JSON/JSONL/Markdown).
 
 - **fan_in**: 2
 - **fan_out**: 0
-- **cycle_group**: 10
+- **cycle_group**: 11
 
 ## Doc Metrics
 

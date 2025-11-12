@@ -8,7 +8,8 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Protocol
+from os import PathLike
+from typing import TYPE_CHECKING, Any, Mapping, Protocol, Sequence
 
 from kgfoundry_common.typing import HEAVY_DEPS as _BASE_HEAVY_DEPS
 from kgfoundry_common.typing import gate_import as _base_gate_import
@@ -32,6 +33,7 @@ __all__ = [
     "NDArrayF32",
     "NDArrayI64",
     "NumpyModule",
+    "PolarsModule",
     "TorchModule",
     "gate_import",
 ]
@@ -229,3 +231,15 @@ class NumpyModule(Protocol):
 
     random: NumpyRandomNamespace
     linalg: NumpyLinalgNamespace
+
+
+class PolarsDataFrame(Protocol):
+    """Subset of polars.DataFrame used for Parquet exports."""
+
+    def write_parquet(self, file: str | PathLike[str]) -> None: ...
+
+
+class PolarsModule(Protocol):
+    """Minimal polars API used within optional export helpers."""
+
+    def DataFrame(self, data: Sequence[Mapping[str, object]]) -> PolarsDataFrame: ...

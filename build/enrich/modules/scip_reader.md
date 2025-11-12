@@ -28,7 +28,7 @@ Lightweight helpers for loading and querying SCIP JSON indices.
 
 - **fan_in**: 3
 - **fan_out**: 1
-- **cycle_group**: 12
+- **cycle_group**: 13
 
 ## Doc Metrics
 

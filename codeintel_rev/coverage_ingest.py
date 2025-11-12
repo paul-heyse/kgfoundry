@@ -6,9 +6,9 @@ from __future__ import annotations
 from pathlib import Path
 
 try:  # pragma: no cover - optional dependency
-    from defusedxml import ElementTree  # type: ignore[import-not-found]
+    from defusedxml import ElementTree
 except ImportError:  # pragma: no cover
-    from xml.etree import ElementTree  # type: ignore[import-not-found]  # noqa: S405
+    from xml.etree import ElementTree  # noqa: S405
 
 
 def collect_coverage(coverage_xml: str | Path) -> dict[str, dict[str, float]]:

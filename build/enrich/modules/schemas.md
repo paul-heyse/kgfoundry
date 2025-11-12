@@ -34,7 +34,7 @@ TypedDict provides automatic JSON Schema generation for FastMCP tools.
 
 ## Dependency Graph
 
-- **fan_in**: 12
+- **fan_in**: 11
 - **fan_out**: 1
 - **cycle_group**: 25
 
@@ -63,7 +63,7 @@ AnswerEnvelope, BaseErrorFields, BlameRangeResponse, FileHistoryResponse, Findin
 
 ## Hotspot Score
 
-- score: 1.81
+- score: 1.78
 
 ## Side Effects
 

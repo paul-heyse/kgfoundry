@@ -5,13 +5,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-
-try:  # pragma: no cover - optional dependency
-    import polars as pl  # type: ignore[import-not-found]
-except ImportError:  # pragma: no cover
-    pl = None  # type: ignore[assignment]
+from typing import cast
 
 from codeintel_rev.enrich.scip_reader import SCIPIndex
+from codeintel_rev.typing import PolarsModule, gate_import
 
 
 @dataclass(slots=True, frozen=True)
@@ -78,12 +75,11 @@ def write_use_graph(use_graph: UseGraph, path: str | Path) -> None:
     if not records:
         target.write_text("", encoding="utf-8")
         return
-    if pl is not None:  # pragma: no cover
-        pl.DataFrame(records).write_parquet(target)
-    else:
-        with target.open("w", encoding="utf-8") as handle:
-            for record in records:
-                handle.write(f"{record}\n")
+    if _write_parquet(records, target):  # pragma: no cover
+        return
+    with target.open("w", encoding="utf-8") as handle:
+        for record in records:
+            handle.write(f"{record}\n")
 
 
 def _is_definition(roles: list[str]) -> bool:
@@ -92,3 +88,12 @@ def _is_definition(roles: list[str]) -> bool:
         if "definition" in normalized or normalized.endswith("def"):
             return True
     return False
+def _write_parquet(records: list[dict[str, str]], target: Path) -> bool:
+    """Write records via polars when available."""
+    try:
+        polars = cast(PolarsModule, gate_import("polars", "use graph export"))
+    except ImportError:
+        return False
+    data_frame = polars.DataFrame(records)
+    data_frame.write_parquet(str(target))
+    return True

@@ -31,7 +31,7 @@ Thread-safe DuckDB connection manager.
 
 - **fan_in**: 9
 - **fan_out**: 2
-- **cycle_group**: 34
+- **cycle_group**: 33
 
 ## Declared Exports (__all__)
 

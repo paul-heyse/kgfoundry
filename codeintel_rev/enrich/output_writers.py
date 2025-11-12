@@ -8,9 +8,9 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 try:  # pragma: no cover - optional dependency
-    import orjson  # type: ignore[import-not-found]
+    import orjson
 except ImportError:  # pragma: no cover - optional dependency
-    orjson = None  # type: ignore[assignment]
+    orjson = None
 
 
 def _dump_json(obj: object) -> str:
@@ -31,7 +31,7 @@ def _dump_json(obj: object) -> str:
     if orjson is not None:
         try:
             return orjson.dumps(obj, option=orjson.OPT_INDENT_2).decode("utf-8")
-        except orjson.JSONEncodeError:  # type: ignore[attr-defined]
+        except orjson.JSONEncodeError:
             pass
     return json.dumps(obj, indent=2, ensure_ascii=False)
 

@@ -13,7 +13,7 @@ Score boosters applied after fusion.
 - from **(absolute)** import time
 - from **collections.abc** import Callable, Iterable, Mapping, Sequence
 - from **dataclasses** import dataclass
-- from **typing** import TYPE_CHECKING, Any
+- from **typing** import TYPE_CHECKING, Any, cast
 - from **codeintel_rev.retrieval.types** import HybridResultDoc
 - from **(absolute)** import duckdb
 - from **codeintel_rev.io.duckdb_manager** import DuckDBManager
@@ -40,7 +40,7 @@ Score boosters applied after fusion.
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 43
+- **cycle_group**: 49
 
 ## Declared Exports (__all__)
 
@@ -77,7 +77,7 @@ RecencyConfig, apply_recency_boost
 
 - branches: 28
 - cyclomatic: 29
-- loc: 206
+- loc: 205
 
 ## Doc Coverage
 
