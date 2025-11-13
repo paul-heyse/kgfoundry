@@ -64,6 +64,7 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 - from **starlette.types** import ASGIApp
 - from **codeintel_rev.observability.timeline** import bind_timeline, new_timeline
 - from **codeintel_rev.runtime.request_context** import capability_stamp_var, session_id_var
+- from **codeintel_rev.telemetry.context** import telemetry_context
 - from **codeintel_rev.telemetry.reporter** import start_run
 - from **kgfoundry_common.logging** import get_logger
 - from **collections.abc** import Awaitable, Callable
@@ -72,15 +73,15 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 
 ## Definitions
 
-- variable: `LOGGER` (line 72)
-- function: `get_session_id` (line 75)
-- function: `get_capability_stamp` (line 126)
-- class: `SessionScopeMiddleware` (line 138)
+- variable: `LOGGER` (line 73)
+- function: `get_session_id` (line 76)
+- function: `get_capability_stamp` (line 127)
+- class: `SessionScopeMiddleware` (line 139)
 
 ## Graph Metrics
 
 - **fan_in**: 6
-- **fan_out**: 4
+- **fan_out**: 5
 - **cycle_group**: 72
 
 ## Ownership
@@ -125,7 +126,7 @@ SessionScopeMiddleware, capability_stamp_var, get_capability_stamp, get_session_
 
 ## Hotspot
 
-- score: 2.09
+- score: 2.12
 
 ## Side Effects
 
@@ -135,7 +136,7 @@ SessionScopeMiddleware, capability_stamp_var, get_capability_stamp, get_session_
 
 - branches: 5
 - cyclomatic: 6
-- loc: 271
+- loc: 286
 
 ## Doc Coverage
 

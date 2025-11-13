@@ -15,7 +15,7 @@ Re-export graph builder utilities within the enrich package.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 20
+- **cycle_group**: 16
 
 ## Ownership
 

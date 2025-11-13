@@ -12,6 +12,7 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 
 - from **__future__** import annotations
 - from **(absolute)** import asyncio
+- from **contextlib** import nullcontext
 - from **functools** import lru_cache
 - from **importlib** import import_module
 - from **time** import perf_counter
@@ -31,19 +32,19 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 
 ## Definitions
 
-- variable: `httpx` (line 32)
-- variable: `LOGGER` (line 34)
-- function: `_get_numpy` (line 38)
-- class: `EmbeddingRequest` (line 74)
-- class: `EmbeddingData` (line 102)
-- class: `EmbeddingResponse` (line 127)
-- class: `VLLMClient` (line 158)
+- variable: `httpx` (line 33)
+- variable: `LOGGER` (line 35)
+- function: `_get_numpy` (line 39)
+- class: `EmbeddingRequest` (line 75)
+- class: `EmbeddingData` (line 103)
+- class: `EmbeddingResponse` (line 128)
+- class: `VLLMClient` (line 159)
 
 ## Graph Metrics
 
 - **fan_in**: 4
 - **fan_out**: 7
-- **cycle_group**: 58
+- **cycle_group**: 67
 
 ## Ownership
 
@@ -83,7 +84,7 @@ EmbeddingData, EmbeddingRequest, EmbeddingResponse, VLLMClient
 
 ## Hotspot
 
-- score: 2.62
+- score: 2.60
 
 ## Side Effects
 
@@ -92,9 +93,9 @@ EmbeddingData, EmbeddingRequest, EmbeddingResponse, VLLMClient
 
 ## Complexity
 
-- branches: 34
-- cyclomatic: 35
-- loc: 655
+- branches: 32
+- cyclomatic: 33
+- loc: 634
 
 ## Doc Coverage
 

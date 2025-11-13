@@ -38,31 +38,31 @@ Notes
 - from **(absolute)** import csv
 - from **(absolute)** import dataclasses
 - from **(absolute)** import json
+- from **collections.abc** import Iterable, Mapping
 - from **pathlib** import Path
-- from **typing** import Iterable, Mapping, Sequence
 - from **(absolute)** import re
 - from **importlib** import import_module
 - from **(absolute)** import math
 
 ## Definitions
 
-- function: `_read_jsonl` (line 40)
-- function: `_read_qrels` (line 51)
-- class: `RM3Params` (line 64)
-- class: `RM3Heuristics` (line 70)
-- function: `_lucene_searcher` (line 90)
-- function: `_apply_rm3` (line 102)
-- function: `_recall_at_k` (line 113)
-- function: `_mrr_at_k` (line 124)
-- function: `_parse_rm3_list` (line 140)
-- function: `_write_run` (line 152)
-- function: `sweep` (line 159)
-- function: `main` (line 222)
+- function: `_read_jsonl` (line 41)
+- function: `_read_qrels` (line 52)
+- class: `RM3Params` (line 65)
+- class: `RM3Heuristics` (line 101)
+- function: `_lucene_searcher` (line 156)
+- function: `_apply_rm3` (line 168)
+- function: `_recall_at_k` (line 179)
+- function: `_mrr_at_k` (line 190)
+- function: `_parse_rm3_list` (line 206)
+- function: `_write_run` (line 218)
+- function: `sweep` (line 225)
+- function: `main` (line 362)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 1
+- **fan_out**: 0
 - **cycle_group**: 149
 
 ## Ownership
@@ -82,7 +82,7 @@ Notes
 
 - **summary**: High-recall harness for BM25 + RM3 and (optionally) SPLADE.
 - has summary: yes
-- param parity: no
+- param parity: yes
 - examples present: no
 
 ## Typedness
@@ -113,6 +113,7 @@ Notes
 - patches/Supporting Documentation/HyperCorn.md
 - patches/Supporting Documentation/nginx.md
 - patches/AST_CST_SCIP_data_pipeline_hardening.md
+- patches/OpenTelemetry_ExtensionPhase2.md
 - patches/CST_Data_Build.md
 - patches/Typing_gating_follow_small_architecture_changes.md
 - patches/FAISS_detailed_implementation_plan.md
@@ -129,6 +130,7 @@ Notes
 - patches/Cli_enrich_fix.md
 - patches/AST_Data_Build.md
 - patches/audit_closeout.md
+- patches/MCP_through_search_hardening.md
 - patches/Index Lifecycle Manager and Concurrency.md
 - patches/MCP_schema_implementation.md
 - patches/OpenTelemetry_ExtensionPhase0.md
@@ -144,7 +146,7 @@ Notes
 
 ## Hotspot
 
-- score: 1.97
+- score: 1.70
 
 ## Side Effects
 
@@ -154,13 +156,13 @@ Notes
 
 - branches: 44
 - cyclomatic: 45
-- loc: 258
+- loc: 427
 
 ## Doc Coverage
 
 - `_read_jsonl` (function): summary=no, examples=no
 - `_read_qrels` (function): summary=no, examples=no
-- `RM3Params` (class): summary=no, examples=no
+- `RM3Params` (class): summary=yes, examples=no — Parameters for RM3 (Relevance Model 3) query expansion.
 - `RM3Heuristics` (class): summary=yes, examples=no — Copy of the production heuristic (kept self-contained here).
 - `_lucene_searcher` (function): summary=no, examples=no
 - `_apply_rm3` (function): summary=no, examples=no

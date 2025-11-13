@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
+from os import PathLike
 from pathlib import Path
 from typing import cast
 
@@ -20,7 +21,7 @@ class _DummyFrame(PolarsDataFrame):
     def __init__(self, records: Sequence[Mapping[str, object]]) -> None:
         self.records = [dict(record) for record in records]
 
-    def write_parquet(self, file: str | Path) -> None:
+    def write_parquet(self, file: str | PathLike[str]) -> None:
         Path(file).write_text(json.dumps(self.records), encoding="utf-8")
 
 
@@ -42,10 +43,15 @@ class _PolarsModern:
     def __init__(self) -> None:
         self.calls: list[list[dict[str, object]]] = []
 
-    def DataFrame(self, data: Sequence[Mapping[str, object]]) -> PolarsDataFrame:  # noqa: N802
+    def dataframe(
+        self,
+        data: Sequence[Mapping[str, object]],
+    ) -> PolarsDataFrame:
         payload = [dict(item) for item in data]
         self.calls.append(payload)
         return _DummyFrame(payload)
+
+    DataFrame = dataframe
 
 
 def test_resolve_polars_frame_factory_prefers_legacy_helper() -> None:

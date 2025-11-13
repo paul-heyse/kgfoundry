@@ -27,21 +27,21 @@ Adaptive gating helpers for multi-stage retrieval pipelines.
 - function: `_code_like_count` (line 236)
 - function: `analyze_query` (line 245)
 - function: `decide_budgets` (line 317)
-- function: `describe_budget_decision` (line 364)
+- function: `describe_budget_decision` (line 371)
 
 ## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 4
-- **cycle_group**: 63
+- **cycle_group**: 61
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 
@@ -73,7 +73,7 @@ BudgetDecision, QueryProfile, StageGateConfig, analyze_query, decide_budgets, de
 
 ## Hotspot
 
-- score: 2.33
+- score: 2.35
 
 ## Side Effects
 
@@ -81,9 +81,9 @@ BudgetDecision, QueryProfile, StageGateConfig, analyze_query, decide_budgets, de
 
 ## Complexity
 
-- branches: 27
-- cyclomatic: 28
-- loc: 412
+- branches: 28
+- cyclomatic: 29
+- loc: 419
 
 ## Doc Coverage
 

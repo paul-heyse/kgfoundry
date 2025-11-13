@@ -4,9 +4,17 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from codeintel_rev.observability.timeline import Timeline
+
+_RUN_REPORT_SCHEMA = "codeintel.telemetry/run-report@v0"
+_RUN_OUTPUT_DIR = Path("data/observability/runs")
+_LATEST_REPORT_STATE: dict[str, dict[str, object] | None] = {"value": None}
 
 
 @dataclass(slots=True, frozen=True)
@@ -34,6 +42,96 @@ class TimelineRunReport:
             "first_error": self.first_error,
             "events": self.events,
         }
+
+
+def _ensure_runs_dir(out_dir: Path | None) -> Path:
+    target = (out_dir or _RUN_OUTPUT_DIR).resolve()
+    target.mkdir(parents=True, exist_ok=True)
+    return target
+
+
+def render_run_report(timeline: Timeline, out_dir: Path | None = None) -> Path:
+    """Render Markdown + JSON artifacts for the provided timeline.
+
+    Parameters
+    ----------
+    timeline : Timeline
+        Timeline instance containing events to render. The timeline must be
+        sampled (timeline.sampled == True) or this function will raise
+        RuntimeError.
+    out_dir : Path | None, optional
+        Optional output directory for report artifacts (default: None). When
+        None, uses the default runs directory. The directory is created if
+        it doesn't exist.
+
+    Returns
+    -------
+    Path
+        Path to the generated Markdown report file. The report is written to
+        {out_dir}/{run_id}.md, with a corresponding JSON file at
+        {out_dir}/{run_id}.json.
+
+    Raises
+    ------
+    RuntimeError
+        Raised when the timeline is not sampled (timeline.sampled == False).
+        Only sampled timelines can be rendered as run reports.
+
+    Notes
+    -----
+    This function generates both Markdown and JSON artifacts for the timeline.
+    The Markdown report is human-readable and includes event summaries, while
+    the JSON report contains the full event data for programmatic processing.
+    The report metadata is also stored globally for retrieval via
+    latest_run_report().
+    """
+    if not timeline.sampled:
+        msg = "Cannot render run report for an unsampled timeline."
+        raise RuntimeError(msg)
+    events = timeline.snapshot()
+    summary, first_error = _summarize_events(events) if events else ({"status": "empty"}, None)
+    report_payload: dict[str, Any] = {
+        "schema": _RUN_REPORT_SCHEMA,
+        "kind": str(timeline.metadata.get("kind", "unknown")),
+        "session": {
+            "session_id": timeline.session_id,
+            "started_at": timeline.metadata.get("started_at"),
+        },
+        "run": {
+            "run_id": timeline.run_id,
+        },
+        "events": events,
+        "summary": summary,
+        "first_error": first_error,
+        "metadata": dict(timeline.metadata),
+    }
+    out_path = _ensure_runs_dir(out_dir)
+    json_path = out_path / f"{timeline.run_id}.json"
+    json_path.write_text(json.dumps(report_payload, indent=2), encoding="utf-8")
+    markdown_path = out_path / f"{timeline.run_id}.md"
+    markdown_path.write_text(_render_markdown_report(report_payload), encoding="utf-8")
+    _LATEST_REPORT_STATE["value"] = {
+        "markdown": str(markdown_path),
+        "json": str(json_path),
+        "session_id": timeline.session_id,
+        "run_id": timeline.run_id,
+        "summary": summary,
+    }
+    return markdown_path
+
+
+def latest_run_report() -> dict[str, object] | None:
+    """Return metadata for the most recently rendered run report.
+
+    Returns
+    -------
+    dict[str, object] | None
+        Dictionary containing the most recent run report metadata, or None
+        if no report has been rendered yet. The dictionary includes keys:
+        "markdown" (str path), "json" (str path), "session_id", "run_id", and
+        "summary". Returns None when no reports have been generated.
+    """
+    return _LATEST_REPORT_STATE["value"]
 
 
 def build_timeline_run_report(
@@ -156,3 +254,47 @@ def _collect_channel_stats(events: list[dict[str, Any]]) -> dict[str, int]:
         except (TypeError, ValueError):
             continue
     return stats
+
+
+def _render_markdown_report(payload: Mapping[str, Any]) -> str:
+    lines: list[str] = [
+        f"# Run Report — `{payload['run']['run_id']}`",
+        f"- **Session:** `{payload['session']['session_id']}`",
+        f"- **Status:** **{payload['summary']['status']}**",
+        f"- **Events Recorded:** {len(payload['events'])}",
+    ]
+    first_error = payload.get("first_error")
+    if first_error:
+        message = first_error.get("message") or ""
+        lines.append(
+            f"- **First Error:** `{first_error.get('name')}` {message}".strip(),
+        )
+    lines.extend(
+        [
+            "",
+            "## Timeline",
+        ]
+    )
+    for event in payload["events"]:
+        ts = datetime.fromtimestamp(event.get("ts", 0.0), tz=UTC).isoformat()
+        attrs = event.get("attrs") or {}
+        attr_text = ", ".join(f"{k}={v}" for k, v in attrs.items())
+        line = (
+            f"- `{ts}` `{event.get('type')}` **{event.get('name')}** status=`{event.get('status')}`"
+        )
+        if attr_text:
+            line += f" ({attr_text})"
+        if event.get("message"):
+            line += f" — {event['message']}"
+        lines.append(line)
+    decisions = [evt for evt in payload["events"] if evt.get("type") == "decision"]
+    if decisions:
+        lines.append("")
+        lines.append("## Decisions")
+        for evt in decisions:
+            attrs = evt.get("attrs") or {}
+            reason = attrs.get("reason") or ""
+            lines.append(
+                f"- `{evt.get('name')}` reason=`{reason}` attrs={json.dumps(attrs, sort_keys=True)}"
+            )
+    return "\n".join(lines)

@@ -25,50 +25,52 @@ corpus size for optimal performance.
 - from **types** import ModuleType
 - from **typing** import TYPE_CHECKING, Any, cast
 - from **codeintel_rev._lazy_imports** import LazyModule
+- from **codeintel_rev.errors** import VectorIndexIncompatibleError, VectorIndexStateError
+- from **codeintel_rev.io.duckdb_catalog** import DuckDBCatalog
 - from **codeintel_rev.metrics.registry** import FAISS_ANN_LATENCY_SECONDS, FAISS_BUILD_SECONDS_LAST, FAISS_BUILD_TOTAL, FAISS_INDEX_CODE_SIZE_BYTES, FAISS_INDEX_CUVS_ENABLED, FAISS_INDEX_DIM, FAISS_INDEX_GPU_ENABLED, FAISS_INDEX_SIZE_VECTORS, FAISS_POSTFILTER_DENSITY, FAISS_REFINE_KEPT_RATIO, FAISS_REFINE_LATENCY_SECONDS, FAISS_SEARCH_ERRORS_TOTAL, FAISS_SEARCH_LAST_K, FAISS_SEARCH_LAST_MS, FAISS_SEARCH_NPROBE, FAISS_SEARCH_TOTAL, HNSW_SEARCH_EF, set_compile_flags_id, set_factory_id
 - from **codeintel_rev.observability.otel** import as_span, record_span_event
 - from **codeintel_rev.observability.timeline** import Timeline, current_timeline
 - from **codeintel_rev.retrieval.rerank_flat** import FlatReranker
+- from **codeintel_rev.retrieval.types** import SearchHit
 - from **codeintel_rev.telemetry.decorators** import span_context
 - from **codeintel_rev.typing** import NDArrayF32, NDArrayI64, gate_import
 - from **kgfoundry_common.errors** import VectorSearchError
 - from **kgfoundry_common.logging** import get_logger
 - from **(absolute)** import faiss
 - from **(absolute)** import numpy
-- from **codeintel_rev.io.duckdb_catalog** import DuckDBCatalog
 - from **(absolute)** import pyarrow
 - from **(absolute)** import pyarrow.parquet
 
 ## Definitions
 
-- variable: `FaissIndex` (line 60)
-- variable: `np` (line 62)
-- variable: `FaissIndex` (line 63)
-- variable: `pa` (line 69)
-- variable: `pq` (line 70)
-- variable: `LOGGER` (line 72)
-- variable: `logger` (line 73)
-- class: `_LazyFaissProxy` (line 76)
-- variable: `faiss` (line 120)
-- function: `_faiss_module` (line 123)
-- function: `_has_faiss_gpu_support` (line 134)
-- function: `apply_parameters` (line 150)
-- function: `_log_extra` (line 207)
-- class: `FAISSRuntimeOptions` (line 225)
-- class: `SearchRuntimeOverrides` (line 246)
-- class: `_SearchExecutionParams` (line 255)
-- class: `_SearchPlan` (line 265)
-- class: `_FAISSIdMapMixin` (line 275)
+- variable: `FaissIndex` (line 61)
+- variable: `np` (line 63)
+- variable: `FaissIndex` (line 64)
+- variable: `pa` (line 70)
+- variable: `pq` (line 71)
+- variable: `LOGGER` (line 73)
+- variable: `logger` (line 74)
+- class: `_LazyFaissProxy` (line 77)
+- variable: `faiss` (line 121)
+- function: `_faiss_module` (line 124)
+- function: `_has_faiss_gpu_support` (line 135)
+- function: `apply_parameters` (line 151)
+- function: `_log_extra` (line 208)
+- class: `FAISSRuntimeOptions` (line 226)
+- class: `SearchRuntimeOverrides` (line 247)
+- class: `_SearchExecutionParams` (line 256)
+- class: `_SearchPlan` (line 266)
+- class: `_FAISSIdMapMixin` (line 276)
 - class: `FAISSManager` (line 453)
-- class: `AutoTuner` (line 3577)
-- function: `_coerce_to_int` (line 3707)
-- function: `_configure_direct_map` (line 3730)
-- function: `_set_direct_map_type` (line 3738)
+- class: `AutoTuner` (line 3741)
+- function: `_coerce_to_int` (line 3871)
+- function: `_configure_direct_map` (line 3894)
+- function: `_set_direct_map_type` (line 3902)
 
 ## Graph Metrics
 
 - **fan_in**: 8
-- **fan_out**: 8
+- **fan_out**: 10
 - **cycle_group**: 69
 
 ## Ownership
@@ -76,8 +78,8 @@ corpus size for optimal performance.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 42
-- recent churn 90: 42
+- recent churn 30: 43
+- recent churn 90: 43
 
 ## Usage
 
@@ -109,7 +111,7 @@ AutoTuner, FAISSManager, apply_parameters
 
 ## Hotspot
 
-- score: 3.31
+- score: 3.38
 
 ## Side Effects
 
@@ -117,9 +119,9 @@ AutoTuner, FAISSManager, apply_parameters
 
 ## Complexity
 
-- branches: 227
-- cyclomatic: 228
-- loc: 3782
+- branches: 245
+- cyclomatic: 246
+- loc: 3946
 
 ## Doc Coverage
 

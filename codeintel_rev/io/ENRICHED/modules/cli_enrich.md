@@ -168,8 +168,8 @@ CLI entrypoint for repo enrichment and targeted overlay generation.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 20
-- recent churn 90: 20
+- recent churn 30: 21
+- recent churn 90: 21
 
 ## Usage
 

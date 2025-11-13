@@ -6,18 +6,19 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, cast
 from uuid import uuid4
 
 import numpy as np
 
-from codeintel_rev.eval.pool_writer import PoolRow, write_pool
+from codeintel_rev.eval.pool_writer import write_pool
 from codeintel_rev.io.faiss_manager import SearchRuntimeOverrides
 from codeintel_rev.metrics.registry import (
     MCP_FETCH_LATENCY_SECONDS,
     MCP_SEARCH_LATENCY_SECONDS,
     MCP_SEARCH_POSTFILTER_DENSITY,
 )
+from codeintel_rev.retrieval.types import SearchPoolRow
 from codeintel_rev.typing import NDArrayF32, NDArrayI64
 from kgfoundry_common.errors import EmbeddingError
 from kgfoundry_common.logging import get_logger
@@ -47,15 +48,65 @@ class EmbeddingClient(Protocol):
 class IndexConfigLike(Protocol):
     """PEP 544 view of the index configuration needed by MCP search."""
 
-    vec_dim: int
-    faiss_nprobe: int
+    @property
+    def vec_dim(self) -> int:
+        """Return the vector dimension for embeddings.
+
+        Returns
+        -------
+        int
+            The dimension of embedding vectors used by the FAISS index.
+            This value must match the dimension of vectors produced by
+            the embedding service and stored in the index.
+        """
+        ...
+
+    @property
+    def faiss_nprobe(self) -> int:
+        """Return the FAISS nprobe parameter for approximate search.
+
+        Returns
+        -------
+        int
+            The number of inverted list clusters to probe during approximate
+            nearest neighbor search. Higher values improve recall at the cost
+            of latency. Used to configure FAISS index search behavior.
+        """
+        ...
 
 
 class LimitsConfigLike(Protocol):
     """PEP 544 view of server limit configuration."""
 
-    max_results: int
-    semantic_overfetch_multiplier: int
+    @property
+    def max_results(self) -> int:
+        """Return the maximum number of results allowed per search request.
+
+        Returns
+        -------
+        int
+            The maximum number of results that can be returned from a single
+            search request. Used to enforce resource limits and prevent excessive
+            result sets. Search requests requesting more than this value will be
+            capped at this limit.
+        """
+        ...
+
+    @property
+    def semantic_overfetch_multiplier(self) -> int:
+        """Return the multiplier for semantic search overfetch when filters are active.
+
+        Returns
+        -------
+        int
+            Multiplier applied to the requested top_k when post-filtering is
+            enabled (path filters, language filters, or symbol filters). Used
+            to fetch more candidates than requested to account for results that
+            will be filtered out. For example, if top_k=10 and multiplier=3,
+            the search will fetch 30 candidates to ensure enough results survive
+            post-filtering.
+        """
+        ...
 
 
 class SearchSettings(Protocol):
@@ -90,9 +141,7 @@ class CatalogLike(Protocol):
         """Return filtered chunk rows for the provided ids."""
         ...
 
-    def get_structure_annotations(
-        self, ids: Sequence[int]
-    ) -> dict[int, StructureAnnotations]:
+    def get_structure_annotations(self, ids: Sequence[int]) -> dict[int, StructureAnnotations]:
         """Return structural overlays for ``ids`` when available."""
         ...
 
@@ -115,7 +164,7 @@ class VectorIndex(Protocol):
         *,
         nprobe: int | None = None,
         runtime: SearchRuntimeOverrides | None = None,
-        catalog: CatalogLike | None = None,
+        catalog: object | None = None,
     ) -> tuple[NDArrayF32, NDArrayI64]:
         """Perform ANN search and return (distances, ids)."""
         ...
@@ -133,14 +182,31 @@ class SearchFilters:
     @classmethod
     def from_payload(
         cls,
-        payload: Mapping[str, Sequence[str]] | None,
+        payload: Mapping[str, Sequence[str]] | SearchFilterPayload | None,
     ) -> SearchFilters:
         """Normalize the incoming JSON payload into immutable tuples.
+
+        This class method converts a JSON payload dictionary (from MCP tool arguments)
+        into a SearchFilters instance with immutable tuple-backed sequences. The method
+        handles missing keys gracefully, normalizes string lists, and validates filter
+        values. Used to convert MCP search filter payloads into typed filter objects.
+
+        Parameters
+        ----------
+        payload : Mapping[str, Sequence[str]] | SearchFilterPayload | None
+            Optional JSON payload dictionary containing filter keys: "lang" (languages),
+            "include" (include paths), "exclude" (exclude paths), "symbols" (symbol
+            filters). Values are sequences of strings that are normalized and converted
+            to tuples. When None or empty, returns a SearchFilters instance with empty
+            tuples (no filters). Can accept either Mapping[str, Sequence[str]] or
+            SearchFilterPayload TypedDict format.
 
         Returns
         -------
         SearchFilters
-            Filter payload with tuple-backed sequences.
+            SearchFilters instance with normalized filter tuples. All filter fields
+            (languages, include, exclude, symbols) are immutable tuples, even when
+            the payload is empty or missing keys.
         """
         if not payload:
             return cls()
@@ -199,7 +265,7 @@ class SearchRequest:
     filters: SearchFilters
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class SearchResult:
     """Single search result entry."""
 
@@ -212,7 +278,7 @@ class SearchResult:
     metadata: dict[str, object]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class SearchResponse:
     """Structured search response returned to MCP adapters."""
 
@@ -222,12 +288,12 @@ class SearchResponse:
     limits: list[str]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class HydrationPayload:
     """Bundle of hydrated rows and structural annotations."""
 
-    rows: Mapping[int, dict]
-    annotations: Mapping[int, object]
+    rows: Mapping[int, dict[str, object]]
+    annotations: Mapping[int, StructureAnnotations]
 
 
 @dataclass(slots=True, frozen=True)
@@ -253,7 +319,7 @@ class FetchRequest:
     max_tokens: int
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class FetchObjectResult:
     """Single hydrated chunk."""
 
@@ -264,7 +330,7 @@ class FetchObjectResult:
     metadata: dict[str, object]
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class FetchResponse:
     """Structured fetch response used by MCP adapters."""
 
@@ -283,10 +349,29 @@ class FetchDependencies:
 def run_search(*, request: SearchRequest, deps: SearchDependencies) -> SearchResponse:
     """Execute FAISS search → DuckDB hydration and return MCP-ready results.
 
+    This function orchestrates the complete search workflow: embeds the query text,
+    executes FAISS approximate nearest neighbor search, optionally reranks candidates
+    with exact similarity, hydrates chunk metadata from DuckDB, applies post-search
+    filters, and builds ranked results. The function records metrics (latency, postfilter
+    density) and writes pool rows for trace analysis.
+
+    Parameters
+    ----------
+    request : SearchRequest
+        Search request containing query text, top_k (number of results), rerank flag,
+        and optional filters (languages, paths, symbols). Used to configure search
+        behavior and result filtering.
+    deps : SearchDependencies
+        Search dependencies providing FAISS manager, embedding client, DuckDB catalog,
+        settings, timeline, and pool directory. Used to execute search operations and
+        hydrate results. The dependencies must be initialized and ready for use.
+
     Returns
     -------
     SearchResponse
-        Dataclass containing search hits and diagnostic metadata.
+        Dataclass containing search hits and diagnostic metadata. Includes query_echo
+        (original query), top_k (requested results), results (ranked SearchResult objects
+        with chunk metadata and scores), and limits (resource limits applied during search).
     """
     start = perf_counter()
     vector = _embed_query(deps.embedder, request.query, deps.settings.index.vec_dim)
@@ -306,20 +391,23 @@ def run_search(*, request: SearchRequest, deps: SearchDependencies) -> SearchRes
         ranked_ids,
         request.filters,
     )
-    structure_map = deps.catalog.get_structure_annotations(chunk_rows.keys()) if chunk_rows else {}
+    annotations = cast(
+        "Mapping[int, StructureAnnotations]",
+        deps.catalog.get_structure_annotations(tuple(chunk_rows.keys())) if chunk_rows else {},
+    )
     source_label = f"faiss_{deps.faiss.faiss_family or 'auto'}"
+    hydration_bundle = HydrationPayload(rows=chunk_rows, annotations=annotations)
     results = _build_results(
         ranked_ids,
         ranked_scores,
-        rows=chunk_rows,
-        annotations=structure_map,
+        hydration=hydration_bundle,
         request=request,
         source_label=source_label,
     )
     duration = max(perf_counter() - start, 0.0)
     MCP_SEARCH_LATENCY_SECONDS.observe(duration)
     _record_postfilter_density(filtered_count, len(ranked_ids))
-    _write_pool_rows(results, deps, structure_map)
+    _write_pool_rows(results, deps, annotations)
     _log_search_completion(request, deps, len(results), faiss_k)
     return SearchResponse(
         query_echo=request.query,
@@ -332,16 +420,39 @@ def run_search(*, request: SearchRequest, deps: SearchDependencies) -> SearchRes
 def run_fetch(*, request: FetchRequest, deps: FetchDependencies) -> FetchResponse:
     """Hydrate chunk content and metadata for the MCP fetch tool.
 
+    This function retrieves full chunk content and metadata for a list of chunk IDs
+    from the DuckDB catalog. The function queries the catalog, builds FetchObjectResult
+    objects with content and metadata, applies max_tokens limits, and records metrics
+    (latency, token counts). Used to hydrate chunk IDs returned from search operations.
+
+    Parameters
+    ----------
+    request : FetchRequest
+        Fetch request containing object_ids (list of chunk IDs to hydrate) and
+        max_tokens (optional token limit). Used to query the catalog and limit response
+        size. Empty object_ids return an empty response immediately.
+    deps : FetchDependencies
+        Fetch dependencies providing DuckDB catalog, settings, and timeline. Used to
+        query chunk metadata and record observability events. The catalog must be
+        initialized and ready for queries.
+
     Returns
     -------
     FetchResponse
-        Dataclass containing hydrated chunk objects.
+        Dataclass containing hydrated chunk objects. Includes a list of FetchObjectResult
+        objects with chunk_id, title, url, content, and metadata fields. Chunks are
+        returned in the order specified by request.object_ids, with missing chunks
+        omitted. Content is truncated to max_tokens when specified.
     """
     start = perf_counter()
     if not request.object_ids:
         return FetchResponse(objects=[])
     rows = deps.catalog.query_by_ids(request.object_ids)
-    by_id = {int(row["id"]): row for row in rows}
+    by_id: dict[int, dict[str, object]] = {}
+    for row in rows:
+        identifier = row.get("id")
+        if isinstance(identifier, int):
+            by_id[identifier] = row
     objects: list[FetchObjectResult] = []
     for chunk_id in request.object_ids:
         row = by_id.get(chunk_id)
@@ -395,8 +506,27 @@ def _compute_fanout(top_k: int, filters: SearchFilters, limits: LimitsConfigLike
 
 
 def _build_runtime_overrides(*, rerank: bool) -> SearchRuntimeOverrides | None:
-    """Return FAISS runtime overrides derived from the rerank flag."""
+    """Return FAISS runtime overrides derived from the rerank flag.
 
+    This helper function constructs FAISS runtime overrides based on the rerank
+    configuration. When rerank is disabled, returns overrides that set k_factor=1.0
+    to disable candidate expansion (since exact reranking won't be performed). When
+    rerank is enabled, returns None to use default overrides (which enable expansion).
+
+    Parameters
+    ----------
+    rerank : bool
+        Whether exact reranking is enabled. When False, returns overrides with
+        k_factor=1.0 to disable candidate expansion. When True, returns None
+        to use default overrides that enable expansion for reranking.
+
+    Returns
+    -------
+    SearchRuntimeOverrides | None
+        Runtime overrides with k_factor=1.0 when rerank is False (disables expansion),
+        otherwise None (uses default overrides that enable expansion for reranking).
+        The overrides are applied to FAISS search to control candidate retrieval.
+    """
     if rerank:
         return None
     return SearchRuntimeOverrides(k_factor=1.0)
@@ -430,7 +560,11 @@ def _hydrate_chunks(
         )
     else:
         rows = catalog.query_by_ids(chunk_ids)
-    chunk_map = {int(row["id"]): row for row in rows if row.get("id") is not None}
+    chunk_map: dict[int, dict[str, object]] = {}
+    for row in rows:
+        identifier = row.get("id")
+        if isinstance(identifier, int):
+            chunk_map[identifier] = row
     return chunk_map, len(chunk_map)
 
 
@@ -467,11 +601,10 @@ def _build_results(
 
 
 def _matches_symbols(row: Mapping[str, object], symbols: Sequence[str]) -> bool:
-    chunk_symbols = row.get("symbols")
+    chunk_symbols = set(_string_sequence(row.get("symbols")))
     if not chunk_symbols:
         return False
-    normalized = {str(symbol) for symbol in chunk_symbols if symbol}
-    return any(symbol in normalized for symbol in symbols)
+    return any(symbol in chunk_symbols for symbol in symbols)
 
 
 def _build_metadata(
@@ -480,14 +613,14 @@ def _build_metadata(
     request: SearchRequest,
     score: float,
 ) -> dict[str, object]:
-    metadata = {
+    metadata: dict[str, object] = {
         "uri": str(row.get("uri")),
-        "start_line": int(row.get("start_line") or 0),
-        "end_line": int(row.get("end_line") or 0),
-        "start_byte": int(row.get("start_byte") or 0),
-        "end_byte": int(row.get("end_byte") or 0),
+        "start_line": _coerce_int(row.get("start_line")),
+        "end_line": _coerce_int(row.get("end_line")),
+        "start_byte": _coerce_int(row.get("start_byte")),
+        "end_byte": _coerce_int(row.get("end_byte")),
         "lang": str(row.get("lang") or ""),
-        "symbols": list(row.get("symbols") or ()),
+        "symbols": _string_sequence(row.get("symbols")),
     }
     explain = {
         "hit_reason": _build_hit_reasons(request, metadata, score),
@@ -512,7 +645,7 @@ def _build_hit_reasons(
     if request.filters.exclude:
         reasons.append("filter:path:exclude")
     if request.filters.symbols:
-        chunk_symbols = {str(sym) for sym in metadata.get("symbols", []) if sym}
+        chunk_symbols = set(_string_sequence(metadata.get("symbols")))
         matched = sorted(chunk_symbols & set(request.filters.symbols))
         reasons.extend(f"symbol:name:{symbol}" for symbol in matched)
     if request.rerank:
@@ -523,15 +656,15 @@ def _build_hit_reasons(
 
 def _build_title(row: Mapping[str, object]) -> str:
     uri = str(row.get("uri") or "")
-    start_line = int(row.get("start_line") or 0) + 1
-    end_line = int(row.get("end_line") or start_line - 1) + 1
+    start_line = _coerce_int(row.get("start_line")) + 1
+    end_line = _coerce_int(row.get("end_line")) + 1
     return f"{uri}: lines {start_line}-{max(start_line, end_line)}"
 
 
 def _build_url(row: Mapping[str, object]) -> str:
     uri = str(row.get("uri") or "")
-    start_line = int(row.get("start_line") or 0) + 1
-    end_line = int(row.get("end_line") or start_line - 1) + 1
+    start_line = _coerce_int(row.get("start_line")) + 1
+    end_line = _coerce_int(row.get("end_line")) + 1
     return f"repo://{uri}#L{start_line}-L{max(start_line, end_line)}"
 
 
@@ -554,16 +687,18 @@ def _truncate_content(content: str, max_tokens: int) -> str:
 def _build_fetch_metadata(row: Mapping[str, object]) -> dict[str, object]:
     return {
         "uri": str(row.get("uri")),
-        "start_line": int(row.get("start_line") or 0),
-        "end_line": int(row.get("end_line") or 0),
-        "start_byte": int(row.get("start_byte") or 0),
-        "end_byte": int(row.get("end_byte") or 0),
+        "start_line": _coerce_int(row.get("start_line")),
+        "end_line": _coerce_int(row.get("end_line")),
+        "start_byte": _coerce_int(row.get("start_byte")),
+        "end_byte": _coerce_int(row.get("end_byte")),
         "lang": str(row.get("lang") or ""),
     }
 
 
 def _write_pool_rows(
-    results: Sequence[SearchResult], deps: SearchDependencies, annotations: Mapping[int, object]
+    results: Sequence[SearchResult],
+    deps: SearchDependencies,
+    annotations: Mapping[int, StructureAnnotations],
 ) -> None:
     if not results or deps.pool_dir is None:
         return
@@ -572,20 +707,27 @@ def _write_pool_rows(
     except OSError:  # pragma: no cover - filesystem tolerance
         return
     query_id = deps.run_id or uuid4().hex
-    rows: list[PoolRow] = []
+    rows: list[SearchPoolRow] = []
     for rank, result in enumerate(results, start=1):
         annotation = annotations.get(result.chunk_id)
+        symbol_hits = annotation.symbol_hits if annotation else ()
+        ast_node_kinds = annotation.ast_node_kinds if annotation else ()
+        cst_matches = annotation.cst_matches if annotation else ()
+        meta = {
+            "uri": str(result.metadata.get("uri")),
+            "symbol_hits": list(symbol_hits),
+            "ast_node_kinds": list(ast_node_kinds),
+            "cst_matches": list(cst_matches),
+            "score": result.score,
+        }
         rows.append(
-            PoolRow(
+            SearchPoolRow(
                 query_id=query_id,
                 channel="faiss",
                 rank=rank,
-                chunk_id=result.chunk_id,
+                id=result.chunk_id,
                 score=result.score,
-                uri=str(result.metadata.get("uri")),
-                symbol_hits=tuple(getattr(annotation, "symbol_hits", ()) or ()),
-                ast_node_kinds=tuple(getattr(annotation, "ast_node_kinds", ()) or ()),
-                cst_matches=tuple(getattr(annotation, "cst_matches", ()) or ()),
+                meta=meta,
             )
         )
     destination = deps.pool_dir / f"{query_id}.parquet"
@@ -620,6 +762,27 @@ def _log_search_completion(
             "run_id": deps.run_id,
         },
     )
+
+
+def _coerce_int(value: object | None) -> int:
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return 0
+    return 0
+
+
+def _string_sequence(value: object | None) -> list[str]:
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return [str(item) for item in value if item]
+    return []
 
 
 __all__ = [

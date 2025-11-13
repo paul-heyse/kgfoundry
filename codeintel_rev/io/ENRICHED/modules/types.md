@@ -10,21 +10,27 @@ Shared retrieval dataclasses for multi-stage pipelines.
 
 - from **__future__** import annotations
 - from **collections.abc** import Mapping, Sequence
-- from **dataclasses** import dataclass
+- from **dataclasses** import dataclass, field
 
 ## Definitions
 
-- class: `ChannelHit` (line 10)
-- class: `HybridResultDoc` (line 18)
-- class: `HybridSearchResult` (line 26)
-- class: `StageSignals` (line 37)
-- class: `StageDecision` (line 59)
+- variable: `ChunkId` (line 8)
+- variable: `FaissRow` (line 9)
+- variable: `Distance` (line 10)
+- variable: `FactoryString` (line 11)
+- class: `SearchHit` (line 15)
+- class: `SearchPoolRow` (line 27)
+- class: `ChannelHit` (line 39)
+- class: `HybridResultDoc` (line 47)
+- class: `HybridSearchResult` (line 55)
+- class: `StageSignals` (line 66)
+- class: `StageDecision` (line 88)
 
 ## Graph Metrics
 
-- **fan_in**: 9
+- **fan_in**: 13
 - **fan_out**: 0
-- **cycle_group**: 61
+- **cycle_group**: 52
 
 ## Ownership
 
@@ -41,7 +47,7 @@ Shared retrieval dataclasses for multi-stage pipelines.
 
 ## Declared Exports (__all__)
 
-ChannelHit, HybridResultDoc, HybridSearchResult, StageDecision, StageSignals
+ChannelHit, ChunkId, Distance, FactoryString, FaissRow, HybridResultDoc, HybridSearchResult, SearchHit, SearchPoolRow, StageDecision, StageSignals
 
 ## Doc Health
 
@@ -64,7 +70,7 @@ ChannelHit, HybridResultDoc, HybridSearchResult, StageDecision, StageSignals
 
 ## Hotspot
 
-- score: 1.88
+- score: 2.02
 
 ## Side Effects
 
@@ -74,10 +80,12 @@ ChannelHit, HybridResultDoc, HybridSearchResult, StageDecision, StageSignals
 
 - branches: 2
 - cyclomatic: 3
-- loc: 74
+- loc: 109
 
 ## Doc Coverage
 
+- `SearchHit` (class): summary=yes, examples=no — Single retrieval hit emitted by FAISS/BM25/SPLADE/XTR stages.
+- `SearchPoolRow` (class): summary=yes, examples=no — Structured row recorded in evaluator pools.
 - `ChannelHit` (class): summary=yes, examples=no — Score emitted by a retrieval channel prior to fusion.
 - `HybridResultDoc` (class): summary=yes, examples=no — Final fused result produced by weighted RRF.
 - `HybridSearchResult` (class): summary=yes, examples=no — Container for fused docs alongside explainability metadata.
@@ -86,4 +94,4 @@ ChannelHit, HybridResultDoc, HybridSearchResult, StageDecision, StageSignals
 
 ## Tags
 
-low-coverage, public-api
+low-coverage, public-api, reexport-hub

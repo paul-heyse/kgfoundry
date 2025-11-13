@@ -23,7 +23,7 @@ Helpers for repo-relative path normalization and stable identifiers.
 
 - **fan_in**: 1
 - **fan_out**: 0
-- **cycle_group**: 21
+- **cycle_group**: 9
 
 ## Ownership
 

@@ -38,7 +38,7 @@ Utilities for building and verifying XTR token indexes.
 
 - **fan_in**: 1
 - **fan_out**: 6
-- **cycle_group**: 99
+- **cycle_group**: 100
 
 ## Ownership
 

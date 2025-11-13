@@ -267,5 +267,6 @@ reexport-hub:
 - telemetry/__init__.py
 - io/splade_manager.py
 - io/__init__.py
+- retrieval/types.py
 - retrieval/mcp_search.py
 - mcp_server/schemas.py

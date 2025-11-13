@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping, Sequence
+from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
@@ -26,6 +27,8 @@ from codeintel_rev.mcp_server.schemas import (
     ScopeIn,
 )
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
+from codeintel_rev.observability.otel import as_span
+from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.telemetry.context import telemetry_metadata
 from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
@@ -110,6 +113,27 @@ class _HybridResult:
     contribution_map: dict[int, list[tuple[str, int, float]]] | None
     retrieval_channels: list[str]
     method: MethodInfo | None
+
+
+@dataclass(slots=True)
+class _SemanticPipelineResult:
+    plan: _SemanticSearchPlan
+    limits_metadata: list[str]
+    result_ids: list[int]
+    hybrid_result: _HybridResult
+    findings: list[Finding]
+    hydrate_exc: Exception | None
+    hydrate_duration_ms: float
+
+
+@dataclass(slots=True)
+class _SemanticPipelineRequest:
+    context: ApplicationContext
+    scope: ScopeIn | None
+    limit: int
+    observation: Observation
+    query: str
+    timeline: Timeline | None
 
 
 @dataclass(frozen=True)
@@ -247,91 +271,143 @@ def _semantic_search_sync(
             },
         )
 
-        plan = _build_semantic_search_plan(context, scope, limit, observation)
-        limits_metadata = list(plan.limits_metadata)
-        query_vector = _embed_query_or_raise(
-            context.vllm_client,
-            query,
-            observation,
-            context.settings.vllm.base_url,
-        )
-        with context.open_catalog() as catalog:
-            faiss_request = _FaissSearchRequest(
+        timeline = current_timeline()
+        artifacts = _execute_semantic_pipeline(
+            _SemanticPipelineRequest(
                 context=context,
-                query_vector=query_vector,
-                limit=plan.fanout.faiss_k,
-                nprobe=plan.nprobe,
-                observation=observation,
-                tuning_overrides=plan.tuning_overrides,
-                catalog=catalog,
-            )
-            result_ids, result_scores = _run_faiss_search_or_raise(faiss_request)
-
-            hybrid_result = _resolve_hybrid_results(
-                context,
-                _HybridSearchState(
-                    query,
-                    result_ids,
-                    result_scores,
-                    plan.effective_limit,
-                    plan.fanout.faiss_k,
-                    plan.nprobe,
-                ),
-                limits_metadata,
-                ("semantic", "faiss"),
-            )
-
-            findings, hydrate_exc = _hydrate_findings(
-                context,
-                hybrid_result.hydration_ids,
-                hybrid_result.hydration_scores,
                 scope=scope,
-                catalog=catalog,
+                limit=limit,
+                observation=observation,
+                query=query,
+                timeline=timeline,
             )
-        _ensure_hydration_success(hydrate_exc, observation, context)
+        )
+        method_payload = (
+            dict(artifacts.hybrid_result.method) if artifacts.hybrid_result.method else {}
+        )
+        stage_entries: list[dict[str, object]] = []
+        if method_payload:
+            existing_stages = method_payload.get("stages")
+            if isinstance(existing_stages, list):
+                stage_entries.extend(stage for stage in existing_stages if isinstance(stage, dict))
+        stage_entries.append(
+            {
+                "name": "hydrate.duckdb",
+                "status": "run" if artifacts.hydrate_exc is None else "error",
+                "duration_ms": artifacts.hydrate_duration_ms,
+                "output": {"rows": len(artifacts.findings)},
+            }
+        )
+        method_payload["stages"] = stage_entries
 
         observation.mark_success()
 
         _warn_scope_filter_reduction(
             scope,
-            plan.scope_flags,
-            len(findings),
-            plan.effective_limit,
-            len(result_ids),
+            artifacts.plan.scope_flags,
+            len(artifacts.findings),
+            artifacts.plan.effective_limit,
+            len(artifacts.result_ids),
         )
         _annotate_hybrid_contributions(
-            findings,
-            hybrid_result.contribution_map,
+            artifacts.findings,
+            artifacts.hybrid_result.contribution_map,
             context.settings.index.rrf_k,
         )
 
         extras = _build_response_extras(
             _MethodContext(
-                findings_count=len(findings),
+                findings_count=len(artifacts.findings),
                 requested_limit=limit,
-                effective_limit=plan.effective_limit,
+                effective_limit=artifacts.plan.effective_limit,
                 start_time=start_time,
-                retrieval_channels=hybrid_result.retrieval_channels,
-                hybrid_method=(
-                    cast("MethodInfo", dict(hybrid_result.method)) if hybrid_result.method else None
-                ),
+                retrieval_channels=artifacts.hybrid_result.retrieval_channels,
+                hybrid_method=cast("MethodInfo", method_payload) if method_payload else None,
             ),
-            limits_metadata,
+            artifacts.limits_metadata,
             scope,
         )
 
         answer_message = (
-            f"Found {len(findings)} hybrid results for: {query}"
-            if any(channel in {"bm25", "splade"} for channel in hybrid_result.retrieval_channels)
-            else f"Found {len(findings)} semantically similar code chunks for: {query}"
+            f"Found {len(artifacts.findings)} hybrid results for: {query}"
+            if any(
+                channel in {"bm25", "splade"}
+                for channel in artifacts.hybrid_result.retrieval_channels
+            )
+            else f"Found {len(artifacts.findings)} semantically similar code chunks for: {query}"
         )
 
         return _make_envelope(
-            findings=findings,
+            findings=artifacts.findings,
             answer=answer_message,
-            confidence=0.85 if findings else 0.0,
+            confidence=0.85 if artifacts.findings else 0.0,
             extras=extras,
         )
+
+
+def _execute_semantic_pipeline(request: _SemanticPipelineRequest) -> _SemanticPipelineResult:
+    plan = _build_semantic_search_plan(
+        request.context, request.scope, request.limit, request.observation
+    )
+    limits_metadata = list(plan.limits_metadata)
+    query_vector = _embed_query_or_raise(
+        request.context.vllm_client,
+        request.query,
+        request.observation,
+        request.context.settings.vllm.base_url,
+    )
+    with request.context.open_catalog() as catalog:
+        faiss_request = _FaissSearchRequest(
+            context=request.context,
+            query_vector=query_vector,
+            limit=plan.fanout.faiss_k,
+            nprobe=plan.nprobe,
+            observation=request.observation,
+            tuning_overrides=plan.tuning_overrides,
+            catalog=catalog,
+        )
+        result_ids, result_scores = _run_faiss_search_or_raise(faiss_request)
+
+        hybrid_result = _resolve_hybrid_results(
+            request.context,
+            _HybridSearchState(
+                request.query,
+                result_ids,
+                result_scores,
+                plan.effective_limit,
+                plan.fanout.faiss_k,
+                plan.nprobe,
+            ),
+            limits_metadata,
+            ("semantic", "faiss"),
+        )
+
+        hydrate_attrs = {"requested": len(hybrid_result.hydration_ids)}
+        hydrate_ctx = (
+            request.timeline.step("hydrate.duckdb", **hydrate_attrs)
+            if request.timeline
+            else nullcontext()
+        )
+        hydrate_start = perf_counter()
+        with hydrate_ctx, as_span("hydrate.duckdb", **hydrate_attrs):
+            findings, hydrate_exc = _hydrate_findings(
+                request.context,
+                hybrid_result.hydration_ids,
+                hybrid_result.hydration_scores,
+                scope=request.scope,
+                catalog=catalog,
+            )
+    _ensure_hydration_success(hydrate_exc, request.observation, request.context)
+    hydrate_duration_ms = round((perf_counter() - hydrate_start) * 1000, 2)
+    return _SemanticPipelineResult(
+        plan=plan,
+        limits_metadata=limits_metadata,
+        result_ids=result_ids,
+        hybrid_result=hybrid_result,
+        findings=findings,
+        hydrate_exc=hydrate_exc,
+        hydrate_duration_ms=hydrate_duration_ms,
+    )
 
 
 def _clamp_result_limit(requested_limit: int, max_results: int) -> tuple[int, list[str]]:

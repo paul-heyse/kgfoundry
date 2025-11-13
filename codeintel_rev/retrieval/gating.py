@@ -340,25 +340,32 @@ def decide_budgets(profile: QueryProfile, cfg: StageGateConfig) -> BudgetDecisio
         disabled in config.
     """
     if not cfg.enable_query_aware_budgets:
-        return BudgetDecision(dict(cfg.default_depths), cfg.rrf_k_default, cfg.rm3_auto)
-
-    if profile.looks_literal:
-        depths = dict(cfg.literal_depths)
-        rrf_k = cfg.rrf_k_literal
-    elif profile.looks_vague or profile.ambiguity_score >= _AMBIGUITY_VAGUE_THRESHOLD:
-        depths = dict(cfg.vague_depths)
-        rrf_k = cfg.rrf_k_vague
-    else:
         depths = dict(cfg.default_depths)
         rrf_k = cfg.rrf_k_default
+        rm3_enabled = cfg.rm3_auto
+    else:
+        if profile.looks_literal:
+            depths = dict(cfg.literal_depths)
+            rrf_k = cfg.rrf_k_literal
+        elif profile.looks_vague or profile.ambiguity_score >= _AMBIGUITY_VAGUE_THRESHOLD:
+            depths = dict(cfg.vague_depths)
+            rrf_k = cfg.rrf_k_vague
+        else:
+            depths = dict(cfg.default_depths)
+            rrf_k = cfg.rrf_k_default
+        rm3_enabled = bool(
+            cfg.rm3_auto
+            and cfg.rm3_min_len <= profile.length <= cfg.rm3_max_len
+            and (profile.ambiguity_score >= _RM3_AMBIGUITY_THRESHOLD or cfg.rm3_enable_on_ambiguity)
+        )
 
-    rm3_enabled = bool(
-        cfg.rm3_auto
-        and cfg.rm3_min_len <= profile.length <= cfg.rm3_max_len
-        and (profile.ambiguity_score >= _RM3_AMBIGUITY_THRESHOLD or cfg.rm3_enable_on_ambiguity)
-    )
-
-    return BudgetDecision(depths, rrf_k, rm3_enabled)
+    decision = BudgetDecision(depths, rrf_k, rm3_enabled)
+    attrs = describe_budget_decision(profile, decision)
+    record_span_event("decision.gate.budget", **attrs)
+    timeline = current_timeline()
+    if timeline is not None:
+        timeline.event("decision", "gate.budget", attrs=attrs)
+    return decision
 
 
 def describe_budget_decision(profile: QueryProfile, decision: BudgetDecision) -> dict[str, object]:

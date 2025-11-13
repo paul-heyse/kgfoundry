@@ -38,22 +38,26 @@ Raising Git operation error:
 ## Imports
 
 - from **__future__** import annotations
+- from **collections.abc** import Mapping
 - from **kgfoundry_common.errors** import ErrorCode, KgFoundryError
 
 ## Definitions
 
-- class: `FileOperationError` (line 40)
-- class: `FileReadError` (line 95)
-- class: `InvalidLineRangeError` (line 142)
-- class: `PathNotFoundError` (line 214)
-- class: `PathNotDirectoryError` (line 233)
-- class: `GitOperationError` (line 255)
-- class: `RuntimeLifecycleError` (line 334)
-- class: `RuntimeUnavailableError` (line 353)
+- class: `FileOperationError` (line 42)
+- class: `FileReadError` (line 97)
+- class: `InvalidLineRangeError` (line 144)
+- class: `PathNotFoundError` (line 216)
+- class: `PathNotDirectoryError` (line 235)
+- class: `GitOperationError` (line 257)
+- class: `RuntimeLifecycleError` (line 336)
+- class: `RuntimeUnavailableError` (line 355)
+- class: `VectorIndexStateError` (line 378)
+- class: `VectorIndexIncompatibleError` (line 400)
+- class: `CatalogJoinError` (line 422)
 
 ## Graph Metrics
 
-- **fan_in**: 12
+- **fan_in**: 13
 - **fan_out**: 0
 - **cycle_group**: 25
 
@@ -95,7 +99,7 @@ FileOperationError, FileReadError, GitOperationError, InvalidLineRangeError, Pat
 
 ## Hotspot
 
-- score: 2.11
+- score: 2.26
 
 ## Side Effects
 
@@ -103,9 +107,9 @@ FileOperationError, FileReadError, GitOperationError, InvalidLineRangeError, Pat
 
 ## Complexity
 
-- branches: 4
-- cyclomatic: 5
-- loc: 399
+- branches: 7
+- cyclomatic: 8
+- loc: 467
 
 ## Doc Coverage
 
@@ -117,6 +121,8 @@ FileOperationError, FileReadError, GitOperationError, InvalidLineRangeError, Pat
 - `GitOperationError` (class): summary=yes, examples=yes — Base exception for Git operation errors.
 - `RuntimeLifecycleError` (class): summary=yes, examples=no — Raised when a runtime fails to initialize or shut down.
 - `RuntimeUnavailableError` (class): summary=yes, examples=no — Raised when a runtime dependency is missing or disabled.
+- `VectorIndexStateError` (class): summary=yes, examples=no — Raised when a FAISS index is missing or not ready.
+- `VectorIndexIncompatibleError` (class): summary=yes, examples=no — Raised when FAISS assets (dimension, factory) are incompatible.
 
 ## Tags
 

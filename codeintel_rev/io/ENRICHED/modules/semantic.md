@@ -14,6 +14,7 @@ the FAISS index, then hydrating results from DuckDB.
 - from **__future__** import annotations
 - from **(absolute)** import asyncio
 - from **collections.abc** import Mapping, Sequence
+- from **contextlib** import nullcontext
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
 - from **time** import perf_counter
@@ -26,6 +27,8 @@ the FAISS index, then hydrating results from DuckDB.
 - from **codeintel_rev.mcp_server.common.observability** import Observation, observe_duration
 - from **codeintel_rev.mcp_server.schemas** import AnswerEnvelope, Finding, MethodInfo, ScopeIn
 - from **codeintel_rev.mcp_server.scope_utils** import get_effective_scope
+- from **codeintel_rev.observability.otel** import as_span
+- from **codeintel_rev.observability.timeline** import Timeline, current_timeline
 - from **codeintel_rev.telemetry.context** import telemetry_metadata
 - from **codeintel_rev.typing** import NDArrayF32
 - from **kgfoundry_common.errors** import EmbeddingError, VectorSearchError
@@ -37,46 +40,49 @@ the FAISS index, then hydrating results from DuckDB.
 
 ## Definitions
 
-- variable: `httpx` (line 41)
-- variable: `np` (line 42)
-- variable: `SNIPPET_PREVIEW_CHARS` (line 44)
-- variable: `COMPONENT_NAME` (line 45)
-- variable: `LOGGER` (line 46)
-- class: `_ScopeFilterFlags` (line 50)
-- class: `_FaissFanout` (line 85)
-- class: `_HybridSearchState` (line 93)
-- class: `_HybridResult` (line 105)
-- class: `_SearchBudget` (line 116)
-- class: `_SemanticSearchPlan` (line 125)
-- class: `_MethodContext` (line 137)
-- class: `_FaissSearchRequest` (line 149)
-- function: `semantic_search` (line 161)
-- function: `_semantic_search_sync` (line 228)
-- function: `_clamp_result_limit` (line 337)
-- function: `_build_search_budget` (line 366)
-- function: `_build_semantic_search_plan` (line 407)
-- function: `_calculate_faiss_fanout` (line 477)
-- function: `_overfetch_bonus` (line 514)
-- function: `_resolve_hybrid_results` (line 545)
-- function: `_build_hybrid_result` (line 646)
-- function: `_embed_query_or_raise` (line 686)
-- function: `_run_faiss_search_or_raise` (line 726)
-- function: `_ensure_hydration_success` (line 763)
-- function: `_warn_scope_filter_reduction` (line 798)
-- function: `_annotate_hybrid_contributions` (line 836)
-- function: `_embed_query` (line 867)
-- function: `_run_faiss_search` (line 891)
-- function: `_normalize_scope_faiss_tuning` (line 940)
-- function: `_hydrate_findings` (line 1005)
-- function: `_build_method` (line 1131)
-- function: `_make_envelope` (line 1168)
-- function: `_success_extras` (line 1221)
-- function: `_build_response_extras` (line 1245)
+- variable: `httpx` (line 44)
+- variable: `np` (line 45)
+- variable: `SNIPPET_PREVIEW_CHARS` (line 47)
+- variable: `COMPONENT_NAME` (line 48)
+- variable: `LOGGER` (line 49)
+- class: `_ScopeFilterFlags` (line 53)
+- class: `_FaissFanout` (line 88)
+- class: `_HybridSearchState` (line 96)
+- class: `_HybridResult` (line 108)
+- class: `_SemanticPipelineResult` (line 119)
+- class: `_SemanticPipelineRequest` (line 130)
+- class: `_SearchBudget` (line 140)
+- class: `_SemanticSearchPlan` (line 149)
+- class: `_MethodContext` (line 161)
+- class: `_FaissSearchRequest` (line 173)
+- function: `semantic_search` (line 185)
+- function: `_semantic_search_sync` (line 252)
+- function: `_execute_semantic_pipeline` (line 348)
+- function: `_clamp_result_limit` (line 413)
+- function: `_build_search_budget` (line 442)
+- function: `_build_semantic_search_plan` (line 483)
+- function: `_calculate_faiss_fanout` (line 553)
+- function: `_overfetch_bonus` (line 590)
+- function: `_resolve_hybrid_results` (line 621)
+- function: `_build_hybrid_result` (line 722)
+- function: `_embed_query_or_raise` (line 762)
+- function: `_run_faiss_search_or_raise` (line 802)
+- function: `_ensure_hydration_success` (line 839)
+- function: `_warn_scope_filter_reduction` (line 874)
+- function: `_annotate_hybrid_contributions` (line 912)
+- function: `_embed_query` (line 943)
+- function: `_run_faiss_search` (line 967)
+- function: `_normalize_scope_faiss_tuning` (line 1016)
+- function: `_hydrate_findings` (line 1081)
+- function: `_build_method` (line 1207)
+- function: `_make_envelope` (line 1244)
+- function: `_success_extras` (line 1297)
+- function: `_build_response_extras` (line 1321)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 12
+- **fan_out**: 14
 - **cycle_group**: 143
 
 ## Ownership
@@ -84,8 +90,8 @@ the FAISS index, then hydrating results from DuckDB.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 37
-- recent churn 90: 37
+- recent churn 30: 38
+- recent churn 90: 38
 
 ## Usage
 
@@ -117,7 +123,7 @@ semantic_search
 
 ## Hotspot
 
-- score: 2.89
+- score: 2.97
 
 ## Side Effects
 
@@ -127,9 +133,9 @@ semantic_search
 
 ## Complexity
 
-- branches: 78
-- cyclomatic: 79
-- loc: 1293
+- branches: 84
+- cyclomatic: 85
+- loc: 1369
 
 ## Doc Coverage
 
@@ -137,12 +143,12 @@ semantic_search
 - `_FaissFanout` (class): summary=yes, examples=no — FAISS fan-out plan produced for a semantic search request.
 - `_HybridSearchState` (class): summary=yes, examples=no — Encapsulate the outputs of FAISS prior to hybrid re-ranking.
 - `_HybridResult` (class): summary=yes, examples=no — Hydration payload returned after hybrid re-ranking.
+- `_SemanticPipelineResult` (class): summary=no, examples=no
+- `_SemanticPipelineRequest` (class): summary=no, examples=no
 - `_SearchBudget` (class): summary=yes, examples=no — Typed representation of the effective limit and metadata.
 - `_SemanticSearchPlan` (class): summary=yes, examples=no — Bundled semantic search parameters derived from scope and settings.
 - `_MethodContext` (class): summary=yes, examples=no — Inputs required to build method metadata.
 - `_FaissSearchRequest` (class): summary=yes, examples=no — Container describing a FAISS search invocation.
-- `semantic_search` (function): summary=yes, params=ok, examples=yes — Perform semantic search using embeddings.
-- `_semantic_search_sync` (function): summary=no, examples=no
 
 ## Tags
 

@@ -7,11 +7,164 @@ import importlib
 import inspect
 from collections.abc import Awaitable, Callable, Iterator, Mapping
 from contextlib import contextmanager, nullcontext
+from dataclasses import dataclass, field
 from time import perf_counter
-from typing import TypeVar, cast
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, TypeVar, cast
 
-from opentelemetry import trace
-from opentelemetry.trace import Span, SpanKind, Status, StatusCode
+try:  # pragma: no cover - optional dependency
+    from opentelemetry import trace
+    from opentelemetry.trace import Span, SpanKind, Status, StatusCode
+except ImportError:  # pragma: no cover - optional dependency
+
+    @dataclass(slots=True, frozen=True)
+    class _NullSpan:
+        """Minimal span stub used when OpenTelemetry is unavailable."""
+
+        attributes: dict[str, object] = field(default_factory=dict)
+
+        def set_attribute(self, key: object, value: object) -> None:
+            """Store an attribute in the span's attribute dictionary.
+
+            This method stores key-value pairs in the span's attributes dictionary,
+            providing a minimal implementation that preserves attribute data even
+            when OpenTelemetry is unavailable.
+
+            Parameters
+            ----------
+            key : object
+                Attribute key (converted to string). Used as the dictionary key
+                for storing the attribute value.
+            value : object
+                Attribute value to store. Can be any object type. Stored in the
+                attributes dictionary for later inspection or debugging.
+
+            Notes
+            -----
+            This is a minimal stub implementation that stores attributes locally
+            instead of sending them to OpenTelemetry. Real span implementations
+            would send attributes to distributed tracing backends.
+            """
+            self.attributes[str(key)] = value
+
+        def record_exception(self, exception: BaseException) -> None:
+            """Record exception information in the span's attributes.
+
+            This method stores the exception type name in the span's attributes
+            dictionary, providing a minimal implementation for exception tracking
+            when OpenTelemetry is unavailable.
+
+            Parameters
+            ----------
+            exception : BaseException
+                Exception instance to record. The exception's type name is stored
+                in the attributes dictionary under the key "last_exception".
+
+            Notes
+            -----
+            This is a minimal stub implementation that stores only the exception
+            type name. Real span implementations would record full exception
+            details (type, message, stack trace) for distributed tracing.
+            """
+            self.attributes["last_exception"] = type(exception).__name__
+
+        def set_status(self, status: object) -> None:
+            """Set the span status in the span's attributes.
+
+            This method stores the status object in the span's attributes dictionary,
+            providing a minimal implementation for status tracking when OpenTelemetry
+            is unavailable.
+
+            Parameters
+            ----------
+            status : object
+                Status object to store. Typically a Status instance with a code
+                attribute (e.g., Status(StatusCode.ERROR)). Stored in the attributes
+                dictionary under the key "status".
+
+            Notes
+            -----
+            This is a minimal stub implementation that stores the status locally.
+            Real span implementations would set the span status in OpenTelemetry,
+            marking spans as OK, ERROR, etc. for trace visualization.
+            """
+            self.attributes["status"] = status
+
+    class _SpanContext:
+        def __enter__(self) -> _NullSpan:
+            return _NullSpan()
+
+        def __exit__(self, *_exc: object) -> bool:
+            return False
+
+    class _NoopTracer:
+        def __init__(self) -> None:
+            self._spans_created = 0
+
+        def start_as_current_span(self, *_args: object, **_kwargs: object) -> _SpanContext:
+            """Create a no-op span context manager.
+
+            This method is part of the no-op tracer implementation used when
+            OpenTelemetry is unavailable. It accepts any arguments but returns
+            a null span context that does nothing, allowing code to use span
+            context managers without checking for tracer availability.
+
+            Parameters
+            ----------
+            *_args : object
+                Variable positional arguments (ignored). In real OpenTelemetry
+                tracers, this would include span name and other configuration.
+            **_kwargs : object
+                Variable keyword arguments (ignored). In real OpenTelemetry
+                tracers, this would include span kind, attributes, etc.
+
+            Returns
+            -------
+            _SpanContext
+                A null span context manager that does nothing. The context
+                manager can be used in `with` statements but has no effect.
+                The internal span counter is incremented for debugging purposes.
+
+            Notes
+            -----
+            This is a stub implementation that provides API compatibility
+            without requiring OpenTelemetry to be installed. Real tracer
+            implementations would create and return active OpenTelemetry spans
+            that record timing and attributes.
+            """
+            self._spans_created += 1
+            return _SpanContext()
+
+    class _SpanKindEnum:
+        INTERNAL = object()
+        SERVER = object()
+        CLIENT = object()
+        PRODUCER = object()
+        CONSUMER = object()
+
+    class _StatusCodeEnum:
+        ERROR = "ERROR"
+
+    @dataclass(slots=True, frozen=True)
+    class _StatusStub:
+        code: object
+
+    trace = SimpleNamespace(get_tracer=lambda *_args, **_kwargs: _NoopTracer())  # type: ignore[assignment]
+    Span = _NullSpan  # type: ignore[assignment]
+    SpanKind = _SpanKindEnum  # type: ignore[assignment]
+    Status = _StatusStub  # type: ignore[assignment]
+    StatusCode = _StatusCodeEnum  # type: ignore[assignment]
+
+if TYPE_CHECKING:
+    from opentelemetry.trace import Span as SpanType
+    from opentelemetry.trace import SpanKind as SpanKindType
+    from opentelemetry.trace import Status as StatusType
+    from opentelemetry.trace import StatusCode as StatusCodeType
+else:  # pragma: no cover - annotations only
+    SpanType = Span
+    SpanKindType = SpanKind
+    StatusType = Status
+    StatusCodeType = StatusCode
 
 from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.telemetry.context import attach_context_attrs, set_request_stage
@@ -19,12 +172,12 @@ from codeintel_rev.telemetry.prom import record_stage_latency
 
 F = TypeVar("F", bound=Callable[..., object])
 
-_SPAN_KINDS: dict[str, SpanKind] = {
-    "internal": SpanKind.INTERNAL,
-    "server": SpanKind.SERVER,
-    "client": SpanKind.CLIENT,
-    "producer": SpanKind.PRODUCER,
-    "consumer": SpanKind.CONSUMER,
+_SPAN_KINDS: dict[str, SpanKindType] = {
+    "internal": cast("SpanKindType", SpanKind.INTERNAL),
+    "server": cast("SpanKindType", SpanKind.SERVER),
+    "client": cast("SpanKindType", SpanKind.CLIENT),
+    "producer": cast("SpanKindType", SpanKind.PRODUCER),
+    "consumer": cast("SpanKindType", SpanKind.CONSUMER),
 }
 
 TRACER = trace.get_tracer("codeintel_rev.telemetry")
@@ -33,6 +186,38 @@ TRACER = trace.get_tracer("codeintel_rev.telemetry")
 def _emit_checkpoint(
     stage: str | None, *, ok: bool, reason: str | None, attrs: Mapping[str, object]
 ) -> None:
+    """Emit a checkpoint event for telemetry reporting.
+
+    This internal helper emits checkpoint events to the telemetry reporter
+    module. Checkpoints are used to track stage-level status (success/failure)
+    and reasons for state changes. The function gracefully handles cases where
+    the reporter module is unavailable.
+
+    Parameters
+    ----------
+    stage : str | None
+        Stage identifier for the checkpoint. When None, no checkpoint is
+        emitted. Used to identify which stage the checkpoint belongs to
+        (e.g., "search.faiss", "search.bm25").
+    ok : bool
+        Boolean flag indicating checkpoint status. True indicates success,
+        False indicates failure or error condition.
+    reason : str | None, optional
+        Optional reason string explaining the checkpoint status. Included
+        in the checkpoint payload when provided. Used to provide context
+        for success or failure conditions.
+    attrs : Mapping[str, object]
+        Additional attributes to include in the checkpoint payload. These
+        attributes are merged with the checkpoint metadata and included
+        in the telemetry event.
+
+    Notes
+    -----
+    This function imports the reporter module dynamically to avoid circular
+    dependencies. If the import fails or the reporter is unavailable, the
+    function silently returns without emitting a checkpoint. This ensures
+    that telemetry failures don't break application functionality.
+    """
     if stage is None:
         return
     payload = dict(attrs)
@@ -45,7 +230,31 @@ def _emit_checkpoint(
         return
 
 
-def _set_span_attributes(span: Span, attrs: Mapping[str, object]) -> None:
+def _set_span_attributes(span: SpanType, attrs: Mapping[str, object]) -> None:
+    """Set attributes on an OpenTelemetry span from a mapping.
+
+    This helper function sets span attributes from a dictionary, converting
+    values to appropriate types for OpenTelemetry. Only primitive types
+    (bool, int, float, str) are set directly; None values are converted to
+    the string "null"; other types are converted to strings.
+
+    Parameters
+    ----------
+    span : SpanType
+        OpenTelemetry span to set attributes on. The span must be active
+        and writable. Can be either a real OpenTelemetry Span or a _NullSpan
+        stub when OpenTelemetry is unavailable.
+    attrs : Mapping[str, object]
+        Dictionary of attribute key-value pairs to set on the span. Keys
+        are attribute names (strings), values are converted to appropriate
+        types (primitives preserved, None -> "null", others -> str).
+
+    Notes
+    -----
+    OpenTelemetry spans only accept primitive types (bool, int, float, str)
+    as attribute values. This function handles type conversion automatically,
+    ensuring all attributes are set correctly regardless of input types.
+    """
     for key, value in attrs.items():
         if isinstance(value, (bool, int, float, str)):
             span.set_attribute(key, value)
@@ -62,12 +271,57 @@ def _span_scope(
     kind: str,
     base_attrs: Mapping[str, object],
     stage: str | None,
-) -> Iterator[tuple[Span, dict[str, object]]]:
+) -> Iterator[tuple[SpanType, dict[str, object]]]:
+    """Create a context manager for OpenTelemetry span and timeline step coordination.
+
+    This internal helper creates a coordinated context for both OpenTelemetry
+    span tracing and timeline step recording. It ensures that spans and steps
+    are created together, attributes are synchronized, and stage context is
+    properly managed.
+
+    Parameters
+    ----------
+    name : str
+        Name for both the OpenTelemetry span and timeline step. Used to
+        identify the operation in both tracing systems.
+    kind : str
+        Span kind identifier (e.g., "internal", "server", "client"). Used
+        to determine the OpenTelemetry SpanKind. Must be a key in
+        _SPAN_KINDS mapping or defaults to INTERNAL.
+    base_attrs : Mapping[str, object]
+        Base attributes to attach to both the span and step. These attributes
+        are enriched with context attributes (request ID, session ID, etc.)
+        before being applied.
+    stage : str | None, optional
+        Optional stage identifier for request stage tracking. When provided,
+        sets the request stage context variable for the duration of the scope.
+        Used to track which stage of request processing is active.
+
+    Yields
+    ------
+    tuple[SpanType, dict[str, object]]
+        Tuple containing:
+        - The active OpenTelemetry span (for setting attributes, recording
+          exceptions, etc.). Can be either a real OpenTelemetry Span or a
+          _NullSpan stub when OpenTelemetry is unavailable.
+        - The enriched telemetry attributes dictionary (for use in timeline
+          steps or additional span attributes)
+
+    Notes
+    -----
+    This function coordinates two observability systems: OpenTelemetry spans
+    (for distributed tracing) and timeline steps (for session-level event
+    tracking). Both are created together and share the same attributes and
+    lifecycle. The stage parameter enables request-level stage tracking for
+    multi-stage operations (e.g., search stages).
+    """
     telemetry_attrs = attach_context_attrs(base_attrs)
     timeline = current_timeline()
     stage_token = set_request_stage(stage) if stage else None
     step_cm = timeline.step(name, **telemetry_attrs) if timeline is not None else nullcontext()
-    span_kind = _SPAN_KINDS.get(kind, SpanKind.INTERNAL)
+    span_kind = _SPAN_KINDS.get(kind)
+    if span_kind is None:
+        span_kind = cast("SpanKindType", SpanKind.INTERNAL)
     with TRACER.start_as_current_span(name, kind=span_kind) as span:
         _set_span_attributes(span, telemetry_attrs)
         try:
@@ -78,9 +332,37 @@ def _span_scope(
                 stage_token.var.reset(stage_token)
 
 
-def _record_exception(span: Span, exc: BaseException) -> None:
+def _record_exception(span: SpanType, exc: BaseException) -> None:
+    """Record an exception on an OpenTelemetry span and mark it as an error.
+
+    This helper function records an exception on a span and sets the span
+    status to ERROR. Used to ensure exceptions are properly captured in
+    distributed traces.
+
+    Parameters
+    ----------
+    span : SpanType
+        OpenTelemetry span to record the exception on. The span must be
+        active and writable. Can be either a real OpenTelemetry Span or a
+        _NullSpan stub when OpenTelemetry is unavailable.
+    exc : BaseException
+        Exception instance to record. The exception's type, message, and
+        stack trace are captured in the span.
+
+    Notes
+    -----
+    This function both records the exception details (type, message, stack)
+    and sets the span status to ERROR, ensuring that error conditions are
+    clearly visible in trace visualizations. Used by error handling code
+    in decorators and context managers.
+    """
     span.record_exception(exc)
-    span.set_status(Status(StatusCode.ERROR))
+    status_cls = cast("type[StatusType]", Status)
+    status_code = cast("StatusCodeType", StatusCode)
+    try:
+        span.set_status(status_cls(status_code.ERROR))
+    except TypeError:  # pragma: no cover - fallback for stub implementations
+        span.set_status(status_code.ERROR)
 
 
 @contextmanager
@@ -91,7 +373,7 @@ def span_context(
     attrs: Mapping[str, object] | None = None,
     stage: str | None = None,
     emit_checkpoint: bool = False,
-) -> Iterator[tuple[Span, dict[str, object]]]:
+) -> Iterator[tuple[SpanType, dict[str, object]]]:
     """Create a span/timeline scope for the wrapped block.
 
     This context manager creates an OpenTelemetry span and timeline step for
@@ -124,10 +406,11 @@ def span_context(
 
     Yields
     ------
-    tuple[Span, dict[str, object]]
+    tuple[SpanType, dict[str, object]]
         Tuple containing:
-        - Span: The active OpenTelemetry span for adding custom attributes or
-          recording events
+        - SpanType: The active OpenTelemetry span for adding custom attributes or
+          recording events. Can be either a real OpenTelemetry Span or a _NullSpan
+          stub when OpenTelemetry is unavailable.
         - dict[str, object]: Merged attribute dictionary combining provided attrs
           with context attributes (request ID, stage, etc.)
 

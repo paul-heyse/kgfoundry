@@ -39,16 +39,16 @@ chunk retrieval and joins.
 - variable: `np` (line 43)
 - variable: `LOGGER` (line 45)
 - function: `_log_extra` (line 48)
-- class: `_ScopeFilterSpec` (line 117)
-- class: `StructureAnnotations` (line 134)
-- class: `DuckDBCatalogOptions` (line 144)
-- class: `_DuckDBQueryMixin` (line 153)
-- class: `_LegacyOptions` (line 404)
-- class: `DuckDBCatalog` (line 411)
+- class: `_ScopeFilterSpec` (line 122)
+- class: `StructureAnnotations` (line 139)
+- class: `DuckDBCatalogOptions` (line 149)
+- class: `_DuckDBQueryMixin` (line 158)
+- class: `_LegacyOptions` (line 413)
+- class: `DuckDBCatalog` (line 420)
 
 ## Graph Metrics
 
-- **fan_in**: 8
+- **fan_in**: 9
 - **fan_out**: 8
 - **cycle_group**: 69
 
@@ -57,8 +57,8 @@ chunk retrieval and joins.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 36
-- recent churn 90: 36
+- recent churn 30: 37
+- recent churn 90: 37
 
 ## Usage
 
@@ -90,7 +90,7 @@ DuckDBCatalog, StructureAnnotations
 
 ## Hotspot
 
-- score: 3.16
+- score: 3.19
 
 ## Side Effects
 
@@ -99,9 +99,9 @@ DuckDBCatalog, StructureAnnotations
 
 ## Complexity
 
-- branches: 139
-- cyclomatic: 140
-- loc: 1650
+- branches: 141
+- cyclomatic: 142
+- loc: 1705
 
 ## Doc Coverage
 

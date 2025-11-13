@@ -10,27 +10,31 @@ Thread-safe DuckDB connection manager.
 
 - from **__future__** import annotations
 - from **collections.abc** import Iterator, Sequence
-- from **contextlib** import contextmanager, suppress
+- from **contextlib** import contextmanager, nullcontext, suppress
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
 - from **queue** import Empty, Full, LifoQueue
 - from **threading** import Lock
+- from **time** import perf_counter
 - from **typing** import TYPE_CHECKING, cast
 - from **codeintel_rev._lazy_imports** import LazyModule
+- from **codeintel_rev.observability.otel** import as_span, record_span_event
+- from **codeintel_rev.observability.timeline** import current_timeline
 - from **(absolute)** import duckdb
 
 ## Definitions
 
-- variable: `duckdb` (line 18)
-- class: `DuckDBConfig` (line 24)
-- class: `DuckDBManager` (line 52)
-- class: `DuckDBQueryOptions` (line 172)
-- class: `DuckDBQueryBuilder` (line 187)
+- variable: `duckdb` (line 21)
+- class: `DuckDBConfig` (line 27)
+- class: `_InstrumentedDuckDBConnection` (line 55)
+- class: `DuckDBManager` (line 153)
+- class: `DuckDBQueryOptions` (line 275)
+- class: `DuckDBQueryBuilder` (line 290)
 
 ## Graph Metrics
 
 - **fan_in**: 10
-- **fan_out**: 2
+- **fan_out**: 4
 - **cycle_group**: 42
 
 ## Ownership
@@ -71,7 +75,7 @@ DuckDBConfig, DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 
 ## Hotspot
 
-- score: 2.75
+- score: 2.83
 
 ## Side Effects
 
@@ -80,13 +84,14 @@ DuckDBConfig, DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 
 ## Complexity
 
-- branches: 48
-- cyclomatic: 49
-- loc: 379
+- branches: 53
+- cyclomatic: 54
+- loc: 482
 
 ## Doc Coverage
 
 - `DuckDBConfig` (class): summary=yes, examples=no — Configuration parameters controlling DuckDB connections.
+- `_InstrumentedDuckDBConnection` (class): summary=yes, examples=no — Proxy connection that instruments DuckDB execute calls.
 - `DuckDBManager` (class): summary=yes, examples=no — Factory for DuckDB connections with consistent pragmas.
 - `DuckDBQueryOptions` (class): summary=yes, examples=no — Options controlling DuckDB query generation.
 - `DuckDBQueryBuilder` (class): summary=yes, examples=no — Helper for building parameterized DuckDB queries with scope filters.

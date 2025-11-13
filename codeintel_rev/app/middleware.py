@@ -60,6 +60,7 @@ from starlette.types import ASGIApp
 
 from codeintel_rev.observability.timeline import bind_timeline, new_timeline
 from codeintel_rev.runtime.request_context import capability_stamp_var, session_id_var
+from codeintel_rev.telemetry.context import telemetry_context
 from codeintel_rev.telemetry.reporter import start_run
 from kgfoundry_common.logging import get_logger
 
@@ -240,6 +241,12 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
         request.state.session_id = session_id
         timeline = new_timeline(session_id)
         request.state.timeline = timeline
+        timeline.set_metadata(
+            kind="http",
+            path=str(request.url.path),
+            method=request.method,
+            started_at=time.time(),
+        )
 
         capability_stamp = getattr(request.app.state, "capability_stamp", None)
         start_run(
@@ -254,7 +261,15 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
         session_token = session_id_var.set(session_id)
         capability_token = capability_stamp_var.set(capability_stamp)
         try:
-            with bind_timeline(timeline):
+            with (
+                bind_timeline(timeline),
+                telemetry_context(
+                    session_id=session_id,
+                    run_id=timeline.run_id,
+                    capability_stamp=capability_stamp,
+                    tool_name=None,
+                ),
+            ):
                 return await call_next(request)
         finally:
             session_id_var.reset(session_token)

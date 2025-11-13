@@ -1,0 +1,152 @@
+{
+  "schema": "codeintel.telemetry/run-report@v0",
+  "kind": "cli",
+  "session": {
+    "session_id": "session-13a2348f",
+    "started_at": "2025-11-13T18:54:32.376289+00:00",
+    "repo_root": "/home/paul/kgfoundry/codeintel_rev",
+    "commit": "2b7f3a1",
+    "branch": "main"
+  },
+  "environment": {
+    "python_version": "3.11.9",
+    "gpu": {
+      "cuda": false,
+      "torch": false,
+      "faiss_gpu": false
+    },
+    "config": {
+      "duckdb_path": "data/catalog.duckdb",
+      "faiss_index": "data/faiss/index.flat",
+      "scip_index": "data/index.scip.json",
+      "xtr_dir": "data/xtr",
+      "warp_index_dir": "data/warp"
+    }
+  },
+  "timeline": [
+    {
+      "span_id": "span-0a33acfc",
+      "name": "cli.run_all",
+      "status": "OK",
+      "started_at": "2025-11-13T18:54:32.376305+00:00",
+      "duration_ms": 5723,
+      "attrs": {
+        "mode": "full",
+        "entry_file": "bin/index_all.py"
+      },
+      "children": [
+        {
+          "span_id": "span-08b56f15",
+          "name": "probe.readiness",
+          "status": "OK",
+          "duration_ms": 216,
+          "attrs": {
+            "faiss_index_found": true,
+            "duckdb_found": true,
+            "scip_found": true,
+            "vllm_reachable": true
+          }
+        },
+        {
+          "span_id": "span-44d8ba16",
+          "name": "load.scip_index",
+          "status": "OK",
+          "duration_ms": 412,
+          "attrs": {
+            "documents": 324,
+            "path": "data/index.scip.json"
+          }
+        },
+        {
+          "span_id": "span-fb04dd18",
+          "name": "enrich.collect_type_signals",
+          "status": "OK",
+          "duration_ms": 689,
+          "attrs": {
+            "modules_processed": 198,
+            "signals": 4287
+          }
+        },
+        {
+          "span_id": "span-2ffd77af",
+          "name": "enrich.collect_coverage",
+          "status": "WARN",
+          "duration_ms": 77,
+          "attrs": {
+            "tests_detected": 0,
+            "reason": "no coverage files"
+          },
+          "warnings": [
+            {
+              "code": "coverage-missing",
+              "message": "No coverage artifacts found; skipped coverage mapping",
+              "suggested_action": "Run test suite with coverage to populate artifacts"
+            }
+          ]
+        },
+        {
+          "span_id": "span-de1436e4",
+          "name": "graph.import_graph",
+          "status": "OK",
+          "duration_ms": 972,
+          "attrs": {
+            "nodes": 198,
+            "edges": 741,
+            "cycles_detected": 3
+          }
+        },
+        {
+          "span_id": "span-eb7bd552",
+          "name": "graph.use_graph",
+          "status": "OK",
+          "duration_ms": 1105,
+          "attrs": {
+            "nodes": 118,
+            "edges": 290
+          }
+        },
+        {
+          "span_id": "span-40146ca4",
+          "name": "write.artifacts",
+          "status": "OK",
+          "duration_ms": 1282,
+          "attrs": {
+            "parquet_rows": 7581,
+            "out_dir": "artifacts/2025-11-13/2b7f3a1",
+            "files_written": [
+              "modules.parquet",
+              "symbols.parquet",
+              "import_graph.parquet",
+              "use_graph.parquet",
+              "summary.json"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "warnings": [
+    {
+      "code": "splade-disabled",
+      "message": "SPLADE channel not configured; hybrid search will omit sparse learned features",
+      "severity": "info"
+    }
+  ],
+  "counters": {
+    "files_scanned": 1243,
+    "python_modules": 198,
+    "symbols_indexed": 14876,
+    "errors": 0
+  },
+  "artifacts": {
+    "base_dir": "artifacts/2025-11-13/2b7f3a1",
+    "paths": [
+      "modules.parquet",
+      "symbols.parquet",
+      "import_graph.parquet",
+      "use_graph.parquet",
+      "summary.json"
+    ]
+  },
+  "ended_at": "2025-11-13T18:54:32.376439+00:00"
+}

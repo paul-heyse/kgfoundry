@@ -41,7 +41,7 @@ In-memory run report builder fed by timeline events.
 
 ## Graph Metrics
 
-- **fan_in**: 4
+- **fan_in**: 5
 - **fan_out**: 6
 - **cycle_group**: 71
 
@@ -50,8 +50,8 @@ In-memory run report builder fed by timeline events.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 3
-- recent churn 90: 3
+- recent churn 30: 4
+- recent churn 90: 4
 
 ## Usage
 
@@ -83,7 +83,7 @@ RUN_REPORT_STORE, RunReport, RunReportStore, build_report, emit_checkpoint, fina
 
 ## Hotspot
 
-- score: 2.76
+- score: 2.80
 
 ## Side Effects
 

@@ -29,7 +29,7 @@ Tree-sitter outline helpers used for enrichment artifacts.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 19
+- **cycle_group**: 17
 
 ## Ownership
 

@@ -79,6 +79,11 @@ _catalog_view_bootstrap_seconds = build_histogram(
     "codeintel_duckdb_view_bootstrap_seconds",
     "Time spent ensuring DuckDB catalog views are installed",
 )
+_hydration_duration_seconds = build_histogram(
+    "codeintel_duckdb_hydration_seconds",
+    "Time to hydrate chunks or embeddings by id",
+    labelnames=("op",),
+)
 
 _EMPTY_CHUNKS_SELECT = """
 SELECT
@@ -201,6 +206,7 @@ class _DuckDBQueryMixin:
             ORDER BY ids.position
             """
         params = [list(ids)]
+        perf_start = perf_counter()
         with span_context(
             "catalog.hydrate",
             stage="catalog.hydrate",
@@ -226,6 +232,9 @@ class _DuckDBQueryMixin:
                     "duration_ms": duration_ms,
                 },
             )
+        _hydration_duration_seconds.labels(op="chunks_by_ids").observe(
+            max(perf_counter() - perf_start, 0.0)
+        )
         return payload
 
     def get_structure_annotations(self, ids: Sequence[int]) -> dict[int, StructureAnnotations]:
@@ -431,10 +440,12 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         Configuration options dataclass containing materialize, manager, log_queries,
         and repo_root settings. When None, uses default options. Cannot be mixed
         with legacy_kwargs. Defaults to None.
-    **legacy_kwargs : object
+    **legacy_kwargs : Unpack[_LegacyOptions]
         Legacy keyword arguments for backward compatibility. Supported keys:
-        materialize (bool), manager (DuckDBManager), log_queries (bool), repo_root (Path).
-        Cannot be used when options is provided. Raises TypeError for unknown keys.
+        materialize (bool), manager (DuckDBManager | None), log_queries (bool),
+        repo_root (Path). Cannot be used when options is provided. Raises TypeError
+        for unknown keys. The type is Unpack[_LegacyOptions] where _LegacyOptions
+        is a TypedDict defining the allowed keyword arguments.
 
     Raises
     ------
@@ -724,8 +735,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             CREATE OR REPLACE VIEW v_faiss_join AS
             SELECT
                 c.*,
-                f.faiss_row,
-                f.source AS faiss_source
+                f.faiss_row
             FROM chunks AS c
             LEFT JOIN faiss_idmap AS f
               ON f.external_id = c.id
@@ -739,10 +749,9 @@ class DuckDBCatalog(_DuckDBQueryMixin):
     ) -> None:
         path = override_path or self._idmap_path
         if path.exists():
-            sql = "SELECT * FROM read_parquet(?)"
             params = [str(path)]
-            self._log_query(sql, params)
-            relation = conn.sql(sql, params=params)
+            self._log_query("SELECT faiss_row, external_id FROM read_parquet(?)", params)
+            relation = conn.sql("SELECT faiss_row, external_id FROM read_parquet(?)", params=params)
             relation.create_view("faiss_idmap", replace=True)
             LOGGER.info(
                 "Configured DuckDB view",
@@ -756,8 +765,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
                 CREATE OR REPLACE VIEW faiss_idmap AS
                 SELECT
                     faiss_row,
-                    external_id,
-                    COALESCE(source, 'materialized') AS source
+                    external_id
                 FROM faiss_idmap_mat
                 """
             )
@@ -772,8 +780,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             CREATE OR REPLACE VIEW faiss_idmap AS
             SELECT
                 CAST(NULL AS BIGINT) AS faiss_row,
-                CAST(NULL AS BIGINT) AS external_id,
-                CAST(NULL AS TEXT)  AS source
+                CAST(NULL AS BIGINT) AS external_id
             WHERE 1 = 0
             """
         )
@@ -802,6 +809,37 @@ class DuckDBCatalog(_DuckDBQueryMixin):
     def set_idmap_path(self, path: Path) -> None:
         """Override the FAISS id map path used for view installation."""
         self._idmap_path = path.resolve()
+
+    def register_idmap_parquet(self, path: Path, *, materialize: bool = False) -> dict[str, Any]:
+        """Register a FAISS id map Parquet file and refresh views/materialized joins.
+
+        Parameters
+        ----------
+        path : Path
+            Path to the Parquet file containing the FAISS ID map. The path is
+            expanded (resolving ~) and resolved to an absolute path before use.
+        materialize : bool, optional
+            If True, materializes the FAISS join table instead of creating views
+            (default: False). Materialization improves query performance but
+            requires more storage and must be refreshed when the ID map changes.
+
+        Returns
+        -------
+        dict[str, Any]
+            Statistics dictionary from refresh_faiss_idmap_mat_if_changed(),
+            containing information about the materialized table refresh operation
+            (e.g., row counts, refresh status). The dictionary includes keys
+            such as "rows", "checksum", and "refreshed" indicating the state
+            of the materialized table.
+        """
+        resolved = path.expanduser().resolve()
+        self.set_idmap_path(resolved)
+        stats = self.refresh_faiss_idmap_mat_if_changed(resolved)
+        if materialize:
+            self.materialize_faiss_join()
+        else:
+            self.ensure_faiss_idmap_views(resolved)
+        return stats
 
     def ensure_pool_views(self, pool_path: Path) -> None:
         """Expose the latest evaluator pool and coverage join as DuckDB views."""
@@ -957,17 +995,30 @@ class DuckDBCatalog(_DuckDBQueryMixin):
                 return {"refreshed": False, "checksum": checksum, "rows": rows}
 
             conn.execute("DELETE FROM faiss_idmap_mat")
-            conn.execute(
-                """
-                INSERT INTO faiss_idmap_mat (faiss_row, external_id, source)
-                SELECT
-                    faiss_row,
-                    external_id,
-                    COALESCE(source, 'parquet') AS source
-                FROM read_parquet(?)
-                """,
-                [str(idmap_parquet)],
-            )
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO faiss_idmap_mat (faiss_row, external_id, source)
+                    SELECT
+                        faiss_row,
+                        external_id,
+                        COALESCE(source, 'parquet') AS source
+                    FROM read_parquet(?)
+                    """,
+                    [str(idmap_parquet)],
+                )
+            except duckdb.Error:
+                conn.execute(
+                    """
+                    INSERT INTO faiss_idmap_mat (faiss_row, external_id, source)
+                    SELECT
+                        faiss_row,
+                        external_id,
+                        'parquet' AS source
+                    FROM read_parquet(?)
+                    """,
+                    [str(idmap_parquet)],
+                )
             count_row = conn.execute("SELECT COUNT(*) FROM faiss_idmap_mat").fetchone()
             row_count = int(count_row[0]) if count_row and count_row[0] is not None else 0
             conn.execute(
@@ -1555,6 +1606,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             return [], np.empty((0, dim), dtype=np.float32)
 
         attrs = {"requested": len(requested_ids)}
+        perf_start = perf_counter()
         timeline = current_timeline()
         with (
             span_context(
@@ -1605,6 +1657,9 @@ class DuckDBCatalog(_DuckDBQueryMixin):
                 "duckdb",
                 attrs={"requested": len(requested_ids), "returned": len(ordered_ids)},
             )
+        _hydration_duration_seconds.labels(op="embeddings_by_ids").observe(
+            max(perf_counter() - perf_start, 0.0)
+        )
         return ordered_ids, vectors
 
     def count_chunks(self) -> int:

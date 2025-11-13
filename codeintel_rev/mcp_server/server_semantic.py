@@ -39,10 +39,35 @@ async def deep_research_search(
 ) -> SearchStructuredContent:
     """Deep-Research compatible semantic search that returns chunk ids.
 
+    This async function provides a Deep-Research compatible search interface that
+    executes semantic search using FAISS and returns ranked chunk identifiers with
+    metadata. The function constructs MCP tool arguments, creates a timeline for
+    observability, and delegates to the deep_research adapter for execution.
+
+    Parameters
+    ----------
+    query : str
+        Search query text. Used to perform semantic similarity search over the
+        indexed codebase. The query is embedded and searched against FAISS vectors.
+    top_k : int | None, optional
+        Maximum number of results to return (default: None). When None, uses the
+        default top_k value (12). The value is clamped to the range [1, 50] before
+        execution. Higher values return more results but increase latency.
+    filters : SearchFilterPayload | None, optional
+        Optional search filters for narrowing results by language, file paths,
+        or symbols (default: None). When None, no filtering is applied. Filters
+        are normalized and applied during post-search hydration.
+    rerank : bool, optional
+        Whether to enable exact reranking of candidates (default: True). When True,
+        candidates are reranked using exact similarity scores. When False, uses
+        approximate search results only.
+
     Returns
     -------
     SearchStructuredContent
-        Structured MCP payload with ranked chunk identifiers and metadata.
+        Structured MCP payload with ranked chunk identifiers and metadata. Contains
+        SearchResultItem objects with id, title, url, snippet, score, source, and
+        metadata fields. Results are ranked by relevance score.
     """
     context = get_context()
     args: SearchToolArgs = {"query": query}
@@ -73,10 +98,28 @@ async def deep_research_fetch(
 ) -> FetchStructuredContent:
     """Hydrate chunk ids produced by :func:`deep_research_search`.
 
+    This async function retrieves full chunk content and metadata for chunk IDs
+    returned from a previous search operation. The function constructs MCP tool
+    arguments, creates a timeline for observability, and delegates to the deep_research
+    adapter for execution.
+
+    Parameters
+    ----------
+    objectIds : list[str]
+        List of chunk ID strings to hydrate. IDs are normalized to integers and
+        queried from the DuckDB catalog. Missing chunks are omitted from results.
+        Must be non-empty for meaningful results.
+    max_tokens : int | None, optional
+        Maximum token limit for chunk content (default: None). When None, uses the
+        default max_tokens value (4000). The value is clamped to the range [256, 16000]
+        before execution. Used to limit response size and control token usage.
+
     Returns
     -------
     FetchStructuredContent
         Structured MCP payload containing chunk contents and provenance metadata.
+        Contains FetchObject objects with id, title, url, content, and metadata
+        fields. Chunks are returned in the order specified by objectIds.
     """
     context = get_context()
     args: FetchToolArgs = {"objectIds": objectIds}

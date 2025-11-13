@@ -10,27 +10,27 @@ Adapters that expose MCP Deep-Research search/fetch semantics.
 
 - from **__future__** import annotations
 - from **(absolute)** import asyncio
-- from **collections.abc** import Sequence
+- from **collections.abc** import Mapping, Sequence
 - from **pathlib** import Path
 - from **typing** import cast
 - from **codeintel_rev.app.config_context** import ApplicationContext
-- from **codeintel_rev.mcp_server.schemas** import FetchStructuredContent, FetchToolArgs, SearchFilterPayload, SearchStructuredContent, SearchToolArgs
+- from **codeintel_rev.mcp_server.schemas** import FetchObject, FetchObjectMetadata, FetchStructuredContent, FetchToolArgs, SearchResultItem, SearchResultMetadata, SearchStructuredContent, SearchToolArgs
 - from **codeintel_rev.observability.timeline** import Timeline
-- from **codeintel_rev.retrieval.mcp_search** import FetchDependencies, FetchResponse, FetchRequest, SearchDependencies, SearchFilters, SearchRequest, SearchResponse, run_fetch, run_search
+- from **codeintel_rev.retrieval.mcp_search** import FetchDependencies, FetchRequest, FetchResponse, SearchDependencies, SearchFilters, SearchRequest, SearchResponse, run_fetch, run_search
 - from **kgfoundry_common.errors** import VectorSearchError
 - from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 33)
-- function: `_pool_dir` (line 37)
-- function: `_clamp_top_k` (line 41)
-- function: `_clamp_max_tokens` (line 46)
-- function: `_serialize_search_response` (line 51)
-- function: `_serialize_fetch_response` (line 75)
-- function: `search` (line 92)
-- function: `fetch` (line 132)
-- function: `_normalize_object_ids` (line 158)
+- variable: `LOGGER` (line 36)
+- function: `_pool_dir` (line 40)
+- function: `_clamp_top_k` (line 44)
+- function: `_clamp_max_tokens` (line 49)
+- function: `_serialize_search_response` (line 54)
+- function: `_serialize_fetch_response` (line 100)
+- function: `search` (line 135)
+- function: `fetch` (line 212)
+- function: `_normalize_object_ids` (line 265)
 
 ## Graph Metrics
 
@@ -40,9 +40,11 @@ Adapters that expose MCP Deep-Research search/fetch semantics.
 
 ## Ownership
 
-- bus factor: 0.00
-- recent churn 30: 0
-- recent churn 90: 0
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 1
+- recent churn 90: 1
 
 ## Usage
 
@@ -57,7 +59,7 @@ fetch, search
 
 - **summary**: Adapters that expose MCP Deep-Research search/fetch semantics.
 - has summary: yes
-- param parity: no
+- param parity: yes
 - examples present: no
 
 ## Typedness
@@ -74,7 +76,7 @@ fetch, search
 
 ## Hotspot
 
-- score: 1.92
+- score: 1.95
 
 ## Side Effects
 
@@ -83,20 +85,20 @@ fetch, search
 
 ## Complexity
 
-- branches: 7
-- cyclomatic: 8
-- loc: 165
+- branches: 8
+- cyclomatic: 9
+- loc: 295
 
 ## Doc Coverage
 
 - `_pool_dir` (function): summary=no, examples=no
 - `_clamp_top_k` (function): summary=no, examples=no
 - `_clamp_max_tokens` (function): summary=no, examples=no
-- `_serialize_search_response` (function): summary=yes, params=mismatch, examples=no — Convert an internal search response into MCP structured content.
-- `_serialize_fetch_response` (function): summary=yes, params=mismatch, examples=no — Convert an internal fetch response into MCP structured content.
-- `search` (function): summary=yes, params=mismatch, examples=no — Execute the Deep-Research search pipeline.
-- `fetch` (function): summary=yes, params=mismatch, examples=no — Hydrate chunk ids returned from the MCP search tool.
-- `_normalize_object_ids` (function): summary=yes, params=mismatch, examples=no — Normalize object identifiers while preserving ordering.
+- `_serialize_search_response` (function): summary=yes, params=ok, examples=no — Convert an internal search response into MCP structured content.
+- `_serialize_fetch_response` (function): summary=yes, params=ok, examples=no — Convert an internal fetch response into MCP structured content.
+- `search` (function): summary=yes, params=ok, examples=no — Execute the Deep-Research search pipeline.
+- `fetch` (function): summary=yes, params=ok, examples=no — Hydrate chunk ids returned from the MCP search tool.
+- `_normalize_object_ids` (function): summary=yes, params=ok, examples=no — Normalize object identifiers while preserving ordering.
 
 ## Tags
 

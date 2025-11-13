@@ -10,9 +10,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from codeintel_rev.eval.pool_writer import Channel, PoolRow, write_pool
+from codeintel_rev.eval.pool_writer import Channel, write_pool
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, StructureAnnotations
 from codeintel_rev.io.faiss_manager import FAISSManager
+from codeintel_rev.retrieval.types import SearchPoolRow
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -57,7 +58,7 @@ class EvalReport:
 class _EvalState:
     fetch_k: int
     search_k: int
-    pool_rows: list[PoolRow]
+    pool_rows: list[SearchPoolRow]
     xtr_index: XTRIndex | None
     ann_hits: int = 0
     oracle_matches: int = 0
@@ -160,7 +161,7 @@ class HybridPoolEvaluator:
         self,
         queries: Sequence[tuple[int, np.ndarray]],
         config: EvalConfig,
-    ) -> tuple[list[PoolRow], int, int, int]:
+    ) -> tuple[list[SearchPoolRow], int, int, int]:
         state = self._build_eval_state(config)
 
         for query_id, raw_vec in queries:
@@ -263,7 +264,7 @@ class HybridPoolEvaluator:
 
     def _extend_pool(
         self,
-        pool: list[PoolRow],
+        pool: list[SearchPoolRow],
         *,
         query_id: str,
         channel: Channel,
@@ -274,17 +275,20 @@ class HybridPoolEvaluator:
         for rank_idx, (chunk_id, score) in enumerate(zip(ids, scores, strict=True), start=1):
             chunk_key = int(chunk_id)
             info = self._structure_cache.get(chunk_key)
+            meta = {
+                "uri": info.uri if info else "",
+                "symbol_hits": list(info.symbol_hits) if info else [],
+                "ast_node_kinds": list(info.ast_node_kinds) if info else [],
+                "cst_matches": list(info.cst_matches) if info else [],
+            }
             pool.append(
-                PoolRow(
+                SearchPoolRow(
                     query_id=query_id,
                     channel=channel,
                     rank=rank_idx,
-                    chunk_id=chunk_key,
+                    id=chunk_key,
                     score=float(score),
-                    uri=info.uri if info else "",
-                    symbol_hits=info.symbol_hits if info else (),
-                    ast_node_kinds=info.ast_node_kinds if info else (),
-                    cst_matches=info.cst_matches if info else (),
+                    meta=meta,
                 )
             )
 

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from dataclasses import dataclass
+import json
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from types import ModuleType
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Literal, Protocol, cast, runtime_checkable
+
+from codeintel_rev.retrieval.types import SearchPoolRow
 
 if TYPE_CHECKING:
     import pyarrow as pa
@@ -24,22 +26,37 @@ else:  # pragma: no cover - dependency optional at import time
         pa = cast("ModuleType", _pyarrow)
         pq = cast("ModuleType", _pyarrow_parquet)
 
-Channel = Literal["faiss", "bm25", "splade", "ann", "oracle", "xtr"]
+Channel = Literal[
+    "faiss",
+    "faiss_refine",
+    "bm25",
+    "splade",
+    "ann",
+    "oracle",
+    "xtr",
+    "xtr_oracle",
+]
 
 
-@dataclass(frozen=True)
-class PoolRow:
-    """Single evaluator pool row."""
+@runtime_checkable
+class _SupportsToList(Protocol):
+    """Protocol describing array-like objects exposing ``tolist``."""
 
-    query_id: str
-    channel: Channel
-    rank: int
-    chunk_id: int
-    score: float
-    uri: str
-    symbol_hits: tuple[str, ...] = ()
-    ast_node_kinds: tuple[str, ...] = ()
-    cst_matches: tuple[str, ...] = ()
+    def tolist(self) -> object:
+        """Convert the array-like object to a Python list.
+
+        This method is part of the Protocol interface for array-like objects
+        that can be converted to lists. Implementations should return a nested
+        list structure representing the array's contents.
+
+        Returns
+        -------
+        object
+            A Python list (or nested list structure) representing the array's
+            contents. The exact structure depends on the array's dimensionality
+            and element types.
+        """
+        ...
 
 
 def _empty_table() -> pa.Table:
@@ -61,35 +78,67 @@ def _empty_table() -> pa.Table:
     return pa.Table.from_arrays(
         [
             pa.array([], type=pa.string()),
-            pa.array([], type=pa.dictionary(pa.int32(), pa.string())),
+            pa.array([], type=pa.string()),
             pa.array([], type=pa.int32()),
             pa.array([], type=pa.int64()),
             pa.array([], type=pa.float32()),
-            pa.array([], type=pa.list_(pa.string())),
-            pa.array([], type=pa.list_(pa.string())),
-            pa.array([], type=pa.list_(pa.string())),
             pa.array([], type=pa.string()),
         ],
         names=[
             "query_id",
             "channel",
             "rank",
-            "chunk_id",
+            "id",
             "score",
-            "symbol_hits",
-            "ast_node_kinds",
-            "cst_matches",
-            "uri",
+            "meta",
         ],
     )
 
 
-def write_pool(rows: Iterable[PoolRow], out_path: Path, *, overwrite: bool = True) -> int:
+def _normalize_meta(meta: Mapping[str, object]) -> dict[str, object]:
+    """Return a JSON-serialisable copy of ``meta``.
+
+    Parameters
+    ----------
+    meta : Mapping[str, object]
+        Metadata dictionary to normalize. Values are coerced to JSON-serializable
+        types (str, int, float, bool, None, dict, list). Non-serializable types
+        are converted to strings.
+
+    Returns
+    -------
+    dict[str, object]
+        Normalized metadata ready for JSON serialization. All values are
+        JSON-serializable types.
+    """
+
+    def _coerce(value: object) -> object:
+        if value is None:
+            result: object = None
+        elif isinstance(value, (str, int, float, bool)):
+            result = value
+        elif isinstance(value, Mapping):
+            result = {str(key): _coerce(val) for key, val in value.items()}
+        elif isinstance(value, (list, tuple, set)):
+            result = [_coerce(item) for item in value]
+        elif isinstance(value, _SupportsToList):
+            try:
+                result = value.tolist()
+            except (ValueError, TypeError, RuntimeError):  # pragma: no cover - best effort
+                result = str(value)
+        else:
+            result = str(value)
+        return result
+
+    return {str(key): _coerce(val) for key, val in meta.items()}
+
+
+def write_pool(rows: Iterable[SearchPoolRow], out_path: Path, *, overwrite: bool = True) -> int:
     """Write `(query_id, channel, rank, chunk_id, score, uri, ...)` rows to Parquet.
 
     Parameters
     ----------
-    rows : Iterable[PoolRow]
+    rows : Iterable[SearchPoolRow]
         Pool rows to persist.
     out_path : Path
         Destination Parquet file.
@@ -119,41 +168,30 @@ def write_pool(rows: Iterable[PoolRow], out_path: Path, *, overwrite: bool = Tru
         pq.write_table(_empty_table(), out_path, compression="zstd")
         return 0
 
+    meta_payloads = [
+        json.dumps(_normalize_meta(row.meta), sort_keys=True) if row.meta else "{}"
+        for row in materialized
+    ]
     table = pa.Table.from_arrays(
         [
             pa.array([row.query_id for row in materialized], type=pa.string()),
-            pa.array([row.channel for row in materialized]),
+            pa.array([row.channel for row in materialized], type=pa.string()),
             pa.array([int(row.rank) for row in materialized], type=pa.int32()),
-            pa.array([int(row.chunk_id) for row in materialized], type=pa.int64()),
+            pa.array([int(row.id) for row in materialized], type=pa.int64()),
             pa.array([float(row.score) for row in materialized], type=pa.float32()),
-            pa.array(
-                [list(row.symbol_hits) for row in materialized],
-                type=pa.list_(pa.string()),
-            ),
-            pa.array(
-                [list(row.ast_node_kinds) for row in materialized],
-                type=pa.list_(pa.string()),
-            ),
-            pa.array(
-                [list(row.cst_matches) for row in materialized],
-                type=pa.list_(pa.string()),
-            ),
-            pa.array([row.uri for row in materialized], type=pa.string()),
+            pa.array(meta_payloads, type=pa.string()),
         ],
         names=[
             "query_id",
             "channel",
             "rank",
-            "chunk_id",
+            "id",
             "score",
-            "symbol_hits",
-            "ast_node_kinds",
-            "cst_matches",
-            "uri",
+            "meta",
         ],
     )
     pq.write_table(table, out_path, compression="zstd", use_dictionary=True)
     return len(materialized)
 
 
-__all__ = ["PoolRow", "write_pool"]
+__all__ = ["Channel", "SearchPoolRow", "write_pool"]

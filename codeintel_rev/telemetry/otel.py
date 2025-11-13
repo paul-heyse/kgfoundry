@@ -15,15 +15,65 @@ LOGGER = get_logger(__name__)
 
 
 class _TraceAPI(Protocol):
-    def set_tracer_provider(self, provider: object) -> None: ...
+    def set_tracer_provider(self, provider: object) -> None:
+        """Set the global tracer provider for OpenTelemetry tracing.
+
+        Parameters
+        ----------
+        provider : object
+            The TracerProvider instance to set as the global provider. This
+            provider will be used for all subsequent trace operations in the
+            application. The provider manages span processors and resource
+            configuration.
+
+        Notes
+        -----
+        This method sets the global tracer provider for the OpenTelemetry
+        trace API. Once set, all trace operations will use this provider.
+        """
+        ...
 
 
 class _MetricsAPI(Protocol):
-    def set_meter_provider(self, provider: object) -> None: ...
+    def set_meter_provider(self, provider: object) -> None:
+        """Set the global meter provider for OpenTelemetry metrics.
+
+        Parameters
+        ----------
+        provider : object
+            The MeterProvider instance to set as the global provider. This
+            provider will be used for all subsequent metric operations in the
+            application. The provider manages metric readers and resource
+            configuration.
+
+        Notes
+        -----
+        This method sets the global meter provider for the OpenTelemetry
+        metrics API. Once set, all metric operations will use this provider.
+        """
+        ...
 
 
 class _TracerProviderInstance(Protocol):
-    def add_span_processor(self, processor: object) -> None: ...
+    def add_span_processor(self, processor: object) -> None:
+        """Add a span processor to the tracer provider.
+
+        Parameters
+        ----------
+        processor : object
+            The SpanProcessor instance to add. Span processors handle span
+            export, batching, and processing. Common processors include
+            BatchSpanProcessor for batching spans before export and
+            SimpleSpanProcessor for immediate export.
+
+        Notes
+        -----
+        Span processors are responsible for processing completed spans,
+        including exporting them to backends (e.g., OTLP, console) and
+        applying batching or sampling policies. Multiple processors can be
+        added to a single provider.
+        """
+        ...
 
 
 class _TracerProviderFactory(Protocol):
@@ -36,7 +86,32 @@ class _Factory(Protocol):
 
 class _ResourceFactory(Protocol):
     @classmethod
-    def create(cls, attributes: dict[str, object]) -> object: ...
+    def create(cls, attributes: dict[str, object]) -> object:
+        """Create an OpenTelemetry Resource from attributes.
+
+        Parameters
+        ----------
+        attributes : dict[str, object]
+            Dictionary of resource attributes (key-value pairs) describing
+            the service, deployment, or process. Common attributes include
+            "service.name", "service.version", "deployment.environment", etc.
+            These attributes are attached to all spans and metrics produced
+            by the application.
+
+        Returns
+        -------
+        object
+            OpenTelemetry Resource instance containing the provided attributes.
+            The Resource identifies the service/process in distributed tracing
+            and metrics, allowing backends to filter and group telemetry data.
+
+        Notes
+        -----
+        Resources are immutable and describe the entity producing telemetry
+        (service, process, container, etc.). All spans and metrics produced
+        by the application will include these resource attributes.
+        """
+        ...
 
 
 def _optional_import(module: str) -> ModuleType | None:

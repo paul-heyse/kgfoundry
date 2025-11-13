@@ -9,11 +9,12 @@ Lightweight Parquet writer for evaluator pools.
 ## Imports
 
 - from **__future__** import annotations
-- from **collections.abc** import Iterable
-- from **dataclasses** import dataclass
+- from **(absolute)** import json
+- from **collections.abc** import Iterable, Mapping
 - from **pathlib** import Path
 - from **types** import ModuleType
-- from **typing** import TYPE_CHECKING, Literal, cast
+- from **typing** import TYPE_CHECKING, Literal, Protocol, cast, runtime_checkable
+- from **codeintel_rev.retrieval.types** import SearchPoolRow
 - from **(absolute)** import pyarrow
 - from **(absolute)** import pyarrow.parquet
 - from **(absolute)** import pyarrow
@@ -21,30 +22,31 @@ Lightweight Parquet writer for evaluator pools.
 
 ## Definitions
 
-- variable: `pa` (line 15)
-- variable: `pq` (line 16)
-- variable: `pa` (line 21)
-- variable: `pq` (line 22)
-- variable: `pa` (line 24)
-- variable: `pq` (line 25)
-- variable: `Channel` (line 27)
-- class: `PoolRow` (line 31)
-- function: `_empty_table` (line 45)
-- function: `write_pool` (line 87)
+- variable: `pa` (line 17)
+- variable: `pq` (line 18)
+- variable: `pa` (line 23)
+- variable: `pq` (line 24)
+- variable: `pa` (line 26)
+- variable: `pq` (line 27)
+- variable: `Channel` (line 29)
+- class: `_SupportsToList` (line 42)
+- function: `_empty_table` (line 48)
+- function: `_normalize_meta` (line 84)
+- function: `write_pool` (line 122)
 
 ## Graph Metrics
 
 - **fan_in**: 3
-- **fan_out**: 1
-- **cycle_group**: 87
+- **fan_out**: 2
+- **cycle_group**: 88
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 
@@ -53,7 +55,7 @@ Lightweight Parquet writer for evaluator pools.
 
 ## Declared Exports (__all__)
 
-PoolRow, write_pool
+Channel, SearchPoolRow, write_pool
 
 ## Doc Health
 
@@ -76,7 +78,7 @@ PoolRow, write_pool
 
 ## Hotspot
 
-- score: 1.88
+- score: 2.11
 
 ## Side Effects
 
@@ -84,14 +86,15 @@ PoolRow, write_pool
 
 ## Complexity
 
-- branches: 8
-- cyclomatic: 9
-- loc: 160
+- branches: 15
+- cyclomatic: 16
+- loc: 184
 
 ## Doc Coverage
 
-- `PoolRow` (class): summary=yes, examples=no — Single evaluator pool row.
+- `_SupportsToList` (class): summary=yes, examples=no — Protocol describing array-like objects exposing ``tolist``.
 - `_empty_table` (function): summary=yes, params=ok, examples=no — Return an empty evaluator table with the expected schema.
+- `_normalize_meta` (function): summary=yes, params=ok, examples=no — Return a JSON-serialisable copy of ``meta``.
 - `write_pool` (function): summary=yes, params=ok, examples=no — Write `(query_id, channel, rank, chunk_id, score, uri, ...)` rows to Parquet.
 
 ## Tags

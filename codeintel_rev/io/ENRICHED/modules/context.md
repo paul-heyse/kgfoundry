@@ -35,17 +35,17 @@ Context variable helpers for telemetry metadata.
 
 ## Graph Metrics
 
-- **fan_in**: 8
+- **fan_in**: 9
 - **fan_out**: 2
-- **cycle_group**: 47
+- **cycle_group**: 45
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 
@@ -77,7 +77,7 @@ attach_context_attrs, capability_stamp_var, current_run_id, current_session, cur
 
 ## Hotspot
 
-- score: 2.30
+- score: 2.33
 
 ## Side Effects
 

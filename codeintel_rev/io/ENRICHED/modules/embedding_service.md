@@ -51,15 +51,15 @@ Embedding provider abstractions for chunk ingestion and runtime services.
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 93
+- **cycle_group**: 94
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 

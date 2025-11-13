@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from contextlib import AbstractContextManager
 from pathlib import Path
+from typing import cast
 
 import duckdb
 import pytest
@@ -20,7 +22,10 @@ def test_duckdb_manager_configures_pragmas(tmp_path: Path) -> None:
         tmp_path / "catalog.duckdb", DuckDBConfig(threads=2, enable_object_cache=True)
     )
 
-    with manager.connection() as conn:
+    with cast(
+        "AbstractContextManager[duckdb.DuckDBPyConnection]",
+        manager.connection(),
+    ) as conn:
         threads_row = conn.execute("SELECT current_setting('threads')").fetchone()
         assert threads_row is not None
         assert int(threads_row[0]) == 2
@@ -35,7 +40,10 @@ def test_duckdb_manager_closes_connections(tmp_path: Path) -> None:
     manager = DuckDBManager(tmp_path / "catalog.duckdb")
 
     connection: duckdb.DuckDBPyConnection
-    with manager.connection() as connection:
+    with cast(
+        "AbstractContextManager[duckdb.DuckDBPyConnection]",
+        manager.connection(),
+    ) as connection:
         assert connection.execute("SELECT 1").fetchone() == (1,)
 
     with pytest.raises(duckdb.Error):
@@ -131,7 +139,10 @@ def test_connection_pool_reuses_connections(
     manager = DuckDBManager(db_path, DuckDBConfig(pool_size=2))
 
     for _ in range(10):
-        with manager.connection() as connection:
+        with cast(
+            "AbstractContextManager[duckdb.DuckDBPyConnection]",
+            manager.connection(),
+        ) as connection:
             assert connection.execute("SELECT value FROM numbers").fetchone() == (1,)
 
     manager.close()

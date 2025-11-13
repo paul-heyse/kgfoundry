@@ -10,6 +10,7 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 
 - from **__future__** import annotations
 - from **collections.abc** import Mapping, Sequence
+- from **contextlib** import nullcontext
 - from **dataclasses** import dataclass
 - from **importlib** import import_module
 - from **pathlib** import Path
@@ -34,18 +35,19 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 
 ## Definitions
 
-- variable: `LOGGER` (line 41)
-- class: `_LuceneHit` (line 44)
-- class: `_LuceneSearcher` (line 49)
-- class: `BM25Rm3Config` (line 64)
-- class: `BM25SearchProvider` (line 73)
-- class: `SpladeSearchProvider` (line 163)
-- class: `HybridSearchTuning` (line 311)
-- class: `HybridSearchOptions` (line 319)
-- class: `_MethodStats` (line 328)
-- class: `_FusionContext` (line 337)
-- class: `_FusionWork` (line 351)
-- class: `HybridSearchEngine` (line 365)
+- variable: `LOGGER` (line 42)
+- class: `_LuceneHit` (line 45)
+- class: `_LuceneSearcher` (line 50)
+- class: `BM25Rm3Config` (line 65)
+- class: `BM25SearchProvider` (line 74)
+- class: `SpladeSearchProvider` (line 164)
+- class: `HybridSearchTuning` (line 312)
+- class: `HybridSearchOptions` (line 320)
+- class: `_MethodStats` (line 329)
+- class: `_FusionContext` (line 338)
+- class: `_SearchTelemetryContext` (line 352)
+- class: `_FusionWork` (line 358)
+- class: `HybridSearchEngine` (line 372)
 
 ## Graph Metrics
 
@@ -58,8 +60,8 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 17
-- recent churn 90: 17
+- recent churn 30: 18
+- recent churn 90: 18
 
 ## Usage
 
@@ -91,7 +93,7 @@ BM25SearchProvider, ChannelHit, HybridResultDoc, HybridSearchEngine, HybridSearc
 
 ## Hotspot
 
-- score: 3.20
+- score: 3.23
 
 ## Side Effects
 
@@ -99,9 +101,9 @@ BM25SearchProvider, ChannelHit, HybridResultDoc, HybridSearchEngine, HybridSearc
 
 ## Complexity
 
-- branches: 111
-- cyclomatic: 112
-- loc: 1106
+- branches: 124
+- cyclomatic: 125
+- loc: 1241
 
 ## Doc Coverage
 
@@ -114,7 +116,7 @@ BM25SearchProvider, ChannelHit, HybridResultDoc, HybridSearchEngine, HybridSearc
 - `HybridSearchOptions` (class): summary=yes, examples=no — Optional knobs influencing hybrid fusion.
 - `_MethodStats` (class): summary=no, examples=no
 - `_FusionContext` (class): summary=yes, examples=no — All inputs required to fuse dense and sparse channel runs.
-- `_FusionWork` (class): summary=yes, examples=no — Resolved fusion parameters after pooler/weights are selected.
+- `_SearchTelemetryContext` (class): summary=no, examples=no
 
 ## Tags
 

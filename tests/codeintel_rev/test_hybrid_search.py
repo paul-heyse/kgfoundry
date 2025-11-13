@@ -13,6 +13,7 @@ from codeintel_rev.io.hybrid_search import (
 )
 from codeintel_rev.plugins.channels import Channel
 from codeintel_rev.plugins.registry import ChannelRegistry
+from msgspec import structs
 
 
 class _StubChannel(Channel):
@@ -37,19 +38,17 @@ class _StubChannel(Channel):
 
 
 def _build_engine(
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path,
+    _monkeypatch: pytest.MonkeyPatch,
+    _tmp_path,
     *,
     channels: Sequence[_StubChannel] | None = None,
     capabilities: Capabilities | None = None,
+    index_overrides: dict[str, object] | None = None,
 ) -> HybridSearchEngine:
-    monkeypatch.setenv("HYBRID_ENABLE_BM25", "1")
-    monkeypatch.setenv("HYBRID_ENABLE_SPLADE", "1")
-    monkeypatch.setenv("BM25_INDEX_DIR", str(tmp_path / "bm25"))
-    monkeypatch.setenv("SPLADE_INDEX_DIR", str(tmp_path / "splade"))
-    monkeypatch.setenv("SPLADE_MODEL_DIR", str(tmp_path / "splade-model"))
-    monkeypatch.setenv("SPLADE_ONNX_DIR", str(tmp_path / "splade-onnx"))
     settings = load_settings()
+    if index_overrides:
+        index_cfg = structs.replace(settings.index, **index_overrides)
+        settings = structs.replace(settings, index=index_cfg)
     paths = resolve_application_paths(settings)
     registry = ChannelRegistry.from_channels(channels or [])
     return HybridSearchEngine(
@@ -107,23 +106,14 @@ def test_hybrid_search_engine_rrf_fuses_channels(monkeypatch: pytest.MonkeyPatch
 def test_hybrid_search_engine_respects_channel_flags(
     monkeypatch: pytest.MonkeyPatch, tmp_path
 ) -> None:
-    monkeypatch.setenv("HYBRID_ENABLE_BM25", "0")
-    monkeypatch.setenv("HYBRID_ENABLE_SPLADE", "0")
-    monkeypatch.setenv("BM25_INDEX_DIR", str(tmp_path / "bm25"))
-    monkeypatch.setenv("SPLADE_INDEX_DIR", str(tmp_path / "splade"))
-    monkeypatch.setenv("SPLADE_MODEL_DIR", str(tmp_path / "splade-model"))
-    monkeypatch.setenv("SPLADE_ONNX_DIR", str(tmp_path / "splade-onnx"))
-
-    settings = load_settings()
-    paths = resolve_application_paths(settings)
     bm25_stub = _StubChannel("bm25", [], requires=frozenset({"warp_index_present"}))
     splade_stub = _StubChannel("splade", [], requires=frozenset({"lucene_importable"}))
-    registry = ChannelRegistry.from_channels([bm25_stub, splade_stub])
-    engine = HybridSearchEngine(
-        settings,
-        paths,
+    engine = _build_engine(
+        monkeypatch,
+        tmp_path,
+        channels=[bm25_stub, splade_stub],
         capabilities=Capabilities(warp_index_present=True, lucene_importable=True),
-        registry=registry,
+        index_overrides={"enable_bm25_channel": False, "enable_splade_channel": False},
     )
 
     result = engine.search(
@@ -142,16 +132,13 @@ def test_hybrid_search_engine_respects_channel_flags(
 def test_hybrid_search_engine_accepts_extra_channels(
     monkeypatch: pytest.MonkeyPatch, tmp_path
 ) -> None:
-    monkeypatch.setenv("HYBRID_ENABLE_BM25", "0")
-    monkeypatch.setenv("HYBRID_ENABLE_SPLADE", "0")
-    monkeypatch.setenv("BM25_INDEX_DIR", str(tmp_path / "bm25"))
-    monkeypatch.setenv("SPLADE_INDEX_DIR", str(tmp_path / "splade"))
-    monkeypatch.setenv("SPLADE_MODEL_DIR", str(tmp_path / "splade-model"))
-    monkeypatch.setenv("SPLADE_ONNX_DIR", str(tmp_path / "splade-onnx"))
-    settings = load_settings()
-    paths = resolve_application_paths(settings)
-    registry = ChannelRegistry.from_channels([])
-    engine = HybridSearchEngine(settings, paths, capabilities=Capabilities(), registry=registry)
+    engine = _build_engine(
+        monkeypatch,
+        tmp_path,
+        channels=[],
+        capabilities=Capabilities(),
+        index_overrides={"enable_bm25_channel": False, "enable_splade_channel": False},
+    )
 
     result = engine.search(
         "query",
@@ -184,3 +171,24 @@ def test_hybrid_channel_skips_missing_capability(monkeypatch: pytest.MonkeyPatch
 
     assert result.channels == ["semantic"]
     assert splade_stub.calls == 0
+
+
+def test_hybrid_search_exposes_stage_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    engine = _build_engine(
+        monkeypatch,
+        tmp_path,
+        channels=[_StubChannel("bm25", [ChannelHit("1", 1.2)])],
+    )
+    result = engine.search("query", semantic_hits=[(1, 0.5)], limit=1)
+    assert result.method is not None
+    stages = result.method.get("stages")
+    assert stages, "expected stage metadata in method payload"
+    assert isinstance(stages, list)
+    stage_dicts: list[dict[str, object]] = [stage for stage in stages if isinstance(stage, dict)]
+    stage_names: set[str] = set()
+    for stage in stage_dicts:
+        name = stage.get("name")
+        if isinstance(name, str):
+            stage_names.add(name)
+    assert "search.faiss" in stage_names
+    assert any(name.startswith("fusion.") for name in stage_names)

@@ -2,10 +2,10 @@
   "root": "/home/paul/kgfoundry/codeintel_rev",
   "repo_root": "/home/paul/kgfoundry",
   "module_count": 162,
-  "symbol_edge_count": 12517,
+  "symbol_edge_count": 12894,
   "coverage_records": 162,
-  "config_files": 190,
-  "generated_at": "2025-11-13T18:31:49+00:00",
+  "config_files": 195,
+  "generated_at": "2025-11-13T20:32:41+00:00",
   "tags": {
     "low-coverage": [
       "risk_hotspots.py",
@@ -272,6 +272,7 @@
       "telemetry/__init__.py",
       "io/splade_manager.py",
       "io/__init__.py",
+      "retrieval/types.py",
       "retrieval/mcp_search.py",
       "mcp_server/schemas.py"
     ],

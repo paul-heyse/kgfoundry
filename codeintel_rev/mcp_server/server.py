@@ -19,6 +19,7 @@ from codeintel_rev.mcp_server.adapters import text_search as text_search_adapter
 from codeintel_rev.mcp_server.error_handling import handle_adapter_errors
 from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.mcp_server.telemetry import tool_operation_scope
+from codeintel_rev.observability.reporting import latest_run_report
 
 # Create FastMCP instance
 mcp = FastMCP("CodeIntel MCP")
@@ -303,6 +304,31 @@ async def file_history(
         limit=limit,
     ):
         return await history_adapter.file_history(context, path, limit)
+
+
+@mcp.tool(name="report:latest_run")
+def report_latest_run() -> dict[str, object]:
+    """Return metadata about the most recent run report artifact.
+
+    Returns
+    -------
+    dict[str, object]
+        Dictionary containing report metadata. When a report is available,
+        includes keys: "available" (True), "run_id", "session_id", "markdown_path",
+        "json_path", and "summary". When no report is available, returns
+        {"available": False}.
+    """
+    report = latest_run_report()
+    if report is None:
+        return {"available": False}
+    return {
+        "available": True,
+        "run_id": report["run_id"],
+        "session_id": report["session_id"],
+        "markdown_path": str(report["markdown"]),
+        "json_path": str(report["json"]),
+        "summary": report["summary"],
+    }
 
 
 # ==================== Resources ====================

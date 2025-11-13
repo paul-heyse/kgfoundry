@@ -8,12 +8,15 @@ from contextlib import contextmanager
 
 from codeintel_rev.app.middleware import get_capability_stamp, get_session_id
 from codeintel_rev.observability.otel import as_span, record_span_event
+from codeintel_rev.observability.reporting import render_run_report
 from codeintel_rev.observability.timeline import Timeline, current_or_new_timeline
 from codeintel_rev.telemetry.context import telemetry_context
 from codeintel_rev.telemetry.prom import observe_request_latency
 from codeintel_rev.telemetry.reporter import finalize_run, start_run
+from kgfoundry_common.logging import get_logger
 
 __all__ = ["tool_operation_scope"]
+LOGGER = get_logger(__name__)
 
 
 @contextmanager
@@ -66,23 +69,27 @@ def tool_operation_scope(
     except RuntimeError:
         session_id = None
     capability_stamp = get_capability_stamp()
-    operation_attrs = dict(attrs)
+    operation_attrs: dict[str, object] = dict(attrs)
     if session_id is not None:
         operation_attrs.setdefault("session_id", session_id)
     if capability_stamp is not None:
         operation_attrs.setdefault("capability_stamp", capability_stamp)
     timeline = current_or_new_timeline(session_id=session_id)
+    operation_attrs.setdefault("run_id", timeline.run_id)
     start_run(
         timeline.session_id,
         timeline.run_id,
         tool_name=tool_name,
         capability_stamp=capability_stamp,
     )
-    span_attrs = {
+    span_attrs: dict[str, object] = {
         "tool": tool_name,
         "session_id": timeline.session_id,
         "run_id": timeline.run_id,
     }
+    for key, value in attrs.items():
+        span_attrs.setdefault(key, value)
+    operation_name = f"mcp.tool:{tool_name}"
     with telemetry_context(
         session_id=timeline.session_id,
         run_id=timeline.run_id,
@@ -90,9 +97,9 @@ def tool_operation_scope(
         tool_name=tool_name,
     ):
         timing_start = time.perf_counter()
-        with as_span(f"mcp.tool.{tool_name}", **span_attrs):
+        with as_span(f"mcp.tool:{tool_name}", **span_attrs):
             try:
-                with timeline.operation(f"mcp.tool.{tool_name}", **operation_attrs):
+                with timeline.operation(operation_name, **operation_attrs):
                     yield timeline
             except BaseException as exc:
                 record_span_event(
@@ -107,6 +114,7 @@ def tool_operation_scope(
                     stop_reason=f"{type(exc).__name__}: {exc}",
                     finished_at=time.time(),
                 )
+                _maybe_render_report(timeline)
                 observe_request_latency(tool_name, time.perf_counter() - timing_start, "error")
                 raise
             else:
@@ -122,4 +130,14 @@ def tool_operation_scope(
                     status="complete",
                     finished_at=time.time(),
                 )
+                _maybe_render_report(timeline)
                 observe_request_latency(tool_name, duration, "complete")
+
+
+def _maybe_render_report(timeline: Timeline) -> None:
+    if not timeline.sampled:
+        return
+    try:
+        render_run_report(timeline)
+    except (OSError, RuntimeError, ValueError) as exc:  # pragma: no cover - best-effort reporting
+        LOGGER.debug("Failed to render run report", exc_info=exc)

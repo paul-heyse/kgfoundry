@@ -23,27 +23,29 @@ Implements full MCP tool catalog for code intelligence.
 - from **codeintel_rev.mcp_server.error_handling** import handle_adapter_errors
 - from **codeintel_rev.mcp_server.schemas** import ScopeIn
 - from **codeintel_rev.mcp_server.telemetry** import tool_operation_scope
+- from **codeintel_rev.observability.reporting** import latest_run_report
 
 ## Definitions
 
-- variable: `mcp` (line 24)
-- variable: `app_context` (line 29)
-- function: `get_context` (line 34)
-- function: `set_scope` (line 62)
-- function: `list_paths` (line 85)
-- function: `open_file` (line 138)
-- function: `search_text` (line 179)
-- function: `blame_range` (line 237)
-- function: `file_history` (line 277)
-- function: `file_resource` (line 312)
-- function: `prompt_code_review` (line 336)
-- function: `build_http_app` (line 352)
+- variable: `mcp` (line 25)
+- variable: `app_context` (line 30)
+- function: `get_context` (line 35)
+- function: `set_scope` (line 63)
+- function: `list_paths` (line 86)
+- function: `open_file` (line 139)
+- function: `search_text` (line 180)
+- function: `blame_range` (line 238)
+- function: `file_history` (line 278)
+- function: `report_latest_run` (line 310)
+- function: `file_resource` (line 338)
+- function: `prompt_code_review` (line 362)
+- function: `build_http_app` (line 378)
 
 ## Graph Metrics
 
 - **fan_in**: 3
-- **fan_out**: 6
-- **cycle_group**: 79
+- **fan_out**: 7
+- **cycle_group**: 82
 
 ## Ownership
 
@@ -83,7 +85,7 @@ app_context, build_http_app, get_context, mcp
 
 ## Hotspot
 
-- score: 2.30
+- score: 2.36
 
 ## Side Effects
 
@@ -91,9 +93,9 @@ app_context, build_http_app, get_context, mcp
 
 ## Complexity
 
-- branches: 14
-- cyclomatic: 15
-- loc: 391
+- branches: 15
+- cyclomatic: 16
+- loc: 417
 
 ## Doc Coverage
 
@@ -104,9 +106,9 @@ app_context, build_http_app, get_context, mcp
 - `search_text` (function): summary=yes, params=ok, examples=no — Fast text search (ripgrep-like).
 - `blame_range` (function): summary=yes, params=ok, examples=no — Git blame for line range (async).
 - `file_history` (function): summary=yes, params=ok, examples=no — Get file commit history (async).
+- `report_latest_run` (function): summary=yes, params=ok, examples=no — Return metadata about the most recent run report artifact.
 - `file_resource` (function): summary=yes, params=ok, examples=no — Serve file content as resource.
 - `prompt_code_review` (function): summary=yes, params=ok, examples=no — Code review prompt template.
-- `build_http_app` (function): summary=yes, params=ok, examples=no — Return the FastMCP ASGI app with capability-gated tool registration.
 
 ## Tags
 

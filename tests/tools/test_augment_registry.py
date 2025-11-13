@@ -3,8 +3,22 @@ from __future__ import annotations
 import importlib
 from pathlib import Path
 from textwrap import dedent
+from typing import Protocol, TypeGuard
 
 import pytest
+
+
+class _ProblemCarrier(Protocol):
+    problem: dict[str, object]
+
+
+PROBLEM_ATTR = "problem"
+
+
+def _has_problem_details(exc: BaseException) -> TypeGuard[_ProblemCarrier]:
+    problem = getattr(exc, PROBLEM_ATTR, None)
+    return isinstance(problem, dict)
+
 
 facade = importlib.import_module("tools._shared.augment_registry")
 
@@ -72,6 +86,7 @@ def test_load_tooling_metadata_missing_augment(tmp_path: Path) -> None:
             registry_path=registry_path,
         )
 
+    assert _has_problem_details(excinfo.value)
     problem = excinfo.value.problem
     assert problem["status"] == 404
     assert problem["type"] == "https://kgfoundry.dev/problems/augment-registry"
@@ -89,9 +104,12 @@ def test_load_tooling_metadata_invalid_registry(tmp_path: Path) -> None:
             registry_path=registry_path,
         )
 
+    assert _has_problem_details(excinfo.value)
     problem = excinfo.value.problem
     assert problem["status"] == 422
-    assert "interfaces" in problem["detail"]
+    detail = problem.get("detail")
+    assert isinstance(detail, str)
+    assert "interfaces" in detail
 
 
 def test_render_problem_details(tmp_path: Path) -> None:

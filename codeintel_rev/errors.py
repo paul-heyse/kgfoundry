@@ -32,6 +32,8 @@ Raising Git operation error:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
 from kgfoundry_common.errors import ErrorCode, KgFoundryError
 
 # ==================== File Operation Errors ====================
@@ -369,6 +371,72 @@ class RuntimeUnavailableError(KgFoundryError):
             code=ErrorCode.RESOURCE_UNAVAILABLE,
             http_status=503,
             context=context,
+            cause=cause,
+        )
+
+
+class VectorIndexStateError(KgFoundryError):
+    """Raised when a FAISS index is missing or not ready."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        context: Mapping[str, object] | None = None,
+        cause: Exception | None = None,
+    ) -> None:
+        payload: dict[str, object] = {"component": "faiss_manager", "runtime": "faiss"}
+        if context:
+            payload.update(context)
+        super().__init__(
+            message,
+            code=ErrorCode.RUNTIME_ERROR,
+            http_status=500,
+            context=payload,
+            cause=cause,
+        )
+
+
+class VectorIndexIncompatibleError(KgFoundryError):
+    """Raised when FAISS assets (dimension, factory) are incompatible."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        context: Mapping[str, object] | None = None,
+        cause: Exception | None = None,
+    ) -> None:
+        payload: dict[str, object] = {"component": "faiss_manager"}
+        if context:
+            payload.update(context)
+        super().__init__(
+            message,
+            code=ErrorCode.INVALID_PARAMETER,
+            http_status=400,
+            context=payload,
+            cause=cause,
+        )
+
+
+class CatalogJoinError(KgFoundryError):
+    """Raised when DuckDB catalog joins or idmap materialization fails."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        context: Mapping[str, object] | None = None,
+        cause: Exception | None = None,
+    ) -> None:
+        payload: dict[str, object] = {"component": "duckdb_catalog"}
+        if context:
+            payload.update(context)
+        super().__init__(
+            message,
+            code=ErrorCode.RUNTIME_ERROR,
+            http_status=500,
+            context=payload,
             cause=cause,
         )
 

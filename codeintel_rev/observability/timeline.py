@@ -12,7 +12,7 @@ import time
 import uuid
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager, contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from importlib import import_module
 from pathlib import Path
 from types import TracebackType
@@ -239,6 +239,8 @@ class Timeline:
     session_id: str
     run_id: str
     sampled: bool = True
+    _events: list[dict[str, object]] = field(default_factory=list, init=False, repr=False)
+    _metadata: dict[str, object] = field(default_factory=dict, init=False, repr=False)
 
     def event(
         self,
@@ -264,6 +266,7 @@ class Timeline:
             record["message"] = message
         if attrs:
             record["attrs"] = _scrub_attrs(attrs)
+        self._events.append(record)
         _FlightRecorder.write(record)
         payload_fn = _get_record_payload_fn()
         if payload_fn is not None:
@@ -348,6 +351,28 @@ class Timeline:
         complexity: O(1) for scope creation, O(1) for event emission.
         """
         return _TimelineScope(self, "step", name, attrs)
+
+    def snapshot(self) -> list[dict[str, object]]:
+        """Return a shallow copy of the recorded events.
+
+        Returns
+        -------
+        list[dict[str, object]]
+            Shallow copy of the events list. Each event is a dictionary
+            containing event metadata (name, timestamp, attributes, etc.).
+            Modifications to the returned list do not affect the internal
+            event storage.
+        """
+        return list(self._events)
+
+    @property
+    def metadata(self) -> dict[str, object]:
+        """Return mutable metadata dictionary associated with this timeline."""
+        return self._metadata
+
+    def set_metadata(self, **attrs: object) -> None:
+        """Update timeline metadata in-place."""
+        self._metadata.update(attrs)
 
 
 class _TimelineScope:

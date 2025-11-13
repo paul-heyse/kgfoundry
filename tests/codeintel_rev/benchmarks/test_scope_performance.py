@@ -15,8 +15,10 @@ All benchmarks use pytest-benchmark plugin for accurate timing and reporting.
 
 from __future__ import annotations
 
+from contextlib import AbstractContextManager
 from pathlib import Path
 from time import perf_counter
+from typing import cast
 
 import duckdb
 import pytest
@@ -465,7 +467,10 @@ class TestScopeFilteringOverhead:
 
 def _run_hot_query(manager: DuckDBManager) -> None:
     """Execute a representative aggregation to exercise DuckDB planning."""
-    with manager.connection() as conn:
+    with cast(
+        "AbstractContextManager[duckdb.DuckDBPyConnection]",
+        manager.connection(),
+    ) as conn:
         conn.execute(
             """
             SELECT avg(end_line - start_line)

@@ -3,7 +3,36 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+ChunkId = int
+FaissRow = int
+Distance = float
+FactoryString = str
+
+
+@dataclass(slots=True, frozen=True)
+class SearchHit:
+    """Single retrieval hit emitted by FAISS/BM25/SPLADE/XTR stages."""
+
+    id: ChunkId
+    rank: int
+    score: float
+    source: str
+    faiss_row: FaissRow | None = None
+    explain: Mapping[str, object] = field(default_factory=dict)
+
+
+@dataclass(slots=True, frozen=True)
+class SearchPoolRow:
+    """Structured row recorded in evaluator pools."""
+
+    query_id: str
+    channel: str
+    rank: int
+    id: ChunkId
+    score: float
+    meta: Mapping[str, object] = field(default_factory=dict)
 
 
 @dataclass(slots=True, frozen=True)
@@ -66,8 +95,14 @@ class StageDecision:
 
 __all__ = [
     "ChannelHit",
+    "ChunkId",
+    "Distance",
+    "FactoryString",
+    "FaissRow",
     "HybridResultDoc",
     "HybridSearchResult",
+    "SearchHit",
+    "SearchPoolRow",
     "StageDecision",
     "StageSignals",
 ]

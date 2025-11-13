@@ -5,7 +5,7 @@ from __future__ import annotations
 import importlib
 import os
 from collections.abc import Mapping
-from contextlib import AbstractContextManager
+from contextlib import AbstractContextManager, suppress
 from dataclasses import dataclass
 from types import ModuleType
 from typing import Any, Protocol
@@ -21,12 +21,22 @@ SpanAttribute = str | int | float | bool
 class _TelemetryState:
     """Mutable telemetry state shared across module functions."""
 
-    __slots__ = ("initialized", "trace_module", "tracing_enabled")
+    __slots__ = (
+        "fastapi_instrumented",
+        "httpx_instrumented",
+        "initialized",
+        "logging_instrumented",
+        "trace_module",
+        "tracing_enabled",
+    )
 
     def __init__(self) -> None:
         self.initialized = False
         self.tracing_enabled = False
         self.trace_module: ModuleType | None = None
+        self.fastapi_instrumented = False
+        self.httpx_instrumented = False
+        self.logging_instrumented = False
 
 
 class SupportsState(Protocol):
@@ -105,6 +115,13 @@ def _should_enable() -> bool:
     return _env_flag("CODEINTEL_TELEMETRY", default=False)
 
 
+def _optional_import(module_name: str) -> ModuleType | None:
+    try:
+        return importlib.import_module(module_name)
+    except ImportError:  # pragma: no cover - optional dependency
+        return None
+
+
 def _load_trace_modules() -> _TraceHandles | None:
     try:
         trace_module = importlib.import_module("opentelemetry.trace")
@@ -130,9 +147,13 @@ def _load_trace_modules() -> _TraceHandles | None:
 def _build_provider(
     handles: _TraceHandles,
     service_name: str,
+    service_version: str | None,
     endpoint: str | None,
 ) -> None:
-    resource = handles.resource.Resource.create({"service.name": service_name})
+    resource_attrs: dict[str, object] = {"service.name": service_name}
+    if service_version:
+        resource_attrs["service.version"] = service_version
+    resource = handles.resource.Resource.create(resource_attrs)
     provider = handles.sdk_trace.TracerProvider(resource=resource)
     processors = 0
     if endpoint and handles.otlp_http is not None:
@@ -168,7 +189,9 @@ def init_telemetry(
     app: SupportsState | None = None,
     *,
     service_name: str = "codeintel_rev",
+    service_version: str | None = None,
     otlp_endpoint: str | None = None,
+    enable_logging_instrumentation: bool = True,
 ) -> None:
     """Best-effort OpenTelemetry bootstrap (safe no-op when disabled/unavailable).
 
@@ -178,9 +201,14 @@ def init_telemetry(
         FastAPI application instance for storing telemetry state.
     service_name : str, optional
         Resource attribute for exported spans. Defaults to ``codeintel_rev``.
+    service_version : str | None, optional
+        Optional semantic version attached to the OpenTelemetry resource.
     otlp_endpoint : str | None, optional
         Override for OTLP HTTP endpoint. When ``None``, uses
         ``OTEL_EXPORTER_OTLP_ENDPOINT``.
+    enable_logging_instrumentation : bool, optional
+        When ``True`` attempts to enable OpenTelemetry logging instrumentation
+        (safe no-op if instrumentation packages are unavailable).
     """
     if _STATE.initialized:
         if app is not None:
@@ -203,12 +231,14 @@ def init_telemetry(
         return
 
     endpoint = otlp_endpoint or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-    _build_provider(handles, service_name, endpoint)
+    _build_provider(handles, service_name, service_version, endpoint)
     _STATE.trace_module = handles.trace
     _STATE.tracing_enabled = True
     _STATE.initialized = True
     if app is not None:
         app.state.telemetry_enabled = True
+    if enable_logging_instrumentation:
+        _install_logging_instrumentation()
 
 
 def as_span(name: str, **attrs: object) -> AbstractContextManager[None]:
@@ -263,4 +293,55 @@ def record_span_event(name: str, **attrs: object) -> None:
         LOGGER.debug("Failed to record OpenTelemetry event; continuing", exc_info=True)
 
 
-__all__ = ["as_span", "init_telemetry", "record_span_event", "telemetry_enabled"]
+def _install_logging_instrumentation() -> None:
+    if _STATE.logging_instrumented:
+        return
+    module = _optional_import("opentelemetry.instrumentation.logging")
+    if module is None:
+        return
+    instrumentor = getattr(module, "LoggingInstrumentor", None)
+    if instrumentor is None:
+        return
+    with suppress(Exception):  # pragma: no cover - defensive
+        instrumentor().instrument(set_logging_format=True)
+        _STATE.logging_instrumented = True
+
+
+def instrument_fastapi(app: SupportsState) -> None:
+    """Instrument FastAPI routes when instrumentation packages are installed."""
+    if _STATE.fastapi_instrumented or not _STATE.tracing_enabled:
+        return
+    module = _optional_import("opentelemetry.instrumentation.fastapi")
+    if module is None:
+        return
+    instrumentor = getattr(module, "FastAPIInstrumentor", None)
+    if instrumentor is None:
+        return
+    with suppress(Exception):  # pragma: no cover - defensive
+        instrumentor.instrument_app(app)
+        _STATE.fastapi_instrumented = True
+
+
+def instrument_httpx() -> None:
+    """Instrument httpx clients when instrumentation packages are installed."""
+    if _STATE.httpx_instrumented or not _STATE.tracing_enabled:
+        return
+    module = _optional_import("opentelemetry.instrumentation.httpx")
+    if module is None:
+        return
+    instrumentor = getattr(module, "HTTPXClientInstrumentor", None)
+    if instrumentor is None:
+        return
+    with suppress(Exception):  # pragma: no cover - defensive
+        instrumentor().instrument()
+        _STATE.httpx_instrumented = True
+
+
+__all__ = [
+    "as_span",
+    "init_telemetry",
+    "instrument_fastapi",
+    "instrument_httpx",
+    "record_span_event",
+    "telemetry_enabled",
+]

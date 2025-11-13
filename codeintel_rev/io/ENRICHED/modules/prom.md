@@ -37,24 +37,24 @@ Prometheus helpers for MCP diagnostics.
 - variable: `STAGE_LATENCY_SECONDS` (line 119)
 - class: `MetricsConfig` (line 128)
 - function: `build_metrics_router` (line 135)
-- function: `record_run` (line 177)
-- function: `record_run_error` (line 182)
-- function: `observe_request_latency` (line 187)
-- function: `record_stage_latency` (line 192)
+- function: `record_run` (line 197)
+- function: `record_run_error` (line 202)
+- function: `observe_request_latency` (line 207)
+- function: `record_stage_latency` (line 212)
 
 ## Graph Metrics
 
 - **fan_in**: 5
 - **fan_out**: 1
-- **cycle_group**: 45
+- **cycle_group**: 44
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 
@@ -96,7 +96,7 @@ MetricsConfig, build_metrics_router, observe_request_latency, record_run, record
 
 - branches: 13
 - cyclomatic: 14
-- loc: 195
+- loc: 215
 
 ## Doc Coverage
 

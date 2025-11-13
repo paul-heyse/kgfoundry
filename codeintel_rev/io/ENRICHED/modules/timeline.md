@@ -19,7 +19,7 @@ Lightweight per-session timeline recording utilities.
 - from **(absolute)** import uuid
 - from **collections.abc** import Callable, Iterator, Mapping, Sequence
 - from **contextlib** import AbstractContextManager, contextmanager
-- from **dataclasses** import dataclass
+- from **dataclasses** import dataclass, field
 - from **importlib** import import_module
 - from **pathlib** import Path
 - from **types** import TracebackType
@@ -40,25 +40,25 @@ Lightweight per-session timeline recording utilities.
 - function: `_scrub_value` (line 210)
 - function: `_scrub_attrs` (line 231)
 - class: `Timeline` (line 236)
-- class: `_TimelineScope` (line 353)
-- function: `new_timeline` (line 406)
-- function: `current_timeline` (line 441)
-- function: `current_or_new_timeline` (line 452)
-- function: `bind_timeline` (line 493)
+- class: `_TimelineScope` (line 378)
+- function: `new_timeline` (line 431)
+- function: `current_timeline` (line 466)
+- function: `current_or_new_timeline` (line 477)
+- function: `bind_timeline` (line 518)
 
 ## Graph Metrics
 
-- **fan_in**: 15
+- **fan_in**: 19
 - **fan_out**: 2
-- **cycle_group**: 40
+- **cycle_group**: 41
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 8
+- recent churn 90: 8
 
 ## Usage
 
@@ -90,7 +90,7 @@ Timeline, bind_timeline, current_timeline, new_timeline
 
 ## Hotspot
 
-- score: 2.84
+- score: 2.92
 
 ## Side Effects
 
@@ -100,7 +100,7 @@ Timeline, bind_timeline, current_timeline, new_timeline
 
 - branches: 42
 - cyclomatic: 43
-- loc: 529
+- loc: 554
 
 ## Doc Coverage
 

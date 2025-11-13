@@ -28,15 +28,15 @@ SCIP-based symbol use graph helpers.
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 10
+- **cycle_group**: 18
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 5
+- recent churn 90: 5
 
 ## Usage
 

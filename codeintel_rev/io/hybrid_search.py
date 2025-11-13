@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from contextlib import nullcontext
 from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
@@ -345,6 +346,12 @@ class _FusionContext:
     budget_decision: BudgetDecision
     budget_info: Mapping[str, object]
     timeline: Timeline | None
+
+
+@dataclass(slots=True)
+class _SearchTelemetryContext:
+    timeline: Timeline | None
+    stage_records: list[dict[str, object]]
 
 
 @dataclass(slots=True, frozen=True)
@@ -710,64 +717,122 @@ class HybridSearchEngine:
             Structured result set containing fused documents, per-document channel
             contributions, warnings, and explainability metadata.
         """
-        timeline = current_timeline()
-        retrieval_metrics.QUERIES_TOTAL.labels(kind="search").inc()
-        gate_cfg = self._make_stage_gate_config()
-        budget_decision, budget_info = self._profile_query(query, gate_cfg, timeline)
-        with as_span(
-            "hybrid.collect_channels",
-            limit=limit,
-            semantic_hits=len(semantic_hits),
-        ):
-            runs, warnings = self._gather_channel_hits(
-                query,
-                semantic_hits,
-                channel_limits=budget_decision.per_channel_depths,
-            )
-        channel_counts = {name: len(hits) for name, hits in runs.items()}
-        record_span_event(
-            "hybrid.channels.collected",
-            semantic=channel_counts.get("semantic", 0),
-            bm25=channel_counts.get("bm25", 0),
-            splade=channel_counts.get("splade", 0),
-            extra=len(channel_counts) - min(len(channel_counts), 3),
+        telemetry_ctx = _SearchTelemetryContext(
+            timeline=current_timeline(),
+            stage_records=[
+                {"name": "embed", "status": "skip", "duration_ms": 0.0, "reason": "upstream"},
+            ],
         )
-        if timeline is not None and channel_counts:
-            channel_attrs: dict[str, object] = {
-                f"{name}_hits": count for name, count in channel_counts.items()
-            }
-            channel_attrs["channels"] = list(channel_counts)
-            timeline.event("hybrid.channels.collected", "hybrid", attrs=channel_attrs)
         opts = options or HybridSearchOptions()
-        ctx = _FusionContext(
+        result = self._execute_hybrid_search(
             query=query,
-            runs=runs,
-            warnings=warnings,
+            semantic_hits=semantic_hits,
             limit=limit,
             options=opts,
-            budget_decision=budget_decision,
-            budget_info=budget_info,
-            timeline=timeline,
+            telemetry=telemetry_ctx,
         )
-        with as_span("hybrid.fuse", limit=limit, channels=len(channel_counts) or 1):
-            result = self._fuse_runs(ctx)
-        record_span_event(
-            "hybrid.fuse.result",
-            documents=len(result.docs),
-            warnings=len(result.warnings),
-            channels=len(result.channels),
+        method_payload = self._with_stage_metadata(result.method, telemetry_ctx.stage_records)
+        return HybridSearchResult(
+            docs=result.docs,
+            contributions=result.contributions,
+            channels=result.channels,
+            warnings=result.warnings,
+            method=method_payload,
         )
-        if timeline is not None:
-            fusion_attrs: dict[str, object] = {
-                "documents": len(result.docs),
-                "warnings": len(result.warnings),
-                "channels": result.channels,
-            }
-            timeline.event(
-                "hybrid.fuse.result",
-                "fusion",
-                attrs=fusion_attrs,
+
+    def _execute_hybrid_search(
+        self,
+        *,
+        query: str,
+        semantic_hits: Sequence[tuple[int, float]],
+        limit: int,
+        options: HybridSearchOptions,
+        telemetry: _SearchTelemetryContext,
+    ) -> HybridSearchResult:
+        op_attrs = {"query_chars": len(query), "limit": int(limit)}
+        op_ctx = (
+            telemetry.timeline.operation("hybrid.search", **op_attrs)
+            if telemetry.timeline
+            else nullcontext()
+        )
+        with op_ctx:
+            retrieval_metrics.QUERIES_TOTAL.labels(kind="search").inc()
+            gate_cfg = self._make_stage_gate_config()
+            budget_decision, budget_info = self._profile_query(query, gate_cfg, telemetry.timeline)
+            with as_span(
+                "hybrid.collect_channels",
+                limit=limit,
+                semantic_hits=len(semantic_hits),
+            ):
+                runs, warnings = self._gather_channel_hits(
+                    query,
+                    semantic_hits,
+                    channel_limits=budget_decision.per_channel_depths,
+                    stage_records=telemetry.stage_records,
+                )
+            channel_counts = {name: len(hits) for name, hits in runs.items()}
+            record_span_event(
+                "hybrid.channels.collected",
+                semantic=channel_counts.get("semantic", 0),
+                bm25=channel_counts.get("bm25", 0),
+                splade=channel_counts.get("splade", 0),
+                extra=len(channel_counts) - min(len(channel_counts), 3),
             )
+            if telemetry.timeline is not None and channel_counts:
+                telemetry.timeline.event(
+                    "hybrid.channels.collected",
+                    "hybrid",
+                    attrs={
+                        **{f"{name}_hits": count for name, count in channel_counts.items()},
+                        "channels": list(channel_counts),
+                    },
+                )
+            ctx = _FusionContext(
+                query=query,
+                runs=runs,
+                warnings=warnings,
+                limit=limit,
+                options=options,
+                budget_decision=budget_decision,
+                budget_info=budget_info,
+                timeline=telemetry.timeline,
+            )
+            fusion_stage_name = (
+                "fusion.rrf" if self._settings.index.hybrid_use_rrf else "fusion.pool"
+            )
+            fusion_ctx = (
+                telemetry.timeline.step(fusion_stage_name, channels=len(channel_counts) or 0)
+                if telemetry.timeline
+                else nullcontext()
+            )
+            fusion_start = perf_counter()
+            with as_span("hybrid.fuse", limit=limit, channels=len(channel_counts) or 1), fusion_ctx:
+                result = self._fuse_runs(ctx)
+            duration_ms = round((perf_counter() - fusion_start) * 1000, 2)
+            telemetry.stage_records.append(
+                {
+                    "name": fusion_stage_name,
+                    "status": "run",
+                    "duration_ms": duration_ms,
+                    "output": {"documents": len(result.docs)},
+                }
+            )
+            record_span_event(
+                "hybrid.fuse.result",
+                documents=len(result.docs),
+                warnings=len(result.warnings),
+                channels=len(result.channels),
+            )
+            if telemetry.timeline is not None:
+                telemetry.timeline.event(
+                    "hybrid.fuse.result",
+                    "fusion",
+                    attrs={
+                        "documents": len(result.docs),
+                        "warnings": len(result.warnings),
+                        "channels": result.channels,
+                    },
+                )
         return result
 
     def _gather_channel_hits(
@@ -776,6 +841,7 @@ class HybridSearchEngine:
         semantic_hits: Sequence[tuple[int, float]],
         *,
         channel_limits: Mapping[str, int] | None = None,
+        stage_records: list[dict[str, object]],
     ) -> tuple[dict[str, list[ChannelHit]], list[str]]:
         """Collect per-channel search hits and warnings for ``query``.
 
@@ -801,6 +867,12 @@ class HybridSearchEngine:
             Optional per-channel depth overrides derived from budget decisions.
             Keys correspond to channel names (e.g., "semantic", "bm25"). When
             provided, each channel fetches at most the specified number of hits.
+        stage_records : list[dict[str, object]]
+            Mutable list of stage timing records. This method appends timing
+            and status records for each channel search stage (e.g., "search.faiss",
+            "search.bm25", "search.splade") to this list. Each record contains
+            "name", "status", "duration_seconds", and optional channel-specific
+            metadata. Used for telemetry and performance analysis.
 
         Returns
         -------
@@ -817,8 +889,21 @@ class HybridSearchEngine:
         timeline = current_timeline()
 
         semantic_limit = channel_limits.get("semantic") if channel_limits else None
-        semantic_channel_hits = self._build_semantic_channel_hits(
-            semantic_hits, limit=semantic_limit
+        faiss_attrs = {"input_hits": len(semantic_hits)}
+        faiss_ctx = timeline.step("search.faiss", **faiss_attrs) if timeline else nullcontext()
+        faiss_start = perf_counter()
+        with faiss_ctx:
+            semantic_channel_hits = self._build_semantic_channel_hits(
+                semantic_hits, limit=semantic_limit
+            )
+        faiss_duration = perf_counter() - faiss_start
+        stage_records.append(
+            {
+                "name": "search.faiss",
+                "status": "run",
+                "duration_ms": round(faiss_duration * 1000, 2),
+                "output": {"hits": len(semantic_channel_hits)},
+            }
         )
         if semantic_channel_hits:
             runs["semantic"] = semantic_channel_hits
@@ -834,7 +919,9 @@ class HybridSearchEngine:
             limit = default_limit
             if channel_limits and channel.name in channel_limits:
                 limit = channel_limits[channel.name]
-            hits, warning = self._collect_channel_hits(channel, query, limit, timeline)
+            hits, warning = self._collect_channel_hits(
+                channel, query, limit, timeline, stage_records
+            )
             if warning:
                 warnings.append(warning)
             if hits:
@@ -868,10 +955,32 @@ class HybridSearchEngine:
         query: str,
         limit: int,
         timeline: Timeline | None,
+        stage_records: list[dict[str, object]],
     ) -> tuple[list[ChannelHit], str | None]:
+        stage_name = f"search.{channel.name}"
+
+        def _record_stage(
+            status: str,
+            *,
+            duration: float = 0.0,
+            reason: str | None = None,
+            output: Mapping[str, object] | None = None,
+        ) -> None:
+            entry: dict[str, object] = {
+                "name": stage_name,
+                "status": status,
+                "duration_ms": round(duration * 1000, 2),
+            }
+            if reason:
+                entry["reason"] = reason
+            if output is not None:
+                entry["output"] = dict(output)
+            stage_records.append(entry)
+
         disabled_reason = self._channel_disabled_reason(channel)
         if disabled_reason is not None:
             self._emit_channel_skip(channel.name, timeline, {"reason": disabled_reason})
+            _record_stage("skip", reason=disabled_reason)
             return [], None
         missing = self._missing_capabilities(channel)
         if missing:
@@ -880,10 +989,10 @@ class HybridSearchEngine:
                 timeline,
                 {"reason": "capability_off", "missing": sorted(missing)},
             )
+            _record_stage("skip", reason="capability_off")
             return [], None
         start = perf_counter()
         try:
-            stage_name = f"search.{channel.name}"
             attrs = {"channel": channel.name, "limit": limit}
             with span_context(
                 stage_name,
@@ -891,7 +1000,9 @@ class HybridSearchEngine:
                 attrs=attrs,
                 emit_checkpoint=True,
             ):
-                hits = list(channel.search(query, limit))
+                step_ctx = timeline.step(stage_name, **attrs) if timeline else nullcontext()
+                with step_ctx:
+                    hits = list(channel.search(query, limit))
         except ChannelError as exc:
             warning = str(exc)
             retrieval_metrics.QUERY_ERRORS_TOTAL.labels(kind="search", channel=channel.name).inc()
@@ -900,6 +1011,7 @@ class HybridSearchEngine:
                 timeline,
                 {"reason": exc.reason, "message": str(exc)},
             )
+            _record_stage("error", duration=perf_counter() - start, reason=exc.reason)
             return [], warning
         except (OSError, RuntimeError, ValueError, ImportError) as exc:  # pragma: no cover
             warning = f"{channel.name} channel failed: {exc}"
@@ -910,10 +1022,16 @@ class HybridSearchEngine:
                 timeline,
                 {"reason": "provider_error", "message": str(exc)},
             )
+            _record_stage("error", duration=perf_counter() - start, reason="provider_error")
             return [], warning
         duration = perf_counter() - start
         retrieval_metrics.CHANNEL_LATENCY_SECONDS.labels(channel=channel.name).observe(duration)
         self._emit_channel_run(channel, hits, timeline)
+        _record_stage(
+            "run",
+            duration=duration,
+            output={"hits": len(hits), "limit": limit},
+        )
         return hits, None
 
     @staticmethod
@@ -924,7 +1042,9 @@ class HybridSearchEngine:
     ) -> None:
         if timeline is None:
             return
-        timeline.event(f"hybrid.{name}.skip", name, attrs=attrs)
+        enriched = dict(attrs)
+        enriched["name"] = name
+        timeline.event("channel", "channel.skip", attrs=enriched)
 
     @staticmethod
     def _emit_channel_run(
@@ -935,10 +1055,25 @@ class HybridSearchEngine:
         if timeline is None:
             return
         timeline.event(
-            f"hybrid.{channel.name}.run",
-            channel.name,
-            attrs={"hits": len(hits), "cost": getattr(channel, "cost", 1.0)},
+            "channel",
+            "channel.run",
+            attrs={
+                "name": channel.name,
+                "hits": len(hits),
+                "cost": getattr(channel, "cost", 1.0),
+            },
         )
+
+    @staticmethod
+    def _with_stage_metadata(
+        method: Mapping[str, object] | None,
+        stages: Sequence[dict[str, object]],
+    ) -> Mapping[str, object] | None:
+        if not stages:
+            return method
+        merged = dict(method) if method else {}
+        merged["stages"] = list(stages)
+        return merged
 
     def resolve_path(self, value: str) -> Path:
         """Resolve a path string to an absolute Path.

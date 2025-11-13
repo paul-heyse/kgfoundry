@@ -260,6 +260,9 @@ class StageInfo(TypedDict, total=False):
     duration_ms: float
     budget_ms: int | None
     exceeded_budget: bool
+    status: Literal["run", "skip", "error"]
+    reason: str
+    output: dict[str, object]
 
 
 class SearchFilterPayload(TypedDict, total=False):

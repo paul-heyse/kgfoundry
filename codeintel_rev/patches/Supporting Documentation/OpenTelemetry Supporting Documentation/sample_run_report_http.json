@@ -1,0 +1,101 @@
+{
+  "schema": "codeintel.telemetry/run-report@v0",
+  "kind": "http",
+  "session": {
+    "session_id": "session-9d6a8a42",
+    "started_at": "2025-11-13T18:54:32.378706+00:00",
+    "route": "/mcp/tools/semantic_search",
+    "method": "POST"
+  },
+  "request": {
+    "query": "How is HybridSearch fused and hydrated?",
+    "top_k": 10
+  },
+  "timeline": [
+    {
+      "span_id": "span-161b0586",
+      "name": "request",
+      "status": "OK",
+      "started_at": "2025-11-13T18:54:32.378720+00:00",
+      "duration_ms": 143,
+      "attrs": {
+        "session_id": "session-9d6a8a42"
+      },
+      "children": [
+        {
+          "span_id": "span-380b500a",
+          "name": "embed.query",
+          "status": "OK",
+          "duration_ms": 21,
+          "attrs": {
+            "model": "vllm-embedding",
+            "dim": 1536
+          }
+        },
+        {
+          "span_id": "span-c9eb36b8",
+          "name": "search.faiss",
+          "status": "OK",
+          "duration_ms": 34,
+          "attrs": {
+            "k": 200,
+            "index": "flat",
+            "gpu": false
+          }
+        },
+        {
+          "span_id": "span-5d424e9b",
+          "name": "search.bm25",
+          "status": "WARN",
+          "duration_ms": 2,
+          "attrs": {
+            "enabled": false,
+            "reason": "channel disabled"
+          }
+        },
+        {
+          "span_id": "span-d090189c",
+          "name": "search.splade",
+          "status": "WARN",
+          "duration_ms": 2,
+          "attrs": {
+            "enabled": false,
+            "reason": "channel not configured"
+          }
+        },
+        {
+          "span_id": "span-168e2abc",
+          "name": "fusion.rrf",
+          "status": "OK",
+          "duration_ms": 5,
+          "attrs": {
+            "weights": {
+              "faiss": 1.0,
+              "bm25": 0.5,
+              "splade": 0.8
+            }
+          }
+        },
+        {
+          "span_id": "span-d882dc70",
+          "name": "hydrate.duckdb",
+          "status": "OK",
+          "duration_ms": 42,
+          "attrs": {
+            "rows": 10,
+            "symbols_joined": 39
+          }
+        }
+      ]
+    }
+  ],
+  "response": {
+    "status_code": 200,
+    "result_count": 10,
+    "warnings": [
+      "bm25-disabled",
+      "splade-disabled"
+    ]
+  },
+  "ended_at": "2025-11-13T18:54:32.378924+00:00"
+}

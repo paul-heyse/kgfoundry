@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
-from contextlib import contextmanager, suppress
+from contextlib import contextmanager, nullcontext, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from queue import Empty, Full, LifoQueue
 from threading import Lock
+from time import perf_counter
 from typing import TYPE_CHECKING, cast
 
 from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.observability.otel import as_span, record_span_event
+from codeintel_rev.observability.timeline import current_timeline
 
 if TYPE_CHECKING:
     import duckdb
@@ -49,6 +52,104 @@ class DuckDBConfig:
     pool_size: int | None = None
 
 
+class _InstrumentedDuckDBConnection:
+    """Proxy connection that instruments DuckDB execute calls."""
+
+    __slots__ = ("_config", "_conn")
+
+    def __init__(self, conn: duckdb.DuckDBPyConnection, config: DuckDBConfig) -> None:
+        self._conn = conn
+        self._config = config
+
+    def execute(
+        self,
+        query: duckdb.Statement | str,
+        parameters: object | None = None,
+    ) -> duckdb.DuckDBPyConnection:
+        """Execute a SQL query with instrumentation and telemetry.
+
+        This method wraps DuckDB connection execution with telemetry tracking,
+        recording query execution time, SQL length, and optionally the SQL
+        text itself. It creates timeline steps and OpenTelemetry spans for
+        observability.
+
+        Parameters
+        ----------
+        query : object
+            SQL query to execute. Accepts raw SQL strings or DuckDB ``Statement``
+            objects that expose precompiled statements.
+        parameters : object | None, optional
+            Optional parameter payload bound to the statement before execution.
+
+        Returns
+        -------
+        duckdb.DuckDBPyConnection
+            Instrumented connection (self) to support chaining follow-up calls
+            such as ``fetchall()`` without breaking existing code.
+
+        Notes
+        -----
+        This method instruments SQL execution with:
+        - Timeline step ("sql.exec") with SQL length and optionally SQL text
+        - OpenTelemetry span ("duckdb.exec") with query metadata
+        - Timeline event ("sql.exec.done") with execution duration
+        - Span event ("duckdb.exec.complete") with completion metadata
+
+        The method tracks execution time and records it in milliseconds. When
+        log_queries is enabled in the config, the SQL text (truncated to 5000
+        characters) is included in telemetry attributes.
+        """
+        sql_text = str(query)
+        timeline = current_timeline()
+        attrs: dict[str, object] = {"sql_len": len(sql_text)}
+        if self._config.log_queries:
+            attrs["sql"] = sql_text[:5000]
+        step_ctx = timeline.step("sql.exec", **attrs) if timeline else nullcontext()
+        start = perf_counter()
+        with step_ctx, as_span("duckdb.exec", **attrs):
+            if parameters is not None:
+                self._conn.execute(query, parameters)
+            else:
+                self._conn.execute(query)
+        duration_ms = round((perf_counter() - start) * 1000, 2)
+        record_span_event("duckdb.exec.complete", duration_ms=duration_ms, sql_len=len(sql_text))
+        if timeline is not None:
+            timeline.event(
+                "io",
+                "sql.exec.done",
+                attrs={"duration_ms": duration_ms, "sql_len": len(sql_text)},
+            )
+        return cast("duckdb.DuckDBPyConnection", self)
+
+    def __getattr__(self, name: str) -> object:
+        """Delegate attribute access to the underlying DuckDB connection.
+
+        This method allows transparent access to DuckDB connection methods
+        and attributes that are not explicitly wrapped by this class.
+
+        Parameters
+        ----------
+        name : str
+            Name of the attribute or method to access from the underlying
+            DuckDB connection.
+
+        Returns
+        -------
+        object
+            The requested attribute or method from the underlying connection.
+            Can be any attribute or method available on the DuckDB connection
+            object.
+
+        Notes
+        -----
+        This method enables transparent delegation to the underlying DuckDB
+        connection, allowing callers to use DuckDB-specific methods and
+        attributes without explicit wrapper methods. Used for methods like
+        fetchone(), fetchall(), etc. that are not explicitly wrapped.
+        """
+        return getattr(self._conn, name)
+
+
 class DuckDBManager:
     """Factory for DuckDB connections with consistent pragmas.
 
@@ -79,8 +180,9 @@ class DuckDBManager:
         Yields
         ------
         duckdb.DuckDBPyConnection
-            Connection configured with the requested pragmas. The connection is
-            automatically closed when the context manager exits.
+            Connection configured with requested pragmas and telemetry hooks.
+            The underlying DuckDB connection is automatically released when the
+            context manager exits.
 
         Notes
         -----
@@ -89,8 +191,9 @@ class DuckDBManager:
         concurrency without reopening the database file for every request.
         """
         conn = self._acquire_connection()
+        instrumented = _InstrumentedDuckDBConnection(conn, self._config)
         try:
-            yield conn
+            yield cast("duckdb.DuckDBPyConnection", instrumented)
         finally:
             self._release_connection(conn)
 

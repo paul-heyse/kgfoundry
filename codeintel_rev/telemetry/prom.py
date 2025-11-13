@@ -169,6 +169,26 @@ def build_metrics_router(config: MetricsConfig | None = None) -> APIRouter | Non
 
     @router.get("/metrics")
     def metrics_endpoint() -> Response:
+        """Handle GET requests to the /metrics endpoint.
+
+        This endpoint serves Prometheus metrics in OpenMetrics format. It
+        generates the metrics payload from the configured registry and returns
+        it as a text/plain response with the appropriate content type.
+
+        Returns
+        -------
+        Response
+            FastAPI Response containing OpenMetrics-formatted metrics payload.
+            The response has Content-Type set to CONTENT_TYPE_LATEST (typically
+            "text/plain; version=0.0.4") and contains all metrics registered
+            in the configured Prometheus registry.
+
+        Notes
+        -----
+        This endpoint is designed to be scraped by Prometheus servers or other
+        metrics collection systems. The metrics payload includes all counters,
+        histograms, and gauges registered in the application's metrics registry.
+        """
         return response_cls(content=generate_latest(registry), media_type=CONTENT_TYPE_LATEST)
 
     return router

@@ -3,9 +3,11 @@ from __future__ import annotations
 import importlib.util
 from collections.abc import Sequence
 from pathlib import Path
-from types import SimpleNamespace
+from typing import cast
 
 import numpy as np
+from codeintel_rev.io.duckdb_catalog import StructureAnnotations
+from codeintel_rev.io.faiss_manager import SearchRuntimeOverrides
 from codeintel_rev.retrieval.mcp_search import (
     FetchDependencies,
     FetchRequest,
@@ -17,6 +19,7 @@ from codeintel_rev.retrieval.mcp_search import (
     run_fetch,
     run_search,
 )
+from codeintel_rev.typing import NDArrayF32, NDArrayI64
 
 
 class _StubEmbedder:
@@ -29,7 +32,7 @@ class _StubEmbedder:
 
 class _StubFaiss:
     vec_dim = 4
-    faiss_family = "ivf_pq"
+    faiss_family: str | None = "ivf_pq"
     refine_k_factor = 1.0
 
     def get_runtime_tuning(self) -> dict[str, object]:
@@ -37,21 +40,22 @@ class _StubFaiss:
 
     def search(
         self,
-        _query: np.ndarray,
-        _k: int | None = None,
+        query: NDArrayF32,
+        k: int | None = None,
         *,
-        _nprobe: int | None = None,
-        _runtime: object | None = None,
-        _catalog: object | None = None,
-    ) -> tuple[np.ndarray, np.ndarray]:
-        distances = np.array([[0.91, 0.88]], dtype=np.float32)
-        identifiers = np.array([[1, 2]], dtype=np.int64)
+        nprobe: int | None = None,
+        runtime: SearchRuntimeOverrides | None = None,
+        catalog: object | None = None,
+    ) -> tuple[NDArrayF32, NDArrayI64]:
+        _ = (query, k, nprobe, runtime, catalog)
+        distances: NDArrayF32 = np.array([[0.91, 0.88]], dtype=np.float32)
+        identifiers: NDArrayI64 = np.array([[1, 2]], dtype=np.int64)
         return distances, identifiers
 
 
 class _StubCatalog:
     def __init__(self) -> None:
-        self._rows = [
+        self._rows: list[dict[str, object]] = [
             {
                 "id": 1,
                 "uri": "codeintel_rev/a.py",
@@ -78,7 +82,7 @@ class _StubCatalog:
             },
         ]
 
-    def query_by_ids(self, ids: Sequence[int]) -> list[dict]:
+    def query_by_ids(self, ids: Sequence[int]) -> list[dict[str, object]]:
         wanted = set(ids)
         return [row for row in self._rows if row["id"] in wanted]
 
@@ -86,16 +90,25 @@ class _StubCatalog:
         self,
         ids: Sequence[int],
         *,
-        _include_globs: list[str] | None = None,
-        _exclude_globs: list[str] | None = None,
-        _languages: list[str] | None = None,
-    ) -> list[dict]:
+        include_globs: list[str] | None = None,
+        exclude_globs: list[str] | None = None,
+        languages: list[str] | None = None,
+    ) -> list[dict[str, object]]:
+        _ = (include_globs, exclude_globs, languages)
         return self.query_by_ids(ids)
 
-    def get_structure_annotations(self, ids: Sequence[int]) -> dict[int, object]:
-        annotations: dict[int, object] = {}
+    def get_structure_annotations(self, ids: Sequence[int]) -> dict[int, StructureAnnotations]:
+        row_map: dict[int, dict[str, object]] = {}
+        for row in self._rows:
+            row_id = row.get("id")
+            if isinstance(row_id, int):
+                row_map[row_id] = row
+        annotations: dict[int, StructureAnnotations] = {}
         for chunk_id in ids:
-            annotations[int(chunk_id)] = SimpleNamespace(
+            row = row_map.get(int(chunk_id))
+            uri = str(row.get("uri", "")) if row else ""
+            annotations[int(chunk_id)] = StructureAnnotations(
+                uri=uri,
                 symbol_hits=(f"symbol:{chunk_id}",),
                 ast_node_kinds=("FunctionDef",),
                 cst_matches=(),
@@ -139,9 +152,13 @@ def test_run_search_returns_structured_results(tmp_path: Path) -> None:
     )
     response: SearchResponse = run_search(request=request, deps=deps)
     assert response.top_k == 1
-    assert response.results[0].metadata["uri"] == "codeintel_rev/a.py"
-    assert response.results[0].metadata["symbols"] == ["foo"]
-    assert response.results[0].metadata["explain"]["hit_reason"][0] == "embedding:cosine"
+    metadata: dict[str, object] = response.results[0].metadata
+    assert cast("str", metadata["uri"]) == "codeintel_rev/a.py"
+    symbols = cast("list[str]", metadata["symbols"])
+    assert symbols == ["foo"]
+    explain = cast("dict[str, object]", metadata["explain"])
+    hit_reason = cast("list[str]", explain["hit_reason"])
+    assert hit_reason[0] == "embedding:cosine"
     if importlib.util.find_spec("pyarrow") is not None:
         pool_files = list(tmp_path.glob("*.parquet"))
         assert pool_files, "pool writer should emit a parquet file"
@@ -156,5 +173,6 @@ def test_run_fetch_hydrates_content() -> None:
     )
     request = FetchRequest(object_ids=(1,), max_tokens=512)
     response: FetchResponse = run_fetch(request=request, deps=deps)
-    assert response.objects[0].metadata["uri"] == "codeintel_rev/a.py"
+    metadata: dict[str, object] = response.objects[0].metadata
+    assert cast("str", metadata["uri"]) == "codeintel_rev/a.py"
     assert "def foo" in response.objects[0].content

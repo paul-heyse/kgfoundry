@@ -23,28 +23,28 @@ TypedDict provides automatic JSON Schema generation for FastMCP tools.
 - class: `Finding` (line 168)
 - class: `MethodInfo` (line 218)
 - class: `StageInfo` (line 256)
-- class: `SearchFilterPayload` (line 265)
-- class: `SearchToolArgs` (line 287)
-- class: `SearchExplainability` (line 296)
-- class: `SearchResultMetadata` (line 305)
-- class: `SearchResultItem` (line 318)
-- class: `SearchStructuredContent` (line 330)
-- class: `FetchToolArgs` (line 339)
-- class: `FetchObjectMetadata` (line 346)
-- class: `FetchObject` (line 357)
-- class: `FetchStructuredContent` (line 367)
-- class: `AnswerEnvelope` (line 373)
-- class: `SymbolInfo` (line 465)
-- class: `GitBlameEntry` (line 496)
-- class: `OpenFileResponse` (line 529)
-- class: `ListPathsResponse` (line 553)
-- class: `BlameRangeResponse` (line 574)
-- class: `FileHistoryResponse` (line 589)
-- class: `SearchTextResponse` (line 604)
+- class: `SearchFilterPayload` (line 268)
+- class: `SearchToolArgs` (line 290)
+- class: `SearchExplainability` (line 299)
+- class: `SearchResultMetadata` (line 308)
+- class: `SearchResultItem` (line 321)
+- class: `SearchStructuredContent` (line 333)
+- class: `FetchToolArgs` (line 342)
+- class: `FetchObjectMetadata` (line 349)
+- class: `FetchObject` (line 360)
+- class: `FetchStructuredContent` (line 370)
+- class: `AnswerEnvelope` (line 376)
+- class: `SymbolInfo` (line 468)
+- class: `GitBlameEntry` (line 499)
+- class: `OpenFileResponse` (line 532)
+- class: `ListPathsResponse` (line 556)
+- class: `BlameRangeResponse` (line 577)
+- class: `FileHistoryResponse` (line 592)
+- class: `SearchTextResponse` (line 607)
 
 ## Graph Metrics
 
-- **fan_in**: 12
+- **fan_in**: 13
 - **fan_out**: 1
 - **cycle_group**: 37
 
@@ -53,8 +53,8 @@ TypedDict provides automatic JSON Schema generation for FastMCP tools.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 9
-- recent churn 90: 9
+- recent churn 30: 10
+- recent churn 90: 10
 
 ## Usage
 
@@ -86,7 +86,7 @@ AnswerEnvelope, BaseErrorFields, BlameRangeResponse, FetchObject, FetchObjectMet
 
 ## Hotspot
 
-- score: 1.81
+- score: 1.84
 
 ## Side Effects
 
@@ -96,7 +96,7 @@ AnswerEnvelope, BaseErrorFields, BlameRangeResponse, FetchObject, FetchObjectMet
 
 - branches: 0
 - cyclomatic: 1
-- loc: 651
+- loc: 654
 
 ## Doc Coverage
 

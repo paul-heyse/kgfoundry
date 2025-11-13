@@ -13,70 +13,79 @@ Deep-Research compatible search/fetch orchestration helpers.
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
 - from **time** import perf_counter
-- from **typing** import TYPE_CHECKING, Protocol
+- from **typing** import TYPE_CHECKING, Protocol, cast
 - from **uuid** import uuid4
 - from **(absolute)** import numpy
-- from **codeintel_rev.eval.pool_writer** import PoolRow, write_pool
+- from **codeintel_rev.eval.pool_writer** import write_pool
 - from **codeintel_rev.io.faiss_manager** import SearchRuntimeOverrides
 - from **codeintel_rev.metrics.registry** import MCP_FETCH_LATENCY_SECONDS, MCP_SEARCH_LATENCY_SECONDS, MCP_SEARCH_POSTFILTER_DENSITY
+- from **codeintel_rev.retrieval.types** import SearchPoolRow
 - from **codeintel_rev.typing** import NDArrayF32, NDArrayI64
 - from **kgfoundry_common.errors** import EmbeddingError
 - from **kgfoundry_common.logging** import get_logger
+- from **codeintel_rev.io.duckdb_catalog** import StructureAnnotations
+- from **codeintel_rev.mcp_server.schemas** import SearchFilterPayload
 - from **codeintel_rev.observability.timeline** import Timeline
-- from **codeintel_rev.io.faiss_manager** import SearchRuntimeOverrides
 
 ## Definitions
 
-- variable: `Timeline` (line 28)
-- variable: `LOGGER` (line 30)
-- class: `EmbeddingClient` (line 33)
-- class: `IndexConfigLike` (line 40)
-- class: `LimitsConfigLike` (line 47)
-- class: `SearchSettings` (line 54)
-- class: `CatalogLike` (line 61)
-- class: `VectorIndex` (line 81)
-- class: `SearchFilters` (line 104)
-- class: `SearchRequest` (line 169)
-- class: `SearchResult` (line 179)
-- class: `SearchResponse` (line 192)
-- class: `SearchDependencies` (line 202)
-- class: `FetchRequest` (line 217)
-- class: `FetchObjectResult` (line 225)
-- class: `FetchResponse` (line 236)
-- class: `FetchDependencies` (line 243)
-- function: `run_search` (line 251)
-- function: `run_fetch` (line 299)
-- function: `_normalize_str_list` (line 336)
-- function: `_embed_query` (line 342)
-- function: `_compute_fanout` (line 354)
-- function: `_build_runtime_overrides` (line 363)
-- function: `_flatten_ids` (line 373)
-- function: `_flatten_scores` (line 379)
-- function: `_hydrate_chunks` (line 385)
-- function: `_build_results` (line 405)
-- function: `_matches_symbols` (line 437)
-- function: `_build_metadata` (line 445)
-- function: `_build_hit_reasons` (line 471)
-- function: `_build_title` (line 494)
-- function: `_build_url` (line 501)
-- function: `_build_snippet` (line 508)
-- function: `_truncate_content` (line 516)
-- function: `_build_fetch_metadata` (line 524)
-- function: `_write_pool_rows` (line 535)
-- function: `_record_postfilter_density` (line 568)
-- function: `_log_search_completion` (line 575)
+- variable: `Timeline` (line 31)
+- variable: `StructureAnnotations` (line 32)
+- variable: `SearchFilterPayload` (line 33)
+- variable: `LOGGER` (line 37)
+- class: `EmbeddingClient` (line 40)
+- class: `IndexConfigLike` (line 48)
+- class: `LimitsConfigLike` (line 78)
+- class: `SearchSettings` (line 112)
+- class: `CatalogLike` (line 126)
+- class: `VectorIndex` (line 149)
+- class: `SearchFilters` (line 174)
+- class: `SearchRequest` (line 259)
+- class: `SearchResult` (line 269)
+- class: `SearchResponse` (line 282)
+- class: `HydrationPayload` (line 292)
+- class: `SearchDependencies` (line 300)
+- class: `FetchRequest` (line 315)
+- class: `FetchObjectResult` (line 323)
+- class: `FetchResponse` (line 334)
+- class: `FetchDependencies` (line 341)
+- function: `run_search` (line 349)
+- function: `run_fetch` (line 420)
+- function: `_normalize_str_list` (line 480)
+- function: `_embed_query` (line 486)
+- function: `_compute_fanout` (line 499)
+- function: `_build_runtime_overrides` (line 508)
+- function: `_flatten_ids` (line 535)
+- function: `_flatten_scores` (line 541)
+- function: `_hydrate_chunks` (line 547)
+- function: `_build_results` (line 571)
+- function: `_matches_symbols` (line 603)
+- function: `_build_metadata` (line 610)
+- function: `_build_hit_reasons` (line 635)
+- function: `_build_title` (line 657)
+- function: `_build_url` (line 664)
+- function: `_build_snippet` (line 671)
+- function: `_truncate_content` (line 679)
+- function: `_build_fetch_metadata` (line 687)
+- function: `_write_pool_rows` (line 698)
+- function: `_record_postfilter_density` (line 740)
+- function: `_log_search_completion` (line 747)
+- function: `_coerce_int` (line 767)
+- function: `_string_sequence` (line 782)
 
 ## Graph Metrics
 
 - **fan_in**: 1
-- **fan_out**: 5
+- **fan_out**: 8
 - **cycle_group**: 121
 
 ## Ownership
 
-- bus factor: 0.00
-- recent churn 30: 0
-- recent churn 90: 0
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 1
+- recent churn 90: 1
 
 ## Usage
 
@@ -91,7 +100,7 @@ FetchDependencies, FetchObjectResult, FetchRequest, FetchResponse, SearchDepende
 
 - **summary**: Deep-Research compatible search/fetch orchestration helpers.
 - has summary: yes
-- param parity: no
+- param parity: yes
 - examples present: no
 
 ## Typedness
@@ -108,7 +117,7 @@ FetchDependencies, FetchObjectResult, FetchRequest, FetchResponse, SearchDepende
 
 ## Hotspot
 
-- score: 2.60
+- score: 2.73
 
 ## Side Effects
 
@@ -116,9 +125,9 @@ FetchDependencies, FetchObjectResult, FetchRequest, FetchResponse, SearchDepende
 
 ## Complexity
 
-- branches: 69
-- cyclomatic: 70
-- loc: 608
+- branches: 66
+- cyclomatic: 67
+- loc: 801
 
 ## Doc Coverage
 

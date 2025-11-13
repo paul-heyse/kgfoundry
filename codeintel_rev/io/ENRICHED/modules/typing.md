@@ -47,7 +47,7 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 
 ## Graph Metrics
 
-- **fan_in**: 99
+- **fan_in**: 98
 - **fan_out**: 0
 - **cycle_group**: 0
 
@@ -56,8 +56,8 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 13
-- recent churn 90: 13
+- recent churn 30: 14
+- recent churn 90: 14
 
 ## Usage
 
@@ -89,7 +89,7 @@ FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, Polars
 
 ## Hotspot
 
-- score: 2.72
+- score: 2.71
 
 ## Side Effects
 

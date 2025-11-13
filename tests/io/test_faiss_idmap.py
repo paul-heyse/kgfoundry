@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
+import duckdb
 import numpy as np
 import pyarrow.parquet as pq
 import pytest
@@ -31,10 +32,60 @@ def test_export_idmap_round_trip(tmp_path: Path) -> None:
     assert rows == 32
 
     table = pq.read_table(out_path)
-    assert set(table.column_names) == {"faiss_row", "external_id", "source"}
+    assert set(table.column_names) == {"faiss_row", "external_id"}
     assert table.num_rows == 32
     assert table.column("external_id").to_pylist()[:5] == [0, 1, 2, 3, 4]
-    assert set(table.column("source").to_pylist()) == {"primary"}
+
+
+def test_duckdb_join_with_idmap(tmp_path: Path) -> None:
+    """ID map sidecar can be joined with chunk metadata via DuckDB."""
+    vec_dim = 4
+    vectors = np.random.RandomState(1).randn(4, vec_dim).astype(np.float32)
+    ids = np.array([10, 11, 12, 13], dtype=np.int64)
+    manager = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim, use_cuvs=False)
+    manager.build_index(vectors)
+    manager.add_vectors(vectors, ids)
+    manager.save_cpu_index()
+    manager.load_cpu_index()
+    idmap_path = tmp_path / "faiss_idmap.parquet"
+    manager.export_idmap(idmap_path)
+    conn = duckdb.connect(str(tmp_path / "cat.duckdb"))
+    conn.execute(
+        """
+        CREATE TABLE chunks (
+            id BIGINT,
+            uri VARCHAR,
+            start_line INTEGER,
+            end_line INTEGER,
+            lang VARCHAR,
+            content VARCHAR,
+            preview VARCHAR,
+            embedding FLOAT[]
+        )
+        """
+    )
+    for chunk_id in ids.tolist():
+        conn.execute(
+            "INSERT INTO chunks VALUES (?, 'repo://file.py', 0, 1, 'py', 'body', 'body', [0.1])",
+            [int(chunk_id)],
+        )
+    relation = conn.sql(
+        "SELECT faiss_row, external_id FROM read_parquet(?)",
+        params=[str(idmap_path)],
+    )
+    relation.create_view("faiss_idmap", replace=True)
+    conn.execute(
+        """
+        CREATE OR REPLACE VIEW v_faiss_join AS
+        SELECT c.id, f.faiss_row
+        FROM chunks AS c
+        LEFT JOIN faiss_idmap AS f
+          ON f.external_id = c.id
+        """
+    )
+    row = conn.execute("SELECT COUNT(*) FROM v_faiss_join WHERE faiss_row IS NOT NULL").fetchone()
+    assert row is not None
+    assert row[0] == len(ids)
 
 
 def _meta_path(manager: FAISSManager) -> Path:

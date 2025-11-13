@@ -21,13 +21,15 @@ Helpers for optional polars exports.
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 5
+- **cycle_group**: 4
 
 ## Ownership
 
-- bus factor: 0.00
-- recent churn 30: 0
-- recent churn 90: 0
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 1
+- recent churn 90: 1
 
 ## Usage
 
@@ -38,7 +40,7 @@ Helpers for optional polars exports.
 
 - **summary**: Helpers for optional polars exports.
 - has summary: yes
-- param parity: no
+- param parity: yes
 - examples present: no
 
 ## Typedness
@@ -65,11 +67,11 @@ Helpers for optional polars exports.
 
 - branches: 2
 - cyclomatic: 3
-- loc: 37
+- loc: 48
 
 ## Doc Coverage
 
-- `resolve_polars_frame_factory` (function): summary=yes, params=mismatch, examples=no — Return a DataFrame factory that works across polars versions.
+- `resolve_polars_frame_factory` (function): summary=yes, params=ok, examples=no — Return a DataFrame factory that works across polars versions.
 
 ## Tags
 

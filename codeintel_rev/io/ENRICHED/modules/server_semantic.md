@@ -26,11 +26,11 @@ Semantic MCP tool registrations (pure move from server.py).
 ## Definitions
 
 - function: `deep_research_search` (line 33)
-- function: `deep_research_fetch` (line 70)
-- function: `semantic_search` (line 99)
-- function: `semantic_search_pro` (line 150)
-- function: `telemetry_run_report` (line 211)
-- function: `_render_run_report` (line 242)
+- function: `deep_research_fetch` (line 95)
+- function: `semantic_search` (line 142)
+- function: `semantic_search_pro` (line 193)
+- function: `telemetry_run_report` (line 254)
+- function: `_render_run_report` (line 285)
 
 ## Graph Metrics
 
@@ -43,8 +43,8 @@ Semantic MCP tool registrations (pure move from server.py).
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 5
+- recent churn 90: 5
 
 ## Usage
 
@@ -55,7 +55,7 @@ Semantic MCP tool registrations (pure move from server.py).
 
 - **summary**: Semantic MCP tool registrations (pure move from server.py).
 - has summary: yes
-- param parity: no
+- param parity: yes
 - examples present: no
 
 ## Typedness
@@ -82,12 +82,12 @@ Semantic MCP tool registrations (pure move from server.py).
 
 - branches: 13
 - cyclomatic: 14
-- loc: 254
+- loc: 297
 
 ## Doc Coverage
 
-- `deep_research_search` (function): summary=yes, params=mismatch, examples=no — Deep-Research compatible semantic search that returns chunk ids.
-- `deep_research_fetch` (function): summary=yes, params=mismatch, examples=no — Hydrate chunk ids produced by :func:`deep_research_search`.
+- `deep_research_search` (function): summary=yes, params=ok, examples=no — Deep-Research compatible semantic search that returns chunk ids.
+- `deep_research_fetch` (function): summary=yes, params=ok, examples=no — Hydrate chunk ids produced by :func:`deep_research_search`.
 - `semantic_search` (function): summary=yes, params=ok, examples=no — Semantic code search using embeddings.
 - `semantic_search_pro` (function): summary=yes, params=ok, examples=no — Two-stage semantic retrieval with optional late interaction and reranker.
 - `telemetry_run_report` (function): summary=yes, params=ok, examples=no — Return the latest run report for the active or requested session.

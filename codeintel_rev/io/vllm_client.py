@@ -6,6 +6,7 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 from __future__ import annotations
 
 import asyncio
+from contextlib import nullcontext
 from functools import lru_cache
 from importlib import import_module
 from time import perf_counter
@@ -302,28 +303,18 @@ class VLLMClient:
 
         mode = self._mode
         batch_size = len(texts)
-        attrs = {"mode": mode, "n_texts": batch_size, "dim": self.config.embedding_dim}
-        if timeline is not None:
-            timeline.event(
-                "vllm.embed.start",
-                "vllm",
-                attrs=attrs,
-            )
+        step_attrs = {"mode": mode, "batch": batch_size, "dim": self.config.embedding_dim}
         start = perf_counter()
         try:
             with (
                 span_context(
                     "search.embed",
                     stage="search.embed",
-                    attrs=attrs,
+                    attrs=step_attrs,
                     emit_checkpoint=True,
                 ),
-                as_span(
-                    "vllm.embed_batch",
-                    mode=mode,
-                    n_texts=batch_size,
-                    dim=self.config.embedding_dim,
-                ),
+                as_span("embed.vllm", **step_attrs),
+                timeline.step("embed.vllm", **step_attrs) if timeline else nullcontext(),
             ):
                 if self._local_engine is not None:
                     vectors = self._local_engine.embed_batch(texts)
@@ -338,11 +329,10 @@ class VLLMClient:
             )
             if timeline is not None:
                 timeline.event(
-                    "vllm.embed.end",
-                    "vllm",
-                    status="error",
+                    "error",
+                    "embed.vllm",
                     message=str(exc),
-                    attrs={"mode": mode, "n_texts": batch_size},
+                    attrs={"mode": mode, "batch": batch_size},
                 )
             raise
 
@@ -356,19 +346,8 @@ class VLLMClient:
             },
         )
         elapsed_ms = int(1000 * (perf_counter() - start))
-        if timeline is not None:
-            timeline.event(
-                "vllm.embed.end",
-                "vllm",
-                attrs={
-                    "duration_ms": elapsed_ms,
-                    "dim": vectors.shape[1] if vectors.size else 0,
-                    "mode": mode,
-                    "n_texts": batch_size,
-                },
-            )
         record_span_event(
-            "vllm.embed.complete",
+            "embed.vllm.complete",
             mode=mode,
             batch_size=batch_size,
             duration_ms=elapsed_ms,

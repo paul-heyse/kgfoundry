@@ -22,6 +22,8 @@ from types import ModuleType
 from typing import TYPE_CHECKING, Any, cast
 
 from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.errors import VectorIndexIncompatibleError, VectorIndexStateError
+from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.metrics.registry import (
     FAISS_ANN_LATENCY_SECONDS,
     FAISS_BUILD_SECONDS_LAST,
@@ -46,6 +48,7 @@ from codeintel_rev.metrics.registry import (
 from codeintel_rev.observability.otel import as_span, record_span_event
 from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.retrieval.rerank_flat import FlatReranker
+from codeintel_rev.retrieval.types import SearchHit
 from codeintel_rev.telemetry.decorators import span_context
 from codeintel_rev.typing import NDArrayF32, NDArrayI64, gate_import
 from kgfoundry_common.errors import VectorSearchError
@@ -54,8 +57,6 @@ from kgfoundry_common.logging import get_logger
 if TYPE_CHECKING:
     import faiss as _faiss
     import numpy as np
-
-    from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 
     FaissIndex = _faiss.Index
 else:
@@ -341,9 +342,8 @@ class _FAISSIdMapMixin:
             [
                 pa.array(rows),
                 pa.array(idmap),
-                pa.array(["primary"] * len(rows)),
             ],
-            names=["faiss_row", "external_id", "source"],
+            names=["faiss_row", "external_id"],
         )
         out_path.parent.mkdir(parents=True, exist_ok=True)
         pq.write_table(table, out_path, compression="zstd", use_dictionary=True)
@@ -488,6 +488,13 @@ class FAISSManager(
     When `update_index()` is called, the secondary index is automatically created
     if it doesn't exist. Use `merge_indexes()` periodically to merge secondary
     into primary and rebuild for optimal performance.
+
+    Attributes
+    ----------
+    apply_tuning : Callable[[Mapping[str, Any]], dict[str, object]]
+        Backwards-compatible alias for `apply_tuning_profile()`. Used in some
+        CLI code paths for applying persisted tuning profiles. Accepts a tuning
+        profile dictionary and returns the current runtime tuning parameters.
 
     Parameters
     ----------
@@ -1397,7 +1404,7 @@ class FAISSManager(
         *,
         nprobe: int | None = None,
         runtime: SearchRuntimeOverrides | None = None,
-        catalog: DuckDBCatalog | None = None,
+        catalog: object | None = None,
     ) -> tuple[NDArrayF32, NDArrayI64]:
         """Search for nearest neighbors using cosine similarity with dual-index support.
 
@@ -1428,9 +1435,12 @@ class FAISSManager(
             used during index construction. Only applies to IVF-family indexes.
         runtime : SearchRuntimeOverrides | None, optional
             Optional overrides controlling HNSW and refinement parameters.
-        catalog : DuckDBCatalog | None, optional
-            When provided and ``refine_k_factor`` > 1, candidate embeddings are
-            hydrated from DuckDB and reranked exactly before returning results.
+        catalog : object | None, optional
+            Optional catalog object (typically DuckDBCatalog) for candidate hydration
+            and exact reranking. When provided and ``refine_k_factor`` > 1, candidate
+            embeddings are hydrated from the catalog and reranked exactly before
+            returning results. The catalog must expose get_embeddings_by_ids() or
+            similar methods for embedding retrieval. When None, reranking is skipped.
 
         Returns
         -------
@@ -1504,8 +1514,9 @@ class FAISSManager(
                     FAISS_POSTFILTER_DENSITY.labels(**metric_labels).set(
                         plan.k / float(plan.search_k)
                     )
+                duck_catalog = catalog if isinstance(catalog, DuckDBCatalog) else None
                 refined = self._maybe_refine_results(
-                    catalog=catalog,
+                    catalog=duck_catalog,
                     plan=plan,
                     identifiers=identifiers,
                     metric_labels=metric_labels,
@@ -1557,6 +1568,81 @@ class FAISSManager(
         self._last_latency_ms = elapsed_total
         FAISS_SEARCH_LAST_MS.set(elapsed_total)
         return result
+
+    def search_with_refine(
+        self,
+        query: NDArrayF32,
+        *,
+        k: int,
+        catalog: DuckDBCatalog,
+        nprobe: int | None = None,
+        runtime: SearchRuntimeOverrides | None = None,
+        source: str = "faiss",
+    ) -> list[SearchHit]:
+        """Return structured hits with ANN search + exact rerank metadata.
+
+        Parameters
+        ----------
+        query : NDArrayF32
+            Query vector for ANN search. Must match the index dimension.
+        k : int
+            Number of results to return after reranking.
+        catalog : DuckDBCatalog
+            DuckDB catalog for fetching chunk metadata and embeddings for
+            reranking. Used to hydrate candidate IDs into full chunk records.
+        nprobe : int | None, optional
+            Optional nprobe override for approximate search (default: None).
+            When None, uses the configured nprobe value.
+        runtime : SearchRuntimeOverrides | None, optional
+            Optional runtime parameter overrides (default: None). Used to
+            customize search behavior (k_factor, ef_search, etc.).
+        source : str, optional
+            Source identifier for telemetry (default: "faiss"). Used to
+            track which search path was used in metrics.
+
+        Returns
+        -------
+        list[SearchHit]
+            List of SearchHit objects containing chunk metadata, scores, and
+            rerank information. Results are sorted by rerank score (descending)
+            when reranking is enabled, or by ANN distance (ascending) otherwise.
+        """
+        runtime = runtime or SearchRuntimeOverrides()
+        _, _, resolved_k_factor, _ = self._resolve_search_knobs(
+            override_nprobe=nprobe,
+            override_ef=runtime.ef_search,
+            override_k_factor=runtime.k_factor,
+            override_quantizer=runtime.quantizer_ef_search,
+        )
+        distances, identifiers = self.search(
+            query,
+            k=k,
+            nprobe=nprobe,
+            runtime=runtime,
+            catalog=catalog,
+        )
+        if distances.size == 0 or identifiers.size == 0:
+            return []
+        top_scores = distances[0]
+        top_ids = identifiers[0]
+        hits: list[SearchHit] = []
+        for rank, (chunk_id, score) in enumerate(zip(top_ids, top_scores, strict=True), start=1):
+            if chunk_id < 0:
+                continue
+            hits.append(
+                SearchHit(
+                    id=int(chunk_id),
+                    rank=rank,
+                    score=float(score),
+                    source=source,
+                    faiss_row=None,
+                    explain={
+                        "family": self.faiss_family or "auto",
+                        "k_factor": resolved_k_factor,
+                    },
+                )
+            )
+        return hits
 
     def _prepare_search_plan(
         self,
@@ -1725,6 +1811,84 @@ class FAISSManager(
             }
         )
         return self.get_runtime_tuning()
+
+    def apply_tuning_profile(self, profile: Mapping[str, Any]) -> dict[str, object]:
+        """Apply a persisted tuning profile (typically from ``tuning.json``).
+
+        Parameters
+        ----------
+        profile : Mapping[str, Any]
+            Tuning profile dictionary containing runtime parameter overrides.
+            Expected keys include "param_str", "nprobe", "efSearch", "k_factor",
+            etc. The profile is typically loaded from a tuning.json file created
+            by the tuning process.
+
+        Returns
+        -------
+        dict[str, object]
+            Current runtime tuning parameters after applying the profile. Returns
+            the same dictionary as get_runtime_tuning(), containing all active
+            runtime parameter overrides.
+
+        Raises
+        ------
+        VectorIndexIncompatibleError
+            Raised when the profile is empty or invalid. Profiles must contain
+            at least one valid parameter override.
+        """
+        if not profile:
+            msg = "Tuning profile payload is empty."
+            raise VectorIndexIncompatibleError(msg)
+
+        def _maybe_int(value: object | None) -> int | None:
+            if value is None:
+                return None
+            return int(value)
+
+        def _maybe_float(value: object | None) -> float | None:
+            if value is None:
+                return None
+            return float(value)
+
+        param_str = str(profile.get("param_str") or "").strip()
+        overrides = {
+            "nprobe": profile.get("nprobe"),
+            "ef_search": profile.get("efSearch"),
+            "quantizer_ef_search": profile.get("quantizer_efSearch"),
+        }
+        k_factor_override = profile.get("k_factor") or profile.get("refine_k_factor")
+        try:
+            if param_str:
+                snapshot = self.set_search_parameters(param_str)
+            else:
+                snapshot = self.apply_runtime_tuning(
+                    nprobe=_maybe_int(overrides["nprobe"]),
+                    ef_search=_maybe_int(overrides["ef_search"]),
+                    quantizer_ef_search=_maybe_int(overrides["quantizer_ef_search"]),
+                    k_factor=_maybe_float(k_factor_override),
+                )
+        except (ValueError, TypeError) as exc:
+            raise VectorIndexIncompatibleError(
+                "Unable to apply tuning profile.",
+                context={"param_str": param_str or "runtime_overrides"},
+                cause=exc,
+            ) from exc
+
+        if k_factor_override is not None:
+            with self._tuning_lock:
+                self.refine_k_factor = float(k_factor_override)
+        try:
+            self.save_tuning_profile(dict(profile))
+        except OSError:  # pragma: no cover - best effort
+            LOGGER.debug(
+                "Unable to persist tuning profile",
+                extra=_log_extra(path=str(self.autotune_profile_path)),
+            )
+        self._tuned_parameters = dict(profile)
+        return snapshot
+
+    # Backwards-compatible alias used in some CLI code paths.
+    apply_tuning = apply_tuning_profile
 
     def _search_primary(
         self, query: NDArrayF32, k: int, nprobe: int
@@ -2277,12 +2441,12 @@ class FAISSManager(
 
         Raises
         ------
-        RuntimeError
+        VectorIndexStateError
             If the index has not been built or loaded yet.
         """
         if self.cpu_index is None:
-            msg = "Index not built"
-            raise RuntimeError(msg)
+            msg = "FAISS index not built or loaded"
+            raise VectorIndexStateError(msg, context={"index_path": str(self.index_path)})
         return self.cpu_index
 
     def require_cpu_index(self) -> _faiss.Index:

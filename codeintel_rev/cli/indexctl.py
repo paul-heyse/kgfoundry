@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Annotated, Literal, cast
 
 import click
+import duckdb
 import numpy as np
 import typer
 
@@ -29,7 +30,7 @@ from codeintel_rev.indexing.index_lifecycle import (
 )
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.duckdb_manager import DuckDBManager
-from codeintel_rev.io.faiss_manager import FAISSManager
+from codeintel_rev.io.faiss_manager import FAISSManager, SearchRuntimeOverrides
 from codeintel_rev.io.parquet_store import (
     ParquetWriteOptions,
     extract_embeddings,
@@ -39,6 +40,11 @@ from codeintel_rev.io.parquet_store import (
 from codeintel_rev.io.xtr_manager import XTRIndex
 from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.logging import get_logger
+
+try:  # pragma: no cover - optional dependency
+    import pyarrow.parquet as pyarrow_parquet
+except ModuleNotFoundError:  # pragma: no cover - optional dependency
+    pyarrow_parquet = None
 
 LOGGER = get_logger(__name__)
 app = typer.Typer(help="Manage versioned FAISS/DuckDB/SCIP assets.", no_args_is_help=True)
@@ -70,6 +76,10 @@ ExtraOption = Annotated[
 ]
 VersionArg = Annotated[str, typer.Argument(help="Version identifier.")]
 PathArg = Annotated[Path, typer.Argument(help="Path to an asset on disk.")]
+QueriesArg = Annotated[
+    Path,
+    typer.Argument(help="Path to newline-delimited queries for smoke tests."),
+]
 IndexOption = Annotated[Path | None, typer.Option("--index", help="Path to FAISS index file.")]
 AssetsArg = Annotated[
     tuple[Path, Path, Path],
@@ -755,6 +765,62 @@ def _duckdb_catalog(path_override: Path | None = None) -> DuckDBCatalog:
     return catalog
 
 
+def _duckdb_embedding_dim(catalog: DuckDBCatalog) -> int:
+    """Return the embedding dimension stored in DuckDB.
+
+    Parameters
+    ----------
+    catalog : DuckDBCatalog
+        DuckDB catalog instance to query for embedding dimension. The catalog
+        must have a chunks table with an embedding column.
+
+    Returns
+    -------
+    int
+        The dimension of embeddings stored in the catalog. Returns 0 if no
+        embeddings are found or if the embedding column is empty/None.
+    """
+    with catalog.connection() as conn:
+        row = conn.execute("SELECT embedding FROM chunks LIMIT 1").fetchone()
+    if not row or row[0] is None:
+        return 0
+    embedding = row[0]
+    try:
+        return len(embedding)
+    except TypeError:
+        return 0
+
+
+def _count_idmap_rows(path: Path) -> int:
+    """Return row count for a FAISS idmap sidecar.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the Parquet file containing the FAISS ID map sidecar. The file
+        may not exist, in which case 0 is returned.
+
+    Returns
+    -------
+    int
+        Number of rows in the ID map Parquet file, or 0 if the file doesn't
+        exist.
+
+    Raises
+    ------
+    RuntimeError
+        Raised when pyarrow is not installed. pyarrow is required to read
+        Parquet metadata and determine the row count.
+    """
+    if not path.exists():
+        return 0
+    if pyarrow_parquet is None:
+        msg = "pyarrow is required to inspect the ID map sidecar"
+        raise RuntimeError(msg)
+    metadata = pyarrow_parquet.ParquetFile(path).metadata
+    return metadata.num_rows if metadata is not None else 0
+
+
 def _load_xtr_index(settings: Settings) -> XTRIndex | None:
     if not settings.xtr.enable:
         return None
@@ -879,6 +945,61 @@ def list_command() -> None:
         typer.echo(version)
 
 
+@app.command("health")
+def health_command(
+    index: IndexOption = None,
+    duckdb: DuckOption = None,
+    idmap: IdMapOption | None = None,
+) -> None:
+    """Validate FAISS, DuckDB, and ID map invariants."""
+    settings = _get_settings()
+    manager = _faiss_manager(index)
+    catalog = _duckdb_catalog(duckdb)
+    idmap_path = (idmap or Path(settings.paths.faiss_idmap_path)).expanduser().resolve()
+    faiss_dim = manager.vec_dim
+    duck_dim = _duckdb_embedding_dim(catalog)
+    cpu_index = manager.require_cpu_index()
+    faiss_rows = getattr(cpu_index, "ntotal", 0)
+    checks: dict[str, dict[str, object]] = {}
+    checks["faiss_dim_match"] = {
+        "ok": faiss_dim == duck_dim,
+        "faiss_dim": faiss_dim,
+        "duckdb_dim": duck_dim,
+    }
+    try:
+        idmap_rows = _count_idmap_rows(idmap_path)
+    except (RuntimeError, OSError, ValueError) as exc:  # pragma: no cover - optional deps
+        checks["idmap_size_match"] = {
+            "ok": False,
+            "error": str(exc),
+            "idmap_path": str(idmap_path),
+        }
+    else:
+        checks["idmap_size_match"] = {
+            "ok": idmap_rows == faiss_rows,
+            "idmap_rows": idmap_rows,
+            "faiss_rows": faiss_rows,
+        }
+    try:
+        catalog.ensure_faiss_idmap_views(idmap_path if idmap_path.exists() else None)
+        with catalog.connection() as conn:
+            conn.execute("SELECT COUNT(*) FROM v_faiss_join LIMIT 1").fetchone()
+    except (duckdb.Error, RuntimeError, ValueError) as exc:  # pragma: no cover - DuckDB failures
+        checks["duckdb_views_ok"] = {"ok": False, "error": str(exc)}
+    else:
+        checks["duckdb_views_ok"] = {"ok": True}
+    try:
+        chunk_count = catalog.count_chunks()
+    except (duckdb.Error, RuntimeError, ValueError) as exc:  # pragma: no cover - schema drift
+        checks["duckdb_schema_ok"] = {"ok": False, "error": str(exc)}
+    else:
+        checks["duckdb_schema_ok"] = {"ok": chunk_count >= 0, "chunks": chunk_count}
+    overall = all(entry.get("ok") for entry in checks.values())
+    payload = {"ok": overall, "checks": checks, "idmap_path": str(idmap_path)}
+    catalog.close()
+    typer.echo(json.dumps(payload, indent=2))
+
+
 @app.command("export-idmap")
 def export_idmap_command(
     index: IndexOption = None,
@@ -893,9 +1014,7 @@ def export_idmap_command(
     typer.echo(f"Exported {rows} FAISS rows -> {destination}")
     if duckdb is not None:
         catalog = _duckdb_catalog(duckdb)
-        stats = catalog.refresh_faiss_idmap_mat_if_changed(destination)
-        catalog.ensure_faiss_idmap_views(destination)
-        catalog.materialize_faiss_join()
+        stats = catalog.register_idmap_parquet(destination, materialize=True)
         typer.echo(
             f"Materialized join rows={stats['rows']} "
             f"checksum={stats['checksum']} refreshed={stats['refreshed']}"
@@ -1105,3 +1224,99 @@ def eval_command(
             extra={"pool_path": str(pool_path), "error": str(exc)},
         )
     typer.echo(json.dumps(report.__dict__, indent=2))
+
+
+@app.command("search")
+def search_command(
+    queries: QueriesArg,
+    k: EvalTopKOption = 10,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run/--write-pool", help="Skip pool artefact creation."),
+    ] = True,
+    nprobe: EvalNProbeOption = None,
+    index: IndexOption = None,
+    duckdb: DuckOption = None,
+) -> None:
+    """Execute ANN + refine search for newline-delimited queries and print a summary.
+
+    Parameters
+    ----------
+    queries : QueriesArg
+        Path to a file containing newline-delimited query strings. Each line
+        is treated as a separate query and embedded for search.
+    k : EvalTopKOption, optional
+        Number of results to return per query (default: 10).
+    dry_run : Annotated[bool, typer.Option("--dry-run/--write-pool")], optional
+        If True, skip pool artifact creation and only print summary (default: True).
+        When False, creates pool artifacts for evaluation.
+    nprobe : EvalNProbeOption, optional
+        Optional nprobe override for FAISS search (default: None).
+    index : IndexOption, optional
+        Optional path override for FAISS index (default: None).
+    duckdb : DuckOption, optional
+        Optional path override for DuckDB catalog (default: None).
+
+    Raises
+    ------
+    typer.BadParameter
+        Raised when the queries file cannot be read. The error includes the
+        file path and the underlying I/O error message.
+    """
+    settings = _get_settings()
+    manager = _faiss_manager(index)
+    catalog = _duckdb_catalog(duckdb)
+    embedder = get_embedding_provider(settings)
+    runtime = SearchRuntimeOverrides()
+    try:
+        try:
+            lines = queries.read_text(encoding="utf-8").splitlines()
+        except OSError as exc:
+            msg = f"Unable to read queries file: {exc}"
+            raise typer.BadParameter(msg) from exc
+        summary: list[dict[str, object]] = []
+        for raw_line in lines:
+            query = raw_line.strip()
+            if not query:
+                continue
+            vectors = embedder.embed_texts([query])
+            ann_dists, ann_ids = manager.search(
+                vectors,
+                k=k,
+                nprobe=nprobe,
+                runtime=runtime,
+                catalog=None,
+            )
+            ann_ids_row = [int(chunk_id) for chunk_id in ann_ids[0].tolist() if chunk_id >= 0]
+            refined_hits = manager.search_with_refine(
+                vectors,
+                k=k,
+                catalog=catalog,
+                nprobe=nprobe,
+                runtime=runtime,
+                source="faiss_refine" if manager.refine_k_factor > 1.0 else "faiss",
+            )
+            refined_ids = [hit.id for hit in refined_hits]
+            overlap = len(set(ann_ids_row) & set(refined_ids))
+            summary.append(
+                {
+                    "query": query,
+                    "ann_ids": ann_ids_row,
+                    "refined_hits": [
+                        {
+                            "id": hit.id,
+                            "rank": hit.rank,
+                            "score": hit.score,
+                            "source": hit.source,
+                            "faiss_row": hit.faiss_row,
+                            "explain": dict(hit.explain),
+                        }
+                        for hit in refined_hits
+                    ],
+                    "overlap": overlap,
+                }
+            )
+    finally:
+        embedder.close()
+        catalog.close()
+    typer.echo(json.dumps({"dry_run": dry_run, "results": summary}, indent=2))

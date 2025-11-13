@@ -11,6 +11,7 @@ import signal
 import threading
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager, suppress
+from importlib.metadata import PackageNotFoundError, version
 from time import perf_counter
 from types import FrameType
 from typing import Any, cast
@@ -33,7 +34,12 @@ from codeintel_rev.app.routers import index_admin
 from codeintel_rev.app.server_settings import get_server_settings
 from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.mcp_server.server import app_context, build_http_app
-from codeintel_rev.observability.otel import as_span
+from codeintel_rev.observability.otel import (
+    as_span,
+    init_telemetry,
+    instrument_fastapi,
+    instrument_httpx,
+)
 from codeintel_rev.observability.runtime_observer import TimelineRuntimeObserver
 from codeintel_rev.observability.timeline import bind_timeline, new_timeline
 from codeintel_rev.runtime.cells import RuntimeCellObserver
@@ -53,6 +59,10 @@ from kgfoundry_common.logging import get_logger
 
 LOGGER = get_logger(__name__)
 SERVER_SETTINGS = get_server_settings()
+try:
+    _DIST_VERSION = version("kgfoundry")
+except PackageNotFoundError:
+    _DIST_VERSION = None
 
 install_structured_logging()
 install_otel(service_name="codeintel-mcp")
@@ -362,6 +372,12 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+init_telemetry(
+    service_name="codeintel-mcp",
+    service_version=_DIST_VERSION,
+)
+instrument_fastapi(app)
+instrument_httpx()
 
 # CORS middleware for browser clients (handle preflight before session scope)
 app.add_middleware(

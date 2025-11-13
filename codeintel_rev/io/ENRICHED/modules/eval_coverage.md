@@ -28,7 +28,7 @@ Command-line entry point for SCIP function coverage evaluation.
 
 - **fan_in**: 0
 - **fan_out**: 3
-- **cycle_group**: 92
+- **cycle_group**: 93
 
 ## Ownership
 
