@@ -18,13 +18,26 @@ Coverage ingestion utilities (Cobertura-style XML).
 - function: `collect_coverage` (line 15)
 - function: `_parse_int` (line 60)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 0
-- **cycle_group**: 15
+- **cycle_group**: 16
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 5
+- recent churn 90: 5
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Coverage ingestion utilities (Cobertura-style XML).
 - has summary: yes
@@ -43,7 +56,7 @@ Coverage ingestion utilities (Cobertura-style XML).
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.54
 

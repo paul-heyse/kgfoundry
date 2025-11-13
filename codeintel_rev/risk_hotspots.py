@@ -5,9 +5,7 @@ from __future__ import annotations
 
 import math
 import shutil
-
-# lint-ignore: S404 subprocess required for git metrics
-import subprocess  # noqa: S404
+import subprocess  # lint-ignore[S404]: subprocess required for git metrics
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -64,8 +62,8 @@ def _git_churn(path: str) -> int:
     if not target.exists():
         return 0
     try:
-        # lint-ignore: S603 git log invocation for analytics
-        result = subprocess.run(  # noqa: S603
+        # lint-ignore[S603]: git log invocation for analytics
+        result = subprocess.run(
             [git_executable, "log", "--pretty=oneline", "--", str(target)],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,

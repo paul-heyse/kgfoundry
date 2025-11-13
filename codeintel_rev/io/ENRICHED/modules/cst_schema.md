@@ -25,13 +25,26 @@ Dataclasses and helpers describing the CST dataset schema.
 - function: `_format_doc` (line 184)
 - function: `_assign_optional` (line 195)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 5
 - **fan_out**: 1
-- **cycle_group**: 23
+- **cycle_group**: 27
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 3
+- recent churn 90: 3
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Dataclasses and helpers describing the CST dataset schema.
 - has summary: yes
@@ -50,7 +63,7 @@ Dataclasses and helpers describing the CST dataset schema.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.12
 

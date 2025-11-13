@@ -24,13 +24,26 @@ Lightweight helpers for loading and querying SCIP JSON indices.
 - class: `SCIPIndex` (line 65)
 - function: `_parse_document` (line 142)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 4
 - **fan_out**: 1
-- **cycle_group**: 9
+- **cycle_group**: 11
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 4
+- recent churn 90: 4
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Lightweight helpers for loading and querying SCIP JSON indices.
 - has summary: yes
@@ -52,9 +65,10 @@ Lightweight helpers for loading and querying SCIP JSON indices.
 ## Config References
 
 - enrich/tagging_rules.yaml
+- enrich/PLAYBOOK.md
 - enrich/README.md
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.03
 

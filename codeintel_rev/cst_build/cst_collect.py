@@ -54,16 +54,16 @@ class _CollectorStatsBuilder:
     scope_resolved: int = 0
 
     def increment_parse_errors(self, count: int = 1) -> None:
-        object.__setattr__(self, "parse_errors", self.parse_errors + count)  # noqa: PLC2801
+        object.__setattr__(self, "parse_errors", self.parse_errors + count)  # lint-ignore[PLC2801]: frozen dataclass uses mutation helper for counters
 
     def set_node_rows(self, count: int) -> None:
-        object.__setattr__(self, "node_rows", count)  # noqa: PLC2801
+        object.__setattr__(self, "node_rows", count)  # lint-ignore[PLC2801]: frozen stats builder
 
     def increment_qname_hits(self) -> None:
-        object.__setattr__(self, "qname_hits", self.qname_hits + 1)  # noqa: PLC2801
+        object.__setattr__(self, "qname_hits", self.qname_hits + 1)  # lint-ignore[PLC2801]: builder updates counters immutably
 
     def increment_scope_resolved(self) -> None:
-        object.__setattr__(self, "scope_resolved", self.scope_resolved + 1)  # noqa: PLC2801
+        object.__setattr__(self, "scope_resolved", self.scope_resolved + 1)  # lint-ignore[PLC2801]: frozen dataclass mutate helper
 
     def snapshot(self) -> CollectorStats:
         """Return an immutable CollectorStats instance.
@@ -180,6 +180,12 @@ class CSTCollector:
             except KeyError:
                 logger.debug(
                     "FullRepoManager missing %s; falling back to per-file parsing", rel_path
+                )
+            except cst.ParserSyntaxError as exc:
+                logger.warning(
+                    "FullRepoManager failed to parse %s (%s); retrying with single-file parser",
+                    rel_path,
+                    exc,
                 )
         try:
             module = cst.parse_module(code)

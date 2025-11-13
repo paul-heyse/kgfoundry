@@ -32,15 +32,28 @@ Utilities for building and verifying XTR token indexes.
 - function: `_gather_chunk_vectors` (line 86)
 - function: `_write_token_matrix` (line 157)
 - function: `build_xtr_index` (line 227)
-- function: `main` (line 329)
+- function: `main` (line 330)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 6
-- **cycle_group**: 82
+- **cycle_group**: 86
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 7
+- recent churn 90: 7
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Utilities for building and verifying XTR token indexes.
 - has summary: yes
@@ -59,7 +72,7 @@ Utilities for building and verifying XTR token indexes.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.28
 
@@ -71,7 +84,7 @@ Utilities for building and verifying XTR token indexes.
 
 - branches: 18
 - cyclomatic: 19
-- loc: 345
+- loc: 346
 
 ## Doc Coverage
 

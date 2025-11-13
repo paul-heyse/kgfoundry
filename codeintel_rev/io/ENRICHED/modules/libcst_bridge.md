@@ -33,17 +33,30 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 - function: `_iter_params` (line 205)
 - function: `_exception_name` (line 220)
 - function: `_infer_side_effects` (line 250)
-- class: `_IndexVisitor` (line 272)
-- function: `index_module` (line 561)
-- function: `_lineno` (line 608)
+- class: `_IndexVisitor` (line 299)
+- function: `index_module` (line 658)
+- function: `_lineno` (line 705)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 4
 - **fan_out**: 1
 - **cycle_group**: 2
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 10
+- recent churn 90: 10
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: LibCST-powered index utilities (imports, defs, exports, docstrings).
 - has summary: yes
@@ -65,9 +78,10 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 ## Config References
 
 - enrich/tagging_rules.yaml
+- enrich/PLAYBOOK.md
 - enrich/README.md
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.72
 
@@ -81,7 +95,7 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 
 - branches: 128
 - cyclomatic: 129
-- loc: 629
+- loc: 726
 
 ## Doc Coverage
 

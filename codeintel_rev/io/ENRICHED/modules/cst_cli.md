@@ -30,13 +30,26 @@ CLI entrypoint for CST dataset builds.
 - function: `main` (line 135)
 - function: `_iter_py_files` (line 223)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 4
-- **cycle_group**: 27
+- **cycle_group**: 31
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 3
+- recent churn 90: 3
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: CLI entrypoint for CST dataset builds.
 - has summary: yes
@@ -55,7 +68,7 @@ CLI entrypoint for CST dataset builds.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.16
 

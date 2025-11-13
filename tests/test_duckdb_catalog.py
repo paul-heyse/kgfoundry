@@ -137,7 +137,8 @@ def test_get_embeddings_by_ids_skips_null_embeddings(tmp_path: Path) -> None:
             """
         )
 
-    results = catalog.get_embeddings_by_ids([1, 2])
+    ids, results = catalog.get_embeddings_by_ids([1, 2])
+    assert ids == [1]
     assert results.shape == (1, 2)
     assert np.allclose(results[0], [0.1, 0.2])
 

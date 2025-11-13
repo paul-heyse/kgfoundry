@@ -32,56 +32,70 @@ the FAISS index, then hydrating results from DuckDB.
 - from **(absolute)** import httpx
 - from **(absolute)** import numpy
 - from **codeintel_rev.app.config_context** import ApplicationContext
+- from **codeintel_rev.io.duckdb_catalog** import DuckDBCatalog
 
 ## Definitions
 
-- variable: `httpx` (line 39)
-- variable: `np` (line 40)
-- variable: `SNIPPET_PREVIEW_CHARS` (line 42)
-- variable: `COMPONENT_NAME` (line 43)
-- variable: `LOGGER` (line 44)
-- class: `_ScopeFilterFlags` (line 48)
-- class: `_FaissFanout` (line 83)
-- class: `_HybridSearchState` (line 91)
-- class: `_HybridResult` (line 103)
-- class: `_SearchBudget` (line 114)
-- class: `_SemanticSearchPlan` (line 123)
-- class: `_MethodContext` (line 135)
-- class: `_FaissSearchRequest` (line 147)
-- function: `semantic_search` (line 158)
-- function: `_semantic_search_sync` (line 225)
-- function: `_clamp_result_limit` (line 331)
-- function: `_build_search_budget` (line 360)
-- function: `_build_semantic_search_plan` (line 401)
-- function: `_calculate_faiss_fanout` (line 471)
-- function: `_overfetch_bonus` (line 508)
-- function: `_resolve_hybrid_results` (line 539)
-- function: `_build_hybrid_result` (line 640)
-- function: `_embed_query_or_raise` (line 680)
-- function: `_run_faiss_search_or_raise` (line 720)
-- function: `_ensure_hydration_success` (line 757)
-- function: `_warn_scope_filter_reduction` (line 792)
-- function: `_annotate_hybrid_contributions` (line 830)
-- function: `_embed_query` (line 861)
-- function: `_run_faiss_search` (line 885)
-- function: `_normalize_scope_faiss_tuning` (line 933)
-- function: `_hydrate_findings` (line 998)
-- function: `_build_method` (line 1112)
-- function: `_make_envelope` (line 1149)
-- function: `_success_extras` (line 1199)
-- function: `_build_response_extras` (line 1223)
+- variable: `httpx` (line 40)
+- variable: `np` (line 41)
+- variable: `SNIPPET_PREVIEW_CHARS` (line 43)
+- variable: `COMPONENT_NAME` (line 44)
+- variable: `LOGGER` (line 45)
+- class: `_ScopeFilterFlags` (line 49)
+- class: `_FaissFanout` (line 84)
+- class: `_HybridSearchState` (line 92)
+- class: `_HybridResult` (line 104)
+- class: `_SearchBudget` (line 115)
+- class: `_SemanticSearchPlan` (line 124)
+- class: `_MethodContext` (line 136)
+- class: `_FaissSearchRequest` (line 148)
+- function: `semantic_search` (line 160)
+- function: `_semantic_search_sync` (line 227)
+- function: `_clamp_result_limit` (line 336)
+- function: `_build_search_budget` (line 365)
+- function: `_build_semantic_search_plan` (line 406)
+- function: `_calculate_faiss_fanout` (line 476)
+- function: `_overfetch_bonus` (line 513)
+- function: `_resolve_hybrid_results` (line 544)
+- function: `_build_hybrid_result` (line 645)
+- function: `_embed_query_or_raise` (line 685)
+- function: `_run_faiss_search_or_raise` (line 725)
+- function: `_ensure_hydration_success` (line 762)
+- function: `_warn_scope_filter_reduction` (line 797)
+- function: `_annotate_hybrid_contributions` (line 835)
+- function: `_embed_query` (line 866)
+- function: `_run_faiss_search` (line 890)
+- function: `_normalize_scope_faiss_tuning` (line 939)
+- function: `_hydrate_findings` (line 1004)
+- function: `_build_method` (line 1130)
+- function: `_make_envelope` (line 1167)
+- function: `_success_extras` (line 1217)
+- function: `_build_response_extras` (line 1241)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 10
-- **cycle_group**: 123
+- **fan_out**: 11
+- **cycle_group**: 127
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 35
+- recent churn 90: 35
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 semantic_search
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Semantic search adapter using FAISS GPU and DuckDB.
 - has summary: yes
@@ -100,9 +114,9 @@ semantic_search
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
-- score: 2.81
+- score: 2.85
 
 ## Side Effects
 
@@ -112,9 +126,9 @@ semantic_search
 
 ## Complexity
 
-- branches: 75
-- cyclomatic: 76
-- loc: 1271
+- branches: 77
+- cyclomatic: 78
+- loc: 1289
 
 ## Doc Coverage
 

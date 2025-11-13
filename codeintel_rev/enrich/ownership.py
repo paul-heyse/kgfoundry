@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-import subprocess  # noqa: S404
+import subprocess  # lint-ignore[S404]: subprocess required for git analytics
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -176,7 +176,7 @@ def _stats_via_subprocess(
 
 def _run_git(cmd: list[str], repo_root: Path) -> list[str]:
     try:
-        process = subprocess.run(  # noqa: S603 - fixed command + cwd
+        process = subprocess.run(  # lint-ignore[S603]: git log invocation uses fixed args and cwd
             cmd,
             cwd=str(repo_root),
             check=False,

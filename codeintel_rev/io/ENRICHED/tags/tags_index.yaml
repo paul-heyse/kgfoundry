@@ -54,11 +54,15 @@ low-coverage:
 - metrics/__init__.py
 - enrich/tree_sitter_bridge.py
 - enrich/scip_reader.py
+- enrich/graph_builder.py
 - enrich/output_writers.py
 - enrich/tagging.py
 - enrich/ast_indexer.py
 - enrich/type_integration.py
+- enrich/slices_builder.py
+- enrich/ownership.py
 - enrich/libcst_bridge.py
+- enrich/pathnorm.py
 - enrich/stubs_overlay.py
 - enrich/__init__.py
 - observability/runtime_observer.py
@@ -97,6 +101,7 @@ low-coverage:
 - retrieval/gating.py
 - retrieval/hybrid.py
 - retrieval/rm3_heuristics.py
+- retrieval/rerank_flat.py
 - retrieval/__init__.py
 - retrieval/boosters.py
 - runtime/request_context.py
@@ -163,7 +168,11 @@ public-api:
 - indexing/__init__.py
 - indexing/cast_chunker.py
 - metrics/registry.py
+- enrich/graph_builder.py
 - enrich/ast_indexer.py
+- enrich/slices_builder.py
+- enrich/ownership.py
+- enrich/pathnorm.py
 - observability/metrics.py
 - observability/otel.py
 - observability/__init__.py
@@ -191,6 +200,7 @@ public-api:
 - retrieval/gating.py
 - retrieval/hybrid.py
 - retrieval/rm3_heuristics.py
+- retrieval/rerank_flat.py
 - retrieval/boosters.py
 - runtime/request_context.py
 - runtime/factory_adjustment.py

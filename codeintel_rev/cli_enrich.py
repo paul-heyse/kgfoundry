@@ -125,6 +125,7 @@ DEFAULT_OWNER_HISTORY_DAYS = 90
 DEFAULT_COMMITS_WINDOW = 50
 DEFAULT_ENABLE_OWNERS = True
 DEFAULT_EMIT_SLICES_FLAG = False
+_EMIT_AST_FLAG = "--emit-ast/--no-emit-ast"
 
 STUBS = typer.Option(
     Path("stubs"),
@@ -258,8 +259,7 @@ def _iter_files(root: Path, patterns: tuple[str, ...] | None = None) -> Iterable
         yield candidate
 
 
-# lint-ignore: PLR0913,PLR0914 pipeline orchestration requires many parameters
-def _run_pipeline(  # noqa: PLR0913, PLR0914
+def _run_pipeline(  # lint-ignore[PLR0913,PLR0914]: pipeline orchestration requires many parameters
     *,
     root: Path,
     scip: Path,
@@ -337,8 +337,7 @@ def _run_pipeline(  # noqa: PLR0913, PLR0914
 
 
 @app.command("all")
-# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
-def run_all(  # noqa: PLR0913, PLR0917
+def run_all(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -349,7 +348,7 @@ def run_all(  # noqa: PLR0913, PLR0917
     emit_ast: Annotated[
         bool,
         typer.Option(
-            "--emit-ast/--no-emit-ast",
+            _EMIT_AST_FLAG,
             help="Emit Parquet datasets with AST nodes and metrics.",
         ),
     ] = DEFAULT_EMIT_AST,
@@ -393,8 +392,7 @@ def run_all(  # noqa: PLR0913, PLR0917
 
 
 @app.command("scan")
-# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
-def scan(  # noqa: PLR0913, PLR0917
+def scan(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -405,7 +403,7 @@ def scan(  # noqa: PLR0913, PLR0917
     emit_ast: Annotated[
         bool,
         typer.Option(
-            "--emit-ast/--no-emit-ast",
+            _EMIT_AST_FLAG,
             help="Emit Parquet datasets with AST nodes and metrics.",
         ),
     ] = DEFAULT_EMIT_AST,
@@ -437,8 +435,7 @@ def scan(  # noqa: PLR0913, PLR0917
 
 
 @app.command("exports")
-# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
-def exports(  # noqa: PLR0913, PLR0917
+def exports(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -478,8 +475,7 @@ def exports(  # noqa: PLR0913, PLR0917
 
 
 @app.command("graph")
-# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
-def graph(  # noqa: PLR0913, PLR0917
+def graph(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -505,8 +501,7 @@ def graph(  # noqa: PLR0913, PLR0917
 
 
 @app.command("uses")
-# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
-def uses(  # noqa: PLR0913, PLR0917
+def uses(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -532,8 +527,7 @@ def uses(  # noqa: PLR0913, PLR0917
 
 
 @app.command("typedness")
-# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
-def typedness(  # noqa: PLR0913, PLR0917
+def typedness(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -559,8 +553,7 @@ def typedness(  # noqa: PLR0913, PLR0917
 
 
 @app.command("doc")
-# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
-def doc(  # noqa: PLR0913, PLR0917
+def doc(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -586,8 +579,7 @@ def doc(  # noqa: PLR0913, PLR0917
 
 
 @app.command("coverage")
-# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
-def coverage(  # noqa: PLR0913, PLR0917
+def coverage(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -613,8 +605,7 @@ def coverage(  # noqa: PLR0913, PLR0917
 
 
 @app.command("config")
-# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
-def config(  # noqa: PLR0913, PLR0917
+def config(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -640,8 +631,7 @@ def config(  # noqa: PLR0913, PLR0917
 
 
 @app.command("hotspots")
-# lint-ignore: PLR0913,PLR0917 CLI surface exposes multiple knobs
-def hotspots(  # noqa: PLR0913, PLR0917
+def hotspots(  # lint-ignore[PLR0913,PLR0917]: CLI surface exposes multiple knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     out: Path = OUT,
@@ -667,8 +657,7 @@ def hotspots(  # noqa: PLR0913, PLR0917
 
 
 @app.command("overlays")
-# lint-ignore: PLR0913,PLR0914 CLI surface intentionally exposes many knobs
-def overlays(  # noqa: PLR0913, PLR0914
+def overlays(  # lint-ignore[PLR0913,PLR0914]: CLI surface intentionally exposes many knobs
     root: Path = ROOT,
     scip: Path = SCIP,
     pyrefly_json: Path | None = PYREFLY,
@@ -1451,8 +1440,7 @@ def _should_mark_overlay(row: Mapping[str, Any]) -> bool:
     )
 
 
-# lint-ignore: PLR0913 helper wires overlay paths atomically
-def _ensure_package_overlays(  # noqa: PLR0913
+def _ensure_package_overlays(  # lint-ignore[PLR0913]: helper wires overlay paths atomically
     *,
     rel_path: Path,
     generated: list[str],

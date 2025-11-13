@@ -13,38 +13,58 @@ Serialization helpers for enrichment artifacts (JSON/JSONL/Markdown).
 - from **collections.abc** import Iterable, Mapping
 - from **pathlib** import Path
 - from **(absolute)** import orjson
+- from **(absolute)** import pyarrow
+- from **(absolute)** import pyarrow.parquet
 
 ## Definitions
 
 - variable: `orjson` (line 13)
-- function: `_dump_json` (line 16)
-- function: `write_json` (line 39)
-- function: `write_jsonl` (line 46)
-- function: `_append_section` (line 56)
-- function: `_format_imports` (line 64)
-- function: `_format_definitions` (line 83)
-- function: `_format_graph_metrics` (line 99)
-- function: `_format_exports` (line 108)
-- function: `_format_exports_resolved` (line 116)
-- function: `_format_reexports` (line 126)
-- function: `_format_doc_metrics` (line 140)
-- function: `_format_typedness` (line 155)
-- function: `_format_side_effects` (line 174)
-- function: `_format_raises` (line 184)
-- function: `_format_complexity` (line 193)
-- function: `_format_doc_items` (line 205)
-- function: `_format_coverage` (line 232)
-- function: `_format_config_refs` (line 243)
-- function: `_format_hotspot` (line 250)
-- function: `write_markdown_module` (line 257)
+- variable: `pa` (line 19)
+- variable: `pq` (line 20)
+- function: `_dump_json` (line 23)
+- function: `write_json` (line 46)
+- function: `write_jsonl` (line 53)
+- function: `write_parquet` (line 63)
+- function: `_append_section` (line 76)
+- function: `_format_imports` (line 84)
+- function: `_format_definitions` (line 103)
+- function: `_format_graph_metrics` (line 119)
+- function: `_format_ownership` (line 128)
+- function: `_format_usage` (line 150)
+- function: `_format_exports` (line 161)
+- function: `_format_exports_resolved` (line 169)
+- function: `_format_reexports` (line 179)
+- function: `_format_doc_metrics` (line 193)
+- function: `_format_typedness` (line 208)
+- function: `_format_side_effects` (line 227)
+- function: `_format_raises` (line 237)
+- function: `_format_complexity` (line 246)
+- function: `_format_doc_items` (line 258)
+- function: `_format_coverage` (line 285)
+- function: `_format_config_refs` (line 296)
+- function: `_format_hotspot` (line 303)
+- function: `write_markdown_module` (line 310)
 
-## Dependency Graph
+## Graph Metrics
 
-- **fan_in**: 3
+- **fan_in**: 4
 - **fan_out**: 0
-- **cycle_group**: 12
+- **cycle_group**: 14
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 8
+- recent churn 90: 8
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Serialization helpers for enrichment artifacts (JSON/JSONL/Markdown).
 - has summary: yes
@@ -66,11 +86,12 @@ Serialization helpers for enrichment artifacts (JSON/JSONL/Markdown).
 ## Config References
 
 - enrich/tagging_rules.yaml
+- enrich/PLAYBOOK.md
 - enrich/README.md
 
-## Hotspot Score
+## Hotspot
 
-- score: 2.41
+- score: 2.55
 
 ## Side Effects
 
@@ -78,22 +99,22 @@ Serialization helpers for enrichment artifacts (JSON/JSONL/Markdown).
 
 ## Complexity
 
-- branches: 76
-- cyclomatic: 77
-- loc: 290
+- branches: 90
+- cyclomatic: 91
+- loc: 345
 
 ## Doc Coverage
 
 - `_dump_json` (function): summary=yes, params=ok, examples=no — Serialize arbitrary objects to UTF-8 JSON with optional orjson accel.
 - `write_json` (function): summary=yes, params=mismatch, examples=no — Write an object as pretty-printed JSON.
 - `write_jsonl` (function): summary=yes, params=mismatch, examples=no — Write newline-delimited JSON records.
+- `write_parquet` (function): summary=yes, params=mismatch, examples=no — Persist ``rows`` to Parquet, falling back to JSONL when PyArrow is missing.
 - `_append_section` (function): summary=no, examples=no
 - `_format_imports` (function): summary=no, examples=no
 - `_format_definitions` (function): summary=no, examples=no
 - `_format_graph_metrics` (function): summary=no, examples=no
-- `_format_exports` (function): summary=no, examples=no
-- `_format_exports_resolved` (function): summary=no, examples=no
-- `_format_reexports` (function): summary=no, examples=no
+- `_format_ownership` (function): summary=no, examples=no
+- `_format_usage` (function): summary=no, examples=no
 
 ## Tags
 

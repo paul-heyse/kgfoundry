@@ -2,62 +2,62 @@
 
 Sample joins to help with human QA of the stitching heuristics.
 
-1. `typing.py` — **Name** `object`
-   - span: start [139, 41] end [139, 47]
-   - symbol: `scip-python python python-stdlib 3.11 builtins/object#`
-   - evidence: module-path, name
-   - preview: def randn(self, *shape: int, device: object | None = None) -> TorchTensor:
+1. `uses_builder.py` — **Name** `write_parquet`
+   - span: start [125, 15] end [125, 28]
+   - symbol: `scip-python python kgfoundry 0.1.0 `codeintel_rev.typing`/PolarsDataFrame#write_parquet().`
+   - evidence: module-path, span, name
+   - preview: data_frame.write_parquet(str(target))
 
-2. `typing.py` — **Name** `object`
-   - span: start [251, 52] end [251, 58]
-   - symbol: `scip-python python python-stdlib 3.11 builtins/object#`
-   - evidence: module-path, name
-   - preview: def DataFrame(self, data: Sequence[Mapping[str, object]]) -> PolarsDataFrame: # noqa: N802
-
-3. `typing.py` — **Name** `str`
-   - span: start [244, 49] end [244, 52]
-   - symbol: `scip-python python python-stdlib 3.11 builtins/str#`
-   - evidence: module-path, name
-   - preview: def write_parquet(self, file: str | PathLike[str]) -> None: ...
-
-4. `typing.py` — **Name** `object`
-   - span: start [135, 35] end [135, 41]
-   - symbol: `scip-python python python-stdlib 3.11 builtins/object#`
-   - evidence: module-path, name
-   - preview: def device(self, name: str) -> object:
-
-5. `typing.py` — **Name** `HEAVY_DEPS`
-   - span: start [43, 0] end [43, 10]
-   - symbol: `scip-python python kgfoundry 0.1.0 `codeintel_rev.typing`/gate_import().(module_name)`
+2. `uses_builder.py` — **Name** `polars`
+   - span: start [124, 17] end [124, 23]
+   - symbol: `local 18`
    - evidence: module-path, span
-   - preview: HEAVY_DEPS = _BASE_HEAVY_DEPS
+   - preview: data_frame = polars.DataFrame(records)
 
-6. `typing.py` — **Name** `str`
-   - span: start [251, 47] end [251, 50]
-   - symbol: `scip-python python python-stdlib 3.11 builtins/str#`
-   - evidence: module-path, name
-   - preview: def DataFrame(self, data: Sequence[Mapping[str, object]]) -> PolarsDataFrame: # noqa: N802
+3. `uses_builder.py` — **Attribute** `write_parquet`
+   - span: start [125, 4] end [125, 28]
+   - symbol: `scip-python python kgfoundry 0.1.0 `codeintel_rev.typing`/PolarsDataFrame#write_parquet().`
+   - evidence: module-path, span, name
+   - preview: data_frame.write_parquet(str(target))
 
-7. `typing.py` — **Name** `str`
-   - span: start [244, 34] end [244, 37]
-   - symbol: `scip-python python python-stdlib 3.11 builtins/str#`
-   - evidence: module-path, name
-   - preview: def write_parquet(self, file: str | PathLike[str]) -> None: ...
+4. `uses_builder.py` — **Name** `gate_import`
+   - span: start [121, 38] end [121, 49]
+   - symbol: `scip-python python kgfoundry 0.1.0 `codeintel_rev.typing`/gate_import().`
+   - evidence: module-path, qname
+   - preview: polars = cast("PolarsModule", gate_import("polars", "use graph export"))
 
-8. `typing.py` — **Name** `NDArray`
-   - span: start [24, 26] end [24, 33]
-   - symbol: `local 4`
+5. `uses_builder.py` — **Name** `data_frame`
+   - span: start [125, 4] end [125, 14]
+   - symbol: `local 18`
    - evidence: module-path, span
-   - preview: type NDArrayAny = npt.NDArray[Any]
+   - preview: data_frame.write_parquet(str(target))
 
-9. `typing.py` — **Name** `object`
-   - span: start [192, 19] end [192, 25]
-   - symbol: `scip-python python python-stdlib 3.11 builtins/object#`
-   - evidence: module-path, name
-   - preview: GpuIndexCagra: object | None
+6. `uses_builder.py` — **Call** `lower`
+   - span: start [99, 21] end [99, 33]
+   - symbol: `scip-python python python-stdlib 3.11 builtins/str#lower().`
+   - evidence: module-path, span, name
+   - preview: normalized = role.lower()
 
-10. `typing.py` — **Name** `object`
-   - span: start [52, 5] end [52, 11]
-   - symbol: `scip-python python python-stdlib 3.11 builtins/object#`
-   - evidence: module-path, name
-   - preview: ) -> object:
+7. `uses_builder.py` — **Attribute** `DataFrame`
+   - span: start [124, 17] end [124, 33]
+   - symbol: `scip-python python kgfoundry 0.1.0 `codeintel_rev.typing`/PolarsModule#DataFrame().`
+   - evidence: module-path, span, name
+   - preview: data_frame = polars.DataFrame(records)
+
+8. `uses_builder.py` — **Name** `True`
+   - span: start [126, 11] end [126, 15]
+   - symbol: `local 18`
+   - evidence: module-path, span
+   - preview: return True
+
+9. `uses_builder.py` — **Name** `str`
+   - span: start [125, 29] end [125, 32]
+   - symbol: `scip-python python python-stdlib 3.11 builtins/str#`
+   - evidence: module-path, span, name
+   - preview: data_frame.write_parquet(str(target))
+
+10. `uses_builder.py` — **Name** `False`
+   - span: start [123, 15] end [123, 20]
+   - symbol: `scip-python python python-stdlib 3.11 builtins/ImportError#`
+   - evidence: module-path, span
+   - preview: return False

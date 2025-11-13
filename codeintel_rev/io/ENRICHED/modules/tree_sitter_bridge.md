@@ -25,13 +25,26 @@ Tree-sitter outline helpers used for enrichment artifacts.
 - function: `build_outline` (line 82)
 - function: `_extract_identifier` (line 133)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 14
+- **cycle_group**: 18
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 4
+- recent churn 90: 4
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Tree-sitter outline helpers used for enrichment artifacts.
 - has summary: yes
@@ -53,9 +66,10 @@ Tree-sitter outline helpers used for enrichment artifacts.
 ## Config References
 
 - enrich/tagging_rules.yaml
+- enrich/PLAYBOOK.md
 - enrich/README.md
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.87
 

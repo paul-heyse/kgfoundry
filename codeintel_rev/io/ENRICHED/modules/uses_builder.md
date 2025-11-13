@@ -23,13 +23,26 @@ SCIP-based symbol use graph helpers.
 - function: `_is_definition` (line 85)
 - function: `_write_parquet` (line 105)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 10
+- **cycle_group**: 12
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 4
+- recent churn 90: 4
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: SCIP-based symbol use graph helpers.
 - has summary: yes
@@ -48,7 +61,7 @@ SCIP-based symbol use graph helpers.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.95
 

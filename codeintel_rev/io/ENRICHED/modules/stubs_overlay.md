@@ -30,18 +30,31 @@ Targeted overlay generation with opt-in activation.
 - function: `_collect_star_reexports` (line 313)
 - function: `_extract_simple_name` (line 344)
 - function: `_build_overlay_text` (line 372)
-- function: `_render_star_exports` (line 436)
-- function: `_render_public_defs` (line 461)
-- function: `_collect_import_reexports` (line 492)
-- function: `_is_windows` (line 523)
+- function: `_render_star_exports` (line 438)
+- function: `_render_public_defs` (line 463)
+- function: `_collect_import_reexports` (line 494)
+- function: `_is_windows` (line 525)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 13
+- **cycle_group**: 22
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 8
+- recent churn 90: 8
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Targeted overlay generation with opt-in activation.
 - has summary: yes
@@ -63,9 +76,10 @@ Targeted overlay generation with opt-in activation.
 ## Config References
 
 - enrich/tagging_rules.yaml
+- enrich/PLAYBOOK.md
 - enrich/README.md
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.47
 
@@ -77,7 +91,7 @@ Targeted overlay generation with opt-in activation.
 
 - branches: 69
 - cyclomatic: 70
-- loc: 532
+- loc: 534
 
 ## Doc Coverage
 

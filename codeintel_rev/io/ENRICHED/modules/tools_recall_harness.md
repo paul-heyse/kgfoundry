@@ -59,13 +59,26 @@ Notes
 - function: `sweep` (line 159)
 - function: `main` (line 222)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 128
+- **cycle_group**: 132
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 3
+- recent churn 90: 3
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: High-recall harness for BM25 + RM3 and (optionally) SPLADE.
 - has summary: yes
@@ -94,11 +107,13 @@ Notes
 - patches/Supporting Documentation/251111_FAISS_whl_overview_rev.md
 - patches/Supporting Documentation/pyrarrow.md
 - patches/Supporting Documentation/duckdb.md
+- patches/AST_CST_SCIP_data_pipeline_hardening.md
 - patches/CST_Data_Build.md
 - patches/Typing_gating_follow_small_architecture_changes.md
 - patches/FAISS_detailed_implementation_plan.md
 - patches/Enrich_Expansion.md
 - patches/Enrich_Extension.md
+- patches/Networking_Implementation.md
 - patches/Type_Gating_Factory_Scope_phase2.md
 - patches/BM25+SPLADEv3_Implementation.md
 - patches/Type_Gating_Factory_Scope.md
@@ -107,14 +122,16 @@ Notes
 - patches/AST_Data_Build.md
 - patches/audit_closeout.md
 - patches/Index Lifecycle Manager and Concurrency.md
+- patches/FAISS Implementation Phase 2 rev.md
 - patches/warp_technical_overview.md
 - patches/Telemetry_Implementation.md
 - patches/Enrich_scope_addendum.md
+- patches/FAISS-Phase2-Refinements.md
 - patches/Enrich_Scope.md
 - patches/Runtime_Cells_Followup_Scope.md
 - patches/FAISS-Implementation-Stage2.md
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.97
 

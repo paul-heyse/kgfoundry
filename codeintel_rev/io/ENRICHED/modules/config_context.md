@@ -59,6 +59,7 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 - from **threading** import Lock
 - from **types** import ModuleType
 - from **typing** import TYPE_CHECKING, Any, Protocol, TypeVar, cast
+- from **(absolute)** import numpy
 - from **(absolute)** import codeintel_rev.observability.metrics
 - from **codeintel_rev.app.capabilities** import Capabilities
 - from **codeintel_rev.app.scope_store** import ScopeStore
@@ -83,43 +84,56 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 
 ## Definitions
 
-- variable: `HybridSearchEngine` (line 90)
-- variable: `XTRIndex` (line 91)
-- variable: `LOGGER` (line 93)
-- class: `_RetrievalMetrics` (line 97)
-- variable: `retrieval_metrics` (line 101)
-- function: `_infer_index_root` (line 106)
-- function: `_build_factory_adjuster` (line 136)
-- function: `_build_faiss_manager` (line 169)
-- function: `_build_scope_store` (line 212)
-- function: `_build_git_clients` (line 238)
-- function: `_assign_frozen` (line 263)
-- function: `_faiss_module` (line 268)
-- function: `_import_faiss_manager_cls` (line 284)
-- function: `_import_faiss_runtime_opts_cls` (line 296)
-- function: `_faiss_runtime_options_from_index` (line 308)
-- function: `_import_hybrid_engine_cls` (line 349)
-- function: `_import_xtr_index_cls` (line 366)
-- function: `_require_dependency` (line 383)
-- function: `_ensure_path_exists` (line 442)
-- class: `ResolvedPaths` (line 502)
-- function: `resolve_application_paths` (line 558)
-- variable: `T` (line 671)
-- class: `_FaissRuntimeState` (line 674)
-- class: `_ContextRuntimeState` (line 686)
-- class: `ApplicationContext` (line 726)
+- variable: `HybridSearchEngine` (line 92)
+- variable: `XTRIndex` (line 93)
+- variable: `LOGGER` (line 95)
+- class: `_RetrievalMetrics` (line 101)
+- variable: `retrieval_metrics` (line 136)
+- function: `_infer_index_root` (line 141)
+- function: `_build_factory_adjuster` (line 171)
+- function: `_build_faiss_manager` (line 204)
+- function: `_build_scope_store` (line 247)
+- function: `_build_git_clients` (line 273)
+- function: `_assign_frozen` (line 298)
+- function: `_faiss_module` (line 303)
+- function: `_import_faiss_manager_cls` (line 319)
+- function: `_import_faiss_runtime_opts_cls` (line 331)
+- function: `_faiss_runtime_options_from_index` (line 343)
+- function: `_import_hybrid_engine_cls` (line 384)
+- function: `_import_xtr_index_cls` (line 401)
+- function: `_require_dependency` (line 418)
+- function: `_ensure_path_exists` (line 477)
+- class: `ResolvedPaths` (line 537)
+- function: `resolve_application_paths` (line 596)
+- variable: `T` (line 711)
+- class: `_FaissRuntimeState` (line 714)
+- class: `_ContextRuntimeState` (line 726)
+- class: `ApplicationContext` (line 766)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 20
 - **fan_out**: 17
-- **cycle_group**: 61
+- **cycle_group**: 65
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 33
+- recent churn 90: 33
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 ApplicationContext, ResolvedPaths, resolve_application_paths
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Application-level configuration context manager.
 - has summary: yes
@@ -142,9 +156,9 @@ ApplicationContext, ResolvedPaths, resolve_application_paths
 
 - app/hypercorn.toml
 
-## Hotspot Score
+## Hotspot
 
-- score: 3.25
+- score: 3.29
 
 ## Side Effects
 
@@ -153,13 +167,13 @@ ApplicationContext, ResolvedPaths, resolve_application_paths
 
 ## Complexity
 
-- branches: 62
-- cyclomatic: 63
-- loc: 1503
+- branches: 70
+- cyclomatic: 71
+- loc: 1587
 
 ## Doc Coverage
 
-- `_RetrievalMetrics` (class): summary=no, examples=no
+- `_RetrievalMetrics` (class): summary=yes, examples=no — Protocol defining the interface for retrieval metrics collection.
 - `_infer_index_root` (function): summary=yes, params=ok, examples=no — Return the directory that stores versioned index assets.
 - `_build_factory_adjuster` (function): summary=yes, params=ok, examples=no — Return a DefaultFactoryAdjuster derived from settings.
 - `_build_faiss_manager` (function): summary=yes, params=ok, examples=no — Construct and log the FAISS manager for the main index.

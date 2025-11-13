@@ -34,13 +34,26 @@ Stitch CST nodes to module summary rows and SCIP symbols.
 - function: `_normalize_qname` (line 328)
 - function: `_score_candidate` (line 334)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 3
-- **cycle_group**: 24
+- **cycle_group**: 28
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 3
+- recent churn 90: 3
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Stitch CST nodes to module summary rows and SCIP symbols.
 - has summary: yes
@@ -59,7 +72,7 @@ Stitch CST nodes to module summary rows and SCIP symbols.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.50
 

@@ -9,7 +9,8 @@ Lightweight Parquet writer for evaluator pools.
 ## Imports
 
 - from **__future__** import annotations
-- from **collections.abc** import Iterable
+- from **(absolute)** import json
+- from **collections.abc** import Iterable, Mapping
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
 - from **typing** import TYPE_CHECKING, Literal
@@ -20,24 +21,37 @@ Lightweight Parquet writer for evaluator pools.
 
 ## Definitions
 
-- variable: `pa` (line 18)
-- variable: `pq` (line 19)
-- variable: `Source` (line 21)
-- class: `PoolRow` (line 25)
-- function: `_empty_table` (line 35)
-- function: `write_pool` (line 63)
+- variable: `pa` (line 19)
+- variable: `pq` (line 20)
+- variable: `Source` (line 22)
+- class: `PoolRow` (line 26)
+- function: `_empty_table` (line 40)
+- function: `write_pool` (line 82)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 72
+- **cycle_group**: 76
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 4
+- recent churn 90: 4
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 PoolRow, write_pool
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Lightweight Parquet writer for evaluator pools.
 - has summary: yes
@@ -56,9 +70,9 @@ PoolRow, write_pool
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
-- score: 1.79
+- score: 1.82
 
 ## Side Effects
 
@@ -66,9 +80,9 @@ PoolRow, write_pool
 
 ## Complexity
 
-- branches: 8
-- cyclomatic: 9
-- loc: 113
+- branches: 9
+- cyclomatic: 10
+- loc: 163
 
 ## Doc Coverage
 

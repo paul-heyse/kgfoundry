@@ -21,20 +21,20 @@ from typing import TYPE_CHECKING, Any, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.metrics.registry import (
+    FAISS_ANN_LATENCY_SECONDS,
     FAISS_BUILD_SECONDS_LAST,
     FAISS_BUILD_TOTAL,
-    FAISS_ANN_LATENCY_SECONDS,
     FAISS_INDEX_CODE_SIZE_BYTES,
     FAISS_INDEX_CUVS_ENABLED,
     FAISS_INDEX_DIM,
     FAISS_INDEX_GPU_ENABLED,
     FAISS_INDEX_SIZE_VECTORS,
+    FAISS_REFINE_KEPT_RATIO,
+    FAISS_REFINE_LATENCY_SECONDS,
     FAISS_SEARCH_ERRORS_TOTAL,
     FAISS_SEARCH_LAST_K,
     FAISS_SEARCH_LAST_MS,
     FAISS_SEARCH_NPROBE,
-    FAISS_REFINE_LATENCY_SECONDS,
-    FAISS_REFINE_KEPT_RATIO,
     FAISS_SEARCH_TOTAL,
     HNSW_SEARCH_EF,
     set_compile_flags_id,
@@ -42,6 +42,7 @@ from codeintel_rev.metrics.registry import (
 )
 from codeintel_rev.observability.otel import as_span
 from codeintel_rev.observability.timeline import Timeline, current_timeline
+from codeintel_rev.retrieval.rerank_flat import exact_rerank
 from codeintel_rev.typing import NDArrayF32, NDArrayI64, gate_import
 from kgfoundry_common.errors import VectorSearchError
 from kgfoundry_common.logging import get_logger
@@ -1192,7 +1193,7 @@ class FAISSManager(
         *,
         nprobe: int | None = None,
         runtime: SearchRuntimeOverrides | None = None,
-        catalog: "DuckDBCatalog" | None = None,
+        catalog: DuckDBCatalog | None = None,
     ) -> tuple[NDArrayF32, NDArrayI64]:
         """Search for nearest neighbors using cosine similarity with dual-index support.
 
@@ -1277,17 +1278,16 @@ class FAISSManager(
 
         start = perf_counter()
         family_label = getattr(self, "faiss_family", "auto")
+        ann_timer_start = start
         try:
-            with FAISS_ANN_LATENCY_SECONDS.labels(str(family_label)).time():
-                distances, identifiers = self._execute_dual_search(
-                    query=plan.queries,
-                    search_k=plan.search_k,
-                    params=plan.params,
-                )
+            distances, identifiers = self._execute_dual_search(
+                query=plan.queries,
+                search_k=plan.search_k,
+                params=plan.params,
+            )
             refined = self._maybe_refine_results(
                 catalog=catalog,
                 plan=plan,
-                distances=distances,
                 identifiers=identifiers,
             )
             if refined is not None:
@@ -1317,6 +1317,9 @@ class FAISSManager(
                     "search_k": plan.k,
                 },
             ) from exc
+        finally:
+            duration = max(perf_counter() - ann_timer_start, 0.0)
+            FAISS_ANN_LATENCY_SECONDS.labels(family=str(family_label)).observe(duration)
 
         elapsed_total = (perf_counter() - start) * 1000.0
         if timeline is not None:
@@ -1616,45 +1619,80 @@ class FAISSManager(
                 ),
             )
             return merged_dists, merged_ids
-    
+
     def _maybe_refine_results(
         self,
         *,
-        catalog: "DuckDBCatalog" | None,
+        catalog: DuckDBCatalog | None,
         plan: _SearchPlan,
-        distances: NDArrayF32,
         identifiers: NDArrayI64,
     ) -> tuple[NDArrayF32, NDArrayI64] | None:
-        """Optionally refine ANN candidates with exact similarity search."""
-        if (
-            catalog is None
-            or plan.k <= 0
-            or plan.search_k <= plan.k
-            or self.refine_k_factor <= 1.0
-        ):
-            return None
-        try:
-            from codeintel_rev.retrieval.rerank_flat import exact_rerank
-        except ImportError as exc:  # pragma: no cover - defensive fallback
-            LOGGER.debug("Exact rerank unavailable", extra=_log_extra(error=str(exc)))
-            return None
+        """Optionally refine ANN candidates with exact similarity search.
 
+        This method performs optional refinement of approximate nearest neighbor
+        (ANN) search results by computing exact similarity scores using the original
+        embeddings from the catalog. Refinement improves recall by reranking
+        candidates based on exact inner product or cosine similarity rather than
+        approximate distances from the FAISS index.
+
+        Refinement is only performed when all conditions are met:
+        - Catalog is available for embedding retrieval
+        - Requested k is positive
+        - Search k (with k_factor expansion) is greater than requested k
+        - Refine k_factor is greater than 1.0
+
+        Parameters
+        ----------
+        catalog : DuckDBCatalog | None
+            DuckDB catalog instance providing embedding retrieval via
+            get_embeddings_by_ids(). If None, refinement is skipped.
+        plan : _SearchPlan
+            Search plan containing normalized queries, effective k, search_k
+            (with k_factor applied), and execution parameters. Used to determine
+            refinement parameters and query vectors.
+        identifiers : NDArrayI64
+            Candidate chunk IDs from ANN search, shape (n_queries, search_k).
+            These IDs are used to retrieve embeddings for exact similarity computation.
+
+        Returns
+        -------
+        tuple[NDArrayF32, NDArrayI64] | None
+            Tuple of (refined_scores, refined_ids) when refinement is performed
+            and successful, both with shape (n_queries, k). Returns None when
+            refinement is skipped (conditions not met), exact rerank is unavailable,
+            or refinement fails (falls back to ANN ordering). Refined scores are
+            exact similarity scores (inner product or cosine similarity); refined
+            IDs are the top-k chunk identifiers after reranking.
+
+        Notes
+        -----
+        This method uses exact_rerank() from codeintel_rev.retrieval.rerank_flat
+        to compute exact similarities. Refinement is best-effort - if it fails,
+        the method returns None and the caller falls back to ANN ordering. Time
+        complexity: O(n_queries * search_k * vec_dim) for exact similarity computation
+        plus O(n_queries * search_k * log(search_k)) for sorting. The method
+        records metrics (FAISS_REFINE_KEPT_RATIO, FAISS_REFINE_LATENCY_SECONDS)
+        for observability. Thread-safe if the catalog instance is thread-safe.
+        """
+        if catalog is None or plan.k <= 0 or plan.search_k <= plan.k or self.refine_k_factor <= 1.0:
+            return None
         kept_ratio = plan.k / float(plan.search_k)
         FAISS_REFINE_KEPT_RATIO.observe(kept_ratio)
+        refine_start = perf_counter()
         try:
-            with FAISS_REFINE_LATENCY_SECONDS.time():
-                rerank_scores, rerank_ids = exact_rerank(
-                    catalog,
-                    plan.queries,
-                    identifiers[:, : plan.search_k],
-                    top_k=plan.k,
-                )
-        except Exception as exc:  # pragma: no cover - rerank is best-effort
+            rerank_scores, rerank_ids = exact_rerank(
+                catalog,
+                plan.queries,
+                identifiers[:, : plan.search_k],
+                top_k=plan.k,
+            )
+        except (RuntimeError, ValueError) as exc:  # pragma: no cover - rerank is best-effort
             LOGGER.warning(
                 "Exact rerank failed; falling back to ANN ordering",
                 extra=_log_extra(error=str(exc)),
             )
             return None
+        FAISS_REFINE_LATENCY_SECONDS.observe(max(perf_counter() - refine_start, 0.0))
         self._log_refine_delta(identifiers[:, : plan.k], rerank_ids)
         return rerank_scores, rerank_ids
 

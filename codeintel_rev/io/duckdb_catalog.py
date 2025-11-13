@@ -96,6 +96,16 @@ class _ScopeFilterSpec:
         return bool(self.complex_include_patterns or self.complex_exclude_patterns)
 
 
+@dataclass(slots=True, frozen=True)
+class DuckDBCatalogOptions:
+    """Optional configuration bundle for DuckDB catalog instantiation."""
+
+    materialize: bool = False
+    manager: DuckDBManager | None = None
+    log_queries: bool | None = None
+    repo_root: Path | None = None
+
+
 class DuckDBCatalog:
     """DuckDB catalog for querying chunks.
 
@@ -123,22 +133,36 @@ class DuckDBCatalog:
         db_path: Path,
         vectors_dir: Path,
         *,
-        materialize: bool = False,
-        manager: DuckDBManager | None = None,
-        log_queries: bool | None = None,
-        repo_root: Path | None = None,
+        options: DuckDBCatalogOptions | None = None,
+        **legacy_kwargs: object,
     ) -> None:
+        if options is not None and legacy_kwargs:
+            msg = "Cannot mix DuckDBCatalog options dataclass with keyword overrides."
+            raise ValueError(msg)
+        if options is None:
+            if legacy_kwargs:
+                allowed = {"materialize", "manager", "log_queries", "repo_root"}
+                unknown = set(legacy_kwargs) - allowed
+                if unknown:
+                    msg = f"Unsupported DuckDBCatalog keyword(s): {', '.join(sorted(unknown))}"
+                    raise TypeError(msg)
+                options = DuckDBCatalogOptions(**legacy_kwargs)  # type: ignore[arg-type]
+            else:
+                options = DuckDBCatalogOptions()
         self.db_path = db_path
         self.vectors_dir = vectors_dir
-        self.materialize = materialize
-        manager = manager or DuckDBManager(db_path)
+        self.materialize = options.materialize
+        manager = options.manager or DuckDBManager(db_path)
         self._manager = manager
         self._query_builder = DuckDBQueryBuilder()
         self._embedding_dim_cache: int | None = None
         self._init_lock = Lock()
         self._views_ready = False
-        self._log_queries = log_queries if log_queries is not None else manager.config.log_queries
+        self._log_queries = (
+            options.log_queries if options.log_queries is not None else manager.config.log_queries
+        )
         self._data_root = vectors_dir.parent.resolve()
+        repo_root = options.repo_root
         self._repo_root = repo_root.resolve() if repo_root is not None else self._data_root.parent
         default_idmap = (self._data_root / "faiss/faiss_idmap.parquet").resolve()
         self._idmap_path = default_idmap

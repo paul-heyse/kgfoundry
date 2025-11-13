@@ -34,23 +34,36 @@ Admin endpoints for staging, publishing, and rolling back index versions.
 - class: `TuningBody` (line 162)
 - class: `FaissRuntimeTuningBody` (line 211)
 - function: `publish_endpoint` (line 263)
-- function: `rollback_endpoint` (line 350)
-- function: `tuning_endpoint` (line 403)
-- function: `faiss_runtime_status` (line 459)
-- function: `faiss_runtime_tuning_endpoint` (line 497)
-- function: `faiss_runtime_reset_endpoint` (line 576)
+- function: `rollback_endpoint` (line 356)
+- function: `tuning_endpoint` (line 409)
+- function: `faiss_runtime_status` (line 465)
+- function: `faiss_runtime_tuning_endpoint` (line 503)
+- function: `faiss_runtime_reset_endpoint` (line 582)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 6
-- **cycle_group**: 129
+- **cycle_group**: 133
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 6
+- recent churn 90: 6
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 router
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Admin endpoints for staging, publishing, and rolling back index versions.
 - has summary: yes
@@ -73,9 +86,9 @@ router
 
 - app/hypercorn.toml
 
-## Hotspot Score
+## Hotspot
 
-- score: 2.19
+- score: 2.22
 
 ## Side Effects
 
@@ -83,9 +96,9 @@ router
 
 ## Complexity
 
-- branches: 16
-- cyclomatic: 17
-- loc: 626
+- branches: 18
+- cyclomatic: 19
+- loc: 632
 
 ## Doc Coverage
 

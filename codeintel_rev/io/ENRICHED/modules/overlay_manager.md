@@ -22,13 +22,26 @@ Targeted overlay manager for opt-in stub generation.
 - function: `activate_generated_overlays` (line 96)
 - function: `_safe_int` (line 130)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 1
 - **cycle_group**: 7
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 3
+- recent churn 90: 3
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Targeted overlay manager for opt-in stub generation.
 - has summary: yes
@@ -47,7 +60,7 @@ Targeted overlay manager for opt-in stub generation.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.69
 

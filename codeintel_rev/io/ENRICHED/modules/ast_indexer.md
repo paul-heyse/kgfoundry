@@ -39,17 +39,30 @@ AST indexer producing join-ready Parquet datasets.
 - function: `_table_from_rows` (line 396)
 - class: `_MetricsVisitor` (line 404)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 8
+- **cycle_group**: 21
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 3
+- recent churn 90: 3
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 AST_METRIC_SCHEMA, AST_NODE_SCHEMA, AstMetricsRow, AstNodeRow, DefInfo, collect_ast_nodes, collect_ast_nodes_from_tree, compute_ast_metrics, empty_metrics_row, stable_module_path, walk_defs_with_qualname, write_ast_parquet
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: AST indexer producing join-ready Parquet datasets.
 - has summary: yes
@@ -71,9 +84,10 @@ AST_METRIC_SCHEMA, AST_NODE_SCHEMA, AstMetricsRow, AstNodeRow, DefInfo, collect_
 ## Config References
 
 - enrich/tagging_rules.yaml
+- enrich/PLAYBOOK.md
 - enrich/README.md
 
-## Hotspot Score
+## Hotspot
 
 - score: 1.96
 
@@ -85,7 +99,7 @@ AST_METRIC_SCHEMA, AST_NODE_SCHEMA, AstMetricsRow, AstNodeRow, DefInfo, collect_
 
 - branches: 24
 - cyclomatic: 25
-- loc: 532
+- loc: 705
 
 ## Doc Coverage
 

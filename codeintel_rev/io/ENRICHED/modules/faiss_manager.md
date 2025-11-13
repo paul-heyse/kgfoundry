@@ -18,15 +18,17 @@ corpus size for optimal performance.
 - from **(absolute)** import math
 - from **collections.abc** import Callable, Mapping, Sequence
 - from **dataclasses** import dataclass
+- from **datetime** import UTC, datetime
 - from **pathlib** import Path
 - from **threading** import RLock
 - from **time** import perf_counter
 - from **types** import ModuleType
 - from **typing** import TYPE_CHECKING, Any, cast
 - from **codeintel_rev._lazy_imports** import LazyModule
-- from **codeintel_rev.metrics.registry** import FAISS_BUILD_SECONDS_LAST, FAISS_BUILD_TOTAL, FAISS_INDEX_CODE_SIZE_BYTES, FAISS_INDEX_CUVS_ENABLED, FAISS_INDEX_DIM, FAISS_INDEX_GPU_ENABLED, FAISS_INDEX_SIZE_VECTORS, FAISS_SEARCH_ERRORS_TOTAL, FAISS_SEARCH_LAST_K, FAISS_SEARCH_LAST_MS, FAISS_SEARCH_NPROBE, FAISS_SEARCH_TOTAL, HNSW_SEARCH_EF, set_compile_flags_id, set_factory_id
+- from **codeintel_rev.metrics.registry** import FAISS_ANN_LATENCY_SECONDS, FAISS_BUILD_SECONDS_LAST, FAISS_BUILD_TOTAL, FAISS_INDEX_CODE_SIZE_BYTES, FAISS_INDEX_CUVS_ENABLED, FAISS_INDEX_DIM, FAISS_INDEX_GPU_ENABLED, FAISS_INDEX_SIZE_VECTORS, FAISS_REFINE_KEPT_RATIO, FAISS_REFINE_LATENCY_SECONDS, FAISS_SEARCH_ERRORS_TOTAL, FAISS_SEARCH_LAST_K, FAISS_SEARCH_LAST_MS, FAISS_SEARCH_NPROBE, FAISS_SEARCH_TOTAL, HNSW_SEARCH_EF, set_compile_flags_id, set_factory_id
 - from **codeintel_rev.observability.otel** import as_span
 - from **codeintel_rev.observability.timeline** import Timeline, current_timeline
+- from **codeintel_rev.retrieval.rerank_flat** import exact_rerank
 - from **codeintel_rev.typing** import NDArrayF32, NDArrayI64, gate_import
 - from **kgfoundry_common.errors** import VectorSearchError
 - from **kgfoundry_common.logging** import get_logger
@@ -38,37 +40,50 @@ corpus size for optimal performance.
 
 ## Definitions
 
-- variable: `np` (line 51)
-- variable: `pa` (line 57)
-- variable: `pq` (line 58)
-- variable: `LOGGER` (line 60)
-- variable: `logger` (line 61)
-- class: `_LazyFaissProxy` (line 64)
-- variable: `faiss` (line 108)
-- function: `_faiss_module` (line 111)
-- function: `_has_faiss_gpu_support` (line 122)
-- function: `_log_extra` (line 145)
-- class: `FAISSRuntimeOptions` (line 163)
-- class: `SearchRuntimeOverrides` (line 184)
-- class: `_SearchExecutionParams` (line 193)
-- class: `_SearchPlan` (line 203)
-- class: `_FAISSIdMapMixin` (line 213)
-- class: `FAISSManager` (line 337)
-- function: `_coerce_to_int` (line 2406)
-- function: `_configure_direct_map` (line 2429)
-- function: `_set_direct_map_type` (line 2437)
+- variable: `np` (line 56)
+- variable: `pa` (line 62)
+- variable: `pq` (line 63)
+- variable: `LOGGER` (line 65)
+- variable: `logger` (line 66)
+- class: `_LazyFaissProxy` (line 69)
+- variable: `faiss` (line 113)
+- function: `_faiss_module` (line 116)
+- function: `_has_faiss_gpu_support` (line 127)
+- function: `_log_extra` (line 150)
+- class: `FAISSRuntimeOptions` (line 168)
+- class: `SearchRuntimeOverrides` (line 189)
+- class: `_SearchExecutionParams` (line 198)
+- class: `_SearchPlan` (line 208)
+- class: `_FAISSIdMapMixin` (line 218)
+- class: `FAISSManager` (line 396)
+- function: `_coerce_to_int` (line 2758)
+- function: `_configure_direct_map` (line 2781)
+- function: `_set_direct_map_type` (line 2789)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 7
-- **fan_out**: 6
-- **cycle_group**: 61
+- **fan_out**: 7
+- **cycle_group**: 65
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 38
+- recent churn 90: 38
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 FAISSManager
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: FAISS manager for GPU-accelerated vector search.
 - has summary: yes
@@ -87,9 +102,9 @@ FAISSManager
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
-- score: 3.15
+- score: 3.24
 
 ## Side Effects
 
@@ -97,9 +112,9 @@ FAISSManager
 
 ## Complexity
 
-- branches: 175
-- cyclomatic: 176
-- loc: 2455
+- branches: 215
+- cyclomatic: 216
+- loc: 2807
 
 ## Doc Coverage
 

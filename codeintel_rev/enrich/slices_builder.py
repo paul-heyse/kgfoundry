@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
-from hashlib import sha1
+from hashlib import blake2s
 from pathlib import Path
 from typing import Any
 
@@ -37,7 +37,7 @@ class SliceRecord:
 
 
 def _slice_id(path: str, module_name: str | None) -> str:
-    digest = sha1(path.encode("utf-8"))  # noqa: S324 - deterministic slice identifier
+    digest = blake2s(path.encode("utf-8"))
     if module_name:
         digest.update(b"|")
         digest.update(module_name.encode("utf-8"))

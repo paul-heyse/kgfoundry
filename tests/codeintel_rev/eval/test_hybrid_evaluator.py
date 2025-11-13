@@ -41,10 +41,12 @@ class _FakeManager:
         _query: np.ndarray,
         k: int,
         nprobe: int | None = None,
+        catalog: object | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
         ids = np.array([[100, 101]], dtype=np.int64)[:, :k]
         scores = np.array([[0.9, 0.1]], dtype=np.float32)[:, :k]
         _ = nprobe  # exercise signature parity
+        _ = catalog
         return scores, ids
 
     def reconstruct_batch(self, ids: list[int] | np.ndarray) -> np.ndarray:
@@ -109,6 +111,8 @@ def test_hybrid_evaluator_writes_metrics(tmp_path: Path) -> None:
     assert config.pool_path.exists()
     table = pq.read_table(config.pool_path)
     assert set(table.column("source").to_pylist()) == {"faiss", "oracle"}
+    assert "explain_symbols" in table.column_names
+    assert all(isinstance(val, list) for val in table.column("explain_symbols").to_pylist())
 
     metrics = json.loads(config.metrics_path.read_text())
     assert metrics["recall_at_k"] == report.recall_at_k

@@ -119,8 +119,8 @@ class TorchTensor(Protocol):
     def __matmul__(self, other: TorchTensor) -> TorchTensor: ...
 
     @property
-    # lint-ignore: N802 matches torch.Tensor API
-    def T(self) -> TorchTensor: ...  # noqa: N802
+    # lint-ignore[N802]: matches torch.Tensor API
+    def T(self) -> TorchTensor: ...
 
     def sum(self) -> TorchTensor: ...
 
@@ -195,8 +195,8 @@ class FaissModule(Protocol):
         """Return the number of available GPUs."""
         ...
 
-    # lint-ignore: N802 FAISS API uses camelCase
-    def normalize_L2(self, vectors: NDArrayF32) -> None:  # noqa: N802
+    # lint-ignore[N802]: FAISS API uses camelCase
+    def normalize_L2(self, vectors: NDArrayF32) -> None:
         """Normalize vectors using L2 norm in-place."""
         ...
 
@@ -220,15 +220,15 @@ class NumpyRandomState(Protocol):
 class NumpyRandomNamespace(Protocol):
     """Namespace for numpy.random helpers."""
 
-    # lint-ignore: N802 mirrors numpy API
-    def RandomState(self, seed: int) -> NumpyRandomState: ...  # noqa: N802
+    # lint-ignore[N802]: mirrors numpy API
+    def RandomState(self, seed: int) -> NumpyRandomState: ...
 
 
 class NumpyLinalgNamespace(Protocol):
     """Namespace for numpy.linalg helpers."""
 
-    # lint-ignore: FBT001 signature mirrors numpy
-    def norm(self, array: NDArrayF32, axis: int, keepdims: bool) -> NDArrayF32: ...  # noqa: FBT001
+    # lint-ignore[FBT001]: signature mirrors numpy
+    def norm(self, array: NDArrayF32, axis: int, keepdims: bool) -> NDArrayF32: ...
 
 
 class NumpyModule(Protocol):
@@ -247,8 +247,8 @@ class PolarsDataFrame(Protocol):
 class PolarsModule(Protocol):
     """Minimal polars API used within optional export helpers."""
 
-    # lint-ignore: N802 preserves polars constructor name
-    def DataFrame(self, data: Sequence[Mapping[str, object]]) -> PolarsDataFrame:  # noqa: N802
+    # lint-ignore[N802]: preserves polars constructor name
+    def DataFrame(self, data: Sequence[Mapping[str, object]]) -> PolarsDataFrame:
         """Create a DataFrame from a sequence of mappings.
 
         Parameters

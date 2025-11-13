@@ -37,20 +37,34 @@ chunk retrieval and joins.
 - variable: `np` (line 39)
 - variable: `LOGGER` (line 41)
 - function: `_log_extra` (line 44)
-- class: `_ScopeFilterSpec` (line 78)
-- class: `DuckDBCatalog` (line 94)
+- class: `_ScopeFilterSpec` (line 83)
+- class: `DuckDBCatalogOptions` (line 100)
+- class: `DuckDBCatalog` (line 109)
 
-## Dependency Graph
+## Graph Metrics
 
-- **fan_in**: 6
+- **fan_in**: 8
 - **fan_out**: 6
-- **cycle_group**: 61
+- **cycle_group**: 65
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 32
+- recent churn 90: 32
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 DuckDBCatalog
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: DuckDB catalog for querying Parquet chunks.
 - has summary: yes
@@ -69,9 +83,9 @@ DuckDBCatalog
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
-- score: 2.91
+- score: 3.03
 
 ## Side Effects
 
@@ -80,14 +94,15 @@ DuckDBCatalog
 
 ## Complexity
 
-- branches: 85
-- cyclomatic: 86
-- loc: 1073
+- branches: 104
+- cyclomatic: 105
+- loc: 1312
 
 ## Doc Coverage
 
 - `_log_extra` (function): summary=yes, params=mismatch, examples=no — Return structured log extras for catalog events.
 - `_ScopeFilterSpec` (class): summary=yes, examples=no — Structured scope filter metadata used during scoped queries.
+- `DuckDBCatalogOptions` (class): summary=yes, examples=no — Optional configuration bundle for DuckDB catalog instantiation.
 - `DuckDBCatalog` (class): summary=yes, examples=no — DuckDB catalog for querying chunks.
 
 ## Tags

@@ -154,7 +154,7 @@ class _FaissSearchRequest:
     nprobe: int
     observation: Observation
     tuning_overrides: Mapping[str, float | int] | None = None
-    catalog: "DuckDBCatalog" | None = None
+    catalog: DuckDBCatalog | None = None
 
 
 async def semantic_search(
@@ -1007,7 +1007,7 @@ def _hydrate_findings(
     scores: Sequence[float],
     *,
     scope: ScopeIn | None = None,
-    catalog: "DuckDBCatalog" | None = None,
+    catalog: DuckDBCatalog | None = None,
 ) -> tuple[list[Finding], Exception | None]:
     """Hydrate FAISS search results from DuckDB.
 
@@ -1027,6 +1027,9 @@ def _hydrate_findings(
         Session scope with optional `include_globs`, `exclude_globs`, and `languages`
         fields. If provided and contains filters, uses `query_by_filters` instead of
         `query_by_ids`. Defaults to None.
+    catalog : DuckDBCatalog | None, optional
+        Reused DuckDB catalog connection. When ``None``, the helper opens a new
+        catalog via :meth:`ApplicationContext.open_catalog`.
 
     Returns
     -------
@@ -1048,7 +1051,7 @@ def _hydrate_findings(
         is opened via :meth:`ApplicationContext.open_catalog`.
     """
 
-    def _hydrate(active_catalog: "DuckDBCatalog") -> tuple[list[Finding], Exception | None]:
+    def _hydrate(active_catalog: DuckDBCatalog) -> tuple[list[Finding], Exception | None]:
         findings: list[Finding] = []
         try:
             valid_ids = [int(chunk_id) for chunk_id in chunk_ids if chunk_id >= 0]

@@ -1,0 +1,98 @@
+# enrich/slices_builder.py
+
+## Docstring
+
+```
+Utilities for generating opt-in LLM slice packs.
+```
+
+## Imports
+
+- from **__future__** import annotations
+- from **collections.abc** import Mapping
+- from **dataclasses** import asdict, dataclass, field
+- from **datetime** import UTC, datetime
+- from **hashlib** import sha1
+- from **pathlib** import Path
+- from **typing** import Any
+- from **codeintel_rev.enrich.output_writers** import write_json, write_markdown_module
+
+## Definitions
+
+- class: `SliceRecord` (line 19)
+- function: `_slice_id` (line 39)
+- function: `build_slice_record` (line 47)
+- function: `write_slice` (line 100)
+
+## Graph Metrics
+
+- **fan_in**: 1
+- **fan_out**: 2
+- **cycle_group**: 15
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 2
+- recent churn 90: 2
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Declared Exports (__all__)
+
+SliceRecord, build_slice_record, write_slice
+
+## Doc Health
+
+- **summary**: Utilities for generating opt-in LLM slice packs.
+- has summary: yes
+- param parity: no
+- examples present: no
+
+## Typedness
+
+- params annotated: 1.00
+- returns annotated: 1.00
+- untyped defs: 0
+- type errors: 0
+
+## Coverage
+
+- lines covered: 0.00%
+- defs covered: 0.00%
+
+## Config References
+
+- enrich/tagging_rules.yaml
+- enrich/PLAYBOOK.md
+- enrich/README.md
+
+## Hotspot
+
+- score: 2.00
+
+## Side Effects
+
+- filesystem
+
+## Complexity
+
+- branches: 18
+- cyclomatic: 19
+- loc: 127
+
+## Doc Coverage
+
+- `SliceRecord` (class): summary=yes, examples=no — Serializable context packet describing a module and its surroundings.
+- `_slice_id` (function): summary=no, examples=no
+- `build_slice_record` (function): summary=yes, params=mismatch, examples=no — Build a :class:`SliceRecord` from a module row dictionary.
+- `write_slice` (function): summary=yes, params=mismatch, examples=no — Persist a slice pack (JSON + Markdown) under ``out_root/slices``.
+
+## Tags
+
+low-coverage, public-api

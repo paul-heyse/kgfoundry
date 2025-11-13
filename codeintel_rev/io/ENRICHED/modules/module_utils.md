@@ -18,13 +18,26 @@ Helpers for converting between module paths and dotted names.
 - function: `resolve_relative_module` (line 59)
 - function: `import_targets_for_entry` (line 87)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 3
 - **fan_out**: 0
 - **cycle_group**: 4
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 2
+- recent churn 90: 2
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: Helpers for converting between module paths and dotted names.
 - has summary: yes
@@ -43,7 +56,7 @@ Helpers for converting between module paths and dotted names.
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.00
 

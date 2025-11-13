@@ -67,17 +67,30 @@ All configuration loaded from environment variables with sensible defaults.
 - function: `_build_warp_config` (line 1315)
 - function: `_build_coderank_llm_config` (line 1326)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 22
 - **fan_out**: 2
-- **cycle_group**: 42
+- **cycle_group**: 55
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 27
+- recent churn 90: 27
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 BM25Config, CodeRankConfig, CodeRankLLMConfig, IndexConfig, PRFConfig, PathsConfig, RedisConfig, RerankConfig, ServerLimits, Settings, SpladeConfig, VLLMConfig, VLLMRunMode, WarpConfig, XTRConfig, load_settings
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Configuration settings using msgspec for fast, validated config.
 - has summary: yes
@@ -96,7 +109,7 @@ BM25Config, CodeRankConfig, CodeRankLLMConfig, IndexConfig, PRFConfig, PathsConf
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.99
 

@@ -45,17 +45,30 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 - class: `PolarsDataFrame` (line 241)
 - class: `PolarsModule` (line 247)
 
-## Dependency Graph
+## Graph Metrics
 
-- **fan_in**: 80
+- **fan_in**: 83
 - **fan_out**: 0
 - **cycle_group**: 0
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 11
+- recent churn 90: 11
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, PolarsModule, TorchModule, gate_import
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Typing façade for codeintel_rev heavy optional dependencies.
 - has summary: yes
@@ -74,9 +87,9 @@ FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, Polars
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
-- score: 2.63
+- score: 2.65
 
 ## Side Effects
 

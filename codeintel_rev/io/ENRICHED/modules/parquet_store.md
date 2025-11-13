@@ -28,22 +28,37 @@ for efficient vector storage and querying via DuckDB.
 
 - variable: `np` (line 27)
 - function: `get_chunks_schema` (line 30)
-- class: `ParquetWriteOptions` (line 62)
-- function: `write_chunks_parquet` (line 70)
-- function: `read_chunks_parquet` (line 139)
-- function: `extract_embeddings` (line 155)
+- variable: `EMBEDDINGS_RANK` (line 64)
+- class: `ParquetWriteOptions` (line 68)
+- function: `_hash_content` (line 76)
+- function: `write_chunks_parquet` (line 88)
+- function: `read_chunks_parquet` (line 166)
+- function: `extract_embeddings` (line 182)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 3
-- **cycle_group**: 52
+- **cycle_group**: 46
+
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 16
+- recent churn 90: 16
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
 
 ## Declared Exports (__all__)
 
 ParquetWriteOptions, extract_embeddings, get_chunks_schema, read_chunks_parquet, write_chunks_parquet
 
-## Doc Metrics
+## Doc Health
 
 - **summary**: Parquet storage for chunks and vectors using Arrow.
 - has summary: yes
@@ -62,9 +77,9 @@ ParquetWriteOptions, extract_embeddings, get_chunks_schema, read_chunks_parquet,
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
-- score: 1.80
+- score: 1.89
 
 ## Side Effects
 
@@ -72,14 +87,15 @@ ParquetWriteOptions, extract_embeddings, get_chunks_schema, read_chunks_parquet,
 
 ## Complexity
 
-- branches: 4
-- cyclomatic: 5
-- loc: 193
+- branches: 6
+- cyclomatic: 7
+- loc: 220
 
 ## Doc Coverage
 
 - `get_chunks_schema` (function): summary=yes, params=ok, examples=no — Get Arrow schema for chunks table.
 - `ParquetWriteOptions` (class): summary=yes, examples=no — Configuration for Parquet persistence.
+- `_hash_content` (function): summary=yes, params=mismatch, examples=no — Return stable 64-bit hash of chunk content.
 - `write_chunks_parquet` (function): summary=yes, params=ok, examples=no — Write chunks and embeddings to Parquet.
 - `read_chunks_parquet` (function): summary=yes, params=ok, examples=no — Read chunks from Parquet file.
 - `extract_embeddings` (function): summary=yes, params=ok, examples=no — Extract embeddings from chunks table.

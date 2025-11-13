@@ -15,7 +15,26 @@ indexctl tune --k-factor 1.5
 ```
 
 `tune` persists a `.audit.json` snapshot that mirrors `faiss.meta.json`. The
-manager immediately applies the overrides to the loaded index.
+manager immediately applies the overrides to the loaded index. To revert to the
+last saved profile remove the audit file and reload the application context.
+
+### Quick sweeps
+
+You can now run bounded sweeps against the vectors already stored in DuckDB:
+
+```bash
+# ~64 vector sample, nprobe grid
+indexctl tune --quick
+
+# Larger (~256 vector) sweep, more nprobe samples
+indexctl tune --full
+```
+
+The command samples chunk embeddings from `duckdb.sample_query_vectors`, runs a
+ParameterSpace sweep, and writes the winning settings to `tuning.json`. These
+profiles ship with the index (staged/published alongside `faiss.index`) and are
+applied automatically at startup. Use `indexctl show-profile` to inspect the
+active profile, overrides, and ParameterSpace string.
 
 ## ParameterSpace sweeps
 

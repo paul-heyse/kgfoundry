@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from hashlib import sha1
+from hashlib import blake2s
 from pathlib import Path
 
 __all__ = [
@@ -73,12 +73,12 @@ def module_name_from_path(
 
 
 def stable_id_for_path(rel_posix: str) -> str:
-    """Return a truncated SHA1 digest for ``rel_posix``.
+    """Return a truncated BLAKE2s digest for ``rel_posix``.
 
     Returns
     -------
     str
         First 12 hexadecimal characters of the digest for deterministic joins.
     """
-    digest = sha1(rel_posix.encode("utf-8"))  # noqa: S324 - deterministic identifier
+    digest = blake2s(rel_posix.encode("utf-8"))
     return digest.hexdigest()[:12]

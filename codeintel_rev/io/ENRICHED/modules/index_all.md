@@ -62,15 +62,28 @@ The FAISS index type is automatically selected based on corpus size:
 - function: `_resolve_nlist` (line 568)
 - function: `_run_offline_evaluation` (line 586)
 - function: `_initialize_duckdb` (line 621)
-- function: `_write_symbols` (line 651)
+- function: `_write_symbols` (line 652)
 
-## Dependency Graph
+## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 12
-- **cycle_group**: 78
+- **cycle_group**: 82
 
-## Doc Metrics
+## Ownership
+
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 17
+- recent churn 90: 17
+
+## Usage
+
+- used by files: 0
+- used by symbols: 0
+
+## Doc Health
 
 - **summary**: One-shot indexing: SCIP → chunk → embed → Parquet → FAISS.
 - has summary: yes
@@ -89,7 +102,7 @@ The FAISS index type is automatically selected based on corpus size:
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Hotspot Score
+## Hotspot
 
 - score: 2.67
 
@@ -101,7 +114,7 @@ The FAISS index type is automatically selected based on corpus size:
 
 - branches: 37
 - cyclomatic: 38
-- loc: 722
+- loc: 723
 
 ## Doc Coverage
 

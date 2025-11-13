@@ -141,6 +141,12 @@ class PublishBody(TypedDict):
     xtr_dir : str | None
         Optional path to the XTR token index directory. If None, XTR reranking
         is unavailable for this version. Used for late-interaction reranking.
+    faiss_idmap : str | None
+        Optional path to the FAISS ID map sidecar. If provided, the lifecycle
+        manager copies the parquet file into the version directory.
+    tuning_profile : str | None
+        Optional path to a tuning.json profile. When present, the profile is
+        staged next to the index assets and applied at runtime.
 
     Notes
     -----
@@ -157,6 +163,8 @@ class PublishBody(TypedDict):
     bm25_dir: str | None
     splade_dir: str | None
     xtr_dir: str | None
+    faiss_idmap: str | None
+    tuning_profile: str | None
 
 
 class TuningBody(TypedDict, total=False):

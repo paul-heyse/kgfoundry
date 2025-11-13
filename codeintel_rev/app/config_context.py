@@ -54,6 +54,8 @@ from threading import Lock
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
 
+import numpy as np
+
 import codeintel_rev.observability.metrics as _retrieval_metrics
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.scope_store import ScopeStore
@@ -92,6 +94,8 @@ else:  # pragma: no cover - runtime only; annotations are postponed
 
 LOGGER = get_logger(__name__)
 _RUNTIME_FAILURE_TTL_S = 15.0
+_AUTOTUNE_SAMPLE_LIMIT = 128
+_MIN_AUTOTUNE_SAMPLES = 4
 
 
 class _RetrievalMetrics(Protocol):
@@ -1022,6 +1026,47 @@ class ApplicationContext:
         retrieval_metrics.set_index_version("bm25", version)
         retrieval_metrics.set_index_version("splade", version)
 
+    def _autotune_if_requested(self) -> None:
+        """Run a quick ParameterSpace sweep when enabled and no profile exists."""
+        if not self.settings.index.autotune_on_start:
+            return
+        legacy_path = getattr(self.faiss_manager, "_legacy_autotune_profile_path", None)
+        if self.faiss_manager.autotune_profile_path.exists() or (
+            legacy_path and legacy_path.exists()
+        ):
+            return
+        try:
+            with self.open_catalog() as catalog:
+                samples = catalog.sample_query_vectors(limit=_AUTOTUNE_SAMPLE_LIMIT)
+        except (OSError, RuntimeError, ValueError) as exc:  # pragma: no cover - defensive
+            LOGGER.warning("Autotune skipped: unable to sample vectors", extra={"error": str(exc)})
+            return
+        if len(samples) < _MIN_AUTOTUNE_SAMPLES:
+            LOGGER.warning(
+                "Autotune skipped: need >=%s vectors, found %s",
+                _MIN_AUTOTUNE_SAMPLES,
+                len(samples),
+            )
+            return
+        vectors = np.stack([vec for _, vec in samples], dtype=np.float32)
+        queries = vectors[: min(32, vectors.shape[0])]
+        try:
+            profile = self.faiss_manager.autotune(
+                queries,
+                vectors,
+                k=min(self.settings.index.default_k, queries.shape[0]),
+            )
+        except (RuntimeError, ValueError) as exc:  # pragma: no cover - defensive logging
+            LOGGER.warning(
+                "Autotune failed; continuing with default parameters",
+                extra={"error": str(exc)},
+            )
+            return
+        LOGGER.info(
+            "Autotune profile created",
+            extra={"param_str": profile.get("param_str"), "recall": profile.get("recall_at_k")},
+        )
+
     def apply_factory_adjuster(self, adjuster: FactoryAdjuster) -> None:
         """Update runtime tuning knobs and reset cells to pick up changes."""
         LOGGER.info("Applying runtime factory adjuster")
@@ -1386,6 +1431,7 @@ class ApplicationContext:
                 limits.append(self.faiss_manager.gpu_disabled_reason)
 
         limits = list(dict.fromkeys(limits))
+        self._autotune_if_requested()
         return True, limits, None
 
     @contextmanager
