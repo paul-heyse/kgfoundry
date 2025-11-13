@@ -47,10 +47,27 @@ def _slice_id(path: str, module_name: str | None) -> str:
 def build_slice_record(module_row: Mapping[str, Any]) -> SliceRecord:
     """Build a :class:`SliceRecord` from a module row dictionary.
 
+    This function constructs a SliceRecord from a module row dictionary containing
+    path, module name, coverage metrics, and ownership information. The function
+    extracts and validates fields from the dictionary, computes a slice ID, and
+    builds a structured record suitable for serialization.
+
+    Parameters
+    ----------
+    module_row : Mapping[str, Any]
+        Dictionary containing module metadata with keys such as "path", "module_name",
+        "covered_lines_ratio", "covered_defs_ratio", "owner", "primary_authors", etc.
+        The dictionary is expected to contain module information from enrichment
+        artifacts or database queries.
+
     Returns
     -------
     SliceRecord
-        Structured slice description derived from ``module_row``.
+        Structured slice description derived from module_row. The record includes
+        path, module name, slice ID, coverage metrics (lines and definitions ratios),
+        and ownership information (owner, primary authors). Missing or invalid
+        values are handled gracefully with defaults (empty strings, zero ratios,
+        empty lists).
     """
     path = str(module_row.get("path"))
     module_name = (

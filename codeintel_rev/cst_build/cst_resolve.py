@@ -31,10 +31,23 @@ class StitchCounters:
     def merge(self, other: StitchCounters) -> StitchCounters:
         """Return a new StitchCounters instance with merged totals.
 
+        This method creates a new StitchCounters instance by adding the counter
+        values from another instance to this instance's values. The method is
+        used to aggregate match statistics across multiple files or collections.
+
+        Parameters
+        ----------
+        other : StitchCounters
+            Another StitchCounters instance whose values should be merged into
+            this instance. The method adds other.module_matches and other.scip_matches
+            to this instance's corresponding counters.
+
         Returns
         -------
         StitchCounters
-            Accumulated counters that include ``other``'s values.
+            New StitchCounters instance with accumulated counter values. The
+            module_matches and scip_matches fields contain the sum of this instance's
+            and other's values. The original instances are not modified.
         """
         return StitchCounters(
             module_matches=self.module_matches + other.module_matches,
@@ -93,11 +106,33 @@ class SCIPResolver:
     ) -> tuple[str, list[str], float, list[StitchCandidate] | None] | None:
         """Return (symbol, evidence, confidence, debug candidates) if matched.
 
+        This method attempts to match a CST node record to a SCIP symbol by
+        searching the symbol index for candidates matching the node's kind,
+        name, and line position. The method uses best-effort matching with
+        confidence scoring based on name hints and qualified names. When debug
+        is enabled, returns candidate information for diagnostics.
+
+        Parameters
+        ----------
+        node : NodeRecord
+            CST node record to match against SCIP symbols. The node's kind,
+            name, and line position are used to search for matching symbols.
+            Only nodes with kinds in _DEF_KINDS or _USE_KINDS are processed.
+        debug : bool, optional
+            Flag indicating whether to include debug candidate information in
+            the result (default: False). When True, the returned tuple includes
+            a list of StitchCandidate objects for diagnostics. When False, the
+            candidate list is None.
+
         Returns
         -------
         tuple[str, list[str], float, list[StitchCandidate] | None] | None
-            Tuple containing symbol, evidence list, confidence score, and optional
-            debug candidate info. Returns ``None`` when no stitch candidate matched.
+            Tuple containing:
+            - symbol: Matched SCIP symbol identifier (e.g., "scip-python python ...")
+            - evidence: List of evidence strings describing the match (e.g., ["name", "qname"])
+            - confidence: Confidence score between 0.0 and 1.0 indicating match quality
+            - debug candidates: Optional list of StitchCandidate objects when debug=True
+            Returns None when no stitch candidate matched or node kind is not supported.
         """
         if node.kind not in (self._DEF_KINDS | self._USE_KINDS):
             return None

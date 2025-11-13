@@ -28,36 +28,36 @@ LibCST traversal utilities that emit normalized node records.
 - variable: `logger` (line 33)
 - class: `CollectorConfig` (line 37)
 - class: `_CollectorStatsBuilder` (line 47)
-- class: `CSTCollector` (line 86)
-- function: `index_file` (line 268)
-- function: `_should_emit` (line 288)
-- function: `_resolve_span` (line 315)
-- function: `_node_id` (line 325)
-- function: `_node_name` (line 331)
-- function: `_definition_or_class_name` (line 342)
-- function: `_assign_target_name` (line 348)
-- function: `_annassign_target_name` (line 356)
-- function: `_attribute_or_name` (line 362)
-- function: `_call_target_name` (line 370)
-- function: `_import_alias_name` (line 376)
-- function: `_parent_chain` (line 384)
-- function: `_scope` (line 413)
-- function: `_extract_module_doc` (line 430)
-- function: `_summarize` (line 437)
-- function: `_doc_snippet` (line 444)
-- function: `_preview_text` (line 455)
-- function: `_decorators` (line 463)
-- function: `_call_targets` (line 479)
-- function: `_annotation` (line 491)
-- function: `_import_metadata` (line 507)
-- function: `_normalize_alias` (line 545)
-- function: `_normalize_module_expr` (line 562)
-- function: `_is_public` (line 572)
-- function: `_resolve_lazy` (line 582)
-- function: `_qualified_name_entries` (line 591)
-- function: `_normalize_qnames` (line 610)
-- function: `_module_name_from_path` (line 619)
-- function: `_build_parse_error_node` (line 636)
+- class: `CSTCollector` (line 138)
+- function: `index_file` (line 363)
+- function: `_should_emit` (line 383)
+- function: `_resolve_span` (line 410)
+- function: `_node_id` (line 420)
+- function: `_node_name` (line 426)
+- function: `_definition_or_class_name` (line 437)
+- function: `_assign_target_name` (line 443)
+- function: `_annassign_target_name` (line 451)
+- function: `_attribute_or_name` (line 457)
+- function: `_call_target_name` (line 465)
+- function: `_import_alias_name` (line 471)
+- function: `_parent_chain` (line 479)
+- function: `_scope` (line 508)
+- function: `_extract_module_doc` (line 525)
+- function: `_summarize` (line 532)
+- function: `_doc_snippet` (line 539)
+- function: `_preview_text` (line 550)
+- function: `_decorators` (line 558)
+- function: `_call_targets` (line 574)
+- function: `_annotation` (line 586)
+- function: `_import_metadata` (line 602)
+- function: `_normalize_alias` (line 640)
+- function: `_normalize_module_expr` (line 657)
+- function: `_is_public` (line 667)
+- function: `_resolve_lazy` (line 677)
+- function: `_qualified_name_entries` (line 686)
+- function: `_normalize_qnames` (line 705)
+- function: `_module_name_from_path` (line 714)
+- function: `_build_parse_error_node` (line 745)
 
 ## Graph Metrics
 
@@ -70,8 +70,8 @@ LibCST traversal utilities that emit normalized node records.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 8
+- recent churn 90: 8
 
 ## Usage
 
@@ -109,7 +109,7 @@ LibCST traversal utilities that emit normalized node records.
 
 - branches: 96
 - cyclomatic: 97
-- loc: 657
+- loc: 784
 
 ## Doc Coverage
 

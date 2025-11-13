@@ -5,6 +5,8 @@ CPU persistence, and GPU cloning. Index type is automatically selected based on
 corpus size for optimal performance.
 """
 
+# ruff: noqa: SLF001
+
 from __future__ import annotations
 
 import importlib
@@ -41,7 +43,7 @@ from codeintel_rev.metrics.registry import (
     set_compile_flags_id,
     set_factory_id,
 )
-from codeintel_rev.observability.otel import as_span
+from codeintel_rev.observability.otel import as_span, record_span_event
 from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.retrieval.rerank_flat import FlatReranker
 from codeintel_rev.telemetry.decorators import span_context
@@ -54,8 +56,11 @@ if TYPE_CHECKING:
     import numpy as np
 
     from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+
+    FaissIndex = _faiss.Index
 else:
     np = cast("Any", LazyModule("numpy", "FAISS manager vector operations"))
+    FaissIndex = object
 
 try:  # optional heavy dependency
     import pyarrow as pa
@@ -142,8 +147,46 @@ def _has_faiss_gpu_support() -> bool:
     return all(hasattr(module, attr) for attr in required_attrs)
 
 
-def apply_parameters(index: Any, param_str: str) -> None:
-    """Apply a FAISS ParameterSpace string to ``index``."""
+def apply_parameters(index: FaissIndex, param_str: str) -> None:
+    """Apply a FAISS ParameterSpace string to ``index``.
+
+    This function applies runtime tuning parameters to a FAISS index using the
+    ParameterSpace API. The parameter string specifies index-specific tuning
+    knobs (e.g., nprobe for IVF indices, efSearch for HNSW indices) that control
+    search behavior and performance. The parameters are applied in-place to the
+    index object, modifying its runtime behavior for subsequent search operations.
+
+    Parameters
+    ----------
+    index : FaissIndex
+        FAISS index object to apply parameters to. Must support the ParameterSpace
+        API (typically IVF, HNSW, or other tunable index types). The index is
+        modified in-place with the new parameter values.
+    param_str : str
+        Parameter string specifying tuning parameters in FAISS ParameterSpace format
+        (e.g., "nprobe=32,efSearch=64"). Must be non-empty and contain valid
+        parameter specifications for the index type.
+
+    Raises
+    ------
+    ValueError
+        Raised in the following cases:
+        - ``param_str`` is empty or whitespace-only: parameter string must be
+          non-empty to apply valid tuning parameters
+        - Parameter application fails: FAISS ParameterSpace API raises
+          AttributeError, RuntimeError, or ValueError when the parameter string
+          is invalid, incompatible with the index type, or contains unsupported
+          parameters
+
+    Notes
+    -----
+    This function wraps the FAISS ParameterSpace API to provide a convenient
+    interface for applying runtime tuning parameters. The function validates input
+    and provides clear error messages when parameter application fails. Time
+    complexity: O(1) for parameter parsing and application. The function modifies
+    the index object in-place and is not thread-safe if the index is being used
+    concurrently. Parameters persist for the lifetime of the index object.
+    """
     if not param_str or not param_str.strip():
         msg = "Parameter string must be non-empty."
         raise ValueError(msg)
@@ -1629,16 +1672,29 @@ class FAISSManager(
                 ef_search=params.ef_search,
                 quantizer_ef_search=params.quantizer_ef_search,
             )
-            primary_dists, primary_ids = self._search_primary(query, search_k, params.nprobe)
+            with as_span("faiss.search.primary", nprobe=params.nprobe or -1):
+                primary_dists, primary_ids = self._search_primary(query, search_k, params.nprobe)
             if self.secondary_index is None:
+                record_span_event(
+                    "faiss.search.primary_only",
+                    candidates=int(primary_ids.shape[1]),
+                )
                 return primary_dists, primary_ids
-            secondary_dists, secondary_ids = self._search_secondary(query, search_k)
-            merged_dists, merged_ids = self._merge_results(
-                primary_dists,
-                primary_ids,
-                secondary_dists,
-                secondary_ids,
-                search_k,
+            with as_span("faiss.search.secondary"):
+                secondary_dists, secondary_ids = self._search_secondary(query, search_k)
+            with as_span("faiss.search.merge"):
+                merged_dists, merged_ids = self._merge_results(
+                    primary_dists,
+                    primary_ids,
+                    secondary_dists,
+                    secondary_ids,
+                    search_k,
+                )
+            record_span_event(
+                "faiss.search.merge_result",
+                primary=primary_ids.shape[1],
+                secondary=secondary_ids.shape[1],
+                merged=merged_ids.shape[1],
             )
             LOGGER.debug(
                 "Dual-index search completed",
@@ -1684,6 +1740,9 @@ class FAISSManager(
         identifiers : NDArrayI64
             Candidate chunk IDs from ANN search, shape (n_queries, search_k).
             These IDs are used to retrieve embeddings for exact similarity computation.
+        metric_labels : Mapping[str, str] | None, optional
+            Prometheus metric labels applied when recording refinement latency.
+            When None, falls back to the unlabeled histogram variant.
 
         Returns
         -------
@@ -2167,7 +2226,41 @@ class FAISSManager(
         *,
         path: Path | None = None,
     ) -> Path:
-        """Persist ``profile`` to ``tuning.json`` and return its path."""
+        """Persist ``profile`` to ``tuning.json`` and return its path.
+
+        This method saves an autotune profile (containing parameter strings, recall
+        metrics, latency measurements, and other tuning metadata) to a JSON file.
+        The profile is serialized with indentation for readability and stored at
+        the configured autotune profile path or a custom path if specified. The
+        parent directory is created if it doesn't exist.
+
+        Parameters
+        ----------
+        profile : Mapping[str, Any]
+            Autotune profile dictionary containing tuning results. Typically includes
+            keys like "param_str" (parameter string), "recall_at_k" (recall metric),
+            "latency_ms" (search latency), and "refine_k_factor" (refinement factor).
+            The dictionary is serialized to JSON format.
+        path : Path | None, optional
+            Custom file system path to save the profile to. If None, uses the
+            configured autotune_profile_path. The parent directory is created
+            automatically if it doesn't exist.
+
+        Returns
+        -------
+        Path
+            File system path where the tuning profile was saved. This is either
+            the provided path or the default autotune_profile_path. The path
+            points to a JSON file containing the serialized profile data.
+
+        Notes
+        -----
+        This method performs file I/O to persist autotune results for later use.
+        The profile JSON file can be loaded to restore optimal tuning parameters
+        without re-running autotune. Time complexity: O(n) where n is the size of
+        the profile dictionary. The method creates parent directories if needed and
+        overwrites existing files. Thread-safe if file system operations are atomic.
+        """
         target = path or self.autotune_profile_path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(json.dumps(profile, indent=2), encoding="utf-8")
@@ -2296,8 +2389,7 @@ class FAISSManager(
     def _dynamic_nlist(self, n_vectors: int, *, minimum: int) -> int:
         if self.faiss_family != "auto":
             return max(self.nlist, minimum)
-        approx = max(int(np.sqrt(n_vectors)), minimum)
-        return max(approx, minimum)
+        return max(int(np.sqrt(n_vectors)), minimum)
 
     def _factory_string_for(self, family: str, _n_vectors: int) -> str:
         fam = family.lower()
@@ -2363,13 +2455,12 @@ class FAISSManager(
 
     def _metric_labels(self, plan: _SearchPlan) -> dict[str, str]:
         ratio = plan.search_k / plan.k if plan.k > 0 else 0.0
-        labels = {
+        return {
             "index_family": str(self.faiss_family or "auto"),
             "nprobe": str(plan.params.nprobe or "default"),
             "ef_search": str(plan.params.ef_search or ""),
             "refine_k_factor": f"{ratio:.2f}",
         }
-        return labels
 
     def _maybe_apply_runtime_parameters(self, overrides: Mapping[str, float | int]) -> None:
         """Best-effort application of overrides to the live index if available."""
@@ -2797,17 +2888,72 @@ class AutoTuner:
         sweep: Sequence[str] | None = None,
         refine_k_factor: float | None = None,
     ) -> dict[str, Any]:
-        """Return the selected operating-point profile."""
-        xq = self._manager._ensure_2d(queries).astype(np.float32)
-        xt = self._manager._ensure_2d(truths).astype(np.float32)
+        """Return the selected operating-point profile.
+
+        This method performs a parameter sweep over a sequence of FAISS parameter
+        strings, evaluating each configuration's recall and latency. The method
+        normalizes query and truth vectors, computes ground-truth nearest neighbors,
+        and tests each parameter configuration to find the optimal operating point
+        balancing recall and latency. The selected profile includes the best
+        parameter string, recall metrics, latency measurements, and refinement
+        factor.
+
+        Parameters
+        ----------
+        queries : NDArrayF32
+            Query vectors with shape `(N, dim)` and dtype float32. Used to evaluate
+            search performance across parameter configurations. Vectors are normalized
+            to unit length (L2 normalization) before evaluation.
+        truths : NDArrayF32
+            Ground-truth vectors with shape `(M, dim)` and dtype float32. Used to
+            compute recall metrics by comparing search results against exact nearest
+            neighbors. Vectors are normalized to unit length (L2 normalization)
+            before evaluation.
+        k : int, optional
+            Number of nearest neighbors to retrieve per query (defaults to 10).
+            Used to compute recall@k metrics and determine ground-truth IDs.
+            Must be positive and not exceed the number of truth vectors.
+        sweep : Sequence[str] | None, optional
+            Sequence of FAISS parameter strings to evaluate (e.g., ["nprobe=16",
+            "nprobe=32", "efSearch=64"]). If None, uses the default parameter sweep
+            defined by the class. Each parameter string is applied to the index
+            and evaluated for recall and latency.
+        refine_k_factor : float | None, optional
+            Refinement factor to include in the profile. If None, uses the manager's
+            default refine_k_factor. Values > 1.0 enable candidate expansion and
+            exact reranking for improved recall.
+
+        Returns
+        -------
+        dict[str, Any]
+            Selected operating-point profile dictionary containing:
+            - param_str: Best parameter string selected from the sweep
+            - recall_at_k: Recall@k metric for the selected configuration (float)
+            - latency_ms: Average search latency in milliseconds (float)
+            - refine_k_factor: Refinement factor for candidate expansion (float)
+            The profile represents the optimal balance between recall and latency
+            based on the sweep evaluation criteria.
+        """
+        xq = self._manager._ensure_2d(queries).astype(
+            np.float32
+        )  # lint-ignore[SLF001]: share private helper inside module
+        xt = self._manager._ensure_2d(truths).astype(
+            np.float32
+        )  # lint-ignore[SLF001]: share private helper inside module
         faiss.normalize_L2(xq)
         faiss.normalize_L2(xt)
         eval_sweep = tuple(sweep) if sweep else self._DEFAULT_SWEEP
-        truth_ids = self._manager._brute_force_truth_ids(xq, xt, min(k, xt.shape[0]))
+        truth_ids = self._manager._brute_force_truth_ids(
+            xq, xt, min(k, xt.shape[0])
+        )  # lint-ignore[SLF001]: reuse internal helper for evaluation
         candidates: list[dict[str, float | str]] = []
         for spec in eval_sweep:
-            latency_ms, (_, ids) = self._manager._timed_search_with_params(xq, k, spec)
-            recall = self._manager._estimate_recall(ids, truth_ids)
+            latency_ms, (_, ids) = self._manager._timed_search_with_params(
+                xq, k, spec
+            )  # lint-ignore[SLF001]: reuse internal helper for evaluation
+            recall = self._manager._estimate_recall(
+                ids, truth_ids
+            )  # lint-ignore[SLF001]: reuse internal helper for evaluation
             candidates.append(
                 {
                     "param_str": spec,
@@ -2819,7 +2965,7 @@ class AutoTuner:
         profile["refine_k_factor"] = float(
             refine_k_factor if refine_k_factor is not None else self._manager.refine_k_factor
         )
-        meta = self._manager._meta_snapshot()
+        meta = self._manager._meta_snapshot()  # lint-ignore[SLF001]: reuse internal helper for evaluation
         if "factory" in meta:
             profile["factory"] = meta["factory"]
         return profile

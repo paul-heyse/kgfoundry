@@ -106,7 +106,30 @@ class InprocessVLLMEmbedder:
         )
 
     def embed_batch(self, texts: Sequence[str]) -> NDArrayF32:
-        """Return embeddings for ``texts`` (shape ``[N, dim]``)."""
+        """Return embeddings for ``texts`` (shape ``[N, dim]``).
+
+        This method generates embeddings for a batch of text inputs using the
+        configured vLLM embedding model. It delegates to embed_batch_with_stats()
+        and returns only the embedding vectors, discarding token count statistics.
+        The embeddings are normalized if configured and ready for similarity
+        computation or storage.
+
+        Parameters
+        ----------
+        texts : Sequence[str]
+            Sequence of text strings to embed. Each string is tokenized and passed
+            through the vLLM embedding model to generate a dense vector representation.
+            The batch is processed efficiently using vLLM's batched inference.
+
+        Returns
+        -------
+        NDArrayF32
+            Embedding matrix with shape `(N, dim)` where N is the number of input
+            texts and dim is the embedding dimension (model-dependent). Dtype is
+            float32. Embeddings are normalized if the normalize configuration is
+            enabled, otherwise raw model outputs. The matrix is ready for similarity
+            computation, storage, or indexing operations.
+        """
         vectors, _ = self.embed_batch_with_stats(texts)
         return vectors
 

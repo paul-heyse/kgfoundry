@@ -20,10 +20,24 @@ except ImportError:  # pragma: no cover - fallback when prometheus missing
     def generate_latest(_registry: object) -> bytes:
         """Return placeholder metrics when prometheus_client is unavailable.
 
+        This fallback function returns a placeholder message when prometheus_client
+        is not installed. It provides a graceful degradation path, allowing the
+        application to run without Prometheus support while indicating that metrics
+        are unavailable.
+
+        Parameters
+        ----------
+        _registry : object
+            Metrics registry object (unused in fallback implementation). The
+            parameter is accepted for API compatibility with prometheus_client's
+            generate_latest() function signature.
+
         Returns
         -------
         bytes
-            Text exposition explaining that metrics are disabled.
+            Placeholder text message (UTF-8 encoded) explaining that Prometheus
+            metrics are unavailable because prometheus_client is not installed.
+            The message is in Prometheus text format for consistency.
         """
         return b"# Prometheus metrics unavailable (prometheus_client not installed)\n"
 
@@ -90,10 +104,25 @@ class MetricsConfig:
 def build_metrics_router(config: MetricsConfig | None = None) -> APIRouter | None:
     """Return an APIRouter exposing the Prometheus scrape endpoint.
 
+    This function creates a FastAPI router with a `/metrics` endpoint that
+    exposes Prometheus metrics in text format. The router is only created when
+    FastAPI and prometheus_client are available, and when metrics are enabled
+    in the configuration. The endpoint can be mounted to a FastAPI application
+    to enable Prometheus scraping.
+
+    Parameters
+    ----------
+    config : MetricsConfig | None, optional
+        Metrics configuration specifying whether metrics are enabled and which
+        registry to use. If None, uses default MetricsConfig with metrics enabled.
+        The router is only created when config.enabled is True.
+
     Returns
     -------
     APIRouter | None
-        Router when FastAPI/prometheus-client are available, otherwise ``None``.
+        FastAPI router with `/metrics` endpoint when FastAPI/prometheus-client
+        are available and metrics are enabled, otherwise None. The router should
+        be mounted to the FastAPI application to expose the metrics endpoint.
     """
     if APIRouter is None or Response is None:
         return None
@@ -107,6 +136,31 @@ def build_metrics_router(config: MetricsConfig | None = None) -> APIRouter | Non
 
     @router.get("/metrics")
     def metrics_endpoint() -> Response:
+        """FastAPI endpoint handler for Prometheus metrics scraping.
+
+        This endpoint handler responds to GET requests at `/metrics` with
+        Prometheus-formatted metrics data. It generates the latest metrics
+        from the configured registry and returns them as a text/plain response
+        with the appropriate Prometheus content type. This endpoint is used
+        by Prometheus scrapers to collect application metrics.
+
+        Returns
+        -------
+        Response
+            FastAPI Response object containing Prometheus metrics exposition
+            format (text/plain) with content type set to CONTENT_TYPE_LATEST.
+            The response body contains all metrics from the configured registry
+            in Prometheus text format, ready for scraping by Prometheus servers.
+
+        Notes
+        -----
+        This endpoint is registered on the returned APIRouter and should be
+        mounted to the FastAPI application. The endpoint generates metrics
+        on-demand when scraped, ensuring up-to-date metrics are always returned.
+        The endpoint is thread-safe if generate_latest() and the registry are
+        thread-safe. Metrics are generated synchronously, so scraping may
+        block briefly during metric collection.
+        """
         return Response(content=generate_latest(registry), media_type=CONTENT_TYPE_LATEST)
 
     return router

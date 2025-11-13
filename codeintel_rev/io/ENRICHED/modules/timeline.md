@@ -17,46 +17,48 @@ Lightweight per-session timeline recording utilities.
 - from **(absolute)** import threading
 - from **(absolute)** import time
 - from **(absolute)** import uuid
-- from **collections.abc** import Iterator, Mapping, Sequence
+- from **collections.abc** import Callable, Iterator, Mapping, Sequence
 - from **contextlib** import AbstractContextManager, contextmanager
 - from **dataclasses** import dataclass
+- from **importlib** import import_module
 - from **pathlib** import Path
 - from **types** import TracebackType
-- from **typing** import Any, Self
+- from **typing** import Any, Self, cast
 - from **codeintel_rev.observability.otel** import as_span, record_span_event
 - from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 23)
-- function: `_env_float` (line 32)
-- function: `_env_int` (line 43)
-- function: `_clamp` (line 54)
-- function: `_diagnostics_dir` (line 62)
-- function: `_max_field_len` (line 68)
-- class: `_FlightRecorder` (line 72)
-- function: `_scrub_value` (line 180)
-- function: `_scrub_attrs` (line 201)
-- class: `Timeline` (line 206)
-- class: `_TimelineScope` (line 315)
-- function: `new_timeline` (line 368)
-- function: `current_timeline` (line 403)
-- function: `current_or_new_timeline` (line 414)
-- function: `bind_timeline` (line 455)
+- variable: `LOGGER` (line 24)
+- function: `_env_float` (line 35)
+- function: `_env_int` (line 46)
+- function: `_clamp` (line 57)
+- function: `_diagnostics_dir` (line 65)
+- function: `_max_field_len` (line 71)
+- class: `_FlightRecorder` (line 75)
+- function: `_get_record_payload_fn` (line 183)
+- function: `_scrub_value` (line 210)
+- function: `_scrub_attrs` (line 231)
+- class: `Timeline` (line 236)
+- class: `_TimelineScope` (line 353)
+- function: `new_timeline` (line 406)
+- function: `current_timeline` (line 441)
+- function: `current_or_new_timeline` (line 452)
+- function: `bind_timeline` (line 493)
 
 ## Graph Metrics
 
-- **fan_in**: 11
+- **fan_in**: 12
 - **fan_out**: 2
-- **cycle_group**: 40
+- **cycle_group**: 39
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 5
-- recent churn 90: 5
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 
@@ -88,7 +90,7 @@ Timeline, bind_timeline, current_timeline, new_timeline
 
 ## Hotspot
 
-- score: 2.69
+- score: 2.77
 
 ## Side Effects
 
@@ -96,9 +98,9 @@ Timeline, bind_timeline, current_timeline, new_timeline
 
 ## Complexity
 
-- branches: 36
-- cyclomatic: 37
-- loc: 491
+- branches: 42
+- cyclomatic: 43
+- loc: 529
 
 ## Doc Coverage
 
@@ -108,10 +110,10 @@ Timeline, bind_timeline, current_timeline, new_timeline
 - `_diagnostics_dir` (function): summary=no, examples=no
 - `_max_field_len` (function): summary=no, examples=no
 - `_FlightRecorder` (class): summary=yes, examples=no — Append-only JSONL recorder with sampling and rotation.
+- `_get_record_payload_fn` (function): summary=yes, params=ok, examples=no — Return the cached reporter hook, importing lazily when required.
 - `_scrub_value` (function): summary=no, examples=no
 - `_scrub_attrs` (function): summary=no, examples=no
 - `Timeline` (class): summary=yes, examples=no — Append-only JSONL event recorder for a single session/run pair.
-- `_TimelineScope` (class): summary=yes, examples=no — Context manager that emits start/end events with duration.
 
 ## Tags
 

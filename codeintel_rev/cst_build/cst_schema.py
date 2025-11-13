@@ -156,10 +156,24 @@ class CollectorStats:
     def merge(self, other: CollectorStats) -> CollectorStats:
         """Return a new CollectorStats representing the merged totals.
 
+        This method creates a new CollectorStats instance by adding the counter
+        values from another instance to this instance's values. The method is
+        used to aggregate collection statistics across multiple files or batches.
+
+        Parameters
+        ----------
+        other : CollectorStats
+            Another CollectorStats instance whose values should be merged into
+            this instance. The method adds all counter fields (files_indexed,
+            node_rows, parse_errors, qname_hits, scope_resolved) from other
+            to this instance's corresponding counters.
+
         Returns
         -------
         CollectorStats
-            Accumulated counters including values from ``other``.
+            New CollectorStats instance with accumulated counter values. All
+            counter fields contain the sum of this instance's and other's values.
+            The original instances are not modified.
         """
         return CollectorStats(
             files_indexed=self.files_indexed + other.files_indexed,

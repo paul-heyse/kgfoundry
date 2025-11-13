@@ -45,7 +45,7 @@ BM25 indexing workflow helpers.
 
 - **fan_in**: 3
 - **fan_out**: 3
-- **cycle_group**: 99
+- **cycle_group**: 110
 
 ## Ownership
 

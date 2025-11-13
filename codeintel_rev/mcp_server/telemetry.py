@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 from codeintel_rev.app.middleware import get_capability_stamp, get_session_id
+from codeintel_rev.observability.otel import as_span, record_span_event
 from codeintel_rev.observability.timeline import Timeline, current_or_new_timeline
 from codeintel_rev.telemetry.context import telemetry_context
 from codeintel_rev.telemetry.prom import observe_request_latency
@@ -49,6 +50,13 @@ def tool_operation_scope(
     This context manager integrates with the timeline system to provide structured
     logging and observability. Events are emitted at context entry and exit with
     duration tracking. Time complexity: O(1) for context setup and event emission.
+
+    Raises
+    ------
+    RuntimeError
+        Raised when session ID cannot be retrieved from the application context.
+        The error is caught internally and handled gracefully by using None for
+        session_id, but may propagate if session context is required.
     """
     try:
         session_id = get_session_id()
@@ -67,6 +75,11 @@ def tool_operation_scope(
         tool_name=tool_name,
         capability_stamp=capability_stamp,
     )
+    span_attrs = {
+        "tool": tool_name,
+        "session_id": timeline.session_id,
+        "run_id": timeline.run_id,
+    }
     with telemetry_context(
         session_id=timeline.session_id,
         run_id=timeline.run_id,
@@ -74,24 +87,36 @@ def tool_operation_scope(
         tool_name=tool_name,
     ):
         timing_start = time.perf_counter()
-        try:
-            with timeline.operation(f"mcp.tool.{tool_name}", **operation_attrs):
-                yield timeline
-        except BaseException as exc:
-            finalize_run(
-                timeline.session_id,
-                timeline.run_id,
-                status="error",
-                stop_reason=f"{type(exc).__name__}: {exc}",
-                finished_at=time.time(),
-            )
-            observe_request_latency(tool_name, time.perf_counter() - timing_start, "error")
-            raise
-        else:
-            finalize_run(
-                timeline.session_id,
-                timeline.run_id,
-                status="complete",
-                finished_at=time.time(),
-            )
-            observe_request_latency(tool_name, time.perf_counter() - timing_start, "complete")
+        with as_span(f"mcp.tool.{tool_name}", **span_attrs):
+            try:
+                with timeline.operation(f"mcp.tool.{tool_name}", **operation_attrs):
+                    yield timeline
+            except BaseException as exc:
+                record_span_event(
+                    "mcp.tool.error",
+                    tool=tool_name,
+                    error=str(exc),
+                )
+                finalize_run(
+                    timeline.session_id,
+                    timeline.run_id,
+                    status="error",
+                    stop_reason=f"{type(exc).__name__}: {exc}",
+                    finished_at=time.time(),
+                )
+                observe_request_latency(tool_name, time.perf_counter() - timing_start, "error")
+                raise
+            else:
+                duration = time.perf_counter() - timing_start
+                record_span_event(
+                    "mcp.tool.complete",
+                    tool=tool_name,
+                    duration_ms=int(duration * 1000),
+                )
+                finalize_run(
+                    timeline.session_id,
+                    timeline.run_id,
+                    status="complete",
+                    finished_at=time.time(),
+                )
+                observe_request_latency(tool_name, duration, "complete")

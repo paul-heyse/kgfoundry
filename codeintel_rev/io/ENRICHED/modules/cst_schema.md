@@ -22,8 +22,8 @@ Dataclasses and helpers describing the CST dataset schema.
 - class: `StitchInfo` (line 61)
 - class: `NodeRecord` (line 92)
 - class: `CollectorStats` (line 147)
-- function: `_format_doc` (line 184)
-- function: `_assign_optional` (line 195)
+- function: `_format_doc` (line 198)
+- function: `_assign_optional` (line 209)
 
 ## Graph Metrics
 
@@ -75,7 +75,7 @@ Dataclasses and helpers describing the CST dataset schema.
 
 - branches: 12
 - cyclomatic: 13
-- loc: 207
+- loc: 221
 
 ## Doc Coverage
 

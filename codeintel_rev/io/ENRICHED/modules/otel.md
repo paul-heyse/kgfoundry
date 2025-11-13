@@ -1,70 +1,75 @@
-# observability/otel.py
+# telemetry/otel.py
 
 ## Docstring
 
 ```
-Optional OpenTelemetry bootstrap helpers.
+OpenTelemetry bootstrap helpers for CodeIntel.
 ```
 
 ## Imports
 
 - from **__future__** import annotations
-- from **(absolute)** import importlib
 - from **(absolute)** import os
-- from **collections.abc** import Mapping
-- from **contextlib** import AbstractContextManager
 - from **dataclasses** import dataclass
-- from **types** import ModuleType
-- from **typing** import Any, Protocol
+- from **importlib** import metadata
+- from **typing** import Any
+- from **opentelemetry** import metrics
+- from **opentelemetry** import trace
+- from **opentelemetry.exporter.otlp.proto.http.metric_exporter** import OTLPMetricExporter
+- from **opentelemetry.exporter.otlp.proto.http.trace_exporter** import OTLPSpanExporter
+- from **opentelemetry.sdk.metrics** import MeterProvider
+- from **opentelemetry.sdk.metrics.export** import ConsoleMetricExporter, PeriodicExportingMetricReader
+- from **opentelemetry.sdk.resources** import Resource
+- from **opentelemetry.sdk.trace** import TracerProvider
+- from **opentelemetry.sdk.trace.export** import BatchSpanProcessor, ConsoleSpanExporter
 - from **kgfoundry_common.logging** import get_logger
-- from **kgfoundry_common.observability** import start_span
 
 ## Definitions
 
-- variable: `LOGGER` (line 16)
-- variable: `SpanAttribute` (line 18)
-- class: `_TelemetryState` (line 21)
-- class: `SupportsState` (line 32)
-- class: `_TraceHandles` (line 39)
-- function: `_env_flag` (line 51)
-- function: `_sanitize_span_attrs` (line 58)
-- function: `_coerce_span_value` (line 67)
-- function: `_should_enable` (line 81)
-- function: `_load_trace_modules` (line 85)
-- function: `_build_provider` (line 107)
-- function: `telemetry_enabled` (line 133)
-- function: `init_telemetry` (line 144)
-- function: `as_span` (line 191)
-- function: `record_span_event` (line 219)
+- variable: `otel_metrics` (line 27)
+- variable: `otel_trace` (line 28)
+- variable: `OTLPMetricExporter` (line 29)
+- variable: `OTLPSpanExporter` (line 30)
+- variable: `MeterProvider` (line 31)
+- variable: `PeriodicExportingMetricReader` (line 32)
+- variable: `ConsoleMetricExporter` (line 33)
+- variable: `BatchSpanProcessor` (line 34)
+- variable: `ConsoleSpanExporter` (line 35)
+- variable: `Resource` (line 36)
+- variable: `TracerProvider` (line 37)
+- variable: `LOGGER` (line 41)
+- function: `_env_flag` (line 44)
+- function: `_service_version` (line 74)
+- function: `build_resource` (line 90)
+- class: `OtelInstallResult` (line 153)
+- function: `_build_span_exporter` (line 160)
+- function: `_build_metric_exporter` (line 190)
+- function: `install_otel` (line 220)
 
 ## Graph Metrics
 
-- **fan_in**: 4
+- **fan_in**: 3
 - **fan_out**: 1
-- **cycle_group**: 39
+- **cycle_group**: 79
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 1
+- recent churn 90: 1
 
 ## Usage
 
 - used by files: 0
 - used by symbols: 0
 
-## Declared Exports (__all__)
-
-as_span, init_telemetry, record_span_event, telemetry_enabled
-
 ## Doc Health
 
-- **summary**: Optional OpenTelemetry bootstrap helpers.
+- **summary**: OpenTelemetry bootstrap helpers for CodeIntel.
 - has summary: yes
-- param parity: no
+- param parity: yes
 - examples present: no
 
 ## Typedness
@@ -81,7 +86,7 @@ as_span, init_telemetry, record_span_event, telemetry_enabled
 
 ## Hotspot
 
-- score: 2.33
+- score: 2.17
 
 ## Side Effects
 
@@ -89,23 +94,20 @@ as_span, init_telemetry, record_span_event, telemetry_enabled
 
 ## Complexity
 
-- branches: 33
-- cyclomatic: 34
-- loc: 244
+- branches: 24
+- cyclomatic: 25
+- loc: 308
 
 ## Doc Coverage
 
-- `_TelemetryState` (class): summary=yes, examples=no — Mutable telemetry state shared across module functions.
-- `SupportsState` (class): summary=yes, examples=no — Protocol describing FastAPI-style objects exposing ``state``.
-- `_TraceHandles` (class): summary=no, examples=no
-- `_env_flag` (function): summary=no, examples=no
-- `_sanitize_span_attrs` (function): summary=no, examples=no
-- `_coerce_span_value` (function): summary=no, examples=no
-- `_should_enable` (function): summary=no, examples=no
-- `_load_trace_modules` (function): summary=no, examples=no
-- `_build_provider` (function): summary=no, examples=no
-- `telemetry_enabled` (function): summary=yes, params=ok, examples=no — Return ``True`` when tracing has been configured for this process.
+- `_env_flag` (function): summary=yes, params=ok, examples=no — Return environment flag value.
+- `_service_version` (function): summary=yes, params=ok, examples=no — Return package version for resource attributes.
+- `build_resource` (function): summary=yes, params=ok, examples=no — Build an OpenTelemetry Resource describing this process.
+- `OtelInstallResult` (class): summary=yes, examples=no — Summary describing which signal providers were installed.
+- `_build_span_exporter` (function): summary=yes, params=ok, examples=no — Return an OTLP span exporter when configured.
+- `_build_metric_exporter` (function): summary=yes, params=ok, examples=no — Return an OTLP metric exporter when configured.
+- `install_otel` (function): summary=yes, params=ok, examples=no — Install tracer/meter providers with console fallbacks.
 
 ## Tags
 
-low-coverage, public-api
+low-coverage

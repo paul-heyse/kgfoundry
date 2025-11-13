@@ -23,7 +23,7 @@ DuckDB symbol catalog writer.
 
 - **fan_in**: 3
 - **fan_out**: 1
-- **cycle_group**: 48
+- **cycle_group**: 63
 
 ## Ownership
 

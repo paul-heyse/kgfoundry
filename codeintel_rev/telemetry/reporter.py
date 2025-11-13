@@ -236,10 +236,28 @@ class RunReportStore:
     def get_run(self, session_id: str, run_id: str | None = None) -> RunRecord | None:
         """Return a cloned run record for the session/run combination.
 
+        This method retrieves a run record from the store for the specified session
+        and optional run identifier. When run_id is None, returns the most recent
+        run for the session. The returned record is a shallow copy to prevent
+        external modifications.
+
+        Parameters
+        ----------
+        session_id : str
+            Session identifier to search for. Used to filter run records by session.
+            The method searches for runs associated with this session.
+        run_id : str | None, optional
+            Optional run identifier to retrieve a specific run (default: None).
+            When None, returns the most recent run for the session by searching
+            the order deque in reverse. When provided, retrieves the exact run
+            matching both session_id and run_id.
+
         Returns
         -------
         RunRecord | None
-            Stored run record or ``None`` when not found.
+            Shallow copy of the stored run record, or None when no matching run
+            is found. The record contains events, checkpoints, and metadata for
+            the requested run.
         """
         with self._lock:
             key: tuple[str, str] | None
@@ -387,10 +405,32 @@ def build_report(
 ) -> RunReport | None:
     """Build a run report for the provided session/run identifiers.
 
+    This function aggregates telemetry data from stored run records and builds
+    a comprehensive RunReport containing operations, steps, decisions, warnings,
+    errors, and checkpoints. The function retrieves the run record from the
+    store and processes events to generate the report.
+
+    Parameters
+    ----------
+    context : ApplicationContext
+        Application context containing runtime configuration and state. Used to
+        access application metadata and configuration for the report. The context
+        provides information about the application instance that generated the run.
+    session_id : str
+        Session identifier to retrieve run data for. Used to identify the
+        telemetry session containing the run report. Must match a session in
+        the run report store.
+    run_id : str | None, optional
+        Optional run identifier to retrieve a specific run report (default: None).
+        When None, retrieves the most recent run for the session. When provided,
+        retrieves the exact run matching both session_id and run_id.
+
     Returns
     -------
     RunReport | None
-        Aggregated run report or ``None`` when no data exists.
+        Aggregated run report containing operations, steps, decisions, warnings,
+        errors, and checkpoints, or None when no matching run data exists in
+        the store. The report is suitable for serialization and display.
     """
     record = RUN_REPORT_STORE.get_run(session_id, run_id)
     if record is None:
@@ -439,10 +479,23 @@ def build_report(
 def report_to_json(report: RunReport) -> dict[str, Any]:
     """Return JSON-serializable payload for the report.
 
+    This function converts a RunReport object into a JSON-serializable dictionary
+    by calling the report's to_dict() method. The resulting dictionary can be
+    serialized to JSON for API responses or storage.
+
+    Parameters
+    ----------
+    report : RunReport
+        Run report object to convert to JSON format. The report contains
+        operations, steps, decisions, warnings, errors, and checkpoints that
+        are serialized into the dictionary.
+
     Returns
     -------
     dict[str, Any]
-        JSON-ready dictionary form of ``report``.
+        JSON-ready dictionary representation of the report. The dictionary
+        contains all report fields in a format suitable for JSON serialization.
+        Can be used with json.dumps() or FastAPI JSONResponse.
     """
     return report.to_dict()
 
@@ -450,10 +503,24 @@ def report_to_json(report: RunReport) -> dict[str, Any]:
 def render_markdown(report: RunReport) -> str:
     """Render the report as Markdown.
 
+    This function converts a RunReport object into a human-readable Markdown
+    string. The function formats operations, steps, decisions, warnings, errors,
+    and checkpoints into structured Markdown sections suitable for display in
+    documentation or web interfaces.
+
+    Parameters
+    ----------
+    report : RunReport
+        Run report object to render as Markdown. The report contains telemetry
+        data, metrics, and execution details that are formatted into Markdown
+        sections with headers, lists, and tables.
+
     Returns
     -------
     str
-        Markdown-formatted summary.
+        Markdown-formatted summary string containing all report sections.
+        The string includes headers, lists, and formatted data suitable for
+        rendering in Markdown viewers or conversion to HTML.
     """
 
     def _append_section(title: str, entries: list[str]) -> None:

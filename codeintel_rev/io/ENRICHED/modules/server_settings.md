@@ -23,13 +23,13 @@ and when exporting the Hypercorn-facing ASGI callable.
 ## Definitions
 
 - class: `ServerSettings` (line 19)
-- function: `get_server_settings` (line 87)
+- function: `get_server_settings` (line 105)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 44
+- **cycle_group**: 72
 
 ## Ownership
 
@@ -77,13 +77,13 @@ ServerSettings, get_server_settings
 
 ## Side Effects
 
-- none detected
+- network
 
 ## Complexity
 
 - branches: 0
 - cyclomatic: 1
-- loc: 102
+- loc: 120
 
 ## Doc Coverage
 

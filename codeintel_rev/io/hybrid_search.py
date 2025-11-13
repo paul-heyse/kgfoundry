@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Protocol
 
 import codeintel_rev.observability.metrics as retrieval_metrics
 from codeintel_rev.evaluation.hybrid_pool import Hit, HybridPoolEvaluator
+from codeintel_rev.observability.otel import as_span, record_span_event
 from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.plugins.channels import Channel, ChannelContext, ChannelError
 from codeintel_rev.plugins.registry import ChannelRegistry
@@ -713,11 +714,28 @@ class HybridSearchEngine:
         retrieval_metrics.QUERIES_TOTAL.labels(kind="search").inc()
         gate_cfg = self._make_stage_gate_config()
         budget_decision, budget_info = self._profile_query(query, gate_cfg, timeline)
-        runs, warnings = self._gather_channel_hits(
-            query,
-            semantic_hits,
-            channel_limits=budget_decision.per_channel_depths,
+        with as_span(
+            "hybrid.collect_channels",
+            limit=limit,
+            semantic_hits=len(semantic_hits),
+        ):
+            runs, warnings = self._gather_channel_hits(
+                query,
+                semantic_hits,
+                channel_limits=budget_decision.per_channel_depths,
+            )
+        channel_counts = {name: len(hits) for name, hits in runs.items()}
+        record_span_event(
+            "hybrid.channels.collected",
+            semantic=channel_counts.get("semantic", 0),
+            bm25=channel_counts.get("bm25", 0),
+            splade=channel_counts.get("splade", 0),
+            extra=len(channel_counts) - min(len(channel_counts), 3),
         )
+        if timeline is not None and channel_counts:
+            attrs = {f"{name}_hits": count for name, count in channel_counts.items()}
+            attrs["channels"] = list(channel_counts)
+            timeline.event("hybrid.channels.collected", "hybrid", attrs=attrs)
         opts = options or HybridSearchOptions()
         ctx = _FusionContext(
             query=query,
@@ -729,7 +747,26 @@ class HybridSearchEngine:
             budget_info=budget_info,
             timeline=timeline,
         )
-        return self._fuse_runs(ctx)
+        with as_span("hybrid.fuse", limit=limit, channels=len(channel_counts) or 1):
+            result = self._fuse_runs(ctx)
+        record_span_event(
+            "hybrid.fuse.result",
+            documents=len(result.docs),
+            warnings=len(result.warnings),
+            channels=len(result.channels),
+        )
+        if timeline is not None:
+            fusion_attrs: dict[str, object] = {
+                "documents": len(result.docs),
+                "warnings": len(result.warnings),
+                "channels": result.channels,
+            }
+            timeline.event(
+                "hybrid.fuse.result",
+                "fusion",
+                attrs=fusion_attrs,
+            )
+        return result
 
     def _gather_channel_hits(
         self,

@@ -26,6 +26,7 @@ the FAISS index, then hydrating results from DuckDB.
 - from **codeintel_rev.mcp_server.common.observability** import Observation, observe_duration
 - from **codeintel_rev.mcp_server.schemas** import AnswerEnvelope, Finding, MethodInfo, ScopeIn
 - from **codeintel_rev.mcp_server.scope_utils** import get_effective_scope
+- from **codeintel_rev.telemetry.context** import telemetry_metadata
 - from **codeintel_rev.typing** import NDArrayF32
 - from **kgfoundry_common.errors** import EmbeddingError, VectorSearchError
 - from **kgfoundry_common.logging** import get_logger
@@ -36,55 +37,55 @@ the FAISS index, then hydrating results from DuckDB.
 
 ## Definitions
 
-- variable: `httpx` (line 40)
-- variable: `np` (line 41)
-- variable: `SNIPPET_PREVIEW_CHARS` (line 43)
-- variable: `COMPONENT_NAME` (line 44)
-- variable: `LOGGER` (line 45)
-- class: `_ScopeFilterFlags` (line 49)
-- class: `_FaissFanout` (line 84)
-- class: `_HybridSearchState` (line 92)
-- class: `_HybridResult` (line 104)
-- class: `_SearchBudget` (line 115)
-- class: `_SemanticSearchPlan` (line 124)
-- class: `_MethodContext` (line 136)
-- class: `_FaissSearchRequest` (line 148)
-- function: `semantic_search` (line 160)
-- function: `_semantic_search_sync` (line 227)
-- function: `_clamp_result_limit` (line 336)
-- function: `_build_search_budget` (line 365)
-- function: `_build_semantic_search_plan` (line 406)
-- function: `_calculate_faiss_fanout` (line 476)
-- function: `_overfetch_bonus` (line 513)
-- function: `_resolve_hybrid_results` (line 544)
-- function: `_build_hybrid_result` (line 645)
-- function: `_embed_query_or_raise` (line 685)
-- function: `_run_faiss_search_or_raise` (line 725)
-- function: `_ensure_hydration_success` (line 762)
-- function: `_warn_scope_filter_reduction` (line 797)
-- function: `_annotate_hybrid_contributions` (line 835)
-- function: `_embed_query` (line 866)
-- function: `_run_faiss_search` (line 890)
-- function: `_normalize_scope_faiss_tuning` (line 939)
-- function: `_hydrate_findings` (line 1004)
-- function: `_build_method` (line 1130)
-- function: `_make_envelope` (line 1167)
-- function: `_success_extras` (line 1217)
-- function: `_build_response_extras` (line 1241)
+- variable: `httpx` (line 41)
+- variable: `np` (line 42)
+- variable: `SNIPPET_PREVIEW_CHARS` (line 44)
+- variable: `COMPONENT_NAME` (line 45)
+- variable: `LOGGER` (line 46)
+- class: `_ScopeFilterFlags` (line 50)
+- class: `_FaissFanout` (line 85)
+- class: `_HybridSearchState` (line 93)
+- class: `_HybridResult` (line 105)
+- class: `_SearchBudget` (line 116)
+- class: `_SemanticSearchPlan` (line 125)
+- class: `_MethodContext` (line 137)
+- class: `_FaissSearchRequest` (line 149)
+- function: `semantic_search` (line 161)
+- function: `_semantic_search_sync` (line 228)
+- function: `_clamp_result_limit` (line 337)
+- function: `_build_search_budget` (line 366)
+- function: `_build_semantic_search_plan` (line 407)
+- function: `_calculate_faiss_fanout` (line 477)
+- function: `_overfetch_bonus` (line 514)
+- function: `_resolve_hybrid_results` (line 545)
+- function: `_build_hybrid_result` (line 646)
+- function: `_embed_query_or_raise` (line 686)
+- function: `_run_faiss_search_or_raise` (line 726)
+- function: `_ensure_hydration_success` (line 763)
+- function: `_warn_scope_filter_reduction` (line 798)
+- function: `_annotate_hybrid_contributions` (line 836)
+- function: `_embed_query` (line 867)
+- function: `_run_faiss_search` (line 891)
+- function: `_normalize_scope_faiss_tuning` (line 940)
+- function: `_hydrate_findings` (line 1005)
+- function: `_build_method` (line 1131)
+- function: `_make_envelope` (line 1168)
+- function: `_success_extras` (line 1221)
+- function: `_build_response_extras` (line 1245)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 11
-- **cycle_group**: 128
+- **fan_out**: 12
+- **cycle_group**: 139
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 36
-- recent churn 90: 36
+- recent churn 30: 37
+- recent churn 90: 37
 
 ## Usage
 
@@ -116,7 +117,7 @@ semantic_search
 
 ## Hotspot
 
-- score: 2.85
+- score: 2.89
 
 ## Side Effects
 
@@ -126,9 +127,9 @@ semantic_search
 
 ## Complexity
 
-- branches: 77
-- cyclomatic: 78
-- loc: 1289
+- branches: 78
+- cyclomatic: 79
+- loc: 1293
 
 ## Doc Coverage
 

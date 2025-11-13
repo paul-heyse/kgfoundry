@@ -80,10 +80,27 @@ class HybridPoolEvaluator:
     def run(self, config: EvalConfig) -> EvalReport:
         """Execute the evaluation and persist per-query pools + metrics.
 
+        This method runs hybrid evaluation by sampling query vectors from the catalog,
+        performing FAISS searches with the configured parameters, comparing results
+        against brute-force and optional XTR oracles, and persisting evaluation
+        artifacts (pool rows, metrics) to disk. The method computes recall metrics
+        and generates an evaluation report.
+
+        Parameters
+        ----------
+        config : EvalConfig
+            Evaluation configuration containing search parameters (k, k_factor, nprobe),
+            query limits (max_queries), and output paths (pool_path, metrics_path).
+            The configuration determines how many queries to evaluate and where to
+            persist results.
+
         Returns
         -------
         EvalReport
-            Structured summary containing query counts, recall, and oracle stats.
+            Structured summary containing query counts, recall metrics, and oracle
+            statistics. The report includes queries evaluated, recall_at_k, oracle_matches,
+            ann_hits, and xtr_records. Returns an empty report if no query vectors
+            are available.
         """
         sample_limit = config.max_queries if config.max_queries is not None else 64
         queries = self._catalog.sample_query_vectors(limit=sample_limit)

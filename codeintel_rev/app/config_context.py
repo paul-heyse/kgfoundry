@@ -940,13 +940,6 @@ class ApplicationContext:
         Details with context fields for debugging (repo_root value, source environment
         variable) and causes application startup to fail.
 
-        Raises
-        ------
-        ConfigurationError
-            Raised when index configuration is invalid (e.g., ``nlist`` is None) or
-            when path resolution fails. The exception includes RFC 9457 Problem Details
-            with context fields for debugging.
-
         See Also
         --------
         load_settings : Loads Settings from environment variables

@@ -16,7 +16,7 @@ Exact reranking utilities for FAISS candidates.
 ## Definitions
 
 - variable: `LOGGER` (line 10)
-- function: `exact_rerank` (line 16)
+- function: `_perform_exact_rerank` (line 16)
 - function: `_normalize_queries` (line 125)
 - function: `_prepare_candidate_matrix` (line 159)
 - function: `_hydrate_embeddings` (line 205)
@@ -25,20 +25,22 @@ Exact reranking utilities for FAISS candidates.
 - function: `_effective_top_k` (line 399)
 - function: `_select_topk` (line 449)
 - function: `_empty_result` (line 508)
+- class: `FlatReranker` (line 554)
+- function: `exact_rerank` (line 615)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 66
+- **cycle_group**: 67
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 5
+- recent churn 90: 5
 
 ## Usage
 
@@ -47,7 +49,7 @@ Exact reranking utilities for FAISS candidates.
 
 ## Declared Exports (__all__)
 
-exact_rerank
+FlatReranker, exact_rerank
 
 ## Doc Health
 
@@ -80,11 +82,11 @@ exact_rerank
 
 - branches: 14
 - cyclomatic: 15
-- loc: 555
+- loc: 678
 
 ## Doc Coverage
 
-- `exact_rerank` (function): summary=yes, params=ok, examples=no — Hydrate embeddings for candidate ids and compute exact similarities.
+- `_perform_exact_rerank` (function): summary=yes, params=ok, examples=no — Hydrate embeddings for candidate ids and compute exact similarities.
 - `_normalize_queries` (function): summary=yes, params=ok, examples=no — Normalize query vectors to 2D array format for batch processing.
 - `_prepare_candidate_matrix` (function): summary=yes, params=ok, examples=no — Validate and prepare candidate ID matrix for embedding retrieval.
 - `_hydrate_embeddings` (function): summary=yes, params=ok, examples=no — Retrieve embeddings from catalog for valid candidate IDs.
@@ -93,6 +95,7 @@ exact_rerank
 - `_effective_top_k` (function): summary=yes, params=ok, examples=no — Compute effective top-k value bounded by available candidates.
 - `_select_topk` (function): summary=yes, params=ok, examples=no — Select top-k candidates by similarity score with efficient partial sorting.
 - `_empty_result` (function): summary=yes, params=ok, examples=no — Create sentinel result arrays for empty or failed reranking operations.
+- `FlatReranker` (class): summary=yes, examples=no — Rerank ANN candidates using exact similarities from DuckDB embeddings.
 
 ## Tags
 

@@ -28,7 +28,7 @@ Typer CLI for building, verifying, and probing XTR artifacts.
 
 - **fan_in**: 1
 - **fan_out**: 5
-- **cycle_group**: 116
+- **cycle_group**: 127
 
 ## Ownership
 

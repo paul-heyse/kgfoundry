@@ -2,38 +2,40 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import sys
 import types
+from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
-
-sys.path.append(str((Path(__file__).resolve().parents[2] / "src")))
 
 import duckdb
 import numpy as np
 import pyarrow.parquet as pq
 import pytest
+from typer import Typer
 from typer.testing import CliRunner
 
+sys.path.append(str(Path(__file__).resolve().parents[2] / "src"))
 
-class _NoopMetric:
-    def labels(self, **_kwargs: object) -> _NoopMetric:
-        return self
-
-    def observe(self, *_args: object, **_kwargs: object) -> None:  # pragma: no cover - noop
-        return None
-
-    def inc(self, *_args: object, **_kwargs: object) -> None:  # pragma: no cover - noop
-        return None
-
-    def set(self, *_args: object, **_kwargs: object) -> None:  # pragma: no cover - noop
-        return None
+from codeintel_rev.embeddings.embedding_service import EmbeddingMetadata
 
 
 def _install_observability_stubs() -> None:
-    import contextlib
-
     metric_mod = types.ModuleType("codeintel_rev.observability.metrics")
+
+    class _NoopMetric:
+        def labels(self, **_kwargs: object) -> _NoopMetric:
+            return self
+
+        def observe(self, *_args: object, **_kwargs: object) -> None:  # pragma: no cover - noop
+            return None
+
+        def inc(self, *_args: object, **_kwargs: object) -> None:  # pragma: no cover - noop
+            return None
+
+        def set(self, *_args: object, **_kwargs: object) -> None:  # pragma: no cover - noop
+            return None
 
     def _build_metric(*_args: object, **_kwargs: object) -> _NoopMetric:
         return _NoopMetric()
@@ -59,8 +61,8 @@ def _install_observability_stubs() -> None:
 
     otel_mod = types.ModuleType("codeintel_rev.observability.otel")
 
-    def _as_span(*_args: object, **_kwargs: object):
-        return contextlib.nullcontext()
+    def _as_span(*_args: object, **_kwargs: object) -> AbstractContextManager[None]:
+        return nullcontext()
 
     otel_mod.as_span = _as_span  # type: ignore[attr-defined]
     sys.modules.setdefault("codeintel_rev.observability.otel", otel_mod)
@@ -71,8 +73,8 @@ def _install_observability_stubs() -> None:
 
     decorators_mod = types.ModuleType("codeintel_rev.telemetry.decorators")
 
-    def _span_context(*_args: object, **_kwargs: object):
-        return contextlib.nullcontext()
+    def _span_context(*_args: object, **_kwargs: object) -> AbstractContextManager[None]:
+        return nullcontext()
 
     decorators_mod.span_context = _span_context  # type: ignore[attr-defined]
     sys.modules.setdefault("codeintel_rev.telemetry.decorators", decorators_mod)
@@ -82,14 +84,22 @@ def _install_observability_stubs() -> None:
         "codeintel_rev.telemetry.logging", types.ModuleType("codeintel_rev.telemetry.logging")
     )
     reporter_mod = types.ModuleType("codeintel_rev.telemetry.reporter")
-    reporter_mod.emit_checkpoint = lambda *args, **kwargs: None  # type: ignore[attr-defined]
+    def _noop_emit_checkpoint(*_: object, **__: object) -> None:
+        return None
+
+    reporter_mod.emit_checkpoint = _noop_emit_checkpoint  # type: ignore[attr-defined]
     sys.modules.setdefault("codeintel_rev.telemetry.reporter", reporter_mod)
 
 
-_install_observability_stubs()
+@functools.lru_cache(maxsize=1)
+def _load_cli_app() -> Typer:
+    _install_observability_stubs()
+    from codeintel_rev.cli.indexctl import app as loaded_app
 
-from codeintel_rev.cli.indexctl import app as indexctl_app
-from codeintel_rev.embeddings.embedding_service import EmbeddingMetadata
+    return loaded_app
+
+
+indexctl_app = _load_cli_app()
 
 
 class _StubProvider:
@@ -115,11 +125,14 @@ class _StubProvider:
         """No-op."""
 
 
-@pytest.fixture()
+@pytest.fixture
 def stub_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    def _provider_factory(_settings: object) -> _StubProvider:
+        return _StubProvider()
+
     monkeypatch.setattr(
         "codeintel_rev.cli.indexctl.get_embedding_provider",
-        lambda settings: _StubProvider(),
+        _provider_factory,
     )
 
 
@@ -152,7 +165,8 @@ def _create_duckdb(path: Path) -> None:
     conn.close()
 
 
-def test_embeddings_build_writes_parquet_and_manifest(tmp_path: Path, stub_provider: None) -> None:
+@pytest.mark.usefixtures("stub_provider")
+def test_embeddings_build_writes_parquet_and_manifest(tmp_path: Path) -> None:
     db_path = tmp_path / "catalog.duckdb"
     _create_duckdb(db_path)
     output = tmp_path / "embeddings.parquet"
@@ -182,7 +196,8 @@ def test_embeddings_build_writes_parquet_and_manifest(tmp_path: Path, stub_provi
     assert table.num_rows == 2
 
 
-def test_embeddings_validate_passes_with_stub(tmp_path: Path, stub_provider: None) -> None:
+@pytest.mark.usefixtures("stub_provider")
+def test_embeddings_validate_passes_with_stub(tmp_path: Path) -> None:
     db_path = tmp_path / "catalog.duckdb"
     _create_duckdb(db_path)
     output = tmp_path / "embeddings.parquet"

@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
+from typing import Any
+
+from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.mcp_server.adapters import semantic as semantic_adapter
 from codeintel_rev.mcp_server.adapters import semantic_pro as semantic_pro_adapter
 from codeintel_rev.mcp_server.error_handling import handle_adapter_errors
 from codeintel_rev.mcp_server.schemas import AnswerEnvelope
 from codeintel_rev.mcp_server.server import get_context, mcp
 from codeintel_rev.mcp_server.telemetry import tool_operation_scope
+from codeintel_rev.telemetry.context import current_session
+from codeintel_rev.telemetry.reporter import build_report as build_run_report
+from codeintel_rev.telemetry.reporter import report_to_json
 
 
 @mcp.tool()
@@ -124,3 +131,49 @@ async def semantic_search_pro(
             limit=limit,
             options=options,
         )
+
+
+@mcp.tool()
+async def telemetry_run_report(
+    session_id: str | None = None,
+    run_id: str | None = None,
+) -> dict[str, Any]:
+    """Return the latest run report for the active or requested session.
+
+    Parameters
+    ----------
+    session_id : str | None
+        Optional explicit session identifier. Defaults to the current request session.
+    run_id : str | None
+        Optional run identifier when multiple runs exist for a session.
+
+    Returns
+    -------
+    dict[str, Any]
+        JSON-safe run report payload.
+
+    Raises
+    ------
+    RuntimeError
+        Raised when no session identifier can be resolved.
+    """
+    context = get_context()
+    effective_session = session_id or current_session()
+    if effective_session is None:
+        msg = "Session ID unavailable; pass session_id explicitly."
+        raise RuntimeError(msg)
+    return await asyncio.to_thread(_render_run_report, context, effective_session, run_id)
+
+
+def _render_run_report(
+    context: ApplicationContext,
+    session_id: str,
+    run_id: str | None,
+) -> dict[str, Any]:
+    report = build_run_report(context, session_id, run_id)
+    if report is None:
+        return {
+            "session_id": session_id,
+            "error": "run_not_found",
+        }
+    return report_to_json(report)

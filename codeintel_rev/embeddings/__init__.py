@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from .embedding_service import (
+from codeintel_rev.embeddings.embedding_service import (
     EmbeddingMetadata,
     EmbeddingProvider,
+    EmbeddingProviderBase,
+    EmbeddingRuntimeError,
     HFEmbeddingProvider,
     VLLMProvider,
     get_embedding_provider,
@@ -13,6 +15,8 @@ from .embedding_service import (
 __all__ = [
     "EmbeddingMetadata",
     "EmbeddingProvider",
+    "EmbeddingProviderBase",
+    "EmbeddingRuntimeError",
     "HFEmbeddingProvider",
     "VLLMProvider",
     "get_embedding_provider",

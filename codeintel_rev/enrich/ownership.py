@@ -59,10 +59,38 @@ def compute_ownership(
 ) -> OwnershipIndex:
     """Return ownership metrics for ``rel_paths`` relative to ``repo_root``.
 
+    This function computes code ownership and churn metrics for a set of files
+    by analyzing Git commit history. The function extracts commit statistics,
+    author information, and churn metrics over specified time windows. Metrics
+    are computed using GitPython when available, or returns an empty index if
+    Git is unavailable.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Root directory of the Git repository. Used to locate the .git directory
+        and initialize GitPython repository access. The path is resolved to an
+        absolute path before processing.
+    rel_paths : Sequence[str]
+        Sequence of repository-relative file paths to compute ownership for.
+        Paths are normalized, deduplicated, and sorted before processing. Empty
+        sequences return an OwnershipIndex with empty by_file mapping.
+    commits_window : int, optional
+        Number of recent commits to analyze for ownership metrics (default: 50).
+        Used to limit Git history traversal for performance. Larger windows
+        provide more comprehensive ownership data but take longer to compute.
+    churn_windows : Sequence[int], optional
+        Time windows in days for churn metric computation (default: (30, 90)).
+        Each window specifies a period over which to compute churn statistics.
+        Windows are normalized and sorted before use.
+
     Returns
     -------
     OwnershipIndex
-        Aggregated ownership/churn signals keyed by repo-relative path.
+        Aggregated ownership/churn signals keyed by repo-relative path. The index
+        contains ownership records for each file with commit counts, author
+        information, and churn metrics. Returns an empty index (with churn_windows
+        set) when Git is unavailable, paths are empty, or repository access fails.
     """
     unique_paths = sorted({path for path in rel_paths if path})
     windows = _normalize_windows(churn_windows)

@@ -29,7 +29,8 @@ The FAISS index type is automatically selected based on corpus size:
 - from **pathlib** import Path
 - from **typing** import TYPE_CHECKING, Any, cast
 - from **codeintel_rev._lazy_imports** import LazyModule
-- from **codeintel_rev.config.settings** import IndexConfig, Settings, VLLMConfig, load_settings
+- from **codeintel_rev.config.settings** import IndexConfig, Settings, load_settings
+- from **codeintel_rev.embeddings** import get_embedding_provider
 - from **codeintel_rev.evaluation.offline_recall** import OfflineRecallEvaluator
 - from **codeintel_rev.indexing.cast_chunker** import Chunk, ChunkOptions, chunk_file
 - from **codeintel_rev.indexing.scip_reader** import SCIPIndex, SymbolDef, extract_definitions, get_top_level_definitions, parse_scip_json
@@ -44,39 +45,39 @@ The FAISS index type is automatically selected based on corpus size:
 
 ## Definitions
 
-- variable: `np` (line 58)
-- variable: `logger` (line 61)
-- variable: `EMBED_PREVIEW_CHARS` (line 63)
-- variable: `TRAINING_LIMIT` (line 64)
-- class: `PipelinePaths` (line 68)
-- function: `main` (line 78)
-- function: `_resolve_paths` (line 153)
-- function: `_load_scip_index` (line 183)
-- function: `_group_definitions_by_file` (line 210)
-- function: `_chunk_repository` (line 231)
-- function: `_embed_chunks` (line 283)
-- function: `_write_parquet` (line 305)
-- function: `_build_faiss_index` (line 347)
-- function: `_update_faiss_index_incremental` (line 408)
-- function: `_runtime_options_from_index` (line 517)
-- function: `_resolve_nlist` (line 568)
-- function: `_run_offline_evaluation` (line 586)
-- function: `_initialize_duckdb` (line 621)
-- function: `_write_symbols` (line 652)
+- variable: `np` (line 54)
+- variable: `logger` (line 57)
+- variable: `EMBED_PREVIEW_CHARS` (line 59)
+- variable: `TRAINING_LIMIT` (line 60)
+- class: `PipelinePaths` (line 64)
+- function: `main` (line 74)
+- function: `_resolve_paths` (line 149)
+- function: `_load_scip_index` (line 179)
+- function: `_group_definitions_by_file` (line 206)
+- function: `_chunk_repository` (line 227)
+- function: `_embed_chunks` (line 279)
+- function: `_write_parquet` (line 309)
+- function: `_build_faiss_index` (line 352)
+- function: `_update_faiss_index_incremental` (line 413)
+- function: `_runtime_options_from_index` (line 522)
+- function: `_resolve_nlist` (line 573)
+- function: `_run_offline_evaluation` (line 591)
+- function: `_initialize_duckdb` (line 626)
+- function: `_write_symbols` (line 657)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 12
-- **cycle_group**: 83
+- **fan_out**: 13
+- **cycle_group**: 93
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 17
-- recent churn 90: 17
+- recent churn 30: 19
+- recent churn 90: 19
 
 ## Usage
 
@@ -104,7 +105,7 @@ The FAISS index type is automatically selected based on corpus size:
 
 ## Hotspot
 
-- score: 2.67
+- score: 2.71
 
 ## Side Effects
 
@@ -112,9 +113,9 @@ The FAISS index type is automatically selected based on corpus size:
 
 ## Complexity
 
-- branches: 37
-- cyclomatic: 38
-- loc: 723
+- branches: 38
+- cyclomatic: 39
+- loc: 728
 
 ## Doc Coverage
 

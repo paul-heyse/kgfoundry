@@ -24,6 +24,7 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 - from **codeintel_rev.retrieval.gating** import BudgetDecision, StageGateConfig, analyze_query, decide_budgets, describe_budget_decision
 - from **codeintel_rev.retrieval.rm3_heuristics** import RM3Heuristics, RM3Params
 - from **codeintel_rev.retrieval.types** import ChannelHit, HybridResultDoc, HybridSearchResult
+- from **codeintel_rev.telemetry.decorators** import span_context
 - from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.app.capabilities** import Capabilities
 - from **codeintel_rev.app.config_context** import ResolvedPaths
@@ -32,32 +33,32 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 
 ## Definitions
 
-- variable: `LOGGER` (line 39)
-- class: `_LuceneHit` (line 42)
-- class: `_LuceneSearcher` (line 47)
-- class: `BM25Rm3Config` (line 62)
-- class: `BM25SearchProvider` (line 71)
-- class: `SpladeSearchProvider` (line 161)
-- class: `HybridSearchTuning` (line 309)
-- class: `HybridSearchOptions` (line 317)
-- class: `_MethodStats` (line 326)
-- class: `_FusionContext` (line 335)
-- class: `_FusionWork` (line 349)
-- class: `HybridSearchEngine` (line 363)
+- variable: `LOGGER` (line 40)
+- class: `_LuceneHit` (line 43)
+- class: `_LuceneSearcher` (line 48)
+- class: `BM25Rm3Config` (line 63)
+- class: `BM25SearchProvider` (line 72)
+- class: `SpladeSearchProvider` (line 162)
+- class: `HybridSearchTuning` (line 310)
+- class: `HybridSearchOptions` (line 318)
+- class: `_MethodStats` (line 327)
+- class: `_FusionContext` (line 336)
+- class: `_FusionWork` (line 350)
+- class: `HybridSearchEngine` (line 364)
 
 ## Graph Metrics
 
 - **fan_in**: 5
-- **fan_out**: 14
-- **cycle_group**: 66
+- **fan_out**: 15
+- **cycle_group**: 67
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 15
-- recent churn 90: 15
+- recent churn 30: 16
+- recent churn 90: 16
 
 ## Usage
 
@@ -89,7 +90,7 @@ BM25SearchProvider, ChannelHit, HybridResultDoc, HybridSearchEngine, HybridSearc
 
 ## Hotspot
 
-- score: 3.14
+- score: 3.17
 
 ## Side Effects
 
@@ -97,9 +98,9 @@ BM25SearchProvider, ChannelHit, HybridResultDoc, HybridSearchEngine, HybridSearc
 
 ## Complexity
 
-- branches: 103
-- cyclomatic: 104
-- loc: 1051
+- branches: 105
+- cyclomatic: 106
+- loc: 1067
 
 ## Doc Coverage
 

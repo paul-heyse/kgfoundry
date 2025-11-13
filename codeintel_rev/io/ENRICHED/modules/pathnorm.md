@@ -15,15 +15,15 @@ Helpers for repo-relative path normalization and stable identifiers.
 ## Definitions
 
 - function: `detect_repo_root` (line 17)
-- function: `to_repo_relative` (line 32)
-- function: `module_name_from_path` (line 47)
-- function: `stable_id_for_path` (line 75)
+- function: `to_repo_relative` (line 46)
+- function: `module_name_from_path` (line 77)
+- function: `stable_id_for_path` (line 127)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 0
-- **cycle_group**: 21
+- **cycle_group**: 19
 
 ## Ownership
 
@@ -46,7 +46,7 @@ detect_repo_root, module_name_from_path, stable_id_for_path, to_repo_relative
 
 - **summary**: Helpers for repo-relative path normalization and stable identifiers.
 - has summary: yes
-- param parity: no
+- param parity: yes
 - examples present: no
 
 ## Typedness
@@ -79,14 +79,14 @@ detect_repo_root, module_name_from_path, stable_id_for_path, to_repo_relative
 
 - branches: 9
 - cyclomatic: 10
-- loc: 85
+- loc: 151
 
 ## Doc Coverage
 
-- `detect_repo_root` (function): summary=yes, params=mismatch, examples=no — Return the closest ancestor containing a ``.git`` directory.
-- `to_repo_relative` (function): summary=yes, params=mismatch, examples=no — Return a POSIX path for ``path`` relative to ``repo_root``.
-- `module_name_from_path` (function): summary=yes, params=mismatch, examples=no — Derive a dotted module name for ``path`` relative to ``repo_root``.
-- `stable_id_for_path` (function): summary=yes, params=mismatch, examples=no — Return a truncated BLAKE2s digest for ``rel_posix``.
+- `detect_repo_root` (function): summary=yes, params=ok, examples=no — Return the closest ancestor containing a ``.git`` directory.
+- `to_repo_relative` (function): summary=yes, params=ok, examples=no — Return a POSIX path for ``path`` relative to ``repo_root``.
+- `module_name_from_path` (function): summary=yes, params=ok, examples=no — Derive a dotted module name for ``path`` relative to ``repo_root``.
+- `stable_id_for_path` (function): summary=yes, params=ok, examples=no — Return a truncated BLAKE2s digest for ``rel_posix``.
 
 ## Tags
 

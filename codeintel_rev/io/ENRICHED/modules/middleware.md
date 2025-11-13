@@ -57,12 +57,14 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 ## Imports
 
 - from **__future__** import annotations
+- from **(absolute)** import time
 - from **(absolute)** import uuid
 - from **typing** import TYPE_CHECKING
 - from **starlette.middleware.base** import BaseHTTPMiddleware, DispatchFunction
 - from **starlette.types** import ASGIApp
 - from **codeintel_rev.observability.timeline** import bind_timeline, new_timeline
 - from **codeintel_rev.runtime.request_context** import capability_stamp_var, session_id_var
+- from **codeintel_rev.telemetry.reporter** import start_run
 - from **kgfoundry_common.logging** import get_logger
 - from **collections.abc** import Awaitable, Callable
 - from **starlette.requests** import Request
@@ -70,24 +72,24 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 
 ## Definitions
 
-- variable: `LOGGER` (line 70)
-- function: `get_session_id` (line 73)
-- function: `get_capability_stamp` (line 124)
-- class: `SessionScopeMiddleware` (line 136)
+- variable: `LOGGER` (line 72)
+- function: `get_session_id` (line 75)
+- function: `get_capability_stamp` (line 126)
+- class: `SessionScopeMiddleware` (line 138)
 
 ## Graph Metrics
 
 - **fan_in**: 6
-- **fan_out**: 3
-- **cycle_group**: 41
+- **fan_out**: 4
+- **cycle_group**: 70
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 10
-- recent churn 90: 10
+- recent churn 30: 11
+- recent churn 90: 11
 
 ## Usage
 
@@ -123,7 +125,7 @@ SessionScopeMiddleware, capability_stamp_var, get_capability_stamp, get_session_
 
 ## Hotspot
 
-- score: 2.05
+- score: 2.09
 
 ## Side Effects
 
@@ -133,7 +135,7 @@ SessionScopeMiddleware, capability_stamp_var, get_capability_stamp, get_session_
 
 - branches: 5
 - cyclomatic: 6
-- loc: 262
+- loc: 271
 
 ## Doc Coverage
 

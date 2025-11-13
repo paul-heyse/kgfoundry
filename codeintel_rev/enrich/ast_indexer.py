@@ -125,17 +125,27 @@ AST_METRIC_SCHEMA = pa.schema(
 def stable_module_path(repo_root: Path, file_path: Path) -> str:
     """Return a repo-relative POSIX path for the given file.
 
+    This function converts an absolute or relative file path into a normalized
+    POSIX-style path relative to the repository root. The function resolves both
+    paths to absolute paths, computes the relative path, and normalizes it to
+    use forward slashes (POSIX style) regardless of the platform.
+
     Parameters
     ----------
-    repo_root :
-        Root directory used for normalization.
-    file_path :
-        Absolute or relative file path to normalize.
+    repo_root : Path
+        Root directory of the repository used for path normalization. The path
+        is resolved to an absolute path before computing the relative path.
+    file_path : Path
+        Absolute or relative file path to normalize. The path is resolved to an
+        absolute path before computing the relative path from repo_root.
 
     Returns
     -------
     str
-        POSIX-style path relative to ``repo_root``.
+        POSIX-style path relative to repo_root, using forward slashes as path
+        separators. The path is normalized and suitable for use in module names
+        or cross-platform file references. Raises ValueError if file_path is not
+        within repo_root (defensive fallback returns file_path as string).
     """
     repo_root_resolved = repo_root.resolve()
     file_resolved = file_path.resolve()
@@ -169,15 +179,25 @@ def _safe_unparse(node: ast.AST | None) -> str | None:
 def walk_defs_with_qualname(tree: ast.AST) -> Iterator[DefInfo]:
     """Yield definition nodes with fully-qualified names.
 
+    This function traverses an AST tree and yields DefInfo objects for each
+    class, function, or async function definition encountered. The function
+    builds fully-qualified names by tracking the nesting stack (class/function
+    hierarchy) and constructs qualified names for each definition.
+
     Parameters
     ----------
-    tree :
-        Parsed module ``ast.AST``.
+    tree : ast.AST
+        Parsed module AST tree from the ast module. The tree is traversed
+        recursively to find all class, function, and async function definitions.
+        Must be an ast.Module or other AST node containing definitions.
 
     Yields
     ------
     DefInfo
-        Metadata for each class, function, or async function encountered.
+        Metadata object for each class, function, or async function definition
+        found in the tree. Each DefInfo contains the node, qualified name,
+        and definition kind. Definitions are yielded in depth-first traversal
+        order.
     """
     stack: list[str] = []
 
@@ -204,17 +224,29 @@ def walk_defs_with_qualname(tree: ast.AST) -> Iterator[DefInfo]:
 def collect_ast_nodes(path: str, code: str) -> list[AstNodeRow]:
     """Parse code and collect node rows for Parquet output.
 
+    This function parses Python source code into an AST and collects node rows
+    (module, class, function definitions) for Parquet serialization. The function
+    extracts AST metrics (complexity, statements, functions, classes) and builds
+    AstNodeRow objects containing definition metadata and metrics.
+
     Parameters
     ----------
-    path :
-        Repo-relative module path (POSIX separators).
-    code :
-        Source code to parse.
+    path : str
+        Repo-relative module path using POSIX separators (e.g., "src/pkg/module.py").
+        Used to identify the source file in the collected node rows. The path
+        is normalized and used for module name extraction.
+    code : str
+        Source code content to parse. The code is parsed using ast.parse() to
+        build an AST tree, which is then traversed to collect definitions and
+        compute metrics.
 
     Returns
     -------
     list[AstNodeRow]
-        Collected module/class/function rows.
+        List of AstNodeRow objects containing module, class, and function definitions
+        with their metadata and AST metrics. Each row includes path, name, kind,
+        complexity, statements count, and other metrics. Empty list if parsing
+        fails or no definitions are found.
     """
     try:
         tree = ast.parse(code, filename=path, type_comments=True)
@@ -227,17 +259,29 @@ def collect_ast_nodes(path: str, code: str) -> list[AstNodeRow]:
 def collect_ast_nodes_from_tree(path: str, tree: ast.AST) -> list[AstNodeRow]:
     """Collect AstNodeRow entries from a pre-parsed AST module.
 
+    This function collects node rows from a pre-parsed AST tree, extracting
+    definitions (module, classes, functions) and computing AST metrics. The
+    function is more efficient than collect_ast_nodes() when the AST is already
+    available, avoiding redundant parsing.
+
     Parameters
     ----------
-    path :
-        Repo-relative module path (POSIX separators).
-    tree :
-        Parsed module tree from :mod:`ast`.
+    path : str
+        Repo-relative module path using POSIX separators (e.g., "src/pkg/module.py").
+        Used to identify the source file in the collected node rows. The path
+        is normalized and used for module name extraction.
+    tree : ast.AST
+        Pre-parsed AST module tree from the ast module. The tree is traversed
+        to collect definitions and compute metrics. Must be an ast.Module or
+        compatible AST node containing definitions.
 
     Returns
     -------
     list[AstNodeRow]
-        Rows ready for serialization.
+        List of AstNodeRow objects ready for Parquet serialization. Each row
+        contains definition metadata (path, name, kind) and AST metrics
+        (complexity, statements, functions, classes). Empty list if no definitions
+        are found or tree is invalid.
     """
     module = _module_name_from_path(path)
     module_node = cast("ast.Module", tree)
@@ -315,17 +359,29 @@ def collect_ast_nodes_from_tree(path: str, tree: ast.AST) -> list[AstNodeRow]:
 def compute_ast_metrics(path: str, tree: ast.AST) -> AstMetricsRow:
     """Compute per-file metrics from a parsed AST.
 
+    This function computes AST metrics (complexity, statements, functions, classes)
+    by traversing a parsed AST tree with a metrics visitor. The function extracts
+    cyclomatic complexity, cognitive complexity, nesting depth, and various node
+    counts to build a comprehensive metrics row for the module.
+
     Parameters
     ----------
-    path :
-        Repo-relative module path (POSIX separators).
-    tree :
-        Parsed AST tree for the module.
+    path : str
+        Repo-relative module path using POSIX separators (e.g., "src/pkg/module.py").
+        Used to identify the source file in the metrics row. The path is normalized
+        and used for module name extraction.
+    tree : ast.AST
+        Parsed AST tree for the module from the ast module. The tree is traversed
+        by a _MetricsVisitor to collect complexity metrics, node counts, and nesting
+        information. Must be an ast.Module or compatible AST node.
 
     Returns
     -------
     AstMetricsRow
-        Aggregate metrics row describing the module.
+        Aggregate metrics row describing the module with computed complexity metrics
+        and node counts. The row includes path, module name, function/class counts,
+        cyclomatic complexity, cognitive complexity, max nesting depth, and statement
+        count.
     """
     module = _module_name_from_path(path)
     visitor = _MetricsVisitor()
@@ -350,15 +406,25 @@ def compute_ast_metrics(path: str, tree: ast.AST) -> AstMetricsRow:
 def empty_metrics_row(path: str) -> AstMetricsRow:
     """Return a zeroed metrics row for parse failures.
 
+    This function creates an AstMetricsRow with all metrics set to zero for files
+    that failed to parse. The function extracts the module name from the path and
+    creates a placeholder row that can be included in metrics output even when
+    parsing fails, enabling downstream tools to identify problematic files.
+
     Parameters
     ----------
-    path :
-        Repo-relative module path (POSIX separators).
+    path : str
+        Repo-relative module path using POSIX separators (e.g., "src/pkg/module.py").
+        Used to identify the source file in the metrics row. The path is normalized
+        and used for module name extraction.
 
     Returns
     -------
     AstMetricsRow
-        Metrics row with zeros for all counters.
+        Metrics row with zeros for all counters (func_count, class_count, assign_count,
+        import_count, branch_nodes, cyclomatic, cognitive, max_nesting, statements).
+        The row includes the path and extracted module name, but all metric values
+        are zero to indicate parse failure.
     """
     module = _module_name_from_path(path)
     return AstMetricsRow(

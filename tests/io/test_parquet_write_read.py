@@ -6,7 +6,6 @@ from pathlib import Path
 
 import numpy as np
 import pyarrow.parquet as pq
-
 from codeintel_rev.indexing.cast_chunker import Chunk
 from codeintel_rev.io.parquet_store import ParquetWriteOptions, write_chunks_parquet
 

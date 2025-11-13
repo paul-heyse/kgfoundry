@@ -21,18 +21,18 @@ Stitch CST nodes to module summary rows and SCIP symbols.
 
 - class: `ModuleRow` (line 17)
 - class: `StitchCounters` (line 25)
-- class: `_SymbolCandidate` (line 46)
-- class: `SCIPResolver` (line 53)
-- function: `load_modules` (line 137)
-- function: `load_scip_index` (line 173)
-- function: `stitch_nodes` (line 192)
-- function: `_normalize_path` (line 253)
-- function: `_collect_candidates` (line 262)
-- function: `_select_best_candidate` (line 275)
-- function: `_symbol_name_hint` (line 302)
-- function: `_symbol_qname_hint` (line 315)
-- function: `_normalize_qname` (line 328)
-- function: `_score_candidate` (line 334)
+- class: `_SymbolCandidate` (line 59)
+- class: `SCIPResolver` (line 66)
+- function: `load_modules` (line 172)
+- function: `load_scip_index` (line 208)
+- function: `stitch_nodes` (line 227)
+- function: `_normalize_path` (line 288)
+- function: `_collect_candidates` (line 297)
+- function: `_select_best_candidate` (line 310)
+- function: `_symbol_name_hint` (line 337)
+- function: `_symbol_qname_hint` (line 350)
+- function: `_normalize_qname` (line 363)
+- function: `_score_candidate` (line 369)
 
 ## Graph Metrics
 
@@ -84,7 +84,7 @@ Stitch CST nodes to module summary rows and SCIP symbols.
 
 - branches: 59
 - cyclomatic: 60
-- loc: 357
+- loc: 392
 
 ## Doc Coverage
 

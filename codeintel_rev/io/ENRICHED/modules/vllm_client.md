@@ -19,8 +19,9 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 - from **typing** import TYPE_CHECKING, cast
 - from **(absolute)** import msgspec
 - from **codeintel_rev._lazy_imports** import LazyModule
-- from **codeintel_rev.observability.otel** import as_span
+- from **codeintel_rev.observability.otel** import as_span, record_span_event
 - from **codeintel_rev.observability.timeline** import current_timeline
+- from **codeintel_rev.telemetry.decorators** import span_context
 - from **codeintel_rev.typing** import NDArrayF32, gate_import
 - from **kgfoundry_common.logging** import get_logger
 - from **collections.abc** import Sequence
@@ -30,27 +31,27 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 
 ## Definitions
 
-- variable: `httpx` (line 31)
-- variable: `LOGGER` (line 33)
-- function: `_get_numpy` (line 37)
-- class: `EmbeddingRequest` (line 73)
-- class: `EmbeddingData` (line 101)
-- class: `EmbeddingResponse` (line 126)
-- class: `VLLMClient` (line 157)
+- variable: `httpx` (line 32)
+- variable: `LOGGER` (line 34)
+- function: `_get_numpy` (line 38)
+- class: `EmbeddingRequest` (line 74)
+- class: `EmbeddingData` (line 102)
+- class: `EmbeddingResponse` (line 127)
+- class: `VLLMClient` (line 158)
 
 ## Graph Metrics
 
 - **fan_in**: 4
-- **fan_out**: 6
-- **cycle_group**: 53
+- **fan_out**: 7
+- **cycle_group**: 52
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 20
-- recent churn 90: 20
+- recent churn 30: 21
+- recent churn 90: 21
 
 ## Usage
 
@@ -82,7 +83,7 @@ EmbeddingData, EmbeddingRequest, EmbeddingResponse, VLLMClient
 
 ## Hotspot
 
-- score: 2.56
+- score: 2.62
 
 ## Side Effects
 
@@ -91,9 +92,9 @@ EmbeddingData, EmbeddingRequest, EmbeddingResponse, VLLMClient
 
 ## Complexity
 
-- branches: 31
-- cyclomatic: 32
-- loc: 623
+- branches: 34
+- cyclomatic: 35
+- loc: 655
 
 ## Doc Coverage
 

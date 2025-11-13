@@ -31,23 +31,23 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 - function: `gate_import` (line 47)
 - class: `TorchDeviceProperties` (line 90)
 - class: `TorchCudaAPI` (line 96)
-- class: `TorchTensor` (line 116)
-- class: `TorchModule` (line 129)
-- class: `FaissStandardGpuResources` (line 147)
-- class: `FaissGpuClonerOptions` (line 151)
-- class: `FaissIndex` (line 159)
-- class: `FaissGpuIndexFlatIP` (line 165)
-- class: `FaissModule` (line 177)
-- class: `NumpyRandomState` (line 212)
-- class: `NumpyRandomNamespace` (line 218)
-- class: `NumpyLinalgNamespace` (line 224)
-- class: `NumpyModule` (line 230)
-- class: `PolarsDataFrame` (line 237)
-- class: `PolarsModule` (line 243)
+- class: `TorchTensor` (line 193)
+- class: `TorchModule` (line 244)
+- class: `FaissStandardGpuResources` (line 262)
+- class: `FaissGpuClonerOptions` (line 266)
+- class: `FaissIndex` (line 274)
+- class: `FaissGpuIndexFlatIP` (line 280)
+- class: `FaissModule` (line 292)
+- class: `NumpyRandomState` (line 327)
+- class: `NumpyRandomNamespace` (line 348)
+- class: `NumpyLinalgNamespace` (line 368)
+- class: `NumpyModule` (line 393)
+- class: `PolarsDataFrame` (line 400)
+- class: `PolarsModule` (line 421)
 
 ## Graph Metrics
 
-- **fan_in**: 85
+- **fan_in**: 91
 - **fan_out**: 0
 - **cycle_group**: 0
 
@@ -56,8 +56,8 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 12
-- recent churn 90: 12
+- recent churn 30: 13
+- recent churn 90: 13
 
 ## Usage
 
@@ -89,7 +89,7 @@ FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, Polars
 
 ## Hotspot
 
-- score: 2.66
+- score: 2.69
 
 ## Side Effects
 
@@ -99,7 +99,7 @@ FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, Polars
 
 - branches: 1
 - cyclomatic: 2
-- loc: 260
+- loc: 438
 
 ## Doc Coverage
 

@@ -43,7 +43,7 @@ Implements full MCP tool catalog for code intelligence.
 
 - **fan_in**: 3
 - **fan_out**: 6
-- **cycle_group**: 71
+- **cycle_group**: 78
 
 ## Ownership
 

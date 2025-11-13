@@ -60,10 +60,23 @@ def compute_hotspot_score(record: dict[str, Any]) -> float:
 def _git_churn(path: str) -> int:
     """Return the number of commits touching ``path``.
 
+    This function queries Git history to count the number of commits that modified
+    a specific file path. The function uses GitPython when available, or returns
+    zero when Git is unavailable or the repository cannot be accessed.
+
+    Parameters
+    ----------
+    path : str
+        Repository-relative file path to query commit history for. The path is
+        used to filter Git commits that modified this specific file. Must be a
+        valid path within the repository.
+
     Returns
     -------
     int
-        Commit count touching the path; ``0`` when unavailable.
+        Number of commits that touched the specified path. Returns 0 when Git is
+        unavailable, the repository cannot be opened, or the path has no commit
+        history. Used as a churn metric for risk hotspot analysis.
     """
     repo = _open_repo()
     if repo is None:

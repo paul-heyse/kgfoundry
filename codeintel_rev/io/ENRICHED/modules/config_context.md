@@ -112,9 +112,9 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 
 ## Graph Metrics
 
-- **fan_in**: 20
+- **fan_in**: 21
 - **fan_out**: 17
-- **cycle_group**: 66
+- **cycle_group**: 67
 
 ## Ownership
 
@@ -169,7 +169,7 @@ ApplicationContext, ResolvedPaths, resolve_application_paths
 
 - branches: 70
 - cyclomatic: 71
-- loc: 1587
+- loc: 1580
 
 ## Doc Coverage
 

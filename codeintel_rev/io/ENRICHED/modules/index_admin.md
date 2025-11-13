@@ -18,7 +18,7 @@ Admin endpoints for staging, publishing, and rolling back index versions.
 - from **codeintel_rev.app.config_context** import ApplicationContext
 - from **codeintel_rev.app.scope_store** import ScopeIn
 - from **codeintel_rev.errors** import RuntimeLifecycleError
-- from **codeintel_rev.indexing.index_lifecycle** import IndexAssets
+- from **codeintel_rev.indexing.index_lifecycle** import IndexAssets, collect_asset_attrs
 - from **codeintel_rev.runtime.factory_adjustment** import DefaultFactoryAdjuster
 - from **kgfoundry_common.logging** import get_logger
 
@@ -44,15 +44,15 @@ Admin endpoints for staging, publishing, and rolling back index versions.
 
 - **fan_in**: 0
 - **fan_out**: 6
-- **cycle_group**: 134
+- **cycle_group**: 145
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 8
+- recent churn 90: 8
 
 ## Usage
 

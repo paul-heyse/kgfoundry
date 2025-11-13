@@ -63,7 +63,7 @@ Notes
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 133
+- **cycle_group**: 144
 
 ## Ownership
 
@@ -103,7 +103,9 @@ Notes
 - patches/Supporting Documentation/BM25+SPLADEv3-patchfiles/grafana-codeintel-retrieval.json
 - patches/Supporting Documentation/faiss_1_12_0_api_inventory.json
 - patches/Supporting Documentation/FastAPI.md
+- patches/Supporting Documentation/opentelemetry.md
 - patches/Supporting Documentation/libcst.md
+- patches/Supporting Documentation/vllm.md
 - patches/Supporting Documentation/tree-sitter.md
 - patches/Supporting Documentation/251111_FAISS_whl_overview_rev.md
 - patches/Supporting Documentation/pyrarrow.md
@@ -117,8 +119,10 @@ Notes
 - patches/Enrich_Expansion.md
 - patches/Enrich_Extension.md
 - patches/Networking_Implementation.md
+- patches/FAISS-Hardening.md
 - patches/Type_Gating_Factory_Scope_phase2.md
 - patches/BM25+SPLADEv3_Implementation.md
+- patches/OpenTelemetry_ExtensionPhase1.md
 - patches/Type_Gating_Factory_Scope.md
 - patches/DuckDB_data_expansion_FAISS.md
 - patches/Type_Gating_Followup.md
@@ -126,9 +130,11 @@ Notes
 - patches/AST_Data_Build.md
 - patches/audit_closeout.md
 - patches/Index Lifecycle Manager and Concurrency.md
+- patches/OpenTelemetry_ExtensionPhase0.md
 - patches/FAISS Implementation Phase 2 rev.md
 - patches/warp_technical_overview.md
 - patches/Telemetry_Implementation.md
+- patches/vllm scope.md
 - patches/Enrich_scope_addendum.md
 - patches/FAISS-Phase2-Refinements.md
 - patches/Enrich_Scope.md

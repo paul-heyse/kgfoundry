@@ -67,22 +67,31 @@ def generate_overlay_for_file(
 ) -> OverlayResult:
     """Generate a .pyi overlay for ``py_file`` when it meets the policy gates.
 
+    This function generates a type stub overlay (.pyi file) for a Python source
+    file when it meets the configured policy requirements (e.g., minimum type
+    errors, star imports, __all__ definitions). The function analyzes the source
+    file, checks policy gates, and generates the overlay if conditions are met.
+
     Parameters
     ----------
     py_file : Path
         Path to the Python source file for which to generate an overlay.
-        May be absolute or relative to ``package_root``.
+        May be absolute or relative to package_root. The file must exist and
+        be readable for overlay generation.
     package_root : Path
-        Root directory of the package containing ``py_file``. Used to
-        compute relative module paths and overlay destination paths.
-    inputs : OverlayInputs | None
-        Optional bundle containing SCIP index, cached type error counts,
-        and override flags (such as ``force``). When omitted, defaults to
-        ``OverlayInputs()``.
+        Root directory of the package containing py_file. Used to compute
+        relative module paths and determine overlay destination paths. The
+        overlay is written relative to this root.
     policy : OverlayPolicy
-        Policy controlling when overlays are generated and how they are
-        written. Includes gates for star imports, ``__all__`` definitions,
-        and type error thresholds.
+        Policy controlling when overlays are generated and how they are written.
+        Includes gates for star imports, __all__ definitions, and type error
+        thresholds. The policy determines whether an overlay should be generated
+        for the file.
+    inputs : OverlayInputs | None, optional
+        Optional bundle containing SCIP index, cached type error counts, and
+        override flags (such as force). When omitted, defaults to OverlayInputs()
+        with empty SCIP index and zero error counts. Used to provide symbol
+        definitions and type error information for overlay generation.
 
     Returns
     -------

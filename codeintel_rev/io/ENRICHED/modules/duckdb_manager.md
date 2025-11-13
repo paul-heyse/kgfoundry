@@ -29,9 +29,9 @@ Thread-safe DuckDB connection manager.
 
 ## Graph Metrics
 
-- **fan_in**: 9
+- **fan_in**: 10
 - **fan_out**: 2
-- **cycle_group**: 45
+- **cycle_group**: 44
 
 ## Ownership
 
@@ -71,7 +71,7 @@ DuckDBConfig, DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 
 ## Hotspot
 
-- score: 2.71
+- score: 2.75
 
 ## Side Effects
 

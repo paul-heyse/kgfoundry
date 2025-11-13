@@ -37,6 +37,7 @@ from codeintel_rev.observability.otel import as_span
 from codeintel_rev.observability.runtime_observer import TimelineRuntimeObserver
 from codeintel_rev.observability.timeline import bind_timeline, new_timeline
 from codeintel_rev.runtime.cells import RuntimeCellObserver
+from codeintel_rev.telemetry.context import current_run_id
 from codeintel_rev.telemetry.logging import install_structured_logging
 from codeintel_rev.telemetry.otel import install_otel
 from codeintel_rev.telemetry.prom import build_metrics_router
@@ -393,15 +394,34 @@ if os.getenv("CODEINTEL_ADMIN", "").strip().lower() in {"1", "true", "yes", "on"
 async def get_run_report(session_id: str, run_id: str | None = None) -> dict[str, Any]:
     """Return JSON run report for the session/run identifier.
 
+    This endpoint retrieves a run report for the specified session and optional
+    run identifier. The report contains telemetry data, metrics, and execution
+    details for the requested run. If no run_id is provided, returns the most
+    recent run for the session.
+
+    Parameters
+    ----------
+    session_id : str
+        Session identifier extracted from the URL path. Used to identify the
+        telemetry session containing the run report.
+    run_id : str | None, optional
+        Optional run identifier to retrieve a specific run report. If None
+        (default), returns the most recent run for the session. Used to
+        retrieve historical run reports within a session.
+
     Returns
     -------
     dict[str, Any]
-        Run report payload serialisable to JSON.
+        Run report payload serialisable to JSON containing telemetry data,
+        metrics, timing information, and execution details for the requested run.
+        The payload structure matches the RunReport schema.
 
     Raises
     ------
     HTTPException
-        Raised when the application context is missing or the run cannot be found.
+        Raised in the following cases:
+        - Status 503: Application context is not initialized (missing from app.state)
+        - Status 404: Run not found for the specified session_id and run_id
     """
     context = getattr(app.state, "context", None)
     if context is None:
@@ -416,15 +436,35 @@ async def get_run_report(session_id: str, run_id: str | None = None) -> dict[str
 async def get_run_report_markdown(session_id: str, run_id: str | None = None) -> PlainTextResponse:
     """Return Markdown run report for the session/run identifier.
 
+    This endpoint retrieves a run report for the specified session and optional
+    run identifier, formatted as Markdown. The report contains telemetry data,
+    metrics, and execution details rendered in human-readable Markdown format.
+    If no run_id is provided, returns the most recent run for the session.
+
+    Parameters
+    ----------
+    session_id : str
+        Session identifier extracted from the URL path. Used to identify the
+        telemetry session containing the run report.
+    run_id : str | None, optional
+        Optional run identifier to retrieve a specific run report. If None
+        (default), returns the most recent run for the session. Used to
+        retrieve historical run reports within a session.
+
     Returns
     -------
     PlainTextResponse
-        Markdown-formatted run report body.
+        FastAPI PlainTextResponse containing Markdown-formatted run report body.
+        The response includes telemetry data, metrics, timing information, and
+        execution details rendered in Markdown format suitable for display in
+        documentation or web interfaces.
 
     Raises
     ------
     HTTPException
-        Raised when the application context is missing or the run cannot be found.
+        Raised in the following cases:
+        - Status 503: Application context is not initialized (missing from app.state)
+        - Status 404: Run not found for the specified session_id and run_id
     """
     context = getattr(app.state, "context", None)
     if context is None:
@@ -501,6 +541,9 @@ async def set_mcp_context(
                 "duration_ms": duration_ms,
             },
         )
+    trace_id = current_run_id()
+    if trace_id:
+        response.headers.setdefault("X-Trace-Id", trace_id)
     return response
 
 

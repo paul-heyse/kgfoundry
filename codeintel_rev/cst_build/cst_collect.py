@@ -53,6 +53,9 @@ class _CollectorStatsBuilder:
     qname_hits: int = 0
     scope_resolved: int = 0
 
+    def _replace(self, field_name: str, value: int) -> None:
+        object.__setattr__(self, field_name, value)
+
     def increment_parse_errors(self, count: int = 1) -> None:
         """Increment the parse error counter.
 
@@ -66,7 +69,7 @@ class _CollectorStatsBuilder:
             Number of parse errors to add (defaults to 1). Used when multiple
             errors occur in a single operation or when batching error counts.
         """
-        self.parse_errors += count
+        self._replace("parse_errors", self.parse_errors + count)
 
     def set_node_rows(self, count: int) -> None:
         """Set the total number of node rows collected.
@@ -82,7 +85,7 @@ class _CollectorStatsBuilder:
             represents the number of NodeRecord objects emitted for the processed
             files.
         """
-        self.node_rows = count
+        self._replace("node_rows", count)
 
     def increment_qname_hits(self) -> None:
         """Increment the qualified name resolution hit counter.
@@ -97,7 +100,7 @@ class _CollectorStatsBuilder:
         This counter tracks how many nodes had their qnames successfully resolved,
         providing a metric for scope resolution quality.
         """
-        self.qname_hits += 1
+        self._replace("qname_hits", self.qname_hits + 1)
 
     def increment_scope_resolved(self) -> None:
         """Increment the scope resolution hit counter.
@@ -112,7 +115,7 @@ class _CollectorStatsBuilder:
         or Comprehension scope. This counter tracks how many nodes had their scope
         successfully resolved, providing a metric for scope analysis quality.
         """
-        self.scope_resolved += 1
+        self._replace("scope_resolved", self.scope_resolved + 1)
 
     def snapshot(self) -> CollectorStats:
         """Return an immutable CollectorStats instance.
@@ -159,10 +162,24 @@ class CSTCollector:
     def _build_repo_manager(self, files: Sequence[Path] | None) -> FullRepoManager | None:
         """Build a repo-scoped metadata manager when a file list is available.
 
+        This method creates a FullRepoManager instance for repository-wide metadata
+        collection when a file list is provided. The manager is configured with
+        LibCST metadata providers and supports pyproject.toml parsing. If file
+        list is None or manager creation fails, returns None gracefully.
+
+        Parameters
+        ----------
+        files : Sequence[Path] | None
+            Sequence of file paths to include in the repository manager. If None
+            or empty, returns None without creating a manager. The paths are
+            converted to relative paths from the collector's root directory.
+
         Returns
         -------
         FullRepoManager | None
-            Configured manager if the environment supports it, otherwise ``None``.
+            Configured FullRepoManager instance if files are provided and manager
+            creation succeeds, otherwise None. Returns None when files is None/empty
+            or when manager creation fails (OSError, ValueError).
         """
         if not files:
             return None
@@ -255,10 +272,39 @@ class CSTCollector:
     ) -> Iterable[NodeRecord]:
         """Yield NodeRecord rows for ``rel_path``.
 
+        This method traverses the LibCST AST and yields NodeRecord instances for
+        each node that should be emitted (functions, classes, assignments, etc.).
+        The method resolves metadata (parent maps, positions, scopes, qualified
+        names) and builds serialized node records matching the schema contract.
+
+        Parameters
+        ----------
+        rel_path : str
+            Relative file path from the repository root. Used to identify the
+            source file in node records and for module name extraction.
+        code : str
+            Source code content of the file. Used to extract text previews for
+            nodes when skip_preview is False. The code is already parsed into
+            the CST module in wrapper.
+        wrapper : cst_metadata.MetadataWrapper
+            LibCST metadata wrapper containing the parsed module and resolved
+            metadata providers (parent maps, positions, scopes, qualified names).
+            Used to extract node metadata during traversal.
+        skip_preview : bool
+            Flag indicating whether to skip text preview extraction for nodes.
+            When True, text_preview is set to None for all nodes, reducing
+            memory usage and serialization size.
+        stats_builder : _CollectorStatsBuilder
+            Statistics builder instance for tracking collection metrics (node
+            counts, parse errors, etc.). Updated during node emission.
+
         Yields
         ------
         NodeRecord
-            Serialized node record matching the schema contract.
+            Serialized node record matching the schema contract. Each record
+            contains node metadata (kind, name, span, parents, scope, qnames)
+            and optional text preview. Records are yielded in depth-first
+            traversal order.
         """
         parent_map = wrapper.resolve(cst_metadata.ParentNodeProvider)
         position_map = wrapper.resolve(cst_metadata.PositionProvider)
@@ -668,10 +714,24 @@ def _normalize_qnames(entries: list[tuple[str, str]], module_name: str) -> list[
 def _module_name_from_path(rel_path: str) -> str:
     """Convert a relative file path into its dotted module name.
 
+    This function converts a relative file path (e.g., "src/pkg/module.py") into
+    a dotted module name (e.g., "src.pkg.module"). It handles Windows path
+    separators, strips .py extension, handles __init__.py files, and converts
+    path separators to dots.
+
+    Parameters
+    ----------
+    rel_path : str
+        Relative file path from repository root (e.g., "src/pkg/module.py").
+        Windows backslashes are normalized to forward slashes. The path may
+        include .py extension and __init__.py files.
+
     Returns
     -------
     str
-        Dotted module path (empty string for top-level modules).
+        Dotted module name (e.g., "src.pkg.module"). Empty string for top-level
+        modules or when rel_path is empty. Path separators are converted to dots,
+        .py extension is stripped, and __init__ is removed from package paths.
     """
     normalized = rel_path.replace("\\", "/")
     if normalized.endswith(".py"):
@@ -685,10 +745,28 @@ def _module_name_from_path(rel_path: str) -> str:
 def _build_parse_error_node(rel_path: str, message: str) -> NodeRecord:
     """Return a placeholder row describing a parse failure.
 
+    This function creates a synthetic NodeRecord for files that failed to parse.
+    The record captures the parse error message and provides a placeholder entry
+    in the node collection output, enabling downstream tools to identify and
+    report parse failures.
+
+    Parameters
+    ----------
+    rel_path : str
+        Relative file path from repository root where the parse error occurred.
+        Used to identify the problematic file in the node record.
+    message : str
+        Parse error message describing the failure. The message is truncated to
+        240 characters and included in the node record's doc snippet and errors
+        list. Used for debugging and error reporting.
+
     Returns
     -------
     NodeRecord
-        Synthetic node record capturing the parse issue.
+        Synthetic node record with kind="ParseError" capturing the parse issue.
+        The record includes the rel_path, a synthetic node_id, an empty span
+        (1,0,1,0), the error message in doc and errors fields, and minimal
+        metadata (parents=["Module"], scope="Global", empty qnames).
     """
     return NodeRecord(
         path=rel_path,

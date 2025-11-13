@@ -6,6 +6,9 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
+from codeintel_rev.observability.otel import record_span_event
+from codeintel_rev.observability.timeline import current_timeline
+from codeintel_rev.retrieval.telemetry import record_stage_decision
 from codeintel_rev.retrieval.types import StageDecision, StageSignals
 
 
@@ -101,24 +104,44 @@ def should_run_secondary_stage(
     3. Score margin (high margin suggests good results already)
     """
     notes: list[str] = []
+    timeline = current_timeline()
+    margin_value = signals.margin()
+
+    def _emit(decision: StageDecision) -> StageDecision:
+        record_stage_decision("retrieval.gating", "secondary", decision=decision)
+        attrs = {
+            "should_run": decision.should_run,
+            "reason": decision.reason,
+            "candidate_count": signals.candidate_count,
+            "elapsed_ms": signals.elapsed_ms,
+            "margin": margin_value if margin_value is not None else -1.0,
+        }
+        record_span_event("retrieval.gating.secondary", **attrs)
+        if timeline is not None:
+            timeline.event("decision", "retrieval.gating.secondary", attrs=attrs)
+        return decision
+
     if signals.candidate_count <= 0:
-        return StageDecision(should_run=False, reason="no_candidates")
+        return _emit(StageDecision(should_run=False, reason="no_candidates"))
     if signals.candidate_count < config.min_candidates:
         notes.append(f"{signals.candidate_count}/{config.min_candidates} candidates available")
-        return StageDecision(should_run=False, reason="insufficient_candidates", notes=tuple(notes))
+        return _emit(
+            StageDecision(should_run=False, reason="insufficient_candidates", notes=tuple(notes))
+        )
 
     if signals.elapsed_ms > config.budget_ms:
         notes.append(f"stage elapsed {signals.elapsed_ms:.1f}ms > budget {config.budget_ms}ms")
-        return StageDecision(
-            should_run=False, reason="upstream_budget_exceeded", notes=tuple(notes)
+        return _emit(
+            StageDecision(
+                should_run=False, reason="upstream_budget_exceeded", notes=tuple(notes)
+            )
         )
 
-    margin = signals.margin()
-    if margin is not None and margin >= config.margin_threshold > 0:
-        notes.append(f"margin {margin:.4f} >= threshold {config.margin_threshold:.4f}")
-        return StageDecision(should_run=False, reason="high_margin", notes=tuple(notes))
+    if margin_value is not None and margin_value >= config.margin_threshold > 0:
+        notes.append(f"margin {margin_value:.4f} >= threshold {config.margin_threshold:.4f}")
+        return _emit(StageDecision(should_run=False, reason="high_margin", notes=tuple(notes)))
 
-    return StageDecision(should_run=True, reason="within_budget", notes=tuple(notes))
+    return _emit(StageDecision(should_run=True, reason="within_budget", notes=tuple(notes)))
 
 
 @dataclass(frozen=True)

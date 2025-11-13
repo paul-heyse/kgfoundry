@@ -565,7 +565,44 @@ class FlatReranker:
         *,
         top_k: int,
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Return exact similarity scores and chunk ids."""
+        """Return exact similarity scores and chunk ids.
+
+        This method performs exact reranking of candidate chunk IDs by computing
+        exact similarity scores between query vectors and candidate embeddings
+        retrieved from the catalog. It delegates to the internal reranking
+        implementation using the configured similarity metric (inner product or
+        cosine similarity). The method returns the top-k reranked candidates
+        sorted by exact similarity score.
+
+        Parameters
+        ----------
+        queries : np.ndarray
+            Query vectors with shape `(B, dim)` or `(dim,)` where B is the batch
+            size and dim is the embedding dimension. Automatically reshaped to 2D
+            if 1D. Dtype should be float32 or convertible to float32.
+        candidate_ids : np.ndarray
+            Candidate chunk identifiers with shape `(B, K')` where B matches the
+            query batch size and K' is the number of candidates per query. Dtype
+            should be int64 or convertible to int64. Negative IDs are treated as
+            invalid and filtered out.
+        top_k : int
+            Number of top results to return per query after reranking. Must be
+            positive. The method returns the top-k candidates sorted by exact
+            similarity score (descending order).
+
+        Returns
+        -------
+        np.ndarray
+            Reranked similarity scores with shape `(B, top_k)` and dtype float32.
+            Scores are exact similarity values (inner product or cosine similarity
+            depending on configured metric) sorted in descending order (highest
+            similarity first). Missing or invalid candidates are filled with
+            minimum float32 value.
+        np.ndarray
+            Reranked chunk IDs with shape `(B, top_k)` and dtype int64. IDs
+            correspond to the top-k scores and are aligned with the scores array.
+            Missing or invalid candidates are filled with -1.
+        """
         return _perform_exact_rerank(
             self._catalog,
             queries,
@@ -583,7 +620,56 @@ def exact_rerank(
     top_k: int,
     metric: str = "ip",
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Backward-compatible helper delegating to :class:`FlatReranker`."""
+    """Backward-compatible helper delegating to :class:`FlatReranker`.
+
+    This function provides a backward-compatible interface to exact reranking
+    functionality. It creates a FlatReranker instance with the specified metric
+    and delegates to its rerank() method. This function maintains compatibility
+    with existing code that calls exact_rerank() directly rather than using the
+    FlatReranker class interface.
+
+    Parameters
+    ----------
+    catalog : DuckDBCatalog
+        DuckDB catalog instance providing embedding retrieval via
+        get_embeddings_by_ids(). The catalog must contain embeddings for the
+        candidate chunk IDs.
+    queries : np.ndarray
+        Query vectors with shape `(B, dim)` or `(dim,)` where B is the batch size
+        and dim is the embedding dimension. Automatically reshaped to 2D if 1D.
+        Dtype should be float32 or convertible to float32.
+    candidate_ids : np.ndarray
+        Candidate chunk identifiers with shape `(B, K')` where B matches the query
+        batch size and K' is the number of candidates per query. Dtype should be
+        int64 or convertible to int64. Negative IDs are treated as invalid.
+    top_k : int
+        Number of top results to return per query after reranking. Must be positive.
+        The function returns the top-k candidates sorted by exact similarity score.
+    metric : str, optional
+        Similarity metric to use: "ip" (inner product) or "cos" (cosine similarity).
+        Defaults to "ip". Cosine similarity normalizes both queries and candidates
+        to unit length before computation.
+
+    Returns
+    -------
+    np.ndarray
+        Reranked similarity scores with shape `(B, top_k)` and dtype float32.
+        Scores are exact similarity values sorted in descending order (highest
+        similarity first). Missing or invalid candidates are filled with minimum
+        float32 value.
+    np.ndarray
+        Reranked chunk IDs with shape `(B, top_k)` and dtype int64. IDs correspond
+        to the top-k scores and are aligned with the scores array. Missing or
+        invalid candidates are filled with -1.
+
+    Notes
+    -----
+    This function is a convenience wrapper around FlatReranker for backward
+    compatibility. New code should prefer using FlatReranker directly for better
+    performance (avoids creating a new instance on each call). The function
+        delegates all processing to FlatReranker.rerank() and returns the same
+        results. Thread-safe if the catalog instance is thread-safe.
+    """
     reranker = FlatReranker(catalog, metric=metric)
     return reranker.rerank(queries, candidate_ids, top_k=top_k)
 

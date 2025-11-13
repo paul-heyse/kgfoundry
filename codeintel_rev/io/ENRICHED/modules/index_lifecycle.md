@@ -26,6 +26,7 @@ through stable paths such as ``.../current/faiss.index`` and reload when
 
 - from **__future__** import annotations
 - from **(absolute)** import contextlib
+- from **(absolute)** import hashlib
 - from **(absolute)** import json
 - from **(absolute)** import shutil
 - from **(absolute)** import time
@@ -38,26 +39,32 @@ through stable paths such as ``.../current/faiss.index`` and reload when
 
 ## Definitions
 
-- variable: `LOGGER` (line 34)
-- class: `LuceneAssets` (line 39)
-- function: `link_current_lucene` (line 59)
-- class: `IndexAssets` (line 72)
-- class: `VersionMeta` (line 115)
-- class: `IndexLifecycleManager` (line 140)
+- variable: `LOGGER` (line 35)
+- class: `LuceneAssets` (line 40)
+- function: `link_current_lucene` (line 60)
+- class: `IndexAssets` (line 73)
+- function: `_file_checksum` (line 115)
+- function: `_read_json` (line 125)
+- function: `collect_asset_attrs` (line 132)
+- function: `_attrs_from_meta` (line 161)
+- function: `_attrs_from_idmap` (line 181)
+- function: `_attrs_from_tuning` (line 187)
+- class: `VersionMeta` (line 208)
+- class: `IndexLifecycleManager` (line 233)
 
 ## Graph Metrics
 
 - **fan_in**: 5
 - **fan_out**: 2
-- **cycle_group**: 58
+- **cycle_group**: 65
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 
@@ -66,7 +73,7 @@ through stable paths such as ``.../current/faiss.index`` and reload when
 
 ## Declared Exports (__all__)
 
-IndexAssets, IndexLifecycleManager, LuceneAssets, VersionMeta, link_current_lucene
+IndexAssets, IndexLifecycleManager, LuceneAssets, VersionMeta, collect_asset_attrs, link_current_lucene
 
 ## Doc Health
 
@@ -89,7 +96,7 @@ IndexAssets, IndexLifecycleManager, LuceneAssets, VersionMeta, link_current_luce
 
 ## Hotspot
 
-- score: 2.44
+- score: 2.59
 
 ## Side Effects
 
@@ -97,17 +104,22 @@ IndexAssets, IndexLifecycleManager, LuceneAssets, VersionMeta, link_current_luce
 
 ## Complexity
 
-- branches: 33
-- cyclomatic: 34
-- loc: 490
+- branches: 55
+- cyclomatic: 56
+- loc: 668
 
 ## Doc Coverage
 
 - `LuceneAssets` (class): summary=yes, examples=no — Lucene index directories that should flip atomically.
 - `link_current_lucene` (function): summary=yes, params=mismatch, examples=no — Copy Lucene assets into a version directory and flip the CURRENT pointer.
 - `IndexAssets` (class): summary=yes, examples=no — File-system assets that must advance together for one index version.
+- `_file_checksum` (function): summary=no, examples=no
+- `_read_json` (function): summary=no, examples=no
+- `collect_asset_attrs` (function): summary=yes, params=ok, examples=no — Return manifest attributes derived from staged asset sidecars.
+- `_attrs_from_meta` (function): summary=no, examples=no
+- `_attrs_from_idmap` (function): summary=no, examples=no
+- `_attrs_from_tuning` (function): summary=no, examples=no
 - `VersionMeta` (class): summary=yes, examples=no — Metadata recorded for each version directory.
-- `IndexLifecycleManager` (class): summary=yes, examples=no — Manage staged/published index versions under a base directory.
 
 ## Tags
 

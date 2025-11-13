@@ -41,17 +41,17 @@ In-process vLLM embedding engine for Stage-0 retrieval.
 
 ## Graph Metrics
 
-- **fan_in**: 1
+- **fan_in**: 2
 - **fan_out**: 4
-- **cycle_group**: 52
+- **cycle_group**: 51
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 8
+- recent churn 90: 8
 
 ## Usage
 
@@ -83,7 +83,7 @@ InprocessVLLMEmbedder
 
 ## Hotspot
 
-- score: 2.03
+- score: 2.09
 
 ## Side Effects
 
@@ -93,7 +93,7 @@ InprocessVLLMEmbedder
 
 - branches: 11
 - cyclomatic: 12
-- loc: 214
+- loc: 244
 
 ## Doc Coverage
 

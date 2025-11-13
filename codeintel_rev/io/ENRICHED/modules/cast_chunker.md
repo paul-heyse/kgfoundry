@@ -38,9 +38,9 @@ the character budget, splitting large symbols on blank lines.
 
 ## Graph Metrics
 
-- **fan_in**: 2
+- **fan_in**: 3
 - **fan_out**: 2
-- **cycle_group**: 55
+- **cycle_group**: 61
 
 ## Ownership
 
@@ -80,7 +80,7 @@ Chunk, chunk_file, line_starts, range_to_bytes
 
 ## Hotspot
 
-- score: 2.29
+- score: 2.36
 
 ## Side Effects
 

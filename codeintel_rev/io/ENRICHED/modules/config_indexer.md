@@ -22,7 +22,7 @@ Config awareness helpers (YAML/TOML/JSON/Markdown).
 - function: `_extract_yaml_keys` (line 60)
 - function: `_extract_toml_keys` (line 73)
 - function: `_extract_json_keys` (line 86)
-- function: `_extract_markdown_headings` (line 112)
+- function: `_extract_markdown_headings` (line 145)
 
 ## Graph Metrics
 
@@ -35,8 +35,8 @@ Config awareness helpers (YAML/TOML/JSON/Markdown).
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 1
-- recent churn 90: 1
+- recent churn 30: 2
+- recent churn 90: 2
 
 ## Usage
 
@@ -74,7 +74,7 @@ Config awareness helpers (YAML/TOML/JSON/Markdown).
 
 - branches: 22
 - cyclomatic: 23
-- loc: 118
+- loc: 151
 
 ## Doc Coverage
 

@@ -36,9 +36,9 @@ Capability snapshot helpers for conditional tool registration and /capz.
 
 ## Graph Metrics
 
-- **fan_in**: 5
+- **fan_in**: 6
 - **fan_out**: 3
-- **cycle_group**: 66
+- **cycle_group**: 67
 
 ## Ownership
 
@@ -82,7 +82,7 @@ Capabilities
 
 ## Hotspot
 
-- score: 2.39
+- score: 2.43
 
 ## Side Effects
 

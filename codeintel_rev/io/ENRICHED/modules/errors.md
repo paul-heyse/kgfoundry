@@ -53,7 +53,7 @@ Raising Git operation error:
 
 ## Graph Metrics
 
-- **fan_in**: 11
+- **fan_in**: 12
 - **fan_out**: 0
 - **cycle_group**: 24
 
@@ -95,7 +95,7 @@ FileOperationError, FileReadError, GitOperationError, InvalidLineRangeError, Pat
 
 ## Hotspot
 
-- score: 2.08
+- score: 2.11
 
 ## Side Effects
 

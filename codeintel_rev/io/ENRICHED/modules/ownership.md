@@ -30,28 +30,28 @@ Ownership, churn, and bus-factor analytics sourced from Git history.
 - class: `FileOwnership` (line 35)
 - class: `OwnershipIndex` (line 46)
 - function: `compute_ownership` (line 53)
-- function: `_normalize_windows` (line 85)
-- function: `_try_open_repo` (line 92)
-- function: `_stats_via_gitpython` (line 101)
-- function: `_author_name` (line 140)
-- function: `_top_k` (line 148)
-- function: `_bus_factor` (line 153)
-- function: `_codeowners_lookup` (line 160)
-- function: `_glob_like_match` (line 180)
+- function: `_normalize_windows` (line 113)
+- function: `_try_open_repo` (line 120)
+- function: `_stats_via_gitpython` (line 129)
+- function: `_author_name` (line 168)
+- function: `_top_k` (line 176)
+- function: `_bus_factor` (line 181)
+- function: `_codeowners_lookup` (line 188)
+- function: `_glob_like_match` (line 208)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 15
+- **cycle_group**: 18
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 3
-- recent churn 90: 3
+- recent churn 30: 4
+- recent churn 90: 4
 
 ## Usage
 
@@ -66,7 +66,7 @@ FileOwnership, OwnershipIndex, compute_ownership
 
 - **summary**: Ownership, churn, and bus-factor analytics sourced from Git history.
 - has summary: yes
-- param parity: no
+- param parity: yes
 - examples present: no
 
 ## Typedness
@@ -99,13 +99,13 @@ FileOwnership, OwnershipIndex, compute_ownership
 
 - branches: 31
 - cyclomatic: 32
-- loc: 187
+- loc: 215
 
 ## Doc Coverage
 
 - `FileOwnership` (class): summary=yes, examples=no — Aggregated ownership metadata for a single file.
 - `OwnershipIndex` (class): summary=yes, examples=no — Collection of :class:`FileOwnership` entries keyed by relative path.
-- `compute_ownership` (function): summary=yes, params=mismatch, examples=no — Return ownership metrics for ``rel_paths`` relative to ``repo_root``.
+- `compute_ownership` (function): summary=yes, params=ok, examples=no — Return ownership metrics for ``rel_paths`` relative to ``repo_root``.
 - `_normalize_windows` (function): summary=no, examples=no
 - `_try_open_repo` (function): summary=no, examples=no
 - `_stats_via_gitpython` (function): summary=no, examples=no

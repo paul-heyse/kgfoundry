@@ -94,10 +94,57 @@ def span_context(
 ) -> Iterator[tuple[Span, dict[str, object]]]:
     """Create a span/timeline scope for the wrapped block.
 
+    This context manager creates an OpenTelemetry span and timeline step for
+    instrumenting code execution. It sets up span attributes, records exceptions,
+    emits checkpoints (if enabled), and records stage latency metrics. The context
+    manager ensures proper span lifecycle management and error handling.
+
+    Parameters
+    ----------
+    name : str
+        Span name used for OpenTelemetry tracing and timeline steps. Should be
+        descriptive and identify the operation being traced (e.g., "search",
+        "embed_batch").
+    kind : str, optional
+        Span kind indicating the role of the span: "internal" (default), "server",
+        "client", "producer", or "consumer". Determines how the span appears in
+        distributed tracing views.
+    attrs : Mapping[str, object] | None, optional
+        Additional attributes to attach to the span. Attributes are merged with
+        context attributes (request ID, stage, etc.) and set on the OpenTelemetry
+        span. None values are converted to "null" strings.
+    stage : str | None, optional
+        Stage identifier for pipeline instrumentation. If provided, records stage
+        latency metrics and can emit checkpoints (if emit_checkpoint is True).
+        Used for tracking pipeline execution stages.
+    emit_checkpoint : bool, optional
+        Whether to emit checkpoint events for the stage (defaults to False).
+        When True, emits success/failure checkpoints with stage metadata. Requires
+        stage to be provided.
+
     Yields
     ------
     tuple[Span, dict[str, object]]
-        The active span and merged attribute dictionary.
+        Tuple containing:
+        - Span: The active OpenTelemetry span for adding custom attributes or
+          recording events
+        - dict[str, object]: Merged attribute dictionary combining provided attrs
+          with context attributes (request ID, stage, etc.)
+
+    Raises
+    ------
+    BaseException
+        Any exception raised within the context is caught, recorded on the span
+        with error status, and re-raised. The context manager ensures proper
+        span cleanup and error attribution even when exceptions occur.
+
+    Notes
+    -----
+    This context manager integrates OpenTelemetry tracing with timeline recording
+    and Prometheus metrics. It automatically records exceptions, sets span status,
+    and records stage latency. The context manager is thread-safe if the underlying
+    tracing infrastructure is thread-safe. Stage latency is recorded only when
+    stage is provided.
     """
     base_attrs = dict(attrs or {})
     stage_start = perf_counter() if stage else None
@@ -130,18 +177,100 @@ def trace_span(
 ) -> Callable[[F], F]:
     """Wrap callable execution in an OpenTelemetry span + timeline step.
 
+    This decorator function creates a decorator that wraps callables (functions
+    or coroutines) with OpenTelemetry span and timeline instrumentation. The
+    decorator automatically detects async vs sync functions and creates appropriate
+    wrappers. All execution within the decorated callable is traced with spans,
+    timeline steps, and optional checkpoints.
+
+    Parameters
+    ----------
+    name : str
+        Span name used for OpenTelemetry tracing and timeline steps. Should be
+        descriptive and identify the operation being traced (e.g., "search",
+        "embed_batch").
+    kind : str, optional
+        Span kind indicating the role of the span: "internal" (default), "server",
+        "client", "producer", or "consumer". Determines how the span appears in
+        distributed tracing views.
+    attrs : Mapping[str, object] | None, optional
+        Additional attributes to attach to the span. Attributes are merged with
+        context attributes and set on the OpenTelemetry span. None values are
+        converted to "null" strings.
+    stage : str | None, optional
+        Stage identifier for pipeline instrumentation. If provided, records stage
+        latency metrics and can emit checkpoints (if emit_checkpoint is True).
+        Used for tracking pipeline execution stages.
+    emit_checkpoint : bool, optional
+        Whether to emit checkpoint events for the stage (defaults to False).
+        When True, emits success/failure checkpoints with stage metadata. Requires
+        stage to be provided.
+
     Returns
     -------
     Callable[[F], F]
-        Decorated callable.
+        Decorator function that wraps callables with span/timeline instrumentation.
+        The decorator preserves the original function's signature and metadata via
+        functools.wraps(). Async functions are wrapped with async wrappers; sync
+        functions are wrapped with sync wrappers.
     """
     base_attrs = dict(attrs or {})
 
     def decorator(func: F) -> F:
+        """Wrap a callable with OpenTelemetry span and timeline instrumentation.
+
+        This nested function creates a decorator that wraps the target callable
+        (function or coroutine) with span_context() to create an OpenTelemetry
+        span and timeline step. The decorator automatically detects whether the
+        callable is async or sync and creates the appropriate wrapper.
+
+        Parameters
+        ----------
+        func : F
+            Callable to wrap (function or coroutine function). The callable is
+            wrapped to execute within a span_context() scope, creating spans and
+            timeline steps automatically.
+
+        Returns
+        -------
+        F
+            Wrapped callable that executes within span/timeline instrumentation.
+            Async functions return an async wrapper; sync functions return a
+            sync wrapper. The wrapper preserves the original function's signature
+            and metadata via functools.wraps().
+
+        Notes
+        -----
+        This decorator function is returned by trace_span() and is applied to
+        the target callable. It uses inspect.iscoroutinefunction() to detect
+        async functions and creates appropriate wrappers. The wrapper executes
+        the original function within a span_context() scope, ensuring all
+        execution is traced. Thread-safe if span_context() is thread-safe.
+        """
         if inspect.iscoroutinefunction(func):
 
             @functools.wraps(func)
             async def async_wrapper(*args: object, **kwargs: object) -> object:
+                """Async wrapper that executes coroutine within span context.
+
+                This nested async function wraps coroutine execution in a
+                span_context() scope, creating OpenTelemetry spans and timeline
+                steps for async operations. It awaits the original coroutine
+                and returns its result.
+
+                Parameters
+                ----------
+                *args : object
+                    Positional arguments passed to the original coroutine.
+                **kwargs : object
+                    Keyword arguments passed to the original coroutine.
+
+                Returns
+                -------
+                object
+                    Result returned by the original coroutine. The result is
+                    passed through unchanged after span/timeline instrumentation.
+                """
                 with span_context(
                     name,
                     kind=kind,
@@ -155,6 +284,26 @@ def trace_span(
 
         @functools.wraps(func)
         def sync_wrapper(*args: object, **kwargs: object) -> object:
+            """Sync wrapper that executes function within span context.
+
+            This nested function wraps synchronous function execution in a
+            span_context() scope, creating OpenTelemetry spans and timeline
+            steps for sync operations. It calls the original function and
+            returns its result.
+
+            Parameters
+            ----------
+            *args : object
+                Positional arguments passed to the original function.
+            **kwargs : object
+                Keyword arguments passed to the original function.
+
+            Returns
+            -------
+            object
+                Result returned by the original function. The result is passed
+                through unchanged after span/timeline instrumentation.
+            """
             with span_context(
                 name,
                 kind=kind,
@@ -177,10 +326,34 @@ def trace_step(
 ) -> Callable[[F], F]:
     """Specialized decorator that records checkpoints for pipeline stages.
 
+    This decorator is a convenience wrapper around trace_span() that automatically
+    enables checkpoint emission for pipeline stage instrumentation. It sets the
+    stage name as both the span name and stage identifier, and enables checkpoint
+    emission to track stage success/failure. This is useful for instrumenting
+    pipeline stages that need checkpoint tracking.
+
+    Parameters
+    ----------
+    stage : str
+        Stage identifier used as both span name and stage name. Should identify
+        the pipeline stage being instrumented (e.g., "index_load", "search_execute").
+        Checkpoints are automatically emitted for this stage.
+    attrs : Mapping[str, object] | None, optional
+        Additional attributes to attach to the span. Attributes are merged with
+        context attributes and the stage name. None values are converted to "null"
+        strings.
+    kind : str, optional
+        Span kind indicating the role of the span: "internal" (default), "server",
+        "client", "producer", or "consumer". Determines how the span appears in
+        distributed tracing views.
+
     Returns
     -------
     Callable[[F], F]
-        Decorated callable instrumented as ``stage``.
+        Decorator function that wraps callables with span/timeline instrumentation
+        and checkpoint emission. The decorator preserves the original function's
+        signature and metadata. Checkpoints are emitted automatically on success
+        or failure.
     """
     step_attrs = dict(attrs or {})
     step_attrs.setdefault("stage", stage)

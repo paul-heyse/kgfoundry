@@ -49,6 +49,29 @@ _SPAN_STR_MAX = int(os.getenv("CODEINTEL_TELEMETRY_MAX_FIELD", "256"))
 
 
 def _env_flag(name: str, *, default: bool = False) -> bool:
+    """Check if an environment variable is set to a truthy value.
+
+    This function reads an environment variable and returns True if it's set to
+    a recognized truthy value ("1", "true", "yes", "on"), or returns the default
+    value if the variable is unset or set to a falsy value.
+
+    Parameters
+    ----------
+    name : str
+        Environment variable name to check. The variable is read using os.getenv()
+        and compared against truthy values (case-insensitive, whitespace-trimmed).
+    default : bool, optional
+        Default value to return when the environment variable is unset or not
+        recognized as truthy (default: False). Used to provide fallback behavior
+        when the flag is not explicitly configured.
+
+    Returns
+    -------
+    bool
+        True if the environment variable is set to a truthy value, otherwise
+        returns the default value. Truthy values are "1", "true", "yes", "on"
+        (case-insensitive, whitespace-trimmed).
+    """
     raw = os.getenv(name)
     if raw is None:
         return default

@@ -19,13 +19,12 @@ Provides health/readiness endpoints, CORS, and streaming support.
 - from **contextlib** import asynccontextmanager, suppress
 - from **time** import perf_counter
 - from **types** import FrameType
-- from **typing** import cast
-- from **fastapi** import FastAPI, Request
+- from **typing** import Any, cast
+- from **fastapi** import FastAPI, HTTPException, Request
 - from **fastapi.middleware.cors** import CORSMiddleware
-- from **fastapi.responses** import JSONResponse, StreamingResponse
+- from **fastapi.responses** import JSONResponse, PlainTextResponse, StreamingResponse
 - from **hypercorn.middleware** import ProxyFixMiddleware
 - from **hypercorn.typing** import ASGIFramework
-- from **prometheus_client** import CONTENT_TYPE_LATEST, generate_latest
 - from **starlette.middleware.trustedhost** import TrustedHostMiddleware
 - from **starlette.responses** import Response
 - from **starlette.types** import ASGIApp
@@ -38,51 +37,59 @@ Provides health/readiness endpoints, CORS, and streaming support.
 - from **codeintel_rev.app.server_settings** import get_server_settings
 - from **codeintel_rev.errors** import RuntimeUnavailableError
 - from **codeintel_rev.mcp_server.server** import app_context, build_http_app
-- from **codeintel_rev.observability.otel** import as_span, init_telemetry
+- from **codeintel_rev.observability.otel** import as_span
 - from **codeintel_rev.observability.runtime_observer** import TimelineRuntimeObserver
 - from **codeintel_rev.observability.timeline** import bind_timeline, new_timeline
 - from **codeintel_rev.runtime.cells** import RuntimeCellObserver
+- from **codeintel_rev.telemetry.context** import current_run_id
+- from **codeintel_rev.telemetry.logging** import install_structured_logging
+- from **codeintel_rev.telemetry.otel** import install_otel
+- from **codeintel_rev.telemetry.prom** import build_metrics_router
+- from **codeintel_rev.telemetry.reporter** import build_report
+- from **codeintel_rev.telemetry.reporter** import render_markdown, report_to_json
 - from **kgfoundry_common.errors** import ConfigurationError
 - from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 44)
-- variable: `SERVER_SETTINGS` (line 45)
-- function: `_preload_faiss_index` (line 48)
-- function: `_env_flag` (line 79)
-- function: `_log_gpu_warmup` (line 96)
-- function: `_preload_faiss_if_configured` (line 117)
-- function: `_preload_xtr_if_configured` (line 127)
-- function: `_preload_hybrid_if_configured` (line 141)
-- function: `_initialize_context` (line 152)
-- function: `_shutdown_context` (line 229)
-- function: `lifespan` (line 252)
-- variable: `app` (line 348)
-- function: `metrics_endpoint` (line 374)
-- function: `set_mcp_context` (line 390)
-- function: `disable_nginx_buffering` (line 459)
-- function: `healthz` (line 495)
-- function: `readyz` (line 507)
-- function: `capz` (line 542)
-- function: `sse_demo` (line 585)
-- variable: `proxy_wrapped` (line 630)
-- variable: `asgi` (line 635)
-- variable: `asgi` (line 637)
+- variable: `LOGGER` (line 54)
+- variable: `SERVER_SETTINGS` (line 55)
+- function: `_preload_faiss_index` (line 61)
+- function: `_env_flag` (line 92)
+- function: `_log_gpu_warmup` (line 109)
+- function: `_preload_faiss_if_configured` (line 130)
+- function: `_preload_xtr_if_configured` (line 140)
+- function: `_preload_hybrid_if_configured` (line 154)
+- function: `_initialize_context` (line 165)
+- function: `_shutdown_context` (line 242)
+- function: `lifespan` (line 265)
+- variable: `app` (line 360)
+- variable: `metrics_router` (line 384)
+- function: `get_run_report` (line 394)
+- function: `get_run_report_markdown` (line 436)
+- function: `set_mcp_context` (line 479)
+- function: `disable_nginx_buffering` (line 551)
+- function: `healthz` (line 587)
+- function: `readyz` (line 599)
+- function: `capz` (line 634)
+- function: `sse_demo` (line 677)
+- variable: `proxy_wrapped` (line 722)
+- variable: `asgi` (line 727)
+- variable: `asgi` (line 729)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 14
-- **cycle_group**: 75
+- **fan_out**: 19
+- **cycle_group**: 83
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 25
-- recent churn 90: 25
+- recent churn 30: 27
+- recent churn 90: 27
 
 ## Usage
 
@@ -118,7 +125,7 @@ app, asgi
 
 ## Hotspot
 
-- score: 2.79
+- score: 2.94
 
 ## Side Effects
 
@@ -127,9 +134,9 @@ app, asgi
 
 ## Complexity
 
-- branches: 46
-- cyclomatic: 47
-- loc: 641
+- branches: 52
+- cyclomatic: 53
+- loc: 733
 
 ## Doc Coverage
 
@@ -142,7 +149,7 @@ app, asgi
 - `_initialize_context` (function): summary=yes, params=ok, examples=yes — Initialize application context, readiness probe, and optional runtimes.
 - `_shutdown_context` (function): summary=yes, params=mismatch, examples=no — Shut down mutable runtimes and readiness probes.
 - `lifespan` (function): summary=yes, params=ok, examples=no — Application lifespan manager with explicit configuration initialization.
-- `metrics_endpoint` (function): summary=yes, params=ok, examples=no — Expose Prometheus metrics for scraping.
+- `get_run_report` (function): summary=yes, params=ok, examples=no — Return JSON run report for the session/run identifier.
 
 ## Tags
 

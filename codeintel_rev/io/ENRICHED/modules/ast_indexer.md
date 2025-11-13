@@ -27,31 +27,31 @@ AST indexer producing join-ready Parquet datasets.
 - variable: `AST_NODE_SCHEMA` (line 89)
 - variable: `AST_METRIC_SCHEMA` (line 108)
 - function: `stable_module_path` (line 125)
-- function: `_module_name_from_path` (line 149)
-- function: `_safe_unparse` (line 160)
-- function: `walk_defs_with_qualname` (line 169)
-- function: `collect_ast_nodes` (line 204)
-- function: `collect_ast_nodes_from_tree` (line 227)
-- function: `compute_ast_metrics` (line 315)
-- function: `empty_metrics_row` (line 350)
-- function: `write_ast_parquet` (line 379)
-- variable: `RowType` (line 393)
-- function: `_table_from_rows` (line 396)
-- class: `_MetricsVisitor` (line 404)
+- function: `_module_name_from_path` (line 159)
+- function: `_safe_unparse` (line 170)
+- function: `walk_defs_with_qualname` (line 179)
+- function: `collect_ast_nodes` (line 224)
+- function: `collect_ast_nodes_from_tree` (line 259)
+- function: `compute_ast_metrics` (line 359)
+- function: `empty_metrics_row` (line 406)
+- function: `write_ast_parquet` (line 445)
+- variable: `RowType` (line 459)
+- function: `_table_from_rows` (line 462)
+- class: `_MetricsVisitor` (line 470)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 14
+- **cycle_group**: 17
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 5
+- recent churn 90: 5
 
 ## Usage
 
@@ -99,7 +99,7 @@ AST_METRIC_SCHEMA, AST_NODE_SCHEMA, AstMetricsRow, AstNodeRow, DefInfo, collect_
 
 - branches: 26
 - cyclomatic: 27
-- loc: 545
+- loc: 608
 
 ## Doc Coverage
 

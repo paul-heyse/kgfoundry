@@ -1,5 +1,6 @@
 fastapi:
 - app/main.py
+- telemetry/prom.py
 - app/routers/index_admin.py
 low-coverage:
 - risk_hotspots.py
@@ -51,6 +52,7 @@ low-coverage:
 - indexing/index_lifecycle.py
 - indexing/__init__.py
 - indexing/cast_chunker.py
+- indexing/chunk_ids.py
 - metrics/registry.py
 - metrics/__init__.py
 - enrich/tree_sitter_bridge.py
@@ -71,6 +73,14 @@ low-coverage:
 - observability/otel.py
 - observability/__init__.py
 - observability/timeline.py
+- telemetry/context.py
+- telemetry/decorators.py
+- telemetry/logging.py
+- telemetry/reporter.py
+- telemetry/events.py
+- telemetry/otel.py
+- telemetry/prom.py
+- telemetry/__init__.py
 - io/rrf.py
 - io/path_utils.py
 - io/coderank_embedder.py
@@ -123,6 +133,8 @@ low-coverage:
 - evaluation/scip_coverage.py
 - evaluation/__init__.py
 - evaluation/hybrid_pool.py
+- embeddings/embedding_service.py
+- embeddings/__init__.py
 - cli/xtr.py
 - cli/indexctl.py
 - cli/splade.py
@@ -169,6 +181,7 @@ public-api:
 - indexing/index_lifecycle.py
 - indexing/__init__.py
 - indexing/cast_chunker.py
+- indexing/chunk_ids.py
 - metrics/registry.py
 - enrich/graph_builder.py
 - enrich/ast_indexer.py
@@ -179,6 +192,12 @@ public-api:
 - observability/otel.py
 - observability/__init__.py
 - observability/timeline.py
+- telemetry/context.py
+- telemetry/decorators.py
+- telemetry/reporter.py
+- telemetry/events.py
+- telemetry/prom.py
+- telemetry/__init__.py
 - io/rrf.py
 - io/vllm_engine.py
 - io/splade_manager.py
@@ -216,6 +235,7 @@ public-api:
 - mcp_server/server.py
 - mcp_server/__init__.py
 - evaluation/hybrid_pool.py
+- embeddings/__init__.py
 - cli/xtr.py
 - mcp_server/common/observability.py
 - mcp_server/retrieval/__init__.py
@@ -234,6 +254,9 @@ reexport-hub:
 - metrics/registry.py
 - enrich/ast_indexer.py
 - observability/metrics.py
+- telemetry/context.py
+- telemetry/reporter.py
+- telemetry/__init__.py
 - io/splade_manager.py
 - io/__init__.py
 - mcp_server/schemas.py

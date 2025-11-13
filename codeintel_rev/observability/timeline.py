@@ -10,12 +10,13 @@ import secrets
 import threading
 import time
 import uuid
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass
+from importlib import import_module
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Self
+from typing import Any, Self, cast
 
 from codeintel_rev.observability.otel import as_span, record_span_event
 from kgfoundry_common.logging import get_logger
@@ -27,6 +28,8 @@ _timeline_var: contextvars.ContextVar[Timeline | None] = contextvars.ContextVar(
     default=None,
 )
 _LOG_LOCK = threading.Lock()
+_RECORD_PAYLOAD_LOCK = threading.Lock()
+_RECORD_PAYLOAD_FN: Callable[[dict[str, object]], None] | None = None
 
 
 def _env_float(name: str, default: float) -> float:
@@ -177,6 +180,33 @@ class _FlightRecorder:
             LOGGER.debug("Failed to write timeline event", exc_info=True)
 
 
+def _get_record_payload_fn() -> Callable[[dict[str, object]], None] | None:
+    """Return the cached reporter hook, importing lazily when required.
+
+    Returns
+    -------
+    Callable[[dict[str, object]], None] | None
+        Callable bound to ``record_timeline_payload`` when available, otherwise
+        ``None`` when telemetry reporting is disabled or unavailable.
+    """
+    global _RECORD_PAYLOAD_FN  # noqa: PLW0603
+    with _RECORD_PAYLOAD_LOCK:
+        if _RECORD_PAYLOAD_FN is not None:
+            return _RECORD_PAYLOAD_FN
+        try:
+            module = import_module("codeintel_rev.telemetry.reporter")
+        except ImportError:
+            _RECORD_PAYLOAD_FN = None
+            return None
+        hook = getattr(module, "record_timeline_payload", None)
+        if callable(hook):
+            typed_hook = cast("Callable[[dict[str, object]], None]", hook)
+            _RECORD_PAYLOAD_FN = typed_hook
+            return typed_hook
+        _RECORD_PAYLOAD_FN = None
+        return None
+
+
 def _scrub_value(value: object) -> object:
     if value is None or isinstance(value, (int, float, bool)):
         result: object = value
@@ -235,22 +265,22 @@ class Timeline:
         if attrs:
             record["attrs"] = _scrub_attrs(attrs)
         _FlightRecorder.write(record)
-        try:
-            from codeintel_rev.telemetry.reporter import (
-                record_timeline_payload as _record_timeline_payload,
-            )
-        except Exception:  # pragma: no cover - telemetry optional during tests
-            _record_timeline_payload = None
-        if _record_timeline_payload is not None:
-            _record_timeline_payload(record)
-        record_span_event(
-            f"timeline.{event_type}",
-            event_name=name,
-            status=status or "ok",
-            session_id=self.session_id,
-            run_id=self.run_id,
-            **(dict(attrs) if attrs else {}),
+        payload_fn = _get_record_payload_fn()
+        if payload_fn is not None:
+            try:
+                payload_fn(record)
+            except (RuntimeError, ValueError, TypeError):  # pragma: no cover - defensive
+                LOGGER.debug("Failed to publish timeline payload", exc_info=True)
+        event_attrs = dict(attrs or {})
+        event_attrs.update(
+            {
+                "event_name": name,
+                "status": status or "ok",
+                "session_id": self.session_id,
+                "run_id": self.run_id,
+            }
         )
+        record_span_event(f"timeline.{event_type}", **event_attrs)
 
     def operation(self, name: str, **attrs: object) -> _TimelineScope:
         """Return a context manager that surrounds a root operation.

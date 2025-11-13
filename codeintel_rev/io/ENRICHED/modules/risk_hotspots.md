@@ -25,8 +25,8 @@ Hotspot scoring utilities.
 - variable: `GitRepoType` (line 25)
 - function: `compute_hotspot_score` (line 28)
 - function: `_git_churn` (line 60)
-- function: `_open_repo` (line 82)
-- function: `_repo_root` (line 101)
+- function: `_open_repo` (line 95)
+- function: `_repo_root` (line 114)
 
 ## Graph Metrics
 
@@ -39,8 +39,8 @@ Hotspot scoring utilities.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 5
+- recent churn 90: 5
 
 ## Usage
 
@@ -78,12 +78,12 @@ Hotspot scoring utilities.
 
 - branches: 13
 - cyclomatic: 14
-- loc: 110
+- loc: 123
 
 ## Doc Coverage
 
 - `compute_hotspot_score` (function): summary=yes, params=ok, examples=no — Compute a heuristic hotspot score for a module record.
-- `_git_churn` (function): summary=yes, params=mismatch, examples=no — Return the number of commits touching ``path``.
+- `_git_churn` (function): summary=yes, params=ok, examples=no — Return the number of commits touching ``path``.
 - `_open_repo` (function): summary=yes, params=ok, examples=no — Open project Git repository for analytics.
 - `_repo_root` (function): summary=yes, params=ok, examples=no — Return repository root path.
 

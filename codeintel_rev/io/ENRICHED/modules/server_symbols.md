@@ -24,7 +24,7 @@ Symbol MCP tool registrations (pure move from server.py).
 
 - **fan_in**: 0
 - **fan_out**: 4
-- **cycle_group**: 112
+- **cycle_group**: 123
 
 ## Ownership
 

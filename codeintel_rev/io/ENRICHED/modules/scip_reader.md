@@ -28,7 +28,7 @@ Lightweight helpers for loading and querying SCIP JSON indices.
 
 - **fan_in**: 4
 - **fan_out**: 1
-- **cycle_group**: 12
+- **cycle_group**: 9
 
 ## Ownership
 

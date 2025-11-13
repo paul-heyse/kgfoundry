@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, cast
 import msgspec
 
 from codeintel_rev._lazy_imports import LazyModule
-from codeintel_rev.observability.otel import as_span
+from codeintel_rev.observability.otel import as_span, record_span_event
 from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.telemetry.decorators import span_context
 from codeintel_rev.typing import NDArrayF32, gate_import
@@ -311,22 +311,31 @@ class VLLMClient:
             )
         start = perf_counter()
         try:
-            with span_context(
-                "search.embed",
-                stage="search.embed",
-                attrs=attrs,
-                emit_checkpoint=True,
-            ), as_span(
-                "vllm.embed_batch",
-                mode=mode,
-                n_texts=batch_size,
-                dim=self.config.embedding_dim,
+            with (
+                span_context(
+                    "search.embed",
+                    stage="search.embed",
+                    attrs=attrs,
+                    emit_checkpoint=True,
+                ),
+                as_span(
+                    "vllm.embed_batch",
+                    mode=mode,
+                    n_texts=batch_size,
+                    dim=self.config.embedding_dim,
+                ),
             ):
                 if self._local_engine is not None:
                     vectors = self._local_engine.embed_batch(texts)
                 else:
                     vectors = self._embed_batch_http(texts)
         except Exception as exc:
+            record_span_event(
+                "vllm.embed.error",
+                mode=mode,
+                batch_size=batch_size,
+                error=str(exc),
+            )
             if timeline is not None:
                 timeline.event(
                     "vllm.embed.end",
@@ -346,8 +355,8 @@ class VLLMClient:
                 "mode": self._mode,
             },
         )
+        elapsed_ms = int(1000 * (perf_counter() - start))
         if timeline is not None:
-            elapsed_ms = int(1000 * (perf_counter() - start))
             timeline.event(
                 "vllm.embed.end",
                 "vllm",
@@ -358,6 +367,12 @@ class VLLMClient:
                     "n_texts": batch_size,
                 },
             )
+        record_span_event(
+            "vllm.embed.complete",
+            mode=mode,
+            batch_size=batch_size,
+            duration_ms=elapsed_ms,
+        )
         return vectors
 
     def _embed_batch_http(self, texts: Sequence[str]) -> NDArrayF32:

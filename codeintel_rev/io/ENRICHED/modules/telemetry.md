@@ -9,28 +9,33 @@ Telemetry helpers for MCP tools.
 ## Imports
 
 - from **__future__** import annotations
+- from **(absolute)** import time
 - from **collections.abc** import Iterator
 - from **contextlib** import contextmanager
 - from **codeintel_rev.app.middleware** import get_capability_stamp, get_session_id
+- from **codeintel_rev.observability.otel** import as_span, record_span_event
 - from **codeintel_rev.observability.timeline** import Timeline, current_or_new_timeline
+- from **codeintel_rev.telemetry.context** import telemetry_context
+- from **codeintel_rev.telemetry.prom** import observe_request_latency
+- from **codeintel_rev.telemetry.reporter** import finalize_run, start_run
 
 ## Definitions
 
-- function: `tool_operation_scope` (line 15)
+- function: `tool_operation_scope` (line 20)
 
 ## Graph Metrics
 
 - **fan_in**: 3
-- **fan_out**: 2
-- **cycle_group**: 67
+- **fan_out**: 6
+- **cycle_group**: 74
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 
@@ -62,7 +67,7 @@ tool_operation_scope
 
 ## Hotspot
 
-- score: 1.80
+- score: 2.13
 
 ## Side Effects
 
@@ -70,9 +75,9 @@ tool_operation_scope
 
 ## Complexity
 
-- branches: 4
-- cyclomatic: 5
-- loc: 62
+- branches: 7
+- cyclomatic: 8
+- loc: 123
 
 ## Doc Coverage
 

@@ -22,13 +22,13 @@ Utilities for generating opt-in LLM slice packs.
 - class: `SliceRecord` (line 19)
 - function: `_slice_id` (line 39)
 - function: `build_slice_record` (line 47)
-- function: `write_slice` (line 100)
+- function: `write_slice` (line 117)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 20
+- **cycle_group**: 13
 
 ## Ownership
 
@@ -84,13 +84,13 @@ SliceRecord, build_slice_record, write_slice
 
 - branches: 18
 - cyclomatic: 19
-- loc: 127
+- loc: 144
 
 ## Doc Coverage
 
 - `SliceRecord` (class): summary=yes, examples=no — Serializable context packet describing a module and its surroundings.
 - `_slice_id` (function): summary=no, examples=no
-- `build_slice_record` (function): summary=yes, params=mismatch, examples=no — Build a :class:`SliceRecord` from a module row dictionary.
+- `build_slice_record` (function): summary=yes, params=ok, examples=no — Build a :class:`SliceRecord` from a module row dictionary.
 - `write_slice` (function): summary=yes, params=mismatch, examples=no — Persist a slice pack (JSON + Markdown) under ``out_root/slices``.
 
 ## Tags

@@ -21,15 +21,15 @@ Coverage ingestion utilities (Cobertura-style XML).
 
 - **fan_in**: 1
 - **fan_out**: 0
-- **cycle_group**: 16
+- **cycle_group**: 21
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 8
+- recent churn 90: 8
 
 ## Usage
 

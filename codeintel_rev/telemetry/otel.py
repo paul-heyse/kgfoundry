@@ -44,10 +44,26 @@ LOGGER = get_logger(__name__)
 def _env_flag(name: str, *, default: bool = True) -> bool:
     """Return environment flag value.
 
+    This function reads an environment variable and returns True if it's set to
+    a recognized truthy value ("1", "true", "yes", "on"), or returns the default
+    value if the variable is unset or set to a falsy value.
+
+    Parameters
+    ----------
+    name : str
+        Environment variable name to check. The variable is read using os.getenv()
+        and compared against truthy values (case-insensitive, whitespace-trimmed).
+    default : bool, optional
+        Default value to return when the environment variable is unset or not
+        recognized as truthy (default: True). Used to provide fallback behavior
+        when the flag is not explicitly configured.
+
     Returns
     -------
     bool
-        Parsed boolean flag.
+        True if the environment variable is set to a truthy value, otherwise
+        returns the default value. Truthy values are "1", "true", "yes", "on"
+        (case-insensitive, whitespace-trimmed).
     """
     raw = os.getenv(name)
     if raw is None:
@@ -79,10 +95,31 @@ def build_resource(
 ) -> Resource:
     """Build an OpenTelemetry Resource describing this process.
 
+    This function creates an OpenTelemetry Resource object that describes the
+    service process for distributed tracing. The resource includes service name,
+    version, and environment attributes that are attached to all exported spans.
+
+    Parameters
+    ----------
+    service_name : str
+        Name of the service for resource identification. Used as the primary
+        identifier in traces and metrics. Should match the application name
+        (e.g., "codeintel_rev").
+    service_version : str | None, optional
+        Version string for the service (default: None). When provided, included
+        as a resource attribute. Useful for tracking deployments and version
+        changes in traces.
+    environment : str | None, optional
+        Environment identifier (e.g., "production", "staging", "development")
+        (default: None). When provided, included as a resource attribute for
+        filtering and grouping traces by environment.
+
     Returns
     -------
     Resource
-        OpenTelemetry resource describing the service.
+        OpenTelemetry Resource object describing the service with name, version,
+        and environment attributes. The resource is attached to all spans exported
+        by this process.
 
     Raises
     ------
@@ -123,10 +160,27 @@ class OtelInstallResult:
 def _build_span_exporter(endpoint: str | None, *, insecure: bool) -> object | None:
     """Return an OTLP span exporter when configured.
 
+    This function creates an OTLP (OpenTelemetry Protocol) HTTP span exporter
+    for exporting traces to an OTLP collector. The exporter is configured with
+    the provided endpoint and security settings.
+
+    Parameters
+    ----------
+    endpoint : str | None
+        OTLP HTTP endpoint URL for span export (e.g., "https://collector:4318/v1/traces").
+        When None, returns None without creating an exporter. Used to configure
+        the destination for exported spans.
+    insecure : bool
+        Flag indicating whether to use insecure (HTTP) connections. When True,
+        disables TLS verification for the OTLP endpoint. When False, uses secure
+        HTTPS connections with certificate validation.
+
     Returns
     -------
     object | None
-        Span exporter instance or ``None`` when OTLP exporters are unavailable.
+        OTLPSpanExporter instance when endpoint is provided and OTLP exporters
+        are available, otherwise None. Returns None when endpoint is None or
+        when OTLP exporter modules are not installed.
     """
     if endpoint is None or OTLPSpanExporter is None:
         return None
@@ -136,10 +190,27 @@ def _build_span_exporter(endpoint: str | None, *, insecure: bool) -> object | No
 def _build_metric_exporter(endpoint: str | None, *, insecure: bool) -> object | None:
     """Return an OTLP metric exporter when configured.
 
+    This function creates an OTLP (OpenTelemetry Protocol) HTTP metric exporter
+    for exporting metrics to an OTLP collector. The exporter is configured with
+    the provided endpoint and security settings.
+
+    Parameters
+    ----------
+    endpoint : str | None
+        OTLP HTTP endpoint URL for metric export (e.g., "https://collector:4318/v1/metrics").
+        When None, returns None without creating an exporter. Used to configure
+        the destination for exported metrics.
+    insecure : bool
+        Flag indicating whether to use insecure (HTTP) connections. When True,
+        disables TLS verification for the OTLP endpoint. When False, uses secure
+        HTTPS connections with certificate validation.
+
     Returns
     -------
     object | None
-        Metric exporter instance or ``None`` when OTLP exporters are unavailable.
+        OTLPMetricExporter instance when endpoint is provided and OTLP exporters
+        are available, otherwise None. Returns None when endpoint is None or
+        when OTLP exporter modules are not installed.
     """
     if endpoint is None or OTLPMetricExporter is None:
         return None
@@ -154,10 +225,32 @@ def install_otel(
 ) -> OtelInstallResult:
     """Install tracer/meter providers with console fallbacks.
 
+    This function initializes OpenTelemetry tracing and metrics providers with
+    OTLP exporters (when configured) or console exporters as fallbacks. The function
+    sets up resource attributes, configures span processors, and enables telemetry
+    for the application lifecycle.
+
+    Parameters
+    ----------
+    service_name : str | None, optional
+        Service name for resource identification (default: None). When None, uses
+        a default service name. Used as the primary identifier in traces and
+        metrics. Should match the application name.
+    service_version : str | None, optional
+        Service version string for resource attributes (default: None). When
+        provided, included in the OpenTelemetry resource. Useful for tracking
+        deployments and version changes in traces.
+    environment : str | None, optional
+        Environment identifier (e.g., "production", "staging", "development")
+        (default: None). When provided, included in the OpenTelemetry resource
+        for filtering and grouping traces by environment.
+
     Returns
     -------
     OtelInstallResult
-        Outcome describing which providers were initialised.
+        Outcome object describing which providers were successfully initialized.
+        Contains traces and metrics boolean flags indicating whether each provider
+        type was installed. Both flags are True when telemetry is fully enabled.
     """
     global _TRACE_INSTALLED, _METRICS_INSTALLED  # noqa: PLW0603
 

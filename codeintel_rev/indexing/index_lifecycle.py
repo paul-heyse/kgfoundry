@@ -130,35 +130,77 @@ def _read_json(path: Path) -> dict[str, object]:
 
 
 def collect_asset_attrs(assets: IndexAssets) -> dict[str, object]:
-    """Return manifest attributes derived from staged asset sidecars."""
+    """Return manifest attributes derived from staged asset sidecars.
+
+    This function aggregates metadata from staged index assets (FAISS index, ID map,
+    tuning profile) and builds a dictionary of attributes suitable for inclusion in
+    the version manifest. The function extracts factory strings, parameter spaces,
+    and tuning information from asset sidecar files.
+
+    Parameters
+    ----------
+    assets : IndexAssets
+        Staged index assets containing paths to FAISS index, ID map, and tuning
+        profile files. The function reads metadata from .meta.json files and
+        extracts attributes from ID map and tuning profile sidecars.
+
+    Returns
+    -------
+    dict[str, object]
+        Aggregated FAISS metadata dictionary containing factory string, parameter
+        space, tuning parameters, and other index configuration attributes. The
+        dictionary is suitable for serialization in version.json manifests.
+    """
     attrs: dict[str, object] = {}
-    meta_path = assets.faiss_index.with_suffix(".meta.json")
-    meta_payload = _read_json(meta_path)
-    if meta_payload:
-        factory = meta_payload.get("factory")
-        if factory:
-            attrs["faiss_factory"] = factory
-        parameter_space = meta_payload.get("parameter_space")
-        if parameter_space:
-            attrs["faiss_parameters"] = parameter_space
-        vector_count = meta_payload.get("vector_count")
-        if vector_count is not None:
-            attrs["faiss_vector_count"] = int(vector_count)
-        default_parameters = meta_payload.get("default_parameters")
-        if default_parameters:
-            attrs["faiss_default_parameters"] = default_parameters
-    if assets.faiss_idmap is not None and assets.faiss_idmap.exists():
-        attrs["faiss_idmap_checksum"] = _file_checksum(assets.faiss_idmap)
-    if assets.tuning_profile is not None and assets.tuning_profile.exists():
-        profile_payload = _read_json(assets.tuning_profile)
-        if profile_payload:
-            attrs["faiss_tuning_profile"] = profile_payload
-            if "param_str" in profile_payload:
-                attrs["faiss_parameters"] = profile_payload["param_str"]
-            if "refine_k_factor" in profile_payload:
-                attrs["faiss_refine_k_factor"] = profile_payload["refine_k_factor"]
-            if "factory" in profile_payload and "faiss_factory" not in attrs:
-                attrs["faiss_factory"] = profile_payload["factory"]
+    attrs.update(_attrs_from_meta(assets.faiss_index.with_suffix(".meta.json")))
+    attrs.update(_attrs_from_idmap(assets.faiss_idmap))
+    attrs.update(_attrs_from_tuning(assets.tuning_profile, attrs))
+    return attrs
+
+
+def _attrs_from_meta(meta_path: Path) -> dict[str, object]:
+    payload = _read_json(meta_path)
+    if not payload:
+        return {}
+    attrs: dict[str, object] = {}
+    factory = payload.get("factory")
+    if factory:
+        attrs["faiss_factory"] = factory
+    parameter_space = payload.get("parameter_space")
+    if parameter_space:
+        attrs["faiss_parameters"] = parameter_space
+    vector_count = payload.get("vector_count")
+    if vector_count is not None:
+        attrs["faiss_vector_count"] = int(vector_count)
+    default_parameters = payload.get("default_parameters")
+    if default_parameters:
+        attrs["faiss_default_parameters"] = default_parameters
+    return attrs
+
+
+def _attrs_from_idmap(idmap_path: Path | None) -> dict[str, object]:
+    if idmap_path is None or not idmap_path.exists():
+        return {}
+    return {"faiss_idmap_checksum": _file_checksum(idmap_path)}
+
+
+def _attrs_from_tuning(
+    tuning_path: Path | None,
+    existing: Mapping[str, object],
+) -> dict[str, object]:
+    if tuning_path is None or not tuning_path.exists():
+        return {}
+    payload = _read_json(tuning_path)
+    if not payload:
+        return {}
+    attrs: dict[str, object] = {"faiss_tuning_profile": payload}
+    if "param_str" in payload:
+        attrs["faiss_parameters"] = payload["param_str"]
+    if "refine_k_factor" in payload:
+        attrs["faiss_refine_k_factor"] = payload["refine_k_factor"]
+    factory = payload.get("factory")
+    if factory and "faiss_factory" not in existing:
+        attrs["faiss_factory"] = factory
     return attrs
 
 
@@ -312,6 +354,7 @@ class IndexLifecycleManager:
         ------
         RuntimeLifecycleError
             If no suitable version directory exists.
+
         """
         target_dir: Path | None
         if version is None:
@@ -320,9 +363,8 @@ class IndexLifecycleManager:
             candidate = self.versions_dir / version
             target_dir = candidate if candidate.exists() else None
         if target_dir is None:
-            raise RuntimeLifecycleError(
-                "No version directory available for embedding metadata", runtime=_RUNTIME
-            )
+            msg = "No version directory available for embedding metadata"
+            raise RuntimeLifecycleError(msg, runtime=_RUNTIME)
         target_dir.mkdir(parents=True, exist_ok=True)
         path = target_dir / "embedding_meta.json"
         path.write_text(json.dumps(payload, sort_keys=True, indent=2), encoding="utf-8")
@@ -406,7 +448,37 @@ class IndexLifecycleManager:
         return staging_dir
 
     def write_attrs(self, version: str, **attrs: object) -> Path:
-        """Merge additional attributes into ``version.json``."""
+        """Merge additional attributes into ``version.json``.
+
+        This method updates the version manifest file by merging additional
+        attributes into the existing attrs dictionary. The method reads the
+        current manifest, merges the provided attributes, and writes the
+        updated manifest back to disk. Used to add metadata to staged or
+        published versions.
+
+        Parameters
+        ----------
+        version : str
+            Version identifier for the manifest to update (e.g., "v1.0.0").
+            The version must exist in the versions directory and have a
+            version.json manifest file.
+        **attrs : object
+            Additional attributes to merge into the manifest's attrs dictionary.
+            Attributes are merged using dict.update(), with new values overriding
+            existing ones. All attributes must be JSON-serializable.
+
+        Returns
+        -------
+        Path
+            Path to the updated manifest file (versions_dir / version / "version.json").
+            The manifest has been updated with merged attributes and written to disk.
+
+        Raises
+        ------
+        RuntimeLifecycleError
+            Raised when the manifest file is missing for the specified version.
+            The error includes the expected manifest path for debugging.
+        """
         manifest_path = self.versions_dir / version / "version.json"
         if not manifest_path.exists():
             message = f"manifest missing: {manifest_path}"

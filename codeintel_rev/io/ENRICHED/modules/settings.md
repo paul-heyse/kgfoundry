@@ -29,57 +29,59 @@ All configuration loaded from environment variables with sensible defaults.
 - function: `_parse_int_list` (line 99)
 - function: `_optional_int` (line 145)
 - function: `_build_vllm_config` (line 182)
-- function: `_build_xtr_config` (line 210)
-- function: `_build_rerank_config` (line 226)
-- class: `CodeRankConfig` (line 237)
-- class: `WarpConfig` (line 276)
-- class: `XTRConfig` (line 303)
-- class: `RerankConfig` (line 316)
-- class: `EvalConfig` (line 325)
-- class: `CodeRankLLMConfig` (line 337)
-- class: `VLLMRunMode` (line 349)
-- class: `VLLMConfig` (line 355)
-- class: `BM25Config` (line 422)
-- class: `PRFConfig` (line 439)
-- class: `SpladeConfig` (line 451)
-- class: `PathsConfig` (line 519)
-- class: `IndexConfig` (line 592)
-- class: `ServerLimits` (line 666)
-- class: `RedisConfig` (line 712)
-- class: `Settings` (line 733)
-- function: `load_settings` (line 798)
-- function: `_build_paths_config` (line 1034)
-- function: `_load_rrf_weights` (line 1055)
-- function: `_load_hybrid_prefetch` (line 1076)
-- function: `_load_hybrid_weights_override` (line 1097)
-- function: `_build_prf_config` (line 1116)
-- function: `_load_hybrid_channel_settings` (line 1128)
-- function: `_build_index_config` (line 1137)
-- function: `_build_server_limits` (line 1177)
-- function: `_build_redis_config` (line 1187)
-- function: `_build_duckdb_config` (line 1201)
-- function: `_build_eval_config` (line 1217)
-- function: `_resolve_bm25_analyzer` (line 1229)
-- function: `_resolve_splade_analyzer` (line 1236)
-- function: `_build_bm25_config` (line 1243)
-- function: `_build_splade_config` (line 1274)
-- function: `_build_coderank_config` (line 1297)
-- function: `_build_warp_config` (line 1315)
-- function: `_build_coderank_llm_config` (line 1326)
+- function: `_build_embeddings_config` (line 210)
+- function: `_build_xtr_config` (line 247)
+- function: `_build_rerank_config` (line 263)
+- class: `CodeRankConfig` (line 274)
+- class: `WarpConfig` (line 313)
+- class: `XTRConfig` (line 340)
+- class: `RerankConfig` (line 353)
+- class: `EvalConfig` (line 362)
+- class: `CodeRankLLMConfig` (line 374)
+- class: `VLLMRunMode` (line 386)
+- class: `VLLMConfig` (line 392)
+- class: `EmbeddingsConfig` (line 459)
+- class: `BM25Config` (line 511)
+- class: `PRFConfig` (line 528)
+- class: `SpladeConfig` (line 540)
+- class: `PathsConfig` (line 608)
+- class: `IndexConfig` (line 681)
+- class: `ServerLimits` (line 755)
+- class: `RedisConfig` (line 801)
+- class: `Settings` (line 822)
+- function: `load_settings` (line 892)
+- function: `_build_paths_config` (line 1130)
+- function: `_load_rrf_weights` (line 1151)
+- function: `_load_hybrid_prefetch` (line 1172)
+- function: `_load_hybrid_weights_override` (line 1193)
+- function: `_build_prf_config` (line 1212)
+- function: `_load_hybrid_channel_settings` (line 1224)
+- function: `_build_index_config` (line 1233)
+- function: `_build_server_limits` (line 1273)
+- function: `_build_redis_config` (line 1283)
+- function: `_build_duckdb_config` (line 1297)
+- function: `_build_eval_config` (line 1313)
+- function: `_resolve_bm25_analyzer` (line 1325)
+- function: `_resolve_splade_analyzer` (line 1332)
+- function: `_build_bm25_config` (line 1339)
+- function: `_build_splade_config` (line 1370)
+- function: `_build_coderank_config` (line 1393)
+- function: `_build_warp_config` (line 1411)
+- function: `_build_coderank_llm_config` (line 1422)
 
 ## Graph Metrics
 
-- **fan_in**: 22
+- **fan_in**: 23
 - **fan_out**: 2
-- **cycle_group**: 46
+- **cycle_group**: 45
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 27
-- recent churn 90: 27
+- recent churn 30: 28
+- recent churn 90: 28
 
 ## Usage
 
@@ -88,7 +90,7 @@ All configuration loaded from environment variables with sensible defaults.
 
 ## Declared Exports (__all__)
 
-BM25Config, CodeRankConfig, CodeRankLLMConfig, IndexConfig, PRFConfig, PathsConfig, RedisConfig, RerankConfig, ServerLimits, Settings, SpladeConfig, VLLMConfig, VLLMRunMode, WarpConfig, XTRConfig, load_settings
+BM25Config, CodeRankConfig, CodeRankLLMConfig, EmbeddingsConfig, IndexConfig, PRFConfig, PathsConfig, RedisConfig, RerankConfig, ServerLimits, Settings, SpladeConfig, VLLMConfig, VLLMRunMode, WarpConfig, XTRConfig, load_settings
 
 ## Doc Health
 
@@ -111,7 +113,7 @@ BM25Config, CodeRankConfig, CodeRankLLMConfig, IndexConfig, PRFConfig, PathsConf
 
 ## Hotspot
 
-- score: 2.99
+- score: 3.02
 
 ## Side Effects
 
@@ -119,9 +121,9 @@ BM25Config, CodeRankConfig, CodeRankLLMConfig, IndexConfig, PRFConfig, PathsConf
 
 ## Complexity
 
-- branches: 45
-- cyclomatic: 46
-- loc: 1356
+- branches: 47
+- cyclomatic: 48
+- loc: 1453
 
 ## Doc Coverage
 
@@ -131,10 +133,10 @@ BM25Config, CodeRankConfig, CodeRankLLMConfig, IndexConfig, PRFConfig, PathsConf
 - `_parse_int_list` (function): summary=yes, params=ok, examples=no — Return a tuple of integers from a comma-separated configuration string.
 - `_optional_int` (function): summary=yes, params=ok, examples=no — Convert an optional string to ``int`` when possible.
 - `_build_vllm_config` (function): summary=no, examples=no
+- `_build_embeddings_config` (function): summary=no, examples=no
 - `_build_xtr_config` (function): summary=no, examples=no
 - `_build_rerank_config` (function): summary=no, examples=no
 - `CodeRankConfig` (class): summary=yes, examples=no — Configuration for the CodeRank dense retriever.
-- `WarpConfig` (class): summary=yes, examples=no — Configuration for the WARP/XTR late-interaction reranker.
 
 ## Tags
 

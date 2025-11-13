@@ -4,10 +4,12 @@ Provides SQL views over Parquet directories and query helpers for fast
 chunk retrieval and joins.
 """
 
+# ruff: noqa: SLF001
+
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,6 +28,7 @@ from codeintel_rev.mcp_server.scope_utils import (
     LANGUAGE_EXTENSIONS,
     path_matches_glob,
 )
+from codeintel_rev.observability.otel import record_span_event
 from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.telemetry.decorators import span_context
 from codeintel_rev.typing import NDArrayF32
@@ -45,10 +48,23 @@ LOGGER = get_logger(__name__)
 def _log_extra(**kwargs: object) -> dict[str, object]:
     """Return structured log extras for catalog events.
 
+    This function creates a structured logging payload by combining a component
+    identifier ("duckdb_catalog") with additional keyword arguments. The function
+    is used to create consistent log context for DuckDB catalog operations.
+
+    Parameters
+    ----------
+    **kwargs : object
+        Additional keyword arguments to include in the logging payload. All arguments
+        are merged into the returned dictionary with the component identifier.
+        Values must be JSON-serializable for structured logging.
+
     Returns
     -------
     dict[str, object]
-        Structured logging payload.
+        Structured logging payload dictionary containing "component": "duckdb_catalog"
+        and all provided keyword arguments. The dictionary is suitable for use with
+        Python's logging module's extra parameter.
     """
     return {"component": "duckdb_catalog", **kwargs}
 
@@ -78,6 +94,23 @@ SELECT
             CAST(NULL AS FLOAT[]) AS embedding
 WHERE 1 = 0
 """
+
+_CST_KIND_QUERIES: dict[str, str] = {
+    "uri": """
+        SELECT DISTINCT kind
+        FROM cst_nodes
+        WHERE uri = ?
+          AND COALESCE(end_line, start_line) >= ?
+          AND COALESCE(start_line, end_line) <= ?
+        """,
+    "path": """
+        SELECT DISTINCT kind
+        FROM cst_nodes
+        WHERE path = ?
+          AND COALESCE(end_line, start_line) >= ?
+          AND COALESCE(start_line, end_line) <= ?
+        """,
+}
 
 
 @dataclass(frozen=True)
@@ -117,26 +150,291 @@ class DuckDBCatalogOptions:
     repo_root: Path | None = None
 
 
-class DuckDBCatalog:
+class _DuckDBQueryMixin:
+    """Chunk-level query helpers shared by :class:`DuckDBCatalog`."""
+
+    def query_by_ids(self, ids: Sequence[int]) -> list[dict]:
+        """Query chunks by their unique IDs.
+
+        This method retrieves chunk records from the DuckDB catalog for the
+        specified chunk identifiers. It performs a SQL query to fetch chunk
+        metadata (URI, start/end lines, symbols, etc.) and returns the results
+        as a list of dictionaries. The method handles empty input gracefully
+        and records telemetry for observability.
+
+        Parameters
+        ----------
+        ids : Sequence[int]
+            Sequence of chunk identifiers to query. Empty sequences return an
+            empty list. Duplicate IDs may result in duplicate records depending
+            on database constraints.
+
+        Returns
+        -------
+        list[dict]
+            List of chunk record dictionaries, each containing chunk metadata
+            fields (e.g., id, uri, start_line, end_line, symbols). The list
+            may be shorter than the input if some IDs don't exist in the catalog.
+            Empty list when no IDs are provided or no matching chunks are found.
+            Records are ordered to match the input ID sequence when possible.
+        """
+        if not ids:
+            return []
+
+        catalog = cast("DuckDBCatalog", self)
+        timeline = current_timeline()
+        span_attrs = {"op": "query_by_ids", "asked_for": len(ids)}
+        start_time = None
+        if timeline is not None:
+            start_time = perf_counter()
+            timeline.event(
+                "duckdb.hydrate.start",
+                "catalog",
+                attrs=span_attrs,
+            )
+
+        sql = """
+            SELECT c.*
+            FROM chunks AS c
+            JOIN UNNEST(?) WITH ORDINALITY AS ids(id, position)
+                ON c.id = ids.id
+            ORDER BY ids.position
+            """
+        params = [list(ids)]
+        with span_context(
+            "catalog.hydrate",
+            stage="catalog.hydrate",
+            attrs=span_attrs,
+            emit_checkpoint=True,
+        ):
+            with catalog.connection() as conn:
+                catalog._log_query(sql, params)
+                relation = conn.execute(sql, params)
+                rows = relation.fetchall()
+                cols = [desc[0] for desc in relation.description]
+            payload = [dict(zip(cols, row, strict=True)) for row in rows]
+        if timeline is not None:
+            duration_ms = (
+                int((perf_counter() - start_time) * 1000) if start_time is not None else None
+            )
+            timeline.event(
+                "duckdb.hydrate.end",
+                "catalog",
+                attrs={
+                    "returned": len(payload),
+                    "missing": max(0, len(ids) - len(payload)),
+                    "duration_ms": duration_ms,
+                },
+            )
+        return payload
+
+    def get_structure_annotations(self, ids: Sequence[int]) -> dict[int, StructureAnnotations]:
+        """Return structural overlays (symbols/AST/CST) for chunk ``ids``.
+
+        Parameters
+        ----------
+        ids : Sequence[int]
+            Chunk identifiers to hydrate with structural metadata.
+
+        Returns
+        -------
+        dict[int, StructureAnnotations]
+            Mapping of chunk ID to :class:`StructureAnnotations` describing URI,
+            symbol hits, AST node kinds, and CST matches.
+        """
+        cleaned = [int(chunk_id) for chunk_id in ids if chunk_id is not None]
+        if not cleaned:
+            return {}
+        unique_ids = list(dict.fromkeys(cleaned))
+        catalog = cast("DuckDBCatalog", self)
+        with catalog.connection() as conn:
+            base_rows = self._fetch_annotation_rows(conn, unique_ids)
+            annotations, boundaries = self._initialize_annotation_maps(base_rows)
+            if not annotations:
+                return {}
+            if catalog._relation_exists(conn, "chunk_symbols"):
+                self._attach_chunk_symbols(conn, unique_ids, annotations)
+            if catalog._relation_exists(conn, "ast_nodes"):
+                self._attach_ast_nodes(conn, boundaries, annotations)
+            if catalog._relation_exists(conn, "cst_nodes"):
+                path_column = self._resolve_cst_path_column(conn)
+                self._attach_cst_nodes(conn, path_column, boundaries, annotations)
+        return self._coerce_annotation_payload(unique_ids, annotations)
+
+    @staticmethod
+    def _fetch_annotation_rows(
+        conn: duckdb.DuckDBPyConnection,
+        unique_ids: Sequence[int],
+    ) -> list[tuple[int, str, int | None, int | None, Sequence[str] | None]]:
+        return conn.execute(
+            """
+            SELECT
+                id,
+                uri,
+                start_line,
+                end_line,
+                COALESCE(symbols, []::VARCHAR[]) AS symbols
+            FROM chunks
+            WHERE id IN (SELECT * FROM UNNEST(?))
+            """,
+            [list(unique_ids)],
+        ).fetchall()
+
+    @staticmethod
+    def _initialize_annotation_maps(
+        rows: Sequence[tuple[int, str, int | None, int | None, Sequence[str] | None]],
+    ) -> tuple[dict[int, dict[str, object]], dict[int, tuple[int, int]]]:
+        annotations: dict[int, dict[str, object]] = {}
+        boundaries: dict[int, tuple[int, int]] = {}
+        for chunk_id, uri, start_line, end_line, symbols in rows:
+            annotations[int(chunk_id)] = {
+                "uri": uri,
+                "symbol_hits": tuple(symbols or ()),
+                "ast_node_kinds": (),
+                "cst_matches": (),
+            }
+            boundaries[int(chunk_id)] = (int(start_line or 0), int(end_line or 0))
+        return annotations, boundaries
+
+    @staticmethod
+    def _attach_chunk_symbols(
+        conn: duckdb.DuckDBPyConnection,
+        unique_ids: Sequence[int],
+        annotations: dict[int, dict[str, object]],
+    ) -> None:
+        rows = conn.execute(
+            """
+            SELECT chunk_id, array_agg(DISTINCT symbol ORDER BY symbol) AS symbols
+            FROM chunk_symbols
+            WHERE chunk_id IN (SELECT * FROM UNNEST(?))
+            GROUP BY chunk_id
+            """,
+            [list(unique_ids)],
+        ).fetchall()
+        for chunk_id, symbols in rows:
+            payload = annotations.get(int(chunk_id))
+            if payload is not None:
+                payload["symbol_hits"] = tuple(symbols or ())
+
+    @staticmethod
+    def _attach_ast_nodes(
+        conn: duckdb.DuckDBPyConnection,
+        boundaries: Mapping[int, tuple[int, int]],
+        annotations: dict[int, dict[str, object]],
+    ) -> None:
+        for chunk_id, (start_line, end_line) in boundaries.items():
+            payload = annotations.get(chunk_id)
+            if payload is None:
+                continue
+            rows = conn.execute(
+                """
+                SELECT DISTINCT node_type
+                FROM ast_nodes
+                WHERE path = ?
+                  AND COALESCE(end_lineno, lineno) >= ?
+                  AND COALESCE(lineno, end_lineno) <= ?
+                """,
+                [payload["uri"], start_line, end_line],
+            ).fetchall()
+            if rows:
+                payload["ast_node_kinds"] = tuple(dict.fromkeys(row[0] for row in rows if row[0]))
+
+    @staticmethod
+    def _resolve_cst_path_column(conn: duckdb.DuckDBPyConnection) -> str:
+        for column, probe_sql in (
+            ("uri", "SELECT uri FROM cst_nodes LIMIT 0"),
+            ("path", "SELECT path FROM cst_nodes LIMIT 0"),
+        ):
+            try:
+                conn.execute(probe_sql)
+            except duckdb.Error:
+                continue
+            else:
+                return column
+        return "uri"
+
+    @staticmethod
+    def _attach_cst_nodes(
+        conn: duckdb.DuckDBPyConnection,
+        path_column: str,
+        boundaries: Mapping[int, tuple[int, int]],
+        annotations: dict[int, dict[str, object]],
+    ) -> None:
+        sql = _CST_KIND_QUERIES.get(path_column)
+        if sql is None:
+            return
+        try:
+            for chunk_id, (start_line, end_line) in boundaries.items():
+                payload = annotations.get(chunk_id)
+                if payload is None:
+                    continue
+                rows = conn.execute(sql, [payload["uri"], start_line, end_line]).fetchall()
+                if rows:
+                    payload["cst_matches"] = tuple(
+                        dict.fromkeys(row[0] for row in rows if row[0]),
+                    )
+        except duckdb.Error as exc:  # pragma: no cover - schema may evolve
+            LOGGER.debug(
+                "Skipping CST annotations",
+                extra=_log_extra(error=str(exc)),
+            )
+
+    @staticmethod
+    def _coerce_annotation_payload(
+        ordered_ids: Sequence[int],
+        annotations: Mapping[int, dict[str, object]],
+    ) -> dict[int, StructureAnnotations]:
+        result: dict[int, StructureAnnotations] = {}
+        for chunk_id in ordered_ids:
+            payload = annotations.get(chunk_id)
+            if payload is None:
+                continue
+            symbol_hits = tuple(cast("Sequence[str]", payload["symbol_hits"]))
+            ast_node_kinds = tuple(cast("Sequence[str]", payload["ast_node_kinds"]))
+            cst_matches = tuple(cast("Sequence[str]", payload["cst_matches"]))
+            result[chunk_id] = StructureAnnotations(
+                uri=str(payload["uri"]),
+                symbol_hits=symbol_hits,
+                ast_node_kinds=ast_node_kinds,
+                cst_matches=cst_matches,
+            )
+        return result
+
+
+class DuckDBCatalog(_DuckDBQueryMixin):
     """DuckDB catalog for querying chunks.
+
+    This class provides a high-level interface for querying chunk metadata and
+    embeddings stored in DuckDB. The catalog can operate in two modes: view-based
+    (zero-copy queries from Parquet files) or materialized (persisted tables with
+    indexes). The catalog manages DuckDB connections, builds query views, and
+    provides methods for fetching embeddings and metadata by IDs.
 
     Parameters
     ----------
     db_path : Path
-        DuckDB database path.
+        Path to the DuckDB database file. The database is created if it doesn't
+        exist. Used for storing catalog metadata and materialized tables when
+        materialize is True.
     vectors_dir : Path
-        Directory containing Parquet files.
-    materialize : bool, optional
-        When ``True``, chunk metadata is materialized into a persisted DuckDB
-        table (``chunks_materialized``) with a secondary index on ``uri``. When
-        ``False`` (default), the catalog exposes Parquet files through a view for
-        zero-copy queries.
-    manager : DuckDBManager | None, optional
-        DuckDB connection manager instance. If ``None``, creates a new manager
-        with default configuration. Defaults to ``None``.
-    log_queries : bool | None, optional
-        Enable debug logging of executed SQL statements when ``True``. Defaults to
-        ``None`` which inherits the global logging configuration.
+        Directory containing Parquet files with chunk embeddings and metadata.
+        The catalog reads from this directory to build views or materialize tables.
+        The directory structure is expected to match the standard layout.
+    options : DuckDBCatalogOptions | None, optional
+        Configuration options dataclass containing materialize, manager, log_queries,
+        and repo_root settings. When None, uses default options. Cannot be mixed
+        with legacy_kwargs. Defaults to None.
+    **legacy_kwargs : object
+        Legacy keyword arguments for backward compatibility. Supported keys:
+        materialize (bool), manager (DuckDBManager), log_queries (bool), repo_root (Path).
+        Cannot be used when options is provided. Raises TypeError for unknown keys.
+
+    Raises
+    ------
+    ValueError
+        Raised when both options and legacy_kwargs are provided (mixing is not allowed).
+    TypeError
+        Raised when legacy_kwargs contains unsupported keyword arguments.
     """
 
     def __init__(
@@ -597,10 +895,22 @@ class DuckDBCatalog:
     def _file_checksum(path: Path) -> str:
         """Return SHA-256 checksum for ``path``.
 
+        This static method computes a SHA-256 hash digest for a file by reading
+        it in chunks (1MB at a time) and updating the hash digest. The method
+        provides a deterministic checksum suitable for detecting file changes.
+
+        Parameters
+        ----------
+        path : Path
+            File path to compute checksum for. The file is opened in binary mode
+            and read in 1MB chunks. The path must exist and be readable.
+
         Returns
         -------
         str
-            Hex digest representing the file contents.
+            Hexadecimal digest string representing the SHA-256 hash of the file
+            contents. The digest is deterministic for the same file content and
+            can be used for change detection or integrity verification.
         """
         digest = hashlib.sha256()
         with path.open("rb") as handle:
@@ -705,190 +1015,6 @@ class DuckDBCatalog:
                 continue
             samples.append((int(chunk_id), vectors[idx]))
         return samples
-
-    def query_by_ids(self, ids: Sequence[int]) -> list[dict]:
-        """Query chunks by their unique IDs.
-
-        Retrieves chunk metadata (text, URI, line numbers, etc.) for a list of
-        chunk IDs. This is typically used after a FAISS search returns chunk IDs
-        to hydrate the results with full chunk information.
-
-        The function constructs a SQL IN clause to efficiently fetch multiple
-        chunks in a single query. Results are returned as dictionaries with column
-        names as keys, matching the Parquet schema.
-
-        Parameters
-        ----------
-        ids : Sequence[int]
-            Sequence of chunk IDs to retrieve. IDs must exist in the chunks table.
-            Empty sequence returns empty list.
-
-        Returns
-        -------
-        list[dict]
-            List of chunk records as dictionaries. Each dict contains all columns
-            from the chunks Parquet file (id, uri, text, start_line, end_line,
-            symbols, etc.). Returns empty list if no IDs provided or no matches.
-
-        """
-        if not ids:
-            return []
-
-        timeline = current_timeline()
-        span_attrs = {"op": "query_by_ids", "asked_for": len(ids)}
-        start_time = None
-        if timeline is not None:
-            start_time = perf_counter()
-            timeline.event(
-                "duckdb.hydrate.start",
-                "catalog",
-                attrs=span_attrs,
-            )
-
-        sql = """
-            SELECT c.*
-            FROM chunks AS c
-            JOIN UNNEST(?) WITH ORDINALITY AS ids(id, position)
-                ON c.id = ids.id
-            ORDER BY ids.position
-            """
-        params = [list(ids)]
-        with span_context(
-            "catalog.hydrate",
-            stage="catalog.hydrate",
-            attrs=span_attrs,
-            emit_checkpoint=True,
-        ):
-            with self.connection() as conn:
-                self._log_query(sql, params)
-                relation = conn.execute(sql, params)
-                rows = relation.fetchall()
-                cols = [desc[0] for desc in relation.description]
-            payload = [dict(zip(cols, row, strict=True)) for row in rows]
-        if timeline is not None:
-            duration_ms = (
-                int((perf_counter() - start_time) * 1000) if start_time is not None else None
-            )
-            timeline.event(
-                "duckdb.hydrate.end",
-                "catalog",
-                attrs={
-                    "returned": len(payload),
-                    "missing": max(0, len(ids) - len(payload)),
-                    "duration_ms": duration_ms,
-                },
-            )
-        return payload
-
-    def get_structure_annotations(self, ids: Sequence[int]) -> dict[int, StructureAnnotations]:
-        """Return structural overlays (symbols/AST/CST) for ``ids``."""
-        cleaned = [int(chunk_id) for chunk_id in ids if chunk_id is not None]
-        if not cleaned:
-            return {}
-        unique_ids = list(dict.fromkeys(cleaned))
-        annotations: dict[int, dict[str, object]] = {}
-        boundaries: dict[int, tuple[int, int]] = {}
-        with self.connection() as conn:
-            base_rows = conn.execute(
-                """
-                SELECT
-                    id,
-                    uri,
-                    start_line,
-                    end_line,
-                    COALESCE(symbols, []::VARCHAR[]) AS symbols
-                FROM chunks
-                WHERE id IN (SELECT * FROM UNNEST(?))
-                """,
-                [unique_ids],
-            ).fetchall()
-            for chunk_id, uri, start_line, end_line, symbols in base_rows:
-                annotations[int(chunk_id)] = {
-                    "uri": uri,
-                    "symbol_hits": tuple(symbols or ()),
-                    "ast_node_kinds": (),
-                    "cst_matches": (),
-                }
-                boundaries[int(chunk_id)] = (int(start_line or 0), int(end_line or 0))
-
-            if self._relation_exists(conn, "chunk_symbols"):
-                rows = conn.execute(
-                    """
-                    SELECT chunk_id, array_agg(DISTINCT symbol ORDER BY symbol) AS symbols
-                    FROM chunk_symbols
-                    WHERE chunk_id IN (SELECT * FROM UNNEST(?))
-                    GROUP BY chunk_id
-                    """,
-                    [unique_ids],
-                ).fetchall()
-                for chunk_id, symbols in rows:
-                    payload = annotations.get(int(chunk_id))
-                    if payload is not None:
-                        payload["symbol_hits"] = tuple(symbols or ())
-
-            if self._relation_exists(conn, "ast_nodes"):
-                for chunk_id, (start_line, end_line) in boundaries.items():
-                    payload = annotations.get(chunk_id)
-                    if payload is None:
-                        continue
-                    rows = conn.execute(
-                        """
-                        SELECT DISTINCT node_type
-                        FROM ast_nodes
-                        WHERE path = ?
-                          AND COALESCE(end_lineno, lineno) >= ?
-                          AND COALESCE(lineno, end_lineno) <= ?
-                        """,
-                        [payload["uri"], start_line, end_line],
-                    ).fetchall()
-                    if rows:
-                        payload["ast_node_kinds"] = tuple(
-                            dict.fromkeys(row[0] for row in rows if row[0])
-                        )
-
-            if self._relation_exists(conn, "cst_nodes"):
-                path_column = "uri"
-                try:
-                    conn.execute(f"SELECT {path_column} FROM cst_nodes LIMIT 0")
-                except duckdb.Error:
-                    path_column = "path"
-                try:
-                    for chunk_id, (start_line, end_line) in boundaries.items():
-                        payload = annotations.get(chunk_id)
-                        if payload is None:
-                            continue
-                        rows = conn.execute(
-                            f"""
-                            SELECT DISTINCT kind
-                            FROM cst_nodes
-                            WHERE {path_column} = ?
-                              AND COALESCE(end_line, start_line) >= ?
-                              AND COALESCE(start_line, end_line) <= ?
-                            """,
-                            [payload["uri"], start_line, end_line],
-                        ).fetchall()
-                        if rows:
-                            payload["cst_matches"] = tuple(
-                                dict.fromkeys(row[0] for row in rows if row[0])
-                            )
-                except duckdb.Error as exc:  # pragma: no cover - schema may evolve
-                    LOGGER.debug(
-                        "Skipping CST annotations",
-                        extra=_log_extra(error=str(exc)),
-                    )
-
-        result: dict[int, StructureAnnotations] = {}
-        for chunk_id in unique_ids:
-            payload = annotations.get(chunk_id)
-            if payload is None:
-                continue
-            result[chunk_id] = StructureAnnotations(
-                uri=str(payload["uri"]),
-                symbol_hits=tuple(payload["symbol_hits"]),
-                ast_node_kinds=tuple(payload["ast_node_kinds"]),
-                cst_matches=tuple(payload["cst_matches"]),
-            )
-        return result
 
     def query_by_filters(
         self,
@@ -1359,11 +1485,31 @@ class DuckDBCatalog:
             sql = "SELECT * FROM chunks WHERE uri = ? ORDER BY id LIMIT ?"
             params.append(limit)
 
-        with self.connection() as conn:
+        timeline = current_timeline()
+        attrs = {"uri": uri, "limit": limit}
+        with span_context(
+            "duckdb.query_by_uri",
+            stage="catalog.query",
+            attrs=attrs,
+        ), self.connection() as conn:
             relation = conn.execute(sql, params)
             rows = relation.fetchall()
             cols = [desc[0] for desc in relation.description]
-        return [dict(zip(cols, row, strict=True)) for row in rows]
+        payload = [dict(zip(cols, row, strict=True)) for row in rows]
+        limited = bool(limit > 0 and len(payload) >= limit)
+        record_span_event(
+            "duckdb.query_by_uri.result",
+            uri=uri,
+            rows=len(payload),
+            limited=limited,
+        )
+        if limited and timeline is not None:
+            timeline.event(
+                "duckdb.query.limit",
+                "duckdb",
+                attrs={"uri": uri, "limit": limit, "rows": len(payload)},
+            )
+        return payload
 
     def get_embeddings_by_ids(self, ids: Sequence[int]) -> tuple[list[int], NDArrayF32]:
         """Extract embedding vectors for given chunk IDs.
@@ -1391,11 +1537,18 @@ class DuckDBCatalog:
             array has shape ``(len(resolved_ids), vec_dim)`` and dtype float32.
 
         """
-        if not ids:
+        requested_ids = [int(chunk_id) for chunk_id in ids]
+        if not requested_ids:
             dim = self._embedding_dim()
             return [], np.empty((0, dim), dtype=np.float32)
 
-        with self.connection() as conn:
+        attrs = {"requested": len(requested_ids)}
+        timeline = current_timeline()
+        with span_context(
+            "duckdb.get_embeddings_by_ids",
+            stage="catalog.hydrate",
+            attrs=attrs,
+        ), self.connection() as conn:
             relation = conn.execute(
                 """
                 SELECT c.id, c.embedding, ids.position
@@ -1404,7 +1557,7 @@ class DuckDBCatalog:
                     ON c.id = ids.id
                 ORDER BY ids.position
                 """,
-                [list(ids)],
+                [requested_ids],
             )
             rows = relation.fetchall()
         dim = self._embedding_dim()
@@ -1425,7 +1578,19 @@ class DuckDBCatalog:
         if not embeddings:
             return [], np.empty((0, dim), dtype=np.float32)
 
-        return ordered_ids, np.vstack(embeddings)
+        vectors = np.vstack(embeddings)
+        record_span_event(
+            "duckdb.get_embeddings_by_ids.result",
+            requested=len(requested_ids),
+            returned=len(ordered_ids),
+        )
+        if timeline is not None:
+            timeline.event(
+                "duckdb.embeddings",
+                "duckdb",
+                attrs={"requested": len(requested_ids), "returned": len(ordered_ids)},
+            )
+        return ordered_ids, vectors
 
     def count_chunks(self) -> int:
         """Count total number of chunks in the index.

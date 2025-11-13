@@ -85,10 +85,22 @@ class ParquetWriteOptions:
 def _hash_content(text: str) -> int:
     """Return stable 64-bit hash of chunk content.
 
+    This function computes a deterministic hash of text content using xxhash when
+    available, or falls back to a built-in hash function. The hash is used for
+    content deduplication and change detection in chunk processing pipelines.
+
+    Parameters
+    ----------
+    text : str
+        Text content to hash. The text is encoded as UTF-8 (with error handling)
+        before hashing. Used to generate a stable identifier for chunk content.
+
     Returns
     -------
     int
-        Unsigned 64-bit hash derived from the UTF-8 encoded chunk body.
+        Unsigned 64-bit hash value derived from the UTF-8 encoded text. The hash
+        is deterministic for the same input text and suitable for use as a content
+        fingerprint or deduplication key.
     """
     encoded = text.encode("utf-8", errors="ignore")
     if xxhash is not None:

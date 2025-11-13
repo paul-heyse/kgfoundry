@@ -15,8 +15,8 @@ Offline hybrid evaluator with oracle reranking and pool exports.
 - from **pathlib** import Path
 - from **typing** import TYPE_CHECKING
 - from **(absolute)** import numpy
-- from **codeintel_rev.eval.pool_writer** import PoolRow, Source, write_pool
-- from **codeintel_rev.io.duckdb_catalog** import DuckDBCatalog
+- from **codeintel_rev.eval.pool_writer** import Channel, PoolRow, write_pool
+- from **codeintel_rev.io.duckdb_catalog** import DuckDBCatalog, StructureAnnotations
 - from **codeintel_rev.io.faiss_manager** import FAISSManager
 - from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.io.xtr_manager** import XTRIndex
@@ -34,15 +34,15 @@ Offline hybrid evaluator with oracle reranking and pool exports.
 
 - **fan_in**: 2
 - **fan_out**: 5
-- **cycle_group**: 78
+- **cycle_group**: 86
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 5
+- recent churn 90: 5
 
 ## Usage
 
@@ -74,7 +74,7 @@ EvalConfig, EvalReport, HybridPoolEvaluator
 
 ## Hotspot
 
-- score: 2.32
+- score: 2.39
 
 ## Side Effects
 
@@ -82,9 +82,9 @@ EvalConfig, EvalReport, HybridPoolEvaluator
 
 ## Complexity
 
-- branches: 21
-- cyclomatic: 22
-- loc: 297
+- branches: 27
+- cyclomatic: 28
+- loc: 329
 
 ## Doc Coverage
 

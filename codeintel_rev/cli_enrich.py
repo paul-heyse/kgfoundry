@@ -258,8 +258,7 @@ def global_options(  # noqa: PLR0913,PLR0917 - Typer CLI requires enumerating al
     slices_filter: list[str] | None = SLICES_FILTER_OPTION,
 ) -> None:
     """Capture shared pipeline + analytics options for all commands."""
-    state = _ensure_state(ctx)
-    state.pipeline = PipelineOptions(
+    new_pipeline = PipelineOptions(
         root=root.resolve(),
         scip=scip.resolve() if scip else None,
         out=out.resolve(),
@@ -269,13 +268,14 @@ def global_options(  # noqa: PLR0913,PLR0917 - Typer CLI requires enumerating al
         only=tuple(only or ()),
         max_file_bytes=max_file_bytes,
     )
-    state.analytics = AnalyticsOptions(
+    new_analytics = AnalyticsOptions(
         owners=owners,
         history_window_days=history_window_days,
         commits_window=commits_window,
         emit_slices=emit_slices,
         slices_filter=tuple(slices_filter or ()),
     )
+    ctx.obj = CLIContextState(pipeline=new_pipeline, analytics=new_analytics)
 
 
 @dataclass(slots=True, frozen=True)
