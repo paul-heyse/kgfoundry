@@ -1,0 +1,122 @@
+"""Shared OpenTelemetry semantic convention helpers for CodeIntel."""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+
+__all__ = ["Attrs", "as_kv", "to_label_str"]
+
+
+@dataclass(slots=True, frozen=True)
+class Attrs:
+    """Trusted attribute keys used across spans, metrics, and logs."""
+
+    # Identity / request scaffolding
+    SESSION_ID: str = "session.id"
+    RUN_ID: str = "run.id"
+    REQUEST_ID: str = "request.id"
+    MCP_TOOL: str = "mcp.tool"
+    COMPONENT: str = "component"
+    OPERATION: str = "operation"
+    STAGE: str = "stage"
+    WARN_DEGRADED: str = "warn.degraded"
+    FALLBACK_REASON: str = "fallback.reason"
+    FALLBACK_TARGET: str = "fallback.target"
+
+    # Query metadata
+    QUERY_TEXT: str = "retrieval.query_text"
+    QUERY_LEN: str = "retrieval.query_len"
+    RETRIEVAL_TOP_K: str = "retrieval.top_k"
+    RETRIEVAL_CHANNELS: str = "retrieval.channels"
+    RETRIEVAL_EXPLAINABILITY: str = "retrieval.explainability"
+
+    # Budget + gating metadata
+    BUDGET_MS: str = "budget.ms"
+    DECISION_RRF_K: str = "decision.rrf_k"
+    DECISION_CHANNEL_DEPTHS: str = "decision.per_channel_depths"
+    DECISION_BM25_RM3_ENABLED: str = "bm25.rm3_enabled"
+
+    # Hybrid + channel contributions
+    GATHERED_DOCS: str = "retrieval.channel_hits"
+    FUSED_DOCS: str = "retrieval.fused_docs"
+    RECENCY_BOOSTED: str = "retrieval.recency_boosted"
+
+    # FAISS / ANN
+    FAISS_INDEX_TYPE: str = "faiss.index_type"
+    FAISS_METRIC: str = "faiss.metric"
+    FAISS_DIM: str = "faiss.dim"
+    FAISS_TOP_K: str = "faiss.k"
+    FAISS_NPROBE: str = "faiss.nprobe"
+    FAISS_GPU: str = "faiss.gpu"
+
+    # vLLM embeddings
+    VLLM_MODE: str = "vllm.mode"
+    VLLM_MODEL_NAME: str = "vllm.model_name"
+    VLLM_EMBED_DIM: str = "vllm.embed_dim"
+    VLLM_BATCH: str = "vllm.batch_size"
+
+    # DuckDB hydration
+    DUCKDB_CATALOG: str = "duckdb.catalog"
+    DUCKDB_ROWS: str = "duckdb.rows"
+    DUCKDB_SQL_BYTES: str = "duckdb.sql_bytes"
+
+    # Rerankers / XTR
+    XTR_VERSION: str = "xtr.version"
+    XTR_TOP_K: str = "xtr.top_k"
+    XTR_CANDIDATES: str = "xtr.candidates"
+
+    # Git utilities
+    GIT_COMMAND: str = "git.command"
+    FILE_PATH: str = "file.path"
+    LINE_START: str = "line.start"
+    LINE_END: str = "line.end"
+    LINE_LIMIT: str = "limit"
+
+    # Envelope wiring
+    ENVELOPE_TRACE_ID: str = "envelope.trace_id"
+    ENVELOPE_SPAN_ID: str = "envelope.span_id"
+    ENVELOPE_DIAG_URI: str = "envelope.diag_report_uri"
+
+
+def as_kv(**attrs: object) -> dict[str, object]:
+    """Return a dict filtered to values that are not ``None``.
+
+    Parameters
+    ----------
+    **attrs : object
+        Arbitrary keyword arguments. Values that are ``None`` are excluded
+        from the returned dictionary.
+
+    Returns
+    -------
+    dict[str, object]
+        Dictionary containing only non-None key-value pairs from the input
+        attributes.
+    """
+    return {key: value for key, value in attrs.items() if value is not None}
+
+
+def to_label_str(value: object) -> str:
+    """Return a deterministic string label for structured values.
+
+    Parameters
+    ----------
+    value : Any
+        Value to convert to a string label. Strings are returned as-is.
+        Other types are JSON-serialized (with sorted keys) or converted
+        to string representation if JSON serialization fails.
+
+    Returns
+    -------
+    str
+        String representation of the value. For strings, returns the value
+        unchanged. For other types, returns JSON-serialized form (with sorted
+        keys) or string representation if JSON serialization fails.
+    """
+    if isinstance(value, str):
+        return value
+    try:
+        return json.dumps(value, sort_keys=True, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return str(value)

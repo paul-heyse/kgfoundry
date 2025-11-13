@@ -15,7 +15,7 @@ Built-in retrieval channel implementations (BM25, SPLADE).
 - from **codeintel_rev.io.hybrid_search** import BM25Rm3Config, BM25SearchProvider, SpladeSearchProvider
 - from **codeintel_rev.plugins.channels** import Channel, ChannelContext, ChannelError
 - from **codeintel_rev.retrieval.rm3_heuristics** import RM3Heuristics, RM3Params
-- from **codeintel_rev.retrieval.types** import ChannelHit
+- from **codeintel_rev.retrieval.types** import SearchHit
 - from **kgfoundry_common.logging** import get_logger
 
 ## Definitions

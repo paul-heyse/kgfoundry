@@ -53,11 +53,17 @@ from __future__ import annotations
 
 import time
 import uuid
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from starlette.middleware.base import BaseHTTPMiddleware, DispatchFunction
 from starlette.types import ASGIApp
 
+from codeintel_rev.observability.otel import (
+    current_trace_id,
+    set_current_span_attrs,
+)
+from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.observability.timeline import bind_timeline, new_timeline
 from codeintel_rev.runtime.request_context import capability_stamp_var, session_id_var
 from codeintel_rev.telemetry.context import telemetry_context
@@ -241,11 +247,13 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
         request.state.session_id = session_id
         timeline = new_timeline(session_id)
         request.state.timeline = timeline
+        started_at = time.time()
         timeline.set_metadata(
             kind="http",
             path=str(request.url.path),
             method=request.method,
-            started_at=time.time(),
+            started_at=started_at,
+            run_date=datetime.fromtimestamp(started_at, tz=UTC).strftime("%Y%m%d"),
         )
 
         capability_stamp = getattr(request.app.state, "capability_stamp", None)
@@ -270,10 +278,22 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
                     tool_name=None,
                 ),
             ):
-                return await call_next(request)
+                set_current_span_attrs(
+                    **{
+                        Attrs.MCP_SESSION_ID: session_id,
+                        Attrs.MCP_RUN_ID: timeline.run_id,
+                        "http.method": request.method,
+                        "http.target": str(request.url.path),
+                    }
+                )
+                response = await call_next(request)
         finally:
             session_id_var.reset(session_token)
             capability_stamp_var.reset(capability_token)
+        trace_id = current_trace_id()
+        if trace_id:
+            response.headers.setdefault("X-Trace-Id", trace_id)
+        return response
 
 
 __all__ = [

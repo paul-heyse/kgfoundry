@@ -39,15 +39,15 @@ Thread-safe runtime cell primitive for mutable subsystems.
 
 - **fan_in**: 3
 - **fan_out**: 5
-- **cycle_group**: 64
+- **cycle_group**: 55
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 12
-- recent churn 90: 12
+- recent churn 30: 13
+- recent churn 90: 13
 
 ## Usage
 

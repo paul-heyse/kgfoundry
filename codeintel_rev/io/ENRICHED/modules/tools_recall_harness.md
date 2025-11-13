@@ -70,8 +70,8 @@ Notes
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 3
-- recent churn 90: 3
+- recent churn 30: 4
+- recent churn 90: 4
 
 ## Usage
 
@@ -118,6 +118,7 @@ Notes
 - patches/Typing_gating_follow_small_architecture_changes.md
 - patches/FAISS_detailed_implementation_plan.md
 - patches/Enrich_Expansion.md
+- patches/OpenTelemetry_ExtensionPhase2addon.md
 - patches/Enrich_Extension.md
 - patches/Networking_Implementation.md
 - patches/FAISS-Hardening.md

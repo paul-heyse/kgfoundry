@@ -25,7 +25,7 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 - from **codeintel_rev.retrieval.boosters** import RecencyConfig, apply_recency_boost
 - from **codeintel_rev.retrieval.gating** import BudgetDecision, StageGateConfig, analyze_query, decide_budgets, describe_budget_decision
 - from **codeintel_rev.retrieval.rm3_heuristics** import RM3Heuristics, RM3Params
-- from **codeintel_rev.retrieval.types** import ChannelHit, HybridResultDoc, HybridSearchResult
+- from **codeintel_rev.retrieval.types** import HybridResultDoc, HybridSearchResult, SearchHit
 - from **codeintel_rev.telemetry.decorators** import span_context
 - from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.app.capabilities** import Capabilities
@@ -35,33 +35,33 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 
 ## Definitions
 
-- variable: `LOGGER` (line 42)
-- class: `_LuceneHit` (line 45)
-- class: `_LuceneSearcher` (line 50)
-- class: `BM25Rm3Config` (line 65)
-- class: `BM25SearchProvider` (line 74)
-- class: `SpladeSearchProvider` (line 164)
-- class: `HybridSearchTuning` (line 312)
-- class: `HybridSearchOptions` (line 320)
-- class: `_MethodStats` (line 329)
-- class: `_FusionContext` (line 338)
-- class: `_SearchTelemetryContext` (line 352)
-- class: `_FusionWork` (line 358)
-- class: `HybridSearchEngine` (line 372)
+- variable: `LOGGER` (line 38)
+- class: `_LuceneHit` (line 41)
+- class: `_LuceneSearcher` (line 46)
+- class: `BM25Rm3Config` (line 61)
+- class: `BM25SearchProvider` (line 70)
+- class: `SpladeSearchProvider` (line 169)
+- class: `HybridSearchTuning` (line 326)
+- class: `HybridSearchOptions` (line 334)
+- class: `_MethodStats` (line 343)
+- class: `_FusionContext` (line 352)
+- class: `_SearchTelemetryContext` (line 366)
+- class: `_FusionWork` (line 372)
+- class: `HybridSearchEngine` (line 386)
 
 ## Graph Metrics
 
 - **fan_in**: 5
 - **fan_out**: 16
-- **cycle_group**: 69
+- **cycle_group**: 70
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 18
-- recent churn 90: 18
+- recent churn 30: 19
+- recent churn 90: 19
 
 ## Usage
 
@@ -70,7 +70,7 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 
 ## Declared Exports (__all__)
 
-BM25SearchProvider, ChannelHit, HybridResultDoc, HybridSearchEngine, HybridSearchOptions, HybridSearchResult, HybridSearchTuning, SpladeSearchProvider
+BM25SearchProvider, HybridResultDoc, HybridSearchEngine, HybridSearchOptions, HybridSearchResult, HybridSearchTuning, SpladeSearchProvider
 
 ## Doc Health
 
@@ -93,7 +93,7 @@ BM25SearchProvider, ChannelHit, HybridResultDoc, HybridSearchEngine, HybridSearc
 
 ## Hotspot
 
-- score: 3.23
+- score: 3.24
 
 ## Side Effects
 
@@ -101,9 +101,9 @@ BM25SearchProvider, ChannelHit, HybridResultDoc, HybridSearchEngine, HybridSearc
 
 ## Complexity
 
-- branches: 124
-- cyclomatic: 125
-- loc: 1241
+- branches: 126
+- cyclomatic: 127
+- loc: 1268
 
 ## Doc Coverage
 

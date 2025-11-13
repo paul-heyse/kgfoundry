@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
 
 from codeintel_rev.errors import RuntimeLifecycleError
+from codeintel_rev.observability.otel import as_span, set_current_span_attrs
 
 LOGGER = get_logger(__name__)
 
@@ -325,42 +326,54 @@ class Capabilities:
         snapshot is used for MCP tool gating and the /capz endpoint. Time
         complexity: O(1) for most checks, O(module_load_time) for optional imports.
         """
-        paths = getattr(context, "paths", None)
-        faiss_module = _import_optional("faiss")
-        duckdb_module = _import_optional("duckdb")
-        httpx_module = _import_optional("httpx")
-        torch_module = _import_optional("torch")
-        lucene_module = _import_optional("pyserini.search.lucene")
-        onnxruntime_module = _import_optional("onnxruntime")
-        faiss_gpu_available, faiss_gpu_reason = _probe_faiss_gpu(faiss_module)
-        active_version: str | None = None
-        version_count = 0
-        index_manager = getattr(context, "index_manager", None)
-        if index_manager is not None:
-            try:
-                active_version = index_manager.current_version()
-                version_count = len(index_manager.list_versions())
-            except RuntimeLifecycleError:
-                active_version = None
+        with as_span("capabilities.detect"):
+            paths = getattr(context, "paths", None)
+            faiss_module = _import_optional("faiss")
+            duckdb_module = _import_optional("duckdb")
+            httpx_module = _import_optional("httpx")
+            torch_module = _import_optional("torch")
+            lucene_module = _import_optional("pyserini.search.lucene")
+            onnxruntime_module = _import_optional("onnxruntime")
+            faiss_gpu_available, faiss_gpu_reason = _probe_faiss_gpu(faiss_module)
+            active_version: str | None = None
+            version_count = 0
+            index_manager = getattr(context, "index_manager", None)
+            if index_manager is not None:
+                try:
+                    active_version = index_manager.current_version()
+                    version_count = len(index_manager.list_versions())
+                except RuntimeLifecycleError:
+                    active_version = None
 
-        snapshot = cls(
-            faiss_index=_path_exists(getattr(paths, "faiss_index", None)) and bool(faiss_module),
-            duckdb=_path_exists(getattr(paths, "duckdb_path", None)),
-            scip_index=_path_exists(getattr(paths, "scip_index", None)),
-            vllm_client=getattr(context, "vllm_client", None) is not None,
-            coderank_index_present=_path_exists(getattr(paths, "coderank_faiss_index", None)),
-            warp_index_present=_path_exists(getattr(paths, "warp_index_dir", None)),
-            xtr_index_present=_path_exists(getattr(paths, "xtr_dir", None)),
-            faiss_importable=faiss_module is not None,
-            duckdb_importable=duckdb_module is not None,
-            httpx_importable=httpx_module is not None,
-            torch_importable=torch_module is not None,
-            lucene_importable=lucene_module is not None,
-            onnxruntime_importable=onnxruntime_module is not None,
-            faiss_gpu_available=faiss_gpu_available,
-            faiss_gpu_disabled_reason=faiss_gpu_reason,
-            active_index_version=active_version,
-            versions_available=version_count,
+            snapshot = cls(
+                faiss_index=_path_exists(getattr(paths, "faiss_index", None))
+                and bool(faiss_module),
+                duckdb=_path_exists(getattr(paths, "duckdb_path", None)),
+                scip_index=_path_exists(getattr(paths, "scip_index", None)),
+                vllm_client=getattr(context, "vllm_client", None) is not None,
+                coderank_index_present=_path_exists(getattr(paths, "coderank_faiss_index", None)),
+                warp_index_present=_path_exists(getattr(paths, "warp_index_dir", None)),
+                xtr_index_present=_path_exists(getattr(paths, "xtr_dir", None)),
+                faiss_importable=faiss_module is not None,
+                duckdb_importable=duckdb_module is not None,
+                httpx_importable=httpx_module is not None,
+                torch_importable=torch_module is not None,
+                lucene_importable=lucene_module is not None,
+                onnxruntime_importable=onnxruntime_module is not None,
+                faiss_gpu_available=faiss_gpu_available,
+                faiss_gpu_disabled_reason=faiss_gpu_reason,
+                active_index_version=active_version,
+                versions_available=version_count,
+            )
+        set_current_span_attrs(
+            component="capabilities",
+            capability_faiss=int(snapshot.faiss_index),
+            capability_duckdb=int(snapshot.duckdb),
+            capability_scip=int(snapshot.scip_index),
+            capability_vllm=int(snapshot.vllm_client),
+            capability_xtr=int(snapshot.xtr_index_present),
+            capability_versions=snapshot.versions_available,
+            capability_active_version=snapshot.active_index_version or "unavailable",
         )
 
         payload = snapshot.model_dump()

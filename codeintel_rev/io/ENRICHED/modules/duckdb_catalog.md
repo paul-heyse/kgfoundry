@@ -13,13 +13,13 @@ chunk retrieval and joins.
 
 - from **__future__** import annotations
 - from **(absolute)** import hashlib
-- from **collections.abc** import Iterator, Mapping, Sequence
+- from **collections.abc** import Callable, Iterator, Mapping, Sequence
 - from **contextlib** import contextmanager, suppress
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
 - from **threading** import Lock
 - from **time** import perf_counter
-- from **typing** import TYPE_CHECKING, Any, Self, TypedDict, Unpack, cast
+- from **typing** import TYPE_CHECKING, Any, ClassVar, Self, TypedDict, Unpack, cast
 - from **codeintel_rev._lazy_imports** import LazyModule
 - from **codeintel_rev.io.duckdb_manager** import DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 - from **codeintel_rev.io.parquet_store** import extract_embeddings
@@ -45,20 +45,23 @@ chunk retrieval and joins.
 - class: `_DuckDBQueryMixin` (line 158)
 - class: `_LegacyOptions` (line 413)
 - class: `DuckDBCatalog` (line 420)
+- function: `_relation_exists` (line 1632)
+- function: `relation_exists` (line 1666)
+- function: `_file_checksum` (line 1684)
 
 ## Graph Metrics
 
 - **fan_in**: 9
 - **fan_out**: 8
-- **cycle_group**: 69
+- **cycle_group**: 70
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 37
-- recent churn 90: 37
+- recent churn 30: 38
+- recent churn 90: 38
 
 ## Usage
 
@@ -67,7 +70,7 @@ chunk retrieval and joins.
 
 ## Declared Exports (__all__)
 
-DuckDBCatalog, StructureAnnotations
+DuckDBCatalog, StructureAnnotations, relation_exists
 
 ## Doc Health
 
@@ -101,7 +104,7 @@ DuckDBCatalog, StructureAnnotations
 
 - branches: 141
 - cyclomatic: 142
-- loc: 1705
+- loc: 1707
 
 ## Doc Coverage
 
@@ -112,6 +115,9 @@ DuckDBCatalog, StructureAnnotations
 - `_DuckDBQueryMixin` (class): summary=yes, examples=no — Chunk-level query helpers shared by :class:`DuckDBCatalog`.
 - `_LegacyOptions` (class): summary=no, examples=no
 - `DuckDBCatalog` (class): summary=yes, examples=no — DuckDB catalog for querying chunks.
+- `_relation_exists` (function): summary=yes, params=ok, examples=no — Return True when a table or view with ``name`` exists in the main schema.
+- `relation_exists` (function): summary=yes, params=ok, examples=no — Public helper returning True when a DuckDB relation exists.
+- `_file_checksum` (function): summary=yes, params=ok, examples=no — Return SHA-256 checksum for ``path``.
 
 ## Tags
 

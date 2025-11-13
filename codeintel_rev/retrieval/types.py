@@ -15,7 +15,7 @@ FactoryString = str
 class SearchHit:
     """Single retrieval hit emitted by FAISS/BM25/SPLADE/XTR stages."""
 
-    id: ChunkId
+    doc_id: str
     rank: int
     score: float
     source: str
@@ -33,14 +33,6 @@ class SearchPoolRow:
     id: ChunkId
     score: float
     meta: Mapping[str, object] = field(default_factory=dict)
-
-
-@dataclass(slots=True, frozen=True)
-class ChannelHit:
-    """Score emitted by a retrieval channel prior to fusion."""
-
-    doc_id: str
-    score: float
 
 
 @dataclass(slots=True, frozen=True)
@@ -94,7 +86,6 @@ class StageDecision:
 
 
 __all__ = [
-    "ChannelHit",
     "ChunkId",
     "Distance",
     "FactoryString",

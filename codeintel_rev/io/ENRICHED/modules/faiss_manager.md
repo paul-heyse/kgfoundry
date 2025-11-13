@@ -19,6 +19,7 @@ corpus size for optimal performance.
 - from **collections.abc** import Callable, Mapping, Sequence
 - from **dataclasses** import dataclass
 - from **datetime** import UTC, datetime
+- from **numbers** import Integral, Real
 - from **pathlib** import Path
 - from **threading** import RLock
 - from **time** import perf_counter
@@ -43,43 +44,52 @@ corpus size for optimal performance.
 
 ## Definitions
 
-- variable: `FaissIndex` (line 61)
-- variable: `np` (line 63)
-- variable: `FaissIndex` (line 64)
-- variable: `pa` (line 70)
-- variable: `pq` (line 71)
-- variable: `LOGGER` (line 73)
-- variable: `logger` (line 74)
-- class: `_LazyFaissProxy` (line 77)
-- variable: `faiss` (line 121)
-- function: `_faiss_module` (line 124)
-- function: `_has_faiss_gpu_support` (line 135)
-- function: `apply_parameters` (line 151)
-- function: `_log_extra` (line 208)
-- class: `FAISSRuntimeOptions` (line 226)
-- class: `SearchRuntimeOverrides` (line 247)
-- class: `_SearchExecutionParams` (line 256)
-- class: `_SearchPlan` (line 266)
-- class: `_FAISSIdMapMixin` (line 276)
-- class: `FAISSManager` (line 453)
-- class: `AutoTuner` (line 3741)
-- function: `_coerce_to_int` (line 3871)
-- function: `_configure_direct_map` (line 3894)
-- function: `_set_direct_map_type` (line 3902)
+- variable: `FaissIndex` (line 62)
+- variable: `np` (line 64)
+- variable: `FaissIndex` (line 65)
+- variable: `pa` (line 71)
+- variable: `pq` (line 72)
+- variable: `LOGGER` (line 74)
+- variable: `logger` (line 75)
+- class: `_LazyFaissProxy` (line 78)
+- variable: `faiss` (line 122)
+- function: `_faiss_module` (line 125)
+- function: `_has_faiss_gpu_support` (line 136)
+- function: `apply_parameters` (line 152)
+- function: `_log_extra` (line 209)
+- class: `FAISSRuntimeOptions` (line 227)
+- class: `SearchRuntimeOverrides` (line 248)
+- class: `RefineSearchConfig` (line 257)
+- class: `_TuningOverrides` (line 266)
+- class: `_SearchExecutionParams` (line 277)
+- class: `_SearchPlan` (line 287)
+- class: `_FAISSIdMapMixin` (line 297)
+- class: `FAISSManager` (line 474)
+- class: `AutoTuner` (line 3607)
+- function: `_coerce_to_int` (line 3737)
+- function: `_configure_direct_map` (line 3760)
+- function: `_set_direct_map_type` (line 3768)
+- function: `_wrap_bool_contains` (line 3811)
+- function: `_wrap_index_contains` (line 3847)
+- function: `_coerce_optional_int` (line 3885)
+- function: `_coerce_optional_float` (line 3919)
+- function: `_parse_tuning_overrides` (line 3953)
+- function: `_persist_tuning_profile` (line 3979)
+- function: `_get_compile_options` (line 3991)
 
 ## Graph Metrics
 
 - **fan_in**: 8
 - **fan_out**: 10
-- **cycle_group**: 69
+- **cycle_group**: 70
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 43
-- recent churn 90: 43
+- recent churn 30: 44
+- recent churn 90: 44
 
 ## Usage
 
@@ -111,7 +121,7 @@ AutoTuner, FAISSManager, apply_parameters
 
 ## Hotspot
 
-- score: 3.38
+- score: 3.39
 
 ## Side Effects
 
@@ -119,9 +129,9 @@ AutoTuner, FAISSManager, apply_parameters
 
 ## Complexity
 
-- branches: 245
-- cyclomatic: 246
-- loc: 3946
+- branches: 254
+- cyclomatic: 255
+- loc: 4008
 
 ## Doc Coverage
 
@@ -132,9 +142,9 @@ AutoTuner, FAISSManager, apply_parameters
 - `_log_extra` (function): summary=yes, params=mismatch, examples=no — Build structured logging extras for FAISS manager events.
 - `FAISSRuntimeOptions` (class): summary=yes, examples=no — Runtime tuning options passed to :class:`FAISSManager`.
 - `SearchRuntimeOverrides` (class): summary=yes, examples=no — Per-search overrides for HNSW/quantizer parameters.
+- `RefineSearchConfig` (class): summary=yes, examples=no — Configuration bundle for refine searches.
+- `_TuningOverrides` (class): summary=yes, examples=no — Normalized tuning overrides extracted from a profile payload.
 - `_SearchExecutionParams` (class): summary=yes, examples=no — Runtime parameters applied during dual search execution.
-- `_SearchPlan` (class): summary=yes, examples=no — Resolved parameters, query buffer, and timeline metadata for a search.
-- `_FAISSIdMapMixin` (class): summary=yes, examples=no — Mixin providing ID map export helpers.
 
 ## Tags
 

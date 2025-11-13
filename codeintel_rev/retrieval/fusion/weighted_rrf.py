@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from codeintel_rev.retrieval.types import ChannelHit, HybridResultDoc
+from codeintel_rev.retrieval.types import HybridResultDoc, SearchHit
 
 
 def fuse_weighted_rrf(
-    runs: Mapping[str, Sequence[ChannelHit]],
+    runs: Mapping[str, Sequence[SearchHit]],
     *,
     weights: Mapping[str, float],
     k: int,
@@ -27,9 +27,9 @@ def fuse_weighted_rrf(
 
     Parameters
     ----------
-    runs : Mapping[str, Sequence[ChannelHit]]
+    runs : Mapping[str, Sequence[SearchHit]]
         Dictionary mapping channel names to their ranked hit lists. Each channel
-        provides a sequence of ChannelHit objects with doc_id, rank, and score.
+        provides a sequence of SearchHit objects with doc_id, rank, and score.
         Empty sequences are skipped.
     weights : Mapping[str, float]
         Dictionary mapping channel names to their fusion weights. Channels not
@@ -75,10 +75,10 @@ def fuse_weighted_rrf(
         weight = float(weights.get(channel, 1.0))
         if weight == 0.0:
             continue
-        for rank, hit in enumerate(hits, start=1):
-            rr = weight * (1.0 / (k + rank))
+        for hit in hits:
+            rr = weight * (1.0 / (k + hit.rank + 1))
             fused_scores[hit.doc_id] = fused_scores.get(hit.doc_id, 0.0) + rr
-            contributions.setdefault(hit.doc_id, []).append((channel, rank, hit.score))
+            contributions.setdefault(hit.doc_id, []).append((channel, hit.rank + 1, hit.score))
 
     ordered = sorted(fused_scores.items(), key=lambda item: item[1], reverse=True)
     sliced = ordered[:limit]

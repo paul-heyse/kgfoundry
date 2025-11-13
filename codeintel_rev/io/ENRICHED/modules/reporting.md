@@ -35,15 +35,15 @@ Timeline-based run report builder and CLI helpers.
 
 - **fan_in**: 4
 - **fan_out**: 2
-- **cycle_group**: 77
+- **cycle_group**: 82
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 

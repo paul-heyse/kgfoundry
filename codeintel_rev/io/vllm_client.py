@@ -17,8 +17,10 @@ import msgspec
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.observability.otel import as_span, record_span_event
+from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.telemetry.decorators import span_context
+from codeintel_rev.telemetry.prom import EMBED_BATCH_SIZE, EMBED_LATENCY_SECONDS
 from codeintel_rev.typing import NDArrayF32, gate_import
 from kgfoundry_common.logging import get_logger
 
@@ -304,6 +306,12 @@ class VLLMClient:
         mode = self._mode
         batch_size = len(texts)
         step_attrs = {"mode": mode, "batch": batch_size, "dim": self.config.embedding_dim}
+        span_attrs = {
+            Attrs.VLLM_MODE: mode,
+            Attrs.VLLM_MODEL_NAME: self.config.model,
+            Attrs.VLLM_EMBED_DIM: self.config.embedding_dim,
+            Attrs.VLLM_BATCH: batch_size,
+        }
         start = perf_counter()
         try:
             with (
@@ -313,7 +321,7 @@ class VLLMClient:
                     attrs=step_attrs,
                     emit_checkpoint=True,
                 ),
-                as_span("embed.vllm", **step_attrs),
+                as_span("vllm.embed_batch", **span_attrs),
                 timeline.step("embed.vllm", **step_attrs) if timeline else nullcontext(),
             ):
                 if self._local_engine is not None:
@@ -321,12 +329,9 @@ class VLLMClient:
                 else:
                     vectors = self._embed_batch_http(texts)
         except Exception as exc:
-            record_span_event(
-                "vllm.embed.error",
-                mode=mode,
-                batch_size=batch_size,
-                error=str(exc),
-            )
+            error_attrs = dict(span_attrs)
+            error_attrs["error"] = str(exc)
+            record_span_event("vllm.embed.error", **error_attrs)
             if timeline is not None:
                 timeline.event(
                     "error",
@@ -346,12 +351,9 @@ class VLLMClient:
             },
         )
         elapsed_ms = int(1000 * (perf_counter() - start))
-        record_span_event(
-            "embed.vllm.complete",
-            mode=mode,
-            batch_size=batch_size,
-            duration_ms=elapsed_ms,
-        )
+        EMBED_BATCH_SIZE.observe(batch_size)
+        EMBED_LATENCY_SECONDS.observe(elapsed_ms / 1000)
+        record_span_event("embed.vllm.complete", duration_ms=elapsed_ms, **span_attrs)
         return vectors
 
     def _embed_batch_http(self, texts: Sequence[str]) -> NDArrayF32:

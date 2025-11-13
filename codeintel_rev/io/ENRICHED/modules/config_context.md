@@ -114,7 +114,7 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 
 - **fan_in**: 23
 - **fan_out**: 17
-- **cycle_group**: 69
+- **cycle_group**: 70
 
 ## Ownership
 

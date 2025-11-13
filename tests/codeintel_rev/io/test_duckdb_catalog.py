@@ -7,7 +7,7 @@ from pathlib import Path
 import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
-from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, relation_exists
 
 
 def test_relation_exists_detects_tables() -> None:
@@ -15,7 +15,7 @@ def test_relation_exists_detects_tables() -> None:
     conn = duckdb.connect(":memory:")
     try:
         conn.execute("CREATE TABLE foo(id INTEGER)")
-        assert DuckDBCatalog.relation_exists(conn, "foo")
+        assert relation_exists(conn, "foo")
     finally:
         conn.close()
 
@@ -26,7 +26,7 @@ def test_relation_exists_detects_views() -> None:
     try:
         conn.execute("CREATE TABLE foo(id INTEGER)")
         conn.execute("CREATE VIEW foo_view AS SELECT * FROM foo")
-        assert DuckDBCatalog.relation_exists(conn, "foo_view")
+        assert relation_exists(conn, "foo_view")
     finally:
         conn.close()
 
@@ -35,7 +35,7 @@ def test_relation_exists_returns_false_for_missing_relation() -> None:
     """Missing relations return False."""
     conn = duckdb.connect(":memory:")
     try:
-        assert not DuckDBCatalog.relation_exists(conn, "does_not_exist")
+        assert not relation_exists(conn, "does_not_exist")
     finally:
         conn.close()
 

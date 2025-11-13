@@ -81,6 +81,13 @@ def generate_latest(registry: CollectorRegistry | None = None) -> bytes:
 
 
 __all__ = [
+    "EMBED_BATCH_SIZE",
+    "EMBED_LATENCY_SECONDS",
+    "FAISS_SEARCH_LATENCY_SECONDS",
+    "GATING_DECISIONS_TOTAL",
+    "QUERY_AMBIGUITY",
+    "RRFK",
+    "XTR_SEARCH_LATENCY_SECONDS",
     "MetricsConfig",
     "build_metrics_router",
     "observe_request_latency",
@@ -121,6 +128,48 @@ STAGE_LATENCY_SECONDS = build_histogram(
     "Latency per search stage.",
     labelnames=("stage",),
     buckets=(0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1.0),
+)
+
+EMBED_BATCH_SIZE = build_histogram(
+    "codeintel_embed_batch_size",
+    "Observed embedding batch sizes.",
+    buckets=(1, 2, 4, 8, 16, 32, 64, 128, 256),
+)
+
+EMBED_LATENCY_SECONDS = build_histogram(
+    "codeintel_embed_latency_seconds",
+    "Latency of vLLM embed_batch invocations.",
+    buckets=(0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10),
+)
+
+FAISS_SEARCH_LATENCY_SECONDS = build_histogram(
+    "codeintel_faiss_search_latency_seconds",
+    "Latency of FAISS ANN searches.",
+    buckets=(0.001, 0.005, 0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1, 2),
+)
+
+XTR_SEARCH_LATENCY_SECONDS = build_histogram(
+    "codeintel_xtr_search_latency_seconds",
+    "Latency of XTR search/rescore phases.",
+    buckets=(0.005, 0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1, 2),
+)
+
+GATING_DECISIONS_TOTAL = build_counter(
+    "codeintel_gating_decisions_total",
+    "Count of gating/budgeting decisions.",
+    labelnames=("klass", "rm3_enabled"),
+)
+
+RRFK = build_histogram(
+    "codeintel_rrf_k",
+    "Distribution of RRF k decisions.",
+    buckets=(10, 25, 50, 75, 100, 150, 200, 300, 500),
+)
+
+QUERY_AMBIGUITY = build_histogram(
+    "codeintel_query_ambiguity",
+    "Distribution of query ambiguity scores.",
+    buckets=(0.0, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0),
 )
 
 

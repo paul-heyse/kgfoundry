@@ -10,7 +10,7 @@ Weighted reciprocal rank fusion utilities.
 
 - from **__future__** import annotations
 - from **collections.abc** import Mapping, Sequence
-- from **codeintel_rev.retrieval.types** import ChannelHit, HybridResultDoc
+- from **codeintel_rev.retrieval.types** import HybridResultDoc, SearchHit
 
 ## Definitions
 

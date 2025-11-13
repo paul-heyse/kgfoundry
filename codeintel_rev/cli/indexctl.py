@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Annotated, Literal, cast
 
 import click
-import duckdb
+import duckdb as duckdb_mod
 import numpy as np
 import typer
 
@@ -30,7 +30,11 @@ from codeintel_rev.indexing.index_lifecycle import (
 )
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.duckdb_manager import DuckDBManager
-from codeintel_rev.io.faiss_manager import FAISSManager, SearchRuntimeOverrides
+from codeintel_rev.io.faiss_manager import (
+    FAISSManager,
+    RefineSearchConfig,
+    SearchRuntimeOverrides,
+)
 from codeintel_rev.io.parquet_store import (
     ParquetWriteOptions,
     extract_embeddings,
@@ -126,6 +130,20 @@ _SWEEP_MODE_BY_NAME: dict[str, SweepMode] = {
     "quick": "quick",
     "full": "full",
 }
+
+
+@dataclass(slots=True, frozen=True)
+class SearchCommandParams:
+    """Typed container for CLI-provided semantic search arguments."""
+
+    queries: Path
+    k: int
+    dry_run: bool
+    nprobe: int | None
+    index: Path | None
+    duckdb: Path | None
+
+
 _SWEEP_FLAG = "--sweep"
 SWEEP_OPTION = typer.Option(
     _SWEEP_FLAG,
@@ -984,13 +1002,17 @@ def health_command(
         catalog.ensure_faiss_idmap_views(idmap_path if idmap_path.exists() else None)
         with catalog.connection() as conn:
             conn.execute("SELECT COUNT(*) FROM v_faiss_join LIMIT 1").fetchone()
-    except (duckdb.Error, RuntimeError, ValueError) as exc:  # pragma: no cover - DuckDB failures
+    except (
+        duckdb_mod.Error,
+        RuntimeError,
+        ValueError,
+    ) as exc:  # pragma: no cover - DuckDB failures
         checks["duckdb_views_ok"] = {"ok": False, "error": str(exc)}
     else:
         checks["duckdb_views_ok"] = {"ok": True}
     try:
         chunk_count = catalog.count_chunks()
-    except (duckdb.Error, RuntimeError, ValueError) as exc:  # pragma: no cover - schema drift
+    except (duckdb_mod.Error, RuntimeError, ValueError) as exc:  # pragma: no cover - schema drift
         checks["duckdb_schema_ok"] = {"ok": False, "error": str(exc)}
     else:
         checks["duckdb_schema_ok"] = {"ok": chunk_count >= 0, "chunks": chunk_count}
@@ -1226,97 +1248,82 @@ def eval_command(
     typer.echo(json.dumps(report.__dict__, indent=2))
 
 
-@app.command("search")
-def search_command(
-    queries: QueriesArg,
-    k: EvalTopKOption = 10,
-    dry_run: Annotated[
-        bool,
-        typer.Option("--dry-run/--write-pool", help="Skip pool artefact creation."),
-    ] = True,
-    nprobe: EvalNProbeOption = None,
-    index: IndexOption = None,
-    duckdb: DuckOption = None,
-) -> None:
-    """Execute ANN + refine search for newline-delimited queries and print a summary.
+def _execute_search(params: SearchCommandParams) -> None:
+    """Execute ANN + refine search for newline-delimited queries.
 
     Parameters
     ----------
-    queries : QueriesArg
-        Path to a file containing newline-delimited query strings. Each line
-        is treated as a separate query and embedded for search.
-    k : EvalTopKOption, optional
-        Number of results to return per query (default: 10).
-    dry_run : Annotated[bool, typer.Option("--dry-run/--write-pool")], optional
-        If True, skip pool artifact creation and only print summary (default: True).
-        When False, creates pool artifacts for evaluation.
-    nprobe : EvalNProbeOption, optional
-        Optional nprobe override for FAISS search (default: None).
-    index : IndexOption, optional
-        Optional path override for FAISS index (default: None).
-    duckdb : DuckOption, optional
-        Optional path override for DuckDB catalog (default: None).
+    params : SearchCommandParams
+        Search command parameters including queries file path, search options,
+        and index/catalog paths.
 
     Raises
     ------
     typer.BadParameter
-        Raised when the queries file cannot be read. The error includes the
-        file path and the underlying I/O error message.
+        Raised when the queries file cannot be read.
     """
     settings = _get_settings()
-    manager = _faiss_manager(index)
-    catalog = _duckdb_catalog(duckdb)
+    manager = _faiss_manager(params.index)
+    catalog = _duckdb_catalog(params.duckdb)
     embedder = get_embedding_provider(settings)
     runtime = SearchRuntimeOverrides()
     try:
         try:
-            lines = queries.read_text(encoding="utf-8").splitlines()
+            lines = params.queries.read_text(encoding="utf-8").splitlines()
         except OSError as exc:
             msg = f"Unable to read queries file: {exc}"
             raise typer.BadParameter(msg) from exc
         summary: list[dict[str, object]] = []
-        for raw_line in lines:
+
+        def _summarize_query(raw_line: str) -> dict[str, object] | None:
             query = raw_line.strip()
             if not query:
-                continue
+                return None
             vectors = embedder.embed_texts([query])
             ann_dists, ann_ids = manager.search(
                 vectors,
-                k=k,
-                nprobe=nprobe,
+                k=params.k,
+                nprobe=params.nprobe,
                 runtime=runtime,
                 catalog=None,
             )
+            ann_dist_row = [float(score) for score in ann_dists[0].tolist()]
             ann_ids_row = [int(chunk_id) for chunk_id in ann_ids[0].tolist() if chunk_id >= 0]
             refined_hits = manager.search_with_refine(
                 vectors,
-                k=k,
+                k=params.k,
                 catalog=catalog,
-                nprobe=nprobe,
-                runtime=runtime,
-                source="faiss_refine" if manager.refine_k_factor > 1.0 else "faiss",
+                config=RefineSearchConfig(
+                    nprobe=params.nprobe,
+                    runtime=runtime,
+                    source="faiss_refine" if manager.refine_k_factor > 1.0 else "faiss",
+                ),
             )
-            refined_ids = [hit.id for hit in refined_hits]
+            refined_ids = [int(hit.doc_id) for hit in refined_hits]
             overlap = len(set(ann_ids_row) & set(refined_ids))
-            summary.append(
-                {
-                    "query": query,
-                    "ann_ids": ann_ids_row,
-                    "refined_hits": [
-                        {
-                            "id": hit.id,
-                            "rank": hit.rank,
-                            "score": hit.score,
-                            "source": hit.source,
-                            "faiss_row": hit.faiss_row,
-                            "explain": dict(hit.explain),
-                        }
-                        for hit in refined_hits
-                    ],
-                    "overlap": overlap,
-                }
-            )
+            return {
+                "query": query,
+                "ann_ids": ann_ids_row,
+                "ann_scores": ann_dist_row,
+                "refined_hits": [
+                    {
+                        "doc_id": hit.doc_id,
+                        "rank": hit.rank,
+                        "score": hit.score,
+                        "source": hit.source,
+                        "faiss_row": hit.faiss_row,
+                        "explain": dict(hit.explain),
+                    }
+                    for hit in refined_hits
+                ],
+                "overlap": overlap,
+            }
+
+        for raw_line in lines:
+            entry = _summarize_query(raw_line)
+            if entry is not None:
+                summary.append(entry)
     finally:
         embedder.close()
         catalog.close()
-    typer.echo(json.dumps({"dry_run": dry_run, "results": summary}, indent=2))
+    typer.echo(json.dumps({"dry_run": params.dry_run, "results": summary}, indent=2))

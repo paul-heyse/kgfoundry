@@ -13,6 +13,13 @@ from typing import Any, Protocol
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.observability import start_span
 
+try:  # pragma: no cover - optional dependency
+    from codeintel_rev.observability.flight_recorder import (
+        install_flight_recorder as _install_flight_recorder,
+    )
+except ImportError:  # pragma: no cover - optional dependency
+    _install_flight_recorder = None
+
 LOGGER = get_logger(__name__)
 
 SpanAttribute = str | int | float | bool
@@ -27,6 +34,7 @@ class _TelemetryState:
         "initialized",
         "logging_instrumented",
         "trace_module",
+        "trace_provider",
         "tracing_enabled",
     )
 
@@ -34,6 +42,7 @@ class _TelemetryState:
         self.initialized = False
         self.tracing_enabled = False
         self.trace_module: ModuleType | None = None
+        self.trace_provider: object | None = None
         self.fastapi_instrumented = False
         self.httpx_instrumented = False
         self.logging_instrumented = False
@@ -51,6 +60,7 @@ class _TraceHandles:
     sdk_trace: ModuleType
     exporter: ModuleType
     resource: ModuleType
+    sampling: ModuleType | None
     otlp_http: ModuleType | None
 
 
@@ -112,6 +122,8 @@ def _coerce_span_value(value: object) -> SpanAttribute:
 
 
 def _should_enable() -> bool:
+    if os.getenv("CODEINTEL_OTEL_ENABLED") is not None:
+        return _env_flag("CODEINTEL_OTEL_ENABLED", default=False)
     return _env_flag("CODEINTEL_TELEMETRY", default=False)
 
 
@@ -128,6 +140,10 @@ def _load_trace_modules() -> _TraceHandles | None:
         sdk_trace = importlib.import_module("opentelemetry.sdk.trace")
         exporter_mod = importlib.import_module("opentelemetry.sdk.trace.export")
         resource_mod = importlib.import_module("opentelemetry.sdk.resources")
+        try:
+            sampling_mod = importlib.import_module("opentelemetry.sdk.trace.sampling")
+        except ImportError:
+            sampling_mod = None
     except ImportError as exc:  # pragma: no cover - optional dependency
         LOGGER.warning("OpenTelemetry packages unavailable; telemetry disabled", exc_info=exc)
         return None
@@ -140,21 +156,72 @@ def _load_trace_modules() -> _TraceHandles | None:
         sdk_trace=sdk_trace,
         exporter=exporter_mod,
         resource=resource_mod,
+        sampling=sampling_mod,
         otlp_http=otlp_mod,
     )
 
 
-def _build_provider(
+def _parse_sampler_spec(raw: str) -> tuple[str, float | None]:
+    spec = raw.strip().lower().replace("-", "_")
+    ratio: float | None = None
+    if ":" in spec:
+        head, tail = spec.split(":", 1)
+        spec = head
+        try:
+            ratio = float(tail)
+        except ValueError:
+            ratio = None
+    return spec, ratio
+
+
+def _build_sampler(handles: _TraceHandles, sampler_spec: str | None) -> object | None:  # noqa: PLR0911
+    if not sampler_spec or handles.sampling is None:
+        return None
+    spec, ratio = _parse_sampler_spec(sampler_spec)
+    module = handles.sampling
+    try:
+        if spec in {"always_on", "alwayson"}:
+            return module.ALWAYS_ON
+        if spec in {"always_off", "alwaysoff"}:
+            return module.ALWAYS_OFF
+        if spec in {"traceidratio", "traceidratio_based"}:
+            factory = getattr(module, "TraceIdRatioBased", None)
+            if factory is None:
+                return None
+            return factory(max(0.0, min(1.0, ratio or 1.0)))
+        if spec in {"parentbased_traceidratio", "parentbased"}:
+            pb_factory = getattr(module, "ParentBased", None)
+            ratio_factory = getattr(module, "TraceIdRatioBased", None)
+            if pb_factory is None or ratio_factory is None:
+                return None
+            inner_ratio = max(0.0, min(1.0, ratio or 1.0))
+            return pb_factory(ratio_factory(inner_ratio))
+    except (AttributeError, TypeError, ValueError):  # pragma: no cover - defensive
+        LOGGER.debug("Failed to instantiate sampler %s", sampler_spec, exc_info=True)
+        return None
+    LOGGER.warning("Unsupported sampler spec '%s'; falling back to default", sampler_spec)
+    return None
+
+
+def _build_resource(
     handles: _TraceHandles,
     service_name: str,
     service_version: str | None,
-    endpoint: str | None,
-) -> None:
+) -> object:
     resource_attrs: dict[str, object] = {"service.name": service_name}
     if service_version:
         resource_attrs["service.version"] = service_version
-    resource = handles.resource.Resource.create(resource_attrs)
-    provider = handles.sdk_trace.TracerProvider(resource=resource)
+    return handles.resource.Resource.create(resource_attrs)
+
+
+def _build_provider(
+    handles: _TraceHandles,
+    resource: object,
+    endpoint: str | None,
+    sampler_spec: str | None,
+) -> object:
+    sampler = _build_sampler(handles, sampler_spec)
+    provider = handles.sdk_trace.TracerProvider(resource=resource, sampler=sampler)
     processors = 0
     if endpoint and handles.otlp_http is not None:
         exporter = handles.otlp_http.OTLPSpanExporter(endpoint=endpoint)
@@ -172,6 +239,7 @@ def _build_provider(
             "OpenTelemetry enabled without exporters; spans will remain in-process only.",
         )
     handles.trace.set_tracer_provider(provider)
+    return provider
 
 
 def telemetry_enabled() -> bool:
@@ -185,13 +253,15 @@ def telemetry_enabled() -> bool:
     return _STATE.tracing_enabled
 
 
-def init_telemetry(
+def init_telemetry(  # noqa: PLR0913, C901
     app: SupportsState | None = None,
     *,
     service_name: str = "codeintel_rev",
     service_version: str | None = None,
     otlp_endpoint: str | None = None,
     enable_logging_instrumentation: bool = True,
+    sampler: str | None = None,
+    install_flight_recorder: bool = True,
 ) -> None:
     """Best-effort OpenTelemetry bootstrap (safe no-op when disabled/unavailable).
 
@@ -209,6 +279,11 @@ def init_telemetry(
     enable_logging_instrumentation : bool, optional
         When ``True`` attempts to enable OpenTelemetry logging instrumentation
         (safe no-op if instrumentation packages are unavailable).
+    sampler : str | None, optional
+        Optional sampler specification (e.g., ``parentbased_traceidratio:0.2``).
+        When ``None`` defers to SDK defaults.
+    install_flight_recorder : bool, optional
+        When ``True`` installs the lightweight flight recorder span processor.
     """
     if _STATE.initialized:
         if app is not None:
@@ -231,14 +306,48 @@ def init_telemetry(
         return
 
     endpoint = otlp_endpoint or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-    _build_provider(handles, service_name, service_version, endpoint)
+    sampler_spec = sampler or os.getenv("CODEINTEL_OTEL_SAMPLER")
+    resource = _build_resource(handles, service_name, service_version)
+    provider = _build_provider(handles, resource, endpoint, sampler_spec)
     _STATE.trace_module = handles.trace
+    _STATE.trace_provider = provider
     _STATE.tracing_enabled = True
     _STATE.initialized = True
     if app is not None:
         app.state.telemetry_enabled = True
     if enable_logging_instrumentation:
         _install_logging_instrumentation()
+    if _env_flag("CODEINTEL_OTEL_METRICS_ENABLED", default=False):
+        metrics_endpoint = os.getenv("CODEINTEL_OTEL_METRICS_ENDPOINT", otlp_endpoint or "")
+        _install_metrics_provider(resource, metrics_endpoint)
+    if install_flight_recorder and _install_flight_recorder is not None:
+        try:
+            _install_flight_recorder(provider)
+        except (RuntimeError, ValueError):  # pragma: no cover - defensive
+            LOGGER.debug("Failed to install flight recorder", exc_info=True)
+
+
+def init_otel(
+    app: SupportsState | None = None,
+    *,
+    service_name: str | None = None,
+    service_version: str | None = None,
+    install_flight_recorder: bool = True,
+) -> None:
+    """Initialize tracing/metrics using the CODEINTEL_OTEL_* env conventions."""
+    resolved_name = service_name or os.getenv("CODEINTEL_OTEL_SERVICE_NAME", "codeintel-mcp")
+    endpoint = os.getenv("CODEINTEL_OTEL_EXPORTER_OTLP_ENDPOINT")
+    sampler = os.getenv("CODEINTEL_OTEL_SAMPLER")
+    enable_logs = _env_flag("CODEINTEL_OTEL_LOGS_ENABLED", default=True)
+    init_telemetry(
+        app=app,
+        service_name=resolved_name,
+        service_version=service_version,
+        otlp_endpoint=endpoint,
+        enable_logging_instrumentation=enable_logs,
+        sampler=sampler,
+        install_flight_recorder=install_flight_recorder,
+    )
 
 
 def as_span(name: str, **attrs: object) -> AbstractContextManager[None]:
@@ -293,6 +402,80 @@ def record_span_event(name: str, **attrs: object) -> None:
         LOGGER.debug("Failed to record OpenTelemetry event; continuing", exc_info=True)
 
 
+def _current_span() -> object | None:
+    trace_module = _STATE.trace_module or _optional_import("opentelemetry.trace")
+    if trace_module is None:
+        return None
+    getter = getattr(trace_module, "get_current_span", None)
+    if getter is None:
+        return None
+    try:
+        return getter()
+    except (RuntimeError, ValueError):  # pragma: no cover - defensive
+        return None
+
+
+def set_current_span_attrs(**attrs: object) -> None:
+    """Attach attributes to the active span when tracing is enabled."""
+    span = _current_span()
+    if span is None:
+        return
+    setter = getattr(span, "set_attribute", None)
+    if setter is None:
+        return
+        for key, value in _sanitize_span_attrs(attrs).items():
+            try:
+                setter(key, value)
+            except (RuntimeError, ValueError, TypeError) as exc:  # pragma: no cover - defensive
+                LOGGER.debug("Failed to set span attribute %s", key, exc_info=exc)
+                continue
+
+
+def _current_span_context() -> object | None:
+    span = _current_span()
+    if span is None:
+        return None
+    getter = getattr(span, "get_span_context", None)
+    if getter is None:
+        return None
+    try:
+        return getter()
+    except (RuntimeError, ValueError):  # pragma: no cover - defensive
+        return None
+
+
+def current_trace_id() -> str | None:
+    """Return the hex trace identifier for the active span.
+
+    Returns
+    -------
+    str | None
+        Hexadecimal trace ID string (32 characters) for the active span, or
+        ``None`` if no active span is available or the trace ID is invalid.
+    """
+    context = _current_span_context()
+    trace_id = getattr(context, "trace_id", 0)
+    if not trace_id:
+        return None
+    return f"{int(trace_id):032x}"
+
+
+def current_span_id() -> str | None:
+    """Return the hex span identifier for the active span.
+
+    Returns
+    -------
+    str | None
+        Hexadecimal span ID string (16 characters) for the active span, or
+        ``None`` if no active span is available or the span ID is invalid.
+    """
+    context = _current_span_context()
+    span_id = getattr(context, "span_id", 0)
+    if not span_id:
+        return None
+    return f"{int(span_id):016x}"
+
+
 def _install_logging_instrumentation() -> None:
     if _STATE.logging_instrumented:
         return
@@ -305,6 +488,30 @@ def _install_logging_instrumentation() -> None:
     with suppress(Exception):  # pragma: no cover - defensive
         instrumentor().instrument(set_logging_format=True)
         _STATE.logging_instrumented = True
+
+
+def _install_metrics_provider(resource: object, endpoint: str | None) -> None:
+    """Configure OTLP metric reader when SDK components are present."""
+    try:
+        metrics_module = importlib.import_module("opentelemetry.sdk.metrics")
+        reader_module = importlib.import_module("opentelemetry.sdk.metrics.export")
+        exporter_module = importlib.import_module(
+            "opentelemetry.exporter.otlp.proto.http.metric_exporter"
+        )
+        metrics_api = importlib.import_module("opentelemetry.metrics")
+    except ImportError:  # pragma: no cover - optional dependency
+        LOGGER.debug("OpenTelemetry metrics SDK unavailable; skipping metric provider setup")
+        return
+    if not endpoint:
+        LOGGER.debug("OTLP metrics endpoint unset; skipping metric provider setup")
+        return
+    try:
+        exporter = exporter_module.OTLPMetricExporter(endpoint=endpoint)
+        reader = reader_module.PeriodicExportingMetricReader(exporter)
+        provider = metrics_module.MeterProvider(resource=resource, metric_readers=[reader])
+        metrics_api.set_meter_provider(provider)
+    except (RuntimeError, ValueError):  # pragma: no cover - defensive
+        LOGGER.debug("Failed to configure OTLP metrics exporter", exc_info=True)
 
 
 def instrument_fastapi(app: SupportsState) -> None:
@@ -339,9 +546,13 @@ def instrument_httpx() -> None:
 
 __all__ = [
     "as_span",
+    "current_span_id",
+    "current_trace_id",
+    "init_otel",
     "init_telemetry",
     "instrument_fastapi",
     "instrument_httpx",
     "record_span_event",
+    "set_current_span_attrs",
     "telemetry_enabled",
 ]

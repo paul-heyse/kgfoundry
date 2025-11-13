@@ -27,9 +27,19 @@ from codeintel_rev.mcp_server.schemas import (
     ScopeIn,
 )
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
-from codeintel_rev.observability.otel import as_span
+from codeintel_rev.observability.flight_recorder import build_report_uri
+from codeintel_rev.observability.otel import (
+    as_span,
+    current_span_id,
+    current_trace_id,
+)
+from codeintel_rev.observability.semantic_conventions import Attrs, to_label_str
 from codeintel_rev.observability.timeline import Timeline, current_timeline
-from codeintel_rev.telemetry.context import telemetry_metadata
+from codeintel_rev.telemetry.context import (
+    current_run_id,
+    current_session,
+    telemetry_metadata,
+)
 from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
 from kgfoundry_common.logging import get_logger
@@ -115,7 +125,7 @@ class _HybridResult:
     method: MethodInfo | None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _SemanticPipelineResult:
     plan: _SemanticSearchPlan
     limits_metadata: list[str]
@@ -126,7 +136,7 @@ class _SemanticPipelineResult:
     hydrate_duration_ms: float
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _SemanticPipelineRequest:
     context: ApplicationContext
     scope: ScopeIn | None
@@ -166,6 +176,7 @@ class _MethodContext:
     effective_limit: int
     start_time: float
     retrieval_channels: Sequence[str]
+    timeline: Timeline | None = None
     hybrid_method: MethodInfo | None = None
 
 
@@ -322,6 +333,7 @@ def _semantic_search_sync(
                 effective_limit=artifacts.plan.effective_limit,
                 start_time=start_time,
                 retrieval_channels=artifacts.hybrid_result.retrieval_channels,
+                timeline=timeline,
                 hybrid_method=cast("MethodInfo", method_payload) if method_payload else None,
             ),
             artifacts.limits_metadata,
@@ -350,53 +362,93 @@ def _execute_semantic_pipeline(request: _SemanticPipelineRequest) -> _SemanticPi
         request.context, request.scope, request.limit, request.observation
     )
     limits_metadata = list(plan.limits_metadata)
-    query_vector = _embed_query_or_raise(
-        request.context.vllm_client,
-        request.query,
-        request.observation,
-        request.context.settings.vllm.base_url,
-    )
-    with request.context.open_catalog() as catalog:
-        faiss_request = _FaissSearchRequest(
-            context=request.context,
-            query_vector=query_vector,
-            limit=plan.fanout.faiss_k,
-            nprobe=plan.nprobe,
-            observation=request.observation,
-            tuning_overrides=plan.tuning_overrides,
-            catalog=catalog,
-        )
-        result_ids, result_scores = _run_faiss_search_or_raise(faiss_request)
-
-        hybrid_result = _resolve_hybrid_results(
-            request.context,
-            _HybridSearchState(
+    pipeline_attrs = {
+        Attrs.COMPONENT: "retrieval",
+        Attrs.QUERY_TEXT: request.query,
+        Attrs.QUERY_LEN: len(request.query),
+        Attrs.RETRIEVAL_TOP_K: plan.effective_limit,
+        Attrs.RRF_K: plan.fanout.faiss_k,
+        Attrs.FAISS_NPROBE: plan.nprobe,
+        Attrs.DECISION_CHANNEL_DEPTHS: to_label_str({"faiss": plan.fanout.faiss_k}),
+    }
+    if limits_metadata:
+        pipeline_attrs["retrieval.limits"] = to_label_str(limits_metadata)
+        pipeline_attrs[Attrs.WARNINGS] = to_label_str(limits_metadata)
+    with as_span("retrieval.pipeline", **pipeline_attrs):
+        with as_span(
+            "retrieval.embed",
+            **{
+                Attrs.COMPONENT: "retrieval",
+                Attrs.STAGE: "embed",
+                Attrs.QUERY_LEN: len(request.query),
+            },
+        ):
+            query_vector = _embed_query_or_raise(
+                request.context.vllm_client,
                 request.query,
-                result_ids,
-                result_scores,
-                plan.effective_limit,
-                plan.fanout.faiss_k,
-                plan.nprobe,
-            ),
-            limits_metadata,
-            ("semantic", "faiss"),
-        )
-
-        hydrate_attrs = {"requested": len(hybrid_result.hydration_ids)}
-        hydrate_ctx = (
-            request.timeline.step("hydrate.duckdb", **hydrate_attrs)
-            if request.timeline
-            else nullcontext()
-        )
-        hydrate_start = perf_counter()
-        with hydrate_ctx, as_span("hydrate.duckdb", **hydrate_attrs):
-            findings, hydrate_exc = _hydrate_findings(
-                request.context,
-                hybrid_result.hydration_ids,
-                hybrid_result.hydration_scores,
-                scope=request.scope,
-                catalog=catalog,
+                request.observation,
+                request.context.settings.vllm.base_url,
             )
+        with request.context.open_catalog() as catalog:
+            faiss_attrs = {
+                Attrs.COMPONENT: "retrieval",
+                Attrs.STAGE: "faiss",
+                Attrs.FAISS_TOP_K: plan.fanout.faiss_k,
+                Attrs.FAISS_NPROBE: plan.nprobe,
+            }
+            with as_span("retrieval.faiss", **faiss_attrs):
+                result_ids, result_scores = _run_faiss_search_or_raise(
+                    _FaissSearchRequest(
+                        context=request.context,
+                        query_vector=query_vector,
+                        limit=plan.fanout.faiss_k,
+                        nprobe=plan.nprobe,
+                        observation=request.observation,
+                        tuning_overrides=plan.tuning_overrides,
+                        catalog=catalog,
+                    )
+                )
+
+            hybrid_attrs = {
+                Attrs.COMPONENT: "retrieval",
+                Attrs.STAGE: "hybrid",
+                Attrs.CHANNELS_USED: to_label_str(["semantic", "faiss"]),
+                Attrs.RETRIEVAL_TOP_K: plan.effective_limit,
+            }
+            with as_span("retrieval.hybrid", **hybrid_attrs):
+                hybrid_result = _resolve_hybrid_results(
+                    request.context,
+                    _HybridSearchState(
+                        request.query,
+                        result_ids,
+                        result_scores,
+                        plan.effective_limit,
+                        plan.fanout.faiss_k,
+                        plan.nprobe,
+                    ),
+                    limits_metadata,
+                    ("semantic", "faiss"),
+                )
+
+            hydrate_attrs = {
+                Attrs.COMPONENT: "retrieval",
+                Attrs.STAGE: "hydrate",
+                "requested": len(hybrid_result.hydration_ids),
+            }
+            hydrate_ctx = (
+                request.timeline.step("hydrate.duckdb", requested=len(hybrid_result.hydration_ids))
+                if request.timeline
+                else nullcontext()
+            )
+            hydrate_start = perf_counter()
+            with hydrate_ctx, as_span("hydrate.duckdb", **hydrate_attrs):
+                findings, hydrate_exc = _hydrate_findings(
+                    request.context,
+                    hybrid_result.hydration_ids,
+                    hybrid_result.hydration_scores,
+                    scope=request.scope,
+                    catalog=catalog,
+                )
     _ensure_hydration_success(hydrate_exc, request.observation, request.context)
     hydrate_duration_ms = round((perf_counter() - hydrate_start) * 1000, 2)
     return _SemanticPipelineResult(
@@ -1294,6 +1346,32 @@ def _make_envelope(
     return envelope
 
 
+def _observability_links(timeline: Timeline | None) -> dict[str, object]:
+    """Return trace/run metadata for AnswerEnvelope extras.
+
+    Returns
+    -------
+    dict[str, object]
+        Observability extras populated with trace/run diagnostics.
+    """
+    extras: dict[str, object] = {}
+    trace_id = current_trace_id()
+    span_id = current_span_id()
+    run_id = timeline.run_id if timeline else current_run_id()
+    session_id = timeline.session_id if timeline else current_session()
+    started_at = cast("float | None", timeline.metadata.get("started_at")) if timeline else None
+    diag_uri = build_report_uri(session_id, run_id, trace_id=trace_id, started_at=started_at)
+    if trace_id:
+        extras["trace_id"] = trace_id
+    if span_id:
+        extras["span_id"] = span_id
+    if run_id:
+        extras["run_id"] = run_id
+    if diag_uri:
+        extras["diag_report_uri"] = diag_uri
+    return extras
+
+
 def _success_extras(
     limits: Sequence[str],
     method: MethodInfo,
@@ -1362,6 +1440,7 @@ def _build_response_extras(
     extras = _success_extras(limits, method_metadata)
     if scope:
         extras["scope"] = scope
+    extras.update(_observability_links(context.timeline))
     return extras
 
 

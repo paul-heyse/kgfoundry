@@ -6,10 +6,16 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from codeintel_rev.observability.otel import record_span_event
+from codeintel_rev.observability.otel import record_span_event, set_current_span_attrs
+from codeintel_rev.observability.semantic_conventions import Attrs, to_label_str
 from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.retrieval.telemetry import record_stage_decision
 from codeintel_rev.retrieval.types import StageDecision, StageSignals
+from codeintel_rev.telemetry.prom import (
+    GATING_DECISIONS_TOTAL,
+    QUERY_AMBIGUITY,
+    RRFK,
+)
 
 
 @dataclass(slots=True, frozen=True)
@@ -362,6 +368,18 @@ def decide_budgets(profile: QueryProfile, cfg: StageGateConfig) -> BudgetDecisio
     decision = BudgetDecision(depths, rrf_k, rm3_enabled)
     attrs = describe_budget_decision(profile, decision)
     record_span_event("decision.gate.budget", **attrs)
+    set_current_span_attrs(
+        **{
+            Attrs.DECISION_CHANNEL_DEPTHS: to_label_str(attrs["per_channel_depths"]),
+            Attrs.DECISION_RRF_K: attrs["rrf_k"],
+            Attrs.BM25_RM3_ENABLED: attrs["rm3_enabled"],
+            Attrs.QUERY_LEN: profile.length,
+        }
+    )
+    klass = "literal" if profile.looks_literal else "vague" if profile.looks_vague else "default"
+    GATING_DECISIONS_TOTAL.labels(klass, str(attrs["rm3_enabled"])).inc()
+    RRFK.observe(attrs["rrf_k"])
+    QUERY_AMBIGUITY.observe(profile.ambiguity_score)
     timeline = current_timeline()
     if timeline is not None:
         timeline.event("decision", "gate.budget", attrs=attrs)

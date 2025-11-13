@@ -9,7 +9,7 @@ from threading import Lock
 from codeintel_rev.io.hybrid_search import BM25Rm3Config, BM25SearchProvider, SpladeSearchProvider
 from codeintel_rev.plugins.channels import Channel, ChannelContext, ChannelError
 from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
-from codeintel_rev.retrieval.types import ChannelHit
+from codeintel_rev.retrieval.types import SearchHit
 from kgfoundry_common.logging import get_logger
 
 LOGGER = get_logger(__name__)
@@ -96,7 +96,7 @@ class _BM25Channel(Channel):
         self._skip_reason: str | None = None
         self._lock = Lock()
 
-    def search(self, query: str, limit: int) -> Sequence[ChannelHit]:
+    def search(self, query: str, limit: int) -> Sequence[SearchHit]:
         """Perform BM25 search and return ranked document hits.
 
         Extended Summary
@@ -121,7 +121,7 @@ class _BM25Channel(Channel):
 
         Returns
         -------
-        Sequence[ChannelHit]
+        Sequence[SearchHit]
             Ranked sequence of channel hits containing document IDs and BM25 scores.
             Results are sorted by score descending. Length is min(limit, total_documents).
 
@@ -225,7 +225,7 @@ class _SpladeChannel(Channel):
         self._skip_reason: str | None = None
         self._lock = Lock()
 
-    def search(self, query: str, limit: int) -> Sequence[ChannelHit]:
+    def search(self, query: str, limit: int) -> Sequence[SearchHit]:
         """Perform SPLADE search and return ranked document hits.
 
         Extended Summary
@@ -250,7 +250,7 @@ class _SpladeChannel(Channel):
 
         Returns
         -------
-        Sequence[ChannelHit]
+        Sequence[SearchHit]
             Ranked sequence of channel hits containing document IDs and SPLADE scores.
             Results are sorted by score descending. Length is min(limit, total_documents).
 

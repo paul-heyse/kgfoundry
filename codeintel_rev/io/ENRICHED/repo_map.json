@@ -2,10 +2,10 @@
   "root": "/home/paul/kgfoundry/codeintel_rev",
   "repo_root": "/home/paul/kgfoundry",
   "module_count": 162,
-  "symbol_edge_count": 12894,
+  "symbol_edge_count": 12914,
   "coverage_records": 162,
-  "config_files": 195,
-  "generated_at": "2025-11-13T20:32:41+00:00",
+  "config_files": 196,
+  "generated_at": "2025-11-13T21:13:41+00:00",
   "tags": {
     "low-coverage": [
       "risk_hotspots.py",

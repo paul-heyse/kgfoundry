@@ -6,13 +6,10 @@ import pytest
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.config_context import resolve_application_paths
 from codeintel_rev.config.settings import load_settings
-from codeintel_rev.io.hybrid_search import (
-    ChannelHit,
-    HybridSearchEngine,
-    HybridSearchOptions,
-)
+from codeintel_rev.io.hybrid_search import HybridSearchEngine, HybridSearchOptions
 from codeintel_rev.plugins.channels import Channel
 from codeintel_rev.plugins.registry import ChannelRegistry
+from codeintel_rev.retrieval.types import SearchHit
 from msgspec import structs
 
 
@@ -20,7 +17,7 @@ class _StubChannel(Channel):
     def __init__(
         self,
         name: str,
-        hits: Sequence[ChannelHit],
+        hits: Sequence[SearchHit],
         *,
         requires: frozenset[str] | None = None,
         cost: float = 1.0,
@@ -31,7 +28,7 @@ class _StubChannel(Channel):
         self._hits = list(hits)
         self.calls = 0
 
-    def search(self, query: str, limit: int) -> list[ChannelHit]:
+    def search(self, query: str, limit: int) -> list[SearchHit]:
         self.calls += 1
         assert query  # sanity check
         return list(self._hits[:limit])
@@ -63,15 +60,15 @@ def test_hybrid_search_engine_rrf_fuses_channels(monkeypatch: pytest.MonkeyPatch
     bm25_stub = _StubChannel(
         "bm25",
         [
-            ChannelHit(doc_id="102", score=7.0),
-            ChannelHit(doc_id="201", score=6.0),
+            SearchHit(doc_id="102", rank=0, score=7.0, source="bm25"),
+            SearchHit(doc_id="201", rank=1, score=6.0, source="bm25"),
         ],
         requires=frozenset({"warp_index_present", "lucene_importable"}),
     )
     splade_stub = _StubChannel(
         "splade",
         [
-            ChannelHit(doc_id="101", score=4.2),
+            SearchHit(doc_id="101", rank=0, score=4.2, source="splade"),
         ],
         requires=frozenset({"lucene_importable", "onnxruntime_importable"}),
     )
@@ -145,7 +142,7 @@ def test_hybrid_search_engine_accepts_extra_channels(
         semantic_hits=[(1, 0.3), (2, 0.2)],
         limit=2,
         options=HybridSearchOptions(
-            extra_channels={"warp": [ChannelHit(doc_id="999", score=5.0)]},
+            extra_channels={"warp": [SearchHit(doc_id="999", rank=0, score=5.0, source="warp")]},
             weights={"semantic": 1.0, "warp": 2.0},
         ),
     )
@@ -157,7 +154,7 @@ def test_hybrid_search_engine_accepts_extra_channels(
 def test_hybrid_channel_skips_missing_capability(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     splade_stub = _StubChannel(
         "splade",
-        [ChannelHit(doc_id="5", score=2.0)],
+        [SearchHit(doc_id="5", rank=0, score=2.0, source="splade")],
         requires=frozenset({"lucene_importable"}),
     )
     engine = _build_engine(
@@ -177,7 +174,7 @@ def test_hybrid_search_exposes_stage_metadata(monkeypatch: pytest.MonkeyPatch, t
     engine = _build_engine(
         monkeypatch,
         tmp_path,
-        channels=[_StubChannel("bm25", [ChannelHit("1", 1.2)])],
+        channels=[_StubChannel("bm25", [SearchHit("1", rank=0, score=1.2, source="bm25")])],
     )
     result = engine.search("query", semantic_hits=[(1, 0.5)], limit=1)
     assert result.method is not None

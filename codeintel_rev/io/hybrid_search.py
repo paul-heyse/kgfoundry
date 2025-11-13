@@ -25,11 +25,7 @@ from codeintel_rev.retrieval.gating import (
     describe_budget_decision,
 )
 from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
-from codeintel_rev.retrieval.types import (
-    ChannelHit,
-    HybridResultDoc,
-    HybridSearchResult,
-)
+from codeintel_rev.retrieval.types import HybridResultDoc, HybridSearchResult, SearchHit
 from codeintel_rev.telemetry.decorators import span_context
 from kgfoundry_common.logging import get_logger
 
@@ -132,7 +128,7 @@ class BM25SearchProvider:
             return self._rm3_enabled_default
         return self._heuristics.should_enable(query)
 
-    def search(self, query: str, top_k: int, *, force_rm3: bool | None = None) -> list[ChannelHit]:
+    def search(self, query: str, top_k: int, *, force_rm3: bool | None = None) -> list[SearchHit]:
         """Return BM25 hits for ``query``, optionally applying RM3 when heuristics fire.
 
         Parameters
@@ -147,7 +143,7 @@ class BM25SearchProvider:
 
         Returns
         -------
-        list[ChannelHit]
+        list[SearchHit]
             List of search results with document IDs and BM25 scores, sorted by
             relevance descending. Returns empty list if top_k <= 0.
         """
@@ -158,7 +154,16 @@ class BM25SearchProvider:
             use_rm3 = force_rm3
         searcher = self._ensure_rm3_searcher() if use_rm3 else self._base_searcher
         hits = searcher.search(query, k=top_k)
-        return [ChannelHit(doc_id=hit.docid, score=float(hit.score)) for hit in hits]
+        return [
+            SearchHit(
+                doc_id=str(hit.docid),
+                rank=rank,
+                score=float(hit.score),
+                source="bm25",
+                explain={"bm25_score": float(hit.score), "rm3": use_rm3},
+            )
+            for rank, hit in enumerate(hits)
+        ]
 
 
 class SpladeSearchProvider:
@@ -236,7 +241,7 @@ class SpladeSearchProvider:
         self._prune_below = max(0.0, float(config.prune_below))
         self._static_prune_pct = min(max(0.0, float(config.static_prune_pct)), 1.0)
 
-    def search(self, query: str, top_k: int) -> list[ChannelHit]:
+    def search(self, query: str, top_k: int) -> list[SearchHit]:
         """Return SPLADE impact hits for ``query``.
 
         Encodes the query using the SPLADE encoder to generate a sparse term
@@ -258,11 +263,11 @@ class SpladeSearchProvider:
 
         Returns
         -------
-        list[ChannelHit]
+        list[SearchHit]
             List of ranked SPLADE results, ordered by learned relevance score
-            (highest first). Each ChannelHit contains a document ID and SPLADE
-            impact score. Returns empty list if encoding fails, no terms are
-            generated, or top_k is 0.
+            (highest first). Each hit contains a document ID and SPLADE impact
+            score. Returns empty list if encoding fails, no terms are generated,
+            or top_k is 0.
         """
         embeddings = self._encoder.encode_query([query])
         decoded = self._encoder.decode(embeddings, top_k=None)
@@ -275,7 +280,16 @@ class SpladeSearchProvider:
         if not bow:
             return []
         hits = self._searcher.search(bow, k=top_k)
-        return [ChannelHit(doc_id=hit.docid, score=float(hit.score)) for hit in hits]
+        return [
+            SearchHit(
+                doc_id=str(hit.docid),
+                rank=rank,
+                score=float(hit.score),
+                source="splade",
+                explain={"splade_score": float(hit.score)},
+            )
+            for rank, hit in enumerate(hits)
+        ]
 
     def _filter_pairs(self, pairs: Sequence[tuple[str, float]]) -> list[tuple[str, float]]:
         filtered = [(token, weight) for token, weight in pairs if weight > 0]
@@ -320,7 +334,7 @@ class HybridSearchTuning:
 class HybridSearchOptions:
     """Optional knobs influencing hybrid fusion."""
 
-    extra_channels: Mapping[str, Sequence[ChannelHit]] | None = None
+    extra_channels: Mapping[str, Sequence[SearchHit]] | None = None
     weights: Mapping[str, float] | None = None
     tuning: HybridSearchTuning | None = None
 
@@ -339,7 +353,7 @@ class _FusionContext:
     """All inputs required to fuse dense and sparse channel runs."""
 
     query: str
-    runs: dict[str, list[ChannelHit]]
+    runs: dict[str, list[SearchHit]]
     warnings: Sequence[str]
     limit: int
     options: HybridSearchOptions
@@ -348,7 +362,7 @@ class _FusionContext:
     timeline: Timeline | None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _SearchTelemetryContext:
     timeline: Timeline | None
     stage_records: list[dict[str, object]]
@@ -358,7 +372,7 @@ class _SearchTelemetryContext:
 class _FusionWork:
     """Resolved fusion parameters after pooler/weights are selected."""
 
-    runs: Mapping[str, Sequence[ChannelHit]]
+    runs: Mapping[str, Sequence[SearchHit]]
     warnings: Sequence[str]
     limit: int
     runtime: HybridSearchTuning
@@ -459,17 +473,17 @@ class HybridSearchEngine:
 
     def _rrf_fuse(
         self,
-        runs: Mapping[str, Sequence[ChannelHit]],
+        runs: Mapping[str, Sequence[SearchHit]],
         *,
         limit: int,
         rrf_k: int,
     ) -> tuple[list[HybridResultDoc], dict[str, list[tuple[str, int, float]]]]:
         aggregated: dict[str, float] = {}
         for hits in runs.values():
-            for rank, hit in enumerate(hits, start=1):
+            for hit in hits:
                 doc_id = str(hit.doc_id)
                 aggregated.setdefault(doc_id, 0.0)
-                aggregated[doc_id] += 1.0 / (rrf_k + rank)
+                aggregated[doc_id] += 1.0 / (rrf_k + hit.rank + 1)
         ranked = sorted(aggregated.items(), key=lambda item: item[1], reverse=True)[:limit]
         docs = [HybridResultDoc(doc_id=doc_id, score=score) for doc_id, score in ranked]
         contributions = self._build_contribution_map(runs)
@@ -480,7 +494,7 @@ class HybridSearchEngine:
     def _build_debug_bundle(
         query: str,
         budget_info: Mapping[str, object],
-        channels: Mapping[str, Sequence[ChannelHit]],
+        channels: Mapping[str, Sequence[SearchHit]],
         rrf_k: int,
     ) -> dict[str, object]:
         return {
@@ -535,9 +549,9 @@ class HybridSearchEngine:
 
     @staticmethod
     def _apply_extra_channels(
-        runs: dict[str, list[ChannelHit]],
-        extra_channels: Mapping[str, Sequence[ChannelHit]] | None,
-    ) -> dict[str, list[ChannelHit]]:
+        runs: dict[str, list[SearchHit]],
+        extra_channels: Mapping[str, Sequence[SearchHit]] | None,
+    ) -> dict[str, list[SearchHit]]:
         if not extra_channels:
             return runs
         updated = dict(runs)
@@ -547,12 +561,12 @@ class HybridSearchEngine:
         return updated
 
     @staticmethod
-    def _resolve_active_channels(runs: Mapping[str, Sequence[ChannelHit]]) -> list[str]:
+    def _resolve_active_channels(runs: Mapping[str, Sequence[SearchHit]]) -> list[str]:
         return [channel for channel, hits in runs.items() if hits] or ["semantic"]
 
     @staticmethod
     def _record_fusion_start(
-        runs: Mapping[str, Sequence[ChannelHit]],
+        runs: Mapping[str, Sequence[SearchHit]],
         timeline: Timeline | None,
         rrf_k: int,
     ) -> None:
@@ -620,7 +634,7 @@ class HybridSearchEngine:
 
     def _run_rrf(
         self,
-        runs: Mapping[str, Sequence[ChannelHit]],
+        runs: Mapping[str, Sequence[SearchHit]],
         *,
         limit: int,
         rrf_k: int,
@@ -650,7 +664,7 @@ class HybridSearchEngine:
 
     def _run_pool(
         self,
-        runs: Mapping[str, Sequence[ChannelHit]],
+        runs: Mapping[str, Sequence[SearchHit]],
         *,
         pooler: HybridPoolEvaluator,
         limit: int,
@@ -842,7 +856,7 @@ class HybridSearchEngine:
         *,
         channel_limits: Mapping[str, int] | None = None,
         stage_records: list[dict[str, object]],
-    ) -> tuple[dict[str, list[ChannelHit]], list[str]]:
+    ) -> tuple[dict[str, list[SearchHit]], list[str]]:
         """Collect per-channel search hits and warnings for ``query``.
 
         This internal method coordinates retrieval across all enabled channels,
@@ -851,7 +865,7 @@ class HybridSearchEngine:
         rather than exceptions to ensure robust multi-channel retrieval.
 
         The semantic channel is always included (converting IDs and scores to
-        ChannelHit objects). BM25 and SPLADE channels are conditionally enabled
+        SearchHit objects). BM25 and SPLADE channels are conditionally enabled
         based on settings and availability. Channel initialization errors are
         captured as warnings and included in the return value.
 
@@ -876,15 +890,15 @@ class HybridSearchEngine:
 
         Returns
         -------
-        tuple[dict[str, list[ChannelHit]], list[str]]
+        tuple[dict[str, list[SearchHit]], list[str]]
             Tuple containing:
             - Dictionary mapping channel identifiers ("semantic", "bm25", "splade")
-              to lists of ChannelHit objects. Only channels that successfully
+              to lists of SearchHit objects. Only channels that successfully
               returned results are included.
             - List of warning messages accumulated during channel retrieval. Includes
               initialization errors, search failures, and availability issues.
         """
-        runs: dict[str, list[ChannelHit]] = {}
+        runs: dict[str, list[SearchHit]] = {}
         warnings: list[str] = []
         timeline = current_timeline()
 
@@ -956,7 +970,7 @@ class HybridSearchEngine:
         limit: int,
         timeline: Timeline | None,
         stage_records: list[dict[str, object]],
-    ) -> tuple[list[ChannelHit], str | None]:
+    ) -> tuple[list[SearchHit], str | None]:
         stage_name = f"search.{channel.name}"
 
         def _record_stage(
@@ -1049,7 +1063,7 @@ class HybridSearchEngine:
     @staticmethod
     def _emit_channel_run(
         channel: Channel,
-        hits: Sequence[ChannelHit],
+        hits: Sequence[SearchHit],
         timeline: Timeline | None,
     ) -> None:
         if timeline is None:
@@ -1099,12 +1113,21 @@ class HybridSearchEngine:
         hits: Sequence[tuple[int, float]],
         *,
         limit: int | None = None,
-    ) -> list[ChannelHit]:
+    ) -> list[SearchHit]:
         limit = limit or self._settings.index.hybrid_top_k_per_channel
         top_k = min(len(hits), limit) or len(hits)
-        return [
-            ChannelHit(doc_id=str(chunk_id), score=float(score)) for chunk_id, score in hits[:top_k]
-        ]
+        semantic_hits: list[SearchHit] = []
+        for rank, (chunk_id, score) in enumerate(hits[:top_k]):
+            semantic_hits.append(
+                SearchHit(
+                    doc_id=str(chunk_id),
+                    rank=rank,
+                    score=float(score),
+                    source="semantic",
+                    explain={"semantic_score": float(score)},
+                )
+            )
+        return semantic_hits
 
     def _compute_pool_weights(self) -> dict[str, float]:
         weights = {
@@ -1169,28 +1192,33 @@ class HybridSearchEngine:
         )
 
     @staticmethod
-    def _flatten_hits_for_pool(runs: Mapping[str, Sequence[ChannelHit]]) -> list[Hit]:
+    def _flatten_hits_for_pool(runs: Mapping[str, Sequence[SearchHit]]) -> list[Hit]:
         flattened: list[Hit] = []
         for source, hits in runs.items():
-            for rank, hit in enumerate(hits, start=1):
+            for hit in hits:
+                meta_payload: dict[str, object] = {"score": float(hit.score), "rank": hit.rank}
+                if hit.explain:
+                    meta_payload.update(hit.explain)
                 flattened.append(
                     Hit(
                         doc_id=str(hit.doc_id),
                         score=float(hit.score),
                         source=source,
-                        meta={"score": float(hit.score), "rank": rank},
+                        meta=meta_payload,
                     )
                 )
         return flattened
 
     @staticmethod
     def _build_contribution_map(
-        runs: Mapping[str, Sequence[ChannelHit]],
+        runs: Mapping[str, Sequence[SearchHit]],
     ) -> dict[str, list[tuple[str, int, float]]]:
         contributions: dict[str, list[tuple[str, int, float]]] = {}
         for channel, hits in runs.items():
-            for rank, hit in enumerate(hits, start=1):
-                contributions.setdefault(hit.doc_id, []).append((channel, rank, float(hit.score)))
+            for hit in hits:
+                contributions.setdefault(hit.doc_id, []).append(
+                    (channel, hit.rank + 1, float(hit.score))
+                )
         return contributions
 
     def _compose_method_metadata(
@@ -1230,7 +1258,6 @@ class HybridSearchEngine:
 
 __all__ = [
     "BM25SearchProvider",
-    "ChannelHit",
     "HybridResultDoc",
     "HybridSearchEngine",
     "HybridSearchOptions",

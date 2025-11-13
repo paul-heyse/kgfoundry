@@ -43,7 +43,7 @@ class CollectorConfig:
     text_preview_skip_bytes: int = 2_000_000
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class _CollectorStatsBuilder:
     """Mutable builder used while collecting CST stats."""
 
@@ -52,9 +52,6 @@ class _CollectorStatsBuilder:
     parse_errors: int = 0
     qname_hits: int = 0
     scope_resolved: int = 0
-
-    def _replace(self, field_name: str, value: int) -> None:
-        object.__setattr__(self, field_name, value)
 
     def increment_parse_errors(self, count: int = 1) -> None:
         """Increment the parse error counter.
@@ -69,7 +66,7 @@ class _CollectorStatsBuilder:
             Number of parse errors to add (defaults to 1). Used when multiple
             errors occur in a single operation or when batching error counts.
         """
-        self._replace("parse_errors", self.parse_errors + count)
+        self.parse_errors += count
 
     def set_node_rows(self, count: int) -> None:
         """Set the total number of node rows collected.
@@ -85,7 +82,7 @@ class _CollectorStatsBuilder:
             represents the number of NodeRecord objects emitted for the processed
             files.
         """
-        self._replace("node_rows", count)
+        self.node_rows = count
 
     def increment_qname_hits(self) -> None:
         """Increment the qualified name resolution hit counter.
@@ -100,7 +97,7 @@ class _CollectorStatsBuilder:
         This counter tracks how many nodes had their qnames successfully resolved,
         providing a metric for scope resolution quality.
         """
-        self._replace("qname_hits", self.qname_hits + 1)
+        self.qname_hits += 1
 
     def increment_scope_resolved(self) -> None:
         """Increment the scope resolution hit counter.
@@ -115,7 +112,7 @@ class _CollectorStatsBuilder:
         or Comprehension scope. This counter tracks how many nodes had their scope
         successfully resolved, providing a metric for scope analysis quality.
         """
-        self._replace("scope_resolved", self.scope_resolved + 1)
+        self.scope_resolved += 1
 
     def snapshot(self) -> CollectorStats:
         """Return an immutable CollectorStats instance.

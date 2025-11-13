@@ -2,6 +2,20 @@
 
 from __future__ import annotations
 
-from codeintel_rev.observability import metrics, otel, runtime_observer, timeline
+from codeintel_rev.observability import (
+    flight_recorder,
+    metrics,
+    otel,
+    runtime_observer,
+    semantic_conventions,
+    timeline,
+)
 
-__all__ = ["metrics", "otel", "runtime_observer", "timeline"]
+__all__ = [
+    "flight_recorder",
+    "metrics",
+    "otel",
+    "runtime_observer",
+    "semantic_conventions",
+    "timeline",
+]

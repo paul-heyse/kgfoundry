@@ -20,6 +20,7 @@ from codeintel_rev.mcp_server.schemas import (
 )
 from codeintel_rev.mcp_server.server import get_context, mcp
 from codeintel_rev.mcp_server.telemetry import tool_operation_scope
+from codeintel_rev.observability.otel import current_trace_id
 from codeintel_rev.telemetry.context import current_session
 from codeintel_rev.telemetry.reporter import build_report as build_run_report
 from codeintel_rev.telemetry.reporter import report_to_json
@@ -93,7 +94,7 @@ async def deep_research_search(
     empty_result={"objects": []},
 )
 async def deep_research_fetch(
-    objectIds: list[str],  # noqa: N803 - MCP schema uses camelCase
+    objectIds: list[str],  # lint-ignore[N803]: MCP schema uses camelCase
     max_tokens: int | None = None,
 ) -> FetchStructuredContent:
     """Hydrate chunk ids produced by :func:`deep_research_search`.
@@ -279,13 +280,21 @@ async def telemetry_run_report(
     if effective_session is None:
         msg = "Session ID unavailable; pass session_id explicitly."
         raise RuntimeError(msg)
-    return await asyncio.to_thread(_render_run_report, context, effective_session, run_id)
+    trace_id = current_trace_id()
+    return await asyncio.to_thread(
+        _render_run_report,
+        context,
+        effective_session,
+        run_id,
+        trace_id,
+    )
 
 
 def _render_run_report(
     context: ApplicationContext,
     session_id: str,
     run_id: str | None,
+    trace_id: str | None = None,
 ) -> dict[str, Any]:
     report = build_run_report(context, session_id, run_id)
     if report is None:
@@ -293,4 +302,7 @@ def _render_run_report(
             "session_id": session_id,
             "error": "run_not_found",
         }
-    return report_to_json(report)
+    payload = report_to_json(report)
+    if trace_id:
+        payload["trace_id"] = trace_id
+    return payload

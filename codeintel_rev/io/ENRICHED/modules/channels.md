@@ -12,7 +12,7 @@ Channel plugin contracts for hybrid retrieval.
 - from **collections.abc** import Sequence
 - from **dataclasses** import dataclass
 - from **typing** import TYPE_CHECKING, Any, Protocol
-- from **codeintel_rev.retrieval.types** import ChannelHit
+- from **codeintel_rev.retrieval.types** import SearchHit
 - from **codeintel_rev.app.capabilities** import Capabilities
 - from **codeintel_rev.app.config_context** import ResolvedPaths
 - from **codeintel_rev.config.settings** import Settings
@@ -30,7 +30,7 @@ Channel plugin contracts for hybrid retrieval.
 
 - **fan_in**: 3
 - **fan_out**: 5
-- **cycle_group**: 69
+- **cycle_group**: 70
 
 ## Ownership
 

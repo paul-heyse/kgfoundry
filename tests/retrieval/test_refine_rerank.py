@@ -39,8 +39,8 @@ def test_search_with_refine_returns_ordered_hits(tmp_path: Path) -> None:
     query = base_vectors[0].reshape(1, -1)
     hits = manager.search_with_refine(query, k=2, catalog=cast("DuckDBCatalog", catalog))
     assert hits, "search_with_refine should return at least one hit"
-    assert hits[0].id == 0
-    assert hits[0].rank == 1
+    assert int(hits[0].doc_id) == 0
+    assert hits[0].rank == 0
     k_factor = hits[0].explain.get("k_factor")
     assert isinstance(k_factor, float)
     assert k_factor >= 1.0

@@ -5,50 +5,12 @@ Fuses results from BM25, SPLADE, and FAISS using Reciprocal Rank Fusion.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
+
+from codeintel_rev.retrieval.types import SearchHit
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-
-
-@dataclass(frozen=True)
-class SearchHit:
-    """Search result hit from a single retrieval system.
-
-    Represents one search result from a retrieval system (FAISS, BM25, SPLADE, etc.)
-    before fusion. Contains the document/chunk ID, its relevance score, rank
-    position, and which retrieval system found it.
-
-    SearchHit objects are created for each retrieval system's results, then
-    combined using Reciprocal Rank Fusion (RRF) to produce a unified ranked list.
-    The source field allows tracking which system contributed each result, which
-    is useful for analysis and debugging.
-
-    Attributes
-    ----------
-    doc_id : str
-        Document or chunk ID that was retrieved. This should match the ID used
-        in the index (e.g., chunk ID from DuckDB). Used to look up full chunk
-        information after fusion.
-    score : float
-        Original relevance score from the retrieval system. Score ranges and
-        meanings vary by system (FAISS uses cosine similarity, BM25 uses BM25 score,
-        etc.). Used for debugging and understanding individual system performance.
-    rank : int
-        Rank position in the original result list (0-indexed). Rank 0 is the
-        top result. Used by RRF to compute fusion scores - lower ranks get higher
-        RRF scores.
-    source : str
-        Identifier for the retrieval system that produced this hit (e.g., "faiss",
-        "bm25", "splade", "structural"). Used for analysis, debugging, and
-        understanding which systems contribute to final results.
-    """
-
-    doc_id: str
-    score: float
-    rank: int
-    source: str
 
 
 def reciprocal_rank_fusion(

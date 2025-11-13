@@ -45,15 +45,15 @@ Implements full MCP tool catalog for code intelligence.
 
 - **fan_in**: 3
 - **fan_out**: 7
-- **cycle_group**: 82
+- **cycle_group**: 84
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 13
-- recent churn 90: 13
+- recent churn 30: 14
+- recent churn 90: 14
 
 ## Usage
 

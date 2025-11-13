@@ -44,15 +44,15 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 
 - **fan_in**: 4
 - **fan_out**: 7
-- **cycle_group**: 67
+- **cycle_group**: 60
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 22
-- recent churn 90: 22
+- recent churn 30: 23
+- recent churn 90: 23
 
 ## Usage
 

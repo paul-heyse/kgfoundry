@@ -9,13 +9,13 @@ chunk retrieval and joins.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, Self, TypedDict, Unpack, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Self, TypedDict, Unpack, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.io.duckdb_manager import (
@@ -261,11 +261,11 @@ class _DuckDBQueryMixin:
             annotations, boundaries = self._initialize_annotation_maps(base_rows)
             if not annotations:
                 return {}
-            if catalog._relation_exists(conn, "chunk_symbols"):
+            if _relation_exists(conn, "chunk_symbols"):
                 self._attach_chunk_symbols(conn, unique_ids, annotations)
-            if catalog._relation_exists(conn, "ast_nodes"):
+            if _relation_exists(conn, "ast_nodes"):
                 self._attach_ast_nodes(conn, boundaries, annotations)
-            if catalog._relation_exists(conn, "cst_nodes"):
+            if _relation_exists(conn, "cst_nodes"):
                 path_column = self._resolve_cst_path_column(conn)
                 self._attach_cst_nodes(conn, path_column, boundaries, annotations)
         return self._coerce_annotation_payload(unique_ids, annotations)
@@ -426,6 +426,13 @@ class DuckDBCatalog(_DuckDBQueryMixin):
     indexes). The catalog manages DuckDB connections, builds query views, and
     provides methods for fetching embeddings and metadata by IDs.
 
+    Attributes
+    ----------
+    relation_exists : ClassVar[Callable[[duckdb.DuckDBPyConnection, str], bool]]
+        Class variable referencing the module-level ``relation_exists()`` function.
+        Used to check if a table or view exists in the DuckDB catalog. Accepts a
+        DuckDB connection and relation name, returns ``True`` if the relation exists.
+
     Parameters
     ----------
     db_path : Path
@@ -454,6 +461,8 @@ class DuckDBCatalog(_DuckDBQueryMixin):
     TypeError
         Raised when legacy_kwargs contains unsupported keyword arguments.
     """
+
+    relation_exists: ClassVar[Callable[[duckdb.DuckDBPyConnection, str], bool]]
 
     def __init__(
         self,
@@ -572,7 +581,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             _catalog_view_bootstrap_seconds.observe(max(perf_counter() - start, 0.0))
 
     def _install_chunks_view(self, conn: duckdb.DuckDBPyConnection) -> None:
-        chunks_ready = self._relation_exists(conn, "chunks")
+        chunks_ready = _relation_exists(conn, "chunks")
         if chunks_ready:
             return
         parquet_pattern = str(self.vectors_dir / "**/*.parquet")
@@ -759,7 +768,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             )
             return
 
-        if self._relation_exists(conn, "faiss_idmap_mat"):
+        if _relation_exists(conn, "faiss_idmap_mat"):
             conn.execute(
                 """
                 CREATE OR REPLACE VIEW faiss_idmap AS
@@ -794,7 +803,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
     def materialize_faiss_join(self) -> None:
         """Persist ``v_faiss_join`` into ``faiss_join_mat`` for BI workloads."""
         with self.connection() as conn:
-            if not self._relation_exists(conn, "v_faiss_join"):
+            if not _relation_exists(conn, "v_faiss_join"):
                 return
             sql = "CREATE OR REPLACE TABLE faiss_join_mat AS SELECT * FROM v_faiss_join"
             self._log_query(sql, None)
@@ -884,87 +893,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):
                 extra=_log_extra(view="v_pool_coverage", source=str(pool_path)),
             )
 
-    @staticmethod
-    def _relation_exists(conn: duckdb.DuckDBPyConnection, name: str) -> bool:
-        """Return True when a table or view with ``name`` exists in the main schema.
-
-        Parameters
-        ----------
-        conn : duckdb.DuckDBPyConnection
-            DuckDB connection used to inspect the catalog.
-        name : str
-            Table or view name to look up within the ``main`` schema.
-
-        Returns
-        -------
-        bool
-            ``True`` when the relation exists, otherwise ``False``.
-        """
-        row = conn.execute(
-            """
-            SELECT EXISTS(
-                SELECT 1
-                FROM information_schema.tables
-                WHERE table_schema = 'main'
-                  AND table_name = ?
-                UNION ALL
-                SELECT 1
-                FROM information_schema.views
-                WHERE table_schema = 'main'
-                  AND table_name = ?
-            )
-            """,
-            [name, name],
-        ).fetchone()
-        return bool(row and row[0])
-
-    @staticmethod
-    def relation_exists(conn: duckdb.DuckDBPyConnection, name: str) -> bool:
-        """Return True when a table or view exists (public wrapper).
-
-        Parameters
-        ----------
-        conn : duckdb.DuckDBPyConnection
-            DuckDB connection to inspect.
-        name : str
-            Table or view name to look up.
-
-        Returns
-        -------
-        bool
-            ``True`` when the relation exists in schema ``main``.
-        """
-        return DuckDBCatalog._relation_exists(conn, name)
-
-    @staticmethod
-    def _file_checksum(path: Path) -> str:
-        """Return SHA-256 checksum for ``path``.
-
-        This static method computes a SHA-256 hash digest for a file by reading
-        it in chunks (1MB at a time) and updating the hash digest. The method
-        provides a deterministic checksum suitable for detecting file changes.
-
-        Parameters
-        ----------
-        path : Path
-            File path to compute checksum for. The file is opened in binary mode
-            and read in 1MB chunks. The path must exist and be readable.
-
-        Returns
-        -------
-        str
-            Hexadecimal digest string representing the SHA-256 hash of the file
-            contents. The digest is deterministic for the same file content and
-            can be used for change detection or integrity verification.
-        """
-        digest = hashlib.sha256()
-        with path.open("rb") as handle:
-            for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-                if not chunk:
-                    break
-                digest.update(chunk)
-        return digest.hexdigest()
-
     def refresh_faiss_idmap_mat_if_changed(self, idmap_parquet: Path) -> dict[str, Any]:
         """Materialize FAISS ID map when the Parquet sidecar content changes.
 
@@ -978,7 +906,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         dict[str, Any]
             Summary dictionary with ``refreshed``, ``checksum``, and ``rows`` keys.
         """
-        checksum = self._file_checksum(idmap_parquet)
+        checksum = _file_checksum(idmap_parquet)
         stats: dict[str, Any]
         with self._manager.connection() as conn:
             self._ensure_views(conn)
@@ -1501,7 +1429,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             list if chunk has no symbols or chunk_id doesn't exist.
         """
         with self.connection() as conn:
-            if self._relation_exists(conn, "v_chunk_symbols"):
+            if _relation_exists(conn, "v_chunk_symbols"):
                 sql = "SELECT symbol FROM v_chunk_symbols WHERE chunk_id = ?"
             else:
                 sql = "SELECT symbol FROM chunk_symbols WHERE chunk_id = ?"
@@ -1701,4 +1629,78 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         return self._embedding_dim_cache
 
 
-__all__ = ["DuckDBCatalog", "StructureAnnotations"]
+def _relation_exists(conn: duckdb.DuckDBPyConnection, name: str) -> bool:
+    """Return True when a table or view with ``name`` exists in the main schema.
+
+    Parameters
+    ----------
+    conn : duckdb.DuckDBPyConnection
+        Active DuckDB connection to query.
+    name : str
+        Name of the table or view to check for existence.
+
+    Returns
+    -------
+    bool
+        ``True`` when the relation exists, otherwise ``False``.
+    """
+    row = conn.execute(
+        """
+        SELECT EXISTS(
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = 'main'
+              AND table_name = ?
+            UNION ALL
+            SELECT 1
+            FROM information_schema.views
+            WHERE table_schema = 'main'
+              AND table_name = ?
+        )
+        """,
+        [name, name],
+    ).fetchone()
+    return bool(row and row[0])
+
+
+def relation_exists(conn: duckdb.DuckDBPyConnection, name: str) -> bool:
+    """Public helper returning True when a DuckDB relation exists.
+
+    Parameters
+    ----------
+    conn : duckdb.DuckDBPyConnection
+        Active DuckDB connection to query.
+    name : str
+        Name of the table or view to check for existence.
+
+    Returns
+    -------
+    bool
+        ``True`` when the relation exists, otherwise ``False``.
+    """
+    return _relation_exists(conn, name)
+
+
+def _file_checksum(path: Path) -> str:
+    """Return SHA-256 checksum for ``path``.
+
+    Parameters
+    ----------
+    path : Path
+        File path to compute checksum for.
+
+    Returns
+    -------
+    str
+        Hex digest string representing the file contents.
+    """
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+__all__ = ["DuckDBCatalog", "StructureAnnotations", "relation_exists"]

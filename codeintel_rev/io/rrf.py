@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from typing import Literal
 
 from codeintel_rev.retrieval.fusion import fuse_weighted_rrf
-from codeintel_rev.retrieval.types import ChannelHit
+from codeintel_rev.retrieval.types import SearchHit
 
 
 def weighted_rrf(
@@ -25,7 +25,7 @@ def weighted_rrf(
     retrieval channels, combining ranked lists from different search methods (e.g.,
     CodeRank, WARP, BM25) into a single unified ranking. It serves as a legacy
     compatibility wrapper that converts integer-based channel hits into the internal
-    ChannelHit format, optionally normalizes scores per-channel (minmax or z-score),
+    SearchHit format, optionally normalizes scores per-channel (minmax or z-score),
     delegates to the core fusion engine, and converts results back to integer document
     IDs. The function is used by the hybrid search pipeline to merge semantic and
     sparse retrieval signals with configurable per-channel weights and normalization.
@@ -88,8 +88,14 @@ def weighted_rrf(
         raise ValueError(msg)
     converted = {
         channel: [
-            ChannelHit(doc_id=str(doc_id), score=float(score))
-            for doc_id, score in _normalize_channel_hits(hits, normalize)
+            SearchHit(
+                doc_id=str(doc_id),
+                rank=rank,
+                score=float(score),
+                source=channel,
+                explain={"normalized_score": float(score)},
+            )
+            for rank, (doc_id, score) in enumerate(_normalize_channel_hits(hits, normalize))
         ]
         for channel, hits in channels.items()
     }

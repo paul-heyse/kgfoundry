@@ -11,20 +11,19 @@ Fuses results from BM25, SPLADE, and FAISS using Reciprocal Rank Fusion.
 ## Imports
 
 - from **__future__** import annotations
-- from **dataclasses** import dataclass
 - from **typing** import TYPE_CHECKING
+- from **codeintel_rev.retrieval.types** import SearchHit
 - from **collections.abc** import Sequence
 
 ## Definitions
 
-- class: `SearchHit` (line 16)
-- function: `reciprocal_rank_fusion` (line 54)
-- function: `create_hit_list` (line 102)
+- function: `reciprocal_rank_fusion` (line 16)
+- function: `create_hit_list` (line 64)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 1
+- **fan_out**: 2
 - **cycle_group**: 122
 
 ## Ownership
@@ -65,7 +64,7 @@ SearchHit, create_hit_list, reciprocal_rank_fusion
 
 ## Hotspot
 
-- score: 1.36
+- score: 1.52
 
 ## Side Effects
 
@@ -75,11 +74,10 @@ SearchHit, create_hit_list, reciprocal_rank_fusion
 
 - branches: 4
 - cyclomatic: 5
-- loc: 134
+- loc: 96
 
 ## Doc Coverage
 
-- `SearchHit` (class): summary=yes, examples=no — Search result hit from a single retrieval system.
 - `reciprocal_rank_fusion` (function): summary=yes, params=ok, examples=no — Fuse multiple ranked lists using RRF.
 - `create_hit_list` (function): summary=yes, params=ok, examples=no — Create SearchHit list from retrieval results.
 

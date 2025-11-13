@@ -441,6 +441,14 @@ class AnswerEnvelope(TypedDict, total=False):
         Telemetry metadata describing the request/session identifiers. Contains
         ``run_id`` (trace identifier) and ``session_id`` when available, enabling
         correlation with traces and run reports.
+    trace_id : str
+        OpenTelemetry trace identifier associated with the request, when available.
+    span_id : str
+        Identifier of the span responsible for assembling the response envelope.
+    run_id : str
+        Diagnostic run identifier that can be used to correlate with run reports.
+    diag_report_uri : str
+        Path to the flight recorder JSON artifact summarizing the run.
     problem : ProblemDetailsDict
         RFC 9457 Problem Details payload describing the failure when the request
         could not be fulfilled successfully.
@@ -462,6 +470,10 @@ class AnswerEnvelope(TypedDict, total=False):
     limits: list[str]
     next_steps: list[str]
     telemetry: dict[str, str]
+    trace_id: str
+    span_id: str
+    run_id: str
+    diag_report_uri: str
     problem: ProblemDetailsDict
 
 

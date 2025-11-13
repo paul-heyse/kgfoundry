@@ -36,16 +36,17 @@ from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.mcp_server.server import app_context, build_http_app
 from codeintel_rev.observability.otel import (
     as_span,
-    init_telemetry,
+    init_otel,
     instrument_fastapi,
     instrument_httpx,
+    set_current_span_attrs,
 )
 from codeintel_rev.observability.runtime_observer import TimelineRuntimeObserver
+from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.observability.timeline import bind_timeline, new_timeline
 from codeintel_rev.runtime.cells import RuntimeCellObserver
 from codeintel_rev.telemetry.context import current_run_id
 from codeintel_rev.telemetry.logging import install_structured_logging
-from codeintel_rev.telemetry.otel import install_otel
 from codeintel_rev.telemetry.prom import build_metrics_router
 from codeintel_rev.telemetry.reporter import (
     build_report as build_run_report,
@@ -65,7 +66,6 @@ except PackageNotFoundError:
     _DIST_VERSION = None
 
 install_structured_logging()
-install_otel(service_name="codeintel-mcp")
 
 
 def _preload_faiss_index(context: ApplicationContext) -> bool:
@@ -238,7 +238,18 @@ async def _initialize_context(
         else:  # pragma: no cover - defensive
             raise
     app.state.context = context
-    _log_gpu_warmup(warmup_gpu())
+    with as_span("readiness.gpu_warmup", component="startup"):
+        warmup_status = warmup_gpu()
+        status = warmup_status.get("overall_status")
+        attrs: dict[str, object] = {
+            Attrs.COMPONENT: "startup",
+            Attrs.STAGE: "gpu_warmup",
+            "readiness.status": status or "unknown",
+        }
+        if status == "degraded":
+            attrs[Attrs.WARN_DEGRADED] = True
+        set_current_span_attrs(**attrs)
+    _log_gpu_warmup(warmup_status)
     readiness = ReadinessProbe(context)
     await readiness.initialize()
     app.state.readiness = readiness
@@ -372,7 +383,8 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
-init_telemetry(
+init_otel(
+    app=app,
     service_name="codeintel-mcp",
     service_version=_DIST_VERSION,
 )

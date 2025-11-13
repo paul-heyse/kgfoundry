@@ -12,11 +12,7 @@ from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.errors import RuntimeUnavailableError
-from codeintel_rev.io.hybrid_search import (
-    ChannelHit,
-    HybridSearchOptions,
-    HybridSearchTuning,
-)
+from codeintel_rev.io.hybrid_search import HybridSearchOptions, HybridSearchTuning
 from codeintel_rev.io.rerank_coderankllm import CodeRankListwiseReranker
 from codeintel_rev.io.warp_engine import WarpEngine, WarpUnavailableError
 from codeintel_rev.mcp_server.common.observability import Observation, observe_duration
@@ -28,6 +24,10 @@ from codeintel_rev.mcp_server.schemas import (
     StageInfo,
 )
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
+from codeintel_rev.observability.flight_recorder import build_report_uri
+from codeintel_rev.observability.otel import current_span_id, current_trace_id
+from codeintel_rev.observability.otel import as_span
+from codeintel_rev.observability.semantic_conventions import Attrs, to_label_str
 from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.rerank.base import RerankRequest, RerankResult, ScoredDoc
 from codeintel_rev.rerank.xtr import XTRReranker
@@ -41,10 +41,11 @@ from codeintel_rev.retrieval.telemetry import (
 from codeintel_rev.retrieval.types import (
     HybridResultDoc,
     HybridSearchResult,
+    SearchHit,
     StageDecision,
     StageSignals,
 )
-from codeintel_rev.telemetry.context import telemetry_metadata
+from codeintel_rev.telemetry.context import current_run_id, telemetry_metadata
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
 from kgfoundry_common.logging import get_logger
 
@@ -506,7 +507,13 @@ def _run_coderank_stage(
         )
 
     try:
-        query_vec = context.vllm_client.embed_batch([query])
+        with as_span(
+            "retrieval.coderank.embed",
+            component="retrieval",
+            stage="coderank.embed",
+            **{Attrs.VLLM_BATCH: 1},
+        ):
+            query_vec = context.vllm_client.embed_batch([query])
     except Exception as exc:
         observation.mark_error()
         msg = f"CodeRank embedding failed: {exc}"
@@ -526,11 +533,17 @@ def _run_coderank_stage(
         raise VectorSearchError(msg, cause=exc) from exc
 
     try:
-        distances, ids = faiss_mgr.search(
-            query_vec,
-            k=max(1, int(fanout)),
-            nprobe=context.settings.index.faiss_nprobe,
-        )
+        with as_span(
+            "retrieval.coderank.faiss",
+            component="retrieval",
+            stage="coderank.faiss",
+            **{Attrs.FAISS_TOP_K: fanout, Attrs.FAISS_NPROBE: context.settings.index.faiss_nprobe},
+        ):
+            distances, ids = faiss_mgr.search(
+                query_vec,
+                k=max(1, int(fanout)),
+                nprobe=context.settings.index.faiss_nprobe,
+            )
     except RuntimeError as exc:
         observation.mark_error()
         msg = "CodeRank FAISS search failed"
@@ -1018,12 +1031,19 @@ def _calculate_xtr_k(limit: int, cfg: XTRConfig, options: SemanticProRuntimeOpti
 def _build_extra_channels(
     warp_hits: list[tuple[int, float]],
     channel_name: str,
-) -> dict[str, list[ChannelHit]] | None:
+) -> dict[str, list[SearchHit]] | None:
     if not warp_hits:
         return None
     return {
         channel_name: [
-            ChannelHit(doc_id=str(doc_id), score=float(score)) for doc_id, score in warp_hits
+            SearchHit(
+                doc_id=str(doc_id),
+                rank=rank,
+                score=float(score),
+                source=channel_name,
+                explain={"source_score": float(score)},
+            )
+            for rank, (doc_id, score) in enumerate(warp_hits)
         ]
     }
 
@@ -1109,11 +1129,20 @@ def _warp_executor_hits(
         return None, notes
 
     try:
-        hits = warp_engine.rerank(
-            query=query,
-            candidate_ids=[cid for cid, _ in candidates],
-            top_k=min(cfg.top_k, len(candidates)),
-        )
+        with as_span(
+            "retrieval.warp",
+            component="retrieval",
+            stage="warp",
+            **{
+                Attrs.RETRIEVAL_TOP_K: min(cfg.top_k, len(candidates)),
+                Attrs.XTR_CANDIDATES: len(candidates),
+            },
+        ):
+            hits = warp_engine.rerank(
+                query=query,
+                candidate_ids=[cid for cid, _ in candidates],
+                top_k=min(cfg.top_k, len(candidates)),
+            )
     except WarpUnavailableError as exc:
         notes.append(str(exc))
         return None, notes
@@ -1644,6 +1673,7 @@ def _assemble_extras(
         extras["limits"] = limits
     if scope:
         extras["scope"] = scope
+    extras.update(_observability_links())
     return extras
 
 
@@ -1664,6 +1694,33 @@ def _make_envelope(
         envelope["telemetry"] = telemetry
     envelope.update(extras)
     return envelope
+
+
+def _observability_links() -> AnswerEnvelope:
+    """Return trace/run metadata for semantic_pro envelopes.
+
+    Returns
+    -------
+    AnswerEnvelope
+        Observability extras populated with trace/run diagnostics.
+    """
+    extras: AnswerEnvelope = {}
+    trace_id = current_trace_id()
+    span_id = current_span_id()
+    timeline = current_timeline()
+    run_id = timeline.run_id if timeline else current_run_id()
+    session_id = timeline.session_id if timeline else None
+    started_at = cast("float | None", timeline.metadata.get("started_at")) if timeline else None
+    diag_uri = build_report_uri(session_id, run_id, trace_id=trace_id, started_at=started_at)
+    if trace_id:
+        extras["trace_id"] = trace_id
+    if span_id:
+        extras["span_id"] = span_id
+    if run_id:
+        extras["run_id"] = run_id
+    if diag_uri:
+        extras["diag_report_uri"] = diag_uri
+    return extras
 
 
 def _clamp_limit(requested: int, max_results: int, notes: list[str]) -> int:

@@ -44,7 +44,7 @@ from __future__ import annotations
 
 import asyncio
 import shutil
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -52,6 +52,8 @@ from urllib.parse import urlparse
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.app.config_context import ApplicationContext
+from codeintel_rev.observability.otel import as_span, set_current_span_attrs
+from codeintel_rev.observability.semantic_conventions import Attrs
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -188,7 +190,8 @@ class ReadinessProbe:
         >>> results = await readiness.refresh()
         >>> faiss_healthy = results["faiss_index"].healthy
         """
-        checks = await asyncio.to_thread(self._run_checks)
+        with as_span("readiness.refresh"):
+            checks = await asyncio.to_thread(self._run_checks)
         async with self._lock:
             self._last_checks = checks
             return dict(self._last_checks)
@@ -250,39 +253,73 @@ class ReadinessProbe:
         paths = self._context.paths
 
         # Check 1: Repository root exists
-        results["repo_root"] = self.check_directory(paths.repo_root)
+        results["repo_root"] = self._record_check(
+            "readiness.repo_root", lambda: self.check_directory(paths.repo_root)
+        )
 
         # Check 2: Data directories exist (create if missing)
-        results["data_dir"] = self.check_directory(paths.data_dir, create=True)
-        results["vectors_dir"] = self.check_directory(paths.vectors_dir, create=True)
+        results["data_dir"] = self._record_check(
+            "readiness.data_dir", lambda: self.check_directory(paths.data_dir, create=True)
+        )
+        results["vectors_dir"] = self._record_check(
+            "readiness.vectors_dir", lambda: self.check_directory(paths.vectors_dir, create=True)
+        )
 
         # Check 3: FAISS index exists
-        results["faiss_index"] = self.check_file(
-            paths.faiss_index,
-            description="FAISS index",
-            optional=False,
+        results["faiss_index"] = self._record_check(
+            "readiness.faiss_index",
+            lambda: self.check_file(
+                paths.faiss_index,
+                description="FAISS index",
+                optional=False,
+            ),
         )
 
         # Check 4: DuckDB catalog exists (and is materialized when configured)
-        results["duckdb_catalog"] = self._check_duckdb_catalog(paths.duckdb_path)
+        results["duckdb_catalog"] = self._record_check(
+            "readiness.duckdb", lambda: self._check_duckdb_catalog(paths.duckdb_path)
+        )
 
         # Check 5: SCIP index exists (optional - may be regenerated)
-        results["scip_index"] = self.check_file(
-            paths.scip_index,
-            description="SCIP index",
-            optional=True,
+        results["scip_index"] = self._record_check(
+            "readiness.scip_index",
+            lambda: self.check_file(
+                paths.scip_index,
+                description="SCIP index",
+                optional=True,
+            ),
         )
 
         # Check 6: vLLM service reachable
-        results["vllm_service"] = self.check_vllm_connection()
+        results["vllm_service"] = self._record_check(
+            "readiness.vllm_service", self.check_vllm_connection
+        )
 
         # Check 7: Search tooling available (ripgrep preferred, grep fallback)
-        results["search_cli"] = self._check_search_tools()
+        results["search_cli"] = self._record_check("readiness.search_cli", self._check_search_tools)
 
         # Check 8: XTR artifacts (optional late-interaction)
-        results["xtr_artifacts"] = self._check_xtr_artifacts()
+        results["xtr_artifacts"] = self._record_check(
+            "readiness.xtr_artifacts", self._check_xtr_artifacts
+        )
 
         return results
+
+    @staticmethod
+    def _record_check(span_name: str, fn: Callable[[], CheckResult]) -> CheckResult:
+        with as_span(span_name, component="readiness"):
+            result = fn()
+            attrs: dict[str, object] = {
+                Attrs.COMPONENT: "readiness",
+                Attrs.STAGE: span_name,
+                "readiness.healthy": int(result.healthy),
+            }
+            if result.detail:
+                attrs["readiness.detail"] = result.detail
+                if result.healthy:
+                    attrs[Attrs.WARN_DEGRADED] = True
+            set_current_span_attrs(**attrs)
+            return result
 
     @staticmethod
     def check_directory(path: Path, *, create: bool = False) -> CheckResult:

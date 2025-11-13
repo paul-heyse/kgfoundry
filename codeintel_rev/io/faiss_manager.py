@@ -15,6 +15,7 @@ import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from numbers import Integral, Real
 from pathlib import Path
 from threading import RLock
 from time import perf_counter
@@ -46,10 +47,12 @@ from codeintel_rev.metrics.registry import (
     set_factory_id,
 )
 from codeintel_rev.observability.otel import as_span, record_span_event
+from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.retrieval.rerank_flat import FlatReranker
 from codeintel_rev.retrieval.types import SearchHit
 from codeintel_rev.telemetry.decorators import span_context
+from codeintel_rev.telemetry.prom import FAISS_SEARCH_LATENCY_SECONDS
 from codeintel_rev.typing import NDArrayF32, NDArrayI64, gate_import
 from kgfoundry_common.errors import VectorSearchError
 from kgfoundry_common.logging import get_logger
@@ -253,6 +256,26 @@ class SearchRuntimeOverrides:
 
 
 @dataclass(frozen=True, slots=True)
+class RefineSearchConfig:
+    """Configuration bundle for refine searches."""
+
+    nprobe: int | None = None
+    runtime: SearchRuntimeOverrides | None = None
+    source: str = "faiss"
+
+
+@dataclass(frozen=True, slots=True)
+class _TuningOverrides:
+    """Normalized tuning overrides extracted from a profile payload."""
+
+    param_str: str
+    nprobe: int | None
+    ef_search: int | None
+    quantizer_ef_search: int | None
+    k_factor: float | None
+
+
+@dataclass(frozen=True, slots=True)
 class _SearchExecutionParams:
     """Runtime parameters applied during dual search execution."""
 
@@ -451,7 +474,7 @@ class _FAISSIdMapMixin:
 
 
 class FAISSManager(
-    _FAISSIdMapMixin,
+    _FAISSIdMapMixin
 ):  # lint-ignore[PLR0904]: manager orchestrates multiple subsystems
     """FAISS index manager with adaptive indexing, GPU support, and incremental updates.
 
@@ -486,15 +509,8 @@ class FAISSManager(
 
     The secondary index is optional and controlled by usage of `update_index()`.
     When `update_index()` is called, the secondary index is automatically created
-    if it doesn't exist. Use `merge_indexes()` periodically to merge secondary
+    if it doesn't exist.     Use `merge_indexes()` periodically to merge secondary
     into primary and rebuild for optimal performance.
-
-    Attributes
-    ----------
-    apply_tuning : Callable[[Mapping[str, Any]], dict[str, object]]
-        Backwards-compatible alias for `apply_tuning_profile()`. Used in some
-        CLI code paths for applying persisted tuning profiles. Accepts a tuning
-        profile dictionary and returns the current runtime tuning parameters.
 
     Parameters
     ----------
@@ -895,9 +911,9 @@ class FAISSManager(
             return lambda _id: False
 
         for attr, builder in (
-            ("contains", self._wrap_bool_contains),
-            ("search", self._wrap_index_contains),
-            ("find", self._wrap_index_contains),
+            ("contains", _wrap_bool_contains),
+            ("search", _wrap_index_contains),
+            ("find", _wrap_index_contains),
         ):
             raw = getattr(id_map_obj, attr, None)
             if callable(raw):
@@ -905,118 +921,6 @@ class FAISSManager(
 
         existing_ids = self._build_existing_ids_set(cpu_index, id_map_obj)
         return lambda id_val: int(id_val) in existing_ids
-
-    @staticmethod
-    def _wrap_bool_contains(raw: Callable[[int], object]) -> Callable[[int], bool]:
-        """Wrap a raw contains function that returns a boolean-like value.
-
-        This helper function wraps FAISS ID map contains methods that return
-        boolean-like values (bool, int, etc.) and ensures they always return
-        a proper boolean. The wrapper handles type conversion and exception
-        handling to provide a robust contains check for ID lookups.
-
-        Parameters
-        ----------
-        raw : Callable[[int], object]
-            Raw contains function from FAISS ID map that accepts an integer ID
-            and returns a boolean-like value (bool, int, etc.). The function
-            may raise TypeError or ValueError for invalid inputs.
-
-        Returns
-        -------
-        Callable[[int], bool]
-            Wrapped contains function that always returns a bool. Returns False
-            if the raw function raises an exception or returns a falsy value,
-            True if the raw function returns a truthy value.
-
-        Notes
-        -----
-        This wrapper is used to normalize FAISS ID map contains() methods that
-        may return different types (bool, int) across FAISS versions. The
-        wrapper ensures consistent boolean return values for duplicate checking
-        in update_index(). Time complexity: O(1) per call, plus the cost of
-        the underlying FAISS contains operation (typically O(1) for hash-based
-        ID maps). The wrapper is thread-safe if the underlying raw function is
-        thread-safe.
-        """
-
-        def contains(id_val: int) -> bool:
-            """Check if an ID exists in the FAISS index.
-
-            Parameters
-            ----------
-            id_val : int
-                Document/chunk ID to check for existence in the index.
-
-            Returns
-            -------
-            bool
-                True if the ID exists in the index, False otherwise (including
-                when the check fails due to type errors or invalid inputs).
-            """
-            try:
-                return bool(raw(int(id_val)))
-            except (TypeError, ValueError):
-                return False
-
-        return contains
-
-    @staticmethod
-    def _wrap_index_contains(raw: Callable[[int], object]) -> Callable[[int], bool]:
-        """Wrap a raw contains function that returns an index position.
-
-        This helper function wraps FAISS ID map contains methods that return
-        index positions (non-negative integers) when an ID is found, or
-        negative values when not found. The wrapper converts the result to a
-        boolean by checking if the returned index is non-negative.
-
-        Parameters
-        ----------
-        raw : Callable[[int], object]
-            Raw contains function from FAISS ID map that accepts an integer ID
-            and returns an index position (int >= 0 if found, < 0 if not found).
-            The function may raise TypeError or ValueError for invalid inputs.
-
-        Returns
-        -------
-        Callable[[int], bool]
-            Wrapped contains function that returns True if the ID exists (index
-            >= 0), False otherwise. Returns False if the raw function raises an
-            exception or returns a value that coerces to a negative integer.
-
-        Notes
-        -----
-        This wrapper is used to normalize FAISS ID map contains() methods that
-        return index positions rather than booleans. The wrapper uses _coerce_to_int
-        to safely convert the result and checks for non-negative values. Time
-        complexity: O(1) per call, plus the cost of the underlying FAISS contains
-        operation. The wrapper is thread-safe if the underlying raw function is
-        thread-safe.
-        """
-
-        def contains(id_val: int) -> bool:
-            """Check if an ID exists in the FAISS index by index position.
-
-            Parameters
-            ----------
-            id_val : int
-                Document/chunk ID to check for existence in the index.
-
-            Returns
-            -------
-            bool
-                True if the ID exists (raw function returns index >= 0), False
-                otherwise (including when the check fails or returns a negative
-                index).
-            """
-            try:
-                result = raw(int(id_val))
-            except (TypeError, ValueError):
-                return False
-
-            return _coerce_to_int(result) >= 0
-
-        return contains
 
     @staticmethod
     def _build_existing_ids_set(cpu_index: _faiss.Index, id_map_obj: object) -> set[int]:
@@ -1492,9 +1396,11 @@ class FAISSManager(
             )
 
         span_attrs = {
-            "k": plan.k,
-            "nprobe": plan.params.nprobe,
-            "use_gpu": plan.params.use_gpu,
+            Attrs.COMPONENT: "retrieval",
+            Attrs.STAGE: "faiss.search",
+            Attrs.FAISS_TOP_K: plan.k,
+            Attrs.FAISS_NPROBE: plan.params.nprobe,
+            Attrs.FAISS_GPU: plan.params.use_gpu,
         }
         with span_context(
             "search.faiss",
@@ -1553,6 +1459,7 @@ class FAISSManager(
                 FAISS_ANN_LATENCY_SECONDS.labels(**metric_labels).observe(duration)
 
         elapsed_total = (perf_counter() - start) * 1000.0
+        FAISS_SEARCH_LATENCY_SECONDS.observe(elapsed_total / 1000.0)
         if timeline is not None:
             timeline.event(
                 "faiss.search.end",
@@ -1575,9 +1482,7 @@ class FAISSManager(
         *,
         k: int,
         catalog: DuckDBCatalog,
-        nprobe: int | None = None,
-        runtime: SearchRuntimeOverrides | None = None,
-        source: str = "faiss",
+        config: RefineSearchConfig | None = None,
     ) -> list[SearchHit]:
         """Return structured hits with ANN search + exact rerank metadata.
 
@@ -1590,15 +1495,10 @@ class FAISSManager(
         catalog : DuckDBCatalog
             DuckDB catalog for fetching chunk metadata and embeddings for
             reranking. Used to hydrate candidate IDs into full chunk records.
-        nprobe : int | None, optional
-            Optional nprobe override for approximate search (default: None).
-            When None, uses the configured nprobe value.
-        runtime : SearchRuntimeOverrides | None, optional
-            Optional runtime parameter overrides (default: None). Used to
-            customize search behavior (k_factor, ef_search, etc.).
-        source : str, optional
-            Source identifier for telemetry (default: "faiss"). Used to
-            track which search path was used in metrics.
+        config : RefineSearchConfig | None, optional
+            Optional configuration bundle controlling nprobe, runtime overrides,
+            and telemetry source. When None, uses default settings (nprobe from
+            manager configuration, telemetry source ``faiss``).
 
         Returns
         -------
@@ -1607,9 +1507,10 @@ class FAISSManager(
             rerank information. Results are sorted by rerank score (descending)
             when reranking is enabled, or by ANN distance (ascending) otherwise.
         """
-        runtime = runtime or SearchRuntimeOverrides()
+        config = config or RefineSearchConfig()
+        runtime = config.runtime or SearchRuntimeOverrides()
         _, _, resolved_k_factor, _ = self._resolve_search_knobs(
-            override_nprobe=nprobe,
+            override_nprobe=config.nprobe,
             override_ef=runtime.ef_search,
             override_k_factor=runtime.k_factor,
             override_quantizer=runtime.quantizer_ef_search,
@@ -1617,7 +1518,7 @@ class FAISSManager(
         distances, identifiers = self.search(
             query,
             k=k,
-            nprobe=nprobe,
+            nprobe=config.nprobe,
             runtime=runtime,
             catalog=catalog,
         )
@@ -1626,15 +1527,15 @@ class FAISSManager(
         top_scores = distances[0]
         top_ids = identifiers[0]
         hits: list[SearchHit] = []
-        for rank, (chunk_id, score) in enumerate(zip(top_ids, top_scores, strict=True), start=1):
+        for rank, (chunk_id, score) in enumerate(zip(top_ids, top_scores, strict=True)):
             if chunk_id < 0:
                 continue
             hits.append(
                 SearchHit(
-                    id=int(chunk_id),
+                    doc_id=str(int(chunk_id)),
                     rank=rank,
                     score=float(score),
-                    source=source,
+                    source=config.source,
                     faiss_row=None,
                     explain={
                         "family": self.faiss_family or "auto",
@@ -1840,55 +1741,30 @@ class FAISSManager(
             msg = "Tuning profile payload is empty."
             raise VectorIndexIncompatibleError(msg)
 
-        def _maybe_int(value: object | None) -> int | None:
-            if value is None:
-                return None
-            return int(value)
-
-        def _maybe_float(value: object | None) -> float | None:
-            if value is None:
-                return None
-            return float(value)
-
-        param_str = str(profile.get("param_str") or "").strip()
-        overrides = {
-            "nprobe": profile.get("nprobe"),
-            "ef_search": profile.get("efSearch"),
-            "quantizer_ef_search": profile.get("quantizer_efSearch"),
-        }
-        k_factor_override = profile.get("k_factor") or profile.get("refine_k_factor")
+        overrides = _parse_tuning_overrides(profile)
         try:
-            if param_str:
-                snapshot = self.set_search_parameters(param_str)
+            if overrides.param_str:
+                snapshot = self.set_search_parameters(overrides.param_str)
             else:
                 snapshot = self.apply_runtime_tuning(
-                    nprobe=_maybe_int(overrides["nprobe"]),
-                    ef_search=_maybe_int(overrides["ef_search"]),
-                    quantizer_ef_search=_maybe_int(overrides["quantizer_ef_search"]),
-                    k_factor=_maybe_float(k_factor_override),
+                    nprobe=overrides.nprobe,
+                    ef_search=overrides.ef_search,
+                    quantizer_ef_search=overrides.quantizer_ef_search,
+                    k_factor=overrides.k_factor,
                 )
         except (ValueError, TypeError) as exc:
+            error_msg = "Unable to apply tuning profile."
             raise VectorIndexIncompatibleError(
-                "Unable to apply tuning profile.",
-                context={"param_str": param_str or "runtime_overrides"},
+                error_msg,
+                context={"param_str": overrides.param_str or "runtime_overrides"},
                 cause=exc,
             ) from exc
 
-        if k_factor_override is not None:
+        if overrides.k_factor is not None:
             with self._tuning_lock:
-                self.refine_k_factor = float(k_factor_override)
-        try:
-            self.save_tuning_profile(dict(profile))
-        except OSError:  # pragma: no cover - best effort
-            LOGGER.debug(
-                "Unable to persist tuning profile",
-                extra=_log_extra(path=str(self.autotune_profile_path)),
-            )
-        self._tuned_parameters = dict(profile)
+                self.refine_k_factor = overrides.k_factor
+        _persist_tuning_profile(self, profile)
         return snapshot
-
-    # Backwards-compatible alias used in some CLI code paths.
-    apply_tuning = apply_tuning_profile
 
     def _search_primary(
         self, query: NDArrayF32, k: int, nprobe: int
@@ -2463,22 +2339,6 @@ class FAISSManager(
     # Modern helper utilities (factory management, tuning, telemetry)
     # ---------------------------------------------------------------------
 
-    @staticmethod
-    def get_compile_options() -> str:
-        """Return FAISS compile options for readiness logs.
-
-        Returns
-        -------
-        str
-            Human-readable compile option string or ``"unknown"``.
-        """
-        get_opts = getattr(faiss, "get_compile_options", None)
-        options = "unknown"
-        if callable(get_opts):
-            options = str(get_opts())
-        set_compile_flags_id(options)
-        return options
-
     def _search_with_params(
         self,
         query: NDArrayF32,
@@ -2531,7 +2391,7 @@ class FAISSManager(
             distances, ids = self._refine_with_flat(xq, ids, k)
         return distances, ids
 
-    def save_tuning_profile(
+    def _save_tuning_profile(
         self,
         profile: Mapping[str, Any],
         *,
@@ -2623,7 +2483,7 @@ class FAISSManager(
         profile = tuner.run_sweep(queries, truths, k=k, sweep=sweep)
         profile["updated_at"] = datetime.now(UTC).isoformat()
         try:
-            self.save_tuning_profile(profile)
+            self._save_tuning_profile(profile)
         except OSError as exc:  # pragma: no cover - best-effort logging
             LOGGER.warning(
                 "Failed to persist FAISS autotune profile",
@@ -3307,6 +3167,19 @@ class FAISSManager(
         self._meta_path.parent.mkdir(parents=True, exist_ok=True)
         self._meta_path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
 
+    @staticmethod
+    def get_compile_options() -> str:
+        """Return FAISS compile options string when available.
+
+        Returns
+        -------
+        str
+            Compile-time configuration string for FAISS, including enabled
+            features and build flags. Returns an empty string if compile options
+            are not available.
+        """
+        return _get_compile_options()
+
     def _resolve_search_knobs(
         self,
         override_nprobe: int | None,
@@ -3940,6 +3813,202 @@ def _set_direct_map_type(index: _faiss.Index) -> None:
                 "FAISS make_direct_map failed",
                 extra=_log_extra(index_type=type(index).__name__, error=str(exc)),
             )
+
+
+def _wrap_bool_contains(raw: Callable[[int], object]) -> Callable[[int], bool]:
+    """Wrap a raw contains function that returns a boolean-like value.
+
+    Parameters
+    ----------
+    raw : Callable[[int], object]
+        Raw contains function that returns a boolean-like value (truthy/falsy).
+
+    Returns
+    -------
+    Callable[[int], bool]
+        Callable that returns ``True`` when ``raw`` reports membership.
+    """
+
+    def contains(id_val: int) -> bool:
+        """Check if an ID value is contained in the wrapped collection.
+
+        Parameters
+        ----------
+        id_val : int
+            ID value to check for membership.
+
+        Returns
+        -------
+        bool
+            ``True`` if the ID is found, ``False`` otherwise. Returns ``False``
+            if type coercion fails.
+        """
+        try:
+            return bool(raw(int(id_val)))
+        except (TypeError, ValueError):
+            return False
+
+    return contains
+
+
+def _wrap_index_contains(raw: Callable[[int], object]) -> Callable[[int], bool]:
+    """Wrap a raw contains function that returns an index position.
+
+    Parameters
+    ----------
+    raw : Callable[[int], object]
+        Raw contains function that returns an index position (non-negative int)
+        when found, or a negative value/exception when not found.
+
+    Returns
+    -------
+    Callable[[int], bool]
+        Callable that returns ``True`` when ``raw`` returns a non-negative index.
+    """
+
+    def contains(id_val: int) -> bool:
+        """Check if an ID value is contained in the wrapped collection.
+
+        Parameters
+        ----------
+        id_val : int
+            ID value to check for membership.
+
+        Returns
+        -------
+        bool
+            ``True`` if the ID is found (non-negative index), ``False`` otherwise.
+            Returns ``False`` if type coercion fails or the index is negative.
+        """
+        try:
+            result = raw(int(id_val))
+        except (TypeError, ValueError):
+            return False
+        return _coerce_to_int(result) >= 0
+
+    return contains
+
+
+def _coerce_optional_int(value: object | None) -> int | None:
+    """Return ``value`` coerced to int when possible.
+
+    Parameters
+    ----------
+    value : object | None
+        Value to coerce to an integer. Accepts integers, floats, or strings.
+        Empty strings and ``None`` are converted to ``None``.
+
+    Returns
+    -------
+    int | None
+        Integer representation or ``None`` when the value is empty.
+
+    Raises
+    ------
+    TypeError
+        If ``value`` cannot be coerced to an integer.
+    """
+    if value is None:
+        return None
+    if isinstance(value, Integral):
+        return int(value)
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        return int(stripped)
+    msg = f"Unsupported integer override type: {type(value)!r}"
+    raise TypeError(msg)
+
+
+def _coerce_optional_float(value: object | None) -> float | None:
+    """Return ``value`` coerced to float when possible.
+
+    Parameters
+    ----------
+    value : object | None
+        Value to coerce to a float. Accepts booleans, numeric types, or strings.
+        Empty strings and ``None`` are converted to ``None``.
+
+    Returns
+    -------
+    float | None
+        Float representation or ``None`` when the value is empty.
+
+    Raises
+    ------
+    TypeError
+        If ``value`` cannot be coerced to a float.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return float(value)
+    if isinstance(value, Real):
+        return float(value)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        return float(stripped)
+    msg = f"Unsupported float override type: {type(value)!r}"
+    raise TypeError(msg)
+
+
+def _parse_tuning_overrides(profile: Mapping[str, Any]) -> _TuningOverrides:
+    """Normalize raw profile payload into structured overrides.
+
+    Parameters
+    ----------
+    profile : Mapping[str, Any]
+        Raw tuning profile dictionary containing runtime parameter overrides.
+        Expected keys include ``nprobe``, ``ef``, ``k_factor``, and ``quantizer``.
+
+    Returns
+    -------
+    _TuningOverrides
+        Structured overrides with coerced numeric values.
+
+    """
+    param_str = str(profile.get("param_str") or "").strip()
+    k_factor = profile.get("k_factor") or profile.get("refine_k_factor")
+    return _TuningOverrides(
+        param_str=param_str,
+        nprobe=_coerce_optional_int(profile.get("nprobe")),
+        ef_search=_coerce_optional_int(profile.get("efSearch")),
+        quantizer_ef_search=_coerce_optional_int(profile.get("quantizer_efSearch")),
+        k_factor=_coerce_optional_float(k_factor),
+    )
+
+
+def _persist_tuning_profile(manager: FAISSManager, profile: Mapping[str, Any]) -> None:
+    """Persist tuning metadata without interrupting the caller."""
+    try:
+        manager._save_tuning_profile(dict(profile))
+    except OSError:  # pragma: no cover - best effort
+        LOGGER.debug(
+            "Unable to persist tuning profile",
+            extra=_log_extra(path=str(manager.autotune_profile_path)),
+        )
+    manager._tuned_parameters = dict(profile)
+
+
+def _get_compile_options() -> str:
+    """Return FAISS compile options for readiness logs.
+
+    Returns
+    -------
+    str
+        Compile option string or ``"unknown"`` when unavailable.
+    """
+    get_opts = getattr(faiss, "get_compile_options", None)
+    options = "unknown"
+    if callable(get_opts):
+        options = str(get_opts())
+    set_compile_flags_id(options)
+    return options
 
 
 __all__ = ["AutoTuner", "FAISSManager", "apply_parameters"]

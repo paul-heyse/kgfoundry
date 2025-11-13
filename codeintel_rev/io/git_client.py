@@ -49,6 +49,8 @@ from typing import TYPE_CHECKING, cast
 import git
 import git.exc
 
+from codeintel_rev.observability.otel import as_span
+from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.telemetry.decorators import span_context
 from kgfoundry_common.logging import get_logger
@@ -580,12 +582,21 @@ class AsyncGitClient:
         >>> len(blame)
         10
         """
-        return await asyncio.to_thread(
-            self._sync_client.blame_range,
-            path,
-            start_line,
-            end_line,
-        )
+        with as_span(
+            "git.blame",
+            **{
+                Attrs.GIT_COMMAND: "blame",
+                Attrs.GIT_PATH: path,
+                Attrs.LINE_START: start_line,
+                Attrs.LINE_END: end_line,
+            },
+        ):
+            return await asyncio.to_thread(
+                self._sync_client.blame_range,
+                path,
+                start_line,
+                end_line,
+            )
 
     async def file_history(
         self,
@@ -616,11 +627,19 @@ class AsyncGitClient:
         >>> len(history)
         5
         """
-        return await asyncio.to_thread(
-            self._sync_client.file_history,
-            path,
-            limit,
-        )
+        with as_span(
+            "git.history",
+            **{
+                Attrs.GIT_COMMAND: "history",
+                Attrs.GIT_PATH: path,
+                Attrs.LINE_LIMIT: limit,
+            },
+        ):
+            return await asyncio.to_thread(
+                self._sync_client.file_history,
+                path,
+                limit,
+            )
 
 
 __all__ = ["AsyncGitClient", "GitClient"]

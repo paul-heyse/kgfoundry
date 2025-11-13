@@ -42,7 +42,7 @@ for efficient vector storage and querying via DuckDB.
 
 - **fan_in**: 3
 - **fan_out**: 4
-- **cycle_group**: 50
+- **cycle_group**: 47
 
 ## Ownership
 

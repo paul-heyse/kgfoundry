@@ -29,13 +29,17 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
+from codeintel_rev.observability.otel import current_trace_id
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.observability import MetricsProvider
 from kgfoundry_common.observability import (
     observe_duration as _base_observe_duration,
 )
+
+if TYPE_CHECKING:
+    from kgfoundry_common.observability import DurationObservation
 
 __all__ = ["Observation", "observe_duration"]
 
@@ -130,12 +134,42 @@ def observe_duration(
         return
 
     try:
-        with _base_observe_duration(provider, operation, component=component) as observation:
-            yield observation
-            return
+        observation: DurationObservation | None = None
+        with _base_observe_duration(provider, operation, component=component) as obs:
+            observation = obs
+            yield obs
     except ValueError as exc:
         LOGGER.warning(
             "Metrics observation failed; using noop fallback",
             extra={"operation": operation, "component": component, "error": str(exc)},
         )
         yield _NoopObservation()
+    else:
+        if observation is not None:
+            _record_exemplar(observation)
+
+
+def _record_exemplar(observation: DurationObservation) -> None:
+    """Attach exemplars to the duration histogram when supported."""
+    trace_id = current_trace_id()
+    if not trace_id:
+        return
+    histogram = observation.metrics.operation_duration_seconds
+    try:
+        labelled = histogram.labels(
+            component=observation.component,
+            operation=observation.operation,
+            status=observation.status,
+        )
+    except (AttributeError, TypeError, ValueError):  # pragma: no cover - defensive
+        return
+    observe_with_exemplar = getattr(labelled, "observe_with_exemplar", None)
+    if not callable(observe_with_exemplar):
+        return
+    try:
+        observe_with_exemplar(
+            observation.duration_seconds(),
+            {"trace_id": trace_id},
+        )
+    except (TypeError, ValueError):  # pragma: no cover - optional feature
+        LOGGER.debug("Failed to record metrics exemplar", exc_info=True)

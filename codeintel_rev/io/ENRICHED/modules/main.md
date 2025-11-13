@@ -89,8 +89,8 @@ Provides health/readiness endpoints, CORS, and streaming support.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 28
-- recent churn 90: 28
+- recent churn 30: 29
+- recent churn 90: 29
 
 ## Usage
 

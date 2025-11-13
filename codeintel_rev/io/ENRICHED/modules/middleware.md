@@ -89,8 +89,8 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 11
-- recent churn 90: 11
+- recent churn 30: 12
+- recent churn 90: 12
 
 ## Usage
 

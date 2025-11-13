@@ -10,7 +10,7 @@ from codeintel_rev.config.settings import Settings
 from codeintel_rev.plugins import registry as registry_module
 from codeintel_rev.plugins.channels import Channel, ChannelContext
 from codeintel_rev.plugins.registry import ChannelRegistry
-from codeintel_rev.retrieval.types import ChannelHit
+from codeintel_rev.retrieval.types import SearchHit
 
 
 class _ToyChannel(Channel):
@@ -18,10 +18,10 @@ class _ToyChannel(Channel):
     cost = 0.1
     requires = frozenset()
 
-    def search(self, query: str, limit: int) -> Sequence[ChannelHit]:
+    def search(self, query: str, limit: int) -> Sequence[SearchHit]:
         assert query
         _ = limit
-        return [ChannelHit(doc_id="1", score=1.0)]
+        return [SearchHit(doc_id="1", rank=0, score=1.0, source="toy")]
 
 
 class _FakeEntryPoint:

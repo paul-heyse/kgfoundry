@@ -30,9 +30,9 @@ Lightweight Parquet writer for evaluator pools.
 - variable: `pq` (line 27)
 - variable: `Channel` (line 29)
 - class: `_SupportsToList` (line 42)
-- function: `_empty_table` (line 48)
-- function: `_normalize_meta` (line 84)
-- function: `write_pool` (line 122)
+- function: `_empty_table` (line 62)
+- function: `_normalize_meta` (line 98)
+- function: `write_pool` (line 136)
 
 ## Graph Metrics
 
@@ -45,8 +45,8 @@ Lightweight Parquet writer for evaluator pools.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 8
+- recent churn 90: 8
 
 ## Usage
 
@@ -88,7 +88,7 @@ Channel, SearchPoolRow, write_pool
 
 - branches: 15
 - cyclomatic: 16
-- loc: 184
+- loc: 198
 
 ## Doc Coverage
 

@@ -54,6 +54,7 @@ Error envelope structure:
 from __future__ import annotations
 
 import inspect
+import traceback
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from functools import wraps
@@ -62,6 +63,8 @@ from typing import TYPE_CHECKING, TypeVar, cast
 
 from codeintel_rev.errors import PathNotDirectoryError, PathNotFoundError
 from codeintel_rev.io.path_utils import PathOutsideRepositoryError
+from codeintel_rev.observability.otel import record_span_event
+from codeintel_rev.telemetry.context import current_run_id
 from kgfoundry_common.errors import KgFoundryError
 from kgfoundry_common.logging import get_logger, with_fields
 from kgfoundry_common.problem_details import build_problem_details
@@ -400,12 +403,32 @@ def convert_exception_to_envelope(
         )
 
     # Build envelope: empty result fields + error + problem
+    _record_exception_event(exc, operation)
     envelope = dict(empty_result)
     detail = problem.get("detail", str(exc))
     envelope["error"] = detail
     envelope["problem"] = problem
 
     return envelope
+
+
+def _record_exception_event(exc: BaseException, operation: str) -> None:
+    """Emit an OpenTelemetry exception event for adapter errors."""
+    attrs = {
+        "operation": operation,
+        "exception.type": type(exc).__name__,
+        "exception.message": str(exc),
+    }
+    run_id = current_run_id()
+    if run_id:
+        attrs["run_id"] = run_id
+    stack = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    if stack:
+        attrs["exception.stacktrace"] = stack[-2048:]
+    try:
+        record_span_event("adapter.exception", **attrs)
+    except (RuntimeError, ValueError):  # pragma: no cover - best-effort telemetry
+        LOGGER.debug("Failed to record exception span event", exc_info=True)
 
 
 def handle_adapter_errors(

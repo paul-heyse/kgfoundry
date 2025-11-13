@@ -20,25 +20,24 @@ Shared retrieval dataclasses for multi-stage pipelines.
 - variable: `FactoryString` (line 11)
 - class: `SearchHit` (line 15)
 - class: `SearchPoolRow` (line 27)
-- class: `ChannelHit` (line 39)
-- class: `HybridResultDoc` (line 47)
-- class: `HybridSearchResult` (line 55)
-- class: `StageSignals` (line 66)
-- class: `StageDecision` (line 88)
+- class: `HybridResultDoc` (line 39)
+- class: `HybridSearchResult` (line 47)
+- class: `StageSignals` (line 58)
+- class: `StageDecision` (line 80)
 
 ## Graph Metrics
 
-- **fan_in**: 13
+- **fan_in**: 14
 - **fan_out**: 0
-- **cycle_group**: 52
+- **cycle_group**: 51
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 
@@ -47,7 +46,7 @@ Shared retrieval dataclasses for multi-stage pipelines.
 
 ## Declared Exports (__all__)
 
-ChannelHit, ChunkId, Distance, FactoryString, FaissRow, HybridResultDoc, HybridSearchResult, SearchHit, SearchPoolRow, StageDecision, StageSignals
+ChunkId, Distance, FactoryString, FaissRow, HybridResultDoc, HybridSearchResult, SearchHit, SearchPoolRow, StageDecision, StageSignals
 
 ## Doc Health
 
@@ -70,7 +69,7 @@ ChannelHit, ChunkId, Distance, FactoryString, FaissRow, HybridResultDoc, HybridS
 
 ## Hotspot
 
-- score: 2.02
+- score: 2.05
 
 ## Side Effects
 
@@ -80,13 +79,12 @@ ChannelHit, ChunkId, Distance, FactoryString, FaissRow, HybridResultDoc, HybridS
 
 - branches: 2
 - cyclomatic: 3
-- loc: 109
+- loc: 100
 
 ## Doc Coverage
 
 - `SearchHit` (class): summary=yes, examples=no — Single retrieval hit emitted by FAISS/BM25/SPLADE/XTR stages.
 - `SearchPoolRow` (class): summary=yes, examples=no — Structured row recorded in evaluator pools.
-- `ChannelHit` (class): summary=yes, examples=no — Score emitted by a retrieval channel prior to fusion.
 - `HybridResultDoc` (class): summary=yes, examples=no — Final fused result produced by weighted RRF.
 - `HybridSearchResult` (class): summary=yes, examples=no — Container for fused docs alongside explainability metadata.
 - `StageSignals` (class): summary=yes, examples=no — Signals gathered from a stage for downstream gating decisions.

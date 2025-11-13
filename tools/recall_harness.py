@@ -14,7 +14,7 @@ import codeintel_rev.observability.metrics as retrieval_metrics
 from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.io.hybrid_search import BM25Rm3Config, BM25SearchProvider
 from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
-from codeintel_rev.retrieval.types import ChannelHit
+from codeintel_rev.retrieval.types import SearchHit
 
 MIN_TREC_FIELDS = 4
 
@@ -151,13 +151,13 @@ def _mrr_at_k(pred: Sequence[str], gold: set[str], k: int) -> float:
     return 0.0
 
 
-def _hits_to_ids(hits: Sequence[ChannelHit]) -> list[str]:
+def _hits_to_ids(hits: Sequence[SearchHit]) -> list[str]:
     """Convert channel hits to string doc IDs.
 
     Parameters
     ----------
-    hits : Sequence[ChannelHit]
-        Sequence of channel hit objects to extract IDs from.
+    hits : Sequence[SearchHit]
+        Sequence of search hit objects to extract IDs from.
 
     Returns
     -------

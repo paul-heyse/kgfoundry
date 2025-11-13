@@ -90,8 +90,8 @@ the FAISS index, then hydrating results from DuckDB.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 38
-- recent churn 90: 38
+- recent churn 30: 39
+- recent churn 90: 39
 
 ## Usage
 

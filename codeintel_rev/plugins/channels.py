@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol
 
-from codeintel_rev.retrieval.types import ChannelHit
+from codeintel_rev.retrieval.types import SearchHit
 
 if TYPE_CHECKING:
     from codeintel_rev.app.capabilities import Capabilities
@@ -36,7 +36,7 @@ class Channel(Protocol):
     cost: float
     requires: frozenset[str]
 
-    def search(self, query: str, limit: int) -> Sequence[ChannelHit]:
+    def search(self, query: str, limit: int) -> Sequence[SearchHit]:
         """Return channel hits for ``query`` with per-channel cutoff ``limit``."""
         ...
 

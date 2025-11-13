@@ -50,15 +50,15 @@ Lightweight per-session timeline recording utilities.
 
 - **fan_in**: 19
 - **fan_out**: 2
-- **cycle_group**: 41
+- **cycle_group**: 42
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 8
-- recent churn 90: 8
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 
