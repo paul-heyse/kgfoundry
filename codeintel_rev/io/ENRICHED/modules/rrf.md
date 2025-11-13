@@ -24,15 +24,15 @@ Reciprocal Rank Fusion utilities (legacy compatibility wrappers).
 
 - **fan_in**: 0
 - **fan_out**: 3
-- **cycle_group**: 108
+- **cycle_group**: 110
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 3
-- recent churn 90: 3
+- recent churn 30: 4
+- recent churn 90: 4
 
 ## Usage
 

@@ -36,7 +36,8 @@ from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.mcp_server.server import app_context, build_http_app
 from codeintel_rev.observability.otel import (
     as_span,
-    init_otel,
+    current_trace_id,
+    init_all_telemetry,
     instrument_fastapi,
     instrument_httpx,
     set_current_span_attrs,
@@ -383,7 +384,7 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
-init_otel(
+init_all_telemetry(
     app=app,
     service_name="codeintel-mcp",
     service_version=_DIST_VERSION,
@@ -569,9 +570,12 @@ async def set_mcp_context(
                 "duration_ms": duration_ms,
             },
         )
-    trace_id = current_run_id()
+    trace_id = current_trace_id()
     if trace_id:
         response.headers.setdefault("X-Trace-Id", trace_id)
+    run_id = getattr(request.state, "run_id", None) or current_run_id()
+    if run_id:
+        response.headers.setdefault("X-Run-Id", run_id)
     return response
 
 

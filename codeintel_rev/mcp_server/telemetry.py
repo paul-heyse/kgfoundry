@@ -7,8 +7,10 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 from codeintel_rev.app.middleware import get_capability_stamp, get_session_id
+from codeintel_rev.observability.ledger import RunLedger, dated_run_dir
 from codeintel_rev.observability.otel import as_span, record_span_event
 from codeintel_rev.observability.reporting import render_run_report
+from codeintel_rev.observability.runtime_observer import bind_run_ledger, current_run_ledger
 from codeintel_rev.observability.timeline import Timeline, current_or_new_timeline
 from codeintel_rev.telemetry.context import telemetry_context
 from codeintel_rev.telemetry.prom import observe_request_latency
@@ -90,6 +92,16 @@ def tool_operation_scope(
     for key, value in attrs.items():
         span_attrs.setdefault(key, value)
     operation_name = f"mcp.tool:{tool_name}"
+    ledger = current_run_ledger()
+    ledger_owner = False
+    if ledger is None:
+        try:
+            ledger_dir = dated_run_dir(None)
+            ledger = RunLedger.open(ledger_dir, run_id=timeline.run_id, session_id=session_id)
+            ledger_owner = True
+        except (OSError, RuntimeError, ValueError):  # pragma: no cover - defensive
+            ledger = None
+
     with telemetry_context(
         session_id=timeline.session_id,
         run_id=timeline.run_id,
@@ -97,7 +109,7 @@ def tool_operation_scope(
         tool_name=tool_name,
     ):
         timing_start = time.perf_counter()
-        with as_span(f"mcp.tool:{tool_name}", **span_attrs):
+        with bind_run_ledger(ledger), as_span(f"mcp.tool:{tool_name}", **span_attrs):
             try:
                 with timeline.operation(operation_name, **operation_attrs):
                     yield timeline
@@ -132,6 +144,8 @@ def tool_operation_scope(
                 )
                 _maybe_render_report(timeline)
                 observe_request_latency(tool_name, duration, "complete")
+    if ledger_owner and ledger is not None:
+        ledger.close()
 
 
 def _maybe_render_report(timeline: Timeline) -> None:

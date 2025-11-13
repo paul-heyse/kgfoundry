@@ -60,6 +60,7 @@ Error envelope structure:
 
 - from **__future__** import annotations
 - from **(absolute)** import inspect
+- from **(absolute)** import traceback
 - from **collections.abc** import Awaitable, Callable, Mapping
 - from **dataclasses** import dataclass
 - from **functools** import wraps
@@ -67,6 +68,8 @@ Error envelope structure:
 - from **typing** import TYPE_CHECKING, TypeVar, cast
 - from **codeintel_rev.errors** import PathNotDirectoryError, PathNotFoundError
 - from **codeintel_rev.io.path_utils** import PathOutsideRepositoryError
+- from **codeintel_rev.observability.otel** import record_span_event
+- from **codeintel_rev.telemetry.context** import current_run_id
 - from **kgfoundry_common.errors** import KgFoundryError
 - from **kgfoundry_common.logging** import get_logger, with_fields
 - from **kgfoundry_common.problem_details** import build_problem_details
@@ -74,28 +77,29 @@ Error envelope structure:
 
 ## Definitions
 
-- variable: `LOGGER` (line 72)
-- variable: `COMPONENT_NAME` (line 73)
-- variable: `F` (line 75)
-- class: `ProblemMapping` (line 111)
-- variable: `EXCEPTION_TO_ERROR_CODE` (line 152)
-- function: `format_error_response` (line 168)
-- function: `convert_exception_to_envelope` (line 226)
-- function: `handle_adapter_errors` (line 411)
+- variable: `LOGGER` (line 75)
+- variable: `COMPONENT_NAME` (line 76)
+- variable: `F` (line 78)
+- class: `ProblemMapping` (line 114)
+- variable: `EXCEPTION_TO_ERROR_CODE` (line 155)
+- function: `format_error_response` (line 171)
+- function: `convert_exception_to_envelope` (line 229)
+- function: `_record_exception_event` (line 415)
+- function: `handle_adapter_errors` (line 434)
 
 ## Graph Metrics
 
 - **fan_in**: 3
-- **fan_out**: 3
-- **cycle_group**: 81
+- **fan_out**: 5
+- **cycle_group**: 85
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 12
-- recent churn 90: 12
+- recent churn 30: 13
+- recent churn 90: 13
 
 ## Usage
 
@@ -127,7 +131,7 @@ EXCEPTION_TO_ERROR_CODE, convert_exception_to_envelope, format_error_response, h
 
 ## Hotspot
 
-- score: 2.21
+- score: 2.35
 
 ## Side Effects
 
@@ -135,15 +139,16 @@ EXCEPTION_TO_ERROR_CODE, convert_exception_to_envelope, format_error_response, h
 
 ## Complexity
 
-- branches: 17
-- cyclomatic: 18
-- loc: 687
+- branches: 20
+- cyclomatic: 21
+- loc: 710
 
 ## Doc Coverage
 
 - `ProblemMapping` (class): summary=yes, examples=no — Mapping from exception type to RFC 9457 Problem Details metadata.
 - `format_error_response` (function): summary=yes, params=ok, examples=no — Return Problem Details payload for the provided exception.
 - `convert_exception_to_envelope` (function): summary=yes, params=ok, examples=yes — Convert exception to unified error envelope with Problem Details.
+- `_record_exception_event` (function): summary=yes, params=mismatch, examples=no — Emit an OpenTelemetry exception event for adapter errors.
 - `handle_adapter_errors` (function): summary=yes, params=ok, examples=yes — Convert adapter exceptions to unified error envelopes.
 
 ## Tags

@@ -53,6 +53,8 @@ GitPython documentation : https://gitpython.readthedocs.io/
 - from **typing** import TYPE_CHECKING, cast
 - from **(absolute)** import git
 - from **(absolute)** import git.exc
+- from **codeintel_rev.observability.otel** import as_span
+- from **codeintel_rev.observability.semantic_conventions** import Attrs
 - from **codeintel_rev.observability.timeline** import current_timeline
 - from **codeintel_rev.telemetry.decorators** import span_context
 - from **kgfoundry_common.logging** import get_logger
@@ -60,29 +62,29 @@ GitPython documentation : https://gitpython.readthedocs.io/
 
 ## Definitions
 
-- variable: `LOGGER` (line 59)
-- function: `_string_attr` (line 62)
-- function: `_commit_iso_date` (line 67)
-- function: `_author_field` (line 77)
-- function: `_short_sha` (line 85)
-- function: `_normalize_line_numbers` (line 90)
-- function: `_coerce_blame_tuple` (line 103)
-- class: `GitClient` (line 118)
-- class: `AsyncGitClient` (line 501)
+- variable: `LOGGER` (line 61)
+- function: `_string_attr` (line 64)
+- function: `_commit_iso_date` (line 69)
+- function: `_author_field` (line 79)
+- function: `_short_sha` (line 87)
+- function: `_normalize_line_numbers` (line 92)
+- function: `_coerce_blame_tuple` (line 105)
+- class: `GitClient` (line 120)
+- class: `AsyncGitClient` (line 503)
 
 ## Graph Metrics
 
 - **fan_in**: 1
-- **fan_out**: 4
-- **cycle_group**: 53
+- **fan_out**: 6
+- **cycle_group**: 61
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 8
-- recent churn 90: 8
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 
@@ -114,7 +116,7 @@ AsyncGitClient, GitClient
 
 ## Hotspot
 
-- score: 2.31
+- score: 2.44
 
 ## Side Effects
 
@@ -123,9 +125,9 @@ AsyncGitClient, GitClient
 
 ## Complexity
 
-- branches: 31
-- cyclomatic: 32
-- loc: 627
+- branches: 33
+- cyclomatic: 34
+- loc: 646
 
 ## Doc Coverage
 

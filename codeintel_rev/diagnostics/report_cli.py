@@ -1,342 +1,343 @@
-"""CLI for rendering session timelines as Markdown diagnostics."""
+"""Diagnostics CLI for rendering run reports from session event ledgers."""
 
 from __future__ import annotations
 
-import argparse
 import json
-from collections import defaultdict
-from collections.abc import Callable, Iterable
+import sys
+from collections.abc import Mapping, Sequence
+from dataclasses import asdict
+from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
-GLYPHS = {"ok": "✅", "error": "❌", "skip": "⏭️"}
-STAGE_EVENT_MAP = {
-    "embed": "embed.end",
-    "faiss.search": "faiss.search.end",
-    "hybrid.fuse": "hybrid.fuse.end",
-    "duckdb.hydrate": "duckdb.hydrate.end",
-}
-HASH_PREVIEW_LEN = 16
+import typer
+
+from codeintel_rev.observability.run_report import LedgerRunReport, infer_stop_reason, load_ledger
+
+__all__ = ["app", "main"]
+
+app = typer.Typer(no_args_is_help=True, add_completion=False)
 
 
-def _load_events(path: Path, session: str) -> list[dict[str, Any]]:
-    if not path.exists():
-        return []
-    events: list[dict[str, Any]] = []
-    with path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            try:
-                event = json.loads(line)
-            except json.JSONDecodeError:
-                continue
-            if event.get("session_id") == session:
-                events.append(event)
-    return events
+class ReportFormat(StrEnum):
+    """Supported output encodings for diagnostics reports."""
+
+    MARKDOWN = "markdown"
+    JSON = "json"
+
+
+EventRecord = dict[str, Any]
+
+
+def _coerce_str(value: object) -> str | None:
+    if isinstance(value, str):
+        return value
+    return None
+
+
+def _coerce_number(value: object) -> float | None:
+    if isinstance(value, (int, float)):
+        return float(value)
+    return None
+
+
+def _event_ts(event: Mapping[str, object]) -> int:
+    raw = event.get("ts")
+    if isinstance(raw, (int, float)):
+        return int(raw)
+    return 0
+
+
+def _event_attrs(event: Mapping[str, object]) -> Mapping[str, object]:
+    attrs = event.get("attrs")
+    if isinstance(attrs, Mapping):
+        return attrs
+    return {}
+
+
+def _stage_label(event_type: str) -> str:
+    return event_type.rsplit(".", 1)[0] if "." in event_type else event_type
 
 
 def _group_events_by_run(
-    events: Iterable[dict[str, Any]],
-) -> dict[str | None, list[dict[str, Any]]]:
-    grouped: dict[str | None, list[dict[str, Any]]] = defaultdict(list)
+    events: Sequence[EventRecord],
+    session_id: str,
+) -> dict[str, list[EventRecord]]:
+    grouped: dict[str, list[EventRecord]] = {}
     for event in events:
-        grouped[event.get("run_id")].append(event)
+        if _coerce_str(event.get("session_id")) != session_id:
+            continue
+        run_id = _coerce_str(event.get("run_id"))
+        if run_id is None:
+            continue
+        grouped.setdefault(run_id, []).append(event)
     return grouped
 
 
-def _select_run_events(events: list[dict[str, Any]]) -> tuple[str | None, list[dict[str, Any]]]:
-    grouped = _group_events_by_run(events)
+def _max_ts(events: Sequence[EventRecord]) -> tuple[int, int]:
+    best_ts = -1
+    index = -1
+    for idx, event in enumerate(events):
+        ts = _event_ts(event)
+        if ts > best_ts or (ts == best_ts and idx > index):
+            best_ts = ts
+            index = idx
+    return best_ts, index
+
+
+def _select_run(
+    grouped: Mapping[str, Sequence[EventRecord]],
+    requested_run: str | None,
+) -> tuple[str, Sequence[EventRecord]]:
+    if requested_run is not None:
+        if requested_run not in grouped:
+            message = f"Run '{requested_run}' not found for the provided session."
+            raise typer.BadParameter(message)
+        return requested_run, grouped[requested_run]
     if not grouped:
-        return None, []
-
-    def _last_ts(items: list[dict[str, Any]]) -> float:
-        return max((evt.get("ts") or 0.0) for evt in items)
-
-    run_id, run_events = max(grouped.items(), key=lambda item: _last_ts(item[1]))
-    run_events.sort(key=lambda evt: evt.get("ts", 0))
-    return run_id, run_events
+        message = "No runs found for the provided session."
+        raise typer.BadParameter(message)
+    run_id, events = max(grouped.items(), key=lambda item: _max_ts(item[1]))
+    return run_id, events
 
 
-def _format_attrs(attrs: dict[str, Any], keys: Iterable[str]) -> str:
-    parts: list[str] = []
-    for key in keys:
-        value = attrs.get(key)
-        if value is None:
+def _stage_rows(events: Sequence[EventRecord]) -> list[tuple[str, str, float, str]]:
+    rows: list[tuple[str, str, float, str]] = []
+    for event in events:
+        event_type = _coerce_str(event.get("type"))
+        if not event_type or not event_type.endswith(".end"):
             continue
-        if isinstance(value, str) and len(value) > HASH_PREVIEW_LEN:
-            prefix = HASH_PREVIEW_LEN // 2
-            value = f"{value[:prefix]}…"
-        parts.append(f"{key}={value}")
-    return ", ".join(parts)
+        duration = _coerce_number(_event_attrs(event).get("duration_ms"))
+        if duration is None:
+            continue
+        stage = _stage_label(event_type)
+        component = _coerce_str(event.get("name")) or stage
+        status = _coerce_str(event.get("status")) or "unknown"
+        rows.append((stage, component, duration, status))
+    return rows
 
 
-def _build_operation_chain(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    stacks: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    completed: list[dict[str, Any]] = []
+def _skip_rows(events: Sequence[EventRecord]) -> list[tuple[str, str, str]]:
+    rows: list[tuple[str, str, str]] = []
     for event in events:
-        event_type = event.get("type")
-        name = event.get("name")
-        if event_type == "operation.start" and name:
-            stacks[name].append(event)
-        elif event_type == "operation.end" and name:
-            start = stacks[name].pop() if stacks.get(name) else None
-            completed.append({"name": name, "start": start, "end": event})
-    completed.sort(key=lambda entry: (entry["start"] or entry["end"]).get("ts", 0.0))
-    return completed
+        event_type = _coerce_str(event.get("type"))
+        if not event_type or not event_type.endswith(".skip"):
+            continue
+        attrs = _event_attrs(event)
+        reason = _coerce_str(attrs.get("reason"))
+        if not reason:
+            continue
+        stage = _stage_label(event_type)
+        component = _coerce_str(event.get("name")) or stage
+        rows.append((stage, component, reason))
+    return rows
 
 
-def _find_event(
-    events: list[dict[str, Any]],
-    predicate: Callable[[dict[str, Any]], bool],
-) -> dict[str, Any] | None:
-    for event in events:
-        if predicate(event):
-            return event
-    return None
+def _render_stage_section(events: Sequence[EventRecord]) -> list[str]:
+    lines = ["## Stage Durations", ""]
+    rows = _stage_rows(events)
+    if not rows:
+        lines.append("_No completed stages recorded._")
+        lines.append("")
+        return lines
+    lines.append("| Stage | Component | Duration (ms) | Status |")
+    lines.append("| --- | --- | ---: | --- |")
+    for stage, component, duration, status in rows:
+        lines.append(f"| {stage} | {component} | {duration:.0f} | {status} |")
+    lines.append("")
+    return lines
 
 
-def _find_last_success(events: list[dict[str, Any]]) -> dict[str, Any] | None:
-    for event in reversed(events):
-        if event.get("status") == "ok":
-            return event
-    return None
+def _render_skip_section(events: Sequence[EventRecord]) -> list[str]:
+    lines = ["## Channel Skips", ""]
+    rows = _skip_rows(events)
+    if not rows:
+        lines.append("_No channel skips recorded._")
+        lines.append("")
+        return lines
+    lines.append("| Channel | Component | Reason |")
+    lines.append("| --- | --- | --- |")
+    for stage, component, reason in rows:
+        lines.append(f"| {stage} | {component} | {reason} |")
+    lines.append("")
+    return lines
 
 
-def _find_first_failure(events: list[dict[str, Any]]) -> dict[str, Any] | None:
-    return _find_event(events, lambda evt: evt.get("status") == "error")
-
-
-def _format_event_summary(event: dict[str, Any] | None) -> str:
-    if event is None:
-        return "n/a"
-    name = event.get("name") or event.get("type")
-    attrs = event.get("attrs") or {}
-    message = event.get("message")
-    summary_attrs = _format_attrs(attrs, ("reason", "fallback", "status_code"))
-    parts = [f"{name}"]
-    if summary_attrs:
-        parts.append(f"({summary_attrs})")
-    if message:
-        parts.append(f"- {message}")
-    return " ".join(parts)
-
-
-def _collect_stage_entries(events: list[dict[str, Any]]) -> list[tuple[str, dict[str, Any]]]:
-    reversed_events = list(reversed(events))
-    stage_entries: list[tuple[str, dict[str, Any]]] = []
-    for label, stage_type in STAGE_EVENT_MAP.items():
-        stage_event = next((evt for evt in reversed_events if evt.get("type") == stage_type), None)
-        if stage_event is not None:
-            stage_entries.append((label, stage_event))
-    return stage_entries
-
-
-def _collect_skip_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [evt for evt in events if (evt.get("type") or "").endswith(".skip")]
-
-
-def _collect_decisions(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [evt for evt in events if evt.get("type") == "decision"]
-
-
-def _render_header(
-    session: str,
-    run_id: str | None,
-    last_success: dict[str, Any] | None,
-    first_failure: dict[str, Any] | None,
-) -> list[str]:
-    return [
-        f"- **Session:** `{session}`",
-        f"- **Run:** `{run_id}`" if run_id else "- **Run:** `n/a`",
-        f"- **Last Success:** {_format_event_summary(last_success)}",
-        f"- **First Failure:** {_format_event_summary(first_failure)}",
+def _render_markdown(session_id: str, run_id: str, events: Sequence[EventRecord]) -> str:
+    lines = [
+        "# Diagnostics Run Report",
+        "",
+        f"**Session:** `{session_id}`",
+        f"**Run:** `{run_id}`",
         "",
     ]
+    lines.extend(_render_stage_section(events))
+    lines.extend(_render_skip_section(events))
+    rendered = "\n".join(lines).rstrip()
+    return f"{rendered}\n"
 
 
-def _render_operations_section(operations: list[dict[str, Any]]) -> list[str]:
-    lines = ["## Operation Chain"]
-    if not operations:
-        lines.append("No operations recorded for this run.")
-        return lines
-    for idx, entry in enumerate(operations, 1):
-        end = entry["end"]
-        status = end.get("status", "ok")
-        glyph = GLYPHS.get(status, "•")
-        duration = end.get("attrs", {}).get("duration_ms")
-        duration_text = f"{duration} ms" if duration is not None else "n/a"
-        start_attrs = entry["start"].get("attrs") if entry["start"] else {}
-        summary_attrs = _format_attrs(
-            start_attrs,
-            ("limit", "query_chars", "capability_stamp"),
-        )
-        detail = f" ({summary_attrs})" if summary_attrs else ""
-        lines.append(f"{idx}. {glyph} **{entry['name']}** — {duration_text}{detail}")
-    return lines
+def _structured_report(
+    run_id: str, ledger_path: Path, events: Sequence[EventRecord]
+) -> LedgerRunReport:
+    steps = [dict(event) for event in events]
+    warnings = [
+        str(step.get("detail"))
+        for step in steps
+        if step.get("status") == "degraded" and step.get("detail")
+    ]
+    return LedgerRunReport(
+        run_id=run_id,
+        stopped_because=infer_stop_reason(steps),
+        steps=steps,
+        warnings=warnings,
+        ledger_path=str(ledger_path),
+    )
 
 
-def _render_stage_section(stages: list[tuple[str, dict[str, Any]]]) -> list[str]:
-    lines = ["## Stage Durations"]
-    if not stages:
-        lines.append("No stage telemetry recorded.")
-        return lines
-    for label, event in stages:
-        attrs = event.get("attrs") or {}
-        duration = attrs.get("duration_ms")
-        duration_text = f"{duration} ms" if duration is not None else "n/a"
-        detail = _format_attrs(
-            attrs,
-            (
-                "mode",
-                "n_texts",
-                "k",
-                "nprobe",
-                "use_gpu",
-                "channels",
-                "total",
-                "returned",
-                "asked_for",
-            ),
-        )
-        suffix = f" ({detail})" if detail else ""
-        lines.append(f"- **{label}**: {duration_text}{suffix}")
-    return lines
-
-
-def _render_skip_section(skips: list[dict[str, Any]]) -> list[str]:
-    lines = ["## Channel Skips"]
-    if not skips:
-        lines.append("No channel skips.")
-        return lines
-    for evt in skips:
-        attrs = evt.get("attrs") or {}
-        reason = attrs.get("reason", "unspecified")
-        message = attrs.get("message")
-        suffix = f" ({message})" if message else ""
-        lines.append(f"- `{evt.get('name')}` — {reason}{suffix}")
-    return lines
-
-
-def _render_decisions_section(decisions: list[dict[str, Any]]) -> list[str]:
-    lines = ["## Decisions"]
-    if not decisions:
-        lines.append("No decision events recorded.")
-        return lines
-    for evt in decisions:
-        attrs = evt.get("attrs") or {}
-        summary = _format_attrs(attrs, ("enabled", "reason", "fallback"))
-        status = evt.get("status", "ok")
-        glyph = GLYPHS.get(status, "•")
-        detail = f" ({summary})" if summary else ""
-        lines.append(f"- {glyph} `{evt.get('name')}`{detail}")
-    return lines
-
-
-def _render_report(session: str, run_id: str | None, events: list[dict[str, Any]]) -> str:
-    """Render a Markdown report for the provided session.
-
-    Extended Summary
-    ----------------
-    This function generates a human-readable Markdown report from timeline events
-    for a specific session. It analyzes events to extract operation chains, stage
-    entries, skip events, and decisions, then formats them into structured sections.
-    Used by the diagnostics CLI to produce readable reports for debugging and
-    performance analysis.
+@app.command("session")
+def session_report(  # pragma: no cover - exercised via pytests
+    events: Annotated[
+        Path,
+        typer.Option(
+            ...,
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+            readable=True,
+            help="Events JSONL ledger.",
+        ),
+    ],
+    session: Annotated[str, typer.Option(..., help="Session identifier to summarise.")],
+    run: Annotated[
+        str | None, typer.Option(None, help="Optional run identifier to render.")
+    ] = None,
+    out: Annotated[
+        Path | None,
+        typer.Option(
+            None, help="Optional output path. When omitted the report is printed to stdout."
+        ),
+    ] = None,
+    fmt: Annotated[
+        ReportFormat,
+        typer.Option(
+            ReportFormat.MARKDOWN,
+            "--format",
+            case_sensitive=False,
+            help="Choose markdown (default) or json output.",
+        ),
+    ] = ReportFormat.MARKDOWN,
+) -> None:
+    """Render the latest (or requested) run for a session from an events ledger.
 
     Parameters
     ----------
+    events : Path
+        JSONL ledger containing mixed run events. Must exist and be readable.
+        Provided via typer.Option.
     session : str
-        Session identifier to filter events and include in report header.
-    run_id : str | None, optional
-        Optional run identifier to include in report header. If None, omitted.
-    events : list[dict[str, Any]]
-        Timeline events for the session, typically loaded from JSONL files.
-        Events are analyzed to extract operations, stages, skips, and decisions.
+        Session identifier to filter runs. Provided via typer.Option.
+    run : str | None
+        Optional run identifier to force selection. Defaults to None.
+        Provided via typer.Option.
+    out : Path | None
+        Optional output path. When omitted the report is printed to stdout.
+        Defaults to None. Provided via typer.Option.
+    fmt : ReportFormat
+        Output format for the report (markdown or json). Defaults to MARKDOWN.
+        Provided via typer.Option with flag "--format".
 
-    Returns
-    -------
-    str
-        Markdown payload describing the session timeline with sections:
-        - Header (session, run_id, success/failure status)
-        - Operations chain
-        - Stage entries
-        - Skip events
-        - Decisions
-
-    Notes
-    -----
-    This function processes events to build a structured report. It identifies
-    the last successful operation and first failure to provide quick status
-    overview. Time complexity: O(n) where n is the number of events.
+    Raises
+    ------
+    typer.BadParameter
+        If the session identifier is empty, the requested run is missing, or no
+        events exist for the resolved run.
     """
-    last_success = _find_last_success(events)
-    first_failure = _find_first_failure(events)
-    operations = _build_operation_chain(events)
-    skips = _collect_skip_events(events)
-    decisions = _collect_decisions(events)
-    stages = _collect_stage_entries(events)
+    session_id = session.strip()
+    if not session_id:
+        message = "Session identifier cannot be blank."
+        raise typer.BadParameter(message)
+    ledger_events = load_ledger(events)
+    grouped = _group_events_by_run(ledger_events, session_id)
+    selected_run, run_events = _select_run(grouped, run)
+    if not run_events:
+        message = "No events recorded for the selected run."
+        raise typer.BadParameter(message)
 
-    lines: list[str] = ["# Session Report", ""]
-    lines.extend(_render_header(session, run_id, last_success, first_failure))
-    lines.extend(_render_operations_section(operations))
-    lines.append("")
-    lines.extend(_render_stage_section(stages))
-    lines.append("")
-    lines.extend(_render_skip_section(skips))
-    lines.append("")
-    lines.extend(_render_decisions_section(decisions))
-    lines.append("")
+    if fmt is ReportFormat.JSON:
+        payload = json.dumps(asdict(_structured_report(selected_run, events, run_events)), indent=2)
+    else:
+        payload = _render_markdown(session_id, selected_run, run_events)
 
-    return "\n".join(lines)
+    if out is None:
+        typer.echo(payload.rstrip("\n"))
+        return
+    out.parent.mkdir(parents=True, exist_ok=True)
+    text = payload if payload.endswith("\n") else f"{payload}\n"
+    out.write_text(text, encoding="utf-8")
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Entrypoint for the diagnostics CLI.
-
-    Extended Summary
-    ----------------
-    This CLI entry point renders timeline events from JSONL files as Markdown
-    reports. It filters events by session identifier, generates a structured
-    report, and writes it to the specified output file. Used for post-processing
-    timeline data to produce human-readable diagnostics reports.
+@app.command("run")
+def ledger_report(
+    run_id: Annotated[str, typer.Argument(..., help="Run identifier returned via X-Run-Id")],
+    data_dir: Annotated[
+        Path, typer.Option(Path("data"), help="Data directory (default: ./data)")
+    ] = Path("data"),
+) -> None:
+    """Render structured JSON for a run ledger stored under ``data/telemetry``.
 
     Parameters
     ----------
-    argv : list[str] | None, optional
-        Command-line arguments. If None, uses `sys.argv[1:]`. Arguments are:
-        --events (path to events JSONL file), --session (session identifier),
-        --out (output Markdown file path).
+    run_id : str
+        Run identifier returned via API response headers. Provided via typer.Argument.
+    data_dir : Path
+        Data directory whose telemetry sub-directory stores run ledgers.
+        Defaults to Path("data"). Provided via typer.Option.
+
+    Raises
+    ------
+    typer.BadParameter
+        If the run ledger cannot be located under ``data/telemetry``.
+    """
+    ledger_path = data_dir.resolve() / "telemetry" / "runs"
+    matches = sorted(ledger_path.glob(f"*/{run_id}.jsonl"), reverse=True)
+    if not matches:
+        message = f"Run ledger {run_id} not found under {ledger_path}"
+        raise typer.BadParameter(message)
+    report = _structured_report(run_id, matches[0], load_ledger(matches[0]))
+    typer.echo(json.dumps(asdict(report), indent=2))
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """
+    Invoke the Typer application while supporting programmatic argv injection.
+
+    Parameters
+    ----------
+    argv : Sequence[str] | None
+        Argument vector override. When None, ``sys.argv[1:]`` is used.
 
     Returns
     -------
     int
-        Zero on success, non-zero when no events were processed or file I/O fails.
-
-    Notes
-    -----
-    This tool reads timeline events from JSONL files and generates Markdown
-    reports. It filters events by session and processes them to extract
-    operations, stages, skips, and decisions. Time complexity: O(n) where n
-    is the number of events in the input file.
+        Process-style exit code emitted by Typer.
     """
-    parser = argparse.ArgumentParser(description="Render timeline JSONL as Markdown.")
-    parser.add_argument("--events", required=True, help="Path to events-*.jsonl file")
-    parser.add_argument("--session", required=True, help="Session identifier to filter")
-    parser.add_argument("--out", required=True, help="Markdown destination")
-    args = parser.parse_args(argv)
-
-    all_events = _load_events(Path(args.events), args.session)
-    run_id, events = _select_run_events(all_events)
-    if not events:
-        Path(args.out).write_text(
-            f"# Session Report\n\nNo events found for session `{args.session}`.\n",
-            encoding="utf-8",
+    args = list(argv) if argv is not None else sys.argv[1:]
+    command = typer.main.get_command(app)
+    known_commands = set(getattr(command, "commands", {}).keys())
+    forwarded_args = args
+    if args and args[0] not in known_commands:
+        forwarded_args = ["session", *args]
+    try:
+        command.main(
+            args=forwarded_args,
+            prog_name="codeintel-diagnostics",
+            standalone_mode=False,
         )
-        return 0
-
-    report = _render_report(args.session, run_id, events)
-    Path(args.out).write_text(report + "\n", encoding="utf-8")
+    except SystemExit as exc:  # pragma: no cover - Typer handles user exits
+        return int(exc.code or 0)
     return 0
 
 
-if __name__ == "__main__":  # pragma: no cover - CLI entry
+if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())

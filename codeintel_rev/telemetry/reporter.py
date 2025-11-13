@@ -31,6 +31,7 @@ __all__ = [
     "build_report",
     "emit_checkpoint",
     "finalize_run",
+    "record_step_payload",
     "record_timeline_payload",
     "render_markdown",
     "report_to_json",
@@ -45,6 +46,20 @@ def _env_retention() -> int:
     except ValueError:
         return 100
     return max(10, min(5000, value))
+
+
+def _infer_stop_reason_from_events(events: Sequence[Mapping[str, Any]]) -> str | None:
+    last_reason: str | None = None
+    for payload in events:
+        status = str(payload.get("status") or "").lower()
+        if status not in {"failed", "timed_out"}:
+            continue
+        kind = str(
+            payload.get("kind") or payload.get("op") or payload.get("component") or "unknown"
+        )
+        detail = payload.get("detail")
+        last_reason = f"{kind}:{detail}" if detail else f"{kind}:{status}"
+    return last_reason
 
 
 @dataclass(slots=True, frozen=False)
@@ -63,6 +78,7 @@ class RunRecord:
     events: list[TimelineEvent] = field(default_factory=list)
     checkpoints: list[RunCheckpoint] = field(default_factory=list)
     metrics_recorded: bool = False
+    structured_events: list[dict[str, Any]] = field(default_factory=list)
 
     def clone(self) -> RunRecord:
         """Return a shallow copy suitable for read-only processing.
@@ -84,6 +100,7 @@ class RunRecord:
             operation_name=self.operation_name,
             events=list(self.events),
             checkpoints=list(self.checkpoints),
+            structured_events=list(self.structured_events),
         )
 
 
@@ -106,6 +123,7 @@ class RunReport:
     timeline: list[dict[str, Any]]
     summary: dict[str, Any]
     capabilities: dict[str, Any]
+    structured_events: list[dict[str, Any]]
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable representation.
@@ -131,6 +149,7 @@ class RunReport:
             "timeline": self.timeline,
             "summary": self.summary,
             "capabilities": self.capabilities,
+            "structured_events": self.structured_events,
         }
 
 
@@ -203,6 +222,16 @@ class RunReportStore:
             record = self._ensure_record(session_id, run_id)
             record.checkpoints.append(checkpoint)
 
+    def record_structured_event(self, payload: Mapping[str, Any]) -> None:
+        """Record structured telemetry payloads for the given run."""
+        session_id = str(payload.get("session_id") or "")
+        run_id = str(payload.get("run_id") or "")
+        if not session_id or not run_id:
+            return
+        with self._lock:
+            record = self._ensure_record(session_id, run_id)
+            record.structured_events.append(dict(payload))
+
     def finalize(
         self,
         session_id: str,
@@ -225,6 +254,10 @@ class RunReportStore:
                 record.status = status
             if stop_reason:
                 record.stop_reason = stop_reason
+            if record.stop_reason is None:
+                inferred_reason = _infer_stop_reason_from_events(record.structured_events)
+                if inferred_reason:
+                    record.stop_reason = inferred_reason
             if not record.metrics_recorded and record.status in {"complete", "error", "partial"}:
                 tool = record.tool_name or "unknown"
                 record_run(tool, record.status)
@@ -319,6 +352,11 @@ def finalize_run(
 def record_timeline_payload(payload: Mapping[str, Any]) -> None:
     """Subscribe to timeline events."""
     RUN_REPORT_STORE.record_event(coerce_event(payload))
+
+
+def record_step_payload(payload: Mapping[str, Any]) -> None:
+    """Record structured step events for inclusion in run reports."""
+    RUN_REPORT_STORE.record_structured_event(payload)
 
 
 def emit_checkpoint(
@@ -475,6 +513,7 @@ def build_report(
         timeline=timeline,
         summary=summary,
         capabilities=capabilities_payload,
+        structured_events=list(record.structured_events),
     )
 
 

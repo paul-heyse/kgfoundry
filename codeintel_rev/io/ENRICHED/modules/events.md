@@ -24,7 +24,7 @@ Typed event helpers shared across telemetry modules.
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 43
+- **cycle_group**: 41
 
 ## Ownership
 

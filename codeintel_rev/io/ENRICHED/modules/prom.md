@@ -30,31 +30,38 @@ Prometheus helpers for MCP diagnostics.
 - function: `_prometheus_generate_latest` (line 48)
 - variable: `CONTENT_TYPE_LATEST` (line 54)
 - function: `generate_latest` (line 57)
-- function: `_env_flag` (line 93)
-- variable: `RUNS_TOTAL` (line 100)
-- variable: `RUN_ERRORS_TOTAL` (line 106)
-- variable: `REQUEST_LATENCY_SECONDS` (line 112)
-- variable: `STAGE_LATENCY_SECONDS` (line 119)
-- class: `MetricsConfig` (line 128)
-- function: `build_metrics_router` (line 135)
-- function: `record_run` (line 197)
-- function: `record_run_error` (line 202)
-- function: `observe_request_latency` (line 207)
-- function: `record_stage_latency` (line 212)
+- function: `_env_flag` (line 100)
+- variable: `RUNS_TOTAL` (line 107)
+- variable: `RUN_ERRORS_TOTAL` (line 113)
+- variable: `REQUEST_LATENCY_SECONDS` (line 119)
+- variable: `STAGE_LATENCY_SECONDS` (line 126)
+- variable: `EMBED_BATCH_SIZE` (line 133)
+- variable: `EMBED_LATENCY_SECONDS` (line 139)
+- variable: `FAISS_SEARCH_LATENCY_SECONDS` (line 145)
+- variable: `XTR_SEARCH_LATENCY_SECONDS` (line 151)
+- variable: `GATING_DECISIONS_TOTAL` (line 157)
+- variable: `RRFK` (line 163)
+- variable: `QUERY_AMBIGUITY` (line 169)
+- class: `MetricsConfig` (line 177)
+- function: `build_metrics_router` (line 184)
+- function: `record_run` (line 246)
+- function: `record_run_error` (line 251)
+- function: `observe_request_latency` (line 256)
+- function: `record_stage_latency` (line 261)
 
 ## Graph Metrics
 
-- **fan_in**: 5
+- **fan_in**: 9
 - **fan_out**: 1
-- **cycle_group**: 49
+- **cycle_group**: 42
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 5
+- recent churn 90: 5
 
 ## Usage
 
@@ -63,7 +70,7 @@ Prometheus helpers for MCP diagnostics.
 
 ## Declared Exports (__all__)
 
-MetricsConfig, build_metrics_router, observe_request_latency, record_run, record_run_error, record_stage_latency
+EMBED_BATCH_SIZE, EMBED_LATENCY_SECONDS, FAISS_SEARCH_LATENCY_SECONDS, GATING_DECISIONS_TOTAL, MetricsConfig, QUERY_AMBIGUITY, RRFK, XTR_SEARCH_LATENCY_SECONDS, build_metrics_router, observe_request_latency, record_run, record_run_error, record_stage_latency
 
 ## Doc Health
 
@@ -86,7 +93,7 @@ MetricsConfig, build_metrics_router, observe_request_latency, record_run, record
 
 ## Hotspot
 
-- score: 2.14
+- score: 2.32
 
 ## Side Effects
 
@@ -96,7 +103,7 @@ MetricsConfig, build_metrics_router, observe_request_latency, record_run, record
 
 - branches: 13
 - cyclomatic: 14
-- loc: 215
+- loc: 264
 
 ## Doc Coverage
 
@@ -113,4 +120,4 @@ MetricsConfig, build_metrics_router, observe_request_latency, record_run, record
 
 ## Tags
 
-fastapi, low-coverage, public-api
+fastapi, low-coverage, public-api, reexport-hub

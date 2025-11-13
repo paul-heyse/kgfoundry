@@ -53,6 +53,7 @@ from codeintel_rev.retrieval.rerank_flat import FlatReranker
 from codeintel_rev.retrieval.types import SearchHit
 from codeintel_rev.telemetry.decorators import span_context
 from codeintel_rev.telemetry.prom import FAISS_SEARCH_LATENCY_SECONDS
+from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from codeintel_rev.typing import NDArrayF32, NDArrayI64, gate_import
 from kgfoundry_common.errors import VectorSearchError
 from kgfoundry_common.logging import get_logger
@@ -1444,6 +1445,18 @@ class FAISSManager(
                         },
                     )
                 FAISS_SEARCH_ERRORS_TOTAL.inc()
+                emit_step(
+                    StepEvent(
+                        kind="faiss.search",
+                        status="failed",
+                        detail=type(exc).__name__,
+                        payload={
+                            "k": plan.k,
+                            "nprobe": plan.params.nprobe,
+                            "use_gpu": plan.params.use_gpu,
+                        },
+                    )
+                )
                 msg = "FAISS search failed"
                 raise VectorSearchError(
                     msg,
@@ -1472,6 +1485,18 @@ class FAISSManager(
                     "use_gpu": plan.params.use_gpu,
                 },
             )
+        emit_step(
+            StepEvent(
+                kind="faiss.search",
+                status="completed",
+                payload={
+                    "k": plan.k,
+                    "nprobe": plan.params.nprobe,
+                    "use_gpu": plan.params.use_gpu,
+                    "duration_ms": int(elapsed_total),
+                },
+            )
+        )
         self._last_latency_ms = elapsed_total
         FAISS_SEARCH_LAST_MS.set(elapsed_total)
         return result

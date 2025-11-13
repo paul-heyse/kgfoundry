@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from types import ModuleType
 from typing import Any, Protocol
 
+from codeintel_rev.observability.logs import init_otel_logging
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.observability import start_span
 
@@ -174,7 +175,7 @@ def _parse_sampler_spec(raw: str) -> tuple[str, float | None]:
     return spec, ratio
 
 
-def _build_sampler(handles: _TraceHandles, sampler_spec: str | None) -> object | None:  # noqa: PLR0911
+def _build_sampler(handles: _TraceHandles, sampler_spec: str | None) -> object | None:
     if not sampler_spec or handles.sampling is None:
         return None
     spec, ratio = _parse_sampler_spec(sampler_spec)
@@ -253,7 +254,7 @@ def telemetry_enabled() -> bool:
     return _STATE.tracing_enabled
 
 
-def init_telemetry(  # noqa: PLR0913, C901
+def init_telemetry(
     app: SupportsState | None = None,
     *,
     service_name: str = "codeintel_rev",
@@ -350,6 +351,27 @@ def init_otel(
     )
 
 
+def init_all_telemetry(
+    app: SupportsState | None = None,
+    *,
+    service_name: str | None = None,
+    service_version: str | None = None,
+    install_flight_recorder: bool = True,
+) -> None:
+    """Initialize traces, metrics, and logs in one call."""
+    init_otel(
+        app,
+        service_name=service_name,
+        service_version=service_version,
+        install_flight_recorder=install_flight_recorder,
+    )
+    try:  # pragma: no cover - logging bridge optional
+        resolved_name = service_name or os.getenv("CODEINTEL_OTEL_SERVICE_NAME", "codeintel-mcp")
+        init_otel_logging(service_name=resolved_name)
+    except (RuntimeError, ValueError, OSError):  # pragma: no cover - defensive
+        LOGGER.debug("Failed to initialize OpenTelemetry logs", exc_info=True)
+
+
 def as_span(name: str, **attrs: object) -> AbstractContextManager[None]:
     """Create a span context that no-ops when telemetry is disabled.
 
@@ -423,12 +445,12 @@ def set_current_span_attrs(**attrs: object) -> None:
     setter = getattr(span, "set_attribute", None)
     if setter is None:
         return
-        for key, value in _sanitize_span_attrs(attrs).items():
-            try:
-                setter(key, value)
-            except (RuntimeError, ValueError, TypeError) as exc:  # pragma: no cover - defensive
-                LOGGER.debug("Failed to set span attribute %s", key, exc_info=exc)
-                continue
+    for key, value in _sanitize_span_attrs(attrs).items():
+        try:
+            setter(key, value)
+        except (RuntimeError, ValueError, TypeError) as exc:  # pragma: no cover - defensive
+            LOGGER.debug("Failed to set span attribute %s", key, exc_info=exc)
+            continue
 
 
 def _current_span_context() -> object | None:
@@ -548,6 +570,7 @@ __all__ = [
     "as_span",
     "current_span_id",
     "current_trace_id",
+    "init_all_telemetry",
     "init_otel",
     "init_telemetry",
     "instrument_fastapi",

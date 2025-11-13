@@ -26,7 +26,7 @@ Entry-point driven registry for retrieval channels.
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 70
+- **cycle_group**: 72
 
 ## Ownership
 

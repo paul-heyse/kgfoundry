@@ -12,36 +12,38 @@ Adaptive gating helpers for multi-stage retrieval pipelines.
 - from **(absolute)** import re
 - from **collections.abc** import Mapping
 - from **dataclasses** import dataclass, field
-- from **codeintel_rev.observability.otel** import record_span_event
+- from **codeintel_rev.observability.otel** import record_span_event, set_current_span_attrs
+- from **codeintel_rev.observability.semantic_conventions** import Attrs, to_label_str
 - from **codeintel_rev.observability.timeline** import current_timeline
 - from **codeintel_rev.retrieval.telemetry** import record_stage_decision
 - from **codeintel_rev.retrieval.types** import StageDecision, StageSignals
+- from **codeintel_rev.telemetry.prom** import GATING_DECISIONS_TOTAL, QUERY_AMBIGUITY, RRFK
 
 ## Definitions
 
-- class: `StageGateConfig` (line 16)
-- function: `should_run_secondary_stage` (line 65)
-- class: `QueryProfile` (line 146)
-- class: `BudgetDecision` (line 198)
-- function: `_tokenize` (line 232)
-- function: `_code_like_count` (line 236)
-- function: `analyze_query` (line 245)
-- function: `decide_budgets` (line 317)
-- function: `describe_budget_decision` (line 371)
+- class: `StageGateConfig` (line 22)
+- function: `should_run_secondary_stage` (line 71)
+- class: `QueryProfile` (line 152)
+- class: `BudgetDecision` (line 204)
+- function: `_tokenize` (line 238)
+- function: `_code_like_count` (line 242)
+- function: `analyze_query` (line 251)
+- function: `decide_budgets` (line 323)
+- function: `describe_budget_decision` (line 389)
 
 ## Graph Metrics
 
 - **fan_in**: 2
-- **fan_out**: 4
-- **cycle_group**: 63
+- **fan_out**: 6
+- **cycle_group**: 66
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 8
-- recent churn 90: 8
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 
@@ -73,7 +75,7 @@ BudgetDecision, QueryProfile, StageGateConfig, analyze_query, decide_budgets, de
 
 ## Hotspot
 
-- score: 2.35
+- score: 2.46
 
 ## Side Effects
 
@@ -81,9 +83,9 @@ BudgetDecision, QueryProfile, StageGateConfig, analyze_query, decide_budgets, de
 
 ## Complexity
 
-- branches: 28
-- cyclomatic: 29
-- loc: 419
+- branches: 30
+- cyclomatic: 31
+- loc: 437
 
 ## Doc Coverage
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypedDict, cast
 
@@ -14,6 +15,7 @@ from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.scope_store import ScopeIn
 from codeintel_rev.errors import RuntimeLifecycleError
 from codeintel_rev.indexing.index_lifecycle import IndexAssets, collect_asset_attrs
+from codeintel_rev.observability.run_report import build_run_report as build_ledger_report
 from codeintel_rev.runtime.factory_adjustment import DefaultFactoryAdjuster
 from kgfoundry_common.logging import get_logger
 
@@ -34,6 +36,47 @@ def _context(request: Request) -> ApplicationContext:
     if context is None:
         raise HTTPException(status_code=503, detail="context-unavailable")
     return context
+
+
+def _find_ledger_path(data_dir: Path, run_id: str) -> Path | None:
+    root = data_dir / "telemetry" / "runs"
+    if not root.exists():
+        return None
+    candidates = sorted(root.glob("*/%s.jsonl" % run_id), reverse=True)
+    if candidates:
+        return candidates[0]
+    today = Path(datetime.now(tz=UTC).strftime("%Y-%m-%d"))
+    default_path = root / today / f"{run_id}.jsonl"
+    return default_path if default_path.exists() else None
+
+
+@router.get("/observability/run/{run_id}/report")
+async def get_run_report(run_id: str, request: Request) -> JSONResponse:
+    """Return structured run report derived from the on-disk ledger.
+
+    Parameters
+    ----------
+    run_id : str
+        Run identifier to look up in the ledger directory.
+    request : Request
+        FastAPI request object used to extract application context.
+
+    Returns
+    -------
+    JSONResponse
+        JSON response containing the structured run report dictionary.
+
+    Raises
+    ------
+    HTTPException
+        Raised with status code 404 when the run ledger file is not found.
+    """
+    ctx = _context(request)
+    ledger_path = _find_ledger_path(ctx.paths.data_dir, run_id)
+    if ledger_path is None:
+        raise HTTPException(status_code=404, detail="Run ledger not found")
+    report = build_ledger_report(run_id, ledger_path)
+    return JSONResponse(report.__dict__)
 
 
 async def _persist_session_tuning(

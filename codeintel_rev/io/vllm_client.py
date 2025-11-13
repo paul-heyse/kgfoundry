@@ -21,6 +21,7 @@ from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.telemetry.decorators import span_context
 from codeintel_rev.telemetry.prom import EMBED_BATCH_SIZE, EMBED_LATENCY_SECONDS
+from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from codeintel_rev.typing import NDArrayF32, gate_import
 from kgfoundry_common.logging import get_logger
 
@@ -339,6 +340,14 @@ class VLLMClient:
                     message=str(exc),
                     attrs={"mode": mode, "batch": batch_size},
                 )
+            emit_step(
+                StepEvent(
+                    kind="vllm.embed_batch",
+                    status="failed",
+                    detail=type(exc).__name__,
+                    payload={"mode": mode, "batch_size": batch_size},
+                )
+            )
             raise
 
         LOGGER.debug(
@@ -354,6 +363,19 @@ class VLLMClient:
         EMBED_BATCH_SIZE.observe(batch_size)
         EMBED_LATENCY_SECONDS.observe(elapsed_ms / 1000)
         record_span_event("embed.vllm.complete", duration_ms=elapsed_ms, **span_attrs)
+        emit_step(
+            StepEvent(
+                kind="vllm.embed_batch",
+                status="completed",
+                payload={
+                    "mode": mode,
+                    "batch_size": batch_size,
+                    "duration_ms": elapsed_ms,
+                    "model": self.config.model,
+                    "output_rows": int(getattr(vectors, "shape", (0, 0))[0]),
+                },
+            )
+        )
         return vectors
 
     def _embed_batch_http(self, texts: Sequence[str]) -> NDArrayF32:

@@ -13,35 +13,39 @@ Token-level XTR index manager with late-interaction scoring utilities.
 - from **collections.abc** import Iterable
 - from **dataclasses** import dataclass, field
 - from **pathlib** import Path
+- from **time** import perf_counter
 - from **typing** import TYPE_CHECKING, Any, Literal, TypedDict, cast
 - from **codeintel_rev._lazy_imports** import LazyModule
 - from **codeintel_rev.config.settings** import XTRConfig
+- from **codeintel_rev.observability.otel** import as_span
+- from **codeintel_rev.observability.semantic_conventions** import Attrs
 - from **codeintel_rev.runtime** import RuntimeCell
+- from **codeintel_rev.telemetry.prom** import XTR_SEARCH_LATENCY_SECONDS
 - from **codeintel_rev.typing** import NDArrayF32, TorchModule, gate_import
 - from **kgfoundry_common.logging** import get_logger
 - from **(absolute)** import numpy
 
 ## Definitions
 
-- variable: `np` (line 20)
-- variable: `LOGGER` (line 22)
-- class: `XTRMetadata` (line 25)
-- class: `_XTRIndexRuntime` (line 37)
-- class: `XTRIndex` (line 61)
+- variable: `np` (line 24)
+- variable: `LOGGER` (line 26)
+- class: `XTRMetadata` (line 29)
+- class: `_XTRIndexRuntime` (line 41)
+- class: `XTRIndex` (line 65)
 
 ## Graph Metrics
 
 - **fan_in**: 8
-- **fan_out**: 4
-- **cycle_group**: 58
+- **fan_out**: 7
+- **cycle_group**: 71
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 8
+- recent churn 90: 8
 
 ## Usage
 
@@ -69,7 +73,7 @@ Token-level XTR index manager with late-interaction scoring utilities.
 
 ## Hotspot
 
-- score: 2.73
+- score: 2.83
 
 ## Side Effects
 
@@ -77,9 +81,9 @@ Token-level XTR index manager with late-interaction scoring utilities.
 
 ## Complexity
 
-- branches: 46
-- cyclomatic: 47
-- loc: 617
+- branches: 48
+- cyclomatic: 49
+- loc: 641
 
 ## Doc Coverage
 

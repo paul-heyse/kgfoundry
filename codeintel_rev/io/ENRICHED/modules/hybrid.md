@@ -24,15 +24,15 @@ Fuses results from BM25, SPLADE, and FAISS using Reciprocal Rank Fusion.
 
 - **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 122
+- **cycle_group**: 124
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 

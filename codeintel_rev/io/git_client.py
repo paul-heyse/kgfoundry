@@ -53,6 +53,7 @@ from codeintel_rev.observability.otel import as_span
 from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.telemetry.decorators import span_context
+from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -372,6 +373,17 @@ class GitClient:
 
             if timeline is not None:
                 timeline.event("git.blame.end", path, attrs={"n_lines": len(entries)})
+            emit_step(
+                StepEvent(
+                    kind="git.blame",
+                    status="completed",
+                    payload={
+                        "path": path,
+                        "range": [start_line, end_line],
+                        "count": len(entries),
+                    },
+                )
+            )
             return entries
 
     def file_history(
@@ -586,7 +598,7 @@ class AsyncGitClient:
             "git.blame",
             **{
                 Attrs.GIT_COMMAND: "blame",
-                Attrs.GIT_PATH: path,
+                Attrs.FILE_PATH: path,
                 Attrs.LINE_START: start_line,
                 Attrs.LINE_END: end_line,
             },
@@ -631,7 +643,7 @@ class AsyncGitClient:
             "git.history",
             **{
                 Attrs.GIT_COMMAND: "history",
-                Attrs.GIT_PATH: path,
+                Attrs.FILE_PATH: path,
                 Attrs.LINE_LIMIT: limit,
             },
         ):

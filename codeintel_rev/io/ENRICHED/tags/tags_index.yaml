@@ -70,10 +70,12 @@ low-coverage:
 - enrich/stubs_overlay.py
 - enrich/__init__.py
 - observability/runtime_observer.py
+- observability/flight_recorder.py
 - observability/reporting.py
 - observability/metrics.py
 - observability/otel.py
 - observability/__init__.py
+- observability/semantic_conventions.py
 - observability/timeline.py
 - telemetry/context.py
 - telemetry/decorators.py
@@ -196,6 +198,7 @@ public-api:
 - observability/metrics.py
 - observability/otel.py
 - observability/__init__.py
+- observability/semantic_conventions.py
 - observability/timeline.py
 - telemetry/context.py
 - telemetry/decorators.py
@@ -262,8 +265,10 @@ reexport-hub:
 - metrics/registry.py
 - enrich/ast_indexer.py
 - observability/metrics.py
+- observability/otel.py
 - telemetry/context.py
 - telemetry/reporter.py
+- telemetry/prom.py
 - telemetry/__init__.py
 - io/splade_manager.py
 - io/__init__.py

@@ -30,10 +30,12 @@ corpus size for optimal performance.
 - from **codeintel_rev.io.duckdb_catalog** import DuckDBCatalog
 - from **codeintel_rev.metrics.registry** import FAISS_ANN_LATENCY_SECONDS, FAISS_BUILD_SECONDS_LAST, FAISS_BUILD_TOTAL, FAISS_INDEX_CODE_SIZE_BYTES, FAISS_INDEX_CUVS_ENABLED, FAISS_INDEX_DIM, FAISS_INDEX_GPU_ENABLED, FAISS_INDEX_SIZE_VECTORS, FAISS_POSTFILTER_DENSITY, FAISS_REFINE_KEPT_RATIO, FAISS_REFINE_LATENCY_SECONDS, FAISS_SEARCH_ERRORS_TOTAL, FAISS_SEARCH_LAST_K, FAISS_SEARCH_LAST_MS, FAISS_SEARCH_NPROBE, FAISS_SEARCH_TOTAL, HNSW_SEARCH_EF, set_compile_flags_id, set_factory_id
 - from **codeintel_rev.observability.otel** import as_span, record_span_event
+- from **codeintel_rev.observability.semantic_conventions** import Attrs
 - from **codeintel_rev.observability.timeline** import Timeline, current_timeline
 - from **codeintel_rev.retrieval.rerank_flat** import FlatReranker
 - from **codeintel_rev.retrieval.types** import SearchHit
 - from **codeintel_rev.telemetry.decorators** import span_context
+- from **codeintel_rev.telemetry.prom** import FAISS_SEARCH_LATENCY_SECONDS
 - from **codeintel_rev.typing** import NDArrayF32, NDArrayI64, gate_import
 - from **kgfoundry_common.errors** import VectorSearchError
 - from **kgfoundry_common.logging** import get_logger
@@ -44,52 +46,52 @@ corpus size for optimal performance.
 
 ## Definitions
 
-- variable: `FaissIndex` (line 62)
-- variable: `np` (line 64)
-- variable: `FaissIndex` (line 65)
-- variable: `pa` (line 71)
-- variable: `pq` (line 72)
-- variable: `LOGGER` (line 74)
-- variable: `logger` (line 75)
-- class: `_LazyFaissProxy` (line 78)
-- variable: `faiss` (line 122)
-- function: `_faiss_module` (line 125)
-- function: `_has_faiss_gpu_support` (line 136)
-- function: `apply_parameters` (line 152)
-- function: `_log_extra` (line 209)
-- class: `FAISSRuntimeOptions` (line 227)
-- class: `SearchRuntimeOverrides` (line 248)
-- class: `RefineSearchConfig` (line 257)
-- class: `_TuningOverrides` (line 266)
-- class: `_SearchExecutionParams` (line 277)
-- class: `_SearchPlan` (line 287)
-- class: `_FAISSIdMapMixin` (line 297)
-- class: `FAISSManager` (line 474)
-- class: `AutoTuner` (line 3607)
-- function: `_coerce_to_int` (line 3737)
-- function: `_configure_direct_map` (line 3760)
-- function: `_set_direct_map_type` (line 3768)
-- function: `_wrap_bool_contains` (line 3811)
-- function: `_wrap_index_contains` (line 3847)
-- function: `_coerce_optional_int` (line 3885)
-- function: `_coerce_optional_float` (line 3919)
-- function: `_parse_tuning_overrides` (line 3953)
-- function: `_persist_tuning_profile` (line 3979)
-- function: `_get_compile_options` (line 3991)
+- variable: `FaissIndex` (line 64)
+- variable: `np` (line 66)
+- variable: `FaissIndex` (line 67)
+- variable: `pa` (line 73)
+- variable: `pq` (line 74)
+- variable: `LOGGER` (line 76)
+- variable: `logger` (line 77)
+- class: `_LazyFaissProxy` (line 80)
+- variable: `faiss` (line 124)
+- function: `_faiss_module` (line 127)
+- function: `_has_faiss_gpu_support` (line 138)
+- function: `apply_parameters` (line 154)
+- function: `_log_extra` (line 211)
+- class: `FAISSRuntimeOptions` (line 229)
+- class: `SearchRuntimeOverrides` (line 250)
+- class: `RefineSearchConfig` (line 259)
+- class: `_TuningOverrides` (line 268)
+- class: `_SearchExecutionParams` (line 279)
+- class: `_SearchPlan` (line 289)
+- class: `_FAISSIdMapMixin` (line 299)
+- class: `FAISSManager` (line 476)
+- class: `AutoTuner` (line 3614)
+- function: `_coerce_to_int` (line 3744)
+- function: `_configure_direct_map` (line 3767)
+- function: `_set_direct_map_type` (line 3775)
+- function: `_wrap_bool_contains` (line 3818)
+- function: `_wrap_index_contains` (line 3854)
+- function: `_coerce_optional_int` (line 3892)
+- function: `_coerce_optional_float` (line 3926)
+- function: `_parse_tuning_overrides` (line 3960)
+- function: `_persist_tuning_profile` (line 3986)
+- function: `_get_compile_options` (line 3998)
 
 ## Graph Metrics
 
 - **fan_in**: 8
-- **fan_out**: 10
-- **cycle_group**: 70
+- **fan_out**: 12
+- **cycle_group**: 72
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 44
-- recent churn 90: 44
+- recent churn 30: 45
+- recent churn 90: 45
 
 ## Usage
 
@@ -121,7 +123,7 @@ AutoTuner, FAISSManager, apply_parameters
 
 ## Hotspot
 
-- score: 3.39
+- score: 3.43
 
 ## Side Effects
 
@@ -131,7 +133,7 @@ AutoTuner, FAISSManager, apply_parameters
 
 - branches: 254
 - cyclomatic: 255
-- loc: 4008
+- loc: 4015
 
 ## Doc Coverage
 

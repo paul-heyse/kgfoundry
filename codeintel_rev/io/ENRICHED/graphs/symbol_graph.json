@@ -7060,7 +7060,23 @@
     "file": "app/middleware.py"
   },
   {
+    "symbol": "local 19",
+    "file": "app/middleware.py"
+  },
+  {
     "symbol": "local 2",
+    "file": "app/middleware.py"
+  },
+  {
+    "symbol": "local 20",
+    "file": "app/middleware.py"
+  },
+  {
+    "symbol": "local 21",
+    "file": "app/middleware.py"
+  },
+  {
+    "symbol": "local 22",
     "file": "app/middleware.py"
   },
   {
@@ -8584,6 +8600,10 @@
     "file": "app/main.py"
   },
   {
+    "symbol": "local 19",
+    "file": "app/main.py"
+  },
+  {
     "symbol": "local 2",
     "file": "app/main.py"
   },
@@ -8592,7 +8612,7 @@
     "file": "app/main.py"
   },
   {
-    "symbol": "local 21",
+    "symbol": "local 22",
     "file": "app/main.py"
   },
   {
@@ -8601,14 +8621,6 @@
   },
   {
     "symbol": "local 25",
-    "file": "app/main.py"
-  },
-  {
-    "symbol": "local 26",
-    "file": "app/main.py"
-  },
-  {
-    "symbol": "local 27",
     "file": "app/main.py"
   },
   {
@@ -8632,6 +8644,10 @@
     "file": "app/main.py"
   },
   {
+    "symbol": "local 32",
+    "file": "app/main.py"
+  },
+  {
     "symbol": "local 33",
     "file": "app/main.py"
   },
@@ -8641,10 +8657,6 @@
   },
   {
     "symbol": "local 35",
-    "file": "app/main.py"
-  },
-  {
-    "symbol": "local 36",
     "file": "app/main.py"
   },
   {
@@ -8688,6 +8700,10 @@
     "file": "app/main.py"
   },
   {
+    "symbol": "local 46",
+    "file": "app/main.py"
+  },
+  {
     "symbol": "local 47",
     "file": "app/main.py"
   },
@@ -8704,11 +8720,11 @@
     "file": "app/main.py"
   },
   {
-    "symbol": "local 50",
+    "symbol": "local 51",
     "file": "app/main.py"
   },
   {
-    "symbol": "local 51",
+    "symbol": "local 52",
     "file": "app/main.py"
   },
   {
@@ -8721,10 +8737,6 @@
   },
   {
     "symbol": "local 55",
-    "file": "app/main.py"
-  },
-  {
-    "symbol": "local 56",
     "file": "app/main.py"
   },
   {
@@ -8744,6 +8756,10 @@
     "file": "app/main.py"
   },
   {
+    "symbol": "local 60",
+    "file": "app/main.py"
+  },
+  {
     "symbol": "local 61",
     "file": "app/main.py"
   },
@@ -8756,15 +8772,19 @@
     "file": "app/main.py"
   },
   {
-    "symbol": "local 64",
-    "file": "app/main.py"
-  },
-  {
     "symbol": "local 65",
     "file": "app/main.py"
   },
   {
+    "symbol": "local 66",
+    "file": "app/main.py"
+  },
+  {
     "symbol": "local 67",
+    "file": "app/main.py"
+  },
+  {
+    "symbol": "local 68",
     "file": "app/main.py"
   },
   {
@@ -8776,15 +8796,23 @@
     "file": "app/main.py"
   },
   {
-    "symbol": "local 70",
-    "file": "app/main.py"
-  },
-  {
     "symbol": "local 71",
     "file": "app/main.py"
   },
   {
+    "symbol": "local 73",
+    "file": "app/main.py"
+  },
+  {
     "symbol": "local 74",
+    "file": "app/main.py"
+  },
+  {
+    "symbol": "local 75",
+    "file": "app/main.py"
+  },
+  {
+    "symbol": "local 78",
     "file": "app/main.py"
   },
   {
@@ -9856,6 +9884,38 @@
     "file": "app/capabilities.py"
   },
   {
+    "symbol": "local 61",
+    "file": "app/capabilities.py"
+  },
+  {
+    "symbol": "local 62",
+    "file": "app/capabilities.py"
+  },
+  {
+    "symbol": "local 63",
+    "file": "app/capabilities.py"
+  },
+  {
+    "symbol": "local 64",
+    "file": "app/capabilities.py"
+  },
+  {
+    "symbol": "local 65",
+    "file": "app/capabilities.py"
+  },
+  {
+    "symbol": "local 66",
+    "file": "app/capabilities.py"
+  },
+  {
+    "symbol": "local 67",
+    "file": "app/capabilities.py"
+  },
+  {
+    "symbol": "local 68",
+    "file": "app/capabilities.py"
+  },
+  {
     "symbol": "local 7",
     "file": "app/capabilities.py"
   },
@@ -10096,19 +10156,15 @@
     "file": "app/readiness.py"
   },
   {
-    "symbol": "local 21",
+    "symbol": "local 22",
     "file": "app/readiness.py"
   },
   {
-    "symbol": "local 26",
+    "symbol": "local 23",
     "file": "app/readiness.py"
   },
   {
-    "symbol": "local 27",
-    "file": "app/readiness.py"
-  },
-  {
-    "symbol": "local 28",
+    "symbol": "local 24",
     "file": "app/readiness.py"
   },
   {
@@ -10192,7 +10248,15 @@
     "file": "app/readiness.py"
   },
   {
+    "symbol": "local 47",
+    "file": "app/readiness.py"
+  },
+  {
     "symbol": "local 48",
+    "file": "app/readiness.py"
+  },
+  {
+    "symbol": "local 49",
     "file": "app/readiness.py"
   },
   {
@@ -10200,19 +10264,23 @@
     "file": "app/readiness.py"
   },
   {
-    "symbol": "local 50",
-    "file": "app/readiness.py"
-  },
-  {
     "symbol": "local 51",
     "file": "app/readiness.py"
   },
   {
-    "symbol": "local 52",
+    "symbol": "local 53",
     "file": "app/readiness.py"
   },
   {
     "symbol": "local 54",
+    "file": "app/readiness.py"
+  },
+  {
+    "symbol": "local 55",
+    "file": "app/readiness.py"
+  },
+  {
+    "symbol": "local 57",
     "file": "app/readiness.py"
   },
   {
@@ -10341,6 +10409,18 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.readiness`/ReadinessProbe#_lock.",
+    "file": "app/readiness.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.readiness`/ReadinessProbe#_record_check().",
+    "file": "app/readiness.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.readiness`/ReadinessProbe#_record_check().(fn)",
+    "file": "app/readiness.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.readiness`/ReadinessProbe#_record_check().(span_name)",
     "file": "app/readiness.py"
   },
   {
@@ -18933,6 +19013,602 @@
   },
   {
     "symbol": "local 0",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 1",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 10",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 11",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 12",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 13",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 14",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 15",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 16",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 17",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 18",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 20",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 21",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 22",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 23",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 26",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 27",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 30",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 31",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 32",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 33",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 34",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 35",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 36",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 37",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 38",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 39",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 40",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 41",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 42",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 43",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 44",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 45",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 46",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 49",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 50",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 51",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 53",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 54",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 55",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 56",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 57",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 58",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 59",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 6",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 60",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 61",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 62",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 63",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 64",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 65",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 66",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 67",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 68",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 69",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 7",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 71",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 72",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 75",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 76",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 77",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 78",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 9",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/FlightRecorderSpanProcessor#",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/FlightRecorderSpanProcessor#__init__().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/FlightRecorderSpanProcessor#__init__().(recorder)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/FlightRecorderSpanProcessor#__init__().(self)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/FlightRecorderSpanProcessor#_recorder.",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/FlightRecorderSpanProcessor#force_flush().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/FlightRecorderSpanProcessor#force_flush().(self)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/FlightRecorderSpanProcessor#force_flush().(timeout_millis)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/FlightRecorderSpanProcessor#on_end().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/FlightRecorderSpanProcessor#on_end().(self)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/FlightRecorderSpanProcessor#on_end().(span)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/FlightRecorderSpanProcessor#on_start().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/FlightRecorderSpanProcessor#on_start().(parent_context)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/FlightRecorderSpanProcessor#on_start().(self)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/FlightRecorderSpanProcessor#on_start().(span)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/FlightRecorderSpanProcessor#shutdown().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/FlightRecorderSpanProcessor#shutdown().(self)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/LOGGER.",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_FlightRecorder#",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_FlightRecorder#__init__().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_FlightRecorder#__init__().(self)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_FlightRecorder#_buffers.",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_FlightRecorder#_flush_locked().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_FlightRecorder#_flush_locked().(buffer)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_FlightRecorder#_flush_locked().(self)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_FlightRecorder#_flush_locked().(trace_id)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_FlightRecorder#_lock.",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_FlightRecorder#on_end().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_FlightRecorder#on_end().(self)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_FlightRecorder#on_end().(span)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_FlightRecorder#on_start().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_FlightRecorder#on_start().(self)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_FlightRecorder#on_start().(span)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_FlightRecorder#shutdown().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_FlightRecorder#shutdown().(self)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_RECORDER_LOCK.",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_RunBuffer#",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_RunBuffer#diag_path.",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_RunBuffer#events.",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_RunBuffer#root_span_id.",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_RunBuffer#run_id.",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_RunBuffer#session_id.",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_RunBuffer#started_ns.",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_RunBuffer#status.",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_RunBuffer#stop_reason.",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_RunBuffer#trace_id.",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/__init__:",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_build_event().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_build_event().(span)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_build_summary().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_build_summary().(events)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_convert_span_events().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_convert_span_events().(events)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_data_root().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_date_segment().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_date_segment().(start_ns)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_is_root_span().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_is_root_span().(span)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_report_path().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_report_path().(ensure_parent)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_report_path().(run_id)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_report_path().(session_id)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_report_path().(started_ns)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_report_path().(trace_id)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_scrub_value().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_scrub_value().(value)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_span_id().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_span_id().(span)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_trace_id().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_trace_id().(span)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_ts().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_ts().(nanoseconds)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_update_identities().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_update_identities().(buffer)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_update_identities().(span)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_update_status().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_update_status().(buffer)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_update_status().(event)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_update_status().(span)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/build_report_uri().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/build_report_uri().(run_id)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/build_report_uri().(session_id)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/build_report_uri().(started_at)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/build_report_uri().(trace_id)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/install_flight_recorder().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/install_flight_recorder().(provider)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 0",
     "file": "observability/reporting.py"
   },
   {
@@ -19364,6 +20040,34 @@
     "file": "observability/otel.py"
   },
   {
+    "symbol": "local 100",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 101",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 102",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 103",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 104",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 105",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 106",
+    "file": "observability/otel.py"
+  },
+  {
     "symbol": "local 11",
     "file": "observability/otel.py"
   },
@@ -19380,7 +20084,7 @@
     "file": "observability/otel.py"
   },
   {
-    "symbol": "local 16",
+    "symbol": "local 15",
     "file": "observability/otel.py"
   },
   {
@@ -19392,31 +20096,15 @@
     "file": "observability/otel.py"
   },
   {
+    "symbol": "local 19",
+    "file": "observability/otel.py"
+  },
+  {
     "symbol": "local 2",
     "file": "observability/otel.py"
   },
   {
     "symbol": "local 20",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 21",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 22",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 23",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 24",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 25",
     "file": "observability/otel.py"
   },
   {
@@ -19452,15 +20140,15 @@
     "file": "observability/otel.py"
   },
   {
-    "symbol": "local 33",
-    "file": "observability/otel.py"
-  },
-  {
     "symbol": "local 34",
     "file": "observability/otel.py"
   },
   {
     "symbol": "local 35",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 36",
     "file": "observability/otel.py"
   },
   {
@@ -19508,6 +20196,210 @@
     "file": "observability/otel.py"
   },
   {
+    "symbol": "local 48",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 49",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 50",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 51",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 52",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 53",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 54",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 55",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 56",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 57",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 58",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 59",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 60",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 62",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 63",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 64",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 65",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 66",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 67",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 68",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 69",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 70",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 71",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 72",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 73",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 74",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 75",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 76",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 77",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 78",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 79",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 80",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 81",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 82",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 83",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 84",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 85",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 86",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 87",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 88",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 89",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 90",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 91",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 92",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 93",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 94",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 95",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 96",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 97",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 98",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "local 99",
+    "file": "observability/otel.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/LOGGER.",
     "file": "observability/otel.py"
   },
@@ -19552,6 +20444,10 @@
     "file": "observability/otel.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_TelemetryState#trace_provider.",
+    "file": "observability/otel.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_TraceHandles#",
     "file": "observability/otel.py"
   },
@@ -19565,6 +20461,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_TraceHandles#resource.",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_TraceHandles#sampling.",
     "file": "observability/otel.py"
   },
   {
@@ -19596,11 +20496,39 @@
     "file": "observability/otel.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_build_provider().(service_name)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_build_provider().(resource)",
     "file": "observability/otel.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_build_provider().(service_version)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_build_provider().(sampler_spec)",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_build_resource().",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_build_resource().(handles)",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_build_resource().(service_name)",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_build_resource().(service_version)",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_build_sampler().",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_build_sampler().(handles)",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_build_sampler().(sampler_spec)",
     "file": "observability/otel.py"
   },
   {
@@ -19609,6 +20537,14 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_coerce_span_value().(value)",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_current_span().",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_current_span_context().",
     "file": "observability/otel.py"
   },
   {
@@ -19628,6 +20564,18 @@
     "file": "observability/otel.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_install_metrics_provider().",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_install_metrics_provider().(endpoint)",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_install_metrics_provider().(resource)",
+    "file": "observability/otel.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_load_trace_modules().",
     "file": "observability/otel.py"
   },
@@ -19637,6 +20585,14 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_optional_import().(module_name)",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_parse_sampler_spec().",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_parse_sampler_spec().(raw)",
     "file": "observability/otel.py"
   },
   {
@@ -19664,6 +20620,34 @@
     "file": "observability/otel.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/current_span_id().",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/current_trace_id().",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/init_otel().",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/init_otel().(app)",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/init_otel().(install_flight_recorder)",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/init_otel().(service_name)",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/init_otel().(service_version)",
+    "file": "observability/otel.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/init_telemetry().",
     "file": "observability/otel.py"
   },
@@ -19676,7 +20660,15 @@
     "file": "observability/otel.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/init_telemetry().(install_flight_recorder)",
+    "file": "observability/otel.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/init_telemetry().(otlp_endpoint)",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/init_telemetry().(sampler)",
     "file": "observability/otel.py"
   },
   {
@@ -19712,6 +20704,14 @@
     "file": "observability/otel.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/set_current_span_attrs().",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/set_current_span_attrs().(attrs)",
+    "file": "observability/otel.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/telemetry_enabled().",
     "file": "observability/otel.py"
   },
@@ -19722,6 +20722,226 @@
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability`/__init__:",
     "file": "observability/__init__.py"
+  },
+  {
+    "symbol": "local 0",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "local 1",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#BUDGET_MS.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#COMPONENT.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#DECISION_BM25_RM3_ENABLED.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#DECISION_CHANNEL_DEPTHS.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#DECISION_RRF_K.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#DUCKDB_CATALOG.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#DUCKDB_ROWS.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#DUCKDB_SQL_BYTES.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#ENVELOPE_DIAG_URI.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#ENVELOPE_SPAN_ID.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#ENVELOPE_TRACE_ID.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#FAISS_DIM.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#FAISS_GPU.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#FAISS_INDEX_TYPE.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#FAISS_METRIC.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#FAISS_NPROBE.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#FAISS_TOP_K.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#FALLBACK_REASON.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#FALLBACK_TARGET.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#FILE_PATH.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#FUSED_DOCS.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#GATHERED_DOCS.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#GIT_COMMAND.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#LINE_END.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#LINE_LIMIT.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#LINE_START.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#MCP_TOOL.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#OPERATION.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#QUERY_LEN.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#QUERY_TEXT.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#RECENCY_BOOSTED.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#REQUEST_ID.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#RETRIEVAL_CHANNELS.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#RETRIEVAL_EXPLAINABILITY.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#RETRIEVAL_TOP_K.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#RUN_ID.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#SESSION_ID.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#STAGE.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#VLLM_BATCH.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#VLLM_EMBED_DIM.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#VLLM_MODE.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#VLLM_MODEL_NAME.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#WARN_DEGRADED.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#XTR_CANDIDATES.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#XTR_TOP_K.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#XTR_VERSION.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/__all__.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/__init__:",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/as_kv().",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/as_kv().(attrs)",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/to_label_str().",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/to_label_str().(value)",
+    "file": "observability/semantic_conventions.py"
   },
   {
     "symbol": "local 0",
@@ -22220,6 +23440,22 @@
     "file": "telemetry/prom.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/EMBED_BATCH_SIZE.",
+    "file": "telemetry/prom.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/EMBED_LATENCY_SECONDS.",
+    "file": "telemetry/prom.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/FAISS_SEARCH_LATENCY_SECONDS.",
+    "file": "telemetry/prom.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/GATING_DECISIONS_TOTAL.",
+    "file": "telemetry/prom.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/MetricsConfig#",
     "file": "telemetry/prom.py"
   },
@@ -22232,7 +23468,15 @@
     "file": "telemetry/prom.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/QUERY_AMBIGUITY.",
+    "file": "telemetry/prom.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/REQUEST_LATENCY_SECONDS.",
+    "file": "telemetry/prom.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/RRFK.",
     "file": "telemetry/prom.py"
   },
   {
@@ -22245,6 +23489,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/STAGE_LATENCY_SECONDS.",
+    "file": "telemetry/prom.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/XTR_SEARCH_LATENCY_SECONDS.",
     "file": "telemetry/prom.py"
   },
   {
@@ -24916,7 +26164,7 @@
     "file": "io/vllm_client.py"
   },
   {
-    "symbol": "local 22",
+    "symbol": "local 21",
     "file": "io/vllm_client.py"
   },
   {
@@ -24928,7 +26176,7 @@
     "file": "io/vllm_client.py"
   },
   {
-    "symbol": "local 25",
+    "symbol": "local 26",
     "file": "io/vllm_client.py"
   },
   {
@@ -24956,11 +26204,11 @@
     "file": "io/vllm_client.py"
   },
   {
-    "symbol": "local 32",
+    "symbol": "local 33",
     "file": "io/vllm_client.py"
   },
   {
-    "symbol": "local 33",
+    "symbol": "local 34",
     "file": "io/vllm_client.py"
   },
   {
@@ -24972,11 +26220,11 @@
     "file": "io/vllm_client.py"
   },
   {
-    "symbol": "local 37",
+    "symbol": "local 38",
     "file": "io/vllm_client.py"
   },
   {
-    "symbol": "local 38",
+    "symbol": "local 39",
     "file": "io/vllm_client.py"
   },
   {
@@ -25012,15 +26260,15 @@
     "file": "io/vllm_client.py"
   },
   {
-    "symbol": "local 47",
-    "file": "io/vllm_client.py"
-  },
-  {
-    "symbol": "local 48",
+    "symbol": "local 49",
     "file": "io/vllm_client.py"
   },
   {
     "symbol": "local 5",
+    "file": "io/vllm_client.py"
+  },
+  {
+    "symbol": "local 50",
     "file": "io/vllm_client.py"
   },
   {
@@ -25040,11 +26288,11 @@
     "file": "io/vllm_client.py"
   },
   {
-    "symbol": "local 55",
+    "symbol": "local 56",
     "file": "io/vllm_client.py"
   },
   {
-    "symbol": "local 56",
+    "symbol": "local 57",
     "file": "io/vllm_client.py"
   },
   {
@@ -25072,11 +26320,11 @@
     "file": "io/vllm_client.py"
   },
   {
-    "symbol": "local 63",
+    "symbol": "local 64",
     "file": "io/vllm_client.py"
   },
   {
-    "symbol": "local 64",
+    "symbol": "local 65",
     "file": "io/vllm_client.py"
   },
   {
@@ -25100,11 +26348,11 @@
     "file": "io/vllm_client.py"
   },
   {
-    "symbol": "local 70",
+    "symbol": "local 71",
     "file": "io/vllm_client.py"
   },
   {
-    "symbol": "local 71",
+    "symbol": "local 72",
     "file": "io/vllm_client.py"
   },
   {
@@ -25116,11 +26364,11 @@
     "file": "io/vllm_client.py"
   },
   {
-    "symbol": "local 75",
+    "symbol": "local 76",
     "file": "io/vllm_client.py"
   },
   {
-    "symbol": "local 76",
+    "symbol": "local 77",
     "file": "io/vllm_client.py"
   },
   {
@@ -25172,15 +26420,7 @@
     "file": "io/vllm_client.py"
   },
   {
-    "symbol": "local 89",
-    "file": "io/vllm_client.py"
-  },
-  {
     "symbol": "local 9",
-    "file": "io/vllm_client.py"
-  },
-  {
-    "symbol": "local 90",
     "file": "io/vllm_client.py"
   },
   {
@@ -26160,6 +27400,22 @@
     "file": "io/xtr_manager.py"
   },
   {
+    "symbol": "local 102",
+    "file": "io/xtr_manager.py"
+  },
+  {
+    "symbol": "local 103",
+    "file": "io/xtr_manager.py"
+  },
+  {
+    "symbol": "local 104",
+    "file": "io/xtr_manager.py"
+  },
+  {
+    "symbol": "local 105",
+    "file": "io/xtr_manager.py"
+  },
+  {
     "symbol": "local 13",
     "file": "io/xtr_manager.py"
   },
@@ -26336,6 +27592,14 @@
     "file": "io/xtr_manager.py"
   },
   {
+    "symbol": "local 57",
+    "file": "io/xtr_manager.py"
+  },
+  {
+    "symbol": "local 59",
+    "file": "io/xtr_manager.py"
+  },
+  {
     "symbol": "local 6",
     "file": "io/xtr_manager.py"
   },
@@ -26360,18 +27624,6 @@
     "file": "io/xtr_manager.py"
   },
   {
-    "symbol": "local 65",
-    "file": "io/xtr_manager.py"
-  },
-  {
-    "symbol": "local 66",
-    "file": "io/xtr_manager.py"
-  },
-  {
-    "symbol": "local 67",
-    "file": "io/xtr_manager.py"
-  },
-  {
     "symbol": "local 68",
     "file": "io/xtr_manager.py"
   },
@@ -26381,6 +27633,10 @@
   },
   {
     "symbol": "local 7",
+    "file": "io/xtr_manager.py"
+  },
+  {
+    "symbol": "local 70",
     "file": "io/xtr_manager.py"
   },
   {
@@ -26412,10 +27668,6 @@
     "file": "io/xtr_manager.py"
   },
   {
-    "symbol": "local 78",
-    "file": "io/xtr_manager.py"
-  },
-  {
     "symbol": "local 79",
     "file": "io/xtr_manager.py"
   },
@@ -26444,6 +27696,10 @@
     "file": "io/xtr_manager.py"
   },
   {
+    "symbol": "local 85",
+    "file": "io/xtr_manager.py"
+  },
+  {
     "symbol": "local 86",
     "file": "io/xtr_manager.py"
   },
@@ -26468,6 +27724,14 @@
     "file": "io/xtr_manager.py"
   },
   {
+    "symbol": "local 91",
+    "file": "io/xtr_manager.py"
+  },
+  {
+    "symbol": "local 92",
+    "file": "io/xtr_manager.py"
+  },
+  {
     "symbol": "local 94",
     "file": "io/xtr_manager.py"
   },
@@ -26481,6 +27745,10 @@
   },
   {
     "symbol": "local 97",
+    "file": "io/xtr_manager.py"
+  },
+  {
+    "symbol": "local 98",
     "file": "io/xtr_manager.py"
   },
   {
@@ -36588,6 +37856,18 @@
     "file": "retrieval/gating.py"
   },
   {
+    "symbol": "local 33",
+    "file": "retrieval/gating.py"
+  },
+  {
+    "symbol": "local 34",
+    "file": "retrieval/gating.py"
+  },
+  {
+    "symbol": "local 35",
+    "file": "retrieval/gating.py"
+  },
+  {
     "symbol": "local 4",
     "file": "retrieval/gating.py"
   },
@@ -39932,6 +41212,10 @@
     "file": "mcp_server/schemas.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.schemas`/AnswerEnvelope#diag_report_uri.",
+    "file": "mcp_server/schemas.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.schemas`/AnswerEnvelope#docs.",
     "file": "mcp_server/schemas.py"
   },
@@ -39972,6 +41256,10 @@
     "file": "mcp_server/schemas.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.schemas`/AnswerEnvelope#run_id.",
+    "file": "mcp_server/schemas.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.schemas`/AnswerEnvelope#scope.",
     "file": "mcp_server/schemas.py"
   },
@@ -39980,7 +41268,15 @@
     "file": "mcp_server/schemas.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.schemas`/AnswerEnvelope#span_id.",
+    "file": "mcp_server/schemas.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.schemas`/AnswerEnvelope#telemetry.",
+    "file": "mcp_server/schemas.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.schemas`/AnswerEnvelope#trace_id.",
     "file": "mcp_server/schemas.py"
   },
   {
@@ -40576,6 +41872,14 @@
     "file": "mcp_server/server_semantic.py"
   },
   {
+    "symbol": "local 30",
+    "file": "mcp_server/server_semantic.py"
+  },
+  {
+    "symbol": "local 31",
+    "file": "mcp_server/server_semantic.py"
+  },
+  {
     "symbol": "local 4",
     "file": "mcp_server/server_semantic.py"
   },
@@ -40609,6 +41913,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.server_semantic`/_render_run_report().(session_id)",
+    "file": "mcp_server/server_semantic.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.server_semantic`/_render_run_report().(trace_id)",
     "file": "mcp_server/server_semantic.py"
   },
   {
@@ -41000,7 +42308,27 @@
     "file": "mcp_server/error_handling.py"
   },
   {
+    "symbol": "local 57",
+    "file": "mcp_server/error_handling.py"
+  },
+  {
     "symbol": "local 58",
+    "file": "mcp_server/error_handling.py"
+  },
+  {
+    "symbol": "local 59",
+    "file": "mcp_server/error_handling.py"
+  },
+  {
+    "symbol": "local 60",
+    "file": "mcp_server/error_handling.py"
+  },
+  {
+    "symbol": "local 61",
+    "file": "mcp_server/error_handling.py"
+  },
+  {
+    "symbol": "local 63",
     "file": "mcp_server/error_handling.py"
   },
   {
@@ -41053,6 +42381,18 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.error_handling`/__init__:",
+    "file": "mcp_server/error_handling.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.error_handling`/_record_exception_event().",
+    "file": "mcp_server/error_handling.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.error_handling`/_record_exception_event().(exc)",
+    "file": "mcp_server/error_handling.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.error_handling`/_record_exception_event().(operation)",
     "file": "mcp_server/error_handling.py"
   },
   {
@@ -46492,11 +47832,23 @@
     "file": "mcp_server/common/observability.py"
   },
   {
-    "symbol": "local 14",
+    "symbol": "local 13",
     "file": "mcp_server/common/observability.py"
   },
   {
-    "symbol": "local 15",
+    "symbol": "local 16",
+    "file": "mcp_server/common/observability.py"
+  },
+  {
+    "symbol": "local 17",
+    "file": "mcp_server/common/observability.py"
+  },
+  {
+    "symbol": "local 18",
+    "file": "mcp_server/common/observability.py"
+  },
+  {
+    "symbol": "local 19",
     "file": "mcp_server/common/observability.py"
   },
   {
@@ -46504,11 +47856,59 @@
     "file": "mcp_server/common/observability.py"
   },
   {
+    "symbol": "local 20",
+    "file": "mcp_server/common/observability.py"
+  },
+  {
+    "symbol": "local 21",
+    "file": "mcp_server/common/observability.py"
+  },
+  {
+    "symbol": "local 22",
+    "file": "mcp_server/common/observability.py"
+  },
+  {
+    "symbol": "local 23",
+    "file": "mcp_server/common/observability.py"
+  },
+  {
+    "symbol": "local 24",
+    "file": "mcp_server/common/observability.py"
+  },
+  {
+    "symbol": "local 25",
+    "file": "mcp_server/common/observability.py"
+  },
+  {
+    "symbol": "local 26",
+    "file": "mcp_server/common/observability.py"
+  },
+  {
+    "symbol": "local 27",
+    "file": "mcp_server/common/observability.py"
+  },
+  {
+    "symbol": "local 28",
+    "file": "mcp_server/common/observability.py"
+  },
+  {
+    "symbol": "local 29",
+    "file": "mcp_server/common/observability.py"
+  },
+  {
     "symbol": "local 3",
     "file": "mcp_server/common/observability.py"
   },
   {
-    "symbol": "local 5",
+    "symbol": "local 31",
+    "file": "mcp_server/common/observability.py"
+  },
+  {
+    "symbol": "local 32",
+    "file": "mcp_server/common/observability.py"
+  },
+  {
+    "symbol": "local 4",
     "file": "mcp_server/common/observability.py"
   },
   {
@@ -46577,6 +47977,14 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.common.observability`/__init__:",
+    "file": "mcp_server/common/observability.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.common.observability`/_record_exemplar().",
+    "file": "mcp_server/common/observability.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.common.observability`/_record_exemplar().(observation)",
     "file": "mcp_server/common/observability.py"
   },
   {
@@ -46860,23 +48268,11 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 102",
+    "symbol": "local 100",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 103",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 105",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 106",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 107",
+    "symbol": "local 104",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -46892,7 +48288,7 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 110",
+    "symbol": "local 111",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -46912,6 +48308,14 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
+    "symbol": "local 116",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 118",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
     "symbol": "local 119",
     "file": "mcp_server/adapters/semantic.py"
   },
@@ -46920,19 +48324,15 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 124",
+    "symbol": "local 120",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 121",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
     "symbol": "local 125",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 127",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 128",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -46948,7 +48348,11 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 135",
+    "symbol": "local 133",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 134",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -46964,23 +48368,23 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 140",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
     "symbol": "local 141",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 144",
+    "symbol": "local 142",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 145",
+    "symbol": "local 143",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 149",
+    "symbol": "local 146",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 147",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -46996,7 +48400,7 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 153",
+    "symbol": "local 155",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -47008,23 +48412,59 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 158",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
     "symbol": "local 159",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 160",
+    "symbol": "local 162",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 161",
+    "symbol": "local 163",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 164",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 165",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 166",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 167",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 169",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
     "symbol": "local 17",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 170",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 171",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 172",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 173",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 174",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -47088,15 +48528,11 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 41",
+    "symbol": "local 42",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
     "symbol": "local 44",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 45",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -47108,6 +48544,10 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
+    "symbol": "local 49",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
     "symbol": "local 5",
     "file": "mcp_server/adapters/semantic.py"
   },
@@ -47116,11 +48556,19 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 53",
+    "symbol": "local 52",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
     "symbol": "local 54",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 57",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 59",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -47129,18 +48577,6 @@
   },
   {
     "symbol": "local 60",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 61",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 62",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 65",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -47156,15 +48592,7 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 69",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
     "symbol": "local 7",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 70",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -47184,11 +48612,19 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
+    "symbol": "local 75",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
     "symbol": "local 76",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
     "symbol": "local 77",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 78",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -47204,10 +48640,6 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 81",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
     "symbol": "local 82",
     "file": "mcp_server/adapters/semantic.py"
   },
@@ -47216,7 +48648,19 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 84",
+    "symbol": "local 85",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 86",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 87",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 88",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -47232,15 +48676,15 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 93",
+    "symbol": "local 95",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 94",
+    "symbol": "local 96",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 98",
+    "symbol": "local 99",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -47377,6 +48821,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic`/_MethodContext#start_time.",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic`/_MethodContext#timeline.",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -47785,6 +49233,14 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic`/_normalize_scope_faiss_tuning().(raw)",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic`/_observability_links().",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic`/_observability_links().(timeline)",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -48416,6 +49872,18 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 102",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 103",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 104",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 105",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
@@ -48424,23 +49892,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 107",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 108",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 109",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
     "symbol": "local 11",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 110",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48476,6 +49928,10 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 119",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 12",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
@@ -48500,15 +49956,15 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 125",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
     "symbol": "local 126",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
     "symbol": "local 127",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 128",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48524,11 +49980,11 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 133",
+    "symbol": "local 132",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 134",
+    "symbol": "local 133",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48541,10 +49997,6 @@
   },
   {
     "symbol": "local 137",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 138",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48576,6 +50028,18 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 146",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 147",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 148",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 149",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
@@ -48588,19 +50052,15 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 153",
+    "symbol": "local 151",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 154",
+    "symbol": "local 155",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
     "symbol": "local 156",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 157",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48612,7 +50072,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 161",
+    "symbol": "local 160",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48624,15 +50084,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 164",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
     "symbol": "local 165",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 166",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48649,6 +50101,10 @@
   },
   {
     "symbol": "local 17",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 170",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48672,6 +50128,10 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 177",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 178",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
@@ -48684,11 +50144,27 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 182",
+    "symbol": "local 180",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 183",
+    "symbol": "local 181",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 184",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 185",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 188",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 189",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48696,19 +50172,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 190",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 192",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 194",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 195",
+    "symbol": "local 196",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48724,11 +50188,11 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 201",
+    "symbol": "local 200",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 203",
+    "symbol": "local 201",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48740,19 +50204,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 206",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 207",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
     "symbol": "local 208",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 209",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48760,15 +50212,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 210",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
     "symbol": "local 211",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 212",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48776,15 +50220,19 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 214",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 215",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 217",
+    "symbol": "local 216",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 218",
+    "symbol": "local 217",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48820,15 +50268,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 227",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
     "symbol": "local 228",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 229",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48840,11 +50280,27 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 232",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 233",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 234",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 235",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 236",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 237",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48856,6 +50312,10 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 240",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 241",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
@@ -48864,15 +50324,11 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 243",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 244",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 245",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 246",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48884,10 +50340,6 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 249",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
     "symbol": "local 25",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
@@ -48896,15 +50348,11 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 251",
+    "symbol": "local 252",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
     "symbol": "local 253",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 254",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48913,10 +50361,6 @@
   },
   {
     "symbol": "local 256",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 257",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48944,6 +50388,14 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 263",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 264",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 265",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
@@ -48956,7 +50408,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 268",
+    "symbol": "local 269",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -48988,19 +50440,15 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 276",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 277",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
     "symbol": "local 278",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 279",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 280",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -49020,6 +50468,14 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 286",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 287",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 288",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
@@ -49032,7 +50488,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 292",
+    "symbol": "local 291",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -49048,7 +50504,15 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 296",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 297",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 298",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -49064,11 +50528,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 301",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 303",
+    "symbol": "local 300",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -49076,7 +50536,19 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 305",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 306",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 308",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 309",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -49084,7 +50556,67 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 310",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 311",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 313",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 315",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 317",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 319",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 321",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 322",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 323",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 324",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 325",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 326",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 327",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 328",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 33",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 330",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -49112,15 +50644,23 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 41",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 42",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 43",
+    "symbol": "local 44",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 44",
+    "symbol": "local 45",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 46",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -49136,10 +50676,6 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 50",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
     "symbol": "local 51",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
@@ -49148,11 +50684,11 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 53",
+    "symbol": "local 54",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 54",
+    "symbol": "local 55",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -49164,6 +50700,10 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 58",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 6",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
@@ -49172,15 +50712,15 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 62",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 63",
+    "symbol": "local 61",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
     "symbol": "local 64",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 66",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -49192,31 +50732,23 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 69",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
     "symbol": "local 7",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 70",
+    "symbol": "local 71",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 76",
+    "symbol": "local 72",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 77",
+    "symbol": "local 73",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 78",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 79",
+    "symbol": "local 74",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -49225,6 +50757,10 @@
   },
   {
     "symbol": "local 80",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 81",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -49260,7 +50796,15 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 90",
+    "symbol": "local 91",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 92",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 93",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -49268,15 +50812,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 96",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 97",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 98",
+    "symbol": "local 95",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -49925,6 +51461,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic_pro`/_merge_rrf_weights().(overrides)",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic_pro`/_observability_links().",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {

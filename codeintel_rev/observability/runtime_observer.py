@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import contextvars
+from collections.abc import Iterator
+from contextlib import contextmanager
+
+from codeintel_rev.observability.ledger import RunLedger
 from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.runtime.cells import (
     RuntimeCellCloseResult,
@@ -9,6 +14,40 @@ from codeintel_rev.runtime.cells import (
     RuntimeCellInitResult,
     RuntimeCellObserver,
 )
+
+__all__ = [
+    "TimelineRuntimeObserver",
+    "bind_run_ledger",
+    "current_run_ledger",
+]
+
+
+_run_ledger_var: contextvars.ContextVar[RunLedger | None] = contextvars.ContextVar(
+    "codeintel_run_ledger",
+    default=None,
+)
+
+
+def current_run_ledger() -> RunLedger | None:
+    """Return the run ledger bound to the current context, if any.
+
+    Returns
+    -------
+    RunLedger | None
+        The run ledger bound to the current context variable, or None if no
+        ledger is currently bound.
+    """
+    return _run_ledger_var.get()
+
+
+@contextmanager
+def bind_run_ledger(ledger: RunLedger | None) -> Iterator[None]:
+    """Bind ``ledger`` to the current context for the duration of the block."""
+    token = _run_ledger_var.set(ledger)
+    try:
+        yield
+    finally:
+        _run_ledger_var.reset(token)
 
 
 class TimelineRuntimeObserver(RuntimeCellObserver):

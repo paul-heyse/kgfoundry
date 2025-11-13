@@ -23,30 +23,31 @@ Capability snapshot helpers for conditional tool registration and /capz.
 - from **kgfoundry_common.typing.heavy_deps** import EXTRAS_HINT
 - from **codeintel_rev.app.config_context** import ApplicationContext
 - from **codeintel_rev.errors** import RuntimeLifecycleError
+- from **codeintel_rev.observability.otel** import as_span, set_current_span_attrs
 
 ## Definitions
 
-- variable: `LOGGER` (line 24)
-- function: `_build_capability_gauge` (line 27)
-- function: `_import_optional` (line 89)
-- function: `_probe_faiss_gpu` (line 124)
-- function: `_path_exists` (line 161)
-- function: `_record_metrics` (line 183)
-- class: `Capabilities` (line 190)
+- variable: `LOGGER` (line 25)
+- function: `_build_capability_gauge` (line 28)
+- function: `_import_optional` (line 90)
+- function: `_probe_faiss_gpu` (line 125)
+- function: `_path_exists` (line 162)
+- function: `_record_metrics` (line 184)
+- class: `Capabilities` (line 191)
 
 ## Graph Metrics
 
 - **fan_in**: 6
-- **fan_out**: 3
-- **cycle_group**: 70
+- **fan_out**: 4
+- **cycle_group**: 72
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 
@@ -82,7 +83,7 @@ Capabilities
 
 ## Hotspot
 
-- score: 2.43
+- score: 2.49
 
 ## Side Effects
 
@@ -90,9 +91,9 @@ Capabilities
 
 ## Complexity
 
-- branches: 23
-- cyclomatic: 24
-- loc: 369
+- branches: 25
+- cyclomatic: 26
+- loc: 382
 
 ## Doc Coverage
 

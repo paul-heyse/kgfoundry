@@ -50,39 +50,41 @@ codeintel_rev.app.main : FastAPI application with /readyz endpoint
 - from **__future__** import annotations
 - from **(absolute)** import asyncio
 - from **(absolute)** import shutil
-- from **collections.abc** import Mapping
+- from **collections.abc** import Callable, Mapping
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
 - from **typing** import TYPE_CHECKING, Any, cast
 - from **urllib.parse** import urlparse
 - from **codeintel_rev._lazy_imports** import LazyModule
 - from **codeintel_rev.app.config_context** import ApplicationContext
+- from **codeintel_rev.observability.otel** import as_span, set_current_span_attrs
+- from **codeintel_rev.observability.semantic_conventions** import Attrs
 - from **kgfoundry_common.logging** import get_logger
 - from **(absolute)** import duckdb
 - from **(absolute)** import httpx
 
 ## Definitions
 
-- variable: `duckdb` (line 61)
-- variable: `httpx` (line 62)
-- variable: `LOGGER` (line 64)
-- variable: `HTTP_HEALTH_TIMEOUT_S` (line 65)
-- class: `CheckResult` (line 71)
-- class: `ReadinessProbe` (line 109)
+- variable: `duckdb` (line 63)
+- variable: `httpx` (line 64)
+- variable: `LOGGER` (line 66)
+- variable: `HTTP_HEALTH_TIMEOUT_S` (line 67)
+- class: `CheckResult` (line 73)
+- class: `ReadinessProbe` (line 111)
 
 ## Graph Metrics
 
 - **fan_in**: 1
-- **fan_out**: 3
-- **cycle_group**: 78
+- **fan_out**: 5
+- **cycle_group**: 79
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 11
-- recent churn 90: 11
+- recent churn 30: 12
+- recent churn 90: 12
 
 ## Usage
 
@@ -114,7 +116,7 @@ codeintel_rev.app.main : FastAPI application with /readyz endpoint
 
 ## Hotspot
 
-- score: 2.27
+- score: 2.44
 
 ## Side Effects
 
@@ -125,9 +127,9 @@ codeintel_rev.app.main : FastAPI application with /readyz endpoint
 
 ## Complexity
 
-- branches: 35
-- cyclomatic: 36
-- loc: 605
+- branches: 39
+- cyclomatic: 40
+- loc: 642
 
 ## Doc Coverage
 

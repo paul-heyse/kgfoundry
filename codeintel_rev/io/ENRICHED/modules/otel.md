@@ -51,9 +51,9 @@ OpenTelemetry bootstrap helpers for CodeIntel.
 
 ## Graph Metrics
 
-- **fan_in**: 3
+- **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 75
+- **cycle_group**: 77
 
 ## Ownership
 
@@ -89,7 +89,7 @@ OpenTelemetry bootstrap helpers for CodeIntel.
 
 ## Hotspot
 
-- score: 2.19
+- score: 2.10
 
 ## Side Effects
 

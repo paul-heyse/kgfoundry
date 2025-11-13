@@ -5,11 +5,11 @@ from __future__ import annotations
 import json
 import os
 import threading
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from codeintel_rev.observability.semantic_conventions import Attrs
 from kgfoundry_common.logging import get_logger
@@ -17,6 +17,7 @@ from kgfoundry_common.logging import get_logger
 LOGGER = get_logger(__name__)
 _RECORDER_LOCK = threading.Lock()
 _RECORDER_STATE: dict[str, object | None] = {"processor": None}
+FlightEvent = dict[str, object]
 
 
 def _data_root() -> Path:
@@ -33,10 +34,15 @@ def _data_root() -> Path:
 def _date_segment(start_ns: int | None) -> str:
     """Return the YYYYMMDD segment for a run report.
 
+    Parameters
+    ----------
+    start_ns : int | None
+        Start timestamp in nanoseconds. If None, uses current UTC time.
+
     Returns
     -------
     str
-        Date segment used to partition run reports.
+        Date segment used to partition run reports (YYYYMMDD format).
     """
     if start_ns is None:
         return datetime.now(UTC).strftime("%Y%m%d")
@@ -56,6 +62,11 @@ def _scrub_value(value: object) -> object:
     return str(value)
 
 
+def _event_start_ns(evt: Mapping[str, object]) -> int:
+    start = evt.get("start_ns")
+    return start if isinstance(start, int) else 0
+
+
 def _report_path(
     session_id: str | None,
     run_id: str | None,
@@ -65,6 +76,19 @@ def _report_path(
     ensure_parent: bool,
 ) -> Path:
     """Return the filesystem path for a diagnostic run report.
+
+    Parameters
+    ----------
+    session_id : str | None
+        Session identifier for partitioning reports. Defaults to "anonymous" if None.
+    run_id : str | None
+        Run identifier. Used as filename if provided, otherwise falls back to trace_id.
+    trace_id : str | None
+        Trace identifier. Used as filename if run_id is not provided.
+    started_ns : int | None
+        Start timestamp in nanoseconds for date segmentation.
+    ensure_parent : bool
+        If True, creates parent directories if they don't exist.
 
     Returns
     -------
@@ -87,6 +111,18 @@ def build_report_uri(
     started_at: float | None = None,
 ) -> str | None:
     """Return the expected diagnostic report path for the provided identifiers.
+
+    Parameters
+    ----------
+    session_id : str | None
+        Session identifier for partitioning reports.
+    run_id : str | None
+        Run identifier. Used as filename if provided.
+    trace_id : str | None, optional
+        Trace identifier. Used as filename if run_id is not provided.
+    started_at : float | None, optional
+        Start timestamp in seconds since epoch. Converted to nanoseconds for
+        date segmentation.
 
     Returns
     -------
@@ -121,6 +157,15 @@ class _FlightRecorder:
         self._lock = threading.Lock()
 
     def on_start(self, span: object) -> None:
+        """Handle span start event and initialize trace buffer.
+
+        Parameters
+        ----------
+        span : object
+            OpenTelemetry span object that has started. The span is inspected
+            to extract trace ID, start time, and identity attributes (session_id,
+            run_id) for buffering.
+        """
         trace_id = _trace_id(span)
         if trace_id is None:
             return
@@ -132,6 +177,14 @@ class _FlightRecorder:
             _update_identities(buffer, span)
 
     def on_end(self, span: object) -> None:
+        """Handle span end event and buffer or flush trace data.
+
+        Parameters
+        ----------
+        span : object
+            OpenTelemetry span object that has ended. The span is converted to
+            an event, added to the trace buffer, and flushed if it's the root span.
+        """
         trace_id = _trace_id(span)
         if trace_id is None:
             return
@@ -147,11 +200,17 @@ class _FlightRecorder:
                 self._flush_locked(trace_id, buffer)
 
     def shutdown(self) -> None:
+        """Flush all buffered traces and clean up resources.
+
+        This method is called during shutdown to ensure all pending trace data
+        is persisted to disk before the recorder is destroyed.
+        """
         with self._lock:
             for trace_id, buffer in list(self._buffers.items()):
                 self._flush_locked(trace_id, buffer)
 
     def _flush_locked(self, trace_id: str, buffer: _RunBuffer) -> None:
+        """Persist buffered span events for ``trace_id`` to disk."""
         self._buffers.pop(trace_id, None)
         path = _report_path(
             buffer.session_id,
@@ -161,7 +220,8 @@ class _FlightRecorder:
             ensure_parent=True,
         )
         buffer.diag_path = str(path)
-        payload = {
+        events: list[FlightEvent] = sorted(buffer.events, key=_event_start_ns)
+        payload: dict[str, object] = {
             "schema": "codeintel.flight-recorder@v1",
             "trace_id": trace_id,
             "span_id": buffer.root_span_id,
@@ -169,18 +229,24 @@ class _FlightRecorder:
             "run_id": buffer.run_id or trace_id,
             "status": buffer.status,
             "stop_reason": buffer.stop_reason,
-            "events": sorted(buffer.events, key=lambda evt: evt.get("start_ns", 0)),
+            "events": events,
         }
-        for evt in payload["events"]:
-            start_ns = evt.pop("start_ns", None)
-            end_ns = evt.pop("end_ns", None)
+        for evt in events:
+            start_val = evt.pop("start_ns", None)
+            end_val = evt.pop("end_ns", None)
+            start_ns = start_val if isinstance(start_val, int) else None
+            end_ns = end_val if isinstance(end_val, int) else None
             evt["ts"] = _ts(start_ns)
             if start_ns is not None and end_ns is not None:
                 evt["duration_ms"] = round((end_ns - start_ns) / 1_000_000, 3)
+        summary = build_event_summary(events)
+        payload["summary"] = summary
         try:
             path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         except OSError:  # pragma: no cover - defensive
             LOGGER.warning("Failed to persist flight recorder output", exc_info=True)
+        else:
+            payload["summary"] = summary
 
 
 class FlightRecorderSpanProcessor:
@@ -204,6 +270,12 @@ class FlightRecorderSpanProcessor:
 
     def force_flush(self, timeout_millis: int | None = None) -> bool:
         """No-op flush hook required by the SpanProcessor protocol.
+
+        Parameters
+        ----------
+        timeout_millis : int | None, optional
+            Timeout in milliseconds (ignored). This parameter is part of the
+            SpanProcessor protocol but is not used in this implementation.
 
         Returns
         -------
@@ -307,8 +379,54 @@ def _build_event(span: object) -> dict[str, Any]:
     }
     warn_flag = attrs.get(Attrs.WARN_DEGRADED)
     if warn_flag:
-        payload.setdefault("warnings", []).append("degraded")
+        warnings_value = payload.get("warnings")
+        if not isinstance(warnings_value, list):
+            warnings_value = []
+        warnings_list = cast("list[object]", warnings_value)
+        warnings_list.append("degraded")
+        payload["warnings"] = warnings_list
     return payload
+
+
+def build_event_summary(events: Sequence[Mapping[str, object]]) -> dict[str, object]:
+    """Build a compact summary describing the recorded events.
+
+    Parameters
+    ----------
+    events : Sequence[Mapping[str, object]]
+        Sequence of event dictionaries from the flight recorder. Events are
+        analyzed to extract stage names, warnings, and decision metadata.
+
+    Returns
+    -------
+    dict[str, object]
+        Summary payload containing counts, stage names, warnings, and decisions.
+    """
+    event_list = list(events)
+    stage_names: list[str] = []
+    for evt in event_list:
+        if evt.get("component") != "retrieval":
+            continue
+        name = evt.get("name")
+        if isinstance(name, str):
+            stage_names.append(name)
+    warnings = 0
+    for evt in event_list:
+        attrs = evt.get("attrs")
+        if isinstance(attrs, Mapping) and attrs.get(Attrs.WARN_DEGRADED):
+            warnings += 1
+    decisions: list[Mapping[str, object]] = []
+    for evt in event_list:
+        name = evt.get("name")
+        attrs = evt.get("attrs")
+        if isinstance(name, str) and name.startswith("decision.") and isinstance(attrs, Mapping):
+            decisions.append(attrs)
+    return {
+        "events": len(event_list),
+        "stages": stage_names,
+        "warnings": warnings,
+        "decisions": list(decisions),
+    }
 
 
 def _convert_span_events(events: Iterable[object]) -> list[dict[str, object]]:

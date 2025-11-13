@@ -65,6 +65,7 @@ from codeintel_rev.errors import PathNotDirectoryError, PathNotFoundError
 from codeintel_rev.io.path_utils import PathOutsideRepositoryError
 from codeintel_rev.observability.otel import record_span_event
 from codeintel_rev.telemetry.context import current_run_id
+from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from kgfoundry_common.errors import KgFoundryError
 from kgfoundry_common.logging import get_logger, with_fields
 from kgfoundry_common.problem_details import build_problem_details
@@ -429,6 +430,14 @@ def _record_exception_event(exc: BaseException, operation: str) -> None:
         record_span_event("adapter.exception", **attrs)
     except (RuntimeError, ValueError):  # pragma: no cover - best-effort telemetry
         LOGGER.debug("Failed to record exception span event", exc_info=True)
+    emit_step(
+        StepEvent(
+            kind=f"{operation}.error",
+            status="failed",
+            detail=type(exc).__name__,
+            payload={"message": str(exc)},
+        )
+    )
 
 
 def handle_adapter_errors(

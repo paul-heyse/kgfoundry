@@ -16,6 +16,7 @@ from codeintel_rev.telemetry.prom import (
     QUERY_AMBIGUITY,
     RRFK,
 )
+from codeintel_rev.telemetry.steps import StepEvent, emit_step
 
 
 @dataclass(slots=True, frozen=True)
@@ -125,6 +126,13 @@ def should_run_secondary_stage(
         record_span_event("retrieval.gating.secondary", **attrs)
         if timeline is not None:
             timeline.event("decision", "retrieval.gating.secondary", attrs=attrs)
+        emit_step(
+            StepEvent(
+                kind="retrieval.gate.secondary",
+                status="completed",
+                payload=attrs,
+            )
+        )
         return decision
 
     if signals.candidate_count <= 0:
@@ -377,12 +385,24 @@ def decide_budgets(profile: QueryProfile, cfg: StageGateConfig) -> BudgetDecisio
         }
     )
     klass = "literal" if profile.looks_literal else "vague" if profile.looks_vague else "default"
-    GATING_DECISIONS_TOTAL.labels(klass, str(attrs["rm3_enabled"])).inc()
-    RRFK.observe(attrs["rrf_k"])
+    rm3_enabled = bool(attrs.get("rm3_enabled"))
+    GATING_DECISIONS_TOTAL.labels(klass=klass, rm3_enabled=str(rm3_enabled)).inc()
+    rrf_value = attrs.get("rrf_k")
+    if isinstance(rrf_value, (int, float)):
+        RRFK.observe(float(rrf_value))
+    else:
+        RRFK.observe(float(decision.rrf_k))
     QUERY_AMBIGUITY.observe(profile.ambiguity_score)
     timeline = current_timeline()
     if timeline is not None:
         timeline.event("decision", "gate.budget", attrs=attrs)
+    emit_step(
+        StepEvent(
+            kind="retrieval.budget",
+            status="completed",
+            payload=attrs,
+        )
+    )
     return decision
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import functools
 import importlib
 import inspect
+import logging
 from collections.abc import Awaitable, Callable, Iterator, Mapping
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass, field
@@ -167,8 +168,11 @@ else:  # pragma: no cover - annotations only
     StatusCodeType = StatusCode
 
 from codeintel_rev.observability.timeline import current_timeline
+from codeintel_rev.telemetry import steps as telemetry_steps
 from codeintel_rev.telemetry.context import attach_context_attrs, set_request_stage
 from codeintel_rev.telemetry.prom import record_stage_latency
+
+LOGGER = logging.getLogger(__name__)
 
 F = TypeVar("F", bound=Callable[..., object])
 
@@ -654,4 +658,170 @@ def trace_step(
     )
 
 
-__all__ = ["span_context", "trace_span", "trace_step"]
+def emit_event(
+    op: str,
+    *,
+    component: str,
+    payload_factory: Callable[
+        [tuple[object, ...], dict[str, object], object | None], Mapping[str, object]
+    ]
+    | None = None,
+) -> Callable[[F], F]:
+    """Emit a :class:`StepEvent` reflecting the wrapped callable's outcome.
+
+    Parameters
+    ----------
+    op : str
+        Operation name to include in the step event kind (format: "{component}.{op}").
+    component : str
+        Component name to include in the step event kind (format: "{component}.{op}").
+    payload_factory : Callable[[tuple[object, ...], dict[str, object], object | None], Mapping[str, object]] | None, optional
+        Optional factory function to build custom payload from function arguments,
+        keyword arguments, and return value. If None, uses default payload extraction.
+
+    Returns
+    -------
+    Callable[[F], F]
+        Decorator wrapping the target callable with structured step emission.
+    """
+
+    def decorator(func: F) -> F:
+        """Wrap the target callable with step event emission.
+
+        Parameters
+        ----------
+        func : F
+            Function or coroutine function to wrap with step event emission.
+
+        Returns
+        -------
+        F
+            Wrapped function that emits step events on completion or failure.
+        """
+        if inspect.iscoroutinefunction(func):
+            async_func = cast("Callable[..., Awaitable[object]]", func)
+
+            @functools.wraps(func)
+            async def async_wrapper(*args: object, **kwargs: object) -> object:
+                """Async wrapper that emits step events for async functions.
+
+                Parameters
+                ----------
+                *args : object
+                    Positional arguments passed to the wrapped function.
+                **kwargs : object
+                    Keyword arguments passed to the wrapped function.
+
+                Returns
+                -------
+                object
+                    Return value from the wrapped async function.
+
+                Raises
+                ------
+                BaseException
+                    Any exception raised by the wrapped function is re-raised after
+                    emitting a failed step event.
+                """
+                start = perf_counter()
+                try:
+                    result = await async_func(*args, **kwargs)
+                except BaseException as exc:
+                    telemetry_steps.emit_step(
+                        telemetry_steps.StepEvent(
+                            kind=f"{component}.{op}",
+                            status="failed",
+                            detail=type(exc).__name__,
+                            payload=_build_step_payload(payload_factory, args, kwargs, None),
+                        )
+                    )
+                    raise
+                telemetry_steps.emit_step(
+                    telemetry_steps.StepEvent(
+                        kind=f"{component}.{op}",
+                        status="completed",
+                        payload=_with_duration(
+                            _build_step_payload(payload_factory, args, kwargs, result),
+                            start,
+                        ),
+                    )
+                )
+                return result
+
+            return cast("F", async_wrapper)
+
+        @functools.wraps(func)
+        def sync_wrapper(*args: object, **kwargs: object) -> object:
+            """Sync wrapper that emits step events for synchronous functions.
+
+            Parameters
+            ----------
+            *args : object
+                Positional arguments passed to the wrapped function.
+            **kwargs : object
+                Keyword arguments passed to the wrapped function.
+
+            Returns
+            -------
+            object
+                Return value from the wrapped function.
+
+            Raises
+            ------
+            BaseException
+                Any exception raised by the wrapped function is re-raised after
+                emitting a failed step event.
+            """
+            start = perf_counter()
+            try:
+                result = func(*args, **kwargs)
+            except BaseException as exc:
+                telemetry_steps.emit_step(
+                    telemetry_steps.StepEvent(
+                        kind=f"{component}.{op}",
+                        status="failed",
+                        detail=type(exc).__name__,
+                        payload=_build_step_payload(payload_factory, args, kwargs, None),
+                    )
+                )
+                raise
+            telemetry_steps.emit_step(
+                telemetry_steps.StepEvent(
+                    kind=f"{component}.{op}",
+                    status="completed",
+                    payload=_with_duration(
+                        _build_step_payload(payload_factory, args, kwargs, result),
+                        start,
+                    ),
+                )
+            )
+            return result
+
+        return cast("F", sync_wrapper)
+
+    return decorator
+
+
+def _build_step_payload(
+    factory: Callable[[tuple[object, ...], dict[str, object], object | None], Mapping[str, object]]
+    | None,
+    args: tuple[object, ...],
+    kwargs: dict[str, object],
+    result: object | None,
+) -> dict[str, object]:
+    if factory is None:
+        return {}
+    try:
+        return dict(factory(args, kwargs, result))
+    except (RuntimeError, ValueError, TypeError):  # pragma: no cover - advisory helper
+        LOGGER.debug("Step payload factory failed", exc_info=True)
+        return {}
+
+
+def _with_duration(payload: dict[str, object], started_at: float) -> dict[str, object]:
+    payload = dict(payload)
+    payload.setdefault("duration_ms", int((perf_counter() - started_at) * 1000))
+    return payload
+
+
+__all__ = ["emit_event", "span_context", "trace_span", "trace_step"]

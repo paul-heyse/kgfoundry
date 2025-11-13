@@ -31,6 +31,7 @@ from codeintel_rev.mcp_server.scope_utils import (
 from codeintel_rev.observability.otel import record_span_event
 from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.telemetry.decorators import span_context
+from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.prometheus import build_histogram
@@ -234,6 +235,17 @@ class _DuckDBQueryMixin:
             )
         _hydration_duration_seconds.labels(op="chunks_by_ids").observe(
             max(perf_counter() - perf_start, 0.0)
+        )
+        emit_step(
+            StepEvent(
+                kind="duckdb.query",
+                status="completed",
+                payload={
+                    "op": "chunks_by_ids",
+                    "returned": len(payload),
+                    "requested": len(ids),
+                },
+            )
         )
         return payload
 

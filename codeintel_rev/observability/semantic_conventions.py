@@ -3,18 +3,18 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
 
 __all__ = ["Attrs", "as_kv", "to_label_str"]
 
 
-@dataclass(slots=True, frozen=True)
 class Attrs:
     """Trusted attribute keys used across spans, metrics, and logs."""
 
     # Identity / request scaffolding
     SESSION_ID: str = "session.id"
+    MCP_SESSION_ID: str = "mcp.session_id"
     RUN_ID: str = "run.id"
+    MCP_RUN_ID: str = "mcp.run_id"
     REQUEST_ID: str = "request.id"
     MCP_TOOL: str = "mcp.tool"
     COMPONENT: str = "component"
@@ -34,11 +34,16 @@ class Attrs:
     # Budget + gating metadata
     BUDGET_MS: str = "budget.ms"
     DECISION_RRF_K: str = "decision.rrf_k"
+    RRF_K: str = "decision.rrf_k"
     DECISION_CHANNEL_DEPTHS: str = "decision.per_channel_depths"
     DECISION_BM25_RM3_ENABLED: str = "bm25.rm3_enabled"
+    BM25_RM3_ENABLED: str = "bm25.rm3_enabled"
+
+    WARNINGS: str = "codeintel.warnings"
 
     # Hybrid + channel contributions
     GATHERED_DOCS: str = "retrieval.channel_hits"
+    CHANNELS_USED: str = "retrieval.channels_used"
     FUSED_DOCS: str = "retrieval.fused_docs"
     RECENCY_BOOSTED: str = "retrieval.recency_boosted"
 
@@ -78,6 +83,14 @@ class Attrs:
     ENVELOPE_SPAN_ID: str = "envelope.span_id"
     ENVELOPE_DIAG_URI: str = "envelope.diag_report_uri"
 
+    # Structured step events
+    STEP_KIND: str = "codeintel.step.kind"
+    STEP_STATUS: str = "codeintel.step.status"
+    STEP_DETAIL: str = "codeintel.step.detail"
+    STEP_PAYLOAD: str = "codeintel.step.payload"
+    RUN_LEDGER_PATH: str = "codeintel.run.ledger_path"
+    TRACE_ID: str = "codeintel.trace.id"
+
 
 def as_kv(**attrs: object) -> dict[str, object]:
     """Return a dict filtered to values that are not ``None``.
@@ -102,7 +115,7 @@ def to_label_str(value: object) -> str:
 
     Parameters
     ----------
-    value : Any
+    value : object
         Value to convert to a string label. Strings are returned as-is.
         Other types are JSON-serialized (with sorted keys) or converted
         to string representation if JSON serialization fails.

@@ -77,7 +77,7 @@ Deep-Research compatible search/fetch orchestration helpers.
 
 - **fan_in**: 1
 - **fan_out**: 8
-- **cycle_group**: 121
+- **cycle_group**: 123
 
 ## Ownership
 

@@ -261,6 +261,9 @@ dependencies = [
     "opentelemetry-distro>=0.59b0",
     "pytest-opentelemetry>=1.1.0",
     "grafana-client>=5.0.1",
+    "opentelemetry-instrumentation-logging>=0.59b0",
+    "opentelemetry-instrumentation-fastapi>=0.59b0",
+    "opentelemetry-exporter-otlp-proto-http>=1.38.0",
 ]
 
 [project.scripts]
@@ -521,6 +524,7 @@ runtime-evaluated-base-classes = [
 "tests/test_namespace_proxy.py" = ["PLC2701", "TID251", "TRY003", "EM101"]  # Tests of internal _namespace_proxy module
 "codeintel_rev/io/faiss_manager.py" = ["PLR0904"]
 "codeintel_rev/mcp_server/server_semantic.py" = ["N803"]
+"codeintel_rev/observability/otel.py" = ["PLR0911", "PLR0913", "C901"]
 "tests/docs/test_griffe_facade.py" = ["PLC2701"]  # Tests of docs._types and docs._scripts facades; imports from private modules expected
 "**/*.pyi" = ["PIE790", "N815", "N802"]  # Stub files require ... literals and match external API naming
 "src/kgfoundry/tooling_bridge.py" = ["PLC2701", "TID251"]

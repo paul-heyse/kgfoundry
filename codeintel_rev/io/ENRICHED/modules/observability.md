@@ -35,32 +35,35 @@ Graceful degradation when metrics are unavailable:
 - from **__future__** import annotations
 - from **collections.abc** import Iterator
 - from **contextlib** import contextmanager
-- from **typing** import Protocol
+- from **typing** import TYPE_CHECKING, Protocol
+- from **codeintel_rev.observability.otel** import current_trace_id
 - from **kgfoundry_common.logging** import get_logger
 - from **kgfoundry_common.observability** import MetricsProvider
 - from **kgfoundry_common.observability** import observe_duration
+- from **kgfoundry_common.observability** import DurationObservation
 
 ## Definitions
 
-- variable: `LOGGER` (line 43)
-- function: `_supports_histogram_labels` (line 46)
-- class: `_NoopObservation` (line 69)
-- class: `Observation` (line 79)
-- function: `observe_duration` (line 90)
+- variable: `LOGGER` (line 47)
+- function: `_supports_histogram_labels` (line 50)
+- class: `_NoopObservation` (line 73)
+- class: `Observation` (line 83)
+- function: `observe_duration` (line 94)
+- function: `_record_exemplar` (line 152)
 
 ## Graph Metrics
 
 - **fan_in**: 3
-- **fan_out**: 1
-- **cycle_group**: 138
+- **fan_out**: 2
+- **cycle_group**: 140
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 3
-- recent churn 90: 3
+- recent churn 30: 4
+- recent churn 90: 4
 
 ## Usage
 
@@ -92,7 +95,7 @@ Observation, observe_duration
 
 ## Hotspot
 
-- score: 1.81
+- score: 2.06
 
 ## Side Effects
 
@@ -100,9 +103,9 @@ Observation, observe_duration
 
 ## Complexity
 
-- branches: 6
-- cyclomatic: 7
-- loc: 142
+- branches: 12
+- cyclomatic: 13
+- loc: 176
 
 ## Doc Coverage
 
@@ -110,6 +113,7 @@ Observation, observe_duration
 - `_NoopObservation` (class): summary=yes, examples=no — Fallback observation used when metrics cannot be recorded.
 - `Observation` (class): summary=yes, examples=no — Protocol describing the helpers provided by metrics observations.
 - `observe_duration` (function): summary=yes, params=ok, examples=no — Yield a metrics observation with graceful degradation.
+- `_record_exemplar` (function): summary=yes, params=mismatch, examples=no — Attach exemplars to the duration histogram when supported.
 
 ## Tags
 

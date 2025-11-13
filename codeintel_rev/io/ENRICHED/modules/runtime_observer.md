@@ -20,7 +20,7 @@ RuntimeCell observer that writes lifecycle events to the active timeline.
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 77
+- **cycle_group**: 80
 
 ## Ownership
 

@@ -30,15 +30,15 @@ Channel plugin contracts for hybrid retrieval.
 
 - **fan_in**: 3
 - **fan_out**: 5
-- **cycle_group**: 70
+- **cycle_group**: 72
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 

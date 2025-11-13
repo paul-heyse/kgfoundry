@@ -40,6 +40,7 @@ from codeintel_rev.telemetry.context import (
     current_session,
     telemetry_metadata,
 )
+from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
 from kgfoundry_common.logging import get_logger
@@ -268,93 +269,125 @@ def _semantic_search_sync(
     scope: ScopeIn | None,
 ) -> AnswerEnvelope:
     start_time = perf_counter()
-    with observe_duration("semantic_search", COMPONENT_NAME) as observation:
-        LOGGER.debug(
-            "Semantic search with scope",
-            extra={
-                "session_id": session_id,
-                "query": query,
-                "has_scope": scope is not None,
-                "scope_languages": (
-                    cast("Sequence[str] | None", scope.get("languages")) if scope else None
+    emit_step(
+        StepEvent(
+            kind="tool.begin",
+            status="completed",
+            payload={"tool": "search:semantic", "limit": limit},
+        )
+    )
+    try:
+        with observe_duration("semantic_search", COMPONENT_NAME) as observation:
+            LOGGER.debug(
+                "Semantic search with scope",
+                extra={
+                    "session_id": session_id,
+                    "query": query,
+                    "has_scope": scope is not None,
+                    "scope_languages": (
+                        cast("Sequence[str] | None", scope.get("languages")) if scope else None
+                    ),
+                    "scope_include_globs": scope.get("include_globs") if scope else None,
+                },
+            )
+
+            timeline = current_timeline()
+            artifacts = _execute_semantic_pipeline(
+                _SemanticPipelineRequest(
+                    context=context,
+                    scope=scope,
+                    limit=limit,
+                    observation=observation,
+                    query=query,
+                    timeline=timeline,
+                )
+            )
+            method_payload = (
+                dict(artifacts.hybrid_result.method) if artifacts.hybrid_result.method else {}
+            )
+            stage_entries: list[dict[str, object]] = []
+            if method_payload:
+                existing_stages = method_payload.get("stages")
+                if isinstance(existing_stages, list):
+                    stage_entries.extend(
+                        stage for stage in existing_stages if isinstance(stage, dict)
+                    )
+            stage_entries.append(
+                {
+                    "name": "hydrate.duckdb",
+                    "status": "run" if artifacts.hydrate_exc is None else "error",
+                    "duration_ms": artifacts.hydrate_duration_ms,
+                    "output": {"rows": len(artifacts.findings)},
+                }
+            )
+            method_payload["stages"] = stage_entries
+
+            observation.mark_success()
+
+            _warn_scope_filter_reduction(
+                scope,
+                artifacts.plan.scope_flags,
+                len(artifacts.findings),
+                artifacts.plan.effective_limit,
+                len(artifacts.result_ids),
+            )
+            _annotate_hybrid_contributions(
+                artifacts.findings,
+                artifacts.hybrid_result.contribution_map,
+                context.settings.index.rrf_k,
+            )
+
+            extras = _build_response_extras(
+                _MethodContext(
+                    findings_count=len(artifacts.findings),
+                    requested_limit=limit,
+                    effective_limit=artifacts.plan.effective_limit,
+                    start_time=start_time,
+                    retrieval_channels=artifacts.hybrid_result.retrieval_channels,
+                    timeline=timeline,
+                    hybrid_method=cast("MethodInfo", method_payload) if method_payload else None,
                 ),
-                "scope_include_globs": scope.get("include_globs") if scope else None,
-            },
-        )
+                artifacts.limits_metadata,
+                scope,
+            )
 
-        timeline = current_timeline()
-        artifacts = _execute_semantic_pipeline(
-            _SemanticPipelineRequest(
-                context=context,
-                scope=scope,
-                limit=limit,
-                observation=observation,
-                query=query,
-                timeline=timeline,
+            answer_message = (
+                f"Found {len(artifacts.findings)} hybrid results for: {query}"
+                if any(
+                    channel in {"bm25", "splade"}
+                    for channel in artifacts.hybrid_result.retrieval_channels
+                )
+                else f"Found {len(artifacts.findings)} semantically similar code chunks for: {query}"
+            )
+
+            envelope = _make_envelope(
+                findings=artifacts.findings,
+                answer=answer_message,
+                confidence=0.85 if artifacts.findings else 0.0,
+                extras=extras,
+            )
+        emit_step(
+            StepEvent(
+                kind="tool.finish",
+                status="completed",
+                payload={
+                    "tool": "search:semantic",
+                    "limit": limit,
+                    "results": len(artifacts.findings),
+                },
             )
         )
-        method_payload = (
-            dict(artifacts.hybrid_result.method) if artifacts.hybrid_result.method else {}
-        )
-        stage_entries: list[dict[str, object]] = []
-        if method_payload:
-            existing_stages = method_payload.get("stages")
-            if isinstance(existing_stages, list):
-                stage_entries.extend(stage for stage in existing_stages if isinstance(stage, dict))
-        stage_entries.append(
-            {
-                "name": "hydrate.duckdb",
-                "status": "run" if artifacts.hydrate_exc is None else "error",
-                "duration_ms": artifacts.hydrate_duration_ms,
-                "output": {"rows": len(artifacts.findings)},
-            }
-        )
-        method_payload["stages"] = stage_entries
-
-        observation.mark_success()
-
-        _warn_scope_filter_reduction(
-            scope,
-            artifacts.plan.scope_flags,
-            len(artifacts.findings),
-            artifacts.plan.effective_limit,
-            len(artifacts.result_ids),
-        )
-        _annotate_hybrid_contributions(
-            artifacts.findings,
-            artifacts.hybrid_result.contribution_map,
-            context.settings.index.rrf_k,
-        )
-
-        extras = _build_response_extras(
-            _MethodContext(
-                findings_count=len(artifacts.findings),
-                requested_limit=limit,
-                effective_limit=artifacts.plan.effective_limit,
-                start_time=start_time,
-                retrieval_channels=artifacts.hybrid_result.retrieval_channels,
-                timeline=timeline,
-                hybrid_method=cast("MethodInfo", method_payload) if method_payload else None,
-            ),
-            artifacts.limits_metadata,
-            scope,
-        )
-
-        answer_message = (
-            f"Found {len(artifacts.findings)} hybrid results for: {query}"
-            if any(
-                channel in {"bm25", "splade"}
-                for channel in artifacts.hybrid_result.retrieval_channels
+        return envelope
+    except Exception as exc:
+        emit_step(
+            StepEvent(
+                kind="tool.error",
+                status="failed",
+                detail=type(exc).__name__,
+                payload={"tool": "search:semantic"},
             )
-            else f"Found {len(artifacts.findings)} semantically similar code chunks for: {query}"
         )
-
-        return _make_envelope(
-            findings=artifacts.findings,
-            answer=answer_message,
-            confidence=0.85 if artifacts.findings else 0.0,
-            extras=extras,
-        )
+        raise
 
 
 def _execute_semantic_pipeline(request: _SemanticPipelineRequest) -> _SemanticPipelineResult:
@@ -1346,15 +1379,21 @@ def _make_envelope(
     return envelope
 
 
-def _observability_links(timeline: Timeline | None) -> dict[str, object]:
+def _observability_links(timeline: Timeline | None) -> AnswerEnvelope:
     """Return trace/run metadata for AnswerEnvelope extras.
+
+    Parameters
+    ----------
+    timeline : Timeline | None
+        Optional timeline object containing run metadata. If None, metadata
+        is extracted from the current context (trace ID, span ID, run ID, session ID).
 
     Returns
     -------
-    dict[str, object]
+    AnswerEnvelope
         Observability extras populated with trace/run diagnostics.
     """
-    extras: dict[str, object] = {}
+    extras: AnswerEnvelope = {}
     trace_id = current_trace_id()
     span_id = current_span_id()
     run_id = timeline.run_id if timeline else current_run_id()
@@ -1370,6 +1409,23 @@ def _observability_links(timeline: Timeline | None) -> dict[str, object]:
     if diag_uri:
         extras["diag_report_uri"] = diag_uri
     return extras
+
+
+def build_observability_links(timeline: Timeline | None) -> AnswerEnvelope:
+    """Return observability extras for semantic responses.
+
+    Parameters
+    ----------
+    timeline : Timeline | None
+        Optional timeline object containing run metadata. If None, metadata
+        is extracted from the current context (trace ID, span ID, run ID, session ID).
+
+    Returns
+    -------
+    AnswerEnvelope
+        Extras populated with trace/run metadata.
+    """
+    return _observability_links(timeline)
 
 
 def _success_extras(

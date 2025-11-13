@@ -27,6 +27,7 @@ from codeintel_rev.retrieval.gating import (
 from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
 from codeintel_rev.retrieval.types import HybridResultDoc, HybridSearchResult, SearchHit
 from codeintel_rev.telemetry.decorators import span_context
+from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -146,15 +147,42 @@ class BM25SearchProvider:
         list[SearchHit]
             List of search results with document IDs and BM25 scores, sorted by
             relevance descending. Returns empty list if top_k <= 0.
+
+        Raises
+        ------
+        Exception
+            Any exception raised by the underlying Pyserini searcher is re-raised
+            after emitting a failed step event for observability.
         """
         if top_k <= 0:
+            emit_step(
+                StepEvent(
+                    kind="bm25.search",
+                    status="skipped",
+                    detail="non_positive_top_k",
+                    payload={"top_k": top_k},
+                )
+            )
             return []
         use_rm3 = self._should_use_rm3(query)
         if force_rm3 is not None:
             use_rm3 = force_rm3
         searcher = self._ensure_rm3_searcher() if use_rm3 else self._base_searcher
-        hits = searcher.search(query, k=top_k)
-        return [
+        start = perf_counter()
+        try:
+            hits = searcher.search(query, k=top_k)
+        except Exception as exc:
+            emit_step(
+                StepEvent(
+                    kind="bm25.search",
+                    status="failed",
+                    detail=type(exc).__name__,
+                    payload={"top_k": top_k, "rm3": use_rm3},
+                )
+            )
+            raise
+        duration_ms = int((perf_counter() - start) * 1000)
+        results = [
             SearchHit(
                 doc_id=str(hit.docid),
                 rank=rank,
@@ -164,6 +192,19 @@ class BM25SearchProvider:
             )
             for rank, hit in enumerate(hits)
         ]
+        emit_step(
+            StepEvent(
+                kind="bm25.search",
+                status="completed",
+                payload={
+                    "top_k": top_k,
+                    "rm3": use_rm3,
+                    "hits": len(results),
+                    "duration_ms": duration_ms,
+                },
+            )
+        )
+        return results
 
 
 class SpladeSearchProvider:
@@ -268,19 +309,72 @@ class SpladeSearchProvider:
             (highest first). Each hit contains a document ID and SPLADE impact
             score. Returns empty list if encoding fails, no terms are generated,
             or top_k is 0.
+
+        Raises
+        ------
+        Exception
+            Any exception raised by the SPLADE encoder or Lucene impact searcher
+            is re-raised after emitting a failed step event for observability.
         """
+        if top_k <= 0:
+            emit_step(
+                StepEvent(
+                    kind="splade.search",
+                    status="skipped",
+                    detail="non_positive_top_k",
+                    payload={"top_k": top_k},
+                )
+            )
+            return []
         embeddings = self._encoder.encode_query([query])
         decoded = self._encoder.decode(embeddings, top_k=None)
         if not decoded or not decoded[0]:
+            emit_step(
+                StepEvent(
+                    kind="splade.search",
+                    status="skipped",
+                    detail="encoder_empty",
+                    payload={"top_k": top_k},
+                )
+            )
             return []
         filtered_pairs = self._filter_pairs(decoded[0])
         if not filtered_pairs:
+            emit_step(
+                StepEvent(
+                    kind="splade.search",
+                    status="skipped",
+                    detail="filtered_empty",
+                    payload={"top_k": top_k},
+                )
+            )
             return []
         bow = self._build_bow(filtered_pairs)
         if not bow:
+            emit_step(
+                StepEvent(
+                    kind="splade.search",
+                    status="skipped",
+                    detail="bow_empty",
+                    payload={"top_k": top_k},
+                )
+            )
             return []
-        hits = self._searcher.search(bow, k=top_k)
-        return [
+        start = perf_counter()
+        try:
+            hits = self._searcher.search(bow, k=top_k)
+        except Exception as exc:
+            emit_step(
+                StepEvent(
+                    kind="splade.search",
+                    status="failed",
+                    detail=type(exc).__name__,
+                    payload={"top_k": top_k},
+                )
+            )
+            raise
+        duration_ms = int((perf_counter() - start) * 1000)
+        results = [
             SearchHit(
                 doc_id=str(hit.docid),
                 rank=rank,
@@ -290,6 +384,14 @@ class SpladeSearchProvider:
             )
             for rank, hit in enumerate(hits)
         ]
+        emit_step(
+            StepEvent(
+                kind="splade.search",
+                status="completed",
+                payload={"top_k": top_k, "hits": len(results), "duration_ms": duration_ms},
+            )
+        )
+        return results
 
     def _filter_pairs(self, pairs: Sequence[tuple[str, float]]) -> list[tuple[str, float]]:
         filtered = [(token, weight) for token, weight in pairs if weight > 0]
@@ -801,6 +903,18 @@ class HybridSearchEngine:
                         "channels": list(channel_counts),
                     },
                 )
+            if channel_counts:
+                emit_step(
+                    StepEvent(
+                        kind="retrieval.gather_channels",
+                        status="completed",
+                        payload={
+                            "channels": list(channel_counts),
+                            "counts": channel_counts,
+                            "warnings": warnings,
+                        },
+                    )
+                )
             ctx = _FusionContext(
                 query=query,
                 runs=runs,
@@ -847,6 +961,17 @@ class HybridSearchEngine:
                         "channels": result.channels,
                     },
                 )
+            emit_step(
+                StepEvent(
+                    kind="retrieval.fuse",
+                    status="completed",
+                    payload={
+                        "documents": len(result.docs),
+                        "warnings": len(result.warnings),
+                        "channels": result.channels,
+                    },
+                )
+            )
         return result
 
     def _gather_channel_hits(

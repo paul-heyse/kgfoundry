@@ -1,0 +1,27 @@
+{
+  "run_id": "11111111-aaaa-bbbb-cccc-222222222222",
+  "stopped_because": "duckdb.query:failed",
+  "ledger_path": "data/telemetry/runs/2024-01-01/11111111-aaaa-bbbb-cccc-222222222222.jsonl",
+  "steps": [
+    {
+      "ts": "2024-01-01T12:00:00Z",
+      "kind": "vllm.embed_batch",
+      "status": "completed",
+      "payload": {"batch_size": 4, "model": "nvidia/voyager"}
+    },
+    {
+      "ts": "2024-01-01T12:00:01Z",
+      "kind": "faiss.search",
+      "status": "completed",
+      "payload": {"k": 40, "nprobe": 32, "use_gpu": true}
+    },
+    {
+      "ts": "2024-01-01T12:00:02Z",
+      "kind": "duckdb.query",
+      "status": "failed",
+      "detail": "OperationalError",
+      "payload": {"op": "hydrate", "rows": 0}
+    }
+  ],
+  "warnings": ["duckdb.query failed"]
+}

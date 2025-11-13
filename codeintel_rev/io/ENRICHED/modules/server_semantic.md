@@ -19,32 +19,33 @@ Semantic MCP tool registrations (pure move from server.py).
 - from **codeintel_rev.mcp_server.schemas** import AnswerEnvelope, FetchStructuredContent, FetchToolArgs, SearchFilterPayload, SearchStructuredContent, SearchToolArgs
 - from **codeintel_rev.mcp_server.server** import get_context, mcp
 - from **codeintel_rev.mcp_server.telemetry** import tool_operation_scope
+- from **codeintel_rev.observability.otel** import current_trace_id
 - from **codeintel_rev.telemetry.context** import current_session
 - from **codeintel_rev.telemetry.reporter** import build_report
 - from **codeintel_rev.telemetry.reporter** import report_to_json
 
 ## Definitions
 
-- function: `deep_research_search` (line 33)
-- function: `deep_research_fetch` (line 95)
-- function: `semantic_search` (line 142)
-- function: `semantic_search_pro` (line 193)
-- function: `telemetry_run_report` (line 254)
-- function: `_render_run_report` (line 285)
+- function: `deep_research_search` (line 34)
+- function: `deep_research_fetch` (line 96)
+- function: `semantic_search` (line 143)
+- function: `semantic_search_pro` (line 194)
+- function: `telemetry_run_report` (line 255)
+- function: `_render_run_report` (line 293)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 9
-- **cycle_group**: 125
+- **fan_out**: 10
+- **cycle_group**: 127
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 
@@ -72,7 +73,7 @@ Semantic MCP tool registrations (pure move from server.py).
 
 ## Hotspot
 
-- score: 2.28
+- score: 2.34
 
 ## Side Effects
 
@@ -80,9 +81,9 @@ Semantic MCP tool registrations (pure move from server.py).
 
 ## Complexity
 
-- branches: 13
-- cyclomatic: 14
-- loc: 297
+- branches: 14
+- cyclomatic: 15
+- loc: 309
 
 ## Doc Coverage
 

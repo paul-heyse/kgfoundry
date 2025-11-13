@@ -38,13 +38,13 @@ Provides health/readiness endpoints, CORS, and streaming support.
 - from **codeintel_rev.app.server_settings** import get_server_settings
 - from **codeintel_rev.errors** import RuntimeUnavailableError
 - from **codeintel_rev.mcp_server.server** import app_context, build_http_app
-- from **codeintel_rev.observability.otel** import as_span, init_telemetry, instrument_fastapi, instrument_httpx
+- from **codeintel_rev.observability.otel** import as_span, init_otel, instrument_fastapi, instrument_httpx, set_current_span_attrs
 - from **codeintel_rev.observability.runtime_observer** import TimelineRuntimeObserver
+- from **codeintel_rev.observability.semantic_conventions** import Attrs
 - from **codeintel_rev.observability.timeline** import bind_timeline, new_timeline
 - from **codeintel_rev.runtime.cells** import RuntimeCellObserver
 - from **codeintel_rev.telemetry.context** import current_run_id
 - from **codeintel_rev.telemetry.logging** import install_structured_logging
-- from **codeintel_rev.telemetry.otel** import install_otel
 - from **codeintel_rev.telemetry.prom** import build_metrics_router
 - from **codeintel_rev.telemetry.reporter** import build_report
 - from **codeintel_rev.telemetry.reporter** import render_markdown, report_to_json
@@ -53,8 +53,8 @@ Provides health/readiness endpoints, CORS, and streaming support.
 
 ## Definitions
 
-- variable: `LOGGER` (line 60)
-- variable: `SERVER_SETTINGS` (line 61)
+- variable: `LOGGER` (line 61)
+- variable: `SERVER_SETTINGS` (line 62)
 - function: `_preload_faiss_index` (line 71)
 - function: `_env_flag` (line 102)
 - function: `_log_gpu_warmup` (line 119)
@@ -62,35 +62,35 @@ Provides health/readiness endpoints, CORS, and streaming support.
 - function: `_preload_xtr_if_configured` (line 150)
 - function: `_preload_hybrid_if_configured` (line 164)
 - function: `_initialize_context` (line 175)
-- function: `_shutdown_context` (line 252)
-- function: `lifespan` (line 275)
-- variable: `app` (line 370)
-- variable: `metrics_router` (line 400)
-- function: `get_run_report` (line 410)
-- function: `get_run_report_markdown` (line 452)
-- function: `set_mcp_context` (line 495)
-- function: `disable_nginx_buffering` (line 567)
-- function: `healthz` (line 603)
-- function: `readyz` (line 615)
-- function: `capz` (line 650)
-- function: `sse_demo` (line 693)
-- variable: `proxy_wrapped` (line 738)
-- variable: `asgi` (line 743)
-- variable: `asgi` (line 745)
+- function: `_shutdown_context` (line 263)
+- function: `lifespan` (line 286)
+- variable: `app` (line 381)
+- variable: `metrics_router` (line 412)
+- function: `get_run_report` (line 422)
+- function: `get_run_report_markdown` (line 464)
+- function: `set_mcp_context` (line 507)
+- function: `disable_nginx_buffering` (line 579)
+- function: `healthz` (line 615)
+- function: `readyz` (line 627)
+- function: `capz` (line 662)
+- function: `sse_demo` (line 705)
+- variable: `proxy_wrapped` (line 750)
+- variable: `asgi` (line 755)
+- variable: `asgi` (line 757)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 19
-- **cycle_group**: 86
+- **cycle_group**: 88
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 29
-- recent churn 90: 29
+- recent churn 30: 30
+- recent churn 90: 30
 
 ## Usage
 
@@ -126,7 +126,7 @@ app, asgi
 
 ## Hotspot
 
-- score: 2.95
+- score: 2.96
 
 ## Side Effects
 
@@ -135,9 +135,9 @@ app, asgi
 
 ## Complexity
 
-- branches: 53
-- cyclomatic: 54
-- loc: 749
+- branches: 56
+- cyclomatic: 57
+- loc: 761
 
 ## Doc Coverage
 
