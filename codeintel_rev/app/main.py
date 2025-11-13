@@ -17,7 +17,9 @@ from types import FrameType
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
+from hypercorn.middleware import ProxyFixMiddleware
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import Response
 
 from codeintel_rev.app.capabilities import Capabilities
@@ -26,6 +28,7 @@ from codeintel_rev.app.gpu_warmup import warmup_gpu
 from codeintel_rev.app.middleware import SessionScopeMiddleware
 from codeintel_rev.app.readiness import ReadinessProbe
 from codeintel_rev.app.routers import index_admin
+from codeintel_rev.app.server_settings import get_server_settings
 from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.mcp_server.server import app_context, build_http_app
 from codeintel_rev.observability.otel import as_span, init_telemetry
@@ -36,6 +39,7 @@ from kgfoundry_common.errors import ConfigurationError
 from kgfoundry_common.logging import get_logger
 
 LOGGER = get_logger(__name__)
+SERVER_SETTINGS = get_server_settings()
 
 
 def _preload_faiss_index(context: ApplicationContext) -> bool:
@@ -347,17 +351,20 @@ app = FastAPI(
 # CORS middleware for browser clients (handle preflight before session scope)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://chat.openai.com",
-        "http://localhost:3000",
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=SERVER_SETTINGS.cors_allow_origins,
+    allow_credentials=SERVER_SETTINGS.cors_allow_credentials,
+    allow_methods=SERVER_SETTINGS.cors_allow_methods,
+    allow_headers=SERVER_SETTINGS.cors_allow_headers,
 )
 
 # Session scope middleware (must be registered after CORS to avoid preflight conflicts)
 app.add_middleware(SessionScopeMiddleware)
+
+if SERVER_SETTINGS.enable_trusted_hosts:
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=SERVER_SETTINGS.allowed_hosts,
+    )
 
 
 @app.get("/metrics")
@@ -616,4 +623,14 @@ async def sse_demo() -> StreamingResponse:
     )
 
 
-__all__ = ["app"]
+if SERVER_SETTINGS.enable_proxy_fix:
+    asgi = ProxyFixMiddleware(
+        app,
+        mode=SERVER_SETTINGS.proxy_mode,
+        trusted_hops=SERVER_SETTINGS.proxy_trusted_hops,
+    )
+else:  # pragma: no cover - wrapper disabled via config
+    asgi = app
+
+
+__all__ = ["app", "asgi"]

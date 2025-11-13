@@ -1,0 +1,22 @@
+[Unit]
+Description=CodeIntel MCP via Hypercorn
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=codeintel
+Group=codeintel
+WorkingDirectory=/opt/codeintel_rev
+Environment="PYTHONUNBUFFERED=1"
+EnvironmentFile=-/etc/codeintel_rev.env
+ExecStart=/usr/bin/env hypercorn --config /opt/codeintel_rev/ops/hypercorn/hypercorn.toml codeintel_rev.app.main:asgi
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

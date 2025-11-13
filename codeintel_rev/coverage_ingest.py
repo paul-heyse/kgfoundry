@@ -8,7 +8,9 @@ from pathlib import Path
 try:  # pragma: no cover - optional dependency
     from defusedxml import ElementTree
 except ImportError:  # pragma: no cover
-    from xml.etree import ElementTree  # lint-ignore[S405]: coverage artifacts are trusted inputs from CI
+    from xml.etree import (
+        ElementTree,
+    )  # lint-ignore[S405]: coverage artifacts are trusted inputs from CI
 
 
 def collect_coverage(coverage_xml: str | Path) -> dict[str, dict[str, float]]:
@@ -28,7 +30,9 @@ def collect_coverage(coverage_xml: str | Path) -> dict[str, dict[str, float]]:
     if not path.exists():
         return {}
     try:
-        root = ElementTree.parse(path).getroot()  # lint-ignore[S314]: parsing trusted coverage XML emitted by our test suite
+        root = ElementTree.parse(
+            path
+        ).getroot()  # lint-ignore[S314]: parsing trusted coverage XML emitted by our test suite
     except ElementTree.ParseError:
         return {}
     results: dict[str, dict[str, float]] = {}
