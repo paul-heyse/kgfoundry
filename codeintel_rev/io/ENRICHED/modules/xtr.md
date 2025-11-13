@@ -15,7 +15,7 @@ Backward-compatible entrypoint for the XTR Typer CLI.
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 128
+- **cycle_group**: 131
 
 ## Ownership
 

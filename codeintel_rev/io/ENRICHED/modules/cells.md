@@ -39,7 +39,7 @@ Thread-safe runtime cell primitive for mutable subsystems.
 
 - **fan_in**: 3
 - **fan_out**: 5
-- **cycle_group**: 49
+- **cycle_group**: 55
 
 ## Ownership
 
@@ -93,7 +93,7 @@ cooldown_error
 
 - branches: 45
 - cyclomatic: 46
-- loc: 635
+- loc: 636
 
 ## Doc Coverage
 

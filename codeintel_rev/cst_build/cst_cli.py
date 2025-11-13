@@ -142,9 +142,10 @@ def main(ctx: click.Context, **_: object) -> None:
     ----------
     ctx : click.Context
         Click context object containing parsed command-line options.
-    **_
+    **_ : object
         Additional keyword arguments (unused, required by Click decorator).
-        Type: object
+        Accepts any keyword arguments but ignores them. Required by Click's
+        decorator signature but not used in the function body.
 
     Raises
     ------

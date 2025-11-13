@@ -114,6 +114,18 @@ SCIP_RETRIEVAL_COVERAGE_RATIO = build_gauge(
     "Fraction of SCIP function defs retrieved by FAISS at top-K.",
     labelnames=("k",),
 )
+MCP_SEARCH_LATENCY_SECONDS = build_histogram(
+    "mcp_search_latency_seconds",
+    "End-to-end latency for MCP Deep-Research search requests.",
+)
+MCP_FETCH_LATENCY_SECONDS = build_histogram(
+    "mcp_fetch_latency_seconds",
+    "Latency for chunk hydration performed by the MCP fetch tool.",
+)
+MCP_SEARCH_POSTFILTER_DENSITY = build_histogram(
+    "mcp_search_postfilter_density",
+    "Ratio of retained search results after filters to FAISS hits.",
+)
 
 
 def _stable_u32(value: str) -> int:
@@ -185,6 +197,9 @@ __all__ = [
     "HNSW_SEARCH_EF",
     "HYBRID_LAST_MS",
     "HYBRID_RETRIEVE_TOTAL",
+    "MCP_FETCH_LATENCY_SECONDS",
+    "MCP_SEARCH_LATENCY_SECONDS",
+    "MCP_SEARCH_POSTFILTER_DENSITY",
     "OFFLINE_EVAL_QUERY_COUNT",
     "OFFLINE_EVAL_RECALL_AT_K",
     "POOL_SHARE_BM25",

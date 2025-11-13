@@ -29,7 +29,7 @@ _timeline_var: contextvars.ContextVar[Timeline | None] = contextvars.ContextVar(
 )
 _LOG_LOCK = threading.Lock()
 _RECORD_PAYLOAD_LOCK = threading.Lock()
-_RECORD_PAYLOAD_FN: Callable[[dict[str, object]], None] | None = None
+_RECORD_PAYLOAD_STATE: dict[str, Callable[[dict[str, object]], None] | None] = {"fn": None}
 
 
 def _env_float(name: str, default: float) -> float:
@@ -189,21 +189,21 @@ def _get_record_payload_fn() -> Callable[[dict[str, object]], None] | None:
         Callable bound to ``record_timeline_payload`` when available, otherwise
         ``None`` when telemetry reporting is disabled or unavailable.
     """
-    global _RECORD_PAYLOAD_FN  # noqa: PLW0603
     with _RECORD_PAYLOAD_LOCK:
-        if _RECORD_PAYLOAD_FN is not None:
-            return _RECORD_PAYLOAD_FN
+        cached = _RECORD_PAYLOAD_STATE["fn"]
+        if cached is not None:
+            return cached
         try:
             module = import_module("codeintel_rev.telemetry.reporter")
         except ImportError:
-            _RECORD_PAYLOAD_FN = None
+            _RECORD_PAYLOAD_STATE["fn"] = None
             return None
         hook = getattr(module, "record_timeline_payload", None)
         if callable(hook):
             typed_hook = cast("Callable[[dict[str, object]], None]", hook)
-            _RECORD_PAYLOAD_FN = typed_hook
+            _RECORD_PAYLOAD_STATE["fn"] = typed_hook
             return typed_hook
-        _RECORD_PAYLOAD_FN = None
+        _RECORD_PAYLOAD_STATE["fn"] = None
         return None
 
 

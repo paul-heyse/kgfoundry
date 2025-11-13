@@ -225,7 +225,7 @@ def _log_extra(**kwargs: object) -> dict[str, object]:
 class FAISSRuntimeOptions:
     """Runtime tuning options passed to :class:`FAISSManager`."""
 
-    faiss_family: str = "auto"
+    faiss_family: str | None = "auto"
     pq_m: int = 64
     pq_nbits: int = 8
     opq_m: int = 0
@@ -521,7 +521,7 @@ class FAISSManager(
         self.nlist = nlist
         self.use_cuvs = use_cuvs
         opts = runtime or FAISSRuntimeOptions()
-        self.faiss_family = opts.faiss_family
+        self.faiss_family: str | None = opts.faiss_family
         self.pq_m = opts.pq_m
         self.pq_nbits = opts.pq_nbits
         self.opq_m = opts.opq_m
@@ -820,6 +820,26 @@ class FAISSManager(
         )
 
     def _ensure_secondary_index(self) -> None:
+        """Ensure the secondary flat index exists, creating it if necessary.
+
+        This method lazily initializes the secondary index used for fast incremental
+        updates. The secondary index is a flat (IndexFlatIP) index wrapped with
+        IndexIDMap2 for ID management. It requires no training and enables instant
+        vector additions without rebuilding the primary index.
+
+        The secondary index is created only once per manager instance. Subsequent
+        calls to this method are no-ops if the index already exists. The index is
+        configured with direct map support to enable vector reconstruction.
+
+        Notes
+        -----
+        The secondary index uses IndexFlatIP (inner product) for exact search over
+        newly added vectors. This provides fast incremental updates at the cost of
+        linear search time. The index is automatically searched alongside the primary
+        index during dual-index search operations. Time complexity: O(1) if index
+        exists, O(1) for creation (no training required). The method performs no I/O
+        operations and is idempotent.
+        """
         if self.secondary_index is not None:
             return
         flat_index = faiss.IndexFlatIP(self.vec_dim)
@@ -832,6 +852,32 @@ class FAISSManager(
         )
 
     def _build_primary_contains(self) -> Callable[[int], bool]:
+        """Build a function to check if chunk IDs exist in the primary index.
+
+        This method constructs a callable that checks whether a given chunk ID exists
+        in the primary FAISS index. It attempts multiple strategies in order of
+        efficiency: (1) use native contains() method if available, (2) use search()
+        or find() methods that return index positions, (3) fall back to building a
+        set of all existing IDs for O(1) lookup. The method handles cases where the
+        index is unavailable or lacks ID mapping support.
+
+        Returns
+        -------
+        Callable[[int], bool]
+            Function that accepts a chunk ID (int) and returns True if the ID exists
+            in the primary index, False otherwise. The function is optimized for the
+            available FAISS ID map interface. Returns a no-op function (always False)
+            if the primary index is unavailable or lacks ID mapping support.
+
+        Notes
+        -----
+        This method is used by update_index() to filter out duplicate IDs before
+        adding vectors to the secondary index. The returned function is thread-safe
+        if the underlying FAISS index is thread-safe. Time complexity of the returned
+        function depends on the strategy: O(1) for native contains() or set lookup,
+        O(log n) for search-based methods. The method itself is O(1) if native
+        methods are available, O(n) if building an ID set is required.
+        """
         try:
             cpu_index = self._require_cpu_index()
         except RuntimeError:
@@ -967,6 +1013,39 @@ class FAISSManager(
 
     @staticmethod
     def _build_existing_ids_set(cpu_index: _faiss.Index, id_map_obj: object) -> set[int]:
+        """Build a set of all existing chunk IDs from the FAISS index.
+
+        This helper method extracts all chunk IDs stored in the FAISS index by
+        iterating through the ID map and collecting external IDs. It uses the
+        id_map.at() method to retrieve the external ID for each internal index
+        position. This set is used as a fallback for duplicate checking when
+        native contains() methods are unavailable.
+
+        Parameters
+        ----------
+        cpu_index : _faiss.Index
+            FAISS CPU index to extract IDs from. Must have an ntotal attribute
+            indicating the number of vectors in the index.
+        id_map_obj : object
+            ID map object from the FAISS index (typically from index.id_map).
+            Must expose an at() method that accepts an index position and returns
+            the external chunk ID.
+
+        Returns
+        -------
+        set[int]
+            Set containing all external chunk IDs stored in the index. Returns an
+            empty set if the index has no vectors, lacks ID mapping support, or
+            if extraction fails (e.g., missing at() method, type errors).
+
+        Notes
+        -----
+        This method is used as a fallback strategy when native contains() methods
+        are unavailable. Building the set requires O(n) time and O(n) space where
+        n is the number of vectors. The set enables O(1) ID lookups for duplicate
+        checking. The method handles errors gracefully, returning an empty set
+        when extraction is not possible.
+        """
         try:
             n_total = cpu_index.ntotal
         except AttributeError:
@@ -986,6 +1065,43 @@ class FAISSManager(
     def _collect_unique_indices(
         self, new_ids: NDArrayI64, primary_contains: Callable[[int], bool]
     ) -> list[int]:
+        """Collect indices of unique IDs that should be added to the secondary index.
+
+        This method filters the input ID array to identify which IDs are truly new
+        and should be added to the secondary index. An ID is considered unique if
+        it (1) appears only once in the current batch (no duplicates within batch),
+        (2) is not already in the secondary index (not in incremental_ids), and
+        (3) is not already in the primary index (checked via primary_contains).
+
+        Parameters
+        ----------
+        new_ids : NDArrayI64
+            Array of chunk IDs to check for uniqueness, shape (n,) or (n, 1).
+            The array is flattened before processing. IDs are converted to integers
+            for comparison.
+        primary_contains : Callable[[int], bool]
+            Function that checks if a chunk ID exists in the primary index. Returns
+            True if the ID exists, False otherwise. Used to filter out IDs that are
+            already indexed in the primary index.
+
+        Returns
+        -------
+        list[int]
+            List of array indices (offsets) corresponding to unique IDs that should
+            be added to the secondary index. The indices can be used to slice the
+            corresponding vectors array to extract only unique vectors. Returns an
+            empty list if all IDs are duplicates or already indexed.
+
+        Notes
+        -----
+        This method is used by update_index() to filter vectors before adding them
+        to the secondary index. It performs three levels of deduplication: within
+        batch, against secondary index, and against primary index. Time complexity:
+        O(n) where n is the number of IDs, plus O(k) for primary_contains checks
+        where k is the number of unique IDs in the batch. Space complexity: O(n) for
+        the seen_in_batch set. The method is deterministic and preserves the order
+        of first occurrence for unique IDs.
+        """
         unique_indices: list[int] = []
         seen_in_batch: set[int] = set()
 
@@ -1010,6 +1126,37 @@ class FAISSManager(
         total_secondary_vectors: int,
         skipped_duplicates: int,
     ) -> None:
+        """Emit structured log event for secondary index vector additions.
+
+        This helper method logs information about vectors added to the secondary
+        index, including the number of vectors added in the current operation,
+        the total number of vectors in the secondary index after the addition,
+        and the number of duplicate IDs that were skipped. Used for observability
+        and debugging of incremental update operations.
+
+        Parameters
+        ----------
+        added : int
+            Number of vectors successfully added to the secondary index in the
+            current operation. Must be non-negative. Represents the count of
+            unique vectors that passed duplicate filtering.
+        total_secondary_vectors : int
+            Total number of vectors in the secondary index after the current
+            addition. Must be >= added. Used to track the size of the secondary
+            index over time.
+        skipped_duplicates : int
+            Number of duplicate IDs that were filtered out and not added to the
+            secondary index. Must be non-negative. Includes IDs that were already
+            in the primary index, already in the secondary index, or duplicated
+            within the current batch.
+
+        Notes
+        -----
+        This method emits structured logs with component="faiss_manager" for
+        consistent log filtering and analysis. The log event is emitted at INFO
+        level and includes all three metrics for comprehensive observability.
+        Time complexity: O(1). The method performs no I/O operations beyond logging.
+        """
         LOGGER.info(
             "Added vectors to secondary index",
             extra=_log_extra(
@@ -2387,11 +2534,83 @@ class FAISSManager(
         return cpu_index, index_string
 
     def _dynamic_nlist(self, n_vectors: int, *, minimum: int) -> int:
+        """Calculate the number of IVF centroids (nlist) based on corpus size.
+
+        This method computes the optimal number of IVF centroids (nlist) for
+        building IVF-family indexes. When faiss_family is "auto", it uses a
+        square-root heuristic (sqrt(n_vectors)) which balances training time
+        and search recall. When a specific family is configured, it uses the
+        configured nlist value. The result is always bounded by the minimum
+        parameter to ensure reasonable index structure.
+
+        Parameters
+        ----------
+        n_vectors : int
+            Number of vectors in the corpus. Used to compute nlist when in auto
+            mode. Must be positive. Larger corpora result in larger nlist values
+            (up to the configured maximum).
+        minimum : int
+            Minimum nlist value to return. Ensures the index has at least this
+            many centroids even for small corpora. Typically 100 for medium
+            corpora, 1024 for large corpora.
+
+        Returns
+        -------
+        int
+            Computed nlist value for IVF index construction. When faiss_family
+            is "auto", returns max(sqrt(n_vectors), minimum). When a specific
+            family is configured, returns max(configured_nlist, minimum). The
+            value is always >= minimum.
+
+        Notes
+        -----
+        The square-root heuristic (sqrt(n_vectors)) is a common practice in
+        FAISS indexing that balances training time (O(nlist * log(nlist))) and
+        search recall. More centroids improve recall but increase training time
+        and memory usage. The method is deterministic and has O(1) time complexity.
+        """
         if self.faiss_family != "auto":
             return max(self.nlist, minimum)
         return max(int(np.sqrt(n_vectors)), minimum)
 
     def _factory_string_for(self, family: str, _n_vectors: int) -> str:
+        """Generate a FAISS index factory string for the specified family.
+
+        This method converts a family name (e.g., "ivf_pq", "hnsw") into a
+        FAISS index factory string that can be passed to faiss.index_factory().
+        The factory string encodes the index structure, including quantization
+        parameters (PQ codes, OPQ preprocessing), IVF centroids (nlist), and
+        HNSW graph parameters (m). The string format follows FAISS conventions
+        for index construction.
+
+        Parameters
+        ----------
+        family : str
+            Index family name (case-insensitive). Valid values: "flat", "ivf_flat",
+            "ivf_pq", "ivf_pq_refine", "hnsw". Determines the index structure
+            and quantization strategy. Unknown families default to "Flat".
+        _n_vectors : int
+            Number of vectors (unused, kept for API compatibility). The factory
+            string does not depend on corpus size, only on the configured family
+            and runtime options.
+
+        Returns
+        -------
+        str
+            FAISS index factory string suitable for faiss.index_factory(). Examples:
+            - "Flat" for exact search
+            - "IVF8192,Flat" for IVFFlat with 8192 centroids
+            - "OPQ64,IVF8192,PQ64x8" for IVF-PQ with OPQ preprocessing
+            - "HNSW32" for HNSW with m=32
+            The string format matches FAISS ParameterSpace conventions.
+
+        Notes
+        -----
+        This method is used by build_index() when a specific family is requested
+        (non-auto mode). The factory string incorporates runtime options like
+        pq_m, pq_nbits, opq_m, hnsw_m, and nlist. Time complexity: O(1). The
+        method is deterministic and case-insensitive for family names.
+        """
         fam = family.lower()
         resolved_nlist = max(self.nlist, 1)
         if fam == "flat":
@@ -2415,6 +2634,44 @@ class FAISSManager(
         parameter_space: str | None = None,
         vector_count: int | None = None,
     ) -> None:
+        """Record the selected index factory and persist metadata.
+
+        This method logs the index factory choice, updates Prometheus metrics,
+        and persists index metadata to disk. It extracts the index type name
+        (either from the provided label or by inspecting the index object),
+        records it in metrics, and writes a metadata snapshot including factory
+        name, vector count, and parameter space configuration.
+
+        Parameters
+        ----------
+        index : _faiss.Index
+            FAISS index object that was built or loaded. Used to extract the
+            index type name if label is not provided. The index must be
+            initialized (ntotal >= 0).
+        label : str | None, optional
+            Optional factory label to use instead of inferring from the index
+            type. When provided, this label is used for logging and metrics.
+            When None, the method attempts to extract the type name from the
+            index object via downcast_index().
+        parameter_space : str | None, optional
+            Optional FAISS ParameterSpace parameter string (e.g., "nprobe=64").
+            When provided, included in the metadata snapshot. Used to track
+            runtime tuning parameters applied to the index.
+        vector_count : int | None, optional
+            Optional vector count to record in metadata. When None, uses
+            index.ntotal to determine the count. When provided, overrides the
+            index's ntotal value. Used to record the number of vectors used
+            during index construction.
+
+        Notes
+        -----
+        This method is called after index construction or loading to record the
+        index configuration for observability and persistence. It updates
+        Prometheus metrics (set_factory_id) and writes metadata to the meta JSON
+        file. Time complexity: O(1) for logging and metrics, O(n) for metadata
+        serialization where n is the metadata size. The method performs file I/O
+        to persist metadata and is not thread-safe if called concurrently.
+        """
         try:
             name = label or type(self._downcast_index(index)).__name__
         except (AttributeError, RuntimeError):
@@ -2436,7 +2693,40 @@ class FAISSManager(
         ef_search: int | None,
         quantizer_ef_search: int | None = None,
     ) -> None:
-        """Apply runtime search knobs to the active FAISS index."""
+        """Apply runtime search knobs to the active FAISS index.
+
+        This method applies runtime tuning parameters (nprobe, efSearch,
+        quantizer_efSearch) to the active FAISS index using the ParameterSpace
+        API. These parameters control search behavior: nprobe controls IVF cell
+        traversal, efSearch controls HNSW graph exploration, and quantizer_efSearch
+        controls quantizer search depth. The method falls back to direct attribute
+        assignment if ParameterSpace API is unavailable.
+
+        Parameters
+        ----------
+        nprobe : int | None
+            Number of IVF cells to probe during search. Higher values improve
+            recall but slow down search. Only applies to IVF-family indexes.
+            When None, the parameter is not applied.
+        ef_search : int | None
+            HNSW exploration factor controlling graph traversal depth. Higher
+            values improve recall but slow down search. Only applies to HNSW
+            indexes. When None, the parameter is not applied.
+        quantizer_ef_search : int | None, optional
+            Exploration factor for IVF quantizer search (default: None). Controls
+            quantizer traversal depth for hierarchical IVF indexes. When None,
+            the parameter is not applied.
+
+        Notes
+        -----
+        This method modifies the index object in-place, affecting all subsequent
+        search operations until parameters are changed again. The method attempts
+        to use FAISS ParameterSpace API first, then falls back to direct attribute
+        assignment (e.g., index.nprobe) if ParameterSpace is unavailable. Time
+        complexity: O(1) for parameter application. The method is not thread-safe
+        if the index is being used concurrently. Parameters persist for the lifetime
+        of the index object or until explicitly changed.
+        """
         params: list[str] = []
         if nprobe is not None:
             params.append(f"nprobe={int(nprobe)}")
@@ -2454,6 +2744,40 @@ class FAISSManager(
                 index.nprobe = int(nprobe)
 
     def _metric_labels(self, plan: _SearchPlan) -> dict[str, str]:
+        """Generate Prometheus metric labels from a search plan.
+
+        This method constructs a dictionary of metric labels for Prometheus
+        histograms and counters based on the search plan parameters. The labels
+        include index family, nprobe setting, ef_search setting, and refine_k_factor
+        (computed as search_k / k). These labels enable fine-grained metric
+        aggregation and analysis of search performance across different index
+        configurations and parameter settings.
+
+        Parameters
+        ----------
+        plan : _SearchPlan
+            Search plan containing queries, effective k, search_k (with k_factor
+            expansion), and execution parameters (nprobe, ef_search, etc.). Used
+            to extract parameter values for metric labeling.
+
+        Returns
+        -------
+        dict[str, str]
+            Dictionary of Prometheus metric labels with keys:
+            - "index_family": Index family name ("auto", "ivf_pq", "hnsw", etc.)
+            - "nprobe": nprobe value as string, or "default" if None
+            - "ef_search": ef_search value as string, or empty string if None
+            - "refine_k_factor": Ratio of search_k to k, formatted as "X.XX"
+            All values are strings as required by Prometheus label constraints.
+
+        Notes
+        -----
+        This method is used by search() to label Prometheus metrics (e.g.,
+        FAISS_ANN_LATENCY_SECONDS, FAISS_REFINE_LATENCY_SECONDS) for dimensional
+        analysis. The refine_k_factor is computed as search_k / k to represent
+        candidate expansion ratio. Time complexity: O(1). The method is deterministic
+        and produces consistent labels for the same search plan.
+        """
         ratio = plan.search_k / plan.k if plan.k > 0 else 0.0
         return {
             "index_family": str(self.faiss_family or "auto"),
@@ -2463,7 +2787,33 @@ class FAISSManager(
         }
 
     def _maybe_apply_runtime_parameters(self, overrides: Mapping[str, float | int]) -> None:
-        """Best-effort application of overrides to the live index if available."""
+        """Best-effort application of overrides to the live index if available.
+
+        This method attempts to apply runtime parameter overrides to the active
+        FAISS index, but gracefully handles failures without raising exceptions.
+        It extracts nprobe, efSearch, and quantizer_efSearch from the overrides
+        dictionary and applies them via _apply_runtime_parameters(). If the index
+        is unavailable or parameter application fails, the method logs a debug
+        message and continues without error.
+
+        Parameters
+        ----------
+        overrides : Mapping[str, float | int]
+            Dictionary of runtime parameter overrides with keys "nprobe", "efSearch",
+            or "quantizer_efSearch". Values are converted to integers before
+            application. Empty dictionaries result in no-op. Unrecognized keys are
+            ignored.
+
+        Notes
+        -----
+        This method is used by apply_runtime_tuning() and reset_runtime_tuning()
+        to update the live index when overrides are changed. The method is
+        best-effort: it does not raise exceptions if the index is unavailable
+        or parameter application fails, allowing the override dictionary to be
+        updated even when the index is not ready. Time complexity: O(1) plus
+        the cost of _apply_runtime_parameters(). The method performs no I/O
+        operations and is safe to call even when the index is not initialized.
+        """
         if not overrides:
             return
         try:
@@ -2550,6 +2900,55 @@ class FAISSManager(
         return self.get_runtime_tuning()
 
     def _prepare_parameter_string(self, param_str: str) -> tuple[str | None, dict[str, float]]:
+        """Parse and validate a FAISS parameter string into FAISS spec and overrides.
+
+        This method parses a comma-separated parameter string (e.g., "nprobe=64,efSearch=128")
+        into two components: (1) a FAISS ParameterSpace string for direct index
+        application, and (2) a sanitized override dictionary for persistence. The
+        method validates parameter names (must be supported), values (must be numeric),
+        and constraints (positive integers, k_factor >= 1.0). The k_factor parameter
+        is excluded from the FAISS spec (it's manager-specific) but included in overrides.
+
+        Parameters
+        ----------
+        param_str : str
+            Comma-separated parameter string in format "key1=value1,key2=value2".
+            Supported keys: "nprobe", "efSearch", "quantizer_efSearch", "k_factor".
+            Values must be numeric. Whitespace around keys/values is stripped.
+            Must be non-empty and contain at least one valid parameter.
+
+        Returns
+        -------
+        tuple[str | None, dict[str, float]]
+            Tuple containing:
+            - FAISS ParameterSpace string (e.g., "nprobe=64,efSearch=128") for
+              direct index application, or None if no FAISS parameters are present
+              (only k_factor was specified)
+            - Sanitized override dictionary with validated parameters, ready for
+              storage in _runtime_overrides. Always non-empty (raises ValueError
+              if empty after parsing).
+
+        Raises
+        ------
+        ValueError
+            Raised in the following cases:
+            - param_str is empty or whitespace-only: parameter string must be non-empty
+            - Invalid parameter fragment: malformed key=value pair (missing =, empty key/value)
+            - Non-numeric parameter value: value cannot be converted to float
+            - Unsupported parameter name: key is not in the supported set
+            - Parameter validation fails: value violates constraints (see _sanitize_runtime_overrides)
+            - No valid parameters: all parameters were invalid or only k_factor was provided
+              (k_factor alone is insufficient)
+
+        Notes
+        -----
+        This method is used by set_search_parameters() to parse user-provided parameter
+        strings. It separates FAISS-specific parameters (for direct index application)
+        from manager-specific parameters (k_factor, for override storage). The method
+        performs comprehensive validation and provides clear error messages. Time
+        complexity: O(n) where n is the length of param_str. The method is deterministic
+        and raises exceptions for invalid inputs.
+        """
         if not param_str or not param_str.strip():
             msg = "Parameter string must be non-empty."
             raise ValueError(msg)
@@ -2589,6 +2988,39 @@ class FAISSManager(
 
     @staticmethod
     def _format_parameter_string(overrides: Mapping[str, float]) -> str | None:
+        """Format runtime override dictionary into a parameter string.
+
+        This method converts a dictionary of runtime parameter overrides into a
+        comma-separated parameter string suitable for display or persistence.
+        Parameters are formatted in a canonical order (nprobe, efSearch,
+        quantizer_efSearch, k_factor) with integer parameters formatted as integers
+        and k_factor formatted as a float. The resulting string can be parsed back
+        by _prepare_parameter_string().
+
+        Parameters
+        ----------
+        overrides : Mapping[str, float]
+            Dictionary of runtime parameter overrides with keys "nprobe", "efSearch",
+            "quantizer_efSearch", and/or "k_factor". Values are expected to be
+            numeric (integers or floats). Only recognized keys are included in the
+            output; unknown keys are ignored.
+
+        Returns
+        -------
+        str | None
+            Comma-separated parameter string (e.g., "nprobe=64,efSearch=128,k_factor=2.0")
+            with parameters in canonical order. Integer parameters are formatted without
+            decimal points; k_factor retains decimal precision. Returns None if the
+            dictionary is empty or contains no recognized parameters.
+
+        Notes
+        -----
+        This method is used by _write_meta_snapshot() and get_runtime_tuning() to
+        serialize override dictionaries for persistence and display. The method
+        ensures consistent formatting and ordering for readability. Time complexity:
+        O(1) since the number of parameters is fixed. The method is deterministic
+        and produces consistent output for the same input dictionary.
+        """
         ordered: list[str] = []
         for key in ("nprobe", "efSearch", "quantizer_efSearch", "k_factor"):
             if key not in overrides:
@@ -2601,6 +3033,39 @@ class FAISSManager(
         return ",".join(ordered) if ordered else None
 
     def _meta_snapshot(self) -> dict[str, object]:
+        """Load and update index metadata snapshot from disk.
+
+        This method loads the existing metadata JSON file (if present) and merges
+        it with current manager configuration to create a comprehensive metadata
+        snapshot. The snapshot includes index path, vector dimension, FAISS family,
+        default parameters, and any previously persisted metadata (factory name,
+        vector count, parameter space, etc.). Used as a base for _write_meta_snapshot()
+        to preserve existing metadata while updating specific fields.
+
+        Returns
+        -------
+        dict[str, object]
+            Metadata snapshot dictionary containing:
+            - "index_path": String path to the index file
+            - "vec_dim": Vector dimension (int)
+            - "faiss_family": Index family name (str)
+            - "default_parameters": Dictionary with default nprobe, efSearch,
+              quantizer_efSearch, and k_factor values
+            - Any additional fields from the existing metadata file (factory,
+              vector_count, parameter_space, runtime_overrides, etc.)
+            Returns a fresh dictionary with current configuration if the metadata
+            file doesn't exist or is invalid JSON.
+
+        Notes
+        -----
+        This method performs file I/O to read the metadata JSON file. If the file
+        doesn't exist or contains invalid JSON, it returns a dictionary with current
+        configuration only. The method merges existing metadata with current settings,
+        allowing incremental updates without losing historical data. Time complexity:
+        O(1) for file existence check, O(n) for JSON parsing where n is file size.
+        The method handles JSON decode errors gracefully, returning an empty base
+        dictionary.
+        """
         snapshot: dict[str, object]
         if self._meta_path.exists():
             try:
@@ -2631,6 +3096,40 @@ class FAISSManager(
         vector_count: int | None = None,
         parameter_space: str | None = None,
     ) -> None:
+        """Write index metadata snapshot to disk.
+
+        This method creates or updates the index metadata JSON file with current
+        manager configuration, runtime overrides, compile options, and optional
+        update fields (factory name, vector count, parameter space). The metadata
+        file serves as a persistent record of index configuration for observability,
+        debugging, and index lifecycle management. The file is written with JSON
+        indentation for readability.
+
+        Parameters
+        ----------
+        factory : str | None, optional
+            Optional factory name (index type) to record in metadata. When provided,
+            updates the "factory" field. When None, preserves existing factory value
+            or leaves it unset. Used to track the index structure (e.g., "IVF8192,Flat").
+        vector_count : int | None, optional
+            Optional vector count to record in metadata. When provided, updates the
+            "vector_count" field. When None, preserves existing count or leaves it
+            unset. Used to track the number of vectors in the index.
+        parameter_space : str | None, optional
+            Optional FAISS ParameterSpace parameter string to record in metadata.
+            When provided, updates the "parameter_space" field. When None, preserves
+            existing parameter space or leaves it unset. Used to track runtime tuning
+            parameters (e.g., "nprobe=64,efSearch=128").
+
+        Notes
+        -----
+        This method performs file I/O to write the metadata JSON file. The parent
+        directory is created if it doesn't exist. The metadata includes a timestamp
+        (updated_at) in ISO format for tracking when the snapshot was last updated.
+        Time complexity: O(n) where n is the metadata size for JSON serialization,
+        plus file I/O overhead. The method overwrites the existing metadata file
+        and is not thread-safe if called concurrently.
+        """
         meta = self._meta_snapshot()
         if factory is not None:
             meta["factory"] = factory
@@ -2718,6 +3217,37 @@ class FAISSManager(
         return nprobe_eff, ef_eff, k_factor, quantizer_ef
 
     def _load_tuned_profile(self) -> dict[str, float | str]:
+        """Load autotune profile from disk with caching.
+
+        This method loads the persisted autotune profile (tuning results) from the
+        JSON file, caches it in _tuned_parameters for subsequent access, and returns
+        the profile dictionary. The profile contains optimal parameter settings
+        discovered during autotune sweeps, including param_str, recall_at_k, latency_ms,
+        and extracted parameter values (nprobe, efSearch, etc.). The method handles
+        file I/O errors and JSON parsing errors gracefully, returning an empty
+        dictionary when the profile cannot be loaded.
+
+        Returns
+        -------
+        dict[str, float | str]
+            Autotune profile dictionary containing tuning results. Typical keys include:
+            - "param_str": Best parameter string (str)
+            - "recall_at_k": Best recall metric (float)
+            - "latency_ms": Search latency for best config (float)
+            - "nprobe", "efSearch", etc.: Extracted parameter values (float/int)
+            Returns the cached profile if already loaded, or an empty dictionary if
+            the profile file doesn't exist, cannot be read, or contains invalid JSON.
+
+        Notes
+        -----
+        This method implements caching: the profile is loaded once and stored in
+        _tuned_parameters for subsequent calls. The method checks both the primary
+        autotune profile path and legacy path for backward compatibility. Time
+        complexity: O(1) if cached, O(n) for file I/O and JSON parsing where n is
+        file size. The method performs file I/O and handles errors gracefully without
+        raising exceptions. Thread-safe if called under lock protection (as used in
+        _resolve_search_knobs).
+        """
         if self._tuned_parameters is not None:
             return self._tuned_parameters
         profile_path = self._profile_path_for_read()
@@ -2743,6 +3273,30 @@ class FAISSManager(
         return profile
 
     def _profile_path_for_read(self) -> Path | None:
+        """Determine the autotune profile file path for reading.
+
+        This method checks for the existence of autotune profile files in order of
+        preference: (1) primary autotune profile path (autotune_profile_path),
+        (2) legacy autotune profile path (_legacy_autotune_profile_path). Returns
+        the first path that exists, or None if neither file exists. This enables
+        backward compatibility with older profile file locations while preferring
+        the new location.
+
+        Returns
+        -------
+        Path | None
+            Path to the autotune profile JSON file if it exists, or None if neither
+            the primary nor legacy profile files are present. The returned path can
+            be used to read the profile data. Returns the primary path if both exist.
+
+        Notes
+        -----
+        This method performs file system checks to determine which profile file to
+        use. The legacy path uses a different naming convention (.tune.json suffix
+        vs tuning.json filename) for backward compatibility. Time complexity: O(1)
+        for file existence checks. The method performs no I/O operations beyond
+        existence checks and is deterministic.
+        """
         if self.autotune_profile_path.exists():
             return self.autotune_profile_path
         if self._legacy_autotune_profile_path.exists():
@@ -2752,6 +3306,47 @@ class FAISSManager(
     def _timed_search_with_params(
         self, queries: NDArrayF32, k: int, param_str: str
     ) -> tuple[float, tuple[NDArrayF32, NDArrayI64]]:
+        """Execute a parameterized search and measure its latency.
+
+        This method performs a FAISS search with the specified parameter string
+        and measures the execution time in milliseconds. It wraps _search_with_params()
+        with timing instrumentation, recording the elapsed time from start to completion.
+        Used by autotune sweeps to evaluate parameter configurations and select optimal
+        settings based on recall and latency trade-offs.
+
+        Parameters
+        ----------
+        queries : NDArrayF32
+            Query vector(s) to search, shape (n_queries, vec_dim) or (vec_dim,).
+            Automatically normalized for cosine similarity by _search_with_params().
+        k : int
+            Number of nearest neighbors to return per query. Must be positive.
+            Used to retrieve top-k results for evaluation.
+        param_str : str
+            FAISS ParameterSpace parameter string (e.g., "nprobe=64,efSearch=128").
+            Applied to the index before search. Used to test different parameter
+            configurations during autotune sweeps.
+
+        Returns
+        -------
+        tuple[float, tuple[NDArrayF32, NDArrayI64]]
+            Tuple containing:
+            - Elapsed time in milliseconds (float): Search execution time measured
+              using perf_counter() for high-resolution timing
+            - Search results tuple: (distances, ids) arrays from _search_with_params(),
+              both with shape (n_queries, k). Distances are cosine similarity scores;
+              IDs are chunk identifiers.
+
+        Notes
+        -----
+        This method is used by AutoTuner.run_sweep() to evaluate parameter
+        configurations during autotune sweeps. The timing measurement uses
+        perf_counter() for high-resolution, monotonic timing that is not affected
+        by system clock adjustments. Time complexity: O(search_time) where search_time
+        depends on index type and parameters, plus O(1) for timing overhead. The
+        method modifies the index parameters in-place before search, affecting
+        subsequent searches until parameters are changed again.
+        """
         start = perf_counter()
         result = self._search_with_params(queries, k, param_str=param_str)
         elapsed = (perf_counter() - start) * 1000.0
@@ -2759,6 +3354,50 @@ class FAISSManager(
 
     @staticmethod
     def _brute_force_truth_ids(queries: NDArrayF32, truths: NDArrayF32, k: int) -> NDArrayI64:
+        """Compute ground-truth nearest neighbor IDs via exact brute-force search.
+
+        This method performs exact nearest neighbor search by computing the full
+        similarity matrix (queries @ truths.T) and selecting the top-k most similar
+        truth vectors for each query. It uses argpartition for efficient top-k
+        selection without full sorting. The result provides ground-truth IDs for
+        recall evaluation during autotune sweeps.
+
+        Parameters
+        ----------
+        queries : NDArrayF32
+            Query vectors with shape (n_queries, vec_dim) and dtype float32.
+            Used to compute similarities against truth vectors. Vectors should be
+            normalized for cosine similarity (inner product).
+        truths : NDArrayF32
+            Ground-truth vectors with shape (n_truths, vec_dim) and dtype float32.
+            Used as the corpus for exact nearest neighbor search. Vectors should be
+            normalized for cosine similarity. The number of truth vectors determines
+            the maximum k value (clamped to n_truths).
+        k : int
+            Number of nearest neighbors to retrieve per query. Must be positive.
+            Clamped to min(k, n_truths) to avoid exceeding the truth corpus size.
+            When k <= 0 or k > n_truths, returns an empty array.
+
+        Returns
+        -------
+        NDArrayI64
+            Array of ground-truth nearest neighbor indices with shape (n_queries, k_eff)
+            where k_eff = min(k, n_truths). Each row contains the indices (0-based) of
+            the top-k most similar truth vectors for the corresponding query, sorted
+            by similarity (descending). Returns an empty array with shape (n_queries, 0)
+            when k <= 0 or n_truths == 0.
+
+        Notes
+        -----
+        This method is used by AutoTuner.run_sweep() to compute ground-truth nearest
+        neighbors for recall evaluation. It performs exact search via matrix
+        multiplication (O(n_queries * n_truths * vec_dim)) and argpartition
+        (O(n_queries * n_truths * log(k))) for top-k selection. The method assumes
+        vectors are normalized for cosine similarity (inner product). Time complexity:
+        O(n_queries * n_truths * vec_dim) for similarity computation plus O(n_queries
+        * n_truths * log(k)) for top-k selection. Space complexity: O(n_queries * n_truths)
+        for the similarity matrix.
+        """
         sims = queries @ truths.T
         k = min(k, sims.shape[1])
         if k <= 0:
@@ -2768,6 +3407,45 @@ class FAISSManager(
 
     @staticmethod
     def _estimate_recall(candidates: NDArrayI64, truth: NDArrayI64) -> float:
+        """Compute recall@k metric by comparing candidates against ground truth.
+
+        This method computes the average recall@k across all queries by comparing
+        candidate IDs returned from FAISS search against ground-truth nearest
+        neighbor IDs. Recall is computed as the fraction of ground-truth IDs that
+        appear in the candidate set, averaged across all queries. The metric ranges
+        from 0.0 (no matches) to 1.0 (all ground-truth IDs found).
+
+        Parameters
+        ----------
+        candidates : NDArrayI64
+            Candidate IDs returned from FAISS search, shape (n_queries, k_candidates).
+            Each row contains chunk IDs (or indices) from approximate search results.
+            Negative values are treated as invalid and ignored.
+        truth : NDArrayI64
+            Ground-truth nearest neighbor IDs (or indices), shape (n_queries, k_truth).
+            Each row contains the true top-k nearest neighbor IDs from exact search.
+            Negative values are treated as invalid and ignored. Must have the same
+            number of rows (n_queries) as candidates.
+
+        Returns
+        -------
+        float
+            Average recall@k metric in the range [0.0, 1.0]. Computed as the mean
+            of per-query recall values, where each query's recall is the fraction
+            of ground-truth IDs found in the candidate set. Returns 0.0 if either
+            array is empty or if there are no queries (total == 0).
+
+        Notes
+        -----
+        This method is used by AutoTuner.run_sweep() to evaluate search quality
+        during parameter sweeps. The recall metric measures how well approximate
+        search results match exact (brute-force) search results. The method handles
+        variable-length ground truth sets (queries with no ground truth are skipped)
+        and invalid IDs (negative values). Time complexity: O(n_queries * (k_candidates
+        + k_truth)) for set operations and comparisons. Space complexity: O(k_truth)
+        per query for truth set construction. The method is deterministic and produces
+        consistent results for the same input arrays.
+        """
         if candidates.size == 0 or truth.size == 0:
             return 0.0
         total = candidates.shape[0]
@@ -2782,6 +3460,37 @@ class FAISSManager(
 
     @staticmethod
     def _ensure_2d(array: NDArrayF32) -> NDArrayF32:
+        """Ensure an array is 2-dimensional for consistent FAISS search interface.
+
+        This helper method normalizes array shapes for FAISS search operations, which
+        expect 2D arrays with shape (n_queries, vec_dim). Single query vectors
+        (1D arrays with shape (vec_dim,)) are reshaped to (1, vec_dim) to maintain
+        consistent array dimensions. Multi-query arrays are returned unchanged.
+
+        Parameters
+        ----------
+        array : NDArrayF32
+            Input array that may be 1D or 2D. Shape (vec_dim,) for single query or
+            (n_queries, vec_dim) for multiple queries. Dtype is converted to float32
+            if not already. The array is copied if reshaping is needed.
+
+        Returns
+        -------
+        NDArrayF32
+            Normalized 2D array with shape (n_queries, vec_dim) where n_queries >= 1.
+            Single query vectors are reshaped from (vec_dim,) to (1, vec_dim).
+            Multi-query arrays are returned unchanged (after dtype conversion).
+            Dtype is guaranteed to be float32.
+
+        Notes
+        -----
+        This method is used throughout the FAISS manager to normalize query inputs
+        before search operations. It ensures consistent array shapes for FAISS API
+        calls and simplifies handling of both single and batch queries. Time
+        complexity: O(1) for shape check, O(n) for dtype conversion where n is
+        array size. The method may create a copy if dtype conversion or reshaping
+        is needed. The method is deterministic and preserves array values.
+        """
         arr = np.asarray(array, dtype=np.float32)
         if arr.ndim == 1:
             return arr.reshape(1, -1)
@@ -2965,7 +3674,9 @@ class AutoTuner:
         profile["refine_k_factor"] = float(
             refine_k_factor if refine_k_factor is not None else self._manager.refine_k_factor
         )
-        meta = self._manager._meta_snapshot()  # lint-ignore[SLF001]: reuse internal helper for evaluation
+        meta = (
+            self._manager._meta_snapshot()
+        )  # lint-ignore[SLF001]: reuse internal helper for evaluation
         if "factory" in meta:
             profile["factory"] = meta["factory"]
         return profile
@@ -3025,7 +3736,33 @@ def _configure_direct_map(index: _faiss.Index) -> None:
 
 
 def _set_direct_map_type(index: _faiss.Index) -> None:
-    """Enable direct map support on FAISS indexes when available."""
+    """Enable direct map support on FAISS indexes when available.
+
+    This function attempts to enable direct map support on FAISS indexes that
+    support it (primarily IVF-family indexes). Direct maps enable efficient vector
+    reconstruction by storing array-backed mappings from index positions to vectors.
+    The function downcasts the index to a concrete type (if possible) and calls
+    make_direct_map() if available. Failures are logged but do not raise exceptions,
+    allowing the index to function without direct map support.
+
+    Parameters
+    ----------
+    index : _faiss.Index
+        FAISS index object to enable direct map support on. May be a base Index
+        type or wrapper (IndexIDMap2, etc.). The function attempts to downcast
+        to concrete types to access index-specific methods.
+
+    Notes
+    -----
+    This function is called by _configure_direct_map() to enable vector reconstruction
+    capabilities. Direct maps are required for reconstruct_batch() and _extract_all_vectors()
+    operations. Not all index types support direct maps (e.g., Flat indexes don't
+    need them). The function handles errors gracefully, logging debug messages when
+    direct map setup fails. Time complexity: O(1) for method lookup, O(n) for direct
+    map construction where n is the number of vectors (if supported). The function
+    modifies the index object in-place and is not thread-safe if the index is being
+    used concurrently.
+    """
     try:
         concrete = faiss.downcast_index(index)
     except (AttributeError, RuntimeError):

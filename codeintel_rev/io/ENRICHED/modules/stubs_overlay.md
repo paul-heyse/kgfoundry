@@ -41,15 +41,15 @@ Targeted overlay generation with opt-in activation.
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 10
+- **cycle_group**: 14
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 10
-- recent churn 90: 10
+- recent churn 30: 11
+- recent churn 90: 11
 
 ## Usage
 

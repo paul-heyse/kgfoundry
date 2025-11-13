@@ -12,33 +12,36 @@ Adaptive gating helpers for multi-stage retrieval pipelines.
 - from **(absolute)** import re
 - from **collections.abc** import Mapping
 - from **dataclasses** import dataclass, field
+- from **codeintel_rev.observability.otel** import record_span_event
+- from **codeintel_rev.observability.timeline** import current_timeline
+- from **codeintel_rev.retrieval.telemetry** import record_stage_decision
 - from **codeintel_rev.retrieval.types** import StageDecision, StageSignals
 
 ## Definitions
 
-- class: `StageGateConfig` (line 13)
-- function: `should_run_secondary_stage` (line 62)
-- class: `QueryProfile` (line 125)
-- class: `BudgetDecision` (line 177)
-- function: `_tokenize` (line 211)
-- function: `_code_like_count` (line 215)
-- function: `analyze_query` (line 224)
-- function: `decide_budgets` (line 296)
-- function: `describe_budget_decision` (line 343)
+- class: `StageGateConfig` (line 16)
+- function: `should_run_secondary_stage` (line 65)
+- class: `QueryProfile` (line 146)
+- class: `BudgetDecision` (line 198)
+- function: `_tokenize` (line 232)
+- function: `_code_like_count` (line 236)
+- function: `analyze_query` (line 245)
+- function: `decide_budgets` (line 317)
+- function: `describe_budget_decision` (line 364)
 
 ## Graph Metrics
 
 - **fan_in**: 2
-- **fan_out**: 1
-- **cycle_group**: 55
+- **fan_out**: 4
+- **cycle_group**: 63
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 5
-- recent churn 90: 5
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 
@@ -70,7 +73,7 @@ BudgetDecision, QueryProfile, StageGateConfig, analyze_query, decide_budgets, de
 
 ## Hotspot
 
-- score: 2.09
+- score: 2.33
 
 ## Side Effects
 
@@ -78,9 +81,9 @@ BudgetDecision, QueryProfile, StageGateConfig, analyze_query, decide_budgets, de
 
 ## Complexity
 
-- branches: 25
-- cyclomatic: 26
-- loc: 391
+- branches: 27
+- cyclomatic: 28
+- loc: 412
 
 ## Doc Coverage
 

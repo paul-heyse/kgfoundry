@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import cast
 
 from codeintel_rev.enrich.scip_reader import SCIPIndex
+from codeintel_rev.polars_support import resolve_polars_frame_factory
 from codeintel_rev.typing import PolarsModule, gate_import
 
 
@@ -121,6 +122,9 @@ def _write_parquet(records: list[dict[str, str]], target: Path) -> bool:
         polars = cast("PolarsModule", gate_import("polars", "use graph export"))
     except ImportError:
         return False
-    data_frame = polars.DataFrame(records)
+    frame_factory = resolve_polars_frame_factory(polars)
+    if frame_factory is None:
+        return False
+    data_frame = frame_factory(records)
     data_frame.write_parquet(str(target))
     return True

@@ -12,6 +12,7 @@ from codeintel_rev.module_utils import (
     module_name_candidates,
     normalize_module_name,
 )
+from codeintel_rev.polars_support import resolve_polars_frame_factory
 from codeintel_rev.typing import PolarsModule, gate_import
 
 
@@ -178,5 +179,9 @@ def _write_parquet(records: list[dict[str, str]], target: Path) -> bool:
         polars = cast("PolarsModule", gate_import("polars", "import graph export"))
     except ImportError:
         return False
-    polars.DataFrame(records).write_parquet(str(target))
+    frame_factory = resolve_polars_frame_factory(polars)
+    if frame_factory is None:
+        return False
+    data_frame = frame_factory(records)
+    data_frame.write_parquet(str(target))
     return True

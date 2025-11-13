@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from typing import cast
@@ -53,14 +55,21 @@ def _fake_app_context() -> ApplicationContext:
 
 
 @asynccontextmanager
-async def _noop_lifespan(_app: FastAPI) -> None:
-    """Skip expensive startup for the global FastAPI app."""
+async def _noop_lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Skip expensive startup for the global FastAPI app.
+
+    Yields
+    ------
+    None
+        Control to FastAPI without running the real lifespan hooks.
+    """
+    await asyncio.sleep(0)
     yield
 
 
 def _ensure_mock_tool_route(app: FastAPI) -> None:
     """Register a lightweight tool route exactly once for integration tests."""
-    if getattr(app.state, "_telemetry_mock_route_registered", False):
+    if getattr(app.state, ROUTE_FLAG_ATTR, False):
         return
 
     @app.post("/test-tools/mock")
@@ -70,7 +79,7 @@ def _ensure_mock_tool_route(app: FastAPI) -> None:
             telemetry = telemetry_metadata() or {}
             return {"ok": True, "telemetry": telemetry}
 
-    app.state._telemetry_mock_route_registered = True
+    setattr(app.state, ROUTE_FLAG_ATTR, True)
 
 
 def _emit_minimal_events(session_id: str, run_id: str) -> None:
@@ -217,3 +226,6 @@ def test_tool_execution_populates_run_report_via_http() -> None:
         app.router.lifespan_context = original_lifespan
         app.state.context = original_context
         app.state.capability_stamp = original_cap_stamp
+
+
+ROUTE_FLAG_ATTR = "telemetry_mock_route_registered"

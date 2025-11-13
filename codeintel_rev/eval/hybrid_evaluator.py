@@ -18,7 +18,10 @@ from kgfoundry_common.logging import get_logger
 if TYPE_CHECKING:
     from codeintel_rev.io.xtr_manager import XTRIndex
 else:  # pragma: no cover - imported lazily in CLI paths
-    XTRIndex = object  # type: ignore[misc,assignment]
+
+    class XTRIndex:
+        """Runtime placeholder for optional XTR dependency."""
+
 
 LOGGER = get_logger(__name__)
 
@@ -259,6 +262,7 @@ class HybridPoolEvaluator:
         return reranked_scores, reranked_ids
 
     def _extend_pool(
+        self,
         pool: list[PoolRow],
         *,
         query_id: str,

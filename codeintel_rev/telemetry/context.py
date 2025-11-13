@@ -109,7 +109,7 @@ def telemetry_context(
     tool_name: str | None = None,
 ) -> Iterator[None]:
     """Bind telemetry identifiers to the current context."""
-    token_stack: list[contextvars.Token[object]] = []
+    token_stack: list[contextvars.Token[Any]] = []
     token_stack.append(session_id_var.set(session_id))
     token_stack.append(capability_stamp_var.set(capability_stamp))
     token_stack.append(_set_run_id(run_id))

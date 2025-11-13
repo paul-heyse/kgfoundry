@@ -733,9 +733,11 @@ class HybridSearchEngine:
             extra=len(channel_counts) - min(len(channel_counts), 3),
         )
         if timeline is not None and channel_counts:
-            attrs = {f"{name}_hits": count for name, count in channel_counts.items()}
-            attrs["channels"] = list(channel_counts)
-            timeline.event("hybrid.channels.collected", "hybrid", attrs=attrs)
+            channel_attrs: dict[str, object] = {
+                f"{name}_hits": count for name, count in channel_counts.items()
+            }
+            channel_attrs["channels"] = list(channel_counts)
+            timeline.event("hybrid.channels.collected", "hybrid", attrs=channel_attrs)
         opts = options or HybridSearchOptions()
         ctx = _FusionContext(
             query=query,

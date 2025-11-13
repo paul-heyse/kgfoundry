@@ -63,7 +63,7 @@ Notes
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 144
+- **cycle_group**: 149
 
 ## Ownership
 
@@ -130,6 +130,7 @@ Notes
 - patches/AST_Data_Build.md
 - patches/audit_closeout.md
 - patches/Index Lifecycle Manager and Concurrency.md
+- patches/MCP_schema_implementation.md
 - patches/OpenTelemetry_ExtensionPhase0.md
 - patches/FAISS Implementation Phase 2 rev.md
 - patches/warp_technical_overview.md

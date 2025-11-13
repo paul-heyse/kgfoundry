@@ -81,15 +81,15 @@ Provides health/readiness endpoints, CORS, and streaming support.
 
 - **fan_in**: 0
 - **fan_out**: 19
-- **cycle_group**: 83
+- **cycle_group**: 85
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 27
-- recent churn 90: 27
+- recent churn 30: 28
+- recent churn 90: 28
 
 ## Usage
 

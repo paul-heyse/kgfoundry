@@ -17,6 +17,7 @@ low-coverage:
 - uses_builder.py
 - __init__.py
 - export_resolver.py
+- polars_support.py
 - _lazy_imports.py
 - cst_build/cst_serialize.py
 - cst_build/cst_schema.py
@@ -69,6 +70,7 @@ low-coverage:
 - enrich/stubs_overlay.py
 - enrich/__init__.py
 - observability/runtime_observer.py
+- observability/reporting.py
 - observability/metrics.py
 - observability/otel.py
 - observability/__init__.py
@@ -110,6 +112,7 @@ low-coverage:
 - retrieval/types.py
 - retrieval/telemetry.py
 - retrieval/gating.py
+- retrieval/mcp_search.py
 - retrieval/hybrid.py
 - retrieval/rm3_heuristics.py
 - retrieval/rerank_flat.py
@@ -137,6 +140,7 @@ low-coverage:
 - embeddings/__init__.py
 - cli/xtr.py
 - cli/indexctl.py
+- cli/telemetry.py
 - cli/splade.py
 - cli/bm25.py
 - cli/build_indexes.py
@@ -150,6 +154,7 @@ low-coverage:
 - mcp_server/adapters/semantic.py
 - mcp_server/adapters/files.py
 - mcp_server/adapters/semantic_pro.py
+- mcp_server/adapters/deep_research.py
 - mcp_server/adapters/text_search.py
 - mcp_server/adapters/__init__.py
 - mcp_server/adapters/history.py
@@ -219,6 +224,7 @@ public-api:
 - retrieval/types.py
 - retrieval/telemetry.py
 - retrieval/gating.py
+- retrieval/mcp_search.py
 - retrieval/hybrid.py
 - retrieval/rm3_heuristics.py
 - retrieval/rerank_flat.py
@@ -241,6 +247,7 @@ public-api:
 - mcp_server/retrieval/__init__.py
 - mcp_server/adapters/semantic.py
 - mcp_server/adapters/files.py
+- mcp_server/adapters/deep_research.py
 - mcp_server/adapters/text_search.py
 - mcp_server/adapters/history.py
 - retrieval/fusion/weighted_rrf.py
@@ -250,6 +257,7 @@ public-api:
 pydantic:
 - app/server_settings.py
 reexport-hub:
+- typing.py
 - config/settings.py
 - metrics/registry.py
 - enrich/ast_indexer.py
@@ -259,4 +267,5 @@ reexport-hub:
 - telemetry/__init__.py
 - io/splade_manager.py
 - io/__init__.py
+- retrieval/mcp_search.py
 - mcp_server/schemas.py

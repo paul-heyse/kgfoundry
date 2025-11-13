@@ -9,28 +9,24 @@ Structured logging bridge + optional OTLP exporter.
 ## Imports
 
 - from **__future__** import annotations
+- from **(absolute)** import importlib
 - from **(absolute)** import logging
 - from **(absolute)** import os
+- from **typing** import Any
 - from **codeintel_rev.telemetry.otel** import _env_flag, build_resource
 - from **kgfoundry_common.logging** import setup_logging
-- from **opentelemetry.exporter.otlp.proto.http._log_exporter** import OTLPLogExporter
-- from **opentelemetry.sdk._logs** import LoggerProvider, LoggingHandler
-- from **opentelemetry.sdk._logs.export** import BatchLogRecordProcessor
 
 ## Definitions
 
-- variable: `OTLPLogExporter` (line 16)
-- variable: `LoggerProvider` (line 17)
-- variable: `LoggingHandler` (line 18)
-- variable: `BatchLogRecordProcessor` (line 19)
-- variable: `LOGGER` (line 21)
-- function: `install_structured_logging` (line 25)
+- variable: `LOGGER` (line 13)
+- function: `_load_logging_dependencies` (line 17)
+- function: `install_structured_logging` (line 50)
 
 ## Graph Metrics
 
 - **fan_in**: 2
-- **fan_out**: 1
-- **cycle_group**: 80
+- **fan_out**: 2
+- **cycle_group**: 82
 
 ## Ownership
 
@@ -66,7 +62,7 @@ Structured logging bridge + optional OTLP exporter.
 
 ## Hotspot
 
-- score: 1.69
+- score: 1.81
 
 ## Side Effects
 
@@ -74,12 +70,13 @@ Structured logging bridge + optional OTLP exporter.
 
 ## Complexity
 
-- branches: 5
-- cyclomatic: 6
-- loc: 58
+- branches: 6
+- cyclomatic: 7
+- loc: 85
 
 ## Doc Coverage
 
+- `_load_logging_dependencies` (function): summary=yes, params=ok, examples=no — Import OpenTelemetry logging modules lazily to keep deps optional.
 - `install_structured_logging` (function): summary=yes, params=mismatch, examples=no — Install JSON logging and optional OTLP log export.
 
 ## Tags

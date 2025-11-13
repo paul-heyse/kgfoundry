@@ -30,7 +30,7 @@ Adapter for the optional WARP/XTR late interaction executor.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 108
+- **cycle_group**: 111
 
 ## Ownership
 

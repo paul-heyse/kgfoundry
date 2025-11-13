@@ -10,7 +10,7 @@ and when exporting the Hypercorn-facing ASGI callable.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import ClassVar, Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -67,12 +67,13 @@ class ServerSettings(BaseSettings):
         Canonical domain used in docs/runbooks (default: None). Does not affect
         runtime behavior but avoids duplicating values elsewhere. Optional
         metadata field for documentation purposes.
-    model_config : SettingsConfigDict | dict[str, object]
+    model_config : ClassVar[SettingsConfigDict]
         Pydantic settings configuration dict. Configures pydantic-settings to
         load from .env (if present) and to use the CODEINTEL_SERVER_ prefix
         for environment variables. Also sets env_file_encoding to utf-8 and
         extra to "ignore". The attribute is assigned a SettingsConfigDict instance
         with env_file, env_file_encoding, env_prefix, and extra settings.
+        This is a class variable (ClassVar) used by Pydantic BaseSettings.
     """
 
     host: str = "127.0.0.1"
@@ -93,7 +94,7 @@ class ServerSettings(BaseSettings):
     proxy_trusted_hops: int = 1
     domain: str | None = None
 
-    model_config = SettingsConfigDict(
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         env_prefix="CODEINTEL_SERVER_",

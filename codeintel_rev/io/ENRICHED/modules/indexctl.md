@@ -115,15 +115,15 @@ Typer CLI for managing index lifecycle operations.
 
 - **fan_in**: 0
 - **fan_out**: 12
-- **cycle_group**: 129
+- **cycle_group**: 132
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 11
-- recent churn 90: 11
+- recent churn 30: 12
+- recent churn 90: 12
 
 ## Usage
 

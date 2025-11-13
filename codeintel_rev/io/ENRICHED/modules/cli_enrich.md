@@ -100,76 +100,76 @@ CLI entrypoint for repo enrichment and targeted overlay generation.
 - class: `PipelineResult` (line 445)
 - function: `_iter_files` (line 460)
 - function: `_run_pipeline` (line 472)
-- function: `_execute_pipeline` (line 531)
-- function: `_scan_modules` (line 538)
-- function: `run_all` (line 562)
-- function: `run` (line 595)
-- function: `scan` (line 605)
-- function: `exports` (line 616)
-- function: `graph` (line 637)
-- function: `uses` (line 645)
-- function: `typedness` (line 653)
-- function: `doc` (line 661)
-- function: `coverage` (line 669)
-- function: `config` (line 677)
-- function: `hotspots` (line 685)
-- function: `overlays` (line 693)
-- function: `_build_overlay_context` (line 824)
-- function: `_build_module_row` (line 868)
-- function: `_scip_symbols_and_edges` (line 969)
-- function: `_outline_nodes_for` (line 980)
-- function: `_type_error_count` (line 995)
-- function: `_coverage_value` (line 1000)
-- function: `_augment_module_rows` (line 1005)
-- function: `_build_tag_index` (line 1075)
-- function: `_apply_tagging` (line 1089)
-- function: `_traits_from_row` (line 1110)
-- function: `_build_coverage_rows` (line 1171)
-- function: `_build_hotspot_rows` (line 1182)
-- function: `_write_exports_outputs` (line 1196)
-- function: `_write_graph_outputs` (line 1203)
-- function: `_write_uses_output` (line 1208)
-- function: `_apply_ownership` (line 1212)
-- function: `_write_ownership_output` (line 1241)
-- function: `_write_slices_output` (line 1256)
-- function: `_write_typedness_output` (line 1287)
-- function: `_write_doc_output` (line 1301)
-- function: `_write_coverage_output` (line 1315)
-- function: `_write_config_output` (line 1319)
-- function: `_write_hotspot_output` (line 1323)
-- function: `_write_ast_outputs` (line 1327)
-- function: `_write_modules_json` (line 1346)
-- function: `_write_markdown_modules` (line 1350)
-- function: `_write_repo_map` (line 1361)
-- function: `_write_symbol_graph` (line 1377)
-- function: `_write_tabular_records` (line 1384)
-- function: `_collect_ast_artifacts` (line 1391)
-- function: `_write_ast_jsonl` (line 1414)
-- function: `_normalize_type_signal_map` (line 1419)
-- function: `_normalize_metric_map` (line 1435)
-- function: `_normalize_path_key` (line 1453)
-- function: `_group_configs_by_dir` (line 1457)
-- function: `_config_refs_for_row` (line 1468)
-- function: `_ancestor_dirs` (line 1484)
-- function: `_dir_key_from_path` (line 1499)
-- function: `_should_mark_overlay` (line 1506)
-- function: `_ensure_package_overlays` (line 1537)
-- function: `_normalized_rel_path` (line 1623)
-- function: `_write_tag_index` (line 1627)
+- function: `_execute_pipeline` (line 533)
+- function: `_scan_modules` (line 540)
+- function: `run_all` (line 564)
+- function: `run` (line 597)
+- function: `scan` (line 607)
+- function: `exports` (line 618)
+- function: `graph` (line 639)
+- function: `uses` (line 647)
+- function: `typedness` (line 655)
+- function: `doc` (line 663)
+- function: `coverage` (line 671)
+- function: `config` (line 679)
+- function: `hotspots` (line 687)
+- function: `overlays` (line 695)
+- function: `_build_overlay_context` (line 826)
+- function: `_build_module_row` (line 870)
+- function: `_scip_symbols_and_edges` (line 971)
+- function: `_outline_nodes_for` (line 982)
+- function: `_type_error_count` (line 997)
+- function: `_coverage_value` (line 1002)
+- function: `_augment_module_rows` (line 1007)
+- function: `_build_tag_index` (line 1077)
+- function: `_apply_tagging` (line 1091)
+- function: `_traits_from_row` (line 1112)
+- function: `_build_coverage_rows` (line 1173)
+- function: `_build_hotspot_rows` (line 1184)
+- function: `_write_exports_outputs` (line 1198)
+- function: `_write_graph_outputs` (line 1205)
+- function: `_write_uses_output` (line 1210)
+- function: `_apply_ownership` (line 1214)
+- function: `_write_ownership_output` (line 1243)
+- function: `_write_slices_output` (line 1258)
+- function: `_write_typedness_output` (line 1289)
+- function: `_write_doc_output` (line 1303)
+- function: `_write_coverage_output` (line 1317)
+- function: `_write_config_output` (line 1321)
+- function: `_write_hotspot_output` (line 1325)
+- function: `_write_ast_outputs` (line 1329)
+- function: `_write_modules_json` (line 1348)
+- function: `_write_markdown_modules` (line 1352)
+- function: `_write_repo_map` (line 1363)
+- function: `_write_symbol_graph` (line 1379)
+- function: `_write_tabular_records` (line 1386)
+- function: `_collect_ast_artifacts` (line 1393)
+- function: `_write_ast_jsonl` (line 1416)
+- function: `_normalize_type_signal_map` (line 1421)
+- function: `_normalize_metric_map` (line 1437)
+- function: `_normalize_path_key` (line 1455)
+- function: `_group_configs_by_dir` (line 1459)
+- function: `_config_refs_for_row` (line 1470)
+- function: `_ancestor_dirs` (line 1486)
+- function: `_dir_key_from_path` (line 1501)
+- function: `_should_mark_overlay` (line 1508)
+- function: `_ensure_package_overlays` (line 1538)
+- function: `_normalized_rel_path` (line 1624)
+- function: `_write_tag_index` (line 1628)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 18
-- **cycle_group**: 23
+- **cycle_group**: 24
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 19
-- recent churn 90: 19
+- recent churn 30: 20
+- recent churn 90: 20
 
 ## Usage
 
@@ -207,7 +207,7 @@ CLI entrypoint for repo enrichment and targeted overlay generation.
 
 - branches: 183
 - cyclomatic: 184
-- loc: 1644
+- loc: 1645
 
 ## Doc Coverage
 

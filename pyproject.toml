@@ -536,11 +536,16 @@ runtime-evaluated-base-classes = [
 "codeintel_rev/mcp_server/adapters/semantic.py" = ["DOC502"]
 "codeintel_rev/mcp_server/adapters/files.py" = ["DOC502"]  # PathOutsideRepositoryError raised by resolve_within_repo helper
 "codeintel_rev/mcp_server/adapters/history.py" = ["DOC502"]  # PathOutsideRepositoryError raised by resolve_within_repo helper
+"codeintel_rev/mcp_server/telemetry.py" = ["DOC502"]  # BaseException re-raised via bare `raise` in context manager; correctly documented in Raises section
+"codeintel_rev/telemetry/decorators.py" = ["DOC502"]  # BaseException re-raised via bare `raise` in context manager; correctly documented in Raises section
+"codeintel_rev/embeddings/embedding_service.py" = ["DOC502"]  # Exception re-raised via bare `raise`; correctly documented in Raises section
 "docs/_scripts/**" = ["PLC2701"]  # docs._scripts is internal tooling; importing from docs._types and tools._shared is expected
 "docs/types/artifacts.py" = ["PLC2701"]  # docs/types is a facade re-exporting from private docs._types module
 "tools/lint/codemod_typing_migration.py" = ["N802"]  # LibCST visitor protocol requires CamelCase method names (leave_ImportFrom, leave_Call)
 "tools/codemods/blind_except_fix.py" = ["N802"]
 "tools/codemods/pathlib_fix.py" = ["N815"]
+# Typer callbacks/options require extensive parameter lists; splitting would break CLI UX.
+"codeintel_rev/cli_enrich.py" = ["PLR0913", "PLR0914", "PLR0917"]
 # New: Façade modules are allowed to import from private sources (controlled re-export)
 "src/kgfoundry_common/typing/__init__.py" = []  # Canonical typing façade
 "tools/typing/__init__.py" = []  # Tooling typing façade
@@ -744,6 +749,9 @@ emit-build-options    = true  # include only/no-binary flags if you use them
 exclude = "codeintel_rev/patches"
 # DOC105: `**_` parameter type annotation limitation in Click decorators
 # The type annotation matches the signature, but pydoclint cannot parse underscore-prefixed kwargs
+# DOC503: RuntimeCell.get_or_initialize raises exceptions via variable (cooldown_error), not directly
+# Pydoclint doesn't recognize that cooldown_error is a variable containing an exception, not an exception type
+skipCheckingCode = ["DOC503"]
 
 [tool.pydocstyle]
 convention = "numpy"

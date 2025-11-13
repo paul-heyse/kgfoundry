@@ -25,15 +25,15 @@ Writers and helpers that persist CST datasets to disk.
 ## Definitions
 
 - class: `DatasetWriter` (line 21)
-- function: `write_index` (line 154)
-- function: `write_join_examples` (line 183)
-- function: `_module_slug` (line 214)
+- function: `write_index` (line 155)
+- function: `write_join_examples` (line 184)
+- function: `_module_slug` (line 215)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 4
-- **cycle_group**: 29
+- **cycle_group**: 30
 
 ## Ownership
 
@@ -79,7 +79,7 @@ Writers and helpers that persist CST datasets to disk.
 
 - branches: 18
 - cyclomatic: 19
-- loc: 220
+- loc: 221
 
 ## Doc Coverage
 

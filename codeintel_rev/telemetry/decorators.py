@@ -5,10 +5,10 @@ from __future__ import annotations
 import functools
 import importlib
 import inspect
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Awaitable, Callable, Iterator, Mapping
 from contextlib import contextmanager, nullcontext
 from time import perf_counter
-from typing import TypeVar
+from typing import TypeVar, cast
 
 from opentelemetry import trace
 from opentelemetry.trace import Span, SpanKind, Status, StatusCode
@@ -131,13 +131,6 @@ def span_context(
         - dict[str, object]: Merged attribute dictionary combining provided attrs
           with context attributes (request ID, stage, etc.)
 
-    Raises
-    ------
-    BaseException
-        Any exception raised within the context is caught, recorded on the span
-        with error status, and re-raised. The context manager ensures proper
-        span cleanup and error attribution even when exceptions occur.
-
     Notes
     -----
     This context manager integrates OpenTelemetry tracing with timeline recording
@@ -145,6 +138,17 @@ def span_context(
     and records stage latency. The context manager is thread-safe if the underlying
     tracing infrastructure is thread-safe. Stage latency is recorded only when
     stage is provided.
+
+    Raises
+    ------
+    BaseException
+        Any exception raised within the context is caught, recorded on the span
+        with error status, and re-raised using Python's bare ``raise`` statement.
+        The context manager ensures proper span cleanup and error attribution even
+        when exceptions occur. Exceptions propagate to the caller after error
+        recording and checkpoint emission (if enabled). Note: Exceptions are
+        re-raised (not directly raised), preserving the original exception traceback
+        and propagating through this context manager.
     """
     base_attrs = dict(attrs or {})
     stage_start = perf_counter() if stage else None
@@ -248,6 +252,7 @@ def trace_span(
         execution is traced. Thread-safe if span_context() is thread-safe.
         """
         if inspect.iscoroutinefunction(func):
+            async_func = cast("Callable[..., Awaitable[object]]", func)
 
             @functools.wraps(func)
             async def async_wrapper(*args: object, **kwargs: object) -> object:
@@ -278,9 +283,9 @@ def trace_span(
                     stage=stage,
                     emit_checkpoint=emit_checkpoint,
                 ):
-                    return await func(*args, **kwargs)
+                    return await async_func(*args, **kwargs)
 
-            return async_wrapper  # type: ignore[return-value]
+            return cast("F", async_wrapper)
 
         @functools.wraps(func)
         def sync_wrapper(*args: object, **kwargs: object) -> object:
@@ -313,7 +318,7 @@ def trace_span(
             ):
                 return func(*args, **kwargs)
 
-        return sync_wrapper  # type: ignore[return-value]
+        return cast("F", sync_wrapper)
 
     return decorator
 

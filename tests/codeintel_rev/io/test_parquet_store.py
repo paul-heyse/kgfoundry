@@ -11,9 +11,9 @@ import pyarrow.parquet as pq
 import pytest
 
 try:  # pragma: no cover - optional dependency
-    import xxhash  # type: ignore[import]
+    import xxhash
 except ModuleNotFoundError:  # pragma: no cover - tests follow runtime fallback
-    xxhash = None  # type: ignore[assignment]
+    xxhash = None
 from codeintel_rev.indexing.cast_chunker import Chunk
 from codeintel_rev.indexing.chunk_ids import stable_chunk_id
 from codeintel_rev.io.parquet_store import (

@@ -170,8 +170,11 @@ def _attrs_from_meta(meta_path: Path) -> dict[str, object]:
     if parameter_space:
         attrs["faiss_parameters"] = parameter_space
     vector_count = payload.get("vector_count")
-    if vector_count is not None:
-        attrs["faiss_vector_count"] = int(vector_count)
+    if isinstance(vector_count, (int, float, str)):
+        try:
+            attrs["faiss_vector_count"] = int(vector_count)
+        except (TypeError, ValueError):
+            LOGGER.warning("invalid vector_count field in %s", meta_path)
     default_parameters = payload.get("default_parameters")
     if default_parameters:
         attrs["faiss_default_parameters"] = default_parameters

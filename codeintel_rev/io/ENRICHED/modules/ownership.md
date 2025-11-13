@@ -15,7 +15,7 @@ Ownership, churn, and bus-factor analytics sourced from Git history.
 - from **datetime** import UTC, datetime, timedelta
 - from **fnmatch** import fnmatch
 - from **pathlib** import Path
-- from **typing** import TYPE_CHECKING, Any
+- from **typing** import TYPE_CHECKING
 - from **kgfoundry_common.logging** import get_logger
 - from **git** import Repo
 - from **git** import exc
@@ -24,34 +24,34 @@ Ownership, churn, and bus-factor analytics sourced from Git history.
 ## Definitions
 
 - variable: `git_exc` (line 21)
-- variable: `GitRepo` (line 26)
-- variable: `GitError` (line 28)
-- variable: `LOGGER` (line 29)
-- class: `FileOwnership` (line 35)
-- class: `OwnershipIndex` (line 46)
-- function: `compute_ownership` (line 53)
-- function: `_normalize_windows` (line 113)
-- function: `_try_open_repo` (line 120)
-- function: `_stats_via_gitpython` (line 129)
-- function: `_author_name` (line 168)
-- function: `_top_k` (line 176)
-- function: `_bus_factor` (line 181)
-- function: `_codeowners_lookup` (line 188)
-- function: `_glob_like_match` (line 208)
+- class: `GitRepo` (line 27)
+- variable: `GitError` (line 31)
+- variable: `LOGGER` (line 32)
+- class: `FileOwnership` (line 38)
+- class: `OwnershipIndex` (line 49)
+- function: `compute_ownership` (line 56)
+- function: `_normalize_windows` (line 116)
+- function: `_try_open_repo` (line 123)
+- function: `_stats_via_gitpython` (line 132)
+- function: `_author_name` (line 171)
+- function: `_top_k` (line 179)
+- function: `_bus_factor` (line 184)
+- function: `_codeowners_lookup` (line 191)
+- function: `_glob_like_match` (line 211)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 18
+- **cycle_group**: 11
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 5
+- recent churn 90: 5
 
 ## Usage
 
@@ -99,10 +99,11 @@ FileOwnership, OwnershipIndex, compute_ownership
 
 - branches: 31
 - cyclomatic: 32
-- loc: 215
+- loc: 218
 
 ## Doc Coverage
 
+- `GitRepo` (class): summary=yes, examples=no — Runtime placeholder for optional GitPython dependency.
 - `FileOwnership` (class): summary=yes, examples=no — Aggregated ownership metadata for a single file.
 - `OwnershipIndex` (class): summary=yes, examples=no — Collection of :class:`FileOwnership` entries keyed by relative path.
 - `compute_ownership` (function): summary=yes, params=ok, examples=no — Return ownership metrics for ``rel_paths`` relative to ``repo_root``.
@@ -112,7 +113,6 @@ FileOwnership, OwnershipIndex, compute_ownership
 - `_author_name` (function): summary=no, examples=no
 - `_top_k` (function): summary=no, examples=no
 - `_bus_factor` (function): summary=no, examples=no
-- `_codeowners_lookup` (function): summary=no, examples=no
 
 ## Tags
 

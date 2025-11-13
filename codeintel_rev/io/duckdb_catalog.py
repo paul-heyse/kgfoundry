@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 from time import perf_counter
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Any, Self, TypedDict, Unpack, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.io.duckdb_manager import (
@@ -401,6 +401,13 @@ class _DuckDBQueryMixin:
         return result
 
 
+class _LegacyOptions(TypedDict, total=False):
+    materialize: bool
+    manager: DuckDBManager | None
+    log_queries: bool
+    repo_root: Path
+
+
 class DuckDBCatalog(_DuckDBQueryMixin):
     """DuckDB catalog for querying chunks.
 
@@ -443,7 +450,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         vectors_dir: Path,
         *,
         options: DuckDBCatalogOptions | None = None,
-        **legacy_kwargs: object,
+        **legacy_kwargs: Unpack[_LegacyOptions],
     ) -> None:
         if options is not None and legacy_kwargs:
             msg = "Cannot mix DuckDBCatalog options dataclass with keyword overrides."
@@ -455,7 +462,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
                 if unknown:
                     msg = f"Unsupported DuckDBCatalog keyword(s): {', '.join(sorted(unknown))}"
                     raise TypeError(msg)
-                options = DuckDBCatalogOptions(**legacy_kwargs)  # type: ignore[arg-type]
+                options = DuckDBCatalogOptions(**legacy_kwargs)
             else:
                 options = DuckDBCatalogOptions()
         self.db_path = db_path
@@ -989,8 +996,10 @@ class DuckDBCatalog(_DuckDBQueryMixin):
 
         Returns
         -------
-        list[tuple[int, numpy.ndarray]]
-            Chunk identifiers paired with embedding vectors.
+        list[tuple[int, np.ndarray]]
+            Chunk identifiers paired with embedding vectors. Each tuple contains
+            a chunk ID (int) and its corresponding embedding vector as a NumPy
+            array (np.ndarray).
         """
         if limit <= 0:
             return []
@@ -1487,11 +1496,14 @@ class DuckDBCatalog(_DuckDBQueryMixin):
 
         timeline = current_timeline()
         attrs = {"uri": uri, "limit": limit}
-        with span_context(
-            "duckdb.query_by_uri",
-            stage="catalog.query",
-            attrs=attrs,
-        ), self.connection() as conn:
+        with (
+            span_context(
+                "duckdb.query_by_uri",
+                stage="catalog.query",
+                attrs=attrs,
+            ),
+            self.connection() as conn,
+        ):
             relation = conn.execute(sql, params)
             rows = relation.fetchall()
             cols = [desc[0] for desc in relation.description]
@@ -1544,11 +1556,14 @@ class DuckDBCatalog(_DuckDBQueryMixin):
 
         attrs = {"requested": len(requested_ids)}
         timeline = current_timeline()
-        with span_context(
-            "duckdb.get_embeddings_by_ids",
-            stage="catalog.hydrate",
-            attrs=attrs,
-        ), self.connection() as conn:
+        with (
+            span_context(
+                "duckdb.get_embeddings_by_ids",
+                stage="catalog.hydrate",
+                attrs=attrs,
+            ),
+            self.connection() as conn,
+        ):
             relation = conn.execute(
                 """
                 SELECT c.id, c.embedding, ids.position

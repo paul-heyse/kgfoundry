@@ -81,7 +81,7 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 
 - **fan_in**: 6
 - **fan_out**: 4
-- **cycle_group**: 70
+- **cycle_group**: 72
 
 ## Ownership
 

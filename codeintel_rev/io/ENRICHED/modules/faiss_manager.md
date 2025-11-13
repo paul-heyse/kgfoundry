@@ -60,24 +60,24 @@ corpus size for optimal performance.
 - class: `_SearchPlan` (line 265)
 - class: `_FAISSIdMapMixin` (line 275)
 - class: `FAISSManager` (line 453)
-- class: `AutoTuner` (line 2868)
-- function: `_coerce_to_int` (line 2996)
-- function: `_configure_direct_map` (line 3019)
-- function: `_set_direct_map_type` (line 3027)
+- class: `AutoTuner` (line 3577)
+- function: `_coerce_to_int` (line 3707)
+- function: `_configure_direct_map` (line 3730)
+- function: `_set_direct_map_type` (line 3738)
 
 ## Graph Metrics
 
-- **fan_in**: 7
+- **fan_in**: 8
 - **fan_out**: 8
-- **cycle_group**: 67
+- **cycle_group**: 69
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 41
-- recent churn 90: 41
+- recent churn 30: 42
+- recent churn 90: 42
 
 ## Usage
 
@@ -109,7 +109,7 @@ AutoTuner, FAISSManager, apply_parameters
 
 ## Hotspot
 
-- score: 3.29
+- score: 3.31
 
 ## Side Effects
 
@@ -119,7 +119,7 @@ AutoTuner, FAISSManager, apply_parameters
 
 - branches: 227
 - cyclomatic: 228
-- loc: 3045
+- loc: 3782
 
 ## Doc Coverage
 

@@ -36,22 +36,22 @@ In-memory run report builder fed by timeline events.
 - function: `_build_operations` (line 341)
 - function: `_collect` (line 380)
 - function: `build_report` (line 401)
-- function: `report_to_json` (line 479)
-- function: `render_markdown` (line 503)
+- function: `report_to_json` (line 481)
+- function: `render_markdown` (line 505)
 
 ## Graph Metrics
 
-- **fan_in**: 3
+- **fan_in**: 4
 - **fan_out**: 6
-- **cycle_group**: 69
+- **cycle_group**: 71
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 
@@ -83,7 +83,7 @@ RUN_REPORT_STORE, RunReport, RunReportStore, build_report, emit_checkpoint, fina
 
 ## Hotspot
 
-- score: 2.73
+- score: 2.76
 
 ## Side Effects
 
@@ -93,7 +93,7 @@ RUN_REPORT_STORE, RunReport, RunReportStore, build_report, emit_checkpoint, fina
 
 - branches: 64
 - cyclomatic: 65
-- loc: 578
+- loc: 580
 
 ## Doc Coverage
 

@@ -2,69 +2,147 @@
 
 from __future__ import annotations
 
+import importlib
 import os
 from dataclasses import dataclass
 from importlib import metadata
-from typing import Any
-
-try:  # pragma: no cover - optional dependency
-    from opentelemetry import metrics as otel_metrics
-    from opentelemetry import trace as otel_trace
-    from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
-    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-    from opentelemetry.sdk.metrics import MeterProvider
-    from opentelemetry.sdk.metrics.export import (
-        ConsoleMetricExporter,
-        PeriodicExportingMetricReader,
-    )
-    from opentelemetry.sdk.resources import Resource
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import (
-        BatchSpanProcessor,
-        ConsoleSpanExporter,
-    )
-except ImportError:  # pragma: no cover - graceful fallback when otel missing
-    otel_metrics = None
-    otel_trace = None
-    OTLPMetricExporter = None
-    OTLPSpanExporter = None
-    MeterProvider = None
-    PeriodicExportingMetricReader = None
-    ConsoleMetricExporter = None
-    BatchSpanProcessor = None
-    ConsoleSpanExporter = None
-    Resource = None
-    TracerProvider = None
+from types import ModuleType
+from typing import Protocol, cast
 
 from kgfoundry_common.logging import get_logger
 
 LOGGER = get_logger(__name__)
 
 
+class _TraceAPI(Protocol):
+    def set_tracer_provider(self, provider: object) -> None: ...
+
+
+class _MetricsAPI(Protocol):
+    def set_meter_provider(self, provider: object) -> None: ...
+
+
+class _TracerProviderInstance(Protocol):
+    def add_span_processor(self, processor: object) -> None: ...
+
+
+class _TracerProviderFactory(Protocol):
+    def __call__(self, *args: object, **kwargs: object) -> _TracerProviderInstance: ...
+
+
+class _Factory(Protocol):
+    def __call__(self, *args: object, **kwargs: object) -> object: ...
+
+
+class _ResourceFactory(Protocol):
+    @classmethod
+    def create(cls, attributes: dict[str, object]) -> object: ...
+
+
+def _optional_import(module: str) -> ModuleType | None:
+    try:
+        return importlib.import_module(module)
+    except ImportError:  # pragma: no cover - optional dependency
+        return None
+
+
+def _import_attr(module: str, attr: str) -> object | None:
+    mod = _optional_import(module)
+    if mod is None:
+        return None
+    return getattr(mod, attr, None)
+
+
+otel_metrics = cast("_MetricsAPI | None", _optional_import("opentelemetry.metrics"))
+otel_trace = cast("_TraceAPI | None", _optional_import("opentelemetry.trace"))
+OTLPMetricExporter = cast(
+    "_Factory | None",
+    _import_attr("opentelemetry.exporter.otlp.proto.http.metric_exporter", "OTLPMetricExporter"),
+)
+OTLPSpanExporter = cast(
+    "_Factory | None",
+    _import_attr("opentelemetry.exporter.otlp.proto.http.trace_exporter", "OTLPSpanExporter"),
+)
+MeterProvider = cast(
+    "_Factory | None",
+    _import_attr("opentelemetry.sdk.metrics", "MeterProvider"),
+)
+PeriodicExportingMetricReader = cast(
+    "_Factory | None",
+    _import_attr("opentelemetry.sdk.metrics.export", "PeriodicExportingMetricReader"),
+)
+ConsoleMetricExporter = cast(
+    "_Factory | None",
+    _import_attr("opentelemetry.sdk.metrics.export", "ConsoleMetricExporter"),
+)
+Resource = cast(
+    "_ResourceFactory | None",
+    _import_attr("opentelemetry.sdk.resources", "Resource"),
+)
+TracerProvider = cast(
+    "_TracerProviderFactory | None",
+    _import_attr("opentelemetry.sdk.trace", "TracerProvider"),
+)
+BatchSpanProcessor = cast(
+    "_Factory | None",
+    _import_attr("opentelemetry.sdk.trace.export", "BatchSpanProcessor"),
+)
+ConsoleSpanExporter = cast(
+    "_Factory | None",
+    _import_attr("opentelemetry.sdk.trace.export", "ConsoleSpanExporter"),
+)
+
+
+_INSTALL_STATE: dict[str, bool] = {"traces": False, "metrics": False}
+
+
+@dataclass(slots=True, frozen=True)
+class OtelInstallResult:
+    """Summary describing which signal providers were installed."""
+
+    traces: bool
+    metrics: bool
+
+
+@dataclass(slots=True, frozen=True)
+class _TelemetryDeps:
+    trace_api: _TraceAPI
+    metrics_api: _MetricsAPI
+    tracer_provider_factory: _TracerProviderFactory
+    meter_provider_factory: _Factory
+    metric_reader_factory: _Factory
+    span_processor_factory: _Factory
+    console_span_exporter_factory: _Factory
+    console_metric_exporter_factory: _Factory
+
+
+def _resolve_factories() -> _TelemetryDeps:
+    components = (
+        otel_trace,
+        otel_metrics,
+        MeterProvider,
+        PeriodicExportingMetricReader,
+        TracerProvider,
+        BatchSpanProcessor,
+        ConsoleSpanExporter,
+        ConsoleMetricExporter,
+    )
+    if any(component is None for component in components):
+        msg = "OpenTelemetry SDK not available; telemetry disabled"
+        raise RuntimeError(msg)
+    return _TelemetryDeps(
+        trace_api=cast("_TraceAPI", otel_trace),
+        metrics_api=cast("_MetricsAPI", otel_metrics),
+        tracer_provider_factory=cast("_TracerProviderFactory", TracerProvider),
+        meter_provider_factory=cast("_Factory", MeterProvider),
+        metric_reader_factory=cast("_Factory", PeriodicExportingMetricReader),
+        span_processor_factory=cast("_Factory", BatchSpanProcessor),
+        console_span_exporter_factory=cast("_Factory", ConsoleSpanExporter),
+        console_metric_exporter_factory=cast("_Factory", ConsoleMetricExporter),
+    )
+
+
 def _env_flag(name: str, *, default: bool = True) -> bool:
-    """Return environment flag value.
-
-    This function reads an environment variable and returns True if it's set to
-    a recognized truthy value ("1", "true", "yes", "on"), or returns the default
-    value if the variable is unset or set to a falsy value.
-
-    Parameters
-    ----------
-    name : str
-        Environment variable name to check. The variable is read using os.getenv()
-        and compared against truthy values (case-insensitive, whitespace-trimmed).
-    default : bool, optional
-        Default value to return when the environment variable is unset or not
-        recognized as truthy (default: True). Used to provide fallback behavior
-        when the flag is not explicitly configured.
-
-    Returns
-    -------
-    bool
-        True if the environment variable is set to a truthy value, otherwise
-        returns the default value. Truthy values are "1", "true", "yes", "on"
-        (case-insensitive, whitespace-trimmed).
-    """
     raw = os.getenv(name)
     if raw is None:
         return default
@@ -72,13 +150,6 @@ def _env_flag(name: str, *, default: bool = True) -> bool:
 
 
 def _service_version() -> str | None:
-    """Return package version for resource attributes.
-
-    Returns
-    -------
-    str | None
-        Installed package version or ``None`` if not resolved.
-    """
     for pkg in ("kgfoundry", "codeintel-rev"):
         try:
             return metadata.version(pkg)
@@ -92,45 +163,46 @@ def build_resource(
     service_name: str,
     service_version: str | None = None,
     environment: str | None = None,
-) -> Resource:
+) -> object:
     """Build an OpenTelemetry Resource describing this process.
 
-    This function creates an OpenTelemetry Resource object that describes the
-    service process for distributed tracing. The resource includes service name,
-    version, and environment attributes that are attached to all exported spans.
+    This function constructs an OpenTelemetry Resource object with service metadata
+    (name, version, environment) extracted from parameters or environment variables.
+    The Resource is used to identify the service in distributed tracing and metrics.
 
     Parameters
     ----------
     service_name : str
-        Name of the service for resource identification. Used as the primary
-        identifier in traces and metrics. Should match the application name
-        (e.g., "codeintel_rev").
+        Service identifier used in OpenTelemetry Resource attributes. Required
+        parameter that identifies the service name (e.g., "codeintel-mcp").
     service_version : str | None, optional
-        Version string for the service (default: None). When provided, included
-        as a resource attribute. Useful for tracking deployments and version
-        changes in traces.
+        Optional service version string (default: None). When provided, added to
+        Resource attributes as "service.version". Used to track service versions
+        in telemetry data.
     environment : str | None, optional
-        Environment identifier (e.g., "production", "staging", "development")
-        (default: None). When provided, included as a resource attribute for
-        filtering and grouping traces by environment.
+        Optional deployment environment identifier (default: None). When provided,
+        added to Resource attributes as "deployment.environment". Falls back to
+        DEPLOYMENT_ENVIRONMENT or ENVIRONMENT environment variables if not provided.
+        Used to distinguish between dev/staging/production environments.
 
     Returns
     -------
-    Resource
-        OpenTelemetry Resource object describing the service with name, version,
-        and environment attributes. The resource is attached to all spans exported
-        by this process.
+    object
+        OpenTelemetry ``Resource`` instance describing the current process. The
+        Resource contains service metadata (name, version, environment) extracted
+        from parameters and environment variables.
 
     Raises
     ------
     RuntimeError
-        Raised when the Resource type is unavailable.
+        Raised when the OpenTelemetry Resource class is unavailable (OpenTelemetry
+        SDK not installed or import failed).
     """
     if Resource is None:  # pragma: no cover - defensive
         msg = "OpenTelemetry Resource type unavailable"
         raise RuntimeError(msg)
 
-    attrs: dict[str, Any] = {"service.name": service_name}
+    attrs: dict[str, object] = {"service.name": service_name}
     if service_version:
         attrs["service.version"] = service_version
     env = environment or os.getenv("DEPLOYMENT_ENVIRONMENT") or os.getenv("ENVIRONMENT")
@@ -142,76 +214,17 @@ def build_resource(
     instance_id = os.getenv("HOSTNAME") or os.getenv("POD_NAME")
     if instance_id:
         attrs["service.instance.id"] = instance_id
-    return Resource.create(attrs)
-
-
-_TRACE_INSTALLED = False
-_METRICS_INSTALLED = False
-
-
-@dataclass(slots=True, frozen=True)
-class OtelInstallResult:
-    """Summary describing which signal providers were installed."""
-
-    traces: bool
-    metrics: bool
+    resource_cls: _ResourceFactory = Resource
+    return resource_cls.create(attrs)
 
 
 def _build_span_exporter(endpoint: str | None, *, insecure: bool) -> object | None:
-    """Return an OTLP span exporter when configured.
-
-    This function creates an OTLP (OpenTelemetry Protocol) HTTP span exporter
-    for exporting traces to an OTLP collector. The exporter is configured with
-    the provided endpoint and security settings.
-
-    Parameters
-    ----------
-    endpoint : str | None
-        OTLP HTTP endpoint URL for span export (e.g., "https://collector:4318/v1/traces").
-        When None, returns None without creating an exporter. Used to configure
-        the destination for exported spans.
-    insecure : bool
-        Flag indicating whether to use insecure (HTTP) connections. When True,
-        disables TLS verification for the OTLP endpoint. When False, uses secure
-        HTTPS connections with certificate validation.
-
-    Returns
-    -------
-    object | None
-        OTLPSpanExporter instance when endpoint is provided and OTLP exporters
-        are available, otherwise None. Returns None when endpoint is None or
-        when OTLP exporter modules are not installed.
-    """
     if endpoint is None or OTLPSpanExporter is None:
         return None
     return OTLPSpanExporter(endpoint=endpoint, insecure=insecure)
 
 
 def _build_metric_exporter(endpoint: str | None, *, insecure: bool) -> object | None:
-    """Return an OTLP metric exporter when configured.
-
-    This function creates an OTLP (OpenTelemetry Protocol) HTTP metric exporter
-    for exporting metrics to an OTLP collector. The exporter is configured with
-    the provided endpoint and security settings.
-
-    Parameters
-    ----------
-    endpoint : str | None
-        OTLP HTTP endpoint URL for metric export (e.g., "https://collector:4318/v1/metrics").
-        When None, returns None without creating an exporter. Used to configure
-        the destination for exported metrics.
-    insecure : bool
-        Flag indicating whether to use insecure (HTTP) connections. When True,
-        disables TLS verification for the OTLP endpoint. When False, uses secure
-        HTTPS connections with certificate validation.
-
-    Returns
-    -------
-    object | None
-        OTLPMetricExporter instance when endpoint is provided and OTLP exporters
-        are available, otherwise None. Returns None when endpoint is None or
-        when OTLP exporter modules are not installed.
-    """
     if endpoint is None or OTLPMetricExporter is None:
         return None
     return OTLPMetricExporter(endpoint=endpoint, insecure=insecure)
@@ -225,53 +238,41 @@ def install_otel(
 ) -> OtelInstallResult:
     """Install tracer/meter providers with console fallbacks.
 
-    This function initializes OpenTelemetry tracing and metrics providers with
-    OTLP exporters (when configured) or console exporters as fallbacks. The function
-    sets up resource attributes, configures span processors, and enables telemetry
-    for the application lifecycle.
+    This function installs OpenTelemetry trace and metric providers for the
+    application, with graceful fallback when OpenTelemetry SDK is unavailable.
+    The function configures global providers and returns installation status.
 
     Parameters
     ----------
     service_name : str | None, optional
-        Service name for resource identification (default: None). When None, uses
-        a default service name. Used as the primary identifier in traces and
-        metrics. Should match the application name.
+        Optional service name for OpenTelemetry Resource (default: None). When None,
+        falls back to OTEL_SERVICE_NAME environment variable or "codeintel-mcp".
+        Used to identify the service in distributed tracing and metrics.
     service_version : str | None, optional
-        Service version string for resource attributes (default: None). When
-        provided, included in the OpenTelemetry resource. Useful for tracking
-        deployments and version changes in traces.
+        Optional service version string (default: None). When None, attempts to
+        detect version from package metadata or environment. Used to track service
+        versions in telemetry data.
     environment : str | None, optional
-        Environment identifier (e.g., "production", "staging", "development")
-        (default: None). When provided, included in the OpenTelemetry resource
-        for filtering and grouping traces by environment.
+        Optional deployment environment identifier (default: None). When None,
+        falls back to DEPLOYMENT_ENVIRONMENT or ENVIRONMENT environment variables.
+        Used to distinguish between dev/staging/production environments.
 
     Returns
     -------
     OtelInstallResult
-        Outcome object describing which providers were successfully initialized.
-        Contains traces and metrics boolean flags indicating whether each provider
-        type was installed. Both flags are True when telemetry is fully enabled.
+        Flags indicating whether trace and metric providers were installed.
+        Returns OtelInstallResult(traces=True, metrics=True) when installation
+        succeeds, or OtelInstallResult(traces=False, metrics=False) when
+        OpenTelemetry SDK is unavailable or telemetry is disabled.
     """
-    global _TRACE_INSTALLED, _METRICS_INSTALLED  # noqa: PLW0603
-
-    if _TRACE_INSTALLED and _METRICS_INSTALLED:
+    if _INSTALL_STATE["traces"] and _INSTALL_STATE["metrics"]:
         return OtelInstallResult(traces=True, metrics=True)
     if not _env_flag("TELEMETRY_ENABLED", default=True):
         LOGGER.info("Telemetry disabled via TELEMETRY_ENABLED=0")
         return OtelInstallResult(traces=False, metrics=False)
-    if any(
-        component is None
-        for component in (
-            otel_metrics,
-            otel_trace,
-            MeterProvider,
-            PeriodicExportingMetricReader,
-            TracerProvider,
-            BatchSpanProcessor,
-            ConsoleSpanExporter,
-            ConsoleMetricExporter,
-        )
-    ):
+    try:
+        deps = _resolve_factories()
+    except RuntimeError:
         LOGGER.warning("OpenTelemetry SDK not available; telemetry disabled")
         return OtelInstallResult(traces=False, metrics=False)
 
@@ -283,25 +284,25 @@ def install_otel(
     endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
     insecure = _env_flag("OTEL_EXPORTER_OTLP_INSECURE", default=True)
 
-    # ----- Traces -----
     span_exporter = _build_span_exporter(endpoint, insecure=insecure)
-    trace_provider = TracerProvider(resource=resource)
+    trace_provider = deps.tracer_provider_factory(resource=resource)
     if span_exporter is not None:
-        trace_provider.add_span_processor(BatchSpanProcessor(span_exporter))
+        trace_provider.add_span_processor(deps.span_processor_factory(span_exporter))
     else:
-        trace_provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
-    otel_trace.set_tracer_provider(trace_provider)
-    _TRACE_INSTALLED = True
+        console_span_exporter = deps.console_span_exporter_factory()
+        trace_provider.add_span_processor(deps.span_processor_factory(console_span_exporter))
+    deps.trace_api.set_tracer_provider(trace_provider)
+    _INSTALL_STATE["traces"] = True
 
-    # ----- Metrics -----
     metric_exporter = _build_metric_exporter(endpoint, insecure=insecure)
-    readers = []
+    readers: list[object] = []
     if metric_exporter is not None:
-        readers.append(PeriodicExportingMetricReader(metric_exporter))
+        readers.append(deps.metric_reader_factory(metric_exporter))
     else:
-        readers.append(PeriodicExportingMetricReader(ConsoleMetricExporter()))
-    meter_provider = MeterProvider(resource=resource, metric_readers=readers)
-    otel_metrics.set_meter_provider(meter_provider)
-    _METRICS_INSTALLED = True
+        console_metric_exporter = deps.console_metric_exporter_factory()
+        readers.append(deps.metric_reader_factory(console_metric_exporter))
+    meter_provider = deps.meter_provider_factory(resource=resource, metric_readers=readers)
+    deps.metrics_api.set_meter_provider(meter_provider)
+    _INSTALL_STATE["metrics"] = True
 
     return OtelInstallResult(traces=True, metrics=True)

@@ -23,26 +23,26 @@ Offline hybrid evaluator with oracle reranking and pool exports.
 
 ## Definitions
 
-- variable: `XTRIndex` (line 21)
-- variable: `LOGGER` (line 23)
-- class: `EvalConfig` (line 27)
-- class: `EvalReport` (line 40)
-- class: `_EvalState` (line 54)
-- class: `HybridPoolEvaluator` (line 64)
+- class: `XTRIndex` (line 22)
+- variable: `LOGGER` (line 26)
+- class: `EvalConfig` (line 30)
+- class: `EvalReport` (line 43)
+- class: `_EvalState` (line 57)
+- class: `HybridPoolEvaluator` (line 67)
 
 ## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 5
-- **cycle_group**: 86
+- **cycle_group**: 88
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 5
-- recent churn 90: 5
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 
@@ -84,10 +84,11 @@ EvalConfig, EvalReport, HybridPoolEvaluator
 
 - branches: 27
 - cyclomatic: 28
-- loc: 329
+- loc: 333
 
 ## Doc Coverage
 
+- `XTRIndex` (class): summary=yes, examples=no — Runtime placeholder for optional XTR dependency.
 - `EvalConfig` (class): summary=yes, examples=no — Evaluator configuration.
 - `EvalReport` (class): summary=yes, examples=no — Summary for an offline ANN vs oracle comparison.
 - `_EvalState` (class): summary=no, examples=no

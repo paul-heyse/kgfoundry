@@ -45,7 +45,7 @@ CLI for rendering session timelines as Markdown diagnostics.
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 33
+- **cycle_group**: 34
 
 ## Ownership
 

@@ -69,15 +69,15 @@ The FAISS index type is automatically selected based on corpus size:
 
 - **fan_in**: 0
 - **fan_out**: 13
-- **cycle_group**: 93
+- **cycle_group**: 95
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 19
-- recent churn 90: 19
+- recent churn 30: 20
+- recent churn 90: 20
 
 ## Usage
 

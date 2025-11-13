@@ -13,21 +13,22 @@ SCIP-based symbol use graph helpers.
 - from **pathlib** import Path
 - from **typing** import cast
 - from **codeintel_rev.enrich.scip_reader** import SCIPIndex
+- from **codeintel_rev.polars_support** import resolve_polars_frame_factory
 - from **codeintel_rev.typing** import PolarsModule, gate_import
 
 ## Definitions
 
-- class: `UseGraph` (line 15)
-- function: `build_use_graph` (line 23)
-- function: `write_use_graph` (line 59)
-- function: `_is_definition` (line 85)
-- function: `_write_parquet` (line 105)
+- class: `UseGraph` (line 16)
+- function: `build_use_graph` (line 24)
+- function: `write_use_graph` (line 60)
+- function: `_is_definition` (line 86)
+- function: `_write_parquet` (line 106)
 
 ## Graph Metrics
 
 - **fan_in**: 1
-- **fan_out**: 2
-- **cycle_group**: 22
+- **fan_out**: 3
+- **cycle_group**: 10
 
 ## Ownership
 
@@ -63,7 +64,7 @@ SCIP-based symbol use graph helpers.
 
 ## Hotspot
 
-- score: 1.95
+- score: 2.06
 
 ## Side Effects
 
@@ -71,9 +72,9 @@ SCIP-based symbol use graph helpers.
 
 ## Complexity
 
-- branches: 15
-- cyclomatic: 16
-- loc: 127
+- branches: 16
+- cyclomatic: 17
+- loc: 131
 
 ## Doc Coverage
 

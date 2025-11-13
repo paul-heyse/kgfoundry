@@ -1194,7 +1194,7 @@ def _make_envelope(
     # Build envelope with all fields at once for type safety
     # AnswerEnvelope is TypedDict with total=False, so all fields are optional
     # We construct the envelope by unpacking extras if present
-    base_envelope = {
+    base_envelope: AnswerEnvelope = {
         "answer": answer,
         "query_kind": "semantic",
         "findings": list(findings),
@@ -1213,7 +1213,7 @@ def _make_envelope(
             {**base_envelope, **extras},
         )
     else:
-        envelope = cast("AnswerEnvelope", base_envelope)
+        envelope = base_envelope
 
     return envelope
 

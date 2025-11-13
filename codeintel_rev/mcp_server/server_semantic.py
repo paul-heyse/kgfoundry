@@ -6,15 +6,89 @@ import asyncio
 from typing import Any
 
 from codeintel_rev.app.config_context import ApplicationContext
+from codeintel_rev.mcp_server.adapters import deep_research as deep_research_adapter
 from codeintel_rev.mcp_server.adapters import semantic as semantic_adapter
 from codeintel_rev.mcp_server.adapters import semantic_pro as semantic_pro_adapter
 from codeintel_rev.mcp_server.error_handling import handle_adapter_errors
-from codeintel_rev.mcp_server.schemas import AnswerEnvelope
+from codeintel_rev.mcp_server.schemas import (
+    AnswerEnvelope,
+    FetchStructuredContent,
+    FetchToolArgs,
+    SearchFilterPayload,
+    SearchStructuredContent,
+    SearchToolArgs,
+)
 from codeintel_rev.mcp_server.server import get_context, mcp
 from codeintel_rev.mcp_server.telemetry import tool_operation_scope
 from codeintel_rev.telemetry.context import current_session
 from codeintel_rev.telemetry.reporter import build_report as build_run_report
 from codeintel_rev.telemetry.reporter import report_to_json
+
+
+@mcp.tool(name="search")
+@handle_adapter_errors(
+    operation="search:deep",
+    empty_result={"results": [], "queryEcho": "", "top_k": 0},
+)
+async def deep_research_search(
+    query: str,
+    top_k: int | None = None,
+    filters: SearchFilterPayload | None = None,
+    *,
+    rerank: bool = True,
+) -> SearchStructuredContent:
+    """Deep-Research compatible semantic search that returns chunk ids.
+
+    Returns
+    -------
+    SearchStructuredContent
+        Structured MCP payload with ranked chunk identifiers and metadata.
+    """
+    context = get_context()
+    args: SearchToolArgs = {"query": query}
+    if top_k is not None:
+        args["top_k"] = top_k
+    if filters is not None:
+        args["filters"] = filters
+    if rerank is not None:
+        args["rerank"] = rerank
+
+    with tool_operation_scope(
+        "search.deep",
+        query_chars=len(query),
+        requested_top_k=top_k or 12,
+        rerank=rerank,
+    ) as timeline:
+        return await deep_research_adapter.search(context, timeline, args)
+
+
+@mcp.tool(name="fetch")
+@handle_adapter_errors(
+    operation="search:fetch",
+    empty_result={"objects": []},
+)
+async def deep_research_fetch(
+    objectIds: list[str],  # noqa: N803 - MCP schema uses camelCase
+    max_tokens: int | None = None,
+) -> FetchStructuredContent:
+    """Hydrate chunk ids produced by :func:`deep_research_search`.
+
+    Returns
+    -------
+    FetchStructuredContent
+        Structured MCP payload containing chunk contents and provenance metadata.
+    """
+    context = get_context()
+    args: FetchToolArgs = {"objectIds": objectIds}
+    if max_tokens is not None:
+        args["max_tokens"] = max_tokens
+
+    with tool_operation_scope(
+        "search.fetch",
+        requested_objects=len(objectIds),
+        max_tokens=max_tokens or 4000,
+    ) as timeline:
+        return await deep_research_adapter.fetch(context, timeline, args)
 
 
 @mcp.tool()

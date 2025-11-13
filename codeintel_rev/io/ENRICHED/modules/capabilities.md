@@ -38,7 +38,7 @@ Capability snapshot helpers for conditional tool registration and /capz.
 
 - **fan_in**: 6
 - **fan_out**: 3
-- **cycle_group**: 67
+- **cycle_group**: 69
 
 ## Ownership
 

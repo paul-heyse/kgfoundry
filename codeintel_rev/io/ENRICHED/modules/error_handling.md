@@ -87,7 +87,7 @@ Error envelope structure:
 
 - **fan_in**: 3
 - **fan_out**: 3
-- **cycle_group**: 77
+- **cycle_group**: 76
 
 ## Ownership
 

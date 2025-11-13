@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from kgfoundry_common.logging import get_logger
 
@@ -23,7 +23,10 @@ except ImportError:  # pragma: no cover
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from git import Repo as GitRepo
 else:
-    GitRepo = Any  # type: ignore[assignment]
+
+    class GitRepo:  # pragma: no cover - runtime placeholder
+        """Runtime placeholder for optional GitPython dependency."""
+
 
 GitError = git_exc.GitError if git_exc is not None else Exception
 LOGGER = get_logger(__name__)

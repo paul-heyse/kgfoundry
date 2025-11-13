@@ -132,9 +132,7 @@ def should_run_secondary_stage(
     if signals.elapsed_ms > config.budget_ms:
         notes.append(f"stage elapsed {signals.elapsed_ms:.1f}ms > budget {config.budget_ms}ms")
         return _emit(
-            StageDecision(
-                should_run=False, reason="upstream_budget_exceeded", notes=tuple(notes)
-            )
+            StageDecision(should_run=False, reason="upstream_budget_exceeded", notes=tuple(notes))
         )
 
     if margin_value is not None and margin_value >= config.margin_threshold > 0:

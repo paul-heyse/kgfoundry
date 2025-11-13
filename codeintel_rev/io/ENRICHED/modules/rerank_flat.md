@@ -32,15 +32,15 @@ Exact reranking utilities for FAISS candidates.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 67
+- **cycle_group**: 69
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 5
-- recent churn 90: 5
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 

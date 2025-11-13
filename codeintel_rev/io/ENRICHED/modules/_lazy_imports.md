@@ -21,7 +21,7 @@ Helpers for lazily importing heavy optional dependencies.
 
 - **fan_in**: 15
 - **fan_out**: 1
-- **cycle_group**: 26
+- **cycle_group**: 27
 
 ## Ownership
 

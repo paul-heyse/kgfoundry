@@ -7,6 +7,7 @@ import sys
 import types
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
 import pytest
@@ -26,7 +27,7 @@ if "codeintel_rev.io.vllm_engine" not in sys.modules:  # pragma: no cover - test
         def close(self) -> None:
             return None
 
-    stub.InprocessVLLMEmbedder = _StubEmbedder  # type: ignore[attr-defined]
+    cast("Any", stub).InprocessVLLMEmbedder = _StubEmbedder
     sys.modules["codeintel_rev.io.vllm_engine"] = stub
 
 embedding_module = importlib.import_module("codeintel_rev.embeddings")

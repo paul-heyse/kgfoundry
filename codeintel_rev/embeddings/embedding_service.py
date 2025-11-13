@@ -10,7 +10,7 @@ from collections.abc import Callable, Iterable, Iterator, Sequence
 from concurrent.futures import Future
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
-from types import TracebackType
+from types import ModuleType, TracebackType
 from typing import Any, Protocol, Self, cast, runtime_checkable
 
 from codeintel_rev.config.settings import EmbeddingsConfig, IndexConfig, Settings, VLLMConfig
@@ -114,15 +114,15 @@ class EmbeddingProvider(Protocol):
         ...
 
 
-def _numpy() -> Any:
+def _numpy() -> ModuleType:
     """Return the lazily imported NumPy module for vector ops.
 
     Returns
     -------
-    Any
+    ModuleType
         The ``numpy`` module resolved via the typing gate.
     """
-    return gate_import("numpy", "embedding provider vector operations")
+    return cast("ModuleType", gate_import("numpy", "embedding provider vector operations"))
 
 
 def _l2_normalize(vectors: NDArrayF32) -> NDArrayF32:
@@ -241,10 +241,14 @@ class _BatchResultHandler:
         return True
 
 
+class _QueueSentinel:
+    """Unique sentinel signaling executor shutdown."""
+
+
 class _BoundedBatchExecutor:
     """Opportunistically coalesces pending embedding jobs into micro-batches."""
 
-    _SENTINEL = object()
+    _SENTINEL = _QueueSentinel()
 
     def __init__(
         self,
@@ -259,10 +263,10 @@ class _BoundedBatchExecutor:
             raise EmbeddingConfigError(msg)
         self._emit = emit
         self._micro_batch = micro_batch
-        self._queue: queue.Queue[_ExecutorJob | object] = queue.Queue(max(max_pending, 1))
+        self._queue: queue.Queue[_ExecutorJob | _QueueSentinel] = queue.Queue(max(max_pending, 1))
         self._max_wait = max(max_wait_ms, 1) / 1000.0
         self._stop = threading.Event()
-        self._sentinel = self._SENTINEL
+        self._sentinel: _QueueSentinel = self._SENTINEL
         self._thread = threading.Thread(target=self._run, name="embedding-batcher", daemon=True)
         self._thread.start()
 
@@ -324,10 +328,10 @@ class _BoundedBatchExecutor:
             item = self._queue.get(timeout=0.1)
         except queue.Empty:
             return None
-        if item is self._sentinel:
+        if isinstance(item, _QueueSentinel):
             self._stop.set()
             return None
-        return item  # type: ignore[return-value]
+        return item
 
     def _gather_jobs(self, first_job: _ExecutorJob) -> list[_ExecutorJob]:
         jobs = [first_job]
@@ -349,10 +353,10 @@ class _BoundedBatchExecutor:
             item = self._queue.get(timeout=timeout)
         except queue.Empty:
             return None
-        if item is self._sentinel:
+        if isinstance(item, _QueueSentinel):
             self._stop.set()
             return None
-        return item  # type: ignore[return-value]
+        return item
 
 
 @dataclass(slots=True, frozen=False)
@@ -754,6 +758,15 @@ def get_embedding_provider(
         For HF provider, no fallback is available. Also raised when HF provider
         initialization fails and no fallback is configured. Wraps underlying
         provider initialization exceptions with context.
+    Exception
+        When vLLM provider initialization fails and allow_hf_fallback is False,
+        the original exception from VLLMProvider initialization is re-raised
+        (not wrapped) using a bare `raise` statement. This allows callers to
+        handle provider-specific exceptions (e.g., CUDA errors, model loading
+        failures) when fallback is disabled. The exception is re-raised using
+        `raise` where the exception comes from the except block. Note: The
+        exception is re-raised using a bare `raise`, so pydoclint may flag this
+        as DOC502, but the exception is correctly propagated.
 
     Notes
     -----

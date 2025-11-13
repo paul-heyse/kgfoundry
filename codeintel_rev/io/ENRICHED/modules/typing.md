@@ -14,9 +14,9 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 ## Imports
 
 - from **__future__** import annotations
-- from **collections.abc** import Mapping, Sequence
+- from **collections.abc** import Callable, Mapping, Sequence
 - from **os** import PathLike
-- from **typing** import TYPE_CHECKING, Any, Protocol
+- from **typing** import TYPE_CHECKING, Any, Literal, Protocol
 - from **kgfoundry_common.typing** import HEAVY_DEPS
 - from **kgfoundry_common.typing** import gate_import
 - from **(absolute)** import numpy
@@ -27,27 +27,27 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 - variable: `NDArrayF32` (line 26)
 - variable: `NDArrayI64` (line 27)
 - variable: `NDArrayAny` (line 28)
-- variable: `HEAVY_DEPS` (line 43)
-- function: `gate_import` (line 47)
-- class: `TorchDeviceProperties` (line 90)
-- class: `TorchCudaAPI` (line 96)
-- class: `TorchTensor` (line 193)
-- class: `TorchModule` (line 244)
-- class: `FaissStandardGpuResources` (line 262)
-- class: `FaissGpuClonerOptions` (line 266)
-- class: `FaissIndex` (line 274)
-- class: `FaissGpuIndexFlatIP` (line 280)
-- class: `FaissModule` (line 292)
-- class: `NumpyRandomState` (line 327)
-- class: `NumpyRandomNamespace` (line 348)
-- class: `NumpyLinalgNamespace` (line 368)
-- class: `NumpyModule` (line 393)
-- class: `PolarsDataFrame` (line 400)
-- class: `PolarsModule` (line 421)
+- variable: `HEAVY_DEPS` (line 44)
+- function: `gate_import` (line 48)
+- class: `TorchDeviceProperties` (line 91)
+- class: `TorchCudaAPI` (line 97)
+- class: `TorchTensor` (line 194)
+- class: `TorchModule` (line 243)
+- class: `FaissStandardGpuResources` (line 261)
+- class: `FaissGpuClonerOptions` (line 265)
+- class: `FaissIndex` (line 273)
+- class: `FaissGpuIndexFlatIP` (line 279)
+- class: `FaissModule` (line 291)
+- class: `NumpyRandomState` (line 330)
+- class: `NumpyRandomNamespace` (line 351)
+- class: `NumpyLinalgNamespace` (line 375)
+- class: `NumpyModule` (line 400)
+- class: `PolarsDataFrame` (line 407)
+- class: `PolarsModule` (line 428)
 
 ## Graph Metrics
 
-- **fan_in**: 91
+- **fan_in**: 99
 - **fan_out**: 0
 - **cycle_group**: 0
 
@@ -66,7 +66,7 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 
 ## Declared Exports (__all__)
 
-FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, PolarsModule, TorchModule, gate_import
+FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, PolarsDataFrame, PolarsModule, TorchModule, gate_import
 
 ## Doc Health
 
@@ -89,7 +89,7 @@ FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, Polars
 
 ## Hotspot
 
-- score: 2.69
+- score: 2.72
 
 ## Side Effects
 
@@ -99,7 +99,7 @@ FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, Polars
 
 - branches: 1
 - cyclomatic: 2
-- loc: 438
+- loc: 454
 
 ## Doc Coverage
 
@@ -116,4 +116,4 @@ FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, Polars
 
 ## Tags
 
-low-coverage, public-api
+low-coverage, public-api, reexport-hub

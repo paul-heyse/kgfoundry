@@ -456,7 +456,9 @@ def build_report(
         "capability_stamp": record.capability_stamp,
         "duration_ms": (record.events[-1].attrs.get("duration_ms") if record.events else None),
     }
-    capabilities = Capabilities.from_context(context).stamp({})
+    capabilities_obj = Capabilities.from_context(context)
+    capabilities_payload = capabilities_obj.model_dump()
+    capabilities_payload["stamp"] = capabilities_obj.stamp(capabilities_payload.copy())
     return RunReport(
         session_id=record.session_id,
         run_id=record.run_id,
@@ -472,7 +474,7 @@ def build_report(
         checkpoints=checkpoints,
         timeline=timeline,
         summary=summary,
-        capabilities=capabilities,
+        capabilities=capabilities_payload,
     )
 
 

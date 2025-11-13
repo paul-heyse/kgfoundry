@@ -11,42 +11,50 @@ Prometheus helpers for MCP diagnostics.
 - from **__future__** import annotations
 - from **(absolute)** import os
 - from **dataclasses** import dataclass
+- from **typing** import TYPE_CHECKING, Protocol, cast
+- from **kgfoundry_common.prometheus** import CollectorRegistry, build_counter, build_histogram, get_default_registry
 - from **fastapi** import APIRouter
 - from **fastapi.responses** import Response
-- from **prometheus_client** import CONTENT_TYPE_LATEST, generate_latest
-- from **kgfoundry_common.prometheus** import CollectorRegistry, build_counter, build_histogram, get_default_registry
+- from **fastapi** import APIRouter
+- from **fastapi.responses** import Response
+- from **prometheus_client** import CONTENT_TYPE_LATEST
+- from **prometheus_client** import generate_latest
 
 ## Definitions
 
-- variable: `APIRouter` (line 12)
-- variable: `Response` (line 13)
-- variable: `CONTENT_TYPE_LATEST` (line 18)
-- function: `generate_latest` (line 20)
-- function: `_env_flag` (line 62)
-- variable: `RUNS_TOTAL` (line 69)
-- variable: `RUN_ERRORS_TOTAL` (line 75)
-- variable: `REQUEST_LATENCY_SECONDS` (line 81)
-- variable: `STAGE_LATENCY_SECONDS` (line 88)
-- class: `MetricsConfig` (line 97)
-- function: `build_metrics_router` (line 104)
-- function: `record_run` (line 169)
-- function: `record_run_error` (line 174)
-- function: `observe_request_latency` (line 179)
-- function: `record_stage_latency` (line 184)
+- variable: `RuntimeAPIRouter` (line 24)
+- variable: `RuntimeResponse` (line 25)
+- class: `_GenerateLatest` (line 28)
+- variable: `PROM_CONTENT_TYPE` (line 36)
+- function: `_prometheus_generate_latest` (line 38)
+- function: `_prometheus_generate_latest` (line 48)
+- variable: `CONTENT_TYPE_LATEST` (line 54)
+- function: `generate_latest` (line 57)
+- function: `_env_flag` (line 93)
+- variable: `RUNS_TOTAL` (line 100)
+- variable: `RUN_ERRORS_TOTAL` (line 106)
+- variable: `REQUEST_LATENCY_SECONDS` (line 112)
+- variable: `STAGE_LATENCY_SECONDS` (line 119)
+- class: `MetricsConfig` (line 128)
+- function: `build_metrics_router` (line 135)
+- function: `record_run` (line 177)
+- function: `record_run_error` (line 182)
+- function: `observe_request_latency` (line 187)
+- function: `record_stage_latency` (line 192)
 
 ## Graph Metrics
 
 - **fan_in**: 5
-- **fan_out**: 0
-- **cycle_group**: 42
+- **fan_out**: 1
+- **cycle_group**: 45
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 1
-- recent churn 90: 1
+- recent churn 30: 2
+- recent churn 90: 2
 
 ## Usage
 
@@ -78,7 +86,7 @@ MetricsConfig, build_metrics_router, observe_request_latency, record_run, record
 
 ## Hotspot
 
-- score: 1.98
+- score: 2.14
 
 ## Side Effects
 
@@ -86,20 +94,22 @@ MetricsConfig, build_metrics_router, observe_request_latency, record_run, record
 
 ## Complexity
 
-- branches: 9
-- cyclomatic: 10
-- loc: 187
+- branches: 13
+- cyclomatic: 14
+- loc: 195
 
 ## Doc Coverage
 
-- `generate_latest` (function): summary=yes, params=ok, examples=no — Return placeholder metrics when prometheus_client is unavailable.
+- `_GenerateLatest` (class): summary=no, examples=no
+- `_prometheus_generate_latest` (function): summary=no, examples=no
+- `_prometheus_generate_latest` (function): summary=no, examples=no
+- `generate_latest` (function): summary=yes, params=ok, examples=no — Proxy to prometheus_client.generate_latest with graceful fallback.
 - `_env_flag` (function): summary=no, examples=no
 - `MetricsConfig` (class): summary=yes, examples=no — Configuration container for exposing `/metrics`.
 - `build_metrics_router` (function): summary=yes, params=ok, examples=no — Return an APIRouter exposing the Prometheus scrape endpoint.
 - `record_run` (function): summary=yes, params=mismatch, examples=no — Increment the runs counter for the given tool/status.
 - `record_run_error` (function): summary=yes, params=mismatch, examples=no — Increment the run error counter.
 - `observe_request_latency` (function): summary=yes, params=mismatch, examples=no — Record request latency for a tool/status pair.
-- `record_stage_latency` (function): summary=yes, params=mismatch, examples=no — Record a telemetry stage duration.
 
 ## Tags
 

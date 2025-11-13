@@ -53,10 +53,13 @@ def tool_operation_scope(
 
     Raises
     ------
-    RuntimeError
-        Raised when session ID cannot be retrieved from the application context.
-        The error is caught internally and handled gracefully by using None for
-        session_id, but may propagate if session context is required.
+    BaseException
+        Any exception raised within the context is caught, recorded on the span
+        with error status, and re-raised using Python's bare ``raise`` statement.
+        The context manager ensures proper span cleanup and error attribution even
+        when exceptions occur. Exceptions propagate to the caller after error recording.
+        Note: Exceptions are re-raised (not directly raised), preserving the original
+        exception traceback and propagating through this context manager.
     """
     try:
         session_id = get_session_id()

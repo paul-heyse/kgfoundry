@@ -5,18 +5,24 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from types import ModuleType
+from typing import TYPE_CHECKING, Literal, cast
 
 if TYPE_CHECKING:
     import pyarrow as pa
     import pyarrow.parquet as pq
 else:  # pragma: no cover - dependency optional at import time
+    pa: ModuleType | None
+    pq: ModuleType | None
     try:
-        import pyarrow as pa  # type: ignore[no-redef]
-        import pyarrow.parquet as pq  # type: ignore[no-redef]
+        import pyarrow as _pyarrow
+        import pyarrow.parquet as _pyarrow_parquet
     except ModuleNotFoundError:
-        pa = None  # type: ignore[assignment]
-        pq = None  # type: ignore[assignment]
+        pa = None
+        pq = None
+    else:
+        pa = cast("ModuleType", _pyarrow)
+        pq = cast("ModuleType", _pyarrow_parquet)
 
 Channel = Literal["faiss", "bm25", "splade", "ann", "oracle", "xtr"]
 

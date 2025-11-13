@@ -38,8 +38,9 @@ class DatasetWriter:
 
         Returns
         -------
-        DatasetWriter
-            Active writer bound to the destination directory.
+        Self
+            Active writer bound to the destination directory. Returns self
+            for use as a context manager.
         """
         self._out_dir.mkdir(parents=True, exist_ok=True)
         stack = ExitStack()

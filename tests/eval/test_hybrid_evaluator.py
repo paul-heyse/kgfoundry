@@ -11,9 +11,9 @@ from codeintel_rev.eval.pool_writer import PoolRow, write_pool
 def test_pool_writer_sources(tmp_path: Path) -> None:
     """Pool writer records sources and scores in Parquet format."""
     rows = [
-        PoolRow("q1", "faiss", 1, 101, 0.9),
-        PoolRow("q1", "bm25", 1, 202, 12.0),
-        PoolRow("q2", "oracle", 1, 303, 0.95),
+        PoolRow("q1", "faiss", 1, 101, 0.9, "repo://chunks/101"),
+        PoolRow("q1", "bm25", 1, 202, 12.0, "repo://chunks/202"),
+        PoolRow("q2", "oracle", 1, 303, 0.95, "repo://chunks/303"),
     ]
     out = tmp_path / "pool.parquet"
     total = write_pool(rows, out)

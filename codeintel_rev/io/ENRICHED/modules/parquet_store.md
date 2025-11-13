@@ -42,15 +42,15 @@ for efficient vector storage and querying via DuckDB.
 
 - **fan_in**: 3
 - **fan_out**: 4
-- **cycle_group**: 62
+- **cycle_group**: 52
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 18
-- recent churn 90: 18
+- recent churn 30: 19
+- recent churn 90: 19
 
 ## Usage
 

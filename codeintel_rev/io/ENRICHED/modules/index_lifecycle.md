@@ -47,24 +47,24 @@ through stable paths such as ``.../current/faiss.index`` and reload when
 - function: `_read_json` (line 125)
 - function: `collect_asset_attrs` (line 132)
 - function: `_attrs_from_meta` (line 161)
-- function: `_attrs_from_idmap` (line 181)
-- function: `_attrs_from_tuning` (line 187)
-- class: `VersionMeta` (line 208)
-- class: `IndexLifecycleManager` (line 233)
+- function: `_attrs_from_idmap` (line 184)
+- function: `_attrs_from_tuning` (line 190)
+- class: `VersionMeta` (line 211)
+- class: `IndexLifecycleManager` (line 236)
 
 ## Graph Metrics
 
 - **fan_in**: 5
 - **fan_out**: 2
-- **cycle_group**: 65
+- **cycle_group**: 67
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 
@@ -96,7 +96,7 @@ IndexAssets, IndexLifecycleManager, LuceneAssets, VersionMeta, collect_asset_att
 
 ## Hotspot
 
-- score: 2.59
+- score: 2.60
 
 ## Side Effects
 
@@ -104,9 +104,9 @@ IndexAssets, IndexLifecycleManager, LuceneAssets, VersionMeta, collect_asset_att
 
 ## Complexity
 
-- branches: 55
-- cyclomatic: 56
-- loc: 668
+- branches: 56
+- cyclomatic: 57
+- loc: 671
 
 ## Doc Coverage
 

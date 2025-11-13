@@ -19,11 +19,12 @@ chunk retrieval and joins.
 - from **pathlib** import Path
 - from **threading** import Lock
 - from **time** import perf_counter
-- from **typing** import TYPE_CHECKING, Any, Self, cast
+- from **typing** import TYPE_CHECKING, Any, Self, TypedDict, Unpack, cast
 - from **codeintel_rev._lazy_imports** import LazyModule
 - from **codeintel_rev.io.duckdb_manager** import DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 - from **codeintel_rev.io.parquet_store** import extract_embeddings
 - from **codeintel_rev.mcp_server.scope_utils** import LANGUAGE_EXTENSIONS, path_matches_glob
+- from **codeintel_rev.observability.otel** import record_span_event
 - from **codeintel_rev.observability.timeline** import current_timeline
 - from **codeintel_rev.telemetry.decorators** import span_context
 - from **codeintel_rev.typing** import NDArrayF32
@@ -34,29 +35,30 @@ chunk retrieval and joins.
 
 ## Definitions
 
-- variable: `duckdb` (line 39)
-- variable: `np` (line 40)
-- variable: `LOGGER` (line 42)
-- function: `_log_extra` (line 45)
-- class: `_ScopeFilterSpec` (line 114)
-- class: `StructureAnnotations` (line 131)
-- class: `DuckDBCatalogOptions` (line 141)
-- class: `_DuckDBQueryMixin` (line 150)
-- class: `DuckDBCatalog` (line 401)
+- variable: `duckdb` (line 42)
+- variable: `np` (line 43)
+- variable: `LOGGER` (line 45)
+- function: `_log_extra` (line 48)
+- class: `_ScopeFilterSpec` (line 117)
+- class: `StructureAnnotations` (line 134)
+- class: `DuckDBCatalogOptions` (line 144)
+- class: `_DuckDBQueryMixin` (line 153)
+- class: `_LegacyOptions` (line 404)
+- class: `DuckDBCatalog` (line 411)
 
 ## Graph Metrics
 
 - **fan_in**: 8
-- **fan_out**: 7
-- **cycle_group**: 67
+- **fan_out**: 8
+- **cycle_group**: 69
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 35
-- recent churn 90: 35
+- recent churn 30: 36
+- recent churn 90: 36
 
 ## Usage
 
@@ -88,7 +90,7 @@ DuckDBCatalog, StructureAnnotations
 
 ## Hotspot
 
-- score: 3.13
+- score: 3.16
 
 ## Side Effects
 
@@ -97,9 +99,9 @@ DuckDBCatalog, StructureAnnotations
 
 ## Complexity
 
-- branches: 135
-- cyclomatic: 136
-- loc: 1593
+- branches: 139
+- cyclomatic: 140
+- loc: 1650
 
 ## Doc Coverage
 
@@ -108,6 +110,7 @@ DuckDBCatalog, StructureAnnotations
 - `StructureAnnotations` (class): summary=yes, examples=no — Structure-aware metadata joined onto explainability pools.
 - `DuckDBCatalogOptions` (class): summary=yes, examples=no — Optional configuration bundle for DuckDB catalog instantiation.
 - `_DuckDBQueryMixin` (class): summary=yes, examples=no — Chunk-level query helpers shared by :class:`DuckDBCatalog`.
+- `_LegacyOptions` (class): summary=no, examples=no
 - `DuckDBCatalog` (class): summary=yes, examples=no — DuckDB catalog for querying chunks.
 
 ## Tags

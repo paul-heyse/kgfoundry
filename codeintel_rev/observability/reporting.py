@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class TimelineRunReport:
     """Structured summary derived from Timeline JSONL records."""
 
@@ -44,10 +44,32 @@ def build_timeline_run_report(
 ) -> TimelineRunReport:
     """Build a run report by parsing Timeline JSONL artifacts.
 
+    This function constructs a TimelineRunReport by loading and parsing Timeline
+    JSONL event files from the timeline directory. The function resolves the
+    timeline directory, loads events for the specified session and optional run,
+    and builds a structured report containing all events.
+
+    Parameters
+    ----------
+    session_id : str
+        Session identifier to load events for. Used to identify the Timeline
+        session directory and filter events. Must match a session directory
+        in the timeline root.
+    run_id : str | None, optional
+        Optional run identifier to filter events for a specific run (default: None).
+        When None, loads all events for the session. When provided, filters
+        events to only those matching the run_id.
+    timeline_dir : Path | None, optional
+        Optional timeline root directory path (default: None). When None, uses
+        the default timeline directory from environment or configuration.
+        Used to locate Timeline JSONL artifact files.
+
     Returns
     -------
     TimelineRunReport
-        Structured run summary derived from Timeline records.
+        Structured run summary derived from Timeline records. The report contains
+        session_id, run_id, and a list of parsed events. Returns an empty report
+        with no events when no matching Timeline files are found.
     """
     root = _resolve_timeline_dir(timeline_dir)
     events = _load_events(root, session_id, run_id)

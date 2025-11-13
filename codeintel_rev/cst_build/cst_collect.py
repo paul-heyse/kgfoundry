@@ -469,10 +469,20 @@ def _call_target_name(node: cst.CSTNode) -> str | None:
 
 
 def _import_alias_name(node: cst.CSTNode) -> str | None:
-    if isinstance(node, (cst.Import, cst.ImportFrom)):
-        alias = node.names[0].name if isinstance(node.names, list) and node.names else None  # type: ignore[arg-type]
-        if isinstance(alias, cst.Name):
-            return alias.value
+    alias: cst.ImportAlias | None = None
+    if isinstance(node, cst.Import):
+        alias = node.names[0] if node.names else None
+    elif isinstance(node, cst.ImportFrom):
+        names = node.names
+        if isinstance(names, Sequence):
+            alias = names[0] if names else None
+    if alias is None:
+        return None
+    target: cst.BaseExpression | cst.Name = alias.asname.name if alias.asname else alias.name
+    if isinstance(target, cst.Name):
+        return target.value
+    if isinstance(target, cst.Attribute):
+        return target.attr.value
     return None
 
 

@@ -28,13 +28,13 @@ CLI entrypoint for CST dataset builds.
 - variable: `OUT_DEFAULT` (line 42)
 - function: `_build_options` (line 45)
 - function: `main` (line 135)
-- function: `_iter_py_files` (line 223)
+- function: `_iter_py_files` (line 224)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 4
-- **cycle_group**: 31
+- **cycle_group**: 32
 
 ## Ownership
 
@@ -80,7 +80,7 @@ CLI entrypoint for CST dataset builds.
 
 - branches: 23
 - cyclomatic: 24
-- loc: 263
+- loc: 264
 
 ## Doc Coverage
 

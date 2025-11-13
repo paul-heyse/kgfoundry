@@ -8,9 +8,9 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from os import PathLike
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 from kgfoundry_common.typing import HEAVY_DEPS as _BASE_HEAVY_DEPS
 from kgfoundry_common.typing import gate_import as _base_gate_import
@@ -34,6 +34,7 @@ __all__ = [
     "NDArrayF32",
     "NDArrayI64",
     "NumpyModule",
+    "PolarsDataFrame",
     "PolarsModule",
     "TorchModule",
     "gate_import",
@@ -209,14 +210,12 @@ class TorchTensor(Protocol):
         ...
 
     @property
-    def T(self) -> TorchTensor:  # noqa: N802 - mirrors torch.Tensor API
-        """Transpose property.
+    def transpose(self) -> TorchTensor:
+        """Transpose property mirroring ``torch.Tensor.T``."""
+        ...
 
-        Returns
-        -------
-        TorchTensor
-            Transposed tensor (swapped dimensions).
-        """
+    def __getattr__(self, name: Literal["T"]) -> TorchTensor:
+        """Return torch-style transpose alias."""
         ...
 
     def sum(self) -> TorchTensor:
@@ -309,8 +308,12 @@ class FaissModule(Protocol):
         """Return the number of available GPUs."""
         ...
 
-    def normalize_L2(self, vectors: NDArrayF32) -> None:  # noqa: N802 - matches FAISS API
+    def normalize_l2(self, vectors: NDArrayF32) -> None:
         """Normalize vectors using L2 norm in-place."""
+        ...
+
+    def __getattr__(self, name: Literal["normalize_L2"]) -> Callable[[NDArrayF32], None]:
+        """Provide FAISS-compatible alias for ``normalize_L2``."""
         ...
 
     def index_cpu_to_gpu(
@@ -348,7 +351,7 @@ class NumpyRandomState(Protocol):
 class NumpyRandomNamespace(Protocol):
     """Namespace for numpy.random helpers."""
 
-    def RandomState(self, seed: int) -> NumpyRandomState:  # noqa: N802 - numpy parity
+    def random_state(self, seed: int) -> NumpyRandomState:
         """Create a random state generator with fixed seed.
 
         Parameters
@@ -364,11 +367,15 @@ class NumpyRandomNamespace(Protocol):
         """
         ...
 
+    def __getattr__(self, name: Literal["RandomState"]) -> Callable[[int], NumpyRandomState]:
+        """Expose numpy-style ``RandomState`` constructor."""
+        ...
+
 
 class NumpyLinalgNamespace(Protocol):
     """Namespace for numpy.linalg helpers."""
 
-    def norm(self, array: NDArrayF32, axis: int, keepdims: bool) -> NDArrayF32:  # noqa: FBT001 - numpy parity
+    def norm(self, array: NDArrayF32, axis: int, *, keepdims: bool) -> NDArrayF32:
         """Compute vector or matrix norm along specified axis.
 
         Parameters
@@ -421,7 +428,10 @@ class PolarsDataFrame(Protocol):
 class PolarsModule(Protocol):
     """Minimal polars API used within optional export helpers."""
 
-    def DataFrame(self, data: Sequence[Mapping[str, object]]) -> PolarsDataFrame:  # noqa: N802 - polars API
+    DataFrame: Callable[[Sequence[Mapping[str, object]]], PolarsDataFrame]
+    """Primary DataFrame constructor exposed by modern polars versions."""
+
+    def data_frame(self, data: Sequence[Mapping[str, object]]) -> PolarsDataFrame:
         """Create a DataFrame from a sequence of mappings.
 
         Parameters
@@ -434,4 +444,10 @@ class PolarsModule(Protocol):
         PolarsDataFrame
             DataFrame instance containing the provided data.
         """
+        ...
+
+    def __getattr__(
+        self, name: Literal["DataFrame"]
+    ) -> Callable[[Sequence[Mapping[str, object]]], PolarsDataFrame]:
+        """Expose polars ``DataFrame`` constructor alias."""
         ...

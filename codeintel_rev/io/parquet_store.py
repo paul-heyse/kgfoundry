@@ -15,9 +15,9 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 try:  # pragma: no cover - optional accelerator
-    import xxhash  # type: ignore[import]
+    import xxhash
 except ModuleNotFoundError:  # pragma: no cover - fallback to hashlib
-    xxhash = None  # type: ignore[assignment]
+    xxhash = None
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.indexing.chunk_ids import stable_chunk_id

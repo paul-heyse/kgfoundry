@@ -262,6 +262,114 @@ class StageInfo(TypedDict, total=False):
     exceeded_budget: bool
 
 
+class SearchFilterPayload(TypedDict, total=False):
+    """Structured filter payload for Deep Research search requests.
+
+    Attributes
+    ----------
+    lang : list[str]
+        Programming languages to restrict results to. Uses the same language
+        mapping as :func:`scope_utils.apply_language_filter`.
+    include : list[str]
+        Glob patterns that candidate paths must match (e.g., ``src/**``).
+    exclude : list[str]
+        Glob patterns that candidate paths must *not* match.
+    symbols : list[str]
+        Exact symbol identifiers the chunk must contain.
+    """
+
+    lang: list[str]
+    include: list[str]
+    exclude: list[str]
+    symbols: list[str]
+
+
+class SearchToolArgs(TypedDict):
+    """Input schema for the MCP ``search`` tool."""
+
+    query: str
+    top_k: NotRequired[int]
+    filters: NotRequired[SearchFilterPayload]
+    rerank: NotRequired[bool]
+
+
+class SearchExplainability(TypedDict, total=False):
+    """Explainability payload attached to each search result."""
+
+    hit_reason: list[str]
+    scip: bool
+    ast: bool
+    cst: bool
+
+
+class SearchResultMetadata(TypedDict, total=False):
+    """Metadata exposed alongside each MCP search hit."""
+
+    uri: str
+    start_line: int
+    end_line: int
+    start_byte: int
+    end_byte: int
+    lang: str
+    symbols: list[str]
+    explain: SearchExplainability
+
+
+class SearchResultItem(TypedDict):
+    """Single MCP search result entry."""
+
+    id: str
+    title: str
+    url: str
+    snippet: str
+    score: float
+    source: str
+    metadata: SearchResultMetadata
+
+
+class SearchStructuredContent(TypedDict, total=False):
+    """Structured payload returned by the MCP ``search`` tool."""
+
+    results: list[SearchResultItem]
+    queryEcho: str
+    top_k: int
+    limits: list[str]
+
+
+class FetchToolArgs(TypedDict):
+    """Input schema for the MCP ``fetch`` tool."""
+
+    objectIds: list[str]
+    max_tokens: NotRequired[int]
+
+
+class FetchObjectMetadata(TypedDict, total=False):
+    """Metadata describing a hydrated chunk object."""
+
+    uri: str
+    start_line: int
+    end_line: int
+    start_byte: int
+    end_byte: int
+    lang: str
+
+
+class FetchObject(TypedDict):
+    """Object entry returned by the MCP ``fetch`` tool."""
+
+    id: str
+    title: str
+    url: str
+    content: str
+    metadata: FetchObjectMetadata
+
+
+class FetchStructuredContent(TypedDict):
+    """Structured payload returned by the MCP ``fetch`` tool."""
+
+    objects: list[FetchObject]
+
+
 class AnswerEnvelope(TypedDict, total=False):
     """Standard response envelope for MCP code intelligence tools.
 
@@ -326,6 +434,10 @@ class AnswerEnvelope(TypedDict, total=False):
         Suggested follow-up queries or actions. Provides guidance on how to
         refine the search or explore related topics (e.g., "Try searching for
         'data validation'", "See callers of this function").
+    telemetry : dict[str, str]
+        Telemetry metadata describing the request/session identifiers. Contains
+        ``run_id`` (trace identifier) and ``session_id`` when available, enabling
+        correlation with traces and run reports.
     problem : ProblemDetailsDict
         RFC 9457 Problem Details payload describing the failure when the request
         could not be fulfilled successfully.
@@ -346,6 +458,7 @@ class AnswerEnvelope(TypedDict, total=False):
     confidence: float
     limits: list[str]
     next_steps: list[str]
+    telemetry: dict[str, str]
     problem: ProblemDetailsDict
 
 
@@ -513,6 +626,10 @@ __all__ = [
     "AnswerEnvelope",
     "BaseErrorFields",
     "BlameRangeResponse",
+    "FetchObject",
+    "FetchObjectMetadata",
+    "FetchStructuredContent",
+    "FetchToolArgs",
     "FileHistoryResponse",
     "Finding",
     "GitBlameEntry",
@@ -522,6 +639,12 @@ __all__ = [
     "MethodInfo",
     "OpenFileResponse",
     "ScopeIn",
+    "SearchExplainability",
+    "SearchFilterPayload",
+    "SearchResultItem",
+    "SearchResultMetadata",
+    "SearchStructuredContent",
     "SearchTextResponse",
+    "SearchToolArgs",
     "SymbolInfo",
 ]

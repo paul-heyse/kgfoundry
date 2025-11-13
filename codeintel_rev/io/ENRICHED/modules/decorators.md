@@ -12,10 +12,10 @@ Decorators for consistent span/timeline instrumentation.
 - from **(absolute)** import functools
 - from **(absolute)** import importlib
 - from **(absolute)** import inspect
-- from **collections.abc** import Callable, Iterator, Mapping
+- from **collections.abc** import Awaitable, Callable, Iterator, Mapping
 - from **contextlib** import contextmanager, nullcontext
 - from **time** import perf_counter
-- from **typing** import TypeVar
+- from **typing** import TypeVar, cast
 - from **opentelemetry** import trace
 - from **opentelemetry.trace** import Span, SpanKind, Status, StatusCode
 - from **codeintel_rev.observability.timeline** import current_timeline
@@ -31,22 +31,22 @@ Decorators for consistent span/timeline instrumentation.
 - function: `_span_scope` (line 59)
 - function: `_record_exception` (line 81)
 - function: `span_context` (line 87)
-- function: `trace_span` (line 170)
-- function: `trace_step` (line 321)
+- function: `trace_span` (line 174)
+- function: `trace_step` (line 326)
 
 ## Graph Metrics
 
 - **fan_in**: 6
 - **fan_out**: 4
-- **cycle_group**: 47
+- **cycle_group**: 48
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 1
-- recent churn 90: 1
+- recent churn 30: 2
+- recent churn 90: 2
 
 ## Usage
 
@@ -88,7 +88,7 @@ span_context, trace_span, trace_step
 
 - branches: 25
 - cyclomatic: 26
-- loc: 370
+- loc: 375
 
 ## Doc Coverage
 

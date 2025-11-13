@@ -40,38 +40,38 @@ LibCST traversal utilities that emit normalized node records.
 - function: `_attribute_or_name` (line 457)
 - function: `_call_target_name` (line 465)
 - function: `_import_alias_name` (line 471)
-- function: `_parent_chain` (line 479)
-- function: `_scope` (line 508)
-- function: `_extract_module_doc` (line 525)
-- function: `_summarize` (line 532)
-- function: `_doc_snippet` (line 539)
-- function: `_preview_text` (line 550)
-- function: `_decorators` (line 558)
-- function: `_call_targets` (line 574)
-- function: `_annotation` (line 586)
-- function: `_import_metadata` (line 602)
-- function: `_normalize_alias` (line 640)
-- function: `_normalize_module_expr` (line 657)
-- function: `_is_public` (line 667)
-- function: `_resolve_lazy` (line 677)
-- function: `_qualified_name_entries` (line 686)
-- function: `_normalize_qnames` (line 705)
-- function: `_module_name_from_path` (line 714)
-- function: `_build_parse_error_node` (line 745)
+- function: `_parent_chain` (line 489)
+- function: `_scope` (line 518)
+- function: `_extract_module_doc` (line 535)
+- function: `_summarize` (line 542)
+- function: `_doc_snippet` (line 549)
+- function: `_preview_text` (line 560)
+- function: `_decorators` (line 568)
+- function: `_call_targets` (line 584)
+- function: `_annotation` (line 596)
+- function: `_import_metadata` (line 612)
+- function: `_normalize_alias` (line 650)
+- function: `_normalize_module_expr` (line 667)
+- function: `_is_public` (line 677)
+- function: `_resolve_lazy` (line 687)
+- function: `_qualified_name_entries` (line 696)
+- function: `_normalize_qnames` (line 715)
+- function: `_module_name_from_path` (line 724)
+- function: `_build_parse_error_node` (line 755)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 30
+- **cycle_group**: 31
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 8
-- recent churn 90: 8
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 
@@ -99,7 +99,7 @@ LibCST traversal utilities that emit normalized node records.
 
 ## Hotspot
 
-- score: 2.48
+- score: 2.49
 
 ## Side Effects
 
@@ -107,9 +107,9 @@ LibCST traversal utilities that emit normalized node records.
 
 ## Complexity
 
-- branches: 96
-- cyclomatic: 97
-- loc: 784
+- branches: 101
+- cyclomatic: 102
+- loc: 794
 
 ## Doc Coverage
 

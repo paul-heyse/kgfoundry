@@ -240,7 +240,7 @@ def _ensure_state(ctx: typer.Context) -> CLIContextState:
 
 
 @app.callback(invoke_without_command=True)
-def global_options(  # noqa: PLR0913,PLR0917 - Typer CLI requires enumerating all shared options.
+def global_options(  # lint-ignore[PLR0913,PLR0917]: Typer CLI requires enumerating shared options
     ctx: typer.Context,
     root: Path = ROOT_OPTION,
     scip: Path | None = SCIP_OPTION,
@@ -469,7 +469,9 @@ def _iter_files(root: Path, patterns: tuple[str, ...] | None = None) -> Iterable
         yield candidate
 
 
-def _run_pipeline(*, pipeline: PipelineOptions) -> PipelineResult:  # noqa: PLR0914 - pipeline orchestration requires structured locals.
+def _run_pipeline(
+    *, pipeline: PipelineOptions
+) -> PipelineResult:  # lint-ignore[PLR0914]: pipeline orchestration needs structured locals
     if pipeline.scip is None:
         message = "The --scip option is required for enrichment commands."
         raise typer.BadParameter(message)
@@ -1533,8 +1535,7 @@ def _should_mark_overlay(row: Mapping[str, Any]) -> bool:
     )
 
 
-# lint-ignore: PLR0913 helper wires overlay paths atomically
-def _ensure_package_overlays(  # noqa: PLR0913
+def _ensure_package_overlays(  # lint-ignore[PLR0913]: helper wires overlay paths atomically
     *,
     rel_path: Path,
     generated: list[str],

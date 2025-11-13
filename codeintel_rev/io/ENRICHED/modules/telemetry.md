@@ -1,54 +1,50 @@
-# mcp_server/telemetry.py
+# cli/telemetry.py
 
 ## Docstring
 
 ```
-Telemetry helpers for MCP tools.
+Telemetry-focused CLI commands.
 ```
 
 ## Imports
 
 - from **__future__** import annotations
-- from **(absolute)** import time
-- from **collections.abc** import Iterator
-- from **contextlib** import contextmanager
-- from **codeintel_rev.app.middleware** import get_capability_stamp, get_session_id
-- from **codeintel_rev.observability.otel** import as_span, record_span_event
-- from **codeintel_rev.observability.timeline** import Timeline, current_or_new_timeline
-- from **codeintel_rev.telemetry.context** import telemetry_context
-- from **codeintel_rev.telemetry.prom** import observe_request_latency
-- from **codeintel_rev.telemetry.reporter** import finalize_run, start_run
+- from **(absolute)** import json
+- from **pathlib** import Path
+- from **typing** import Annotated
+- from **(absolute)** import typer
+- from **codeintel_rev.observability.reporting** import build_timeline_run_report
 
 ## Definitions
 
-- function: `tool_operation_scope` (line 20)
+- variable: `app` (line 13)
+- variable: `SessionArg` (line 15)
+- variable: `RunIdOption` (line 16)
+- variable: `TimelineDirOption` (line 24)
+- function: `run_report` (line 35)
 
 ## Graph Metrics
 
-- **fan_in**: 3
-- **fan_out**: 6
-- **cycle_group**: 74
+- **fan_in**: 0
+- **fan_out**: 2
+- **cycle_group**: 133
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 3
-- recent churn 90: 3
+- recent churn 30: 1
+- recent churn 90: 1
 
 ## Usage
 
 - used by files: 0
 - used by symbols: 0
 
-## Declared Exports (__all__)
-
-tool_operation_scope
-
 ## Doc Health
 
-- **summary**: Telemetry helpers for MCP tools.
+- **summary**: Telemetry-focused CLI commands.
 - has summary: yes
 - param parity: no
 - examples present: no
@@ -67,22 +63,22 @@ tool_operation_scope
 
 ## Hotspot
 
-- score: 2.13
+- score: 1.19
 
 ## Side Effects
 
-- none detected
+- filesystem
 
 ## Complexity
 
-- branches: 7
-- cyclomatic: 8
-- loc: 123
+- branches: 0
+- cyclomatic: 1
+- loc: 47
 
 ## Doc Coverage
 
-- `tool_operation_scope` (function): summary=yes, params=mismatch, examples=no — Emit start/end events for an MCP tool and yield the active timeline.
+- `run_report` (function): summary=yes, params=mismatch, examples=no — Render a run report from Timeline JSONL artifacts.
 
 ## Tags
 
-low-coverage, public-api
+low-coverage

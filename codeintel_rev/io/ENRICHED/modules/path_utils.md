@@ -20,7 +20,7 @@ Path safety utilities for repository-scoped operations.
 
 - **fan_in**: 5
 - **fan_out**: 0
-- **cycle_group**: 76
+- **cycle_group**: 75
 
 ## Ownership
 

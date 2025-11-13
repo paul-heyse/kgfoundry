@@ -12,7 +12,8 @@ Lightweight Parquet writer for evaluator pools.
 - from **collections.abc** import Iterable
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
-- from **typing** import TYPE_CHECKING, Literal
+- from **types** import ModuleType
+- from **typing** import TYPE_CHECKING, Literal, cast
 - from **(absolute)** import pyarrow
 - from **(absolute)** import pyarrow.parquet
 - from **(absolute)** import pyarrow
@@ -20,18 +21,22 @@ Lightweight Parquet writer for evaluator pools.
 
 ## Definitions
 
-- variable: `pa` (line 18)
-- variable: `pq` (line 19)
-- variable: `Channel` (line 21)
-- class: `PoolRow` (line 25)
-- function: `_empty_table` (line 39)
-- function: `write_pool` (line 81)
+- variable: `pa` (line 15)
+- variable: `pq` (line 16)
+- variable: `pa` (line 21)
+- variable: `pq` (line 22)
+- variable: `pa` (line 24)
+- variable: `pq` (line 25)
+- variable: `Channel` (line 27)
+- class: `PoolRow` (line 31)
+- function: `_empty_table` (line 45)
+- function: `write_pool` (line 87)
 
 ## Graph Metrics
 
-- **fan_in**: 2
+- **fan_in**: 3
 - **fan_out**: 1
-- **cycle_group**: 85
+- **cycle_group**: 87
 
 ## Ownership
 
@@ -71,7 +76,7 @@ PoolRow, write_pool
 
 ## Hotspot
 
-- score: 1.79
+- score: 1.88
 
 ## Side Effects
 
@@ -81,7 +86,7 @@ PoolRow, write_pool
 
 - branches: 8
 - cyclomatic: 9
-- loc: 154
+- loc: 160
 
 ## Doc Coverage
 

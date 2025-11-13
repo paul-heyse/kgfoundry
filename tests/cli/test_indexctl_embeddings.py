@@ -8,6 +8,7 @@ import sys
 import types
 from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
+from typing import Any, cast
 
 import duckdb
 import numpy as np
@@ -40,9 +41,10 @@ def _install_observability_stubs() -> None:
     def _build_metric(*_args: object, **_kwargs: object) -> _NoopMetric:
         return _NoopMetric()
 
-    metric_mod.build_counter = _build_metric  # type: ignore[attr-defined]
-    metric_mod.build_histogram = _build_metric  # type: ignore[attr-defined]
-    metric_mod.build_gauge = _build_metric  # type: ignore[attr-defined]
+    metrics_stub = cast("Any", metric_mod)
+    metrics_stub.build_counter = _build_metric
+    metrics_stub.build_histogram = _build_metric
+    metrics_stub.build_gauge = _build_metric
     sys.modules.setdefault("codeintel_rev.observability.metrics", metric_mod)
 
     timeline_mod = types.ModuleType("codeintel_rev.observability.timeline")
@@ -51,8 +53,9 @@ def _install_observability_stubs() -> None:
         def event(self, *_args: object, **_kwargs: object) -> None:  # pragma: no cover - noop
             return None
 
-    timeline_mod.Timeline = _Timeline  # type: ignore[attr-defined]
-    timeline_mod.current_timeline = lambda: None  # type: ignore[attr-defined]
+    timeline_stub = cast("Any", timeline_mod)
+    timeline_stub.Timeline = _Timeline
+    timeline_stub.current_timeline = lambda: None
     sys.modules.setdefault("codeintel_rev.observability.timeline", timeline_mod)
 
     sys.modules.setdefault(
@@ -64,7 +67,7 @@ def _install_observability_stubs() -> None:
     def _as_span(*_args: object, **_kwargs: object) -> AbstractContextManager[None]:
         return nullcontext()
 
-    otel_mod.as_span = _as_span  # type: ignore[attr-defined]
+    cast("Any", otel_mod).as_span = _as_span
     sys.modules.setdefault("codeintel_rev.observability.otel", otel_mod)
     sys.modules.setdefault(
         "codeintel_rev.observability.runtime_observer",
@@ -76,7 +79,7 @@ def _install_observability_stubs() -> None:
     def _span_context(*_args: object, **_kwargs: object) -> AbstractContextManager[None]:
         return nullcontext()
 
-    decorators_mod.span_context = _span_context  # type: ignore[attr-defined]
+    cast("Any", decorators_mod).span_context = _span_context
     sys.modules.setdefault("codeintel_rev.telemetry.decorators", decorators_mod)
 
     sys.modules.setdefault("codeintel_rev.telemetry", types.ModuleType("codeintel_rev.telemetry"))
@@ -84,10 +87,11 @@ def _install_observability_stubs() -> None:
         "codeintel_rev.telemetry.logging", types.ModuleType("codeintel_rev.telemetry.logging")
     )
     reporter_mod = types.ModuleType("codeintel_rev.telemetry.reporter")
+
     def _noop_emit_checkpoint(*_: object, **__: object) -> None:
         return None
 
-    reporter_mod.emit_checkpoint = _noop_emit_checkpoint  # type: ignore[attr-defined]
+    cast("Any", reporter_mod).emit_checkpoint = _noop_emit_checkpoint
     sys.modules.setdefault("codeintel_rev.telemetry.reporter", reporter_mod)
 
 

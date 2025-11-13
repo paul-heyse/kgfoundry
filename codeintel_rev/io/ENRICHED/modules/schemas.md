@@ -23,20 +23,30 @@ TypedDict provides automatic JSON Schema generation for FastMCP tools.
 - class: `Finding` (line 168)
 - class: `MethodInfo` (line 218)
 - class: `StageInfo` (line 256)
-- class: `AnswerEnvelope` (line 265)
-- class: `SymbolInfo` (line 352)
-- class: `GitBlameEntry` (line 383)
-- class: `OpenFileResponse` (line 416)
-- class: `ListPathsResponse` (line 440)
-- class: `BlameRangeResponse` (line 461)
-- class: `FileHistoryResponse` (line 476)
-- class: `SearchTextResponse` (line 491)
+- class: `SearchFilterPayload` (line 265)
+- class: `SearchToolArgs` (line 287)
+- class: `SearchExplainability` (line 296)
+- class: `SearchResultMetadata` (line 305)
+- class: `SearchResultItem` (line 318)
+- class: `SearchStructuredContent` (line 330)
+- class: `FetchToolArgs` (line 339)
+- class: `FetchObjectMetadata` (line 346)
+- class: `FetchObject` (line 357)
+- class: `FetchStructuredContent` (line 367)
+- class: `AnswerEnvelope` (line 373)
+- class: `SymbolInfo` (line 465)
+- class: `GitBlameEntry` (line 496)
+- class: `OpenFileResponse` (line 529)
+- class: `ListPathsResponse` (line 553)
+- class: `BlameRangeResponse` (line 574)
+- class: `FileHistoryResponse` (line 589)
+- class: `SearchTextResponse` (line 604)
 
 ## Graph Metrics
 
-- **fan_in**: 11
+- **fan_in**: 12
 - **fan_out**: 1
-- **cycle_group**: 36
+- **cycle_group**: 37
 
 ## Ownership
 
@@ -53,7 +63,7 @@ TypedDict provides automatic JSON Schema generation for FastMCP tools.
 
 ## Declared Exports (__all__)
 
-AnswerEnvelope, BaseErrorFields, BlameRangeResponse, FileHistoryResponse, Finding, GitBlameEntry, ListPathsResponse, Location, Match, MethodInfo, OpenFileResponse, ScopeIn, SearchTextResponse, SymbolInfo
+AnswerEnvelope, BaseErrorFields, BlameRangeResponse, FetchObject, FetchObjectMetadata, FetchStructuredContent, FetchToolArgs, FileHistoryResponse, Finding, GitBlameEntry, ListPathsResponse, Location, Match, MethodInfo, OpenFileResponse, ScopeIn, SearchExplainability, SearchFilterPayload, SearchResultItem, SearchResultMetadata, SearchStructuredContent, SearchTextResponse, SearchToolArgs, SymbolInfo
 
 ## Doc Health
 
@@ -76,17 +86,17 @@ AnswerEnvelope, BaseErrorFields, BlameRangeResponse, FileHistoryResponse, Findin
 
 ## Hotspot
 
-- score: 1.78
+- score: 1.81
 
 ## Side Effects
 
-- none detected
+- network
 
 ## Complexity
 
 - branches: 0
 - cyclomatic: 1
-- loc: 528
+- loc: 651
 
 ## Doc Coverage
 
@@ -97,9 +107,9 @@ AnswerEnvelope, BaseErrorFields, BlameRangeResponse, FileHistoryResponse, Findin
 - `Finding` (class): summary=yes, examples=no — Generic finding result from code intelligence queries.
 - `MethodInfo` (class): summary=yes, examples=no — Retrieval method metadata for search operations.
 - `StageInfo` (class): summary=yes, examples=no — Timing metadata for an individual retrieval stage.
-- `AnswerEnvelope` (class): summary=yes, examples=no — Standard response envelope for MCP code intelligence tools.
-- `SymbolInfo` (class): summary=yes, examples=no — Symbol information with location and documentation.
-- `GitBlameEntry` (class): summary=yes, examples=no — Git blame entry for a single line of code.
+- `SearchFilterPayload` (class): summary=yes, examples=no — Structured filter payload for Deep Research search requests.
+- `SearchToolArgs` (class): summary=yes, examples=no — Input schema for the MCP ``search`` tool.
+- `SearchExplainability` (class): summary=yes, examples=no — Explainability payload attached to each search result.
 
 ## Tags
 

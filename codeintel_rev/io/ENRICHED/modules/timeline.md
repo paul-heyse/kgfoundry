@@ -48,17 +48,17 @@ Lightweight per-session timeline recording utilities.
 
 ## Graph Metrics
 
-- **fan_in**: 12
+- **fan_in**: 15
 - **fan_out**: 2
-- **cycle_group**: 39
+- **cycle_group**: 40
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 
@@ -90,7 +90,7 @@ Timeline, bind_timeline, current_timeline, new_timeline
 
 ## Hotspot
 
-- score: 2.77
+- score: 2.84
 
 ## Side Effects
 

@@ -17,7 +17,7 @@ Embedding provider abstractions for chunk ingestion and runtime services.
 - from **concurrent.futures** import Future
 - from **contextlib** import contextmanager, suppress
 - from **dataclasses** import dataclass
-- from **types** import TracebackType
+- from **types** import ModuleType, TracebackType
 - from **typing** import Any, Protocol, Self, cast, runtime_checkable
 - from **codeintel_rev.config.settings** import EmbeddingsConfig, IndexConfig, Settings, VLLMConfig
 - from **codeintel_rev.io.vllm_engine** import InprocessVLLMEmbedder
@@ -38,27 +38,28 @@ Embedding provider abstractions for chunk ingestion and runtime services.
 - class: `_ExecutorJob` (line 161)
 - class: `_FailureCounter` (line 166)
 - class: `_BatchResultHandler` (line 187)
-- class: `_BoundedBatchExecutor` (line 244)
-- class: `_ProviderState` (line 359)
-- class: `_ProviderBase` (line 371)
-- class: `VLLMProvider` (line 689)
-- function: `get_embedding_provider` (line 714)
-- class: `HFEmbeddingProvider` (line 792)
-- variable: `EmbeddingProviderBase` (line 864)
+- class: `_QueueSentinel` (line 244)
+- class: `_BoundedBatchExecutor` (line 248)
+- class: `_ProviderState` (line 363)
+- class: `_ProviderBase` (line 375)
+- class: `VLLMProvider` (line 693)
+- function: `get_embedding_provider` (line 718)
+- class: `HFEmbeddingProvider` (line 805)
+- variable: `EmbeddingProviderBase` (line 877)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 91
+- **cycle_group**: 93
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 1
-- recent churn 90: 1
+- recent churn 30: 2
+- recent churn 90: 2
 
 ## Usage
 
@@ -104,7 +105,7 @@ NotImplementedError
 
 - branches: 63
 - cyclomatic: 64
-- loc: 865
+- loc: 878
 
 ## Doc Coverage
 
@@ -117,7 +118,7 @@ NotImplementedError
 - `_ExecutorJob` (class): summary=no, examples=no
 - `_FailureCounter` (class): summary=yes, examples=no — Increment error counters when an exception bubbles out of a context.
 - `_BatchResultHandler` (class): summary=yes, examples=no — Resolve futures when a fused batch completes or fails.
-- `_BoundedBatchExecutor` (class): summary=yes, examples=no — Opportunistically coalesces pending embedding jobs into micro-batches.
+- `_QueueSentinel` (class): summary=yes, examples=no — Unique sentinel signaling executor shutdown.
 
 ## Tags
 

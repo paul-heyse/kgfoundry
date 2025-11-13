@@ -234,18 +234,19 @@ class RuntimeCell[T]:
         ------
         RuntimeError
             Raised when generation tracking becomes inconsistent (defensive check).
-        RuntimeUnavailableError
-            Raised during cooldown periods when a previous initialization failure occurred.
-            The exception is stored in `_cooldown_error` and re-raised via the
-            `cooldown_error` variable when cooldown periods are active.
-        RuntimeLifecycleError
-            Raised during cooldown periods when a previous initialization failure occurred.
-            The exception is stored in `_cooldown_error` and re-raised via the
-            `cooldown_error` variable when cooldown periods are active.
-        BaseException
-            Any other exception stored in the cell from a previous failure is re-raised
-            during cooldown periods. The exception is stored in `_cooldown_error` and
-            re-raised via the `cooldown_error` variable when cooldown periods are active.
+            Also raised when the initialization generation is missing (should not occur
+            in normal operation).
+        Exception
+            Any exception stored in the cell from a previous initialization failure
+            is re-raised during cooldown periods. The exception is stored in
+            `_cooldown_error` (typed as Exception | None) and re-raised via the
+            `cooldown_error` variable when cooldown periods are active. The specific
+            exception type depends on what was raised during the previous initialization
+            attempt (e.g., RuntimeError, RuntimeUnavailableError, RuntimeLifecycleError,
+            or any other Exception subclass). The exception is re-raised using
+            `raise cooldown_error` where `cooldown_error` is a variable containing the
+            stored exception. Note: The exception is re-raised using a variable, so
+            pydoclint may flag this as DOC502, but the exception is correctly propagated.
 
         Notes
         -----
