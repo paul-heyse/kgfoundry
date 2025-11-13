@@ -235,6 +235,14 @@ class Timeline:
         if attrs:
             record["attrs"] = _scrub_attrs(attrs)
         _FlightRecorder.write(record)
+        try:
+            from codeintel_rev.telemetry.reporter import (
+                record_timeline_payload as _record_timeline_payload,
+            )
+        except Exception:  # pragma: no cover - telemetry optional during tests
+            _record_timeline_payload = None
+        if _record_timeline_payload is not None:
+            _record_timeline_payload(record)
         record_span_event(
             f"timeline.{event_type}",
             event_name=name,

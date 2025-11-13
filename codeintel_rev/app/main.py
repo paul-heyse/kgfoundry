@@ -13,14 +13,13 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager, suppress
 from time import perf_counter
 from types import FrameType
-from typing import cast
+from typing import Any, cast
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
 from hypercorn.middleware import ProxyFixMiddleware
 from hypercorn.typing import ASGIFramework
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import Response
 from starlette.types import ASGIApp
@@ -34,15 +33,28 @@ from codeintel_rev.app.routers import index_admin
 from codeintel_rev.app.server_settings import get_server_settings
 from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.mcp_server.server import app_context, build_http_app
-from codeintel_rev.observability.otel import as_span, init_telemetry
+from codeintel_rev.observability.otel import as_span
 from codeintel_rev.observability.runtime_observer import TimelineRuntimeObserver
 from codeintel_rev.observability.timeline import bind_timeline, new_timeline
 from codeintel_rev.runtime.cells import RuntimeCellObserver
+from codeintel_rev.telemetry.logging import install_structured_logging
+from codeintel_rev.telemetry.otel import install_otel
+from codeintel_rev.telemetry.prom import build_metrics_router
+from codeintel_rev.telemetry.reporter import (
+    build_report as build_run_report,
+)
+from codeintel_rev.telemetry.reporter import (
+    render_markdown,
+    report_to_json,
+)
 from kgfoundry_common.errors import ConfigurationError
 from kgfoundry_common.logging import get_logger
 
 LOGGER = get_logger(__name__)
 SERVER_SETTINGS = get_server_settings()
+
+install_structured_logging()
+install_otel(service_name="codeintel-mcp")
 
 
 def _preload_faiss_index(context: ApplicationContext) -> bool:
@@ -306,7 +318,6 @@ async def lifespan(
         app.state.capabilities = capabilities
         app.state.capability_stamp = capabilities.stamp()
         app.mount("/mcp", build_http_app(capabilities))
-        init_telemetry(app)
         main_thread = threading.current_thread() is threading.main_thread()
         if os.name != "nt" and main_thread:
             previous_sighup = signal.getsignal(signal.SIGHUP)
@@ -369,21 +380,59 @@ if SERVER_SETTINGS.enable_trusted_hosts:
         allowed_hosts=SERVER_SETTINGS.allowed_hosts,
     )
 
-
-@app.get("/metrics")
-async def metrics_endpoint() -> Response:
-    """Expose Prometheus metrics for scraping.
-
-    Returns
-    -------
-    Response
-        Text-based metrics payload encoded in Prometheus exposition format.
-    """
-    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+metrics_router = build_metrics_router()
+if metrics_router is not None:
+    app.include_router(metrics_router)
 
 
 if os.getenv("CODEINTEL_ADMIN", "").strip().lower() in {"1", "true", "yes", "on"}:
     app.include_router(index_admin.router)
+
+
+@app.get("/reports/{session_id}")
+async def get_run_report(session_id: str, run_id: str | None = None) -> dict[str, Any]:
+    """Return JSON run report for the session/run identifier.
+
+    Returns
+    -------
+    dict[str, Any]
+        Run report payload serialisable to JSON.
+
+    Raises
+    ------
+    HTTPException
+        Raised when the application context is missing or the run cannot be found.
+    """
+    context = getattr(app.state, "context", None)
+    if context is None:
+        raise HTTPException(status_code=503, detail="Application context not initialized")
+    report = build_run_report(context, session_id, run_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return report_to_json(report)
+
+
+@app.get("/reports/{session_id}.md", response_class=PlainTextResponse)
+async def get_run_report_markdown(session_id: str, run_id: str | None = None) -> PlainTextResponse:
+    """Return Markdown run report for the session/run identifier.
+
+    Returns
+    -------
+    PlainTextResponse
+        Markdown-formatted run report body.
+
+    Raises
+    ------
+    HTTPException
+        Raised when the application context is missing or the run cannot be found.
+    """
+    context = getattr(app.state, "context", None)
+    if context is None:
+        raise HTTPException(status_code=503, detail="Application context not initialized")
+    report = build_run_report(context, session_id, run_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return PlainTextResponse(render_markdown(report))
 
 
 @app.middleware("http")

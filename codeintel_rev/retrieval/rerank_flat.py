@@ -552,7 +552,7 @@ def _empty_result(batch: int, width: int) -> tuple[np.ndarray, np.ndarray]:
 
 
 class FlatReranker:
-    """Rerank ANN candidates using exact similarity computed from DuckDB."""
+    """Rerank ANN candidates using exact similarities from DuckDB embeddings."""
 
     def __init__(self, catalog: DuckDBCatalog, *, metric: str = "ip") -> None:
         self._catalog = catalog
@@ -565,7 +565,7 @@ class FlatReranker:
         *,
         top_k: int,
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Return exact similarity scores and ids."""
+        """Return exact similarity scores and chunk ids."""
         return _perform_exact_rerank(
             self._catalog,
             queries,
@@ -583,7 +583,7 @@ def exact_rerank(
     top_k: int,
     metric: str = "ip",
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Backward-compatible wrapper around :class:`FlatReranker`."""
+    """Backward-compatible helper delegating to :class:`FlatReranker`."""
     reranker = FlatReranker(catalog, metric=metric)
     return reranker.rerank(queries, candidate_ids, top_k=top_k)
 

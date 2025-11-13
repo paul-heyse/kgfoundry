@@ -2,30 +2,39 @@
 
 from __future__ import annotations
 
+import json
 import os
 import threading
 from collections import deque
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any
 
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.telemetry.context import (
-    attach_context_attrs,
     current_run_id,
     current_session,
 )
-from codeintel_rev.telemetry.events import RunCheckpoint, TimelineEvent, checkpoint_event, coerce_event
+from codeintel_rev.telemetry.events import (
+    RunCheckpoint,
+    TimelineEvent,
+    checkpoint_event,
+    coerce_event,
+)
+from codeintel_rev.telemetry.prom import record_run, record_run_error
 
 __all__ = [
+    "RUN_REPORT_STORE",
     "RunReport",
     "RunReportStore",
-    "RUN_REPORT_STORE",
     "build_report",
     "emit_checkpoint",
-    "record_timeline_payload",
-    "start_run",
     "finalize_run",
+    "record_timeline_payload",
+    "render_markdown",
+    "report_to_json",
+    "start_run",
 ]
 
 
@@ -38,7 +47,7 @@ def _env_retention() -> int:
     return max(10, min(5000, value))
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=False)
 class RunRecord:
     """Mutable storage for a sampled run."""
 
@@ -53,10 +62,16 @@ class RunRecord:
     operation_name: str | None = None
     events: list[TimelineEvent] = field(default_factory=list)
     checkpoints: list[RunCheckpoint] = field(default_factory=list)
+    metrics_recorded: bool = False
 
-    def clone(self) -> "RunRecord":
-        """Return a shallow copy suitable for read-only processing."""
+    def clone(self) -> RunRecord:
+        """Return a shallow copy suitable for read-only processing.
 
+        Returns
+        -------
+        RunRecord
+            Independent copy of this record.
+        """
         return RunRecord(
             session_id=self.session_id,
             run_id=self.run_id,
@@ -72,7 +87,7 @@ class RunRecord:
         )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class RunReport:
     """Structured run summary consumable by humans and automation."""
 
@@ -93,8 +108,13 @@ class RunReport:
     capabilities: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-serializable representation."""
+        """Return a JSON-serializable representation.
 
+        Returns
+        -------
+        dict[str, Any]
+            Dictionary containing all report fields.
+        """
         return {
             "session_id": self.session_id,
             "run_id": self.run_id,
@@ -147,6 +167,7 @@ class RunReportStore:
         capability_stamp: str | None,
         started_at: float | None = None,
     ) -> None:
+        """Register or update the metadata for a run record."""
         with self._lock:
             record = self._ensure_record(session_id, run_id)
             record.tool_name = tool_name
@@ -154,6 +175,7 @@ class RunReportStore:
             record.started_at = record.started_at or started_at
 
     def record_event(self, event: TimelineEvent) -> None:
+        """Append a timeline event to the stored history."""
         if not event.session_id or not event.run_id:
             return
         with self._lock:
@@ -174,6 +196,7 @@ class RunReportStore:
                     record.stop_reason = event.message or event.attrs.get("error") or event.name
 
     def record_checkpoint(self, session_id: str, run_id: str, checkpoint: RunCheckpoint) -> None:
+        """Persist a structured checkpoint emitted by decorators."""
         if not session_id or not run_id:
             return
         with self._lock:
@@ -189,6 +212,7 @@ class RunReportStore:
         stop_reason: str | None = None,
         finished_at: float | None = None,
     ) -> None:
+        """Finish a run and emit metrics once."""
         if not session_id or not run_id:
             return
         with self._lock:
@@ -201,8 +225,22 @@ class RunReportStore:
                 record.status = status
             if stop_reason:
                 record.stop_reason = stop_reason
+            if not record.metrics_recorded and record.status in {"complete", "error", "partial"}:
+                tool = record.tool_name or "unknown"
+                record_run(tool, record.status)
+                if record.status == "error":
+                    code = (record.stop_reason or "unknown").split(":")[0].strip() or "unknown"
+                    record_run_error(tool, code)
+                record.metrics_recorded = True
 
     def get_run(self, session_id: str, run_id: str | None = None) -> RunRecord | None:
+        """Return a cloned run record for the session/run combination.
+
+        Returns
+        -------
+        RunRecord | None
+            Stored run record or ``None`` when not found.
+        """
         with self._lock:
             key: tuple[str, str] | None
             if run_id is not None:
@@ -233,7 +271,6 @@ def start_run(
     started_at: float | None = None,
 ) -> None:
     """Register a run at request ingress."""
-
     RUN_REPORT_STORE.start_run(
         session_id,
         run_id,
@@ -252,7 +289,6 @@ def finalize_run(
     finished_at: float | None = None,
 ) -> None:
     """Mark the run as complete/partial/error."""
-
     RUN_REPORT_STORE.finalize(
         session_id,
         run_id,
@@ -264,7 +300,6 @@ def finalize_run(
 
 def record_timeline_payload(payload: Mapping[str, Any]) -> None:
     """Subscribe to timeline events."""
-
     RUN_REPORT_STORE.record_event(coerce_event(payload))
 
 
@@ -273,18 +308,21 @@ def emit_checkpoint(
     *,
     ok: bool,
     reason: str | None = None,
-    **attrs: Any,
+    **attrs: object,
 ) -> None:
     """Capture a stage checkpoint tied to the current request."""
-
     session_id = current_session()
     run_id = current_run_id()
     if session_id is None or run_id is None:
         return
-    RUN_REPORT_STORE.record_checkpoint(session_id, run_id, checkpoint_event(stage, ok=ok, reason=reason, **attrs))
+    RUN_REPORT_STORE.record_checkpoint(
+        session_id, run_id, checkpoint_event(stage, ok=ok, reason=reason, **attrs)
+    )
 
 
-def _build_operations(events: Sequence[TimelineEvent]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _build_operations(
+    events: Sequence[TimelineEvent],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     operations: list[dict[str, Any]] = []
     steps: list[dict[str, Any]] = []
     op_stack: dict[str, TimelineEvent] = {}
@@ -321,7 +359,9 @@ def _build_operations(events: Sequence[TimelineEvent]) -> tuple[list[dict[str, A
     return operations, steps
 
 
-def _collect(events: Iterable[TimelineEvent], *, event_type: str | None = None, status: str | None = None) -> list[dict[str, Any]]:
+def _collect(
+    events: Iterable[TimelineEvent], *, event_type: str | None = None, status: str | None = None
+) -> list[dict[str, Any]]:
     collected: list[dict[str, Any]] = []
     for event in events:
         if event_type is not None and event.type != event_type:
@@ -345,8 +385,13 @@ def build_report(
     session_id: str,
     run_id: str | None = None,
 ) -> RunReport | None:
-    """Build a run report for the provided session/run identifiers."""
+    """Build a run report for the provided session/run identifiers.
 
+    Returns
+    -------
+    RunReport | None
+        Aggregated run report or ``None`` when no data exists.
+    """
     record = RUN_REPORT_STORE.get_run(session_id, run_id)
     if record is None:
         return None
@@ -389,3 +434,77 @@ def build_report(
         summary=summary,
         capabilities=capabilities,
     )
+
+
+def report_to_json(report: RunReport) -> dict[str, Any]:
+    """Return JSON-serializable payload for the report.
+
+    Returns
+    -------
+    dict[str, Any]
+        JSON-ready dictionary form of ``report``.
+    """
+    return report.to_dict()
+
+
+def render_markdown(report: RunReport) -> str:
+    """Render the report as Markdown.
+
+    Returns
+    -------
+    str
+        Markdown-formatted summary.
+    """
+
+    def _append_section(title: str, entries: list[str]) -> None:
+        if not entries:
+            return
+        lines.append(f"## {title}")
+        lines.extend(entries)
+
+    lines: list[str] = [
+        f"# Run report — session `{report.session_id}`",
+        f"- **Run ID:** `{report.run_id}`",
+        f"- **Status:** **{report.status}**",
+    ]
+    if report.stop_reason:
+        lines.append(f"- **Stop reason:** {report.stop_reason}")
+    lines.extend(
+        [
+            "",
+            "## Capabilities",
+            "```json",
+            json.dumps(report.capabilities, indent=2),
+            "```",
+        ]
+    )
+    _append_section(
+        "Operations",
+        [
+            f"- `{op['name']}` status=`{op['status']}` duration={op.get('duration_ms')}ms attrs={op.get('attrs')}"
+            for op in report.operations
+        ],
+    )
+    _append_section(
+        "Steps",
+        [
+            f"- `{step['name']}` ({step['status']}) duration={step.get('duration_ms')}ms attrs={step.get('attrs')}"
+            for step in report.steps
+        ],
+    )
+    _append_section(
+        "Checkpoints",
+        [
+            f"- `{checkpoint['stage']}` — {'ok' if checkpoint.get('ok') else 'error'} {checkpoint.get('reason') or ''}"
+            for checkpoint in report.checkpoints
+        ],
+    )
+    _append_section(
+        "Errors",
+        [f"- `{err['name']}`: {err.get('message', '')}" for err in report.errors],
+    )
+    _append_section(
+        "Warnings",
+        [f"- `{warning['name']}`: {warning.get('message', '')}" for warning in report.warnings],
+    )
+    return "\n".join(lines)

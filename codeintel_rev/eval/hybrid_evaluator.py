@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from codeintel_rev.eval.pool_writer import PoolRow, Source, write_pool
-from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.eval.pool_writer import Channel, PoolRow, write_pool
+from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, StructureAnnotations
 from codeintel_rev.io.faiss_manager import FAISSManager
 from kgfoundry_common.logging import get_logger
 
@@ -75,6 +75,7 @@ class HybridPoolEvaluator:
         self._manager = manager
         self._xtr_index = xtr_index
         self._text_cache: dict[int, str] = {}
+        self._structure_cache: dict[int, StructureAnnotations] = {}
 
     def run(self, config: EvalConfig) -> EvalReport:
         """Execute the evaluation and persist per-query pools + metrics.
@@ -166,14 +167,14 @@ class HybridPoolEvaluator:
             self._extend_pool(
                 state.pool_rows,
                 query_id=qid,
-                source="faiss",
+                channel="faiss",
                 ids=ann_ids_list,
                 scores=ann_scores[0].tolist(),
             )
             self._extend_pool(
                 state.pool_rows,
                 query_id=qid,
-                source="oracle",
+                channel="oracle",
                 ids=oracle_cut,
                 scores=oracle_scores[0].tolist(),
             )
@@ -185,7 +186,7 @@ class HybridPoolEvaluator:
                     self._extend_pool(
                         state.pool_rows,
                         query_id=qid,
-                        source="xtr",
+                        channel="xtr",
                         ids=xtr_ids,
                         scores=xtr_scores,
                     )
@@ -212,6 +213,14 @@ class HybridPoolEvaluator:
             xtr_index=xtr_index,
         )
 
+    def _ensure_structure_cache(self, chunk_ids: Sequence[int]) -> None:
+        """Populate structure annotations for ``chunk_ids``."""
+        missing = [cid for cid in chunk_ids if cid >= 0 and cid not in self._structure_cache]
+        if not missing:
+            return
+        annotations = self._catalog.get_structure_annotations(missing)
+        self._structure_cache.update(annotations)
+
     def _flat_rerank(
         self,
         xq: np.ndarray,
@@ -232,23 +241,29 @@ class HybridPoolEvaluator:
         reranked_scores = np.take_along_axis(scores, order, axis=1)
         return reranked_scores, reranked_ids
 
-    @staticmethod
     def _extend_pool(
         pool: list[PoolRow],
         *,
         query_id: str,
-        source: Source,
+        channel: Channel,
         ids: Sequence[int],
         scores: Sequence[float],
     ) -> None:
+        self._ensure_structure_cache([int(chunk_id) for chunk_id in ids])
         for rank_idx, (chunk_id, score) in enumerate(zip(ids, scores, strict=True), start=1):
+            chunk_key = int(chunk_id)
+            info = self._structure_cache.get(chunk_key)
             pool.append(
                 PoolRow(
                     query_id=query_id,
-                    source=source,
+                    channel=channel,
                     rank=rank_idx,
-                    chunk_id=int(chunk_id),
+                    chunk_id=chunk_key,
                     score=float(score),
+                    uri=info.uri if info else "",
+                    symbol_hits=info.symbol_hits if info else (),
+                    ast_node_kinds=info.ast_node_kinds if info else (),
+                    cst_matches=info.cst_matches if info else (),
                 )
             )
 

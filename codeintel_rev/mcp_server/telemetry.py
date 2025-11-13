@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 
 from codeintel_rev.app.middleware import get_capability_stamp, get_session_id
 from codeintel_rev.observability.timeline import Timeline, current_or_new_timeline
+from codeintel_rev.telemetry.context import telemetry_context
+from codeintel_rev.telemetry.prom import observe_request_latency
+from codeintel_rev.telemetry.reporter import finalize_run, start_run
 
 __all__ = ["tool_operation_scope"]
 
@@ -57,5 +61,37 @@ def tool_operation_scope(
     if capability_stamp is not None:
         operation_attrs.setdefault("capability_stamp", capability_stamp)
     timeline = current_or_new_timeline(session_id=session_id)
-    with timeline.operation(f"mcp.tool.{tool_name}", **operation_attrs):
-        yield timeline
+    start_run(
+        timeline.session_id,
+        timeline.run_id,
+        tool_name=tool_name,
+        capability_stamp=capability_stamp,
+    )
+    with telemetry_context(
+        session_id=timeline.session_id,
+        run_id=timeline.run_id,
+        capability_stamp=capability_stamp,
+        tool_name=tool_name,
+    ):
+        timing_start = time.perf_counter()
+        try:
+            with timeline.operation(f"mcp.tool.{tool_name}", **operation_attrs):
+                yield timeline
+        except BaseException as exc:
+            finalize_run(
+                timeline.session_id,
+                timeline.run_id,
+                status="error",
+                stop_reason=f"{type(exc).__name__}: {exc}",
+                finished_at=time.time(),
+            )
+            observe_request_latency(tool_name, time.perf_counter() - timing_start, "error")
+            raise
+        else:
+            finalize_run(
+                timeline.session_id,
+                timeline.run_id,
+                status="complete",
+                finished_at=time.time(),
+            )
+            observe_request_latency(tool_name, time.perf_counter() - timing_start, "complete")

@@ -207,6 +207,43 @@ def _build_vllm_config() -> VLLMConfig:
     )
 
 
+def _build_embeddings_config() -> EmbeddingsConfig:
+    provider_env = os.environ.get("EMBED_PROVIDER", "vllm").strip().lower()
+    provider: Literal["vllm", "hf"] = "hf" if provider_env == "hf" else "vllm"
+    model_name = os.environ.get(
+        "EMBED_MODEL",
+        os.environ.get("VLLM_MODEL", "nomic-ai/nomic-embed-code"),
+    )
+    batch_size = int(os.environ.get("EMBED_BATCH_SIZE", "64"))
+    micro_batch_default = str(min(max(batch_size // 2, 16), 64))
+    micro_batch_size = int(os.environ.get("EMBED_MICRO_BATCH_SIZE", micro_batch_default))
+    normalize_flag = os.environ.get("EMBED_NORMALIZE")
+    if normalize_flag is None:
+        normalize_flag = os.environ.get("VLLM_NORMALIZE", "1")
+    normalize = normalize_flag.strip().lower() in {"1", "true", "yes"}
+    max_tokens = int(os.environ.get("EMBED_MAX_TOKENS", "4096"))
+    max_chars = int(os.environ.get("EMBED_MAX_SEQUENCE_CHARS", "8192"))
+    retry_max_attempts = int(os.environ.get("EMBED_MAX_RETRIES", "3"))
+    retry_backoff_ms = int(os.environ.get("EMBED_RETRY_BACKOFF_MS", "250"))
+    max_pending = int(os.environ.get("EMBED_MAX_PENDING_BATCHES", "8"))
+    max_wait_ms = int(os.environ.get("EMBED_MAX_WAIT_MS", "8"))
+    return EmbeddingsConfig(
+        provider=provider,
+        model_name=model_name,
+        device=os.environ.get("EMBED_DEVICE", "auto"),
+        batch_size=batch_size,
+        micro_batch_size=micro_batch_size,
+        normalize=normalize,
+        max_tokens=max_tokens,
+        max_sequence_chars=max_chars,
+        retry_max_attempts=retry_max_attempts,
+        retry_backoff_ms=retry_backoff_ms,
+        max_pending_batches=max_pending,
+        max_wait_ms=max_wait_ms,
+        allow_hf_fallback=_env_bool("EMBED_ALLOW_HF_FALLBACK", default=True),
+    )
+
+
 def _build_xtr_config() -> XTRConfig:
     dtype_env = (os.environ.get("XTR_DTYPE") or "float16").lower()
     mode_env = os.environ.get("XTR_MODE", "narrow").lower()
@@ -327,7 +364,7 @@ class EvalConfig(msgspec.Struct, frozen=True):
 
     enabled: bool = False
     queries_path: str | None = None
-    output_dir: str = "artifacts/eval"
+    output_dir: str = "build/explain/pools"
     k_values: tuple[int, ...] = (5, 10, 20)
     max_queries: int | None = 200
     oracle_top_k: int = 50
@@ -417,6 +454,58 @@ class VLLMConfig(msgspec.Struct, frozen=True):
     normalize: bool = True
     pooling_type: Literal["lasttoken", "cls", "mean"] = "lasttoken"
     max_concurrent_requests: int = 4
+
+
+class EmbeddingsConfig(msgspec.Struct, frozen=True):
+    """Embedding provider configuration shared by CLIs and services.
+
+    Attributes
+    ----------
+    provider : Literal["vllm", "hf"]
+        Embedding backend to use. ``"vllm"`` runs the vLLM engine locally while
+        ``"hf"`` uses a lightweight Hugging Face runtime for CPU-only hosts.
+    model_name : str
+        Fully-qualified model identifier (e.g., ``nomic-ai/nomic-embed-code``).
+    device : str
+        Target device string (``"auto"``, ``"cuda"``, ``"cpu"``). ``"auto"``
+        picks ``"cuda"`` when GPUs are available.
+    batch_size : int
+        Maximum logical batch size requested by callers.
+    micro_batch_size : int
+        Size of the internal micro-batches executed by the provider. Used by the
+        bounded executor to coalesce small jobs.
+    normalize : bool
+        Whether to enforce L2 normalization after pooling.
+    max_tokens : int
+        Upper bound on tokens per sequence. Used to guard pathological inputs.
+    max_sequence_chars : int
+        Hard clamp on the number of UTF-8 characters accepted per chunk.
+    retry_max_attempts : int
+        Number of retries for transient provider errors.
+    retry_backoff_ms : int
+        Initial exponential backoff delay in milliseconds.
+    max_pending_batches : int
+        Maximum number of pending batches in the bounded executor queue.
+    max_wait_ms : int
+        Aggregator wait window for fusing small jobs into a single batch.
+    allow_hf_fallback : bool
+        When ``True``, automatically fall back to the Hugging Face provider if
+        vLLM initialization fails.
+    """
+
+    provider: Literal["vllm", "hf"] = "vllm"
+    model_name: str = "nomic-ai/nomic-embed-code"
+    device: str = "auto"
+    batch_size: int = 64
+    micro_batch_size: int = 32
+    normalize: bool = True
+    max_tokens: int = 4096
+    max_sequence_chars: int = 8192
+    retry_max_attempts: int = 3
+    retry_backoff_ms: int = 250
+    max_pending_batches: int = 8
+    max_wait_ms: int = 8
+    allow_hf_fallback: bool = True
 
 
 class BM25Config(msgspec.Struct, frozen=True):
@@ -746,6 +835,10 @@ class Settings(msgspec.Struct, frozen=True):
     vllm : VLLMConfig
         Configuration for the vLLM embedding service. Includes connection details,
         model selection, and batching parameters for generating code embeddings.
+    embeddings : EmbeddingsConfig
+        Runtime-agnostic embedding provider configuration shared by CLIs and
+        services. Controls provider selection, device, normalization, and
+        batching/backpressure settings.
     paths : PathsConfig
         File system path configuration. Defines where indexes, vectors, databases,
         and source code are stored. All paths are resolved relative to repo_root.
@@ -780,6 +873,7 @@ class Settings(msgspec.Struct, frozen=True):
     """
 
     vllm: VLLMConfig
+    embeddings: EmbeddingsConfig
     paths: PathsConfig
     index: IndexConfig
     limits: ServerLimits
@@ -987,6 +1081,7 @@ def load_settings() -> Settings:
     repo_root = os.environ.get("REPO_ROOT", str(Path.cwd()))
 
     vllm = _build_vllm_config()
+    embeddings = _build_embeddings_config()
     paths = _build_paths_config(repo_root)
 
     rrf_weights = _load_rrf_weights()
@@ -1010,6 +1105,7 @@ def load_settings() -> Settings:
 
     return Settings(
         vllm=vllm,
+        embeddings=embeddings,
         paths=paths,
         index=index,
         limits=limits,
@@ -1339,6 +1435,7 @@ __all__ = [
     "BM25Config",
     "CodeRankConfig",
     "CodeRankLLMConfig",
+    "EmbeddingsConfig",
     "IndexConfig",
     "PRFConfig",
     "PathsConfig",

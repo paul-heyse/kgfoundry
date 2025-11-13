@@ -106,7 +106,12 @@ class InprocessVLLMEmbedder:
         )
 
     def embed_batch(self, texts: Sequence[str]) -> NDArrayF32:
-        """Return embeddings for ``texts`` (shape ``[N, dim]``).
+        """Return embeddings for ``texts`` (shape ``[N, dim]``)."""
+        vectors, _ = self.embed_batch_with_stats(texts)
+        return vectors
+
+    def embed_batch_with_stats(self, texts: Sequence[str]) -> tuple[NDArrayF32, int]:
+        """Return embeddings and total token count for ``texts``.
 
         Parameters
         ----------
@@ -115,8 +120,8 @@ class InprocessVLLMEmbedder:
 
         Returns
         -------
-        NDArrayF32
-            Embedding matrix aligned with the input order.
+        tuple[NDArrayF32, int]
+            Tuple containing the embedding matrix and the total prompt token count.
 
         Raises
         ------
@@ -124,7 +129,8 @@ class InprocessVLLMEmbedder:
             If the vLLM runtime failed to initialize.
         """
         if not texts:
-            return np.zeros((0, self.config.embedding_dim), dtype=np.float32)
+            empty = np.zeros((0, self.config.embedding_dim), dtype=np.float32)
+            return empty, 0
         runtime = self._runtime()
         tokenizer = runtime.tokenizer
         engine = runtime.engine
@@ -146,6 +152,7 @@ class InprocessVLLMEmbedder:
         prompts: list[TokensPrompt] = [
             tokens_prompt_cls(prompt_token_ids=list(map(int, ids))) for ids in token_sequences
         ]
+        total_tokens = sum(len(ids) for ids in token_sequences)
         outputs = engine.embed(prompts)
         vectors = np.asarray(
             [item.outputs.embedding for item in outputs],
@@ -159,7 +166,7 @@ class InprocessVLLMEmbedder:
                     "observed": vectors.shape[1],
                 },
             )
-        return vectors
+        return vectors, total_tokens
 
     def close(self) -> None:  # pragma: no cover - best-effort cleanup
         """Release tokenizer/engine references to help GC."""

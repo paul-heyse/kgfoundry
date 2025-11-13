@@ -43,7 +43,7 @@ class CollectorConfig:
     text_preview_skip_bytes: int = 2_000_000
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _CollectorStatsBuilder:
     """Mutable builder used while collecting CST stats."""
 

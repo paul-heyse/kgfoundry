@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import numpy as np
 import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
-import xxhash
+
+try:  # pragma: no cover - optional dependency
+    import xxhash  # type: ignore[import]
+except ModuleNotFoundError:  # pragma: no cover - tests follow runtime fallback
+    xxhash = None  # type: ignore[assignment]
 from codeintel_rev.indexing.cast_chunker import Chunk
 from codeintel_rev.indexing.chunk_ids import stable_chunk_id
 from codeintel_rev.io.parquet_store import (
@@ -76,9 +81,14 @@ def test_write_chunks_parquet_roundtrip(tmp_path: Path) -> None:
     assert table.num_rows == len(chunks)
 
     hashes = table.column("content_hash").to_pylist()
-    expected_hashes = [
-        xxhash.xxh64_intdigest(chunk.text.encode("utf-8", errors="ignore")) for chunk in chunks
-    ]
+
+    def _expected_hash(chunk_text: str) -> int:
+        encoded = chunk_text.encode("utf-8", errors="ignore")
+        if xxhash is not None:
+            return xxhash.xxh64_intdigest(encoded)
+        return int.from_bytes(hashlib.blake2b(encoded, digest_size=8).digest(), "little")
+
+    expected_hashes = [_expected_hash(chunk.text) for chunk in chunks]
     assert hashes == expected_hashes
 
     symbols_column = table.column("symbols").to_pylist()

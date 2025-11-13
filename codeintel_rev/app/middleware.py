@@ -51,6 +51,7 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 
 from __future__ import annotations
 
+import time
 import uuid
 from typing import TYPE_CHECKING
 
@@ -59,6 +60,7 @@ from starlette.types import ASGIApp
 
 from codeintel_rev.observability.timeline import bind_timeline, new_timeline
 from codeintel_rev.runtime.request_context import capability_stamp_var, session_id_var
+from codeintel_rev.telemetry.reporter import start_run
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -240,6 +242,13 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
         request.state.timeline = timeline
 
         capability_stamp = getattr(request.app.state, "capability_stamp", None)
+        start_run(
+            session_id,
+            timeline.run_id,
+            tool_name=None,
+            capability_stamp=capability_stamp,
+            started_at=time.time(),
+        )
 
         # Store in ContextVar (for adapter access)
         session_token = session_id_var.set(session_id)

@@ -20,6 +20,7 @@ from codeintel_rev.config.settings import (
     BM25Config,
     CodeRankConfig,
     CodeRankLLMConfig,
+    EmbeddingsConfig,
     EvalConfig,
     IndexConfig,
     PathsConfig,
@@ -94,6 +95,17 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
     repo_root.mkdir()
 
     settings = Settings(
+        vllm=VLLMConfig(
+            base_url="http://localhost:8001/v1",
+            batch_size=32,
+        ),
+        embeddings=EmbeddingsConfig(
+            provider="vllm",
+            model_name="nomic-ai/nomic-embed-code",
+            device="cpu",
+            batch_size=4,
+            micro_batch_size=2,
+        ),
         paths=PathsConfig(
             repo_root=str(repo_root),
             data_dir="data",
@@ -111,10 +123,6 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
             chunk_budget=2200,
             faiss_nlist=8192,
             use_cuvs=True,
-        ),
-        vllm=VLLMConfig(
-            base_url="http://localhost:8001/v1",
-            batch_size=32,
         ),
         limits=ServerLimits(),
         eval=EvalConfig(),

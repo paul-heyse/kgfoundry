@@ -49,6 +49,12 @@ The parameter string is validated (positive integers, supported keys) before we
 hand it off to FAISS. The string is also recorded in the metadata file so you
 can reconstruct the exact runtime state later.
 
+Every search records ANN/refine latencies (via
+`faiss_ann_latency_seconds{index_family,...}` and
+`faiss_refine_latency_seconds{...}`) plus the post-filter density gauge
+(`faiss_postfilter_density`). Use these metrics to confirm that a new tuning
+profile improves recall without blowing the refine budget.
+
 ## Offline evaluation
 
 `indexctl eval` compares ANN results against a Flat oracle (and optionally XTR):
@@ -57,11 +63,12 @@ can reconstruct the exact runtime state later.
 indexctl eval --k 10 --k-factor 2.0 --nprobe 96 --xtr-oracle
 ```
 
-Results are written under `settings.eval.output_dir`:
-
-- `last_eval_pool.parquet`: pooled candidates with `source` (`faiss`, `oracle`,
-  `xtr`).
-- `metrics.json`: summary (queries evaluated, k, nprobe, recall@k, matches).
+Results land under `settings.eval.output_dir` (default `build/explain/pools`) in
+timestamped subfolders. The Parquet pool includes channel, URI, and structure
+annotations (`symbol_hits`, `ast_node_kinds`, `cst_matches`) for each hit,
+making it easy to query coverage via DuckDB (see `docs/sql/coverage_examples.sql`).
+The companion `metrics.json` captures aggregate recall statistics for quick
+regression checks.
 
 Use these artifacts to spot regressions when tweaking FAISS knobs or after
 refreshing the embedding model.

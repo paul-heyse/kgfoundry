@@ -44,6 +44,7 @@ from codeintel_rev.retrieval.types import (
     StageDecision,
     StageSignals,
 )
+from codeintel_rev.telemetry.context import telemetry_metadata
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
 from kgfoundry_common.logging import get_logger
 
@@ -1658,6 +1659,9 @@ def _make_envelope(
         "findings": findings,
         "confidence": 0.9 if findings else 0.0,
     }
+    telemetry = telemetry_metadata()
+    if telemetry:
+        envelope["telemetry"] = telemetry
     envelope.update(extras)
     return envelope
 

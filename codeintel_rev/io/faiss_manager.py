@@ -29,9 +29,9 @@ from codeintel_rev.metrics.registry import (
     FAISS_INDEX_DIM,
     FAISS_INDEX_GPU_ENABLED,
     FAISS_INDEX_SIZE_VECTORS,
+    FAISS_POSTFILTER_DENSITY,
     FAISS_REFINE_KEPT_RATIO,
     FAISS_REFINE_LATENCY_SECONDS,
-    FAISS_POSTFILTER_DENSITY,
     FAISS_SEARCH_ERRORS_TOTAL,
     FAISS_SEARCH_LAST_K,
     FAISS_SEARCH_LAST_MS,
@@ -43,7 +43,8 @@ from codeintel_rev.metrics.registry import (
 )
 from codeintel_rev.observability.otel import as_span
 from codeintel_rev.observability.timeline import Timeline, current_timeline
-from codeintel_rev.retrieval.rerank_flat import exact_rerank
+from codeintel_rev.retrieval.rerank_flat import FlatReranker
+from codeintel_rev.telemetry.decorators import span_context
 from codeintel_rev.typing import NDArrayF32, NDArrayI64, gate_import
 from kgfoundry_common.errors import VectorSearchError
 from kgfoundry_common.logging import get_logger
@@ -1290,54 +1291,65 @@ class FAISSManager(
                 },
             )
 
-        start = perf_counter()
-        ann_timer_start = start
-        try:
-            distances, identifiers = self._execute_dual_search(
-                query=plan.queries,
-                search_k=plan.search_k,
-                params=plan.params,
-            )
-            if plan.search_k > 0:
-                FAISS_POSTFILTER_DENSITY.labels(**metric_labels).set(
-                    plan.k / float(plan.search_k)
+        span_attrs = {
+            "k": plan.k,
+            "nprobe": plan.params.nprobe,
+            "use_gpu": plan.params.use_gpu,
+        }
+        with span_context(
+            "search.faiss",
+            stage="search.faiss",
+            attrs=span_attrs,
+            emit_checkpoint=True,
+        ):
+            start = perf_counter()
+            ann_timer_start = start
+            try:
+                distances, identifiers = self._execute_dual_search(
+                    query=plan.queries,
+                    search_k=plan.search_k,
+                    params=plan.params,
                 )
-            refined = self._maybe_refine_results(
-                catalog=catalog,
-                plan=plan,
-                identifiers=identifiers,
-                metric_labels=metric_labels,
-            )
-            if refined is not None:
-                distances, identifiers = refined
-            result = (distances[:, : plan.k], identifiers[:, : plan.k])
-        except Exception as exc:
-            if timeline is not None:
-                timeline.event(
-                    "faiss.search.end",
-                    "faiss",
-                    status="error",
-                    message=str(exc),
-                    attrs={
-                        "k": plan.k,
-                        "nprobe": plan.params.nprobe,
+                if plan.search_k > 0:
+                    FAISS_POSTFILTER_DENSITY.labels(**metric_labels).set(
+                        plan.k / float(plan.search_k)
+                    )
+                refined = self._maybe_refine_results(
+                    catalog=catalog,
+                    plan=plan,
+                    identifiers=identifiers,
+                    metric_labels=metric_labels,
+                )
+                if refined is not None:
+                    distances, identifiers = refined
+                result = (distances[:, : plan.k], identifiers[:, : plan.k])
+            except Exception as exc:
+                if timeline is not None:
+                    timeline.event(
+                        "faiss.search.end",
+                        "faiss",
+                        status="error",
+                        message=str(exc),
+                        attrs={
+                            "k": plan.k,
+                            "nprobe": plan.params.nprobe,
+                            "use_gpu": plan.params.use_gpu,
+                        },
+                    )
+                FAISS_SEARCH_ERRORS_TOTAL.inc()
+                msg = "FAISS search failed"
+                raise VectorSearchError(
+                    msg,
+                    cause=exc,
+                    context={
+                        "index_path": str(self.index_path),
                         "use_gpu": plan.params.use_gpu,
+                        "search_k": plan.k,
                     },
-                )
-            FAISS_SEARCH_ERRORS_TOTAL.inc()
-            msg = "FAISS search failed"
-            raise VectorSearchError(
-                msg,
-                cause=exc,
-                context={
-                    "index_path": str(self.index_path),
-                    "use_gpu": plan.params.use_gpu,
-                    "search_k": plan.k,
-                },
-            ) from exc
-        finally:
-            duration = max(perf_counter() - ann_timer_start, 0.0)
-            FAISS_ANN_LATENCY_SECONDS.labels(**metric_labels).observe(duration)
+                ) from exc
+            finally:
+                duration = max(perf_counter() - ann_timer_start, 0.0)
+                FAISS_ANN_LATENCY_SECONDS.labels(**metric_labels).observe(duration)
 
         elapsed_total = (perf_counter() - start) * 1000.0
         if timeline is not None:
@@ -1699,8 +1711,8 @@ class FAISSManager(
         FAISS_REFINE_KEPT_RATIO.observe(kept_ratio)
         refine_start = perf_counter()
         try:
-            rerank_scores, rerank_ids = exact_rerank(
-                catalog,
+            reranker = FlatReranker(catalog)
+            rerank_scores, rerank_ids = reranker.rerank(
                 plan.queries,
                 identifiers[:, : plan.search_k],
                 top_k=plan.k,
@@ -2345,9 +2357,9 @@ class FAISSManager(
         index = self._active_index()
         try:
             faiss.ParameterSpace().set_index_parameters(index, ",".join(params))
-            except (RuntimeError, AttributeError, ValueError):
-                if nprobe is not None and hasattr(index, "nprobe"):
-                    index.nprobe = int(nprobe)
+        except (RuntimeError, AttributeError, ValueError):
+            if nprobe is not None and hasattr(index, "nprobe"):
+                index.nprobe = int(nprobe)
 
     def _metric_labels(self, plan: _SearchPlan) -> dict[str, str]:
         ratio = plan.search_k / plan.k if plan.k > 0 else 0.0
@@ -2821,9 +2833,7 @@ class AutoTuner:
             key=lambda row: (-float(row["recall_at_k"]), float(row["latency_ms"])),
         )
         best_recall = float(ordered[0]["recall_at_k"])
-        pareto = [
-            row for row in ordered if float(row["recall_at_k"]) >= best_recall - 0.005
-        ]
+        pareto = [row for row in ordered if float(row["recall_at_k"]) >= best_recall - 0.005]
         pareto.sort(key=lambda row: float(row["latency_ms"]))
         profile = dict(pareto[0])
         for token in str(profile["param_str"]).split(","):

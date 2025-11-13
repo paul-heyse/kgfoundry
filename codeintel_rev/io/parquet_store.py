@@ -6,13 +6,18 @@ for efficient vector storage and querying via DuckDB.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal, cast
 
 import pyarrow as pa
 import pyarrow.parquet as pq
-import xxhash
+
+try:  # pragma: no cover - optional accelerator
+    import xxhash  # type: ignore[import]
+except ModuleNotFoundError:  # pragma: no cover - fallback to hashlib
+    xxhash = None  # type: ignore[assignment]
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.indexing.chunk_ids import stable_chunk_id
@@ -74,6 +79,7 @@ class ParquetWriteOptions:
     preview_max_chars: int = 240
     id_strategy: Literal["sequence", "stable_hash"] = "sequence"
     id_hash_salt: str = ""
+    table_meta: dict[str, str] | None = None
 
 
 def _hash_content(text: str) -> int:
@@ -85,7 +91,10 @@ def _hash_content(text: str) -> int:
         Unsigned 64-bit hash derived from the UTF-8 encoded chunk body.
     """
     encoded = text.encode("utf-8", errors="ignore")
-    return xxhash.xxh64_intdigest(encoded) & 0xFFFFFFFFFFFFFFFF
+    if xxhash is not None:
+        return xxhash.xxh64_intdigest(encoded) & 0xFFFFFFFFFFFFFFFF
+    digest = hashlib.blake2b(encoded, digest_size=8)
+    return int.from_bytes(digest.digest(), byteorder="little", signed=False)
 
 
 def write_chunks_parquet(
@@ -169,6 +178,12 @@ def write_chunks_parquet(
         },
         schema=get_chunks_schema(vec_dim),
     )
+    if options.table_meta:
+        existing_meta = table.schema.metadata or {}
+        encoded = existing_meta.copy()
+        for key, value in options.table_meta.items():
+            encoded[str(key).encode("utf-8")] = str(value).encode("utf-8")
+        table = table.replace_schema_metadata(encoded)
 
     # Write with compression
     output_path.parent.mkdir(parents=True, exist_ok=True)

@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import json
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
@@ -19,7 +18,7 @@ else:  # pragma: no cover - dependency optional at import time
         pa = None  # type: ignore[assignment]
         pq = None  # type: ignore[assignment]
 
-Source = Literal["faiss", "bm25", "splade", "ann", "oracle", "xtr"]
+Channel = Literal["faiss", "bm25", "splade", "ann", "oracle", "xtr"]
 
 
 @dataclass(frozen=True)
@@ -27,14 +26,14 @@ class PoolRow:
     """Single evaluator pool row."""
 
     query_id: str
-    source: Source
+    channel: Channel
     rank: int
     chunk_id: int
     score: float
-    explain_symbols: tuple[str, ...] = ()
-    explain_ast_kinds: tuple[str, ...] = ()
-    explain_cst_hits: tuple[str, ...] = ()
-    explanation_json: Mapping[str, object] | None = None
+    uri: str
+    symbol_hits: tuple[str, ...] = ()
+    ast_node_kinds: tuple[str, ...] = ()
+    cst_matches: tuple[str, ...] = ()
 
 
 def _empty_table() -> pa.Table:
@@ -67,20 +66,20 @@ def _empty_table() -> pa.Table:
         ],
         names=[
             "query_id",
-            "source",
+            "channel",
             "rank",
             "chunk_id",
             "score",
-            "explain_symbols",
-            "explain_ast_kinds",
-            "explain_cst_hits",
-            "explanation_json",
+            "symbol_hits",
+            "ast_node_kinds",
+            "cst_matches",
+            "uri",
         ],
     )
 
 
 def write_pool(rows: Iterable[PoolRow], out_path: Path, *, overwrite: bool = True) -> int:
-    """Write `(query_id, source, rank, chunk_id, score)` tuples to Parquet.
+    """Write `(query_id, channel, rank, chunk_id, score, uri, ...)` rows to Parquet.
 
     Parameters
     ----------
@@ -117,42 +116,34 @@ def write_pool(rows: Iterable[PoolRow], out_path: Path, *, overwrite: bool = Tru
     table = pa.Table.from_arrays(
         [
             pa.array([row.query_id for row in materialized], type=pa.string()),
-            pa.array([row.source for row in materialized]),
+            pa.array([row.channel for row in materialized]),
             pa.array([int(row.rank) for row in materialized], type=pa.int32()),
             pa.array([int(row.chunk_id) for row in materialized], type=pa.int64()),
             pa.array([float(row.score) for row in materialized], type=pa.float32()),
             pa.array(
-                [list(row.explain_symbols) for row in materialized],
+                [list(row.symbol_hits) for row in materialized],
                 type=pa.list_(pa.string()),
             ),
             pa.array(
-                [list(row.explain_ast_kinds) for row in materialized],
+                [list(row.ast_node_kinds) for row in materialized],
                 type=pa.list_(pa.string()),
             ),
             pa.array(
-                [list(row.explain_cst_hits) for row in materialized],
+                [list(row.cst_matches) for row in materialized],
                 type=pa.list_(pa.string()),
             ),
-            pa.array(
-                [
-                    json.dumps(row.explanation_json, sort_keys=True)
-                    if row.explanation_json
-                    else None
-                    for row in materialized
-                ],
-                type=pa.string(),
-            ),
+            pa.array([row.uri for row in materialized], type=pa.string()),
         ],
         names=[
             "query_id",
-            "source",
+            "channel",
             "rank",
             "chunk_id",
             "score",
-            "explain_symbols",
-            "explain_ast_kinds",
-            "explain_cst_hits",
-            "explanation_json",
+            "symbol_hits",
+            "ast_node_kinds",
+            "cst_matches",
+            "uri",
         ],
     )
     pq.write_table(table, out_path, compression="zstd", use_dictionary=True)

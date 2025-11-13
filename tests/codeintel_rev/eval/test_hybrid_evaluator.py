@@ -10,7 +10,7 @@ from typing import cast
 import numpy as np
 import pyarrow.parquet as pq
 from codeintel_rev.eval.hybrid_evaluator import EvalConfig, HybridPoolEvaluator
-from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, StructureAnnotations
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.xtr_manager import XTRIndex
 
@@ -27,6 +27,17 @@ class _FakeCatalog:
 
     def get_chunk_by_id(self, chunk_id: int) -> dict[str, str]:
         return {"content": f"chunk-{chunk_id}"}
+
+    def get_structure_annotations(self, ids: Sequence[int]) -> dict[int, StructureAnnotations]:
+        return {
+            int(chunk_id): StructureAnnotations(
+                uri=f"chunk-{chunk_id}",
+                symbol_hits=("sym",),
+                ast_node_kinds=("FunctionDef",),
+                cst_matches=(),
+            )
+            for chunk_id in ids
+        }
 
 
 class _FakeManager:
@@ -110,9 +121,10 @@ def test_hybrid_evaluator_writes_metrics(tmp_path: Path) -> None:
     assert 0.0 < report.recall_at_k <= 1.0
     assert config.pool_path.exists()
     table = pq.read_table(config.pool_path)
-    assert set(table.column("source").to_pylist()) == {"faiss", "oracle"}
-    assert "explain_symbols" in table.column_names
-    assert all(isinstance(val, list) for val in table.column("explain_symbols").to_pylist())
+    assert set(table.column("channel").to_pylist()) == {"faiss", "oracle"}
+    assert "symbol_hits" in table.column_names
+    assert all(isinstance(val, list) for val in table.column("symbol_hits").to_pylist())
+    assert all(val for val in table.column("uri").to_pylist())
 
     metrics = json.loads(config.metrics_path.read_text())
     assert metrics["recall_at_k"] == report.recall_at_k
@@ -127,4 +139,4 @@ def test_hybrid_evaluator_adds_xtr_rows(tmp_path: Path) -> None:
     config = _config(tmp_path, use_xtr_oracle=True)
     evaluator.run(config)
     table = pq.read_table(config.pool_path)
-    assert "xtr" in set(table.column("source").to_pylist())
+    assert "xtr" in set(table.column("channel").to_pylist())

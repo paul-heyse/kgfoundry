@@ -28,10 +28,27 @@ Extras are specified as `name=/abs/path` (e.g. `--extra bm25=/tmp/bm25`).
 
 ### Evaluation artifacts
 
-Running `indexctl eval` writes:
+Running `indexctl eval` writes timestamped artifacts under
+`<output_dir>/<YYMMDD-HHMM>/<RUN_ID>.{parquet,json}` (the default output directory
+is `build/explain/pools`). The Parquet file stores one row per `(query, channel)`
+hit with the schema:
 
-* `<output_dir>/last_eval_pool.parquet` – pooled candidates with `source ∈ {faiss, oracle, xtr}`.
-* `<output_dir>/metrics.json` – summary payload:
+| Column | Description |
+| --- | --- |
+| `query_id` | Stable identifier for the sampled query/vector. |
+| `channel` | Retrieval channel (`faiss`, `oracle`, `xtr`, etc.). |
+| `rank` / `score` | Rank and score reported by the channel. |
+| `chunk_id`, `uri` | Chunk identifier + URI hydrated from DuckDB. |
+| `symbol_hits` | SCIP symbol matches within the chunk span. |
+| `ast_node_kinds` | AST node kinds overlapping the chunk span. |
+| `cst_matches` | CST node kinds overlapping the chunk span. |
+
+Example queries for per-module coverage and channel contribution breakdowns
+live in `docs/sql/coverage_examples.sql`; they operate on `v_pool_coverage`,
+which is populated automatically when you call `indexctl export-idmap` or
+`indexctl materialize-join`.
+
+`metrics.json` shares the same directory and captures the evaluation summary:
 
 ```json
 {

@@ -72,9 +72,7 @@ def _write_chunks_parquet(path: Path) -> None:
 
 def _write_idmap_parquet(path: Path) -> None:
     connection = duckdb.connect(database=":memory:")
-    connection.execute(
-        "CREATE TABLE tmp (faiss_row BIGINT, external_id BIGINT, source TEXT)"
-    )
+    connection.execute("CREATE TABLE tmp (faiss_row BIGINT, external_id BIGINT, source TEXT)")
     connection.executemany(
         "INSERT INTO tmp VALUES (?, ?, ?)",
         [
@@ -840,6 +838,63 @@ def test_materialize_creates_empty_table_when_parquet_missing(tmp_path: Path) ->
 
     assert _table_exists(catalog_path, "chunks_materialized") is True
     assert _index_exists(catalog_path, "idx_chunks_materialized_uri") is True
+
+
+def test_get_structure_annotations_with_ast(tmp_path: Path) -> None:
+    vectors_dir = tmp_path / "vectors"
+    vectors_dir.mkdir()
+    catalog_path = tmp_path / "catalog.duckdb"
+    catalog = DuckDBCatalog(catalog_path, vectors_dir)
+    with duckdb.connect(str(catalog_path)) as connection:
+        connection.execute(
+            """
+            CREATE OR REPLACE VIEW chunks AS
+            SELECT
+                1::BIGINT AS id,
+                'src/example.py'::VARCHAR AS uri,
+                0::INTEGER AS start_line,
+                10::INTEGER AS end_line,
+                ['sym.A']::VARCHAR[] AS symbols
+            """
+        )
+        connection.execute(
+            """
+            CREATE OR REPLACE VIEW ast_nodes AS
+            SELECT
+                'src/example.py'::VARCHAR AS path,
+                'FunctionDef'::VARCHAR AS node_type,
+                1::INTEGER AS lineno,
+                4::INTEGER AS end_lineno
+            """
+        )
+    info = catalog.get_structure_annotations([1])[1]
+    assert info.uri == "src/example.py"
+    assert info.symbol_hits == ("sym.A",)
+    assert info.ast_node_kinds == ("FunctionDef",)
+    assert info.cst_matches == ()
+
+
+def test_get_structure_annotations_without_optional_tables(tmp_path: Path) -> None:
+    vectors_dir = tmp_path / "vectors"
+    vectors_dir.mkdir()
+    catalog_path = tmp_path / "catalog.duckdb"
+    catalog = DuckDBCatalog(catalog_path, vectors_dir)
+    with duckdb.connect(str(catalog_path)) as connection:
+        connection.execute(
+            """
+            CREATE OR REPLACE VIEW chunks AS
+            SELECT
+                7::BIGINT AS id,
+                'src/missing.py'::VARCHAR AS uri,
+                0::INTEGER AS start_line,
+                1::INTEGER AS end_line,
+                []::VARCHAR[] AS symbols
+            """
+        )
+    info = catalog.get_structure_annotations([7])[7]
+    assert info.symbol_hits == ()
+    assert info.ast_node_kinds == ()
+    assert info.cst_matches == ()
 
     @pytest.mark.parametrize(
         ("language", "expected_count"),

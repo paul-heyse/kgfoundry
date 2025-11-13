@@ -17,6 +17,7 @@ import msgspec
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.observability.otel import as_span
 from codeintel_rev.observability.timeline import current_timeline
+from codeintel_rev.telemetry.decorators import span_context
 from codeintel_rev.typing import NDArrayF32, gate_import
 from kgfoundry_common.logging import get_logger
 
@@ -301,19 +302,21 @@ class VLLMClient:
 
         mode = self._mode
         batch_size = len(texts)
+        attrs = {"mode": mode, "n_texts": batch_size, "dim": self.config.embedding_dim}
         if timeline is not None:
             timeline.event(
                 "vllm.embed.start",
                 "vllm",
-                attrs={
-                    "mode": mode,
-                    "n_texts": batch_size,
-                    "dim": self.config.embedding_dim,
-                },
+                attrs=attrs,
             )
         start = perf_counter()
         try:
-            with as_span(
+            with span_context(
+                "search.embed",
+                stage="search.embed",
+                attrs=attrs,
+                emit_checkpoint=True,
+            ), as_span(
                 "vllm.embed_batch",
                 mode=mode,
                 n_texts=batch_size,
@@ -502,8 +505,17 @@ class VLLMClient:
                 dtype=np_module.float32,
             )
 
+        mode = "local" if self._local_engine is not None else "http"
+        attrs = {"mode": mode, "n_texts": len(texts), "dim": self.config.embedding_dim}
+
         if self._local_engine is not None:
-            return await self._embed_batch_async_local(texts)
+            with span_context(
+                "search.embed",
+                stage="search.embed",
+                attrs=attrs,
+                emit_checkpoint=True,
+            ):
+                return await self._embed_batch_async_local(texts)
 
         async_client = self._ensure_async_http_client()
         request = EmbeddingRequest(input=list(texts), model=self.config.model)
@@ -514,14 +526,19 @@ class VLLMClient:
             extra={"batch_size": len(texts), "model": self.config.model},
         )
 
-        response = await async_client.post(
-            f"{self.config.base_url}/embeddings",
-            content=payload,
-            headers={"Content-Type": "application/json"},
-        )
-        response.raise_for_status()
-
-        result = self._decoder.decode(response.content)
+        with span_context(
+            "search.embed",
+            stage="search.embed",
+            attrs=attrs,
+            emit_checkpoint=True,
+        ):
+            response = await async_client.post(
+                f"{self.config.base_url}/embeddings",
+                content=payload,
+                headers={"Content-Type": "application/json"},
+            )
+            response.raise_for_status()
+            result = self._decoder.decode(response.content)
 
         # Sort by index and extract vectors
         sorted_data = sorted(result.data, key=lambda d: d.index)

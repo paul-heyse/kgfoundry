@@ -287,6 +287,47 @@ class IndexLifecycleManager:
             )
         return assets
 
+    def write_embedding_metadata(
+        self,
+        payload: Mapping[str, object],
+        *,
+        version: str | None = None,
+    ) -> Path:
+        """Persist ``embedding_meta.json`` into the requested version directory.
+
+        Parameters
+        ----------
+        payload : Mapping[str, object]
+            JSON-serialisable metadata describing the embeddings.
+        version : str | None, optional
+            Version identifier to target. When omitted, writes to the current
+            version directory.
+
+        Returns
+        -------
+        Path
+            Filesystem path to the written metadata file.
+
+        Raises
+        ------
+        RuntimeLifecycleError
+            If no suitable version directory exists.
+        """
+        target_dir: Path | None
+        if version is None:
+            target_dir = self.current_dir()
+        else:
+            candidate = self.versions_dir / version
+            target_dir = candidate if candidate.exists() else None
+        if target_dir is None:
+            raise RuntimeLifecycleError(
+                "No version directory available for embedding metadata", runtime=_RUNTIME
+            )
+        target_dir.mkdir(parents=True, exist_ok=True)
+        path = target_dir / "embedding_meta.json"
+        path.write_text(json.dumps(payload, sort_keys=True, indent=2), encoding="utf-8")
+        return path
+
     # ------------------------------------------------------------------ writes
     def prepare(
         self,
@@ -548,7 +589,7 @@ __all__ = [
     "IndexAssets",
     "IndexLifecycleManager",
     "LuceneAssets",
-    "collect_asset_attrs",
     "VersionMeta",
+    "collect_asset_attrs",
     "link_current_lucene",
 ]

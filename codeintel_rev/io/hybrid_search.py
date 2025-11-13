@@ -28,6 +28,7 @@ from codeintel_rev.retrieval.types import (
     HybridResultDoc,
     HybridSearchResult,
 )
+from codeintel_rev.telemetry.decorators import span_context
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -618,11 +619,18 @@ class HybridSearchEngine:
         timeline: Timeline | None,
     ) -> tuple[list[HybridResultDoc], dict[str, list[tuple[str, int, float]]]]:
         start_rrf = perf_counter()
-        docs, contributions_for_docs = self._rrf_fuse(
-            runs,
-            limit=limit,
-            rrf_k=rrf_k,
-        )
+        attrs = {"rrf_k": rrf_k, "channels": list(runs.keys())}
+        with span_context(
+            "search.rrf_fuse",
+            stage="search.rrf_fuse",
+            attrs=attrs,
+            emit_checkpoint=True,
+        ):
+            docs, contributions_for_docs = self._rrf_fuse(
+                runs,
+                limit=limit,
+                rrf_k=rrf_k,
+            )
         retrieval_metrics.RRF_DURATION_SECONDS.observe(perf_counter() - start_rrf)
         if timeline is not None:
             timeline.event(
@@ -836,7 +844,15 @@ class HybridSearchEngine:
             return [], None
         start = perf_counter()
         try:
-            hits = list(channel.search(query, limit))
+            stage_name = f"search.{channel.name}"
+            attrs = {"channel": channel.name, "limit": limit}
+            with span_context(
+                stage_name,
+                stage=stage_name,
+                attrs=attrs,
+                emit_checkpoint=True,
+            ):
+                hits = list(channel.search(query, limit))
         except ChannelError as exc:
             warning = str(exc)
             retrieval_metrics.QUERY_ERRORS_TOTAL.labels(kind="search", channel=channel.name).inc()

@@ -27,6 +27,7 @@ from codeintel_rev.mcp_server.scope_utils import (
     path_matches_glob,
 )
 from codeintel_rev.observability.timeline import current_timeline
+from codeintel_rev.telemetry.decorators import span_context
 from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.prometheus import build_histogram
@@ -94,6 +95,16 @@ class _ScopeFilterSpec:
     def has_complex_globs(self) -> bool:
         """Return ``True`` when complex include/exclude patterns exist."""
         return bool(self.complex_include_patterns or self.complex_exclude_patterns)
+
+
+@dataclass(slots=True, frozen=True)
+class StructureAnnotations:
+    """Structure-aware metadata joined onto explainability pools."""
+
+    uri: str
+    symbol_hits: tuple[str, ...]
+    ast_node_kinds: tuple[str, ...]
+    cst_matches: tuple[str, ...]
 
 
 @dataclass(slots=True, frozen=True)
@@ -505,14 +516,13 @@ class DuckDBCatalog:
                     CREATE OR REPLACE VIEW v_pool_coverage AS
                     SELECT
                         pool.*,
-                        chunks.uri,
                         chunks.lang,
-                        modules.repo_path AS module_repo_path,
+                        modules.repo_path AS repo_path,
                         modules.module_name,
                         modules.tags
                     FROM v_faiss_pool AS pool
                     LEFT JOIN chunks ON chunks.id = pool.chunk_id
-                    LEFT JOIN modules ON modules.repo_path = chunks.uri
+                    LEFT JOIN modules ON modules.repo_path = pool.uri
                     """
                 )
             except duckdb.Error:
@@ -521,7 +531,6 @@ class DuckDBCatalog:
                     CREATE OR REPLACE VIEW v_pool_coverage AS
                     SELECT
                         pool.*,
-                        chunks.uri,
                         chunks.lang
                     FROM v_faiss_pool AS pool
                     LEFT JOIN chunks ON chunks.id = pool.chunk_id
@@ -726,13 +735,14 @@ class DuckDBCatalog:
             return []
 
         timeline = current_timeline()
+        span_attrs = {"op": "query_by_ids", "asked_for": len(ids)}
         start_time = None
         if timeline is not None:
             start_time = perf_counter()
             timeline.event(
                 "duckdb.hydrate.start",
                 "catalog",
-                attrs={"asked_for": len(ids)},
+                attrs=span_attrs,
             )
 
         sql = """
@@ -743,12 +753,18 @@ class DuckDBCatalog:
             ORDER BY ids.position
             """
         params = [list(ids)]
-        with self.connection() as conn:
-            self._log_query(sql, params)
-            relation = conn.execute(sql, params)
-            rows = relation.fetchall()
-            cols = [desc[0] for desc in relation.description]
-        payload = [dict(zip(cols, row, strict=True)) for row in rows]
+        with span_context(
+            "catalog.hydrate",
+            stage="catalog.hydrate",
+            attrs=span_attrs,
+            emit_checkpoint=True,
+        ):
+            with self.connection() as conn:
+                self._log_query(sql, params)
+                relation = conn.execute(sql, params)
+                rows = relation.fetchall()
+                cols = [desc[0] for desc in relation.description]
+            payload = [dict(zip(cols, row, strict=True)) for row in rows]
         if timeline is not None:
             duration_ms = (
                 int((perf_counter() - start_time) * 1000) if start_time is not None else None
@@ -763,6 +779,116 @@ class DuckDBCatalog:
                 },
             )
         return payload
+
+    def get_structure_annotations(self, ids: Sequence[int]) -> dict[int, StructureAnnotations]:
+        """Return structural overlays (symbols/AST/CST) for ``ids``."""
+        cleaned = [int(chunk_id) for chunk_id in ids if chunk_id is not None]
+        if not cleaned:
+            return {}
+        unique_ids = list(dict.fromkeys(cleaned))
+        annotations: dict[int, dict[str, object]] = {}
+        boundaries: dict[int, tuple[int, int]] = {}
+        with self.connection() as conn:
+            base_rows = conn.execute(
+                """
+                SELECT
+                    id,
+                    uri,
+                    start_line,
+                    end_line,
+                    COALESCE(symbols, []::VARCHAR[]) AS symbols
+                FROM chunks
+                WHERE id IN (SELECT * FROM UNNEST(?))
+                """,
+                [unique_ids],
+            ).fetchall()
+            for chunk_id, uri, start_line, end_line, symbols in base_rows:
+                annotations[int(chunk_id)] = {
+                    "uri": uri,
+                    "symbol_hits": tuple(symbols or ()),
+                    "ast_node_kinds": (),
+                    "cst_matches": (),
+                }
+                boundaries[int(chunk_id)] = (int(start_line or 0), int(end_line or 0))
+
+            if self._relation_exists(conn, "chunk_symbols"):
+                rows = conn.execute(
+                    """
+                    SELECT chunk_id, array_agg(DISTINCT symbol ORDER BY symbol) AS symbols
+                    FROM chunk_symbols
+                    WHERE chunk_id IN (SELECT * FROM UNNEST(?))
+                    GROUP BY chunk_id
+                    """,
+                    [unique_ids],
+                ).fetchall()
+                for chunk_id, symbols in rows:
+                    payload = annotations.get(int(chunk_id))
+                    if payload is not None:
+                        payload["symbol_hits"] = tuple(symbols or ())
+
+            if self._relation_exists(conn, "ast_nodes"):
+                for chunk_id, (start_line, end_line) in boundaries.items():
+                    payload = annotations.get(chunk_id)
+                    if payload is None:
+                        continue
+                    rows = conn.execute(
+                        """
+                        SELECT DISTINCT node_type
+                        FROM ast_nodes
+                        WHERE path = ?
+                          AND COALESCE(end_lineno, lineno) >= ?
+                          AND COALESCE(lineno, end_lineno) <= ?
+                        """,
+                        [payload["uri"], start_line, end_line],
+                    ).fetchall()
+                    if rows:
+                        payload["ast_node_kinds"] = tuple(
+                            dict.fromkeys(row[0] for row in rows if row[0])
+                        )
+
+            if self._relation_exists(conn, "cst_nodes"):
+                path_column = "uri"
+                try:
+                    conn.execute(f"SELECT {path_column} FROM cst_nodes LIMIT 0")
+                except duckdb.Error:
+                    path_column = "path"
+                try:
+                    for chunk_id, (start_line, end_line) in boundaries.items():
+                        payload = annotations.get(chunk_id)
+                        if payload is None:
+                            continue
+                        rows = conn.execute(
+                            f"""
+                            SELECT DISTINCT kind
+                            FROM cst_nodes
+                            WHERE {path_column} = ?
+                              AND COALESCE(end_line, start_line) >= ?
+                              AND COALESCE(start_line, end_line) <= ?
+                            """,
+                            [payload["uri"], start_line, end_line],
+                        ).fetchall()
+                        if rows:
+                            payload["cst_matches"] = tuple(
+                                dict.fromkeys(row[0] for row in rows if row[0])
+                            )
+                except duckdb.Error as exc:  # pragma: no cover - schema may evolve
+                    LOGGER.debug(
+                        "Skipping CST annotations",
+                        extra=_log_extra(error=str(exc)),
+                    )
+
+        result: dict[int, StructureAnnotations] = {}
+        for chunk_id in unique_ids:
+            payload = annotations.get(chunk_id)
+            if payload is None:
+                continue
+            result[chunk_id] = StructureAnnotations(
+                uri=str(payload["uri"]),
+                symbol_hits=tuple(payload["symbol_hits"]),
+                ast_node_kinds=tuple(payload["ast_node_kinds"]),
+                cst_matches=tuple(payload["cst_matches"]),
+            )
+        return result
 
     def query_by_filters(
         self,
@@ -856,44 +982,61 @@ class DuckDBCatalog:
         if not ids:
             return []
 
-        start_time = perf_counter()
-        spec = self._build_scope_filter_spec(
-            ids,
-            include_globs=include_globs,
-            exclude_globs=exclude_globs,
-            languages=languages,
-        )
+        attrs = {
+            "op": "query_by_filters",
+            "ids": len(ids),
+            "include_globs": bool(include_globs),
+            "exclude_globs": bool(exclude_globs),
+            "languages": bool(languages),
+        }
+        with span_context(
+            "catalog.hydrate",
+            stage="catalog.hydrate",
+            attrs=attrs,
+            emit_checkpoint=True,
+        ):
+            start_time = perf_counter()
+            spec = self._build_scope_filter_spec(
+                ids,
+                include_globs=include_globs,
+                exclude_globs=exclude_globs,
+                languages=languages,
+            )
 
-        if languages and not spec.language_extensions:
-            self._observe_scope_filter_duration(start_time, include_globs, exclude_globs, languages)
-            return []
+            if languages and not spec.language_extensions:
+                self._observe_scope_filter_duration(
+                    start_time, include_globs, exclude_globs, languages
+                )
+                results: list[dict] = []
+            else:
+                options = DuckDBQueryOptions(
+                    include_globs=spec.simple_include_globs,
+                    exclude_globs=spec.simple_exclude_globs,
+                    select_columns=("c.*",),
+                    preserve_order=True,
+                )
 
-        options = DuckDBQueryOptions(
-            include_globs=spec.simple_include_globs,
-            exclude_globs=spec.simple_exclude_globs,
-            select_columns=("c.*",),
-            preserve_order=True,
-        )
+                sql, sql_params = self._query_builder.build_filter_query(
+                    chunk_ids=spec.chunk_ids,
+                    options=options,
+                )
 
-        sql, sql_params = self._query_builder.build_filter_query(
-            chunk_ids=spec.chunk_ids,
-            options=options,
-        )
+                with self.connection() as conn:
+                    relation = conn.execute(sql, sql_params)
+                    rows = relation.fetchall()
+                    cols = [desc[0] for desc in relation.description]
+                results = [dict(zip(cols, row, strict=True)) for row in rows]
 
-        with self.connection() as conn:
-            relation = conn.execute(sql, sql_params)
-            rows = relation.fetchall()
-            cols = [desc[0] for desc in relation.description]
-        results = [dict(zip(cols, row, strict=True)) for row in rows]
+                results = self._apply_complex_glob_filters(
+                    results,
+                    spec.complex_include_patterns,
+                    spec.complex_exclude_patterns,
+                )
+                results = self._apply_language_filters(results, spec.language_extensions)
 
-        results = self._apply_complex_glob_filters(
-            results,
-            spec.complex_include_patterns,
-            spec.complex_exclude_patterns,
-        )
-        results = self._apply_language_filters(results, spec.language_extensions)
-
-        self._observe_scope_filter_duration(start_time, include_globs, exclude_globs, languages)
+                self._observe_scope_filter_duration(
+                    start_time, include_globs, exclude_globs, languages
+                )
         return results
 
     def _build_scope_filter_spec(
@@ -1323,4 +1466,4 @@ class DuckDBCatalog:
         return self._embedding_dim_cache
 
 
-__all__ = ["DuckDBCatalog"]
+__all__ = ["DuckDBCatalog", "StructureAnnotations"]

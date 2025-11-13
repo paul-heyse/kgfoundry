@@ -26,6 +26,7 @@ from codeintel_rev.mcp_server.schemas import (
     ScopeIn,
 )
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
+from codeintel_rev.telemetry.context import telemetry_metadata
 from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
 from kgfoundry_common.logging import get_logger
@@ -1199,6 +1200,9 @@ def _make_envelope(
         "findings": list(findings),
         "confidence": confidence,
     }
+    telemetry = telemetry_metadata()
+    if telemetry:
+        base_envelope["telemetry"] = telemetry
 
     if extras:
         # Include extras in initial construction using dict unpacking

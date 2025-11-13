@@ -97,7 +97,7 @@ DEFAULT_EMIT_SLICES_FLAG = False
 _EMIT_AST_FLAG = "--emit-ast/--no-emit-ast"
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class PipelineOptions:
     """Resolved paths and filters required for pipeline execution."""
 
@@ -111,7 +111,7 @@ class PipelineOptions:
     max_file_bytes: int = DEFAULT_MAX_FILE_BYTES
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class AnalyticsOptions:
     """Optional analytics toggles shared across commands."""
 
@@ -122,7 +122,7 @@ class AnalyticsOptions:
     slices_filter: tuple[str, ...] = ()
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class CLIContextState:
     """CLI-scoped state shared between commands."""
 
@@ -278,7 +278,7 @@ def global_options(  # noqa: PLR0913,PLR0917 - Typer CLI requires enumerating al
     )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class OverlayCLIOptions:
     """Mutable overlay generation options parsed from CLI/config."""
 
@@ -294,7 +294,7 @@ class OverlayCLIOptions:
     type_error_overlays: bool = DEFAULT_USE_TYPE_ERROR_OVERLAYS
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class OverlayContext:
     """Aggregated context used during overlay generation."""
 
@@ -426,7 +426,7 @@ class ScanInputs:
     package_prefix: str | None
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class PipelineContext:
     """Aggregated context derived from CLI inputs and repo state."""
 

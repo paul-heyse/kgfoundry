@@ -12,6 +12,7 @@ from codeintel_rev.config.settings import (
     BM25Config,
     CodeRankConfig,
     CodeRankLLMConfig,
+    EmbeddingsConfig,
     EvalConfig,
     IndexConfig,
     PathsConfig,
@@ -64,6 +65,8 @@ class _FakeRedis:
 
 def _build_context(repo_root: Path) -> ApplicationContext:
     settings = Settings(
+        vllm=VLLMConfig(base_url="http://localhost:8001/v1", batch_size=32),
+        embeddings=EmbeddingsConfig(provider="vllm", model_name="nomic-ai/nomic-embed-code"),
         paths=PathsConfig(
             repo_root=str(repo_root),
             data_dir="data",
@@ -77,7 +80,6 @@ def _build_context(repo_root: Path) -> ApplicationContext:
             xtr_dir="data/xtr",
         ),
         index=IndexConfig(vec_dim=2560, chunk_budget=2200, faiss_nlist=8192, use_cuvs=True),
-        vllm=VLLMConfig(base_url="http://localhost:8001/v1", batch_size=32),
         limits=ServerLimits(),
         eval=EvalConfig(),
         redis=RedisConfig(

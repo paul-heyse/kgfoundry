@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import Any
 
 __all__ = [
     "RunCheckpoint",
@@ -23,8 +24,13 @@ class RunCheckpoint:
     attrs: dict[str, Any] = field(default_factory=dict)
 
     def to_event_attrs(self) -> dict[str, Any]:
-        """Return a JSON-ready dictionary for downstream stores."""
+        """Return a JSON-ready dictionary for downstream stores.
 
+        Returns
+        -------
+        dict[str, Any]
+            Attribute dictionary describing the checkpoint.
+        """
         payload: dict[str, Any] = {"stage": self.stage, "ok": self.ok}
         if self.reason:
             payload["reason"] = self.reason
@@ -46,15 +52,27 @@ class TimelineEvent:
     attrs: dict[str, Any]
 
 
-def checkpoint_event(stage: str, *, ok: bool, reason: str | None = None, **attrs: Any) -> RunCheckpoint:
-    """Convenience factory for run checkpoint payloads."""
+def checkpoint_event(
+    stage: str, *, ok: bool, reason: str | None = None, **attrs: object
+) -> RunCheckpoint:
+    """Create a RunCheckpoint instance.
 
+    Returns
+    -------
+    RunCheckpoint
+        Structured checkpoint payload.
+    """
     return RunCheckpoint(stage=stage, ok=ok, reason=reason, attrs=dict(attrs))
 
 
 def coerce_event(payload: Mapping[str, Any]) -> TimelineEvent:
-    """Coerce a raw timeline payload into :class:`TimelineEvent`."""
+    """Coerce a raw timeline payload into :class:`TimelineEvent`.
 
+    Returns
+    -------
+    TimelineEvent
+        Normalised timeline event.
+    """
     return TimelineEvent(
         session_id=str(payload.get("session_id", "")),
         run_id=str(payload.get("run_id", "")),

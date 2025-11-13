@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
-from collections.abc import Callable, Sequence
+import random
+import uuid
+from collections.abc import Callable, Mapping, Sequence
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
@@ -14,20 +18,33 @@ import numpy as np
 import typer
 
 from codeintel_rev.config.settings import Settings, load_settings
+from codeintel_rev.embeddings import get_embedding_provider
+from codeintel_rev.errors import RuntimeLifecycleError
 from codeintel_rev.eval.hybrid_evaluator import EvalConfig, HybridPoolEvaluator
+from codeintel_rev.indexing.cast_chunker import Chunk
 from codeintel_rev.indexing.index_lifecycle import (
     IndexAssets,
     IndexLifecycleManager,
     collect_asset_attrs,
 )
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
+from codeintel_rev.io.parquet_store import (
+    ParquetWriteOptions,
+    extract_embeddings,
+    read_chunks_parquet,
+    write_chunks_parquet,
+)
 from codeintel_rev.io.xtr_manager import XTRIndex
+from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.logging import get_logger
 
 LOGGER = get_logger(__name__)
 app = typer.Typer(help="Manage versioned FAISS/DuckDB/SCIP assets.", no_args_is_help=True)
 DEFAULT_XTR_ORACLE = False
+embeddings_app = typer.Typer(help="Embedding lifecycle commands.", no_args_is_help=True)
+app.add_typer(embeddings_app, name="embeddings")
 
 
 @lru_cache(maxsize=1)
@@ -69,6 +86,27 @@ SidecarOption = Annotated[
         help="Optional sidecar entry of the form name=/path (faiss_idmap, tuning).",
         default_factory=list,
     ),
+]
+VersionOption = Annotated[
+    str | None,
+    typer.Option("--version", help="Explicit version directory (defaults to CURRENT)."),
+]
+ParquetOption = Annotated[
+    Path | None, typer.Option("--parquet", help="Embeddings Parquet override.")
+]
+OutputOption = Annotated[Path | None, typer.Option("--output", help="Output Parquet path.")]
+ChunkBatchOption = Annotated[
+    int,
+    typer.Option("--chunk-size", min=1, help="DuckDB rows fetched per embedding batch."),
+]
+SampleOption = Annotated[int, typer.Option("--samples", min=1, help="Rows sampled for validation.")]
+EpsilonOption = Annotated[
+    float,
+    typer.Option("--epsilon", min=0.0, help="Maximum allowed cosine drift during validation."),
+]
+ForceFlag = Annotated[
+    bool,
+    typer.Option("--force/--no-force", help="Rebuild even when checksum and fingerprint match."),
 ]
 SweepMode = Literal["quick", "full"]
 _PRIMARY_ASSET_COUNT = 3
@@ -188,6 +226,283 @@ def _parse_sidecars(entries: list[str]) -> dict[str, Path]:
     return parsed
 
 
+def _resolve_version_dir(manager: IndexLifecycleManager, version: str | None) -> Path | None:
+    if version:
+        candidate = manager.versions_dir / version
+        if not candidate.exists():
+            msg = f"Version {version!r} does not exist under {manager.versions_dir}"
+            raise typer.BadParameter(msg)
+        return candidate
+    return manager.current_dir()
+
+
+def _manifest_path_for(output_path: Path) -> Path:
+    return output_path.with_suffix(".manifest.json")
+
+
+def _load_manifest(path: Path) -> dict[str, object]:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    except json.JSONDecodeError:
+        LOGGER.warning("Malformed manifest file ignored", extra={"path": str(path)})
+        return {}
+
+
+def _write_manifest(path: Path, payload: dict[str, object]) -> None:
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _parquet_meta(provider) -> dict[str, str]:
+    meta = provider.metadata
+    return {
+        "embedding_provider": meta.provider,
+        "embedding_model": meta.model_name,
+        "embedding_dim": str(meta.dimension),
+        "embedding_dtype": meta.dtype,
+        "embedding_normalize": str(meta.normalize).lower(),
+        "embedding_device": meta.device,
+        "embedding_fingerprint": provider.fingerprint(),
+    }
+
+
+def _build_embedding_manifest(
+    provider,
+    *,
+    checksum: str,
+    vector_count: int,
+    output_path: Path,
+    settings: Settings,
+) -> dict[str, object]:
+    meta = provider.metadata
+    return {
+        "provider": meta.provider,
+        "model_name": meta.model_name,
+        "dimension": meta.dimension,
+        "dtype": meta.dtype,
+        "normalize": meta.normalize,
+        "device": meta.device,
+        "fingerprint": provider.fingerprint(),
+        "checksum": checksum,
+        "vectors": vector_count,
+        "batch_size": settings.embeddings.batch_size,
+        "micro_batch_size": settings.embeddings.micro_batch_size,
+        "output_path": str(output_path),
+        "generated_at": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+    }
+
+
+def _compute_chunk_checksum(manager: DuckDBManager, *, batch_size: int = 2048) -> tuple[str, int]:
+    digest = hashlib.sha256()
+    total = 0
+    with manager.connection() as conn:
+        cursor = conn.execute("SELECT id, content_hash FROM chunks ORDER BY id")
+        while True:
+            rows = cursor.fetchmany(batch_size)
+            if not rows:
+                break
+            for chunk_id, content_hash in rows:
+                digest.update(f"{int(chunk_id)}:{int(content_hash):016x}".encode("utf-8"))
+                total += 1
+    return digest.hexdigest(), total
+
+
+def _collect_chunks_and_embeddings(
+    manager: DuckDBManager,
+    *,
+    provider,
+    batch_rows: int,
+) -> tuple[list[Chunk], NDArrayF32]:
+    np_module = np
+    chunks: list[Chunk] = []
+    embeddings_parts: list[NDArrayF32] = []
+    sql = """
+        SELECT uri, start_byte, end_byte, start_line, end_line, content, lang, symbols
+        FROM chunks
+        ORDER BY id
+    """
+    with manager.connection() as conn:
+        cursor = conn.execute(sql)
+        while True:
+            rows = cursor.fetchmany(batch_rows)
+            if not rows:
+                break
+            batch_chunks: list[Chunk] = []
+            texts: list[str] = []
+            for uri, start_byte, end_byte, start_line, end_line, content, lang, symbols in rows:
+                chunk = Chunk(
+                    uri=uri,
+                    start_byte=int(start_byte),
+                    end_byte=int(end_byte),
+                    start_line=int(start_line),
+                    end_line=int(end_line),
+                    text=content,
+                    symbols=tuple(symbols) if symbols else (),
+                    language=lang or "",
+                )
+                batch_chunks.append(chunk)
+                texts.append(chunk.text)
+            if not batch_chunks:
+                continue
+            vectors = provider.embed_texts(texts)
+            embeddings_parts.append(vectors)
+            chunks.extend(batch_chunks)
+    if embeddings_parts:
+        embeddings = np_module.vstack(embeddings_parts)
+    else:
+        embeddings = np_module.empty((0, provider.metadata.dimension), dtype=np_module.float32)
+    return chunks, embeddings
+
+
+def _write_embedding_meta(
+    manager: IndexLifecycleManager,
+    payload: Mapping[str, object],
+    *,
+    version: str | None,
+) -> None:
+    try:
+        manager.write_embedding_metadata(payload, version=version)
+    except RuntimeLifecycleError:
+        LOGGER.debug(
+            "No version directory available for embedding metadata", extra={"version": version}
+        )
+
+
+@embeddings_app.command("build")
+def embeddings_build_command(
+    version: VersionOption = None,
+    duckdb_path: DuckOption = None,
+    output: OutputOption = None,
+    chunk_size: ChunkBatchOption = 512,
+    force: ForceFlag = False,
+) -> None:
+    """Embed chunks from DuckDB and write Parquet + manifest artifacts."""
+    settings = _get_settings()
+    manager = _manager()
+    version_dir = _resolve_version_dir(manager, version)
+    if duckdb_path is not None:
+        duck_path = duckdb_path.expanduser().resolve()
+    elif version_dir is not None:
+        duck_path = (version_dir / "catalog.duckdb").resolve()
+    else:
+        duck_path = Path(settings.paths.duckdb_path).expanduser().resolve()
+    if not duck_path.exists():
+        raise typer.BadParameter(f"DuckDB catalog not found: {duck_path}")
+
+    if output is not None:
+        output_path = output.expanduser().resolve()
+    elif version_dir is not None:
+        output_path = (version_dir / "embeddings.parquet").resolve()
+    else:
+        output_path = (
+            Path(settings.paths.vectors_dir).expanduser() / "embeddings.parquet"
+        ).resolve()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path = _manifest_path_for(output_path)
+
+    provider = get_embedding_provider(settings)
+    db_manager = DuckDBManager(duck_path, settings.duckdb)
+    try:
+        checksum, row_count = _compute_chunk_checksum(db_manager)
+        existing_manifest = _load_manifest(manifest_path)
+        if (
+            not force
+            and existing_manifest
+            and existing_manifest.get("checksum") == checksum
+            and existing_manifest.get("fingerprint") == provider.fingerprint()
+        ):
+            typer.echo(
+                f"Embeddings already current for checksum={checksum[:8]}… and provider {existing_manifest.get('provider')}",
+            )
+            return
+
+        typer.echo(f"Embedding {row_count} chunks from {duck_path} → {output_path}")
+        chunks, embeddings = _collect_chunks_and_embeddings(
+            db_manager,
+            provider=provider,
+            batch_rows=chunk_size,
+        )
+        options = ParquetWriteOptions(
+            vec_dim=provider.metadata.dimension,
+            preview_max_chars=settings.index.preview_max_chars,
+            id_strategy="stable_hash",
+            table_meta=_parquet_meta(provider),
+        )
+        write_chunks_parquet(output_path, chunks, embeddings, options=options)
+        manifest_payload = _build_embedding_manifest(
+            provider,
+            checksum=checksum,
+            vector_count=len(chunks),
+            output_path=output_path,
+            settings=settings,
+        )
+        manifest_payload["row_count"] = row_count
+        _write_manifest(manifest_path, manifest_payload)
+        if version_dir is not None:
+            _write_embedding_meta(manager, manifest_payload, version=version)
+        typer.echo(f"Wrote embeddings Parquet ({len(chunks)} rows) and manifest at {manifest_path}")
+    finally:
+        provider.close()
+
+
+@embeddings_app.command("validate")
+def embeddings_validate_command(
+    parquet: ParquetOption = None,
+    version: VersionOption = None,
+    samples: SampleOption = 32,
+    epsilon: EpsilonOption = 5e-3,
+) -> None:
+    """Sample stored embeddings, recompute vectors, and detect drift."""
+    settings = _get_settings()
+    manager = _manager()
+    version_dir = _resolve_version_dir(manager, version)
+    if parquet is not None:
+        parquet_path = parquet.expanduser().resolve()
+    elif version_dir is not None:
+        parquet_path = (version_dir / "embeddings.parquet").resolve()
+    else:
+        parquet_path = (
+            Path(settings.paths.vectors_dir).expanduser() / "embeddings.parquet"
+        ).resolve()
+    if not parquet_path.exists():
+        raise typer.BadParameter(f"Embeddings Parquet not found: {parquet_path}")
+
+    table = read_chunks_parquet(parquet_path)
+    embeddings = extract_embeddings(table)
+    total_rows = embeddings.shape[0]
+    if total_rows == 0:
+        typer.echo("Parquet file is empty; nothing to validate.")
+        return
+    sample_size = min(samples, total_rows)
+    contents = table.column("content").to_pylist()
+    indices = random.Random(42).sample(range(total_rows), sample_size)
+
+    provider = get_embedding_provider(settings)
+    try:
+        drifts: list[float] = []
+        failures: list[tuple[int, float]] = []
+        for idx in indices:
+            text = contents[idx]
+            fresh = provider.embed_texts([text])[0]
+            stored = embeddings[idx]
+            denom = float(np.linalg.norm(stored) * np.linalg.norm(fresh))
+            cosine = float(np.dot(stored, fresh) / denom) if denom else 0.0
+            drift = max(0.0, 1.0 - cosine)
+            drifts.append(drift)
+            if drift > epsilon:
+                failures.append((idx, drift))
+        typer.echo(
+            f"Validated {sample_size}/{total_rows} rows from {parquet_path} | "
+            f"max drift={max(drifts):.4f} avg drift={float(np.mean(drifts)):.4f}",
+        )
+        if failures:
+            typer.echo(f"{len(failures)} samples exceeded epsilon={epsilon:.4f}")
+            raise typer.Exit(code=1)
+    finally:
+        provider.close()
+
+
 def _parse_tune_overrides(
     raw_args: Sequence[str],
 ) -> tuple[dict[str, float | int], SweepMode | None]:
@@ -273,9 +588,12 @@ def _load_xtr_index(settings: Settings) -> XTRIndex | None:
 
 
 def _eval_paths(settings: Settings) -> tuple[Path, Path]:
-    out_dir = Path(settings.eval.output_dir).expanduser().resolve()
-    out_dir.mkdir(parents=True, exist_ok=True)
-    return out_dir / "last_eval_pool.parquet", out_dir / "metrics.json"
+    base_dir = Path(settings.eval.output_dir).expanduser().resolve()
+    timestamp = datetime.now().strftime("%y%m%d-%H%M")
+    run_id = uuid.uuid4().hex[:8]
+    output_dir = base_dir / timestamp
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return output_dir / f"{run_id}.parquet", output_dir / f"{run_id}.json"
 
 
 @app.command("status")
