@@ -15,7 +15,11 @@ import typer
 
 from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.eval.hybrid_evaluator import EvalConfig, HybridPoolEvaluator
-from codeintel_rev.indexing.index_lifecycle import IndexAssets, IndexLifecycleManager
+from codeintel_rev.indexing.index_lifecycle import (
+    IndexAssets,
+    IndexLifecycleManager,
+    collect_asset_attrs,
+)
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.xtr_manager import XTRIndex
@@ -311,7 +315,7 @@ def stage_command(
         channels,
         sidecar_paths,
     )
-    staging = mgr.prepare(version, staged_assets)
+    staging = mgr.prepare(version, staged_assets, attrs=collect_asset_attrs(staged_assets))
     typer.echo(f"Staged assets at {staging}")
 
 
@@ -363,6 +367,7 @@ def export_idmap_command(
         catalog = _duckdb_catalog(duckdb)
         stats = catalog.refresh_faiss_idmap_mat_if_changed(destination)
         catalog.ensure_faiss_idmap_views(destination)
+        catalog.materialize_faiss_join()
         typer.echo(
             f"Materialized join rows={stats['rows']} "
             f"checksum={stats['checksum']} refreshed={stats['refreshed']}"
@@ -378,6 +383,7 @@ def materialize_join_command(
     catalog = _duckdb_catalog(duckdb)
     stats = catalog.refresh_faiss_idmap_mat_if_changed(idmap.expanduser().resolve())
     catalog.ensure_faiss_idmap_views(idmap)
+    catalog.materialize_faiss_join()
     typer.echo(f"Refreshed={stats['refreshed']} rows={stats['rows']} checksum={stats['checksum']}")
 
 

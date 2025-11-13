@@ -38,14 +38,21 @@ FAISS_SEARCH_LAST_K = build_gauge("faiss_search_last_k", "k used by the last FAI
 FAISS_SEARCH_NPROBE = build_gauge(
     "faiss_search_nprobe", "IVF nprobe value used for the most recent FAISS search."
 )
+_METRIC_LABELS = ("index_family", "nprobe", "ef_search", "refine_k_factor")
 FAISS_ANN_LATENCY_SECONDS = build_histogram(
     "faiss_ann_latency_seconds",
     "Latency for ANN (approximate) FAISS searches.",
-    labelnames=("family",),
+    labelnames=_METRIC_LABELS,
 )
 FAISS_REFINE_LATENCY_SECONDS = build_histogram(
     "faiss_refine_latency_seconds",
     "Latency for exact rerank refinement over hydrated embeddings.",
+    labelnames=_METRIC_LABELS,
+)
+FAISS_POSTFILTER_DENSITY = build_gauge(
+    "faiss_postfilter_density",
+    "Ratio of final top-k to ANN candidate fan-out.",
+    labelnames=_METRIC_LABELS,
 )
 FAISS_REFINE_KEPT_RATIO = build_histogram(
     "faiss_refine_kept_ratio",
@@ -164,6 +171,7 @@ __all__ = [
     "FAISS_INDEX_FACTORY",
     "FAISS_INDEX_GPU_ENABLED",
     "FAISS_INDEX_SIZE_VECTORS",
+    "FAISS_POSTFILTER_DENSITY",
     "FAISS_REFINE_KEPT_RATIO",
     "FAISS_REFINE_LATENCY_SECONDS",
     "FAISS_SEARCH_ERRORS_TOTAL",

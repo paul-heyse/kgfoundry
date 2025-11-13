@@ -338,6 +338,7 @@ def _write_parquet(
             start_id=0,
             vec_dim=vec_dim,
             preview_max_chars=preview_max_chars,
+            id_strategy="stable_hash",
         ),
     )
     logger.info("Wrote Parquet dataset to %s", output_path)

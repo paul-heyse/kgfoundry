@@ -468,6 +468,21 @@ class DuckDBCatalog:
             self._ensure_faiss_idmap_view(conn, idmap_path)
             self._ensure_faiss_join_view(conn)
 
+    def materialize_faiss_join(self) -> None:
+        """Persist ``v_faiss_join`` into ``faiss_join_mat`` for BI workloads."""
+        with self.connection() as conn:
+            if not self._relation_exists(conn, "v_faiss_join"):
+                return
+            sql = "CREATE OR REPLACE TABLE faiss_join_mat AS SELECT * FROM v_faiss_join"
+            self._log_query(sql, None)
+            conn.execute(sql)
+            row = conn.execute("SELECT COUNT(*) FROM faiss_join_mat").fetchone()
+            rows = int(row[0]) if row and row[0] is not None else 0
+            LOGGER.info(
+                "Materialized FAISS join table",
+                extra=_log_extra(rows=rows, table="faiss_join_mat"),
+            )
+
     def set_idmap_path(self, path: Path) -> None:
         """Override the FAISS id map path used for view installation."""
         self._idmap_path = path.resolve()

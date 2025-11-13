@@ -70,6 +70,22 @@ def _write_chunks_parquet(path: Path) -> None:
     connection.close()
 
 
+def _write_idmap_parquet(path: Path) -> None:
+    connection = duckdb.connect(database=":memory:")
+    connection.execute(
+        "CREATE TABLE tmp (faiss_row BIGINT, external_id BIGINT, source TEXT)"
+    )
+    connection.executemany(
+        "INSERT INTO tmp VALUES (?, ?, ?)",
+        [
+            (0, 1, "primary"),
+            (1, 2, "primary"),
+        ],
+    )
+    connection.execute("COPY tmp TO ? (FORMAT PARQUET)", [str(path)])
+    connection.close()
+
+
 def _table_exists(db_path: Path, table_name: str) -> bool:
     connection = duckdb.connect(str(db_path))
     try:
@@ -764,6 +780,29 @@ def test_query_by_filters_handles_literal_underscore(tmp_path: Path) -> None:
     results = catalog.query_by_filters([1], include_globs=["src/config_file.py"])
     assert len(results) == 1
     assert results[0]["uri"] == "src/config_file.py"
+
+
+def test_materialize_faiss_join_builds_table(tmp_path: Path) -> None:
+    """Materializing the FAISS join hydrates a persistent table."""
+    vectors_dir = tmp_path / "vectors"
+    vectors_dir.mkdir(parents=True, exist_ok=True)
+    chunks_parquet = vectors_dir / "chunks.parquet"
+    _write_chunks_parquet(chunks_parquet)
+
+    faiss_dir = tmp_path / "faiss"
+    faiss_dir.mkdir(parents=True, exist_ok=True)
+    idmap_parquet = faiss_dir / "faiss_idmap.parquet"
+    _write_idmap_parquet(idmap_parquet)
+
+    catalog_path = tmp_path / "catalog.duckdb"
+    catalog = DuckDBCatalog(catalog_path, vectors_dir)
+    catalog.ensure_faiss_idmap_views(idmap_parquet)
+    catalog.materialize_faiss_join()
+
+    with duckdb.connect(str(catalog_path)) as connection:
+        row = connection.execute("SELECT COUNT(*) FROM faiss_join_mat").fetchone()
+        count = row[0] if row else 0
+    assert count == 2
 
 
 def test_open_materialize_creates_table_and_index(tmp_path: Path) -> None:

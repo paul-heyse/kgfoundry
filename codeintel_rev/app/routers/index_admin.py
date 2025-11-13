@@ -13,7 +13,7 @@ from fastapi.responses import JSONResponse
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.scope_store import ScopeIn
 from codeintel_rev.errors import RuntimeLifecycleError
-from codeintel_rev.indexing.index_lifecycle import IndexAssets
+from codeintel_rev.indexing.index_lifecycle import IndexAssets, collect_asset_attrs
 from codeintel_rev.runtime.factory_adjustment import DefaultFactoryAdjuster
 from kgfoundry_common.logging import get_logger
 
@@ -340,7 +340,7 @@ async def publish_endpoint(
             faiss_idmap=Path(idmap_raw) if idmap_raw else None,
             tuning_profile=Path(tuning_raw) if tuning_raw else None,
         )
-        staging = mgr.prepare(body["version"], assets)
+        staging = mgr.prepare(body["version"], assets, attrs=collect_asset_attrs(assets))
         final = mgr.publish(body["version"])
         ctx.reload_indices()
     except KeyError as exc:  # pragma: no cover - body validation

@@ -10,6 +10,7 @@ import pyarrow.parquet as pq
 import pytest
 import xxhash
 from codeintel_rev.indexing.cast_chunker import Chunk
+from codeintel_rev.indexing.chunk_ids import stable_chunk_id
 from codeintel_rev.io.parquet_store import (
     ParquetWriteOptions,
     extract_embeddings,
@@ -101,3 +102,25 @@ def test_write_chunks_parquet_rejects_dimension_mismatch(tmp_path: Path) -> None
             embeddings,
             options=ParquetWriteOptions(vec_dim=3),
         )
+
+
+def test_write_chunks_parquet_supports_stable_ids(tmp_path: Path) -> None:
+    """Writer emits deterministic ids when requested."""
+    chunks = _make_chunks()
+    vec_dim = 2
+    embeddings = np.arange(len(chunks) * vec_dim, dtype=np.float32).reshape(len(chunks), vec_dim)
+    out_path = tmp_path / "stable_ids.parquet"
+
+    write_chunks_parquet(
+        out_path,
+        chunks,
+        embeddings,
+        options=ParquetWriteOptions(vec_dim=vec_dim, id_strategy="stable_hash", id_hash_salt="s1"),
+    )
+
+    table = pq.read_table(out_path)
+    ids = table.column("id").to_pylist()
+    expected = [
+        stable_chunk_id(chunk.uri, chunk.start_byte, chunk.end_byte, salt="s1") for chunk in chunks
+    ]
+    assert ids == expected

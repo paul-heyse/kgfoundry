@@ -31,6 +31,7 @@ from codeintel_rev.metrics.registry import (
     FAISS_INDEX_SIZE_VECTORS,
     FAISS_REFINE_KEPT_RATIO,
     FAISS_REFINE_LATENCY_SECONDS,
+    FAISS_POSTFILTER_DENSITY,
     FAISS_SEARCH_ERRORS_TOTAL,
     FAISS_SEARCH_LAST_K,
     FAISS_SEARCH_LAST_MS,
@@ -138,6 +139,18 @@ def _has_faiss_gpu_support() -> bool:
         return False
     required_attrs = ("StandardGpuResources", "GpuClonerOptions", "index_cpu_to_gpu")
     return all(hasattr(module, attr) for attr in required_attrs)
+
+
+def apply_parameters(index: Any, param_str: str) -> None:
+    """Apply a FAISS ParameterSpace string to ``index``."""
+    if not param_str or not param_str.strip():
+        msg = "Parameter string must be non-empty."
+        raise ValueError(msg)
+    try:
+        faiss.ParameterSpace().set_index_parameters(index, param_str)
+    except (AttributeError, RuntimeError, ValueError) as exc:
+        msg = f"Unable to apply FAISS parameters: {param_str}"
+        raise ValueError(msg) from exc
 
 
 # Adaptive indexing thresholds
@@ -1258,6 +1271,7 @@ class FAISSManager(
         """
         plan = self._prepare_search_plan(query, k, nprobe, runtime)
         timeline = plan.timeline
+        metric_labels = self._metric_labels(plan)
         FAISS_SEARCH_TOTAL.inc()
         FAISS_SEARCH_LAST_K.set(float(plan.k))
         if plan.params.nprobe is not None:
@@ -1277,7 +1291,6 @@ class FAISSManager(
             )
 
         start = perf_counter()
-        family_label = getattr(self, "faiss_family", "auto")
         ann_timer_start = start
         try:
             distances, identifiers = self._execute_dual_search(
@@ -1285,10 +1298,15 @@ class FAISSManager(
                 search_k=plan.search_k,
                 params=plan.params,
             )
+            if plan.search_k > 0:
+                FAISS_POSTFILTER_DENSITY.labels(**metric_labels).set(
+                    plan.k / float(plan.search_k)
+                )
             refined = self._maybe_refine_results(
                 catalog=catalog,
                 plan=plan,
                 identifiers=identifiers,
+                metric_labels=metric_labels,
             )
             if refined is not None:
                 distances, identifiers = refined
@@ -1319,7 +1337,7 @@ class FAISSManager(
             ) from exc
         finally:
             duration = max(perf_counter() - ann_timer_start, 0.0)
-            FAISS_ANN_LATENCY_SECONDS.labels(family=str(family_label)).observe(duration)
+            FAISS_ANN_LATENCY_SECONDS.labels(**metric_labels).observe(duration)
 
         elapsed_total = (perf_counter() - start) * 1000.0
         if timeline is not None:
@@ -1626,6 +1644,7 @@ class FAISSManager(
         catalog: DuckDBCatalog | None,
         plan: _SearchPlan,
         identifiers: NDArrayI64,
+        metric_labels: Mapping[str, str] | None = None,
     ) -> tuple[NDArrayF32, NDArrayI64] | None:
         """Optionally refine ANN candidates with exact similarity search.
 
@@ -1692,7 +1711,11 @@ class FAISSManager(
                 extra=_log_extra(error=str(exc)),
             )
             return None
-        FAISS_REFINE_LATENCY_SECONDS.observe(max(perf_counter() - refine_start, 0.0))
+        duration = max(perf_counter() - refine_start, 0.0)
+        if metric_labels is not None:
+            FAISS_REFINE_LATENCY_SECONDS.labels(**metric_labels).observe(duration)
+        else:  # pragma: no cover - legacy path
+            FAISS_REFINE_LATENCY_SECONDS.observe(duration)
         self._log_refine_delta(identifiers[:, : plan.k], rerank_ids)
         return rerank_scores, rerank_ids
 
@@ -2115,8 +2138,8 @@ class FAISSManager(
         index = self._active_index()
         if param_str:
             try:
-                faiss.ParameterSpace().set_index_parameters(index, param_str)
-            except (RuntimeError, ValueError) as exc:
+                apply_parameters(index, param_str)
+            except ValueError as exc:
                 LOGGER.warning(
                     "Failed to apply FAISS parameters",
                     extra=_log_extra(param_str=param_str, error=str(exc)),
@@ -2125,6 +2148,18 @@ class FAISSManager(
         if refine_k_factor and refine_k_factor > 1.0:
             distances, ids = self._refine_with_flat(xq, ids, k)
         return distances, ids
+
+    def save_tuning_profile(
+        self,
+        profile: Mapping[str, Any],
+        *,
+        path: Path | None = None,
+    ) -> Path:
+        """Persist ``profile`` to ``tuning.json`` and return its path."""
+        target = path or self.autotune_profile_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps(profile, indent=2), encoding="utf-8")
+        return target
 
     def autotune(
         self,
@@ -2168,53 +2203,17 @@ class FAISSManager(
         `autotune_profile_path` and stored in `_tuned_parameters` for future use.
         Time complexity: O(n_queries * n_truths) for ground truth + O(len(sweep) * search_time).
         """
-        xq = self._ensure_2d(queries).astype(np.float32)
-        xt = self._ensure_2d(truths).astype(np.float32)
-        faiss.normalize_L2(xq)
-        faiss.normalize_L2(xt)
-        sweep = sweep or ["nprobe=16", "nprobe=32", "nprobe=64", "nprobe=96", "nprobe=128"]
-        truth_ids = self._brute_force_truth_ids(xq, xt, min(k, xt.shape[0]))
-        best_recall = 0.0
-        best_latency = float("inf")
-        best_param = ""
-        for spec in sweep:
-            latency_ms, (_, ids) = self._timed_search_with_params(xq, k, spec)
-            recall = self._estimate_recall(ids, truth_ids)
-            is_better = recall > best_recall or (
-                math.isclose(recall, best_recall) and latency_ms < best_latency
-            )
-            if is_better:
-                best_recall = float(recall)
-                best_latency = float(latency_ms)
-                best_param = spec
-        if not best_param:
-            return {
-                "recall_at_k": best_recall,
-                "latency_ms": best_latency,
-                "param_str": best_param,
-            }
-        profile: dict[str, float | str] = {
-            "recall_at_k": best_recall,
-            "latency_ms": best_latency,
-            "param_str": best_param,
-        }
-        for token in best_param.split(","):
-            if "=" not in token:
-                continue
-            key, raw_value = token.split("=", 1)
-            try:
-                profile[key.strip()] = float(raw_value)
-            except ValueError:
-                continue
+        tuner = AutoTuner(self)
+        profile = tuner.run_sweep(queries, truths, k=k, sweep=sweep)
+        profile["updated_at"] = datetime.now(UTC).isoformat()
         try:
-            self.autotune_profile_path.parent.mkdir(parents=True, exist_ok=True)
-            self.autotune_profile_path.write_text(json.dumps(profile, indent=2))
-        except OSError as exc:
+            self.save_tuning_profile(profile)
+        except OSError as exc:  # pragma: no cover - best-effort logging
             LOGGER.warning(
                 "Failed to persist FAISS autotune profile",
                 extra=_log_extra(path=str(self.autotune_profile_path), error=str(exc)),
             )
-        self._tuned_parameters = profile
+        self._tuned_parameters = dict(profile)
         return profile
 
     # ------------------------------------------------------------------
@@ -2346,9 +2345,19 @@ class FAISSManager(
         index = self._active_index()
         try:
             faiss.ParameterSpace().set_index_parameters(index, ",".join(params))
-        except (RuntimeError, AttributeError, ValueError):
-            if nprobe is not None and hasattr(index, "nprobe"):
-                index.nprobe = int(nprobe)
+            except (RuntimeError, AttributeError, ValueError):
+                if nprobe is not None and hasattr(index, "nprobe"):
+                    index.nprobe = int(nprobe)
+
+    def _metric_labels(self, plan: _SearchPlan) -> dict[str, str]:
+        ratio = plan.search_k / plan.k if plan.k > 0 else 0.0
+        labels = {
+            "index_family": str(self.faiss_family or "auto"),
+            "nprobe": str(plan.params.nprobe or "default"),
+            "ef_search": str(plan.params.ef_search or ""),
+            "refine_k_factor": f"{ratio:.2f}",
+        }
+        return labels
 
     def _maybe_apply_runtime_parameters(self, overrides: Mapping[str, float | int]) -> None:
         """Best-effort application of overrides to the live index if available."""
@@ -2427,10 +2436,9 @@ class FAISSManager(
         faiss_spec, sanitized = self._prepare_parameter_string(param_str)
         if faiss_spec:
             try:
-                faiss.ParameterSpace().set_index_parameters(self._active_index(), faiss_spec)
-            except (AttributeError, RuntimeError, ValueError) as exc:
-                msg = f"Unable to apply FAISS parameters: {faiss_spec}"
-                raise ValueError(msg) from exc
+                apply_parameters(self._active_index(), faiss_spec)
+            except ValueError as exc:
+                raise ValueError(str(exc)) from exc
         with self._tuning_lock:
             self._runtime_overrides.update(sanitized)
         self._write_meta_snapshot(
@@ -2754,6 +2762,81 @@ class FAISSManager(
         raise RuntimeError(msg)
 
 
+class AutoTuner:
+    """Evaluate FAISS ParameterSpace candidates for a given manager."""
+
+    _DEFAULT_SWEEP: tuple[str, ...] = (
+        "nprobe=16",
+        "nprobe=32",
+        "nprobe=64",
+        "nprobe=96",
+        "nprobe=128",
+    )
+
+    def __init__(self, manager: FAISSManager) -> None:
+        self._manager = manager
+
+    def run_sweep(
+        self,
+        queries: NDArrayF32,
+        truths: NDArrayF32,
+        *,
+        k: int = 10,
+        sweep: Sequence[str] | None = None,
+        refine_k_factor: float | None = None,
+    ) -> dict[str, Any]:
+        """Return the selected operating-point profile."""
+        xq = self._manager._ensure_2d(queries).astype(np.float32)
+        xt = self._manager._ensure_2d(truths).astype(np.float32)
+        faiss.normalize_L2(xq)
+        faiss.normalize_L2(xt)
+        eval_sweep = tuple(sweep) if sweep else self._DEFAULT_SWEEP
+        truth_ids = self._manager._brute_force_truth_ids(xq, xt, min(k, xt.shape[0]))
+        candidates: list[dict[str, float | str]] = []
+        for spec in eval_sweep:
+            latency_ms, (_, ids) = self._manager._timed_search_with_params(xq, k, spec)
+            recall = self._manager._estimate_recall(ids, truth_ids)
+            candidates.append(
+                {
+                    "param_str": spec,
+                    "recall_at_k": float(recall),
+                    "latency_ms": float(latency_ms),
+                }
+            )
+        profile = self._select_candidate(candidates)
+        profile["refine_k_factor"] = float(
+            refine_k_factor if refine_k_factor is not None else self._manager.refine_k_factor
+        )
+        meta = self._manager._meta_snapshot()
+        if "factory" in meta:
+            profile["factory"] = meta["factory"]
+        return profile
+
+    @staticmethod
+    def _select_candidate(rows: Sequence[dict[str, float | str]]) -> dict[str, Any]:
+        if not rows:
+            return {"param_str": "", "recall_at_k": 0.0, "latency_ms": float("inf")}
+        ordered = sorted(
+            rows,
+            key=lambda row: (-float(row["recall_at_k"]), float(row["latency_ms"])),
+        )
+        best_recall = float(ordered[0]["recall_at_k"])
+        pareto = [
+            row for row in ordered if float(row["recall_at_k"]) >= best_recall - 0.005
+        ]
+        pareto.sort(key=lambda row: float(row["latency_ms"]))
+        profile = dict(pareto[0])
+        for token in str(profile["param_str"]).split(","):
+            key, sep, raw_value = token.partition("=")
+            if not sep:
+                continue
+            try:
+                profile[key.strip()] = float(raw_value)
+            except ValueError:
+                continue
+        return profile
+
+
 def _coerce_to_int(value: object, default: int = -1) -> int:
     """Safely round arbitrary objects to integers for index comparisons.
 
@@ -2802,4 +2885,4 @@ def _set_direct_map_type(index: _faiss.Index) -> None:
             )
 
 
-__all__ = ["FAISSManager"]
+__all__ = ["AutoTuner", "FAISSManager", "apply_parameters"]

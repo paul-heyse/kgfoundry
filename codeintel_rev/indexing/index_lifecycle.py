@@ -20,6 +20,7 @@ through stable paths such as ``.../current/faiss.index`` and reload when
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import shutil
 import time
@@ -109,6 +110,56 @@ class IndexAssets:
             if path is not None and not path.exists():
                 message = f"{label} missing: {path}"
                 raise RuntimeLifecycleError(message, runtime=_RUNTIME)
+
+
+def _file_checksum(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _read_json(path: Path) -> dict[str, object]:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def collect_asset_attrs(assets: IndexAssets) -> dict[str, object]:
+    """Return manifest attributes derived from staged asset sidecars."""
+    attrs: dict[str, object] = {}
+    meta_path = assets.faiss_index.with_suffix(".meta.json")
+    meta_payload = _read_json(meta_path)
+    if meta_payload:
+        factory = meta_payload.get("factory")
+        if factory:
+            attrs["faiss_factory"] = factory
+        parameter_space = meta_payload.get("parameter_space")
+        if parameter_space:
+            attrs["faiss_parameters"] = parameter_space
+        vector_count = meta_payload.get("vector_count")
+        if vector_count is not None:
+            attrs["faiss_vector_count"] = int(vector_count)
+        default_parameters = meta_payload.get("default_parameters")
+        if default_parameters:
+            attrs["faiss_default_parameters"] = default_parameters
+    if assets.faiss_idmap is not None and assets.faiss_idmap.exists():
+        attrs["faiss_idmap_checksum"] = _file_checksum(assets.faiss_idmap)
+    if assets.tuning_profile is not None and assets.tuning_profile.exists():
+        profile_payload = _read_json(assets.tuning_profile)
+        if profile_payload:
+            attrs["faiss_tuning_profile"] = profile_payload
+            if "param_str" in profile_payload:
+                attrs["faiss_parameters"] = profile_payload["param_str"]
+            if "refine_k_factor" in profile_payload:
+                attrs["faiss_refine_k_factor"] = profile_payload["refine_k_factor"]
+            if "factory" in profile_payload and "faiss_factory" not in attrs:
+                attrs["faiss_factory"] = profile_payload["factory"]
+    return attrs
 
 
 @dataclass(slots=True, frozen=True)
@@ -313,6 +364,19 @@ class IndexLifecycleManager:
         )
         return staging_dir
 
+    def write_attrs(self, version: str, **attrs: object) -> Path:
+        """Merge additional attributes into ``version.json``."""
+        manifest_path = self.versions_dir / version / "version.json"
+        if not manifest_path.exists():
+            message = f"manifest missing: {manifest_path}"
+            raise RuntimeLifecycleError(message, runtime=_RUNTIME)
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        merged = dict(payload.get("attrs", {}))
+        merged.update(attrs)
+        payload["attrs"] = merged
+        manifest_path.write_text(json.dumps(payload, sort_keys=True, indent=2), encoding="utf-8")
+        return manifest_path
+
     def publish(self, version: str) -> Path:
         """Atomically promote a staged directory to active ``version``.
 
@@ -484,6 +548,7 @@ __all__ = [
     "IndexAssets",
     "IndexLifecycleManager",
     "LuceneAssets",
+    "collect_asset_attrs",
     "VersionMeta",
     "link_current_lucene",
 ]

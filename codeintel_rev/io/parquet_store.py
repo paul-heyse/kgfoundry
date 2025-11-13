@@ -8,13 +8,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Literal, cast
 
 import pyarrow as pa
 import pyarrow.parquet as pq
 import xxhash
 
 from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.indexing.chunk_ids import stable_chunk_id
 from codeintel_rev.typing import NDArrayF32
 
 if TYPE_CHECKING:
@@ -71,6 +72,8 @@ class ParquetWriteOptions:
     start_id: int = 0
     vec_dim: int = 2560
     preview_max_chars: int = 240
+    id_strategy: Literal["sequence", "stable_hash"] = "sequence"
+    id_hash_salt: str = ""
 
 
 def _hash_content(text: str) -> int:
@@ -134,10 +137,24 @@ def write_chunks_parquet(
         vec_dim,
     )
 
+    # Prepare IDs
+    if options.id_strategy == "stable_hash":
+        ids = [
+            stable_chunk_id(
+                chunk.uri,
+                int(chunk.start_byte),
+                int(chunk.end_byte),
+                salt=options.id_hash_salt,
+            )
+            for chunk in chunks
+        ]
+    else:
+        ids = list(range(options.start_id, options.start_id + len(chunks)))
+
     # Create table
     table = pa.table(
         {
-            "id": list(range(options.start_id, options.start_id + len(chunks))),
+            "id": ids,
             "uri": [chunk.uri for chunk in chunks],
             "start_line": [chunk.start_line for chunk in chunks],
             "end_line": [chunk.end_line for chunk in chunks],

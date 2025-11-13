@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -64,3 +65,19 @@ def test_rollback_switches_pointer(tmp_path: Path) -> None:
     assert manager.current_version() == "beta"
     manager.rollback("alpha")
     assert manager.current_version() == "alpha"
+
+
+def test_write_attrs_updates_manifest(tmp_path: Path) -> None:
+    manager = IndexLifecycleManager(tmp_path / "indexes")
+    assets = _make_assets(tmp_path, "v3")
+    manager.prepare("v3", assets, attrs={"initial": True})
+    manager.publish("v3")
+
+    manifest_path = manager.versions_dir / "v3" / "version.json"
+    initial = json.loads(manifest_path.read_text())
+    assert initial["attrs"]["initial"] is True
+
+    manager.write_attrs("v3", faiss_factory="Flat", initial=False)
+    updated = json.loads(manifest_path.read_text())
+    assert updated["attrs"]["faiss_factory"] == "Flat"
+    assert updated["attrs"]["initial"] is False
