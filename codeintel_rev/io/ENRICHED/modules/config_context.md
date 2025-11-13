@@ -114,15 +114,15 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 
 - **fan_in**: 20
 - **fan_out**: 17
-- **cycle_group**: 65
+- **cycle_group**: 66
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 33
-- recent churn 90: 33
+- recent churn 30: 34
+- recent churn 90: 34
 
 ## Usage
 

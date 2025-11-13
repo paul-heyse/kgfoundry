@@ -34,7 +34,7 @@ Offline hybrid evaluator with oracle reranking and pool exports.
 
 - **fan_in**: 2
 - **fan_out**: 5
-- **cycle_group**: 77
+- **cycle_group**: 78
 
 ## Ownership
 

@@ -41,7 +41,7 @@ CLI helpers for building Lucene indexes and flipping lifecycle pointers.
 
 - **fan_in**: 0
 - **fan_out**: 5
-- **cycle_group**: 120
+- **cycle_group**: 121
 
 ## Ownership
 

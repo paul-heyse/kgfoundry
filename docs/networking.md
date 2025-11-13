@@ -82,6 +82,21 @@ and wraps the exported ASGI object with Hypercorn's `ProxyFixMiddleware`.
 * The `/readyz`, `/capz`, and `/sse` regression tests use `httpx.AsyncClient`
   to ensure 200s and streaming survive future code changes.
 
+## Server settings & environment
+
+`codeintel_rev/app/server_settings.py` exposes typed knobs that can be set from
+`.env` or the environment. Common overrides:
+
+| Variable | Purpose |
+| -------- | ------- |
+| `CODEINTEL_SERVER_ALLOWED_HOSTS` | Comma-separated list of domains accepted by `TrustedHostMiddleware`. Include your public FQDN and loopback values for health checks. |
+| `CODEINTEL_SERVER_CORS_ALLOW_ORIGINS` | CSV of origins permitted to call the FastAPI surface. Defaults to ChatGPT + localhost. |
+| `CODEINTEL_SERVER_PROXY_MODE` | `modern` (default) prefers the `Forwarded` header, `legacy` reads `X-Forwarded-*`. |
+| `CODEINTEL_SERVER_PROXY_TRUSTED_HOPS` | Number of proxy hops Hypercorn trusts when reconstructing the client IP. |
+
+Regenerate the `.env` example whenever you add variables so runbooks stay in
+sync.
+
 ## Certificate automation
 
 * `ops/certbot/renewal-hook.sh`:

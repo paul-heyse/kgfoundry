@@ -14,7 +14,7 @@ Typer CLI for managing index lifecycle operations.
 - from **collections.abc** import Callable, Sequence
 - from **functools** import lru_cache
 - from **pathlib** import Path
-- from **typing** import Annotated, Literal, cast
+- from **typing** import Annotated, Literal
 - from **(absolute)** import click
 - from **(absolute)** import numpy
 - from **(absolute)** import typer
@@ -40,53 +40,54 @@ Typer CLI for managing index lifecycle operations.
 - variable: `AssetsArg` (line 53)
 - variable: `SidecarOption` (line 61)
 - variable: `SweepMode` (line 69)
-- variable: `IdMapOption` (line 77)
-- variable: `DuckOption` (line 78)
-- variable: `OutOption` (line 79)
-- variable: `ParamSpaceArg` (line 80)
-- variable: `EvalTopKOption` (line 84)
-- variable: `EvalKFactorOption` (line 88)
-- variable: `EvalNProbeOption` (line 92)
-- variable: `EvalXtrOracleOption` (line 96)
-- function: `global_options` (line 106)
-- function: `_default_root` (line 111)
-- function: `_resolve_root` (line 118)
-- function: `_manager` (line 124)
-- function: `_build_assets` (line 129)
-- function: `_parse_extras` (line 147)
-- function: `_parse_sidecars` (line 158)
-- function: `_parse_tune_overrides` (line 177)
-- function: `_faiss_manager` (line 217)
-- function: `_duckdb_catalog` (line 231)
-- function: `_load_xtr_index` (line 245)
-- function: `_eval_paths` (line 261)
-- function: `status_command` (line 268)
-- function: `stage_command` (line 278)
-- function: `publish_command` (line 309)
-- function: `rollback_command` (line 319)
-- function: `list_command` (line 329)
-- function: `export_idmap_command` (line 341)
-- function: `materialize_join_command` (line 363)
-- function: `tune_command` (line 378)
-- function: `tune_params_command` (line 428)
-- function: `show_profile_command` (line 450)
-- function: `_write_tuning_audit` (line 456)
-- function: `_run_autotune` (line 467)
-- function: `eval_command` (line 493)
+- variable: `SWEEP_OPTION` (line 82)
+- variable: `IdMapOption` (line 87)
+- variable: `DuckOption` (line 88)
+- variable: `OutOption` (line 89)
+- variable: `ParamSpaceArg` (line 90)
+- variable: `EvalTopKOption` (line 94)
+- variable: `EvalKFactorOption` (line 98)
+- variable: `EvalNProbeOption` (line 102)
+- variable: `EvalXtrOracleOption` (line 106)
+- function: `global_options` (line 116)
+- function: `_default_root` (line 121)
+- function: `_resolve_root` (line 128)
+- function: `_manager` (line 134)
+- function: `_build_assets` (line 139)
+- function: `_parse_extras` (line 157)
+- function: `_parse_sidecars` (line 168)
+- function: `_parse_tune_overrides` (line 187)
+- function: `_faiss_manager` (line 227)
+- function: `_duckdb_catalog` (line 241)
+- function: `_load_xtr_index` (line 255)
+- function: `_eval_paths` (line 271)
+- function: `status_command` (line 278)
+- function: `stage_command` (line 288)
+- function: `publish_command` (line 319)
+- function: `rollback_command` (line 329)
+- function: `list_command` (line 339)
+- function: `export_idmap_command` (line 351)
+- function: `materialize_join_command` (line 373)
+- function: `tune_command` (line 388)
+- function: `tune_params_command` (line 434)
+- function: `show_profile_command` (line 456)
+- function: `_write_tuning_audit` (line 462)
+- function: `_run_autotune` (line 473)
+- function: `eval_command` (line 499)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 7
-- **cycle_group**: 117
+- **cycle_group**: 118
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 8
+- recent churn 90: 8
 
 ## Usage
 
@@ -124,7 +125,7 @@ Typer CLI for managing index lifecycle operations.
 
 - branches: 48
 - cyclomatic: 49
-- loc: 524
+- loc: 530
 
 ## Doc Coverage
 

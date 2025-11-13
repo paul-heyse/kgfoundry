@@ -51,12 +51,11 @@ VersionArg = Annotated[str, typer.Argument(help="Version identifier.")]
 PathArg = Annotated[Path, typer.Argument(help="Path to an asset on disk.")]
 IndexOption = Annotated[Path | None, typer.Option("--index", help="Path to FAISS index file.")]
 AssetsArg = Annotated[
-    list[Path],
+    tuple[Path, Path, Path],
     typer.Argument(
         ...,
         help="Primary assets (faiss.index catalog.duckdb code.scip).",
         metavar="FAISS_INDEX DUCKDB_PATH SCIP_INDEX",
-        nargs=3,
     ),
 ]
 SidecarOption = Annotated[
@@ -301,11 +300,11 @@ def stage_command(
     """
     mgr = _manager()
     channels = _parse_extras(list(extras))
-    resolved = tuple(path.expanduser().resolve() for path in assets)
-    if len(resolved) != _PRIMARY_ASSET_COUNT:
+    resolved_assets = tuple(path.expanduser().resolve() for path in assets)
+    if len(resolved_assets) != _PRIMARY_ASSET_COUNT:  # defensive: typer should enforce length
         msg = "Provide FAISS, DuckDB, and SCIP asset paths."
         raise typer.BadParameter(msg)
-    faiss_index, duckdb_path, scip_index = resolved
+    faiss_index, duckdb_path, scip_index = resolved_assets
     sidecar_paths = _parse_sidecars(list(sidecars))
     staged_assets = _build_assets(
         (faiss_index, duckdb_path, scip_index),

@@ -56,23 +56,23 @@ corpus size for optimal performance.
 - class: `_SearchPlan` (line 208)
 - class: `_FAISSIdMapMixin` (line 218)
 - class: `FAISSManager` (line 396)
-- function: `_coerce_to_int` (line 2758)
-- function: `_configure_direct_map` (line 2781)
-- function: `_set_direct_map_type` (line 2789)
+- function: `_coerce_to_int` (line 2757)
+- function: `_configure_direct_map` (line 2780)
+- function: `_set_direct_map_type` (line 2788)
 
 ## Graph Metrics
 
 - **fan_in**: 7
 - **fan_out**: 7
-- **cycle_group**: 65
+- **cycle_group**: 66
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 38
-- recent churn 90: 38
+- recent churn 30: 39
+- recent churn 90: 39
 
 ## Usage
 
@@ -112,9 +112,9 @@ FAISSManager
 
 ## Complexity
 
-- branches: 215
-- cyclomatic: 216
-- loc: 2807
+- branches: 213
+- cyclomatic: 214
+- loc: 2806
 
 ## Doc Coverage
 

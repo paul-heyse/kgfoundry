@@ -9,7 +9,7 @@ Helpers for repo-relative path normalization and stable identifiers.
 ## Imports
 
 - from **__future__** import annotations
-- from **hashlib** import sha1
+- from **hashlib** import blake2s
 - from **pathlib** import Path
 
 ## Definitions
@@ -23,15 +23,15 @@ Helpers for repo-relative path normalization and stable identifiers.
 
 - **fan_in**: 1
 - **fan_out**: 0
-- **cycle_group**: 13
+- **cycle_group**: 21
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 
@@ -86,7 +86,7 @@ detect_repo_root, module_name_from_path, stable_id_for_path, to_repo_relative
 - `detect_repo_root` (function): summary=yes, params=mismatch, examples=no — Return the closest ancestor containing a ``.git`` directory.
 - `to_repo_relative` (function): summary=yes, params=mismatch, examples=no — Return a POSIX path for ``path`` relative to ``repo_root``.
 - `module_name_from_path` (function): summary=yes, params=mismatch, examples=no — Derive a dotted module name for ``path`` relative to ``repo_root``.
-- `stable_id_for_path` (function): summary=yes, params=mismatch, examples=no — Return a truncated SHA1 digest for ``rel_posix``.
+- `stable_id_for_path` (function): summary=yes, params=mismatch, examples=no — Return a truncated BLAKE2s digest for ``rel_posix``.
 
 ## Tags
 

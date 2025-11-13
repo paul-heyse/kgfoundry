@@ -73,7 +73,7 @@ GitPython documentation : https://gitpython.readthedocs.io/
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 53
+- **cycle_group**: 47
 
 ## Ownership
 

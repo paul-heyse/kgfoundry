@@ -49,7 +49,7 @@ Serialization helpers for enrichment artifacts (JSON/JSONL/Markdown).
 
 - **fan_in**: 4
 - **fan_out**: 0
-- **cycle_group**: 14
+- **cycle_group**: 18
 
 ## Ownership
 

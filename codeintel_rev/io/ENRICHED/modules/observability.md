@@ -52,7 +52,7 @@ Graceful degradation when metrics are unavailable:
 
 - **fan_in**: 3
 - **fan_out**: 1
-- **cycle_group**: 122
+- **cycle_group**: 123
 
 ## Ownership
 

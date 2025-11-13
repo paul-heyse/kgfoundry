@@ -16,29 +16,29 @@ Exact reranking utilities for FAISS candidates.
 ## Definitions
 
 - variable: `LOGGER` (line 10)
-- function: `exact_rerank` (line 13)
-- function: `_normalize_queries` (line 120)
-- function: `_prepare_candidate_matrix` (line 127)
-- function: `_hydrate_embeddings` (line 136)
-- function: `_build_candidate_vectors` (line 150)
-- function: `_compute_similarity` (line 173)
-- function: `_effective_top_k` (line 191)
-- function: `_select_topk` (line 198)
-- function: `_empty_result` (line 212)
+- function: `exact_rerank` (line 16)
+- function: `_normalize_queries` (line 125)
+- function: `_prepare_candidate_matrix` (line 159)
+- function: `_hydrate_embeddings` (line 205)
+- function: `_build_candidate_vectors` (line 261)
+- function: `_compute_similarity` (line 330)
+- function: `_effective_top_k` (line 399)
+- function: `_select_topk` (line 449)
+- function: `_empty_result` (line 508)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 65
+- **cycle_group**: 66
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 1
-- recent churn 90: 1
+- recent churn 30: 2
+- recent churn 90: 2
 
 ## Usage
 
@@ -80,19 +80,19 @@ exact_rerank
 
 - branches: 14
 - cyclomatic: 15
-- loc: 219
+- loc: 555
 
 ## Doc Coverage
 
 - `exact_rerank` (function): summary=yes, params=ok, examples=no — Hydrate embeddings for candidate ids and compute exact similarities.
-- `_normalize_queries` (function): summary=no, examples=no
-- `_prepare_candidate_matrix` (function): summary=no, examples=no
-- `_hydrate_embeddings` (function): summary=no, examples=no
-- `_build_candidate_vectors` (function): summary=no, examples=no
-- `_compute_similarity` (function): summary=no, examples=no
-- `_effective_top_k` (function): summary=no, examples=no
-- `_select_topk` (function): summary=no, examples=no
-- `_empty_result` (function): summary=no, examples=no
+- `_normalize_queries` (function): summary=yes, params=ok, examples=no — Normalize query vectors to 2D array format for batch processing.
+- `_prepare_candidate_matrix` (function): summary=yes, params=ok, examples=no — Validate and prepare candidate ID matrix for embedding retrieval.
+- `_hydrate_embeddings` (function): summary=yes, params=ok, examples=no — Retrieve embeddings from catalog for valid candidate IDs.
+- `_build_candidate_vectors` (function): summary=yes, params=ok, examples=no — Assemble candidate embedding vectors from lookup dictionary.
+- `_compute_similarity` (function): summary=yes, params=ok, examples=no — Compute batch similarity scores between queries and candidate vectors.
+- `_effective_top_k` (function): summary=yes, params=ok, examples=no — Compute effective top-k value bounded by available candidates.
+- `_select_topk` (function): summary=yes, params=ok, examples=no — Select top-k candidates by similarity score with efficient partial sorting.
+- `_empty_result` (function): summary=yes, params=ok, examples=no — Create sentinel result arrays for empty or failed reranking operations.
 
 ## Tags
 

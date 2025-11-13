@@ -37,14 +37,33 @@ class OverlayResult:
     exports_resolved: Mapping[str, set[str]]
 
 
-def generate_overlay_for_file(  # lint-ignore[PLR0913]: overlay generation requires structured parameters
+@dataclass(frozen=True, slots=True)
+class OverlayInputs:
+    """Runtime inputs influencing overlay generation."""
+
+    scip: SCIPIndex | None = None
+    type_error_counts: Mapping[str, int] | None = None
+    force: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class OverlayRenderContext:
+    """Bundle of values required to render overlay text."""
+
+    module_name: str
+    module: ModuleIndex
+    star_targets: Mapping[str, list[str]]
+    import_reexports: list[str]
+    include_public_defs: bool
+    inject_getattr_any: bool
+
+
+def generate_overlay_for_file(
     py_file: Path,
     package_root: Path,
     *,
-    scip: SCIPIndex | None,
     policy: OverlayPolicy,
-    type_error_counts: Mapping[str, int] | None = None,
-    force: bool = False,
+    inputs: OverlayInputs | None = None,
 ) -> OverlayResult:
     """Generate a .pyi overlay for ``py_file`` when it meets the policy gates.
 
@@ -56,20 +75,14 @@ def generate_overlay_for_file(  # lint-ignore[PLR0913]: overlay generation requi
     package_root : Path
         Root directory of the package containing ``py_file``. Used to
         compute relative module paths and overlay destination paths.
-    scip : SCIPIndex | None
-        Optional SCIP index for resolving star import re-exports. When
-        provided, star imports are expanded using symbol information
-        from the index.
+    inputs : OverlayInputs | None
+        Optional bundle containing SCIP index, cached type error counts,
+        and override flags (such as ``force``). When omitted, defaults to
+        ``OverlayInputs()``.
     policy : OverlayPolicy
         Policy controlling when overlays are generated and how they are
         written. Includes gates for star imports, ``__all__`` definitions,
         and type error thresholds.
-    type_error_counts : Mapping[str, int] | None, optional
-        Optional mapping of module keys to type error counts. Used to
-        determine if a module should receive an overlay based on error
-        thresholds. Defaults to None.
-    force : bool, optional
-        When True, bypasses policy gates and forces overlay creation.
 
     Returns
     -------
@@ -77,6 +90,7 @@ def generate_overlay_for_file(  # lint-ignore[PLR0913]: overlay generation requi
         Metadata describing whether an overlay was created, including
         the destination path, creation reason, and resolved exports.
     """
+    ctx = inputs or OverlayInputs()
     source = py_file if py_file.is_absolute() else package_root / py_file
     if not source.exists():
         return OverlayResult(
@@ -88,19 +102,19 @@ def generate_overlay_for_file(  # lint-ignore[PLR0913]: overlay generation requi
 
     rel_key = _normalized_module_key(package_root, source)
     error_count = 0
-    if type_error_counts:
-        error_count = type_error_counts.get(rel_key, type_error_counts.get(str(source), 0))
+    if ctx.type_error_counts:
+        error_count = ctx.type_error_counts.get(rel_key, ctx.type_error_counts.get(str(source), 0))
 
     module = index_module(str(source), source.read_text(encoding="utf-8", errors="ignore"))
 
     has_star = any(entry.is_star for entry in module.imports)
     has_all = bool(module.exports)
-
-    should_for_star = policy.when_star_imports and has_star
-    should_for_all = policy.when_has_all and has_all and not module.defs
-    should_for_errors = policy.when_type_errors and (error_count >= policy.min_type_errors)
-
-    if not force and not (should_for_star or should_for_all or should_for_errors):
+    eligibility_triggers = (
+        policy.when_star_imports and has_star,
+        policy.when_has_all and has_all and not module.defs,
+        policy.when_type_errors and (error_count >= policy.min_type_errors),
+    )
+    if not ctx.force and not any(eligibility_triggers):
         return OverlayResult(
             pyi_path=None,
             created=False,
@@ -109,15 +123,15 @@ def generate_overlay_for_file(  # lint-ignore[PLR0913]: overlay generation requi
         )
 
     star_targets: MutableMapping[str, set[str]] = {}
-    if has_star and scip is not None:
+    if has_star and ctx.scip is not None:
         for entry in module.imports:
             if entry.is_star and entry.module:
-                names = _collect_star_reexports(scip, entry)
+                names = _collect_star_reexports(ctx.scip, entry)
                 if names:
                     star_targets[entry.module] = names
 
     module_name = _module_name_from_path(package_root, source)
-    overlay_text = _build_overlay_text(
+    render_ctx = OverlayRenderContext(
         module_name=module_name,
         module=module,
         star_targets={key: sorted(names) for key, names in star_targets.items()},
@@ -125,6 +139,7 @@ def generate_overlay_for_file(  # lint-ignore[PLR0913]: overlay generation requi
         include_public_defs=policy.include_public_defs,
         inject_getattr_any=policy.inject_module_getattr_any,
     )
+    overlay_text = _build_overlay_text(render_ctx)
 
     pyi_path = _overlay_path(policy.overlays_root, package_root, py_file)
     pyi_path.parent.mkdir(parents=True, exist_ok=True)
@@ -142,7 +157,7 @@ def generate_overlay_for_file(  # lint-ignore[PLR0913]: overlay generation requi
             "parse_ok": module.parse_ok,
             "errors": module.errors,
             "type_errors": error_count,
-            "forced": force,
+            "forced": ctx.force,
         },
     )
 
@@ -367,35 +382,14 @@ def _extract_simple_name(symbol: str) -> str | None:
     return None
 
 
-def _build_overlay_text(  # lint-ignore[PLR0913]: builder needs multiple knobs for readability
-    *,
-    module_name: str,
-    module: ModuleIndex,
-    star_targets: Mapping[str, list[str]],
-    import_reexports: list[str],
-    include_public_defs: bool,
-    inject_getattr_any: bool,
-) -> str:
+def _build_overlay_text(context: OverlayRenderContext) -> str:
     """Render overlay text from the collected module metadata.
 
     Parameters
     ----------
-    module_name : str
-        Dotted module name used in the overlay header comment.
-    module : ModuleIndex
-        Parsed module metadata containing imports, definitions, exports,
-        and docstring information.
-    star_targets : Mapping[str, list[str]]
-        Mapping of imported module names to lists of resolved re-export
-        names. Used to expand star imports in the overlay.
-    import_reexports : list[str]
-        Explicit re-export lines derived from ``__all__`` plus import statements.
-    include_public_defs : bool
-        When True, includes stub definitions for public functions and
-        classes in the overlay.
-    inject_getattr_any : bool
-        When True, adds a ``__getattr__`` function returning ``Any`` to
-        the overlay, allowing dynamic attribute access.
+    context : OverlayRenderContext
+        Rendering context bundling module metadata, expansion targets, and
+        overlay feature flags.
 
     Returns
     -------
@@ -404,30 +398,32 @@ def _build_overlay_text(  # lint-ignore[PLR0913]: builder needs multiple knobs f
         to write to a .pyi file.
     """
     lines: list[str] = [
-        f"# Auto-generated overlay for {module_name}. Edit as needed for precise types.",
+        f"# Auto-generated overlay for {context.module_name}. Edit as needed for precise types.",
         "from __future__ import annotations",
         "from typing import Any",
         "",
     ]
 
-    lines.extend(_render_star_exports(star_targets))
-    if import_reexports:
-        lines.extend(import_reexports)
+    lines.extend(_render_star_exports(context.star_targets))
+    if context.import_reexports:
+        lines.extend(context.import_reexports)
         lines.append("")
-    if include_public_defs:
-        lines.extend(_render_public_defs(module.defs))
-    overlay_exports: set[str] = set(module.exports)
-    for names in star_targets.values():
+    if context.include_public_defs:
+        lines.extend(_render_public_defs(context.module.defs))
+    overlay_exports: set[str] = set(context.module.exports)
+    for names in context.star_targets.values():
         overlay_exports.update(names)
-    if include_public_defs:
+    if context.include_public_defs:
         overlay_exports.update(
-            def_entry.name for def_entry in module.defs if not def_entry.name.startswith("_")
+            def_entry.name
+            for def_entry in context.module.defs
+            if not def_entry.name.startswith("_")
         )
     if overlay_exports:
         exports = ", ".join(f'"{name}"' for name in sorted(overlay_exports))
         lines.append(f"__all__ = [{exports}]")
         lines.append("")
-    if inject_getattr_any:
+    if context.inject_getattr_any:
         lines.append("def __getattr__(name: str) -> Any: ...")
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"

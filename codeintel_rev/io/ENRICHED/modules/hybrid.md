@@ -25,7 +25,7 @@ Fuses results from BM25, SPLADE, and FAISS using Reciprocal Rank Fusion.
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 107
+- **cycle_group**: 108
 
 ## Ownership
 

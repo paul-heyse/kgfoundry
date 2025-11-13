@@ -5,7 +5,11 @@ import json
 from pathlib import Path
 
 from codeintel_rev.enrich.scip_reader import Document, SCIPIndex, SymbolInfo
-from codeintel_rev.enrich.stubs_overlay import OverlayPolicy, generate_overlay_for_file
+from codeintel_rev.enrich.stubs_overlay import (
+    OverlayInputs,
+    OverlayPolicy,
+    generate_overlay_for_file,
+)
 
 
 def _scip_symbol(module: str, name: str) -> str:
@@ -42,8 +46,8 @@ def test_generate_overlay_creates_stub_with_reexports(tmp_path: Path) -> None:
     result = generate_overlay_for_file(
         module_path,
         package_root,
-        scip=scip,
         policy=OverlayPolicy(),
+        inputs=OverlayInputs(scip=scip),
     )
 
     assert result.created
@@ -77,8 +81,8 @@ def test_generate_overlay_skips_private_only_module(tmp_path: Path) -> None:
     result = generate_overlay_for_file(
         module_path,
         package_root,
-        scip=None,
         policy=OverlayPolicy(),
+        inputs=OverlayInputs(),
     )
 
     assert not result.created

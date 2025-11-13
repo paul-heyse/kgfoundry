@@ -43,7 +43,7 @@ class CollectorConfig:
     text_preview_skip_bytes: int = 2_000_000
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class _CollectorStatsBuilder:
     """Mutable builder used while collecting CST stats."""
 
@@ -54,22 +54,65 @@ class _CollectorStatsBuilder:
     scope_resolved: int = 0
 
     def increment_parse_errors(self, count: int = 1) -> None:
-        object.__setattr__(
-            self, "parse_errors", self.parse_errors + count
-        )  # lint-ignore[PLC2801]: frozen dataclass uses mutation helper for counters
+        """Increment the parse error counter.
+
+        This method increments the parse error count, tracking the number of files
+        that failed to parse during CST collection. Used for statistics and error
+        reporting.
+
+        Parameters
+        ----------
+        count : int, optional
+            Number of parse errors to add (defaults to 1). Used when multiple
+            errors occur in a single operation or when batching error counts.
+        """
+        self.parse_errors += count
 
     def set_node_rows(self, count: int) -> None:
-        object.__setattr__(self, "node_rows", count)  # lint-ignore[PLC2801]: frozen stats builder
+        """Set the total number of node rows collected.
+
+        This method sets the node_rows counter to the specified count, representing
+        the total number of node records emitted during CST collection. Used to
+        track collection output size.
+
+        Parameters
+        ----------
+        count : int
+            Total number of node records collected. Must be non-negative. This count
+            represents the number of NodeRecord objects emitted for the processed
+            files.
+        """
+        self.node_rows = count
 
     def increment_qname_hits(self) -> None:
-        object.__setattr__(
-            self, "qname_hits", self.qname_hits + 1
-        )  # lint-ignore[PLC2801]: builder updates counters immutably
+        """Increment the qualified name resolution hit counter.
+
+        This method increments the qname_hits counter, tracking the number of nodes
+        for which qualified names were successfully resolved. Used to measure the
+        effectiveness of qualified name resolution during CST collection.
+
+        Notes
+        -----
+        Qualified names (qnames) are fully qualified identifiers like "module.Class.method".
+        This counter tracks how many nodes had their qnames successfully resolved,
+        providing a metric for scope resolution quality.
+        """
+        self.qname_hits += 1
 
     def increment_scope_resolved(self) -> None:
-        object.__setattr__(
-            self, "scope_resolved", self.scope_resolved + 1
-        )  # lint-ignore[PLC2801]: frozen dataclass mutate helper
+        """Increment the scope resolution hit counter.
+
+        This method increments the scope_resolved counter, tracking the number of
+        nodes for which scope information was successfully resolved. Used to measure
+        the effectiveness of scope resolution during CST collection.
+
+        Notes
+        -----
+        Scope resolution identifies whether a node belongs to Global, Class, Function,
+        or Comprehension scope. This counter tracks how many nodes had their scope
+        successfully resolved, providing a metric for scope analysis quality.
+        """
+        self.scope_resolved += 1
 
     def snapshot(self) -> CollectorStats:
         """Return an immutable CollectorStats instance.

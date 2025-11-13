@@ -4,11 +4,25 @@
 from __future__ import annotations
 
 import math
-import shutil
-import subprocess  # lint-ignore[S404]: subprocess required for git metrics
 from functools import lru_cache
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+from kgfoundry_common.logging import get_logger
+
+LOGGER = get_logger(__name__)
+
+try:  # pragma: no cover - optional dependency
+    from git import Repo as _RuntimeGitRepo
+    from git.exc import GitError
+except ImportError:  # pragma: no cover - GitPython not installed
+    _RuntimeGitRepo = None
+    GitError = Exception
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from git import Repo as GitRepoType
+else:  # pragma: no cover - runtime placeholder
+    GitRepoType = object
 
 
 def compute_hotspot_score(record: dict[str, Any]) -> float:
@@ -46,31 +60,50 @@ def compute_hotspot_score(record: dict[str, Any]) -> float:
 def _git_churn(path: str) -> int:
     """Return the number of commits touching ``path``.
 
-    Parameters
-    ----------
-    path : str
-        Relative file path from repository root.
-
     Returns
     -------
     int
-        Commit count derived from ``git log`` output.
+        Commit count touching the path; ``0`` when unavailable.
     """
-    repo_root = Path(__file__).resolve().parents[1]
-    git_executable = shutil.which("git") or "git"
-    target = repo_root / path
+    repo = _open_repo()
+    if repo is None:
+        return 0
+    target = _repo_root() / path
     if not target.exists():
         return 0
     try:
-        # lint-ignore[S603]: git log invocation for analytics
-        result = subprocess.run(
-            [git_executable, "log", "--pretty=oneline", "--", str(target)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True,
-            cwd=repo_root,
-            check=False,
-        )
-    except OSError:
+        return sum(1 for _ in repo.iter_commits(paths=str(target)))
+    except (GitError, OSError, ValueError):  # pragma: no cover - git failure
+        LOGGER.debug("Failed to compute churn for %s", path, exc_info=True)
         return 0
-    return len([line for line in result.stdout.splitlines() if line.strip()])
+
+
+@lru_cache(maxsize=1)
+def _open_repo() -> GitRepoType | None:
+    """Open project Git repository for analytics.
+
+    Returns
+    -------
+    GitRepoType | None
+        Git repository handle or ``None`` if GitPython unavailable.
+    """
+    if _RuntimeGitRepo is None:
+        LOGGER.debug("GitPython unavailable; churn analytics disabled.")
+        return None
+    try:
+        return _RuntimeGitRepo(str(_repo_root()))
+    except (GitError, OSError):  # pragma: no cover - repo open failure
+        LOGGER.debug("Unable to open Git repository for hotspot metrics.", exc_info=True)
+        return None
+
+
+@lru_cache(maxsize=1)
+def _repo_root() -> Path:
+    """Return repository root path.
+
+    Returns
+    -------
+    Path
+        Absolute path to the repository root (two levels up from this file).
+    """
+    return Path(__file__).resolve().parents[1]

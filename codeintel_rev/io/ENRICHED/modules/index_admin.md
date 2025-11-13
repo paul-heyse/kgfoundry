@@ -31,28 +31,28 @@ Admin endpoints for staging, publishing, and rolling back index versions.
 - function: `_persist_session_tuning` (line 39)
 - function: `status_endpoint` (line 55)
 - class: `PublishBody` (line 107)
-- class: `TuningBody` (line 162)
-- class: `FaissRuntimeTuningBody` (line 211)
-- function: `publish_endpoint` (line 263)
-- function: `rollback_endpoint` (line 356)
-- function: `tuning_endpoint` (line 409)
-- function: `faiss_runtime_status` (line 465)
-- function: `faiss_runtime_tuning_endpoint` (line 503)
-- function: `faiss_runtime_reset_endpoint` (line 582)
+- class: `TuningBody` (line 170)
+- class: `FaissRuntimeTuningBody` (line 219)
+- function: `publish_endpoint` (line 271)
+- function: `rollback_endpoint` (line 364)
+- function: `tuning_endpoint` (line 417)
+- function: `faiss_runtime_status` (line 473)
+- function: `faiss_runtime_tuning_endpoint` (line 511)
+- function: `faiss_runtime_reset_endpoint` (line 590)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 6
-- **cycle_group**: 133
+- **cycle_group**: 134
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 
@@ -98,7 +98,7 @@ router
 
 - branches: 18
 - cyclomatic: 19
-- loc: 632
+- loc: 640
 
 ## Doc Coverage
 

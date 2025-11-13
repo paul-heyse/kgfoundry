@@ -7,7 +7,7 @@ from collections.abc import Iterator, Sequence
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, ClassVar, Protocol, cast
 
 import libcst as cst
 from libcst import metadata as cst_metadata
@@ -19,6 +19,14 @@ try:  # pragma: no cover - optional dependency
     from docstring_parser import parse as parse_docstring
 except ImportError:  # pragma: no cover - optional dependency
     parse_docstring = None
+
+
+class NodeHandler(Protocol):
+    """Callable signature for node-dispatch handlers."""
+
+    def __call__(self, visitor: _IndexVisitor, node: cst.CSTNode, *, is_top_level: bool) -> None:
+        """Process `node` with awareness of top-level status."""
+        ...
 
 
 @dataclass(slots=True, frozen=True)
@@ -300,6 +308,7 @@ class _IndexVisitor(cst.CSTVisitor):
     """Collect module metadata via a single LibCST traversal."""
 
     METADATA_DEPENDENCIES = (cst_metadata.PositionProvider,)
+    NODE_HANDLERS: ClassVar[dict[type[cst.CSTNode], NodeHandler]]
 
     def __init__(self, code: str) -> None:
         self.imports: list[ImportEntry] = []
@@ -392,28 +401,9 @@ class _IndexVisitor(cst.CSTVisitor):
                 self._raise_names.add(name)
 
         is_top_level = self._class_depth == 0 and self._function_depth == 0
-        if isinstance(node, cst.Module):
-            self.docstring = _extract_module_docstring(node)
-            if self.docstring:
-                self.doc_summary = _summarize_docstring(self.docstring)
-                if self.doc_summary:
-                    self.doc_metrics["has_summary"] = True
-        elif isinstance(node, cst.Import):
-            self._handle_import(node)
-        elif isinstance(node, cst.ImportFrom):
-            self._handle_import_from(node)
-        elif isinstance(node, cst.FunctionDef):
-            if is_top_level:
-                self._handle_function_def(node)
-            self._function_depth += 1
-        elif isinstance(node, cst.ClassDef):
-            if is_top_level:
-                self._handle_class_def(node)
-            self._class_depth += 1
-        elif isinstance(node, cst.Assign) and is_top_level:
-            self._handle_assign(node)
-        elif isinstance(node, cst.AnnAssign) and is_top_level:
-            self._handle_ann_assign(node)
+        handler = self.NODE_HANDLERS.get(type(node))
+        if handler is not None:
+            handler(self, node, is_top_level=is_top_level)
         return True
 
     def on_leave(self, original_node: cst.CSTNode) -> None:
@@ -484,58 +474,22 @@ class _IndexVisitor(cst.CSTVisitor):
             self.doc_metrics["has_summary"] = True
 
     def _handle_import(self, node: cst.Import) -> None:
-        names: list[str] = []
-        aliases: dict[str, str] = {}
-        for alias in node.names:
-            ident = alias.name
-            dotted = None
-            with suppress(Exception):
-                dotted = get_full_name_for_node(ident)
-            if isinstance(ident, cst.Name):
-                value = ident.value
-            elif dotted:
-                value = dotted
-            elif isinstance(ident, cst.Attribute):
-                value = ident.attr.value
-            else:
-                value = ""
-            names.append(value)
+        names, aliases = self._resolve_import_aliases(node.names)
+        for value in names:
             if value:
                 self._imported_modules.add(value)
-            if isinstance(alias.asname, cst.AsName) and isinstance(alias.asname.name, cst.Name):
-                aliases[value] = alias.asname.name.value
         self.imports.append(
             ImportEntry(module=None, names=names, aliases=aliases, is_star=False, level=0)
         )
 
-    def _handle_import_from(
-        self, node: cst.ImportFrom
-    ) -> None:  # lint-ignore[C901]: handles numerous import shapes
+    def _handle_import_from(self, node: cst.ImportFrom) -> None:
         is_star = isinstance(node.names, cst.ImportStar)
         names: list[str] = []
         aliases: dict[str, str] = {}
         if not is_star:
             alias_nodes = cast("Sequence[cst.ImportAlias]", node.names)
-            for ref in alias_nodes:
-                ident = ref.name
-                dotted = None
-                with suppress(Exception):
-                    dotted = get_full_name_for_node(ident)
-                if isinstance(ident, cst.Name):
-                    value = ident.value
-                elif dotted:
-                    value = dotted
-                elif isinstance(ident, cst.Attribute):
-                    value = ident.attr.value
-                else:
-                    value = ""
-                names.append(value)
-                if isinstance(ref.asname, cst.AsName) and isinstance(ref.asname.name, cst.Name):
-                    aliases[value] = ref.asname.name.value
-        module = None
-        if node.module:
-            with suppress(Exception):  # pragma: no cover - LibCST helper may raise
-                module = get_full_name_for_node(node.module)
+            names, aliases = self._resolve_import_aliases(alias_nodes)
+        module = self._resolve_module_name(node.module)
         level = len(node.relative or [])
         if module:
             self._imported_modules.add(module)
@@ -655,6 +609,321 @@ class _IndexVisitor(cst.CSTVisitor):
             if name == "__all__" or name.startswith("_"):
                 return
             self.defs.append(DefEntry(kind="variable", name=name, lineno=lineno))
+
+    @staticmethod
+    def handle_module_node(
+        visitor: _IndexVisitor, node: cst.CSTNode, *, is_top_level: bool
+    ) -> None:
+        """Handle module node during AST traversal.
+
+        This static method processes the root module node during LibCST AST traversal.
+        It extracts the module-level docstring and computes a summary for documentation
+        metrics. The module docstring is stored in the visitor state and used for
+        documentation health analysis.
+
+        Parameters
+        ----------
+        visitor : _IndexVisitor
+            The visitor instance collecting module definitions, imports, and exports.
+            The visitor's docstring and doc_summary attributes are updated with
+            module-level documentation information.
+        node : cst.CSTNode
+            The CST node being visited, cast to cst.Module. Contains the module's
+            body including the docstring as the first statement if present.
+        is_top_level : bool
+            Flag indicating module level (always True for module nodes). Unused
+            but required by the visitor pattern interface.
+
+        Notes
+        -----
+        This method is part of the LibCST visitor pattern and is called automatically
+        during AST traversal. It extracts module docstrings and computes summaries
+        for documentation metrics. If no docstring is present, the method returns
+        early without updating visitor state. Thread-safe if the visitor instance
+        is thread-safe.
+        """
+        del is_top_level
+        module_node = cast("cst.Module", node)
+        visitor.docstring = _extract_module_docstring(module_node)
+        if not visitor.docstring:
+            return
+        visitor.doc_summary = _summarize_docstring(visitor.docstring)
+        if visitor.doc_summary:
+            visitor.doc_metrics["has_summary"] = True
+
+    @staticmethod
+    def handle_import_node(
+        visitor: _IndexVisitor, node: cst.CSTNode, *, is_top_level: bool
+    ) -> None:
+        """Handle import node during AST traversal.
+
+        This static method processes import statements (e.g., `import os`) during
+        LibCST AST traversal. It delegates to the visitor's internal handler to
+        extract imported module names and track them in the visitor's import list.
+        All imports are processed regardless of nesting level to build a complete
+        import graph.
+
+        Parameters
+        ----------
+        visitor : _IndexVisitor
+            The visitor instance collecting module definitions, imports, and exports.
+            The visitor's imports list is updated with imported module names.
+        node : cst.CSTNode
+            The CST node being visited, cast to cst.Import. Contains import aliases
+            specifying which modules are imported.
+        is_top_level : bool
+            Flag indicating whether the import is at module level (True) or nested
+            inside a function/class (False). Unused but required by the visitor
+            pattern interface.
+
+        Notes
+        -----
+        This method is part of the LibCST visitor pattern and is called automatically
+        during AST traversal. It processes all import statements to build a complete
+        import graph for dependency analysis. Thread-safe if the visitor instance
+        is thread-safe.
+        """
+        del is_top_level
+        visitor._handle_import(cast("cst.Import", node))
+
+    @staticmethod
+    def handle_import_from_node(
+        visitor: _IndexVisitor, node: cst.CSTNode, *, is_top_level: bool
+    ) -> None:
+        """Handle import-from node during AST traversal.
+
+        This static method processes import-from statements (e.g., `from os import path`)
+        during LibCST AST traversal. It delegates to the visitor's internal handler
+        to extract imported module names, imported symbols, and import levels (for
+        relative imports). All imports are processed regardless of nesting level to
+        build a complete import graph.
+
+        Parameters
+        ----------
+        visitor : _IndexVisitor
+            The visitor instance collecting module definitions, imports, and exports.
+            The visitor's imports list is updated with imported module names and
+            symbol information.
+        node : cst.CSTNode
+            The CST node being visited, cast to cst.ImportFrom. Contains the source
+            module name, import level (for relative imports), and imported symbol
+            aliases.
+        is_top_level : bool
+            Flag indicating whether the import-from is at module level (True) or
+            nested inside a function/class (False). Unused but required by the
+            visitor pattern interface.
+
+        Notes
+        -----
+        This method is part of the LibCST visitor pattern and is called automatically
+        during AST traversal. It processes all import-from statements to build a
+        complete import graph for dependency analysis, including relative imports.
+        Thread-safe if the visitor instance is thread-safe.
+        """
+        del is_top_level
+        visitor._handle_import_from(cast("cst.ImportFrom", node))
+
+    @staticmethod
+    def handle_function_node(
+        visitor: _IndexVisitor, node: cst.CSTNode, *, is_top_level: bool
+    ) -> None:
+        """Handle function definition node during AST traversal.
+
+        This static method processes function definitions during LibCST AST traversal.
+        For top-level functions, it delegates to the visitor's internal handler to
+        extract function metadata (name, parameters, return type, docstring) and
+        track them as module-level definitions. The function depth counter is
+        incremented to track nesting level for all functions.
+
+        Parameters
+        ----------
+        visitor : _IndexVisitor
+            The visitor instance collecting module definitions, imports, and exports.
+            For top-level functions, the visitor's defs list and doc_items list are
+            updated with function metadata. The function depth counter is always
+            incremented to track nesting.
+        node : cst.CSTNode
+            The CST node being visited, cast to cst.FunctionDef. Contains function
+            name, parameters, return type annotation, decorators, and body.
+        is_top_level : bool
+            Flag indicating whether the function is at module level (True) or nested
+            inside a class/function (False). Only top-level functions are tracked
+            as module-level definitions.
+
+        Notes
+        -----
+        This method is part of the LibCST visitor pattern and is called automatically
+        during AST traversal. It processes function definitions to extract metadata
+        for top-level functions while tracking nesting depth for all functions.
+        Thread-safe if the visitor instance is thread-safe.
+        """
+        func_node = cast("cst.FunctionDef", node)
+        if is_top_level:
+            visitor._handle_function_def(func_node)
+        visitor._function_depth += 1
+
+    @staticmethod
+    def handle_class_node(visitor: _IndexVisitor, node: cst.CSTNode, *, is_top_level: bool) -> None:
+        """Handle class definition node during AST traversal.
+
+        This static method processes class definitions during LibCST AST traversal.
+        For top-level classes, it delegates to the visitor's internal handler to
+        extract class metadata (name, base classes, docstring) and track them as
+        module-level definitions. The class depth counter is incremented to track
+        nesting level for all classes.
+
+        Parameters
+        ----------
+        visitor : _IndexVisitor
+            The visitor instance collecting module definitions, imports, and exports.
+            For top-level classes, the visitor's defs list and doc_items list are
+            updated with class metadata. The class depth counter is always incremented
+            to track nesting.
+        node : cst.CSTNode
+            The CST node being visited, cast to cst.ClassDef. Contains class name,
+            base classes, decorators, and body including methods and class variables.
+        is_top_level : bool
+            Flag indicating whether the class is at module level (True) or nested
+            inside another class/function (False). Only top-level classes are tracked
+            as module-level definitions.
+
+        Notes
+        -----
+        This method is part of the LibCST visitor pattern and is called automatically
+        during AST traversal. It processes class definitions to extract metadata for
+        top-level classes while tracking nesting depth for all classes. Thread-safe
+        if the visitor instance is thread-safe.
+        """
+        class_node = cast("cst.ClassDef", node)
+        if is_top_level:
+            visitor._handle_class_def(class_node)
+        visitor._class_depth += 1
+
+    @staticmethod
+    def handle_assign_node(
+        visitor: _IndexVisitor, node: cst.CSTNode, *, is_top_level: bool
+    ) -> None:
+        """Handle assignment node during AST traversal.
+
+        This static method processes assignment nodes (e.g., `x = value`) during
+        LibCST AST traversal. It delegates to the visitor's internal handler
+        only for top-level assignments, which are tracked as module-level variable
+        definitions. Nested assignments (inside functions/classes) are ignored
+        to focus on module-level exports and definitions.
+
+        Parameters
+        ----------
+        visitor : _IndexVisitor
+            The visitor instance collecting module definitions, imports, and exports.
+            The visitor's state is updated with variable definitions found in
+            top-level assignments.
+        node : cst.CSTNode
+            The CST node being visited, cast to cst.Assign. Contains assignment
+            targets and values used to extract variable names and __all__ exports.
+        is_top_level : bool
+            Flag indicating whether the assignment is at module level (True) or
+            nested inside a function/class (False). Only top-level assignments
+            are processed to track module-level variables.
+
+        Notes
+        -----
+        This method is part of the LibCST visitor pattern and is called automatically
+        during AST traversal. It filters assignments to only process top-level ones,
+        ensuring module-level variable definitions are tracked while ignoring
+        local variables. The method handles __all__ assignments specially to extract
+        explicit export lists. Thread-safe if the visitor instance is thread-safe.
+        """
+        if is_top_level:
+            visitor._handle_assign(cast("cst.Assign", node))
+
+    @staticmethod
+    def handle_ann_assign_node(
+        visitor: _IndexVisitor, node: cst.CSTNode, *, is_top_level: bool
+    ) -> None:
+        """Handle annotated assignment node during AST traversal.
+
+        This static method processes annotated assignment nodes (e.g., `x: int = value`)
+        during LibCST AST traversal. It delegates to the visitor's internal handler
+        only for top-level annotated assignments, which are tracked as module-level
+        typed variable definitions. Nested assignments (inside functions/classes) are
+        ignored to focus on module-level exports and definitions.
+
+        Parameters
+        ----------
+        visitor : _IndexVisitor
+            The visitor instance collecting module definitions, imports, and exports.
+            The visitor's state is updated with typed variable definitions found in
+            top-level annotated assignments.
+        node : cst.CSTNode
+            The CST node being visited, cast to cst.AnnAssign. Contains assignment
+            target, type annotation, and optional value used to extract variable names.
+        is_top_level : bool
+            Flag indicating whether the annotated assignment is at module level (True)
+            or nested inside a function/class (False). Only top-level assignments are
+            processed to track module-level typed variables.
+
+        Notes
+        -----
+        This method is part of the LibCST visitor pattern and is called automatically
+        during AST traversal. It filters annotated assignments to only process top-level
+        ones, ensuring module-level typed variable definitions are tracked while ignoring
+        local variables. The method handles __all__ assignments specially to extract
+        explicit export lists. Thread-safe if the visitor instance is thread-safe.
+        """
+        if is_top_level:
+            visitor._handle_ann_assign(cast("cst.AnnAssign", node))
+
+    def _resolve_import_aliases(
+        self, alias_nodes: Sequence[cst.ImportAlias]
+    ) -> tuple[list[str], dict[str, str]]:
+        names: list[str] = []
+        aliases: dict[str, str] = {}
+        for ref in alias_nodes:
+            value = self._resolve_alias_target(ref.name)
+            names.append(value)
+            alias = self._resolve_alias_name(ref.asname)
+            if alias:
+                aliases[value] = alias
+        return names, aliases
+
+    @staticmethod
+    def _resolve_alias_name(asname: cst.AsName | None) -> str | None:
+        if isinstance(asname, cst.AsName) and isinstance(asname.name, cst.Name):
+            return asname.name.value
+        return None
+
+    @staticmethod
+    def _resolve_alias_target(ident: cst.BaseExpression) -> str:
+        dotted = None
+        with suppress(Exception):
+            dotted = get_full_name_for_node(ident)
+        if isinstance(ident, cst.Name):
+            return ident.value
+        if dotted:
+            return dotted
+        if isinstance(ident, cst.Attribute):
+            return ident.attr.value
+        return ""
+
+    @staticmethod
+    def _resolve_module_name(module: cst.BaseExpression | None) -> str | None:
+        if module is None:
+            return None
+        with suppress(Exception):  # pragma: no cover - LibCST helper may raise
+            return get_full_name_for_node(module)
+        return None
+
+
+_IndexVisitor.NODE_HANDLERS = {
+    cst.Module: _IndexVisitor.handle_module_node,
+    cst.Import: _IndexVisitor.handle_import_node,
+    cst.ImportFrom: _IndexVisitor.handle_import_from_node,
+    cst.FunctionDef: _IndexVisitor.handle_function_node,
+    getattr(cst, "AsyncFunctionDef", cst.FunctionDef): _IndexVisitor.handle_function_node,
+    cst.ClassDef: _IndexVisitor.handle_class_node,
+    cst.Assign: _IndexVisitor.handle_assign_node,
+    cst.AnnAssign: _IndexVisitor.handle_ann_assign_node,
+}
 
 
 def index_module(path: str, code: str) -> ModuleIndex:

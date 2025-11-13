@@ -76,15 +76,15 @@ the FAISS index, then hydrating results from DuckDB.
 
 - **fan_in**: 0
 - **fan_out**: 11
-- **cycle_group**: 127
+- **cycle_group**: 128
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 35
-- recent churn 90: 35
+- recent churn 30: 36
+- recent churn 90: 36
 
 ## Usage
 

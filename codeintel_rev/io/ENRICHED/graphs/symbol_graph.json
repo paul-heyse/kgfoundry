@@ -36,11 +36,23 @@
     "file": "risk_hotspots.py"
   },
   {
+    "symbol": "local 17",
+    "file": "risk_hotspots.py"
+  },
+  {
     "symbol": "local 18",
     "file": "risk_hotspots.py"
   },
   {
+    "symbol": "local 19",
+    "file": "risk_hotspots.py"
+  },
+  {
     "symbol": "local 2",
+    "file": "risk_hotspots.py"
+  },
+  {
+    "symbol": "local 20",
     "file": "risk_hotspots.py"
   },
   {
@@ -72,6 +84,10 @@
     "file": "risk_hotspots.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.risk_hotspots`/LOGGER.",
+    "file": "risk_hotspots.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.risk_hotspots`/__init__:",
     "file": "risk_hotspots.py"
   },
@@ -81,6 +97,14 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.risk_hotspots`/_git_churn().(path)",
+    "file": "risk_hotspots.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.risk_hotspots`/_open_repo().",
+    "file": "risk_hotspots.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.risk_hotspots`/_repo_root().",
     "file": "risk_hotspots.py"
   },
   {
@@ -1136,14 +1160,6 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 10",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 100",
-    "file": "cli_enrich.py"
-  },
-  {
     "symbol": "local 101",
     "file": "cli_enrich.py"
   },
@@ -1152,7 +1168,15 @@
     "file": "cli_enrich.py"
   },
   {
+    "symbol": "local 103",
+    "file": "cli_enrich.py"
+  },
+  {
     "symbol": "local 104",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 105",
     "file": "cli_enrich.py"
   },
   {
@@ -1164,11 +1188,15 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 109",
+    "symbol": "local 108",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 11",
+    "symbol": "local 110",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 111",
     "file": "cli_enrich.py"
   },
   {
@@ -1180,11 +1208,27 @@
     "file": "cli_enrich.py"
   },
   {
+    "symbol": "local 114",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 115",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 118",
+    "file": "cli_enrich.py"
+  },
+  {
     "symbol": "local 119",
     "file": "cli_enrich.py"
   },
   {
     "symbol": "local 12",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 120",
     "file": "cli_enrich.py"
   },
   {
@@ -1204,11 +1248,31 @@
     "file": "cli_enrich.py"
   },
   {
+    "symbol": "local 125",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 126",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 127",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 128",
+    "file": "cli_enrich.py"
+  },
+  {
     "symbol": "local 129",
     "file": "cli_enrich.py"
   },
   {
     "symbol": "local 13",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 130",
     "file": "cli_enrich.py"
   },
   {
@@ -1220,7 +1284,23 @@
     "file": "cli_enrich.py"
   },
   {
+    "symbol": "local 133",
+    "file": "cli_enrich.py"
+  },
+  {
     "symbol": "local 134",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 135",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 136",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 137",
     "file": "cli_enrich.py"
   },
   {
@@ -1228,19 +1308,15 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 139",
-    "file": "cli_enrich.py"
-  },
-  {
     "symbol": "local 14",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 142",
+    "symbol": "local 140",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 143",
+    "symbol": "local 144",
     "file": "cli_enrich.py"
   },
   {
@@ -1249,10 +1325,6 @@
   },
   {
     "symbol": "local 146",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 147",
     "file": "cli_enrich.py"
   },
   {
@@ -1272,7 +1344,7 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 155",
+    "symbol": "local 153",
     "file": "cli_enrich.py"
   },
   {
@@ -1284,23 +1356,7 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 158",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 159",
-    "file": "cli_enrich.py"
-  },
-  {
     "symbol": "local 16",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 160",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 161",
     "file": "cli_enrich.py"
   },
   {
@@ -1308,11 +1364,19 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 164",
+    "symbol": "local 165",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 17",
+    "symbol": "local 166",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 167",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 168",
     "file": "cli_enrich.py"
   },
   {
@@ -1320,23 +1384,15 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 174",
+    "symbol": "local 175",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 176",
     "file": "cli_enrich.py"
   },
   {
     "symbol": "local 178",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 179",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 18",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 181",
     "file": "cli_enrich.py"
   },
   {
@@ -1348,14 +1404,6 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 184",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 185",
-    "file": "cli_enrich.py"
-  },
-  {
     "symbol": "local 186",
     "file": "cli_enrich.py"
   },
@@ -1364,11 +1412,11 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 188",
+    "symbol": "local 189",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 19",
+    "symbol": "local 190",
     "file": "cli_enrich.py"
   },
   {
@@ -1376,11 +1424,15 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 193",
+    "symbol": "local 192",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 196",
+    "symbol": "local 194",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 195",
     "file": "cli_enrich.py"
   },
   {
@@ -1392,7 +1444,19 @@
     "file": "cli_enrich.py"
   },
   {
+    "symbol": "local 20",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 200",
+    "file": "cli_enrich.py"
+  },
+  {
     "symbol": "local 201",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 202",
     "file": "cli_enrich.py"
   },
   {
@@ -1400,27 +1464,27 @@
     "file": "cli_enrich.py"
   },
   {
+    "symbol": "local 204",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 205",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 207",
+    "file": "cli_enrich.py"
+  },
+  {
     "symbol": "local 208",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 209",
+    "symbol": "local 21",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 213",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 214",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 215",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 216",
+    "symbol": "local 217",
     "file": "cli_enrich.py"
   },
   {
@@ -1432,7 +1496,7 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 221",
+    "symbol": "local 222",
     "file": "cli_enrich.py"
   },
   {
@@ -1440,11 +1504,27 @@
     "file": "cli_enrich.py"
   },
   {
+    "symbol": "local 225",
+    "file": "cli_enrich.py"
+  },
+  {
     "symbol": "local 226",
     "file": "cli_enrich.py"
   },
   {
+    "symbol": "local 227",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 228",
+    "file": "cli_enrich.py"
+  },
+  {
     "symbol": "local 229",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 230",
     "file": "cli_enrich.py"
   },
   {
@@ -1456,11 +1536,11 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 238",
+    "symbol": "local 235",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 239",
+    "symbol": "local 237",
     "file": "cli_enrich.py"
   },
   {
@@ -1468,23 +1548,11 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 241",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 242",
-    "file": "cli_enrich.py"
-  },
-  {
     "symbol": "local 243",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 244",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 246",
+    "symbol": "local 245",
     "file": "cli_enrich.py"
   },
   {
@@ -1492,35 +1560,11 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 248",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 249",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 250",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 251",
+    "symbol": "local 252",
     "file": "cli_enrich.py"
   },
   {
     "symbol": "local 253",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 254",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 255",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 256",
     "file": "cli_enrich.py"
   },
   {
@@ -1544,11 +1588,7 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 261",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 263",
+    "symbol": "local 262",
     "file": "cli_enrich.py"
   },
   {
@@ -1556,11 +1596,91 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 266",
+    "symbol": "local 267",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 267",
+    "symbol": "local 27",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 270",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 273",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 275",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 276",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 282",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 283",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 284",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 285",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 286",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 287",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 288",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 290",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 291",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 292",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 293",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 294",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 295",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 297",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 298",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 299",
     "file": "cli_enrich.py"
   },
   {
@@ -1572,11 +1692,47 @@
     "file": "cli_enrich.py"
   },
   {
+    "symbol": "local 300",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 301",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 302",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 303",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 304",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 305",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 307",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 309",
+    "file": "cli_enrich.py"
+  },
+  {
     "symbol": "local 31",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 32",
+    "symbol": "local 310",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 311",
     "file": "cli_enrich.py"
   },
   {
@@ -1584,7 +1740,15 @@
     "file": "cli_enrich.py"
   },
   {
+    "symbol": "local 34",
+    "file": "cli_enrich.py"
+  },
+  {
     "symbol": "local 35",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 36",
     "file": "cli_enrich.py"
   },
   {
@@ -1612,26 +1776,6 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 43",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 44",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 45",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 46",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 47",
-    "file": "cli_enrich.py"
-  },
-  {
     "symbol": "local 48",
     "file": "cli_enrich.py"
   },
@@ -1640,7 +1784,15 @@
     "file": "cli_enrich.py"
   },
   {
+    "symbol": "local 5",
+    "file": "cli_enrich.py"
+  },
+  {
     "symbol": "local 50",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "local 51",
     "file": "cli_enrich.py"
   },
   {
@@ -1652,11 +1804,7 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 54",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 55",
+    "symbol": "local 56",
     "file": "cli_enrich.py"
   },
   {
@@ -1664,23 +1812,15 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 61",
+    "symbol": "local 60",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 62",
+    "symbol": "local 64",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 67",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 68",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 69",
+    "symbol": "local 65",
     "file": "cli_enrich.py"
   },
   {
@@ -1688,47 +1828,7 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 70",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 71",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 74",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 75",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 76",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 77",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 78",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 79",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 80",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 81",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 82",
+    "symbol": "local 8",
     "file": "cli_enrich.py"
   },
   {
@@ -1760,27 +1860,7 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "local 9",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 90",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 91",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 92",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 93",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "local 94",
+    "symbol": "local 95",
     "file": "cli_enrich.py"
   },
   {
@@ -1788,7 +1868,43 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/ACTIVATE.",
+    "symbol": "scip-python python click 8.1.8 `click.core`/Context#obj.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/AnalyticsOptions#",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/AnalyticsOptions#commits_window.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/AnalyticsOptions#emit_slices.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/AnalyticsOptions#history_window_days.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/AnalyticsOptions#owners.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/AnalyticsOptions#slices_filter.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/CLIContextState#",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/CLIContextState#analytics.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/CLIContextState#pipeline.",
     "file": "cli_enrich.py"
   },
   {
@@ -1796,11 +1912,7 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/COVERAGE_XML.",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/DEACTIVATE.",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/COVERAGE_OPTION.",
     "file": "cli_enrich.py"
   },
   {
@@ -1860,7 +1972,11 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/DRY_RUN.",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/EMIT_AST_OPTION.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/EMIT_SLICES_OPTION.",
     "file": "cli_enrich.py"
   },
   {
@@ -1868,19 +1984,7 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/EmitSlicesOption.",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/HISTORY_WINDOW.",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/INCLUDE_PUBLIC_DEFS.",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/INJECT_GETATTR_ANY.",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/HISTORY_WINDOW_OPTION.",
     "file": "cli_enrich.py"
   },
   {
@@ -1888,23 +1992,23 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/MAX_FILE_BYTES.",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/MAX_FILE_BYTES_OPTION.",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/MAX_OVERLAYS.",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/ONLY_OPTION.",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/MIN_ERRORS.",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OUT_OPTION.",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OUT.",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OVERLAYS_CONFIG_OPTION.",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OVERLAYS_ROOT.",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OVERLAYS_SET_OPTION.",
     "file": "cli_enrich.py"
   },
   {
@@ -1920,15 +2024,167 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OnlyPatternsOption.",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OWNERS_OPTION.",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OwnersOption.",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayCLIOptions#",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PYREFLY.",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayCLIOptions#activate.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayCLIOptions#deactivate_all_first.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayCLIOptions#dry_run.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayCLIOptions#include_public_defs.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayCLIOptions#inject_getattr_any.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayCLIOptions#max_overlays.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayCLIOptions#min_errors.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayCLIOptions#overlays_root.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayCLIOptions#stubs_root.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayCLIOptions#type_error_overlays.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayContext#",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayContext#inputs.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayContext#overlays_root.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayContext#package_name.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayContext#policy.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayContext#root.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayContext#scip_index.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayContext#stubs_root.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/OverlayContext#type_counts.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PYREFLY_OPTION.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineContext#",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineContext#config_records.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineContext#coverage_map.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineContext#package_prefix.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineContext#repo_root.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineContext#root.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineContext#scip_ctx.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineContext#scip_index.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineContext#tagging_rules.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineContext#type_signals.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineOptions#",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineOptions#coverage_xml.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineOptions#max_file_bytes.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineOptions#only.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineOptions#out.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineOptions#pyrefly_json.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineOptions#root.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineOptions#scip.",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/PipelineOptions#tags_yaml.",
     "file": "cli_enrich.py"
   },
   {
@@ -1976,15 +2232,15 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/ROOT.",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/ROOT_OPTION.",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/SCIP.",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/SCIP_OPTION.",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/STUBS.",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/SLICES_FILTER_OPTION.",
     "file": "cli_enrich.py"
   },
   {
@@ -2032,15 +2288,11 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/SlicesFilterOption.",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/TAGS_OPTION.",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/TAGS.",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/TYPE_ERROR_OVERLAYS.",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_EMIT_AST_FLAG.",
     "file": "cli_enrich.py"
   },
   {
@@ -2160,6 +2412,18 @@
     "file": "cli_enrich.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_build_overlay_context().",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_build_overlay_context().(options)",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_build_overlay_context().(pipeline)",
+    "file": "cli_enrich.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_build_tag_index().",
     "file": "cli_enrich.py"
   },
@@ -2260,6 +2524,22 @@
     "file": "cli_enrich.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_ensure_state().",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_ensure_state().(ctx)",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_execute_pipeline().",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_execute_pipeline().(ctx)",
+    "file": "cli_enrich.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_group_configs_by_dir().",
     "file": "cli_enrich.py"
   },
@@ -2277,6 +2557,18 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_iter_files().(root)",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_load_overlay_options().",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_load_overlay_options().(config_path)",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_load_overlay_options().(overrides)",
     "file": "cli_enrich.py"
   },
   {
@@ -2336,35 +2628,47 @@
     "file": "cli_enrich.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_parse_bool().",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_parse_bool().(value)",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_read_overlay_config().",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_read_overlay_config().(path)",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_resolve_path().",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_resolve_path().(path_value)",
+    "file": "cli_enrich.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_run_pipeline().",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_run_pipeline().(coverage_xml)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_run_pipeline().(pipeline)",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_run_pipeline().(max_file_bytes)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_scan_modules().",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_run_pipeline().(only)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_scan_modules().(ctx)",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_run_pipeline().(pyrefly_json)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_run_pipeline().(root)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_run_pipeline().(scip)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_run_pipeline().(tags_yaml)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_scan_modules().(pipeline)",
     "file": "cli_enrich.py"
   },
   {
@@ -2377,6 +2681,22 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_scip_symbols_and_edges().(rel_path)",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_set_overlay_option().",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_set_overlay_option().(key)",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_set_overlay_option().(options)",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/_set_overlay_option().(raw_value)",
     "file": "cli_enrich.py"
   },
   {
@@ -2640,35 +2960,7 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/config().(coverage_xml)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/config().(max_file_bytes)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/config().(only)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/config().(out)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/config().(pyrefly_json)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/config().(root)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/config().(scip)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/config().(tags_yaml)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/config().(ctx)",
     "file": "cli_enrich.py"
   },
   {
@@ -2676,35 +2968,7 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/coverage().(coverage_xml)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/coverage().(max_file_bytes)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/coverage().(only)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/coverage().(out)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/coverage().(pyrefly_json)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/coverage().(root)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/coverage().(scip)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/coverage().(tags_yaml)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/coverage().(ctx)",
     "file": "cli_enrich.py"
   },
   {
@@ -2712,35 +2976,7 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/doc().(coverage_xml)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/doc().(max_file_bytes)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/doc().(only)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/doc().(out)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/doc().(pyrefly_json)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/doc().(root)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/doc().(scip)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/doc().(tags_yaml)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/doc().(ctx)",
     "file": "cli_enrich.py"
   },
   {
@@ -2748,55 +2984,67 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/exports().(commits_window)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/exports().(ctx)",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/exports().(coverage_xml)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/global_options().",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/exports().(emit_slices)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/global_options().(commits_window)",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/exports().(history_window_days)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/global_options().(coverage_xml)",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/exports().(max_file_bytes)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/global_options().(ctx)",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/exports().(only)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/global_options().(emit_slices)",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/exports().(out)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/global_options().(history_window_days)",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/exports().(owners)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/global_options().(max_file_bytes)",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/exports().(pyrefly_json)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/global_options().(only)",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/exports().(root)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/global_options().(out)",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/exports().(scip)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/global_options().(owners)",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/exports().(slices_filter)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/global_options().(pyrefly_json)",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/exports().(tags_yaml)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/global_options().(root)",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/global_options().(scip)",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/global_options().(slices_filter)",
+    "file": "cli_enrich.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/global_options().(tags_yaml)",
     "file": "cli_enrich.py"
   },
   {
@@ -2804,35 +3052,7 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/graph().(coverage_xml)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/graph().(max_file_bytes)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/graph().(only)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/graph().(out)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/graph().(pyrefly_json)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/graph().(root)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/graph().(scip)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/graph().(tags_yaml)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/graph().(ctx)",
     "file": "cli_enrich.py"
   },
   {
@@ -2840,35 +3060,7 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/hotspots().(coverage_xml)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/hotspots().(max_file_bytes)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/hotspots().(only)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/hotspots().(out)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/hotspots().(pyrefly_json)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/hotspots().(root)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/hotspots().(scip)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/hotspots().(tags_yaml)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/hotspots().(ctx)",
     "file": "cli_enrich.py"
   },
   {
@@ -2876,55 +3068,27 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/overlays().(activate)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/overlays().(config_path)",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/overlays().(deactivate_all_first)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/overlays().(ctx)",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/overlays().(dry_run)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/overlays().(overrides)",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/overlays().(include_public_defs)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/run().",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/overlays().(inject_getattr_any)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/run().(ctx)",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/overlays().(max_overlays)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/overlays().(min_errors)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/overlays().(overlays_root)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/overlays().(pyrefly_json)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/overlays().(root)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/overlays().(scip)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/overlays().(stubs_root)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/overlays().(type_error_overlays)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/run().(emit_ast)",
     "file": "cli_enrich.py"
   },
   {
@@ -2932,11 +3096,7 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/run_all().(commits_window)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/run_all().(coverage_xml)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/run_all().(ctx)",
     "file": "cli_enrich.py"
   },
   {
@@ -2944,59 +3104,11 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/run_all().(emit_slices)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/run_all().(history_window_days)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/run_all().(max_file_bytes)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/run_all().(only)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/run_all().(out)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/run_all().(owners)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/run_all().(pyrefly_json)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/run_all().(root)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/run_all().(scip)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/run_all().(slices_filter)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/run_all().(tags_yaml)",
-    "file": "cli_enrich.py"
-  },
-  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/scan().",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/scan().(commits_window)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/scan().(coverage_xml)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/scan().(ctx)",
     "file": "cli_enrich.py"
   },
   {
@@ -3004,83 +3116,11 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/scan().(emit_slices)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/scan().(history_window_days)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/scan().(max_file_bytes)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/scan().(only)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/scan().(out)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/scan().(owners)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/scan().(pyrefly_json)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/scan().(root)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/scan().(scip)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/scan().(slices_filter)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/scan().(tags_yaml)",
-    "file": "cli_enrich.py"
-  },
-  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/typedness().",
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/typedness().(coverage_xml)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/typedness().(max_file_bytes)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/typedness().(only)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/typedness().(out)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/typedness().(pyrefly_json)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/typedness().(root)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/typedness().(scip)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/typedness().(tags_yaml)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/typedness().(ctx)",
     "file": "cli_enrich.py"
   },
   {
@@ -3088,35 +3128,7 @@
     "file": "cli_enrich.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/uses().(coverage_xml)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/uses().(max_file_bytes)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/uses().(only)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/uses().(out)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/uses().(pyrefly_json)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/uses().(root)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/uses().(scip)",
-    "file": "cli_enrich.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/uses().(tags_yaml)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli_enrich`/uses().(ctx)",
     "file": "cli_enrich.py"
   },
   {
@@ -6984,6 +6996,74 @@
     "file": "app/gpu_warmup.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.server_settings`/ServerSettings#",
+    "file": "app/server_settings.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.server_settings`/ServerSettings#allowed_hosts.",
+    "file": "app/server_settings.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.server_settings`/ServerSettings#cors_allow_credentials.",
+    "file": "app/server_settings.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.server_settings`/ServerSettings#cors_allow_headers.",
+    "file": "app/server_settings.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.server_settings`/ServerSettings#cors_allow_methods.",
+    "file": "app/server_settings.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.server_settings`/ServerSettings#cors_allow_origins.",
+    "file": "app/server_settings.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.server_settings`/ServerSettings#domain.",
+    "file": "app/server_settings.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.server_settings`/ServerSettings#enable_proxy_fix.",
+    "file": "app/server_settings.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.server_settings`/ServerSettings#enable_trusted_hosts.",
+    "file": "app/server_settings.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.server_settings`/ServerSettings#host.",
+    "file": "app/server_settings.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.server_settings`/ServerSettings#model_config.",
+    "file": "app/server_settings.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.server_settings`/ServerSettings#port.",
+    "file": "app/server_settings.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.server_settings`/ServerSettings#proxy_mode.",
+    "file": "app/server_settings.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.server_settings`/ServerSettings#proxy_trusted_hops.",
+    "file": "app/server_settings.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.server_settings`/__all__.",
+    "file": "app/server_settings.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.server_settings`/__init__:",
+    "file": "app/server_settings.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.server_settings`/get_server_settings().",
+    "file": "app/server_settings.py"
+  },
+  {
     "symbol": "local 0",
     "file": "app/config_context.py"
   },
@@ -8268,11 +8348,11 @@
     "file": "app/main.py"
   },
   {
-    "symbol": "local 4",
+    "symbol": "local 39",
     "file": "app/main.py"
   },
   {
-    "symbol": "local 40",
+    "symbol": "local 4",
     "file": "app/main.py"
   },
   {
@@ -8292,7 +8372,7 @@
     "file": "app/main.py"
   },
   {
-    "symbol": "local 46",
+    "symbol": "local 45",
     "file": "app/main.py"
   },
   {
@@ -8320,7 +8400,7 @@
     "file": "app/main.py"
   },
   {
-    "symbol": "local 53",
+    "symbol": "local 52",
     "file": "app/main.py"
   },
   {
@@ -8340,11 +8420,11 @@
     "file": "app/main.py"
   },
   {
-    "symbol": "local 59",
+    "symbol": "local 58",
     "file": "app/main.py"
   },
   {
-    "symbol": "local 61",
+    "symbol": "local 60",
     "file": "app/main.py"
   },
   {
@@ -8356,7 +8436,11 @@
     "file": "app/main.py"
   },
   {
-    "symbol": "local 66",
+    "symbol": "local 64",
+    "file": "app/main.py"
+  },
+  {
+    "symbol": "local 67",
     "file": "app/main.py"
   },
   {
@@ -8377,6 +8461,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.main`/LOGGER.",
+    "file": "app/main.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.main`/SERVER_SETTINGS.",
     "file": "app/main.py"
   },
   {
@@ -8513,6 +8601,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.main`/metrics_endpoint().",
+    "file": "app/main.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.main`/proxy_wrapped.",
     "file": "app/main.py"
   },
   {
@@ -15576,6 +15668,18 @@
     "file": "enrich/ast_indexer.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#branch_visit().",
+    "file": "enrich/ast_indexer.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#branch_visit().(node)",
+    "file": "enrich/ast_indexer.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#branch_visit().(self)",
+    "file": "enrich/ast_indexer.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#class_count.",
     "file": "enrich/ast_indexer.py"
   },
@@ -15608,18 +15712,6 @@
     "file": "enrich/ast_indexer.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_AnnAssign().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_AnnAssign().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_AnnAssign().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_Assign().",
     "file": "enrich/ast_indexer.py"
   },
@@ -15629,66 +15721,6 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_Assign().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_AsyncFor().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_AsyncFor().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_AsyncFor().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_AsyncFunctionDef().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_AsyncFunctionDef().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_AsyncFunctionDef().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_AsyncWith().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_AsyncWith().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_AsyncWith().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_AugAssign().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_AugAssign().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_AugAssign().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_BoolOp().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_BoolOp().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_BoolOp().(self)",
     "file": "enrich/ast_indexer.py"
   },
   {
@@ -15704,30 +15736,6 @@
     "file": "enrich/ast_indexer.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_DictComp().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_DictComp().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_DictComp().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_For().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_For().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_For().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_FunctionDef().",
     "file": "enrich/ast_indexer.py"
   },
@@ -15740,42 +15748,6 @@
     "file": "enrich/ast_indexer.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_GeneratorExp().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_GeneratorExp().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_GeneratorExp().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_If().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_If().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_If().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_IfExp().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_IfExp().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_IfExp().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_Import().",
     "file": "enrich/ast_indexer.py"
   },
@@ -15785,102 +15757,6 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_Import().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_ImportFrom().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_ImportFrom().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_ImportFrom().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_ListComp().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_ListComp().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_ListComp().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_Match().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_Match().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_Match().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_NamedExpr().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_NamedExpr().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_NamedExpr().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_SetComp().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_SetComp().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_SetComp().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_Try().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_Try().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_Try().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_While().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_While().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_While().(self)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_With().",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_With().(node)",
-    "file": "enrich/ast_indexer.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ast_indexer`/_MetricsVisitor#visit_With().(self)",
     "file": "enrich/ast_indexer.py"
   },
   {
@@ -16344,7 +16220,7 @@
     "file": "enrich/slices_builder.py"
   },
   {
-    "symbol": "local 1",
+    "symbol": "local 0",
     "file": "enrich/ownership.py"
   },
   {
@@ -16376,7 +16252,11 @@
     "file": "enrich/ownership.py"
   },
   {
-    "symbol": "local 19",
+    "symbol": "local 17",
+    "file": "enrich/ownership.py"
+  },
+  {
+    "symbol": "local 18",
     "file": "enrich/ownership.py"
   },
   {
@@ -16384,11 +16264,11 @@
     "file": "enrich/ownership.py"
   },
   {
-    "symbol": "local 20",
+    "symbol": "local 21",
     "file": "enrich/ownership.py"
   },
   {
-    "symbol": "local 23",
+    "symbol": "local 22",
     "file": "enrich/ownership.py"
   },
   {
@@ -16396,11 +16276,7 @@
     "file": "enrich/ownership.py"
   },
   {
-    "symbol": "local 28",
-    "file": "enrich/ownership.py"
-  },
-  {
-    "symbol": "local 29",
+    "symbol": "local 27",
     "file": "enrich/ownership.py"
   },
   {
@@ -16420,11 +16296,15 @@
     "file": "enrich/ownership.py"
   },
   {
-    "symbol": "local 33",
+    "symbol": "local 34",
     "file": "enrich/ownership.py"
   },
   {
-    "symbol": "local 34",
+    "symbol": "local 35",
+    "file": "enrich/ownership.py"
+  },
+  {
+    "symbol": "local 36",
     "file": "enrich/ownership.py"
   },
   {
@@ -16432,11 +16312,19 @@
     "file": "enrich/ownership.py"
   },
   {
+    "symbol": "local 39",
+    "file": "enrich/ownership.py"
+  },
+  {
     "symbol": "local 4",
     "file": "enrich/ownership.py"
   },
   {
-    "symbol": "local 41",
+    "symbol": "local 40",
+    "file": "enrich/ownership.py"
+  },
+  {
+    "symbol": "local 42",
     "file": "enrich/ownership.py"
   },
   {
@@ -16444,23 +16332,7 @@
     "file": "enrich/ownership.py"
   },
   {
-    "symbol": "local 44",
-    "file": "enrich/ownership.py"
-  },
-  {
-    "symbol": "local 45",
-    "file": "enrich/ownership.py"
-  },
-  {
     "symbol": "local 46",
-    "file": "enrich/ownership.py"
-  },
-  {
-    "symbol": "local 47",
-    "file": "enrich/ownership.py"
-  },
-  {
-    "symbol": "local 49",
     "file": "enrich/ownership.py"
   },
   {
@@ -16468,39 +16340,7 @@
     "file": "enrich/ownership.py"
   },
   {
-    "symbol": "local 50",
-    "file": "enrich/ownership.py"
-  },
-  {
-    "symbol": "local 51",
-    "file": "enrich/ownership.py"
-  },
-  {
-    "symbol": "local 52",
-    "file": "enrich/ownership.py"
-  },
-  {
-    "symbol": "local 54",
-    "file": "enrich/ownership.py"
-  },
-  {
-    "symbol": "local 55",
-    "file": "enrich/ownership.py"
-  },
-  {
-    "symbol": "local 57",
-    "file": "enrich/ownership.py"
-  },
-  {
-    "symbol": "local 58",
-    "file": "enrich/ownership.py"
-  },
-  {
     "symbol": "local 6",
-    "file": "enrich/ownership.py"
-  },
-  {
-    "symbol": "local 61",
     "file": "enrich/ownership.py"
   },
   {
@@ -16541,6 +16381,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ownership`/GitError.",
+    "file": "enrich/ownership.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ownership`/LOGGER.",
     "file": "enrich/ownership.py"
   },
   {
@@ -16612,18 +16456,6 @@
     "file": "enrich/ownership.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ownership`/_run_git().",
-    "file": "enrich/ownership.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ownership`/_run_git().(cmd)",
-    "file": "enrich/ownership.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ownership`/_run_git().(repo_root)",
-    "file": "enrich/ownership.py"
-  },
-  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ownership`/_stats_via_gitpython().",
     "file": "enrich/ownership.py"
   },
@@ -16645,26 +16477,6 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ownership`/_stats_via_gitpython().(windows)",
-    "file": "enrich/ownership.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ownership`/_stats_via_subprocess().",
-    "file": "enrich/ownership.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ownership`/_stats_via_subprocess().(commits_window)",
-    "file": "enrich/ownership.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ownership`/_stats_via_subprocess().(rel_paths)",
-    "file": "enrich/ownership.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ownership`/_stats_via_subprocess().(repo_root)",
-    "file": "enrich/ownership.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.ownership`/_stats_via_subprocess().(windows)",
     "file": "enrich/ownership.py"
   },
   {
@@ -16712,23 +16524,19 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 10",
+    "symbol": "local 102",
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 101",
-    "file": "enrich/libcst_bridge.py"
-  },
-  {
-    "symbol": "local 105",
-    "file": "enrich/libcst_bridge.py"
-  },
-  {
-    "symbol": "local 106",
+    "symbol": "local 104",
     "file": "enrich/libcst_bridge.py"
   },
   {
     "symbol": "local 109",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 11",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -16744,19 +16552,11 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 113",
-    "file": "enrich/libcst_bridge.py"
-  },
-  {
-    "symbol": "local 114",
-    "file": "enrich/libcst_bridge.py"
-  },
-  {
-    "symbol": "local 116",
-    "file": "enrich/libcst_bridge.py"
-  },
-  {
     "symbol": "local 117",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 120",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -16764,7 +16564,23 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 123",
+    "symbol": "local 122",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 124",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 125",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 126",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 127",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -16776,10 +16592,6 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 13",
-    "file": "enrich/libcst_bridge.py"
-  },
-  {
     "symbol": "local 130",
     "file": "enrich/libcst_bridge.py"
   },
@@ -16788,7 +16600,19 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 136",
+    "symbol": "local 132",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 133",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 134",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 138",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -16796,19 +16620,11 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 140",
+    "symbol": "local 14",
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 141",
-    "file": "enrich/libcst_bridge.py"
-  },
-  {
-    "symbol": "local 143",
-    "file": "enrich/libcst_bridge.py"
-  },
-  {
-    "symbol": "local 144",
+    "symbol": "local 142",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -16816,7 +16632,7 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 147",
+    "symbol": "local 146",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -16824,7 +16640,11 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 15",
+    "symbol": "local 149",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 16",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -16832,19 +16652,19 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 21",
+    "symbol": "local 22",
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 23",
+    "symbol": "local 24",
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 26",
+    "symbol": "local 27",
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 29",
+    "symbol": "local 3",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -16852,7 +16672,7 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 32",
+    "symbol": "local 31",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -16860,7 +16680,7 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 35",
+    "symbol": "local 34",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -16880,23 +16700,23 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 4",
-    "file": "enrich/libcst_bridge.py"
-  },
-  {
     "symbol": "local 40",
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 48",
+    "symbol": "local 41",
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 52",
+    "symbol": "local 49",
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 54",
+    "symbol": "local 5",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 53",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -16920,7 +16740,7 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 61",
+    "symbol": "local 60",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -16928,7 +16748,7 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 66",
+    "symbol": "local 63",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -16936,7 +16756,31 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 7",
+    "symbol": "local 68",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 69",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 70",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 73",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 74",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 75",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 76",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -16944,15 +16788,7 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 78",
-    "file": "enrich/libcst_bridge.py"
-  },
-  {
-    "symbol": "local 79",
-    "file": "enrich/libcst_bridge.py"
-  },
-  {
-    "symbol": "local 80",
+    "symbol": "local 8",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -16968,7 +16804,15 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 88",
+    "symbol": "local 87",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 90",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 91",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -16976,15 +16820,23 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "local 96",
+    "symbol": "local 93",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 94",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 95",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "local 97",
     "file": "enrich/libcst_bridge.py"
   },
   {
     "symbol": "local 98",
-    "file": "enrich/libcst_bridge.py"
-  },
-  {
-    "symbol": "local 99",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -17100,11 +16952,35 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/NodeHandler#",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/NodeHandler#__call__().",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/NodeHandler#__call__().(is_top_level)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/NodeHandler#__call__().(node)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/NodeHandler#__call__().(self)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/NodeHandler#__call__().(visitor)",
     "file": "enrich/libcst_bridge.py"
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#METADATA_DEPENDENCIES.",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#NODE_HANDLERS.",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -17252,6 +17128,42 @@
     "file": "enrich/libcst_bridge.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#_resolve_alias_name().",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#_resolve_alias_name().(asname)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#_resolve_alias_target().",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#_resolve_alias_target().(ident)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#_resolve_import_aliases().",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#_resolve_import_aliases().(alias_nodes)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#_resolve_import_aliases().(self)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#_resolve_module_name().",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#_resolve_module_name().(module)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#_untyped_defs.",
     "file": "enrich/libcst_bridge.py"
   },
@@ -17293,6 +17205,118 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#finalize().(self)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_ann_assign_node().",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_ann_assign_node().(is_top_level)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_ann_assign_node().(node)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_ann_assign_node().(visitor)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_assign_node().",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_assign_node().(is_top_level)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_assign_node().(node)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_assign_node().(visitor)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_class_node().",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_class_node().(is_top_level)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_class_node().(node)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_class_node().(visitor)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_function_node().",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_function_node().(is_top_level)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_function_node().(node)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_function_node().(visitor)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_import_from_node().",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_import_from_node().(is_top_level)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_import_from_node().(node)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_import_from_node().(visitor)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_import_node().",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_import_node().(is_top_level)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_import_node().(node)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_import_node().(visitor)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_module_node().",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_module_node().(is_top_level)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_module_node().(node)",
+    "file": "enrich/libcst_bridge.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.libcst_bridge`/_IndexVisitor#handle_module_node().(visitor)",
     "file": "enrich/libcst_bridge.py"
   },
   {
@@ -17540,10 +17564,6 @@
     "file": "enrich/stubs_overlay.py"
   },
   {
-    "symbol": "local 11",
-    "file": "enrich/stubs_overlay.py"
-  },
-  {
     "symbol": "local 14",
     "file": "enrich/stubs_overlay.py"
   },
@@ -17596,7 +17616,7 @@
     "file": "enrich/stubs_overlay.py"
   },
   {
-    "symbol": "local 27",
+    "symbol": "local 26",
     "file": "enrich/stubs_overlay.py"
   },
   {
@@ -17620,7 +17640,7 @@
     "file": "enrich/stubs_overlay.py"
   },
   {
-    "symbol": "local 33",
+    "symbol": "local 32",
     "file": "enrich/stubs_overlay.py"
   },
   {
@@ -17660,11 +17680,11 @@
     "file": "enrich/stubs_overlay.py"
   },
   {
-    "symbol": "local 43",
+    "symbol": "local 42",
     "file": "enrich/stubs_overlay.py"
   },
   {
-    "symbol": "local 45",
+    "symbol": "local 44",
     "file": "enrich/stubs_overlay.py"
   },
   {
@@ -17672,7 +17692,11 @@
     "file": "enrich/stubs_overlay.py"
   },
   {
-    "symbol": "local 48",
+    "symbol": "local 47",
+    "file": "enrich/stubs_overlay.py"
+  },
+  {
+    "symbol": "local 49",
     "file": "enrich/stubs_overlay.py"
   },
   {
@@ -17680,15 +17704,11 @@
     "file": "enrich/stubs_overlay.py"
   },
   {
-    "symbol": "local 50",
-    "file": "enrich/stubs_overlay.py"
-  },
-  {
     "symbol": "local 51",
     "file": "enrich/stubs_overlay.py"
   },
   {
-    "symbol": "local 53",
+    "symbol": "local 52",
     "file": "enrich/stubs_overlay.py"
   },
   {
@@ -17701,6 +17721,10 @@
   },
   {
     "symbol": "local 59",
+    "file": "enrich/stubs_overlay.py"
+  },
+  {
+    "symbol": "local 6",
     "file": "enrich/stubs_overlay.py"
   },
   {
@@ -17724,10 +17748,6 @@
     "file": "enrich/stubs_overlay.py"
   },
   {
-    "symbol": "local 7",
-    "file": "enrich/stubs_overlay.py"
-  },
-  {
     "symbol": "local 73",
     "file": "enrich/stubs_overlay.py"
   },
@@ -17737,6 +17757,22 @@
   },
   {
     "symbol": "local 9",
+    "file": "enrich/stubs_overlay.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/OverlayInputs#",
+    "file": "enrich/stubs_overlay.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/OverlayInputs#force.",
+    "file": "enrich/stubs_overlay.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/OverlayInputs#scip.",
+    "file": "enrich/stubs_overlay.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/OverlayInputs#type_error_counts.",
     "file": "enrich/stubs_overlay.py"
   },
   {
@@ -17776,6 +17812,34 @@
     "file": "enrich/stubs_overlay.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/OverlayRenderContext#",
+    "file": "enrich/stubs_overlay.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/OverlayRenderContext#import_reexports.",
+    "file": "enrich/stubs_overlay.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/OverlayRenderContext#include_public_defs.",
+    "file": "enrich/stubs_overlay.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/OverlayRenderContext#inject_getattr_any.",
+    "file": "enrich/stubs_overlay.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/OverlayRenderContext#module.",
+    "file": "enrich/stubs_overlay.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/OverlayRenderContext#module_name.",
+    "file": "enrich/stubs_overlay.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/OverlayRenderContext#star_targets.",
+    "file": "enrich/stubs_overlay.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/OverlayResult#",
     "file": "enrich/stubs_overlay.py"
   },
@@ -17804,27 +17868,7 @@
     "file": "enrich/stubs_overlay.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/_build_overlay_text().(import_reexports)",
-    "file": "enrich/stubs_overlay.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/_build_overlay_text().(include_public_defs)",
-    "file": "enrich/stubs_overlay.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/_build_overlay_text().(inject_getattr_any)",
-    "file": "enrich/stubs_overlay.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/_build_overlay_text().(module)",
-    "file": "enrich/stubs_overlay.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/_build_overlay_text().(module_name)",
-    "file": "enrich/stubs_overlay.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/_build_overlay_text().(star_targets)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/_build_overlay_text().(context)",
     "file": "enrich/stubs_overlay.py"
   },
   {
@@ -17952,7 +17996,7 @@
     "file": "enrich/stubs_overlay.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/generate_overlay_for_file().(force)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/generate_overlay_for_file().(inputs)",
     "file": "enrich/stubs_overlay.py"
   },
   {
@@ -17965,14 +18009,6 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/generate_overlay_for_file().(py_file)",
-    "file": "enrich/stubs_overlay.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/generate_overlay_for_file().(scip)",
-    "file": "enrich/stubs_overlay.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.enrich.stubs_overlay`/generate_overlay_for_file().(type_error_counts)",
     "file": "enrich/stubs_overlay.py"
   },
   {
@@ -25268,39 +25304,39 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 186",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 187",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 188",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 189",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 19",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 190",
+    "symbol": "local 194",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 191",
+    "symbol": "local 195",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 192",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 197",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 198",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 199",
+    "symbol": "local 196",
     "file": "io/faiss_manager.py"
   },
   {
     "symbol": "local 2",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 200",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25312,7 +25348,15 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 203",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 204",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 205",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25320,15 +25364,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 207",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 208",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 209",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25340,23 +25376,23 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 217",
+    "symbol": "local 211",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 218",
+    "symbol": "local 212",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 219",
+    "symbol": "local 213",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 214",
     "file": "io/faiss_manager.py"
   },
   {
     "symbol": "local 22",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 220",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25372,11 +25408,19 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 227",
+    "symbol": "local 224",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 228",
+    "symbol": "local 225",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 226",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 227",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25388,19 +25432,11 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 234",
+    "symbol": "local 232",
     "file": "io/faiss_manager.py"
   },
   {
     "symbol": "local 235",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 236",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 237",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25416,6 +25452,14 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 240",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 241",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 242",
     "file": "io/faiss_manager.py"
   },
@@ -25424,15 +25468,11 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 245",
+    "symbol": "local 246",
     "file": "io/faiss_manager.py"
   },
   {
     "symbol": "local 247",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 248",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25441,10 +25481,6 @@
   },
   {
     "symbol": "local 25",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 250",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25480,11 +25516,19 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 259",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 260",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 261",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 263",
+    "symbol": "local 262",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25492,11 +25536,11 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 266",
+    "symbol": "local 267",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 268",
+    "symbol": "local 269",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25508,31 +25552,31 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 271",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 272",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 278",
+    "symbol": "local 274",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 279",
+    "symbol": "local 275",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 280",
+    "symbol": "local 276",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 281",
+    "symbol": "local 282",
     "file": "io/faiss_manager.py"
   },
   {
     "symbol": "local 283",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 284",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25544,7 +25588,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 288",
+    "symbol": "local 289",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25552,7 +25596,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 290",
+    "symbol": "local 291",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25564,15 +25608,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 295",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 296",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 297",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25596,6 +25632,10 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 301",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 302",
     "file": "io/faiss_manager.py"
   },
@@ -25604,7 +25644,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 305",
+    "symbol": "local 304",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25612,7 +25652,11 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 308",
+    "symbol": "local 307",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 309",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25628,19 +25672,15 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 313",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 314",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 315",
+    "symbol": "local 316",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 316",
+    "symbol": "local 317",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25672,6 +25712,10 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 326",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 327",
     "file": "io/faiss_manager.py"
   },
@@ -25680,15 +25724,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 329",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 33",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 330",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25704,27 +25740,27 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 334",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 335",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 336",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 337",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 338",
+    "symbol": "local 341",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 344",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 345",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 346",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 347",
+    "symbol": "local 342",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25848,11 +25884,19 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 375",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 376",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 379",
+    "symbol": "local 377",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 378",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25861,10 +25905,6 @@
   },
   {
     "symbol": "local 380",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 381",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25880,11 +25920,15 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 386",
+    "symbol": "local 387",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 387",
+    "symbol": "local 388",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 389",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25892,11 +25936,19 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 390",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 391",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 392",
+    "symbol": "local 395",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 396",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25908,27 +25960,15 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 400",
+    "symbol": "local 404",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 401",
+    "symbol": "local 405",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 403",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 406",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 408",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 409",
+    "symbol": "local 407",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25937,10 +25977,6 @@
   },
   {
     "symbol": "local 410",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 411",
     "file": "io/faiss_manager.py"
   },
   {
@@ -25960,6 +25996,10 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 416",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 417",
     "file": "io/faiss_manager.py"
   },
@@ -25973,10 +26013,6 @@
   },
   {
     "symbol": "local 42",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 420",
     "file": "io/faiss_manager.py"
   },
   {
@@ -26004,6 +26040,10 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 427",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 428",
     "file": "io/faiss_manager.py"
   },
@@ -26017,10 +26057,6 @@
   },
   {
     "symbol": "local 430",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 431",
     "file": "io/faiss_manager.py"
   },
   {
@@ -26068,19 +26104,19 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 443",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 444",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 445",
     "file": "io/faiss_manager.py"
   },
   {
     "symbol": "local 446",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 447",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 448",
     "file": "io/faiss_manager.py"
   },
   {
@@ -26092,6 +26128,10 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 450",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 451",
     "file": "io/faiss_manager.py"
   },
@@ -26100,7 +26140,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 454",
+    "symbol": "local 453",
     "file": "io/faiss_manager.py"
   },
   {
@@ -26109,6 +26149,10 @@
   },
   {
     "symbol": "local 456",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 458",
     "file": "io/faiss_manager.py"
   },
   {
@@ -26124,7 +26168,15 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 461",
+    "symbol": "local 463",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 464",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 465",
     "file": "io/faiss_manager.py"
   },
   {
@@ -32340,10 +32392,6 @@
     "file": "retrieval/rerank_flat.py"
   },
   {
-    "symbol": "local 10",
-    "file": "retrieval/rerank_flat.py"
-  },
-  {
     "symbol": "local 11",
     "file": "retrieval/rerank_flat.py"
   },
@@ -32364,11 +32412,11 @@
     "file": "retrieval/rerank_flat.py"
   },
   {
-    "symbol": "local 18",
+    "symbol": "local 16",
     "file": "retrieval/rerank_flat.py"
   },
   {
-    "symbol": "local 19",
+    "symbol": "local 17",
     "file": "retrieval/rerank_flat.py"
   },
   {
@@ -32384,11 +32432,11 @@
     "file": "retrieval/rerank_flat.py"
   },
   {
-    "symbol": "local 24",
+    "symbol": "local 22",
     "file": "retrieval/rerank_flat.py"
   },
   {
-    "symbol": "local 25",
+    "symbol": "local 23",
     "file": "retrieval/rerank_flat.py"
   },
   {
@@ -32404,15 +32452,15 @@
     "file": "retrieval/rerank_flat.py"
   },
   {
+    "symbol": "local 29",
+    "file": "retrieval/rerank_flat.py"
+  },
+  {
     "symbol": "local 3",
     "file": "retrieval/rerank_flat.py"
   },
   {
-    "symbol": "local 31",
-    "file": "retrieval/rerank_flat.py"
-  },
-  {
-    "symbol": "local 32",
+    "symbol": "local 30",
     "file": "retrieval/rerank_flat.py"
   },
   {
@@ -32480,11 +32528,39 @@
     "file": "retrieval/rerank_flat.py"
   },
   {
-    "symbol": "local 7",
+    "symbol": "local 48",
+    "file": "retrieval/rerank_flat.py"
+  },
+  {
+    "symbol": "local 49",
+    "file": "retrieval/rerank_flat.py"
+  },
+  {
+    "symbol": "local 5",
+    "file": "retrieval/rerank_flat.py"
+  },
+  {
+    "symbol": "local 50",
+    "file": "retrieval/rerank_flat.py"
+  },
+  {
+    "symbol": "local 8",
     "file": "retrieval/rerank_flat.py"
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.rerank_flat`/LOGGER.",
+    "file": "retrieval/rerank_flat.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.rerank_flat`/_CANDIDATE_MATRIX_NDIM.",
+    "file": "retrieval/rerank_flat.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.rerank_flat`/_SIMILARITY_EPS.",
+    "file": "retrieval/rerank_flat.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.rerank_flat`/_VECTOR_AXIS.",
     "file": "retrieval/rerank_flat.py"
   },
   {
@@ -36312,15 +36388,7 @@
     "file": "cli/indexctl.py"
   },
   {
-    "symbol": "local 100",
-    "file": "cli/indexctl.py"
-  },
-  {
     "symbol": "local 101",
-    "file": "cli/indexctl.py"
-  },
-  {
-    "symbol": "local 102",
     "file": "cli/indexctl.py"
   },
   {
@@ -36352,15 +36420,23 @@
     "file": "cli/indexctl.py"
   },
   {
+    "symbol": "local 11",
+    "file": "cli/indexctl.py"
+  },
+  {
+    "symbol": "local 110",
+    "file": "cli/indexctl.py"
+  },
+  {
+    "symbol": "local 111",
+    "file": "cli/indexctl.py"
+  },
+  {
     "symbol": "local 112",
     "file": "cli/indexctl.py"
   },
   {
-    "symbol": "local 113",
-    "file": "cli/indexctl.py"
-  },
-  {
-    "symbol": "local 114",
+    "symbol": "local 115",
     "file": "cli/indexctl.py"
   },
   {
@@ -36368,19 +36444,23 @@
     "file": "cli/indexctl.py"
   },
   {
+    "symbol": "local 117",
+    "file": "cli/indexctl.py"
+  },
+  {
+    "symbol": "local 119",
+    "file": "cli/indexctl.py"
+  },
+  {
     "symbol": "local 12",
     "file": "cli/indexctl.py"
   },
   {
-    "symbol": "local 13",
+    "symbol": "local 16",
     "file": "cli/indexctl.py"
   },
   {
-    "symbol": "local 17",
-    "file": "cli/indexctl.py"
-  },
-  {
-    "symbol": "local 19",
+    "symbol": "local 18",
     "file": "cli/indexctl.py"
   },
   {
@@ -36388,15 +36468,19 @@
     "file": "cli/indexctl.py"
   },
   {
+    "symbol": "local 21",
+    "file": "cli/indexctl.py"
+  },
+  {
     "symbol": "local 22",
     "file": "cli/indexctl.py"
   },
   {
-    "symbol": "local 23",
+    "symbol": "local 25",
     "file": "cli/indexctl.py"
   },
   {
-    "symbol": "local 26",
+    "symbol": "local 27",
     "file": "cli/indexctl.py"
   },
   {
@@ -36416,7 +36500,7 @@
     "file": "cli/indexctl.py"
   },
   {
-    "symbol": "local 31",
+    "symbol": "local 32",
     "file": "cli/indexctl.py"
   },
   {
@@ -36476,7 +36560,7 @@
     "file": "cli/indexctl.py"
   },
   {
-    "symbol": "local 46",
+    "symbol": "local 47",
     "file": "cli/indexctl.py"
   },
   {
@@ -36500,7 +36584,7 @@
     "file": "cli/indexctl.py"
   },
   {
-    "symbol": "local 52",
+    "symbol": "local 53",
     "file": "cli/indexctl.py"
   },
   {
@@ -36516,15 +36600,11 @@
     "file": "cli/indexctl.py"
   },
   {
-    "symbol": "local 57",
+    "symbol": "local 58",
     "file": "cli/indexctl.py"
   },
   {
-    "symbol": "local 59",
-    "file": "cli/indexctl.py"
-  },
-  {
-    "symbol": "local 6",
+    "symbol": "local 62",
     "file": "cli/indexctl.py"
   },
   {
@@ -36556,7 +36636,7 @@
     "file": "cli/indexctl.py"
   },
   {
-    "symbol": "local 70",
+    "symbol": "local 71",
     "file": "cli/indexctl.py"
   },
   {
@@ -36588,7 +36668,7 @@
     "file": "cli/indexctl.py"
   },
   {
-    "symbol": "local 79",
+    "symbol": "local 81",
     "file": "cli/indexctl.py"
   },
   {
@@ -36620,15 +36700,15 @@
     "file": "cli/indexctl.py"
   },
   {
+    "symbol": "local 89",
+    "file": "cli/indexctl.py"
+  },
+  {
     "symbol": "local 90",
     "file": "cli/indexctl.py"
   },
   {
     "symbol": "local 91",
-    "file": "cli/indexctl.py"
-  },
-  {
-    "symbol": "local 92",
     "file": "cli/indexctl.py"
   },
   {
@@ -36648,15 +36728,19 @@
     "file": "cli/indexctl.py"
   },
   {
+    "symbol": "local 97",
+    "file": "cli/indexctl.py"
+  },
+  {
     "symbol": "local 98",
     "file": "cli/indexctl.py"
   },
   {
-    "symbol": "scip-python python click 8.1.8 `click.core`/Context#args.",
+    "symbol": "local 99",
     "file": "cli/indexctl.py"
   },
   {
-    "symbol": "scip-python python click 8.1.8 `click.core`/Context#obj.",
+    "symbol": "scip-python python click 8.1.8 `click.core`/Context#args.",
     "file": "cli/indexctl.py"
   },
   {
@@ -36720,6 +36804,10 @@
     "file": "cli/indexctl.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli.indexctl`/SWEEP_OPTION.",
+    "file": "cli/indexctl.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli.indexctl`/SidecarOption.",
     "file": "cli/indexctl.py"
   },
@@ -36741,6 +36829,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli.indexctl`/_PRIMARY_ASSET_COUNT.",
+    "file": "cli/indexctl.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cli.indexctl`/_SWEEP_FLAG.",
     "file": "cli/indexctl.py"
   },
   {
@@ -42464,6 +42556,10 @@
     "file": "app/routers/index_admin.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.routers.index_admin`/PublishBody#faiss_idmap.",
+    "file": "app/routers/index_admin.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.routers.index_admin`/PublishBody#faiss_index.",
     "file": "app/routers/index_admin.py"
   },
@@ -42473,6 +42569,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.routers.index_admin`/PublishBody#splade_dir.",
+    "file": "app/routers/index_admin.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.routers.index_admin`/PublishBody#tuning_profile.",
     "file": "app/routers/index_admin.py"
   },
   {

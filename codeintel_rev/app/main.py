@@ -13,14 +13,17 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager, suppress
 from time import perf_counter
 from types import FrameType
+from typing import cast
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from hypercorn.middleware import ProxyFixMiddleware
+from hypercorn.typing import ASGIFramework
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import Response
+from starlette.types import ASGIApp
 
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.config_context import ApplicationContext
@@ -624,13 +627,14 @@ async def sse_demo() -> StreamingResponse:
 
 
 if SERVER_SETTINGS.enable_proxy_fix:
-    asgi = ProxyFixMiddleware(
-        app,
+    proxy_wrapped = ProxyFixMiddleware(
+        cast("ASGIFramework", app),
         mode=SERVER_SETTINGS.proxy_mode,
         trusted_hops=SERVER_SETTINGS.proxy_trusted_hops,
     )
+    asgi: ASGIApp = cast("ASGIApp", proxy_wrapped)
 else:  # pragma: no cover - wrapper disabled via config
-    asgi = app
+    asgi = cast("ASGIApp", app)
 
 
 __all__ = ["app", "asgi"]

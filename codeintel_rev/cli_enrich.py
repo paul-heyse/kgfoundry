@@ -6,21 +6,19 @@ from __future__ import annotations
 import ast
 import json
 import logging
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import Annotated, Any, Protocol, cast
+from typing import Any, Protocol, cast
 
 try:  # pragma: no cover - optional dependency
     import polars as pl
 except ImportError:  # pragma: no cover - optional dependency
     pl = None
 
-import click
 import typer
-from typer.models import CommandInfo
 
 from codeintel_rev.config_indexer import index_config_files
 from codeintel_rev.coverage_ingest import collect_coverage
@@ -50,6 +48,7 @@ from codeintel_rev.enrich.pathnorm import (
 from codeintel_rev.enrich.scip_reader import Document, SCIPIndex
 from codeintel_rev.enrich.slices_builder import build_slice_record, write_slice
 from codeintel_rev.enrich.stubs_overlay import (
+    OverlayInputs,
     OverlayPolicy,
     activate_overlays,
     deactivate_all,
@@ -95,6 +94,8 @@ DEFAULT_COMMITS_WINDOW = 50
 DEFAULT_ENABLE_OWNERS = True
 DEFAULT_EMIT_SLICES_FLAG = False
 
+_EMIT_AST_FLAG = "--emit-ast/--no-emit-ast"
+
 
 @dataclass(slots=True)
 class PipelineOptions:
@@ -129,6 +130,107 @@ class CLIContextState:
     analytics: AnalyticsOptions = field(default_factory=AnalyticsOptions)
 
 
+ROOT_OPTION = typer.Option(
+    Path().resolve(),
+    "--root",
+    help="Repo or subfolder to scan.",
+    exists=True,
+    file_okay=False,
+    dir_okay=True,
+    readable=True,
+)
+SCIP_OPTION = typer.Option(
+    None,
+    "--scip",
+    help="Path to SCIP index.json",
+    exists=True,
+    dir_okay=False,
+    readable=True,
+)
+OUT_OPTION = typer.Option(
+    Path("codeintel_rev/io/ENRICHED"),
+    "--out",
+    help="Output directory for enrichment artifacts.",
+    dir_okay=True,
+)
+PYREFLY_OPTION = typer.Option(
+    None,
+    "--pyrefly-json",
+    help="Optional path to a Pyrefly JSON/JSONL report.",
+    exists=True,
+    dir_okay=False,
+    readable=True,
+)
+TAGS_OPTION = typer.Option(
+    None,
+    "--tags-yaml",
+    help="Optional tagging rules YAML.",
+    exists=True,
+    dir_okay=False,
+    readable=True,
+)
+COVERAGE_OPTION = typer.Option(
+    Path("coverage.xml"),
+    "--coverage-xml",
+    help="Optional path to coverage XML (Cobertura format).",
+    dir_okay=False,
+)
+ONLY_OPTION = typer.Option(
+    None,
+    "--only",
+    help="Glob patterns (repeatable) limiting modules relative to --root.",
+)
+MAX_FILE_BYTES_OPTION = typer.Option(
+    DEFAULT_MAX_FILE_BYTES,
+    "--max-file-bytes",
+    help="Skip parsing files larger than this byte threshold.",
+)
+OWNERS_OPTION = typer.Option(
+    DEFAULT_ENABLE_OWNERS,
+    "--owners/--no-owners",
+    help="Compute Git ownership analytics and enrich module rows.",
+)
+HISTORY_WINDOW_OPTION = typer.Option(
+    DEFAULT_OWNER_HISTORY_DAYS,
+    "--history-window-days",
+    help="Length (in days) of the long-term churn window.",
+)
+COMMITS_WINDOW_OPTION = typer.Option(
+    DEFAULT_COMMITS_WINDOW,
+    "--commits-window",
+    help="Maximum commits per file sampled when computing bus factor.",
+)
+EMIT_SLICES_OPTION = typer.Option(
+    DEFAULT_EMIT_SLICES_FLAG,
+    "--emit-slices/--no-emit-slices",
+    help="Emit optional slice packs (JSON + Markdown) for selected modules.",
+)
+SLICES_FILTER_OPTION = typer.Option(
+    None,
+    "--slices-filter",
+    help="Tag filters (repeatable) selecting modules when emitting slices.",
+)
+EMIT_AST_OPTION = typer.Option(
+    DEFAULT_EMIT_AST,
+    "--emit-ast/--no-emit-ast",
+    help="Emit Parquet datasets with AST nodes and metrics.",
+)
+OVERLAYS_CONFIG_OPTION = typer.Option(
+    None,
+    "--overlays-config",
+    help="Path to a YAML/JSON file describing overlay settings.",
+)
+OVERLAYS_SET_OPTION = typer.Option(
+    None,
+    "--set",
+    "-s",
+    help="Override overlay settings as KEY=VALUE entries (repeatable).",
+)
+
+
+app = typer.Typer(add_completion=False, help="Repo enrichment utilities (scan + overlays).")
+
+
 def _ensure_state(ctx: typer.Context) -> CLIContextState:
     state = ctx.obj
     if not isinstance(state, CLIContextState):
@@ -137,203 +239,43 @@ def _ensure_state(ctx: typer.Context) -> CLIContextState:
     return state
 
 
-def _state_from_click(ctx: click.Context) -> CLIContextState:
-    typer_ctx = typer.Context.from_click(ctx)
-    return _ensure_state(typer_ctx)
-
-
-def _load_overlay_options(config_path: Path | None, overrides: list[str]) -> OverlayCLIOptions:
-    options = OverlayCLIOptions()
-    if config_path is not None:
-        config_data = _read_overlay_config(config_path)
-        for key, value in config_data.items():
-            _set_overlay_option(options, key, value)
-    for override in overrides:
-        if "=" not in override:
-            raise typer.BadParameter("Override values must use the KEY=VALUE format.")
-        key, value = override.split("=", 1)
-        _set_overlay_option(options, key, value)
-    return options
-
-
-def _resolve_path(path_value: Path | None) -> Path | None:
-    if path_value is None:
-        return None
-    return path_value.expanduser().resolve()
-
-
-def _update_pipeline_path(attr: str, allow_none: bool = False):
-    def _callback(ctx: click.Context, param: click.Parameter, value: Path | None) -> None:
-        state = _state_from_click(ctx)
-        resolved = _resolve_path(value)
-        if resolved is None and not allow_none:
-            return
-        setattr(state.pipeline, attr, resolved)
-
-    return _callback
-
-
-def _update_pipeline_tuple(attr: str):
-    def _callback(ctx: click.Context, param: click.Parameter, value: tuple[str, ...]) -> None:
-        state = _state_from_click(ctx)
-        setattr(state.pipeline, attr, tuple(value))
-
-    return _callback
-
-
-def _update_pipeline_int(attr: str):
-    def _callback(ctx: click.Context, param: click.Parameter, value: int) -> None:
-        state = _state_from_click(ctx)
-        setattr(state.pipeline, attr, value)
-
-    return _callback
-
-
-def _update_analytics_bool(attr: str):
-    def _callback(ctx: click.Context, param: click.Parameter, value: bool) -> None:
-        state = _state_from_click(ctx)
-        setattr(state.analytics, attr, value)
-
-    return _callback
-
-
-def _update_analytics_int(attr: str):
-    def _callback(ctx: click.Context, param: click.Parameter, value: int) -> None:
-        state = _state_from_click(ctx)
-        setattr(state.analytics, attr, value)
-
-    return _callback
-
-
-def _update_analytics_tuple(attr: str):
-    def _callback(ctx: click.Context, param: click.Parameter, value: tuple[str, ...]) -> None:
-        state = _state_from_click(ctx)
-        setattr(state.analytics, attr, tuple(value))
-
-    return _callback
-
-
-def _build_common_click_options() -> list[click.Option]:
-    return [
-        click.Option(
-            ["--root"],
-            help="Repo or subfolder to scan.",
-            default=Path().resolve(),
-            type=click.Path(path_type=Path, exists=True, file_okay=False),
-            expose_value=False,
-            callback=_update_pipeline_path("root"),
-        ),
-        click.Option(
-            ["--scip"],
-            help="Path to SCIP index.json",
-            required=True,
-            type=click.Path(path_type=Path, exists=True, dir_okay=False),
-            expose_value=False,
-            callback=_update_pipeline_path("scip"),
-        ),
-        click.Option(
-            ["--out"],
-            help="Output directory for enrichment artifacts.",
-            default=Path("codeintel_rev/io/ENRICHED"),
-            type=click.Path(path_type=Path, file_okay=False),
-            expose_value=False,
-            callback=_update_pipeline_path("out"),
-        ),
-        click.Option(
-            ["--pyrefly-json"],
-            help="Optional path to a Pyrefly JSON/JSONL report.",
-            default=None,
-            type=click.Path(path_type=Path, exists=True, dir_okay=False),
-            expose_value=False,
-            callback=_update_pipeline_path("pyrefly_json", allow_none=True),
-        ),
-        click.Option(
-            ["--tags-yaml"],
-            help="Optional tagging rules YAML.",
-            default=None,
-            type=click.Path(path_type=Path, exists=True, dir_okay=False),
-            expose_value=False,
-            callback=_update_pipeline_path("tags_yaml", allow_none=True),
-        ),
-        click.Option(
-            ["--coverage-xml"],
-            help="Optional path to coverage XML (Cobertura format).",
-            default=Path("coverage.xml"),
-            type=click.Path(path_type=Path, dir_okay=False),
-            expose_value=False,
-            callback=_update_pipeline_path("coverage_xml"),
-        ),
-        click.Option(
-            ["--only"],
-            help="Glob patterns (repeatable) limiting modules relative to --root.",
-            multiple=True,
-            expose_value=False,
-            callback=_update_pipeline_tuple("only"),
-        ),
-        click.Option(
-            ["--max-file-bytes"],
-            help="Skip parsing files larger than this byte threshold.",
-            default=DEFAULT_MAX_FILE_BYTES,
-            type=int,
-            expose_value=False,
-            callback=_update_pipeline_int("max_file_bytes"),
-        ),
-        click.Option(
-            ["--owners/--no-owners"],
-            help="Compute Git ownership analytics and enrich module rows.",
-            default=DEFAULT_ENABLE_OWNERS,
-            expose_value=False,
-            callback=_update_analytics_bool("owners"),
-        ),
-        click.Option(
-            ["--history-window-days"],
-            help="Length (in days) of the long-term churn window (default: 90).",
-            default=DEFAULT_OWNER_HISTORY_DAYS,
-            type=int,
-            expose_value=False,
-            callback=_update_analytics_int("history_window_days"),
-        ),
-        click.Option(
-            ["--commits-window"],
-            help="Maximum commits per file sampled when computing bus factor.",
-            default=DEFAULT_COMMITS_WINDOW,
-            type=int,
-            expose_value=False,
-            callback=_update_analytics_int("commits_window"),
-        ),
-        click.Option(
-            ["--emit-slices/--no-emit-slices"],
-            help="Emit optional slice packs (JSON + Markdown) for selected modules.",
-            default=DEFAULT_EMIT_SLICES_FLAG,
-            expose_value=False,
-            callback=_update_analytics_bool("emit_slices"),
-        ),
-        click.Option(
-            ["--slices-filter"],
-            help="Tag filters (repeatable) selecting modules when emitting slices.",
-            multiple=True,
-            expose_value=False,
-            callback=_update_analytics_tuple("slices_filter"),
-        ),
-    ]
-
-
-def _attach_common_options(command_info: typer.models.CommandInfo) -> None:
-    click_command = command_info.command
-    for option in _build_common_click_options():
-        click_command.params.append(option)
-
-
-def _command(*args: Any, **kwargs: Any):
-    def decorator(func: Callable[..., Any]):
-        command_info = app.command(*args, **kwargs)(func)
-        _attach_common_options(command_info)
-        return command_info
-
-    return decorator
-
-
-_EMIT_AST_FLAG = "--emit-ast/--no-emit-ast"
+@app.callback(invoke_without_command=True)
+def global_options(  # noqa: PLR0913,PLR0917 - Typer CLI requires enumerating all shared options.
+    ctx: typer.Context,
+    root: Path = ROOT_OPTION,
+    scip: Path | None = SCIP_OPTION,
+    out: Path = OUT_OPTION,
+    pyrefly_json: Path | None = PYREFLY_OPTION,
+    tags_yaml: Path | None = TAGS_OPTION,
+    coverage_xml: Path = COVERAGE_OPTION,
+    only: list[str] | None = ONLY_OPTION,
+    max_file_bytes: int = MAX_FILE_BYTES_OPTION,
+    *,
+    owners: bool = OWNERS_OPTION,
+    history_window_days: int = HISTORY_WINDOW_OPTION,
+    commits_window: int = COMMITS_WINDOW_OPTION,
+    emit_slices: bool = EMIT_SLICES_OPTION,
+    slices_filter: list[str] | None = SLICES_FILTER_OPTION,
+) -> None:
+    """Capture shared pipeline + analytics options for all commands."""
+    state = _ensure_state(ctx)
+    state.pipeline = PipelineOptions(
+        root=root.resolve(),
+        scip=scip.resolve() if scip else None,
+        out=out.resolve(),
+        pyrefly_json=pyrefly_json.resolve() if pyrefly_json else None,
+        tags_yaml=tags_yaml.resolve() if tags_yaml else None,
+        coverage_xml=coverage_xml.resolve(),
+        only=tuple(only or ()),
+        max_file_bytes=max_file_bytes,
+    )
+    state.analytics = AnalyticsOptions(
+        owners=owners,
+        history_window_days=history_window_days,
+        commits_window=commits_window,
+        emit_slices=emit_slices,
+        slices_filter=tuple(slices_filter or ()),
+    )
 
 
 @dataclass(slots=True)
@@ -352,21 +294,52 @@ class OverlayCLIOptions:
     type_error_overlays: bool = DEFAULT_USE_TYPE_ERROR_OVERLAYS
 
 
+@dataclass(slots=True)
+class OverlayContext:
+    """Aggregated context used during overlay generation."""
+
+    root: Path
+    package_name: str
+    overlays_root: Path
+    stubs_root: Path
+    scip_index: SCIPIndex
+    type_counts: Mapping[str, int]
+    policy: OverlayPolicy
+    inputs: OverlayInputs
+
+
+def _load_overlay_options(config_path: Path | None, overrides: list[str]) -> OverlayCLIOptions:
+    options = OverlayCLIOptions()
+    if config_path is not None:
+        config_data = _read_overlay_config(config_path)
+        for key, value in config_data.items():
+            _set_overlay_option(options, key, value)
+    for override in overrides:
+        if "=" not in override:
+            message = "Override values must use the KEY=VALUE format."
+            raise typer.BadParameter(message)
+        key, value = override.split("=", 1)
+        _set_overlay_option(options, key, value)
+    return options
+
+
 def _read_overlay_config(path: Path) -> Mapping[str, Any]:
     payload = path.read_text(encoding="utf-8")
     suffix = path.suffix.lower()
     if suffix in {".yaml", ".yml"}:
         if yaml_module is None:
-            raise typer.BadParameter("PyYAML is required to parse YAML overlay configs.")
+            message = "PyYAML is required to parse YAML overlay configs."
+            raise typer.BadParameter(message)
         data = yaml_module.safe_load(payload)
     else:
         data = json.loads(payload)
     if not isinstance(data, Mapping):
-        raise typer.BadParameter("Overlay config must be a mapping of option names to values.")
+        message = "Overlay config must be a mapping of option names to values."
+        raise typer.BadParameter(message)
     return data
 
 
-def _parse_bool(value: Any) -> bool:
+def _parse_bool(value: object) -> bool:
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -375,15 +348,49 @@ def _parse_bool(value: Any) -> bool:
             return True
         if normalized in {"0", "false", "no", "off"}:
             return False
-    raise typer.BadParameter(f"Cannot interpret '{value}' as a boolean.")
+    message = f"Cannot interpret '{value}' as a boolean."
+    raise typer.BadParameter(message)
 
 
-def _set_overlay_option(options: OverlayCLIOptions, key: str, raw_value: Any) -> None:
+def _resolve_path(path_value: Path | None) -> Path | None:
+    if path_value is None:
+        return None
+    return path_value.expanduser().resolve()
+
+
+def _parse_int_option(raw_value: object, *, option: str) -> int:
+    if isinstance(raw_value, int):
+        return raw_value
+    if isinstance(raw_value, str):
+        try:
+            return int(raw_value, 10)
+        except ValueError as exc:  # pragma: no cover - defensive parsing
+            message = f"Overlay option '{option}' must be an integer."
+            raise typer.BadParameter(message) from exc
+    message = f"Overlay option '{option}' must be an integer."
+    raise typer.BadParameter(message)
+
+
+def _parse_path_option(raw_value: object, *, option: str) -> Path:
+    if isinstance(raw_value, Path):
+        return raw_value
+    if isinstance(raw_value, str):
+        return Path(raw_value)
+    message = f"Overlay option '{option}' must be a filesystem path."
+    raise typer.BadParameter(message)
+
+
+def _set_overlay_option(options: OverlayCLIOptions, key: str, raw_value: object) -> None:
     attr = key.strip().lower()
     if attr in {"stubs_root", "overlays_root"}:
-        setattr(options, attr, _resolve_path(Path(str(raw_value))) or Path())
+        candidate = _parse_path_option(raw_value, option=attr)
+        resolved = _resolve_path(candidate)
+        if resolved is None:
+            message = f"Overlay option '{attr}' must be a filesystem path."
+            raise typer.BadParameter(message)
+        setattr(options, attr, resolved)
     elif attr in {"min_errors", "max_overlays"}:
-        setattr(options, attr, int(raw_value))
+        setattr(options, attr, _parse_int_option(raw_value, option=attr))
     elif attr in {
         "include_public_defs",
         "inject_getattr_any",
@@ -394,16 +401,8 @@ def _set_overlay_option(options: OverlayCLIOptions, key: str, raw_value: Any) ->
     }:
         setattr(options, attr, _parse_bool(raw_value))
     else:
-        raise typer.BadParameter(f"Unknown overlay option '{key}'.")
-
-
-app = typer.Typer(add_completion=False, help="Repo enrichment utilities (scan + overlays).")
-
-
-@app.callback(invoke_without_command=True)
-def main(ctx: typer.Context) -> None:
-    """Initialize shared CLI context."""
-    _ensure_state(ctx)
+        message = f"Unknown overlay option '{key}'."
+        raise typer.BadParameter(message)
 
 
 @dataclass(frozen=True)
@@ -424,6 +423,21 @@ class ScanInputs:
     tagging_rules: Mapping[str, Any]
     repo_root: Path
     max_file_bytes: int
+    package_prefix: str | None
+
+
+@dataclass(slots=True)
+class PipelineContext:
+    """Aggregated context derived from CLI inputs and repo state."""
+
+    root: Path
+    repo_root: Path
+    scip_index: SCIPIndex
+    scip_ctx: ScipContext
+    type_signals: Mapping[str, FileTypeSignals]
+    coverage_map: Mapping[str, Mapping[str, float]]
+    config_records: list[dict[str, Any]]
+    tagging_rules: Mapping[str, Any]
     package_prefix: str | None
 
 
@@ -455,9 +469,10 @@ def _iter_files(root: Path, patterns: tuple[str, ...] | None = None) -> Iterable
         yield candidate
 
 
-def _run_pipeline(*, pipeline: PipelineOptions) -> PipelineResult:
+def _run_pipeline(*, pipeline: PipelineOptions) -> PipelineResult:  # noqa: PLR0914 - pipeline orchestration requires structured locals.
     if pipeline.scip is None:
-        raise typer.BadParameter("The --scip option is required for enrichment commands.")
+        message = "The --scip option is required for enrichment commands."
+        raise typer.BadParameter(message)
     root_resolved = pipeline.root.resolve()
     repo_root = detect_repo_root(root_resolved)
     scip_index = SCIPIndex.load(pipeline.scip)
@@ -474,46 +489,34 @@ def _run_pipeline(*, pipeline: PipelineOptions) -> PipelineResult:
         collect_coverage(pipeline.coverage_xml) if pipeline.coverage_xml else {},
         root_resolved,
     )
-    config_records = index_config_files(root_resolved)
-    rules = load_rules(str(pipeline.tags_yaml) if pipeline.tags_yaml else None)
-
-    scan_inputs = ScanInputs(
+    ctx = PipelineContext(
+        root=root_resolved,
+        repo_root=repo_root,
+        scip_index=scip_index,
         scip_ctx=scip_ctx,
         type_signals=type_signal_lookup,
         coverage_map=coverage_lookup,
-        tagging_rules=rules,
-        repo_root=repo_root,
-        max_file_bytes=pipeline.max_file_bytes,
+        config_records=index_config_files(root_resolved),
+        tagging_rules=load_rules(str(pipeline.tags_yaml) if pipeline.tags_yaml else None),
         package_prefix=root_resolved.name or None,
     )
-    module_rows: list[dict[str, Any]] = []
-    symbol_edges: list[tuple[str, str]] = []
-    only_patterns = pipeline.only
 
-    for fp in _iter_files(root_resolved, only_patterns if only_patterns else None):
-        row_dict, edges = _build_module_row(
-            fp,
-            root_resolved,
-            scan_inputs,
-        )
-        module_rows.append(row_dict)
-        symbol_edges.extend(edges)
+    module_rows, symbol_edges = _scan_modules(ctx, pipeline)
 
-    package_prefix = root_resolved.name or None
     import_graph, use_graph, config_index = _augment_module_rows(
         module_rows,
-        scip_index,
-        package_prefix,
-        config_records=config_records,
+        ctx.scip_index,
+        ctx.package_prefix,
+        config_records=ctx.config_records,
     )
-    _apply_tagging(module_rows, scan_inputs.tagging_rules)
+    _apply_tagging(module_rows, ctx.tagging_rules)
     tag_index = _build_tag_index(module_rows)
     coverage_rows = _build_coverage_rows(module_rows)
     hotspot_rows = _build_hotspot_rows(module_rows)
 
     return PipelineResult(
-        root=root_resolved,
-        repo_root=repo_root,
+        root=ctx.root,
+        repo_root=ctx.repo_root,
         module_rows=module_rows,
         symbol_edges=symbol_edges,
         import_graph=import_graph,
@@ -532,16 +535,34 @@ def _execute_pipeline(ctx: typer.Context) -> tuple[PipelineResult, CLIContextSta
     return result, state
 
 
-@_command("all")
+def _scan_modules(
+    ctx: PipelineContext,
+    pipeline: PipelineOptions,
+) -> tuple[list[dict[str, Any]], list[tuple[str, str]]]:
+    scan_inputs = ScanInputs(
+        scip_ctx=ctx.scip_ctx,
+        type_signals=ctx.type_signals,
+        coverage_map=ctx.coverage_map,
+        tagging_rules=ctx.tagging_rules,
+        repo_root=ctx.repo_root,
+        max_file_bytes=pipeline.max_file_bytes,
+        package_prefix=ctx.package_prefix,
+    )
+    module_rows: list[dict[str, Any]] = []
+    symbol_edges: list[tuple[str, str]] = []
+    only_patterns = pipeline.only
+    for fp in _iter_files(ctx.root, only_patterns if only_patterns else None):
+        row_dict, edges = _build_module_row(fp, ctx.root, scan_inputs)
+        module_rows.append(row_dict)
+        symbol_edges.extend(edges)
+    return module_rows, symbol_edges
+
+
+@app.command("all")
 def run_all(
     ctx: typer.Context,
-    emit_ast: Annotated[
-        bool,
-        typer.Option(
-            _EMIT_AST_FLAG,
-            help="Emit Parquet datasets with AST nodes and metrics.",
-        ),
-    ] = DEFAULT_EMIT_AST,
+    *,
+    emit_ast: bool = EMIT_AST_OPTION,
 ) -> None:
     """Run the full enrichment pipeline and emit all artifacts."""
     result, state = _execute_pipeline(ctx)
@@ -570,23 +591,28 @@ def run_all(
     typer.echo(f"[all] Completed enrichment for {len(result.module_rows)} modules.")
 
 
-@_command("scan")
+@app.command("run")
+def run(
+    ctx: typer.Context,
+    *,
+    emit_ast: bool = EMIT_AST_OPTION,
+) -> None:
+    """Alias for ``all`` to match historical CLI entrypoints."""
+    run_all(ctx, emit_ast=emit_ast)
+
+
+@app.command("scan")
 def scan(
     ctx: typer.Context,
-    emit_ast: Annotated[
-        bool,
-        typer.Option(
-            _EMIT_AST_FLAG,
-            help="Emit Parquet datasets with AST nodes and metrics.",
-        ),
-    ] = DEFAULT_EMIT_AST,
+    *,
+    emit_ast: bool = EMIT_AST_OPTION,
 ) -> None:
     """Backward-compatible alias for ``all``."""
     typer.echo("[scan] Deprecated alias for `all`; running full pipeline.")
     run_all(ctx, emit_ast=emit_ast)
 
 
-@_command("exports")
+@app.command("exports")
 def exports(ctx: typer.Context) -> None:
     """Emit modules.jsonl, repo map, tag index, and Markdown module sheets."""
     result, state = _execute_pipeline(ctx)
@@ -607,7 +633,7 @@ def exports(ctx: typer.Context) -> None:
     typer.echo(f"[exports] Wrote module artifacts for {len(result.module_rows)} modules.")
 
 
-@_command("graph")
+@app.command("graph")
 def graph(ctx: typer.Context) -> None:
     """Emit symbol and import graph artifacts."""
     result, state = _execute_pipeline(ctx)
@@ -615,7 +641,7 @@ def graph(ctx: typer.Context) -> None:
     typer.echo("[graph] Wrote symbol and import graphs.")
 
 
-@_command("uses")
+@app.command("uses")
 def uses(ctx: typer.Context) -> None:
     """Emit the definition-to-use graph derived from SCIP."""
     result, state = _execute_pipeline(ctx)
@@ -623,7 +649,7 @@ def uses(ctx: typer.Context) -> None:
     typer.echo("[uses] Wrote uses graph.")
 
 
-@_command("typedness")
+@app.command("typedness")
 def typedness(ctx: typer.Context) -> None:
     """Emit typedness analytics (errors, annotation ratios, untyped defs)."""
     result, state = _execute_pipeline(ctx)
@@ -631,7 +657,7 @@ def typedness(ctx: typer.Context) -> None:
     typer.echo("[typedness] Wrote typedness analytics.")
 
 
-@_command("doc")
+@app.command("doc")
 def doc(ctx: typer.Context) -> None:
     """Emit doc health analytics for module docstrings."""
     result, state = _execute_pipeline(ctx)
@@ -639,7 +665,7 @@ def doc(ctx: typer.Context) -> None:
     typer.echo("[doc] Wrote doc health analytics.")
 
 
-@_command("coverage")
+@app.command("coverage")
 def coverage(ctx: typer.Context) -> None:
     """Emit coverage analytics table."""
     result, state = _execute_pipeline(ctx)
@@ -647,7 +673,7 @@ def coverage(ctx: typer.Context) -> None:
     typer.echo("[coverage] Wrote coverage analytics.")
 
 
-@_command("config")
+@app.command("config")
 def config(ctx: typer.Context) -> None:
     """Emit config index (YAML/TOML/JSON/Markdown references)."""
     result, state = _execute_pipeline(ctx)
@@ -655,7 +681,7 @@ def config(ctx: typer.Context) -> None:
     typer.echo("[config] Wrote config index.")
 
 
-@_command("hotspots")
+@app.command("hotspots")
 def hotspots(ctx: typer.Context) -> None:
     """Emit hotspot analytics (complexity x churn x centrality)."""
     result, state = _execute_pipeline(ctx)
@@ -663,96 +689,106 @@ def hotspots(ctx: typer.Context) -> None:
     typer.echo("[hotspots] Wrote hotspot analytics.")
 
 
-@_command("overlays")
+@app.command("overlays")
 def overlays(
     ctx: typer.Context,
-    config_path: Annotated[
-        Path | None,
-        typer.Option(
-            "--overlays-config",
-            help="Path to a YAML/JSON file describing overlay settings.",
-        ),
-    ] = None,
-    overrides: Annotated[
-        list[str],
-        typer.Option(
-            "--set",
-            "-s",
-            help="Override overlay settings as KEY=VALUE entries (repeatable).",
-        ),
-    ] = (),
+    *,
+    config_path: Path | None = OVERLAYS_CONFIG_OPTION,
+    overrides: list[str] | None = OVERLAYS_SET_OPTION,
 ) -> None:
-    """Generate targeted overlays and optionally activate them into the stub path."""
+    """Generate targeted overlays and optionally activate them into the stub path.
+
+    This command generates type stub overlays (.pyi files) for modules with type
+    errors, missing annotations, or other typing issues. Overlays are generated based
+    on SCIP index data, type error reports, and configurable policies. The command
+    can optionally activate overlays into the stub path for immediate use by type
+    checkers, or deactivate existing overlays before generating new ones.
+
+    Parameters
+    ----------
+    ctx : typer.Context
+        Typer context object providing access to shared CLI state (pipeline options,
+        analytics settings). The context is used to retrieve SCIP index path and
+        other pipeline configuration required for overlay generation.
+    config_path : Path | None, optional
+        Path to a YAML/JSON configuration file describing overlay generation settings
+        (e.g., min_errors, max_overlays, include_public_defs). If None, default
+        settings are used. The config file can specify overlay policies, paths,
+        and generation rules.
+    overrides : list[str] | None, optional
+        List of KEY=VALUE override strings to modify overlay settings from config
+        or defaults. Each override must use the format "KEY=VALUE" (e.g., "min_errors=5").
+        Overrides take precedence over config file settings. If None, no overrides
+        are applied.
+
+    Raises
+    ------
+    typer.BadParameter
+        Raised in the following cases:
+        - ``--scip`` option is missing or invalid: SCIP index is required for
+          overlay generation as it provides symbol definitions and type information
+        - Override format is invalid: override strings must use KEY=VALUE format
+        - Config file parsing fails: YAML/JSON config cannot be parsed or contains
+          invalid values
+
+    Notes
+    -----
+    This command performs overlay generation by analyzing SCIP index data and type
+    error reports to identify modules that would benefit from type stub overlays.
+    Overlays are generated based on configurable policies (e.g., minimum type errors,
+    maximum overlays per run, public definitions only). The command writes overlay
+    files to the configured overlays root directory and optionally activates them
+    into the stub path. A manifest file tracks generated overlays for management
+    and cleanup. The command respects the --deactivate-all-first option to clear
+    existing overlays before generating new ones.
+    """
     state = _ensure_state(ctx)
     pipeline = state.pipeline
     if pipeline.scip is None:
-        raise typer.BadParameter("The --scip option is required for overlay generation.")
-    options = _load_overlay_options(config_path, list(overrides))
-    root_resolved = pipeline.root.resolve()
-    package_name = root_resolved.name
-    overlays_target_root = (options.overlays_root / package_name).resolve()
-    stubs_target_root = (options.stubs_root / package_name).resolve()
-    overlays_target_root.mkdir(parents=True, exist_ok=True)
-    stubs_target_root.parent.mkdir(parents=True, exist_ok=True)
-
-    scip_index = SCIPIndex.load(pipeline.scip)
-    type_signal_lookup = _normalize_type_signal_map(
-        collect_type_signals(
-            pyrefly_report=str(pipeline.pyrefly_json) if pipeline.pyrefly_json else None,
-            pyright_json=str(root_resolved),
-        ),
-        root_resolved,
-    )
-    type_counts: dict[str, int] = {
-        path: signals.total
-        for path, signals in type_signal_lookup.items()
-        if not Path(path).is_absolute()
-    }
-
-    policy = OverlayPolicy(
-        overlays_root=overlays_target_root,
-        include_public_defs=options.include_public_defs,
-        inject_module_getattr_any=options.inject_getattr_any,
-        when_type_errors=options.type_error_overlays,
-        min_type_errors=options.min_errors,
-        max_overlays=options.max_overlays,
-    )
+        message = "The --scip option is required for overlay generation."
+        raise typer.BadParameter(message)
+    options = _load_overlay_options(config_path, list(overrides or ()))
+    overlay_ctx = _build_overlay_context(pipeline, options)
+    overlay_ctx.overlays_root.mkdir(parents=True, exist_ok=True)
+    overlay_ctx.stubs_root.parent.mkdir(parents=True, exist_ok=True)
 
     removed = 0
     if options.deactivate_all_first:
-        removed = deactivate_all(overlays_root=overlays_target_root, stubs_root=stubs_target_root)
+        removed = deactivate_all(
+            overlays_root=overlay_ctx.overlays_root,
+            stubs_root=overlay_ctx.stubs_root,
+        )
 
     generated: list[str] = []
     generated_set: set[str] = set()
     manifest_entries: list[str] = []
     package_overlays: set[str] = set()
-    for fp in _iter_files(root_resolved):
-        rel = _normalized_rel_path(fp, root_resolved)
+    for fp in _iter_files(overlay_ctx.root):
+        rel = _normalized_rel_path(fp, overlay_ctx.root)
         result = generate_overlay_for_file(
             py_file=fp,
-            package_root=root_resolved,
-            scip=scip_index,
-            policy=policy,
-            type_error_counts=type_counts,
+            package_root=overlay_ctx.root,
+            policy=overlay_ctx.policy,
+            inputs=overlay_ctx.inputs,
         )
         if result.created and rel not in generated_set:
             generated.append(rel)
             generated_set.add(rel)
-            manifest_entries.append(f"{package_name}/{rel}")
-            if len(generated) >= policy.max_overlays or _ensure_package_overlays(
+            manifest_entries.append(f"{overlay_ctx.package_name}/{rel}")
+            if len(generated) >= overlay_ctx.policy.max_overlays or _ensure_package_overlays(
                 rel_path=Path(rel),
                 generated=generated,
                 generated_set=generated_set,
                 manifest_entries=manifest_entries,
-                package_name=package_name,
+                package_name=overlay_ctx.package_name,
                 package_overlays=package_overlays,
-                root=root_resolved,
-                scip_index=scip_index,
-                policy=policy,
-                type_error_counts=type_counts,
+                root=overlay_ctx.root,
+                scip_index=overlay_ctx.scip_index,
+                policy=overlay_ctx.policy,
+                type_error_counts=overlay_ctx.type_counts,
             ):
                 break
-        if len(generated) >= policy.max_overlays:
+        if len(generated) >= overlay_ctx.policy.max_overlays:
             break
 
     if options.dry_run:
@@ -767,22 +803,66 @@ def overlays(
     if options.activate and generated:
         activated = activate_overlays(
             generated,
-            overlays_root=overlays_target_root,
-            stubs_root=stubs_target_root,
+            overlays_root=overlay_ctx.overlays_root,
+            stubs_root=overlay_ctx.stubs_root,
         )
         typer.echo(f"[overlays] Activated {activated} overlays into {options.stubs_root}.")
 
-    manifest_path = overlays_target_root / "overlays_manifest.json"
+    manifest_path = overlay_ctx.overlays_root / "overlays_manifest.json"
     write_json(
         manifest_path,
         {
-            "package": package_name,
+            "package": overlay_ctx.package_name,
             "generated": manifest_entries,
             "removed": removed,
             "activated": bool(options.activate and generated),
         },
     )
     typer.echo(f"[overlays] Manifest written to {manifest_path}")
+
+
+def _build_overlay_context(
+    pipeline: PipelineOptions,
+    options: OverlayCLIOptions,
+) -> OverlayContext:
+    if pipeline.scip is None:
+        message = "The --scip option is required for overlay generation."
+        raise typer.BadParameter(message)
+    root_resolved = pipeline.root.resolve()
+    package_name = root_resolved.name
+    overlays_target_root = (options.overlays_root / package_name).resolve()
+    stubs_target_root = (options.stubs_root / package_name).resolve()
+    scip_index = SCIPIndex.load(pipeline.scip)
+    type_signal_lookup = _normalize_type_signal_map(
+        collect_type_signals(
+            pyrefly_report=str(pipeline.pyrefly_json) if pipeline.pyrefly_json else None,
+            pyright_json=str(root_resolved),
+        ),
+        root_resolved,
+    )
+    type_counts: dict[str, int] = {
+        path: signals.total
+        for path, signals in type_signal_lookup.items()
+        if not Path(path).is_absolute()
+    }
+    policy = OverlayPolicy(
+        overlays_root=overlays_target_root,
+        include_public_defs=options.include_public_defs,
+        inject_module_getattr_any=options.inject_getattr_any,
+        when_type_errors=options.type_error_overlays,
+        min_type_errors=options.min_errors,
+        max_overlays=options.max_overlays,
+    )
+    return OverlayContext(
+        root=root_resolved,
+        package_name=package_name,
+        overlays_root=overlays_target_root,
+        stubs_root=stubs_target_root,
+        scip_index=scip_index,
+        type_counts=type_counts,
+        policy=policy,
+        inputs=OverlayInputs(scip=scip_index, type_error_counts=type_counts),
+    )
 
 
 def _build_module_row(
@@ -1522,10 +1602,12 @@ def _ensure_package_overlays(  # noqa: PLR0913
         result = generate_overlay_for_file(
             py_file=init_abs,
             package_root=root,
-            scip=scip_index,
             policy=policy,
-            type_error_counts=type_error_counts,
-            force=True,
+            inputs=OverlayInputs(
+                scip=scip_index,
+                type_error_counts=type_error_counts,
+                force=True,
+            ),
         )
         if result.created:
             if rel_key not in generated_set:

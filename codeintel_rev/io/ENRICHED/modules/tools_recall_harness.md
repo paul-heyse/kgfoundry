@@ -63,7 +63,7 @@ Notes
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 132
+- **cycle_group**: 133
 
 ## Ownership
 
@@ -102,11 +102,14 @@ Notes
 - patches/Supporting Documentation/BM25+SPLADEv3-patchfiles/grafana_codeintel_retrieval.json
 - patches/Supporting Documentation/BM25+SPLADEv3-patchfiles/grafana-codeintel-retrieval.json
 - patches/Supporting Documentation/faiss_1_12_0_api_inventory.json
+- patches/Supporting Documentation/FastAPI.md
 - patches/Supporting Documentation/libcst.md
 - patches/Supporting Documentation/tree-sitter.md
 - patches/Supporting Documentation/251111_FAISS_whl_overview_rev.md
 - patches/Supporting Documentation/pyrarrow.md
 - patches/Supporting Documentation/duckdb.md
+- patches/Supporting Documentation/HyperCorn.md
+- patches/Supporting Documentation/nginx.md
 - patches/AST_CST_SCIP_data_pipeline_hardening.md
 - patches/CST_Data_Build.md
 - patches/Typing_gating_follow_small_architecture_changes.md
@@ -119,6 +122,7 @@ Notes
 - patches/Type_Gating_Factory_Scope.md
 - patches/DuckDB_data_expansion_FAISS.md
 - patches/Type_Gating_Followup.md
+- patches/Cli_enrich_fix.md
 - patches/AST_Data_Build.md
 - patches/audit_closeout.md
 - patches/Index Lifecycle Manager and Concurrency.md

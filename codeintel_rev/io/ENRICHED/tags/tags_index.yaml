@@ -29,6 +29,7 @@ low-coverage:
 - app/scope_registry.py
 - app/middleware.py
 - app/gpu_warmup.py
+- app/server_settings.py
 - app/config_context.py
 - app/main.py
 - app/scope_store.py
@@ -154,6 +155,7 @@ public-api:
 - app/scope_registry.py
 - app/middleware.py
 - app/gpu_warmup.py
+- app/server_settings.py
 - app/config_context.py
 - app/main.py
 - app/scope_store.py
@@ -225,6 +227,8 @@ public-api:
 - retrieval/fusion/__init__.py
 - app/routers/index_admin.py
 - app/routers/__init__.py
+pydantic:
+- app/server_settings.py
 reexport-hub:
 - config/settings.py
 - metrics/registry.py

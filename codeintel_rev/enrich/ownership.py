@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import subprocess  # lint-ignore[S404]: subprocess required for git analytics
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -11,6 +10,8 @@ from datetime import UTC, datetime, timedelta
 from fnmatch import fnmatch
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from kgfoundry_common.logging import get_logger
 
 try:  # pragma: no cover - optional dependency
     from git import Repo as _RuntimeGitRepo
@@ -25,6 +26,7 @@ else:
     GitRepo = Any  # type: ignore[assignment]
 
 GitError = git_exc.GitError if git_exc is not None else Exception
+LOGGER = get_logger(__name__)
 
 __all__ = ["FileOwnership", "OwnershipIndex", "compute_ownership"]
 
@@ -67,21 +69,16 @@ def compute_ownership(
     if not unique_paths:
         return OwnershipIndex(churn_windows=windows)
     repo = _try_open_repo(repo_root)
-    if repo is not None:
-        records = _stats_via_gitpython(
-            repo=repo,
-            repo_root=repo_root,
-            rel_paths=unique_paths,
-            commits_window=commits_window,
-            windows=windows,
-        )
-    else:
-        records = _stats_via_subprocess(
-            repo_root=repo_root,
-            rel_paths=unique_paths,
-            commits_window=commits_window,
-            windows=windows,
-        )
+    if repo is None:
+        LOGGER.debug("GitPython unavailable; ownership analytics disabled.")
+        return OwnershipIndex(churn_windows=windows)
+    records = _stats_via_gitpython(
+        repo=repo,
+        repo_root=repo_root,
+        rel_paths=unique_paths,
+        commits_window=commits_window,
+        windows=windows,
+    )
     return OwnershipIndex(by_file=records, churn_windows=windows)
 
 
@@ -138,56 +135,6 @@ def _stats_via_gitpython(
             churn_by_window=churn_counts,
         )
     return rows
-
-
-def _stats_via_subprocess(
-    *,
-    repo_root: Path,
-    rel_paths: Sequence[str],
-    commits_window: int,
-    windows: tuple[int, ...],
-) -> dict[str, FileOwnership]:
-    commit_limit = max(1, commits_window)
-    now = datetime.now(tz=UTC)
-    cutoffs = {window: now - timedelta(days=window) for window in windows}
-    result: dict[str, FileOwnership] = {}
-    for rel in rel_paths:
-        authors = _run_git(
-            ["git", "log", f"-n{commit_limit}", "--pretty=%an", "--", rel], repo_root
-        )
-        authors = authors[:commit_limit]
-        churn_counts: dict[int, int] = {}
-        for window, cutoff in cutoffs.items():
-            lines = _run_git(
-                ["git", "log", f"--since={cutoff.isoformat()}", "--pretty=%h", "--", rel],
-                repo_root,
-            )
-            churn_counts[window] = len(lines)
-        owner = _codeowners_lookup(repo_root, rel) or (authors[0] if authors else None)
-        result[rel] = FileOwnership(
-            path=rel,
-            owner=owner,
-            primary_authors=tuple(_top_k(authors, k=3)),
-            bus_factor=_bus_factor(authors),
-            churn_by_window=churn_counts,
-        )
-    return result
-
-
-def _run_git(cmd: list[str], repo_root: Path) -> list[str]:
-    try:
-        process = subprocess.run(  # lint-ignore[S603]: git log invocation uses fixed args and cwd
-            cmd,
-            cwd=str(repo_root),
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-    except (OSError, ValueError):  # pragma: no cover - git missing
-        return []
-    if process.returncode != 0 or not process.stdout:
-        return []
-    return [line.strip() for line in process.stdout.splitlines() if line.strip()]
 
 
 def _author_name(commit: object) -> str | None:

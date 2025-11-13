@@ -40,7 +40,7 @@ Usage:
 
 - **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 125
+- **cycle_group**: 126
 
 ## Ownership
 

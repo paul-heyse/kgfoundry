@@ -71,7 +71,7 @@ All configuration loaded from environment variables with sensible defaults.
 
 - **fan_in**: 22
 - **fan_out**: 2
-- **cycle_group**: 55
+- **cycle_group**: 46
 
 ## Ownership
 

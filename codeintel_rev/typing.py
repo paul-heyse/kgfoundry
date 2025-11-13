@@ -96,35 +96,149 @@ class TorchDeviceProperties(Protocol):
 class TorchCudaAPI(Protocol):
     """Minimal CUDA API surface used throughout the codebase."""
 
-    def is_available(self) -> bool: ...
+    def is_available(self) -> bool:
+        """Check if CUDA is available on the system.
 
-    def device_count(self) -> int: ...
+        Returns
+        -------
+        bool
+            True if CUDA is available and can be used, False otherwise.
+        """
+        ...
 
-    def current_device(self) -> int: ...
+    def device_count(self) -> int:
+        """Get the number of available CUDA devices.
 
-    def get_device_name(self, index: int) -> str: ...
+        Returns
+        -------
+        int
+            Number of CUDA-capable GPUs available on the system.
+        """
+        ...
 
-    def get_device_capability(self, index: int) -> tuple[int, int]: ...
+    def current_device(self) -> int:
+        """Get the index of the currently selected CUDA device.
 
-    def get_device_properties(self, index: int) -> TorchDeviceProperties: ...
+        Returns
+        -------
+        int
+            Index of the currently active CUDA device (0-based).
+        """
+        ...
 
-    def synchronize(self) -> None: ...
+    def get_device_name(self, index: int) -> str:
+        """Get the name of a CUDA device.
 
-    def init(self) -> None: ...
+        Parameters
+        ----------
+        index : int
+            Device index (0-based) to query.
+
+        Returns
+        -------
+        str
+            Human-readable device name (e.g., "NVIDIA GeForce RTX 3090").
+        """
+        ...
+
+    def get_device_capability(self, index: int) -> tuple[int, int]:
+        """Get the compute capability of a CUDA device.
+
+        Parameters
+        ----------
+        index : int
+            Device index (0-based) to query.
+
+        Returns
+        -------
+        tuple[int, int]
+            Tuple of (major, minor) compute capability version (e.g., (8, 6)
+            for compute capability 8.6).
+        """
+        ...
+
+    def get_device_properties(self, index: int) -> TorchDeviceProperties:
+        """Get properties of a CUDA device.
+
+        Parameters
+        ----------
+        index : int
+            Device index (0-based) to query.
+
+        Returns
+        -------
+        TorchDeviceProperties
+            Device properties object containing memory information and other
+            device characteristics.
+        """
+        ...
+
+    def synchronize(self) -> None:
+        """Synchronize all CUDA operations on the current device.
+
+        Blocks until all CUDA operations on the current device have completed.
+        Used to ensure operations are finished before proceeding.
+        """
+        ...
+
+    def init(self) -> None:
+        """Initialize CUDA runtime.
+
+        Performs one-time initialization of the CUDA runtime. Safe to call
+        multiple times (idempotent).
+        """
+        ...
 
 
 class TorchTensor(Protocol):
     """Tensor operations invoked inside diagnostics."""
 
-    def __matmul__(self, other: TorchTensor) -> TorchTensor: ...
+    def __matmul__(self, other: TorchTensor) -> TorchTensor:
+        """Matrix multiplication operator.
+
+        Parameters
+        ----------
+        other : TorchTensor
+            Right-hand operand for matrix multiplication.
+
+        Returns
+        -------
+        TorchTensor
+            Result tensor from matrix multiplication.
+        """
+        ...
 
     @property
-    # lint-ignore[N802]: matches torch.Tensor API
-    def T(self) -> TorchTensor: ...
+    def T(self) -> TorchTensor:  # noqa: N802 - mirrors torch.Tensor API
+        """Transpose property.
 
-    def sum(self) -> TorchTensor: ...
+        Returns
+        -------
+        TorchTensor
+            Transposed tensor (swapped dimensions).
+        """
+        ...
 
-    def item(self) -> float: ...
+    def sum(self) -> TorchTensor:
+        """Sum all elements of the tensor.
+
+        Returns
+        -------
+        TorchTensor
+            Scalar tensor containing the sum of all elements.
+        """
+        ...
+
+    def item(self) -> float:
+        """Extract scalar value from single-element tensor.
+
+        Returns
+        -------
+        float
+            Python scalar value extracted from the tensor. Raises ValueError
+            if the tensor contains more than one element.
+        """
+        ...
 
 
 class TorchModule(Protocol):
@@ -195,8 +309,7 @@ class FaissModule(Protocol):
         """Return the number of available GPUs."""
         ...
 
-    # lint-ignore[N802]: FAISS API uses camelCase
-    def normalize_L2(self, vectors: NDArrayF32) -> None:
+    def normalize_L2(self, vectors: NDArrayF32) -> None:  # noqa: N802 - matches FAISS API
         """Normalize vectors using L2 norm in-place."""
         ...
 
@@ -214,21 +327,67 @@ class FaissModule(Protocol):
 class NumpyRandomState(Protocol):
     """Random state wrapper for numpy.random."""
 
-    def randn(self, *shape: int) -> NDArrayF32: ...
+    def randn(self, *shape: int) -> NDArrayF32:
+        """Generate random array from standard normal distribution.
+
+        Parameters
+        ----------
+        *shape : int
+            Variable-length shape arguments defining the output array dimensions
+            (e.g., randn(3, 4) creates a 3x4 array).
+
+        Returns
+        -------
+        NDArrayF32
+            Random array with specified shape, sampled from standard normal
+            distribution (mean=0, std=1), dtype float32.
+        """
+        ...
 
 
 class NumpyRandomNamespace(Protocol):
     """Namespace for numpy.random helpers."""
 
-    # lint-ignore[N802]: mirrors numpy API
-    def RandomState(self, seed: int) -> NumpyRandomState: ...
+    def RandomState(self, seed: int) -> NumpyRandomState:  # noqa: N802 - numpy parity
+        """Create a random state generator with fixed seed.
+
+        Parameters
+        ----------
+        seed : int
+            Random seed value for reproducible random number generation.
+
+        Returns
+        -------
+        NumpyRandomState
+            Random state instance initialized with the given seed, providing
+            methods for generating random arrays with reproducible sequences.
+        """
+        ...
 
 
 class NumpyLinalgNamespace(Protocol):
     """Namespace for numpy.linalg helpers."""
 
-    # lint-ignore[FBT001]: signature mirrors numpy
-    def norm(self, array: NDArrayF32, axis: int, keepdims: bool) -> NDArrayF32: ...
+    def norm(self, array: NDArrayF32, axis: int, keepdims: bool) -> NDArrayF32:  # noqa: FBT001 - numpy parity
+        """Compute vector or matrix norm along specified axis.
+
+        Parameters
+        ----------
+        array : NDArrayF32
+            Input array to compute norm for, dtype float32.
+        axis : int
+            Axis along which to compute the norm. If negative, counts from the last axis.
+        keepdims : bool
+            If True, keep reduced dimensions with size 1 in the result. If False,
+            remove reduced dimensions.
+
+        Returns
+        -------
+        NDArrayF32
+            Norm values computed along the specified axis, dtype float32. Shape
+            depends on input shape and keepdims parameter.
+        """
+        ...
 
 
 class NumpyModule(Protocol):
@@ -241,14 +400,28 @@ class NumpyModule(Protocol):
 class PolarsDataFrame(Protocol):
     """Subset of polars.DataFrame used for Parquet exports."""
 
-    def write_parquet(self, file: str | PathLike[str]) -> None: ...
+    def write_parquet(self, file: str | PathLike[str]) -> None:
+        """Write DataFrame to Parquet format.
+
+        Parameters
+        ----------
+        file : str | PathLike[str]
+            File system path (string or path-like object) where the Parquet file
+            will be written. The file will be created or overwritten.
+
+        Notes
+        -----
+        This method writes the DataFrame contents to a Parquet file using efficient
+        columnar storage format. The method may raise IOError if the file cannot
+        be written (e.g., permission denied, disk full).
+        """
+        ...
 
 
 class PolarsModule(Protocol):
     """Minimal polars API used within optional export helpers."""
 
-    # lint-ignore[N802]: preserves polars constructor name
-    def DataFrame(self, data: Sequence[Mapping[str, object]]) -> PolarsDataFrame:
+    def DataFrame(self, data: Sequence[Mapping[str, object]]) -> PolarsDataFrame:  # noqa: N802 - polars API
         """Create a DataFrame from a sequence of mappings.
 
         Parameters

@@ -11,12 +11,11 @@ Coverage ingestion utilities (Cobertura-style XML).
 - from **__future__** import annotations
 - from **pathlib** import Path
 - from **defusedxml** import ElementTree
-- from **xml.etree** import ElementTree
 
 ## Definitions
 
-- function: `collect_coverage` (line 15)
-- function: `_parse_int` (line 60)
+- function: `collect_coverage` (line 11)
+- function: `_parse_int` (line 55)
 
 ## Graph Metrics
 
@@ -29,8 +28,8 @@ Coverage ingestion utilities (Cobertura-style XML).
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 5
-- recent churn 90: 5
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 
@@ -58,7 +57,7 @@ Coverage ingestion utilities (Cobertura-style XML).
 
 ## Hotspot
 
-- score: 1.54
+- score: 1.51
 
 ## Side Effects
 
@@ -66,9 +65,9 @@ Coverage ingestion utilities (Cobertura-style XML).
 
 ## Complexity
 
-- branches: 9
-- cyclomatic: 10
-- loc: 79
+- branches: 8
+- cyclomatic: 9
+- loc: 74
 
 ## Doc Coverage
 

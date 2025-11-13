@@ -20,7 +20,7 @@ Weighted reciprocal rank fusion utilities.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 91
+- **cycle_group**: 92
 
 ## Ownership
 

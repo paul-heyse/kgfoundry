@@ -1,7 +1,7 @@
 UV ?= uv
 H3_HOST ?= mcp.example.com
 
-.PHONY: format lint types test run-hypercorn reload-hypercorn install-systemd verify-h3
+.PHONY: format lint types test run-hypercorn reload-hypercorn install-systemd verify-h3 ci
 
 format:
 	$(UV) run ruff format
@@ -30,3 +30,5 @@ install-systemd:
 
 verify-h3:
 	curl --http3-only -I https://$(H3_HOST)/readyz
+
+ci: format lint types test

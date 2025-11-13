@@ -19,17 +19,23 @@ Provides health/readiness endpoints, CORS, and streaming support.
 - from **contextlib** import asynccontextmanager, suppress
 - from **time** import perf_counter
 - from **types** import FrameType
+- from **typing** import cast
 - from **fastapi** import FastAPI, Request
 - from **fastapi.middleware.cors** import CORSMiddleware
 - from **fastapi.responses** import JSONResponse, StreamingResponse
+- from **hypercorn.middleware** import ProxyFixMiddleware
+- from **hypercorn.typing** import ASGIFramework
 - from **prometheus_client** import CONTENT_TYPE_LATEST, generate_latest
+- from **starlette.middleware.trustedhost** import TrustedHostMiddleware
 - from **starlette.responses** import Response
+- from **starlette.types** import ASGIApp
 - from **codeintel_rev.app.capabilities** import Capabilities
 - from **codeintel_rev.app.config_context** import ApplicationContext
 - from **codeintel_rev.app.gpu_warmup** import warmup_gpu
 - from **codeintel_rev.app.middleware** import SessionScopeMiddleware
 - from **codeintel_rev.app.readiness** import ReadinessProbe
 - from **codeintel_rev.app.routers** import index_admin
+- from **codeintel_rev.app.server_settings** import get_server_settings
 - from **codeintel_rev.errors** import RuntimeUnavailableError
 - from **codeintel_rev.mcp_server.server** import app_context, build_http_app
 - from **codeintel_rev.observability.otel** import as_span, init_telemetry
@@ -41,38 +47,42 @@ Provides health/readiness endpoints, CORS, and streaming support.
 
 ## Definitions
 
-- variable: `LOGGER` (line 38)
-- function: `_preload_faiss_index` (line 41)
-- function: `_env_flag` (line 72)
-- function: `_log_gpu_warmup` (line 89)
-- function: `_preload_faiss_if_configured` (line 110)
-- function: `_preload_xtr_if_configured` (line 120)
-- function: `_preload_hybrid_if_configured` (line 134)
-- function: `_initialize_context` (line 145)
-- function: `_shutdown_context` (line 222)
-- function: `lifespan` (line 245)
-- variable: `app` (line 341)
-- function: `metrics_endpoint` (line 364)
-- function: `set_mcp_context` (line 380)
-- function: `disable_nginx_buffering` (line 449)
-- function: `healthz` (line 485)
-- function: `readyz` (line 497)
-- function: `capz` (line 532)
-- function: `sse_demo` (line 575)
+- variable: `LOGGER` (line 44)
+- variable: `SERVER_SETTINGS` (line 45)
+- function: `_preload_faiss_index` (line 48)
+- function: `_env_flag` (line 79)
+- function: `_log_gpu_warmup` (line 96)
+- function: `_preload_faiss_if_configured` (line 117)
+- function: `_preload_xtr_if_configured` (line 127)
+- function: `_preload_hybrid_if_configured` (line 141)
+- function: `_initialize_context` (line 152)
+- function: `_shutdown_context` (line 229)
+- function: `lifespan` (line 252)
+- variable: `app` (line 348)
+- function: `metrics_endpoint` (line 374)
+- function: `set_mcp_context` (line 390)
+- function: `disable_nginx_buffering` (line 459)
+- function: `healthz` (line 495)
+- function: `readyz` (line 507)
+- function: `capz` (line 542)
+- function: `sse_demo` (line 585)
+- variable: `proxy_wrapped` (line 630)
+- variable: `asgi` (line 635)
+- variable: `asgi` (line 637)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 12
-- **cycle_group**: 74
+- **fan_out**: 14
+- **cycle_group**: 75
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 24
-- recent churn 90: 24
+- recent churn 30: 25
+- recent churn 90: 25
 
 ## Usage
 
@@ -81,7 +91,7 @@ Provides health/readiness endpoints, CORS, and streaming support.
 
 ## Declared Exports (__all__)
 
-app
+app, asgi
 
 ## Doc Health
 
@@ -108,7 +118,7 @@ app
 
 ## Hotspot
 
-- score: 2.72
+- score: 2.79
 
 ## Side Effects
 
@@ -117,9 +127,9 @@ app
 
 ## Complexity
 
-- branches: 44
-- cyclomatic: 45
-- loc: 620
+- branches: 46
+- cyclomatic: 47
+- loc: 641
 
 ## Doc Coverage
 

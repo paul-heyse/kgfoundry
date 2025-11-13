@@ -70,8 +70,8 @@ LibCST traversal utilities that emit normalized node records.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 

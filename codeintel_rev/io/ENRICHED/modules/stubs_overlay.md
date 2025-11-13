@@ -21,33 +21,35 @@ Targeted overlay generation with opt-in activation.
 
 - class: `OverlayPolicy` (line 17)
 - class: `OverlayResult` (line 31)
-- function: `generate_overlay_for_file` (line 41)
-- function: `activate_overlays` (line 158)
-- function: `deactivate_all` (line 207)
-- function: `_overlay_path` (line 245)
-- function: `_normalized_module_key` (line 269)
-- function: `_module_name_from_path` (line 289)
-- function: `_collect_star_reexports` (line 313)
-- function: `_extract_simple_name` (line 344)
-- function: `_build_overlay_text` (line 372)
-- function: `_render_star_exports` (line 438)
-- function: `_render_public_defs` (line 463)
-- function: `_collect_import_reexports` (line 494)
-- function: `_is_windows` (line 525)
+- class: `OverlayInputs` (line 41)
+- class: `OverlayRenderContext` (line 50)
+- function: `generate_overlay_for_file` (line 61)
+- function: `activate_overlays` (line 172)
+- function: `deactivate_all` (line 221)
+- function: `_overlay_path` (line 259)
+- function: `_normalized_module_key` (line 283)
+- function: `_module_name_from_path` (line 303)
+- function: `_collect_star_reexports` (line 327)
+- function: `_extract_simple_name` (line 358)
+- function: `_build_overlay_text` (line 385)
+- function: `_render_star_exports` (line 432)
+- function: `_render_public_defs` (line 457)
+- function: `_collect_import_reexports` (line 488)
+- function: `_is_windows` (line 519)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 22
+- **cycle_group**: 19
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 8
-- recent churn 90: 8
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 
@@ -81,7 +83,7 @@ Targeted overlay generation with opt-in activation.
 
 ## Hotspot
 
-- score: 2.47
+- score: 2.46
 
 ## Side Effects
 
@@ -89,22 +91,22 @@ Targeted overlay generation with opt-in activation.
 
 ## Complexity
 
-- branches: 69
-- cyclomatic: 70
-- loc: 534
+- branches: 68
+- cyclomatic: 69
+- loc: 528
 
 ## Doc Coverage
 
 - `OverlayPolicy` (class): summary=yes, examples=no — Controls when an overlay is generated and how it is written.
 - `OverlayResult` (class): summary=yes, examples=no — Summary of overlay creation for a single module.
+- `OverlayInputs` (class): summary=yes, examples=no — Runtime inputs influencing overlay generation.
+- `OverlayRenderContext` (class): summary=yes, examples=no — Bundle of values required to render overlay text.
 - `generate_overlay_for_file` (function): summary=yes, params=ok, examples=no — Generate a .pyi overlay for ``py_file`` when it meets the policy gates.
 - `activate_overlays` (function): summary=yes, params=ok, examples=no — Activate overlays by linking or copying into ``stubs_root``.
 - `deactivate_all` (function): summary=yes, params=ok, examples=no — Remove overlays under ``stubs_root`` that originated from ``overlays_root``.
 - `_overlay_path` (function): summary=yes, params=ok, examples=no — Return the overlay destination path for ``py_file``.
 - `_normalized_module_key` (function): summary=yes, params=ok, examples=no — Return a normalized module key used for lookups.
 - `_module_name_from_path` (function): summary=yes, params=ok, examples=no — Return the dotted module name for ``py_file``.
-- `_collect_star_reexports` (function): summary=yes, params=ok, examples=no — Return candidate names that a star import might re-export.
-- `_extract_simple_name` (function): summary=yes, params=ok, examples=no — Extract a plausible leaf identifier from a SCIP symbol string.
 
 ## Tags
 

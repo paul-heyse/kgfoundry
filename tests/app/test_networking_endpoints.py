@@ -89,17 +89,21 @@ def _networking_test_app(tmp_path, monkeypatch) -> FastAPI:
 @pytest.mark.asyncio
 async def test_readyz_reports_all_checks(networking_test_app: FastAPI) -> None:
     """Ensure /readyz stays green and reports sub-check payloads."""
-    async with httpx.AsyncClient(
-        app=networking_test_app,
-        base_url="http://testserver",
-        timeout=httpx.Timeout(5.0),
-    ) as client:
-        response = await client.get("/readyz")
-        assert response.status_code == 200
-        payload = response.json()
-        assert payload["ready"] is True
-        assert "faiss" in payload["checks"]
-        assert payload["checks"]["faiss"]["healthy"] is True
+    transport = httpx.ASGITransport(app=networking_test_app)
+    try:
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+            timeout=httpx.Timeout(5.0),
+        ) as client:
+            response = await client.get("/readyz")
+            assert response.status_code == 200
+            payload = response.json()
+            assert payload["ready"] is True
+            assert "faiss" in payload["checks"]
+            assert payload["checks"]["faiss"]["healthy"] is True
+    finally:
+        await transport.aclose()
 
 
 @pytest.mark.asyncio
@@ -107,38 +111,49 @@ async def test_capz_refreshes_capability_snapshot(
     networking_test_app: FastAPI,
 ) -> None:
     """Verify /capz refresh flag rehydrates the cached snapshot."""
-    async with httpx.AsyncClient(
-        app=networking_test_app,
-        base_url="http://testserver",
-        timeout=httpx.Timeout(5.0),
-    ) as client:
-        baseline = await client.get("/capz")
-        assert baseline.status_code == 200
-        body = baseline.json()
-        assert body["faiss_index_present"] is True
-        stamp = body["stamp"]
+    transport = httpx.ASGITransport(app=networking_test_app)
+    try:
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://testserver",
+            timeout=httpx.Timeout(5.0),
+        ) as client:
+            baseline = await client.get("/capz")
+            assert baseline.status_code == 200
+            body = baseline.json()
+            assert body["faiss_index_present"] is True
+            stamp = body["stamp"]
 
-        refreshed = await client.get("/capz", params={"refresh": "true"})
-        assert refreshed.status_code == 200
-        refreshed_body = refreshed.json()
-        assert refreshed_body["faiss_index_present"] is False
-        assert refreshed_body["active_index_version"] == "v2"
-        assert refreshed_body["versions_available"] == 2
-        assert refreshed_body["stamp"] != stamp
+            refreshed = await client.get("/capz", params={"refresh": "true"})
+            assert refreshed.status_code == 200
+            refreshed_body = refreshed.json()
+            assert refreshed_body["faiss_index_present"] is False
+            assert refreshed_body["active_index_version"] == "v2"
+            assert refreshed_body["versions_available"] == 2
+            assert refreshed_body["stamp"] != stamp
+    finally:
+        await transport.aclose()
 
 
 @pytest.mark.asyncio
 async def test_sse_stream_flushes_events(networking_test_app: FastAPI) -> None:
     """The /sse demo should stream events and keep buffering disabled."""
-    async with httpx.AsyncClient(
-        app=networking_test_app,
-        base_url="http://testserver",
-        timeout=httpx.Timeout(10.0),
-    ) as client, client.stream("GET", "/sse") as response:
-        assert response.status_code == 200
-        assert response.headers.get("x-accel-buffering") == "no"
-        lines: AsyncIterator[str] = response.aiter_lines()
-        first_line = await anext(lines)
-        second_line = await anext(lines)
-        assert first_line == "event: ready"
-        assert second_line.startswith("data:")
+    transport = httpx.ASGITransport(app=networking_test_app)
+    try:
+        async with (
+            httpx.AsyncClient(
+                transport=transport,
+                base_url="http://testserver",
+                timeout=httpx.Timeout(10.0),
+            ) as client,
+            client.stream("GET", "/sse") as response,
+        ):
+            assert response.status_code == 200
+            assert response.headers.get("x-accel-buffering") == "no"
+            lines: AsyncIterator[str] = response.aiter_lines()
+            first_line = await anext(lines)
+            second_line = await anext(lines)
+            assert first_line == "event: ready"
+            assert second_line.startswith("data:")
+    finally:
+        await transport.aclose()

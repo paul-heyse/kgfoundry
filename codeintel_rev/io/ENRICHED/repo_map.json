@@ -1,11 +1,11 @@
 {
   "root": "/home/paul/kgfoundry/codeintel_rev",
   "repo_root": "/home/paul/kgfoundry",
-  "module_count": 145,
-  "symbol_edge_count": 10698,
-  "coverage_records": 145,
-  "config_files": 165,
-  "generated_at": "2025-11-12T23:43:31+00:00",
+  "module_count": 146,
+  "symbol_edge_count": 10723,
+  "coverage_records": 146,
+  "config_files": 169,
+  "generated_at": "2025-11-13T02:45:27+00:00",
   "tags": {
     "low-coverage": [
       "risk_hotspots.py",
@@ -35,6 +35,7 @@
       "app/scope_registry.py",
       "app/middleware.py",
       "app/gpu_warmup.py",
+      "app/server_settings.py",
       "app/config_context.py",
       "app/main.py",
       "app/scope_store.py",
@@ -161,6 +162,7 @@
       "app/scope_registry.py",
       "app/middleware.py",
       "app/gpu_warmup.py",
+      "app/server_settings.py",
       "app/config_context.py",
       "app/main.py",
       "app/scope_store.py",
@@ -232,6 +234,9 @@
       "retrieval/fusion/__init__.py",
       "app/routers/index_admin.py",
       "app/routers/__init__.py"
+    ],
+    "pydantic": [
+      "app/server_settings.py"
     ],
     "fastapi": [
       "app/main.py",

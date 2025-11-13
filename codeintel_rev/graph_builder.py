@@ -107,6 +107,31 @@ def _tarjan_scc(edges: dict[str, set[str]]) -> dict[str, int]:
     assignment: dict[str, int] = {}
 
     def strongconnect(node: str) -> None:
+        """Perform depth-first search to find strongly connected components.
+
+        This nested function implements Tarjan's algorithm for finding strongly
+        connected components (SCCs) in a directed graph. It performs a depth-first
+        search, tracking discovery order and lowlink values to identify cycles.
+        When a root node of an SCC is found (lowlink == order), all nodes on the
+        stack up to that root are assigned to the same component.
+
+        Parameters
+        ----------
+        node : str
+            The current node being processed. Represents a module path in the import
+            graph. The function recursively processes all neighbors (imported modules)
+            to discover SCCs.
+
+        Notes
+        -----
+        This function is part of Tarjan's SCC algorithm implementation. It uses
+        closure variables (order, lowlink, stack, on_stack, assignment, component)
+        to maintain algorithm state across recursive calls. Time complexity:
+        O(V + E) where V is the number of nodes and E is the number of edges.
+        The function modifies closure variables and is not thread-safe. It assigns
+        component IDs to nodes that form cycles in the import graph, enabling
+        cycle detection and grouping for dependency analysis.
+        """
         nonlocal index, component
         order[node] = index
         lowlink[node] = index

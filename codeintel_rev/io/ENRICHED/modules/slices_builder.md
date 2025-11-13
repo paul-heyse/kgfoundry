@@ -12,7 +12,7 @@ Utilities for generating opt-in LLM slice packs.
 - from **collections.abc** import Mapping
 - from **dataclasses** import asdict, dataclass, field
 - from **datetime** import UTC, datetime
-- from **hashlib** import sha1
+- from **hashlib** import blake2s
 - from **pathlib** import Path
 - from **typing** import Any
 - from **codeintel_rev.enrich.output_writers** import write_json, write_markdown_module
@@ -28,15 +28,15 @@ Utilities for generating opt-in LLM slice packs.
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 15
+- **cycle_group**: 20
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 

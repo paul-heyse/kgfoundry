@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
+trap 'log "hook failed on line ${LINENO}" >&2' ERR
 
 NGINX_BIN=${NGINX_BIN:-/usr/sbin/nginx}
 SYSTEMCTL_BIN=${SYSTEMCTL_BIN:-/bin/systemctl}

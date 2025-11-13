@@ -43,15 +43,15 @@ AST indexer producing join-ready Parquet datasets.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 21
+- **cycle_group**: 14
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 3
-- recent churn 90: 3
+- recent churn 30: 4
+- recent churn 90: 4
 
 ## Usage
 
@@ -89,7 +89,7 @@ AST_METRIC_SCHEMA, AST_NODE_SCHEMA, AstMetricsRow, AstNodeRow, DefInfo, collect_
 
 ## Hotspot
 
-- score: 1.96
+- score: 1.99
 
 ## Side Effects
 
@@ -97,9 +97,9 @@ AST_METRIC_SCHEMA, AST_NODE_SCHEMA, AstMetricsRow, AstNodeRow, DefInfo, collect_
 
 ## Complexity
 
-- branches: 24
-- cyclomatic: 25
-- loc: 705
+- branches: 26
+- cyclomatic: 27
+- loc: 545
 
 ## Doc Coverage
 
