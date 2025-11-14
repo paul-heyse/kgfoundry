@@ -284,7 +284,7 @@ def ledger_report(
         Path,
         typer.Option(
             Path(data),
-            --data-dir,
+            --data - dir,
             help="Telemetry data directory (default: ./data).",
         ),
     ] = Path("data"),

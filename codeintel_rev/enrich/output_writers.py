@@ -4,7 +4,8 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable, Mapping
+import os
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 
 try:  # pragma: no cover - optional dependency
@@ -14,10 +15,29 @@ except ImportError:  # pragma: no cover - optional dependency
 
 try:  # pragma: no cover - optional dependency
     import pyarrow as pa
+    import pyarrow.dataset as ds
     import pyarrow.parquet as pq
 except ImportError:  # pragma: no cover - optional dependency
     pa = None
+    ds = None
     pq = None
+
+
+_JSONL_WRITER_ENV = "ENRICH_JSONL_WRITER"
+_JSONL_V2 = "v2"
+_JSONL_DEFAULT_VERSION = "v1"
+_ORJSON_JSONL_OPTS = (
+    orjson.OPT_SORT_KEYS | orjson.OPT_APPEND_NEWLINE if orjson is not None else None
+)
+_DEFAULT_DICT_FIELDS: tuple[str, ...] = (
+    "path",
+    "repo_path",
+    "module_name",
+    "language",
+    "package",
+    "tags",
+    "owner",
+)
 
 
 def _dump_json(obj: object) -> str:
@@ -43,6 +63,53 @@ def _dump_json(obj: object) -> str:
     return json.dumps(obj, indent=2, ensure_ascii=False)
 
 
+def _dump_jsonl_bytes(obj: object) -> bytes:
+    """Serialize JSON rows for JSONL outputs with deterministic ordering.
+
+    Parameters
+    ----------
+    obj : object
+        Python object to serialize to JSON. The object must be JSON-serializable.
+        If orjson is available, uses orjson for faster serialization. Otherwise,
+        falls back to standard library json.
+
+    Returns
+    -------
+    bytes
+        UTF-8 encoded JSON bytes with a trailing newline. The output uses
+        deterministic key ordering (sorted keys) for consistent serialization.
+    """
+    if _ORJSON_JSONL_OPTS is not None:
+        return orjson.dumps(obj, option=_ORJSON_JSONL_OPTS)
+    return (json.dumps(obj, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8")
+
+
+def _resolve_dictionary_fields(table: pa.Table, hints: Sequence[str] | None = None) -> list[str]:
+    """Return dictionary-encoded columns present in ``table``.
+
+    Parameters
+    ----------
+    table : pa.Table
+        PyArrow table to inspect for dictionary-encoded columns. The table's
+        schema is checked to identify columns that use dictionary encoding.
+    hints : Sequence[str] | None, optional
+        Optional sequence of column names to check. If provided, only these
+        columns are checked. If None, uses default dictionary field names.
+        Defaults to None.
+
+    Returns
+    -------
+    list[str]
+        List of column names that are dictionary-encoded in the table. Returns
+        an empty list if PyArrow is not available or if none of the hinted
+        columns use dictionary encoding.
+    """
+    if pa is None:
+        return []
+    candidate_names = hints or _DEFAULT_DICT_FIELDS
+    return [name for name in candidate_names if name in table.schema.names]
+
+
 def write_json(path: str | Path, obj: object) -> None:
     """Write an object as pretty-printed JSON."""
     target = Path(path)
@@ -54,9 +121,18 @@ def write_jsonl(path: str | Path, rows: Iterable[dict[str, object]]) -> None:
     """Write newline-delimited JSON records."""
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
+    writer_version = (os.getenv(_JSONL_WRITER_ENV) or _JSONL_DEFAULT_VERSION).lower()
+    if writer_version == _JSONL_V2 and _ORJSON_JSONL_OPTS is not None:
+        with target.open("wb") as handle:
+            for row in rows:
+                handle.write(_dump_jsonl_bytes(row))
+        return
     with target.open("w", encoding="utf-8") as handle:
         for row in rows:
-            handle.write(_dump_json(row))
+            if writer_version == _JSONL_V2:
+                handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True))
+            else:
+                handle.write(_dump_json(row))
             handle.write("\n")
 
 
@@ -70,7 +146,101 @@ def write_parquet(path: str | Path, rows: Iterable[dict[str, object]]) -> None:
         write_jsonl(fallback, records)
         return
     table = pa.Table.from_pylist(records)
-    pq.write_table(table, target)
+    _write_dataset_table(table, target)
+
+
+def write_parquet_dataset(
+    path: str | Path,
+    rows: Iterable[dict[str, object]],
+    *,
+    partitioning: Sequence[str],
+    dictionary_fields: Sequence[str] | None = None,
+) -> None:
+    """Write records to a partitioned Parquet dataset directory.
+
+    Parameters
+    ----------
+    path : str | Path
+        Output directory path for the partitioned Parquet dataset. The directory
+        will be created if it doesn't exist. If PyArrow is unavailable, falls back
+        to writing a single JSONL file at this path.
+    rows : Iterable[dict[str, object]]
+        Iterable of dictionary records to write. Each dictionary represents a row
+        in the dataset. Records are converted to a PyArrow table before writing.
+    partitioning : Sequence[str]
+        List of column names to use for partitioning. Each unique combination of
+        values in these columns creates a separate Parquet file in a subdirectory.
+        Must not be empty.
+    dictionary_fields : Sequence[str] | None, optional
+        Optional list of column names to use dictionary encoding for. Dictionary
+        encoding can improve compression and query performance for columns with
+        repeated values. If None, uses default dictionary fields. Defaults to None.
+
+    Raises
+    ------
+    ValueError
+        Raised when partitioning is empty. Partitioning columns are required
+        for dataset writes to organize data into separate files.
+    """
+    records = list(rows)
+    target = Path(path)
+    if not partitioning:
+        message = "Partitioning columns are required for dataset writes."
+        raise ValueError(message)
+    if pa is None or pq is None:
+        fallback = target.with_suffix(".jsonl") if target.suffix else target / "dataset.jsonl"
+        write_jsonl(fallback, records)
+        return
+    table = pa.Table.from_pylist(records)
+    _write_dataset_table(
+        table,
+        target,
+        partitioning=partitioning,
+        dictionary_fields=dictionary_fields,
+    )
+
+
+def _write_dataset_table(
+    table: pa.Table,
+    destination: Path,
+    *,
+    partitioning: Sequence[str] | None = None,
+    dictionary_fields: Sequence[str] | None = None,
+) -> None:
+    """Write ``table`` to Parquet using dataset writer settings."""
+    if ds is None:
+        pq.write_table(table, destination)
+        return
+    if table.num_rows == 0 and not partitioning:
+        pq.write_table(table, destination)
+        return
+    fmt = ds.ParquetFileFormat()
+    use_dictionary = _resolve_dictionary_fields(table, dictionary_fields)
+    file_options = fmt.make_write_options(
+        compression="zstd",
+        use_dictionary=use_dictionary or None,
+    )
+    if partitioning:
+        destination.mkdir(parents=True, exist_ok=True)
+        base_dir = destination
+        basename_template = "part-{i}.parquet"
+        partitioning_descriptor = ds.partitioning(field_names=list(partitioning))
+    else:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        base_dir = destination.parent
+        basename_template = destination.name
+        partitioning_descriptor = None
+    max_rows = max(1, table.num_rows)
+    ds.write_dataset(
+        data=table,
+        format=fmt,
+        base_dir=str(base_dir),
+        partitioning=partitioning_descriptor,
+        file_options=file_options,
+        existing_data_behavior="delete_matching",
+        basename_template=basename_template,
+        max_rows_per_file=max_rows,
+    )
 
 
 def _append_section(sections: list[str], title: str, lines: list[str]) -> None:

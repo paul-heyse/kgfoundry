@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from threading import Lock
 from typing import cast
 
@@ -146,6 +146,32 @@ class HistogramLike:
         """Record ``value`` against the histogram."""
         self._default_handle.observe(value)
 
+    def record(self, value: float, attributes: Mapping[str, object] | None = None) -> None:
+        """Record ``value`` with optional attributes.
+
+        This method provides a Prometheus-like API for recording histogram values
+        with attributes. If attributes are provided, they are used to create a
+        labeled handle. If no attributes are provided, the default handle is used.
+
+        Parameters
+        ----------
+        value : float
+            Value to record in the histogram.
+        attributes : Mapping[str, object] | None, optional
+            Optional attributes dictionary. If provided, must contain all required
+            label names. Defaults to None (uses default handle).
+
+        Notes
+        -----
+        When attributes are provided, this method calls ``labels()`` which may raise
+        ``ValueError`` if required label names are missing from the attributes dict.
+        """
+        if attributes is None:
+            self._default_handle.observe(value)
+        else:
+            handle = self.labels(**attributes)
+            handle.observe(value)
+
 
 @dataclass(slots=True, frozen=True)
 class _GaugeEntry:
@@ -247,9 +273,9 @@ class GaugeLike:
             entry = self._entries.get(key)
             if entry is None:
                 entry = _GaugeEntry(attributes=dict(key), value=float(value))
-                self._entries[key] = entry
             else:
-                entry.value = float(value)
+                entry = replace(entry, value=float(value))
+            self._entries[key] = entry
 
     def _observe(self, _: CallbackOptions) -> list[Observation]:
         """Return the latest gauge observations.

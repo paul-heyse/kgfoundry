@@ -8,11 +8,14 @@ from collections.abc import Mapping, Sequence
 from contextlib import AbstractContextManager, suppress
 from dataclasses import dataclass
 from types import ModuleType
-from typing import Any, Protocol
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from codeintel_rev.observability.logs import init_otel_logging
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.observability import start_span
+
+if TYPE_CHECKING:
+    from opentelemetry.sdk.resources import Resource
 
 try:  # pragma: no cover - optional dependency
     from codeintel_rev.observability.flight_recorder import (
@@ -213,7 +216,7 @@ def _build_resource(
     handles: _TraceHandles,
     service_name: str,
     service_version: str | None,
-) -> object:
+) -> Resource:
     try:
         semconv = importlib.import_module("opentelemetry.semconv.resource")
         attributes = getattr(semconv, "ResourceAttributes", None)
@@ -241,15 +244,22 @@ def _build_resource(
     if service_version:
         resource_attrs[service_version_key] = service_version
     resource = handles.resource.Resource.create(resource_attrs)
-    return _merge_detected_resources(resource)
+    return _merge_detected_resources(handles, resource)
 
 
-def _merge_detected_resources(resource: object) -> object:
+def _merge_detected_resources(handles: _TraceHandles, resource: Resource) -> Resource:
     """Augment ``resource`` with optional detector-provided attributes.
+
+    Parameters
+    ----------
+    handles : _TraceHandles
+        Trace module handles for type checking.
+    resource : Resource
+        Base resource to augment.
 
     Returns
     -------
-    object
+    Resource
         Resource merged with detector-provided metadata.
     """
     merged = resource
@@ -271,7 +281,10 @@ def _merge_detected_resources(resource: object) -> object:
         merge_fn = getattr(merged, "merge", None)
         if callable(merge_fn):
             try:
-                merged = merge_fn(detected)
+                merged_result = merge_fn(detected)
+                # Type guard: ensure result is Resource
+                if isinstance(merged_result, handles.resource.Resource):
+                    merged = cast("Resource", merged_result)
             except (RuntimeError, ValueError, OSError):  # pragma: no cover - defensive
                 LOGGER.debug("Failed to merge resource detector output", exc_info=True)
     return merged
@@ -279,7 +292,7 @@ def _merge_detected_resources(resource: object) -> object:
 
 def _build_provider(
     handles: _TraceHandles,
-    resource: object,
+    resource: Resource,
     endpoint: str | None,
     sampler_spec: str | None,
 ) -> object:
@@ -316,6 +329,67 @@ def telemetry_enabled() -> bool:
     return _STATE.tracing_enabled
 
 
+def _initialize_tracing_state(
+    app: SupportsState | None,
+    *,
+    enabled: bool,
+) -> None:
+    """Update application state with telemetry enabled status.
+
+    Parameters
+    ----------
+    app : SupportsState | None
+        FastAPI application instance (may be None).
+    enabled : bool
+        Whether telemetry is enabled.
+    """
+    if app is not None:
+        app.state.telemetry_enabled = enabled
+
+
+def _initialize_metrics_provider(
+    resource: Resource,
+    otlp_endpoint: str | None,
+) -> None:
+    """Initialize metrics provider if enabled.
+
+    Parameters
+    ----------
+    resource : Resource
+        OpenTelemetry Resource instance.
+    otlp_endpoint : str | None
+        Optional OTLP endpoint override.
+    """
+    metrics_enabled = _env_flag("CODEINTEL_OTEL_METRICS_ENABLED", default=True)
+    if not metrics_enabled:
+        return
+    metrics_endpoint = os.getenv("CODEINTEL_OTEL_METRICS_ENDPOINT", otlp_endpoint or None)
+    try:
+        from codeintel_rev.observability.metrics import (  # noqa: PLC0415
+            install_metrics_provider as _install_metrics_provider,
+        )
+
+        _install_metrics_provider(resource, otlp_endpoint=metrics_endpoint)
+    except ImportError:  # pragma: no cover - defensive
+        LOGGER.debug("Metrics module unavailable; skipping meter provider install")
+
+
+def _initialize_flight_recorder(provider: object) -> None:
+    """Initialize flight recorder if available.
+
+    Parameters
+    ----------
+    provider : object
+        TracerProvider instance.
+    """
+    if _install_flight_recorder is None:
+        return
+    try:
+        _install_flight_recorder(provider)
+    except (RuntimeError, ValueError):  # pragma: no cover - defensive
+        LOGGER.debug("Failed to install flight recorder", exc_info=True)
+
+
 def init_telemetry(
     app: SupportsState | None = None,
     *,
@@ -349,23 +423,20 @@ def init_telemetry(
         When ``True`` installs the lightweight flight recorder span processor.
     """
     if _STATE.initialized:
-        if app is not None:
-            app.state.telemetry_enabled = _STATE.tracing_enabled
+        _initialize_tracing_state(app, enabled=_STATE.tracing_enabled)
         return
 
     if not _should_enable():
         _STATE.initialized = True
         _STATE.tracing_enabled = False
-        if app is not None:
-            app.state.telemetry_enabled = False
+        _initialize_tracing_state(app, enabled=False)
         return
 
     handles = _load_trace_modules()
     if handles is None:
         _STATE.initialized = True
         _STATE.tracing_enabled = False
-        if app is not None:
-            app.state.telemetry_enabled = False
+        _initialize_tracing_state(app, enabled=False)
         return
 
     endpoint = otlp_endpoint or os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
@@ -376,26 +447,13 @@ def init_telemetry(
     _STATE.trace_provider = provider
     _STATE.tracing_enabled = True
     _STATE.initialized = True
-    if app is not None:
-        app.state.telemetry_enabled = True
+    _initialize_tracing_state(app, enabled=True)
+
     if enable_logging_instrumentation:
         _install_logging_instrumentation()
-    metrics_enabled = _env_flag("CODEINTEL_OTEL_METRICS_ENABLED", default=True)
-    if metrics_enabled:
-        metrics_endpoint = os.getenv("CODEINTEL_OTEL_METRICS_ENDPOINT", otlp_endpoint or None)
-        try:
-            from codeintel_rev.observability.metrics import (
-                install_metrics_provider as _install_metrics_provider,
-            )
-        except ImportError:  # pragma: no cover - defensive
-            LOGGER.debug("Metrics module unavailable; skipping meter provider install")
-        else:
-            _install_metrics_provider(resource, otlp_endpoint=metrics_endpoint)
-    if install_flight_recorder and _install_flight_recorder is not None:
-        try:
-            _install_flight_recorder(provider)
-        except (RuntimeError, ValueError):  # pragma: no cover - defensive
-            LOGGER.debug("Failed to install flight recorder", exc_info=True)
+    _initialize_metrics_provider(resource, otlp_endpoint)
+    if install_flight_recorder:
+        _initialize_flight_recorder(provider)
 
 
 def init_otel(
@@ -583,8 +641,6 @@ def _install_logging_instrumentation() -> None:
     with suppress(Exception):  # pragma: no cover - defensive
         instrumentor().instrument(set_logging_format=True)
         _STATE.logging_instrumented = True
-
-
 
 
 def instrument_fastapi(app: SupportsState) -> None:

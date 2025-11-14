@@ -19,5 +19,8 @@ def install_structured_logging(level: int = logging.INFO) -> None:
     _LOGGING_STATE["installed"] = True
     try:
         init_otel_logging(level=level)
-    except Exception:  # pragma: no cover - defensive
-        LOGGER.debug("Failed to initialize OpenTelemetry logging bridge", exc_info=True)
+    except (RuntimeError, ValueError, OSError, ImportError) as exc:  # pragma: no cover - defensive
+        LOGGER.debug(
+            "Failed to initialize OpenTelemetry logging bridge",
+            exc_info=exc,
+        )

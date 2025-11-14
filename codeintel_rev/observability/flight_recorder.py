@@ -6,7 +6,7 @@ import json
 import os
 import threading
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -172,9 +172,12 @@ class _FlightRecorder:
         with self._lock:
             buffer = self._buffers.setdefault(trace_id, _RunBuffer(trace_id=trace_id))
             start_ns = getattr(span, "start_time", None)
-            if isinstance(start_ns, int):
-                buffer.started_ns = buffer.started_ns or start_ns
-            _update_identities(buffer, span)
+            if isinstance(start_ns, int) and buffer.started_ns is None:
+                buffer = replace(buffer, started_ns=start_ns)
+                self._buffers[trace_id] = buffer
+            buffer = _update_identities(buffer, span)
+            if buffer is not self._buffers.get(trace_id):
+                self._buffers[trace_id] = buffer
 
     def on_end(self, span: object) -> None:
         """Handle span end event and buffer or flush trace data.
@@ -192,10 +195,16 @@ class _FlightRecorder:
         root_span = _is_root_span(span)
         with self._lock:
             buffer = self._buffers.setdefault(trace_id, _RunBuffer(trace_id=trace_id))
-            buffer.events.append(event)
-            buffer.root_span_id = buffer.root_span_id or event.get("span_id")
-            _update_identities(buffer, span)
-            _update_status(buffer, span, event)
+            events = list(buffer.events)
+            events.append(event)
+            root_span_id = buffer.root_span_id or event.get("span_id")
+            if isinstance(root_span_id, str):
+                buffer = replace(buffer, root_span_id=root_span_id, events=events)
+            else:
+                buffer = replace(buffer, events=events)
+            buffer = _update_identities(buffer, span)
+            buffer = _update_status(buffer, span, event)
+            self._buffers[trace_id] = buffer
             if root_span:
                 self._flush_locked(trace_id, buffer)
 
@@ -219,7 +228,7 @@ class _FlightRecorder:
             buffer.started_ns,
             ensure_parent=True,
         )
-        buffer.diag_path = str(path)
+        buffer = replace(buffer, diag_path=str(path))
         events: list[FlightEvent] = sorted(buffer.events, key=_event_start_ns)
         payload: dict[str, object] = {
             "schema": "codeintel.flight-recorder@v1",
@@ -327,28 +336,73 @@ def _span_id(span: object) -> str | None:
     return f"{int(span_id):016x}"
 
 
-def _update_identities(buffer: _RunBuffer, span: object) -> None:
+def _update_identities(buffer: _RunBuffer, span: object) -> _RunBuffer:
+    """Update buffer with identity attributes from span, returning new buffer if changed.
+
+    Parameters
+    ----------
+    buffer : _RunBuffer
+        Current buffer instance.
+    span : object
+        OpenTelemetry span object containing identity attributes.
+
+    Returns
+    -------
+    _RunBuffer
+        Updated buffer instance (new instance if changes were made).
+    """
     attrs = getattr(span, "attributes", {}) or {}
     session = attrs.get(Attrs.SESSION_ID)
     run_id = attrs.get(Attrs.RUN_ID)
-    if isinstance(session, str):
-        buffer.session_id = buffer.session_id or session
-    if isinstance(run_id, str):
-        buffer.run_id = buffer.run_id or run_id
+    updates: dict[str, object] = {}
+    if isinstance(session, str) and buffer.session_id is None:
+        updates["session_id"] = session
+    if isinstance(run_id, str) and buffer.run_id is None:
+        updates["run_id"] = run_id
+    if updates:
+        return replace(buffer, **updates)
+    return buffer
 
 
-def _update_status(buffer: _RunBuffer, span: object, event: Mapping[str, Any]) -> None:
+def _update_status(buffer: _RunBuffer, span: object, event: Mapping[str, Any]) -> _RunBuffer:
+    """Update buffer status based on span status and events, returning new buffer if changed.
+
+    Parameters
+    ----------
+    buffer : _RunBuffer
+        Current buffer instance.
+    span : object
+        OpenTelemetry span object containing status information.
+    event : Mapping[str, Any]
+        Event dictionary containing exception information.
+
+    Returns
+    -------
+    _RunBuffer
+        Updated buffer instance (new instance if status changed).
+    """
     status_obj = getattr(span, "status", None)
     status_code = getattr(status_obj, "status_code", None)
     description = getattr(status_obj, "description", None)
+    updates: dict[str, object] = {}
     if getattr(status_code, "name", "") == "ERROR":
-        buffer.status = "error"
-        buffer.stop_reason = description or event.get("name")
-    for evt in event.get("events", []):
-        if evt.get("name") == "exception":
-            buffer.status = "error"
-            message = evt.get("attrs", {}).get("exception.message")
-            buffer.stop_reason = buffer.stop_reason or message or evt.get("name")
+        updates["status"] = "error"
+        updates["stop_reason"] = description or event.get("name")
+    events_list = event.get("events", [])
+    if isinstance(events_list, list):
+        for evt in events_list:
+            if isinstance(evt, dict) and evt.get("name") == "exception":
+                updates["status"] = "error"
+                evt_attrs = evt.get("attrs", {})
+                if isinstance(evt_attrs, dict):
+                    message = evt_attrs.get("exception.message")
+                else:
+                    message = None
+                if not updates.get("stop_reason"):
+                    updates["stop_reason"] = buffer.stop_reason or message or evt.get("name")
+    if updates:
+        return replace(buffer, **updates)
+    return buffer
 
 
 def _is_root_span(span: object) -> bool:

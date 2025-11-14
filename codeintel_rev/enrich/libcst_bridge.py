@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, ClassVar, Protocol, cast
 
 import libcst as cst
+from libcst import matchers as m
 from libcst import metadata as cst_metadata
 from libcst.helpers import (
     get_full_name_for_node,
@@ -131,28 +132,29 @@ def _literal_string_values(node: cst.BaseExpression) -> Iterator[str]:
     str
         Literal names included in ``__all__`` definitions.
     """
+    literal = _string_literal_value(node)
+    if literal is not None:
+        yield literal
+        return
     containers = (cst.List, cst.Tuple, cst.Set)
     if isinstance(node, containers):
         for raw_element in node.elements:
             element_value = getattr(raw_element, "value", None)
-            if isinstance(element_value, cst.SimpleString):
-                with suppress(ValueError):
-                    evaluated = element_value.evaluated_value
-                    if isinstance(evaluated, bytes):
-                        yield evaluated.decode("utf-8", "ignore")
-                    elif isinstance(evaluated, str):
-                        yield evaluated
-                    else:
-                        yield str(evaluated)
-            elif isinstance(node, cst.SimpleString):
-                with suppress(ValueError):
-                    evaluated = node.evaluated_value
-                    if isinstance(evaluated, bytes):
-                        yield evaluated.decode("utf-8", "ignore")
-                    elif isinstance(evaluated, str):
-                        yield evaluated
-                    else:
-                        yield str(evaluated)
+            literal_value = _string_literal_value(element_value)
+            if literal_value is not None:
+                yield literal_value
+
+
+def _string_literal_value(node: cst.BaseExpression | None) -> str | None:
+    if isinstance(node, cst.SimpleString):
+        with suppress(ValueError):
+            evaluated = node.evaluated_value
+            if isinstance(evaluated, bytes):
+                return evaluated.decode("utf-8", "ignore")
+            if isinstance(evaluated, str):
+                return evaluated
+            return str(evaluated)
+    return None
 
 
 def _extract_def_docstring(body: cst.BaseSuite) -> str | None:
@@ -307,7 +309,11 @@ def _infer_side_effects(imports: set[str], code: str) -> dict[str, bool]:
 class _IndexVisitor(cst.CSTVisitor):
     """Collect module metadata via a single LibCST traversal."""
 
-    METADATA_DEPENDENCIES = (cst_metadata.PositionProvider,)
+    METADATA_DEPENDENCIES = (
+        cst_metadata.PositionProvider,
+        cst_metadata.ScopeProvider,
+        cst_metadata.QualifiedNameProvider,
+    )
     NODE_HANDLERS: ClassVar[dict[type[cst.CSTNode], NodeHandler]]
 
     def __init__(self, code: str) -> None:
@@ -400,7 +406,7 @@ class _IndexVisitor(cst.CSTVisitor):
             if name:
                 self._raise_names.add(name)
 
-        is_top_level = self._class_depth == 0 and self._function_depth == 0
+        is_top_level = self._is_module_scope(node)
         handler = self.NODE_HANDLERS.get(type(node))
         if handler is not None:
             handler(self, node, is_top_level=is_top_level)
@@ -431,6 +437,13 @@ class _IndexVisitor(cst.CSTVisitor):
             self._function_depth = max(0, self._function_depth - 1)
         elif isinstance(original_node, cst.ClassDef):
             self._class_depth = max(0, self._class_depth - 1)
+
+    def _is_module_scope(self, node: cst.CSTNode) -> bool:
+        try:
+            scope = self.get_metadata(cst_metadata.ScopeProvider, node)
+            return isinstance(scope, cst_metadata.GlobalScope)
+        except KeyError:
+            return self._class_depth == 0 and self._function_depth == 0
 
     def finalize(self) -> None:
         """Finalize visitor state after AST traversal completes.
@@ -591,15 +604,15 @@ class _IndexVisitor(cst.CSTVisitor):
     def _handle_assign(self, node: cst.Assign) -> None:
         lineno = _lineno(self, node)
         for target in node.targets:
-            if not isinstance(target.target, cst.Name):
+            assign_target = target.target
+            if m.matches(assign_target, m.Name("__all__")):
+                self._extend_exports_from_node(node.value)
                 continue
-            name = target.target.value
-            if name == "__all__":
-                self.exports.update(_literal_string_values(node.value))
-                continue
-            if name.startswith("_"):
-                continue
-            self.defs.append(DefEntry(kind="variable", name=name, lineno=lineno))
+            if isinstance(assign_target, cst.Name):
+                name = assign_target.value
+                if name.startswith("_"):
+                    continue
+                self.defs.append(DefEntry(kind="variable", name=name, lineno=lineno))
 
     def _handle_ann_assign(self, node: cst.AnnAssign) -> None:
         lineno = _lineno(self, node)
@@ -609,6 +622,19 @@ class _IndexVisitor(cst.CSTVisitor):
             if name == "__all__" or name.startswith("_"):
                 return
             self.defs.append(DefEntry(kind="variable", name=name, lineno=lineno))
+
+    def _extend_exports_from_node(self, value: cst.BaseExpression) -> None:
+        if isinstance(value, cst.BinaryOperation) and isinstance(value.operator, cst.Add):
+            self._extend_exports_from_node(value.left)
+            self._extend_exports_from_node(value.right)
+            return
+        if isinstance(value, cst.Call) and value.args:
+            func_expr = value.func
+            if isinstance(func_expr, cst.Name) and func_expr.value in {"list", "tuple", "set", "sorted"}:
+                self._extend_exports_from_node(value.args[0].value)
+                return
+        for literal in _literal_string_values(value):
+            self.exports.add(literal)
 
     @staticmethod
     def handle_module_node(
@@ -873,6 +899,32 @@ class _IndexVisitor(cst.CSTVisitor):
         if is_top_level:
             visitor._handle_ann_assign(cast("cst.AnnAssign", node))
 
+    @staticmethod
+    def handle_expr_node(visitor: _IndexVisitor, node: cst.CSTNode, *, is_top_level: bool) -> None:
+        if not is_top_level:
+            return
+        expr = cast("cst.Expr", node)
+        value = expr.value
+        if not isinstance(value, cst.Call) or not value.args:
+            return
+        func = value.func
+        if m.matches(func, m.Attribute(value=m.Name("__all__"), attr=m.Name("append"))):
+            literal = _string_literal_value(value.args[0].value)
+            if literal:
+                visitor.exports.add(literal)
+        elif m.matches(func, m.Attribute(value=m.Name("__all__"), attr=m.Name("extend"))):
+            visitor._extend_exports_from_node(value.args[0].value)
+
+    @staticmethod
+    def handle_aug_assign_node(
+        visitor: _IndexVisitor, node: cst.CSTNode, *, is_top_level: bool
+    ) -> None:
+        if not is_top_level:
+            return
+        aug = cast("cst.AugAssign", node)
+        if m.matches(aug.target, m.Name("__all__")):
+            visitor._extend_exports_from_node(aug.value)
+
     def _resolve_import_aliases(
         self, alias_nodes: Sequence[cst.ImportAlias]
     ) -> tuple[list[str], dict[str, str]]:
@@ -923,6 +975,8 @@ _IndexVisitor.NODE_HANDLERS = {
     cst.ClassDef: _IndexVisitor.handle_class_node,
     cst.Assign: _IndexVisitor.handle_assign_node,
     cst.AnnAssign: _IndexVisitor.handle_ann_assign_node,
+    cst.AugAssign: _IndexVisitor.handle_aug_assign_node,
+    cst.Expr: _IndexVisitor.handle_expr_node,
 }
 
 

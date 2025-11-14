@@ -8,7 +8,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 __all__ = ["RunLedger", "dated_run_dir", "ensure_ledger_root"]
 
@@ -50,9 +49,13 @@ def dated_run_dir(base_dir: Path | None, *, stamp: datetime | None = None) -> Pa
     return ensure_ledger_root(resolved_base / "telemetry" / "runs" / day)
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True, frozen=False)
 class RunLedger:
-    """Append-only JSONL ledger scoped to a single run."""
+    """Append-only JSONL ledger scoped to a single run.
+
+    Note: _handle is mutable to support lazy initialization of file handles.
+    All other fields remain immutable after construction.
+    """
 
     run_id: str
     session_id: str | None
@@ -84,7 +87,7 @@ class RunLedger:
         handle = path.open("a", encoding="utf-8")
         return cls(run_id=run_id, session_id=session_id, path=path, _handle=handle)
 
-    def append(self, record: Mapping[str, Any]) -> None:
+    def append(self, record: Mapping[str, object]) -> None:
         """Append a JSON record to the ledger."""
         handle = self._handle
         if handle is None:

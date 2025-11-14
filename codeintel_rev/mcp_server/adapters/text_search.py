@@ -455,6 +455,9 @@ def _fallback_grep(
         Case-sensitive search.
     max_results : int
         Maximum results.
+    telemetry_attrs : Mapping[str, object] | None, optional
+        Optional telemetry attributes to include in span context. These are
+        merged with stage-specific attributes for observability. Defaults to None.
 
     Returns
     -------
@@ -668,7 +671,24 @@ def _parse_ripgrep_output(
 
 
 def _preview_text(value: str, *, limit: int = 200) -> str:
-    """Return a truncated preview suitable for span attributes."""
+    """Return a truncated preview suitable for span attributes.
+
+    Parameters
+    ----------
+    value : str
+        Text string to truncate. Leading and trailing whitespace is stripped
+        before truncation.
+    limit : int, optional
+        Maximum length of the returned string. If the text exceeds this limit,
+        it is truncated and "..." is appended. Defaults to 200.
+
+    Returns
+    -------
+    str
+        Truncated text preview. If the original text (after stripping) is shorter
+        than the limit, returns the text unchanged. Otherwise, returns the
+        truncated text with "..." appended.
+    """
     text = value.strip()
     if len(text) <= limit:
         return text
@@ -676,7 +696,21 @@ def _preview_text(value: str, *, limit: int = 200) -> str:
 
 
 def _clean_attrs(attrs: Mapping[str, object]) -> dict[str, object]:
-    """Filter out ``None`` values to keep span attributes compact."""
+    """Filter out ``None`` values to keep span attributes compact.
+
+    Parameters
+    ----------
+    attrs : Mapping[str, object]
+        Dictionary of span attributes. May contain None values which will be
+        filtered out in the returned dictionary.
+
+    Returns
+    -------
+    dict[str, object]
+        Dictionary containing only non-None key-value pairs from the input.
+        Preserves the original key-value pairs, excluding any entries where
+        the value is None.
+    """
     return {key: value for key, value in attrs.items() if value is not None}
 
 

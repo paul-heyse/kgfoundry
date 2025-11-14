@@ -184,6 +184,7 @@ def _record_stage_latency(stage: str, duration_s: float) -> None:
     except ValueError:  # pragma: no cover - defensive attribute validation
         LOGGER.debug("Failed to record stage latency", exc_info=True)
 
+
 _SPAN_KINDS: dict[str, SpanKindType] = {
     "internal": cast("SpanKindType", SpanKind.INTERNAL),
     "server": cast("SpanKindType", SpanKind.SERVER),

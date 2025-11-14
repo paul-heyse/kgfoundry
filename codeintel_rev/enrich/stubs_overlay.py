@@ -21,10 +21,11 @@ class OverlayPolicy:
     include_public_defs: bool = True
     inject_module_getattr_any: bool = True
     when_star_imports: bool = True
-    when_has_all: bool = True
     when_type_errors: bool = False
     min_type_errors: int = 25
     max_overlays: int = 200
+    export_hub_threshold: int = 0
+    overlay_tag: str = "overlay-needed"
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +45,7 @@ class OverlayInputs:
     scip: SCIPIndex | None = None
     type_error_counts: Mapping[str, int] | None = None
     force: bool = False
+    overlay_tagged_paths: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,9 +70,10 @@ def generate_overlay_for_file(
     """Generate a .pyi overlay for ``py_file`` when it meets the policy gates.
 
     This function generates a type stub overlay (.pyi file) for a Python source
-    file when it meets the configured policy requirements (e.g., minimum type
-    errors, star imports, __all__ definitions). The function analyzes the source
-    file, checks policy gates, and generates the overlay if conditions are met.
+    file when it meets the configured policy requirements (e.g., star re-exports,
+    large ``__all__`` hubs, explicit overlay-needed tags, or type error thresholds).
+    The function analyzes the source file, checks policy gates, and generates the
+    overlay if conditions are met.
 
     Parameters
     ----------
@@ -84,9 +87,9 @@ def generate_overlay_for_file(
         overlay is written relative to this root.
     policy : OverlayPolicy
         Policy controlling when overlays are generated and how they are written.
-        Includes gates for star imports, __all__ definitions, and type error
-        thresholds. The policy determines whether an overlay should be generated
-        for the file.
+        Includes gates for star imports, export hubs, overlay-needed tags, and
+        optional type error thresholds. The policy determines whether an overlay
+        should be generated for the file.
     inputs : OverlayInputs | None, optional
         Optional bundle containing SCIP index, cached type error counts, and
         override flags (such as force). When omitted, defaults to OverlayInputs()
@@ -99,7 +102,7 @@ def generate_overlay_for_file(
         Metadata describing whether an overlay was created, including
         the destination path, creation reason, and resolved exports.
     """
-    ctx = inputs or OverlayInputs()
+    overlay_inputs = inputs or OverlayInputs()
     source = py_file if py_file.is_absolute() else package_root / py_file
     if not source.exists():
         return OverlayResult(
@@ -111,19 +114,26 @@ def generate_overlay_for_file(
 
     rel_key = _normalized_module_key(package_root, source)
     error_count = 0
-    if ctx.type_error_counts:
-        error_count = ctx.type_error_counts.get(rel_key, ctx.type_error_counts.get(str(source), 0))
+    if overlay_inputs.type_error_counts:
+        error_count = overlay_inputs.type_error_counts.get(
+            rel_key, overlay_inputs.type_error_counts.get(str(source), 0)
+        )
 
     module = index_module(str(source), source.read_text(encoding="utf-8", errors="ignore"))
 
     has_star = any(entry.is_star for entry in module.imports)
-    has_all = bool(module.exports)
-    eligibility_triggers = (
-        policy.when_star_imports and has_star,
-        policy.when_has_all and has_all and not module.defs,
-        policy.when_type_errors and (error_count >= policy.min_type_errors),
+    export_count = len(module.exports)
+    export_hub = policy.export_hub_threshold > 0 and export_count >= policy.export_hub_threshold
+    tagged_overlay = (
+        bool(policy.overlay_tag)
+        and bool(overlay_inputs.overlay_tagged_paths)
+        and rel_key in overlay_inputs.overlay_tagged_paths
     )
-    if not ctx.force and not any(eligibility_triggers):
+    type_error_trigger = policy.when_type_errors and (error_count >= policy.min_type_errors)
+    star_trigger = policy.when_star_imports and has_star
+    if not overlay_inputs.force and not (
+        star_trigger or export_hub or tagged_overlay or type_error_trigger
+    ):
         return OverlayResult(
             pyi_path=None,
             created=False,
@@ -132,10 +142,10 @@ def generate_overlay_for_file(
         )
 
     star_targets: MutableMapping[str, set[str]] = {}
-    if has_star and ctx.scip is not None:
+    if has_star and overlay_inputs.scip is not None:
         for entry in module.imports:
             if entry.is_star and entry.module:
-                names = _collect_star_reexports(ctx.scip, entry)
+                names = _collect_star_reexports(overlay_inputs.scip, entry)
                 if names:
                     star_targets[entry.module] = names
 
@@ -166,7 +176,7 @@ def generate_overlay_for_file(
             "parse_ok": module.parse_ok,
             "errors": module.errors,
             "type_errors": error_count,
-            "forced": ctx.force,
+            "forced": overlay_inputs.force,
         },
     )
 

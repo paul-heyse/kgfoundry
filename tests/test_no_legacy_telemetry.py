@@ -1,37 +1,62 @@
-"""Regression test ensuring legacy telemetry shims stay removed."""
+"""Regression tests to prevent legacy telemetry imports."""
 
 from __future__ import annotations
 
 import ast
-from pathlib import Path
+import pathlib
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-CODE_ROOT = PROJECT_ROOT / "codeintel_rev"
+ROOT = pathlib.Path(__file__).resolve().parents[1] / "codeintel_rev"
 
 
-def _python_files() -> list[Path]:
-    files: list[Path] = []
-    for path in CODE_ROOT.rglob("*.py"):
-        # Observability metrics is the only module that may touch prometheus_client
-        if path.name == "metrics.py" and "observability" in path.parts:
+def _python_files() -> list[pathlib.Path]:
+    """Return all Python files in codeintel_rev, excluding observability/metrics.py.
+
+    Returns
+    -------
+    list[pathlib.Path]
+        Python file paths in the codeintel_rev directory.
+    """
+    files: list[pathlib.Path] = []
+    for p in ROOT.rglob("*.py"):
+        if "observability/metrics.py" in str(p):
+            continue  # allowed to import prometheus_client.start_http_server
+        if "__pycache__" in str(p):
             continue
-        files.append(path)
+        files.append(p)
     return files
 
 
-def test_no_legacy_prometheus_client_imports() -> None:
-    """Ensure telemetry.prom and prometheus_client are no longer imported."""
+def test_no_legacy_prometheus_client_imports():
+    """Verify no files import prometheus_client or telemetry.prom."""
     banned = {"prometheus_client", "codeintel_rev.telemetry.prom"}
-    offenders: list[tuple[Path, str]] = []
-    for file_path in _python_files():
-        tree = ast.parse(file_path.read_text(encoding="utf-8"))
+    offenders: list[tuple[pathlib.Path, str]] = []
+    for py in _python_files():
+        try:
+            tree = ast.parse(py.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError):
+            continue
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name in banned:
-                        offenders.append((file_path, alias.name))
+                offenders.extend((py, n.name) for n in node.names if n.name in banned)
             elif isinstance(node, ast.ImportFrom):
-                module_name = node.module or ""
-                if module_name in banned:
-                    offenders.append((file_path, module_name))
+                mod = node.module or ""
+                if mod in banned:
+                    offenders.append((py, mod))
     assert not offenders, f"Legacy telemetry imports found: {offenders}"
+
+
+def test_no_legacy_telemetry_otel_imports():
+    """Verify no files import telemetry.otel (should use observability.otel)."""
+    banned = {"codeintel_rev.telemetry.otel"}
+    offenders = []
+    for py in _python_files():
+        try:
+            tree = ast.parse(py.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError):
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                mod = node.module or ""
+                if mod in banned:
+                    offenders.append((py, mod))
+    assert not offenders, f"Legacy telemetry.otel imports found: {offenders}"

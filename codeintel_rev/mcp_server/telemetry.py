@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 
 from codeintel_rev.app.middleware import get_capability_stamp, get_session_id
+from codeintel_rev.metrics.registry import MCP_REQUEST_LATENCY_SECONDS
 from codeintel_rev.observability.ledger import RunLedger, dated_run_dir
 from codeintel_rev.observability.otel import record_span_event
 from codeintel_rev.observability.reporting import render_run_report
@@ -15,7 +16,6 @@ from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.observability.timeline import Timeline, current_or_new_timeline
 from codeintel_rev.telemetry.context import telemetry_context
 from codeintel_rev.telemetry.decorators import span_context
-from codeintel_rev.metrics.registry import MCP_REQUEST_LATENCY_SECONDS
 from codeintel_rev.telemetry.reporter import finalize_run, start_run
 from kgfoundry_common.logging import get_logger
 

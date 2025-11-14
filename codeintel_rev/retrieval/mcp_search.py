@@ -459,7 +459,9 @@ def run_search(*, request: SearchRequest, deps: SearchDependencies) -> SearchRes
             )
             annotations = cast(
                 "Mapping[int, StructureAnnotations]",
-                deps.catalog.get_structure_annotations(tuple(chunk_rows.keys())) if chunk_rows else {},
+                deps.catalog.get_structure_annotations(tuple(chunk_rows.keys()))
+                if chunk_rows
+                else {},
             )
         hyd_elapsed = perf_counter() - hyd_start
         hydration_bundle = HydrationPayload(rows=chunk_rows, annotations=annotations)

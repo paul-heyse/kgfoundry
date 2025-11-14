@@ -782,9 +782,7 @@ def build_run_report_v2(
         for event in record.structured_events
     ]
     budgets = _budgets_from_timeline(timeline_entries, record.structured_events)
-    stopped_because = record.stop_reason or (
-        f"stage:{stopped_after}" if stopped_after else None
-    )
+    stopped_because = record.stop_reason or (f"stage:{stopped_after}" if stopped_after else None)
     span_attributes: dict[str, object] = {
         Attrs.MCP_SESSION_ID: record.session_id,
         Attrs.MCP_RUN_ID: record.run_id,
@@ -1050,6 +1048,106 @@ def render_markdown(report: RunReport) -> str:
     return "\n".join(lines)
 
 
+def _format_markdown_header(report: RunReportV2) -> list[str]:
+    """Format report header section.
+
+    Parameters
+    ----------
+    report : RunReportV2
+        Report to format.
+
+    Returns
+    -------
+    list[str]
+        Header lines.
+    """
+    lines = [
+        f"# Run {report.run_id}",
+        f"- Tool: {report.tool or 'n/a'}",
+        f"- Trace ID: {report.trace_id or 'n/a'}",
+        f"- Session ID: {report.session_id or 'n/a'}",
+    ]
+    if report.stopped_because:
+        lines.append(f"- Stopped because: {report.stopped_because}")
+    elif report.stopped_after_stage:
+        lines.append(f"- Stopped after stage: `{report.stopped_after_stage}`")
+    return lines
+
+
+def _format_markdown_stages(report: RunReportV2) -> list[str]:
+    """Format stages section.
+
+    Parameters
+    ----------
+    report : RunReportV2
+        Report to format.
+
+    Returns
+    -------
+    list[str]
+        Stage lines.
+    """
+    lines = ["", "## Stages"]
+    for stage in report.stages:
+        detail_suffix = f" — {stage.detail}" if stage.detail else ""
+        duration_suffix = (
+            f" ({stage.duration_ms:.2f} ms)" if isinstance(stage.duration_ms, (int, float)) else ""
+        )
+        lines.append(f"- **{stage.name}**: {stage.status}{detail_suffix}{duration_suffix}")
+    return lines
+
+
+def _format_markdown_timeline(report: RunReportV2) -> list[str]:
+    """Format timeline section.
+
+    Parameters
+    ----------
+    report : RunReportV2
+        Report to format.
+
+    Returns
+    -------
+    list[str]
+        Timeline lines.
+    """
+    if not report.timeline:
+        return []
+    lines = ["", "## Timeline"]
+    for entry in report.timeline:
+        timestamp = entry.get("ts")
+        ts_display = f"{timestamp:.3f}s" if isinstance(timestamp, (int, float)) else str(timestamp)
+        entry_type = entry.get("type", "unknown")
+        entry_name = entry.get("name", "unknown")
+        entry_status = entry.get("status", "unknown")
+        lines.append(f"- [{ts_display}] {entry_type} `{entry_name}` → {entry_status}")
+    return lines
+
+
+def _format_markdown_events(report: RunReportV2) -> list[str]:
+    """Format discrete events section.
+
+    Parameters
+    ----------
+    report : RunReportV2
+        Report to format.
+
+    Returns
+    -------
+    list[str]
+        Event lines.
+    """
+    if not report.events:
+        return []
+    lines = ["", "## Discrete Events"]
+    for event in report.events:
+        kind = event.get("kind", "unknown")
+        status = event.get("status", "unknown")
+        payload = event.get("payload")
+        payload_suffix = f" payload={payload}" if payload else ""
+        lines.append(f"- {kind} ({status}){payload_suffix}".strip())
+    return lines
+
+
 def render_markdown_v2(report: RunReportV2) -> str:
     """Render a RunReportV2 payload as Markdown text.
 
@@ -1068,16 +1166,7 @@ def render_markdown_v2(report: RunReportV2) -> str:
         Markdown-formatted representation of the V2 report including run ID,
         trace ID, session ID, stage summaries, and warnings.
     """
-    lines = [
-        f"# Run {report.run_id}",
-        f"- Tool: {report.tool or 'n/a'}",
-        f"- Trace ID: {report.trace_id or 'n/a'}",
-        f"- Session ID: {report.session_id or 'n/a'}",
-    ]
-    if report.stopped_because:
-        lines.append(f"- Stopped because: {report.stopped_because}")
-    elif report.stopped_after_stage:
-        lines.append(f"- Stopped after stage: `{report.stopped_after_stage}`")
+    lines = _format_markdown_header(report)
     if report.budgets:
         lines.extend(
             [
@@ -1088,32 +1177,9 @@ def render_markdown_v2(report: RunReportV2) -> str:
                 "```",
             ]
         )
-    lines.append("")
-    lines.append("## Stages")
-    for stage in report.stages:
-        detail_suffix = f" — {stage.detail}" if stage.detail else ""
-        duration_suffix = (
-            f" ({stage.duration_ms:.2f} ms)" if isinstance(stage.duration_ms, (int, float)) else ""
-        )
-        lines.append(f"- **{stage.name}**: {stage.status}{detail_suffix}{duration_suffix}")
-    if report.timeline:
-        lines.append("")
-        lines.append("## Timeline")
-        for entry in report.timeline:
-            timestamp = entry.get("ts")
-            ts_display = f"{timestamp:.3f}s" if isinstance(timestamp, (int, float)) else timestamp
-            lines.append(
-                f"- [{ts_display}] {entry.get('type')} `{entry.get('name')}` → {entry.get('status')}"
-            )
-    if report.events:
-        lines.append("")
-        lines.append("## Discrete Events")
-        for event in report.events:
-            payload = event.get("payload")
-            payload_suffix = f" payload={payload}" if payload else ""
-            lines.append(
-                f"- {event.get('kind')} ({event.get('status')}){payload_suffix}".strip()
-            )
+    lines.extend(_format_markdown_stages(report))
+    lines.extend(_format_markdown_timeline(report))
+    lines.extend(_format_markdown_events(report))
     if report.warnings:
         lines.append("")
         lines.append("## Warnings")

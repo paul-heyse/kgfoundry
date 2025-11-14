@@ -40,6 +40,7 @@ from codeintel_rev.metrics.registry import (
     FAISS_SEARCH_ERRORS_TOTAL,
     FAISS_SEARCH_LAST_K,
     FAISS_SEARCH_LAST_MS,
+    FAISS_SEARCH_LATENCY_SECONDS,
     FAISS_SEARCH_NPROBE,
     FAISS_SEARCH_TOTAL,
     HNSW_SEARCH_EF,
@@ -52,7 +53,6 @@ from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.retrieval.rerank_flat import FlatReranker
 from codeintel_rev.retrieval.types import SearchHit
 from codeintel_rev.telemetry.decorators import span_context
-from codeintel_rev.metrics.registry import FAISS_SEARCH_LATENCY_SECONDS
 from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from codeintel_rev.typing import NDArrayF32, NDArrayI64, gate_import
 from kgfoundry_common.errors import VectorSearchError

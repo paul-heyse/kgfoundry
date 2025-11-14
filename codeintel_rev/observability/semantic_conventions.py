@@ -102,6 +102,10 @@ class Attrs:
     RUN_LEDGER_PATH: str = "codeintel.run.ledger_path"
     TRACE_ID: str = "codeintel.trace.id"
 
+    # Request/session (additional)  # noqa: ERA001
+    REQUEST_SCOPE: str = "request.scope"
+    REQUEST_CONTROLS: str = "request.controls"
+
 
 def as_kv(**attrs: object) -> dict[str, object]:
     """Return a dict filtered to values that are not ``None``.
