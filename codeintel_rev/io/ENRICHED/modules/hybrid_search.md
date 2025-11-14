@@ -56,15 +56,15 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 
 - **fan_in**: 5
 - **fan_out**: 18
-- **cycle_group**: 78
+- **cycle_group**: 43
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 24
-- recent churn 90: 24
+- recent churn 30: 26
+- recent churn 90: 26
 
 ## Usage
 

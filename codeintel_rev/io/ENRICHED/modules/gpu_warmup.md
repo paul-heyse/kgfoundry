@@ -33,7 +33,7 @@ GPU is reachable and functional before expensive operations begin.
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 81
+- **cycle_group**: 44
 
 ## Ownership
 

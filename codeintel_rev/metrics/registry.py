@@ -138,6 +138,76 @@ MCP_SEARCH_RERANK_LATENCY_MS = build_histogram(
     "Latency of the rerank/exact scoring stage during MCP search.",
 )
 
+# MCP server + adapter telemetry
+MCP_RUNS_TOTAL = build_counter(
+    "mcp_runs_total",
+    "Total MCP runs grouped by tool and status.",
+    labelnames=("tool", "status"),
+)
+
+MCP_RUN_ERRORS_TOTAL = build_counter(
+    "mcp_run_errors_total",
+    "Run errors grouped by tool and error code.",
+    labelnames=("tool", "error_code"),
+)
+
+MCP_REQUEST_LATENCY_SECONDS = build_histogram(
+    "mcp_request_latency_seconds",
+    "Per-request latency histogram for MCP tools.",
+    labelnames=("tool", "status"),
+    buckets=(0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0),
+)
+
+MCP_STAGE_LATENCY_SECONDS = build_histogram(
+    "mcp_stage_latency_seconds",
+    "Latency per retrieval stage within MCP runs.",
+    labelnames=("stage",),
+    buckets=(0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1.0),
+)
+
+# Embedding + ANN metrics
+EMBED_BATCH_SIZE = build_histogram(
+    "mcp_embed_batch_size",
+    "Observed embedding batch sizes.",
+    buckets=(1, 2, 4, 8, 16, 32, 64, 128, 256),
+)
+
+EMBED_LATENCY_SECONDS = build_histogram(
+    "mcp_embed_latency_seconds",
+    "Latency of vLLM embed_batch invocations.",
+    buckets=(0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10),
+)
+
+FAISS_SEARCH_LATENCY_SECONDS = build_histogram(
+    "mcp_faiss_search_latency_seconds",
+    "Latency of FAISS ANN searches.",
+    buckets=(0.001, 0.005, 0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1, 2),
+)
+
+XTR_SEARCH_LATENCY_SECONDS = build_histogram(
+    "mcp_xtr_search_latency_seconds",
+    "Latency of XTR search/rescore phases.",
+    buckets=(0.005, 0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1, 2),
+)
+
+GATING_DECISIONS_TOTAL = build_counter(
+    "mcp_gating_decisions_total",
+    "Count of gating/budgeting decisions.",
+    labelnames=("klass", "rm3_enabled"),
+)
+
+GATING_RRF_K = build_histogram(
+    "mcp_rrf_k",
+    "Distribution of RRF k decisions.",
+    buckets=(10, 25, 50, 75, 100, 150, 200, 300, 500),
+)
+
+GATING_QUERY_AMBIGUITY = build_histogram(
+    "mcp_query_ambiguity",
+    "Distribution of query ambiguity scores.",
+    buckets=(0.0, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.7, 1.0),
+)
+
 
 def _stable_u32(value: str) -> int:
     """Return a deterministic 32-bit hash for the provided string.
@@ -184,6 +254,8 @@ def set_compile_flags_id(flags: str) -> None:
 
 
 __all__ = [
+    "EMBED_BATCH_SIZE",
+    "EMBED_LATENCY_SECONDS",
     "FAISS_ANN_LATENCY_SECONDS",
     "FAISS_BUILD_SECONDS_LAST",
     "FAISS_BUILD_TOTAL",
@@ -197,23 +269,31 @@ __all__ = [
     "FAISS_POSTFILTER_DENSITY",
     "FAISS_REFINE_KEPT_RATIO",
     "FAISS_REFINE_LATENCY_SECONDS",
+    "FAISS_SEARCH_LATENCY_SECONDS",
     "FAISS_SEARCH_ERRORS_TOTAL",
     "FAISS_SEARCH_LAST_K",
     "FAISS_SEARCH_LAST_MS",
     "FAISS_SEARCH_NPROBE",
     "FAISS_SEARCH_TOTAL",
+    "GATING_DECISIONS_TOTAL",
+    "GATING_QUERY_AMBIGUITY",
+    "GATING_RRF_K",
     "GPU_AVAILABLE",
     "GPU_TEMP_SCRATCH_BYTES",
     "HITS_ABOVE_THRESH",
     "HNSW_SEARCH_EF",
     "HYBRID_LAST_MS",
     "HYBRID_RETRIEVE_TOTAL",
+    "MCP_REQUEST_LATENCY_SECONDS",
     "MCP_FETCH_LATENCY_SECONDS",
     "MCP_SEARCH_ANN_LATENCY_MS",
     "MCP_SEARCH_HYDRATION_LATENCY_MS",
     "MCP_SEARCH_LATENCY_SECONDS",
     "MCP_SEARCH_POSTFILTER_DENSITY",
     "MCP_SEARCH_RERANK_LATENCY_MS",
+    "MCP_STAGE_LATENCY_SECONDS",
+    "MCP_RUN_ERRORS_TOTAL",
+    "MCP_RUNS_TOTAL",
     "OFFLINE_EVAL_QUERY_COUNT",
     "OFFLINE_EVAL_RECALL_AT_K",
     "POOL_SHARE_BM25",
@@ -225,6 +305,7 @@ __all__ = [
     "SCIP_CHUNK_COVERAGE_RATIO",
     "SCIP_INDEX_COVERAGE_RATIO",
     "SCIP_RETRIEVAL_COVERAGE_RATIO",
+    "XTR_SEARCH_LATENCY_SECONDS",
     "set_compile_flags_id",
     "set_factory_id",
 ]

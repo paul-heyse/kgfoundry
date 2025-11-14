@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
@@ -27,14 +28,14 @@ class ImportGraph:
 
 
 def build_import_graph(
-    rows: list[dict[str, Any]],
+    rows: Sequence[Mapping[str, Any]],
     package_prefix: str | None = None,
 ) -> ImportGraph:
     """Build an import graph across repo modules.
 
     Parameters
     ----------
-    rows : list[dict[str, Any]]
+    rows : Sequence[Mapping[str, Any]]
         Module metadata rows containing import information.
     package_prefix : str | None, optional
         Optional package prefix for module name normalization.

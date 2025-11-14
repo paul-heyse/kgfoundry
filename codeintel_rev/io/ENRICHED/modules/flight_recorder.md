@@ -48,15 +48,15 @@ Trace-anchored flight recorder that mirrors run execution timelines.
 
 - **fan_in**: 3
 - **fan_out**: 2
-- **cycle_group**: 45
+- **cycle_group**: 8
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 4
+- recent churn 90: 4
 
 ## Usage
 

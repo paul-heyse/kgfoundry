@@ -28,7 +28,7 @@ Config awareness helpers (YAML/TOML/JSON/Markdown).
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 7
+- **cycle_group**: 89
 
 ## Ownership
 

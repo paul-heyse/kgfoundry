@@ -1,34 +1,32 @@
-# mcp_server/registry.py
+# plugins/registry.py
 
 ## Docstring
 
 ```
-In-process registry for the lightweight MCP testing harness.
+Entry-point driven registry for retrieval channels.
 ```
 
 ## Imports
 
 - from **__future__** import annotations
-- from **collections.abc** import Callable
-- from **dataclasses** import dataclass
-- from **typing** import Any
-- from **(absolute)** import msgspec
-- from **codeintel_rev.mcp_server.fetch_tool** import handle_fetch
-- from **codeintel_rev.mcp_server.search_tool** import SearchDeps, handle_search
-- from **codeintel_rev.mcp_server.types** import FetchOutput, fetch_input_schema, fetch_output_schema, search_input_schema, search_output_schema
+- from **collections.abc** import Callable, Iterable, Sequence
+- from **importlib.metadata** import EntryPoint, entry_points
+- from **typing** import cast
+- from **codeintel_rev.plugins.channels** import Channel, ChannelContext
+- from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- class: `McpDeps` (line 23)
-- function: `list_tools` (line 31)
-- function: `call_tool` (line 55)
-- function: `_error_response` (line 99)
+- variable: `LOGGER` (line 12)
+- class: `ChannelRegistry` (line 19)
+- function: `_iter_entry_points` (line 113)
+- function: `_load_factory` (line 140)
 
 ## Graph Metrics
 
 - **fan_in**: 1
-- **fan_out**: 4
-- **cycle_group**: 129
+- **fan_out**: 2
+- **cycle_group**: 43
 
 ## Ownership
 
@@ -43,9 +41,13 @@ In-process registry for the lightweight MCP testing harness.
 - used by files: 0
 - used by symbols: 0
 
+## Declared Exports (__all__)
+
+ChannelRegistry
+
 ## Doc Health
 
-- **summary**: In-process registry for the lightweight MCP testing harness.
+- **summary**: Entry-point driven registry for retrieval channels.
 - has summary: yes
 - param parity: yes
 - examples present: no
@@ -64,7 +66,7 @@ In-process registry for the lightweight MCP testing harness.
 
 ## Hotspot
 
-- score: 1.89
+- score: 1.79
 
 ## Side Effects
 
@@ -72,17 +74,16 @@ In-process registry for the lightweight MCP testing harness.
 
 ## Complexity
 
-- branches: 6
-- cyclomatic: 7
-- loc: 118
+- branches: 8
+- cyclomatic: 9
+- loc: 178
 
 ## Doc Coverage
 
-- `McpDeps` (class): summary=yes, examples=no — Dependencies required for running the lightweight MCP tools.
-- `list_tools` (function): summary=yes, params=ok, examples=no — Return tool metadata compatible with MCP /tools/list responses.
-- `call_tool` (function): summary=yes, params=ok, examples=no — Execute a tool using the provided dependencies.
-- `_error_response` (function): summary=yes, params=ok, examples=no — Build an MCP-compatible error response envelope.
+- `ChannelRegistry` (class): summary=yes, examples=no — Registry that discovers channel plugins via Python entry points.
+- `_iter_entry_points` (function): summary=yes, params=ok, examples=no — Return entry points for the channel group across Python versions.
+- `_load_factory` (function): summary=yes, params=ok, examples=no — Return a callable factory if the entry point loads successfully.
 
 ## Tags
 
-low-coverage
+low-coverage, public-api

@@ -54,7 +54,8 @@ class Attrs:
     RECENCY_BOOSTED: str = "retrieval.recency_boosted"
 
     # FAISS / ANN
-    FAISS_INDEX_TYPE: str = "faiss.index_type"
+    FAISS_INDEX_KIND: str = "faiss.index_kind"
+    FAISS_INDEX_TYPE: str = FAISS_INDEX_KIND
     FAISS_METRIC: str = "faiss.metric"
     FAISS_DIM: str = "faiss.dim"
     FAISS_TOP_K: str = "faiss.k"
@@ -79,8 +80,11 @@ class Attrs:
     XTR_CANDIDATES: str = "xtr.candidates"
 
     # Git utilities
-    GIT_COMMAND: str = "git.command"
+    GIT_OPERATION: str = "git.op"
+    GIT_COMMAND: str = GIT_OPERATION
+    GIT_PATH: str = "git.path"
     FILE_PATH: str = "file.path"
+    GIT_LINE_RANGE: str = "git.line_range"
     LINE_START: str = "line.start"
     LINE_END: str = "line.end"
     LINE_LIMIT: str = "limit"

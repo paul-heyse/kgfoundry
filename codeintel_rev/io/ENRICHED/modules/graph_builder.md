@@ -1,44 +1,54 @@
-# enrich/graph_builder.py
+# graph_builder.py
 
 ## Docstring
 
 ```
-Re-export graph builder utilities within the enrich package.
+Import graph builder utilities.
 ```
 
 ## Imports
 
 - from **__future__** import annotations
-- from **codeintel_rev.graph_builder** import ImportGraph, build_import_graph, write_import_graph
+- from **collections.abc** import Mapping, Sequence
+- from **dataclasses** import dataclass
+- from **pathlib** import Path
+- from **typing** import Any, cast
+- from **codeintel_rev.module_utils** import import_targets_for_entry, module_name_candidates, normalize_module_name
+- from **codeintel_rev.polars_support** import resolve_polars_frame_factory
+- from **codeintel_rev.typing** import PolarsModule, gate_import
+
+## Definitions
+
+- class: `ImportGraph` (line 21)
+- function: `build_import_graph` (line 30)
+- function: `write_import_graph` (line 85)
+- function: `_tarjan_scc` (line 102)
+- function: `_write_parquet` (line 164)
 
 ## Graph Metrics
 
 - **fan_in**: 1
-- **fan_out**: 1
-- **cycle_group**: 11
+- **fan_out**: 3
+- **cycle_group**: 87
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 1
-- recent churn 90: 1
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 
 - used by files: 0
 - used by symbols: 0
 
-## Declared Exports (__all__)
-
-ImportGraph, build_import_graph, write_import_graph
-
 ## Doc Health
 
-- **summary**: Re-export graph builder utilities within the enrich package.
+- **summary**: Import graph builder utilities.
 - has summary: yes
-- param parity: yes
+- param parity: no
 - examples present: no
 
 ## Typedness
@@ -53,26 +63,28 @@ ImportGraph, build_import_graph, write_import_graph
 - lines covered: 0.00%
 - defs covered: 0.00%
 
-## Config References
-
-- enrich/tagging_rules.yaml
-- enrich/PLAYBOOK.md
-- enrich/README.md
-
 ## Hotspot
 
-- score: 1.19
+- score: 2.19
 
 ## Side Effects
 
-- none detected
+- filesystem
 
 ## Complexity
 
-- branches: 0
-- cyclomatic: 1
-- loc: 13
+- branches: 26
+- cyclomatic: 27
+- loc: 189
+
+## Doc Coverage
+
+- `ImportGraph` (class): summary=yes, examples=no — Graph representation of intra-repo imports.
+- `build_import_graph` (function): summary=yes, params=ok, examples=no — Build an import graph across repo modules.
+- `write_import_graph` (function): summary=yes, params=mismatch, examples=no — Write import edges to Parquet (or JSONL fallback).
+- `_tarjan_scc` (function): summary=no, examples=no
+- `_write_parquet` (function): summary=yes, params=ok, examples=no — Persist records to Parquet via polars when available.
 
 ## Tags
 
-low-coverage, public-api
+low-coverage

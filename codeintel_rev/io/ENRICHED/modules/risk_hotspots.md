@@ -10,6 +10,7 @@ Hotspot scoring utilities.
 
 - from **__future__** import annotations
 - from **(absolute)** import math
+- from **collections.abc** import Mapping
 - from **functools** import lru_cache
 - from **pathlib** import Path
 - from **typing** import TYPE_CHECKING, Any
@@ -20,19 +21,19 @@ Hotspot scoring utilities.
 
 ## Definitions
 
-- variable: `LOGGER` (line 13)
-- variable: `GitError` (line 20)
-- variable: `GitRepoType` (line 25)
-- function: `compute_hotspot_score` (line 28)
-- function: `_git_churn` (line 60)
-- function: `_open_repo` (line 95)
-- function: `_repo_root` (line 114)
+- variable: `LOGGER` (line 14)
+- variable: `GitError` (line 21)
+- variable: `GitRepoType` (line 26)
+- function: `compute_hotspot_score` (line 29)
+- function: `_git_churn` (line 63)
+- function: `_open_repo` (line 98)
+- function: `_repo_root` (line 117)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 1
+- **cycle_group**: 83
 
 ## Ownership
 
@@ -68,7 +69,7 @@ Hotspot scoring utilities.
 
 ## Hotspot
 
-- score: 1.80
+- score: 1.82
 
 ## Side Effects
 
@@ -76,9 +77,9 @@ Hotspot scoring utilities.
 
 ## Complexity
 
-- branches: 13
-- cyclomatic: 14
-- loc: 123
+- branches: 14
+- cyclomatic: 15
+- loc: 126
 
 ## Doc Coverage
 

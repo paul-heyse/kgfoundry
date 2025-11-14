@@ -14,7 +14,7 @@ from codeintel_rev.config.settings import XTRConfig
 from codeintel_rev.observability.otel import as_span
 from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.runtime import RuntimeCell
-from codeintel_rev.telemetry.prom import XTR_SEARCH_LATENCY_SECONDS
+from codeintel_rev.metrics.registry import XTR_SEARCH_LATENCY_SECONDS
 from codeintel_rev.typing import NDArrayF32, TorchModule, gate_import
 from kgfoundry_common.logging import get_logger
 

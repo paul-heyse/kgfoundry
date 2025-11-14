@@ -167,14 +167,22 @@ else:  # pragma: no cover - annotations only
     StatusType = Status
     StatusCodeType = StatusCode
 
+from codeintel_rev.metrics.registry import MCP_STAGE_LATENCY_SECONDS
 from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.telemetry import steps as telemetry_steps
 from codeintel_rev.telemetry.context import attach_context_attrs, set_request_stage
-from codeintel_rev.telemetry.prom import record_stage_latency
 
 LOGGER = logging.getLogger(__name__)
 
 F = TypeVar("F", bound=Callable[..., object])
+
+
+def _record_stage_latency(stage: str, duration_s: float) -> None:
+    """Record latency for a retrieval stage."""
+    try:
+        MCP_STAGE_LATENCY_SECONDS.labels(stage=stage).observe(duration_s)
+    except ValueError:  # pragma: no cover - defensive attribute validation
+        LOGGER.debug("Failed to record stage latency", exc_info=True)
 
 _SPAN_KINDS: dict[str, SpanKindType] = {
     "internal": cast("SpanKindType", SpanKind.INTERNAL),
@@ -456,7 +464,7 @@ def span_context(
                 _emit_checkpoint(stage, ok=True, reason=None, attrs=telemetry_attrs)
         finally:
             if stage_start is not None and stage is not None:
-                record_stage_latency(stage, perf_counter() - stage_start)
+                _record_stage_latency(stage, perf_counter() - stage_start)
 
 
 def trace_span(

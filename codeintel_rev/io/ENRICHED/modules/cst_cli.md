@@ -34,7 +34,7 @@ CLI entrypoint for CST dataset builds.
 
 - **fan_in**: 0
 - **fan_out**: 4
-- **cycle_group**: 32
+- **cycle_group**: 114
 
 ## Ownership
 

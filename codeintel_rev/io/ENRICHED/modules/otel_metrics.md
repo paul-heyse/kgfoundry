@@ -12,35 +12,37 @@ Compatibility layer exposing Prometheus-like helpers backed by OpenTelemetry.
 - from **collections.abc** import Mapping, Sequence
 - from **dataclasses** import dataclass
 - from **threading** import Lock
+- from **typing** import cast
 - from **opentelemetry** import metrics
-- from **opentelemetry.metrics** import CallbackOptions, Observation
+- from **opentelemetry.metrics** import CallbackOptions, Counter, Histogram, Observation
+- from **opentelemetry.util.types** import Attributes
 
 ## Definitions
 
-- class: `CounterHandle` (line 24)
-- class: `HistogramHandle` (line 38)
-- class: `CounterLike` (line 52)
-- class: `HistogramLike` (line 95)
-- class: `_GaugeEntry` (line 147)
-- class: `GaugeHandle` (line 152)
-- class: `GaugeLike` (line 166)
-- function: `build_counter` (line 263)
-- function: `build_histogram` (line 278)
-- function: `build_gauge` (line 302)
+- class: `CounterHandle` (line 26)
+- class: `HistogramHandle` (line 40)
+- class: `CounterLike` (line 54)
+- class: `HistogramLike` (line 98)
+- class: `_GaugeEntry` (line 151)
+- class: `GaugeHandle` (line 156)
+- class: `GaugeLike` (line 170)
+- function: `build_counter` (line 271)
+- function: `build_histogram` (line 286)
+- function: `build_gauge` (line 310)
 
 ## Graph Metrics
 
 - **fan_in**: 10
-- **fan_out**: 0
-- **cycle_group**: 39
+- **fan_out**: 1
+- **cycle_group**: 4
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 1
-- recent churn 90: 1
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 
@@ -72,7 +74,7 @@ CounterLike, GaugeLike, HistogramLike, build_counter, build_gauge, build_histogr
 
 ## Hotspot
 
-- score: 2.42
+- score: 2.47
 
 ## Side Effects
 
@@ -80,9 +82,9 @@ CounterLike, GaugeLike, HistogramLike, build_counter, build_gauge, build_histogr
 
 ## Complexity
 
-- branches: 19
-- cyclomatic: 20
-- loc: 322
+- branches: 20
+- cyclomatic: 21
+- loc: 330
 
 ## Doc Coverage
 

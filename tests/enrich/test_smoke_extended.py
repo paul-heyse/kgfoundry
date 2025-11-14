@@ -126,6 +126,33 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     return records
 
 
+def _assert_duckdb_ingest(
+    runner: CliRunner,
+    modules_jsonl: Path,
+    db_path: Path,
+    expected_count: int,
+) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "to-duckdb",
+            "--modules-jsonl",
+            str(modules_jsonl),
+            "--db",
+            str(db_path),
+        ],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0, result.output
+    import duckdb
+
+    with duckdb.connect(str(db_path)) as con:
+        result_row = con.execute("SELECT COUNT(*) FROM modules").fetchone()
+    assert result_row is not None
+    (count,) = result_row
+    assert count == expected_count
+
+
 def test_cli_enrich_emits_extended_artifacts(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -139,7 +166,6 @@ def test_cli_enrich_emits_extended_artifacts(tmp_path: Path) -> None:
     result = runner.invoke(
         app,
         [
-            "all",
             "--root",
             str(repo_root),
             "--scip",
@@ -152,6 +178,7 @@ def test_cli_enrich_emits_extended_artifacts(tmp_path: Path) -> None:
             "public-api",
             "--max-file-bytes",
             "8192",
+            "all",
         ],
         catch_exceptions=False,
     )
@@ -167,6 +194,10 @@ def test_cli_enrich_emits_extended_artifacts(tmp_path: Path) -> None:
     assert str(alpha_row.get("path", "")).endswith("alpha.py")
     assert "recent_churn_30" in alpha_row
 
+    repo_map = json.loads((out_dir / "repo_map.json").read_text(encoding="utf-8"))
+    assert repo_map["module_count"] == len(module_rows)
+    assert repo_map["tag_counts"]
+
     ownership_parquet = out_dir / "analytics" / "ownership.parquet"
     fallback_jsonl = ownership_parquet.with_suffix(".parquet.jsonl")
     assert ownership_parquet.exists() or fallback_jsonl.exists()
@@ -181,3 +212,15 @@ def test_cli_enrich_emits_extended_artifacts(tmp_path: Path) -> None:
     graphs_dir = out_dir / "graphs"
     assert (graphs_dir / "imports.parquet").exists()
     assert (graphs_dir / "uses.parquet").exists()
+
+    try:
+        __import__("duckdb")
+    except ModuleNotFoundError:  # pragma: no cover - duckdb optional
+        return
+    db_path = out_dir / "enrich.duckdb"
+    _assert_duckdb_ingest(
+        runner=runner,
+        modules_jsonl=out_dir / "modules" / "modules.jsonl",
+        db_path=db_path,
+        expected_count=len(module_rows),
+    )

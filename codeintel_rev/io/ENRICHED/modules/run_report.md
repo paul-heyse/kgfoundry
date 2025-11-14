@@ -26,7 +26,7 @@ Utilities for composing run reports from JSONL ledgers.
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 35
+- **cycle_group**: 58
 
 ## Ownership
 

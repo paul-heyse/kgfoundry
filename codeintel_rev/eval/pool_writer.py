@@ -172,10 +172,7 @@ def write_pool(rows: Iterable[SearchPoolRow], out_path: Path, *, overwrite: bool
         pq.write_table(_empty_table(), out_path, compression="zstd")
         return 0
 
-    normalized_meta = [
-        _normalize_meta(row.meta) if row.meta else {}
-        for row in materialized
-    ]
+    normalized_meta = [_normalize_meta(row.meta) if row.meta else {} for row in materialized]
     meta_payloads = [json.dumps(meta, sort_keys=True) if meta else "{}" for meta in normalized_meta]
     uris: list[str] = []
     symbol_hits: list[list[str]] = []

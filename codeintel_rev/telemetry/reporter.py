@@ -14,6 +14,8 @@ from typing import Any
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.diagnostics.detectors import detect
+from codeintel_rev.metrics.registry import MCP_RUN_ERRORS_TOTAL, MCP_RUNS_TOTAL
+from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.telemetry.context import (
     current_run_id,
     current_session,
@@ -24,7 +26,6 @@ from codeintel_rev.telemetry.events import (
     checkpoint_event,
     coerce_event,
 )
-from codeintel_rev.telemetry.prom import record_run, record_run_error
 
 __all__ = [
     "RUN_REPORT_STORE",
@@ -198,13 +199,49 @@ def _build_stage_summary(record: RunRecord) -> tuple[list[RunReportStage], str |
     for _, label in _STAGE_SEQUENCE:
         event = stage_map.get(label)
         if event is None:
-            stages.append(RunReportStage(name=label, status="pending", detail=None))
+            stages.append(
+                RunReportStage(
+                    name=label,
+                    status="pending",
+                    detail=None,
+                    ts=None,
+                    duration_ms=None,
+                    payload=None,
+                    trace_id=None,
+                    span_id=None,
+                )
+            )
             continue
         status = str(event.get("status") or "unknown")
         detail = event.get("detail")
+        payload = event.get("payload")
+        payload_dict = dict(payload) if isinstance(payload, Mapping) else None
+        duration = None
+        if payload_dict is not None:
+            duration = payload_dict.get("duration_ms")
+            if isinstance(duration, str):
+                try:
+                    duration = float(duration)
+                except ValueError:
+                    duration = None
+        stage_ts_raw = event.get("ts")
+        stage_ts = str(stage_ts_raw) if stage_ts_raw is not None else None
+        trace_id = event.get("trace_id")
+        span_id = event.get("span_id")
         if status == "completed":
             last_completed = label
-        stages.append(RunReportStage(name=label, status=status, detail=detail))
+        stages.append(
+            RunReportStage(
+                name=label,
+                status=status,
+                detail=detail,
+                ts=stage_ts,
+                duration_ms=duration if isinstance(duration, (int, float)) else None,
+                payload=payload_dict,
+                trace_id=str(trace_id) if trace_id else None,
+                span_id=str(span_id) if span_id else None,
+            )
+        )
     return stages, last_completed
 
 
@@ -430,10 +467,10 @@ class RunReportStore:
                     record.stop_reason = inferred_reason
             if not record.metrics_recorded and record.status in {"complete", "error", "partial"}:
                 tool = record.tool_name or "unknown"
-                record_run(tool, record.status)
+                MCP_RUNS_TOTAL.labels(tool=tool, status=record.status).inc()
                 if record.status == "error":
                     code = (record.stop_reason or "unknown").split(":")[0].strip() or "unknown"
-                    record_run_error(tool, code)
+                    MCP_RUN_ERRORS_TOTAL.labels(tool=tool, error_code=code).inc()
                 record.metrics_recorded = True
 
     def get_run(self, session_id: str, run_id: str | None = None) -> RunRecord | None:
@@ -721,13 +758,56 @@ def build_run_report_v2(
     )
     if not trace_id:
         trace_id = record.run_id
+    timeline_entries = [
+        {
+            "ts": event.ts,
+            "type": event.type,
+            "name": event.name,
+            "status": event.status,
+            "message": event.message,
+            "attrs": dict(event.attrs),
+        }
+        for event in record.events
+    ]
+    structured_events = [
+        {
+            "ts": event.get("ts"),
+            "kind": event.get("kind"),
+            "status": event.get("status"),
+            "detail": event.get("detail"),
+            "payload": event.get("payload"),
+            "trace_id": event.get("trace_id"),
+            "span_id": event.get("span_id"),
+        }
+        for event in record.structured_events
+    ]
+    budgets = _budgets_from_timeline(timeline_entries, record.structured_events)
+    stopped_because = record.stop_reason or (
+        f"stage:{stopped_after}" if stopped_after else None
+    )
+    span_attributes: dict[str, object] = {
+        Attrs.MCP_SESSION_ID: record.session_id,
+        Attrs.MCP_RUN_ID: record.run_id,
+    }
+    if record.tool_name:
+        span_attributes[Attrs.MCP_TOOL] = record.tool_name
+    if record.capability_stamp:
+        span_attributes["capability_stamp"] = record.capability_stamp
+    # Remove None values for serialization clarity
+    span_attributes = {key: value for key, value in span_attributes.items() if value is not None}
     return RunReportV2(
         trace_id=trace_id,
         session_id=record.session_id,
         run_id=record.run_id,
+        tool=record.tool_name,
         stages=stages,
+        timeline=timeline_entries,
+        events=structured_events,
         warnings=warnings,
+        budgets=budgets,
         stopped_after_stage=stopped_after,
+        stopped_because=stopped_because,
+        span_attributes=span_attributes,
     )
 
 
@@ -788,6 +868,11 @@ class RunReportStage:
     name: str
     status: str
     detail: str | None
+    ts: str | None
+    duration_ms: float | None
+    payload: Mapping[str, Any] | None
+    trace_id: str | None
+    span_id: str | None
 
     def as_dict(self) -> dict[str, object]:
         """Return a JSON-serializable representation of the stage.
@@ -801,6 +886,11 @@ class RunReportStage:
             "name": self.name,
             "status": self.status,
             "detail": self.detail,
+            "ts": self.ts,
+            "duration_ms": self.duration_ms,
+            "payload": dict(self.payload) if self.payload else None,
+            "trace_id": self.trace_id,
+            "span_id": self.span_id,
         }
 
 
@@ -811,9 +901,15 @@ class RunReportV2:
     trace_id: str | None
     session_id: str | None
     run_id: str
+    tool: str | None
     stages: list[RunReportStage]
+    timeline: list[dict[str, Any]]
+    events: list[dict[str, Any]]
     warnings: list[str]
+    budgets: Mapping[str, Any] | None
     stopped_after_stage: str | None
+    stopped_because: str | None
+    span_attributes: dict[str, object]
 
     def as_dict(self) -> dict[str, object]:
         """Return a JSON-serializable payload for the V2 report.
@@ -827,9 +923,15 @@ class RunReportV2:
             "trace_id": self.trace_id,
             "session_id": self.session_id,
             "run_id": self.run_id,
+            "tool": self.tool,
             "stages": [stage.as_dict() for stage in self.stages],
+            "timeline": list(self.timeline),
+            "events": list(self.events),
             "warnings": list(self.warnings),
+            "budgets": dict(self.budgets) if self.budgets else None,
             "stopped_after_stage": self.stopped_after_stage,
+            "stopped_because": self.stopped_because,
+            "span_attributes": dict(self.span_attributes),
         }
 
 
@@ -968,18 +1070,58 @@ def render_markdown_v2(report: RunReportV2) -> str:
     """
     lines = [
         f"# Run {report.run_id}",
+        f"- Tool: {report.tool or 'n/a'}",
         f"- Trace ID: {report.trace_id or 'n/a'}",
         f"- Session ID: {report.session_id or 'n/a'}",
     ]
-    if report.stopped_after_stage:
+    if report.stopped_because:
+        lines.append(f"- Stopped because: {report.stopped_because}")
+    elif report.stopped_after_stage:
         lines.append(f"- Stopped after stage: `{report.stopped_after_stage}`")
+    if report.budgets:
+        lines.extend(
+            [
+                "",
+                "## Budgets",
+                "```json",
+                json.dumps(report.budgets, indent=2, ensure_ascii=False),
+                "```",
+            ]
+        )
     lines.append("")
     lines.append("## Stages")
     for stage in report.stages:
         detail_suffix = f" — {stage.detail}" if stage.detail else ""
-        lines.append(f"- **{stage.name}**: {stage.status}{detail_suffix}")
+        duration_suffix = (
+            f" ({stage.duration_ms:.2f} ms)" if isinstance(stage.duration_ms, (int, float)) else ""
+        )
+        lines.append(f"- **{stage.name}**: {stage.status}{detail_suffix}{duration_suffix}")
+    if report.timeline:
+        lines.append("")
+        lines.append("## Timeline")
+        for entry in report.timeline:
+            timestamp = entry.get("ts")
+            ts_display = f"{timestamp:.3f}s" if isinstance(timestamp, (int, float)) else timestamp
+            lines.append(
+                f"- [{ts_display}] {entry.get('type')} `{entry.get('name')}` → {entry.get('status')}"
+            )
+    if report.events:
+        lines.append("")
+        lines.append("## Discrete Events")
+        for event in report.events:
+            payload = event.get("payload")
+            payload_suffix = f" payload={payload}" if payload else ""
+            lines.append(
+                f"- {event.get('kind')} ({event.get('status')}){payload_suffix}".strip()
+            )
     if report.warnings:
         lines.append("")
         lines.append("## Warnings")
         lines.extend(f"- {warning}" for warning in report.warnings)
+    if report.span_attributes:
+        lines.append("")
+        lines.append("## Span Attributes")
+        lines.append("```json")
+        lines.append(json.dumps(report.span_attributes, indent=2, ensure_ascii=False))
+        lines.append("```")
     return "\n".join(lines)

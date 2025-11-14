@@ -1,20 +1,26 @@
-# cli/xtr.py
+# rerank/xtr.py
 
 ## Docstring
 
 ```
-Backward-compatible entrypoint for the XTR Typer CLI.
+XTR-backed reranker implementation.
 ```
 
 ## Imports
 
 - from **__future__** import annotations
-- from **codeintel_rev.mcp_server.retrieval.xtr_cli** import app, main
+- from **collections.abc** import Sequence
+- from **codeintel_rev.io.xtr_manager** import XTRIndex
+- from **codeintel_rev.rerank.base** import Reranker, RerankRequest, RerankResult
+
+## Definitions
+
+- class: `XTRReranker` (line 13)
 
 ## Graph Metrics
 
-- **fan_in**: 0
-- **fan_out**: 1
+- **fan_in**: 1
+- **fan_out**: 2
 - **cycle_group**: 137
 
 ## Ownership
@@ -32,11 +38,11 @@ Backward-compatible entrypoint for the XTR Typer CLI.
 
 ## Declared Exports (__all__)
 
-app, main
+XTRReranker
 
 ## Doc Health
 
-- **summary**: Backward-compatible entrypoint for the XTR Typer CLI.
+- **summary**: XTR-backed reranker implementation.
 - has summary: yes
 - param parity: yes
 - examples present: no
@@ -55,7 +61,7 @@ app, main
 
 ## Hotspot
 
-- score: 1.03
+- score: 1.58
 
 ## Side Effects
 
@@ -63,9 +69,13 @@ app, main
 
 ## Complexity
 
-- branches: 0
-- cyclomatic: 1
-- loc: 8
+- branches: 3
+- cyclomatic: 4
+- loc: 74
+
+## Doc Coverage
+
+- `XTRReranker` (class): summary=yes, examples=no — Rerank hits using the XTR MaxSim scorer.
 
 ## Tags
 

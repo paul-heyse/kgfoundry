@@ -48,7 +48,7 @@ Admin endpoints for staging, publishing, and rolling back index versions.
 
 - **fan_in**: 0
 - **fan_out**: 7
-- **cycle_group**: 156
+- **cycle_group**: 59
 
 ## Ownership
 

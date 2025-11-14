@@ -9,7 +9,7 @@ Resolve exports and re-exports for module records.
 ## Imports
 
 - from **__future__** import annotations
-- from **collections.abc** import Mapping
+- from **collections.abc** import Mapping, Sequence
 - from **typing** import Any
 - from **codeintel_rev.module_utils** import import_targets_for_entry, module_name_candidates, normalize_module_name
 
@@ -25,7 +25,7 @@ Resolve exports and re-exports for module records.
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 13
+- **cycle_group**: 100
 
 ## Ownership
 

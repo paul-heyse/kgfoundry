@@ -64,49 +64,50 @@ Provides health/readiness endpoints, CORS, and streaming support.
 - function: `_stream_log_extra` (line 153)
 - function: `_preload_faiss_index` (line 192)
 - function: `_env_flag` (line 223)
-- function: `_log_gpu_warmup` (line 240)
-- function: `_preload_faiss_if_configured` (line 261)
-- function: `_preload_xtr_if_configured` (line 271)
-- function: `_preload_hybrid_if_configured` (line 285)
-- function: `_initialize_context` (line 296)
-- function: `_shutdown_context` (line 384)
-- function: `lifespan` (line 407)
-- variable: `app` (line 502)
-- variable: `metrics_router` (line 531)
-- function: `observability_run_report` (line 541)
-- function: `get_run_report` (line 578)
-- function: `get_run_report_markdown` (line 620)
-- function: `get_run_report_mermaid` (line 663)
-- function: `get_run_report_v2` (line 695)
-- function: `get_run_report_markdown_v2` (line 715)
-- function: `get_run_report_mermaid_v2` (line 737)
-- function: `inject_request_id` (line 759)
-- function: `set_mcp_context` (line 786)
-- function: `disable_nginx_buffering` (line 865)
-- function: `healthz` (line 901)
-- function: `readyz` (line 913)
-- function: `capz` (line 948)
-- function: `_stream_with_logging` (line 990)
-- function: `sse_demo` (line 1052)
-- function: `http_exception_handler_with_request_id` (line 1105)
-- function: `unhandled_exception_handler` (line 1137)
-- variable: `proxy_wrapped` (line 1178)
-- variable: `asgi` (line 1183)
-- variable: `asgi` (line 1185)
+- function: `_resolve_proxy_trusted_hops` (line 240)
+- function: `_log_gpu_warmup` (line 262)
+- function: `_preload_faiss_if_configured` (line 283)
+- function: `_preload_xtr_if_configured` (line 293)
+- function: `_preload_hybrid_if_configured` (line 307)
+- function: `_initialize_context` (line 318)
+- function: `_shutdown_context` (line 406)
+- function: `lifespan` (line 429)
+- variable: `app` (line 524)
+- variable: `metrics_router` (line 553)
+- function: `observability_run_report` (line 563)
+- function: `get_run_report` (line 600)
+- function: `get_run_report_markdown` (line 642)
+- function: `get_run_report_mermaid` (line 685)
+- function: `get_run_report_v2` (line 717)
+- function: `get_run_report_markdown_v2` (line 737)
+- function: `get_run_report_mermaid_v2` (line 759)
+- function: `inject_request_id` (line 781)
+- function: `set_mcp_context` (line 808)
+- function: `disable_nginx_buffering` (line 887)
+- function: `healthz` (line 923)
+- function: `readyz` (line 935)
+- function: `capz` (line 970)
+- function: `_stream_with_logging` (line 1012)
+- function: `sse_demo` (line 1074)
+- function: `http_exception_handler_with_request_id` (line 1127)
+- function: `unhandled_exception_handler` (line 1159)
+- variable: `proxy_wrapped` (line 1200)
+- variable: `asgi` (line 1205)
+- variable: `asgi` (line 1207)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 19
-- **cycle_group**: 91
+- **cycle_group**: 57
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 33
-- recent churn 90: 33
+- recent churn 30: 34
+- recent churn 90: 34
 
 ## Usage
 
@@ -142,7 +143,7 @@ app, asgi
 
 ## Hotspot
 
-- score: 3.09
+- score: 3.10
 
 ## Side Effects
 
@@ -151,9 +152,9 @@ app, asgi
 
 ## Complexity
 
-- branches: 86
-- cyclomatic: 87
-- loc: 1189
+- branches: 88
+- cyclomatic: 89
+- loc: 1211
 
 ## Doc Coverage
 
@@ -164,9 +165,9 @@ app, asgi
 - `_stream_log_extra` (function): summary=yes, params=ok, examples=no — Return structured logging metadata for streaming lifecycle events.
 - `_preload_faiss_index` (function): summary=yes, params=ok, examples=no — Pre-load FAISS index during startup to avoid first-request latency.
 - `_env_flag` (function): summary=yes, params=ok, examples=no — Return ``True`` when an environment flag is explicitly enabled.
+- `_resolve_proxy_trusted_hops` (function): summary=yes, params=ok, examples=no — Return ProxyFix trusted hop count with PROXY_TRUSTED_HOPS override.
 - `_log_gpu_warmup` (function): summary=yes, params=ok, examples=no — Log the GPU warmup status summary.
 - `_preload_faiss_if_configured` (function): summary=yes, params=mismatch, examples=no — Preload FAISS indexes when configured to do so.
-- `_preload_xtr_if_configured` (function): summary=yes, params=mismatch, examples=no — Preload XTR runtime when toggle is enabled.
 
 ## Tags
 

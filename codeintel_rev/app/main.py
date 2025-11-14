@@ -48,7 +48,6 @@ from codeintel_rev.observability.timeline import bind_timeline, new_timeline
 from codeintel_rev.runtime.cells import RuntimeCellObserver
 from codeintel_rev.telemetry.context import current_run_id
 from codeintel_rev.telemetry.logging import install_structured_logging
-from codeintel_rev.telemetry.prom import build_metrics_router
 from codeintel_rev.telemetry.reporter import (
     build_report as build_run_report,
 )
@@ -549,11 +548,6 @@ if SERVER_SETTINGS.enable_trusted_hosts:
         TrustedHostMiddleware,
         allowed_hosts=SERVER_SETTINGS.allowed_hosts,
     )
-
-metrics_router = build_metrics_router()
-if metrics_router is not None:
-    app.include_router(metrics_router)
-
 
 if os.getenv("CODEINTEL_ADMIN", "").strip().lower() in {"1", "true", "yes", "on"}:
     app.include_router(index_admin.router)

@@ -94,103 +94,12 @@ operations:
     x-codeSamples:
       - lang: bash
         source: "kgf e2e"
-  docstrings.generate:
-    tags: [docstrings, docstrings-update]
-    x-handler: "tools.docstring_builder.cli:_command_generate"
-    x-codeSamples:
-      - lang: bash
-        source: "uv run python -m tools.docstring_builder.cli generate"
-  docstrings.fix:
-    tags: [docstrings, docstrings-update]
-    x-handler: "tools.docstring_builder.cli:_command_fix"
-    x-codeSamples:
-      - lang: bash
-        source: "uv run python -m tools.docstring_builder.cli fix"
-  docstrings.fmt:
-    tags: [docstrings, docstrings-update]
-    x-handler: "tools.docstring_builder.cli:_command_fmt"
-    x-codeSamples:
-      - lang: bash
-        source: "uv run python -m tools.docstring_builder.cli fmt"
-  docstrings.update:
-    tags: [docstrings, docstrings-update]
-    x-handler: "tools.docstring_builder.cli:_command_update"
-    x-codeSamples:
-      - lang: bash
-        source: "uv run python -m tools.docstring_builder.cli update"
-  docstrings.check:
-    tags: [docstrings, docstrings-validate]
-    x-handler: "tools.docstring_builder.cli:_command_check"
-    x-codeSamples:
-      - lang: bash
-        source: "uv run python -m tools.docstring_builder.cli check"
-  docstrings.diff:
-    tags: [docstrings, docstrings-validate]
-    x-handler: "tools.docstring_builder.cli:_command_diff"
-    x-codeSamples:
-      - lang: bash
-        source: "uv run python -m tools.docstring_builder.cli diff"
-  docstrings.lint:
-    tags: [docstrings, docstrings-validate]
-    x-handler: "tools.docstring_builder.cli:_command_lint"
-    x-codeSamples:
-      - lang: bash
-        source: "uv run python -m tools.docstring_builder.cli lint --no-docfacts"
-  docstrings.measure:
-    tags: [docstrings, docstrings-observability]
-    x-handler: "tools.docstring_builder.cli:_command_measure"
-    x-codeSamples:
-      - lang: bash
-        source: "uv run python -m tools.docstring_builder.cli measure"
-  docstrings.list:
-    tags: [docstrings, docstrings-observability]
-    x-handler: "tools.docstring_builder.cli:_command_list"
-    x-codeSamples:
-      - lang: bash
-        source: "uv run python -m tools.docstring_builder.cli list"
-  docstrings.harvest:
-    tags: [docstrings, docstrings-utilities]
-    x-handler: "tools.docstring_builder.cli:_command_harvest"
-    x-codeSamples:
-      - lang: bash
-        source: "uv run python -m tools.docstring_builder.cli harvest"
-  docstrings.schema:
-    tags: [docstrings, docstrings-utilities]
-    x-handler: "tools.docstring_builder.cli:_command_schema"
-    x-codeSamples:
-      - lang: bash
-        source: "uv run python -m tools.docstring_builder.cli schema --output docs/_build/docstring-schema.json"
-  docstrings.clear_cache:
-    tags: [docstrings, docstrings-utilities]
-    x-handler: "tools.docstring_builder.cli:_command_clear_cache"
-    x-codeSamples:
-      - lang: bash
-        source: "uv run python -m tools.docstring_builder.cli clear-cache"
-  docstrings.doctor:
-    tags: [docstrings, docstrings-diagnostics]
-    x-handler: "tools.docstring_builder.cli:_command_doctor"
-    x-codeSamples:
-      - lang: bash
-        source: "uv run python -m tools.docstring_builder.cli doctor --stubs"
   docs.validate_artifacts:
     tags: [docs, docs-validation]
     x-handler: "docs.toolchain.validate_artifacts:validate_artifacts"
     x-codeSamples:
       - lang: bash
         source: "uv run python -m docs._scripts.validate_artifacts --docs-build-dir docs/_build"
-  docs.build_graphs:
-    summary: Build dependency graphs for documentation and subsystem analysis.
-    description: |
-      Generate per-package and subsystem-wide dependency graphs using pydeps and pyreverse. The
-      command manages caching, parallel execution, and policy enforcement so documentation tooling
-      stays aligned with architectural guidelines.
-    tags: [docs]
-    x-handler: "tools.docs.build_graphs:main"
-    x-codeSamples:
-      - lang: bash
-        source: "uv run python -m tools.docs.build_graphs --format svg"
-    x-problemDetails:
-      - schema/examples/problem_details/tool-execution-error.json
   codeintel.indexer.query:
     summary: Execute a Tree-sitter query against a source file.
     description: |
@@ -261,4 +170,3 @@ operations:
     x-codeSamples:
       - lang: bash
         source: "uv run python -m docs.toolchain.build_symbol_index"
-

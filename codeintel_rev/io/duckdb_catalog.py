@@ -9,10 +9,10 @@ chunk retrieval and joins.
 from __future__ import annotations
 
 import hashlib
-from glob import glob
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
+from glob import glob
 from pathlib import Path
 from threading import Lock
 from time import perf_counter
@@ -58,7 +58,7 @@ class IdMapMeta:
     refreshed: bool
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _ScopeFilterLogInfo:
     """Container for scope filter logging inputs."""
 
@@ -831,8 +831,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
 
         if _relation_exists(conn, "faiss_idmap_mat"):
             columns = {
-                row[1]
-                for row in conn.execute("PRAGMA table_info('faiss_idmap_mat')").fetchall()
+                row[1] for row in conn.execute("PRAGMA table_info('faiss_idmap_mat')").fetchall()
             }
             if "chunk_id" in columns:
                 external_expr = "chunk_id"

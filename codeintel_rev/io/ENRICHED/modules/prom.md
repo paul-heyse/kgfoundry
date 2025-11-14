@@ -38,24 +38,24 @@ Prometheus helpers for MCP diagnostics.
 - variable: `QUERY_AMBIGUITY` (line 113)
 - class: `MetricsConfig` (line 121)
 - function: `build_metrics_router` (line 127)
-- function: `record_run` (line 176)
-- function: `record_run_error` (line 181)
-- function: `observe_request_latency` (line 186)
-- function: `record_stage_latency` (line 191)
+- function: `record_run` (line 178)
+- function: `record_run_error` (line 183)
+- function: `observe_request_latency` (line 188)
+- function: `record_stage_latency` (line 193)
 
 ## Graph Metrics
 
 - **fan_in**: 9
 - **fan_out**: 2
-- **cycle_group**: 63
+- **cycle_group**: 17
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 8
+- recent churn 90: 8
 
 ## Usage
 
@@ -97,7 +97,7 @@ EMBED_BATCH_SIZE, EMBED_LATENCY_SECONDS, FAISS_SEARCH_LATENCY_SECONDS, GATING_DE
 
 - branches: 7
 - cyclomatic: 8
-- loc: 194
+- loc: 196
 
 ## Doc Coverage
 

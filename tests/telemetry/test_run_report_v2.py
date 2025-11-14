@@ -28,6 +28,7 @@ if "codeintel_rev.runtime.cells" not in sys.modules:
     stub_typed.RuntimeCellCloseResult = _StubCloseResult
     sys.modules["codeintel_rev.runtime.cells"] = stub
 
+from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.telemetry import reporter
 from codeintel_rev.telemetry.context import telemetry_context
 from codeintel_rev.telemetry.steps import StepEvent, emit_step
@@ -63,8 +64,11 @@ def test_run_report_v2_infers_stage_progression() -> None:
 
         report = reporter.build_run_report_v2("session", "run")
         assert report is not None
+        assert report.tool == "search.semantic"
         assert [stage.name for stage in report.stages[:2]] == ["gather", "fuse"]
         assert report.stages[0].status == "completed"
         assert report.stages[1].status == "failed"
         assert report.stopped_after_stage == "gather"
         assert report.warnings == ["timeout waiting for FAISS"]
+        assert report.events and report.events[0]["kind"] == "retrieval.gather_channels"
+        assert report.span_attributes[Attrs.MCP_SESSION_ID] == "session"

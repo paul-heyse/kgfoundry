@@ -42,7 +42,7 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 
 - **fan_in**: 4
 - **fan_out**: 1
-- **cycle_group**: 2
+- **cycle_group**: 98
 
 ## Ownership
 

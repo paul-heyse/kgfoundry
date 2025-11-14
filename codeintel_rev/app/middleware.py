@@ -243,9 +243,16 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
                 extra={"session_id": session_id, "path": request.url.path},
             )
 
+        run_id_header = request.headers.get("X-Run-ID")
+        if run_id_header:
+            self._logger.debug(
+                "Using client-provided run ID",
+                extra={"run_id": run_id_header, "path": request.url.path},
+            )
+
         # Store in request.state (FastAPI convention)
         request.state.session_id = session_id
-        timeline = new_timeline(session_id)
+        timeline = new_timeline(session_id, run_id=run_id_header)
         request.state.run_id = timeline.run_id
         request.state.timeline = timeline
         started_at = time.time()

@@ -80,15 +80,15 @@ codeintel_rev.app.middleware : get_session_id for retrieving session ID
 
 - **fan_in**: 5
 - **fan_out**: 4
-- **cycle_group**: 78
+- **cycle_group**: 43
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 8
+- recent churn 90: 8
 
 ## Usage
 

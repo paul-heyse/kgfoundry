@@ -39,15 +39,15 @@ Capability snapshot helpers for conditional tool registration and /capz.
 
 - **fan_in**: 6
 - **fan_out**: 5
-- **cycle_group**: 78
+- **cycle_group**: 43
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 8
-- recent churn 90: 8
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 

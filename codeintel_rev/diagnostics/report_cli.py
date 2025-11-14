@@ -222,7 +222,7 @@ def session_report(  # pragma: no cover - exercised via pytests
         ReportFormat,
         typer.Option(
             ReportFormat.MARKDOWN,
-            "--format",
+            --format,
             case_sensitive=False,
             help="Choose markdown (default) or json output.",
         ),
@@ -283,8 +283,8 @@ def ledger_report(
     data_dir: Annotated[
         Path,
         typer.Option(
-            Path("data"),
-            "--data-dir",
+            Path(data),
+            --data-dir,
             help="Telemetry data directory (default: ./data).",
         ),
     ] = Path("data"),

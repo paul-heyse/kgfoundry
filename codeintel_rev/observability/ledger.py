@@ -50,7 +50,7 @@ def dated_run_dir(base_dir: Path | None, *, stamp: datetime | None = None) -> Pa
     return ensure_ledger_root(resolved_base / "telemetry" / "runs" / day)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class RunLedger:
     """Append-only JSONL ledger scoped to a single run."""
 
@@ -58,6 +58,10 @@ class RunLedger:
     session_id: str | None
     path: Path
     _handle: io.TextIOWrapper | None = None
+
+    def _set_attr(self, **changes: object) -> None:
+        for key, value in changes.items():
+            object.__setattr__(self, key, value)  # noqa: PLC2801
 
     @classmethod
     def open(cls, root_dir: Path, *, run_id: str, session_id: str | None) -> RunLedger:
@@ -89,7 +93,7 @@ class RunLedger:
         handle = self._handle
         if handle is None:
             handle = self.path.open("a", encoding="utf-8")
-            self._handle = handle
+            self._set_attr(_handle=handle)
         payload = {
             "run_id": self.run_id,
             "session_id": self.session_id,
@@ -107,4 +111,4 @@ class RunLedger:
             handle.flush()
         finally:
             handle.close()
-            self._handle = None
+            self._set_attr(_handle=None)

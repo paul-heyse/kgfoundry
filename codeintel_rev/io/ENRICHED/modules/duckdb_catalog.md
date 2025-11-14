@@ -16,6 +16,7 @@ chunk retrieval and joins.
 - from **collections.abc** import Callable, Iterator, Mapping, Sequence
 - from **contextlib** import contextmanager, suppress
 - from **dataclasses** import dataclass
+- from **glob** import glob
 - from **pathlib** import Path
 - from **threading** import Lock
 - from **time** import perf_counter
@@ -26,7 +27,7 @@ chunk retrieval and joins.
 - from **codeintel_rev.mcp_server.scope_utils** import LANGUAGE_EXTENSIONS, path_matches_glob
 - from **codeintel_rev.observability.otel** import record_span_event
 - from **codeintel_rev.observability.semantic_conventions** import Attrs
-- from **codeintel_rev.observability.timeline** import current_timeline
+- from **codeintel_rev.observability.timeline** import Timeline, current_timeline
 - from **codeintel_rev.telemetry.decorators** import span_context
 - from **codeintel_rev.telemetry.otel_metrics** import build_histogram
 - from **codeintel_rev.telemetry.steps** import StepEvent, emit_step
@@ -37,37 +38,38 @@ chunk retrieval and joins.
 
 ## Definitions
 
-- variable: `duckdb` (line 44)
-- variable: `np` (line 45)
-- variable: `LOGGER` (line 47)
-- class: `IdMapMeta` (line 51)
-- function: `_log_extra` (line 60)
-- class: `_ScopeFilterSpec` (line 134)
-- class: `StructureAnnotations` (line 151)
-- class: `DuckDBCatalogOptions` (line 161)
-- class: `_DuckDBQueryMixin` (line 170)
-- class: `_LegacyOptions` (line 445)
-- class: `DuckDBCatalog` (line 452)
-- function: `_relation_exists` (line 1664)
-- function: `relation_exists` (line 1698)
-- function: `_file_checksum` (line 1716)
-- function: `_parquet_hash` (line 1738)
-- function: `ensure_faiss_idmap_view` (line 1766)
-- function: `refresh_faiss_idmap_materialized` (line 1797)
+- variable: `duckdb` (line 45)
+- variable: `np` (line 46)
+- variable: `LOGGER` (line 48)
+- class: `IdMapMeta` (line 52)
+- class: `_ScopeFilterLogInfo` (line 62)
+- function: `_log_extra` (line 71)
+- class: `_ScopeFilterSpec` (line 145)
+- class: `StructureAnnotations` (line 162)
+- class: `DuckDBCatalogOptions` (line 172)
+- class: `_DuckDBQueryMixin` (line 181)
+- class: `_LegacyOptions` (line 456)
+- class: `DuckDBCatalog` (line 463)
+- function: `_relation_exists` (line 1725)
+- function: `relation_exists` (line 1759)
+- function: `_file_checksum` (line 1777)
+- function: `_parquet_hash` (line 1799)
+- function: `ensure_faiss_idmap_view` (line 1827)
+- function: `refresh_faiss_idmap_materialized` (line 1874)
 
 ## Graph Metrics
 
 - **fan_in**: 9
 - **fan_out**: 11
-- **cycle_group**: 78
+- **cycle_group**: 43
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 43
-- recent churn 90: 43
+- recent churn 30: 45
+- recent churn 90: 45
 
 ## Usage
 
@@ -99,7 +101,7 @@ DuckDBCatalog, IdMapMeta, StructureAnnotations, ensure_faiss_idmap_view, refresh
 
 ## Hotspot
 
-- score: 3.27
+- score: 3.29
 
 ## Side Effects
 
@@ -108,13 +110,14 @@ DuckDBCatalog, IdMapMeta, StructureAnnotations, ensure_faiss_idmap_view, refresh
 
 ## Complexity
 
-- branches: 152
-- cyclomatic: 153
-- loc: 1896
+- branches: 160
+- cyclomatic: 161
+- loc: 1973
 
 ## Doc Coverage
 
 - `IdMapMeta` (class): summary=yes, examples=no — Metadata describing a materialized FAISS ID map join.
+- `_ScopeFilterLogInfo` (class): summary=yes, examples=no — Container for scope filter logging inputs.
 - `_log_extra` (function): summary=yes, params=mismatch, examples=no — Return structured log extras for catalog events.
 - `_ScopeFilterSpec` (class): summary=yes, examples=no — Structured scope filter metadata used during scoped queries.
 - `StructureAnnotations` (class): summary=yes, examples=no — Structure-aware metadata joined onto explainability pools.
@@ -123,7 +126,6 @@ DuckDBCatalog, IdMapMeta, StructureAnnotations, ensure_faiss_idmap_view, refresh
 - `_LegacyOptions` (class): summary=no, examples=no
 - `DuckDBCatalog` (class): summary=yes, examples=no — DuckDB catalog for querying chunks.
 - `_relation_exists` (function): summary=yes, params=ok, examples=no — Return True when a table or view with ``name`` exists in the main schema.
-- `relation_exists` (function): summary=yes, params=ok, examples=no — Public helper returning True when a DuckDB relation exists.
 
 ## Tags
 

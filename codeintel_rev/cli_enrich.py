@@ -6,12 +6,14 @@ from __future__ import annotations
 import ast
 import json
 import logging
-from collections.abc import Iterable, Mapping
+import time
+from collections.abc import Iterable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import Annotated, Any, Protocol, cast
 
 try:  # pragma: no cover - optional dependency
     import polars as pl
@@ -31,8 +33,17 @@ from codeintel_rev.enrich.ast_indexer import (
     stable_module_path,
     write_ast_parquet,
 )
+from codeintel_rev.enrich.duckdb_store import DuckConn, ingest_modules_jsonl
+from codeintel_rev.enrich.errors import (
+    IndexingError,
+    IngestError,
+    StageError,
+    TaggingError,
+    TypeSignalError,
+)
 from codeintel_rev.enrich.graph_builder import ImportGraph, build_import_graph, write_import_graph
-from codeintel_rev.enrich.libcst_bridge import index_module
+from codeintel_rev.enrich.libcst_bridge import ModuleIndex, index_module
+from codeintel_rev.enrich.models import ModuleRecord
 from codeintel_rev.enrich.output_writers import (
     write_json,
     write_jsonl,
@@ -56,6 +67,7 @@ from codeintel_rev.enrich.stubs_overlay import (
 )
 from codeintel_rev.enrich.tagging import ModuleTraits, infer_tags, load_rules
 from codeintel_rev.enrich.tree_sitter_bridge import build_outline
+from codeintel_rev.enrich.validators import ModuleRecordModel
 from codeintel_rev.export_resolver import build_module_name_map, resolve_exports
 from codeintel_rev.risk_hotspots import compute_hotspot_score
 from codeintel_rev.typedness import FileTypeSignals, collect_type_signals
@@ -68,6 +80,48 @@ except ImportError:  # pragma: no cover - optional dependency
 
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _format_stage_meta(metadata: Mapping[str, object]) -> str:
+    parts = [f"{key}={metadata[key]}" for key in sorted(metadata)]
+    return " ".join(parts)
+
+
+@contextmanager
+def _stage_span(stage: str, **start_meta: object) -> Iterator[dict[str, object]]:
+    """Context manager logging structured stage timings.
+
+    Parameters
+    ----------
+    stage : str
+        Stage name used for logging identification. Appears in all log messages
+        emitted by this context manager.
+    **start_meta : object
+        Additional metadata key-value pairs to include in the start event log.
+        These are formatted and logged when the context manager enters.
+
+    Yields
+    ------
+    dict[str, object]
+        Mutable dictionary that can be populated with additional metadata prior
+        to logging the ``event=finish`` line.
+
+    """
+    start = time.perf_counter()
+    LOGGER.debug("stage=%s event=start %s", stage, _format_stage_meta(start_meta))
+    outcome: dict[str, Any] = {}
+    try:
+        yield outcome
+    except Exception:
+        LOGGER.exception("stage=%s event=error %s", stage, _format_stage_meta(start_meta))
+        raise
+    finally:
+        outcome.setdefault("duration_sec", round(time.perf_counter() - start, 3))
+        LOGGER.info(
+            "stage=%s event=finish %s",
+            stage,
+            _format_stage_meta({**start_meta, **outcome}),
+        )
 
 
 class _YamlDumpFn(Protocol):
@@ -447,7 +501,7 @@ class PipelineResult:
 
     root: Path
     repo_root: Path
-    module_rows: list[dict[str, Any]]
+    module_rows: list[ModuleRecord]
     symbol_edges: list[tuple[str, str]]
     import_graph: ImportGraph
     use_graph: UseGraph
@@ -455,6 +509,174 @@ class PipelineResult:
     coverage_rows: list[dict[str, Any]]
     hotspot_rows: list[dict[str, Any]]
     tag_index: dict[str, list[str]]
+
+
+def _discover_py_files(root: Path, patterns: tuple[str, ...]) -> list[Path]:
+    """Return ordered Python files under ``root`` honoring include patterns.
+
+    Parameters
+    ----------
+    root : Path
+        Root directory to search for Python files. Files are discovered recursively
+        using ``rglob("*.py")``, excluding any paths containing hidden directories
+        (starting with ``.``).
+    patterns : tuple[str, ...]
+        Glob patterns to filter files. If empty, all Python files are returned.
+        Patterns are matched against paths relative to ``root`` using ``fnmatch``.
+
+    Returns
+    -------
+    list[Path]
+        Sorted list of files relative to ``root`` matching the configured patterns.
+    """
+    with _stage_span("discover", root=root, patterns=len(patterns)) as meta:
+        files = sorted(_iter_files(root, patterns if patterns else None))
+        meta["count"] = len(files)
+    return files
+
+
+def _load_scip_artifacts(path: Path) -> tuple[SCIPIndex, ScipContext]:
+    """Load the SCIP index and derive lookup helpers.
+
+    Parameters
+    ----------
+    path : Path
+        Path to the SCIP index file to load. The file must exist and be readable.
+
+    Returns
+    -------
+    tuple[SCIPIndex, ScipContext]
+        Parsed SCIP index and context lookups.
+
+    Raises
+    ------
+    IngestError
+        Raised when the SCIP payload cannot be read or parsed.
+    """
+    with _stage_span("ingest", scip=path) as meta:
+        try:
+            index = SCIPIndex.load(path)
+        except Exception as exc:  # pragma: no cover - surface via CLI
+            reason = "scip-load"
+            raise IngestError(reason, path=str(path), detail=str(exc)) from exc
+        ctx = ScipContext(index=index, by_file=index.by_file())
+        meta["documents"] = len(index.documents)
+        return index, ctx
+
+
+def _collect_type_signal_map(
+    root: Path,
+    *,
+    pyrefly_json: Path | None,
+) -> dict[str, FileTypeSignals]:
+    """Collect Pyrefly/Pyright summaries and normalize path keys.
+
+    Parameters
+    ----------
+    root : Path
+        Root directory path used for normalizing file paths. Also serves as the
+        base path for locating Pyright JSON reports.
+    pyrefly_json : Path | None
+        Optional path to a Pyrefly JSON report file. If None, only Pyright
+        reports are collected.
+
+    Returns
+    -------
+    dict[str, FileTypeSignals]
+        Mapping of normalized repo paths to joined type signal counts.
+
+    Raises
+    ------
+    TypeSignalError
+        Raised when either tool report cannot be parsed.
+    """
+    with _stage_span("type-signals", root=root) as meta:
+        try:
+            signals = collect_type_signals(
+                pyrefly_report=str(pyrefly_json) if pyrefly_json else None,
+                pyright_json=str(root),
+            )
+        except Exception as exc:  # pragma: no cover - defensive
+            reason = "collect"
+            raise TypeSignalError(reason, path=str(root), detail=str(exc)) from exc
+        normalized = _normalize_type_signal_map(signals, root)
+        meta["files"] = len(normalized)
+        return normalized
+
+
+def _collect_coverage_map(root: Path, coverage_xml: Path | None) -> dict[str, Mapping[str, float]]:
+    """Collect coverage metrics keyed by normalized path.
+
+    Parameters
+    ----------
+    root : Path
+        Root directory path used for normalizing file paths in the coverage map.
+    coverage_xml : Path | None
+        Optional path to a coverage XML report file. If None or the file does
+        not exist, returns an empty mapping.
+
+    Returns
+    -------
+    dict[str, Mapping[str, float]]
+        Mapping of repo paths to coverage metrics (may be empty).
+    """
+    with _stage_span("coverage", source=str(coverage_xml) if coverage_xml else "none") as meta:
+        raw_metrics = (
+            collect_coverage(coverage_xml) if coverage_xml and coverage_xml.exists() else {}
+        )
+        normalized = _normalize_metric_map(raw_metrics, root)
+        meta["files"] = len(normalized)
+        return normalized
+
+
+def _index_config_records(root: Path) -> list[dict[str, Any]]:
+    """Return discovered config records under ``root``.
+
+    Parameters
+    ----------
+    root : Path
+        Root directory to search for configuration files. The function discovers
+        config files using the indexing logic from ``index_config_files``.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        Config metadata rows consumed by downstream stages.
+    """
+    with _stage_span("config-index", root=root) as meta:
+        records = index_config_files(root)
+        meta["records"] = len(records)
+        return records
+
+
+def _load_tagging_rules(path: Path | None) -> Mapping[str, Any]:
+    """Load YAML tagging rules or fall back to defaults.
+
+    Parameters
+    ----------
+    path : Path | None
+        Optional path to a custom YAML tagging rules file. If None, default
+        rules are loaded.
+
+    Returns
+    -------
+    Mapping[str, Any]
+        Rule dictionary keyed by tag name.
+
+    Raises
+    ------
+    TaggingError
+        Raised when a custom rules file cannot be parsed.
+    """
+    source = str(path) if path else "defaults"
+    with _stage_span("tagging-rules", source=source) as meta:
+        try:
+            rules = load_rules(str(path) if path else None)
+        except Exception as exc:  # pragma: no cover - defensive
+            reason = "load-rules"
+            raise TaggingError(reason, path=source, detail=str(exc)) from exc
+        meta["rules"] = len(rules)
+        return rules
 
 
 def _iter_files(root: Path, patterns: tuple[str, ...] | None = None) -> Iterable[Path]:
@@ -477,20 +699,15 @@ def _run_pipeline(
         raise typer.BadParameter(message)
     root_resolved = pipeline.root.resolve()
     repo_root = detect_repo_root(root_resolved)
-    scip_index = SCIPIndex.load(pipeline.scip)
-    scip_ctx = ScipContext(index=scip_index, by_file=scip_index.by_file())
-
-    type_signal_lookup = _normalize_type_signal_map(
-        collect_type_signals(
-            pyrefly_report=str(pipeline.pyrefly_json) if pipeline.pyrefly_json else None,
-            pyright_json=str(root_resolved),
-        ),
+    files = _discover_py_files(root_resolved, pipeline.only or ())
+    scip_index, scip_ctx = _load_scip_artifacts(pipeline.scip)
+    type_signal_lookup = _collect_type_signal_map(
         root_resolved,
+        pyrefly_json=pipeline.pyrefly_json,
     )
-    coverage_lookup = _normalize_metric_map(
-        collect_coverage(pipeline.coverage_xml) if pipeline.coverage_xml else {},
-        root_resolved,
-    )
+    coverage_lookup = _collect_coverage_map(root_resolved, pipeline.coverage_xml)
+    config_records = _index_config_records(root_resolved)
+    tagging_rules = _load_tagging_rules(pipeline.tags_yaml)
     ctx = PipelineContext(
         root=root_resolved,
         repo_root=repo_root,
@@ -498,23 +715,27 @@ def _run_pipeline(
         scip_ctx=scip_ctx,
         type_signals=type_signal_lookup,
         coverage_map=coverage_lookup,
-        config_records=index_config_files(root_resolved),
-        tagging_rules=load_rules(str(pipeline.tags_yaml) if pipeline.tags_yaml else None),
+        config_records=config_records,
+        tagging_rules=tagging_rules,
         package_prefix=root_resolved.name or None,
     )
 
-    module_rows, symbol_edges = _scan_modules(ctx, pipeline)
+    module_rows, symbol_edges = _scan_modules(ctx, pipeline, files)
 
-    import_graph, use_graph, config_index = _augment_module_rows(
-        module_rows,
-        ctx.scip_index,
-        ctx.package_prefix,
-        config_records=ctx.config_records,
-    )
-    _apply_tagging(module_rows, ctx.tagging_rules)
+    with _stage_span("analytics", modules=len(module_rows)) as meta:
+        import_graph, use_graph, config_index = _augment_module_rows(
+            module_rows,
+            ctx.scip_index,
+            ctx.package_prefix,
+            config_records=ctx.config_records,
+        )
+        coverage_rows = _build_coverage_rows(module_rows)
+        hotspot_rows = _build_hotspot_rows(module_rows)
+        meta["configs"] = len(config_index)
+        meta["coverage_rows"] = len(coverage_rows)
+        meta["hotspots"] = len(hotspot_rows)
+    _infer_tags(module_rows, ctx.tagging_rules)
     tag_index = _build_tag_index(module_rows)
-    coverage_rows = _build_coverage_rows(module_rows)
-    hotspot_rows = _build_hotspot_rows(module_rows)
 
     return PipelineResult(
         root=ctx.root,
@@ -537,10 +758,21 @@ def _execute_pipeline(ctx: typer.Context) -> tuple[PipelineResult, CLIContextSta
     return result, state
 
 
+def _execute_pipeline_or_exit(ctx: typer.Context) -> tuple[PipelineResult, CLIContextState]:
+    try:
+        return _execute_pipeline(ctx)
+    except StageError as exc:  # pragma: no cover - exercised in integration
+        LOGGER.exception("stage_error %s", _format_stage_meta(exc.log_extra()))
+        message = exc.detail or exc.reason
+        typer.echo(f"[{exc.stage}] {message}", err=True)
+        raise typer.Exit(1) from exc
+
+
 def _scan_modules(
     ctx: PipelineContext,
     pipeline: PipelineOptions,
-) -> tuple[list[dict[str, Any]], list[tuple[str, str]]]:
+    files: Sequence[Path],
+) -> tuple[list[ModuleRecord], list[tuple[str, str]]]:
     scan_inputs = ScanInputs(
         scip_ctx=ctx.scip_ctx,
         type_signals=ctx.type_signals,
@@ -550,13 +782,14 @@ def _scan_modules(
         max_file_bytes=pipeline.max_file_bytes,
         package_prefix=ctx.package_prefix,
     )
-    module_rows: list[dict[str, Any]] = []
+    module_rows: list[ModuleRecord] = []
     symbol_edges: list[tuple[str, str]] = []
-    only_patterns = pipeline.only
-    for fp in _iter_files(ctx.root, only_patterns if only_patterns else None):
-        row_dict, edges = _build_module_row(fp, ctx.root, scan_inputs)
-        module_rows.append(row_dict)
-        symbol_edges.extend(edges)
+    with _stage_span("index", files=len(files)) as meta:
+        for fp in files:
+            row_dict, edges = _build_module_row(fp, ctx.root, scan_inputs)
+            module_rows.append(row_dict)
+            symbol_edges.extend(edges)
+        meta["modules"] = len(module_rows)
     return module_rows, symbol_edges
 
 
@@ -567,7 +800,7 @@ def run_all(
     emit_ast: bool = EMIT_AST_OPTION,
 ) -> None:
     """Run the full enrichment pipeline and emit all artifacts."""
-    result, state = _execute_pipeline(ctx)
+    result, state = _execute_pipeline_or_exit(ctx)
     if state.analytics.owners:
         _apply_ownership(
             result,
@@ -617,7 +850,7 @@ def scan(
 @app.command("exports")
 def exports(ctx: typer.Context) -> None:
     """Emit modules.jsonl, repo map, tag index, and Markdown module sheets."""
-    result, state = _execute_pipeline(ctx)
+    result, state = _execute_pipeline_or_exit(ctx)
     if state.analytics.owners:
         _apply_ownership(
             result,
@@ -638,7 +871,7 @@ def exports(ctx: typer.Context) -> None:
 @app.command("graph")
 def graph(ctx: typer.Context) -> None:
     """Emit symbol and import graph artifacts."""
-    result, state = _execute_pipeline(ctx)
+    result, state = _execute_pipeline_or_exit(ctx)
     _write_graph_outputs(result, state.pipeline.out)
     typer.echo("[graph] Wrote symbol and import graphs.")
 
@@ -646,7 +879,7 @@ def graph(ctx: typer.Context) -> None:
 @app.command("uses")
 def uses(ctx: typer.Context) -> None:
     """Emit the definition-to-use graph derived from SCIP."""
-    result, state = _execute_pipeline(ctx)
+    result, state = _execute_pipeline_or_exit(ctx)
     _write_uses_output(result, state.pipeline.out)
     typer.echo("[uses] Wrote uses graph.")
 
@@ -654,7 +887,7 @@ def uses(ctx: typer.Context) -> None:
 @app.command("typedness")
 def typedness(ctx: typer.Context) -> None:
     """Emit typedness analytics (errors, annotation ratios, untyped defs)."""
-    result, state = _execute_pipeline(ctx)
+    result, state = _execute_pipeline_or_exit(ctx)
     _write_typedness_output(result, state.pipeline.out)
     typer.echo("[typedness] Wrote typedness analytics.")
 
@@ -662,7 +895,7 @@ def typedness(ctx: typer.Context) -> None:
 @app.command("doc")
 def doc(ctx: typer.Context) -> None:
     """Emit doc health analytics for module docstrings."""
-    result, state = _execute_pipeline(ctx)
+    result, state = _execute_pipeline_or_exit(ctx)
     _write_doc_output(result, state.pipeline.out)
     typer.echo("[doc] Wrote doc health analytics.")
 
@@ -670,7 +903,7 @@ def doc(ctx: typer.Context) -> None:
 @app.command("coverage")
 def coverage(ctx: typer.Context) -> None:
     """Emit coverage analytics table."""
-    result, state = _execute_pipeline(ctx)
+    result, state = _execute_pipeline_or_exit(ctx)
     _write_coverage_output(result, state.pipeline.out)
     typer.echo("[coverage] Wrote coverage analytics.")
 
@@ -678,7 +911,7 @@ def coverage(ctx: typer.Context) -> None:
 @app.command("config")
 def config(ctx: typer.Context) -> None:
     """Emit config index (YAML/TOML/JSON/Markdown references)."""
-    result, state = _execute_pipeline(ctx)
+    result, state = _execute_pipeline_or_exit(ctx)
     _write_config_output(result, state.pipeline.out)
     typer.echo("[config] Wrote config index.")
 
@@ -686,7 +919,7 @@ def config(ctx: typer.Context) -> None:
 @app.command("hotspots")
 def hotspots(ctx: typer.Context) -> None:
     """Emit hotspot analytics (complexity x churn x centrality)."""
-    result, state = _execute_pipeline(ctx)
+    result, state = _execute_pipeline_or_exit(ctx)
     _write_hotspot_output(result, state.pipeline.out)
     typer.echo("[hotspots] Wrote hotspot analytics.")
 
@@ -823,6 +1056,32 @@ def overlays(
     typer.echo(f"[overlays] Manifest written to {manifest_path}")
 
 
+@app.command("to-duckdb")
+def to_duckdb(  # pragma: no cover - exercised in dedicated test
+    modules_jsonl: Annotated[
+        Path,
+        typer.Option(
+            --modules-jsonl,
+            help="Path to modules.jsonl produced by the enrichment CLI.",
+            exists=True,
+            dir_okay=False,
+            readable=True,
+        ),
+    ],
+    db_path: Annotated[
+        Path,
+        typer.Option(
+            --db,
+            help="Target DuckDB catalog for enrichment analytics.",
+            dir_okay=False,
+        ),
+    ] = Path("build/enrich/enrich.duckdb"),
+) -> None:
+    """Load ``modules.jsonl`` into DuckDB (idempotent on ``path``)."""
+    count = ingest_modules_jsonl(DuckConn(db_path=db_path), modules_jsonl)
+    typer.echo(f"[to-duckdb] Loaded {count} rows into {db_path}")
+
+
 def _build_overlay_context(
     pipeline: PipelineOptions,
     options: OverlayCLIOptions,
@@ -871,101 +1130,53 @@ def _build_module_row(
     fp: Path,
     root: Path,
     inputs: ScanInputs,
-) -> tuple[dict[str, Any], list[tuple[str, str]]]:
+) -> tuple[ModuleRecord, list[tuple[str, str]]]:
     rel = _normalized_rel_path(fp, root)
     repo_path = _normalized_rel_path(fp, inputs.repo_root)
+    module_name = module_name_from_path(inputs.repo_root, fp, inputs.package_prefix)
     stable_id = stable_id_for_path(repo_path)
     scip_symbols, symbol_edges = _scip_symbols_and_edges(rel, inputs)
+    type_errors = _type_error_count(rel, inputs)
+    record = ModuleRecord(
+        path=rel,
+        repo_path=repo_path,
+        module_name=module_name,
+        stable_id=stable_id,
+        scip_symbols=scip_symbols,
+        type_errors=type_errors,
+        type_error_count=type_errors,
+        doc_metrics={
+            "has_summary": False,
+            "param_parity": True,
+            "examples_present": False,
+        },
+        annotation_ratio={"params": 1.0, "returns": 1.0},
+        side_effects={
+            "filesystem": False,
+            "network": False,
+            "subprocess": False,
+            "database": False,
+        },
+        complexity={"branches": 0, "cyclomatic": 1, "loc": 0},
+        covered_lines_ratio=_coverage_value(rel, inputs, "covered_lines_ratio"),
+        covered_defs_ratio=_coverage_value(rel, inputs, "covered_defs_ratio"),
+    )
+
+    code = _read_module_source(fp, rel, record, inputs.max_file_bytes)
+    if code is None:
+        return record, symbol_edges
 
     try:
-        file_size = fp.stat().st_size
-    except OSError:
-        file_size = None
+        idx = _index_module_safe(rel, code)
+    except IndexingError as exc:
+        LOGGER.exception("LibCST index failed for %s", rel, extra=exc.log_extra())
+        record.add_error(exc)
+        return record, symbol_edges
 
-    if file_size is not None and file_size > inputs.max_file_bytes:
-        row = {
-            "path": rel,
-            "repo_path": repo_path,
-            "module_name": module_name_from_path(inputs.repo_root, fp, inputs.package_prefix),
-            "stable_id": stable_id,
-            "docstring": None,
-            "doc_has_summary": False,
-            "doc_param_parity": True,
-            "doc_examples_present": False,
-            "imports": [],
-            "defs": [],
-            "exports": [],
-            "exports_declared": [],
-            "outline_nodes": [],
-            "scip_symbols": scip_symbols,
-            "parse_ok": False,
-            "errors": [
-                f"file-too-large>{file_size}>{inputs.max_file_bytes}",
-            ],
-            "tags": [],
-            "type_errors": 0,
-            "type_error_count": 0,
-            "doc_summary": None,
-            "doc_metrics": {
-                "has_summary": False,
-                "param_parity": True,
-                "examples_present": False,
-            },
-            "doc_items": [],
-            "annotation_ratio": {"params": 1.0, "returns": 1.0},
-            "untyped_defs": 0,
-        }
-        return row, symbol_edges
-
-    code = fp.read_text(encoding="utf-8", errors="ignore")
-    idx = index_module(rel, code)
-    outline_nodes = _outline_nodes_for(rel, code)
-
-    type_errors = _type_error_count(rel, inputs)
-
-    row = {
-        "path": rel,
-        "repo_path": repo_path,
-        "module_name": module_name_from_path(inputs.repo_root, fp, inputs.package_prefix),
-        "stable_id": stable_id,
-        "docstring": idx.docstring,
-        "doc_has_summary": bool(idx.doc_metrics.get("has_summary")),
-        "doc_param_parity": bool(idx.doc_metrics.get("param_parity")),
-        "doc_examples_present": bool(idx.doc_metrics.get("examples_present")),
-        "imports": [
-            {
-                "module": entry.module,
-                "names": entry.names,
-                "aliases": entry.aliases,
-                "is_star": entry.is_star,
-                "level": entry.level,
-            }
-            for entry in idx.imports
-        ],
-        "defs": [{"kind": d.kind, "name": d.name, "lineno": d.lineno} for d in idx.defs],
-        "exports": sorted(idx.exports),
-        "exports_declared": sorted(idx.exports),
-        "outline_nodes": outline_nodes,
-        "scip_symbols": scip_symbols,
-        "parse_ok": idx.parse_ok,
-        "errors": idx.errors,
-        "tags": [],
-        "type_errors": type_errors,
-        "type_error_count": type_errors,
-        "doc_summary": idx.doc_summary,
-        "doc_metrics": idx.doc_metrics,
-        "doc_items": idx.doc_items,
-        "annotation_ratio": idx.annotation_ratio,
-        "untyped_defs": idx.untyped_defs,
-        "side_effects": idx.side_effects,
-        "raises": idx.raises,
-        "complexity": idx.complexity,
-        "covered_lines_ratio": _coverage_value(rel, inputs, "covered_lines_ratio"),
-        "covered_defs_ratio": _coverage_value(rel, inputs, "covered_defs_ratio"),
-        "config_refs": [],
-        "overlay_needed": False,
-    }
-    return row, symbol_edges
+    outline_nodes = _collect_outline_nodes(rel, code, record)
+    _apply_index_results(record, idx, outline_nodes)
+    record.set_fields(config_refs=[])
+    return record, symbol_edges
 
 
 def _scip_symbols_and_edges(
@@ -979,8 +1190,183 @@ def _scip_symbols_and_edges(
     return symbols, [(symbol, rel_path) for symbol in symbols]
 
 
+def _index_module_safe(rel_path: str, code: str) -> ModuleIndex:
+    """Run LibCST indexing with structured error reporting.
+
+    Parameters
+    ----------
+    rel_path : str
+        Relative path to the module being indexed. Used for error reporting and
+        context in the returned ModuleIndex.
+    code : str
+        Source code content of the module to parse. Must be valid Python syntax
+        for LibCST to successfully parse.
+
+    Returns
+    -------
+    ModuleIndex
+        Parsed LibCST metadata for the module.
+
+    Raises
+    ------
+    IndexingError
+        Raised when LibCST fails to parse the module.
+    """
+    try:
+        return index_module(rel_path, code)
+    except Exception as exc:  # pragma: no cover - defensive
+        reason = "libcst"
+        raise IndexingError(reason, path=rel_path, detail=str(exc)) from exc
+
+
+def _read_module_source(
+    fp: Path,
+    rel_path: str,
+    record: ModuleRecord,
+    max_file_bytes: int,
+) -> str | None:
+    """Return module source or record a structured error.
+
+    Parameters
+    ----------
+    fp : Path
+        File path to read source from. The file must exist and be readable.
+    rel_path : str
+        Relative path to the module, used for error reporting when read fails.
+    record : ModuleRecord
+        Module record to update with errors if reading fails. Errors are added
+        via ``record.add_error()`` and ``parse_ok`` is set to False.
+    max_file_bytes : int
+        Maximum file size in bytes. Files exceeding this limit are skipped and
+        an error is recorded.
+
+    Returns
+    -------
+    str | None
+        Source text when available, otherwise ``None`` after recording an error.
+    """
+    try:
+        file_size = fp.stat().st_size
+    except OSError as exc:
+        error = IndexingError("stat", path=rel_path, detail=str(exc))
+        LOGGER.warning("Failed to stat %s", rel_path, exc_info=True)
+        record.add_error(error)
+        return None
+    if file_size > max_file_bytes:
+        detail = f"{file_size}>{max_file_bytes}"
+        error = IndexingError("file-too-large", path=rel_path, detail=detail)
+        record.add_error(error)
+        return None
+    try:
+        return fp.read_text(encoding="utf-8", errors="ignore")
+    except OSError as exc:
+        error = IndexingError("read", path=rel_path, detail=str(exc))
+        LOGGER.warning("Failed to read %s", rel_path, exc_info=True)
+        record.add_error(error)
+        return None
+
+
+def _collect_outline_nodes(
+    rel_path: str,
+    code: str,
+    record: ModuleRecord,
+) -> list[dict[str, Any]]:
+    """Return Tree-sitter outline nodes while capturing failures.
+
+    Parameters
+    ----------
+    rel_path : str
+        Relative path to the module being processed. Used for error reporting
+        when Tree-sitter parsing fails.
+    code : str
+        Source code content to parse with Tree-sitter. Must be valid Python
+        syntax for successful parsing.
+    record : ModuleRecord
+        Module record to update with errors if Tree-sitter parsing fails. Errors
+        are added via ``record.add_error()``.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        Outline nodes; empty list when extraction fails.
+    """
+    try:
+        return _outline_nodes_for(rel_path, code)
+    except IndexingError as exc:
+        LOGGER.warning("Tree-sitter outline failed for %s", rel_path, extra=exc.log_extra())
+        record.add_error(exc)
+        return []
+
+
+def _apply_index_results(
+    record: ModuleRecord,
+    idx: ModuleIndex,
+    outline_nodes: list[dict[str, Any]],
+) -> None:
+    """Populate ``record`` with data derived from LibCST/Tree-sitter."""
+    doc_metrics = dict(idx.doc_metrics)
+    has_summary = doc_metrics.get("has_summary")
+    param_parity = doc_metrics.get("param_parity")
+    record.set_fields(
+        doc_metrics=doc_metrics,
+        docstring=idx.docstring,
+        doc_summary=idx.doc_summary,
+        doc_has_summary=bool(has_summary),
+        doc_param_parity=bool(param_parity) if param_parity is not None else True,
+        doc_examples_present=bool(doc_metrics.get("examples_present")),
+        imports=[
+            {
+                "module": entry.module,
+                "names": list(entry.names),
+                "aliases": dict(entry.aliases),
+                "is_star": entry.is_star,
+                "level": entry.level,
+            }
+            for entry in idx.imports
+        ],
+        defs=[{"kind": d.kind, "name": d.name, "lineno": d.lineno} for d in idx.defs],
+        exports=sorted(idx.exports),
+        exports_declared=sorted(idx.exports),
+        outline_nodes=outline_nodes,
+        parse_ok=idx.parse_ok,
+        doc_items=idx.doc_items,
+        annotation_ratio=dict(idx.annotation_ratio),
+        untyped_defs=idx.untyped_defs,
+        side_effects=dict(idx.side_effects),
+        raises=list(idx.raises),
+        complexity=dict(idx.complexity),
+    )
+    if idx.errors:
+        record.set_fields(errors=[*record.errors, *idx.errors])
+
+
 def _outline_nodes_for(rel_path: str, code: str) -> list[dict[str, Any]]:
-    outline = build_outline(rel_path, code.encode("utf-8"))
+    """Build Tree-sitter outline nodes for ``rel_path``.
+
+    Parameters
+    ----------
+    rel_path : str
+        Relative path to the module being processed. Used for error reporting
+        when Tree-sitter parsing fails.
+    code : str
+        Source code content to parse with Tree-sitter. Must be valid Python
+        syntax for successful parsing.
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        Outline node structures capturing names and byte offsets.
+
+    Raises
+    ------
+    IndexingError
+        Raised when Tree-sitter parsing fails.
+    """
+    try:
+        outline = build_outline(rel_path, code.encode("utf-8"))
+    except Exception as exc:  # pragma: no cover - defensive
+        reason = "tree-sitter"
+        raise IndexingError(reason, path=rel_path, detail=str(exc)) from exc
     if outline is None:
         return []
     return [
@@ -1005,7 +1391,7 @@ def _coverage_value(rel_path: str, inputs: ScanInputs, key: str) -> float:
 
 
 def _augment_module_rows(
-    module_rows: list[dict[str, Any]],
+    module_rows: list[ModuleRecord],
     scip_index: SCIPIndex,
     package_prefix: str | None,
     *,
@@ -1015,8 +1401,8 @@ def _augment_module_rows(
 
     Parameters
     ----------
-    module_rows : list[dict[str, Any]]
-        Module metadata rows to augment with graph and export information.
+    module_rows : list[ModuleRecord]
+        Module metadata rows (mutable mapping) to augment with graph and export information.
     scip_index : SCIPIndex
         SCIP index for building use graphs and resolving symbol references.
     package_prefix : str | None
@@ -1046,7 +1432,7 @@ def _augment_module_rows(
             row["exports_resolved"] = exports_resolved
         if reexports:
             row["reexports"] = reexports
-        path = row["path"]
+        path = str(row["path"])
         row["fan_in"] = import_graph.fan_in.get(path, 0)
         row["fan_out"] = import_graph.fan_out.get(path, 0)
         row["cycle_group"] = import_graph.cycle_group.get(path, -1)
@@ -1064,9 +1450,11 @@ def _augment_module_rows(
         overlay_needed = _should_mark_overlay(row)
         row["overlay_needed"] = overlay_needed
         if overlay_needed:
-            tags = set(row.get("tags", []))
-            tags.add("overlay-needed")
-            row["tags"] = sorted(tags)
+            current_tags = row.get("tags")
+            tag_list = current_tags if isinstance(current_tags, list) else []
+            tag_set = {str(tag) for tag in tag_list}
+            tag_set.add("overlay-needed")
+            row["tags"] = sorted(tag_set)
         row["hotspot_score"] = compute_hotspot_score(row)
     for record in config_records:
         referenced = config_references.get(record["path"], set())
@@ -1074,7 +1462,7 @@ def _augment_module_rows(
     return import_graph, use_graph, config_records
 
 
-def _build_tag_index(rows: list[dict[str, Any]]) -> dict[str, list[str]]:
+def _build_tag_index(rows: Sequence[Mapping[str, Any]]) -> dict[str, list[str]]:
     tag_index: dict[str, list[str]] = {}
     for row in rows:
         tags = row.get("tags") or []
@@ -1088,12 +1476,19 @@ def _build_tag_index(rows: list[dict[str, Any]]) -> dict[str, list[str]]:
     return tag_index
 
 
-def _apply_tagging(rows: list[dict[str, Any]], rules: Mapping[str, Any]) -> None:
+def _infer_tags(rows: list[ModuleRecord], rules: Mapping[str, Any]) -> None:
+    """Apply tagging rules with logging/telemetry."""
+    with _stage_span("tagging", rules=len(rules)) as meta:
+        _apply_tagging(rows, rules)
+        meta["tagged"] = sum(1 for row in rows if row.get("tags"))
+
+
+def _apply_tagging(rows: list[ModuleRecord], rules: Mapping[str, Any]) -> None:
     """Apply tagging rules to module rows and update their tags in-place.
 
     Parameters
     ----------
-    rows : list[dict[str, Any]]
+    rows : list[ModuleRecord]
         Module metadata rows to tag. Modified in-place.
     rules : Mapping[str, Any]
         Tagging rules dictionary for inferring tags from module traits.
@@ -1170,7 +1565,7 @@ def _traits_from_row(row: Mapping[str, Any]) -> ModuleTraits:
     )
 
 
-def _build_coverage_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _build_coverage_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     return [
         {
             "path": row.get("path"),
@@ -1181,7 +1576,7 @@ def _build_coverage_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
-def _build_hotspot_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _build_hotspot_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     return [
         {
             "path": row.get("path"),
@@ -1196,19 +1591,25 @@ def _build_hotspot_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _write_exports_outputs(result: PipelineResult, out: Path) -> None:
-    _write_modules_json(out, result.module_rows)
-    _write_markdown_modules(out, result.module_rows)
-    _write_repo_map(out, result)
-    _write_tag_index(out, result.tag_index)
+    with _stage_span("write-exports", modules=len(result.module_rows)) as meta:
+        _write_modules_json(out, result.module_rows)
+        _write_markdown_modules(out, result.module_rows)
+        _write_repo_map(out, result)
+        _write_tag_index(out, result.tag_index)
+        meta["tag_groups"] = len(result.tag_index)
 
 
 def _write_graph_outputs(result: PipelineResult, out: Path) -> None:
-    _write_symbol_graph(out, result.symbol_edges)
-    write_import_graph(result.import_graph, out / "graphs" / "imports.parquet")
+    with _stage_span("write-graphs", symbols=len(result.symbol_edges)) as meta:
+        _write_symbol_graph(out, result.symbol_edges)
+        write_import_graph(result.import_graph, out / "graphs" / "imports.parquet")
+        meta["imports"] = sum(len(edges) for edges in result.import_graph.edges.values())
 
 
 def _write_uses_output(result: PipelineResult, out: Path) -> None:
-    write_use_graph(result.use_graph, out / "graphs" / "uses.parquet")
+    with _stage_span("write-uses", files=len(result.use_graph.uses_by_file)) as meta:
+        write_use_graph(result.use_graph, out / "graphs" / "uses.parquet")
+        meta["edges"] = sum(len(paths) for paths in result.use_graph.uses_by_file.values())
 
 
 def _apply_ownership(
@@ -1256,7 +1657,7 @@ def _write_ownership_output(ownership: OwnershipIndex, out: Path) -> None:
 
 
 def _write_slices_output(
-    module_rows: list[dict[str, Any]],
+    module_rows: Sequence[Mapping[str, Any]],
     out: Path,
     *,
     slices_filter: list[str] | None = None,
@@ -1345,22 +1746,31 @@ def _write_ast_outputs(result: PipelineResult, out: Path, *, emit_ast: bool) -> 
     typer.echo(f"[ast] Wrote AST nodes ({len(nodes)}) and metrics ({len(metrics)}) tables + JSONL.")
 
 
-def _write_modules_json(out: Path, module_rows: list[dict[str, Any]]) -> None:
-    write_jsonl(out / "modules" / "modules.jsonl", module_rows)
+def _write_modules_json(out: Path, module_rows: Sequence[ModuleRecord | dict[str, Any]]) -> None:
+    records: list[dict[str, Any]] = []
+    for row in module_rows:
+        payload = row.as_json_row() if isinstance(row, ModuleRecord) else dict(row)
+        ModuleRecordModel.model_validate(payload)
+        records.append(payload)
+    write_jsonl(out / "modules" / "modules.jsonl", records)
 
 
-def _write_markdown_modules(out: Path, module_rows: list[dict[str, Any]]) -> None:
+def _write_markdown_modules(
+    out: Path, module_rows: Sequence[ModuleRecord | dict[str, Any]]
+) -> None:
     modules_dir = out / "modules"
     modules_dir.mkdir(parents=True, exist_ok=True)
     for row in module_rows:
-        path = row.get("path")
+        record = row.as_json_row() if isinstance(row, ModuleRecord) else row
+        path = record.get("path")
         if not isinstance(path, str):
             continue
         target = modules_dir / (Path(path).with_suffix(".md").name)
-        write_markdown_module(target, row)
+        write_markdown_module(target, record)
 
 
 def _write_repo_map(out: Path, result: PipelineResult) -> None:
+    tag_counts = {tag: len(paths) for tag, paths in result.tag_index.items()}
     write_json(
         out / "repo_map.json",
         {
@@ -1372,7 +1782,15 @@ def _write_repo_map(out: Path, result: PipelineResult) -> None:
             "config_files": len(result.config_index),
             "generated_at": datetime.now(tz=UTC).isoformat(timespec="seconds"),
             "tags": result.tag_index,
+            "tag_counts": tag_counts,
         },
+    )
+    LOGGER.info(
+        "stage=summary modules=%d symbol_edges=%d tags=%d out=%s",
+        len(result.module_rows),
+        len(result.symbol_edges),
+        len(tag_counts),
+        out,
     )
 
 

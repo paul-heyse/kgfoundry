@@ -136,7 +136,7 @@ def build_report_uri(
     return str(_report_path(session_id, run_id, trace_id, started_ns, ensure_parent=False))
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _RunBuffer:
     session_id: str | None = None
     run_id: str | None = None
@@ -147,6 +147,12 @@ class _RunBuffer:
     status: str = "ok"
     stop_reason: str | None = None
     diag_path: str | None = None
+
+
+def _buffer_update(buffer: _RunBuffer, **changes: object) -> None:
+    """Safely mutate the frozen run buffer."""
+    for attr, value in changes.items():
+        object.__setattr__(buffer, attr, value)  # noqa: PLC2801
 
 
 class _FlightRecorder:
@@ -173,7 +179,7 @@ class _FlightRecorder:
             buffer = self._buffers.setdefault(trace_id, _RunBuffer(trace_id=trace_id))
             start_ns = getattr(span, "start_time", None)
             if isinstance(start_ns, int):
-                buffer.started_ns = buffer.started_ns or start_ns
+                _buffer_update(buffer, started_ns=buffer.started_ns or start_ns)
             _update_identities(buffer, span)
 
     def on_end(self, span: object) -> None:
@@ -193,7 +199,7 @@ class _FlightRecorder:
         with self._lock:
             buffer = self._buffers.setdefault(trace_id, _RunBuffer(trace_id=trace_id))
             buffer.events.append(event)
-            buffer.root_span_id = buffer.root_span_id or event.get("span_id")
+            _buffer_update(buffer, root_span_id=buffer.root_span_id or event.get("span_id"))
             _update_identities(buffer, span)
             _update_status(buffer, span, event)
             if root_span:
@@ -219,7 +225,7 @@ class _FlightRecorder:
             buffer.started_ns,
             ensure_parent=True,
         )
-        buffer.diag_path = str(path)
+        _buffer_update(buffer, diag_path=str(path))
         events: list[FlightEvent] = sorted(buffer.events, key=_event_start_ns)
         payload: dict[str, object] = {
             "schema": "codeintel.flight-recorder@v1",
@@ -331,10 +337,13 @@ def _update_identities(buffer: _RunBuffer, span: object) -> None:
     attrs = getattr(span, "attributes", {}) or {}
     session = attrs.get(Attrs.SESSION_ID)
     run_id = attrs.get(Attrs.RUN_ID)
+    updates: dict[str, object] = {}
     if isinstance(session, str):
-        buffer.session_id = buffer.session_id or session
+        updates["session_id"] = buffer.session_id or session
     if isinstance(run_id, str):
-        buffer.run_id = buffer.run_id or run_id
+        updates["run_id"] = buffer.run_id or run_id
+    if updates:
+        _buffer_update(buffer, **updates)
 
 
 def _update_status(buffer: _RunBuffer, span: object, event: Mapping[str, Any]) -> None:
@@ -342,13 +351,15 @@ def _update_status(buffer: _RunBuffer, span: object, event: Mapping[str, Any]) -
     status_code = getattr(status_obj, "status_code", None)
     description = getattr(status_obj, "description", None)
     if getattr(status_code, "name", "") == "ERROR":
-        buffer.status = "error"
-        buffer.stop_reason = description or event.get("name")
+        _buffer_update(buffer, status="error", stop_reason=description or event.get("name"))
     for evt in event.get("events", []):
         if evt.get("name") == "exception":
-            buffer.status = "error"
             message = evt.get("attrs", {}).get("exception.message")
-            buffer.stop_reason = buffer.stop_reason or message or evt.get("name")
+            _buffer_update(
+                buffer,
+                status="error",
+                stop_reason=buffer.stop_reason or message or evt.get("name"),
+            )
 
 
 def _is_root_span(span: object) -> bool:

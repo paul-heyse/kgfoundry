@@ -20,7 +20,7 @@ Docstring summarization helpers.
 
 - **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 3
+- **cycle_group**: 117
 
 ## Ownership
 

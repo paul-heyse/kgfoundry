@@ -37,7 +37,7 @@ OpenTelemetry logging bootstrap helpers.
 
 - **fan_in**: 1
 - **fan_out**: 0
-- **cycle_group**: 43
+- **cycle_group**: 6
 
 ## Ownership
 

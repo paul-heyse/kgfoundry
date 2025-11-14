@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -25,7 +26,7 @@ else:  # pragma: no cover - runtime placeholder
     GitRepoType = object
 
 
-def compute_hotspot_score(record: dict[str, Any]) -> float:
+def compute_hotspot_score(record: Mapping[str, Any]) -> float:
     """Compute a heuristic hotspot score for a module record.
 
     Parameters
@@ -45,7 +46,9 @@ def compute_hotspot_score(record: dict[str, Any]) -> float:
     type_errors = float(record.get("type_errors") or 0)
     untyped = float(record.get("untyped_defs") or 0)
     coverage = float(record.get("covered_lines_ratio") or 0.0)
-    churn = float(_git_churn(record["path"]) or 0)
+    path_value = record.get("path")
+    path = str(path_value) if path_value is not None else ""
+    churn = float(_git_churn(path) or 0)
 
     structural = math.log1p(fan_in + fan_out) * 0.4
     complexity = math.log1p(cyclomatic + untyped) * 0.3

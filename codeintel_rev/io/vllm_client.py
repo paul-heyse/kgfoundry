@@ -20,7 +20,7 @@ from codeintel_rev.observability.otel import record_span_event
 from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.telemetry.decorators import span_context
-from codeintel_rev.telemetry.prom import EMBED_BATCH_SIZE, EMBED_LATENCY_SECONDS
+from codeintel_rev.metrics.registry import EMBED_BATCH_SIZE, EMBED_LATENCY_SECONDS
 from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from codeintel_rev.typing import NDArrayF32, gate_import
 from kgfoundry_common.logging import get_logger

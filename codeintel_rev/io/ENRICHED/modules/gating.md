@@ -36,7 +36,7 @@ Adaptive gating helpers for multi-stage retrieval pipelines.
 
 - **fan_in**: 2
 - **fan_out**: 7
-- **cycle_group**: 78
+- **cycle_group**: 43
 
 ## Ownership
 

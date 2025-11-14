@@ -40,7 +40,7 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 - from **kgfoundry_common.errors** import EmbeddingError, VectorSearchError
 - from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.app.config_context** import ApplicationContext
-- from **codeintel_rev.config.settings** import RerankConfig, XTRConfig
+- from **codeintel_rev.config.settings** import CodeRankLLMConfig, RerankConfig, XTRConfig
 - from **codeintel_rev.io.xtr_manager** import XTRIndex
 
 ## Definitions
@@ -89,34 +89,34 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 - function: `_hydrate_and_rerank_records` (line 1286)
 - function: `_maybe_rerank` (line 1454)
 - function: `_rerank_gate_decision` (line 1499)
-- function: `_build_findings` (line 1511)
-- function: `merge_explainability_into_findings` (line 1551)
-- function: `_build_method_explainability` (line 1616)
-- function: `_build_method` (line 1683)
-- function: `_assemble_extras` (line 1722)
-- function: `_make_envelope` (line 1787)
-- function: `_observability_links` (line 1806)
-- function: `build_observability_links` (line 1833)
-- function: `_clamp_limit` (line 1844)
-- function: `_coerce_positive_int` (line 1855)
-- function: `_dedupe_preserve_order` (line 1865)
-- class: `WarpOutcome` (line 1877)
-- class: `FusionRequest` (line 1888)
-- class: `MethodContext` (line 1902)
+- function: `_build_findings` (line 1516)
+- function: `merge_explainability_into_findings` (line 1556)
+- function: `_build_method_explainability` (line 1621)
+- function: `_build_method` (line 1688)
+- function: `_assemble_extras` (line 1727)
+- function: `_make_envelope` (line 1792)
+- function: `_observability_links` (line 1811)
+- function: `build_observability_links` (line 1838)
+- function: `_clamp_limit` (line 1849)
+- function: `_coerce_positive_int` (line 1860)
+- function: `_dedupe_preserve_order` (line 1870)
+- class: `WarpOutcome` (line 1882)
+- class: `FusionRequest` (line 1893)
+- class: `MethodContext` (line 1907)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 24
-- **cycle_group**: 151
+- **cycle_group**: 138
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 17
-- recent churn 90: 17
+- recent churn 30: 19
+- recent churn 90: 19
 
 ## Usage
 
@@ -153,9 +153,9 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 
 ## Complexity
 
-- branches: 175
-- cyclomatic: 176
-- loc: 1915
+- branches: 178
+- cyclomatic: 179
+- loc: 1920
 
 ## Doc Coverage
 

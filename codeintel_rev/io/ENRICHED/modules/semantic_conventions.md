@@ -14,22 +14,22 @@ Shared OpenTelemetry semantic convention helpers for CodeIntel.
 ## Definitions
 
 - class: `Attrs` (line 10)
-- function: `as_kv` (line 99)
-- function: `to_label_str` (line 117)
+- function: `as_kv` (line 102)
+- function: `to_label_str` (line 120)
 
 ## Graph Metrics
 
 - **fan_in**: 16
 - **fan_out**: 0
-- **cycle_group**: 44
+- **cycle_group**: 7
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 3
-- recent churn 90: 3
+- recent churn 30: 4
+- recent churn 90: 4
 
 ## Usage
 
@@ -71,7 +71,7 @@ Attrs, as_kv, to_label_str
 
 - branches: 2
 - cyclomatic: 3
-- loc: 140
+- loc: 143
 
 ## Doc Coverage
 

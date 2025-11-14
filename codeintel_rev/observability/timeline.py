@@ -428,7 +428,12 @@ class _TimelineScope:
         return False
 
 
-def new_timeline(session_id: str | None, *, force: bool = False) -> Timeline:
+def new_timeline(
+    session_id: str | None,
+    *,
+    run_id: str | None = None,
+    force: bool = False,
+) -> Timeline:
     """Return a new timeline bound to ``session_id``.
 
     Extended Summary
@@ -442,6 +447,9 @@ def new_timeline(session_id: str | None, *, force: bool = False) -> Timeline:
     ----------
     session_id : str | None
         Session identifier. If None, uses "anonymous" as the session identifier.
+    run_id : str | None, optional
+        Optional externally provided run identifier. When ``None`` or empty,
+        a new UUID4 hex string is generated.
     force : bool, optional
         If True, forces timeline sampling even if sampling rate would normally
         skip this session (default: False). Used for debugging and critical paths.
@@ -460,7 +468,9 @@ def new_timeline(session_id: str | None, *, force: bool = False) -> Timeline:
     """
     session = session_id or "anonymous"
     sampled = _FlightRecorder.should_sample(force=force)
-    return Timeline(session_id=session, run_id=uuid.uuid4().hex, sampled=sampled)
+    supplied_run = (run_id or "").strip()
+    resolved_run_id = supplied_run if supplied_run else uuid.uuid4().hex
+    return Timeline(session_id=session, run_id=resolved_run_id, sampled=sampled)
 
 
 def current_timeline() -> Timeline | None:
@@ -477,6 +487,7 @@ def current_timeline() -> Timeline | None:
 def current_or_new_timeline(
     *,
     session_id: str | None = None,
+    run_id: str | None = None,
     force: bool = False,
 ) -> Timeline:
     """Return the active timeline or create a new one when missing.
@@ -493,6 +504,9 @@ def current_or_new_timeline(
     session_id : str | None, optional
         Session identifier to use if creating a new timeline. If None and a new
         timeline is needed, uses "anonymous".
+    run_id : str | None, optional
+        Optional externally supplied run identifier passed to :func:`new_timeline`
+        when a new timeline must be created.
     force : bool, optional
         If True, forces timeline sampling when creating a new timeline (default: False).
 
@@ -511,7 +525,7 @@ def current_or_new_timeline(
     timeline = current_timeline()
     if timeline is not None:
         return timeline
-    return new_timeline(session_id, force=force)
+    return new_timeline(session_id, run_id=run_id, force=force)
 
 
 @contextmanager

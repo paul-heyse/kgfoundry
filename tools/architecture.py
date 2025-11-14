@@ -1,11 +1,11 @@
 """Architecture checks for the internal tooling package.
 
 The tooling suite follows a layered structure where reusable domain helpers live
-under ``tools._shared``; feature packages such as ``tools.docs`` and
-``tools.docstring_builder`` adapt those helpers; and executable entry points
-(``tools/*.py`` and ``*.cli`` modules) form the outermost IO/CLI layer.  This
-module provides pytestarch-based helpers so both the CLI and the automated test
-suite can enforce that layering discipline.
+under ``tools._shared``; feature packages such as ``tools.navmap`` and
+``tools.codemods`` adapt those helpers; and executable entry points (``tools/*.py``
+and ``*.cli`` modules) form the outermost IO/CLI layer. This module provides
+pytestarch-based helpers so both the CLI and the automated test suite can enforce
+that layering discipline.
 """
 
 from __future__ import annotations
@@ -34,9 +34,9 @@ TOOLS_ROOT = Path(__file__).resolve().parent
 REPO_ROOT = TOOLS_ROOT.parent
 
 DOMAIN_PATTERNS = (r"^kgfoundry\.tools\._shared(\..+)?$",)
-ADAPTER_PATTERNS = (r"^kgfoundry\.tools\.(?:docstring_builder|docs|navmap|codemods)(\..+)?$",)
+ADAPTER_PATTERNS = (r"^kgfoundry\.tools\.(?:docs|navmap|codemods)(\..+)?$",)
 CLI_PATTERNS = (
-    r"^kgfoundry\.tools\.(?!(?:_shared|docs|docstring_builder|navmap|codemods)$)[^.]+$",
+    r"^kgfoundry\.tools\.(?!(?:_shared|docs|navmap|codemods)$)[^.]+$",
     r"^kgfoundry\.tools\..*\.cli(\..+)?$",
 )
 
@@ -48,15 +48,10 @@ ADAPTER_SUPPORT_MODULES = {
 
 ADAPTER_BASE_PACKAGES = {
     "kgfoundry.tools.codemods",
-    "kgfoundry.tools.docstring_builder",
-    "kgfoundry.tools.docs",
     "kgfoundry.tools.navmap",
 }
 
-CLI_SUPPORT_MODULES = {
-    "kgfoundry.tools.docstring_builder.__init__",
-    "kgfoundry.tools.docstring_builder.__main__",
-}
+CLI_SUPPORT_MODULES: set[str] = set()
 
 
 @dataclass(frozen=True, slots=True)

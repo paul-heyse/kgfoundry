@@ -6,16 +6,16 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
+from codeintel_rev.metrics.registry import (
+    GATING_DECISIONS_TOTAL,
+    GATING_QUERY_AMBIGUITY,
+    GATING_RRF_K,
+)
 from codeintel_rev.observability.otel import record_span_event, set_current_span_attrs
 from codeintel_rev.observability.semantic_conventions import Attrs, to_label_str
 from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.retrieval.telemetry import record_stage_decision
 from codeintel_rev.retrieval.types import StageDecision, StageSignals
-from codeintel_rev.telemetry.prom import (
-    GATING_DECISIONS_TOTAL,
-    QUERY_AMBIGUITY,
-    RRFK,
-)
 from codeintel_rev.telemetry.steps import StepEvent, emit_step
 
 
@@ -389,10 +389,10 @@ def decide_budgets(profile: QueryProfile, cfg: StageGateConfig) -> BudgetDecisio
     GATING_DECISIONS_TOTAL.labels(klass=klass, rm3_enabled=str(rm3_enabled)).inc()
     rrf_value = attrs.get("rrf_k")
     if isinstance(rrf_value, (int, float)):
-        RRFK.observe(float(rrf_value))
+        GATING_RRF_K.observe(float(rrf_value))
     else:
-        RRFK.observe(float(decision.rrf_k))
-    QUERY_AMBIGUITY.observe(profile.ambiguity_score)
+        GATING_RRF_K.observe(float(decision.rrf_k))
+    GATING_QUERY_AMBIGUITY.observe(profile.ambiguity_score)
     timeline = current_timeline()
     if timeline is not None:
         timeline.event("decision", "gate.budget", attrs=attrs)

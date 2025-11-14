@@ -10,3 +10,8 @@
   views (`v_faiss_pool`, `v_pool_coverage`) for coverage heatmaps.
 - Lifecycle manager stages `faiss_idmap.parquet` + `tuning.json`, and the new
   operator runbook + SQL examples document the full workflow.
+- Enrichment pipeline hardening: stage-scoped logging/metrics, `ModuleRecord`
+  dataclass with structured error capture, per-stage unit tests, repo map tag
+  counts, `docs/enrich_pipeline.md` describing the CLI workflow, DuckDB ingestion
+  (`codeintel-enrich to-duckdb`) with schema validation, and new tests covering the
+  LibCST/SCIP/tagging/writer stages.

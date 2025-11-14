@@ -1,8 +1,8 @@
 """Shared CLI context for the orchestration command suite.
 
 This module mirrors the shared tooling helpers introduced for other CLIs
-(`download`, `tools.docstring_builder`) so orchestration commands can load typed
-augment and registry metadata without duplicating configuration logic. The
+(for example, ``download``) so orchestration commands can load typed augment
+and registry metadata without duplicating configuration logic. The
 helpers expose cached accessors for the `CLIToolSettings`, `CLIToolingContext`,
 and associated metadata models consumed by downstream tooling (OpenAPI
 generation, MkDocs diagrams, navmap loader, etc.).

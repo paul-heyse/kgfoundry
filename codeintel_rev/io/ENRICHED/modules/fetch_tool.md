@@ -19,24 +19,24 @@ Lightweight fetch helper used by the in-process MCP harness.
 - function: `handle_fetch` (line 19)
 - function: `_build_url` (line 78)
 - function: `_normalize_fetch_input` (line 97)
-- function: `_coerce_optional_int` (line 127)
-- function: `_coerce_object_ids` (line 145)
-- function: `_coerce_resolve` (line 179)
-- function: `_coerce_int` (line 212)
+- function: `_coerce_optional_int` (line 131)
+- function: `_coerce_object_ids` (line 149)
+- function: `_coerce_resolve` (line 183)
+- function: `_coerce_int` (line 216)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 127
+- **cycle_group**: 142
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 
@@ -64,7 +64,7 @@ Lightweight fetch helper used by the in-process MCP harness.
 
 ## Hotspot
 
-- score: 2.11
+- score: 2.12
 
 ## Side Effects
 
@@ -76,9 +76,9 @@ NotImplementedError
 
 ## Complexity
 
-- branches: 27
-- cyclomatic: 28
-- loc: 249
+- branches: 28
+- cyclomatic: 29
+- loc: 253
 
 ## Doc Coverage
 

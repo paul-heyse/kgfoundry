@@ -59,15 +59,15 @@ In-memory run report builder fed by timeline events.
 
 - **fan_in**: 6
 - **fan_out**: 7
-- **cycle_group**: 79
+- **cycle_group**: 47
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 8
+- recent churn 90: 8
 
 ## Usage
 

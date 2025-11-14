@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from codeintel_rev.module_utils import (
@@ -16,9 +16,9 @@ EXPORT_HUB_THRESHOLD = 10
 
 
 def build_module_name_map(
-    rows: list[dict[str, Any]],
+    rows: Sequence[Mapping[str, Any]],
     package_prefix: str | None = None,
-) -> dict[str, dict[str, Any]]:
+) -> dict[str, Mapping[str, Any]]:
     """Return mapping of module name → module row for quick lookup.
 
     Parameters
@@ -33,7 +33,7 @@ def build_module_name_map(
     dict[str, dict[str, Any]]
         Mapping of dotted module names to the associated row dictionaries.
     """
-    mapping: dict[str, dict[str, Any]] = {}
+    mapping: dict[str, Mapping[str, Any]] = {}
     for row in rows:
         for candidate in module_name_candidates(row["path"], package_prefix):
             if candidate:

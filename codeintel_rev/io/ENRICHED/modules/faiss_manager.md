@@ -84,7 +84,7 @@ corpus size for optimal performance.
 
 - **fan_in**: 8
 - **fan_out**: 13
-- **cycle_group**: 78
+- **cycle_group**: 43
 
 ## Ownership
 

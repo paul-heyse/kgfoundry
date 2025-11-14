@@ -7,10 +7,8 @@ import importlib
 import pytest
 
 CLI_SUITES = (
-    ("tools.docs.build_graphs", "docs._scripts.cli_context", "docs-build-graphs"),
     ("download.cli", "download.cli_context", None),
     ("orchestration.cli", "orchestration.cli_context", None),
-    ("tools.docstring_builder.cli", "tools.docstring_builder.cli_context", None),
 )
 
 

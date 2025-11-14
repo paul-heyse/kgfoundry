@@ -11,13 +11,9 @@ from types import ModuleType
 from typing import Any, Protocol
 
 from codeintel_rev.observability.logs import init_otel_logging
+from codeintel_rev.observability.metrics import install_metrics_provider
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.observability import start_span
-
-try:  # pragma: no cover - optional dependency
-    from prometheus_client import start_http_server as _prom_start_http_server
-except ImportError:  # pragma: no cover - optional dependency
-    _prom_start_http_server = None
 
 try:  # pragma: no cover - optional dependency
     from codeintel_rev.observability.flight_recorder import (
@@ -39,8 +35,6 @@ class _TelemetryState:
         "httpx_instrumented",
         "initialized",
         "logging_instrumented",
-        "metrics_initialized",
-        "prometheus_running",
         "trace_module",
         "trace_provider",
         "tracing_enabled",
@@ -51,11 +45,9 @@ class _TelemetryState:
         self.tracing_enabled = False
         self.trace_module: ModuleType | None = None
         self.trace_provider: object | None = None
-        self.metrics_initialized = False
         self.fastapi_instrumented = False
         self.httpx_instrumented = False
         self.logging_instrumented = False
-        self.prometheus_running = False
 
 
 class SupportsState(Protocol):
@@ -392,7 +384,7 @@ def init_telemetry(
     metrics_enabled = _env_flag("CODEINTEL_OTEL_METRICS_ENABLED", default=True)
     if metrics_enabled:
         metrics_endpoint = os.getenv("CODEINTEL_OTEL_METRICS_ENDPOINT", otlp_endpoint or None)
-        _install_metrics_provider(resource, metrics_endpoint)
+        install_metrics_provider(resource, otlp_endpoint=metrics_endpoint)
     if install_flight_recorder and _install_flight_recorder is not None:
         try:
             _install_flight_recorder(provider)
@@ -587,139 +579,6 @@ def _install_logging_instrumentation() -> None:
         _STATE.logging_instrumented = True
 
 
-def _install_metrics_provider(resource: object, endpoint: str | None) -> None:
-    """Configure OTLP/Prometheus metric readers when SDK components are present."""
-    if _STATE.metrics_initialized:
-        return
-    try:
-        metrics_module = importlib.import_module("opentelemetry.sdk.metrics")
-        view_module = importlib.import_module("opentelemetry.sdk.metrics.view")
-        export_module = importlib.import_module("opentelemetry.sdk.metrics.export")
-        metrics_api = importlib.import_module("opentelemetry.metrics")
-    except ImportError:  # pragma: no cover - optional dependency
-        LOGGER.debug("OpenTelemetry metrics SDK unavailable; skipping metric provider setup")
-        return
-    metric_readers: list[object] = []
-    exporter_endpoint = endpoint or os.getenv("CODEINTEL_OTEL_METRICS_ENDPOINT")
-    if exporter_endpoint:
-        try:
-            exporter_module = importlib.import_module(
-                "opentelemetry.exporter.otlp.proto.http.metric_exporter"
-            )
-        except ImportError:  # pragma: no cover - optional dependency
-            LOGGER.debug("OTLP metric exporter unavailable; skipping OTLP reader")
-        else:
-            try:
-                exporter = exporter_module.OTLPMetricExporter(endpoint=exporter_endpoint)
-                reader_cls = getattr(export_module, "PeriodicExportingMetricReader", None)
-                if reader_cls is not None:
-                    metric_readers.append(reader_cls(exporter))
-            except (RuntimeError, TypeError, ValueError):  # pragma: no cover - defensive
-                LOGGER.debug("Failed to configure OTLP metric exporter", exc_info=True)
-    if _env_flag("CODEINTEL_OTEL_PROMETHEUS_ENABLED", default=True):
-        reader = _build_prometheus_reader()
-        if reader is not None:
-            metric_readers.append(reader)
-            _start_prometheus_http_server()
-    if not metric_readers:
-        LOGGER.debug("No metric readers configured; skipping meter provider setup")
-        return
-    views = _build_metric_views(view_module, export_module)
-    try:
-        provider = metrics_module.MeterProvider(
-            resource=resource,
-            metric_readers=metric_readers,
-            views=views or None,
-        )
-        metrics_api.set_meter_provider(provider)
-        _STATE.metrics_initialized = True
-    except (RuntimeError, ValueError):  # pragma: no cover - defensive
-        LOGGER.debug("Failed to configure meter provider", exc_info=True)
-
-
-def _build_prometheus_reader() -> object | None:
-    """Return a PrometheusMetricReader when exporter is installed.
-
-    Returns
-    -------
-    object | None
-        Reader instance or ``None`` when unavailable.
-    """
-    module = _optional_import("opentelemetry.exporter.prometheus")
-    if module is None:
-        return None
-    reader_cls = getattr(module, "PrometheusMetricReader", None)
-    if reader_cls is None:
-        return None
-    try:
-        return reader_cls()
-    except (RuntimeError, ValueError, TypeError):  # pragma: no cover - defensive
-        LOGGER.debug("PrometheusMetricReader construction failed", exc_info=True)
-        return None
-
-
-def _start_prometheus_http_server() -> None:
-    """Expose the default Prometheus registry when supported."""
-    if _STATE.prometheus_running or _prom_start_http_server is None:
-        return
-    host = os.getenv("CODEINTEL_OTEL_PROMETHEUS_HOST", os.getenv("PROMETHEUS_HOST", "127.0.0.1"))
-    raw_port = os.getenv("CODEINTEL_OTEL_PROMETHEUS_PORT", os.getenv("PROMETHEUS_PORT", "9464"))
-    try:
-        port = int(raw_port)
-    except (TypeError, ValueError):
-        port = 9464
-    try:
-        _prom_start_http_server(port=port, addr=host)
-        LOGGER.info("Prometheus scrape endpoint listening", extra={"host": host, "port": port})
-        _STATE.prometheus_running = True
-    except OSError:  # pragma: no cover - defensive
-        LOGGER.warning("Failed to start Prometheus HTTP server", exc_info=True)
-
-
-def _build_metric_views(view_module: ModuleType, export_module: ModuleType) -> list[object]:
-    """Return default metric views for latency/counter instruments.
-
-    Returns
-    -------
-    list[object]
-        Collection of :class:`View` instances configuring histogram buckets and attributes.
-    """
-    view_cls = getattr(view_module, "View", None)
-    histogram_cls = getattr(export_module, "ExplicitBucketHistogramAggregation", None)
-    if view_cls is None or histogram_cls is None:
-        return []
-    bucket_defs = [
-        (
-            "codeintel_mcp_request_latency_seconds",
-            [0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0],
-            ("tool", "status"),
-        ),
-        (
-            "codeintel_embed_latency_seconds",
-            [0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10],
-            (),
-        ),
-        (
-            "codeintel_faiss_search_latency_seconds",
-            [0.001, 0.005, 0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1, 2],
-            (),
-        ),
-        (
-            "codeintel_rerank_exact_latency_ms",
-            [1, 5, 10, 25, 50, 100, 250, 500],
-            (),
-        ),
-    ]
-    views: list[object] = []
-    for instrument_name, buckets, attrs in bucket_defs:
-        kwargs: dict[str, object] = {
-            "instrument_name": instrument_name,
-            "aggregation": histogram_cls(buckets),
-        }
-        if attrs:
-            kwargs["attribute_keys"] = attrs
-        views.append(view_cls(**kwargs))
-    return views
 
 
 def instrument_fastapi(app: SupportsState) -> None:

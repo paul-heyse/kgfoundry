@@ -65,7 +65,7 @@ Decorators for consistent span/timeline instrumentation.
 
 - **fan_in**: 9
 - **fan_out**: 5
-- **cycle_group**: 65
+- **cycle_group**: 19
 
 ## Ownership
 

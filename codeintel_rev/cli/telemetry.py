@@ -55,8 +55,8 @@ def run_report(
         OutputFormat,
         typer.Option(
             OutputFormat.JSON,
-            "--format",
-            "-f",
+            --format,
+            -f,
             case_sensitive=False,
             help="Select json (default), md, or mmd output.",
         ),
@@ -84,7 +84,7 @@ def runpack(
         str | None,
         typer.Option(
             None,
-            "--reason",
+            --reason,
             help="Optional reason stored in metadata.",
         ),
     ] = None,
@@ -92,7 +92,7 @@ def runpack(
         str | None,
         typer.Option(
             None,
-            "--trace-id",
+            --trace-id,
             help="Optional trace identifier to record.",
         ),
     ] = None,

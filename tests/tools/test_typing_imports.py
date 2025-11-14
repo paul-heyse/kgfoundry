@@ -16,7 +16,6 @@ import pytest
 from tests.helpers import load_module
 
 TOOLS_DIRS = [
-    Path(__file__).parent.parent.parent / "tools" / "docstring_builder",
     Path(__file__).parent.parent.parent / "tools" / "docs",
     Path(__file__).parent.parent.parent / "tools" / "lint",
     Path(__file__).parent.parent.parent / "tools" / "navmap",
@@ -183,9 +182,6 @@ class TestToolsTypingFacade:
 @pytest.mark.parametrize(
     "module_name",
     [
-        "tools.docstring_builder.harvest",
-        "tools.docstring_builder.policy",
-        "tools.docstring_builder.pipeline",
         "tools.lint.check_typing_gates",
         "tools.lint.apply_postponed_annotations",
     ],

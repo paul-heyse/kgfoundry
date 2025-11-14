@@ -1,55 +1,59 @@
-# cli/telemetry.py
+# retrieval/telemetry.py
 
 ## Docstring
 
 ```
-Telemetry-focused CLI commands.
+Stage-level telemetry helpers used by multi-stage retrieval pipelines.
 ```
 
 ## Imports
 
 - from **__future__** import annotations
-- from **(absolute)** import json
-- from **enum** import Enum
-- from **pathlib** import Path
-- from **typing** import Annotated
-- from **(absolute)** import typer
-- from **codeintel_rev.app.config_context** import ApplicationContext
-- from **codeintel_rev.observability.reporting** import build_timeline_run_report, render_timeline_markdown, timeline_mermaid
-- from **codeintel_rev.observability.runpack** import make_runpack
+- from **collections.abc** import Iterator
+- from **contextlib** import contextmanager
+- from **dataclasses** import dataclass, field
+- from **time** import perf_counter
+- from **codeintel_rev.retrieval.types** import StageDecision
+- from **codeintel_rev.telemetry.otel_metrics** import build_counter
+- from **kgfoundry_common.logging** import get_logger
+- from **kgfoundry_common.observability** import MetricsProvider
 
 ## Definitions
 
-- variable: `app` (line 20)
-- variable: `SessionArg` (line 22)
-- variable: `RunIdOption` (line 23)
-- variable: `TimelineDirOption` (line 31)
-- class: `OutputFormat` (line 41)
-- function: `run_report` (line 50)
-- function: `runpack` (line 80)
+- class: `StageTiming` (line 17)
+- class: `_TimerRuntime` (line 41)
+- class: `_StageTimer` (line 83)
+- function: `track_stage` (line 147)
+- variable: `LOGGER` (line 193)
+- function: `record_stage_metric` (line 201)
+- function: `record_stage_decision` (line 226)
 
 ## Graph Metrics
 
-- **fan_in**: 0
-- **fan_out**: 4
-- **cycle_group**: 139
+- **fan_in**: 2
+- **fan_out**: 2
+- **cycle_group**: 30
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 
 - used by files: 0
 - used by symbols: 0
 
+## Declared Exports (__all__)
+
+StageTiming, record_stage_decision, record_stage_metric, track_stage
+
 ## Doc Health
 
-- **summary**: Telemetry-focused CLI commands.
+- **summary**: Stage-level telemetry helpers used by multi-stage retrieval pipelines.
 - has summary: yes
 - param parity: no
 - examples present: no
@@ -68,24 +72,27 @@ Telemetry-focused CLI commands.
 
 ## Hotspot
 
-- score: 1.67
+- score: 1.85
 
 ## Side Effects
 
-- filesystem
+- none detected
 
 ## Complexity
 
-- branches: 3
-- cyclomatic: 4
-- loc: 129
+- branches: 7
+- cyclomatic: 8
+- loc: 247
 
 ## Doc Coverage
 
-- `OutputFormat` (class): summary=yes, examples=no — Output formats supported by the run report command.
-- `run_report` (function): summary=yes, params=mismatch, examples=no — Render a run report from Timeline JSONL artifacts.
-- `runpack` (function): summary=yes, params=ok, examples=no — Create a runpack zip for the specified session/run.
+- `StageTiming` (class): summary=yes, examples=no — Snapshot describing how long a stage took relative to its budget.
+- `_TimerRuntime` (class): summary=yes, examples=no — Mutable stopwatch backing the frozen stage timer.
+- `_StageTimer` (class): summary=no, examples=no
+- `track_stage` (function): summary=yes, params=ok, examples=no — Context manager yielding a timer that can be converted into StageTiming.
+- `record_stage_metric` (function): summary=yes, params=mismatch, examples=no — Record the provided ``timing`` in Prometheus metrics.
+- `record_stage_decision` (function): summary=yes, params=mismatch, examples=no — Increment the stage decision counter for the given outcome.
 
 ## Tags
 
-low-coverage
+low-coverage, public-api

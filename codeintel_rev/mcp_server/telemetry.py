@@ -15,7 +15,7 @@ from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.observability.timeline import Timeline, current_or_new_timeline
 from codeintel_rev.telemetry.context import telemetry_context
 from codeintel_rev.telemetry.decorators import span_context
-from codeintel_rev.telemetry.prom import observe_request_latency
+from codeintel_rev.metrics.registry import MCP_REQUEST_LATENCY_SECONDS
 from codeintel_rev.telemetry.reporter import finalize_run, start_run
 from kgfoundry_common.logging import get_logger
 
@@ -136,7 +136,10 @@ def tool_operation_scope(
                     finished_at=time.time(),
                 )
                 _maybe_render_report(timeline)
-                observe_request_latency(tool_name, time.perf_counter() - timing_start, "error")
+                MCP_REQUEST_LATENCY_SECONDS.record(
+                    time.perf_counter() - timing_start,
+                    {"tool": tool_name, "status": "error"},
+                )
                 raise
             else:
                 duration = time.perf_counter() - timing_start
@@ -152,7 +155,10 @@ def tool_operation_scope(
                     finished_at=time.time(),
                 )
                 _maybe_render_report(timeline)
-                observe_request_latency(tool_name, duration, "complete")
+                MCP_REQUEST_LATENCY_SECONDS.record(
+                    duration,
+                    {"tool": tool_name, "status": "complete"},
+                )
     if ledger_owner and ledger is not None:
         ledger.close()
 

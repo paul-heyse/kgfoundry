@@ -75,15 +75,15 @@ codeintel_rev.mcp_server.scope_utils : Scope merging and filtering utilities
 
 - **fan_in**: 0
 - **fan_out**: 3
-- **cycle_group**: 41
+- **cycle_group**: 60
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 8
-- recent churn 90: 8
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 
