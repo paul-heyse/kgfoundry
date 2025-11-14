@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class LedgerRunReport:
     """Structured run report derived from a run ledger."""
 
@@ -39,8 +39,8 @@ def load_ledger(path: Path) -> list[dict[str, Any]]:
         return []
     entries: list[dict[str, Any]] = []
     with path.open("r", encoding="utf-8") as handle:
-        for line in handle:
-            line = line.strip()
+        for raw_line in handle:
+            line = raw_line.strip()
             if not line:
                 continue
             try:
@@ -70,10 +70,7 @@ def infer_stop_reason(events: Iterable[Mapping[str, Any]]) -> str | None:
         if status in {"failed", "timed_out"}:
             kind = str(event.get("kind") or "unknown")
             detail = event.get("detail")
-            if detail:
-                last_failure = f"{kind}:{detail}"
-            else:
-                last_failure = f"{kind}:{status}"
+            last_failure = f"{kind}:{detail}" if detail else f"{kind}:{status}"
     return last_failure
 
 

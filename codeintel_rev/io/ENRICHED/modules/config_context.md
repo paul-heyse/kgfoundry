@@ -112,17 +112,17 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 
 ## Graph Metrics
 
-- **fan_in**: 23
+- **fan_in**: 26
 - **fan_out**: 17
-- **cycle_group**: 76
+- **cycle_group**: 77
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 35
-- recent churn 90: 35
+- recent churn 30: 36
+- recent churn 90: 36
 
 ## Usage
 
@@ -158,7 +158,7 @@ ApplicationContext, ResolvedPaths, resolve_application_paths
 
 ## Hotspot
 
-- score: 3.31
+- score: 3.34
 
 ## Side Effects
 

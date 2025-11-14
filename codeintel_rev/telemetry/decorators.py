@@ -225,6 +225,7 @@ def _emit_checkpoint(
     if stage is None:
         return
     payload = dict(attrs)
+    payload.setdefault("status", "ok" if ok else "error")
     if reason is not None:
         payload["reason"] = reason
     try:

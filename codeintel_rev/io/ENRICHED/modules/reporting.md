@@ -14,28 +14,32 @@ Timeline-based run report builder and CLI helpers.
 - from **collections.abc** import Mapping
 - from **dataclasses** import dataclass, field
 - from **datetime** import UTC, datetime
+- from **itertools** import pairwise
 - from **pathlib** import Path
 - from **typing** import Any
 - from **codeintel_rev.observability.timeline** import Timeline
 
 ## Definitions
 
-- class: `TimelineRunReport` (line 21)
-- function: `_ensure_runs_dir` (line 47)
-- function: `render_run_report` (line 53)
-- function: `latest_run_report` (line 123)
-- function: `build_timeline_run_report` (line 137)
-- function: `_resolve_timeline_dir` (line 194)
-- function: `_load_events` (line 202)
-- function: `_summarize_events` (line 222)
-- function: `_collect_channel_stats` (line 244)
-- function: `_render_markdown_report` (line 259)
+- class: `TimelineRunReport` (line 22)
+- function: `render_timeline_markdown` (line 48)
+- function: `timeline_mermaid` (line 77)
+- function: `_ensure_runs_dir` (line 112)
+- function: `render_run_report` (line 118)
+- function: `latest_run_report` (line 188)
+- function: `build_timeline_run_report` (line 202)
+- function: `_resolve_timeline_dir` (line 259)
+- function: `resolve_timeline_dir` (line 267)
+- function: `_load_events` (line 285)
+- function: `_summarize_events` (line 305)
+- function: `_collect_channel_stats` (line 327)
+- function: `_render_markdown_report` (line 342)
 
 ## Graph Metrics
 
-- **fan_in**: 4
+- **fan_in**: 5
 - **fan_out**: 2
-- **cycle_group**: 82
+- **cycle_group**: 84
 
 ## Ownership
 
@@ -71,7 +75,7 @@ Timeline-based run report builder and CLI helpers.
 
 ## Hotspot
 
-- score: 2.38
+- score: 2.51
 
 ## Side Effects
 
@@ -79,22 +83,22 @@ Timeline-based run report builder and CLI helpers.
 
 ## Complexity
 
-- branches: 32
-- cyclomatic: 33
-- loc: 301
+- branches: 41
+- cyclomatic: 42
+- loc: 384
 
 ## Doc Coverage
 
 - `TimelineRunReport` (class): summary=yes, examples=no — Structured summary derived from Timeline JSONL records.
+- `render_timeline_markdown` (function): summary=yes, params=ok, examples=no — Return Markdown for the provided :class:`TimelineRunReport`.
+- `timeline_mermaid` (function): summary=yes, params=ok, examples=no — Return a Mermaid diagram that visualizes the recorded events.
 - `_ensure_runs_dir` (function): summary=no, examples=no
 - `render_run_report` (function): summary=yes, params=ok, examples=no — Render Markdown + JSON artifacts for the provided timeline.
 - `latest_run_report` (function): summary=yes, params=ok, examples=no — Return metadata for the most recently rendered run report.
 - `build_timeline_run_report` (function): summary=yes, params=ok, examples=no — Build a run report by parsing Timeline JSONL artifacts.
 - `_resolve_timeline_dir` (function): summary=no, examples=no
+- `resolve_timeline_dir` (function): summary=yes, params=ok, examples=no — Return the normalized diagnostics directory used for timeline artifacts.
 - `_load_events` (function): summary=no, examples=no
-- `_summarize_events` (function): summary=no, examples=no
-- `_collect_channel_stats` (function): summary=no, examples=no
-- `_render_markdown_report` (function): summary=no, examples=no
 
 ## Tags
 

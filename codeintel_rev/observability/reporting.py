@@ -7,6 +7,7 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +43,70 @@ class TimelineRunReport:
             "first_error": self.first_error,
             "events": self.events,
         }
+
+
+def render_timeline_markdown(report: TimelineRunReport) -> str:
+    """Return Markdown for the provided :class:`TimelineRunReport`.
+
+    This function renders a timeline run report as Markdown text suitable for
+    display in documentation or web interfaces. It is called by CLI commands
+    and HTTP endpoints to format telemetry reports for human-readable output.
+
+    Parameters
+    ----------
+    report : TimelineRunReport
+        Timeline run report to render as Markdown.
+
+    Returns
+    -------
+    str
+        Markdown body describing the run including session, run, summary,
+        events, and error information.
+    """
+    payload = report.to_dict()
+    normalized = {
+        "session": {"session_id": payload.get("session_id")},
+        "run": {"run_id": payload.get("run_id")},
+        "summary": payload.get("summary") or {"status": "unknown"},
+        "events": payload.get("events") or [],
+        "first_error": payload.get("first_error"),
+    }
+    return _render_markdown_report(normalized)
+
+
+def timeline_mermaid(report: TimelineRunReport, *, max_events: int = 30) -> str:
+    """Return a Mermaid diagram that visualizes the recorded events.
+
+    Parameters
+    ----------
+    report : TimelineRunReport
+        Timeline report to render.
+    max_events : int, optional
+        Maximum number of events to include before truncating.
+
+    Returns
+    -------
+    str
+        Mermaid ``graph TD`` diagram describing the timeline.
+    """
+    events = report.events[:max_events]
+    lines = ["graph TD"]
+    if not events:
+        lines.append('empty["No events recorded"]')
+        return "\n".join(lines)
+    node_ids: list[str] = []
+    for idx, event in enumerate(events, 1):
+        node_id = f"evt{idx}"
+        name = event.get("name") or event.get("type") or f"event_{idx}"
+        status = event.get("status") or ""
+        label = f"{name}\\n{status}".strip()
+        lines.append(f'{node_id}["{label}"]')
+        node_ids.append(node_id)
+    for prev, current in pairwise(node_ids):
+        lines.append(f"{prev} --> {current}")
+    if len(report.events) > max_events:
+        lines.append(f'{node_ids[-1]} --> tail["... {len(report.events) - max_events} more"]')
+    return "\n".join(lines)
 
 
 def _ensure_runs_dir(out_dir: Path | None) -> Path:
@@ -197,6 +262,24 @@ def _resolve_timeline_dir(candidate: Path | None) -> Path:
     root = Path(os.getenv("CODEINTEL_DIAG_DIR", "./data/diagnostics")).resolve()
     root.mkdir(parents=True, exist_ok=True)
     return root
+
+
+def resolve_timeline_dir(candidate: Path | None = None) -> Path:
+    """Return the normalized diagnostics directory used for timeline artifacts.
+
+    Parameters
+    ----------
+    candidate : Path | None, optional
+        Optional override path supplied by callers. When ``None`` (default),
+        falls back to ``CODEINTEL_DIAG_DIR`` or ``./data/diagnostics``.
+
+    Returns
+    -------
+    Path
+        Absolute path to the diagnostics directory. The directory is created
+        if it does not already exist.
+    """
+    return _resolve_timeline_dir(candidate)
 
 
 def _load_events(root: Path, session_id: str, run_id: str | None) -> list[dict[str, Any]]:

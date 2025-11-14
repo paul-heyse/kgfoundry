@@ -305,6 +305,23 @@ __all__ = ["fetch", "search"]
 async def _bounded(operation: str, timeout_s: int) -> AsyncIterator[None]:
     """Enforce concurrency and timeout guards for MCP operations.
 
+    This context manager limits concurrent MCP operations using a semaphore and
+    enforces a timeout to prevent operations from hanging indefinitely. It is used
+    by deep research adapters to ensure resource limits are respected during
+    vector search and retrieval operations.
+
+    Parameters
+    ----------
+    operation : str
+        Name of the operation being bounded, used in error messages.
+    timeout_s : int
+        Maximum duration in seconds before the operation times out.
+
+    Yields
+    ------
+    None
+        Yields control to the bounded operation block.
+
     Raises
     ------
     VectorSearchError

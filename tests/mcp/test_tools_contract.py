@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from codeintel_rev.mcp_server.registry import McpDeps
 from codeintel_rev.mcp_server.testing import InProcessMCP
 
 
 class _CatalogStub:
     def __init__(self) -> None:
-        self._rows = {
+        self._rows: dict[int, dict[str, object]] = {
             1: {
                 "id": 1,
                 "uri": "pkg/a.py",
@@ -27,7 +29,7 @@ class _CatalogStub:
             },
         }
 
-    def query_by_ids(self, ids) -> list[dict[str, object]]:
+    def query_by_ids(self, ids: Sequence[int]) -> list[dict[str, object]]:
         return [self._rows[i] for i in ids if i in self._rows]
 
 

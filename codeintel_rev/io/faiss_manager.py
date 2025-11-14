@@ -377,22 +377,6 @@ class _FAISSIdMapMixin:
         )
         return int(idmap.shape[0])
 
-    def _write_profile(self, path: Path) -> None:
-        """Persist a minimal profile snapshot describing the active index."""
-        if self.cpu_index is None:
-            return
-        profile = {
-            "dims": int(self.cpu_index.d),
-            "ntotal": int(self.cpu_index.ntotal),
-            "is_trained": bool(getattr(self.cpu_index, "is_trained", False)),
-            "type_name": type(self.cpu_index).__name__,
-            "faiss_family": self.faiss_family,
-            "refine_k_factor": self.refine_k_factor,
-        }
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(profile, indent=2, sort_keys=True), encoding="utf-8")
-        LOGGER.debug("Persisted FAISS profile snapshot", extra=_log_extra(path=str(path)))
-
     def hydrate_by_ids(self, catalog: DuckDBCatalog, ids: Sequence[int]) -> list[dict]:
         """Hydrate chunk metadata for ``ids`` via the provided DuckDB catalog.
 
@@ -596,6 +580,23 @@ class FAISSManager(
         self._meta_path = Path(f"{self.index_path}.meta.json")
         self._runtime_overrides: dict[str, float] = {}
         self._tuning_lock = RLock()
+
+    def _write_profile(self, path: Path) -> None:
+        """Persist a minimal profile snapshot describing the active CPU index."""
+        cpu_index = self.cpu_index
+        if cpu_index is None:
+            return
+        profile = {
+            "dims": int(cpu_index.d),
+            "ntotal": int(cpu_index.ntotal),
+            "is_trained": bool(getattr(cpu_index, "is_trained", False)),
+            "type_name": type(cpu_index).__name__,
+            "faiss_family": self.faiss_family,
+            "refine_k_factor": self.refine_k_factor,
+        }
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(profile, indent=2, sort_keys=True), encoding="utf-8")
+        LOGGER.debug("Persisted FAISS profile snapshot", extra=_log_extra(path=str(path)))
 
     def build_index(self, vectors: NDArrayF32, *, family: str | None = None) -> None:
         """Build and train FAISS index with adaptive type selection.
@@ -1128,10 +1129,21 @@ class FAISSManager(
 
         Reads a previously saved FAISS index from index_path and loads it into
         memory. This allows reusing an index without rebuilding it, which is much
-        faster for large indexes.
+        faster for large indexes. Optionally exports the ID map and writes tuning
+        profile files for debugging and performance analysis.
 
         After loading, you can call clone_to_gpu() to create a GPU version for
         faster search, or use search() directly with the CPU index.
+
+        Parameters
+        ----------
+        export_idmap : Path | None
+            Optional path to export the FAISS ID map as a Parquet file. If provided,
+            the ID map is written to this location. Defaults to None.
+        profile_path : Path | None
+            Optional path to write the autotune profile JSON. If provided, the
+            current tuning profile is persisted. If None, uses autotune_profile_path.
+            Defaults to None.
 
         Raises
         ------

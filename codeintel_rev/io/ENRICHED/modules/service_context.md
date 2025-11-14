@@ -36,7 +36,7 @@ variables change or when they need fresh dependencies.
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 123
+- **cycle_group**: 125
 
 ## Ownership
 

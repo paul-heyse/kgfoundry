@@ -10,24 +10,29 @@ Telemetry-focused CLI commands.
 
 - from **__future__** import annotations
 - from **(absolute)** import json
+- from **enum** import Enum
 - from **pathlib** import Path
 - from **typing** import Annotated
 - from **(absolute)** import typer
-- from **codeintel_rev.observability.reporting** import build_timeline_run_report
+- from **codeintel_rev.app.config_context** import ApplicationContext
+- from **codeintel_rev.observability.reporting** import build_timeline_run_report, render_timeline_markdown, timeline_mermaid
+- from **codeintel_rev.observability.runpack** import make_runpack
 
 ## Definitions
 
-- variable: `app` (line 13)
-- variable: `SessionArg` (line 15)
-- variable: `RunIdOption` (line 16)
-- variable: `TimelineDirOption` (line 24)
-- function: `run_report` (line 35)
+- variable: `app` (line 20)
+- variable: `SessionArg` (line 22)
+- variable: `RunIdOption` (line 23)
+- variable: `TimelineDirOption` (line 31)
+- class: `OutputFormat` (line 41)
+- function: `run_report` (line 50)
+- function: `runpack` (line 80)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 2
-- **cycle_group**: 136
+- **fan_out**: 4
+- **cycle_group**: 138
 
 ## Ownership
 
@@ -63,7 +68,7 @@ Telemetry-focused CLI commands.
 
 ## Hotspot
 
-- score: 1.19
+- score: 1.67
 
 ## Side Effects
 
@@ -71,13 +76,15 @@ Telemetry-focused CLI commands.
 
 ## Complexity
 
-- branches: 0
-- cyclomatic: 1
-- loc: 47
+- branches: 3
+- cyclomatic: 4
+- loc: 129
 
 ## Doc Coverage
 
+- `OutputFormat` (class): summary=yes, examples=no — Output formats supported by the run report command.
 - `run_report` (function): summary=yes, params=mismatch, examples=no — Render a run report from Timeline JSONL artifacts.
+- `runpack` (function): summary=yes, params=ok, examples=no — Create a runpack zip for the specified session/run.
 
 ## Tags
 

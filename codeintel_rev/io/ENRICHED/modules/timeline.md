@@ -48,9 +48,9 @@ Lightweight per-session timeline recording utilities.
 
 ## Graph Metrics
 
-- **fan_in**: 19
+- **fan_in**: 20
 - **fan_out**: 2
-- **cycle_group**: 44
+- **cycle_group**: 45
 
 ## Ownership
 
@@ -90,7 +90,7 @@ Timeline, bind_timeline, current_timeline, new_timeline
 
 ## Hotspot
 
-- score: 2.92
+- score: 2.94
 
 ## Side Effects
 

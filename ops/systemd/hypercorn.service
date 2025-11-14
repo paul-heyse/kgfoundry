@@ -1,0 +1,25 @@
+[Unit]
+Description=CodeIntel MCP Hypercorn
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=app
+Group=app
+WorkingDirectory=/opt/app
+Environment=EDGE_MODE=nginx-terminate
+Environment=HYPERCORN_CONFIG=/opt/app/ops/hypercorn.toml
+Environment=HYPERCORN_CERT_FILE=/etc/ssl/live/mcp.example.com/fullchain.pem
+Environment=HYPERCORN_KEY_FILE=/etc/ssl/live/mcp.example.com/privkey.pem
+Environment=PYTHONUNBUFFERED=1
+Environment=PATH=/opt/app/.venv/bin:/usr/bin
+ExecStart=/usr/bin/env bash /opt/app/ops/scripts/run_hypercorn.sh
+Restart=always
+RestartSec=5
+LimitNOFILE=131072
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

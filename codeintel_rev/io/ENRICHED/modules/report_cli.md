@@ -46,7 +46,7 @@ Diagnostics CLI for rendering run reports from session event ledgers.
 
 - **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 35
+- **cycle_group**: 36
 
 ## Ownership
 

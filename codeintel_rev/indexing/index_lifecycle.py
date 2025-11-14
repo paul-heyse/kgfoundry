@@ -286,10 +286,28 @@ class IndexLifecycleManager:
         return None
 
     def open_current(self) -> Path:
-        """Return the active version directory, validating manifest presence."""
+        """Return the active version directory, validating manifest presence.
+
+        This method resolves the currently active index version directory and ensures
+        that a valid manifest file exists at that location. It is used by index
+        management operations that require access to the active version's assets.
+
+        Returns
+        -------
+        Path
+            Path to the active version directory containing validated manifest and
+            index assets.
+
+        Raises
+        ------
+        RuntimeLifecycleError
+            If no CURRENT version is set or if the manifest file cannot be resolved
+            at the active directory path.
+        """
         active_dir = self.current_dir()
         if active_dir is None:
-            raise RuntimeLifecycleError("No CURRENT version", runtime=_RUNTIME)
+            message = "No CURRENT version"
+            raise RuntimeLifecycleError(message, runtime=_RUNTIME)
         self._resolve_manifest_path(active_dir)
         return active_dir
 
@@ -312,15 +330,24 @@ class IndexLifecycleManager:
     def read_assets(self) -> IndexAssets | None:
         """Return paths for active assets or ``None`` when unset.
 
+        This method reads the manifest file from the active version directory and
+        constructs an IndexAssets object containing paths to FAISS index, DuckDB
+        catalog, and SCIP index files. Used by runtime components to locate index
+        assets when loading or reloading indices.
+
         Returns
         -------
         IndexAssets | None
-            Asset set for the active version, if any.
+            Asset set for the active version containing paths to FAISS index,
+            DuckDB catalog, and SCIP index files, or ``None`` if no active version
+            is set.
 
-        Raises
-        ------
-        RuntimeLifecycleError
-            If the manifest is missing or inconsistent.
+        Notes
+        -----
+        The method does not raise RuntimeLifecycleError directly, but
+        ``_resolve_manifest_path`` may raise it if the manifest is missing or
+        inconsistent. This is documented for completeness, though the exception
+        is not explicitly raised in this method's body.
         """
         active_dir = self.current_dir()
         if active_dir is None:
@@ -687,7 +714,8 @@ class IndexLifecycleManager:
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
 
-    def _resolve_manifest_path(self, version_dir: Path) -> Path:
+    @staticmethod
+    def _resolve_manifest_path(version_dir: Path) -> Path:
         manifest_path = version_dir / MANIFEST_FILE
         if manifest_path.exists():
             return manifest_path
@@ -702,8 +730,8 @@ class IndexLifecycleManager:
         message = f"manifest missing: {manifest_path}"
         raise RuntimeLifecycleError(message, runtime=_RUNTIME)
 
+    @staticmethod
     def _locate_sidecar(
-        self,
         base_dir: Path,
         primary_name: str,
         legacy_names: tuple[str, ...],

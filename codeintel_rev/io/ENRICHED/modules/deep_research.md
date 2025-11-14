@@ -38,15 +38,15 @@ Adapters that expose MCP Deep-Research search/fetch semantics.
 
 - **fan_in**: 0
 - **fan_out**: 5
-- **cycle_group**: 149
+- **cycle_group**: 151
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 
@@ -89,7 +89,7 @@ fetch, search
 
 - branches: 13
 - cyclomatic: 14
-- loc: 323
+- loc: 340
 
 ## Doc Coverage
 
@@ -101,7 +101,7 @@ fetch, search
 - `search` (function): summary=yes, params=ok, examples=no — Execute the Deep-Research search pipeline.
 - `fetch` (function): summary=yes, params=ok, examples=no — Hydrate chunk ids returned from the MCP search tool.
 - `_normalize_object_ids` (function): summary=yes, params=ok, examples=no — Normalize object identifiers while preserving ordering.
-- `_bounded` (function): summary=yes, params=mismatch, examples=no — Enforce concurrency and timeout guards for MCP operations.
+- `_bounded` (function): summary=yes, params=ok, examples=no — Enforce concurrency and timeout guards for MCP operations.
 
 ## Tags
 

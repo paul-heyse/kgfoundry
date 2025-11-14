@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
 
@@ -51,7 +52,12 @@ def _fake_app_context() -> ApplicationContext:
     ApplicationContext
         Placeholder context object used to satisfy type contracts in tests.
     """
-    return cast("ApplicationContext", SimpleNamespace())
+    fake_paths = SimpleNamespace(data_dir=Path("data/diagnostics"))
+    fake_settings = SimpleNamespace(
+        index=SimpleNamespace(rrf_k=60, hybrid_prefetch={"semantic": 50}),
+        bm25=SimpleNamespace(rm3_enabled=False),
+    )
+    return cast("ApplicationContext", SimpleNamespace(paths=fake_paths, settings=fake_settings))
 
 
 @asynccontextmanager
@@ -129,6 +135,14 @@ def _emit_minimal_events(session_id: str, run_id: str) -> None:
             "attrs": {"reason": "capability_off"},
         }
     )
+    reporter_module.RUN_REPORT_STORE.record_structured_event(
+        {
+            "session_id": session_id,
+            "run_id": run_id,
+            "kind": "retrieval.budget",
+            "payload": {"rrf_k": 60, "rm3_enabled": False},
+        }
+    )
     record_timeline_payload(
         {
             **base,
@@ -170,6 +184,11 @@ def test_build_report_from_timeline_events() -> None:
 
     json_payload = report_to_json(report)
     assert json_payload["session_id"] == session_id
+    assert json_payload["ops_coverage"]["embed"] is True
+    assert json_payload["stages"]
+    assert json_payload["budgets"]["rrf_k"] == 60
+    mermaid = reporter_module.render_mermaid(report)
+    assert "graph TD" in mermaid
     markdown = render_markdown(report)
     assert session_id in markdown
 
@@ -191,6 +210,8 @@ async def test_report_routes_return_payload() -> None:
 
         markdown_response = await app_main.get_run_report_markdown(session_id)
         assert session_id in bytes(markdown_response.body).decode("utf-8")
+        mermaid_response = await app_main.get_run_report_mermaid(session_id)
+        assert "graph TD" in bytes(mermaid_response.body).decode("utf-8")
     finally:
         app_main.app.state.context = original_context
 

@@ -27,7 +27,7 @@ Append-only run ledger utilities.
 
 - **fan_in**: 4
 - **fan_out**: 2
-- **cycle_group**: 76
+- **cycle_group**: 77
 
 ## Ownership
 

@@ -21,7 +21,7 @@ Helpers for optional polars exports.
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 5
+- **cycle_group**: 4
 
 ## Ownership
 

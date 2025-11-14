@@ -22,18 +22,21 @@ In-process registry for the lightweight MCP testing harness.
 - class: `McpDeps` (line 23)
 - function: `list_tools` (line 31)
 - function: `call_tool` (line 55)
+- function: `_error_response` (line 99)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 4
-- **cycle_group**: 126
+- **cycle_group**: 128
 
 ## Ownership
 
-- bus factor: 0.00
-- recent churn 30: 0
-- recent churn 90: 0
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 1
+- recent churn 90: 1
 
 ## Usage
 
@@ -44,7 +47,7 @@ In-process registry for the lightweight MCP testing harness.
 
 - **summary**: In-process registry for the lightweight MCP testing harness.
 - has summary: yes
-- param parity: no
+- param parity: yes
 - examples present: no
 
 ## Typedness
@@ -61,7 +64,7 @@ In-process registry for the lightweight MCP testing harness.
 
 ## Hotspot
 
-- score: 1.80
+- score: 1.89
 
 ## Side Effects
 
@@ -69,15 +72,16 @@ In-process registry for the lightweight MCP testing harness.
 
 ## Complexity
 
-- branches: 4
-- cyclomatic: 5
-- loc: 82
+- branches: 6
+- cyclomatic: 7
+- loc: 118
 
 ## Doc Coverage
 
 - `McpDeps` (class): summary=yes, examples=no — Dependencies required for running the lightweight MCP tools.
 - `list_tools` (function): summary=yes, params=ok, examples=no — Return tool metadata compatible with MCP /tools/list responses.
-- `call_tool` (function): summary=yes, params=mismatch, examples=no — Execute a tool using the provided dependencies.
+- `call_tool` (function): summary=yes, params=ok, examples=no — Execute a tool using the provided dependencies.
+- `_error_response` (function): summary=yes, params=ok, examples=no — Build an MCP-compatible error response envelope.
 
 ## Tags
 

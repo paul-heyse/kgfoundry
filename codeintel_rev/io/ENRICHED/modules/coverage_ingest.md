@@ -21,7 +21,7 @@ Coverage ingestion utilities (Cobertura-style XML).
 
 - **fan_in**: 1
 - **fan_out**: 0
-- **cycle_group**: 21
+- **cycle_group**: 20
 
 ## Ownership
 

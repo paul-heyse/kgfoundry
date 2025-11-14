@@ -65,10 +65,14 @@ Error envelope structure:
 - from **dataclasses** import dataclass
 - from **functools** import wraps
 - from **http** import HTTPStatus
+- from **importlib** import import_module
 - from **typing** import TYPE_CHECKING, TypeVar, cast
+- from **codeintel_rev.app.config_context** import ApplicationContext
 - from **codeintel_rev.errors** import PathNotDirectoryError, PathNotFoundError
 - from **codeintel_rev.io.path_utils** import PathOutsideRepositoryError
-- from **codeintel_rev.observability.otel** import record_span_event
+- from **codeintel_rev.observability.otel** import current_trace_id, record_span_event
+- from **codeintel_rev.observability.runpack** import make_runpack
+- from **codeintel_rev.observability.timeline** import current_timeline
 - from **codeintel_rev.telemetry.context** import current_run_id
 - from **codeintel_rev.telemetry.steps** import StepEvent, emit_step
 - from **kgfoundry_common.errors** import KgFoundryError
@@ -78,21 +82,23 @@ Error envelope structure:
 
 ## Definitions
 
-- variable: `LOGGER` (line 76)
-- variable: `COMPONENT_NAME` (line 77)
-- variable: `F` (line 79)
-- class: `ProblemMapping` (line 115)
-- variable: `EXCEPTION_TO_ERROR_CODE` (line 156)
-- function: `format_error_response` (line 172)
-- function: `convert_exception_to_envelope` (line 230)
-- function: `_record_exception_event` (line 416)
-- function: `handle_adapter_errors` (line 443)
+- variable: `LOGGER` (line 80)
+- variable: `COMPONENT_NAME` (line 81)
+- variable: `F` (line 83)
+- class: `ProblemMapping` (line 119)
+- variable: `EXCEPTION_TO_ERROR_CODE` (line 160)
+- function: `format_error_response` (line 176)
+- function: `convert_exception_to_envelope` (line 234)
+- function: `_record_exception_event` (line 420)
+- function: `handle_adapter_errors` (line 447)
+- function: `_extract_context_from_args` (line 739)
+- function: `_maybe_attach_runpack` (line 763)
 
 ## Graph Metrics
 
 - **fan_in**: 3
-- **fan_out**: 6
-- **cycle_group**: 84
+- **fan_out**: 9
+- **cycle_group**: 88
 
 ## Ownership
 
@@ -132,7 +138,7 @@ EXCEPTION_TO_ERROR_CODE, convert_exception_to_envelope, format_error_response, h
 
 ## Hotspot
 
-- score: 2.40
+- score: 2.62
 
 ## Side Effects
 
@@ -140,9 +146,9 @@ EXCEPTION_TO_ERROR_CODE, convert_exception_to_envelope, format_error_response, h
 
 ## Complexity
 
-- branches: 20
-- cyclomatic: 21
-- loc: 719
+- branches: 31
+- cyclomatic: 32
+- loc: 791
 
 ## Doc Coverage
 
@@ -151,6 +157,8 @@ EXCEPTION_TO_ERROR_CODE, convert_exception_to_envelope, format_error_response, h
 - `convert_exception_to_envelope` (function): summary=yes, params=ok, examples=yes — Convert exception to unified error envelope with Problem Details.
 - `_record_exception_event` (function): summary=yes, params=mismatch, examples=no — Emit an OpenTelemetry exception event for adapter errors.
 - `handle_adapter_errors` (function): summary=yes, params=ok, examples=yes — Convert adapter exceptions to unified error envelopes.
+- `_extract_context_from_args` (function): summary=no, examples=no
+- `_maybe_attach_runpack` (function): summary=no, examples=no
 
 ## Tags
 

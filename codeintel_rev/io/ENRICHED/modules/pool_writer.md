@@ -38,7 +38,7 @@ Lightweight Parquet writer for evaluator pools.
 
 - **fan_in**: 3
 - **fan_out**: 2
-- **cycle_group**: 90
+- **cycle_group**: 92
 
 ## Ownership
 

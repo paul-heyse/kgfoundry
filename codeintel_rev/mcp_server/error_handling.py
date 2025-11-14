@@ -59,11 +59,15 @@ from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from functools import wraps
 from http import HTTPStatus
+from importlib import import_module
 from typing import TYPE_CHECKING, TypeVar, cast
 
+from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.errors import PathNotDirectoryError, PathNotFoundError
 from codeintel_rev.io.path_utils import PathOutsideRepositoryError
-from codeintel_rev.observability.otel import record_span_event
+from codeintel_rev.observability.otel import current_trace_id, record_span_event
+from codeintel_rev.observability.runpack import make_runpack
+from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.telemetry.context import current_run_id
 from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from kgfoundry_common.errors import KgFoundryError
@@ -644,7 +648,14 @@ def handle_adapter_errors(
                     # SystemExit, GeneratorExit) are re-raised above.
                     # This is a boundary handler that MUST catch all user exceptions to
                     # guarantee consistent error responses for clients.
-                    return convert_exception_to_envelope(exc, operation, empty_result)
+                    envelope = convert_exception_to_envelope(exc, operation, empty_result)
+                    _maybe_attach_runpack(
+                        envelope,
+                        operation=operation,
+                        args=args,
+                        kwargs=kwargs,
+                    )
+                    return envelope
 
             return cast("F", async_wrapper)
 
@@ -703,7 +714,14 @@ def handle_adapter_errors(
                 # SystemExit, GeneratorExit) are re-raised above.
                 # This is a boundary handler that MUST catch all user exceptions to
                 # guarantee consistent error responses for clients.
-                return convert_exception_to_envelope(exc, operation, empty_result)
+                envelope = convert_exception_to_envelope(exc, operation, empty_result)
+                _maybe_attach_runpack(
+                    envelope,
+                    operation=operation,
+                    args=args,
+                    kwargs=kwargs,
+                )
+                return envelope
 
         return cast("F", sync_wrapper)
 
@@ -716,3 +734,57 @@ __all__ = [
     "format_error_response",
     "handle_adapter_errors",
 ]
+
+
+def _extract_context_from_args(
+    args: tuple[object, ...],
+    kwargs: Mapping[str, object],
+) -> ApplicationContext | None:
+    candidate = kwargs.get("context")
+    if isinstance(candidate, ApplicationContext):
+        return candidate
+    for arg in args:
+        if isinstance(arg, ApplicationContext):
+            return arg
+    try:
+        server_module = import_module("codeintel_rev.mcp_server.server")
+    except ImportError:  # pragma: no cover - import failure is benign
+        return None
+    get_context = getattr(server_module, "get_context", None)
+    if get_context is None:
+        return None
+    try:
+        resolved = get_context()
+    except RuntimeError:
+        return None
+    return cast("ApplicationContext | None", resolved)
+
+
+def _maybe_attach_runpack(
+    envelope: dict[str, object],
+    *,
+    operation: str,
+    args: tuple[object, ...],
+    kwargs: Mapping[str, object],
+) -> None:
+    timeline = current_timeline()
+    if timeline is None or not timeline.session_id:
+        return
+    context = _extract_context_from_args(args, kwargs)
+    if context is None:
+        return
+    trace_id = current_trace_id()
+    try:
+        path = make_runpack(
+            context=context,
+            session_id=timeline.session_id,
+            run_id=timeline.run_id,
+            trace_id=trace_id,
+            reason=operation,
+        )
+    except (OSError, RuntimeError, ValueError):  # pragma: no cover - diagnostics must never raise
+        LOGGER.debug("runpack.create_failed", exc_info=True)
+        return
+    obs = envelope.setdefault("observability", {})
+    if isinstance(obs, dict):
+        obs["runpack_path"] = str(path)

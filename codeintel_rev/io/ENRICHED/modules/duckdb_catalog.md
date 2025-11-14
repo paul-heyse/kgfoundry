@@ -51,22 +51,22 @@ chunk retrieval and joins.
 - function: `relation_exists` (line 1666)
 - function: `_file_checksum` (line 1684)
 - function: `_parquet_hash` (line 1706)
-- function: `ensure_faiss_idmap_view` (line 1724)
-- function: `refresh_faiss_idmap_materialized` (line 1755)
+- function: `ensure_faiss_idmap_view` (line 1734)
+- function: `refresh_faiss_idmap_materialized` (line 1765)
 
 ## Graph Metrics
 
 - **fan_in**: 9
 - **fan_out**: 9
-- **cycle_group**: 76
+- **cycle_group**: 77
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 40
-- recent churn 90: 40
+- recent churn 30: 41
+- recent churn 90: 41
 
 ## Usage
 
@@ -109,7 +109,7 @@ DuckDBCatalog, IdMapMeta, StructureAnnotations, ensure_faiss_idmap_view, refresh
 
 - branches: 147
 - cyclomatic: 148
-- loc: 1836
+- loc: 1864
 
 ## Doc Coverage
 

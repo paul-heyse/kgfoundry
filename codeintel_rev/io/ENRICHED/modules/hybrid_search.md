@@ -9,6 +9,7 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 ## Imports
 
 - from **__future__** import annotations
+- from **(absolute)** import math
 - from **collections.abc** import Mapping, Sequence
 - from **contextlib** import nullcontext
 - from **dataclasses** import dataclass
@@ -36,33 +37,33 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 
 ## Definitions
 
-- variable: `LOGGER` (line 39)
-- class: `_LuceneHit` (line 42)
-- class: `_LuceneSearcher` (line 47)
-- class: `BM25Rm3Config` (line 62)
-- class: `BM25SearchProvider` (line 71)
-- class: `SpladeSearchProvider` (line 210)
-- class: `HybridSearchTuning` (line 428)
-- class: `HybridSearchOptions` (line 436)
-- class: `_MethodStats` (line 445)
-- class: `_FusionContext` (line 454)
-- class: `_SearchTelemetryContext` (line 468)
-- class: `_FusionWork` (line 474)
-- class: `HybridSearchEngine` (line 488)
+- variable: `LOGGER` (line 40)
+- class: `_LuceneHit` (line 43)
+- class: `_LuceneSearcher` (line 48)
+- class: `BM25Rm3Config` (line 63)
+- class: `BM25SearchProvider` (line 72)
+- class: `SpladeSearchProvider` (line 211)
+- class: `HybridSearchTuning` (line 423)
+- class: `HybridSearchOptions` (line 431)
+- class: `_MethodStats` (line 441)
+- class: `_FusionContext` (line 450)
+- class: `_SearchTelemetryContext` (line 464)
+- class: `_FusionWork` (line 470)
+- class: `HybridSearchEngine` (line 484)
 
 ## Graph Metrics
 
 - **fan_in**: 5
 - **fan_out**: 17
-- **cycle_group**: 76
+- **cycle_group**: 77
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 21
-- recent churn 90: 21
+- recent churn 30: 22
+- recent churn 90: 22
 
 ## Usage
 
@@ -94,7 +95,7 @@ BM25SearchProvider, HybridResultDoc, HybridSearchEngine, HybridSearchOptions, Hy
 
 ## Hotspot
 
-- score: 3.27
+- score: 3.29
 
 ## Side Effects
 
@@ -102,9 +103,9 @@ BM25SearchProvider, HybridResultDoc, HybridSearchEngine, HybridSearchOptions, Hy
 
 ## Complexity
 
-- branches: 130
-- cyclomatic: 131
-- loc: 1393
+- branches: 140
+- cyclomatic: 141
+- loc: 1447
 
 ## Doc Coverage
 

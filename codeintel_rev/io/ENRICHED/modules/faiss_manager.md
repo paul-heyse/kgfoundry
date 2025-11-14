@@ -67,32 +67,32 @@ corpus size for optimal performance.
 - class: `_SearchExecutionParams` (line 280)
 - class: `_SearchPlan` (line 290)
 - class: `_FAISSIdMapMixin` (line 300)
-- class: `FAISSManager` (line 493)
-- class: `AutoTuner` (line 3677)
-- function: `_coerce_to_int` (line 3807)
-- function: `_configure_direct_map` (line 3830)
-- function: `_set_direct_map_type` (line 3838)
-- function: `_wrap_bool_contains` (line 3881)
-- function: `_wrap_index_contains` (line 3917)
-- function: `_coerce_optional_int` (line 3955)
-- function: `_coerce_optional_float` (line 3989)
-- function: `_parse_tuning_overrides` (line 4023)
-- function: `_persist_tuning_profile` (line 4049)
-- function: `_get_compile_options` (line 4061)
+- class: `FAISSManager` (line 477)
+- class: `AutoTuner` (line 3689)
+- function: `_coerce_to_int` (line 3819)
+- function: `_configure_direct_map` (line 3842)
+- function: `_set_direct_map_type` (line 3850)
+- function: `_wrap_bool_contains` (line 3893)
+- function: `_wrap_index_contains` (line 3929)
+- function: `_coerce_optional_int` (line 3967)
+- function: `_coerce_optional_float` (line 4001)
+- function: `_parse_tuning_overrides` (line 4035)
+- function: `_persist_tuning_profile` (line 4061)
+- function: `_get_compile_options` (line 4073)
 
 ## Graph Metrics
 
 - **fan_in**: 8
 - **fan_out**: 13
-- **cycle_group**: 76
+- **cycle_group**: 77
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 46
-- recent churn 90: 46
+- recent churn 30: 47
+- recent churn 90: 47
 
 ## Usage
 
@@ -134,7 +134,7 @@ AutoTuner, FAISSManager, apply_parameters
 
 - branches: 260
 - cyclomatic: 261
-- loc: 4078
+- loc: 4090
 
 ## Doc Coverage
 

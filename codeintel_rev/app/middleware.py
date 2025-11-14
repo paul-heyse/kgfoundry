@@ -269,7 +269,8 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
         ledger_root: Path | None = None
         context = getattr(request.app.state, "context", None)
         if context is not None:
-            ledger_root = context.paths.data_dir
+            paths = getattr(context, "paths", None)
+            ledger_root = getattr(paths, "data_dir", None)
         ledger: RunLedger | None = None
         try:
             ledger_dir = dated_run_dir(ledger_root)

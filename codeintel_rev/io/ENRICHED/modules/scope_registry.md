@@ -75,7 +75,7 @@ codeintel_rev.mcp_server.scope_utils : Scope merging and filtering utilities
 
 - **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 39
+- **cycle_group**: 40
 
 ## Ownership
 

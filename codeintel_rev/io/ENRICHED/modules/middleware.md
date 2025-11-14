@@ -88,7 +88,7 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 
 - **fan_in**: 6
 - **fan_out**: 9
-- **cycle_group**: 78
+- **cycle_group**: 79
 
 ## Ownership
 
@@ -142,7 +142,7 @@ SessionScopeMiddleware, capability_stamp_var, get_capability_stamp, get_session_
 
 - branches: 9
 - cyclomatic: 10
-- loc: 324
+- loc: 325
 
 ## Doc Coverage
 

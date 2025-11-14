@@ -8,7 +8,7 @@ from typing import Any
 from codeintel_rev.mcp_server.registry import McpDeps, call_tool, list_tools
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class InProcessMCP:
     """Minimal harness for exercising MCP tools without FastMCP wiring."""
 
@@ -28,9 +28,21 @@ class InProcessMCP:
     def tools_call(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """Execute a tool locally using the configured dependencies.
 
+        This method dispatches tool execution requests to the call_tool function
+        using the instance's configured dependencies. It is used by in-process MCP
+        implementations for testing and local tool execution without network overhead.
+
+        Parameters
+        ----------
+        name : str
+            Tool name to execute, typically "search" or "fetch".
+        arguments : dict[str, Any]
+            Tool-specific arguments dictionary passed to the handler.
+
         Returns
         -------
         dict[str, Any]
-            Response envelope compatible with MCP.
+            Response envelope compatible with MCP containing structuredContent
+            for successful tool execution, or isError flag with error content.
         """
         return call_tool(self.deps, name, arguments)

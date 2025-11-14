@@ -42,7 +42,7 @@ def _find_ledger_path(data_dir: Path, run_id: str) -> Path | None:
     root = data_dir / "telemetry" / "runs"
     if not root.exists():
         return None
-    candidates = sorted(root.glob("*/%s.jsonl" % run_id), reverse=True)
+    candidates = sorted(root.glob(f"*/{run_id}.jsonl"), reverse=True)
     if candidates:
         return candidates[0]
     today = Path(datetime.now(tz=UTC).strftime("%Y-%m-%d"))

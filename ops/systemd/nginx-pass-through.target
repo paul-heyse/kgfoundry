@@ -1,0 +1,7 @@
+[Unit]
+Description=MCP HTTP/3 pass-through stack
+Requires=nginx.service hypercorn.service
+After=network-online.target
+
+[Install]
+WantedBy=multi-user.target

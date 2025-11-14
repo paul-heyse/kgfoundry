@@ -76,7 +76,7 @@ codeintel_rev.app.main : FastAPI application with /readyz endpoint
 
 - **fan_in**: 1
 - **fan_out**: 5
-- **cycle_group**: 86
+- **cycle_group**: 82
 
 ## Ownership
 

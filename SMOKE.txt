@@ -1,0 +1,3 @@
+bash ops/scripts/smoke_h3.sh https://example.com
+curl binary is missing HTTP/3 support (needs nghttp3/quiche build)
+make: *** [Makefile:57: smoke-h3] Error 2

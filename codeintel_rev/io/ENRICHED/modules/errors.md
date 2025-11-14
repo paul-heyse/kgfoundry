@@ -58,7 +58,7 @@ Raising Git operation error:
 
 ## Graph Metrics
 
-- **fan_in**: 13
+- **fan_in**: 14
 - **fan_out**: 0
 - **cycle_group**: 25
 
@@ -67,8 +67,8 @@ Raising Git operation error:
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 5
-- recent churn 90: 5
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 
@@ -100,7 +100,7 @@ FileOperationError, FileReadError, GitOperationError, InvalidLineRangeError, Pat
 
 ## Hotspot
 
-- score: 2.29
+- score: 2.32
 
 ## Side Effects
 

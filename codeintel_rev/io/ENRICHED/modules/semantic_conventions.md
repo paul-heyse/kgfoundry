@@ -14,8 +14,8 @@ Shared OpenTelemetry semantic convention helpers for CodeIntel.
 ## Definitions
 
 - class: `Attrs` (line 10)
-- function: `as_kv` (line 95)
-- function: `to_label_str` (line 113)
+- function: `as_kv` (line 99)
+- function: `to_label_str` (line 117)
 
 ## Graph Metrics
 
@@ -71,7 +71,7 @@ Attrs, as_kv, to_label_str
 
 - branches: 2
 - cyclomatic: 3
-- loc: 136
+- loc: 140
 
 ## Doc Coverage
 

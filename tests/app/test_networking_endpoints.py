@@ -2,12 +2,22 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
+from typing import cast
 
 import httpx
 import pytest
 from codeintel_rev.app.capabilities import Capabilities
-from codeintel_rev.app.main import capz, disable_nginx_buffering, readyz, sse_demo
-from fastapi import FastAPI
+from codeintel_rev.app.main import (
+    capz,
+    disable_nginx_buffering,
+    http_exception_handler_with_request_id,
+    inject_request_id,
+    readyz,
+    sse_demo,
+    unhandled_exception_handler,
+)
+from fastapi import FastAPI, HTTPException
+from starlette.types import ExceptionHandler
 
 from tests.app._context_factory import build_application_context
 
@@ -136,8 +146,11 @@ async def test_capz_refreshes_capability_snapshot(
 
 
 @pytest.mark.asyncio
-async def test_sse_stream_flushes_events(networking_test_app: FastAPI) -> None:
+async def test_sse_stream_flushes_events(
+    networking_test_app: FastAPI, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The /sse demo should stream events and keep buffering disabled."""
+    monkeypatch.setenv("SSE_MAX_KEEPALIVES", "0")
     transport = httpx.ASGITransport(app=networking_test_app)
     try:
         async with (
@@ -155,5 +168,97 @@ async def test_sse_stream_flushes_events(networking_test_app: FastAPI) -> None:
             second_line = await anext(lines)
             assert first_line == "event: ready"
             assert second_line.startswith("data:")
+    finally:
+        await transport.aclose()
+
+
+@pytest.mark.asyncio
+async def test_request_id_header_round_trip() -> None:
+    """Middleware should generate request IDs and echo caller supplied ones."""
+    app = FastAPI()
+    app.middleware("http")(inject_request_id)
+
+    @app.get("/ping")
+    async def _ping() -> dict[str, str]:
+        return {"status": "ok"}
+
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    try:
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://test",
+            timeout=httpx.Timeout(5.0),
+        ) as client:
+            generated = await client.get("/ping")
+            generated_header = generated.headers.get("x-request-id")
+            assert generated_header
+
+            echoed = await client.get("/ping", headers={"X-Request-Id": "req-test"})
+            assert echoed.headers.get("x-request-id") == "req-test"
+    finally:
+        await transport.aclose()
+
+
+@pytest.mark.asyncio
+async def test_exception_handler_includes_request_id() -> None:
+    """Unhandled exceptions should be wrapped with a helpful envelope."""
+    app = FastAPI()
+    app.middleware("http")(inject_request_id)
+    app.add_exception_handler(
+        HTTPException,
+        cast("ExceptionHandler", http_exception_handler_with_request_id),
+    )
+    app.add_exception_handler(
+        Exception,
+        cast("ExceptionHandler", unhandled_exception_handler),
+    )
+
+    @app.get("/boom")
+    async def _boom() -> None:  # pragma: no cover - exercised in test
+        message = "kapow"
+        raise RuntimeError(message)
+
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    try:
+        async with httpx.AsyncClient(
+            transport=transport,
+            base_url="http://test",
+            timeout=httpx.Timeout(5.0),
+        ) as client:
+            response = await client.get("/boom")
+            assert response.status_code == 500
+            payload = response.json()
+            assert payload["ok"] is False
+            assert payload["error"]["type"] == "RuntimeError"
+            assert payload["request_id"] == response.headers.get("x-request-id")
+    finally:
+        await transport.aclose()
+
+
+@pytest.mark.asyncio
+async def test_sse_emits_keepalive_comments(
+    networking_test_app: FastAPI, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ensure the SSE demo keeps idle connections alive via comment frames."""
+    monkeypatch.setenv("SSE_KEEPALIVE_SECONDS", "0.01")
+    monkeypatch.setenv("SSE_MAX_KEEPALIVES", "2")
+    transport = httpx.ASGITransport(app=networking_test_app)
+    try:
+        async with (
+            httpx.AsyncClient(
+                transport=transport,
+                base_url="http://testserver",
+                timeout=httpx.Timeout(10.0),
+            ) as client,
+            client.stream("GET", "/sse") as response,
+        ):
+            lines: AsyncIterator[str] = response.aiter_lines()
+            keep_alive_seen = False
+            for _ in range(30):
+                next_line = await anext(lines)
+                if next_line == ": keep-alive":
+                    keep_alive_seen = True
+                    break
+            assert keep_alive_seen
     finally:
         await transport.aclose()

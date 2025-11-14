@@ -25,6 +25,7 @@ low-coverage:
 - cst_build/cst_cli.py
 - cst_build/__init__.py
 - cst_build/cst_resolve.py
+- diagnostics/detectors.py
 - diagnostics/report_cli.py
 - diagnostics/__init__.py
 - ops/__init__.py
@@ -71,6 +72,7 @@ low-coverage:
 - enrich/__init__.py
 - observability/runtime_observer.py
 - observability/flight_recorder.py
+- observability/runpack.py
 - observability/reporting.py
 - observability/metrics.py
 - observability/ledger.py
@@ -180,6 +182,7 @@ public-api:
 - typing.py
 - errors.py
 - cst_build/__init__.py
+- diagnostics/detectors.py
 - diagnostics/report_cli.py
 - app/scope_registry.py
 - app/middleware.py
@@ -206,6 +209,7 @@ public-api:
 - enrich/ownership.py
 - enrich/pathnorm.py
 - observability/runtime_observer.py
+- observability/runpack.py
 - observability/metrics.py
 - observability/ledger.py
 - observability/otel.py

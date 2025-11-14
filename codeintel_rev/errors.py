@@ -224,7 +224,7 @@ class CatalogConsistencyError(KgFoundryError):
     ) -> None:
         super().__init__(
             message,
-            code=ErrorCode.INVALID_STATE,
+            code=ErrorCode.RUNTIME_ERROR,
             http_status=500,
             context=dict(context or {}),
         )

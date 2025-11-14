@@ -82,15 +82,15 @@ Deep-Research compatible search/fetch orchestration helpers.
 
 - **fan_in**: 1
 - **fan_out**: 8
-- **cycle_group**: 119
+- **cycle_group**: 121
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 
@@ -105,7 +105,7 @@ FetchDependencies, FetchObjectResult, FetchRequest, FetchResponse, SearchDepende
 
 - **summary**: Deep-Research compatible search/fetch orchestration helpers.
 - has summary: yes
-- param parity: no
+- param parity: yes
 - examples present: no
 
 ## Typedness
@@ -132,7 +132,7 @@ FetchDependencies, FetchObjectResult, FetchRequest, FetchResponse, SearchDepende
 
 - branches: 92
 - cyclomatic: 93
-- loc: 915
+- loc: 928
 
 ## Doc Coverage
 

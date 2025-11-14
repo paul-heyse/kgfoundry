@@ -8,10 +8,12 @@ import threading
 from collections import deque
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from itertools import pairwise
 from typing import Any
 
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.config_context import ApplicationContext
+from codeintel_rev.diagnostics.detectors import detect
 from codeintel_rev.telemetry.context import (
     current_run_id,
     current_session,
@@ -34,6 +36,7 @@ __all__ = [
     "record_step_payload",
     "record_timeline_payload",
     "render_markdown",
+    "render_mermaid",
     "report_to_json",
     "start_run",
 ]
@@ -60,6 +63,98 @@ def _infer_stop_reason_from_events(events: Sequence[Mapping[str, Any]]) -> str |
         detail = payload.get("detail")
         last_reason = f"{kind}:{detail}" if detail else f"{kind}:{status}"
     return last_reason
+
+
+def _default_budget_snapshot(context: ApplicationContext) -> dict[str, object]:
+    snapshot: dict[str, object] = {"rrf_k": 60}
+    settings = getattr(context, "settings", None)
+    if settings is None:
+        return snapshot
+    index_cfg = getattr(settings, "index", None)
+    if index_cfg is not None:
+        snapshot["rrf_k"] = getattr(index_cfg, "rrf_k", snapshot["rrf_k"])
+        prefetch = getattr(index_cfg, "hybrid_prefetch", {})
+        if isinstance(prefetch, Mapping):
+            snapshot["per_channel_depths"] = dict(prefetch)
+    bm25_cfg = getattr(settings, "bm25", None)
+    if bm25_cfg is not None:
+        snapshot["rm3_enabled"] = bool(getattr(bm25_cfg, "rm3_enabled", False))
+    return snapshot
+
+
+def _checkpoint_hit(
+    checkpoints: Sequence[Mapping[str, Any]],
+    prefixes: tuple[str, ...],
+) -> bool:
+    for checkpoint in checkpoints:
+        stage = checkpoint.get("stage")
+        if not isinstance(stage, str):
+            continue
+        if any(stage.startswith(prefix) for prefix in prefixes):
+            return True
+    return False
+
+
+def _checkpoint_summaries(checkpoints: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    summaries: list[dict[str, Any]] = []
+    for checkpoint in checkpoints:
+        stage = checkpoint.get("stage")
+        if not isinstance(stage, str):
+            continue
+        attrs = dict(checkpoint)
+        ok = bool(attrs.pop("ok", False))
+        reason = attrs.pop("reason", None)
+        attrs.pop("stage", None)
+        summaries.append(
+            {
+                "name": stage,
+                "ok": ok,
+                "reason": reason,
+                "attrs": attrs,
+            }
+        )
+    return summaries
+
+
+def _compute_ops_coverage(checkpoints: Sequence[Mapping[str, Any]]) -> dict[str, bool]:
+    return {
+        "embed": _checkpoint_hit(checkpoints, ("search.embed", "coderank.embed")),
+        "dense": _checkpoint_hit(checkpoints, ("search.faiss", "coderank.faiss")),
+        "sparse": _checkpoint_hit(checkpoints, ("search.bm25", "search.splade")),
+        "gather": _checkpoint_hit(
+            checkpoints,
+            ("gather.channels", "search.bm25", "search.splade"),
+        ),
+        "fuse": _checkpoint_hit(
+            checkpoints,
+            ("search.rrf_fuse", "fusion.rrf", "fusion.pool"),
+        ),
+        "hydrate": _checkpoint_hit(checkpoints, ("hydrate.",)),
+    }
+
+
+def _budgets_from_timeline(
+    events: Sequence[Mapping[str, Any]],
+    structured_events: Sequence[Mapping[str, Any]] | None = None,
+) -> dict[str, Any] | None:
+    for event in events:
+        if event.get("type") != "decision":
+            continue
+        name = str(event.get("name") or "")
+        if name not in {"gate.budget", "retrieval.budget"}:
+            continue
+        attrs = event.get("attrs")
+        if isinstance(attrs, Mapping):
+            return dict(attrs)
+    if structured_events is None:
+        return None
+    for record in structured_events:
+        if record.get("kind") != "retrieval.budget":
+            continue
+        payload = record.get("payload")
+        if isinstance(payload, Mapping):
+            return dict(payload)
+    return None
 
 
 @dataclass(slots=True, frozen=False)
@@ -493,6 +588,7 @@ def build_report(
         "tool": record.tool_name,
         "capability_stamp": record.capability_stamp,
         "duration_ms": (record.events[-1].attrs.get("duration_ms") if record.events else None),
+        "budgets": _default_budget_snapshot(context),
     }
     capabilities_obj = Capabilities.from_context(context)
     capabilities_payload = capabilities_obj.model_dump()
@@ -538,7 +634,71 @@ def report_to_json(report: RunReport) -> dict[str, Any]:
         contains all report fields in a format suitable for JSON serialization.
         Can be used with json.dumps() or FastAPI JSONResponse.
     """
-    return report.to_dict()
+    payload = report.to_dict()
+    payload.setdefault("trace_id", report.run_id)
+    checkpoints = payload.get("checkpoints")
+    if isinstance(checkpoints, Sequence):
+        checkpoint_items = [cp for cp in checkpoints if isinstance(cp, Mapping)]
+    else:
+        checkpoint_items = []
+    payload["ops_coverage"] = _compute_ops_coverage(checkpoint_items)
+    payload["stages"] = _checkpoint_summaries(checkpoint_items)
+    timeline_events = payload.get("timeline")
+    if isinstance(timeline_events, Sequence):
+        filtered_events = [event for event in timeline_events if isinstance(event, Mapping)]
+    else:
+        filtered_events = []
+    structured_events = [event for event in report.structured_events if isinstance(event, Mapping)]
+    budgets = _budgets_from_timeline(filtered_events, structured_events)
+    summary_budgets = payload.get("summary", {}).get("budgets")
+    fallback_budgets = dict(summary_budgets) if isinstance(summary_budgets, Mapping) else {}
+    if budgets:
+        payload["budgets"] = budgets
+    else:
+        payload["budgets"] = fallback_budgets
+    try:
+        payload["hints"] = detect(payload)
+    except (RuntimeError, ValueError, TypeError):  # pragma: no cover - defensive
+        payload["hints"] = []
+    return payload
+
+
+def render_mermaid(report: RunReport) -> str:
+    """Return a Mermaid graph describing stage checkpoints.
+
+    This function renders a run report as a Mermaid flowchart diagram showing
+    the sequence of stage checkpoints and their status. It is called by HTTP
+    endpoints and CLI commands to visualize run execution flow.
+
+    Parameters
+    ----------
+    report : RunReport
+        Run report containing checkpoint data to visualize.
+
+    Returns
+    -------
+    str
+        Mermaid ``graph TD`` describing the run's checkpoints with node labels
+        showing stage names, status (OK/FAILED), and optional reason messages.
+    """
+    checkpoints = report.checkpoints
+    lines = ["graph TD"]
+    if not checkpoints:
+        lines.append('empty["No checkpoints recorded"]')
+        return "\n".join(lines)
+    node_ids: list[str] = []
+    for idx, checkpoint in enumerate(checkpoints, 1):
+        stage = checkpoint.get("stage") or f"stage_{idx}"
+        status = "OK" if checkpoint.get("ok") else "FAILED"
+        reason = checkpoint.get("reason")
+        reason_suffix = f"\\n{reason}" if reason else ""
+        node_id = f"stage{idx}"
+        label = f"{stage}\\n{status}{reason_suffix}"
+        lines.append(f'{node_id}["{label}"]')
+        node_ids.append(node_id)
+    for prev, current in pairwise(node_ids):
+        lines.append(f"{prev} --> {current}")
+    return "\n".join(lines)
 
 
 def render_markdown(report: RunReport) -> str:

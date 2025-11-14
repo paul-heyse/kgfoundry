@@ -47,7 +47,7 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 
 - **fan_in**: 4
 - **fan_out**: 10
-- **cycle_group**: 76
+- **cycle_group**: 77
 
 ## Ownership
 

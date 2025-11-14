@@ -316,6 +316,7 @@ class _BaseStubFAISSManager:
         self.last_quantizer_ef_search: int | None = None
         self.last_k_factor: float | None = None
         self._search_ids = search_ids or [123]
+        self._last_catalog: object | None = None
 
     def load_cpu_index(self) -> None:
         """Load CPU index (no-op for testing)."""
@@ -357,6 +358,9 @@ class _BaseStubFAISSManager:
             Number of probes. Defaults to 128.
         runtime : object | None, optional
             Runtime override bundle captured for verification in tests.
+        catalog : object | None, optional
+            Catalog reference mirroring the production signature. Captured for
+            verification during tests.
 
         Returns
         -------
@@ -370,6 +374,8 @@ class _BaseStubFAISSManager:
         self.last_ef_search = getattr(runtime, "ef_search", None)
         self.last_quantizer_ef_search = getattr(runtime, "quantizer_ef_search", None)
         self.last_k_factor = getattr(runtime, "k_factor", None)
+        if catalog is not None:
+            self._last_catalog = catalog
         assert nprobe >= 1
         # Return k results (or fewer if k > available chunks)
         # Use stored search_ids or default to [123]

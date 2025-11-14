@@ -9,6 +9,8 @@ import asyncio
 import os
 import signal
 import threading
+import traceback
+import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager, suppress
 from importlib.metadata import PackageNotFoundError, version
@@ -54,6 +56,7 @@ from codeintel_rev.telemetry.reporter import (
 )
 from codeintel_rev.telemetry.reporter import (
     render_markdown,
+    render_mermaid,
     report_to_json,
 )
 from kgfoundry_common.errors import ConfigurationError
@@ -67,6 +70,123 @@ except PackageNotFoundError:
     _DIST_VERSION = None
 
 install_structured_logging()
+
+_DEFAULT_SSE_KEEPALIVE_SECONDS = 25.0
+
+
+def _sse_keepalive_interval() -> float:
+    """Return the configured SSE keep-alive interval (seconds).
+
+    Returns
+    -------
+    float
+        Keep-alive interval in seconds, clamped to a minimum of 5.0 seconds.
+        Defaults to ``_DEFAULT_SSE_KEEPALIVE_SECONDS`` if environment variable
+        is unset or invalid.
+    """
+    raw_value = os.getenv("SSE_KEEPALIVE_SECONDS", str(_DEFAULT_SSE_KEEPALIVE_SECONDS))
+    try:
+        interval = float(raw_value)
+    except ValueError:
+        return _DEFAULT_SSE_KEEPALIVE_SECONDS
+    return max(5.0, interval)
+
+
+def _sse_keepalive_budget() -> int | None:
+    """Return optional cap on keep-alive frames for long-lived SSE streams.
+
+    Returns
+    -------
+    int | None
+        Maximum number of keep-alive frames to emit after the initial payload.
+        ``None`` indicates infinite keep-alives (default). Intended for tests to
+        keep the stream finite by setting ``SSE_MAX_KEEPALIVES``.
+    """
+    raw_value = os.getenv("SSE_MAX_KEEPALIVES")
+    if raw_value is None:
+        return None
+    try:
+        budget = int(raw_value)
+    except ValueError:
+        return None
+    return None if budget < 0 else budget
+
+
+def _client_address(request: Request) -> str:
+    """Return a printable representation of the originating client address.
+
+    Parameters
+    ----------
+    request : Request
+        FastAPI request object containing client connection information.
+
+    Returns
+    -------
+    str
+        Client address string in "host:port" format, or "host" if port is None,
+        or "unknown" if client information is unavailable.
+    """
+    client = request.client
+    if client is None:
+        return "unknown"
+    host = client.host or "unknown"
+    port = client.port
+    return f"{host}:{port}" if port is not None else host
+
+
+def _log_request_summary(request: Request, *, status_code: int, duration_ms: int) -> None:
+    """Emit a structured log describing a completed HTTP request."""
+    LOGGER.info(
+        "http.request",
+        extra={
+            "request_id": getattr(request.state, "request_id", None),
+            "method": request.method,
+            "path": request.url.path,
+            "status_code": status_code,
+            "duration_ms": duration_ms,
+            "http_version": request.scope.get("http_version", "1.1"),
+            "client_addr": _client_address(request),
+        },
+    )
+
+
+def _stream_log_extra(
+    request: Request,
+    *,
+    stream_name: str,
+    stage: str,
+    chunk_bytes: int | None = None,
+) -> dict[str, object]:
+    """Return structured logging metadata for streaming lifecycle events.
+
+    Parameters
+    ----------
+    request : Request
+        FastAPI request object containing request state and URL path.
+    stream_name : str
+        Name identifier for the stream being logged.
+    stage : str
+        Lifecycle stage identifier (e.g., "open", "flush", "closed").
+    chunk_bytes : int | None
+        Optional byte count for the chunk being processed. Defaults to None.
+
+    Returns
+    -------
+    dict[str, object]
+        Dictionary containing request_id, path, stream name, stage, and optional
+        chunk_bytes for structured logging.
+    """
+    metadata: dict[str, object] = {
+        "request_id": getattr(request.state, "request_id", None),
+        "path": request.url.path,
+        "stream": stream_name,
+        "stage": stage,
+        "client_addr": _client_address(request),
+        "http_version": request.scope.get("http_version", "1.1"),
+    }
+    if chunk_bytes is not None:
+        metadata["chunk_bytes"] = chunk_bytes
+    return metadata
 
 
 def _preload_faiss_index(context: ApplicationContext) -> bool:
@@ -504,6 +624,129 @@ async def get_run_report_markdown(session_id: str, run_id: str | None = None) ->
     return PlainTextResponse(render_markdown(report))
 
 
+@app.get("/reports/{session_id}.mmd", response_class=PlainTextResponse)
+async def get_run_report_mermaid(session_id: str, run_id: str | None = None) -> PlainTextResponse:
+    """Return a Mermaid representation of the run.
+
+    Parameters
+    ----------
+    session_id : str
+        Session identifier to retrieve the run report for.
+    run_id : str | None
+        Optional run identifier when multiple runs share a session. If None,
+        returns the latest run for the session.
+
+    Returns
+    -------
+    PlainTextResponse
+        Mermaid `graph TD` body describing the run.
+
+    Raises
+    ------
+    HTTPException
+        Raised when the application context is not initialized or the run cannot
+        be found.
+    """
+    context = getattr(app.state, "context", None)
+    if context is None:
+        raise HTTPException(status_code=503, detail="Application context not initialized")
+    report = build_run_report(context, session_id, run_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return PlainTextResponse(render_mermaid(report))
+
+
+@app.get("/runs/{session_id}/report")
+async def get_run_report_v2(session_id: str, run_id: str | None = None) -> dict[str, Any]:
+    """Alias for `/reports/{session_id}` retaining backwards compatibility.
+
+    Parameters
+    ----------
+    session_id : str
+        Session identifier to retrieve the run report for.
+    run_id : str | None
+        Optional run identifier when multiple runs share a session. If None,
+        returns the latest run for the session.
+
+    Returns
+    -------
+    dict[str, Any]
+        JSON run report payload.
+    """
+    return await get_run_report(session_id, run_id)
+
+
+@app.get("/runs/{session_id}/report.md", response_class=PlainTextResponse)
+async def get_run_report_markdown_v2(
+    session_id: str, run_id: str | None = None
+) -> PlainTextResponse:
+    """Alias for `/reports/{session_id}.md`.
+
+    Parameters
+    ----------
+    session_id : str
+        Session identifier to retrieve the run report for.
+    run_id : str | None
+        Optional run identifier when multiple runs share a session. If None,
+        returns the latest run for the session.
+
+    Returns
+    -------
+    PlainTextResponse
+        Markdown run report body.
+    """
+    return await get_run_report_markdown(session_id, run_id)
+
+
+@app.get("/runs/{session_id}/report.mmd", response_class=PlainTextResponse)
+async def get_run_report_mermaid_v2(
+    session_id: str, run_id: str | None = None
+) -> PlainTextResponse:
+    """Alias for `/reports/{session_id}.mmd`.
+
+    Parameters
+    ----------
+    session_id : str
+        Session identifier to retrieve the run report for.
+    run_id : str | None
+        Optional run identifier when multiple runs share a session. If None,
+        returns the latest run for the session.
+
+    Returns
+    -------
+    PlainTextResponse
+        Mermaid graph for the run.
+    """
+    return await get_run_report_mermaid(session_id, run_id)
+
+
+@app.middleware("http")
+async def inject_request_id(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    """Ensure every request carries a stable request identifier.
+
+    Parameters
+    ----------
+    request : Request
+        Incoming HTTP request to process.
+    call_next : Callable[[Request], Awaitable[Response]]
+        Next middleware or route handler in the chain.
+
+    Returns
+    -------
+    Response
+        Response with X-Request-Id header set to the request identifier.
+    """
+    incoming = request.headers.get("x-request-id", "").strip()
+    request_id = incoming or uuid.uuid4().hex
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers.setdefault("X-Request-Id", request_id)
+    return response
+
+
 @app.middleware("http")
 async def set_mcp_context(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
@@ -550,6 +793,7 @@ async def set_mcp_context(
         with as_span("http.request", path=request.url.path, method=request.method):
             response = await call_next(request)
     except Exception as exc:
+        duration_ms = int((perf_counter() - start) * 1000)
         if timeline is not None:
             timeline.event(
                 "http.request",
@@ -558,9 +802,11 @@ async def set_mcp_context(
                 message=str(exc),
                 attrs={"method": request.method},
             )
+        status_code = getattr(exc, "status_code", 500)
+        _log_request_summary(request, status_code=status_code, duration_ms=duration_ms)
         raise
+    duration_ms = int((perf_counter() - start) * 1000)
     if timeline is not None:
-        duration_ms = int((perf_counter() - start) * 1000)
         timeline.event(
             "http.request",
             request.url.path,
@@ -570,6 +816,7 @@ async def set_mcp_context(
                 "duration_ms": duration_ms,
             },
         )
+    _log_request_summary(request, status_code=response.status_code, duration_ms=duration_ms)
     trace_id = current_trace_id()
     if trace_id:
         response.headers.setdefault("X-Trace-Id", trace_id)
@@ -705,15 +952,84 @@ async def capz(request: Request, *, refresh: bool = False) -> JSONResponse:
     return JSONResponse(payload)
 
 
+async def _stream_with_logging(
+    source: AsyncIterator[bytes],
+    *,
+    request: Request,
+    stream_name: str,
+) -> AsyncIterator[bytes]:
+    """Wrap a streaming iterator and emit lifecycle logs for observability.
+
+    Parameters
+    ----------
+    source : AsyncIterator[bytes]
+        Source iterator to wrap and log.
+    request : Request
+        FastAPI request object for logging context.
+    stream_name : str
+        Name identifier for the stream being logged.
+
+    Yields
+    ------
+    bytes
+        Chunks from the source iterator, passed through unchanged.
+
+    Raises
+    ------
+    asyncio.CancelledError
+        Re-raised if the source iterator is cancelled, after logging cancellation.
+    """
+    LOGGER.info(
+        "stream.lifecycle", extra=_stream_log_extra(request, stream_name=stream_name, stage="open")
+    )
+    try:
+        async for chunk in source:
+            if isinstance(chunk, (bytes, bytearray)):
+                byte_count = len(chunk)
+            elif isinstance(chunk, str):
+                byte_count = len(chunk.encode("utf-8"))
+            else:  # pragma: no cover - defensive path
+                byte_count = 0
+            LOGGER.info(
+                "stream.lifecycle",
+                extra=_stream_log_extra(
+                    request,
+                    stream_name=stream_name,
+                    stage="flush",
+                    chunk_bytes=byte_count,
+                ),
+            )
+            yield chunk
+    except asyncio.CancelledError:
+        LOGGER.info(
+            "stream.lifecycle",
+            extra=_stream_log_extra(request, stream_name=stream_name, stage="cancelled"),
+        )
+        raise
+    finally:
+        LOGGER.info(
+            "stream.lifecycle",
+            extra=_stream_log_extra(request, stream_name=stream_name, stage="closed"),
+        )
+
+
 @app.get("/sse")
-async def sse_demo() -> StreamingResponse:
-    """SSE streaming demo endpoint.
+async def sse_demo(request: Request) -> StreamingResponse:
+    """SSE streaming demo endpoint with keep-alive comments.
+
+    Parameters
+    ----------
+    request : Request
+        FastAPI request object for logging context.
 
     Returns
     -------
     StreamingResponse
-        Server-sent events stream.
+        SSE stream containing ready event, 5 data events, and recurring keep-alive
+        comments.
     """
+    keepalive_interval = _sse_keepalive_interval()
+    keepalive_budget = _sse_keepalive_budget()
 
     async def event_generator() -> AsyncIterator[bytes]:
         r"""Generate Server-Sent Events (SSE) stream for demo purposes.
@@ -721,33 +1037,106 @@ async def sse_demo() -> StreamingResponse:
         This generator function produces a simple SSE stream containing a ready
         event followed by 5 data events with incremental counters. Each data
         event is sent with a 0.5 second delay to demonstrate streaming behavior.
-        The stream follows the SSE format: "event: <name>\ndata: <payload>\n\n"
-        for named events, or "data: <payload>\n\n" for data-only events.
+        After the initial payload burst, the generator emits keep-alive comments
+        every ``SSE_KEEPALIVE_SECONDS`` so intermediaries keep the connection
+        open for long-lived sessions.
 
         Yields
         ------
         bytes
             SSE-formatted event chunks. Each chunk is a complete SSE message
             terminated with double newlines. The first chunk is a ready event,
-            followed by 5 data events containing incremental counters (0-4).
-
-        Notes
-        -----
-        This is a demo endpoint for testing SSE streaming functionality. The
-        generator demonstrates proper SSE formatting and async streaming behavior.
-        Time complexity: O(1) per event, total duration ~2.5 seconds (5 events
-        * 0.5s delay). The function performs async I/O (asyncio.sleep) and yields
-        control to the event loop between events.
+            followed by 5 data events containing incremental counters (0-4),
+            and then recurring keep-alive comments until the client disconnects.
         """
         yield b"event: ready\ndata: {}\n\n"
         for i in range(5):
             yield f"data: {i}\n\n".encode()
             await asyncio.sleep(0.5)
+        heartbeat = b": keep-alive\n\n"
+        keepalive_count = 0
+        while keepalive_budget is None or keepalive_count < keepalive_budget:
+            await asyncio.sleep(keepalive_interval)
+            yield heartbeat
+            keepalive_count += 1
 
     return StreamingResponse(
-        event_generator(),
+        _stream_with_logging(event_generator(), request=request, stream_name="sse-demo"),
         media_type="text/event-stream",
     )
+
+
+@app.exception_handler(HTTPException)
+def http_exception_handler_with_request_id(request: Request, exc: HTTPException) -> JSONResponse:
+    """Return HTTPException responses with structured payloads and request IDs.
+
+    Parameters
+    ----------
+    request : Request
+        FastAPI request object containing request state.
+    exc : HTTPException
+        HTTP exception to handle and format.
+
+    Returns
+    -------
+    JSONResponse
+        JSON response with error payload and X-Request-Id header if available.
+    """
+    headers: dict[str, str] = {}
+    exc_headers = exc.headers
+    if exc_headers is not None:
+        headers.update(exc_headers)
+    request_id = getattr(request.state, "request_id", None)
+    if request_id is not None:
+        headers.setdefault("X-Request-Id", request_id)
+    payload: dict[str, object] = {
+        "ok": False,
+        "error": {"type": exc.__class__.__name__, "message": exc.detail},
+    }
+    if request_id is not None:
+        payload["request_id"] = request_id
+    return JSONResponse(payload, status_code=exc.status_code, headers=headers or None)
+
+
+@app.exception_handler(Exception)
+def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Wrap unhandled exceptions in a debuggable envelope.
+
+    Parameters
+    ----------
+    request : Request
+        FastAPI request object containing request state.
+    exc : Exception
+        Unhandled exception to wrap and log.
+
+    Returns
+    -------
+    JSONResponse
+        JSON response with error payload (status 500) and X-Request-Id header
+        if available.
+    """
+    request_id = getattr(request.state, "request_id", None)
+    stacktrace = "".join(traceback.format_exception(exc.__class__, exc, exc.__traceback__))
+    LOGGER.error(
+        "http.unhandled_exception",
+        extra={
+            "request_id": request_id,
+            "path": request.url.path,
+            "method": request.method,
+            "client_addr": _client_address(request),
+            "stacktrace": stacktrace,
+        },
+    )
+    payload: dict[str, object] = {
+        "ok": False,
+        "error": {"type": exc.__class__.__name__, "message": str(exc)},
+    }
+    if request_id is not None:
+        payload["request_id"] = request_id
+    headers: dict[str, str] = {}
+    if request_id is not None:
+        headers["X-Request-Id"] = request_id
+    return JSONResponse(payload, status_code=500, headers=headers or None)
 
 
 if SERVER_SETTINGS.enable_proxy_fix:

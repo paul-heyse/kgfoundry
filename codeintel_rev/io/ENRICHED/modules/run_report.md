@@ -20,13 +20,13 @@ Utilities for composing run reports from JSONL ledgers.
 - class: `LedgerRunReport` (line 13)
 - function: `load_ledger` (line 23)
 - function: `infer_stop_reason` (line 53)
-- function: `build_run_report` (line 80)
+- function: `build_run_report` (line 77)
 
 ## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 34
+- **cycle_group**: 35
 
 ## Ownership
 
@@ -72,7 +72,7 @@ Utilities for composing run reports from JSONL ledgers.
 
 - branches: 11
 - cyclomatic: 12
-- loc: 110
+- loc: 107
 
 ## Doc Coverage
 

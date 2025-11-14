@@ -43,31 +43,31 @@ through stable paths such as ``.../current/faiss.index`` and reload when
 - variable: `MANIFEST_FILE` (line 37)
 - variable: `IDMAP_FILE` (line 38)
 - variable: `PROFILE_FILE` (line 39)
-- class: `LuceneAssets` (line 43)
-- function: `link_current_lucene` (line 63)
-- class: `IndexAssets` (line 76)
-- function: `_file_checksum` (line 118)
-- function: `_read_json` (line 128)
-- function: `collect_asset_attrs` (line 135)
-- function: `_attrs_from_meta` (line 169)
-- function: `_attrs_from_idmap` (line 192)
-- function: `_attrs_from_tuning` (line 198)
-- class: `VersionMeta` (line 219)
-- class: `IndexLifecycleManager` (line 244)
+- class: `LuceneAssets` (line 46)
+- function: `link_current_lucene` (line 66)
+- class: `IndexAssets` (line 79)
+- function: `_file_checksum` (line 121)
+- function: `_read_json` (line 131)
+- function: `collect_asset_attrs` (line 138)
+- function: `_attrs_from_meta` (line 172)
+- function: `_attrs_from_idmap` (line 195)
+- function: `_attrs_from_tuning` (line 201)
+- class: `VersionMeta` (line 222)
+- class: `IndexLifecycleManager` (line 247)
 
 ## Graph Metrics
 
 - **fan_in**: 5
 - **fan_out**: 2
-- **cycle_group**: 74
+- **cycle_group**: 54
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 8
-- recent churn 90: 8
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 
@@ -99,7 +99,7 @@ IndexAssets, IndexLifecycleManager, LuceneAssets, VersionMeta, collect_asset_att
 
 ## Hotspot
 
-- score: 2.64
+- score: 2.67
 
 ## Side Effects
 
@@ -107,9 +107,9 @@ IndexAssets, IndexLifecycleManager, LuceneAssets, VersionMeta, collect_asset_att
 
 ## Complexity
 
-- branches: 65
-- cyclomatic: 66
-- loc: 689
+- branches: 71
+- cyclomatic: 72
+- loc: 761
 
 ## Doc Coverage
 

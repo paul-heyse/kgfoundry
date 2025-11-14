@@ -29,12 +29,27 @@ class SearchDeps:
 def handle_search(deps: SearchDeps, args: dict[str, object]) -> SearchOutput:
     """Execute a lightweight search suitable for MCP tests or tooling.
 
+    This function performs a hybrid search combining dense (FAISS) and sparse
+    (BM25/SPLADE) retrieval channels, then hydrates results with chunk metadata
+    from the catalog. It is called by MCP tool handlers to provide search
+    functionality for testing and lightweight tooling scenarios.
+
+    Parameters
+    ----------
+    deps : SearchDeps
+        Search dependencies including catalog, FAISS search function, and sparse
+        search function. Functions may be None if corresponding channels are disabled.
+    args : dict[str, object]
+        Dictionary containing SearchInput fields, typically with "query" and
+        "top_k" keys.
+
     Returns
     -------
     SearchOutput
-        msgspec-structured payload describing top-k results.
+        msgspec-structured payload describing top-k results with metadata,
+        query echo, and limits information.
     """
-    payload = SearchInput(**args)
+    payload = _normalize_search_input(args)
     top_k = max(1, min(50, payload.top_k))
     query = payload.query.strip()
     if not query:
@@ -45,7 +60,11 @@ def handle_search(deps: SearchDeps, args: dict[str, object]) -> SearchOutput:
     merged = _merge_candidates(dense, sparse, top_k)
     chunk_ids = [cid for cid, _, _ in merged]
     rows = deps.catalog.query_by_ids(chunk_ids) if chunk_ids else []
-    rows_by_id = {int(row["id"]): row for row in rows if isinstance(row.get("id"), int)}
+    rows_by_id: dict[int, dict[str, object]] = {}
+    for row in rows:
+        row_id = row.get("id")
+        if isinstance(row_id, int):
+            rows_by_id[row_id] = row
     results: list[SearchResultItem] = []
     limits: list[str] = []
     for chunk_id, score, channel in merged:
@@ -111,13 +130,37 @@ def _merge_candidates(
 
 
 def _build_url(row: Mapping[str, object]) -> str:
-    start = int(row.get("start_line") or 0) + 1
-    end = int(row.get("end_line") or start) + 1
+    """Build a repo:// URL from chunk metadata row.
+
+    Parameters
+    ----------
+    row : Mapping[str, object]
+        Chunk metadata dictionary containing uri, start_line, and end_line.
+
+    Returns
+    -------
+    str
+        URL in format "repo://{uri}#L{start}-L{end}" with 1-based line numbers.
+    """
+    start = _coerce_int(row.get("start_line"), default=0) + 1
+    end = _coerce_int(row.get("end_line"), default=start) + 1
     uri = str(row.get("uri") or "")
     return f"repo://{uri}#L{start}-L{end}"
 
 
 def _build_snippet(row: Mapping[str, object]) -> str:
+    """Build a text snippet from chunk metadata row.
+
+    Parameters
+    ----------
+    row : Mapping[str, object]
+        Chunk metadata dictionary containing preview or content.
+
+    Returns
+    -------
+    str
+        Text snippet up to 400 characters, preferring preview over content.
+    """
     preview = row.get("preview")
     if preview:
         return str(preview)[:400]
@@ -125,3 +168,72 @@ def _build_snippet(row: Mapping[str, object]) -> str:
     lines = content.splitlines()
     snippet = "\n".join(lines[:8])
     return snippet[:400]
+
+
+def _normalize_search_input(args: Mapping[str, object]) -> SearchInput:
+    """Normalize and validate search tool input arguments.
+
+    Parameters
+    ----------
+    args : Mapping[str, object]
+        Raw arguments dictionary containing query, top_k, and filters.
+
+    Returns
+    -------
+    SearchInput
+        Normalized and validated SearchInput object.
+
+    Raises
+    ------
+    ValueError
+        If query is missing.
+    """
+    query_raw = args.get("query")
+    if query_raw is None:
+        msg = "query is required"
+        raise ValueError(msg)
+    query = str(query_raw)
+    top_k_raw = args.get("top_k", 12)
+    top_k = max(1, min(50, _coerce_int(top_k_raw, default=12)))
+    filters_raw = args.get("filters")
+    filters = dict(filters_raw) if isinstance(filters_raw, Mapping) else None
+    return SearchInput(query=query, top_k=top_k, filters=filters)
+
+
+def _coerce_int(value: object, *, default: int = 0) -> int:
+    """Coerce a value to an integer with fallback to default.
+
+    This function attempts to convert various types (bool, int, float, str) to
+    an integer, falling back to the default value if conversion fails or the
+    value is None. Used by input normalization functions to safely coerce
+    user-provided values.
+
+    Parameters
+    ----------
+    value : object
+        Value to coerce to integer.
+    default : int
+        Default value to return if coercion fails. Defaults to 0.
+
+    Returns
+    -------
+    int
+        Coerced integer value, or default if conversion fails.
+    """
+    if value is None:
+        return default
+    candidate = default
+    if isinstance(value, bool):
+        candidate = int(value)
+    elif isinstance(value, int):
+        candidate = value
+    elif isinstance(value, float):
+        candidate = int(value)
+    elif isinstance(value, str):
+        stripped = value.strip()
+        if stripped:
+            try:
+                candidate = int(stripped, 10)
+            except ValueError:
+                candidate = default
+    return candidate

@@ -30,7 +30,7 @@ better performance (50-80ms latency reduction) and reliability.
 
 - **fan_in**: 0
 - **fan_out**: 4
-- **cycle_group**: 151
+- **cycle_group**: 153
 
 ## Ownership
 

@@ -63,7 +63,7 @@ Notes
 
 - **fan_in**: 0
 - **fan_out**: 0
-- **cycle_group**: 152
+- **cycle_group**: 154
 
 ## Ownership
 
@@ -115,6 +115,7 @@ Notes
 - patches/AST_CST_SCIP_data_pipeline_hardening.md
 - patches/OpenTelemetry_ExtensionPhase2.md
 - patches/CST_Data_Build.md
+- patches/OpenTelemetry_ExtensionPhase4.md
 - patches/Typing_gating_follow_small_architecture_changes.md
 - patches/FAISS_detailed_implementation_plan.md
 - patches/Enrich_Expansion.md
@@ -143,6 +144,7 @@ Notes
 - patches/vllm scope.md
 - patches/Enrich_scope_addendum.md
 - patches/FAISS-Phase2-Refinements.md
+- patches/Front_End_Hardening_Phase1.md
 - patches/Enrich_Scope.md
 - patches/Runtime_Cells_Followup_Scope.md
 - patches/FAISS-Implementation-Stage2.md

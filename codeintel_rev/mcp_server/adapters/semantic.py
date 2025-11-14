@@ -140,6 +140,24 @@ class _SemanticPipelineResult:
 
 
 @dataclass(slots=True, frozen=True)
+class _FaissStageResult:
+    """Outputs from the FAISS stage before hybrid reranking."""
+
+    ids: list[int]
+    scores: list[float]
+    exception: Exception | None
+
+
+@dataclass(slots=True, frozen=True)
+class _HydrationOutcome:
+    """DuckDB hydration outcome with duration metadata."""
+
+    findings: list[Finding]
+    exception: Exception | None
+    duration_ms: float
+
+
+@dataclass(slots=True, frozen=True)
 class _SemanticPipelineRequest:
     context: ApplicationContext
     scope: ScopeIn | None
@@ -370,6 +388,17 @@ def _semantic_search_sync(
                 confidence=0.85 if artifacts.findings else 0.0,
                 extras=extras,
             )
+    except Exception as exc:
+        emit_step(
+            StepEvent(
+                kind="tool.error",
+                status="failed",
+                detail=type(exc).__name__,
+                payload={"tool": "search:semantic"},
+            )
+        )
+        raise
+    else:
         emit_step(
             StepEvent(
                 kind="tool.finish",
@@ -382,16 +411,6 @@ def _semantic_search_sync(
             )
         )
         return envelope
-    except Exception as exc:
-        emit_step(
-            StepEvent(
-                kind="tool.error",
-                status="failed",
-                detail=type(exc).__name__,
-                payload={"tool": "search:semantic"},
-            )
-        )
-        raise
 
 
 def _execute_semantic_pipeline(request: _SemanticPipelineRequest) -> _SemanticPipelineResult:
@@ -429,66 +448,28 @@ def _execute_semantic_pipeline(request: _SemanticPipelineRequest) -> _SemanticPi
                     request.context.settings.vllm.base_url,
                 )
         with request.context.open_catalog() as catalog:
-            if plan.faiss_ready and query_vector is not None:
-                faiss_attrs = {
+            faiss_stage = _run_faiss_stage(
+                request,
+                plan,
+                catalog,
+                query_vector,
+                limits_metadata,
+            )
+            with as_span(
+                "retrieval.hybrid",
+                **{
                     Attrs.COMPONENT: "retrieval",
-                    Attrs.STAGE: "faiss",
-                    Attrs.FAISS_TOP_K: plan.fanout.faiss_k,
-                    Attrs.FAISS_NPROBE: plan.nprobe,
-                }
-                with as_span("retrieval.faiss", **faiss_attrs):
-                    (
-                        result_ids,
-                        result_scores,
-                        search_exc,
-                    ) = _run_faiss_search(
-                        _FaissSearchRequest(
-                            context=request.context,
-                            query_vector=query_vector,
-                            limit=plan.fanout.faiss_k,
-                            nprobe=plan.nprobe,
-                            observation=request.observation,
-                            tuning_overrides=plan.tuning_overrides,
-                            catalog=catalog,
-                        )
-                    )
-            else:
-                result_ids = []
-                result_scores = []
-                search_exc = None
-            if search_exc is not None:
-                warning = f"FAISS unavailable, falling back to sparse channels ({search_exc})"
-                LOGGER.warning(warning, exc_info=search_exc)
-                limits_metadata.append("faiss_fallback:unavailable")
-                result_ids = []
-                result_scores = []
-            else:
-                threshold = float(request.context.settings.index.semantic_min_score or 0.0)
-                if threshold > 0.0 and result_scores and float(result_scores[0]) < threshold:
-                    LOGGER.info(
-                        "faiss.low_similarity_fallback",
-                        extra={
-                            "top_score": float(result_scores[0]),
-                            "threshold": threshold,
-                        },
-                    )
-                    limits_metadata.append("faiss_fallback:low_score")
-                    result_ids = []
-                    result_scores = []
-
-            hybrid_attrs = {
-                Attrs.COMPONENT: "retrieval",
-                Attrs.STAGE: "hybrid",
-                Attrs.CHANNELS_USED: to_label_str(["semantic", "faiss"]),
-                Attrs.RETRIEVAL_TOP_K: plan.effective_limit,
-            }
-            with as_span("retrieval.hybrid", **hybrid_attrs):
+                    Attrs.STAGE: "hybrid",
+                    Attrs.CHANNELS_USED: to_label_str(["semantic", "faiss"]),
+                    Attrs.RETRIEVAL_TOP_K: plan.effective_limit,
+                },
+            ):
                 hybrid_result = _resolve_hybrid_results(
                     request.context,
                     _HybridSearchState(
                         request.query,
-                        result_ids,
-                        result_scores,
+                        faiss_stage.ids,
+                        faiss_stage.scores,
                         plan.effective_limit,
                         plan.fanout.faiss_k,
                         plan.nprobe,
@@ -497,37 +478,114 @@ def _execute_semantic_pipeline(request: _SemanticPipelineRequest) -> _SemanticPi
                     limits_metadata,
                     ("semantic", "faiss"),
                 )
-
-            hydrate_attrs = {
-                Attrs.COMPONENT: "retrieval",
-                Attrs.STAGE: "hydrate",
-                "requested": len(hybrid_result.hydration_ids),
-            }
-            hydrate_ctx = (
-                request.timeline.step("hydrate.duckdb", requested=len(hybrid_result.hydration_ids))
-                if request.timeline
-                else nullcontext()
-            )
-            hydrate_start = perf_counter()
-            with hydrate_ctx, as_span("hydrate.duckdb", **hydrate_attrs):
-                findings, hydrate_exc = _hydrate_findings(
-                    request.context,
-                    hybrid_result.hydration_ids,
-                    hybrid_result.hydration_scores,
-                    scope=request.scope,
-                    catalog=catalog,
-                )
-    _ensure_hydration_success(hydrate_exc, request.observation, request.context)
-    hydrate_duration_ms = round((perf_counter() - hydrate_start) * 1000, 2)
+            hydration = _run_hydration_stage(request, hybrid_result, catalog)
+    _ensure_hydration_success(hydration.exception, request.observation, request.context)
     return _SemanticPipelineResult(
         plan=plan,
         limits_metadata=limits_metadata,
-        result_ids=result_ids,
+        result_ids=list(faiss_stage.ids),
         hybrid_result=hybrid_result,
-        findings=findings,
-        hydrate_exc=hydrate_exc,
-        hydrate_duration_ms=hydrate_duration_ms,
+        findings=hydration.findings,
+        hydrate_exc=hydration.exception,
+        hydrate_duration_ms=hydration.duration_ms,
     )
+
+
+def _run_faiss_stage(
+    request: _SemanticPipelineRequest,
+    plan: _SemanticSearchPlan,
+    catalog: DuckDBCatalog,
+    query_vector: NDArrayF32 | None,
+    limits_metadata: list[str],
+) -> _FaissStageResult:
+    if not (plan.faiss_ready and query_vector is not None):
+        return _FaissStageResult([], [], None)
+    attrs = {
+        Attrs.COMPONENT: "retrieval",
+        Attrs.STAGE: "faiss",
+        Attrs.FAISS_TOP_K: plan.fanout.faiss_k,
+        Attrs.FAISS_NPROBE: plan.nprobe,
+    }
+    with as_span("retrieval.faiss", **attrs):
+        result_ids, result_scores, search_exc = _run_faiss_search(
+            _FaissSearchRequest(
+                context=request.context,
+                query_vector=query_vector,
+                limit=plan.fanout.faiss_k,
+                nprobe=plan.nprobe,
+                observation=request.observation,
+                tuning_overrides=plan.tuning_overrides,
+                catalog=catalog,
+            )
+        )
+    if search_exc is not None:
+        warning = f"FAISS unavailable, falling back to sparse channels ({search_exc})"
+        LOGGER.warning(warning, exc_info=search_exc)
+        limits_metadata.append("faiss_fallback:unavailable")
+        return _FaissStageResult([], [], search_exc)
+    threshold = float(request.context.settings.index.semantic_min_score or 0.0)
+    if threshold > 0.0 and result_scores and float(result_scores[0]) < threshold:
+        LOGGER.info(
+            "faiss.low_similarity_fallback",
+            extra={
+                "top_score": float(result_scores[0]),
+                "threshold": threshold,
+            },
+        )
+        limits_metadata.append("faiss_fallback:low_score")
+        return _FaissStageResult([], [], None)
+    return _FaissStageResult(list(result_ids), list(result_scores), None)
+
+
+def _run_hydration_stage(
+    request: _SemanticPipelineRequest,
+    hybrid_result: _HybridResult,
+    catalog: DuckDBCatalog,
+) -> _HydrationOutcome:
+    """Execute DuckDB hydration stage with instrumentation and error handling.
+
+    This function hydrates search result IDs with chunk metadata from DuckDB,
+    applying scope filters and measuring duration. It is called during semantic
+    search execution after hybrid reranking to enrich results with full chunk
+    information. Used by semantic search adapters to isolate hydration logic.
+
+    Parameters
+    ----------
+    request : _SemanticPipelineRequest
+        Semantic pipeline request containing context, scope, and timeline.
+    hybrid_result : _HybridResult
+        Hybrid search result containing hydration IDs and scores.
+    catalog : DuckDBCatalog
+        DuckDB catalog instance for querying chunk metadata.
+
+    Returns
+    -------
+    _HydrationOutcome
+        Outcome containing hydrated findings, any exception that occurred, and
+        hydration duration in milliseconds.
+    """
+    hydrate_attrs = {
+        Attrs.COMPONENT: "retrieval",
+        Attrs.STAGE: "hydrate",
+        "requested": len(hybrid_result.hydration_ids),
+    }
+    timeline = request.timeline
+    hydrate_ctx = (
+        timeline.step("hydrate.duckdb", requested=len(hybrid_result.hydration_ids))
+        if timeline
+        else nullcontext()
+    )
+    hydrate_start = perf_counter()
+    with hydrate_ctx, as_span("hydrate.duckdb", **hydrate_attrs):
+        findings, hydrate_exc = _hydrate_findings(
+            request.context,
+            hybrid_result.hydration_ids,
+            hybrid_result.hydration_scores,
+            scope=request.scope,
+            catalog=catalog,
+        )
+    duration_ms = round((perf_counter() - hydrate_start) * 1000, 2)
+    return _HydrationOutcome(findings, hydrate_exc, duration_ms)
 
 
 def _clamp_result_limit(requested_limit: int, max_results: int) -> tuple[int, list[str]]:
@@ -562,9 +620,14 @@ def _clamp_result_limit(requested_limit: int, max_results: int) -> tuple[int, li
 def _build_search_budget(
     context: ApplicationContext,
     requested_limit: int,
-    observation: Observation,
+    observation: Observation,  # noqa: ARG001 - reserved for future error tracking
 ) -> _SearchBudget:
     """Combine limit clamping and FAISS readiness metadata for a search.
+
+    This function constructs a search budget by clamping the requested limit to
+    configured maximums and checking FAISS index readiness. It is called during
+    semantic search planning to ensure search operations respect resource limits
+    and handle FAISS unavailability gracefully.
 
     Parameters
     ----------
@@ -573,17 +636,13 @@ def _build_search_budget(
     requested_limit : int
         Requested result limit from client.
     observation : Observation
-        Observation block used to mark errors.
+        Observation block reserved for future error tracking. Currently unused
+        but maintained for API consistency with other search planning functions.
 
     Returns
     -------
     _SearchBudget
         Search budget containing effective limit, max results, and limits metadata.
-
-    Raises
-    ------
-    VectorSearchError
-        If FAISS index is not ready or unavailable.
     """
     max_results = max(1, context.settings.limits.max_results)
     effective_limit, clamp_messages = _clamp_result_limit(requested_limit, max_results)
@@ -984,8 +1043,9 @@ def _ensure_hydration_success(
         return
 
     observation.mark_error()
+    message = "DuckDB hydration failed"
     raise CatalogConsistencyError(
-        "DuckDB hydration failed",
+        message,
         context={
             "duckdb_path": str(context.paths.duckdb_path),
             "vectors_dir": str(context.paths.vectors_dir),

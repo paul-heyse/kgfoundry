@@ -43,15 +43,31 @@ class CollectorConfig:
     text_preview_skip_bytes: int = 2_000_000
 
 
-@dataclass(slots=True)
 class _CollectorStatsBuilder:
     """Mutable builder used while collecting CST stats."""
 
-    files_indexed: int = 0
-    node_rows: int = 0
-    parse_errors: int = 0
-    qname_hits: int = 0
-    scope_resolved: int = 0
+    __slots__ = (
+        "files_indexed",
+        "node_rows",
+        "parse_errors",
+        "qname_hits",
+        "scope_resolved",
+    )
+
+    def __init__(
+        self,
+        *,
+        files_indexed: int = 0,
+        node_rows: int = 0,
+        parse_errors: int = 0,
+        qname_hits: int = 0,
+        scope_resolved: int = 0,
+    ) -> None:
+        self.files_indexed = files_indexed
+        self.node_rows = node_rows
+        self.parse_errors = parse_errors
+        self.qname_hits = qname_hits
+        self.scope_resolved = scope_resolved
 
     def increment_parse_errors(self, count: int = 1) -> None:
         """Increment the parse error counter.

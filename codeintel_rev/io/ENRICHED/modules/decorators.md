@@ -51,21 +51,21 @@ Decorators for consistent span/timeline instrumentation.
 - variable: `F` (line 177)
 - variable: `TRACER` (line 187)
 - function: `_emit_checkpoint` (line 190)
-- function: `_set_span_attributes` (line 237)
-- function: `_span_scope` (line 272)
-- function: `_record_exception` (line 339)
-- function: `span_context` (line 373)
-- function: `trace_span` (line 461)
-- function: `trace_step` (line 613)
-- function: `emit_event` (line 661)
-- function: `_build_step_payload` (line 805)
-- function: `_with_duration` (line 821)
+- function: `_set_span_attributes` (line 238)
+- function: `_span_scope` (line 273)
+- function: `_record_exception` (line 340)
+- function: `span_context` (line 374)
+- function: `trace_span` (line 462)
+- function: `trace_step` (line 614)
+- function: `emit_event` (line 662)
+- function: `_build_step_payload` (line 806)
+- function: `_with_duration` (line 822)
 
 ## Graph Metrics
 
 - **fan_in**: 6
 - **fan_out**: 5
-- **cycle_group**: 58
+- **cycle_group**: 64
 
 ## Ownership
 
@@ -113,9 +113,9 @@ emit_event, span_context, trace_span, trace_step
 
 ## Complexity
 
-- branches: 34
-- cyclomatic: 35
-- loc: 828
+- branches: 35
+- cyclomatic: 36
+- loc: 829
 
 ## Doc Coverage
 

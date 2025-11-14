@@ -69,7 +69,7 @@ The FAISS index type is automatically selected based on corpus size:
 
 - **fan_in**: 0
 - **fan_out**: 13
-- **cycle_group**: 98
+- **cycle_group**: 100
 
 ## Ownership
 

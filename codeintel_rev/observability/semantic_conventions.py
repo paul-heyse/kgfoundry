@@ -29,6 +29,7 @@ class Attrs:
     QUERY_LEN: str = "retrieval.query_len"
     RETRIEVAL_TOP_K: str = "retrieval.top_k"
     RETRIEVAL_CHANNELS: str = "retrieval.channels"
+    RETRIEVAL_RRF_K: str = "retrieval.rrf_k"
     RETRIEVAL_EXPLAINABILITY: str = "retrieval.explainability"
 
     # Budget + gating metadata
@@ -38,6 +39,8 @@ class Attrs:
     DECISION_CHANNEL_DEPTHS: str = "decision.per_channel_depths"
     DECISION_BM25_RM3_ENABLED: str = "bm25.rm3_enabled"
     BM25_RM3_ENABLED: str = "bm25.rm3_enabled"
+    GATING_RM3_ENABLED: str = "gating.rm3_enabled"
+    GATING_AMBIGUITY: str = "gating.ambiguity_score"
 
     WARNINGS: str = "codeintel.warnings"
 
@@ -54,6 +57,7 @@ class Attrs:
     FAISS_TOP_K: str = "faiss.k"
     FAISS_NPROBE: str = "faiss.nprobe"
     FAISS_GPU: str = "faiss.gpu"
+    FAISS_GPU_READY: str = "faiss.gpu_ready"
 
     # vLLM embeddings
     VLLM_MODE: str = "vllm.mode"

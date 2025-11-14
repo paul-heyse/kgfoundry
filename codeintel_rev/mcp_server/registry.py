@@ -19,7 +19,7 @@ from codeintel_rev.mcp_server.types import (
 )
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class McpDeps:
     """Dependencies required for running the lightweight MCP tools."""
 
@@ -55,27 +55,63 @@ def list_tools() -> list[dict[str, Any]]:
 def call_tool(deps: McpDeps, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
     """Execute a tool using the provided dependencies.
 
+    This function dispatches tool execution requests to the appropriate handler
+    (search or fetch) and packages the response in MCP-compatible format. It is
+    called by MCP server implementations to execute tools requested by clients.
+
+    Parameters
+    ----------
+    deps : McpDeps
+        MCP dependencies including catalog and search functions.
+    name : str
+        Tool name to execute, typically "search" or "fetch".
+    arguments : dict[str, Any]
+        Tool-specific arguments dictionary passed to the handler.
+
     Returns
     -------
     dict[str, Any]
-        MCP-compatible response envelope.
+        MCP-compatible response envelope containing structuredContent for successful
+        tool execution, or isError flag with error content for unknown tools.
     """
     if name == "search":
-        out = handle_search(
-            SearchDeps(
-                catalog=deps.catalog,
-                faiss_search=deps.faiss_search,
-                sparse_search=deps.sparse_search,
-            ),
-            arguments or {},
-        )
-        return {"structuredContent": msgspec.to_builtins(out)}
+        try:
+            search_out = handle_search(
+                SearchDeps(
+                    catalog=deps.catalog,
+                    faiss_search=deps.faiss_search,
+                    sparse_search=deps.sparse_search,
+                ),
+                arguments or {},
+            )
+        except ValueError as exc:
+            return _error_response(str(exc))
+        return {"structuredContent": msgspec.to_builtins(search_out)}
     if name == "fetch":
-        out: FetchOutput = handle_fetch(deps.catalog, arguments or {})
-        return {"structuredContent": msgspec.to_builtins(out)}
+        try:
+            fetch_out: FetchOutput = handle_fetch(deps.catalog, arguments or {})
+        except ValueError as exc:
+            return _error_response(str(exc))
+        return {"structuredContent": msgspec.to_builtins(fetch_out)}
+    return _error_response(f"Unknown tool: {name}")
+
+
+def _error_response(message: str) -> dict[str, Any]:
+    """Build an MCP-compatible error response envelope.
+
+    Parameters
+    ----------
+    message : str
+        Error message to include in the response.
+
+    Returns
+    -------
+    dict[str, Any]
+        MCP error response dictionary with isError flag and content array.
+    """
     return {
         "isError": True,
         "content": [
-            {"type": "text", "text": f"Unknown tool: {name}"},
+            {"type": "text", "text": message},
         ],
     }

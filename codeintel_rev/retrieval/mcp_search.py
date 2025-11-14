@@ -873,6 +873,19 @@ def post_search_validate_and_fill(
 ) -> tuple[list[SearchResult], _RepairStats]:
     """Ensure MCP results have required metadata, dropping corrupt rows.
 
+    This function validates and repairs search results by ensuring each item has
+    required metadata fields (URI, line ranges, content) from the hydration payload.
+    It is called after search execution to ensure result quality and completeness
+    before returning results to clients.
+
+    Parameters
+    ----------
+    items : Sequence[SearchResult]
+        Sequence of search result items to validate and repair.
+    hydration : HydrationPayload
+        Payload containing chunk metadata rows keyed by chunk ID, used to fill
+        missing fields in search results.
+
     Returns
     -------
     tuple[list[SearchResult], _RepairStats]

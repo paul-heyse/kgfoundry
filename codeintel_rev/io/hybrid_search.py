@@ -1401,7 +1401,27 @@ class HybridSearchEngine:
         *,
         faiss_ready: bool,
     ) -> tuple[list[tuple[int, float]], list[str]]:
-        """Drop semantic hits when FAISS is unavailable or below score threshold."""
+        """Drop semantic hits when FAISS is unavailable or below score threshold.
+
+        This method filters semantic search results based on FAISS availability and
+        minimum score thresholds. It is called during hybrid search execution to
+        ensure only valid semantic hits are included in the final results. When FAISS
+        is unavailable or scores are too low, warnings are generated for telemetry.
+
+        Parameters
+        ----------
+        semantic_hits : Sequence[tuple[int, float]]
+            Sequence of (chunk_id, score) tuples from semantic search.
+        faiss_ready : bool
+            Whether FAISS index is available and ready for use.
+
+        Returns
+        -------
+        tuple[list[tuple[int, float]], list[str]]
+            Filtered list of (chunk_id, score) tuples and list of warning strings
+            indicating why hits were filtered (e.g., "faiss_fallback:unavailable" or
+            "faiss_fallback:low_score").
+        """
         hits = list(semantic_hits)
         warnings: list[str] = []
         if not faiss_ready:

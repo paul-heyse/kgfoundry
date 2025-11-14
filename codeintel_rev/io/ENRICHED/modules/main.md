@@ -15,6 +15,8 @@ Provides health/readiness endpoints, CORS, and streaming support.
 - from **(absolute)** import os
 - from **(absolute)** import signal
 - from **(absolute)** import threading
+- from **(absolute)** import traceback
+- from **(absolute)** import uuid
 - from **collections.abc** import AsyncIterator, Awaitable, Callable, Mapping
 - from **contextlib** import asynccontextmanager, suppress
 - from **importlib.metadata** import PackageNotFoundError, version
@@ -47,42 +49,54 @@ Provides health/readiness endpoints, CORS, and streaming support.
 - from **codeintel_rev.telemetry.logging** import install_structured_logging
 - from **codeintel_rev.telemetry.prom** import build_metrics_router
 - from **codeintel_rev.telemetry.reporter** import build_report
-- from **codeintel_rev.telemetry.reporter** import render_markdown, report_to_json
+- from **codeintel_rev.telemetry.reporter** import render_markdown, render_mermaid, report_to_json
 - from **kgfoundry_common.errors** import ConfigurationError
 - from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 62)
-- variable: `SERVER_SETTINGS` (line 63)
-- function: `_preload_faiss_index` (line 72)
-- function: `_env_flag` (line 103)
-- function: `_log_gpu_warmup` (line 120)
-- function: `_preload_faiss_if_configured` (line 141)
-- function: `_preload_xtr_if_configured` (line 151)
-- function: `_preload_hybrid_if_configured` (line 165)
-- function: `_initialize_context` (line 176)
-- function: `_shutdown_context` (line 264)
-- function: `lifespan` (line 287)
-- variable: `app` (line 382)
-- variable: `metrics_router` (line 413)
-- function: `get_run_report` (line 423)
-- function: `get_run_report_markdown` (line 465)
-- function: `set_mcp_context` (line 508)
-- function: `disable_nginx_buffering` (line 583)
-- function: `healthz` (line 619)
-- function: `readyz` (line 631)
-- function: `capz` (line 666)
-- function: `sse_demo` (line 709)
-- variable: `proxy_wrapped` (line 754)
-- variable: `asgi` (line 759)
-- variable: `asgi` (line 761)
+- variable: `LOGGER` (line 65)
+- variable: `SERVER_SETTINGS` (line 66)
+- function: `_sse_keepalive_interval` (line 77)
+- function: `_client_address` (line 95)
+- function: `_log_request_summary` (line 117)
+- function: `_stream_log_extra` (line 133)
+- function: `_preload_faiss_index` (line 172)
+- function: `_env_flag` (line 203)
+- function: `_log_gpu_warmup` (line 220)
+- function: `_preload_faiss_if_configured` (line 241)
+- function: `_preload_xtr_if_configured` (line 251)
+- function: `_preload_hybrid_if_configured` (line 265)
+- function: `_initialize_context` (line 276)
+- function: `_shutdown_context` (line 364)
+- function: `lifespan` (line 387)
+- variable: `app` (line 482)
+- variable: `metrics_router` (line 513)
+- function: `get_run_report` (line 523)
+- function: `get_run_report_markdown` (line 565)
+- function: `get_run_report_mermaid` (line 608)
+- function: `get_run_report_v2` (line 640)
+- function: `get_run_report_markdown_v2` (line 660)
+- function: `get_run_report_mermaid_v2` (line 682)
+- function: `inject_request_id` (line 704)
+- function: `set_mcp_context` (line 731)
+- function: `disable_nginx_buffering` (line 810)
+- function: `healthz` (line 846)
+- function: `readyz` (line 858)
+- function: `capz` (line 893)
+- function: `_stream_with_logging` (line 935)
+- function: `sse_demo` (line 997)
+- function: `http_exception_handler_with_request_id` (line 1047)
+- function: `unhandled_exception_handler` (line 1079)
+- variable: `proxy_wrapped` (line 1120)
+- variable: `asgi` (line 1125)
+- variable: `asgi` (line 1127)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 19
-- **cycle_group**: 88
+- **cycle_group**: 90
 
 ## Ownership
 
@@ -126,7 +140,7 @@ app, asgi
 
 ## Hotspot
 
-- score: 2.97
+- score: 3.06
 
 ## Side Effects
 
@@ -135,22 +149,22 @@ app, asgi
 
 ## Complexity
 
-- branches: 58
-- cyclomatic: 59
-- loc: 765
+- branches: 78
+- cyclomatic: 79
+- loc: 1131
 
 ## Doc Coverage
 
+- `_sse_keepalive_interval` (function): summary=yes, params=ok, examples=no — Return the configured SSE keep-alive interval (seconds).
+- `_client_address` (function): summary=yes, params=ok, examples=no — Return a printable representation of the originating client address.
+- `_log_request_summary` (function): summary=yes, params=mismatch, examples=no — Emit a structured log describing a completed HTTP request.
+- `_stream_log_extra` (function): summary=yes, params=ok, examples=no — Return structured logging metadata for streaming lifecycle events.
 - `_preload_faiss_index` (function): summary=yes, params=ok, examples=no — Pre-load FAISS index during startup to avoid first-request latency.
 - `_env_flag` (function): summary=yes, params=ok, examples=no — Return ``True`` when an environment flag is explicitly enabled.
 - `_log_gpu_warmup` (function): summary=yes, params=ok, examples=no — Log the GPU warmup status summary.
 - `_preload_faiss_if_configured` (function): summary=yes, params=mismatch, examples=no — Preload FAISS indexes when configured to do so.
 - `_preload_xtr_if_configured` (function): summary=yes, params=mismatch, examples=no — Preload XTR runtime when toggle is enabled.
 - `_preload_hybrid_if_configured` (function): summary=yes, params=mismatch, examples=no — Preload HybridSearchEngine when toggle is enabled.
-- `_initialize_context` (function): summary=yes, params=ok, examples=yes — Initialize application context, readiness probe, and optional runtimes.
-- `_shutdown_context` (function): summary=yes, params=mismatch, examples=no — Shut down mutable runtimes and readiness probes.
-- `lifespan` (function): summary=yes, params=ok, examples=no — Application lifespan manager with explicit configuration initialization.
-- `get_run_report` (function): summary=yes, params=ok, examples=no — Return JSON run report for the session/run identifier.
 
 ## Tags
 

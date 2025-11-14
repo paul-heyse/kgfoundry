@@ -1706,10 +1706,20 @@ def _file_checksum(path: Path) -> str:
 def _parquet_hash(path: str | Path) -> str:
     """Return SHA256 checksum for the Parquet file at ``path``.
 
+    This function computes a SHA256 hash of a Parquet file's contents for
+    integrity verification. It is used by catalog operations to detect changes
+    in FAISS ID map or chunk metadata files, enabling cache invalidation when
+    data files are updated.
+
+    Parameters
+    ----------
+    path : str | Path
+        Path to the Parquet file to hash.
+
     Returns
     -------
     str
-        Hex digest representing the Parquet file contents.
+        Hexadecimal SHA256 digest representing the Parquet file contents.
     """
     file_path = Path(path)
     digest = hashlib.sha256()
@@ -1760,10 +1770,28 @@ def refresh_faiss_idmap_materialized(
 ) -> IdMapMeta:
     """Materialize ``v_faiss_join`` into ``faiss_idmap_mat`` with checksum guard.
 
+    This function refreshes the materialized FAISS ID map table by computing checksums
+    of the source Parquet files and comparing them to cached values. If the checksums
+    differ, the materialized table is rebuilt from the view. Used by catalog
+    operations to ensure ID map queries remain fast while staying synchronized with
+    updated index files.
+
+    Parameters
+    ----------
+    conn : duckdb.DuckDBPyConnection
+        DuckDB connection to use for executing SQL operations.
+    idmap_parquet : str
+        Path to the FAISS ID map Parquet file containing faiss_row to external_id
+        mappings.
+    chunks_parquet : str
+        Path to the chunks Parquet file containing chunk metadata (uri, lines,
+        language, text).
+
     Returns
     -------
     IdMapMeta
-        Metadata describing the materialized table and whether a refresh occurred.
+        Metadata describing the materialized table including checksum, row count,
+        and whether a refresh occurred.
     """
     DuckDBCatalog._ensure_idmap_tables(conn)
     ensure_faiss_idmap_view(

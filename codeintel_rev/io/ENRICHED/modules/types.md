@@ -29,13 +29,15 @@ Typed DTOs and JSON Schema helpers for MCP search/fetch tools.
 
 - **fan_in**: 3
 - **fan_out**: 1
-- **cycle_group**: 122
+- **cycle_group**: 124
 
 ## Ownership
 
-- bus factor: 0.00
-- recent churn 30: 0
-- recent churn 90: 0
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 1
+- recent churn 90: 1
 
 ## Usage
 
