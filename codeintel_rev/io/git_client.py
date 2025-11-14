@@ -304,9 +304,16 @@ class GitClient:
         Line numbers are 1-indexed to match editor conventions and Git's
         output format. Internally, GitPython uses 0-indexed lines.
         """
-        attrs = {"path": path, "start_line": start_line, "end_line": end_line}
+        attrs = {
+            Attrs.GIT_OPERATION: "blame_range",
+            Attrs.GIT_PATH: path,
+            Attrs.LINE_START: start_line,
+            Attrs.LINE_END: end_line,
+            Attrs.GIT_LINE_RANGE: f"{start_line}:{end_line}",
+        }
         with span_context(
             "git.blame",
+            kind="client",
             stage="git.blame",
             attrs=attrs,
             emit_checkpoint=True,
@@ -455,9 +462,14 @@ class GitClient:
         not work perfectly. Consider using Git's --follow flag via subprocess
         if rename tracking is critical.
         """
-        attrs = {"path": path, "limit": limit}
+        attrs = {
+            Attrs.GIT_OPERATION: "file_history",
+            Attrs.GIT_PATH: path,
+            Attrs.LINE_LIMIT: limit,
+        }
         with span_context(
             "git.file_history",
+            kind="client",
             stage="git.file_history",
             attrs=attrs,
             emit_checkpoint=True,

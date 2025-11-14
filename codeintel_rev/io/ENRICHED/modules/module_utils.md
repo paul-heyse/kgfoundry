@@ -22,7 +22,7 @@ Helpers for converting between module paths and dotted names.
 
 - **fan_in**: 3
 - **fan_out**: 0
-- **cycle_group**: 86
+- **cycle_group**: 84
 
 ## Ownership
 

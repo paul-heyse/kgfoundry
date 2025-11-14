@@ -35,9 +35,9 @@ OpenTelemetry logging bootstrap helpers.
 
 ## Graph Metrics
 
-- **fan_in**: 1
+- **fan_in**: 2
 - **fan_out**: 0
-- **cycle_group**: 6
+- **cycle_group**: 8
 
 ## Ownership
 
@@ -77,7 +77,7 @@ init_otel_logging
 
 ## Hotspot
 
-- score: 1.74
+- score: 1.90
 
 ## Side Effects
 

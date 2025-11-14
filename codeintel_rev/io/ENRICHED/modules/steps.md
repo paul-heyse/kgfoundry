@@ -36,7 +36,7 @@ Structured step event helpers.
 
 - **fan_in**: 9
 - **fan_out**: 5
-- **cycle_group**: 43
+- **cycle_group**: 41
 
 ## Ownership
 

@@ -106,6 +106,11 @@ def _stage_span(stage: str, **start_meta: object) -> Iterator[dict[str, object]]
         Mutable dictionary that can be populated with additional metadata prior
         to logging the ``event=finish`` line.
 
+    Raises
+    ------
+    Exception
+        Any exception raised within the context is re-raised after logging an
+        error event. The original exception is preserved.
     """
     start = time.perf_counter()
     LOGGER.debug("stage=%s event=start %s", stage, _format_stage_meta(start_meta))
@@ -1061,7 +1066,7 @@ def to_duckdb(  # pragma: no cover - exercised in dedicated test
     modules_jsonl: Annotated[
         Path,
         typer.Option(
-            --modules-jsonl,
+            "--modules-jsonl",
             help="Path to modules.jsonl produced by the enrichment CLI.",
             exists=True,
             dir_okay=False,
@@ -1071,7 +1076,7 @@ def to_duckdb(  # pragma: no cover - exercised in dedicated test
     db_path: Annotated[
         Path,
         typer.Option(
-            --db,
+            "--db",
             help="Target DuckDB catalog for enrichment analytics.",
             dir_okay=False,
         ),
@@ -1175,7 +1180,7 @@ def _build_module_row(
 
     outline_nodes = _collect_outline_nodes(rel, code, record)
     _apply_index_results(record, idx, outline_nodes)
-    record.set_fields(config_refs=[])
+    record.config_refs = []
     return record, symbol_edges
 
 
@@ -1305,39 +1310,37 @@ def _apply_index_results(
 ) -> None:
     """Populate ``record`` with data derived from LibCST/Tree-sitter."""
     doc_metrics = dict(idx.doc_metrics)
+    record.doc_metrics = doc_metrics
     has_summary = doc_metrics.get("has_summary")
+    record.docstring = idx.docstring
+    record.doc_summary = idx.doc_summary
+    record.doc_has_summary = bool(has_summary)
     param_parity = doc_metrics.get("param_parity")
-    record.set_fields(
-        doc_metrics=doc_metrics,
-        docstring=idx.docstring,
-        doc_summary=idx.doc_summary,
-        doc_has_summary=bool(has_summary),
-        doc_param_parity=bool(param_parity) if param_parity is not None else True,
-        doc_examples_present=bool(doc_metrics.get("examples_present")),
-        imports=[
-            {
-                "module": entry.module,
-                "names": list(entry.names),
-                "aliases": dict(entry.aliases),
-                "is_star": entry.is_star,
-                "level": entry.level,
-            }
-            for entry in idx.imports
-        ],
-        defs=[{"kind": d.kind, "name": d.name, "lineno": d.lineno} for d in idx.defs],
-        exports=sorted(idx.exports),
-        exports_declared=sorted(idx.exports),
-        outline_nodes=outline_nodes,
-        parse_ok=idx.parse_ok,
-        doc_items=idx.doc_items,
-        annotation_ratio=dict(idx.annotation_ratio),
-        untyped_defs=idx.untyped_defs,
-        side_effects=dict(idx.side_effects),
-        raises=list(idx.raises),
-        complexity=dict(idx.complexity),
-    )
+    record.doc_param_parity = bool(param_parity) if param_parity is not None else True
+    record.doc_examples_present = bool(doc_metrics.get("examples_present"))
+    record.imports = [
+        {
+            "module": entry.module,
+            "names": list(entry.names),
+            "aliases": dict(entry.aliases),
+            "is_star": entry.is_star,
+            "level": entry.level,
+        }
+        for entry in idx.imports
+    ]
+    record.defs = [{"kind": d.kind, "name": d.name, "lineno": d.lineno} for d in idx.defs]
+    record.exports = sorted(idx.exports)
+    record.exports_declared = sorted(idx.exports)
+    record.outline_nodes = outline_nodes
+    record.parse_ok = idx.parse_ok
     if idx.errors:
-        record.set_fields(errors=[*record.errors, *idx.errors])
+        record.errors.extend(idx.errors)
+    record.doc_items = idx.doc_items
+    record.annotation_ratio = dict(idx.annotation_ratio)
+    record.untyped_defs = idx.untyped_defs
+    record.side_effects = dict(idx.side_effects)
+    record.raises = list(idx.raises)
+    record.complexity = dict(idx.complexity)
 
 
 def _outline_nodes_for(rel_path: str, code: str) -> list[dict[str, Any]]:

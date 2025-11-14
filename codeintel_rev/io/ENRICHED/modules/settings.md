@@ -73,7 +73,7 @@ All configuration loaded from environment variables with sensible defaults.
 
 - **fan_in**: 23
 - **fan_out**: 2
-- **cycle_group**: 22
+- **cycle_group**: 18
 
 ## Ownership
 

@@ -33,7 +33,7 @@ Writers and helpers that persist CST datasets to disk.
 
 - **fan_in**: 1
 - **fan_out**: 4
-- **cycle_group**: 112
+- **cycle_group**: 110
 
 ## Ownership
 

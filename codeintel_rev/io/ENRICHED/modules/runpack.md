@@ -40,7 +40,7 @@ Helpers for building per-run diagnostic artifacts ("runpacks").
 
 - **fan_in**: 2
 - **fan_out**: 6
-- **cycle_group**: 48
+- **cycle_group**: 50
 
 ## Ownership
 

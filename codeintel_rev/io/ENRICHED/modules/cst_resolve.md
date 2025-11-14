@@ -38,7 +38,7 @@ Stitch CST nodes to module summary rows and SCIP symbols.
 
 - **fan_in**: 2
 - **fan_out**: 3
-- **cycle_group**: 111
+- **cycle_group**: 109
 
 ## Ownership
 

@@ -63,7 +63,7 @@ LibCST traversal utilities that emit normalized node records.
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 113
+- **cycle_group**: 111
 
 ## Ownership
 

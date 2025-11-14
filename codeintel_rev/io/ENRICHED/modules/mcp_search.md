@@ -19,7 +19,10 @@ Deep-Research compatible search/fetch orchestration helpers.
 - from **codeintel_rev.eval.pool_writer** import write_pool
 - from **codeintel_rev.io.faiss_manager** import SearchRuntimeOverrides
 - from **codeintel_rev.metrics.registry** import MCP_FETCH_LATENCY_SECONDS, MCP_SEARCH_ANN_LATENCY_MS, MCP_SEARCH_HYDRATION_LATENCY_MS, MCP_SEARCH_LATENCY_SECONDS, MCP_SEARCH_POSTFILTER_DENSITY, MCP_SEARCH_RERANK_LATENCY_MS
+- from **codeintel_rev.observability.otel** import record_span_event
+- from **codeintel_rev.observability.semantic_conventions** import Attrs, to_label_str
 - from **codeintel_rev.retrieval.types** import SearchPoolRow
+- from **codeintel_rev.telemetry.decorators** import span_context
 - from **codeintel_rev.typing** import NDArrayF32, NDArrayI64
 - from **kgfoundry_common.errors** import EmbeddingError
 - from **kgfoundry_common.logging** import get_logger
@@ -29,60 +32,60 @@ Deep-Research compatible search/fetch orchestration helpers.
 
 ## Definitions
 
-- variable: `Timeline` (line 34)
-- variable: `StructureAnnotations` (line 35)
-- variable: `SearchFilterPayload` (line 36)
-- variable: `LOGGER` (line 40)
-- class: `EmbeddingClient` (line 43)
-- class: `IndexConfigLike` (line 51)
-- class: `LimitsConfigLike` (line 81)
-- class: `SearchSettings` (line 115)
-- class: `CatalogLike` (line 129)
-- class: `VectorIndex` (line 152)
-- class: `SearchFilters` (line 177)
-- class: `SearchRequest` (line 262)
-- class: `SearchResult` (line 272)
-- class: `SearchResponse` (line 285)
-- class: `HydrationPayload` (line 295)
-- class: `SearchDependencies` (line 303)
-- class: `FetchRequest` (line 318)
-- class: `FetchObjectResult` (line 326)
-- class: `FetchResponse` (line 337)
-- class: `FetchDependencies` (line 344)
-- function: `run_search` (line 352)
-- function: `run_fetch` (line 438)
-- function: `_normalize_str_list` (line 498)
-- function: `_embed_query` (line 504)
-- function: `_compute_fanout` (line 517)
-- function: `_build_runtime_overrides` (line 526)
-- function: `_flatten_ids` (line 553)
-- function: `_flatten_scores` (line 559)
-- function: `_hydrate_chunks` (line 565)
-- function: `_build_results` (line 589)
-- function: `_matches_symbols` (line 621)
-- function: `_build_metadata` (line 628)
-- function: `_build_hit_reasons` (line 653)
-- function: `_build_title` (line 675)
-- function: `_build_url` (line 682)
-- function: `_build_snippet` (line 689)
-- function: `_truncate_content` (line 697)
-- function: `_build_fetch_metadata` (line 705)
-- function: `_write_pool_rows` (line 716)
-- function: `_record_postfilter_density` (line 758)
-- function: `_log_search_completion` (line 765)
-- function: `_coerce_int` (line 785)
-- function: `_string_sequence` (line 800)
-- function: `_repair_single_result` (line 806)
-- function: `_resolve_snippet` (line 821)
-- function: `_merge_metadata` (line 831)
-- class: `_RepairStats` (line 861)
-- function: `post_search_validate_and_fill` (line 869)
+- variable: `Timeline` (line 37)
+- variable: `StructureAnnotations` (line 38)
+- variable: `SearchFilterPayload` (line 39)
+- variable: `LOGGER` (line 43)
+- class: `EmbeddingClient` (line 46)
+- class: `IndexConfigLike` (line 54)
+- class: `LimitsConfigLike` (line 84)
+- class: `SearchSettings` (line 118)
+- class: `CatalogLike` (line 132)
+- class: `VectorIndex` (line 155)
+- class: `SearchFilters` (line 180)
+- class: `SearchRequest` (line 265)
+- class: `SearchResult` (line 275)
+- class: `SearchResponse` (line 288)
+- class: `HydrationPayload` (line 298)
+- class: `SearchDependencies` (line 306)
+- class: `FetchRequest` (line 321)
+- class: `FetchObjectResult` (line 329)
+- class: `FetchResponse` (line 340)
+- class: `FetchDependencies` (line 347)
+- function: `run_search` (line 355)
+- function: `run_fetch` (line 516)
+- function: `_normalize_str_list` (line 582)
+- function: `_embed_query` (line 588)
+- function: `_compute_fanout` (line 610)
+- function: `_build_runtime_overrides` (line 619)
+- function: `_flatten_ids` (line 646)
+- function: `_flatten_scores` (line 652)
+- function: `_hydrate_chunks` (line 658)
+- function: `_build_results` (line 682)
+- function: `_matches_symbols` (line 714)
+- function: `_build_metadata` (line 721)
+- function: `_build_hit_reasons` (line 746)
+- function: `_build_title` (line 768)
+- function: `_build_url` (line 775)
+- function: `_build_snippet` (line 782)
+- function: `_truncate_content` (line 790)
+- function: `_build_fetch_metadata` (line 798)
+- function: `_write_pool_rows` (line 809)
+- function: `_record_postfilter_density` (line 851)
+- function: `_log_search_completion` (line 858)
+- function: `_coerce_int` (line 878)
+- function: `_string_sequence` (line 893)
+- function: `_repair_single_result` (line 899)
+- function: `_resolve_snippet` (line 914)
+- function: `_merge_metadata` (line 924)
+- class: `_RepairStats` (line 954)
+- function: `post_search_validate_and_fill` (line 962)
 
 ## Graph Metrics
 
 - **fan_in**: 1
-- **fan_out**: 8
-- **cycle_group**: 130
+- **fan_out**: 11
+- **cycle_group**: 128
 
 ## Ownership
 
@@ -122,7 +125,7 @@ FetchDependencies, FetchObjectResult, FetchRequest, FetchResponse, SearchDepende
 
 ## Hotspot
 
-- score: 2.83
+- score: 2.97
 
 ## Side Effects
 
@@ -130,9 +133,9 @@ FetchDependencies, FetchObjectResult, FetchRequest, FetchResponse, SearchDepende
 
 ## Complexity
 
-- branches: 92
-- cyclomatic: 93
-- loc: 928
+- branches: 104
+- cyclomatic: 105
+- loc: 1021
 
 ## Doc Coverage
 

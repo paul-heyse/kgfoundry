@@ -20,7 +20,7 @@ Token-level XTR index manager with late-interaction scoring utilities.
 - from **codeintel_rev.observability.otel** import as_span
 - from **codeintel_rev.observability.semantic_conventions** import Attrs
 - from **codeintel_rev.runtime** import RuntimeCell
-- from **codeintel_rev.telemetry.prom** import XTR_SEARCH_LATENCY_SECONDS
+- from **codeintel_rev.metrics.registry** import XTR_SEARCH_LATENCY_SECONDS
 - from **codeintel_rev.typing** import NDArrayF32, TorchModule, gate_import
 - from **kgfoundry_common.logging** import get_logger
 - from **(absolute)** import numpy
@@ -37,15 +37,15 @@ Token-level XTR index manager with late-interaction scoring utilities.
 
 - **fan_in**: 8
 - **fan_out**: 7
-- **cycle_group**: 35
+- **cycle_group**: 32
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 8
-- recent churn 90: 8
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 

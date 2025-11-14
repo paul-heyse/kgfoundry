@@ -26,7 +26,7 @@ Factory adjustment hooks for RuntimeCell initialization.
 
 - **fan_in**: 4
 - **fan_out**: 1
-- **cycle_group**: 32
+- **cycle_group**: 27
 
 ## Ownership
 

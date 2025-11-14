@@ -42,23 +42,23 @@ Lightweight per-session timeline recording utilities.
 - class: `Timeline` (line 236)
 - class: `_TimelineScope` (line 378)
 - function: `new_timeline` (line 431)
-- function: `current_timeline` (line 466)
-- function: `current_or_new_timeline` (line 477)
-- function: `bind_timeline` (line 518)
+- function: `current_timeline` (line 476)
+- function: `current_or_new_timeline` (line 487)
+- function: `bind_timeline` (line 532)
 
 ## Graph Metrics
 
 - **fan_in**: 20
 - **fan_out**: 2
-- **cycle_group**: 18
+- **cycle_group**: 15
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 9
-- recent churn 90: 9
+- recent churn 30: 10
+- recent churn 90: 10
 
 ## Usage
 
@@ -90,7 +90,7 @@ Timeline, bind_timeline, current_timeline, new_timeline
 
 ## Hotspot
 
-- score: 2.94
+- score: 2.95
 
 ## Side Effects
 
@@ -98,9 +98,9 @@ Timeline, bind_timeline, current_timeline, new_timeline
 
 ## Complexity
 
-- branches: 42
-- cyclomatic: 43
-- loc: 554
+- branches: 44
+- cyclomatic: 45
+- loc: 568
 
 ## Doc Coverage
 

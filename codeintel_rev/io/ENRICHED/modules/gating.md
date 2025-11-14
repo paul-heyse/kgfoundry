@@ -12,12 +12,12 @@ Adaptive gating helpers for multi-stage retrieval pipelines.
 - from **(absolute)** import re
 - from **collections.abc** import Mapping
 - from **dataclasses** import dataclass, field
+- from **codeintel_rev.metrics.registry** import GATING_DECISIONS_TOTAL, GATING_QUERY_AMBIGUITY, GATING_RRF_K
 - from **codeintel_rev.observability.otel** import record_span_event, set_current_span_attrs
 - from **codeintel_rev.observability.semantic_conventions** import Attrs, to_label_str
 - from **codeintel_rev.observability.timeline** import current_timeline
 - from **codeintel_rev.retrieval.telemetry** import record_stage_decision
 - from **codeintel_rev.retrieval.types** import StageDecision, StageSignals
-- from **codeintel_rev.telemetry.prom** import GATING_DECISIONS_TOTAL, QUERY_AMBIGUITY, RRFK
 - from **codeintel_rev.telemetry.steps** import StepEvent, emit_step
 
 ## Definitions
@@ -36,15 +36,15 @@ Adaptive gating helpers for multi-stage retrieval pipelines.
 
 - **fan_in**: 2
 - **fan_out**: 7
-- **cycle_group**: 43
+- **cycle_group**: 41
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 10
-- recent churn 90: 10
+- recent churn 30: 11
+- recent churn 90: 11
 
 ## Usage
 

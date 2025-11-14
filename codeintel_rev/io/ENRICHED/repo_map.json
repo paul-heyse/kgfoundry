@@ -1,11 +1,11 @@
 {
   "root": "/home/paul/kgfoundry/codeintel_rev",
   "repo_root": "/home/paul/kgfoundry",
-  "module_count": 181,
-  "symbol_edge_count": 14677,
-  "coverage_records": 181,
-  "config_files": 218,
-  "generated_at": "2025-11-14T06:07:17+00:00",
+  "module_count": 179,
+  "symbol_edge_count": 14642,
+  "coverage_records": 179,
+  "config_files": 220,
+  "generated_at": "2025-11-14T07:11:34+00:00",
   "tags": {
     "low-coverage": [
       "__init__.py",
@@ -181,9 +181,7 @@
       "telemetry/decorators.py",
       "telemetry/events.py",
       "telemetry/logging.py",
-      "telemetry/otel.py",
       "telemetry/otel_metrics.py",
-      "telemetry/prom.py",
       "telemetry/reporter.py",
       "telemetry/steps.py",
       "typedness.py",
@@ -288,15 +286,13 @@
       "telemetry/decorators.py",
       "telemetry/events.py",
       "telemetry/otel_metrics.py",
-      "telemetry/prom.py",
       "telemetry/reporter.py",
       "telemetry/steps.py",
       "typing.py"
     ],
     "fastapi": [
       "app/main.py",
-      "app/routers/index_admin.py",
-      "telemetry/prom.py"
+      "app/routers/index_admin.py"
     ],
     "pydantic": [
       "app/server_settings.py",
@@ -315,16 +311,15 @@
       "retrieval/types.py",
       "telemetry/__init__.py",
       "telemetry/context.py",
-      "telemetry/prom.py",
       "telemetry/reporter.py",
       "typing.py"
     ]
   },
   "tag_counts": {
-    "low-coverage": 181,
-    "public-api": 101,
-    "fastapi": 3,
+    "low-coverage": 179,
+    "public-api": 100,
+    "fastapi": 2,
     "pydantic": 2,
-    "reexport-hub": 15
+    "reexport-hub": 14
   }
 }

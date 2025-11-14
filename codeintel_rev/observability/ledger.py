@@ -59,10 +59,6 @@ class RunLedger:
     path: Path
     _handle: io.TextIOWrapper | None = None
 
-    def _set_attr(self, **changes: object) -> None:
-        for key, value in changes.items():
-            object.__setattr__(self, key, value)  # noqa: PLC2801
-
     @classmethod
     def open(cls, root_dir: Path, *, run_id: str, session_id: str | None) -> RunLedger:
         """Return a ledger instance for ``run_id`` rooted under ``root_dir``.
@@ -93,7 +89,7 @@ class RunLedger:
         handle = self._handle
         if handle is None:
             handle = self.path.open("a", encoding="utf-8")
-            self._set_attr(_handle=handle)
+            self._handle = handle
         payload = {
             "run_id": self.run_id,
             "session_id": self.session_id,
@@ -111,4 +107,4 @@ class RunLedger:
             handle.flush()
         finally:
             handle.close()
-            self._set_attr(_handle=None)
+            self._handle = None

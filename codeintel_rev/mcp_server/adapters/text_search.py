@@ -19,6 +19,10 @@ from codeintel_rev.mcp_server.scope_utils import (
     get_effective_scope,
     merge_scope_filters,
 )
+from codeintel_rev.observability.otel import record_span_event
+from codeintel_rev.observability.semantic_conventions import Attrs, to_label_str
+from codeintel_rev.telemetry.context import current_run_id
+from codeintel_rev.telemetry.decorators import span_context
 from kgfoundry_common.errors import VectorSearchError
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.subprocess_utils import (
@@ -239,18 +243,49 @@ async def search_text(
     """
     session_id = get_session_id()
     scope = await get_effective_scope(context, session_id)
+    run_id = current_run_id()
     if options is None:
         options = TextSearchOptions.from_overrides(query, overrides)
     elif overrides:
         msg = "Cannot pass keyword overrides when options is provided"
         raise TypeError(msg)
-    return await asyncio.to_thread(
-        _search_text_sync,
-        context,
-        session_id,
-        scope,
-        options,
+    telemetry_attrs: dict[str, object] = {
+        Attrs.MCP_TOOL: "search.text",
+        Attrs.MCP_SESSION_ID: session_id or "",
+        Attrs.MCP_RUN_ID: run_id or "",
+        Attrs.QUERY_LEN: len(query),
+        "text.regex": options.regex,
+        "text.case_sensitive": options.case_sensitive,
+        "text.max_results": options.max_results,
+    }
+    record_span_event(
+        "mcp.request.accepted",
+        query_preview=_preview_text(query),
+        **telemetry_attrs,
     )
+
+    def _run_sync() -> dict:
+        with span_context(
+            "search.text",
+            kind="internal",
+            attrs=telemetry_attrs,
+            emit_checkpoint=True,
+        ):
+            result = _search_text_sync(
+                context,
+                session_id,
+                scope,
+                options,
+                telemetry_attrs=telemetry_attrs,
+            )
+            record_span_event(
+                "search.text.completed",
+                total=result.get("total", 0),
+                truncated=result.get("truncated", False),
+            )
+            return result
+
+    return await asyncio.to_thread(_run_sync)
 
 
 def _search_text_sync(
@@ -258,6 +293,8 @@ def _search_text_sync(
     session_id: str,
     scope: ScopeIn | None,
     options: TextSearchOptions,
+    *,
+    telemetry_attrs: Mapping[str, object] | None = None,
 ) -> dict:
     repo_root = context.paths.repo_root
 
@@ -324,9 +361,31 @@ def _search_text_sync(
 
     cmd = _build_ripgrep_command(params)
 
+    plan_attrs = _clean_attrs(
+        {
+            **(telemetry_attrs or {}),
+            "text.paths": to_label_str(effective_paths) if effective_paths else None,
+            "text.include_globs": to_label_str(effective_include_globs)
+            if effective_include_globs
+            else None,
+            "text.exclude_globs": to_label_str(effective_exclude_globs)
+            if effective_exclude_globs
+            else None,
+        }
+    )
+    record_span_event("search.text.plan", **plan_attrs)
+
     with observe_duration("text_search", COMPONENT_NAME) as observation:
+        span_attrs = dict(plan_attrs)
+        span_attrs[Attrs.STAGE] = "gather_channels"
         try:
-            stdout = run_subprocess(cmd, cwd=repo_root, timeout=SEARCH_TIMEOUT_SECONDS)
+            with span_context(
+                "search.text.ripgrep",
+                kind="client",
+                attrs=span_attrs,
+                emit_checkpoint=True,
+            ):
+                stdout = run_subprocess(cmd, cwd=repo_root, timeout=SEARCH_TIMEOUT_SECONDS)
         except SubprocessTimeoutError as exc:
             observation.mark_error()
             error_msg = "Search timeout"
@@ -338,12 +397,14 @@ def _search_text_sync(
             if exc.returncode == 1:
                 stdout = ""
             elif exc.returncode == COMMAND_NOT_FOUND_RETURN_CODE:
+                record_span_event("search.text.fallback", reason="ripgrep_missing")
                 return _fallback_grep(
                     observation=observation,
                     repo_root=repo_root,
                     query=query,
                     case_sensitive=options.case_sensitive,
                     max_results=max_results,
+                    telemetry_attrs=telemetry_attrs,
                 )
             else:
                 observation.mark_error()
@@ -378,6 +439,7 @@ def _fallback_grep(
     query: str,
     case_sensitive: bool,
     max_results: int,
+    telemetry_attrs: Mapping[str, object] | None = None,
 ) -> dict:
     """Fallback to basic grep if ripgrep unavailable.
 
@@ -411,8 +473,21 @@ def _fallback_grep(
 
     command.extend(["--", query, "."])
 
+    span_attrs = _clean_attrs(
+        {
+            **(telemetry_attrs or {}),
+            Attrs.STAGE: "gather_channels",
+            "text.fallback": "grep",
+        }
+    )
     try:
-        stdout = run_subprocess(command, cwd=repo_root, timeout=SEARCH_TIMEOUT_SECONDS)
+        with span_context(
+            "search.text.grep",
+            kind="client",
+            attrs=span_attrs,
+            emit_checkpoint=True,
+        ):
+            stdout = run_subprocess(command, cwd=repo_root, timeout=SEARCH_TIMEOUT_SECONDS)
     except SubprocessTimeoutError as exc:
         observation.mark_error()
         error_msg = "Search tool unavailable"
@@ -590,6 +665,19 @@ def _parse_ripgrep_output(
             break
 
     return matches, truncated
+
+
+def _preview_text(value: str, *, limit: int = 200) -> str:
+    """Return a truncated preview suitable for span attributes."""
+    text = value.strip()
+    if len(text) <= limit:
+        return text
+    return text[: max(limit - 3, 0)] + "..."
+
+
+def _clean_attrs(attrs: Mapping[str, object]) -> dict[str, object]:
+    """Filter out ``None`` values to keep span attributes compact."""
+    return {key: value for key, value in attrs.items() if value is not None}
 
 
 __all__ = ["search_text"]

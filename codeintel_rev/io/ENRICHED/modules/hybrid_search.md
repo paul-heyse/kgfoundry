@@ -56,7 +56,7 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 
 - **fan_in**: 5
 - **fan_out**: 18
-- **cycle_group**: 43
+- **cycle_group**: 41
 
 ## Ownership
 

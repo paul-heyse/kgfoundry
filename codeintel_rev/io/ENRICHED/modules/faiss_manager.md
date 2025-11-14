@@ -35,7 +35,7 @@ corpus size for optimal performance.
 - from **codeintel_rev.retrieval.rerank_flat** import FlatReranker
 - from **codeintel_rev.retrieval.types** import SearchHit
 - from **codeintel_rev.telemetry.decorators** import span_context
-- from **codeintel_rev.telemetry.prom** import FAISS_SEARCH_LATENCY_SECONDS
+- from **codeintel_rev.metrics.registry** import FAISS_SEARCH_LATENCY_SECONDS
 - from **codeintel_rev.telemetry.steps** import StepEvent, emit_step
 - from **codeintel_rev.typing** import NDArrayF32, NDArrayI64, gate_import
 - from **kgfoundry_common.errors** import VectorSearchError
@@ -83,16 +83,16 @@ corpus size for optimal performance.
 ## Graph Metrics
 
 - **fan_in**: 8
-- **fan_out**: 13
-- **cycle_group**: 43
+- **fan_out**: 12
+- **cycle_group**: 41
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 49
-- recent churn 90: 49
+- recent churn 30: 50
+- recent churn 90: 50
 
 ## Usage
 
@@ -124,7 +124,7 @@ AutoTuner, FAISSManager, apply_parameters
 
 ## Hotspot
 
-- score: 3.46
+- score: 3.44
 
 ## Side Effects
 

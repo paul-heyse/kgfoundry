@@ -21,6 +21,10 @@ Fast text search with regex support.
 - from **codeintel_rev.mcp_server.common.observability** import Observation, observe_duration
 - from **codeintel_rev.mcp_server.schemas** import Match, ScopeIn
 - from **codeintel_rev.mcp_server.scope_utils** import get_effective_scope, merge_scope_filters
+- from **codeintel_rev.observability.otel** import record_span_event
+- from **codeintel_rev.observability.semantic_conventions** import Attrs, to_label_str
+- from **codeintel_rev.telemetry.context** import current_run_id
+- from **codeintel_rev.telemetry.decorators** import span_context
 - from **kgfoundry_common.errors** import VectorSearchError
 - from **kgfoundry_common.logging** import get_logger
 - from **kgfoundry_common.subprocess_utils** import SubprocessError, SubprocessTimeoutError, run_subprocess
@@ -28,28 +32,30 @@ Fast text search with regex support.
 
 ## Definitions
 
-- variable: `SEARCH_TIMEOUT_SECONDS` (line 33)
-- variable: `MAX_PREVIEW_CHARS` (line 34)
-- variable: `GREP_SPLIT_PARTS` (line 35)
-- variable: `COMMAND_NOT_FOUND_RETURN_CODE` (line 36)
-- variable: `COMPONENT_NAME` (line 37)
-- variable: `LOGGER` (line 38)
-- class: `TextSearchOptions` (line 42)
-- function: `_bool_override` (line 117)
-- function: `_sequence_override` (line 144)
-- function: `_int_override` (line 177)
-- function: `search_text` (line 204)
-- function: `_search_text_sync` (line 256)
-- function: `_fallback_grep` (line 374)
-- class: `RipgrepCommandParams` (line 476)
-- function: `_build_ripgrep_command` (line 488)
-- function: `_parse_ripgrep_output` (line 528)
+- variable: `SEARCH_TIMEOUT_SECONDS` (line 37)
+- variable: `MAX_PREVIEW_CHARS` (line 38)
+- variable: `GREP_SPLIT_PARTS` (line 39)
+- variable: `COMMAND_NOT_FOUND_RETURN_CODE` (line 40)
+- variable: `COMPONENT_NAME` (line 41)
+- variable: `LOGGER` (line 42)
+- class: `TextSearchOptions` (line 46)
+- function: `_bool_override` (line 121)
+- function: `_sequence_override` (line 148)
+- function: `_int_override` (line 181)
+- function: `search_text` (line 208)
+- function: `_search_text_sync` (line 291)
+- function: `_fallback_grep` (line 435)
+- class: `RipgrepCommandParams` (line 551)
+- function: `_build_ripgrep_command` (line 563)
+- function: `_parse_ripgrep_output` (line 603)
+- function: `_preview_text` (line 670)
+- function: `_clean_attrs` (line 678)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 6
-- **cycle_group**: 139
+- **fan_out**: 10
+- **cycle_group**: 137
 
 ## Ownership
 
@@ -89,7 +95,7 @@ search_text
 
 ## Hotspot
 
-- score: 2.53
+- score: 2.76
 
 ## Side Effects
 
@@ -98,9 +104,9 @@ search_text
 
 ## Complexity
 
-- branches: 53
-- cyclomatic: 54
-- loc: 596
+- branches: 64
+- cyclomatic: 65
+- loc: 684
 
 ## Doc Coverage
 
@@ -110,7 +116,7 @@ search_text
 - `_int_override` (function): summary=yes, params=ok, examples=no — Return an integer override for the given key.
 - `search_text` (function): summary=yes, params=mismatch, examples=no — Fast text search using ripgrep (async wrapper).
 - `_search_text_sync` (function): summary=no, examples=no
-- `_fallback_grep` (function): summary=yes, params=ok, examples=no — Fallback to basic grep if ripgrep unavailable.
+- `_fallback_grep` (function): summary=yes, params=mismatch, examples=no — Fallback to basic grep if ripgrep unavailable.
 - `RipgrepCommandParams` (class): summary=yes, examples=no — Parameter bundle for constructing ripgrep commands.
 - `_build_ripgrep_command` (function): summary=yes, params=ok, examples=no — Assemble the ripgrep command arguments.
 - `_parse_ripgrep_output` (function): summary=yes, params=ok, examples=no — Parse ripgrep JSON output into structured matches.

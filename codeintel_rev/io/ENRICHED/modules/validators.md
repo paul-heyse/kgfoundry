@@ -20,13 +20,15 @@ Schema validation helpers for enrichment rows.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 93
+- **cycle_group**: 98
 
 ## Ownership
 
-- bus factor: 0.00
-- recent churn 30: 0
-- recent churn 90: 0
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 1
+- recent churn 90: 1
 
 ## Usage
 

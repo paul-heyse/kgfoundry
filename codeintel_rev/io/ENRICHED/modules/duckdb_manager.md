@@ -18,24 +18,26 @@ Thread-safe DuckDB connection manager.
 - from **time** import perf_counter
 - from **typing** import TYPE_CHECKING, cast
 - from **codeintel_rev._lazy_imports** import LazyModule
+- from **codeintel_rev.metrics.registry** import DUCKDB_EXECUTE_SECONDS
 - from **codeintel_rev.observability.otel** import as_span, record_span_event
+- from **codeintel_rev.observability.semantic_conventions** import Attrs
 - from **codeintel_rev.observability.timeline** import current_timeline
 - from **(absolute)** import duckdb
 
 ## Definitions
 
-- variable: `duckdb` (line 21)
-- class: `DuckDBConfig` (line 27)
-- class: `_InstrumentedDuckDBConnection` (line 55)
-- class: `DuckDBManager` (line 153)
-- class: `DuckDBQueryOptions` (line 291)
-- class: `DuckDBQueryBuilder` (line 306)
+- variable: `duckdb` (line 23)
+- class: `DuckDBConfig` (line 29)
+- class: `_InstrumentedDuckDBConnection` (line 57)
+- class: `DuckDBManager` (line 175)
+- class: `DuckDBQueryOptions` (line 313)
+- class: `DuckDBQueryBuilder` (line 328)
 
 ## Graph Metrics
 
 - **fan_in**: 10
-- **fan_out**: 4
-- **cycle_group**: 21
+- **fan_out**: 6
+- **cycle_group**: 17
 
 ## Ownership
 
@@ -75,7 +77,7 @@ DuckDBConfig, DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 
 ## Hotspot
 
-- score: 2.84
+- score: 2.89
 
 ## Side Effects
 
@@ -86,7 +88,7 @@ DuckDBConfig, DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 
 - branches: 54
 - cyclomatic: 55
-- loc: 498
+- loc: 520
 
 ## Doc Coverage
 

@@ -47,7 +47,6 @@ Provides health/readiness endpoints, CORS, and streaming support.
 - from **codeintel_rev.runtime.cells** import RuntimeCellObserver
 - from **codeintel_rev.telemetry.context** import current_run_id
 - from **codeintel_rev.telemetry.logging** import install_structured_logging
-- from **codeintel_rev.telemetry.prom** import build_metrics_router
 - from **codeintel_rev.telemetry.reporter** import build_report
 - from **codeintel_rev.telemetry.reporter** import build_run_report_v2, render_markdown, render_markdown_v2, render_mermaid, report_to_json
 - from **kgfoundry_common.errors** import ConfigurationError
@@ -55,59 +54,58 @@ Provides health/readiness endpoints, CORS, and streaming support.
 
 ## Definitions
 
-- variable: `LOGGER` (line 65)
-- variable: `SERVER_SETTINGS` (line 66)
-- function: `_sse_keepalive_interval` (line 77)
-- function: `_sse_keepalive_budget` (line 95)
-- function: `_client_address` (line 115)
-- function: `_log_request_summary` (line 137)
-- function: `_stream_log_extra` (line 153)
-- function: `_preload_faiss_index` (line 192)
-- function: `_env_flag` (line 223)
-- function: `_resolve_proxy_trusted_hops` (line 240)
-- function: `_log_gpu_warmup` (line 262)
-- function: `_preload_faiss_if_configured` (line 283)
-- function: `_preload_xtr_if_configured` (line 293)
-- function: `_preload_hybrid_if_configured` (line 307)
-- function: `_initialize_context` (line 318)
-- function: `_shutdown_context` (line 406)
-- function: `lifespan` (line 429)
-- variable: `app` (line 524)
-- variable: `metrics_router` (line 553)
-- function: `observability_run_report` (line 563)
-- function: `get_run_report` (line 600)
-- function: `get_run_report_markdown` (line 642)
-- function: `get_run_report_mermaid` (line 685)
-- function: `get_run_report_v2` (line 717)
-- function: `get_run_report_markdown_v2` (line 737)
-- function: `get_run_report_mermaid_v2` (line 759)
-- function: `inject_request_id` (line 781)
-- function: `set_mcp_context` (line 808)
-- function: `disable_nginx_buffering` (line 887)
-- function: `healthz` (line 923)
-- function: `readyz` (line 935)
-- function: `capz` (line 970)
-- function: `_stream_with_logging` (line 1012)
-- function: `sse_demo` (line 1074)
-- function: `http_exception_handler_with_request_id` (line 1127)
-- function: `unhandled_exception_handler` (line 1159)
-- variable: `proxy_wrapped` (line 1200)
-- variable: `asgi` (line 1205)
-- variable: `asgi` (line 1207)
+- variable: `LOGGER` (line 64)
+- variable: `SERVER_SETTINGS` (line 65)
+- function: `_sse_keepalive_interval` (line 76)
+- function: `_sse_keepalive_budget` (line 94)
+- function: `_client_address` (line 114)
+- function: `_log_request_summary` (line 136)
+- function: `_stream_log_extra` (line 152)
+- function: `_preload_faiss_index` (line 191)
+- function: `_env_flag` (line 222)
+- function: `_resolve_proxy_trusted_hops` (line 239)
+- function: `_log_gpu_warmup` (line 261)
+- function: `_preload_faiss_if_configured` (line 282)
+- function: `_preload_xtr_if_configured` (line 292)
+- function: `_preload_hybrid_if_configured` (line 306)
+- function: `_initialize_context` (line 317)
+- function: `_shutdown_context` (line 405)
+- function: `lifespan` (line 428)
+- variable: `app` (line 523)
+- function: `observability_run_report` (line 557)
+- function: `get_run_report` (line 594)
+- function: `get_run_report_markdown` (line 636)
+- function: `get_run_report_mermaid` (line 679)
+- function: `get_run_report_v2` (line 711)
+- function: `get_run_report_markdown_v2` (line 731)
+- function: `get_run_report_mermaid_v2` (line 753)
+- function: `inject_request_id` (line 775)
+- function: `set_mcp_context` (line 802)
+- function: `disable_nginx_buffering` (line 881)
+- function: `healthz` (line 917)
+- function: `readyz` (line 929)
+- function: `capz` (line 964)
+- function: `_stream_with_logging` (line 1006)
+- function: `sse_demo` (line 1068)
+- function: `http_exception_handler_with_request_id` (line 1121)
+- function: `unhandled_exception_handler` (line 1153)
+- variable: `proxy_wrapped` (line 1194)
+- variable: `asgi` (line 1199)
+- variable: `asgi` (line 1201)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 19
-- **cycle_group**: 57
+- **fan_out**: 18
+- **cycle_group**: 55
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 34
-- recent churn 90: 34
+- recent churn 30: 35
+- recent churn 90: 35
 
 ## Usage
 
@@ -143,7 +141,7 @@ app, asgi
 
 ## Hotspot
 
-- score: 3.10
+- score: 3.07
 
 ## Side Effects
 
@@ -152,9 +150,9 @@ app, asgi
 
 ## Complexity
 
-- branches: 88
-- cyclomatic: 89
-- loc: 1211
+- branches: 87
+- cyclomatic: 88
+- loc: 1205
 
 ## Doc Coverage
 

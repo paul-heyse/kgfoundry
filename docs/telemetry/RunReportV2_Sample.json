@@ -1,0 +1,125 @@
+{
+  "trace_id": "sample-run",
+  "session_id": "sample-session",
+  "run_id": "sample-run",
+  "tool": "search.semantic",
+  "stages": [
+    {
+      "name": "gather",
+      "status": "completed",
+      "detail": null,
+      "ts": "2025-11-14T06:54:45.349393+00:00",
+      "duration_ms": 12.5,
+      "payload": {
+        "duration_ms": 12.5,
+        "channels": [
+          "semantic",
+          "bm25"
+        ]
+      },
+      "trace_id": null,
+      "span_id": null
+    },
+    {
+      "name": "fuse",
+      "status": "completed",
+      "detail": null,
+      "ts": "2025-11-14T06:54:45.349437+00:00",
+      "duration_ms": 31.2,
+      "payload": {
+        "duration_ms": 31.2,
+        "rrf_k": 60
+      },
+      "trace_id": null,
+      "span_id": null
+    },
+    {
+      "name": "hydrate",
+      "status": "completed",
+      "detail": null,
+      "ts": "2025-11-14T06:54:45.349451+00:00",
+      "duration_ms": 18.4,
+      "payload": {
+        "duration_ms": 18.4,
+        "rows": 4
+      },
+      "trace_id": null,
+      "span_id": null
+    },
+    {
+      "name": "rerank",
+      "status": "skipped",
+      "detail": "budget_exceeded",
+      "ts": "2025-11-14T06:54:45.349461+00:00",
+      "duration_ms": 0.0,
+      "payload": {
+        "duration_ms": 0.0
+      },
+      "trace_id": null,
+      "span_id": null
+    }
+  ],
+  "timeline": [],
+  "events": [
+    {
+      "ts": "2025-11-14T06:54:45.349393+00:00",
+      "kind": "retrieval.gather_channels",
+      "status": "completed",
+      "detail": null,
+      "payload": {
+        "duration_ms": 12.5,
+        "channels": [
+          "semantic",
+          "bm25"
+        ]
+      },
+      "trace_id": null,
+      "span_id": null
+    },
+    {
+      "ts": "2025-11-14T06:54:45.349437+00:00",
+      "kind": "retrieval.fuse",
+      "status": "completed",
+      "detail": null,
+      "payload": {
+        "duration_ms": 31.2,
+        "rrf_k": 60
+      },
+      "trace_id": null,
+      "span_id": null
+    },
+    {
+      "ts": "2025-11-14T06:54:45.349451+00:00",
+      "kind": "duckdb.query",
+      "status": "completed",
+      "detail": null,
+      "payload": {
+        "duration_ms": 18.4,
+        "rows": 4
+      },
+      "trace_id": null,
+      "span_id": null
+    },
+    {
+      "ts": "2025-11-14T06:54:45.349461+00:00",
+      "kind": "retrieval.rerank",
+      "status": "skipped",
+      "detail": "budget_exceeded",
+      "payload": {
+        "duration_ms": 0.0
+      },
+      "trace_id": null,
+      "span_id": null
+    }
+  ],
+  "warnings": [],
+  "budgets": null,
+  "stopped_after_stage": "hydrate",
+  "stopped_because": "completed",
+  "span_attributes": {
+    "mcp.session_id": "sample-session",
+    "mcp.run_id": "sample-run",
+    "mcp.tool": "search.semantic",
+    "capability_stamp": "cap-123"
+  }
+}

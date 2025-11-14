@@ -88,15 +88,15 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 
 - **fan_in**: 6
 - **fan_out**: 9
-- **cycle_group**: 50
+- **cycle_group**: 47
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 15
-- recent churn 90: 15
+- recent churn 30: 16
+- recent churn 90: 16
 
 ## Usage
 
@@ -132,7 +132,7 @@ SessionScopeMiddleware, capability_stamp_var, get_capability_stamp, get_session_
 
 ## Hotspot
 
-- score: 2.38
+- score: 2.40
 
 ## Side Effects
 
@@ -140,9 +140,9 @@ SessionScopeMiddleware, capability_stamp_var, get_capability_stamp, get_session_
 
 ## Complexity
 
-- branches: 9
-- cyclomatic: 10
-- loc: 325
+- branches: 10
+- cyclomatic: 11
+- loc: 332
 
 ## Doc Coverage
 

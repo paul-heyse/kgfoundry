@@ -47,7 +47,7 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 
 ## Graph Metrics
 
-- **fan_in**: 114
+- **fan_in**: 112
 - **fan_out**: 0
 - **cycle_group**: 1
 

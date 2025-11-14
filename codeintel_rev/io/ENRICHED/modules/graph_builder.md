@@ -29,15 +29,15 @@ Import graph builder utilities.
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 87
+- **cycle_group**: 86
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 

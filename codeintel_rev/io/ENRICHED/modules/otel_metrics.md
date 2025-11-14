@@ -32,7 +32,7 @@ Compatibility layer exposing Prometheus-like helpers backed by OpenTelemetry.
 
 ## Graph Metrics
 
-- **fan_in**: 10
+- **fan_in**: 9
 - **fan_out**: 1
 - **cycle_group**: 4
 
@@ -41,8 +41,8 @@ Compatibility layer exposing Prometheus-like helpers backed by OpenTelemetry.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 3
-- recent churn 90: 3
+- recent churn 30: 4
+- recent churn 90: 4
 
 ## Usage
 
@@ -74,7 +74,7 @@ CounterLike, GaugeLike, HistogramLike, build_counter, build_gauge, build_histogr
 
 ## Hotspot
 
-- score: 2.47
+- score: 2.43
 
 ## Side Effects
 

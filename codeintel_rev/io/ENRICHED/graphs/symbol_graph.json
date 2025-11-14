@@ -2536,10 +2536,6 @@
     "file": "app/main.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.main`/metrics_router.",
-    "file": "app/main.py"
-  },
-  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.main`/observability_run_report().",
     "file": "app/main.py"
   },
@@ -2652,11 +2648,15 @@
     "file": "app/middleware.py"
   },
   {
+    "symbol": "local 15",
+    "file": "app/middleware.py"
+  },
+  {
     "symbol": "local 16",
     "file": "app/middleware.py"
   },
   {
-    "symbol": "local 17",
+    "symbol": "local 18",
     "file": "app/middleware.py"
   },
   {
@@ -2665,10 +2665,6 @@
   },
   {
     "symbol": "local 2",
-    "file": "app/middleware.py"
-  },
-  {
-    "symbol": "local 20",
     "file": "app/middleware.py"
   },
   {
@@ -2704,7 +2700,15 @@
     "file": "app/middleware.py"
   },
   {
+    "symbol": "local 29",
+    "file": "app/middleware.py"
+  },
+  {
     "symbol": "local 3",
+    "file": "app/middleware.py"
+  },
+  {
+    "symbol": "local 30",
     "file": "app/middleware.py"
   },
   {
@@ -7936,11 +7940,11 @@
     "file": "cli/splade.py"
   },
   {
-    "symbol": "local 0",
+    "symbol": "local 1",
     "file": "cli/telemetry.py"
   },
   {
-    "symbol": "local 1",
+    "symbol": "local 2",
     "file": "cli/telemetry.py"
   },
   {
@@ -7949,6 +7953,18 @@
   },
   {
     "symbol": "local 4",
+    "file": "cli/telemetry.py"
+  },
+  {
+    "symbol": "local 6",
+    "file": "cli/telemetry.py"
+  },
+  {
+    "symbol": "local 8",
+    "file": "cli/telemetry.py"
+  },
+  {
+    "symbol": "local 9",
     "file": "cli/telemetry.py"
   },
   {
@@ -14488,10 +14504,6 @@
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "local 49",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
     "symbol": "local 50",
     "file": "diagnostics/report_cli.py"
   },
@@ -14504,7 +14516,7 @@
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "local 55",
+    "symbol": "local 53",
     "file": "diagnostics/report_cli.py"
   },
   {
@@ -14524,10 +14536,6 @@
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "local 60",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
     "symbol": "local 61",
     "file": "diagnostics/report_cli.py"
   },
@@ -14541,6 +14549,22 @@
   },
   {
     "symbol": "local 64",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "local 65",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "local 66",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "local 67",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "local 68",
     "file": "diagnostics/report_cli.py"
   },
   {
@@ -27616,6 +27640,14 @@
     "file": "io/duckdb_manager.py"
   },
   {
+    "symbol": "local 13",
+    "file": "io/duckdb_manager.py"
+  },
+  {
+    "symbol": "local 14",
+    "file": "io/duckdb_manager.py"
+  },
+  {
     "symbol": "local 15",
     "file": "io/duckdb_manager.py"
   },
@@ -27660,7 +27692,7 @@
     "file": "io/duckdb_manager.py"
   },
   {
-    "symbol": "local 27",
+    "symbol": "local 25",
     "file": "io/duckdb_manager.py"
   },
   {
@@ -27696,7 +27728,7 @@
     "file": "io/duckdb_manager.py"
   },
   {
-    "symbol": "local 36",
+    "symbol": "local 35",
     "file": "io/duckdb_manager.py"
   },
   {
@@ -27720,7 +27752,7 @@
     "file": "io/duckdb_manager.py"
   },
   {
-    "symbol": "local 45",
+    "symbol": "local 41",
     "file": "io/duckdb_manager.py"
   },
   {
@@ -27728,11 +27760,15 @@
     "file": "io/duckdb_manager.py"
   },
   {
-    "symbol": "local 48",
+    "symbol": "local 47",
     "file": "io/duckdb_manager.py"
   },
   {
-    "symbol": "local 53",
+    "symbol": "local 49",
+    "file": "io/duckdb_manager.py"
+  },
+  {
+    "symbol": "local 5",
     "file": "io/duckdb_manager.py"
   },
   {
@@ -27752,11 +27788,11 @@
     "file": "io/duckdb_manager.py"
   },
   {
-    "symbol": "local 59",
+    "symbol": "local 58",
     "file": "io/duckdb_manager.py"
   },
   {
-    "symbol": "local 7",
+    "symbol": "local 60",
     "file": "io/duckdb_manager.py"
   },
   {
@@ -32000,7 +32036,7 @@
     "file": "io/git_client.py"
   },
   {
-    "symbol": "local 33",
+    "symbol": "local 32",
     "file": "io/git_client.py"
   },
   {
@@ -32020,23 +32056,23 @@
     "file": "io/git_client.py"
   },
   {
-    "symbol": "local 39",
+    "symbol": "local 38",
     "file": "io/git_client.py"
   },
   {
-    "symbol": "local 41",
+    "symbol": "local 40",
     "file": "io/git_client.py"
   },
   {
-    "symbol": "local 46",
+    "symbol": "local 42",
+    "file": "io/git_client.py"
+  },
+  {
+    "symbol": "local 47",
     "file": "io/git_client.py"
   },
   {
     "symbol": "local 5",
-    "file": "io/git_client.py"
-  },
-  {
-    "symbol": "local 50",
     "file": "io/git_client.py"
   },
   {
@@ -32064,11 +32100,11 @@
     "file": "io/git_client.py"
   },
   {
-    "symbol": "local 58",
+    "symbol": "local 57",
     "file": "io/git_client.py"
   },
   {
-    "symbol": "local 59",
+    "symbol": "local 58",
     "file": "io/git_client.py"
   },
   {
@@ -32093,6 +32129,14 @@
   },
   {
     "symbol": "local 64",
+    "file": "io/git_client.py"
+  },
+  {
+    "symbol": "local 65",
+    "file": "io/git_client.py"
+  },
+  {
+    "symbol": "local 66",
     "file": "io/git_client.py"
   },
   {
@@ -42428,7 +42472,63 @@
     "file": "mcp_server/adapters/text_search.py"
   },
   {
+    "symbol": "local 101",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 103",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 104",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 105",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 106",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 107",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 108",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 109",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
     "symbol": "local 11",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 110",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 111",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 114",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 115",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 117",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 118",
     "file": "mcp_server/adapters/text_search.py"
   },
   {
@@ -42508,19 +42608,15 @@
     "file": "mcp_server/adapters/text_search.py"
   },
   {
-    "symbol": "local 35",
-    "file": "mcp_server/adapters/text_search.py"
-  },
-  {
-    "symbol": "local 36",
-    "file": "mcp_server/adapters/text_search.py"
-  },
-  {
     "symbol": "local 37",
     "file": "mcp_server/adapters/text_search.py"
   },
   {
     "symbol": "local 38",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 39",
     "file": "mcp_server/adapters/text_search.py"
   },
   {
@@ -42548,6 +42644,10 @@
     "file": "mcp_server/adapters/text_search.py"
   },
   {
+    "symbol": "local 45",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
     "symbol": "local 46",
     "file": "mcp_server/adapters/text_search.py"
   },
@@ -42560,11 +42660,11 @@
     "file": "mcp_server/adapters/text_search.py"
   },
   {
-    "symbol": "local 5",
+    "symbol": "local 49",
     "file": "mcp_server/adapters/text_search.py"
   },
   {
-    "symbol": "local 50",
+    "symbol": "local 5",
     "file": "mcp_server/adapters/text_search.py"
   },
   {
@@ -42588,6 +42688,14 @@
     "file": "mcp_server/adapters/text_search.py"
   },
   {
+    "symbol": "local 56",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 58",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
     "symbol": "local 59",
     "file": "mcp_server/adapters/text_search.py"
   },
@@ -42604,6 +42712,10 @@
     "file": "mcp_server/adapters/text_search.py"
   },
   {
+    "symbol": "local 62",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
     "symbol": "local 63",
     "file": "mcp_server/adapters/text_search.py"
   },
@@ -42612,7 +42724,15 @@
     "file": "mcp_server/adapters/text_search.py"
   },
   {
+    "symbol": "local 66",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
     "symbol": "local 67",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 68",
     "file": "mcp_server/adapters/text_search.py"
   },
   {
@@ -42640,7 +42760,15 @@
     "file": "mcp_server/adapters/text_search.py"
   },
   {
+    "symbol": "local 77",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
     "symbol": "local 78",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 79",
     "file": "mcp_server/adapters/text_search.py"
   },
   {
@@ -42652,11 +42780,11 @@
     "file": "mcp_server/adapters/text_search.py"
   },
   {
-    "symbol": "local 82",
+    "symbol": "local 81",
     "file": "mcp_server/adapters/text_search.py"
   },
   {
-    "symbol": "local 83",
+    "symbol": "local 82",
     "file": "mcp_server/adapters/text_search.py"
   },
   {
@@ -42668,19 +42796,7 @@
     "file": "mcp_server/adapters/text_search.py"
   },
   {
-    "symbol": "local 86",
-    "file": "mcp_server/adapters/text_search.py"
-  },
-  {
-    "symbol": "local 87",
-    "file": "mcp_server/adapters/text_search.py"
-  },
-  {
     "symbol": "local 88",
-    "file": "mcp_server/adapters/text_search.py"
-  },
-  {
-    "symbol": "local 89",
     "file": "mcp_server/adapters/text_search.py"
   },
   {
@@ -42689,6 +42805,26 @@
   },
   {
     "symbol": "local 90",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 91",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 92",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 93",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 97",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "local 99",
     "file": "mcp_server/adapters/text_search.py"
   },
   {
@@ -42824,6 +42960,14 @@
     "file": "mcp_server/adapters/text_search.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.text_search`/_clean_attrs().",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.text_search`/_clean_attrs().(attrs)",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.text_search`/_fallback_grep().",
     "file": "mcp_server/adapters/text_search.py"
   },
@@ -42845,6 +42989,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.text_search`/_fallback_grep().(repo_root)",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.text_search`/_fallback_grep().(telemetry_attrs)",
     "file": "mcp_server/adapters/text_search.py"
   },
   {
@@ -42876,6 +43024,18 @@
     "file": "mcp_server/adapters/text_search.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.text_search`/_preview_text().",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.text_search`/_preview_text().(limit)",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.text_search`/_preview_text().(value)",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.text_search`/_search_text_sync().",
     "file": "mcp_server/adapters/text_search.py"
   },
@@ -42893,6 +43053,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.text_search`/_search_text_sync().(session_id)",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.text_search`/_search_text_sync().(telemetry_attrs)",
     "file": "mcp_server/adapters/text_search.py"
   },
   {
@@ -42925,6 +43089,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.text_search`/search_text().(query)",
+    "file": "mcp_server/adapters/text_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.text_search`/search_text()._run_sync().",
     "file": "mcp_server/adapters/text_search.py"
   },
   {
@@ -46020,6 +46188,18 @@
     "file": "metrics/registry.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/DUCKDB_EXECUTE_SECONDS.",
+    "file": "metrics/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/EMBED_BATCH_SIZE.",
+    "file": "metrics/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/EMBED_LATENCY_SECONDS.",
+    "file": "metrics/registry.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/FAISS_ANN_LATENCY_SECONDS.",
     "file": "metrics/registry.py"
   },
@@ -46084,11 +46264,27 @@
     "file": "metrics/registry.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/FAISS_SEARCH_LATENCY_SECONDS.",
+    "file": "metrics/registry.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/FAISS_SEARCH_NPROBE.",
     "file": "metrics/registry.py"
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/FAISS_SEARCH_TOTAL.",
+    "file": "metrics/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/GATING_DECISIONS_TOTAL.",
+    "file": "metrics/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/GATING_QUERY_AMBIGUITY.",
+    "file": "metrics/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/GATING_RRF_K.",
     "file": "metrics/registry.py"
   },
   {
@@ -46120,6 +46316,18 @@
     "file": "metrics/registry.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/MCP_REQUEST_LATENCY_SECONDS.",
+    "file": "metrics/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/MCP_RUNS_TOTAL.",
+    "file": "metrics/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/MCP_RUN_ERRORS_TOTAL.",
+    "file": "metrics/registry.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/MCP_SEARCH_ANN_LATENCY_MS.",
     "file": "metrics/registry.py"
   },
@@ -46137,6 +46345,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/MCP_SEARCH_RERANK_LATENCY_MS.",
+    "file": "metrics/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/MCP_STAGE_LATENCY_SECONDS.",
     "file": "metrics/registry.py"
   },
   {
@@ -46181,6 +46393,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/SCIP_RETRIEVAL_COVERAGE_RATIO.",
+    "file": "metrics/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/XTR_SEARCH_LATENCY_SECONDS.",
     "file": "metrics/registry.py"
   },
   {
@@ -47208,7 +47424,79 @@
     "file": "observability/logs.py"
   },
   {
+    "symbol": "local 0",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 1",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 13",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 14",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 15",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 16",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 17",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 18",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 19",
+    "file": "observability/metrics.py"
+  },
+  {
     "symbol": "local 2",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 20",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 21",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 22",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 23",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 24",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 25",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 26",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 27",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 28",
     "file": "observability/metrics.py"
   },
   {
@@ -47216,11 +47504,87 @@
     "file": "observability/metrics.py"
   },
   {
+    "symbol": "local 30",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 31",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 32",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 33",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 34",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 35",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 36",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 37",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 38",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 39",
+    "file": "observability/metrics.py"
+  },
+  {
     "symbol": "local 4",
     "file": "observability/metrics.py"
   },
   {
+    "symbol": "local 40",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 41",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 42",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 45",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 46",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 47",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 48",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 49",
+    "file": "observability/metrics.py"
+  },
+  {
     "symbol": "local 5",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "local 50",
     "file": "observability/metrics.py"
   },
   {
@@ -47245,6 +47609,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/INDEX_VERSION_INFO.",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/LOGGER.",
     "file": "observability/metrics.py"
   },
   {
@@ -47280,11 +47648,71 @@
     "file": "observability/metrics.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/_METRICS_PROVIDER_INSTALLED.",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/_PROM_HTTP_SERVER_STARTED.",
+    "file": "observability/metrics.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/__all__.",
     "file": "observability/metrics.py"
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/__init__:",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/_build_metric_views().",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/_build_metric_views().(export_module)",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/_build_metric_views().(view_module)",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/_build_prometheus_reader().",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/_env_flag().",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/_env_flag().(default)",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/_env_flag().(name)",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/_import_module().",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/_import_module().(name)",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/_start_prometheus_http_server().",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/install_metrics_provider().",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/install_metrics_provider().(otlp_endpoint)",
+    "file": "observability/metrics.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.metrics`/install_metrics_provider().(resource)",
     "file": "observability/metrics.py"
   },
   {
@@ -47356,55 +47784,7 @@
     "file": "observability/otel.py"
   },
   {
-    "symbol": "local 108",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 109",
-    "file": "observability/otel.py"
-  },
-  {
     "symbol": "local 11",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 110",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 111",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 112",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 113",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 114",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 115",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 116",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 117",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 118",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 119",
     "file": "observability/otel.py"
   },
   {
@@ -47412,75 +47792,11 @@
     "file": "observability/otel.py"
   },
   {
-    "symbol": "local 120",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 121",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 122",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 123",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 124",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 125",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 126",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 127",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 128",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 129",
-    "file": "observability/otel.py"
-  },
-  {
     "symbol": "local 13",
     "file": "observability/otel.py"
   },
   {
-    "symbol": "local 130",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 131",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 137",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 138",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 139",
-    "file": "observability/otel.py"
-  },
-  {
     "symbol": "local 14",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 140",
     "file": "observability/otel.py"
   },
   {
@@ -47860,22 +48176,6 @@
     "file": "observability/otel.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_build_metric_views().",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_build_metric_views().(export_module)",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_build_metric_views().(view_module)",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_build_prometheus_reader().",
-    "file": "observability/otel.py"
-  },
-  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_build_provider().",
     "file": "observability/otel.py"
   },
@@ -47956,18 +48256,6 @@
     "file": "observability/otel.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_install_metrics_provider().",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_install_metrics_provider().(endpoint)",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_install_metrics_provider().(resource)",
-    "file": "observability/otel.py"
-  },
-  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_load_trace_modules().",
     "file": "observability/otel.py"
   },
@@ -48005,10 +48293,6 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_should_enable().",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/_start_prometheus_http_server().",
     "file": "observability/otel.py"
   },
   {
@@ -49060,6 +49344,10 @@
     "file": "observability/semantic_conventions.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#FAISS_INDEX_KIND.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#FAISS_INDEX_TYPE.",
     "file": "observability/semantic_conventions.py"
   },
@@ -49105,6 +49393,18 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#GIT_COMMAND.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#GIT_LINE_RANGE.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#GIT_OPERATION.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#GIT_PATH.",
     "file": "observability/semantic_conventions.py"
   },
   {
@@ -49404,15 +49704,23 @@
     "file": "observability/timeline.py"
   },
   {
+    "symbol": "local 52",
+    "file": "observability/timeline.py"
+  },
+  {
     "symbol": "local 53",
     "file": "observability/timeline.py"
   },
   {
-    "symbol": "local 54",
+    "symbol": "local 55",
     "file": "observability/timeline.py"
   },
   {
-    "symbol": "local 55",
+    "symbol": "local 56",
+    "file": "observability/timeline.py"
+  },
+  {
+    "symbol": "local 57",
     "file": "observability/timeline.py"
   },
   {
@@ -49760,6 +50068,10 @@
     "file": "observability/timeline.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.timeline`/current_or_new_timeline().(run_id)",
+    "file": "observability/timeline.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.timeline`/current_or_new_timeline().(session_id)",
     "file": "observability/timeline.py"
   },
@@ -49773,6 +50085,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.timeline`/new_timeline().(force)",
+    "file": "observability/timeline.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.timeline`/new_timeline().(run_id)",
     "file": "observability/timeline.py"
   },
   {
@@ -51580,15 +51896,19 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 101",
+    "symbol": "local 104",
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 102",
+    "symbol": "local 105",
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 103",
+    "symbol": "local 106",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 108",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -51596,7 +51916,7 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 111",
+    "symbol": "local 110",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -51609,6 +51929,14 @@
   },
   {
     "symbol": "local 114",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 115",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 116",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -51652,7 +51980,11 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 129",
+    "symbol": "local 127",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 128",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -51660,23 +51992,19 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 130",
-    "file": "retrieval/mcp_search.py"
-  },
-  {
-    "symbol": "local 131",
-    "file": "retrieval/mcp_search.py"
-  },
-  {
-    "symbol": "local 132",
-    "file": "retrieval/mcp_search.py"
-  },
-  {
     "symbol": "local 133",
     "file": "retrieval/mcp_search.py"
   },
   {
+    "symbol": "local 134",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
     "symbol": "local 135",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 136",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -51688,7 +52016,27 @@
     "file": "retrieval/mcp_search.py"
   },
   {
+    "symbol": "local 139",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
     "symbol": "local 14",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 140",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 141",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 142",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 143",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -51696,7 +52044,63 @@
     "file": "retrieval/mcp_search.py"
   },
   {
+    "symbol": "local 151",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 152",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 153",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 154",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 157",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 158",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 159",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
     "symbol": "local 16",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 160",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 161",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 162",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 163",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 164",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 165",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 169",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -51704,11 +52108,35 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 18",
+    "symbol": "local 170",
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 19",
+    "symbol": "local 171",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 172",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 173",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 175",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 177",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 178",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 18",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -51716,7 +52144,11 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 20",
+    "symbol": "local 21",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 22",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -51744,11 +52176,27 @@
     "file": "retrieval/mcp_search.py"
   },
   {
+    "symbol": "local 29",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
     "symbol": "local 3",
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 31",
+    "symbol": "local 30",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 32",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 33",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 34",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -51772,6 +52220,18 @@
     "file": "retrieval/mcp_search.py"
   },
   {
+    "symbol": "local 41",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 42",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 43",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
     "symbol": "local 44",
     "file": "retrieval/mcp_search.py"
   },
@@ -51781,6 +52241,10 @@
   },
   {
     "symbol": "local 46",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 47",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -51804,14 +52268,6 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 52",
-    "file": "retrieval/mcp_search.py"
-  },
-  {
-    "symbol": "local 53",
-    "file": "retrieval/mcp_search.py"
-  },
-  {
     "symbol": "local 54",
     "file": "retrieval/mcp_search.py"
   },
@@ -51820,7 +52276,7 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 58",
+    "symbol": "local 57",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -51829,6 +52285,14 @@
   },
   {
     "symbol": "local 60",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 62",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 63",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -51848,6 +52312,10 @@
     "file": "retrieval/mcp_search.py"
   },
   {
+    "symbol": "local 69",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
     "symbol": "local 7",
     "file": "retrieval/mcp_search.py"
   },
@@ -51856,23 +52324,7 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 72",
-    "file": "retrieval/mcp_search.py"
-  },
-  {
     "symbol": "local 73",
-    "file": "retrieval/mcp_search.py"
-  },
-  {
-    "symbol": "local 74",
-    "file": "retrieval/mcp_search.py"
-  },
-  {
-    "symbol": "local 75",
-    "file": "retrieval/mcp_search.py"
-  },
-  {
-    "symbol": "local 76",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -51892,10 +52344,6 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 80",
-    "file": "retrieval/mcp_search.py"
-  },
-  {
     "symbol": "local 81",
     "file": "retrieval/mcp_search.py"
   },
@@ -51905,10 +52353,6 @@
   },
   {
     "symbol": "local 83",
-    "file": "retrieval/mcp_search.py"
-  },
-  {
-    "symbol": "local 84",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -51924,7 +52368,23 @@
     "file": "retrieval/mcp_search.py"
   },
   {
+    "symbol": "local 89",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
     "symbol": "local 9",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 90",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 91",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 92",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -51940,19 +52400,7 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 96",
-    "file": "retrieval/mcp_search.py"
-  },
-  {
-    "symbol": "local 97",
-    "file": "retrieval/mcp_search.py"
-  },
-  {
     "symbol": "local 98",
-    "file": "retrieval/mcp_search.py"
-  },
-  {
-    "symbol": "local 99",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -54908,7 +55356,7 @@
     "file": "telemetry/decorators.py"
   },
   {
-    "symbol": "local 18",
+    "symbol": "local 15",
     "file": "telemetry/decorators.py"
   },
   {
@@ -54940,7 +55388,7 @@
     "file": "telemetry/decorators.py"
   },
   {
-    "symbol": "local 26",
+    "symbol": "local 25",
     "file": "telemetry/decorators.py"
   },
   {
@@ -54976,7 +55424,7 @@
     "file": "telemetry/decorators.py"
   },
   {
-    "symbol": "local 37",
+    "symbol": "local 34",
     "file": "telemetry/decorators.py"
   },
   {
@@ -55052,11 +55500,15 @@
     "file": "telemetry/decorators.py"
   },
   {
-    "symbol": "local 55",
+    "symbol": "local 54",
     "file": "telemetry/decorators.py"
   },
   {
     "symbol": "local 56",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "local 57",
     "file": "telemetry/decorators.py"
   },
   {
@@ -55289,6 +55741,18 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/_record_exception().(span)",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/_record_stage_latency().",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/_record_stage_latency().(duration_s)",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/_record_stage_latency().(stage)",
     "file": "telemetry/decorators.py"
   },
   {
@@ -55692,107 +56156,11 @@
     "file": "telemetry/logging.py"
   },
   {
-    "symbol": "local 10",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 11",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 12",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 13",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 14",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 15",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 16",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 17",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 18",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 19",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 2",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 20",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 21",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 22",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 23",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 24",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 25",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 3",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 4",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 5",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 6",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 7",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 9",
-    "file": "telemetry/logging.py"
-  },
-  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.logging`/LOGGER.",
     "file": "telemetry/logging.py"
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.logging`/__init__:",
-    "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.logging`/_load_logging_dependencies().",
     "file": "telemetry/logging.py"
   },
   {
@@ -55802,450 +56170,6 @@
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.logging`/install_structured_logging().(level)",
     "file": "telemetry/logging.py"
-  },
-  {
-    "symbol": "local 0",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 1",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 10",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 11",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 12",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 14",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 15",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 16",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 18",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 19",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 2",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 20",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 21",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 22",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 23",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 24",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 25",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 26",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 27",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 28",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 29",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 30",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 31",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 32",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 33",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 34",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 35",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 37",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 38",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 39",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 4",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 40",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 5",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 6",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 7",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "local 9",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/BatchSpanProcessor.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/ConsoleMetricExporter.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/ConsoleSpanExporter.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/LOGGER.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/MeterProvider.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/OTLPMetricExporter.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/OTLPSpanExporter.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/OtelInstallResult#",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/OtelInstallResult#metrics.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/OtelInstallResult#traces.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/PeriodicExportingMetricReader.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/Resource.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/TracerProvider.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_Factory#",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_Factory#__call__().",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_Factory#__call__().(args)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_Factory#__call__().(kwargs)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_Factory#__call__().(self)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_MetricsAPI#",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_MetricsAPI#set_meter_provider().",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_MetricsAPI#set_meter_provider().(provider)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_MetricsAPI#set_meter_provider().(self)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_ResourceFactory#",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_ResourceFactory#create().",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_ResourceFactory#create().(attributes)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_ResourceFactory#create().(cls)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TelemetryDeps#",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TelemetryDeps#console_metric_exporter_factory.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TelemetryDeps#console_span_exporter_factory.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TelemetryDeps#meter_provider_factory.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TelemetryDeps#metric_reader_factory.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TelemetryDeps#metrics_api.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TelemetryDeps#span_processor_factory.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TelemetryDeps#trace_api.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TelemetryDeps#tracer_provider_factory.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TraceAPI#",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TraceAPI#set_tracer_provider().",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TraceAPI#set_tracer_provider().(provider)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TraceAPI#set_tracer_provider().(self)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TracerProviderFactory#",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TracerProviderFactory#__call__().",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TracerProviderFactory#__call__().(args)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TracerProviderFactory#__call__().(kwargs)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TracerProviderFactory#__call__().(self)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TracerProviderInstance#",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TracerProviderInstance#add_span_processor().",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TracerProviderInstance#add_span_processor().(processor)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_TracerProviderInstance#add_span_processor().(self)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/__init__:",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_build_metric_exporter().",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_build_metric_exporter().(endpoint)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_build_metric_exporter().(insecure)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_build_span_exporter().",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_build_span_exporter().(endpoint)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_build_span_exporter().(insecure)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_env_flag().",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_env_flag().(default)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_env_flag().(name)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_import_attr().",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_import_attr().(attr)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_import_attr().(module)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_optional_import().",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_optional_import().(module)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_resolve_factories().",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/_service_version().",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/build_resource().",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/build_resource().(environment)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/build_resource().(service_name)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/build_resource().(service_version)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/install_otel().",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/install_otel().(environment)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/install_otel().(service_name)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/install_otel().(service_version)",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/otel_metrics.",
-    "file": "telemetry/otel.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.otel`/otel_trace.",
-    "file": "telemetry/otel.py"
   },
   {
     "symbol": "local 12",
@@ -56705,210 +56629,6 @@
   },
   {
     "symbol": "local 0",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "local 1",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "local 10",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "local 11",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "local 12",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "local 13",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "local 14",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "local 15",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "local 2",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "local 3",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "local 4",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "local 5",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "local 6",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "local 7",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "local 8",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "local 9",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/EMBED_BATCH_SIZE.",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/EMBED_LATENCY_SECONDS.",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/FAISS_SEARCH_LATENCY_SECONDS.",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/GATING_DECISIONS_TOTAL.",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/MetricsConfig#",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/MetricsConfig#enabled.",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/QUERY_AMBIGUITY.",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/REQUEST_LATENCY_SECONDS.",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/RRFK.",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/RUNS_TOTAL.",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/RUN_ERRORS_TOTAL.",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/ResponseType.",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/STAGE_LATENCY_SECONDS.",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/XTR_SEARCH_LATENCY_SECONDS.",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/__all__.",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/__init__:",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/_env_flag().",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/_env_flag().(default)",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/_env_flag().(name)",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/build_metrics_router().",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/build_metrics_router().(config)",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/build_metrics_router().metrics_endpoint().",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/observe_request_latency().",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/observe_request_latency().(duration_s)",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/observe_request_latency().(status)",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/observe_request_latency().(tool)",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/record_run().",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/record_run().(status)",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/record_run().(tool)",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/record_run_error().",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/record_run_error().(error_code)",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/record_run_error().(tool)",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/record_stage_latency().",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/record_stage_latency().(duration_s)",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.prom`/record_stage_latency().(stage)",
-    "file": "telemetry/prom.py"
-  },
-  {
-    "symbol": "local 0",
     "file": "telemetry/reporter.py"
   },
   {
@@ -56928,15 +56648,19 @@
     "file": "telemetry/reporter.py"
   },
   {
+    "symbol": "local 102",
+    "file": "telemetry/reporter.py"
+  },
+  {
     "symbol": "local 103",
     "file": "telemetry/reporter.py"
   },
   {
-    "symbol": "local 105",
+    "symbol": "local 104",
     "file": "telemetry/reporter.py"
   },
   {
-    "symbol": "local 106",
+    "symbol": "local 107",
     "file": "telemetry/reporter.py"
   },
   {
@@ -56945,6 +56669,10 @@
   },
   {
     "symbol": "local 109",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 110",
     "file": "telemetry/reporter.py"
   },
   {
@@ -56960,6 +56688,10 @@
     "file": "telemetry/reporter.py"
   },
   {
+    "symbol": "local 114",
+    "file": "telemetry/reporter.py"
+  },
+  {
     "symbol": "local 115",
     "file": "telemetry/reporter.py"
   },
@@ -56968,7 +56700,11 @@
     "file": "telemetry/reporter.py"
   },
   {
-    "symbol": "local 117",
+    "symbol": "local 118",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 119",
     "file": "telemetry/reporter.py"
   },
   {
@@ -56976,11 +56712,11 @@
     "file": "telemetry/reporter.py"
   },
   {
-    "symbol": "local 121",
+    "symbol": "local 120",
     "file": "telemetry/reporter.py"
   },
   {
-    "symbol": "local 122",
+    "symbol": "local 121",
     "file": "telemetry/reporter.py"
   },
   {
@@ -56992,15 +56728,15 @@
     "file": "telemetry/reporter.py"
   },
   {
-    "symbol": "local 125",
-    "file": "telemetry/reporter.py"
-  },
-  {
     "symbol": "local 126",
     "file": "telemetry/reporter.py"
   },
   {
-    "symbol": "local 130",
+    "symbol": "local 128",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 129",
     "file": "telemetry/reporter.py"
   },
   {
@@ -57012,10 +56748,6 @@
     "file": "telemetry/reporter.py"
   },
   {
-    "symbol": "local 133",
-    "file": "telemetry/reporter.py"
-  },
-  {
     "symbol": "local 134",
     "file": "telemetry/reporter.py"
   },
@@ -57024,7 +56756,7 @@
     "file": "telemetry/reporter.py"
   },
   {
-    "symbol": "local 137",
+    "symbol": "local 136",
     "file": "telemetry/reporter.py"
   },
   {
@@ -57032,11 +56764,95 @@
     "file": "telemetry/reporter.py"
   },
   {
+    "symbol": "local 139",
+    "file": "telemetry/reporter.py"
+  },
+  {
     "symbol": "local 14",
     "file": "telemetry/reporter.py"
   },
   {
+    "symbol": "local 140",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 144",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 145",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 146",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 147",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 148",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 149",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 153",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 154",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 155",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 156",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 157",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 158",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 160",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 161",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 164",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 165",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 168",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 169",
+    "file": "telemetry/reporter.py"
+  },
+  {
     "symbol": "local 17",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 170",
     "file": "telemetry/reporter.py"
   },
   {
@@ -57068,11 +56884,15 @@
     "file": "telemetry/reporter.py"
   },
   {
+    "symbol": "local 35",
+    "file": "telemetry/reporter.py"
+  },
+  {
     "symbol": "local 36",
     "file": "telemetry/reporter.py"
   },
   {
-    "symbol": "local 37",
+    "symbol": "local 38",
     "file": "telemetry/reporter.py"
   },
   {
@@ -57084,15 +56904,15 @@
     "file": "telemetry/reporter.py"
   },
   {
+    "symbol": "local 41",
+    "file": "telemetry/reporter.py"
+  },
+  {
     "symbol": "local 42",
     "file": "telemetry/reporter.py"
   },
   {
     "symbol": "local 43",
-    "file": "telemetry/reporter.py"
-  },
-  {
-    "symbol": "local 45",
     "file": "telemetry/reporter.py"
   },
   {
@@ -57104,14 +56924,6 @@
     "file": "telemetry/reporter.py"
   },
   {
-    "symbol": "local 48",
-    "file": "telemetry/reporter.py"
-  },
-  {
-    "symbol": "local 49",
-    "file": "telemetry/reporter.py"
-  },
-  {
     "symbol": "local 5",
     "file": "telemetry/reporter.py"
   },
@@ -57120,19 +56932,11 @@
     "file": "telemetry/reporter.py"
   },
   {
-    "symbol": "local 51",
-    "file": "telemetry/reporter.py"
-  },
-  {
     "symbol": "local 52",
     "file": "telemetry/reporter.py"
   },
   {
     "symbol": "local 53",
-    "file": "telemetry/reporter.py"
-  },
-  {
-    "symbol": "local 54",
     "file": "telemetry/reporter.py"
   },
   {
@@ -57148,7 +56952,19 @@
     "file": "telemetry/reporter.py"
   },
   {
+    "symbol": "local 58",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 59",
+    "file": "telemetry/reporter.py"
+  },
+  {
     "symbol": "local 6",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 60",
     "file": "telemetry/reporter.py"
   },
   {
@@ -57176,15 +56992,39 @@
     "file": "telemetry/reporter.py"
   },
   {
-    "symbol": "local 72",
+    "symbol": "local 67",
     "file": "telemetry/reporter.py"
   },
   {
-    "symbol": "local 73",
+    "symbol": "local 68",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 69",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 70",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 71",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 75",
     "file": "telemetry/reporter.py"
   },
   {
     "symbol": "local 76",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 77",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 78",
     "file": "telemetry/reporter.py"
   },
   {
@@ -57200,39 +57040,11 @@
     "file": "telemetry/reporter.py"
   },
   {
-    "symbol": "local 81",
-    "file": "telemetry/reporter.py"
-  },
-  {
-    "symbol": "local 82",
-    "file": "telemetry/reporter.py"
-  },
-  {
-    "symbol": "local 83",
-    "file": "telemetry/reporter.py"
-  },
-  {
-    "symbol": "local 84",
-    "file": "telemetry/reporter.py"
-  },
-  {
-    "symbol": "local 85",
-    "file": "telemetry/reporter.py"
-  },
-  {
     "symbol": "local 86",
     "file": "telemetry/reporter.py"
   },
   {
     "symbol": "local 87",
-    "file": "telemetry/reporter.py"
-  },
-  {
-    "symbol": "local 88",
-    "file": "telemetry/reporter.py"
-  },
-  {
-    "symbol": "local 89",
     "file": "telemetry/reporter.py"
   },
   {
@@ -57265,6 +57077,10 @@
   },
   {
     "symbol": "local 98",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 99",
     "file": "telemetry/reporter.py"
   },
   {
@@ -57420,11 +57236,31 @@
     "file": "telemetry/reporter.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportStage#duration_ms.",
+    "file": "telemetry/reporter.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportStage#name.",
     "file": "telemetry/reporter.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportStage#payload.",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportStage#span_id.",
+    "file": "telemetry/reporter.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportStage#status.",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportStage#trace_id.",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportStage#ts.",
     "file": "telemetry/reporter.py"
   },
   {
@@ -57608,6 +57444,14 @@
     "file": "telemetry/reporter.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportV2#budgets.",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportV2#events.",
+    "file": "telemetry/reporter.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportV2#run_id.",
     "file": "telemetry/reporter.py"
   },
@@ -57616,11 +57460,27 @@
     "file": "telemetry/reporter.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportV2#span_attributes.",
+    "file": "telemetry/reporter.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportV2#stages.",
     "file": "telemetry/reporter.py"
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportV2#stopped_after_stage.",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportV2#stopped_because.",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportV2#timeline.",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportV2#tool.",
     "file": "telemetry/reporter.py"
   },
   {

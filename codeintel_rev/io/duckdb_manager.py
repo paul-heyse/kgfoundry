@@ -12,7 +12,9 @@ from time import perf_counter
 from typing import TYPE_CHECKING, cast
 
 from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.metrics.registry import DUCKDB_EXECUTE_SECONDS
 from codeintel_rev.observability.otel import as_span, record_span_event
+from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.observability.timeline import current_timeline
 
 if TYPE_CHECKING:
@@ -101,23 +103,43 @@ class _InstrumentedDuckDBConnection:
         """
         sql_text = str(query)
         timeline = current_timeline()
-        attrs: dict[str, object] = {"sql_len": len(sql_text)}
+        sql_bytes = len(sql_text.encode("utf-8"))
+        attrs: dict[str, object] = {
+            Attrs.DUCKDB_SQL_BYTES: sql_bytes,
+        }
         if self._config.log_queries:
-            attrs["sql"] = sql_text[:5000]
+            attrs["duckdb.sql"] = sql_text[:5000]
         step_ctx = timeline.step("sql.exec", **attrs) if timeline else nullcontext()
         start = perf_counter()
-        with step_ctx, as_span("duckdb.exec", **attrs):
+        span_attrs = {
+            Attrs.COMPONENT: "duckdb",
+            Attrs.STAGE: "duckdb.query",
+            Attrs.DUCKDB_SQL_BYTES: sql_bytes,
+        }
+        with step_ctx, as_span("duckdb.query", **span_attrs):
             if parameters is not None:
                 self._conn.execute(query, parameters)
             else:
                 self._conn.execute(query)
         duration_ms = round((perf_counter() - start) * 1000, 2)
-        record_span_event("duckdb.exec.complete", duration_ms=duration_ms, sql_len=len(sql_text))
+        duration_s = duration_ms / 1000
+        DUCKDB_EXECUTE_SECONDS.record(
+            duration_s,
+            {
+                "object_cache": str(self._config.enable_object_cache),
+                "threads": str(self._config.threads),
+            },
+        )
+        record_span_event(
+            "duckdb.query.complete",
+            duration_ms=duration_ms,
+            sql_bytes=sql_bytes,
+        )
         if timeline is not None:
             timeline.event(
                 "io",
-                "sql.exec.done",
-                attrs={"duration_ms": duration_ms, "sql_len": len(sql_text)},
+                "duckdb.query",
+                attrs={"duration_ms": duration_ms, Attrs.DUCKDB_SQL_BYTES: sql_bytes},
             )
         return cast("duckdb.DuckDBPyConnection", self)
 

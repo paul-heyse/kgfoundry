@@ -43,7 +43,7 @@ Example failure payload::
 
 - **fan_in**: 0
 - **fan_out**: 5
-- **cycle_group**: 156
+- **cycle_group**: 154
 
 ## Ownership
 

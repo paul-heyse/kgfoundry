@@ -138,6 +138,12 @@ MCP_SEARCH_RERANK_LATENCY_MS = build_histogram(
     "Latency of the rerank/exact scoring stage during MCP search.",
 )
 
+DUCKDB_EXECUTE_SECONDS = build_histogram(
+    "codeintel_duckdb_execute_seconds",
+    "Duration of DuckDB query execution across catalog operations.",
+    unit="s",
+)
+
 # MCP server + adapter telemetry
 MCP_RUNS_TOTAL = build_counter(
     "mcp_runs_total",
@@ -275,6 +281,7 @@ __all__ = [
     "FAISS_SEARCH_LAST_MS",
     "FAISS_SEARCH_NPROBE",
     "FAISS_SEARCH_TOTAL",
+    "DUCKDB_EXECUTE_SECONDS",
     "GATING_DECISIONS_TOTAL",
     "GATING_QUERY_AMBIGUITY",
     "GATING_RRF_K",

@@ -1,7 +1,6 @@
 fastapi:
 - app/main.py
 - app/routers/index_admin.py
-- telemetry/prom.py
 low-coverage:
 - __init__.py
 - _lazy_imports.py
@@ -176,9 +175,7 @@ low-coverage:
 - telemetry/decorators.py
 - telemetry/events.py
 - telemetry/logging.py
-- telemetry/otel.py
 - telemetry/otel_metrics.py
-- telemetry/prom.py
 - telemetry/reporter.py
 - telemetry/steps.py
 - typedness.py
@@ -282,7 +279,6 @@ public-api:
 - telemetry/decorators.py
 - telemetry/events.py
 - telemetry/otel_metrics.py
-- telemetry/prom.py
 - telemetry/reporter.py
 - telemetry/steps.py
 - typing.py
@@ -302,6 +298,5 @@ reexport-hub:
 - retrieval/types.py
 - telemetry/__init__.py
 - telemetry/context.py
-- telemetry/prom.py
 - telemetry/reporter.py
 - typing.py

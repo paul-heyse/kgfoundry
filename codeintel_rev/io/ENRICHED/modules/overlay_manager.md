@@ -26,7 +26,7 @@ Targeted overlay manager for opt-in stub generation.
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 157
+- **cycle_group**: 155
 
 ## Ownership
 

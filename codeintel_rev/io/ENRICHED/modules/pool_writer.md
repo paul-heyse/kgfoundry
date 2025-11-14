@@ -38,15 +38,15 @@ Lightweight Parquet writer for evaluator pools.
 
 - **fan_in**: 3
 - **fan_out**: 2
-- **cycle_group**: 73
+- **cycle_group**: 71
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 9
-- recent churn 90: 9
+- recent churn 30: 10
+- recent churn 90: 10
 
 ## Usage
 

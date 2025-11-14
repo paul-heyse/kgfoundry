@@ -41,7 +41,7 @@ def test_module_record_behaves_like_mapping() -> None:
         stable_id="abc123",
     )
     record["fan_in"] = 2
-    record.set_fields(tags=["cli", "alpha"])
+    record.tags = ["cli", "alpha"]
     payload = record.as_json_row()
     assert payload["fan_in"] == 2
     assert payload["path"] == "pkg/demo.py"

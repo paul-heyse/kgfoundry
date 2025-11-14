@@ -11,7 +11,6 @@ from types import ModuleType
 from typing import Any, Protocol
 
 from codeintel_rev.observability.logs import init_otel_logging
-from codeintel_rev.observability.metrics import install_metrics_provider
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.observability import start_span
 
@@ -384,7 +383,14 @@ def init_telemetry(
     metrics_enabled = _env_flag("CODEINTEL_OTEL_METRICS_ENABLED", default=True)
     if metrics_enabled:
         metrics_endpoint = os.getenv("CODEINTEL_OTEL_METRICS_ENDPOINT", otlp_endpoint or None)
-        install_metrics_provider(resource, otlp_endpoint=metrics_endpoint)
+        try:
+            from codeintel_rev.observability.metrics import (
+                install_metrics_provider as _install_metrics_provider,
+            )
+        except ImportError:  # pragma: no cover - defensive
+            LOGGER.debug("Metrics module unavailable; skipping meter provider install")
+        else:
+            _install_metrics_provider(resource, otlp_endpoint=metrics_endpoint)
     if install_flight_recorder and _install_flight_recorder is not None:
         try:
             _install_flight_recorder(provider)

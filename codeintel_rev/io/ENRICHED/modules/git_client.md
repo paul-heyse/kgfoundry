@@ -71,13 +71,13 @@ GitPython documentation : https://gitpython.readthedocs.io/
 - function: `_normalize_line_numbers` (line 93)
 - function: `_coerce_blame_tuple` (line 106)
 - class: `GitClient` (line 121)
-- class: `AsyncGitClient` (line 515)
+- class: `AsyncGitClient` (line 527)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 7
-- **cycle_group**: 43
+- **cycle_group**: 41
 
 ## Ownership
 
@@ -128,7 +128,7 @@ AsyncGitClient, GitClient
 
 - branches: 33
 - cyclomatic: 34
-- loc: 658
+- loc: 670
 
 ## Doc Coverage
 

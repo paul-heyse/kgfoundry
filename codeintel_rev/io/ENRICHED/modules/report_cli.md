@@ -46,15 +46,15 @@ Diagnostics CLI for rendering run reports from session event ledgers.
 
 - **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 116
+- **cycle_group**: 114
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 5
-- recent churn 90: 5
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 

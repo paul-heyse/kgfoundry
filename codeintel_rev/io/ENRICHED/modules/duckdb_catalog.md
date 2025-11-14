@@ -61,15 +61,15 @@ chunk retrieval and joins.
 
 - **fan_in**: 9
 - **fan_out**: 11
-- **cycle_group**: 43
+- **cycle_group**: 41
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 45
-- recent churn 90: 45
+- recent churn 30: 46
+- recent churn 90: 46
 
 ## Usage
 

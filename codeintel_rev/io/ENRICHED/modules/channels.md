@@ -30,7 +30,7 @@ Channel plugin contracts for hybrid retrieval.
 
 - **fan_in**: 3
 - **fan_out**: 5
-- **cycle_group**: 43
+- **cycle_group**: 41
 
 ## Ownership
 

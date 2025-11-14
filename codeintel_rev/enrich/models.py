@@ -52,7 +52,7 @@ def _dedupe_strings(values: Iterable[object]) -> list[str]:
     return seen
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class ModuleRecord(MutableMapping[str, Any]):
     """Canonical per-module row emitted to ``modules.jsonl``."""
 
@@ -193,19 +193,9 @@ class ModuleRecord(MutableMapping[str, Any]):
     def add_error(self, error: StageError | str) -> None:
         """Append a structured error token and flag ``parse_ok`` as False."""
         token = error.token() if isinstance(error, StageError) else str(error)
-        if not token:
-            return
-        errors = list(self.errors)
-        errors.append(token)
-        self.set_fields(errors=errors, parse_ok=False)
-
-    def set_fields(self, **changes: object) -> None:
-        """Update record fields via ``object.__setattr__`` for frozen safety."""
-        for key, value in changes.items():
-            if key in self._FIELD_ORDER:
-                object.__setattr__(self, key, value)  # noqa: PLC2801
-            else:
-                self._extra[key] = value
+        if token:
+            self.errors.append(token)
+        self.parse_ok = False
 
     def as_json_row(self) -> dict[str, Any]:
         """Return a JSON-friendly dictionary for downstream writers.

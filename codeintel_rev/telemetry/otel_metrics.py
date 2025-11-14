@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from threading import Lock
-from typing import Any, cast
+from typing import cast
 
 from opentelemetry import metrics
 from opentelemetry.metrics import CallbackOptions, Counter, Histogram, Observation
@@ -146,23 +146,11 @@ class HistogramLike:
         """Record ``value`` against the histogram."""
         self._default_handle.observe(value)
 
-    def record(self, value: float, attributes: Mapping[str, object] | None = None) -> None:
-        """Compatibility alias for `.observe()` used by legacy call sites."""
-        if attributes:
-            handle = HistogramHandle(self._instrument, attributes)
-            handle.observe(value)
-        else:
-            self.observe(value)
-
 
 @dataclass(slots=True, frozen=True)
 class _GaugeEntry:
     attributes: Mapping[str, object]
     value: float = 0.0
-
-
-def _set_gauge_value(entry: _GaugeEntry, value: float) -> None:
-    object.__setattr__(entry, "value", float(value))  # noqa: PLC2801
 
 
 class GaugeHandle:
@@ -261,7 +249,7 @@ class GaugeLike:
                 entry = _GaugeEntry(attributes=dict(key), value=float(value))
                 self._entries[key] = entry
             else:
-                _set_gauge_value(entry, value)
+                entry.value = float(value)
 
     def _observe(self, _: CallbackOptions) -> list[Observation]:
         """Return the latest gauge observations.

@@ -24,7 +24,7 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 - from **codeintel_rev.observability.semantic_conventions** import Attrs
 - from **codeintel_rev.observability.timeline** import current_timeline
 - from **codeintel_rev.telemetry.decorators** import span_context
-- from **codeintel_rev.telemetry.prom** import EMBED_BATCH_SIZE, EMBED_LATENCY_SECONDS
+- from **codeintel_rev.metrics.registry** import EMBED_BATCH_SIZE, EMBED_LATENCY_SECONDS
 - from **codeintel_rev.telemetry.steps** import StepEvent, emit_step
 - from **codeintel_rev.typing** import NDArrayF32, gate_import
 - from **kgfoundry_common.logging** import get_logger
@@ -47,15 +47,15 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 
 - **fan_in**: 4
 - **fan_out**: 10
-- **cycle_group**: 43
+- **cycle_group**: 41
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 26
-- recent churn 90: 26
+- recent churn 30: 27
+- recent churn 90: 27
 
 ## Usage
 

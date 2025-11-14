@@ -182,15 +182,15 @@ CLI entrypoint for repo enrichment and targeted overlay generation.
 
 - **fan_in**: 0
 - **fan_out**: 22
-- **cycle_group**: 106
+- **cycle_group**: 104
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 21
-- recent churn 90: 21
+- recent churn 30: 22
+- recent churn 90: 22
 
 ## Usage
 
