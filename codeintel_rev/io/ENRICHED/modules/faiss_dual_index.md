@@ -35,7 +35,7 @@ FAISS dual-index utilities and metadata helpers.
 
 - **fan_in**: 0
 - **fan_out**: 3
-- **cycle_group**: 114
+- **cycle_group**: 112
 
 ## Ownership
 

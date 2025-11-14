@@ -24,7 +24,7 @@ Reciprocal Rank Fusion utilities (legacy compatibility wrappers).
 
 - **fan_in**: 0
 - **fan_out**: 3
-- **cycle_group**: 110
+- **cycle_group**: 109
 
 ## Ownership
 

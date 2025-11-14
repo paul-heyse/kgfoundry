@@ -213,6 +213,23 @@ class InvalidLineRangeError(FileOperationError):
         )
 
 
+class CatalogConsistencyError(KgFoundryError):
+    """Raised when catalog state does not match expected invariants."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        context: Mapping[str, object] | None = None,
+    ) -> None:
+        super().__init__(
+            message,
+            code=ErrorCode.INVALID_STATE,
+            http_status=500,
+            context=dict(context or {}),
+        )
+
+
 class PathNotFoundError(KgFoundryError):
     """Raised when a requested repository path does not exist."""
 

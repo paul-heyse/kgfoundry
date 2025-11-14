@@ -46,14 +46,15 @@ Raising Git operation error:
 - class: `FileOperationError` (line 42)
 - class: `FileReadError` (line 97)
 - class: `InvalidLineRangeError` (line 144)
-- class: `PathNotFoundError` (line 216)
-- class: `PathNotDirectoryError` (line 235)
-- class: `GitOperationError` (line 257)
-- class: `RuntimeLifecycleError` (line 336)
-- class: `RuntimeUnavailableError` (line 355)
-- class: `VectorIndexStateError` (line 378)
-- class: `VectorIndexIncompatibleError` (line 400)
-- class: `CatalogJoinError` (line 422)
+- class: `CatalogConsistencyError` (line 216)
+- class: `PathNotFoundError` (line 233)
+- class: `PathNotDirectoryError` (line 252)
+- class: `GitOperationError` (line 274)
+- class: `RuntimeLifecycleError` (line 353)
+- class: `RuntimeUnavailableError` (line 372)
+- class: `VectorIndexStateError` (line 395)
+- class: `VectorIndexIncompatibleError` (line 417)
+- class: `CatalogJoinError` (line 439)
 
 ## Graph Metrics
 
@@ -99,7 +100,7 @@ FileOperationError, FileReadError, GitOperationError, InvalidLineRangeError, Pat
 
 ## Hotspot
 
-- score: 2.26
+- score: 2.29
 
 ## Side Effects
 
@@ -107,22 +108,22 @@ FileOperationError, FileReadError, GitOperationError, InvalidLineRangeError, Pat
 
 ## Complexity
 
-- branches: 7
-- cyclomatic: 8
-- loc: 467
+- branches: 8
+- cyclomatic: 9
+- loc: 484
 
 ## Doc Coverage
 
 - `FileOperationError` (class): summary=yes, examples=yes — Base exception for file operation errors.
 - `FileReadError` (class): summary=yes, examples=yes — Raised when file cannot be read due to encoding or binary content.
 - `InvalidLineRangeError` (class): summary=yes, examples=yes — Raised when line range parameters are invalid.
+- `CatalogConsistencyError` (class): summary=yes, examples=no — Raised when catalog state does not match expected invariants.
 - `PathNotFoundError` (class): summary=yes, examples=no — Raised when a requested repository path does not exist.
 - `PathNotDirectoryError` (class): summary=yes, examples=no — Raised when a repository path is expected to be a directory but is not.
 - `GitOperationError` (class): summary=yes, examples=yes — Base exception for Git operation errors.
 - `RuntimeLifecycleError` (class): summary=yes, examples=no — Raised when a runtime fails to initialize or shut down.
 - `RuntimeUnavailableError` (class): summary=yes, examples=no — Raised when a runtime dependency is missing or disabled.
 - `VectorIndexStateError` (class): summary=yes, examples=no — Raised when a FAISS index is missing or not ready.
-- `VectorIndexIncompatibleError` (class): summary=yes, examples=no — Raised when FAISS assets (dimension, factory) are incompatible.
 
 ## Tags
 

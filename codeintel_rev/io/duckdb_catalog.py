@@ -46,6 +46,16 @@ else:
 LOGGER = get_logger(__name__)
 
 
+@dataclass(slots=True, frozen=True)
+class IdMapMeta:
+    """Metadata describing a materialized FAISS ID map join."""
+
+    parquet_path: str
+    parquet_hash: str
+    row_count: int
+    refreshed: bool
+
+
 def _log_extra(**kwargs: object) -> dict[str, object]:
     """Return structured log extras for catalog events.
 
@@ -214,7 +224,7 @@ class _DuckDBQueryMixin:
             attrs=span_attrs,
             emit_checkpoint=True,
         ):
-            with catalog.connection() as conn:
+            with catalog._readonly_connection() as conn:
                 catalog._log_query(sql, params)
                 relation = conn.execute(sql, params)
                 rows = relation.fetchall()
@@ -268,7 +278,7 @@ class _DuckDBQueryMixin:
             return {}
         unique_ids = list(dict.fromkeys(cleaned))
         catalog = cast("DuckDBCatalog", self)
-        with catalog.connection() as conn:
+        with catalog._readonly_connection() as conn:
             base_rows = self._fetch_annotation_rows(conn, unique_ids)
             annotations, boundaries = self._initialize_annotation_maps(base_rows)
             if not annotations:
@@ -567,6 +577,19 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         with self._manager.connection() as conn:
             yield conn
 
+    @contextmanager
+    def _readonly_connection(self) -> Iterator[duckdb.DuckDBPyConnection]:
+        """Yield a read-only DuckDB connection for hydration queries.
+
+        Yields
+        ------
+        duckdb.DuckDBPyConnection
+            Connection opened in read-only mode for catalog reads.
+        """
+        self._ensure_ready()
+        with self._manager.readonly_connection() as conn:
+            yield conn
+
     def _log_query(self, sql: str, params: object | None = None) -> None:
         """Emit debug log for executed DuckDB statement when enabled."""
         if not self._log_queries:
@@ -741,12 +764,17 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS faiss_idmap_mat_meta (
-                checksum   TEXT NOT NULL,
-                row_count  BIGINT NOT NULL,
-                updated_at TIMESTAMP NOT NULL
+                parquet_path TEXT,
+                parquet_hash TEXT,
+                checksum     TEXT,
+                row_count    BIGINT NOT NULL,
+                updated_at   TIMESTAMP NOT NULL
             )
             """
         )
+        conn.execute("ALTER TABLE faiss_idmap_mat_meta ADD COLUMN IF NOT EXISTS parquet_path TEXT")
+        conn.execute("ALTER TABLE faiss_idmap_mat_meta ADD COLUMN IF NOT EXISTS parquet_hash TEXT")
+        conn.execute("ALTER TABLE faiss_idmap_mat_meta ADD COLUMN IF NOT EXISTS checksum TEXT")
 
     @staticmethod
     def _ensure_faiss_join_view(conn: duckdb.DuckDBPyConnection) -> None:
@@ -918,62 +946,22 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         dict[str, Any]
             Summary dictionary with ``refreshed``, ``checksum``, and ``rows`` keys.
         """
-        checksum = _file_checksum(idmap_parquet)
         stats: dict[str, Any]
         with self._manager.connection() as conn:
             self._ensure_views(conn)
-            row = conn.execute(
-                """
-                SELECT checksum, row_count
-                  FROM faiss_idmap_mat_meta
-              ORDER BY updated_at DESC
-                 LIMIT 1
-                """
-            ).fetchone()
-            if row and row[0] == checksum:
-                rows = int(row[1])
-                return {"refreshed": False, "checksum": checksum, "rows": rows}
-
-            conn.execute("DELETE FROM faiss_idmap_mat")
-            try:
-                conn.execute(
-                    """
-                    INSERT INTO faiss_idmap_mat (faiss_row, external_id, source)
-                    SELECT
-                        faiss_row,
-                        external_id,
-                        COALESCE(source, 'parquet') AS source
-                    FROM read_parquet(?)
-                    """,
-                    [str(idmap_parquet)],
-                )
-            except duckdb.Error:
-                conn.execute(
-                    """
-                    INSERT INTO faiss_idmap_mat (faiss_row, external_id, source)
-                    SELECT
-                        faiss_row,
-                        external_id,
-                        'parquet' AS source
-                    FROM read_parquet(?)
-                    """,
-                    [str(idmap_parquet)],
-                )
-            count_row = conn.execute("SELECT COUNT(*) FROM faiss_idmap_mat").fetchone()
-            row_count = int(count_row[0]) if count_row and count_row[0] is not None else 0
-            conn.execute(
-                """
-                INSERT INTO faiss_idmap_mat_meta(checksum, row_count, updated_at)
-                VALUES (?, ?, CURRENT_TIMESTAMP)
-                """,
-                [checksum, row_count],
+            meta = refresh_faiss_idmap_materialized(
+                conn,
+                idmap_parquet=str(idmap_parquet),
+                chunks_parquet=str(self.vectors_dir / "**/*.parquet"),
             )
-            stats = {"refreshed": True, "checksum": checksum, "rows": row_count}
-            self._ensure_faiss_idmap_view(conn, idmap_parquet)
-            self._ensure_faiss_join_view(conn)
-
+            stats = {
+                "refreshed": meta.refreshed,
+                "checksum": meta.parquet_hash,
+                "rows": meta.row_count,
+            }
         LOGGER.info(
-            "faiss_idmap_materialized", extra=_log_extra(rows=stats["rows"], checksum=checksum)
+            "faiss_idmap_materialized",
+            extra=_log_extra(rows=stats["rows"], checksum=stats["checksum"]),
         )
         return stats
 
@@ -994,7 +982,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         """
         if limit <= 0:
             return []
-        with self.connection() as conn:
+        with self._readonly_connection() as conn:
             result = conn.execute(
                 """
                 SELECT id, embedding
@@ -1147,7 +1135,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
                     options=options,
                 )
 
-                with self.connection() as conn:
+                with self._readonly_connection() as conn:
                     relation = conn.execute(sql, sql_params)
                     rows = relation.fetchall()
                     cols = [desc[0] for desc in relation.description]
@@ -1440,7 +1428,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             List of symbol identifiers associated with the chunk. Returns empty
             list if chunk has no symbols or chunk_id doesn't exist.
         """
-        with self.connection() as conn:
+        with self._readonly_connection() as conn:
             if _relation_exists(conn, "v_chunk_symbols"):
                 sql = "SELECT symbol FROM v_chunk_symbols WHERE chunk_id = ?"
             else:
@@ -1493,7 +1481,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
                 stage="catalog.query",
                 attrs=attrs,
             ),
-            self.connection() as conn,
+            self._readonly_connection() as conn,
         ):
             relation = conn.execute(sql, params)
             rows = relation.fetchall()
@@ -1618,7 +1606,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             is empty or no Parquet files exist.
 
         """
-        with self.connection() as conn:
+        with self._readonly_connection() as conn:
             result = conn.execute("SELECT COUNT(*) FROM chunks").fetchone()
         return result[0] if result else 0
 
@@ -1632,7 +1620,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         """
         if self._embedding_dim_cache is not None:
             return self._embedding_dim_cache
-        with self.connection() as conn:
+        with self._readonly_connection() as conn:
             result = conn.execute("SELECT embedding FROM chunks LIMIT 1").fetchone()
         if result and result[0] is not None:
             self._embedding_dim_cache = len(result[0])
@@ -1715,4 +1703,133 @@ def _file_checksum(path: Path) -> str:
     return digest.hexdigest()
 
 
-__all__ = ["DuckDBCatalog", "StructureAnnotations", "relation_exists"]
+def _parquet_hash(path: str | Path) -> str:
+    """Return SHA256 checksum for the Parquet file at ``path``.
+
+    Returns
+    -------
+    str
+        Hex digest representing the Parquet file contents.
+    """
+    file_path = Path(path)
+    digest = hashlib.sha256()
+    with file_path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def ensure_faiss_idmap_view(
+    conn: duckdb.DuckDBPyConnection,
+    *,
+    idmap_parquet: str,
+    chunks_parquet: str,
+) -> None:
+    """Register ``v_faiss_join`` by joining FAISS ID map and chunk metadata."""
+    conn.sql("SELECT * FROM read_parquet(?)", params=[idmap_parquet]).create_view(
+        "v_faiss_idmap", replace=True
+    )
+    conn.sql("SELECT * FROM read_parquet(?)", params=[chunks_parquet]).create_view(
+        "v_chunks", replace=True
+    )
+    conn.execute(
+        """
+        CREATE OR REPLACE VIEW v_faiss_join AS
+        SELECT
+            idmap.faiss_row,
+            idmap.external_id AS chunk_id,
+            chunks.uri,
+            chunks.start_line,
+            chunks.end_line,
+            chunks.language,
+            chunks.text
+        FROM v_faiss_idmap AS idmap
+        LEFT JOIN v_chunks AS chunks
+          ON chunks.id = idmap.external_id
+        """
+    )
+
+
+def refresh_faiss_idmap_materialized(
+    conn: duckdb.DuckDBPyConnection,
+    *,
+    idmap_parquet: str,
+    chunks_parquet: str,
+) -> IdMapMeta:
+    """Materialize ``v_faiss_join`` into ``faiss_idmap_mat`` with checksum guard.
+
+    Returns
+    -------
+    IdMapMeta
+        Metadata describing the materialized table and whether a refresh occurred.
+    """
+    DuckDBCatalog._ensure_idmap_tables(conn)
+    ensure_faiss_idmap_view(
+        conn,
+        idmap_parquet=idmap_parquet,
+        chunks_parquet=chunks_parquet,
+    )
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS faiss_idmap_mat_meta (
+            parquet_path TEXT PRIMARY KEY,
+            parquet_hash TEXT NOT NULL,
+            row_count BIGINT NOT NULL,
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            checksum TEXT
+        )
+        """
+    )
+    checksum = _parquet_hash(idmap_parquet)
+    row = conn.execute(
+        """
+        SELECT parquet_hash, row_count
+          FROM faiss_idmap_mat_meta
+         WHERE parquet_path = ?
+      ORDER BY updated_at DESC
+         LIMIT 1
+        """,
+        [idmap_parquet],
+    ).fetchone()
+    if row and row[0] == checksum:
+        count_row = conn.execute("SELECT COUNT(*) FROM faiss_idmap_mat").fetchone()
+        row_count = int(count_row[0]) if count_row and count_row[0] is not None else 0
+        return IdMapMeta(
+            parquet_path=idmap_parquet,
+            parquet_hash=checksum,
+            row_count=row_count,
+            refreshed=False,
+        )
+
+    conn.execute("DROP TABLE IF EXISTS faiss_idmap_mat")
+    conn.execute("CREATE TABLE faiss_idmap_mat AS SELECT * FROM v_faiss_join")
+    row_count = (conn.execute("SELECT COUNT(*) FROM faiss_idmap_mat").fetchone() or (0,))[0]
+    conn.execute(
+        "DELETE FROM faiss_idmap_mat_meta WHERE parquet_path = ?",
+        [idmap_parquet],
+    )
+    conn.execute(
+        """
+        INSERT INTO faiss_idmap_mat_meta(parquet_path, parquet_hash, row_count, updated_at, checksum)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?)
+        """,
+        [idmap_parquet, checksum, int(row_count or 0), checksum],
+    )
+    return IdMapMeta(
+        parquet_path=idmap_parquet,
+        parquet_hash=checksum,
+        row_count=int(row_count or 0),
+        refreshed=True,
+    )
+
+
+__all__ = [
+    "DuckDBCatalog",
+    "IdMapMeta",
+    "StructureAnnotations",
+    "ensure_faiss_idmap_view",
+    "refresh_faiss_idmap_materialized",
+    "relation_exists",
+]

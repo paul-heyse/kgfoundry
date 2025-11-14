@@ -70,6 +70,7 @@ Error envelope structure:
 - from **codeintel_rev.io.path_utils** import PathOutsideRepositoryError
 - from **codeintel_rev.observability.otel** import record_span_event
 - from **codeintel_rev.telemetry.context** import current_run_id
+- from **codeintel_rev.telemetry.steps** import StepEvent, emit_step
 - from **kgfoundry_common.errors** import KgFoundryError
 - from **kgfoundry_common.logging** import get_logger, with_fields
 - from **kgfoundry_common.problem_details** import build_problem_details
@@ -77,29 +78,29 @@ Error envelope structure:
 
 ## Definitions
 
-- variable: `LOGGER` (line 75)
-- variable: `COMPONENT_NAME` (line 76)
-- variable: `F` (line 78)
-- class: `ProblemMapping` (line 114)
-- variable: `EXCEPTION_TO_ERROR_CODE` (line 155)
-- function: `format_error_response` (line 171)
-- function: `convert_exception_to_envelope` (line 229)
-- function: `_record_exception_event` (line 415)
-- function: `handle_adapter_errors` (line 434)
+- variable: `LOGGER` (line 76)
+- variable: `COMPONENT_NAME` (line 77)
+- variable: `F` (line 79)
+- class: `ProblemMapping` (line 115)
+- variable: `EXCEPTION_TO_ERROR_CODE` (line 156)
+- function: `format_error_response` (line 172)
+- function: `convert_exception_to_envelope` (line 230)
+- function: `_record_exception_event` (line 416)
+- function: `handle_adapter_errors` (line 443)
 
 ## Graph Metrics
 
 - **fan_in**: 3
-- **fan_out**: 5
-- **cycle_group**: 85
+- **fan_out**: 6
+- **cycle_group**: 84
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 13
-- recent churn 90: 13
+- recent churn 30: 14
+- recent churn 90: 14
 
 ## Usage
 
@@ -131,7 +132,7 @@ EXCEPTION_TO_ERROR_CODE, convert_exception_to_envelope, format_error_response, h
 
 ## Hotspot
 
-- score: 2.35
+- score: 2.40
 
 ## Side Effects
 
@@ -141,7 +142,7 @@ EXCEPTION_TO_ERROR_CODE, convert_exception_to_envelope, format_error_response, h
 
 - branches: 20
 - cyclomatic: 21
-- loc: 710
+- loc: 719
 
 ## Doc Coverage
 

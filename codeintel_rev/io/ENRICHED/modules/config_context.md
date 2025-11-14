@@ -114,7 +114,7 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 
 - **fan_in**: 23
 - **fan_out**: 17
-- **cycle_group**: 72
+- **cycle_group**: 76
 
 ## Ownership
 
@@ -169,7 +169,7 @@ ApplicationContext, ResolvedPaths, resolve_application_paths
 
 - branches: 70
 - cyclomatic: 71
-- loc: 1580
+- loc: 1583
 
 ## Doc Coverage
 

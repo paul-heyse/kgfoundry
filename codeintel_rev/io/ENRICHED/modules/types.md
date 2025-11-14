@@ -1,56 +1,50 @@
-# retrieval/types.py
+# mcp_server/types.py
 
 ## Docstring
 
 ```
-Shared retrieval dataclasses for multi-stage pipelines.
+Typed DTOs and JSON Schema helpers for MCP search/fetch tools.
 ```
 
 ## Imports
 
 - from **__future__** import annotations
-- from **collections.abc** import Mapping, Sequence
-- from **dataclasses** import dataclass, field
+- from **typing** import Any, Literal
+- from **(absolute)** import msgspec
 
 ## Definitions
 
-- variable: `ChunkId` (line 8)
-- variable: `FaissRow` (line 9)
-- variable: `Distance` (line 10)
-- variable: `FactoryString` (line 11)
-- class: `SearchHit` (line 15)
-- class: `SearchPoolRow` (line 27)
-- class: `HybridResultDoc` (line 39)
-- class: `HybridSearchResult` (line 47)
-- class: `StageSignals` (line 58)
-- class: `StageDecision` (line 80)
+- class: `SearchInput` (line 12)
+- class: `SearchResultItem` (line 20)
+- class: `SearchOutput` (line 32)
+- class: `FetchInput` (line 41)
+- class: `FetchedObject` (line 49)
+- class: `FetchOutput` (line 59)
+- function: `search_input_schema` (line 65)
+- function: `search_output_schema` (line 85)
+- function: `fetch_input_schema` (line 121)
+- function: `fetch_output_schema` (line 144)
 
 ## Graph Metrics
 
-- **fan_in**: 14
-- **fan_out**: 0
-- **cycle_group**: 53
+- **fan_in**: 3
+- **fan_out**: 1
+- **cycle_group**: 122
 
 ## Ownership
 
-- owner: paul-heyse
-- primary authors: paul-heyse
-- bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- bus factor: 0.00
+- recent churn 30: 0
+- recent churn 90: 0
 
 ## Usage
 
 - used by files: 0
 - used by symbols: 0
 
-## Declared Exports (__all__)
-
-ChunkId, Distance, FactoryString, FaissRow, HybridResultDoc, HybridSearchResult, SearchHit, SearchPoolRow, StageDecision, StageSignals
-
 ## Doc Health
 
-- **summary**: Shared retrieval dataclasses for multi-stage pipelines.
+- **summary**: Typed DTOs and JSON Schema helpers for MCP search/fetch tools.
 - has summary: yes
 - param parity: yes
 - examples present: no
@@ -69,7 +63,7 @@ ChunkId, Distance, FactoryString, FaissRow, HybridResultDoc, HybridSearchResult,
 
 ## Hotspot
 
-- score: 2.05
+- score: 1.40
 
 ## Side Effects
 
@@ -77,19 +71,23 @@ ChunkId, Distance, FactoryString, FaissRow, HybridResultDoc, HybridSearchResult,
 
 ## Complexity
 
-- branches: 2
-- cyclomatic: 3
-- loc: 100
+- branches: 0
+- cyclomatic: 1
+- loc: 173
 
 ## Doc Coverage
 
-- `SearchHit` (class): summary=yes, examples=no — Single retrieval hit emitted by FAISS/BM25/SPLADE/XTR stages.
-- `SearchPoolRow` (class): summary=yes, examples=no — Structured row recorded in evaluator pools.
-- `HybridResultDoc` (class): summary=yes, examples=no — Final fused result produced by weighted RRF.
-- `HybridSearchResult` (class): summary=yes, examples=no — Container for fused docs alongside explainability metadata.
-- `StageSignals` (class): summary=yes, examples=no — Signals gathered from a stage for downstream gating decisions.
-- `StageDecision` (class): summary=yes, examples=no — Decision emitted by gating logic describing whether to run the stage.
+- `SearchInput` (class): summary=yes, examples=no — Incoming payload for the lightweight MCP search tool.
+- `SearchResultItem` (class): summary=yes, examples=no — Single search result entry returned by the lightweight MCP tools.
+- `SearchOutput` (class): summary=yes, examples=no — Structured search response returned to the caller.
+- `FetchInput` (class): summary=yes, examples=no — Incoming payload for the lightweight MCP fetch tool.
+- `FetchedObject` (class): summary=yes, examples=no — Hydrated chunk entry returned from fetch operations.
+- `FetchOutput` (class): summary=yes, examples=no — Fetch response wrapping one or more hydrated chunk objects.
+- `search_input_schema` (function): summary=yes, params=ok, examples=no — Return the JSON Schema describing search tool inputs.
+- `search_output_schema` (function): summary=yes, params=ok, examples=no — Return the JSON Schema describing search tool outputs.
+- `fetch_input_schema` (function): summary=yes, params=ok, examples=no — Return the JSON Schema describing fetch tool inputs.
+- `fetch_output_schema` (function): summary=yes, params=ok, examples=no — Return the JSON Schema describing fetch tool outputs.
 
 ## Tags
 
-low-coverage, public-api, reexport-hub
+low-coverage

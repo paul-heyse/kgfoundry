@@ -63,7 +63,7 @@ Notes
 
 - **fan_in**: 0
 - **fan_out**: 0
-- **cycle_group**: 151
+- **cycle_group**: 152
 
 ## Ownership
 
@@ -126,6 +126,7 @@ Notes
 - patches/BM25+SPLADEv3_Implementation.md
 - patches/OpenTelemetry_ExtensionPhase1.md
 - patches/Type_Gating_Factory_Scope.md
+- patches/MCP_through_search_hardening_phase2.md
 - patches/DuckDB_data_expansion_FAISS.md
 - patches/Type_Gating_Followup.md
 - patches/Cli_enrich_fix.md
@@ -137,6 +138,7 @@ Notes
 - patches/OpenTelemetry_ExtensionPhase0.md
 - patches/FAISS Implementation Phase 2 rev.md
 - patches/warp_technical_overview.md
+- patches/OpenTelemetry_ExtensionPhase3.md
 - patches/Telemetry_Implementation.md
 - patches/vllm scope.md
 - patches/Enrich_scope_addendum.md

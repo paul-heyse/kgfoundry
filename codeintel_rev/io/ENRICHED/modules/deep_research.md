@@ -10,7 +10,8 @@ Adapters that expose MCP Deep-Research search/fetch semantics.
 
 - from **__future__** import annotations
 - from **(absolute)** import asyncio
-- from **collections.abc** import Mapping, Sequence
+- from **collections.abc** import AsyncIterator, Mapping, Sequence
+- from **contextlib** import asynccontextmanager
 - from **pathlib** import Path
 - from **typing** import cast
 - from **codeintel_rev.app.config_context** import ApplicationContext
@@ -22,21 +23,22 @@ Adapters that expose MCP Deep-Research search/fetch semantics.
 
 ## Definitions
 
-- variable: `LOGGER` (line 36)
-- function: `_pool_dir` (line 40)
-- function: `_clamp_top_k` (line 44)
-- function: `_clamp_max_tokens` (line 49)
-- function: `_serialize_search_response` (line 54)
-- function: `_serialize_fetch_response` (line 100)
-- function: `search` (line 135)
-- function: `fetch` (line 212)
-- function: `_normalize_object_ids` (line 265)
+- variable: `LOGGER` (line 37)
+- function: `_pool_dir` (line 45)
+- function: `_clamp_top_k` (line 49)
+- function: `_clamp_max_tokens` (line 54)
+- function: `_serialize_search_response` (line 59)
+- function: `_serialize_fetch_response` (line 105)
+- function: `search` (line 140)
+- function: `fetch` (line 218)
+- function: `_normalize_object_ids` (line 272)
+- function: `_bounded` (line 305)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 5
-- **cycle_group**: 148
+- **cycle_group**: 149
 
 ## Ownership
 
@@ -76,7 +78,7 @@ fetch, search
 
 ## Hotspot
 
-- score: 1.95
+- score: 2.08
 
 ## Side Effects
 
@@ -85,9 +87,9 @@ fetch, search
 
 ## Complexity
 
-- branches: 8
-- cyclomatic: 9
-- loc: 295
+- branches: 13
+- cyclomatic: 14
+- loc: 323
 
 ## Doc Coverage
 
@@ -99,6 +101,7 @@ fetch, search
 - `search` (function): summary=yes, params=ok, examples=no — Execute the Deep-Research search pipeline.
 - `fetch` (function): summary=yes, params=ok, examples=no — Hydrate chunk ids returned from the MCP search tool.
 - `_normalize_object_ids` (function): summary=yes, params=ok, examples=no — Normalize object identifiers while preserving ordering.
+- `_bounded` (function): summary=yes, params=mismatch, examples=no — Enforce concurrency and timeout guards for MCP operations.
 
 ## Tags
 

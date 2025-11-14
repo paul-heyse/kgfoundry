@@ -12,49 +12,51 @@ Trace-anchored flight recorder that mirrors run execution timelines.
 - from **(absolute)** import json
 - from **(absolute)** import os
 - from **(absolute)** import threading
-- from **collections.abc** import Iterable, Mapping
+- from **collections.abc** import Iterable, Mapping, Sequence
 - from **dataclasses** import dataclass, field
 - from **datetime** import UTC, datetime
 - from **pathlib** import Path
-- from **typing** import Any
+- from **typing** import Any, cast
 - from **codeintel_rev.observability.semantic_conventions** import Attrs
 - from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
 - variable: `LOGGER` (line 17)
-- function: `_data_root` (line 22)
-- function: `_date_segment` (line 33)
-- function: `_scrub_value` (line 47)
-- function: `_report_path` (line 59)
-- function: `build_report_uri` (line 82)
-- class: `_RunBuffer` (line 104)
-- class: `_FlightRecorder` (line 116)
-- class: `FlightRecorderSpanProcessor` (line 189)
-- function: `install_flight_recorder` (line 221)
-- function: `_trace_id` (line 241)
-- function: `_span_id` (line 251)
-- function: `_update_identities` (line 261)
-- function: `_update_status` (line 271)
-- function: `_is_root_span` (line 285)
-- function: `_build_event` (line 293)
-- function: `_build_summary` (line 317)
-- function: `_convert_span_events` (line 338)
-- function: `_ts` (line 352)
+- variable: `FlightEvent` (line 20)
+- function: `_data_root` (line 23)
+- function: `_date_segment` (line 34)
+- function: `_scrub_value` (line 53)
+- function: `_event_start_ns` (line 65)
+- function: `_report_path` (line 70)
+- function: `build_report_uri` (line 106)
+- class: `_RunBuffer` (line 140)
+- class: `_FlightRecorder` (line 152)
+- class: `FlightRecorderSpanProcessor` (line 252)
+- function: `install_flight_recorder` (line 290)
+- function: `_trace_id` (line 310)
+- function: `_span_id` (line 320)
+- function: `_update_identities` (line 330)
+- function: `_update_status` (line 340)
+- function: `_is_root_span` (line 354)
+- function: `_build_event` (line 362)
+- function: `build_event_summary` (line 391)
+- function: `_convert_span_events` (line 432)
+- function: `_ts` (line 446)
 
 ## Graph Metrics
 
 - **fan_in**: 3
 - **fan_out**: 2
-- **cycle_group**: 45
+- **cycle_group**: 42
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 1
-- recent churn 90: 1
+- recent churn 30: 2
+- recent churn 90: 2
 
 ## Usage
 
@@ -82,7 +84,7 @@ Trace-anchored flight recorder that mirrors run execution timelines.
 
 ## Hotspot
 
-- score: 2.50
+- score: 2.55
 
 ## Side Effects
 
@@ -90,22 +92,22 @@ Trace-anchored flight recorder that mirrors run execution timelines.
 
 ## Complexity
 
-- branches: 60
-- cyclomatic: 61
-- loc: 357
+- branches: 72
+- cyclomatic: 73
+- loc: 451
 
 ## Doc Coverage
 
 - `_data_root` (function): summary=yes, params=ok, examples=no — Return the base directory for diagnostic run artifacts.
-- `_date_segment` (function): summary=yes, params=mismatch, examples=no — Return the YYYYMMDD segment for a run report.
+- `_date_segment` (function): summary=yes, params=ok, examples=no — Return the YYYYMMDD segment for a run report.
 - `_scrub_value` (function): summary=no, examples=no
-- `_report_path` (function): summary=yes, params=mismatch, examples=no — Return the filesystem path for a diagnostic run report.
-- `build_report_uri` (function): summary=yes, params=mismatch, examples=no — Return the expected diagnostic report path for the provided identifiers.
+- `_event_start_ns` (function): summary=no, examples=no
+- `_report_path` (function): summary=yes, params=ok, examples=no — Return the filesystem path for a diagnostic run report.
+- `build_report_uri` (function): summary=yes, params=ok, examples=no — Return the expected diagnostic report path for the provided identifiers.
 - `_RunBuffer` (class): summary=no, examples=no
 - `_FlightRecorder` (class): summary=yes, examples=no — Collect spans per-trace and emit ordered JSON reports.
 - `FlightRecorderSpanProcessor` (class): summary=yes, examples=no — Minimal SpanProcessor-compatible shim.
 - `install_flight_recorder` (function): summary=yes, params=mismatch, examples=no — Attach the flight recorder span processor exactly once.
-- `_trace_id` (function): summary=no, examples=no
 
 ## Tags
 

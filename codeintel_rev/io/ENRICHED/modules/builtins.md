@@ -32,7 +32,7 @@ Built-in retrieval channel implementations (BM25, SPLADE).
 
 - **fan_in**: 0
 - **fan_out**: 4
-- **cycle_group**: 118
+- **cycle_group**: 114
 
 ## Ownership
 

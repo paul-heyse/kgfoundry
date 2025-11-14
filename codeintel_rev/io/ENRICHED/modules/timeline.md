@@ -50,7 +50,7 @@ Lightweight per-session timeline recording utilities.
 
 - **fan_in**: 19
 - **fan_out**: 2
-- **cycle_group**: 47
+- **cycle_group**: 44
 
 ## Ownership
 

@@ -377,6 +377,22 @@ class _FAISSIdMapMixin:
         )
         return int(idmap.shape[0])
 
+    def _write_profile(self, path: Path) -> None:
+        """Persist a minimal profile snapshot describing the active index."""
+        if self.cpu_index is None:
+            return
+        profile = {
+            "dims": int(self.cpu_index.d),
+            "ntotal": int(self.cpu_index.ntotal),
+            "is_trained": bool(getattr(self.cpu_index, "is_trained", False)),
+            "type_name": type(self.cpu_index).__name__,
+            "faiss_family": self.faiss_family,
+            "refine_k_factor": self.refine_k_factor,
+        }
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(profile, indent=2, sort_keys=True), encoding="utf-8")
+        LOGGER.debug("Persisted FAISS profile snapshot", extra=_log_extra(path=str(path)))
+
     def hydrate_by_ids(self, catalog: DuckDBCatalog, ids: Sequence[int]) -> list[dict]:
         """Hydrate chunk metadata for ``ids`` via the provided DuckDB catalog.
 
@@ -1102,7 +1118,12 @@ class FAISSManager(
         self.index_path.parent.mkdir(parents=True, exist_ok=True)
         faiss.write_index(cpu_index, str(self.index_path))
 
-    def load_cpu_index(self) -> None:
+    def load_cpu_index(
+        self,
+        *,
+        export_idmap: Path | None = None,
+        profile_path: Path | None = None,
+    ) -> None:
         """Load CPU index from disk.
 
         Reads a previously saved FAISS index from index_path and loads it into
@@ -1135,6 +1156,23 @@ class FAISSManager(
             vector_count=cpu_index.ntotal,
             parameter_space=self._format_parameter_string(self._runtime_overrides),
         )
+        if export_idmap is not None:
+            try:
+                self.export_idmap(export_idmap)
+            except RuntimeError as exc:
+                LOGGER.warning(
+                    "faiss.idmap.export_failed",
+                    extra=_log_extra(path=str(export_idmap), error=str(exc)),
+                )
+        profile_target = profile_path or self.autotune_profile_path
+        if profile_target is not None:
+            try:
+                self._write_profile(profile_target)
+            except OSError as exc:
+                LOGGER.warning(
+                    "faiss.profile.persist_failed",
+                    extra=_log_extra(path=str(profile_target), error=str(exc)),
+                )
 
     def save_secondary_index(self) -> None:
         """Save secondary index to disk.

@@ -126,6 +126,17 @@ MCP_SEARCH_POSTFILTER_DENSITY = build_histogram(
     "mcp_search_postfilter_density",
     "Ratio of retained search results after filters to FAISS hits.",
 )
+MCP_SEARCH_ANN_LATENCY_MS = build_histogram(
+    "mcp_search_ann_latency_ms", "Latency of FAISS ANN queries executed via MCP search."
+)
+MCP_SEARCH_HYDRATION_LATENCY_MS = build_histogram(
+    "mcp_search_hydration_latency_ms",
+    "Latency of DuckDB hydration performed during MCP search.",
+)
+MCP_SEARCH_RERANK_LATENCY_MS = build_histogram(
+    "mcp_search_rerank_latency_ms",
+    "Latency of the rerank/exact scoring stage during MCP search.",
+)
 
 
 def _stable_u32(value: str) -> int:
@@ -198,8 +209,11 @@ __all__ = [
     "HYBRID_LAST_MS",
     "HYBRID_RETRIEVE_TOTAL",
     "MCP_FETCH_LATENCY_SECONDS",
+    "MCP_SEARCH_ANN_LATENCY_MS",
+    "MCP_SEARCH_HYDRATION_LATENCY_MS",
     "MCP_SEARCH_LATENCY_SECONDS",
     "MCP_SEARCH_POSTFILTER_DENSITY",
+    "MCP_SEARCH_RERANK_LATENCY_MS",
     "OFFLINE_EVAL_QUERY_COUNT",
     "OFFLINE_EVAL_RECALL_AT_K",
     "POOL_SHARE_BM25",

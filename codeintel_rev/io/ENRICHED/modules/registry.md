@@ -1,55 +1,50 @@
-# plugins/registry.py
+# mcp_server/registry.py
 
 ## Docstring
 
 ```
-Entry-point driven registry for retrieval channels.
+In-process registry for the lightweight MCP testing harness.
 ```
 
 ## Imports
 
 - from **__future__** import annotations
-- from **collections.abc** import Callable, Iterable, Sequence
-- from **importlib.metadata** import EntryPoint, entry_points
-- from **typing** import cast
-- from **codeintel_rev.plugins.channels** import Channel, ChannelContext
-- from **kgfoundry_common.logging** import get_logger
+- from **collections.abc** import Callable
+- from **dataclasses** import dataclass
+- from **typing** import Any
+- from **(absolute)** import msgspec
+- from **codeintel_rev.mcp_server.fetch_tool** import handle_fetch
+- from **codeintel_rev.mcp_server.search_tool** import SearchDeps, handle_search
+- from **codeintel_rev.mcp_server.types** import FetchOutput, fetch_input_schema, fetch_output_schema, search_input_schema, search_output_schema
 
 ## Definitions
 
-- variable: `LOGGER` (line 12)
-- class: `ChannelRegistry` (line 19)
-- function: `_iter_entry_points` (line 113)
-- function: `_load_factory` (line 140)
+- class: `McpDeps` (line 23)
+- function: `list_tools` (line 31)
+- function: `call_tool` (line 55)
 
 ## Graph Metrics
 
 - **fan_in**: 1
-- **fan_out**: 2
-- **cycle_group**: 72
+- **fan_out**: 4
+- **cycle_group**: 126
 
 ## Ownership
 
-- owner: paul-heyse
-- primary authors: paul-heyse
-- bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- bus factor: 0.00
+- recent churn 30: 0
+- recent churn 90: 0
 
 ## Usage
 
 - used by files: 0
 - used by symbols: 0
 
-## Declared Exports (__all__)
-
-ChannelRegistry
-
 ## Doc Health
 
-- **summary**: Entry-point driven registry for retrieval channels.
+- **summary**: In-process registry for the lightweight MCP testing harness.
 - has summary: yes
-- param parity: yes
+- param parity: no
 - examples present: no
 
 ## Typedness
@@ -66,7 +61,7 @@ ChannelRegistry
 
 ## Hotspot
 
-- score: 1.79
+- score: 1.80
 
 ## Side Effects
 
@@ -74,16 +69,16 @@ ChannelRegistry
 
 ## Complexity
 
-- branches: 8
-- cyclomatic: 9
-- loc: 178
+- branches: 4
+- cyclomatic: 5
+- loc: 82
 
 ## Doc Coverage
 
-- `ChannelRegistry` (class): summary=yes, examples=no — Registry that discovers channel plugins via Python entry points.
-- `_iter_entry_points` (function): summary=yes, params=ok, examples=no — Return entry points for the channel group across Python versions.
-- `_load_factory` (function): summary=yes, params=ok, examples=no — Return a callable factory if the entry point loads successfully.
+- `McpDeps` (class): summary=yes, examples=no — Dependencies required for running the lightweight MCP tools.
+- `list_tools` (function): summary=yes, params=ok, examples=no — Return tool metadata compatible with MCP /tools/list responses.
+- `call_tool` (function): summary=yes, params=mismatch, examples=no — Execute a tool using the provided dependencies.
 
 ## Tags
 
-low-coverage, public-api
+low-coverage

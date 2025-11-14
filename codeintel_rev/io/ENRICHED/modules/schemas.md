@@ -46,7 +46,7 @@ TypedDict provides automatic JSON Schema generation for FastMCP tools.
 
 - **fan_in**: 13
 - **fan_out**: 1
-- **cycle_group**: 37
+- **cycle_group**: 38
 
 ## Ownership
 

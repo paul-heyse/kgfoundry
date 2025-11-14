@@ -3,66 +3,71 @@
 ## Docstring
 
 ```
-CLI for rendering session timelines as Markdown diagnostics.
+Diagnostics CLI for rendering run reports from session event ledgers.
 ```
 
 ## Imports
 
 - from **__future__** import annotations
-- from **(absolute)** import argparse
 - from **(absolute)** import json
-- from **collections** import defaultdict
-- from **collections.abc** import Callable, Iterable
+- from **(absolute)** import sys
+- from **collections.abc** import Mapping, Sequence
+- from **dataclasses** import asdict
+- from **enum** import StrEnum
 - from **pathlib** import Path
-- from **typing** import Any
+- from **typing** import Annotated, Any
+- from **(absolute)** import typer
+- from **codeintel_rev.observability.run_report** import LedgerRunReport, infer_stop_reason, load_ledger
 
 ## Definitions
 
-- variable: `GLYPHS` (line 12)
-- variable: `STAGE_EVENT_MAP` (line 13)
-- variable: `HASH_PREVIEW_LEN` (line 19)
-- function: `_load_events` (line 22)
-- function: `_group_events_by_run` (line 37)
-- function: `_select_run_events` (line 46)
-- function: `_format_attrs` (line 59)
-- function: `_build_operation_chain` (line 72)
-- function: `_find_event` (line 87)
-- function: `_find_last_success` (line 97)
-- function: `_find_first_failure` (line 104)
-- function: `_format_event_summary` (line 108)
-- function: `_collect_stage_entries` (line 123)
-- function: `_collect_skip_events` (line 133)
-- function: `_collect_decisions` (line 137)
-- function: `_render_header` (line 141)
-- function: `_render_operations_section` (line 156)
-- function: `_render_stage_section` (line 177)
-- function: `_render_skip_section` (line 205)
-- function: `_render_decisions_section` (line 219)
-- function: `_render_report` (line 234)
-- function: `main` (line 292)
+- variable: `app` (line 19)
+- class: `ReportFormat` (line 22)
+- variable: `EventRecord` (line 29)
+- function: `_coerce_str` (line 32)
+- function: `_coerce_number` (line 38)
+- function: `_event_ts` (line 44)
+- function: `_event_attrs` (line 51)
+- function: `_stage_label` (line 58)
+- function: `_group_events_by_run` (line 62)
+- function: `_max_ts` (line 77)
+- function: `_select_run` (line 88)
+- function: `_stage_rows` (line 104)
+- function: `_skip_rows` (line 120)
+- function: `_render_stage_section` (line 136)
+- function: `_render_skip_section` (line 151)
+- function: `_render_markdown` (line 166)
+- function: `_structured_report` (line 180)
+- function: `session_report` (line 199)
+- function: `ledger_report` (line 281)
+- function: `main` (line 311)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 1
-- **cycle_group**: 34
+- **fan_out**: 2
+- **cycle_group**: 35
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 3
-- recent churn 90: 3
+- recent churn 30: 4
+- recent churn 90: 4
 
 ## Usage
 
 - used by files: 0
 - used by symbols: 0
 
+## Declared Exports (__all__)
+
+app, main
+
 ## Doc Health
 
-- **summary**: CLI for rendering session timelines as Markdown diagnostics.
+- **summary**: Diagnostics CLI for rendering run reports from session event ledgers.
 - has summary: yes
 - param parity: yes
 - examples present: no
@@ -81,7 +86,7 @@ CLI for rendering session timelines as Markdown diagnostics.
 
 ## Hotspot
 
-- score: 2.02
+- score: 2.13
 
 ## Side Effects
 
@@ -89,23 +94,23 @@ CLI for rendering session timelines as Markdown diagnostics.
 
 ## Complexity
 
-- branches: 52
-- cyclomatic: 53
-- loc: 343
+- branches: 43
+- cyclomatic: 44
+- loc: 344
 
 ## Doc Coverage
 
-- `_load_events` (function): summary=no, examples=no
+- `ReportFormat` (class): summary=yes, examples=no — Supported output encodings for diagnostics reports.
+- `_coerce_str` (function): summary=no, examples=no
+- `_coerce_number` (function): summary=no, examples=no
+- `_event_ts` (function): summary=no, examples=no
+- `_event_attrs` (function): summary=no, examples=no
+- `_stage_label` (function): summary=no, examples=no
 - `_group_events_by_run` (function): summary=no, examples=no
-- `_select_run_events` (function): summary=no, examples=no
-- `_format_attrs` (function): summary=no, examples=no
-- `_build_operation_chain` (function): summary=no, examples=no
-- `_find_event` (function): summary=no, examples=no
-- `_find_last_success` (function): summary=no, examples=no
-- `_find_first_failure` (function): summary=no, examples=no
-- `_format_event_summary` (function): summary=no, examples=no
-- `_collect_stage_entries` (function): summary=no, examples=no
+- `_max_ts` (function): summary=no, examples=no
+- `_select_run` (function): summary=no, examples=no
+- `_stage_rows` (function): summary=no, examples=no
 
 ## Tags
 
-low-coverage
+low-coverage, public-api

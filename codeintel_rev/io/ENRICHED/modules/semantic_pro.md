@@ -25,8 +25,7 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 - from **codeintel_rev.mcp_server.schemas** import AnswerEnvelope, Finding, MethodInfo, ScopeIn, StageInfo
 - from **codeintel_rev.mcp_server.scope_utils** import get_effective_scope
 - from **codeintel_rev.observability.flight_recorder** import build_report_uri
-- from **codeintel_rev.observability.otel** import current_span_id, current_trace_id
-- from **codeintel_rev.observability.otel** import as_span
+- from **codeintel_rev.observability.otel** import as_span, current_span_id, current_trace_id
 - from **codeintel_rev.observability.semantic_conventions** import Attrs, to_label_str
 - from **codeintel_rev.observability.timeline** import Timeline, current_timeline
 - from **codeintel_rev.rerank.base** import RerankRequest, RerankResult, ScoredDoc
@@ -35,6 +34,7 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 - from **codeintel_rev.retrieval.telemetry** import StageTiming, record_stage_decision, record_stage_metric, track_stage
 - from **codeintel_rev.retrieval.types** import HybridResultDoc, HybridSearchResult, SearchHit, StageDecision, StageSignals
 - from **codeintel_rev.telemetry.context** import current_run_id, telemetry_metadata
+- from **codeintel_rev.telemetry.steps** import StepEvent, emit_step
 - from **kgfoundry_common.errors** import EmbeddingError, VectorSearchError
 - from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.app.config_context** import ApplicationContext
@@ -60,59 +60,60 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 - function: `_summarize_options` (line 236)
 - function: `semantic_search_pro` (line 249)
 - function: `_semantic_search_pro_sync` (line 342)
-- function: `_run_coderank_stage` (line 494)
-- function: `_timed_coderank_stage` (line 562)
-- function: `_maybe_run_warp` (line 582)
-- function: `_should_execute_stage_two` (line 607)
-- function: `_execute_stage_two` (line 661)
-- function: `_run_fusion_stage` (line 695)
-- function: `_maybe_apply_rerank_stage` (line 729)
-- class: `_RerankOutcome` (line 807)
-- function: `_reorder_docs` (line 812)
-- function: `_emit_rerank_decision` (line 854)
-- function: `_build_rerank_plan` (line 860)
-- function: `_resolve_reranker` (line 881)
-- function: `_maybe_schedule_xtr_wide` (line 896)
-- function: `_resolve_stage_one_outcome` (line 929)
-- function: `_run_xtr_wide_stage` (line 1007)
-- function: `_calculate_xtr_k` (line 1039)
-- function: `_build_extra_channels` (line 1046)
-- function: `_append_budget_notes` (line 1066)
-- function: `_safe_int` (line 1081)
-- function: `_merge_rrf_weights` (line 1089)
-- function: `_run_warp_stage` (line 1105)
-- function: `_warp_executor_hits` (line 1128)
-- function: `_xtr_rescore_hits` (line 1169)
-- function: `_hydrate_records` (line 1217)
-- function: `_hydrate_and_rerank_records` (line 1241)
-- function: `_maybe_rerank` (line 1396)
-- function: `_build_findings` (line 1441)
-- function: `merge_explainability_into_findings` (line 1481)
-- function: `_build_method_explainability` (line 1546)
-- function: `_build_method` (line 1613)
-- function: `_assemble_extras` (line 1652)
-- function: `_make_envelope` (line 1717)
-- function: `_observability_links` (line 1736)
-- function: `_clamp_limit` (line 1763)
-- function: `_coerce_positive_int` (line 1774)
-- function: `_dedupe_preserve_order` (line 1784)
-- class: `WarpOutcome` (line 1796)
-- class: `FusionRequest` (line 1807)
-- class: `MethodContext` (line 1821)
+- function: `_run_coderank_stage` (line 537)
+- function: `_timed_coderank_stage` (line 605)
+- function: `_maybe_run_warp` (line 625)
+- function: `_should_execute_stage_two` (line 650)
+- function: `_execute_stage_two` (line 704)
+- function: `_run_fusion_stage` (line 738)
+- function: `_maybe_apply_rerank_stage` (line 772)
+- class: `_RerankOutcome` (line 850)
+- function: `_reorder_docs` (line 855)
+- function: `_emit_rerank_decision` (line 897)
+- function: `_build_rerank_plan` (line 903)
+- function: `_resolve_reranker` (line 924)
+- function: `_maybe_schedule_xtr_wide` (line 939)
+- function: `_resolve_stage_one_outcome` (line 972)
+- function: `_run_xtr_wide_stage` (line 1050)
+- function: `_calculate_xtr_k` (line 1082)
+- function: `_build_extra_channels` (line 1089)
+- function: `_append_budget_notes` (line 1109)
+- function: `_safe_int` (line 1124)
+- function: `_merge_rrf_weights` (line 1132)
+- function: `_run_warp_stage` (line 1148)
+- function: `_warp_executor_hits` (line 1171)
+- function: `_xtr_rescore_hits` (line 1212)
+- function: `_hydrate_records` (line 1260)
+- function: `_hydrate_and_rerank_records` (line 1284)
+- function: `_maybe_rerank` (line 1439)
+- function: `_build_findings` (line 1484)
+- function: `merge_explainability_into_findings` (line 1524)
+- function: `_build_method_explainability` (line 1589)
+- function: `_build_method` (line 1656)
+- function: `_assemble_extras` (line 1695)
+- function: `_make_envelope` (line 1760)
+- function: `_observability_links` (line 1779)
+- function: `build_observability_links` (line 1806)
+- function: `_clamp_limit` (line 1817)
+- function: `_coerce_positive_int` (line 1828)
+- function: `_dedupe_preserve_order` (line 1838)
+- class: `WarpOutcome` (line 1850)
+- class: `FusionRequest` (line 1861)
+- class: `MethodContext` (line 1875)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 22
-- **cycle_group**: 147
+- **fan_out**: 23
+- **cycle_group**: 148
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 15
-- recent churn 90: 15
+- recent churn 30: 16
+- recent churn 90: 16
 
 ## Usage
 
@@ -140,7 +141,7 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 
 ## Hotspot
 
-- score: 3.35
+- score: 3.37
 
 ## Side Effects
 
@@ -151,7 +152,7 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 
 - branches: 172
 - cyclomatic: 173
-- loc: 1834
+- loc: 1888
 
 ## Doc Coverage
 

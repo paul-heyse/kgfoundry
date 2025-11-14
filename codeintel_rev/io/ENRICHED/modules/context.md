@@ -37,7 +37,7 @@ Context variable helpers for telemetry metadata.
 
 - **fan_in**: 10
 - **fan_out**: 2
-- **cycle_group**: 40
+- **cycle_group**: 57
 
 ## Ownership
 

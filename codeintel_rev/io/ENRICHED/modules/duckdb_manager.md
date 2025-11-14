@@ -28,14 +28,14 @@ Thread-safe DuckDB connection manager.
 - class: `DuckDBConfig` (line 27)
 - class: `_InstrumentedDuckDBConnection` (line 55)
 - class: `DuckDBManager` (line 153)
-- class: `DuckDBQueryOptions` (line 275)
-- class: `DuckDBQueryBuilder` (line 290)
+- class: `DuckDBQueryOptions` (line 291)
+- class: `DuckDBQueryBuilder` (line 306)
 
 ## Graph Metrics
 
 - **fan_in**: 10
 - **fan_out**: 4
-- **cycle_group**: 51
+- **cycle_group**: 48
 
 ## Ownership
 
@@ -75,7 +75,7 @@ DuckDBConfig, DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 
 ## Hotspot
 
-- score: 2.83
+- score: 2.84
 
 ## Side Effects
 
@@ -84,9 +84,9 @@ DuckDBConfig, DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 
 ## Complexity
 
-- branches: 53
-- cyclomatic: 54
-- loc: 482
+- branches: 54
+- cyclomatic: 55
+- loc: 498
 
 ## Doc Coverage
 

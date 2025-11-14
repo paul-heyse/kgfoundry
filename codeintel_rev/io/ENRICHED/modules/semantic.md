@@ -32,6 +32,7 @@ the FAISS index, then hydrating results from DuckDB.
 - from **codeintel_rev.observability.semantic_conventions** import Attrs, to_label_str
 - from **codeintel_rev.observability.timeline** import Timeline, current_timeline
 - from **codeintel_rev.telemetry.context** import current_run_id, current_session, telemetry_metadata
+- from **codeintel_rev.telemetry.steps** import StepEvent, emit_step
 - from **codeintel_rev.typing** import NDArrayF32
 - from **kgfoundry_common.errors** import EmbeddingError, VectorSearchError
 - from **kgfoundry_common.logging** import get_logger
@@ -42,59 +43,60 @@ the FAISS index, then hydrating results from DuckDB.
 
 ## Definitions
 
-- variable: `httpx` (line 54)
-- variable: `np` (line 55)
-- variable: `SNIPPET_PREVIEW_CHARS` (line 57)
-- variable: `COMPONENT_NAME` (line 58)
-- variable: `LOGGER` (line 59)
-- class: `_ScopeFilterFlags` (line 63)
-- class: `_FaissFanout` (line 98)
-- class: `_HybridSearchState` (line 106)
-- class: `_HybridResult` (line 118)
-- class: `_SemanticPipelineResult` (line 129)
-- class: `_SemanticPipelineRequest` (line 140)
-- class: `_SearchBudget` (line 150)
-- class: `_SemanticSearchPlan` (line 159)
-- class: `_MethodContext` (line 171)
-- class: `_FaissSearchRequest` (line 184)
-- function: `semantic_search` (line 196)
-- function: `_semantic_search_sync` (line 263)
-- function: `_execute_semantic_pipeline` (line 360)
-- function: `_clamp_result_limit` (line 465)
-- function: `_build_search_budget` (line 494)
-- function: `_build_semantic_search_plan` (line 535)
-- function: `_calculate_faiss_fanout` (line 605)
-- function: `_overfetch_bonus` (line 642)
-- function: `_resolve_hybrid_results` (line 673)
-- function: `_build_hybrid_result` (line 774)
-- function: `_embed_query_or_raise` (line 814)
-- function: `_run_faiss_search_or_raise` (line 854)
-- function: `_ensure_hydration_success` (line 891)
-- function: `_warn_scope_filter_reduction` (line 926)
-- function: `_annotate_hybrid_contributions` (line 964)
-- function: `_embed_query` (line 995)
-- function: `_run_faiss_search` (line 1019)
-- function: `_normalize_scope_faiss_tuning` (line 1068)
-- function: `_hydrate_findings` (line 1133)
-- function: `_build_method` (line 1259)
-- function: `_make_envelope` (line 1296)
-- function: `_observability_links` (line 1349)
-- function: `_success_extras` (line 1375)
-- function: `_build_response_extras` (line 1399)
+- variable: `httpx` (line 55)
+- variable: `np` (line 56)
+- variable: `SNIPPET_PREVIEW_CHARS` (line 58)
+- variable: `COMPONENT_NAME` (line 59)
+- variable: `LOGGER` (line 60)
+- class: `_ScopeFilterFlags` (line 64)
+- class: `_FaissFanout` (line 99)
+- class: `_HybridSearchState` (line 107)
+- class: `_HybridResult` (line 119)
+- class: `_SemanticPipelineResult` (line 130)
+- class: `_SemanticPipelineRequest` (line 141)
+- class: `_SearchBudget` (line 151)
+- class: `_SemanticSearchPlan` (line 161)
+- class: `_MethodContext` (line 174)
+- class: `_FaissSearchRequest` (line 187)
+- function: `semantic_search` (line 199)
+- function: `_semantic_search_sync` (line 266)
+- function: `_execute_semantic_pipeline` (line 395)
+- function: `_clamp_result_limit` (line 530)
+- function: `_build_search_budget` (line 559)
+- function: `_build_semantic_search_plan` (line 601)
+- function: `_calculate_faiss_fanout` (line 672)
+- function: `_overfetch_bonus` (line 709)
+- function: `_resolve_hybrid_results` (line 740)
+- function: `_build_hybrid_result` (line 841)
+- function: `_embed_query_or_raise` (line 881)
+- function: `_run_faiss_search_or_raise` (line 921)
+- function: `_ensure_hydration_success` (line 958)
+- function: `_warn_scope_filter_reduction` (line 993)
+- function: `_annotate_hybrid_contributions` (line 1031)
+- function: `_embed_query` (line 1062)
+- function: `_run_faiss_search` (line 1086)
+- function: `_normalize_scope_faiss_tuning` (line 1135)
+- function: `_hydrate_findings` (line 1200)
+- function: `_build_method` (line 1326)
+- function: `_make_envelope` (line 1363)
+- function: `_observability_links` (line 1416)
+- function: `build_observability_links` (line 1448)
+- function: `_success_extras` (line 1465)
+- function: `_build_response_extras` (line 1489)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 16
-- **cycle_group**: 145
+- **fan_out**: 17
+- **cycle_group**: 146
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 40
-- recent churn 90: 40
+- recent churn 30: 41
+- recent churn 90: 41
 
 ## Usage
 
@@ -126,7 +128,7 @@ semantic_search
 
 ## Hotspot
 
-- score: 3.06
+- score: 3.10
 
 ## Side Effects
 
@@ -136,9 +138,9 @@ semantic_search
 
 ## Complexity
 
-- branches: 96
-- cyclomatic: 97
-- loc: 1448
+- branches: 105
+- cyclomatic: 106
+- loc: 1538
 
 ## Doc Coverage
 

@@ -3448,6 +3448,10 @@
     "file": "errors.py"
   },
   {
+    "symbol": "local 25",
+    "file": "errors.py"
+  },
+  {
     "symbol": "local 26",
     "file": "errors.py"
   },
@@ -3457,10 +3461,6 @@
   },
   {
     "symbol": "local 28",
-    "file": "errors.py"
-  },
-  {
-    "symbol": "local 29",
     "file": "errors.py"
   },
   {
@@ -3500,6 +3500,10 @@
     "file": "errors.py"
   },
   {
+    "symbol": "local 38",
+    "file": "errors.py"
+  },
+  {
     "symbol": "local 39",
     "file": "errors.py"
   },
@@ -3516,15 +3520,15 @@
     "file": "errors.py"
   },
   {
-    "symbol": "local 42",
-    "file": "errors.py"
-  },
-  {
     "symbol": "local 43",
     "file": "errors.py"
   },
   {
     "symbol": "local 44",
+    "file": "errors.py"
+  },
+  {
+    "symbol": "local 45",
     "file": "errors.py"
   },
   {
@@ -3540,15 +3544,15 @@
     "file": "errors.py"
   },
   {
-    "symbol": "local 49",
-    "file": "errors.py"
-  },
-  {
     "symbol": "local 5",
     "file": "errors.py"
   },
   {
     "symbol": "local 50",
+    "file": "errors.py"
+  },
+  {
+    "symbol": "local 51",
     "file": "errors.py"
   },
   {
@@ -3564,11 +3568,11 @@
     "file": "errors.py"
   },
   {
-    "symbol": "local 55",
+    "symbol": "local 56",
     "file": "errors.py"
   },
   {
-    "symbol": "local 56",
+    "symbol": "local 57",
     "file": "errors.py"
   },
   {
@@ -3588,7 +3592,19 @@
     "file": "errors.py"
   },
   {
-    "symbol": "local 61",
+    "symbol": "local 62",
+    "file": "errors.py"
+  },
+  {
+    "symbol": "local 63",
+    "file": "errors.py"
+  },
+  {
+    "symbol": "local 64",
+    "file": "errors.py"
+  },
+  {
+    "symbol": "local 65",
     "file": "errors.py"
   },
   {
@@ -3597,6 +3613,26 @@
   },
   {
     "symbol": "local 9",
+    "file": "errors.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.errors`/CatalogConsistencyError#",
+    "file": "errors.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.errors`/CatalogConsistencyError#__init__().",
+    "file": "errors.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.errors`/CatalogConsistencyError#__init__().(context)",
+    "file": "errors.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.errors`/CatalogConsistencyError#__init__().(message)",
+    "file": "errors.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.errors`/CatalogConsistencyError#__init__().(self)",
     "file": "errors.py"
   },
   {
@@ -6364,11 +6400,23 @@
     "file": "cst_build/cst_resolve.py"
   },
   {
+    "symbol": "local 10",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "local 13",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
     "symbol": "local 14",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "local 17",
+    "symbol": "local 2",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "local 20",
     "file": "diagnostics/report_cli.py"
   },
   {
@@ -6384,15 +6432,19 @@
     "file": "diagnostics/report_cli.py"
   },
   {
+    "symbol": "local 24",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "local 27",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
     "symbol": "local 28",
     "file": "diagnostics/report_cli.py"
   },
   {
     "symbol": "local 29",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "local 3",
     "file": "diagnostics/report_cli.py"
   },
   {
@@ -6412,10 +6464,6 @@
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "local 37",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
     "symbol": "local 38",
     "file": "diagnostics/report_cli.py"
   },
@@ -6424,11 +6472,11 @@
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "local 40",
+    "symbol": "local 4",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "local 41",
+    "symbol": "local 43",
     "file": "diagnostics/report_cli.py"
   },
   {
@@ -6488,11 +6536,11 @@
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "local 6",
+    "symbol": "local 60",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "local 60",
+    "symbol": "local 61",
     "file": "diagnostics/report_cli.py"
   },
   {
@@ -6508,87 +6556,31 @@
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "local 65",
+    "symbol": "local 8",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "local 66",
+    "symbol": "local 9",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "local 68",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/EventRecord.",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "local 69",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/ReportFormat#",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "local 7",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/ReportFormat#JSON.",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "local 70",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/ReportFormat#MARKDOWN.",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "local 71",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "local 72",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "local 73",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "local 74",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "local 75",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "local 76",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "local 77",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "local 78",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "local 80",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "local 84",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "local 85",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "local 88",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/GLYPHS.",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/HASH_PREVIEW_LEN.",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/STAGE_EVENT_MAP.",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/__all__.",
     "file": "diagnostics/report_cli.py"
   },
   {
@@ -6596,83 +6588,35 @@
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_build_operation_chain().",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_coerce_number().",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_build_operation_chain().(events)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_coerce_number().(value)",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_collect_decisions().",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_coerce_str().",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_collect_decisions().(events)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_coerce_str().(value)",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_collect_skip_events().",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_event_attrs().",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_collect_skip_events().(events)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_event_attrs().(event)",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_collect_stage_entries().",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_event_ts().",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_collect_stage_entries().(events)",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_find_event().",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_find_event().(events)",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_find_event().(predicate)",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_find_first_failure().",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_find_first_failure().(events)",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_find_last_success().",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_find_last_success().(events)",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_format_attrs().",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_format_attrs().(attrs)",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_format_attrs().(keys)",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_format_event_summary().",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_format_event_summary().(event)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_event_ts().(event)",
     "file": "diagnostics/report_cli.py"
   },
   {
@@ -6684,67 +6628,31 @@
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_load_events().",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_group_events_by_run().(session_id)",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_load_events().(path)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_max_ts().",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_load_events().(session)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_max_ts().(events)",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_decisions_section().",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_markdown().",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_decisions_section().(decisions)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_markdown().(events)",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_header().",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_markdown().(run_id)",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_header().(first_failure)",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_header().(last_success)",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_header().(run_id)",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_header().(session)",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_operations_section().",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_operations_section().(operations)",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_report().",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_report().(events)",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_report().(run_id)",
-    "file": "diagnostics/report_cli.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_report().(session)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_markdown().(session_id)",
     "file": "diagnostics/report_cli.py"
   },
   {
@@ -6752,7 +6660,7 @@
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_skip_section().(skips)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_skip_section().(events)",
     "file": "diagnostics/report_cli.py"
   },
   {
@@ -6760,23 +6668,75 @@
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_stage_section().(stages)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_render_stage_section().(events)",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_select_run_events().",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_select_run().",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_select_run_events().(events)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_select_run().(grouped)",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_select_run_events()._last_ts().",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_select_run().(requested_run)",
     "file": "diagnostics/report_cli.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_select_run_events()._last_ts().(items)",
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_skip_rows().",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_skip_rows().(events)",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_stage_label().",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_stage_label().(event_type)",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_stage_rows().",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_stage_rows().(events)",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_structured_report().",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_structured_report().(events)",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_structured_report().(ledger_path)",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/_structured_report().(run_id)",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/app.",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/ledger_report().",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/ledger_report().(data_dir)",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/ledger_report().(run_id)",
     "file": "diagnostics/report_cli.py"
   },
   {
@@ -6785,6 +6745,30 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/main().(argv)",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/session_report().",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/session_report().(events)",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/session_report().(fmt)",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/session_report().(out)",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/session_report().(run)",
+    "file": "diagnostics/report_cli.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.diagnostics.report_cli`/session_report().(session)",
     "file": "diagnostics/report_cli.py"
   },
   {
@@ -7044,15 +7028,7 @@
     "file": "app/middleware.py"
   },
   {
-    "symbol": "local 15",
-    "file": "app/middleware.py"
-  },
-  {
     "symbol": "local 16",
-    "file": "app/middleware.py"
-  },
-  {
-    "symbol": "local 17",
     "file": "app/middleware.py"
   },
   {
@@ -7077,6 +7053,26 @@
   },
   {
     "symbol": "local 22",
+    "file": "app/middleware.py"
+  },
+  {
+    "symbol": "local 23",
+    "file": "app/middleware.py"
+  },
+  {
+    "symbol": "local 24",
+    "file": "app/middleware.py"
+  },
+  {
+    "symbol": "local 25",
+    "file": "app/middleware.py"
+  },
+  {
+    "symbol": "local 26",
+    "file": "app/middleware.py"
+  },
+  {
+    "symbol": "local 27",
     "file": "app/middleware.py"
   },
   {
@@ -8772,7 +8768,7 @@
     "file": "app/main.py"
   },
   {
-    "symbol": "local 65",
+    "symbol": "local 64",
     "file": "app/main.py"
   },
   {
@@ -8796,11 +8792,11 @@
     "file": "app/main.py"
   },
   {
-    "symbol": "local 71",
+    "symbol": "local 70",
     "file": "app/main.py"
   },
   {
-    "symbol": "local 73",
+    "symbol": "local 72",
     "file": "app/main.py"
   },
   {
@@ -8812,7 +8808,11 @@
     "file": "app/main.py"
   },
   {
-    "symbol": "local 78",
+    "symbol": "local 76",
+    "file": "app/main.py"
+  },
+  {
+    "symbol": "local 79",
     "file": "app/main.py"
   },
   {
@@ -13820,10 +13820,6 @@
     "file": "indexing/index_lifecycle.py"
   },
   {
-    "symbol": "local 41",
-    "file": "indexing/index_lifecycle.py"
-  },
-  {
     "symbol": "local 42",
     "file": "indexing/index_lifecycle.py"
   },
@@ -13884,11 +13880,11 @@
     "file": "indexing/index_lifecycle.py"
   },
   {
-    "symbol": "local 58",
+    "symbol": "local 56",
     "file": "indexing/index_lifecycle.py"
   },
   {
-    "symbol": "local 59",
+    "symbol": "local 57",
     "file": "indexing/index_lifecycle.py"
   },
   {
@@ -13904,7 +13900,19 @@
     "file": "indexing/index_lifecycle.py"
   },
   {
+    "symbol": "local 63",
+    "file": "indexing/index_lifecycle.py"
+  },
+  {
+    "symbol": "local 64",
+    "file": "indexing/index_lifecycle.py"
+  },
+  {
     "symbol": "local 7",
+    "file": "indexing/index_lifecycle.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.indexing.index_lifecycle`/IDMAP_FILE.",
     "file": "indexing/index_lifecycle.py"
   },
   {
@@ -14189,6 +14197,14 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.indexing.index_lifecycle`/LuceneAssets#splade_dir.",
+    "file": "indexing/index_lifecycle.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.indexing.index_lifecycle`/MANIFEST_FILE.",
+    "file": "indexing/index_lifecycle.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.indexing.index_lifecycle`/PROFILE_FILE.",
     "file": "indexing/index_lifecycle.py"
   },
   {
@@ -15068,11 +15084,23 @@
     "file": "metrics/registry.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/MCP_SEARCH_ANN_LATENCY_MS.",
+    "file": "metrics/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/MCP_SEARCH_HYDRATION_LATENCY_MS.",
+    "file": "metrics/registry.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/MCP_SEARCH_LATENCY_SECONDS.",
     "file": "metrics/registry.py"
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/MCP_SEARCH_POSTFILTER_DENSITY.",
+    "file": "metrics/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.metrics.registry`/MCP_SEARCH_RERANK_LATENCY_MS.",
     "file": "metrics/registry.py"
   },
   {
@@ -18884,15 +18912,23 @@
     "file": "observability/runtime_observer.py"
   },
   {
+    "symbol": "local 10",
+    "file": "observability/runtime_observer.py"
+  },
+  {
+    "symbol": "local 11",
+    "file": "observability/runtime_observer.py"
+  },
+  {
+    "symbol": "local 2",
+    "file": "observability/runtime_observer.py"
+  },
+  {
     "symbol": "local 3",
     "file": "observability/runtime_observer.py"
   },
   {
     "symbol": "local 5",
-    "file": "observability/runtime_observer.py"
-  },
-  {
-    "symbol": "local 6",
     "file": "observability/runtime_observer.py"
   },
   {
@@ -19008,7 +19044,23 @@
     "file": "observability/runtime_observer.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.runtime_observer`/__all__.",
+    "file": "observability/runtime_observer.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.runtime_observer`/__init__:",
+    "file": "observability/runtime_observer.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.runtime_observer`/bind_run_ledger().",
+    "file": "observability/runtime_observer.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.runtime_observer`/bind_run_ledger().(ledger)",
+    "file": "observability/runtime_observer.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.runtime_observer`/current_run_ledger().",
     "file": "observability/runtime_observer.py"
   },
   {
@@ -19021,10 +19073,6 @@
   },
   {
     "symbol": "local 10",
-    "file": "observability/flight_recorder.py"
-  },
-  {
-    "symbol": "local 11",
     "file": "observability/flight_recorder.py"
   },
   {
@@ -19056,11 +19104,11 @@
     "file": "observability/flight_recorder.py"
   },
   {
-    "symbol": "local 20",
+    "symbol": "local 19",
     "file": "observability/flight_recorder.py"
   },
   {
-    "symbol": "local 21",
+    "symbol": "local 20",
     "file": "observability/flight_recorder.py"
   },
   {
@@ -19072,19 +19120,15 @@
     "file": "observability/flight_recorder.py"
   },
   {
-    "symbol": "local 26",
+    "symbol": "local 24",
     "file": "observability/flight_recorder.py"
   },
   {
-    "symbol": "local 27",
+    "symbol": "local 25",
     "file": "observability/flight_recorder.py"
   },
   {
-    "symbol": "local 30",
-    "file": "observability/flight_recorder.py"
-  },
-  {
-    "symbol": "local 31",
+    "symbol": "local 28",
     "file": "observability/flight_recorder.py"
   },
   {
@@ -19100,15 +19144,7 @@
     "file": "observability/flight_recorder.py"
   },
   {
-    "symbol": "local 35",
-    "file": "observability/flight_recorder.py"
-  },
-  {
     "symbol": "local 36",
-    "file": "observability/flight_recorder.py"
-  },
-  {
-    "symbol": "local 37",
     "file": "observability/flight_recorder.py"
   },
   {
@@ -19148,6 +19184,14 @@
     "file": "observability/flight_recorder.py"
   },
   {
+    "symbol": "local 47",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 48",
+    "file": "observability/flight_recorder.py"
+  },
+  {
     "symbol": "local 49",
     "file": "observability/flight_recorder.py"
   },
@@ -19160,15 +19204,11 @@
     "file": "observability/flight_recorder.py"
   },
   {
+    "symbol": "local 52",
+    "file": "observability/flight_recorder.py"
+  },
+  {
     "symbol": "local 53",
-    "file": "observability/flight_recorder.py"
-  },
-  {
-    "symbol": "local 54",
-    "file": "observability/flight_recorder.py"
-  },
-  {
-    "symbol": "local 55",
     "file": "observability/flight_recorder.py"
   },
   {
@@ -19181,10 +19221,6 @@
   },
   {
     "symbol": "local 58",
-    "file": "observability/flight_recorder.py"
-  },
-  {
-    "symbol": "local 59",
     "file": "observability/flight_recorder.py"
   },
   {
@@ -19236,11 +19272,19 @@
     "file": "observability/flight_recorder.py"
   },
   {
+    "symbol": "local 70",
+    "file": "observability/flight_recorder.py"
+  },
+  {
     "symbol": "local 71",
     "file": "observability/flight_recorder.py"
   },
   {
     "symbol": "local 72",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 73",
     "file": "observability/flight_recorder.py"
   },
   {
@@ -19252,15 +19296,39 @@
     "file": "observability/flight_recorder.py"
   },
   {
-    "symbol": "local 77",
+    "symbol": "local 79",
     "file": "observability/flight_recorder.py"
   },
   {
-    "symbol": "local 78",
+    "symbol": "local 81",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 82",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 88",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 89",
     "file": "observability/flight_recorder.py"
   },
   {
     "symbol": "local 9",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 90",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "local 91",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/FlightEvent.",
     "file": "observability/flight_recorder.py"
   },
   {
@@ -19460,14 +19528,6 @@
     "file": "observability/flight_recorder.py"
   },
   {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_build_summary().",
-    "file": "observability/flight_recorder.py"
-  },
-  {
-    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_build_summary().(events)",
-    "file": "observability/flight_recorder.py"
-  },
-  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_convert_span_events().",
     "file": "observability/flight_recorder.py"
   },
@@ -19485,6 +19545,14 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_date_segment().(start_ns)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_event_start_ns().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_event_start_ns().(evt)",
     "file": "observability/flight_recorder.py"
   },
   {
@@ -19577,6 +19645,14 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/_update_status().(span)",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/build_event_summary().",
+    "file": "observability/flight_recorder.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.flight_recorder`/build_event_summary().(events)",
     "file": "observability/flight_recorder.py"
   },
   {
@@ -20033,38 +20109,150 @@
   },
   {
     "symbol": "local 0",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "local 1",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "local 10",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "local 11",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "local 12",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "local 2",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "local 3",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "local 4",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "local 5",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "local 6",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "local 7",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "local 8",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "local 9",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/RunLedger#",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/RunLedger#_handle.",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/RunLedger#append().",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/RunLedger#append().(record)",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/RunLedger#append().(self)",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/RunLedger#close().",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/RunLedger#close().(self)",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/RunLedger#open().",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/RunLedger#open().(cls)",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/RunLedger#open().(root_dir)",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/RunLedger#open().(run_id)",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/RunLedger#open().(session_id)",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/RunLedger#path.",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/RunLedger#run_id.",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/RunLedger#session_id.",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/__all__.",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/__init__:",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/dated_run_dir().",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/dated_run_dir().(base_dir)",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/dated_run_dir().(stamp)",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/ensure_ledger_root().",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.ledger`/ensure_ledger_root().(root_dir)",
+    "file": "observability/ledger.py"
+  },
+  {
+    "symbol": "local 0",
     "file": "observability/otel.py"
   },
   {
     "symbol": "local 1",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 100",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 101",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 102",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 103",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 104",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 105",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 106",
     "file": "observability/otel.py"
   },
   {
@@ -20248,15 +20436,15 @@
     "file": "observability/otel.py"
   },
   {
+    "symbol": "local 61",
+    "file": "observability/otel.py"
+  },
+  {
     "symbol": "local 62",
     "file": "observability/otel.py"
   },
   {
     "symbol": "local 63",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 64",
     "file": "observability/otel.py"
   },
   {
@@ -20285,18 +20473,6 @@
   },
   {
     "symbol": "local 71",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 72",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 73",
-    "file": "observability/otel.py"
-  },
-  {
-    "symbol": "local 74",
     "file": "observability/otel.py"
   },
   {
@@ -20628,6 +20804,26 @@
     "file": "observability/otel.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/init_all_telemetry().",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/init_all_telemetry().(app)",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/init_all_telemetry().(install_flight_recorder)",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/init_all_telemetry().(service_name)",
+    "file": "observability/otel.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/init_all_telemetry().(service_version)",
+    "file": "observability/otel.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.otel`/init_otel().",
     "file": "observability/otel.py"
   },
@@ -20716,12 +20912,212 @@
     "file": "observability/otel.py"
   },
   {
+    "symbol": "local 10",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "local 11",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "local 5",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "local 6",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "local 7",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "local 8",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "local 9",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.run_report`/LedgerRunReport#",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.run_report`/LedgerRunReport#ledger_path.",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.run_report`/LedgerRunReport#run_id.",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.run_report`/LedgerRunReport#steps.",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.run_report`/LedgerRunReport#stopped_because.",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.run_report`/LedgerRunReport#warnings.",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.run_report`/__init__:",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.run_report`/build_run_report().",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.run_report`/build_run_report().(ledger_path)",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.run_report`/build_run_report().(run_id)",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.run_report`/infer_stop_reason().",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.run_report`/infer_stop_reason().(events)",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.run_report`/load_ledger().",
+    "file": "observability/run_report.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.run_report`/load_ledger().(path)",
+    "file": "observability/run_report.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability`/__all__.",
     "file": "observability/__init__.py"
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability`/__init__:",
     "file": "observability/__init__.py"
+  },
+  {
+    "symbol": "local 0",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "local 10",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "local 11",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "local 12",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "local 13",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "local 14",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "local 15",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "local 16",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "local 17",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "local 18",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "local 2",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "local 3",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "local 4",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "local 5",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "local 6",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "local 7",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "local 8",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "local 9",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.logs`/LOGGER.",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.logs`/_INIT_STATE.",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.logs`/__all__.",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.logs`/__init__:",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.logs`/_instrument_stdlib_logging().",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.logs`/_should_enable().",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.logs`/init_otel_logging().",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.logs`/init_otel_logging().(exporters)",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.logs`/init_otel_logging().(level)",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.logs`/init_otel_logging().(otlp_endpoint)",
+    "file": "observability/logs.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.logs`/init_otel_logging().(service_name)",
+    "file": "observability/logs.py"
   },
   {
     "symbol": "local 0",
@@ -20736,7 +21132,15 @@
     "file": "observability/semantic_conventions.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#BM25_RM3_ENABLED.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#BUDGET_MS.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#CHANNELS_USED.",
     "file": "observability/semantic_conventions.py"
   },
   {
@@ -20840,6 +21244,14 @@
     "file": "observability/semantic_conventions.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#MCP_RUN_ID.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#MCP_SESSION_ID.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#MCP_TOOL.",
     "file": "observability/semantic_conventions.py"
   },
@@ -20876,7 +21288,15 @@
     "file": "observability/semantic_conventions.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#RRF_K.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#RUN_ID.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#RUN_LEDGER_PATH.",
     "file": "observability/semantic_conventions.py"
   },
   {
@@ -20885,6 +21305,26 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#STAGE.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#STEP_DETAIL.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#STEP_KIND.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#STEP_PAYLOAD.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#STEP_STATUS.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#TRACE_ID.",
     "file": "observability/semantic_conventions.py"
   },
   {
@@ -20901,6 +21341,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#VLLM_MODEL_NAME.",
+    "file": "observability/semantic_conventions.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.observability.semantic_conventions`/Attrs#WARNINGS.",
     "file": "observability/semantic_conventions.py"
   },
   {
@@ -21449,6 +21893,94 @@
   },
   {
     "symbol": "local 0",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "local 1",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "local 2",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "local 4",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "local 5",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "local 6",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "local 7",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.steps`/LOGGER.",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.steps`/StepEvent#",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.steps`/StepEvent#detail.",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.steps`/StepEvent#kind.",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.steps`/StepEvent#payload.",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.steps`/StepEvent#status.",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.steps`/StepStatus.",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.steps`/__all__.",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.steps`/__init__:",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.steps`/_now_iso().",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.steps`/_record_structured_event().",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.steps`/_record_structured_event().(record)",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.steps`/emit_step().",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.steps`/emit_step().(ledger)",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.steps`/emit_step().(step)",
+    "file": "telemetry/steps.py"
+  },
+  {
+    "symbol": "local 0",
     "file": "telemetry/context.py"
   },
   {
@@ -21584,10 +22116,6 @@
     "file": "telemetry/decorators.py"
   },
   {
-    "symbol": "local 10",
-    "file": "telemetry/decorators.py"
-  },
-  {
     "symbol": "local 11",
     "file": "telemetry/decorators.py"
   },
@@ -21600,7 +22128,7 @@
     "file": "telemetry/decorators.py"
   },
   {
-    "symbol": "local 17",
+    "symbol": "local 14",
     "file": "telemetry/decorators.py"
   },
   {
@@ -21632,7 +22160,7 @@
     "file": "telemetry/decorators.py"
   },
   {
-    "symbol": "local 25",
+    "symbol": "local 24",
     "file": "telemetry/decorators.py"
   },
   {
@@ -21668,7 +22196,7 @@
     "file": "telemetry/decorators.py"
   },
   {
-    "symbol": "local 36",
+    "symbol": "local 33",
     "file": "telemetry/decorators.py"
   },
   {
@@ -21724,7 +22252,35 @@
     "file": "telemetry/decorators.py"
   },
   {
+    "symbol": "local 49",
+    "file": "telemetry/decorators.py"
+  },
+  {
     "symbol": "local 5",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "local 50",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "local 51",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "local 52",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "local 53",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "local 55",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "local 56",
     "file": "telemetry/decorators.py"
   },
   {
@@ -21745,6 +22301,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/F.",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/LOGGER.",
     "file": "telemetry/decorators.py"
   },
   {
@@ -21904,6 +22464,26 @@
     "file": "telemetry/decorators.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/_build_step_payload().",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/_build_step_payload().(args)",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/_build_step_payload().(factory)",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/_build_step_payload().(kwargs)",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/_build_step_payload().(result)",
+    "file": "telemetry/decorators.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/_emit_checkpoint().",
     "file": "telemetry/decorators.py"
   },
@@ -21965,6 +22545,66 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/_span_scope().(stage)",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/_with_duration().",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/_with_duration().(payload)",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/_with_duration().(started_at)",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/emit_event().",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/emit_event().(component)",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/emit_event().(op)",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/emit_event().(payload_factory)",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/emit_event().decorator().",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/emit_event().decorator().(func)",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/emit_event().decorator().async_wrapper().",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/emit_event().decorator().async_wrapper().(args)",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/emit_event().decorator().async_wrapper().(kwargs)",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/emit_event().decorator().sync_wrapper().",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/emit_event().decorator().sync_wrapper().(args)",
+    "file": "telemetry/decorators.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.decorators`/emit_event().decorator().sync_wrapper().(kwargs)",
     "file": "telemetry/decorators.py"
   },
   {
@@ -22208,6 +22848,18 @@
     "file": "telemetry/reporter.py"
   },
   {
+    "symbol": "local 14",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 15",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 16",
+    "file": "telemetry/reporter.py"
+  },
+  {
     "symbol": "local 17",
     "file": "telemetry/reporter.py"
   },
@@ -22217,10 +22869,6 @@
   },
   {
     "symbol": "local 19",
-    "file": "telemetry/reporter.py"
-  },
-  {
-    "symbol": "local 2",
     "file": "telemetry/reporter.py"
   },
   {
@@ -22236,6 +22884,14 @@
     "file": "telemetry/reporter.py"
   },
   {
+    "symbol": "local 26",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 27",
+    "file": "telemetry/reporter.py"
+  },
+  {
     "symbol": "local 28",
     "file": "telemetry/reporter.py"
   },
@@ -22244,19 +22900,11 @@
     "file": "telemetry/reporter.py"
   },
   {
-    "symbol": "local 3",
+    "symbol": "local 30",
     "file": "telemetry/reporter.py"
   },
   {
-    "symbol": "local 32",
-    "file": "telemetry/reporter.py"
-  },
-  {
-    "symbol": "local 35",
-    "file": "telemetry/reporter.py"
-  },
-  {
-    "symbol": "local 36",
+    "symbol": "local 31",
     "file": "telemetry/reporter.py"
   },
   {
@@ -22268,23 +22916,11 @@
     "file": "telemetry/reporter.py"
   },
   {
-    "symbol": "local 39",
-    "file": "telemetry/reporter.py"
-  },
-  {
-    "symbol": "local 40",
+    "symbol": "local 4",
     "file": "telemetry/reporter.py"
   },
   {
     "symbol": "local 41",
-    "file": "telemetry/reporter.py"
-  },
-  {
-    "symbol": "local 42",
-    "file": "telemetry/reporter.py"
-  },
-  {
-    "symbol": "local 43",
     "file": "telemetry/reporter.py"
   },
   {
@@ -22293,6 +22929,10 @@
   },
   {
     "symbol": "local 45",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 46",
     "file": "telemetry/reporter.py"
   },
   {
@@ -22320,7 +22960,39 @@
     "file": "telemetry/reporter.py"
   },
   {
+    "symbol": "local 52",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 53",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 54",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 56",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 57",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 58",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 59",
+    "file": "telemetry/reporter.py"
+  },
+  {
     "symbol": "local 6",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "local 60",
     "file": "telemetry/reporter.py"
   },
   {
@@ -22329,10 +23001,6 @@
   },
   {
     "symbol": "local 8",
-    "file": "telemetry/reporter.py"
-  },
-  {
-    "symbol": "local 9",
     "file": "telemetry/reporter.py"
   },
   {
@@ -22396,6 +23064,10 @@
     "file": "telemetry/reporter.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunRecord#structured_events.",
+    "file": "telemetry/reporter.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunRecord#tool_name.",
     "file": "telemetry/reporter.py"
   },
@@ -22449,6 +23121,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReport#stop_reason.",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReport#structured_events.",
     "file": "telemetry/reporter.py"
   },
   {
@@ -22604,6 +23280,18 @@
     "file": "telemetry/reporter.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportStore#record_structured_event().",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportStore#record_structured_event().(payload)",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportStore#record_structured_event().(self)",
+    "file": "telemetry/reporter.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/RunReportStore#start_run().",
     "file": "telemetry/reporter.py"
   },
@@ -22668,6 +23356,14 @@
     "file": "telemetry/reporter.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/_infer_stop_reason_from_events().",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/_infer_stop_reason_from_events().(events)",
+    "file": "telemetry/reporter.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/build_report().",
     "file": "telemetry/reporter.py"
   },
@@ -22725,6 +23421,14 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/finalize_run().(stop_reason)",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/record_step_payload().",
+    "file": "telemetry/reporter.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.reporter`/record_step_payload().(payload)",
     "file": "telemetry/reporter.py"
   },
   {
@@ -22792,6 +23496,14 @@
     "file": "telemetry/events.py"
   },
   {
+    "symbol": "local 4",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "local 5",
+    "file": "telemetry/events.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunCheckpoint#",
     "file": "telemetry/events.py"
   },
@@ -22817,6 +23529,74 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunCheckpoint#to_event_attrs().(self)",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunEventRecord#",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunEventRecord#batch_size.",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunEventRecord#component.",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunEventRecord#duration_ms.",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunEventRecord#error_code.",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunEventRecord#error_context.",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunEventRecord#input_size.",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunEventRecord#op.",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunEventRecord#output_size.",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunEventRecord#resource_ids.",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunEventRecord#run_id.",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunEventRecord#session_id.",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunEventRecord#span_id.",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunEventRecord#status.",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunEventRecord#trace_id.",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunEventRecord#ts.",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/RunEventRecord#warnings.",
     "file": "telemetry/events.py"
   },
   {
@@ -22864,6 +23644,14 @@
     "file": "telemetry/events.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/_maybe_str().",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/_maybe_str().(value)",
+    "file": "telemetry/events.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/checkpoint_event().",
     "file": "telemetry/events.py"
   },
@@ -22889,6 +23677,22 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/coerce_event().(payload)",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/normalize_run_event().",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/normalize_run_event().(payload)",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/normalize_run_event()._tuple().",
+    "file": "telemetry/events.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.telemetry.events`/normalize_run_event()._tuple().(value)",
     "file": "telemetry/events.py"
   },
   {
@@ -26976,15 +27780,15 @@
     "file": "io/duckdb_manager.py"
   },
   {
+    "symbol": "local 22",
+    "file": "io/duckdb_manager.py"
+  },
+  {
+    "symbol": "local 23",
+    "file": "io/duckdb_manager.py"
+  },
+  {
     "symbol": "local 24",
-    "file": "io/duckdb_manager.py"
-  },
-  {
-    "symbol": "local 25",
-    "file": "io/duckdb_manager.py"
-  },
-  {
-    "symbol": "local 26",
     "file": "io/duckdb_manager.py"
   },
   {
@@ -27008,6 +27812,10 @@
     "file": "io/duckdb_manager.py"
   },
   {
+    "symbol": "local 31",
+    "file": "io/duckdb_manager.py"
+  },
+  {
     "symbol": "local 32",
     "file": "io/duckdb_manager.py"
   },
@@ -27020,11 +27828,19 @@
     "file": "io/duckdb_manager.py"
   },
   {
-    "symbol": "local 35",
+    "symbol": "local 36",
     "file": "io/duckdb_manager.py"
   },
   {
-    "symbol": "local 36",
+    "symbol": "local 37",
+    "file": "io/duckdb_manager.py"
+  },
+  {
+    "symbol": "local 38",
+    "file": "io/duckdb_manager.py"
+  },
+  {
+    "symbol": "local 39",
     "file": "io/duckdb_manager.py"
   },
   {
@@ -27032,31 +27848,19 @@
     "file": "io/duckdb_manager.py"
   },
   {
-    "symbol": "local 41",
+    "symbol": "local 40",
     "file": "io/duckdb_manager.py"
   },
   {
-    "symbol": "local 42",
+    "symbol": "local 45",
     "file": "io/duckdb_manager.py"
   },
   {
-    "symbol": "local 44",
+    "symbol": "local 46",
     "file": "io/duckdb_manager.py"
   },
   {
-    "symbol": "local 49",
-    "file": "io/duckdb_manager.py"
-  },
-  {
-    "symbol": "local 50",
-    "file": "io/duckdb_manager.py"
-  },
-  {
-    "symbol": "local 51",
-    "file": "io/duckdb_manager.py"
-  },
-  {
-    "symbol": "local 52",
+    "symbol": "local 48",
     "file": "io/duckdb_manager.py"
   },
   {
@@ -27064,7 +27868,23 @@
     "file": "io/duckdb_manager.py"
   },
   {
+    "symbol": "local 54",
+    "file": "io/duckdb_manager.py"
+  },
+  {
     "symbol": "local 55",
+    "file": "io/duckdb_manager.py"
+  },
+  {
+    "symbol": "local 56",
+    "file": "io/duckdb_manager.py"
+  },
+  {
+    "symbol": "local 57",
+    "file": "io/duckdb_manager.py"
+  },
+  {
+    "symbol": "local 59",
     "file": "io/duckdb_manager.py"
   },
   {
@@ -27148,6 +27968,10 @@
     "file": "io/duckdb_manager.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_manager`/DuckDBManager#_create_connection().(read_only)",
+    "file": "io/duckdb_manager.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_manager`/DuckDBManager#_create_connection().(self)",
     "file": "io/duckdb_manager.py"
   },
@@ -27209,6 +28033,14 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_manager`/DuckDBManager#connections_created().(self)",
+    "file": "io/duckdb_manager.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_manager`/DuckDBManager#readonly_connection().",
+    "file": "io/duckdb_manager.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_manager`/DuckDBManager#readonly_connection().(self)",
     "file": "io/duckdb_manager.py"
   },
   {
@@ -28060,23 +28892,23 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 103",
-    "file": "io/hybrid_search.py"
-  },
-  {
     "symbol": "local 104",
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 105",
+    "symbol": "local 107",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 108",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 109",
     "file": "io/hybrid_search.py"
   },
   {
     "symbol": "local 11",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 110",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28097,10 +28929,6 @@
   },
   {
     "symbol": "local 115",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 119",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28129,14 +28957,6 @@
   },
   {
     "symbol": "local 125",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 126",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 128",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28172,7 +28992,7 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 137",
+    "symbol": "local 136",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28192,11 +29012,27 @@
     "file": "io/hybrid_search.py"
   },
   {
+    "symbol": "local 141",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 142",
+    "file": "io/hybrid_search.py"
+  },
+  {
     "symbol": "local 143",
     "file": "io/hybrid_search.py"
   },
   {
     "symbol": "local 144",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 145",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 147",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28212,11 +29048,7 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 151",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 152",
+    "symbol": "local 150",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28225,10 +29057,6 @@
   },
   {
     "symbol": "local 154",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 155",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28244,10 +29072,6 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 160",
-    "file": "io/hybrid_search.py"
-  },
-  {
     "symbol": "local 161",
     "file": "io/hybrid_search.py"
   },
@@ -28260,15 +29084,15 @@
     "file": "io/hybrid_search.py"
   },
   {
+    "symbol": "local 164",
+    "file": "io/hybrid_search.py"
+  },
+  {
     "symbol": "local 165",
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 166",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 167",
+    "symbol": "local 168",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28284,11 +29108,19 @@
     "file": "io/hybrid_search.py"
   },
   {
+    "symbol": "local 171",
+    "file": "io/hybrid_search.py"
+  },
+  {
     "symbol": "local 172",
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 174",
+    "symbol": "local 173",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 175",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28296,7 +29128,11 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 18",
+    "symbol": "local 177",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 179",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28304,7 +29140,7 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 183",
+    "symbol": "local 182",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28312,19 +29148,7 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 185",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 187",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 188",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 189",
+    "symbol": "local 186",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28332,15 +29156,23 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 190",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 193",
+    "symbol": "local 192",
     "file": "io/hybrid_search.py"
   },
   {
     "symbol": "local 195",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 196",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 197",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 199",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28360,11 +29192,7 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 203",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 204",
+    "symbol": "local 202",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28372,19 +29200,7 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 206",
-    "file": "io/hybrid_search.py"
-  },
-  {
     "symbol": "local 207",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 208",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 209",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28392,19 +29208,11 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 210",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 211",
+    "symbol": "local 212",
     "file": "io/hybrid_search.py"
   },
   {
     "symbol": "local 213",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 214",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28444,7 +29252,11 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 224",
+    "symbol": "local 223",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 225",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28464,11 +29276,27 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 236",
+    "symbol": "local 230",
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 237",
+    "symbol": "local 231",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 232",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 233",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 234",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 236",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28488,27 +29316,7 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 242",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 243",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 244",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 245",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 246",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 247",
+    "symbol": "local 241",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28521,6 +29329,38 @@
   },
   {
     "symbol": "local 25",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 250",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 251",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 252",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 254",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 255",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 256",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 257",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 258",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28540,19 +29380,27 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 263",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 264",
-    "file": "io/hybrid_search.py"
-  },
-  {
     "symbol": "local 27",
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 28",
+    "symbol": "local 271",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 272",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 273",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 275",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 276",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28620,15 +29468,19 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 43",
-    "file": "io/hybrid_search.py"
-  },
-  {
     "symbol": "local 44",
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 48",
+    "symbol": "local 45",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 46",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 47",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28637,6 +29489,14 @@
   },
   {
     "symbol": "local 5",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 50",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 51",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28652,18 +29512,6 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 55",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 56",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 57",
-    "file": "io/hybrid_search.py"
-  },
-  {
     "symbol": "local 58",
     "file": "io/hybrid_search.py"
   },
@@ -28673,14 +29521,6 @@
   },
   {
     "symbol": "local 6",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 60",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 61",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28700,6 +29540,18 @@
     "file": "io/hybrid_search.py"
   },
   {
+    "symbol": "local 66",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 67",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 68",
+    "file": "io/hybrid_search.py"
+  },
+  {
     "symbol": "local 69",
     "file": "io/hybrid_search.py"
   },
@@ -28709,6 +29561,10 @@
   },
   {
     "symbol": "local 70",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 71",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28728,18 +29584,6 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 76",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 77",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 78",
-    "file": "io/hybrid_search.py"
-  },
-  {
     "symbol": "local 79",
     "file": "io/hybrid_search.py"
   },
@@ -28749,6 +29593,10 @@
   },
   {
     "symbol": "local 80",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 82",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28768,15 +29616,27 @@
     "file": "io/hybrid_search.py"
   },
   {
+    "symbol": "local 87",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 88",
+    "file": "io/hybrid_search.py"
+  },
+  {
+    "symbol": "local 89",
+    "file": "io/hybrid_search.py"
+  },
+  {
     "symbol": "local 9",
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 91",
+    "symbol": "local 90",
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 92",
+    "symbol": "local 93",
     "file": "io/hybrid_search.py"
   },
   {
@@ -28784,15 +29644,11 @@
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 97",
+    "symbol": "local 95",
     "file": "io/hybrid_search.py"
   },
   {
-    "symbol": "local 98",
-    "file": "io/hybrid_search.py"
-  },
-  {
-    "symbol": "local 99",
+    "symbol": "local 96",
     "file": "io/hybrid_search.py"
   },
   {
@@ -30092,15 +30948,15 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 104",
+    "symbol": "local 100",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 105",
+    "symbol": "local 101",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 106",
+    "symbol": "local 102",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30112,6 +30968,10 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 109",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 11",
     "file": "io/faiss_manager.py"
   },
@@ -30120,15 +30980,15 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 114",
+    "symbol": "local 111",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 116",
+    "symbol": "local 113",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 118",
+    "symbol": "local 117",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30148,6 +31008,10 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 124",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 125",
     "file": "io/faiss_manager.py"
   },
@@ -30156,15 +31020,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 129",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 13",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 130",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30184,6 +31040,10 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 135",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 136",
     "file": "io/faiss_manager.py"
   },
@@ -30192,7 +31052,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 138",
+    "symbol": "local 139",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30208,19 +31068,15 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 143",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 144",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 145",
     "file": "io/faiss_manager.py"
   },
   {
     "symbol": "local 146",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 147",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30244,6 +31100,10 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 153",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 154",
     "file": "io/faiss_manager.py"
   },
@@ -30260,15 +31120,15 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 158",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 159",
     "file": "io/faiss_manager.py"
   },
   {
     "symbol": "local 16",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 160",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30292,10 +31152,6 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 166",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 167",
     "file": "io/faiss_manager.py"
   },
@@ -30313,10 +31169,6 @@
   },
   {
     "symbol": "local 170",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 171",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30356,6 +31208,14 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 181",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 182",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 183",
     "file": "io/faiss_manager.py"
   },
@@ -30364,11 +31224,19 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 185",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 186",
     "file": "io/faiss_manager.py"
   },
   {
     "symbol": "local 187",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 188",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30392,14 +31260,6 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 193",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 194",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 195",
     "file": "io/faiss_manager.py"
   },
@@ -30408,7 +31268,11 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 197",
+    "symbol": "local 198",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 199",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30428,6 +31292,22 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 203",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 204",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 205",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 206",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 207",
     "file": "io/faiss_manager.py"
   },
@@ -30444,15 +31324,15 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 213",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 214",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 215",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 216",
+    "symbol": "local 219",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30460,23 +31340,11 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 220",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 221",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 222",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 223",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 224",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 225",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30496,15 +31364,11 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 230",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 231",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 233",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 234",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30532,7 +31396,19 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 242",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 243",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 245",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 247",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30560,31 +31436,19 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 253",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 254",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 255",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 256",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 257",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 258",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 26",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 260",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 261",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30600,7 +31464,23 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 265",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 266",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 267",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 268",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 269",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30612,18 +31492,6 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 271",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 272",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 273",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 274",
     "file": "io/faiss_manager.py"
   },
@@ -30632,7 +31500,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 278",
+    "symbol": "local 276",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30644,7 +31512,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 281",
+    "symbol": "local 282",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30668,14 +31536,6 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 288",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 289",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 29",
     "file": "io/faiss_manager.py"
   },
@@ -30688,19 +31548,23 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 292",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 293",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 294",
+    "symbol": "local 295",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 296",
     "file": "io/faiss_manager.py"
   },
   {
     "symbol": "local 297",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 298",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30712,6 +31576,10 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 300",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 301",
     "file": "io/faiss_manager.py"
   },
@@ -30720,7 +31588,15 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 303",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 304",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 305",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30728,11 +31604,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 307",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 308",
+    "symbol": "local 309",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30740,11 +31612,15 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 314",
+    "symbol": "local 311",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 315",
+    "symbol": "local 313",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 314",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30752,7 +31628,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 317",
+    "symbol": "local 318",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30760,15 +31636,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 321",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 323",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 324",
+    "symbol": "local 320",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30776,7 +31644,15 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 327",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 328",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 329",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30784,23 +31660,11 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 330",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 331",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 332",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 333",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 334",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30816,15 +31680,11 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 339",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 34",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 341",
+    "symbol": "local 340",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30832,7 +31692,15 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 343",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 344",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 345",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30840,11 +31708,11 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 348",
+    "symbol": "local 347",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 349",
+    "symbol": "local 348",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30860,15 +31728,11 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 352",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 353",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 355",
+    "symbol": "local 354",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30876,7 +31740,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 357",
+    "symbol": "local 358",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30904,7 +31768,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 366",
+    "symbol": "local 365",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30921,14 +31785,6 @@
   },
   {
     "symbol": "local 37",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 370",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 371",
     "file": "io/faiss_manager.py"
   },
   {
@@ -30949,10 +31805,6 @@
   },
   {
     "symbol": "local 376",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 377",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31036,7 +31888,15 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 396",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 397",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 398",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31052,6 +31912,10 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 400",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 401",
     "file": "io/faiss_manager.py"
   },
@@ -31061,6 +31925,10 @@
   },
   {
     "symbol": "local 403",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 404",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31076,10 +31944,6 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 408",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 409",
     "file": "io/faiss_manager.py"
   },
@@ -31088,7 +31952,31 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 411",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 413",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 414",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 415",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 417",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 418",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 419",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31096,39 +31984,19 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 420",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 421",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 422",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 424",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 427",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 429",
+    "symbol": "local 425",
     "file": "io/faiss_manager.py"
   },
   {
     "symbol": "local 43",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 430",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 431",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 432",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31140,15 +32008,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 435",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 436",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 438",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31157,10 +32017,6 @@
   },
   {
     "symbol": "local 44",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 440",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31192,7 +32048,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 449",
+    "symbol": "local 448",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31244,10 +32100,6 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 460",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 461",
     "file": "io/faiss_manager.py"
   },
@@ -31257,6 +32109,14 @@
   },
   {
     "symbol": "local 463",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 464",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 465",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31276,7 +32136,15 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 47",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 470",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 471",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31296,15 +32164,11 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 476",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 477",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 478",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 479",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31312,7 +32176,15 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 483",
+    "symbol": "local 480",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 481",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 482",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31325,6 +32197,10 @@
   },
   {
     "symbol": "local 486",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 487",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31344,7 +32220,15 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 492",
+    "symbol": "local 495",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 496",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 497",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31352,15 +32236,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 499",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 5",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 50",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31368,19 +32244,15 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 503",
+    "symbol": "local 501",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 502",
     "file": "io/faiss_manager.py"
   },
   {
     "symbol": "local 504",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 505",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 506",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31393,6 +32265,10 @@
   },
   {
     "symbol": "local 511",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 512",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31412,19 +32288,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 519",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 52",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 520",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 521",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31432,23 +32296,59 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 523",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 527",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 528",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 529",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 53",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 530",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 531",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 532",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 533",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 534",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 54",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 58",
+    "symbol": "local 55",
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 59",
+    "symbol": "local 57",
     "file": "io/faiss_manager.py"
   },
   {
     "symbol": "local 6",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 60",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31464,7 +32364,15 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 64",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 65",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "local 66",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31472,15 +32380,7 @@
     "file": "io/faiss_manager.py"
   },
   {
-    "symbol": "local 69",
-    "file": "io/faiss_manager.py"
-  },
-  {
     "symbol": "local 7",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 70",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31548,15 +32448,15 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 86",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 87",
     "file": "io/faiss_manager.py"
   },
   {
     "symbol": "local 88",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 89",
     "file": "io/faiss_manager.py"
   },
   {
@@ -31576,15 +32476,15 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "local 93",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "local 94",
     "file": "io/faiss_manager.py"
   },
   {
     "symbol": "local 95",
-    "file": "io/faiss_manager.py"
-  },
-  {
-    "symbol": "local 96",
     "file": "io/faiss_manager.py"
   },
   {
@@ -32500,6 +33400,14 @@
     "file": "io/faiss_manager.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.faiss_manager`/FAISSManager#load_cpu_index().(export_idmap)",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.faiss_manager`/FAISSManager#load_cpu_index().(profile_path)",
+    "file": "io/faiss_manager.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.faiss_manager`/FAISSManager#load_cpu_index().(self)",
     "file": "io/faiss_manager.py"
   },
@@ -32773,6 +33681,18 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.faiss_manager`/_FAISSIdMapMixin#",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.faiss_manager`/_FAISSIdMapMixin#_write_profile().",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.faiss_manager`/_FAISSIdMapMixin#_write_profile().(path)",
+    "file": "io/faiss_manager.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.faiss_manager`/_FAISSIdMapMixin#_write_profile().(self)",
     "file": "io/faiss_manager.py"
   },
   {
@@ -33848,10 +34768,6 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 102",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
     "symbol": "local 103",
     "file": "io/duckdb_catalog.py"
   },
@@ -33956,15 +34872,15 @@
     "file": "io/duckdb_catalog.py"
   },
   {
+    "symbol": "local 127",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
     "symbol": "local 128",
     "file": "io/duckdb_catalog.py"
   },
   {
     "symbol": "local 129",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
-    "symbol": "local 130",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34000,19 +34916,19 @@
     "file": "io/duckdb_catalog.py"
   },
   {
+    "symbol": "local 139",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
     "symbol": "local 14",
     "file": "io/duckdb_catalog.py"
   },
   {
+    "symbol": "local 140",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
     "symbol": "local 141",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
-    "symbol": "local 142",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
-    "symbol": "local 143",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34048,15 +34964,15 @@
     "file": "io/duckdb_catalog.py"
   },
   {
+    "symbol": "local 151",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
     "symbol": "local 152",
     "file": "io/duckdb_catalog.py"
   },
   {
     "symbol": "local 153",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
-    "symbol": "local 154",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34092,11 +35008,11 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 164",
+    "symbol": "local 162",
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 165",
+    "symbol": "local 163",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34120,7 +35036,7 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 170",
+    "symbol": "local 171",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34148,11 +35064,11 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 178",
+    "symbol": "local 18",
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 18",
+    "symbol": "local 181",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34160,7 +35076,7 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 183",
+    "symbol": "local 184",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34180,15 +35096,15 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 189",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
     "symbol": "local 19",
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 191",
+    "symbol": "local 190",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "local 194",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34224,7 +35140,7 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 201",
+    "symbol": "local 211",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34240,11 +35156,7 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 215",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
-    "symbol": "local 218",
+    "symbol": "local 217",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34252,19 +35164,23 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 221",
+    "symbol": "local 220",
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 223",
+    "symbol": "local 222",
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 226",
+    "symbol": "local 225",
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 228",
+    "symbol": "local 227",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "local 229",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34296,15 +35212,15 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 236",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
-    "symbol": "local 239",
+    "symbol": "local 238",
     "file": "io/duckdb_catalog.py"
   },
   {
     "symbol": "local 24",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "local 240",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34324,7 +35240,7 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 245",
+    "symbol": "local 246",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34344,7 +35260,7 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 250",
+    "symbol": "local 251",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34376,11 +35292,11 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 259",
+    "symbol": "local 26",
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 26",
+    "symbol": "local 260",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34388,11 +35304,11 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 262",
+    "symbol": "local 263",
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 264",
+    "symbol": "local 265",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34416,7 +35332,7 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 270",
+    "symbol": "local 271",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34432,7 +35348,7 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 275",
+    "symbol": "local 276",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34444,11 +35360,11 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 279",
+    "symbol": "local 28",
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 28",
+    "symbol": "local 283",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34464,11 +35380,7 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 287",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
-    "symbol": "local 289",
+    "symbol": "local 288",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34476,15 +35388,19 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 293",
+    "symbol": "local 292",
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 295",
+    "symbol": "local 294",
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 297",
+    "symbol": "local 296",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "local 298",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34500,11 +35416,39 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 300",
+    "symbol": "local 302",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "local 303",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "local 306",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "local 307",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "local 308",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "local 309",
     "file": "io/duckdb_catalog.py"
   },
   {
     "symbol": "local 31",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "local 310",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "local 311",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34524,15 +35468,7 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 39",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
     "symbol": "local 4",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
-    "symbol": "local 40",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34544,11 +35480,19 @@
     "file": "io/duckdb_catalog.py"
   },
   {
+    "symbol": "local 43",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
     "symbol": "local 44",
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 47",
+    "symbol": "local 46",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "local 49",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34556,11 +35500,7 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 55",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
-    "symbol": "local 58",
+    "symbol": "local 57",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34568,11 +35508,7 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 62",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
-    "symbol": "local 63",
+    "symbol": "local 60",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34580,7 +35516,15 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 67",
+    "symbol": "local 65",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "local 66",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "local 69",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34588,15 +35532,11 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 71",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
-    "symbol": "local 72",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
     "symbol": "local 73",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "local 74",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34604,23 +35544,19 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 76",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
     "symbol": "local 77",
     "file": "io/duckdb_catalog.py"
   },
   {
+    "symbol": "local 78",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "local 79",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
     "symbol": "local 8",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
-    "symbol": "local 80",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
-    "symbol": "local 81",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34668,15 +35604,11 @@
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 94",
+    "symbol": "local 92",
     "file": "io/duckdb_catalog.py"
   },
   {
-    "symbol": "local 95",
-    "file": "io/duckdb_catalog.py"
-  },
-  {
-    "symbol": "local 96",
+    "symbol": "local 93",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -34685,6 +35617,10 @@
   },
   {
     "symbol": "local 98",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "local 99",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -35008,6 +35944,14 @@
     "file": "io/duckdb_catalog.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/DuckDBCatalog#_readonly_connection().",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/DuckDBCatalog#_readonly_connection().(self)",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/DuckDBCatalog#_repo_root.",
     "file": "io/duckdb_catalog.py"
   },
@@ -35252,6 +36196,26 @@
     "file": "io/duckdb_catalog.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/IdMapMeta#",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/IdMapMeta#parquet_hash.",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/IdMapMeta#parquet_path.",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/IdMapMeta#refreshed.",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/IdMapMeta#row_count.",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/LOGGER.",
     "file": "io/duckdb_catalog.py"
   },
@@ -35488,6 +36452,14 @@
     "file": "io/duckdb_catalog.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/_parquet_hash().",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/_parquet_hash().(path)",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/_relation_exists().",
     "file": "io/duckdb_catalog.py"
   },
@@ -35501,6 +36473,38 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/_scope_filter_duration_seconds.",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/ensure_faiss_idmap_view().",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/ensure_faiss_idmap_view().(chunks_parquet)",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/ensure_faiss_idmap_view().(conn)",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/ensure_faiss_idmap_view().(idmap_parquet)",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/refresh_faiss_idmap_materialized().",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/refresh_faiss_idmap_materialized().(chunks_parquet)",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/refresh_faiss_idmap_materialized().(conn)",
+    "file": "io/duckdb_catalog.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.io.duckdb_catalog`/refresh_faiss_idmap_materialized().(idmap_parquet)",
     "file": "io/duckdb_catalog.py"
   },
   {
@@ -36108,10 +37112,6 @@
     "file": "io/git_client.py"
   },
   {
-    "symbol": "local 49",
-    "file": "io/git_client.py"
-  },
-  {
     "symbol": "local 5",
     "file": "io/git_client.py"
   },
@@ -36140,7 +37140,7 @@
     "file": "io/git_client.py"
   },
   {
-    "symbol": "local 57",
+    "symbol": "local 56",
     "file": "io/git_client.py"
   },
   {
@@ -36169,6 +37169,10 @@
   },
   {
     "symbol": "local 63",
+    "file": "io/git_client.py"
+  },
+  {
+    "symbol": "local 64",
     "file": "io/git_client.py"
   },
   {
@@ -37868,7 +38872,23 @@
     "file": "retrieval/gating.py"
   },
   {
+    "symbol": "local 36",
+    "file": "retrieval/gating.py"
+  },
+  {
+    "symbol": "local 37",
+    "file": "retrieval/gating.py"
+  },
+  {
+    "symbol": "local 39",
+    "file": "retrieval/gating.py"
+  },
+  {
     "symbol": "local 4",
+    "file": "retrieval/gating.py"
+  },
+  {
+    "symbol": "local 40",
     "file": "retrieval/gating.py"
   },
   {
@@ -38192,11 +39212,11 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 105",
+    "symbol": "local 11",
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 11",
+    "symbol": "local 112",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -38204,11 +39224,87 @@
     "file": "retrieval/mcp_search.py"
   },
   {
+    "symbol": "local 114",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 115",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 118",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 119",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
     "symbol": "local 12",
     "file": "retrieval/mcp_search.py"
   },
   {
+    "symbol": "local 120",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 121",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 122",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 123",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 124",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 125",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 126",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
     "symbol": "local 13",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 130",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 131",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 132",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 133",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 134",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 136",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 138",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 139",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -38244,7 +39340,7 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 21",
+    "symbol": "local 23",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -38256,11 +39352,15 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 28",
+    "symbol": "local 26",
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 29",
+    "symbol": "local 27",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 28",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -38268,15 +39368,7 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 30",
-    "file": "retrieval/mcp_search.py"
-  },
-  {
     "symbol": "local 31",
-    "file": "retrieval/mcp_search.py"
-  },
-  {
-    "symbol": "local 32",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -38360,7 +39452,11 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 62",
+    "symbol": "local 61",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "local 65",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -38372,7 +39468,7 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 68",
+    "symbol": "local 69",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -38380,11 +39476,11 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 70",
+    "symbol": "local 71",
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 72",
+    "symbol": "local 73",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -38444,7 +39540,7 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 87",
+    "symbol": "local 88",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -38456,7 +39552,7 @@
     "file": "retrieval/mcp_search.py"
   },
   {
-    "symbol": "local 90",
+    "symbol": "local 94",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -38904,6 +40000,18 @@
     "file": "retrieval/mcp_search.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/_RepairStats#dropped.",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/_RepairStats#inspected.",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/_RepairStats#repaired.",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/__all__.",
     "file": "retrieval/mcp_search.py"
   },
@@ -39116,6 +40224,18 @@
     "file": "retrieval/mcp_search.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/_merge_metadata().",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/_merge_metadata().(metadata_in)",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/_merge_metadata().(row)",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/_normalize_str_list().",
     "file": "retrieval/mcp_search.py"
   },
@@ -39133,6 +40253,30 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/_record_postfilter_density().(retained)",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/_repair_single_result().",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/_repair_single_result().(item)",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/_repair_single_result().(row)",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/_resolve_snippet().",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/_resolve_snippet().(row)",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/_resolve_snippet().(snippet)",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -39169,6 +40313,18 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/_write_pool_rows().(results)",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/post_search_validate_and_fill().",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/post_search_validate_and_fill().(hydration)",
+    "file": "retrieval/mcp_search.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.retrieval.mcp_search`/post_search_validate_and_fill().(items)",
     "file": "retrieval/mcp_search.py"
   },
   {
@@ -41013,6 +42169,166 @@
   },
   {
     "symbol": "local 0",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "local 1",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "local 2",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "local 3",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "local 4",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "local 5",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/FetchInput#",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/FetchInput#max_tokens.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/FetchInput#objectIds.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/FetchInput#resolve.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/FetchOutput#",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/FetchOutput#objects.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/FetchedObject#",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/FetchedObject#content.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/FetchedObject#id.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/FetchedObject#metadata.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/FetchedObject#title.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/FetchedObject#url.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/SearchInput#",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/SearchInput#filters.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/SearchInput#query.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/SearchInput#top_k.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/SearchOutput#",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/SearchOutput#limits.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/SearchOutput#queryEcho.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/SearchOutput#results.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/SearchOutput#top_k.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/SearchResultItem#",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/SearchResultItem#id.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/SearchResultItem#metadata.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/SearchResultItem#score.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/SearchResultItem#snippet.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/SearchResultItem#source.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/SearchResultItem#title.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/SearchResultItem#url.",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/__init__:",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/fetch_input_schema().",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/fetch_output_schema().",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/search_input_schema().",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.types`/search_output_schema().",
+    "file": "mcp_server/types.py"
+  },
+  {
+    "symbol": "local 0",
     "file": "mcp_server/telemetry.py"
   },
   {
@@ -41036,15 +42352,15 @@
     "file": "mcp_server/telemetry.py"
   },
   {
+    "symbol": "local 14",
+    "file": "mcp_server/telemetry.py"
+  },
+  {
     "symbol": "local 15",
     "file": "mcp_server/telemetry.py"
   },
   {
     "symbol": "local 16",
-    "file": "mcp_server/telemetry.py"
-  },
-  {
-    "symbol": "local 17",
     "file": "mcp_server/telemetry.py"
   },
   {
@@ -41060,11 +42376,23 @@
     "file": "mcp_server/telemetry.py"
   },
   {
+    "symbol": "local 20",
+    "file": "mcp_server/telemetry.py"
+  },
+  {
     "symbol": "local 21",
     "file": "mcp_server/telemetry.py"
   },
   {
     "symbol": "local 22",
+    "file": "mcp_server/telemetry.py"
+  },
+  {
+    "symbol": "local 24",
+    "file": "mcp_server/telemetry.py"
+  },
+  {
+    "symbol": "local 25",
     "file": "mcp_server/telemetry.py"
   },
   {
@@ -41810,6 +43138,238 @@
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.schemas`/__init__:",
     "file": "mcp_server/schemas.py"
+  },
+  {
+    "symbol": "local 0",
+    "file": "mcp_server/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.registry`/McpDeps#",
+    "file": "mcp_server/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.registry`/McpDeps#catalog.",
+    "file": "mcp_server/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.registry`/McpDeps#faiss_search.",
+    "file": "mcp_server/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.registry`/McpDeps#sparse_search.",
+    "file": "mcp_server/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.registry`/__init__:",
+    "file": "mcp_server/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.registry`/call_tool().",
+    "file": "mcp_server/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.registry`/call_tool().(arguments)",
+    "file": "mcp_server/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.registry`/call_tool().(deps)",
+    "file": "mcp_server/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.registry`/call_tool().(name)",
+    "file": "mcp_server/registry.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.registry`/list_tools().",
+    "file": "mcp_server/registry.py"
+  },
+  {
+    "symbol": "local 0",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 1",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 10",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 17",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 18",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 2",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 21",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 22",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 3",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 33",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 34",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 35",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 36",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 37",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 39",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 4",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 40",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 41",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 42",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 43",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 44",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 45",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 5",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 6",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 7",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 8",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "local 9",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/CatalogProtocol#",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/CatalogProtocol#query_by_ids().",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/CatalogProtocol#query_by_ids().(ids)",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/CatalogProtocol#query_by_ids().(self)",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/SearchDeps#",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/SearchDeps#catalog.",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/SearchDeps#faiss_search.",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/SearchDeps#sparse_search.",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/__init__:",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/_build_snippet().",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/_build_snippet().(row)",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/_build_url().",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/_build_url().(row)",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/_merge_candidates().",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/_merge_candidates().(dense)",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/_merge_candidates().(k)",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/_merge_candidates().(sparse)",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/handle_search().",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/handle_search().(args)",
+    "file": "mcp_server/search_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.search_tool`/handle_search().(deps)",
+    "file": "mcp_server/search_tool.py"
   },
   {
     "symbol": "local 11",
@@ -42632,6 +44192,86 @@
     "file": "mcp_server/scope_utils.py"
   },
   {
+    "symbol": "local 0",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "local 1",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "local 10",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "local 11",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "local 12",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "local 2",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "local 3",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "local 4",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "local 5",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "local 9",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.fetch_tool`/CatalogProtocol#",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.fetch_tool`/CatalogProtocol#query_by_ids().",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.fetch_tool`/CatalogProtocol#query_by_ids().(ids)",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.fetch_tool`/CatalogProtocol#query_by_ids().(self)",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.fetch_tool`/__init__:",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.fetch_tool`/_build_url().",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.fetch_tool`/_build_url().(row)",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.fetch_tool`/handle_fetch().",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.fetch_tool`/handle_fetch().(args)",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.fetch_tool`/handle_fetch().(catalog)",
+    "file": "mcp_server/fetch_tool.py"
+  },
+  {
     "symbol": "local 10",
     "file": "mcp_server/server.py"
   },
@@ -42950,6 +44590,46 @@
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server`/__init__:",
     "file": "mcp_server/__init__.py"
+  },
+  {
+    "symbol": "local 0",
+    "file": "mcp_server/testing.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.testing`/InProcessMCP#",
+    "file": "mcp_server/testing.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.testing`/InProcessMCP#deps.",
+    "file": "mcp_server/testing.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.testing`/InProcessMCP#tools_call().",
+    "file": "mcp_server/testing.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.testing`/InProcessMCP#tools_call().(arguments)",
+    "file": "mcp_server/testing.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.testing`/InProcessMCP#tools_call().(name)",
+    "file": "mcp_server/testing.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.testing`/InProcessMCP#tools_call().(self)",
+    "file": "mcp_server/testing.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.testing`/InProcessMCP#tools_list().",
+    "file": "mcp_server/testing.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.testing`/InProcessMCP#tools_list().(self)",
+    "file": "mcp_server/testing.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.testing`/__init__:",
+    "file": "mcp_server/testing.py"
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.cache`/__init__:",
@@ -48268,11 +49948,11 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 100",
+    "symbol": "local 104",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 104",
+    "symbol": "local 105",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -48288,27 +49968,11 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 111",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 112",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
     "symbol": "local 113",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 114",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 115",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 116",
+    "symbol": "local 117",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -48324,15 +49988,35 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 120",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
     "symbol": "local 121",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
+    "symbol": "local 122",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 123",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 124",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
     "symbol": "local 125",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 126",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 128",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 129",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -48348,19 +50032,7 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 133",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 134",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 136",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 137",
+    "symbol": "local 135",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -48368,15 +50040,19 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
+    "symbol": "local 140",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
     "symbol": "local 141",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 142",
+    "symbol": "local 143",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 143",
+    "symbol": "local 144",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -48392,15 +50068,15 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 150",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
     "symbol": "local 151",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 155",
+    "symbol": "local 152",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 153",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -48412,19 +50088,11 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 159",
+    "symbol": "local 160",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 162",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 163",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 164",
+    "symbol": "local 161",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -48448,14 +50116,6 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 170",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 171",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
     "symbol": "local 172",
     "file": "mcp_server/adapters/semantic.py"
   },
@@ -48468,7 +50128,43 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
+    "symbol": "local 175",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 176",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 177",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 179",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
     "symbol": "local 18",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 180",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 181",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 182",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 183",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 184",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -48516,15 +50212,15 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 38",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 39",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
     "symbol": "local 4",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 40",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 41",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -48532,19 +50228,7 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 44",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
     "symbol": "local 47",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 48",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 49",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -48560,11 +50244,27 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
+    "symbol": "local 53",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
     "symbol": "local 54",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
+    "symbol": "local 55",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 56",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
     "symbol": "local 57",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 58",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -48576,11 +50276,15 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 60",
+    "symbol": "local 61",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 66",
+    "symbol": "local 62",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 64",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -48588,7 +50292,7 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 68",
+    "symbol": "local 69",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -48596,27 +50300,7 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 71",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 72",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 73",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 74",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 75",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
-    "symbol": "local 76",
+    "symbol": "local 70",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -48628,15 +50312,11 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 79",
-    "file": "mcp_server/adapters/semantic.py"
-  },
-  {
     "symbol": "local 8",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
-    "symbol": "local 80",
+    "symbol": "local 81",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -48645,6 +50325,10 @@
   },
   {
     "symbol": "local 83",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 84",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -48676,11 +50360,27 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
+    "symbol": "local 92",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 93",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
     "symbol": "local 95",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
     "symbol": "local 96",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 97",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "local 98",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -48872,6 +50572,10 @@
     "file": "mcp_server/adapters/semantic.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic`/_SearchBudget#faiss_ready.",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic`/_SearchBudget#limits_metadata.",
     "file": "mcp_server/adapters/semantic.py"
   },
@@ -48941,6 +50645,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic`/_SemanticSearchPlan#effective_limit.",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic`/_SemanticSearchPlan#faiss_ready.",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -49349,6 +51057,14 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic`/_warn_scope_filter_reduction().(scope_flags)",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic`/build_observability_links().",
+    "file": "mcp_server/adapters/semantic.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic`/build_observability_links().(timeline)",
     "file": "mcp_server/adapters/semantic.py"
   },
   {
@@ -49868,19 +51584,11 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 100",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
     "symbol": "local 102",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
     "symbol": "local 103",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 104",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -49892,19 +51600,19 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 107",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 108",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 109",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 11",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 111",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 112",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 113",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -49956,15 +51664,15 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 125",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 126",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
     "symbol": "local 127",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 128",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -49988,6 +51696,10 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 134",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 135",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
@@ -49996,7 +51708,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 137",
+    "symbol": "local 138",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50005,10 +51717,6 @@
   },
   {
     "symbol": "local 140",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 141",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50056,11 +51764,19 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 155",
+    "symbol": "local 152",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 156",
+    "symbol": "local 153",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 154",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 158",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50069,10 +51785,6 @@
   },
   {
     "symbol": "local 16",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 160",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50088,15 +51800,11 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 167",
+    "symbol": "local 166",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
     "symbol": "local 168",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 169",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50128,15 +51836,15 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 176",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 177",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
     "symbol": "local 178",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 179",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50152,11 +51860,19 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 182",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 183",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 184",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 185",
+    "symbol": "local 187",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50164,19 +51880,19 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 189",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
     "symbol": "local 19",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 196",
+    "symbol": "local 191",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 198",
+    "symbol": "local 192",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 199",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50188,11 +51904,11 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 200",
+    "symbol": "local 201",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 201",
+    "symbol": "local 203",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50200,7 +51916,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 205",
+    "symbol": "local 207",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50216,15 +51932,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 213",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
     "symbol": "local 214",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 215",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50236,15 +51944,15 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 218",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 219",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
     "symbol": "local 220",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 221",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50268,19 +51976,19 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 227",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 228",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 230",
+    "symbol": "local 229",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
     "symbol": "local 231",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 232",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50332,7 +52040,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 247",
+    "symbol": "local 245",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50340,15 +52048,15 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 249",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 25",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 250",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 252",
+    "symbol": "local 251",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50356,7 +52064,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 255",
+    "symbol": "local 254",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50364,7 +52072,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 258",
+    "symbol": "local 257",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50408,7 +52116,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 269",
+    "symbol": "local 268",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50452,7 +52160,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 281",
+    "symbol": "local 279",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50468,7 +52176,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 286",
+    "symbol": "local 285",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50492,7 +52200,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 293",
+    "symbol": "local 292",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50532,7 +52240,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 304",
+    "symbol": "local 301",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50544,7 +52252,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 308",
+    "symbol": "local 307",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50564,23 +52272,23 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 313",
+    "symbol": "local 312",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 315",
+    "symbol": "local 314",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 317",
+    "symbol": "local 316",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 319",
+    "symbol": "local 318",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 321",
+    "symbol": "local 320",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50612,23 +52320,19 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 329",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 33",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 330",
+    "symbol": "local 331",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
     "symbol": "local 34",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 37",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 38",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50652,11 +52356,11 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 44",
+    "symbol": "local 43",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 45",
+    "symbol": "local 44",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50672,23 +52376,23 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 49",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 5",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 51",
+    "symbol": "local 50",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 52",
+    "symbol": "local 53",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
     "symbol": "local 54",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 55",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50704,6 +52408,10 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 59",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 6",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
@@ -50712,11 +52420,11 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 61",
+    "symbol": "local 62",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 64",
+    "symbol": "local 63",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50724,11 +52432,11 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 67",
+    "symbol": "local 68",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 68",
+    "symbol": "local 69",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50736,11 +52444,7 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 71",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 72",
+    "symbol": "local 70",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50752,15 +52456,15 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 75",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 76",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 8",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 80",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 81",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50776,15 +52480,15 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 85",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 86",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
     "symbol": "local 87",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 88",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50796,15 +52500,15 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "local 90",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "local 91",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
     "symbol": "local 92",
-    "file": "mcp_server/adapters/semantic_pro.py"
-  },
-  {
-    "symbol": "local 93",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -50816,7 +52520,15 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
-    "symbol": "local 99",
+    "symbol": "local 96",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 97",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "local 98",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -51612,6 +53324,18 @@
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic_pro`/_semantic_search_pro_sync()._finish().",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic_pro`/_semantic_search_pro_sync()._finish().(envelope)",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic_pro`/_semantic_search_pro_sync()._finish().(findings_count)",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic_pro`/_should_execute_stage_two().",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
@@ -51693,6 +53417,10 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic_pro`/_xtr_rescore_hits().(query)",
+    "file": "mcp_server/adapters/semantic_pro.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.semantic_pro`/build_observability_links().",
     "file": "mcp_server/adapters/semantic_pro.py"
   },
   {
@@ -51792,6 +53520,10 @@
     "file": "mcp_server/adapters/deep_research.py"
   },
   {
+    "symbol": "local 27",
+    "file": "mcp_server/adapters/deep_research.py"
+  },
+  {
     "symbol": "local 3",
     "file": "mcp_server/adapters/deep_research.py"
   },
@@ -51812,6 +53544,22 @@
     "file": "mcp_server/adapters/deep_research.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.deep_research`/_DEFAULT_CONCURRENCY.",
+    "file": "mcp_server/adapters/deep_research.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.deep_research`/_DEFAULT_FETCH_TIMEOUT_S.",
+    "file": "mcp_server/adapters/deep_research.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.deep_research`/_DEFAULT_SEARCH_TIMEOUT_S.",
+    "file": "mcp_server/adapters/deep_research.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.deep_research`/_SEMAPHORE.",
+    "file": "mcp_server/adapters/deep_research.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.deep_research`/_TRACE_SUBDIR.",
     "file": "mcp_server/adapters/deep_research.py"
   },
@@ -51821,6 +53569,18 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.deep_research`/__init__:",
+    "file": "mcp_server/adapters/deep_research.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.deep_research`/_bounded().",
+    "file": "mcp_server/adapters/deep_research.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.deep_research`/_bounded().(operation)",
+    "file": "mcp_server/adapters/deep_research.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.mcp_server.adapters.deep_research`/_bounded().(timeout_s)",
     "file": "mcp_server/adapters/deep_research.py"
   },
   {
@@ -52648,10 +54408,6 @@
     "file": "app/routers/index_admin.py"
   },
   {
-    "symbol": "local 14",
-    "file": "app/routers/index_admin.py"
-  },
-  {
     "symbol": "local 16",
     "file": "app/routers/index_admin.py"
   },
@@ -52677,10 +54433,6 @@
   },
   {
     "symbol": "local 21",
-    "file": "app/routers/index_admin.py"
-  },
-  {
-    "symbol": "local 22",
     "file": "app/routers/index_admin.py"
   },
   {
@@ -52720,6 +54472,10 @@
     "file": "app/routers/index_admin.py"
   },
   {
+    "symbol": "local 31",
+    "file": "app/routers/index_admin.py"
+  },
+  {
     "symbol": "local 32",
     "file": "app/routers/index_admin.py"
   },
@@ -52732,15 +54488,15 @@
     "file": "app/routers/index_admin.py"
   },
   {
+    "symbol": "local 35",
+    "file": "app/routers/index_admin.py"
+  },
+  {
     "symbol": "local 36",
     "file": "app/routers/index_admin.py"
   },
   {
     "symbol": "local 37",
-    "file": "app/routers/index_admin.py"
-  },
-  {
-    "symbol": "local 38",
     "file": "app/routers/index_admin.py"
   },
   {
@@ -52757,10 +54513,6 @@
   },
   {
     "symbol": "local 41",
-    "file": "app/routers/index_admin.py"
-  },
-  {
-    "symbol": "local 42",
     "file": "app/routers/index_admin.py"
   },
   {
@@ -52796,6 +54548,10 @@
     "file": "app/routers/index_admin.py"
   },
   {
+    "symbol": "local 50",
+    "file": "app/routers/index_admin.py"
+  },
+  {
     "symbol": "local 51",
     "file": "app/routers/index_admin.py"
   },
@@ -52812,7 +54568,39 @@
     "file": "app/routers/index_admin.py"
   },
   {
+    "symbol": "local 55",
+    "file": "app/routers/index_admin.py"
+  },
+  {
+    "symbol": "local 56",
+    "file": "app/routers/index_admin.py"
+  },
+  {
+    "symbol": "local 58",
+    "file": "app/routers/index_admin.py"
+  },
+  {
+    "symbol": "local 59",
+    "file": "app/routers/index_admin.py"
+  },
+  {
     "symbol": "local 6",
+    "file": "app/routers/index_admin.py"
+  },
+  {
+    "symbol": "local 60",
+    "file": "app/routers/index_admin.py"
+  },
+  {
+    "symbol": "local 61",
+    "file": "app/routers/index_admin.py"
+  },
+  {
+    "symbol": "local 7",
+    "file": "app/routers/index_admin.py"
+  },
+  {
+    "symbol": "local 8",
     "file": "app/routers/index_admin.py"
   },
   {
@@ -52932,6 +54720,18 @@
     "file": "app/routers/index_admin.py"
   },
   {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.routers.index_admin`/_find_ledger_path().",
+    "file": "app/routers/index_admin.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.routers.index_admin`/_find_ledger_path().(data_dir)",
+    "file": "app/routers/index_admin.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.routers.index_admin`/_find_ledger_path().(run_id)",
+    "file": "app/routers/index_admin.py"
+  },
+  {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.routers.index_admin`/_persist_session_tuning().",
     "file": "app/routers/index_admin.py"
   },
@@ -52993,6 +54793,18 @@
   },
   {
     "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.routers.index_admin`/faiss_runtime_tuning_endpoint().(request)",
+    "file": "app/routers/index_admin.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.routers.index_admin`/get_run_report().",
+    "file": "app/routers/index_admin.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.routers.index_admin`/get_run_report().(request)",
+    "file": "app/routers/index_admin.py"
+  },
+  {
+    "symbol": "scip-python python kgfoundry 0.1.0 `codeintel_rev.app.routers.index_admin`/get_run_report().(run_id)",
     "file": "app/routers/index_admin.py"
   },
   {

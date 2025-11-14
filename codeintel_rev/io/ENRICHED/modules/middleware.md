@@ -60,10 +60,13 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 - from **(absolute)** import time
 - from **(absolute)** import uuid
 - from **datetime** import UTC, datetime
+- from **pathlib** import Path
 - from **typing** import TYPE_CHECKING
 - from **starlette.middleware.base** import BaseHTTPMiddleware, DispatchFunction
 - from **starlette.types** import ASGIApp
+- from **codeintel_rev.observability.ledger** import RunLedger, dated_run_dir
 - from **codeintel_rev.observability.otel** import current_trace_id, set_current_span_attrs
+- from **codeintel_rev.observability.runtime_observer** import bind_run_ledger
 - from **codeintel_rev.observability.semantic_conventions** import Attrs
 - from **codeintel_rev.observability.timeline** import bind_timeline, new_timeline
 - from **codeintel_rev.runtime.request_context** import capability_stamp_var, session_id_var
@@ -84,16 +87,16 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 ## Graph Metrics
 
 - **fan_in**: 6
-- **fan_out**: 7
-- **cycle_group**: 74
+- **fan_out**: 9
+- **cycle_group**: 78
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 13
-- recent churn 90: 13
+- recent churn 30: 14
+- recent churn 90: 14
 
 ## Usage
 
@@ -129,17 +132,17 @@ SessionScopeMiddleware, capability_stamp_var, get_capability_stamp, get_session_
 
 ## Hotspot
 
-- score: 2.23
+- score: 2.38
 
 ## Side Effects
 
-- none detected
+- filesystem
 
 ## Complexity
 
-- branches: 6
-- cyclomatic: 7
-- loc: 306
+- branches: 9
+- cyclomatic: 10
+- loc: 324
 
 ## Doc Coverage
 

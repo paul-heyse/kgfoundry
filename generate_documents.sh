@@ -38,6 +38,10 @@ uv run python -m codeintel_rev.cst_build.cst_cli \
   --modules "$ENRICH_OUT/modules/modules.jsonl" \
   --out "$CST_OUT"
 
+echo "==> Normalizing CST dataset artifacts..."
+rm -f "$CST_OUT/cst_nodes.jsonl"
+gzip -dc "$CST_OUT/cst_nodes.jsonl.gz" > "$CST_OUT/cst_nodes.jsonl"
+
 echo "==> Copying artifacts into \"$DOC_OUT\"..."
 rm -rf "$DOC_OUT"
 mkdir -p "$DOC_OUT"
@@ -46,6 +50,13 @@ cp -R "$CST_OUT" "$DOC_OUT/cst"
 mkdir -p "$DOC_OUT/scip"
 cp "$SCIP_BIN" "$DOC_OUT/scip/index.scip"
 cp "$SCIP_JSON" "$DOC_OUT/scip/index.scip.json"
+
+echo "==> Promoting frequently accessed artifacts to Document Output root..."
+cp "$SCIP_JSON" "$DOC_OUT/index.scip.json"
+cp "$ENRICH_OUT/repo_map.json" "$DOC_OUT/repo_map.json"
+cp "$ENRICH_OUT/modules/modules.jsonl" "$DOC_OUT/modules.jsonl"
+cp "$ENRICH_OUT/ast/ast_nodes.jsonl" "$DOC_OUT/ast_nodes.jsonl"
+cp "$CST_OUT/cst_nodes.jsonl" "$DOC_OUT/cst_nodes.jsonl"
 
 echo "Document generation complete."
 echo "Outputs available under: $DOC_OUT"

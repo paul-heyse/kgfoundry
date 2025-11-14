@@ -34,6 +34,12 @@ from kgfoundry_common.logging import get_logger
 
 LOGGER = get_logger(__name__)
 _RUNTIME = "index-lifecycle"
+MANIFEST_FILE = "manifest.json"
+IDMAP_FILE = "faiss.idmap.parquet"
+PROFILE_FILE = "faiss.tuning.json"
+_LEGACY_MANIFEST_FILES = ("version.json",)
+_LEGACY_IDMAP_FILES = ("faiss_idmap.parquet",)
+_LEGACY_PROFILE_FILES = ("tuning.json",)
 
 
 @dataclass(slots=True, frozen=True)
@@ -152,9 +158,14 @@ def collect_asset_attrs(assets: IndexAssets) -> dict[str, object]:
         dictionary is suitable for serialization in version.json manifests.
     """
     attrs: dict[str, object] = {}
+    attrs.setdefault("faiss_bytes_sha256", _file_checksum(assets.faiss_index))
     attrs.update(_attrs_from_meta(assets.faiss_index.with_suffix(".meta.json")))
     attrs.update(_attrs_from_idmap(assets.faiss_idmap))
     attrs.update(_attrs_from_tuning(assets.tuning_profile, attrs))
+    if assets.faiss_idmap and assets.faiss_idmap.exists():
+        attrs.setdefault("faiss_idmap", assets.faiss_idmap.name)
+    if assets.tuning_profile and assets.tuning_profile.exists():
+        attrs.setdefault("faiss_profile", assets.tuning_profile.name)
     return attrs
 
 
@@ -274,6 +285,14 @@ class IndexLifecycleManager:
             return candidate
         return None
 
+    def open_current(self) -> Path:
+        """Return the active version directory, validating manifest presence."""
+        active_dir = self.current_dir()
+        if active_dir is None:
+            raise RuntimeLifecycleError("No CURRENT version", runtime=_RUNTIME)
+        self._resolve_manifest_path(active_dir)
+        return active_dir
+
     def list_versions(self) -> list[str]:
         """Return the list of committed versions (excludes staging dirs).
 
@@ -306,10 +325,7 @@ class IndexLifecycleManager:
         active_dir = self.current_dir()
         if active_dir is None:
             return None
-        manifest_path = active_dir / "version.json"
-        if not manifest_path.exists():
-            message = f"manifest missing: {manifest_path}"
-            raise RuntimeLifecycleError(message, runtime=_RUNTIME)
+        manifest_path = self._resolve_manifest_path(active_dir)
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
         assets = IndexAssets(
             faiss_index=active_dir / "faiss.index",
@@ -318,8 +334,8 @@ class IndexLifecycleManager:
             bm25_dir=self._maybe_dir(active_dir / "bm25"),
             splade_dir=self._maybe_dir(active_dir / "splade"),
             xtr_dir=self._maybe_dir(active_dir / "xtr"),
-            faiss_idmap=self._maybe_file(active_dir / "faiss_idmap.parquet"),
-            tuning_profile=self._maybe_file(active_dir / "tuning.json"),
+            faiss_idmap=self._locate_sidecar(active_dir, IDMAP_FILE, _LEGACY_IDMAP_FILES),
+            tuning_profile=self._locate_sidecar(active_dir, PROFILE_FILE, _LEGACY_PROFILE_FILES),
         )
         assets.ensure_exists()
         if payload.get("version") != self.current_version():
@@ -440,10 +456,20 @@ class IndexLifecycleManager:
         self._copy_tree(assets.bm25_dir, staging_dir / "bm25")
         self._copy_tree(assets.splade_dir, staging_dir / "splade")
         self._copy_tree(assets.xtr_dir, staging_dir / "xtr")
-        self._copy_optional_file(assets.faiss_idmap, staging_dir / "faiss_idmap.parquet")
-        self._copy_optional_file(assets.tuning_profile, staging_dir / "tuning.json")
+        self._copy_optional_file(assets.faiss_idmap, staging_dir / IDMAP_FILE)
+        self._copy_optional_file(assets.tuning_profile, staging_dir / PROFILE_FILE)
+        missing_sidecars: list[str] = []
+        if assets.faiss_idmap is None or not assets.faiss_idmap.exists():
+            missing_sidecars.append("faiss_idmap")
+        if assets.tuning_profile is None or not assets.tuning_profile.exists():
+            missing_sidecars.append("tuning_profile")
+        if missing_sidecars:
+            LOGGER.warning(
+                "index.prepare.sidecars_missing",
+                extra={"version": version, "missing": ",".join(missing_sidecars)},
+            )
         meta = VersionMeta(version=version, created_ts=time.time(), attrs=attrs or {})
-        (staging_dir / "version.json").write_text(meta.to_json(), encoding="utf-8")
+        (staging_dir / MANIFEST_FILE).write_text(meta.to_json(), encoding="utf-8")
         LOGGER.info(
             "index.prepare.complete",
             extra={"version": version, "dir": str(staging_dir)},
@@ -451,7 +477,7 @@ class IndexLifecycleManager:
         return staging_dir
 
     def write_attrs(self, version: str, **attrs: object) -> Path:
-        """Merge additional attributes into ``version.json``.
+        """Merge additional attributes into the lifecycle manifest.
 
         This method updates the version manifest file by merging additional
         attributes into the existing attrs dictionary. The method reads the
@@ -464,7 +490,7 @@ class IndexLifecycleManager:
         version : str
             Version identifier for the manifest to update (e.g., "v1.0.0").
             The version must exist in the versions directory and have a
-            version.json manifest file.
+            manifest file.
         **attrs : object
             Additional attributes to merge into the manifest's attrs dictionary.
             Attributes are merged using dict.update(), with new values overriding
@@ -473,7 +499,7 @@ class IndexLifecycleManager:
         Returns
         -------
         Path
-            Path to the updated manifest file (versions_dir / version / "version.json").
+            Path to the updated manifest file (versions_dir / version / MANIFEST_FILE).
             The manifest has been updated with merged attributes and written to disk.
 
         Raises
@@ -482,10 +508,11 @@ class IndexLifecycleManager:
             Raised when the manifest file is missing for the specified version.
             The error includes the expected manifest path for debugging.
         """
-        manifest_path = self.versions_dir / version / "version.json"
-        if not manifest_path.exists():
-            message = f"manifest missing: {manifest_path}"
+        version_dir = self.versions_dir / version
+        if not version_dir.exists():
+            message = f"version not found: {version_dir}"
             raise RuntimeLifecycleError(message, runtime=_RUNTIME)
+        manifest_path = self._resolve_manifest_path(version_dir)
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
         merged = dict(payload.get("attrs", {}))
         merged.update(attrs)
@@ -536,6 +563,7 @@ class IndexLifecycleManager:
             raise RuntimeLifecycleError(message, runtime=_RUNTIME)
         final_dir = self.versions_dir / version
         staging_dir.replace(final_dir)
+        self._resolve_manifest_path(final_dir)
         self._write_current_pointer(version, final_dir)
         LOGGER.info(
             "index.publish.complete",
@@ -658,6 +686,40 @@ class IndexLifecycleManager:
             return
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
+
+    def _resolve_manifest_path(self, version_dir: Path) -> Path:
+        manifest_path = version_dir / MANIFEST_FILE
+        if manifest_path.exists():
+            return manifest_path
+        for legacy_name in _LEGACY_MANIFEST_FILES:
+            legacy_path = version_dir / legacy_name
+            if legacy_path.exists():
+                LOGGER.warning(
+                    "index.manifest.legacy_path",
+                    extra={"path": str(legacy_path), "preferred": MANIFEST_FILE},
+                )
+                return legacy_path
+        message = f"manifest missing: {manifest_path}"
+        raise RuntimeLifecycleError(message, runtime=_RUNTIME)
+
+    def _locate_sidecar(
+        self,
+        base_dir: Path,
+        primary_name: str,
+        legacy_names: tuple[str, ...],
+    ) -> Path | None:
+        candidate = base_dir / primary_name
+        if candidate.exists():
+            return candidate
+        for legacy_name in legacy_names:
+            legacy_candidate = base_dir / legacy_name
+            if legacy_candidate.exists():
+                LOGGER.warning(
+                    "index.sidecar.legacy_path",
+                    extra={"path": str(legacy_candidate), "preferred": primary_name},
+                )
+                return legacy_candidate
+        return None
 
 
 __all__ = [

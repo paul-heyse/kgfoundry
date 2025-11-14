@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 from codeintel_rev.mcp_server.adapters.semantic import semantic_search
 from codeintel_rev.mcp_server.schemas import ScopeIn
 
-from kgfoundry_common.errors import EmbeddingError, VectorSearchError
+from kgfoundry_common.errors import EmbeddingError
 
 
 @dataclass(frozen=True)
@@ -343,6 +343,7 @@ class _BaseStubFAISSManager:
         k: int,
         nprobe: int = 128,
         runtime: object | None = None,
+        catalog: object | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
         """Return mock search results.
 
@@ -886,7 +887,7 @@ async def test_semantic_search_hybrid_merges_channels() -> None:
 
 
 async def test_semantic_search_faiss_not_ready() -> None:
-    """Test semantic_search raises VectorSearchError when FAISS is not ready."""
+    """Test semantic_search falls back when FAISS is not ready."""
     faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
     context = StubContext(
         faiss_manager=faiss_manager,
@@ -902,9 +903,12 @@ async def test_semantic_search_faiss_not_ready() -> None:
             "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
             return_value=None,
         ),
-        pytest.raises(VectorSearchError, match="Index not built"),
     ):
-        await semantic_search(cast("ApplicationContext", context), "query", limit=10)
+        result = await semantic_search(cast("ApplicationContext", context), "query", limit=10)
+    limits = result.get("limits") or []
+    joined_limits = " ".join(limits)
+    assert "faiss_fallback" in joined_limits
+    assert result.get("findings") == []
 
 
 async def test_semantic_search_embedding_error() -> None:
@@ -935,7 +939,7 @@ async def test_semantic_search_embedding_error() -> None:
 
 
 async def test_semantic_search_faiss_search_error() -> None:
-    """Test semantic_search raises VectorSearchError when FAISS search fails."""
+    """Test semantic_search falls back when FAISS search fails."""
     faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
     context = StubContext(
         faiss_manager=faiss_manager,
@@ -956,6 +960,8 @@ async def test_semantic_search_faiss_search_error() -> None:
             "search",
             side_effect=RuntimeError("FAISS search failed"),
         ),
-        pytest.raises(VectorSearchError, match="FAISS search failed"),
     ):
-        await semantic_search(cast("ApplicationContext", context), "query", limit=10)
+        result = await semantic_search(cast("ApplicationContext", context), "query", limit=10)
+    limits = result.get("limits") or []
+    assert any("faiss_fallback" in entry for entry in limits)
+    assert result.get("findings") == []

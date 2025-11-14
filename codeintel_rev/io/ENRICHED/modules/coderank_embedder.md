@@ -30,7 +30,7 @@ Pooled wrapper around the CodeRank embedding SentenceTransformer.
 
 - **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 111
+- **cycle_group**: 110
 
 ## Ownership
 

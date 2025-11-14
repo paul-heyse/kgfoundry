@@ -24,7 +24,7 @@ Shared reranker interfaces and request/response types.
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 120
+- **cycle_group**: 116
 
 ## Ownership
 

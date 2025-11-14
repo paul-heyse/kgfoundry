@@ -40,7 +40,7 @@ Score boosters applied after fusion.
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 67
+- **cycle_group**: 61
 
 ## Ownership
 

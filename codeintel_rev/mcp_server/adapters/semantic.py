@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.app.middleware import get_session_id
+from codeintel_rev.errors import CatalogConsistencyError
 from codeintel_rev.io.faiss_manager import SearchRuntimeOverrides
 from codeintel_rev.io.hybrid_search import HybridSearchOptions, HybridSearchTuning
 from codeintel_rev.io.vllm_client import VLLMClient
@@ -113,6 +114,7 @@ class _HybridSearchState:
     effective_limit: int
     faiss_k: int
     nprobe: int
+    faiss_ready: bool
 
 
 @dataclass(frozen=True)
@@ -154,6 +156,7 @@ class _SearchBudget:
     effective_limit: int
     max_results: int
     limits_metadata: tuple[str, ...]
+    faiss_ready: bool
 
 
 @dataclass(frozen=True)
@@ -166,6 +169,7 @@ class _SemanticSearchPlan:
     effective_limit: int
     fanout: _FaissFanout
     nprobe: int
+    faiss_ready: bool
 
 
 @dataclass(frozen=True)
@@ -408,39 +412,69 @@ def _execute_semantic_pipeline(request: _SemanticPipelineRequest) -> _SemanticPi
         pipeline_attrs["retrieval.limits"] = to_label_str(limits_metadata)
         pipeline_attrs[Attrs.WARNINGS] = to_label_str(limits_metadata)
     with as_span("retrieval.pipeline", **pipeline_attrs):
-        with as_span(
-            "retrieval.embed",
-            **{
-                Attrs.COMPONENT: "retrieval",
-                Attrs.STAGE: "embed",
-                Attrs.QUERY_LEN: len(request.query),
-            },
-        ):
-            query_vector = _embed_query_or_raise(
-                request.context.vllm_client,
-                request.query,
-                request.observation,
-                request.context.settings.vllm.base_url,
-            )
-        with request.context.open_catalog() as catalog:
-            faiss_attrs = {
-                Attrs.COMPONENT: "retrieval",
-                Attrs.STAGE: "faiss",
-                Attrs.FAISS_TOP_K: plan.fanout.faiss_k,
-                Attrs.FAISS_NPROBE: plan.nprobe,
-            }
-            with as_span("retrieval.faiss", **faiss_attrs):
-                result_ids, result_scores = _run_faiss_search_or_raise(
-                    _FaissSearchRequest(
-                        context=request.context,
-                        query_vector=query_vector,
-                        limit=plan.fanout.faiss_k,
-                        nprobe=plan.nprobe,
-                        observation=request.observation,
-                        tuning_overrides=plan.tuning_overrides,
-                        catalog=catalog,
-                    )
+        query_vector: NDArrayF32 | None = None
+        if plan.faiss_ready:
+            with as_span(
+                "retrieval.embed",
+                **{
+                    Attrs.COMPONENT: "retrieval",
+                    Attrs.STAGE: "embed",
+                    Attrs.QUERY_LEN: len(request.query),
+                },
+            ):
+                query_vector = _embed_query_or_raise(
+                    request.context.vllm_client,
+                    request.query,
+                    request.observation,
+                    request.context.settings.vllm.base_url,
                 )
+        with request.context.open_catalog() as catalog:
+            if plan.faiss_ready and query_vector is not None:
+                faiss_attrs = {
+                    Attrs.COMPONENT: "retrieval",
+                    Attrs.STAGE: "faiss",
+                    Attrs.FAISS_TOP_K: plan.fanout.faiss_k,
+                    Attrs.FAISS_NPROBE: plan.nprobe,
+                }
+                with as_span("retrieval.faiss", **faiss_attrs):
+                    (
+                        result_ids,
+                        result_scores,
+                        search_exc,
+                    ) = _run_faiss_search(
+                        _FaissSearchRequest(
+                            context=request.context,
+                            query_vector=query_vector,
+                            limit=plan.fanout.faiss_k,
+                            nprobe=plan.nprobe,
+                            observation=request.observation,
+                            tuning_overrides=plan.tuning_overrides,
+                            catalog=catalog,
+                        )
+                    )
+            else:
+                result_ids = []
+                result_scores = []
+                search_exc = None
+            if search_exc is not None:
+                warning = f"FAISS unavailable, falling back to sparse channels ({search_exc})"
+                LOGGER.warning(warning, exc_info=search_exc)
+                limits_metadata.append("faiss_fallback:unavailable")
+                result_ids = []
+                result_scores = []
+            else:
+                threshold = float(request.context.settings.index.semantic_min_score or 0.0)
+                if threshold > 0.0 and result_scores and float(result_scores[0]) < threshold:
+                    LOGGER.info(
+                        "faiss.low_similarity_fallback",
+                        extra={
+                            "top_score": float(result_scores[0]),
+                            "threshold": threshold,
+                        },
+                    )
+                    limits_metadata.append("faiss_fallback:low_score")
+                    result_ids = []
+                    result_scores = []
 
             hybrid_attrs = {
                 Attrs.COMPONENT: "retrieval",
@@ -458,6 +492,7 @@ def _execute_semantic_pipeline(request: _SemanticPipelineRequest) -> _SemanticPi
                         plan.effective_limit,
                         plan.fanout.faiss_k,
                         plan.nprobe,
+                        plan.faiss_ready,
                     ),
                     limits_metadata,
                     ("semantic", "faiss"),
@@ -554,15 +589,16 @@ def _build_search_budget(
     effective_limit, clamp_messages = _clamp_result_limit(requested_limit, max_results)
 
     ready, faiss_limits, faiss_error = context.ensure_faiss_ready()
+    limits_metadata: tuple[str, ...] = tuple(faiss_limits) + tuple(clamp_messages)
     if not ready:
-        observation.mark_error()
-        raise VectorSearchError(
-            faiss_error or "Semantic search not available - index not built",
-            context={"faiss_index": str(context.paths.faiss_index)},
-        )
-
-    limits_metadata = (*faiss_limits, *clamp_messages)
-    return _SearchBudget(effective_limit, max_results, limits_metadata)
+        note = faiss_error or "Semantic search not available - index not built"
+        limits_metadata = (*limits_metadata, f"faiss_fallback:unavailable ({note})")
+    return _SearchBudget(
+        effective_limit=effective_limit,
+        max_results=max_results,
+        limits_metadata=limits_metadata,
+        faiss_ready=ready,
+    )
 
 
 def _build_semantic_search_plan(
@@ -632,6 +668,7 @@ def _build_semantic_search_plan(
         effective_limit=budget.effective_limit,
         fanout=fanout,
         nprobe=faiss_nprobe,
+        faiss_ready=budget.faiss_ready,
     )
 
 
@@ -763,7 +800,8 @@ def _resolve_hybrid_results(
         semantic_hits=semantic_hits,
         limit=state.effective_limit,
         options=HybridSearchOptions(
-            tuning=HybridSearchTuning(k=state.faiss_k, nprobe=state.nprobe)
+            tuning=HybridSearchTuning(k=state.faiss_k, nprobe=state.nprobe),
+            faiss_ready=state.faiss_ready,
         ),
     )
     if hybrid_result.warnings:
@@ -939,21 +977,20 @@ def _ensure_hydration_success(
 
     Raises
     ------
-    VectorSearchError
+    CatalogConsistencyError
         If hydration fails.
     """
     if hydrate_exc is None:
         return
 
     observation.mark_error()
-    raise VectorSearchError(
-        str(hydrate_exc),
-        cause=hydrate_exc,
+    raise CatalogConsistencyError(
+        "DuckDB hydration failed",
         context={
             "duckdb_path": str(context.paths.duckdb_path),
             "vectors_dir": str(context.paths.vectors_dir),
         },
-    )
+    ) from hydrate_exc
 
 
 def _warn_scope_filter_reduction(

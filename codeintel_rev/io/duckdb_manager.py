@@ -197,6 +197,22 @@ class DuckDBManager:
         finally:
             self._release_connection(conn)
 
+    @contextmanager
+    def readonly_connection(self) -> Iterator[duckdb.DuckDBPyConnection]:
+        """Yield a dedicated read-only DuckDB connection (non pooled).
+
+        Yields
+        ------
+        duckdb.DuckDBPyConnection
+            Instrumented connection opened in read-only mode.
+        """
+        conn = self._create_connection(read_only=True)
+        instrumented = _InstrumentedDuckDBConnection(conn, self._config)
+        try:
+            yield cast("duckdb.DuckDBPyConnection", instrumented)
+        finally:
+            conn.close()
+
     @property
     def config(self) -> DuckDBConfig:
         """Return the active DuckDB configuration."""
@@ -230,8 +246,8 @@ class DuckDBManager:
         with suppress(Exception):
             self.close()
 
-    def _create_connection(self) -> duckdb.DuckDBPyConnection:
-        conn = duckdb.connect(str(self._db_path))
+    def _create_connection(self, *, read_only: bool = False) -> duckdb.DuckDBPyConnection:
+        conn = duckdb.connect(str(self._db_path), read_only=read_only)
         if self._config.enable_object_cache:
             conn.execute("PRAGMA enable_object_cache = true")
         conn.execute(f"SET threads = {self._config.threads}")

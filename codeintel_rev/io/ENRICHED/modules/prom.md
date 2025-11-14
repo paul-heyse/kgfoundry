@@ -53,7 +53,7 @@ Prometheus helpers for MCP diagnostics.
 
 - **fan_in**: 9
 - **fan_out**: 1
-- **cycle_group**: 42
+- **cycle_group**: 52
 
 ## Ownership
 

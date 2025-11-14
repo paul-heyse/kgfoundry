@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping, Sequence
 from contextlib import nullcontext
 from dataclasses import dataclass
@@ -439,6 +440,7 @@ class HybridSearchOptions:
     extra_channels: Mapping[str, Sequence[SearchHit]] | None = None
     weights: Mapping[str, float] | None = None
     tuning: HybridSearchTuning | None = None
+    faiss_ready: bool = True
 
 
 @dataclass(slots=True, frozen=True)
@@ -840,21 +842,34 @@ class HybridSearchEngine:
             ],
         )
         opts = options or HybridSearchOptions()
+        normalized_hits, readiness_warnings = self._filter_semantic_hits(
+            semantic_hits,
+            faiss_ready=opts.faiss_ready,
+        )
         result = self._execute_hybrid_search(
             query=query,
-            semantic_hits=semantic_hits,
+            semantic_hits=normalized_hits,
             limit=limit,
             options=opts,
             telemetry=telemetry_ctx,
         )
         method_payload = self._with_stage_metadata(result.method, telemetry_ctx.stage_records)
-        return HybridSearchResult(
+        enriched = HybridSearchResult(
             docs=result.docs,
             contributions=result.contributions,
             channels=result.channels,
             warnings=result.warnings,
             method=method_payload,
         )
+        if readiness_warnings:
+            enriched = HybridSearchResult(
+                docs=enriched.docs,
+                contributions=enriched.contributions,
+                channels=enriched.channels,
+                warnings=[*readiness_warnings, *enriched.warnings],
+                method=enriched.method,
+            )
+        return enriched
 
     def _execute_hybrid_search(
         self,
@@ -1379,6 +1394,31 @@ class HybridSearchEngine:
         if budget is not None:
             method["budget"] = dict(budget)
         return method
+
+    def _filter_semantic_hits(
+        self,
+        semantic_hits: Sequence[tuple[int, float]],
+        *,
+        faiss_ready: bool,
+    ) -> tuple[list[tuple[int, float]], list[str]]:
+        """Drop semantic hits when FAISS is unavailable or below score threshold."""
+        hits = list(semantic_hits)
+        warnings: list[str] = []
+        if not faiss_ready:
+            warnings.append("faiss_fallback:unavailable")
+            return [], warnings
+        if not hits:
+            return hits, warnings
+        threshold = float(getattr(self._settings.index, "semantic_min_score", 0.0) or 0.0)
+        if threshold <= 0.0:
+            return hits, warnings
+        top_score = float(hits[0][1]) if hits and len(hits[0]) > 1 else None
+        if top_score is None or math.isnan(top_score):
+            return hits, warnings
+        if top_score < threshold:
+            warnings.append("faiss_fallback:low_score")
+            return [], warnings
+        return hits, warnings
 
 
 __all__ = [

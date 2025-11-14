@@ -1406,7 +1406,10 @@ class ApplicationContext:
         with faiss_state.lock:
             if not faiss_state.loaded:
                 try:
-                    self.faiss_manager.load_cpu_index()
+                    self.faiss_manager.load_cpu_index(
+                        export_idmap=self.paths.faiss_idmap_path,
+                        profile_path=self.faiss_manager.autotune_profile_path,
+                    )
                 except (FileNotFoundError, RuntimeError) as exc:
                     return False, limits, f"FAISS index load failed: {exc}"
                 faiss_state.loaded = True

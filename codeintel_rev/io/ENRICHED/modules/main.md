@@ -38,7 +38,7 @@ Provides health/readiness endpoints, CORS, and streaming support.
 - from **codeintel_rev.app.server_settings** import get_server_settings
 - from **codeintel_rev.errors** import RuntimeUnavailableError
 - from **codeintel_rev.mcp_server.server** import app_context, build_http_app
-- from **codeintel_rev.observability.otel** import as_span, init_otel, instrument_fastapi, instrument_httpx, set_current_span_attrs
+- from **codeintel_rev.observability.otel** import as_span, current_trace_id, init_all_telemetry, instrument_fastapi, instrument_httpx, set_current_span_attrs
 - from **codeintel_rev.observability.runtime_observer** import TimelineRuntimeObserver
 - from **codeintel_rev.observability.semantic_conventions** import Attrs
 - from **codeintel_rev.observability.timeline** import bind_timeline, new_timeline
@@ -53,30 +53,30 @@ Provides health/readiness endpoints, CORS, and streaming support.
 
 ## Definitions
 
-- variable: `LOGGER` (line 61)
-- variable: `SERVER_SETTINGS` (line 62)
-- function: `_preload_faiss_index` (line 71)
-- function: `_env_flag` (line 102)
-- function: `_log_gpu_warmup` (line 119)
-- function: `_preload_faiss_if_configured` (line 140)
-- function: `_preload_xtr_if_configured` (line 150)
-- function: `_preload_hybrid_if_configured` (line 164)
-- function: `_initialize_context` (line 175)
-- function: `_shutdown_context` (line 263)
-- function: `lifespan` (line 286)
-- variable: `app` (line 381)
-- variable: `metrics_router` (line 412)
-- function: `get_run_report` (line 422)
-- function: `get_run_report_markdown` (line 464)
-- function: `set_mcp_context` (line 507)
-- function: `disable_nginx_buffering` (line 579)
-- function: `healthz` (line 615)
-- function: `readyz` (line 627)
-- function: `capz` (line 662)
-- function: `sse_demo` (line 705)
-- variable: `proxy_wrapped` (line 750)
-- variable: `asgi` (line 755)
-- variable: `asgi` (line 757)
+- variable: `LOGGER` (line 62)
+- variable: `SERVER_SETTINGS` (line 63)
+- function: `_preload_faiss_index` (line 72)
+- function: `_env_flag` (line 103)
+- function: `_log_gpu_warmup` (line 120)
+- function: `_preload_faiss_if_configured` (line 141)
+- function: `_preload_xtr_if_configured` (line 151)
+- function: `_preload_hybrid_if_configured` (line 165)
+- function: `_initialize_context` (line 176)
+- function: `_shutdown_context` (line 264)
+- function: `lifespan` (line 287)
+- variable: `app` (line 382)
+- variable: `metrics_router` (line 413)
+- function: `get_run_report` (line 423)
+- function: `get_run_report_markdown` (line 465)
+- function: `set_mcp_context` (line 508)
+- function: `disable_nginx_buffering` (line 583)
+- function: `healthz` (line 619)
+- function: `readyz` (line 631)
+- function: `capz` (line 666)
+- function: `sse_demo` (line 709)
+- variable: `proxy_wrapped` (line 754)
+- variable: `asgi` (line 759)
+- variable: `asgi` (line 761)
 
 ## Graph Metrics
 
@@ -89,8 +89,8 @@ Provides health/readiness endpoints, CORS, and streaming support.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 30
-- recent churn 90: 30
+- recent churn 30: 31
+- recent churn 90: 31
 
 ## Usage
 
@@ -126,7 +126,7 @@ app, asgi
 
 ## Hotspot
 
-- score: 2.96
+- score: 2.97
 
 ## Side Effects
 
@@ -135,9 +135,9 @@ app, asgi
 
 ## Complexity
 
-- branches: 56
-- cyclomatic: 57
-- loc: 761
+- branches: 58
+- cyclomatic: 59
+- loc: 765
 
 ## Doc Coverage
 

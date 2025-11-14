@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Mapping, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import cast
 
@@ -35,6 +36,10 @@ from kgfoundry_common.logging import get_logger
 
 LOGGER = get_logger(__name__)
 _TRACE_SUBDIR = Path("trace/mcp_pool")
+_DEFAULT_CONCURRENCY = 8
+_DEFAULT_SEARCH_TIMEOUT_S = 20
+_DEFAULT_FETCH_TIMEOUT_S = 30
+_SEMAPHORE = asyncio.Semaphore(_DEFAULT_CONCURRENCY)
 
 
 def _pool_dir(data_dir: Path) -> Path:
@@ -206,7 +211,8 @@ async def search(
             response = run_search(request=request, deps=deps)
             return _serialize_search_response(response)
 
-    return await asyncio.to_thread(_work)
+    async with _bounded("search", _DEFAULT_SEARCH_TIMEOUT_S):
+        return await asyncio.to_thread(_work)
 
 
 async def fetch(
@@ -259,7 +265,8 @@ async def fetch(
             response = run_fetch(request=request, deps=deps)
             return _serialize_fetch_response(response)
 
-    return await asyncio.to_thread(_work)
+    async with _bounded("fetch", _DEFAULT_FETCH_TIMEOUT_S):
+        return await asyncio.to_thread(_work)
 
 
 def _normalize_object_ids(raw_ids: Sequence[str]) -> tuple[int, ...]:
@@ -292,3 +299,24 @@ def _normalize_object_ids(raw_ids: Sequence[str]) -> tuple[int, ...]:
 
 
 __all__ = ["fetch", "search"]
+
+
+@asynccontextmanager
+async def _bounded(operation: str, timeout_s: int) -> AsyncIterator[None]:
+    """Enforce concurrency and timeout guards for MCP operations.
+
+    Raises
+    ------
+    VectorSearchError
+        Raised when the bounded block exceeds ``timeout_s`` seconds.
+    """
+    async with _SEMAPHORE:
+        try:
+            async with asyncio.timeout(timeout_s):
+                yield
+        except TimeoutError as exc:
+            message = f"{operation} timed out"
+            raise VectorSearchError(
+                message,
+                context={"operation": operation, "timeout_seconds": timeout_s},
+            ) from exc

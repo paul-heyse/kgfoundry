@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING, Protocol, cast
@@ -15,8 +15,11 @@ from codeintel_rev.eval.pool_writer import write_pool
 from codeintel_rev.io.faiss_manager import SearchRuntimeOverrides
 from codeintel_rev.metrics.registry import (
     MCP_FETCH_LATENCY_SECONDS,
+    MCP_SEARCH_ANN_LATENCY_MS,
+    MCP_SEARCH_HYDRATION_LATENCY_MS,
     MCP_SEARCH_LATENCY_SECONDS,
     MCP_SEARCH_POSTFILTER_DENSITY,
+    MCP_SEARCH_RERANK_LATENCY_MS,
 )
 from codeintel_rev.retrieval.types import SearchPoolRow
 from codeintel_rev.typing import NDArrayF32, NDArrayI64
@@ -374,19 +377,19 @@ def run_search(*, request: SearchRequest, deps: SearchDependencies) -> SearchRes
         with chunk metadata and scores), and limits (resource limits applied during search).
     """
     start = perf_counter()
-    vector = _embed_query(deps.embedder, request.query, deps.settings.index.vec_dim)
     faiss_k = _compute_fanout(request.top_k, request.filters, deps.settings.limits)
-    runtime = _build_runtime_overrides(rerank=request.rerank)
+    ann_elapsed = perf_counter()
     distances, identifiers = deps.faiss.search(
-        vector,
+        _embed_query(deps.embedder, request.query, deps.settings.index.vec_dim),
         k=faiss_k,
         nprobe=deps.settings.index.faiss_nprobe,
-        runtime=runtime,
+        runtime=_build_runtime_overrides(rerank=request.rerank),
         catalog=deps.catalog if request.rerank else None,
     )
+    ann_elapsed = perf_counter() - ann_elapsed
     ranked_ids = _flatten_ids(identifiers)
-    ranked_scores = _flatten_scores(distances)
-    chunk_rows, filtered_count = _hydrate_chunks(
+    hyd_elapsed = perf_counter()
+    chunk_rows = _hydrate_chunks(
         deps.catalog,
         ranked_ids,
         request.filters,
@@ -395,25 +398,40 @@ def run_search(*, request: SearchRequest, deps: SearchDependencies) -> SearchRes
         "Mapping[int, StructureAnnotations]",
         deps.catalog.get_structure_annotations(tuple(chunk_rows.keys())) if chunk_rows else {},
     )
-    source_label = f"faiss_{deps.faiss.faiss_family or 'auto'}"
+    hyd_elapsed = perf_counter() - hyd_elapsed
     hydration_bundle = HydrationPayload(rows=chunk_rows, annotations=annotations)
-    results = _build_results(
-        ranked_ids,
-        ranked_scores,
+    rerank_elapsed = perf_counter()
+    results, repair_stats = post_search_validate_and_fill(
+        _build_results(
+            ranked_ids,
+            _flatten_scores(distances),
+            hydration=hydration_bundle,
+            request=request,
+            source_label=f"faiss_{deps.faiss.faiss_family or 'auto'}",
+        ),
         hydration=hydration_bundle,
-        request=request,
-        source_label=source_label,
     )
-    duration = max(perf_counter() - start, 0.0)
-    MCP_SEARCH_LATENCY_SECONDS.observe(duration)
-    _record_postfilter_density(filtered_count, len(ranked_ids))
+    rerank_elapsed = perf_counter() - rerank_elapsed
+    limits = list(deps.limits)
+    limits.extend(
+        [
+            f"postfilter_density={len(results) / max(repair_stats.inspected, 1):.2f}",
+            f"dropped={repair_stats.dropped}",
+            f"repaired={repair_stats.repaired}",
+        ]
+    )
+    MCP_SEARCH_ANN_LATENCY_MS.observe(max(ann_elapsed * 1000.0, 0.0))
+    MCP_SEARCH_HYDRATION_LATENCY_MS.observe(max(hyd_elapsed * 1000.0, 0.0))
+    MCP_SEARCH_RERANK_LATENCY_MS.observe(max(rerank_elapsed * 1000.0, 0.0))
+    MCP_SEARCH_LATENCY_SECONDS.observe(max(perf_counter() - start, 0.0))
+    _record_postfilter_density(len(results), repair_stats.inspected)
     _write_pool_rows(results, deps, annotations)
     _log_search_completion(request, deps, len(results), faiss_k)
     return SearchResponse(
         query_echo=request.query,
         top_k=request.top_k,
         results=results,
-        limits=list(deps.limits),
+        limits=limits,
     )
 
 
@@ -548,9 +566,9 @@ def _hydrate_chunks(
     catalog: CatalogLike,
     chunk_ids: Sequence[int],
     filters: SearchFilters,
-) -> tuple[dict[int, dict[str, object]], int]:
+) -> dict[int, dict[str, object]]:
     if not chunk_ids:
-        return {}, 0
+        return {}
     if filters.has_path_filters or filters.has_language_filters:
         rows = catalog.query_by_filters(
             chunk_ids,
@@ -565,7 +583,7 @@ def _hydrate_chunks(
         identifier = row.get("id")
         if isinstance(identifier, int):
             chunk_map[identifier] = row
-    return chunk_map, len(chunk_map)
+    return chunk_map
 
 
 def _build_results(
@@ -785,6 +803,101 @@ def _string_sequence(value: object | None) -> list[str]:
     return []
 
 
+def _repair_single_result(
+    item: SearchResult,
+    row: Mapping[str, object],
+) -> SearchResult | None:
+    title = item.title or _build_title(row)
+    url = item.url or _build_url(row)
+    snippet = _resolve_snippet(item.snippet, row)
+    if not snippet:
+        return None
+    metadata, metadata_changed = _merge_metadata(item.metadata, row)
+    if title == item.title and url == item.url and snippet == item.snippet and not metadata_changed:
+        return item
+    return replace(item, title=title, url=url, snippet=snippet, metadata=metadata)
+
+
+def _resolve_snippet(snippet: str, row: Mapping[str, object]) -> str:
+    if snippet and snippet.strip():
+        return snippet
+    fallback = _build_snippet(row)
+    if fallback.strip():
+        return fallback
+    raw = str(row.get("content") or row.get("preview") or "")
+    return raw[:400]
+
+
+def _merge_metadata(
+    metadata_in: Mapping[str, object],
+    row: Mapping[str, object],
+) -> tuple[dict[str, object], bool]:
+    metadata = dict(metadata_in)
+    changed = False
+    if not str(metadata.get("uri") or "").strip():
+        metadata["uri"] = str(row.get("uri") or "")
+        changed = True
+    row_lang = str(row.get("lang") or "")
+    if row_lang and not str(metadata.get("lang") or "").strip():
+        metadata["lang"] = row_lang
+        changed = True
+    for meta_key, row_key in (
+        ("start_line", "start_line"),
+        ("end_line", "end_line"),
+        ("start_byte", "start_byte"),
+        ("end_byte", "end_byte"),
+    ):
+        if isinstance(metadata.get(meta_key), int):
+            continue
+        value = row.get(row_key)
+        if value is None:
+            continue
+        metadata[meta_key] = _coerce_int(value)
+        changed = True
+    return metadata, changed
+
+
+@dataclass(slots=True, frozen=True)
+class _RepairStats:
+    """Aggregate counters describing validator repairs."""
+
+    inspected: int
+    repaired: int
+    dropped: int
+
+
+def post_search_validate_and_fill(
+    items: Sequence[SearchResult],
+    *,
+    hydration: HydrationPayload,
+) -> tuple[list[SearchResult], _RepairStats]:
+    """Ensure MCP results have required metadata, dropping corrupt rows.
+
+    Returns
+    -------
+    tuple[list[SearchResult], _RepairStats]
+        Tuple of repaired results and aggregate statistics describing how many
+        rows were inspected, repaired, or dropped.
+    """
+    inspected = dropped = repaired = 0
+    fixed: list[SearchResult] = []
+    rows = hydration.rows
+    for item in items:
+        inspected += 1
+        row = rows.get(item.chunk_id)
+        if row is None:
+            dropped += 1
+            continue
+        repaired_item = _repair_single_result(item, row)
+        if repaired_item is None:
+            dropped += 1
+            continue
+        if repaired_item is not item:
+            repaired += 1
+        fixed.append(repaired_item)
+    return fixed, _RepairStats(inspected=inspected, repaired=repaired, dropped=dropped)
+
+
 __all__ = [
     "FetchDependencies",
     "FetchObjectResult",
@@ -795,6 +908,7 @@ __all__ = [
     "SearchRequest",
     "SearchResponse",
     "SearchResult",
+    "post_search_validate_and_fill",
     "run_fetch",
     "run_search",
 ]

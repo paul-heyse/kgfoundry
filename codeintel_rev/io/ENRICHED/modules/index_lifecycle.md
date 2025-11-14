@@ -40,23 +40,26 @@ through stable paths such as ``.../current/faiss.index`` and reload when
 ## Definitions
 
 - variable: `LOGGER` (line 35)
-- class: `LuceneAssets` (line 40)
-- function: `link_current_lucene` (line 60)
-- class: `IndexAssets` (line 73)
-- function: `_file_checksum` (line 115)
-- function: `_read_json` (line 125)
-- function: `collect_asset_attrs` (line 132)
-- function: `_attrs_from_meta` (line 161)
-- function: `_attrs_from_idmap` (line 184)
-- function: `_attrs_from_tuning` (line 190)
-- class: `VersionMeta` (line 211)
-- class: `IndexLifecycleManager` (line 236)
+- variable: `MANIFEST_FILE` (line 37)
+- variable: `IDMAP_FILE` (line 38)
+- variable: `PROFILE_FILE` (line 39)
+- class: `LuceneAssets` (line 43)
+- function: `link_current_lucene` (line 63)
+- class: `IndexAssets` (line 76)
+- function: `_file_checksum` (line 118)
+- function: `_read_json` (line 128)
+- function: `collect_asset_attrs` (line 135)
+- function: `_attrs_from_meta` (line 169)
+- function: `_attrs_from_idmap` (line 192)
+- function: `_attrs_from_tuning` (line 198)
+- class: `VersionMeta` (line 219)
+- class: `IndexLifecycleManager` (line 244)
 
 ## Graph Metrics
 
 - **fan_in**: 5
 - **fan_out**: 2
-- **cycle_group**: 60
+- **cycle_group**: 74
 
 ## Ownership
 
@@ -96,7 +99,7 @@ IndexAssets, IndexLifecycleManager, LuceneAssets, VersionMeta, collect_asset_att
 
 ## Hotspot
 
-- score: 2.60
+- score: 2.64
 
 ## Side Effects
 
@@ -104,9 +107,9 @@ IndexAssets, IndexLifecycleManager, LuceneAssets, VersionMeta, collect_asset_att
 
 ## Complexity
 
-- branches: 56
-- cyclomatic: 57
-- loc: 671
+- branches: 65
+- cyclomatic: 66
+- loc: 689
 
 ## Doc Coverage
 

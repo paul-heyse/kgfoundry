@@ -34,7 +34,7 @@ Prometheus metrics for hybrid retrieval.
 
 - **fan_in**: 2
 - **fan_out**: 0
-- **cycle_group**: 50
+- **cycle_group**: 62
 
 ## Ownership
 

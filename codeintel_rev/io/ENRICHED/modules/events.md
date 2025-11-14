@@ -9,30 +9,33 @@ Typed event helpers shared across telemetry modules.
 ## Imports
 
 - from **__future__** import annotations
-- from **collections.abc** import Mapping
+- from **collections.abc** import Mapping, Sequence
 - from **dataclasses** import dataclass, field
 - from **typing** import Any
 
 ## Definitions
 
-- class: `RunCheckpoint` (line 18)
-- class: `TimelineEvent` (line 42)
-- function: `checkpoint_event` (line 55)
-- function: `coerce_event` (line 91)
+- class: `RunCheckpoint` (line 20)
+- class: `TimelineEvent` (line 44)
+- function: `checkpoint_event` (line 57)
+- function: `coerce_event` (line 93)
+- class: `RunEventRecord` (line 129)
+- function: `normalize_run_event` (line 150)
+- function: `_maybe_str` (line 194)
 
 ## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 41
+- **cycle_group**: 55
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 3
-- recent churn 90: 3
+- recent churn 30: 4
+- recent churn 90: 4
 
 ## Usage
 
@@ -41,7 +44,7 @@ Typed event helpers shared across telemetry modules.
 
 ## Declared Exports (__all__)
 
-RunCheckpoint, TimelineEvent, checkpoint_event, coerce_event
+RunCheckpoint, RunEventRecord, TimelineEvent, checkpoint_event, coerce_event, normalize_run_event
 
 ## Doc Health
 
@@ -64,7 +67,7 @@ RunCheckpoint, TimelineEvent, checkpoint_event, coerce_event
 
 ## Hotspot
 
-- score: 1.64
+- score: 1.79
 
 ## Side Effects
 
@@ -72,9 +75,9 @@ RunCheckpoint, TimelineEvent, checkpoint_event, coerce_event
 
 ## Complexity
 
-- branches: 4
-- cyclomatic: 5
-- loc: 124
+- branches: 8
+- cyclomatic: 9
+- loc: 198
 
 ## Doc Coverage
 
@@ -82,6 +85,9 @@ RunCheckpoint, TimelineEvent, checkpoint_event, coerce_event
 - `TimelineEvent` (class): summary=yes, examples=no — Normalized representation of a timeline entry.
 - `checkpoint_event` (function): summary=yes, params=mismatch, examples=no — Create a RunCheckpoint instance.
 - `coerce_event` (function): summary=yes, params=ok, examples=no — Coerce a raw timeline payload into :class:`TimelineEvent`.
+- `RunEventRecord` (class): summary=yes, examples=no — Structured representation of a run-level event.
+- `normalize_run_event` (function): summary=yes, params=ok, examples=no — Return a :class:`RunEventRecord` from ``payload`` with defaults applied.
+- `_maybe_str` (function): summary=no, examples=no
 
 ## Tags
 

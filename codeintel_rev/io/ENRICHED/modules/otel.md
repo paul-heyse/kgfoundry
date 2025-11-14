@@ -53,7 +53,7 @@ OpenTelemetry bootstrap helpers for CodeIntel.
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 77
+- **cycle_group**: 53
 
 ## Ownership
 

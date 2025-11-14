@@ -170,6 +170,51 @@ def test_hybrid_channel_skips_missing_capability(monkeypatch: pytest.MonkeyPatch
     assert splade_stub.calls == 0
 
 
+def test_hybrid_search_falls_back_when_faiss_unavailable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    bm25_stub = _StubChannel(
+        "bm25",
+        [SearchHit(doc_id="5", rank=0, score=3.2, source="bm25")],
+    )
+    engine = _build_engine(
+        monkeypatch,
+        tmp_path,
+        channels=[bm25_stub],
+        capabilities=Capabilities(warp_index_present=True, lucene_importable=True),
+    )
+
+    result = engine.search(
+        "query",
+        semantic_hits=[(5, 0.99)],
+        limit=1,
+        options=HybridSearchOptions(faiss_ready=False),
+    )
+
+    assert result.channels == ["bm25"]
+    assert any(msg.startswith("faiss_fallback:unavailable") for msg in result.warnings)
+    assert bm25_stub.calls == 1
+
+
+def test_hybrid_search_drops_low_semantic_scores(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    bm25_stub = _StubChannel(
+        "bm25",
+        [SearchHit(doc_id="7", rank=0, score=4.5, source="bm25")],
+    )
+    engine = _build_engine(
+        monkeypatch,
+        tmp_path,
+        channels=[bm25_stub],
+        index_overrides={"semantic_min_score": 0.8},
+    )
+
+    result = engine.search("query", semantic_hits=[(7, 0.2)], limit=1)
+
+    assert "semantic" not in result.channels
+    assert result.channels == ["bm25"]
+    assert any(msg.startswith("faiss_fallback:low_score") for msg in result.warnings)
+
+
 def test_hybrid_search_exposes_stage_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     engine = _build_engine(
         monkeypatch,

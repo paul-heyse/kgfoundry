@@ -11,6 +11,7 @@ Admin endpoints for staging, publishing, and rolling back index versions.
 - from **__future__** import annotations
 - from **(absolute)** import os
 - from **collections.abc** import Mapping
+- from **datetime** import UTC, datetime
 - from **pathlib** import Path
 - from **typing** import TypedDict, cast
 - from **fastapi** import APIRouter, Depends, HTTPException, Query, Request
@@ -19,40 +20,43 @@ Admin endpoints for staging, publishing, and rolling back index versions.
 - from **codeintel_rev.app.scope_store** import ScopeIn
 - from **codeintel_rev.errors** import RuntimeLifecycleError
 - from **codeintel_rev.indexing.index_lifecycle** import IndexAssets, collect_asset_attrs
+- from **codeintel_rev.observability.run_report** import build_run_report
 - from **codeintel_rev.runtime.factory_adjustment** import DefaultFactoryAdjuster
 - from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 20)
-- variable: `router` (line 21)
-- function: `_require_admin` (line 26)
-- function: `_context` (line 32)
-- function: `_persist_session_tuning` (line 39)
-- function: `status_endpoint` (line 55)
-- class: `PublishBody` (line 107)
-- class: `TuningBody` (line 170)
-- class: `FaissRuntimeTuningBody` (line 219)
-- function: `publish_endpoint` (line 271)
-- function: `rollback_endpoint` (line 364)
-- function: `tuning_endpoint` (line 417)
-- function: `faiss_runtime_status` (line 473)
-- function: `faiss_runtime_tuning_endpoint` (line 511)
-- function: `faiss_runtime_reset_endpoint` (line 590)
+- variable: `LOGGER` (line 22)
+- variable: `router` (line 23)
+- function: `_require_admin` (line 28)
+- function: `_context` (line 34)
+- function: `_find_ledger_path` (line 41)
+- function: `get_run_report` (line 54)
+- function: `_persist_session_tuning` (line 82)
+- function: `status_endpoint` (line 98)
+- class: `PublishBody` (line 150)
+- class: `TuningBody` (line 213)
+- class: `FaissRuntimeTuningBody` (line 262)
+- function: `publish_endpoint` (line 314)
+- function: `rollback_endpoint` (line 407)
+- function: `tuning_endpoint` (line 460)
+- function: `faiss_runtime_status` (line 516)
+- function: `faiss_runtime_tuning_endpoint` (line 554)
+- function: `faiss_runtime_reset_endpoint` (line 633)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 6
-- **cycle_group**: 152
+- **fan_out**: 7
+- **cycle_group**: 153
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 8
-- recent churn 90: 8
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 
@@ -88,7 +92,7 @@ router
 
 ## Hotspot
 
-- score: 2.22
+- score: 2.33
 
 ## Side Effects
 
@@ -96,22 +100,22 @@ router
 
 ## Complexity
 
-- branches: 18
-- cyclomatic: 19
-- loc: 640
+- branches: 22
+- cyclomatic: 23
+- loc: 683
 
 ## Doc Coverage
 
 - `_require_admin` (function): summary=no, examples=no
 - `_context` (function): summary=no, examples=no
+- `_find_ledger_path` (function): summary=no, examples=no
+- `get_run_report` (function): summary=yes, params=ok, examples=no — Return structured run report derived from the on-disk ledger.
 - `_persist_session_tuning` (function): summary=no, examples=no
 - `status_endpoint` (function): summary=yes, params=mismatch, examples=no — Return the current index version and health.
 - `PublishBody` (class): summary=yes, examples=no — Request body schema for index publication endpoint.
 - `TuningBody` (class): summary=yes, examples=no — Request body schema for runtime tuning endpoint.
 - `FaissRuntimeTuningBody` (class): summary=yes, examples=no — Request body schema for FAISS runtime tuning endpoint.
 - `publish_endpoint` (function): summary=yes, params=mismatch, examples=no — Stage and publish a new index version, then reload runtimes.
-- `rollback_endpoint` (function): summary=yes, params=mismatch, examples=no — Flip ``CURRENT`` to a previously published version.
-- `tuning_endpoint` (function): summary=yes, params=mismatch, examples=no — Update runtime tuning knobs (nprobe, fusion weights, etc.).
 
 ## Tags
 

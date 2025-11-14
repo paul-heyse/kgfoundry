@@ -29,7 +29,7 @@ from codeintel_rev.telemetry.reporter import report_to_json
 @mcp.tool(name="search")
 @handle_adapter_errors(
     operation="search:deep",
-    empty_result={"results": [], "queryEcho": "", "top_k": 0},
+    empty_result={"results": [], "queryEcho": "", "top_k": 0, "limits": []},
 )
 async def deep_research_search(
     query: str,

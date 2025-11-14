@@ -25,6 +25,7 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 - from **codeintel_rev.observability.timeline** import current_timeline
 - from **codeintel_rev.telemetry.decorators** import span_context
 - from **codeintel_rev.telemetry.prom** import EMBED_BATCH_SIZE, EMBED_LATENCY_SECONDS
+- from **codeintel_rev.telemetry.steps** import StepEvent, emit_step
 - from **codeintel_rev.typing** import NDArrayF32, gate_import
 - from **kgfoundry_common.logging** import get_logger
 - from **collections.abc** import Sequence
@@ -34,27 +35,27 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 
 ## Definitions
 
-- variable: `httpx` (line 35)
-- variable: `LOGGER` (line 37)
-- function: `_get_numpy` (line 41)
-- class: `EmbeddingRequest` (line 77)
-- class: `EmbeddingData` (line 105)
-- class: `EmbeddingResponse` (line 130)
-- class: `VLLMClient` (line 161)
+- variable: `httpx` (line 36)
+- variable: `LOGGER` (line 38)
+- function: `_get_numpy` (line 42)
+- class: `EmbeddingRequest` (line 78)
+- class: `EmbeddingData` (line 106)
+- class: `EmbeddingResponse` (line 131)
+- class: `VLLMClient` (line 162)
 
 ## Graph Metrics
 
 - **fan_in**: 4
-- **fan_out**: 9
-- **cycle_group**: 69
+- **fan_out**: 10
+- **cycle_group**: 76
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 24
-- recent churn 90: 24
+- recent churn 30: 25
+- recent churn 90: 25
 
 ## Usage
 
@@ -86,7 +87,7 @@ EmbeddingData, EmbeddingRequest, EmbeddingResponse, VLLMClient
 
 ## Hotspot
 
-- score: 2.66
+- score: 2.69
 
 ## Side Effects
 
@@ -97,7 +98,7 @@ EmbeddingData, EmbeddingRequest, EmbeddingResponse, VLLMClient
 
 - branches: 32
 - cyclomatic: 33
-- loc: 636
+- loc: 658
 
 ## Doc Coverage
 
