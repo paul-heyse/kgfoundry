@@ -70,5 +70,6 @@ def test_run_report_v2_infers_stage_progression() -> None:
         assert report.stages[1].status == "failed"
         assert report.stopped_after_stage == "gather"
         assert report.warnings == ["timeout waiting for FAISS"]
-        assert report.events and report.events[0]["kind"] == "retrieval.gather_channels"
+        assert report.events
+        assert report.events[0]["kind"] == "retrieval.gather_channels"
         assert report.span_attributes[Attrs.MCP_SESSION_ID] == "session"

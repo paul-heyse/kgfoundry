@@ -7,11 +7,12 @@ import importlib
 import importlib.util
 import logging
 import os
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, cast
 
-from tree_sitter import Language, Node, Parser, Query
+from tree_sitter import Language, Node, Parser, Query, Tree
 
 _languages_spec = importlib.util.find_spec("tree_sitter_languages")
 if _languages_spec is not None:  # pragma: no cover
@@ -34,7 +35,27 @@ _OUTLINE_QUERY_PATTERNS: dict[str, str] = {
         (class_definition name: (identifier) @name) @class
     """,
 }
-_OUTLINE_QUERY_CACHE: dict[str, Query | None] = {}
+_OUTLINE_QUERY_CACHE: dict[str, QueryProtocol | None] = {}
+
+
+class ParserProtocol(Protocol):
+    """Subset of :class:`tree_sitter.Parser` used by this module."""
+
+    def set_language(self, language: Language) -> None:
+        """Bind the parser to ``language``."""
+        ...
+
+    def parse(self, content: bytes) -> Tree:
+        """Parse UTF-8 ``content`` into a :class:`tree_sitter.Tree`."""
+        ...
+
+
+class QueryProtocol(Protocol):
+    """Subset of :class:`tree_sitter.Query` APIs required for outlines."""
+
+    def captures(self, node: Node) -> Sequence[tuple[Node, str]]:
+        """Return captures for ``node``."""
+        ...
 
 
 def _lang_for_ext(ext: str) -> tuple[str, Language] | None:
@@ -115,7 +136,7 @@ def build_outline(path: str | Path, content: bytes) -> TSOutline | None:
     if lang_info is None:
         return None
     language_name, language = lang_info
-    parser: Any = Parser()
+    parser = cast("ParserProtocol", Parser())
     parser.set_language(language)
     tree = parser.parse(content)
 
@@ -156,11 +177,14 @@ def _extract_identifier(content: bytes, node: Node | None) -> str:
 def _outline_with_query(
     language_name: str,
     language: Language,
-    tree: Any,
+    tree: Tree,
     content: bytes,
 ) -> list[OutlineNode]:
     query = _get_outline_query(language_name, language)
     if query is None:
+        return []
+    if not hasattr(query, "captures"):
+        LOGGER.debug("Tree-sitter query missing captures method for %s", language_name)
         return []
     captures = query.captures(tree.root_node)
     name_by_def: dict[int, str] = {}
@@ -208,7 +232,7 @@ def _outline_with_dfs(root_node: Node | None, content: bytes) -> list[OutlineNod
     return nodes
 
 
-def _get_outline_query(language_name: str, language: Language) -> Query | None:
+def _get_outline_query(language_name: str, language: Language) -> QueryProtocol | None:
     if language_name in _OUTLINE_QUERY_CACHE:
         return _OUTLINE_QUERY_CACHE[language_name]
     pattern = _OUTLINE_QUERY_PATTERNS.get(language_name)
@@ -216,8 +240,8 @@ def _get_outline_query(language_name: str, language: Language) -> Query | None:
         _OUTLINE_QUERY_CACHE[language_name] = None
         return None
     try:
-        query = language.query(pattern)
-    except Exception as exc:  # pragma: no cover - query compilation failures are rare
+        query = cast("QueryProtocol", Query(language, pattern))
+    except (ValueError, TypeError) as exc:  # pragma: no cover - query compilation failures are rare
         LOGGER.debug("Tree-sitter query compile failed for %s: %s", language_name, exc)
         _OUTLINE_QUERY_CACHE[language_name] = None
         return None

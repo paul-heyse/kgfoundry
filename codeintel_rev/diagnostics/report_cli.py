@@ -287,7 +287,7 @@ def ledger_report(
             Path("data"),
             "--data-dir",
             "-d",
-            exists=True,
+            exists=False,
             file_okay=False,
             dir_okay=True,
             help="Telemetry data directory (default: ./data).",

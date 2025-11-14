@@ -62,6 +62,35 @@ class OverlayRenderContext:
     inject_getattr_any: bool
 
 
+@dataclass(frozen=True)
+class OverlayDecisionInputs:
+    """Data needed to decide whether an overlay should be generated."""
+
+    module: ModuleIndex
+    rel_key: str
+    has_star: bool
+    error_count: int
+
+
+def _should_generate_overlay(
+    decision: OverlayDecisionInputs,
+    *,
+    inputs: OverlayInputs,
+    policy: OverlayPolicy,
+) -> bool:
+    if inputs.force:
+        return True
+    export_hub = policy.export_hub_threshold > 0 and len(decision.module.exports) >= policy.export_hub_threshold
+    tagged_overlay = (
+        bool(policy.overlay_tag)
+        and bool(inputs.overlay_tagged_paths)
+        and decision.rel_key in inputs.overlay_tagged_paths
+    )
+    type_error_trigger = policy.when_type_errors and (decision.error_count >= policy.min_type_errors)
+    star_trigger = policy.when_star_imports and decision.has_star
+    return star_trigger or export_hub or tagged_overlay or type_error_trigger
+
+
 def generate_overlay_for_file(
     py_file: Path,
     package_root: Path,
@@ -124,18 +153,13 @@ def generate_overlay_for_file(
     module = index_module(str(source), source.read_text(encoding="utf-8", errors="ignore"))
 
     has_star = any(entry.is_star for entry in module.imports)
-    export_count = len(module.exports)
-    export_hub = policy.export_hub_threshold > 0 and export_count >= policy.export_hub_threshold
-    tagged_overlay = (
-        bool(policy.overlay_tag)
-        and bool(overlay_inputs.overlay_tagged_paths)
-        and rel_key in overlay_inputs.overlay_tagged_paths
+    decision = OverlayDecisionInputs(
+        module=module,
+        rel_key=rel_key,
+        has_star=has_star,
+        error_count=error_count,
     )
-    type_error_trigger = policy.when_type_errors and (error_count >= policy.min_type_errors)
-    star_trigger = policy.when_star_imports and has_star
-    if not overlay_inputs.force and not (
-        star_trigger or export_hub or tagged_overlay or type_error_trigger
-    ):
+    if not _should_generate_overlay(decision, inputs=overlay_inputs, policy=policy):
         return OverlayResult(
             pyi_path=None,
             created=False,

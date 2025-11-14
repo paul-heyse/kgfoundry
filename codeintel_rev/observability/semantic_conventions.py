@@ -101,6 +101,9 @@ class Attrs:
     STEP_PAYLOAD: str = "codeintel.step.payload"
     RUN_LEDGER_PATH: str = "codeintel.run.ledger_path"
     TRACE_ID: str = "codeintel.trace.id"
+    LEDGER_STATUS: str = "ledger.status"
+    LEDGER_STOP_REASON: str = "ledger.stop_reason"
+    LEDGER_DURATION_MS: str = "ledger.duration_ms"
 
     # Request/session (additional)  # noqa: ERA001
     REQUEST_SCOPE: str = "request.scope"

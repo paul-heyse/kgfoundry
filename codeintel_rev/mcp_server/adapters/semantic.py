@@ -28,6 +28,7 @@ from codeintel_rev.mcp_server.schemas import (
     ScopeIn,
 )
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
+from codeintel_rev.observability.execution_ledger import step as ledger_step
 from codeintel_rev.observability.flight_recorder import build_report_uri
 from codeintel_rev.observability.otel import (
     as_span,
@@ -382,12 +383,23 @@ def _semantic_search_sync(
                 else f"Found {len(artifacts.findings)} semantically similar code chunks for: {query}"
             )
 
-            envelope = _make_envelope(
-                findings=artifacts.findings,
-                answer=answer_message,
-                confidence=0.85 if artifacts.findings else 0.0,
-                extras=extras,
-            )
+            with ledger_step(
+                stage="envelope",
+                op="semantic.envelope",
+                component="mcp.semantic",
+                attrs={
+                    Attrs.RETRIEVAL_TOP_K: limit,
+                    Attrs.CHANNELS_USED: to_label_str(
+                        artifacts.hybrid_result.retrieval_channels
+                    ),
+                },
+            ):
+                envelope = _make_envelope(
+                    findings=artifacts.findings,
+                    answer=answer_message,
+                    confidence=0.85 if artifacts.findings else 0.0,
+                    extras=extras,
+                )
     except Exception as exc:
         emit_step(
             StepEvent(
@@ -414,9 +426,19 @@ def _semantic_search_sync(
 
 
 def _execute_semantic_pipeline(request: _SemanticPipelineRequest) -> _SemanticPipelineResult:
-    plan = _build_semantic_search_plan(
-        request.context, request.scope, request.limit, request.observation
-    )
+    plan_attrs = {
+        Attrs.RETRIEVAL_TOP_K: request.limit,
+        Attrs.REQUEST_SCOPE: to_label_str(request.scope) if request.scope else None,
+    }
+    with ledger_step(
+        stage="channel_gather",
+        op="semantic.plan",
+        component="retrieval",
+        attrs=plan_attrs,
+    ):
+        plan = _build_semantic_search_plan(
+            request.context, request.scope, request.limit, request.observation
+        )
     limits_metadata = list(plan.limits_metadata)
     pipeline_attrs = {
         Attrs.COMPONENT: "retrieval",
@@ -433,51 +455,74 @@ def _execute_semantic_pipeline(request: _SemanticPipelineRequest) -> _SemanticPi
     with as_span("retrieval.pipeline", **pipeline_attrs):
         query_vector: NDArrayF32 | None = None
         if plan.faiss_ready:
-            with as_span(
-                "retrieval.embed",
-                **{
-                    Attrs.COMPONENT: "retrieval",
-                    Attrs.STAGE: "embed",
+            embed_attrs = {
+                Attrs.COMPONENT: "retrieval",
+                Attrs.STAGE: "embed",
+                Attrs.QUERY_LEN: len(request.query),
+            }
+            with ledger_step(
+                stage="embed",
+                op="retrieval.embed",
+                component="retrieval",
+                attrs={
                     Attrs.QUERY_LEN: len(request.query),
+                    Attrs.RETRIEVAL_TOP_K: plan.effective_limit,
                 },
             ):
-                query_vector = _embed_query_or_raise(
-                    request.context.vllm_client,
-                    request.query,
-                    request.observation,
-                    request.context.settings.vllm.base_url,
-                )
+                with as_span("retrieval.embed", **embed_attrs):
+                    query_vector = _embed_query_or_raise(
+                        request.context.vllm_client,
+                        request.query,
+                        request.observation,
+                        request.context.settings.vllm.base_url,
+                    )
         with request.context.open_catalog() as catalog:
-            faiss_stage = _run_faiss_stage(
-                request,
-                plan,
-                catalog,
-                query_vector,
-                limits_metadata,
-            )
-            with as_span(
-                "retrieval.hybrid",
-                **{
-                    Attrs.COMPONENT: "retrieval",
-                    Attrs.STAGE: "hybrid",
+            with ledger_step(
+                stage="pool_search",
+                op="retrieval.faiss",
+                component="retrieval",
+                attrs={
+                    Attrs.FAISS_TOP_K: plan.fanout.faiss_k,
+                    Attrs.FAISS_NPROBE: plan.nprobe,
+                },
+            ):
+                faiss_stage = _run_faiss_stage(
+                    request,
+                    plan,
+                    catalog,
+                    query_vector,
+                    limits_metadata,
+                )
+            hybrid_attrs = {
+                Attrs.COMPONENT: "retrieval",
+                Attrs.STAGE: "hybrid",
+                Attrs.CHANNELS_USED: to_label_str(["semantic", "faiss"]),
+                Attrs.RETRIEVAL_TOP_K: plan.effective_limit,
+            }
+            with ledger_step(
+                stage="fuse",
+                op="retrieval.hybrid",
+                component="retrieval",
+                attrs={
                     Attrs.CHANNELS_USED: to_label_str(["semantic", "faiss"]),
                     Attrs.RETRIEVAL_TOP_K: plan.effective_limit,
                 },
             ):
-                hybrid_result = _resolve_hybrid_results(
-                    request.context,
-                    _HybridSearchState(
-                        request.query,
-                        faiss_stage.ids,
-                        faiss_stage.scores,
-                        plan.effective_limit,
-                        plan.fanout.faiss_k,
-                        plan.nprobe,
-                        plan.faiss_ready,
-                    ),
-                    limits_metadata,
-                    ("semantic", "faiss"),
-                )
+                with as_span("retrieval.hybrid", **hybrid_attrs):
+                    hybrid_result = _resolve_hybrid_results(
+                        request.context,
+                        _HybridSearchState(
+                            request.query,
+                            faiss_stage.ids,
+                            faiss_stage.scores,
+                            plan.effective_limit,
+                            plan.fanout.faiss_k,
+                            plan.nprobe,
+                            plan.faiss_ready,
+                        ),
+                        limits_metadata,
+                        ("semantic", "faiss"),
+                    )
             hydration = _run_hydration_stage(request, hybrid_result, catalog)
     _ensure_hydration_success(hydration.exception, request.observation, request.context)
     return _SemanticPipelineResult(
@@ -576,14 +621,20 @@ def _run_hydration_stage(
         else nullcontext()
     )
     hydrate_start = perf_counter()
-    with hydrate_ctx, as_span("hydrate.duckdb", **hydrate_attrs):
-        findings, hydrate_exc = _hydrate_findings(
-            request.context,
-            hybrid_result.hydration_ids,
-            hybrid_result.hydration_scores,
-            scope=request.scope,
-            catalog=catalog,
-        )
+    with ledger_step(
+        stage="hydrate",
+        op="hydrate.duckdb",
+        component="retrieval",
+        attrs={"requested": len(hybrid_result.hydration_ids)},
+    ):
+        with hydrate_ctx, as_span("hydrate.duckdb", **hydrate_attrs):
+            findings, hydrate_exc = _hydrate_findings(
+                request.context,
+                hybrid_result.hydration_ids,
+                hybrid_result.hydration_scores,
+                scope=request.scope,
+                catalog=catalog,
+            )
     duration_ms = round((perf_counter() - hydrate_start) * 1000, 2)
     return _HydrationOutcome(findings, hydrate_exc, duration_ms)
 

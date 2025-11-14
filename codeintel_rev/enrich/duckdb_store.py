@@ -212,15 +212,19 @@ def _ingest_via_native_json(con: DuckDBConnection, modules_jsonl: Path) -> None:
     assignments = ", ".join(f"{name}=s.{name}" for name in _MODULE_COLUMN_NAMES)
     insert_columns = ", ".join(_MODULE_COLUMN_NAMES)
     insert_values = ", ".join(f"s.{name}" for name in _MODULE_COLUMN_NAMES)
-    con.execute(
-        f"""
+    merge_template = """
         MERGE INTO modules t
         USING modules_stage s
         ON t.path = s.path
-        WHEN MATCHED THEN UPDATE SET {assignments}
-        WHEN NOT MATCHED THEN INSERT ({insert_columns}) VALUES ({insert_values})
+        WHEN MATCHED THEN UPDATE SET __ASSIGNMENTS__
+        WHEN NOT MATCHED THEN INSERT (__COLUMNS__) VALUES (__VALUES__)
         """
+    merge_sql = (
+        merge_template.replace("__ASSIGNMENTS__", assignments)
+        .replace("__COLUMNS__", insert_columns)
+        .replace("__VALUES__", insert_values)
     )
+    con.execute(merge_sql)
     con.execute("DROP TABLE IF EXISTS modules_stage")
 
 

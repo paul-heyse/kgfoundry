@@ -5,34 +5,66 @@ from __future__ import annotations
 import importlib
 import logging
 import os
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass
+from functools import lru_cache
+from typing import Any
 
 from kgfoundry_common.logging import get_logger
-
-try:  # pragma: no cover - optional dependency
-    from opentelemetry._logs import set_logger_provider
-    from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
-    from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
-    from opentelemetry.sdk.resources import Resource
-except ImportError:  # pragma: no cover - instrumentation optional
-    set_logger_provider = None  # type: ignore[assignment]
-    LoggerProvider = None  # type: ignore[assignment]
-    LoggingHandler = None  # type: ignore[assignment]
-    BatchLogRecordProcessor = None  # type: ignore[assignment]
-    Resource = None  # type: ignore[assignment]
-
-try:  # pragma: no cover - exporter optional
-    from opentelemetry.exporter.otlp.proto.http.log_exporter import (  # type: ignore[reportMissingImports]
-        OTLPLogExporter,
-    )
-except ImportError:  # pragma: no cover - exporter missing
-    OTLPLogExporter = None  # type: ignore[assignment]
-
 
 LOGGER = get_logger(__name__)
 _INIT_STATE = {"done": False}
 
 __all__ = ["init_otel_logging"]
+
+
+@dataclass(slots=True)
+class _LoggingAPI:
+    set_logger_provider: Callable[[Any], None]
+    logger_provider_cls: type[Any]
+    handler_cls: type[Any]
+    processor_cls: type[Any] | None
+    resource_cls: type[Any]
+    exporter_cls: type[Any] | None
+
+
+@lru_cache(maxsize=1)
+def _load_logging_api() -> _LoggingAPI | None:
+    """Return Otel logging classes when the dependency is installed.
+
+    Returns
+    -------
+    _LoggingAPI | None
+        Structured set of constructors and factories required for log export,
+        or ``None`` when OpenTelemetry logging modules are unavailable.
+    """
+    try:
+        logs_module = importlib.import_module("opentelemetry._logs")
+        sdk_logs_module = importlib.import_module("opentelemetry.sdk._logs")
+        export_module = importlib.import_module("opentelemetry.sdk._logs.export")
+        resource_module = importlib.import_module("opentelemetry.sdk.resources")
+    except ImportError:
+        return None
+    exporter_cls = None
+    try:
+        exporter_module = importlib.import_module(
+            "opentelemetry.exporter.otlp.proto.http.log_exporter"
+        )
+        exporter_cls = exporter_module.OTLPLogExporter
+    except (ImportError, AttributeError):
+        exporter_cls = None
+    try:
+        processor_cls = export_module.BatchLogRecordProcessor
+    except AttributeError:
+        processor_cls = None
+    return _LoggingAPI(
+        set_logger_provider=logs_module.set_logger_provider,
+        logger_provider_cls=sdk_logs_module.LoggerProvider,
+        handler_cls=sdk_logs_module.LoggingHandler,
+        processor_cls=processor_cls,
+        resource_cls=resource_module.Resource,
+        exporter_cls=exporter_cls,
+    )
 
 
 def _should_enable() -> bool:
@@ -73,39 +105,42 @@ def init_otel_logging(
     """Bridge stdlib logging into OpenTelemetry logs when available."""
     if _INIT_STATE["done"] or not _should_enable():
         return
-    if (
-        set_logger_provider is None or LoggerProvider is None or Resource is None
-    ):  # pragma: no cover
+    api = _load_logging_api()
+    if api is None:  # pragma: no cover
         LOGGER.debug("OpenTelemetry logging components unavailable; skipping init")
         return
 
-    resource = Resource.create(
+    resource = api.resource_cls.create(
         {
             "service.name": service_name,
             "service.namespace": "kgfoundry",
             "codeintel.role": "mcp",
         }
     )
-    provider = LoggerProvider(resource=resource)
-    set_logger_provider(provider)
+    provider = api.logger_provider_cls(resource=resource)
+    api.set_logger_provider(provider)
 
-    if "otlp" in exporters and OTLPLogExporter is not None and BatchLogRecordProcessor is not None:
+    if (
+        "otlp" in exporters
+        and api.exporter_cls is not None
+        and api.processor_cls is not None
+    ):
         endpoint = otlp_endpoint or os.getenv(
             "OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318"
         )
         try:
-            exporter = OTLPLogExporter(endpoint=f"{endpoint.rstrip('/')}/v1/logs")
+            exporter = api.exporter_cls(endpoint=f"{endpoint.rstrip('/')}/v1/logs")
         except (OSError, ValueError, RuntimeError):  # pragma: no cover - exporter misconfigured
             LOGGER.warning("Failed to initialise OTLP log exporter", exc_info=True)
         else:
-            processor = BatchLogRecordProcessor(exporter)
+            processor = api.processor_cls(exporter)
             provider.add_log_record_processor(processor)
 
-    if LoggingHandler is None:  # pragma: no cover - guard
+    if api.handler_cls is None:  # pragma: no cover - guard
         LOGGER.debug("OpenTelemetry logging handler unavailable")
         return
 
-    handler = LoggingHandler(level=level, logger_provider=provider)
+    handler = api.handler_cls(level=level, logger_provider=provider)
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)
     root_logger.setLevel(min(root_logger.level or level, level))

@@ -153,6 +153,38 @@ def _assert_duckdb_ingest(
     assert count == expected_count
 
 
+def _assert_artifacts(out_dir: Path, module_rows: list[dict[str, object]]) -> None:
+    alpha_row = next(row for row in module_rows if str(row.get("path", "")).endswith("alpha.py"))
+    assert alpha_row["owner"] == "@alpha-owner"
+    assert alpha_row["primary_authors"]
+    assert alpha_row.get("stable_id")
+    assert str(alpha_row.get("repo_path", "")).endswith("pkg/alpha.py")
+    assert str(alpha_row.get("path", "")).endswith("alpha.py")
+    assert "recent_churn_30" in alpha_row
+
+    repo_map = json.loads((out_dir / "repo_map.json").read_text(encoding="utf-8"))
+    assert repo_map["module_count"] == len(module_rows)
+    assert repo_map["tag_counts"]
+
+    ownership_parquet = out_dir / "analytics" / "ownership.parquet"
+    fallback_jsonl = ownership_parquet.with_suffix(".parquet.jsonl")
+    assert ownership_parquet.exists() or fallback_jsonl.exists()
+
+    slices_dir = out_dir / "slices"
+    assert (slices_dir / "index.parquet").exists()
+    dataset_dir = slices_dir / "index_dataset"
+    if dataset_dir.exists():
+        assert any(dataset_dir.rglob("*.parquet"))
+    slices_jsonl = slices_dir / "slices.jsonl"
+    assert slices_jsonl.exists()
+    slice_records = _read_jsonl(slices_jsonl)
+    assert any(str(record.get("path", "")).endswith("alpha.py") for record in slice_records)
+
+    graphs_dir = out_dir / "graphs"
+    assert (graphs_dir / "imports.parquet").exists()
+    assert (graphs_dir / "uses.parquet").exists()
+
+
 def test_cli_enrich_emits_extended_artifacts(tmp_path: Path) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -186,35 +218,7 @@ def test_cli_enrich_emits_extended_artifacts(tmp_path: Path) -> None:
 
     module_rows = _read_jsonl(out_dir / "modules" / "modules.jsonl")
     assert module_rows
-    alpha_row = next(row for row in module_rows if str(row.get("path", "")).endswith("alpha.py"))
-    assert alpha_row["owner"] == "@alpha-owner"
-    assert alpha_row["primary_authors"]
-    assert alpha_row.get("stable_id")
-    assert str(alpha_row.get("repo_path", "")).endswith("pkg/alpha.py")
-    assert str(alpha_row.get("path", "")).endswith("alpha.py")
-    assert "recent_churn_30" in alpha_row
-
-    repo_map = json.loads((out_dir / "repo_map.json").read_text(encoding="utf-8"))
-    assert repo_map["module_count"] == len(module_rows)
-    assert repo_map["tag_counts"]
-
-    ownership_parquet = out_dir / "analytics" / "ownership.parquet"
-    fallback_jsonl = ownership_parquet.with_suffix(".parquet.jsonl")
-    assert ownership_parquet.exists() or fallback_jsonl.exists()
-
-    slices_dir = out_dir / "slices"
-    assert (slices_dir / "index.parquet").exists()
-    dataset_dir = slices_dir / "index_dataset"
-    if dataset_dir.exists():
-        assert any(dataset_dir.rglob("*.parquet"))
-    slices_jsonl = slices_dir / "slices.jsonl"
-    assert slices_jsonl.exists()
-    slice_records = _read_jsonl(slices_jsonl)
-    assert any(str(record.get("path", "")).endswith("alpha.py") for record in slice_records)
-
-    graphs_dir = out_dir / "graphs"
-    assert (graphs_dir / "imports.parquet").exists()
-    assert (graphs_dir / "uses.parquet").exists()
+    _assert_artifacts(out_dir, module_rows)
 
     try:
         __import__("duckdb")

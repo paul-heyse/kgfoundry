@@ -28,7 +28,8 @@ def test_scip_reader_loads_documents(tmp_path: Path) -> None:
     document = index.by_file()["pkg/demo.py"]
     assert document.path == "pkg/demo.py"
     occurrences = document.occurrences
-    assert occurrences and occurrences[0].symbol == "pkg.demo.func"
+    assert occurrences
+    assert occurrences[0].symbol == "pkg.demo.func"
     symbol_map = index.symbol_to_files()
     assert symbol_map["pkg.demo.func"] == ["pkg/demo.py"]
     assert index.external_symbols["pkg.external.helper"].kind == "function"

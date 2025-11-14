@@ -47,6 +47,7 @@ from codeintel_rev.metrics.registry import (
     set_compile_flags_id,
     set_factory_id,
 )
+from codeintel_rev.observability.execution_ledger import step as ledger_step
 from codeintel_rev.observability.otel import record_span_event
 from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.observability.timeline import Timeline, current_timeline
@@ -1453,16 +1454,26 @@ class FAISSManager(
             Attrs.FAISS_NPROBE: plan.params.nprobe,
             Attrs.FAISS_GPU: plan.params.use_gpu,
         }
-        with span_context(
-            "search.faiss",
-            stage="search.faiss",
-            attrs=span_attrs,
-            emit_checkpoint=True,
+        with ledger_step(
+            stage="pool_search",
+            op="faiss.search",
+            component="retrieval.faiss",
+            attrs={
+                Attrs.FAISS_TOP_K: plan.k,
+                Attrs.FAISS_NPROBE: plan.params.nprobe,
+                Attrs.FAISS_GPU: plan.params.use_gpu,
+            },
         ):
-            start = perf_counter()
-            ann_timer_start = start
-            try:
-                distances, identifiers = self._execute_dual_search(
+            with span_context(
+                "search.faiss",
+                stage="search.faiss",
+                attrs=span_attrs,
+                emit_checkpoint=True,
+            ):
+                start = perf_counter()
+                ann_timer_start = start
+                try:
+                    distances, identifiers = self._execute_dual_search(
                     query=plan.queries,
                     search_k=plan.search_k,
                     params=plan.params,
@@ -2060,12 +2071,21 @@ class FAISSManager(
         FAISS_REFINE_KEPT_RATIO.observe(kept_ratio)
         refine_start = perf_counter()
         try:
-            reranker = FlatReranker(catalog)
-            rerank_scores, rerank_ids = reranker.rerank(
-                plan.queries,
-                identifiers[:, : plan.search_k],
-                top_k=plan.k,
-            )
+            with ledger_step(
+                stage="rerank",
+                op="faiss.refine",
+                component="retrieval.faiss",
+                attrs={
+                    Attrs.RETRIEVAL_TOP_K: plan.k,
+                    Attrs.FAISS_TOP_K: plan.search_k,
+                },
+            ):
+                reranker = FlatReranker(catalog)
+                rerank_scores, rerank_ids = reranker.rerank(
+                    plan.queries,
+                    identifiers[:, : plan.search_k],
+                    top_k=plan.k,
+                )
         except (RuntimeError, ValueError) as exc:  # pragma: no cover - rerank is best-effort
             LOGGER.warning(
                 "Exact rerank failed; falling back to ANN ordering",

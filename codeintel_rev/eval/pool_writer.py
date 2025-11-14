@@ -182,7 +182,7 @@ def write_pool(rows: Iterable[SearchPoolRow], out_path: Path, *, overwrite: bool
         if isinstance(hits, list):
             coerced_hits = [str(item) for item in hits]
         else:
-            coerced_hits = [str(hits)] if hits not in (None, "") else []
+            coerced_hits = [str(hits)] if hits not in {None, ""} else []
         uris.append(uri)
         symbol_hits.append(coerced_hits)
     table = pa.Table.from_arrays(

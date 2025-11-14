@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Collection, Iterator, Sequence
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -519,6 +519,8 @@ class _IndexVisitor(cst.CSTVisitor):
         try:
             qualnames = self.get_metadata(cst_metadata.QualifiedNameProvider, node)
         except KeyError:
+            return None
+        if not isinstance(qualnames, Collection):
             return None
         for qualified in qualnames:
             if qualified.source is cst_metadata.QualifiedNameSource.LOCAL:

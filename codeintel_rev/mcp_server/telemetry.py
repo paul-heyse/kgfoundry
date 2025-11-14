@@ -8,11 +8,20 @@ from contextlib import contextmanager
 
 from codeintel_rev.app.middleware import get_capability_stamp, get_session_id
 from codeintel_rev.metrics.registry import MCP_REQUEST_LATENCY_SECONDS
+from codeintel_rev.observability.execution_ledger import (
+    begin_run as ledger_begin_run,
+)
+from codeintel_rev.observability.execution_ledger import (
+    end_run as ledger_end_run,
+)
+from codeintel_rev.observability.execution_ledger import (
+    step as ledger_step,
+)
 from codeintel_rev.observability.ledger import RunLedger, dated_run_dir
 from codeintel_rev.observability.otel import record_span_event
 from codeintel_rev.observability.reporting import render_run_report
 from codeintel_rev.observability.runtime_observer import bind_run_ledger, current_run_ledger
-from codeintel_rev.observability.semantic_conventions import Attrs
+from codeintel_rev.observability.semantic_conventions import Attrs, to_label_str
 from codeintel_rev.observability.timeline import Timeline, current_or_new_timeline
 from codeintel_rev.telemetry.context import telemetry_context
 from codeintel_rev.telemetry.decorators import span_context
@@ -87,6 +96,20 @@ def tool_operation_scope(
         capability_stamp=capability_stamp,
     )
     operation_name = f"mcp.tool:{tool_name}"
+    ledger_status: str | None = None
+    ledger_stop_reason: str | None = None
+    step_attrs = {
+        Attrs.MCP_TOOL: tool_name,
+        Attrs.MCP_SESSION_ID: timeline.session_id,
+        Attrs.MCP_RUN_ID: timeline.run_id,
+        Attrs.REQUEST_CONTROLS: to_label_str(attrs) if attrs else None,
+    }
+    ledger_begin_run(
+        tool=tool_name,
+        session_id=timeline.session_id,
+        run_id=timeline.run_id,
+        request=dict(operation_attrs),
+    )
     ledger = current_run_ledger()
     ledger_owner = False
     if ledger is None:
@@ -111,54 +134,66 @@ def tool_operation_scope(
         }
         for key, value in attrs.items():
             otel_attrs.setdefault(key, value)
-        with (
-            bind_run_ledger(ledger),
-            span_context(
-                f"mcp.tool:{tool_name}",
-                kind="server",
-                attrs=otel_attrs,
-            ),
-        ):
-            try:
-                with timeline.operation(operation_name, **operation_attrs):
-                    yield timeline
-            except BaseException as exc:
-                record_span_event(
-                    "mcp.tool.error",
-                    tool=tool_name,
-                    error=str(exc),
-                )
-                finalize_run(
-                    timeline.session_id,
-                    timeline.run_id,
-                    status="error",
-                    stop_reason=f"{type(exc).__name__}: {exc}",
-                    finished_at=time.time(),
-                )
-                _maybe_render_report(timeline)
-                MCP_REQUEST_LATENCY_SECONDS.record(
-                    time.perf_counter() - timing_start,
-                    {"tool": tool_name, "status": "error"},
-                )
-                raise
-            else:
-                duration = time.perf_counter() - timing_start
-                record_span_event(
-                    "mcp.tool.complete",
-                    tool=tool_name,
-                    duration_ms=int(duration * 1000),
-                )
-                finalize_run(
-                    timeline.session_id,
-                    timeline.run_id,
-                    status="complete",
-                    finished_at=time.time(),
-                )
-                _maybe_render_report(timeline)
-                MCP_REQUEST_LATENCY_SECONDS.record(
-                    duration,
-                    {"tool": tool_name, "status": "complete"},
-                )
+        try:
+            with (
+                bind_run_ledger(ledger),
+                span_context(
+                    f"mcp.tool:{tool_name}",
+                    kind="server",
+                    attrs=otel_attrs,
+                ),
+            ):
+                try:
+                    with timeline.operation(operation_name, **operation_attrs):
+                        with ledger_step(
+                            stage="request",
+                            op="dispatch",
+                            component="mcp.adapter",
+                            attrs=step_attrs,
+                        ):
+                            yield timeline
+                except BaseException as exc:
+                    ledger_status = f"error:{type(exc).__name__}"
+                    ledger_stop_reason = f"{type(exc).__name__}: {exc}"
+                    record_span_event(
+                        "mcp.tool.error",
+                        tool=tool_name,
+                        error=str(exc),
+                    )
+                    finalize_run(
+                        timeline.session_id,
+                        timeline.run_id,
+                        status="error",
+                        stop_reason=f"{type(exc).__name__}: {exc}",
+                        finished_at=time.time(),
+                    )
+                    _maybe_render_report(timeline)
+                    MCP_REQUEST_LATENCY_SECONDS.record(
+                        time.perf_counter() - timing_start,
+                        {"tool": tool_name, "status": "error"},
+                    )
+                    raise
+                else:
+                    ledger_status = "complete"
+                    duration = time.perf_counter() - timing_start
+                    record_span_event(
+                        "mcp.tool.complete",
+                        tool=tool_name,
+                        duration_ms=int(duration * 1000),
+                    )
+                    finalize_run(
+                        timeline.session_id,
+                        timeline.run_id,
+                        status="complete",
+                        finished_at=time.time(),
+                    )
+                    _maybe_render_report(timeline)
+                    MCP_REQUEST_LATENCY_SECONDS.record(
+                        duration,
+                        {"tool": tool_name, "status": "complete"},
+                    )
+        finally:
+            ledger_end_run(status=ledger_status, stop_reason=ledger_stop_reason)
     if ledger_owner and ledger is not None:
         ledger.close()
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from codeintel_rev.observability import (
+    execution_ledger,
     flight_recorder,
     metrics,
     otel,
@@ -12,6 +13,7 @@ from codeintel_rev.observability import (
 )
 
 __all__ = [
+    "execution_ledger",
     "flight_recorder",
     "metrics",
     "otel",

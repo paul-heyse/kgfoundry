@@ -33,10 +33,6 @@ if TYPE_CHECKING:
     from codeintel_rev.io.duckdb_catalog import StructureAnnotations
     from codeintel_rev.mcp_server.schemas import SearchFilterPayload
     from codeintel_rev.observability.timeline import Timeline
-else:  # pragma: no cover - annotations only
-    Timeline = None
-    StructureAnnotations = object  # type: ignore[assignment]
-    SearchFilterPayload = Mapping[str, Sequence[str]]  # type: ignore[assignment]
 
 type EmbeddingVector = Sequence[float] | NDArrayF32
 
@@ -302,6 +298,15 @@ class HydrationPayload:
     annotations: Mapping[int, StructureAnnotations]
 
 
+@dataclass(slots=True)
+class _StageDurations:
+    """Per-stage latencies captured during a search run."""
+
+    ann: float = 0.0
+    hydrate: float = 0.0
+    rerank: float = 0.0
+
+
 @dataclass(slots=True, frozen=True)
 class SearchDependencies:
     """Dependency bundle consumed by :func:`run_search`."""
@@ -380,26 +385,10 @@ def run_search(*, request: SearchRequest, deps: SearchDependencies) -> SearchRes
         with chunk metadata and scores), and limits (resource limits applied during search).
     """
     start = perf_counter()
-    search_attrs: dict[str, object] = {
-        Attrs.RETRIEVAL_TOP_K: request.top_k,
-        Attrs.QUERY_TEXT: request.query,
-        Attrs.QUERY_LEN: len(request.query),
-    }
-    if deps.session_id:
-        search_attrs[Attrs.MCP_SESSION_ID] = deps.session_id
-    if deps.run_id:
-        search_attrs[Attrs.MCP_RUN_ID] = deps.run_id
-    if request.filters.languages:
-        search_attrs["retrieval.languages"] = to_label_str(request.filters.languages)
-    if request.filters.include or request.filters.exclude:
-        search_attrs["retrieval.paths"] = to_label_str(
-            {
-                "include": request.filters.include,
-                "exclude": request.filters.exclude,
-            }
-        )
+    search_attrs = _build_search_attrs(request, deps)
     faiss_k = _compute_fanout(request.top_k, request.filters, deps.settings.limits)
     search_attrs[Attrs.FAISS_TOP_K] = faiss_k
+    durations = _StageDurations()
     with span_context(
         "retrieval.search",
         kind="internal",
@@ -412,94 +401,34 @@ def run_search(*, request: SearchRequest, deps: SearchDependencies) -> SearchRes
             top_k=request.top_k,
             rerank=request.rerank,
         )
-        embed_start = perf_counter()
-        with span_context(
-            "retrieval.embed",
-            kind="internal",
-            attrs={
-                Attrs.STAGE: "embed",
-                Attrs.QUERY_LEN: len(request.query),
-            },
-        ):
-            query_vector = _embed_query(deps.embedder, request.query, deps.settings.index.vec_dim)
-        embed_elapsed = perf_counter() - embed_start
-        record_span_event("retrieval.embed.complete", duration_ms=embed_elapsed * 1000.0)
-        ann_start = perf_counter()
-        with span_context(
-            "retrieval.ann",
-            kind="internal",
-            attrs={
-                Attrs.STAGE: "gather_channels",
-                Attrs.FAISS_TOP_K: faiss_k,
-                Attrs.FAISS_NPROBE: deps.settings.index.faiss_nprobe,
-            },
-        ):
-            distances, identifiers = deps.faiss.search(
-                query_vector,
-                k=faiss_k,
-                nprobe=deps.settings.index.faiss_nprobe,
-                runtime=_build_runtime_overrides(rerank=request.rerank),
-                catalog=deps.catalog if request.rerank else None,
-            )
-        ann_elapsed = perf_counter() - ann_start
-        ranked_ids = _flatten_ids(identifiers)
-        hyd_start = perf_counter()
-        with span_context(
-            "retrieval.hydrate",
-            kind="internal",
-            attrs={
-                Attrs.STAGE: "hydrate",
-                Attrs.RETRIEVAL_TOP_K: request.top_k,
-            },
-        ):
-            chunk_rows = _hydrate_chunks(
-                deps.catalog,
-                ranked_ids,
-                request.filters,
-            )
-            annotations = cast(
-                "Mapping[int, StructureAnnotations]",
-                deps.catalog.get_structure_annotations(tuple(chunk_rows.keys()))
-                if chunk_rows
-                else {},
-            )
-        hyd_elapsed = perf_counter() - hyd_start
-        hydration_bundle = HydrationPayload(rows=chunk_rows, annotations=annotations)
-        rerank_start = perf_counter()
-        with span_context(
-            "retrieval.rerank",
-            kind="internal",
-            attrs={
-                Attrs.STAGE: "rerank",
-                "rerank.enabled": str(request.rerank),
-            },
-        ):
-            results, repair_stats = post_search_validate_and_fill(
-                _build_results(
-                    ranked_ids,
-                    _flatten_scores(distances),
-                    hydration=hydration_bundle,
-                    request=request,
-                    source_label=f"faiss_{deps.faiss.faiss_family or 'auto'}",
-                ),
-                hydration=hydration_bundle,
-            )
-        rerank_elapsed = perf_counter() - rerank_start
-        limits = list(deps.limits)
-        limits.extend(
-            [
-                f"postfilter_density={len(results) / max(repair_stats.inspected, 1):.2f}",
-                f"dropped={repair_stats.dropped}",
-                f"repaired={repair_stats.repaired}",
-            ]
+        query_vector = _embed_with_metrics(request, deps)
+        distances, identifiers, durations.ann = _run_ann_search(
+            request,
+            deps,
+            query_vector,
+            faiss_k,
         )
-        MCP_SEARCH_ANN_LATENCY_MS.observe(max(ann_elapsed * 1000.0, 0.0))
-        MCP_SEARCH_HYDRATION_LATENCY_MS.observe(max(hyd_elapsed * 1000.0, 0.0))
-        MCP_SEARCH_RERANK_LATENCY_MS.observe(max(rerank_elapsed * 1000.0, 0.0))
+        ranked_ids = _flatten_ids(identifiers)
+        hydration_bundle, durations.hydrate = _hydrate_with_metrics(
+            deps,
+            ranked_ids,
+            request,
+        )
+        results, repair_stats, durations.rerank = _rerank_with_metrics(
+            ranked_ids=ranked_ids,
+            scores=_flatten_scores(distances),
+            hydration=hydration_bundle,
+            request=request,
+            source_label=f"faiss_{deps.faiss.faiss_family or 'auto'}",
+        )
+        limits = _compose_limits(deps.limits, results, repair_stats)
+        MCP_SEARCH_ANN_LATENCY_MS.observe(max(durations.ann * 1000.0, 0.0))
+        MCP_SEARCH_HYDRATION_LATENCY_MS.observe(max(durations.hydrate * 1000.0, 0.0))
+        MCP_SEARCH_RERANK_LATENCY_MS.observe(max(durations.rerank * 1000.0, 0.0))
         total_duration = max(perf_counter() - start, 0.0)
         MCP_SEARCH_LATENCY_SECONDS.observe(total_duration)
         _record_postfilter_density(len(results), repair_stats.inspected)
-        _write_pool_rows(results, deps, annotations)
+        _write_pool_rows(results, deps, hydration_bundle.annotations)
         _log_search_completion(request, deps, len(results), faiss_k)
         record_span_event(
             "retrieval.search.complete",
@@ -585,6 +514,243 @@ def _normalize_str_list(values: Sequence[str] | None) -> list[str]:
     if not values:
         return []
     return [str(value).strip() for value in values if str(value).strip()]
+
+
+def _build_search_attrs(request: SearchRequest, deps: SearchDependencies) -> dict[str, object]:
+    """Return the base telemetry attributes for ``run_search`` spans.
+
+    Parameters
+    ----------
+    request : SearchRequest
+        Incoming search request describing query text and filters.
+    deps : SearchDependencies
+        Dependency bundle carrying session metadata for telemetry.
+
+    Returns
+    -------
+    dict[str, object]
+        Structured attributes used to initialize the retrieval span.
+    """
+    attrs: dict[str, object] = {
+        Attrs.RETRIEVAL_TOP_K: request.top_k,
+        Attrs.QUERY_TEXT: request.query,
+        Attrs.QUERY_LEN: len(request.query),
+    }
+    if deps.session_id:
+        attrs[Attrs.MCP_SESSION_ID] = deps.session_id
+    if deps.run_id:
+        attrs[Attrs.MCP_RUN_ID] = deps.run_id
+    if request.filters.languages:
+        attrs["retrieval.languages"] = to_label_str(request.filters.languages)
+    if request.filters.include or request.filters.exclude:
+        attrs["retrieval.paths"] = to_label_str(
+            {
+                "include": request.filters.include,
+                "exclude": request.filters.exclude,
+            }
+        )
+    return attrs
+
+
+def _embed_with_metrics(request: SearchRequest, deps: SearchDependencies) -> NDArrayF32:
+    """Embed the query text and emit timing telemetry.
+
+    Parameters
+    ----------
+    request : SearchRequest
+        Search request providing query text to embed.
+    deps : SearchDependencies
+        Dependency bundle with configured embedder and settings.
+
+    Returns
+    -------
+    NDArrayF32
+        Normalized query embedding reshaped to ``(1, vec_dim)``.
+    """
+    embed_start = perf_counter()
+    with span_context(
+        "retrieval.embed",
+        kind="internal",
+        attrs={
+            Attrs.STAGE: "embed",
+            Attrs.QUERY_LEN: len(request.query),
+        },
+    ):
+        vector = _embed_query(deps.embedder, request.query, deps.settings.index.vec_dim)
+    embed_elapsed = perf_counter() - embed_start
+    record_span_event("retrieval.embed.complete", duration_ms=embed_elapsed * 1000.0)
+    return vector
+
+
+def _run_ann_search(
+    request: SearchRequest,
+    deps: SearchDependencies,
+    query_vector: NDArrayF32,
+    faiss_k: int,
+) -> tuple[NDArrayF32, NDArrayI64, float]:
+    """Execute FAISS search and report elapsed time.
+
+    Parameters
+    ----------
+    request : SearchRequest
+        Search request used to determine rerank behavior.
+    deps : SearchDependencies
+        Dependency bundle supplying the FAISS index and settings.
+    query_vector : NDArrayF32
+        Embedded query vector produced by the embedder.
+    faiss_k : int
+        Number of neighbors to retrieve from the FAISS index.
+
+    Returns
+    -------
+    tuple[NDArrayF32, NDArrayI64, float]
+        Tuple containing cosine distances, identifiers, and elapsed seconds.
+    """
+    ann_start = perf_counter()
+    with span_context(
+        "retrieval.ann",
+        kind="internal",
+        attrs={
+            Attrs.STAGE: "gather_channels",
+            Attrs.FAISS_TOP_K: faiss_k,
+            Attrs.FAISS_NPROBE: deps.settings.index.faiss_nprobe,
+        },
+    ):
+        distances, identifiers = deps.faiss.search(
+            query_vector,
+            k=faiss_k,
+            nprobe=deps.settings.index.faiss_nprobe,
+            runtime=_build_runtime_overrides(rerank=request.rerank),
+            catalog=deps.catalog if request.rerank else None,
+        )
+    return distances, identifiers, perf_counter() - ann_start
+
+
+def _hydrate_with_metrics(
+    deps: SearchDependencies,
+    ranked_ids: Sequence[int],
+    request: SearchRequest,
+) -> tuple[HydrationPayload, float]:
+    """Hydrate chunk metadata and annotations with telemetry.
+
+    Parameters
+    ----------
+    deps : SearchDependencies
+        Dependency bundle providing the catalog handle.
+    ranked_ids : Sequence[int]
+        Ordered chunk identifiers returned from FAISS.
+    request : SearchRequest
+        Search request whose filters guide hydration.
+
+    Returns
+    -------
+    tuple[HydrationPayload, float]
+        Hydration payload (rows and annotations) with elapsed seconds.
+    """
+    hyd_start = perf_counter()
+    with span_context(
+        "retrieval.hydrate",
+        kind="internal",
+        attrs={
+            Attrs.STAGE: "hydrate",
+            Attrs.RETRIEVAL_TOP_K: request.top_k,
+        },
+    ):
+        chunk_rows = _hydrate_chunks(
+            deps.catalog,
+            ranked_ids,
+            request.filters,
+        )
+        annotations = cast(
+            "Mapping[int, StructureAnnotations]",
+            deps.catalog.get_structure_annotations(tuple(chunk_rows.keys()))
+            if chunk_rows
+            else {},
+        )
+    elapsed = perf_counter() - hyd_start
+    return HydrationPayload(rows=chunk_rows, annotations=annotations), elapsed
+
+
+def _rerank_with_metrics(
+    *,
+    ranked_ids: Sequence[int],
+    scores: Sequence[float],
+    hydration: HydrationPayload,
+    request: SearchRequest,
+    source_label: str,
+) -> tuple[list[SearchResult], _RepairStats, float]:
+    """Apply post-filtering/rerank logic and emit telemetry.
+
+    Parameters
+    ----------
+    ranked_ids : Sequence[int]
+        Ranked chunk identifiers after FAISS search.
+    scores : Sequence[float]
+        Corresponding similarity scores for ``ranked_ids``.
+    hydration : HydrationPayload
+        Hydrated chunk rows and annotations.
+    request : SearchRequest
+        Original request controlling rerank toggle and filters.
+    source_label : str
+        Label describing the source of the result scores.
+
+    Returns
+    -------
+    tuple[list[SearchResult], _RepairStats, float]
+        Tuple of validated results, repair stats, and elapsed seconds.
+    """
+    rerank_start = perf_counter()
+    with span_context(
+        "retrieval.rerank",
+        kind="internal",
+        attrs={
+            Attrs.STAGE: "rerank",
+            "rerank.enabled": str(request.rerank),
+        },
+    ):
+        results, repair_stats = post_search_validate_and_fill(
+            _build_results(
+                ranked_ids,
+                scores,
+                hydration=hydration,
+                request=request,
+                source_label=source_label,
+            ),
+            hydration=hydration,
+        )
+    return results, repair_stats, perf_counter() - rerank_start
+
+
+def _compose_limits(
+    base_limits: Sequence[str],
+    results: Sequence[SearchResult],
+    repair_stats: _RepairStats,
+) -> list[str]:
+    """Augment limit annotations with validator statistics.
+
+    Parameters
+    ----------
+    base_limits : Sequence[str]
+        Existing limits derived from dependency configuration.
+    results : Sequence[SearchResult]
+        Final search results returned to callers.
+    repair_stats : _RepairStats
+        Validator statistics describing inspected/dropped rows.
+
+    Returns
+    -------
+    list[str]
+        Composite list of limit annotations augmented with validators.
+    """
+    limits = list(base_limits)
+    limits.extend(
+        [
+            f"postfilter_density={len(results) / max(repair_stats.inspected, 1):.2f}",
+            f"dropped={repair_stats.dropped}",
+            f"repaired={repair_stats.repaired}",
+        ]
+    )
+    return limits
 
 
 def _embed_query(embedder: EmbeddingClient, query: str, vec_dim: int) -> NDArrayF32:

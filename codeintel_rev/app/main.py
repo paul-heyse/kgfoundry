@@ -36,6 +36,7 @@ from codeintel_rev.app.routers import index_admin
 from codeintel_rev.app.server_settings import get_server_settings
 from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.mcp_server.server import app_context, build_http_app
+from codeintel_rev.observability import execution_ledger
 from codeintel_rev.observability.otel import (
     as_span,
     current_trace_id,
@@ -71,6 +72,27 @@ except PackageNotFoundError:
 install_structured_logging()
 
 _DEFAULT_SSE_KEEPALIVE_SECONDS = 25.0
+
+
+def request_identity(request: Request) -> dict[str, str | None]:
+    """Return the session/run identifiers bound to ``request``.
+
+    Parameters
+    ----------
+    request : Request
+        FastAPI request object containing state attributes. The function extracts
+        session_id and run_id from request.state if they exist.
+
+    Returns
+    -------
+    dict[str, str | None]
+        Dictionary with "session_id" and "run_id" keys, containing the identifiers
+        from request.state or None if not present.
+    """
+    return {
+        "session_id": getattr(request.state, "session_id", None),
+        "run_id": getattr(request.state, "run_id", None),
+    }
 
 
 def _sse_keepalive_interval() -> float:
@@ -525,6 +547,25 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+
+@app.on_event("startup")
+async def _log_execution_ledger_state() -> None:
+    status = "enabled" if execution_ledger.SETTINGS.enabled else "disabled"
+    app.state.execution_ledger_enabled = execution_ledger.SETTINGS.enabled
+    app.state.execution_ledger_store = execution_ledger.STORE
+    LOGGER.info(
+        "execution_ledger.ready",
+        extra={
+            Attrs.LEDGER_STATUS: status,
+            "ledger.max_runs": execution_ledger.SETTINGS.max_runs,
+            "ledger.flush_path": str(execution_ledger.SETTINGS.flush_path)
+            if execution_ledger.SETTINGS.flush_path
+            else None,
+        },
+    )
+
+
 init_all_telemetry(
     app=app,
     service_name="codeintel-mcp",

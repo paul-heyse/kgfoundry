@@ -2,36 +2,26 @@
 
 from __future__ import annotations
 
+import importlib
 import os
-from typing import TYPE_CHECKING
+from typing import Any, cast
 from unittest.mock import patch
 
 import pytest
 from codeintel_rev.app.main import app
 from fastapi.testclient import TestClient
 
-if TYPE_CHECKING:
-    from opentelemetry.sdk.trace.export import (
-        InMemorySpanExporter,  # type: ignore[reportAttributeAccessIssue]
-        SimpleSpanProcessor,  # type: ignore[reportAttributeAccessIssue]
-    )
-
 try:
-    from opentelemetry import trace
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import (
-        InMemorySpanExporter,  # type: ignore[reportAttributeAccessIssue]
-        SimpleSpanProcessor,  # type: ignore[reportAttributeAccessIssue]
-    )
-
-    _OTELEMETRY_AVAILABLE = True
+    trace_module = importlib.import_module("opentelemetry.trace")
+    sdk_trace_module = importlib.import_module("opentelemetry.sdk.trace")
+    exporter_module = importlib.import_module("opentelemetry.sdk.trace.export")
 except ImportError:
-    _OTELEMETRY_AVAILABLE = False
-    # Stub types for runtime when OTel is unavailable (tests will be skipped)
-    InMemorySpanExporter = object  # type: ignore[assignment,misc]
-    SimpleSpanProcessor = object  # type: ignore[assignment,misc]
+    pytest.skip("OpenTelemetry packages not available", allow_module_level=True)
 
-OTELEMETRY_AVAILABLE = _OTELEMETRY_AVAILABLE
+trace = cast("Any", trace_module)
+TracerProvider = cast("type[Any]", sdk_trace_module.TracerProvider)
+InMemorySpanExporter = cast("type[Any]", exporter_module.InMemorySpanExporter)
+SimpleSpanProcessor = cast("type[Any]", exporter_module.SimpleSpanProcessor)
 
 
 @pytest.fixture
@@ -43,19 +33,16 @@ def memory_exporter():
     InMemorySpanExporter
         Exporter instance for capturing spans during tests.
     """
-    if not OTELEMETRY_AVAILABLE:
-        pytest.skip("OpenTelemetry packages not available")
-    exporter = InMemorySpanExporter()  # type: ignore[misc]
+    exporter = InMemorySpanExporter()
     provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exporter))  # type: ignore[misc]
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
     trace.set_tracer_provider(provider)
     yield exporter
-    exporter.clear()  # type: ignore[misc]
+    exporter.clear()
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(not OTELEMETRY_AVAILABLE, reason="OpenTelemetry packages not available")
-def test_readyz_traces(memory_exporter):
+def test_readyz_traces(memory_exporter: Any) -> None:
     """Verify /readyz endpoint produces spans."""
     with patch.dict(os.environ, {"CODEINTEL_OTEL_ENABLED": "1"}):
         client = TestClient(app)
@@ -67,8 +54,7 @@ def test_readyz_traces(memory_exporter):
 
 
 @pytest.mark.integration
-@pytest.mark.skipif(not OTELEMETRY_AVAILABLE, reason="OpenTelemetry packages not available")
-def test_healthz_traces(memory_exporter):
+def test_healthz_traces(memory_exporter: Any) -> None:
     """Verify /healthz endpoint produces spans."""
     with patch.dict(os.environ, {"CODEINTEL_OTEL_ENABLED": "1"}):
         client = TestClient(app)

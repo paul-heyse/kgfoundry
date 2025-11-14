@@ -12,7 +12,6 @@ import hashlib
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
-from glob import glob
 from pathlib import Path
 from threading import Lock
 from time import perf_counter
@@ -29,6 +28,7 @@ from codeintel_rev.mcp_server.scope_utils import (
     LANGUAGE_EXTENSIONS,
     path_matches_glob,
 )
+from codeintel_rev.observability.execution_ledger import step as ledger_step
 from codeintel_rev.observability.otel import record_span_event
 from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.observability.timeline import Timeline, current_timeline
@@ -90,6 +90,26 @@ def _log_extra(**kwargs: object) -> dict[str, object]:
         Python's logging module's extra parameter.
     """
     return {"component": "duckdb_catalog", **kwargs}
+
+
+def _escape_identifier(expr: str) -> str:
+    """Return a DuckDB-escaped identifier string.
+
+    Parameters
+    ----------
+    expr : str
+        Identifier or column reference to escape for inclusion in SQL.
+
+    Returns
+    -------
+    str
+        Escaped identifier ready for substitution into SQL statements.
+    """
+    escape_fn = cast("Callable[[str], str] | None", getattr(duckdb, "escape_identifier", None))
+    if callable(escape_fn):
+        return str(escape_fn(expr))
+    escaped = expr.replace('"', '""')
+    return f'"{escaped}"'
 
 
 # Prometheus metrics for scope filtering
@@ -241,13 +261,22 @@ class _DuckDBQueryMixin:
             attrs=otel_attrs,
             emit_checkpoint=True,
         )
-        with span_cm as (span, _):
-            with catalog._readonly_connection() as conn:
-                catalog._log_query(sql, params)
-                relation = conn.execute(sql, params)
-                rows = relation.fetchall()
-                cols = [desc[0] for desc in relation.description]
-            payload = [dict(zip(cols, row, strict=True)) for row in rows]
+        with ledger_step(
+            stage="hydrate",
+            op="duckdb.query_by_ids",
+            component="duckdb.catalog",
+            attrs={
+                "requested": len(ids),
+                Attrs.DUCKDB_SQL_BYTES: len(sql.encode("utf-8")),
+            },
+        ):
+            with span_cm as (span, _):
+                with catalog._readonly_connection() as conn:
+                    catalog._log_query(sql, params)
+                    relation = conn.execute(sql, params)
+                    rows = relation.fetchall()
+                    cols = [desc[0] for desc in relation.description]
+                payload = [dict(zip(cols, row, strict=True)) for row in rows]
         if span is not None:
             with suppress(AttributeError):  # pragma: no cover - noop span
                 span.set_attribute(Attrs.DUCKDB_ROWS, len(payload))
@@ -839,15 +868,19 @@ class DuckDBCatalog(_DuckDBQueryMixin):
                 external_expr = "external_id"
             else:
                 external_expr = "NULL"
-            conn.execute(
-                f"""
+            expr_sql = (
+                "NULL"
+                if external_expr.upper() == "NULL"
+                else _escape_identifier(external_expr)
+            )
+            query_template = """
                 CREATE OR REPLACE VIEW faiss_idmap AS
                 SELECT
                     faiss_row,
-                    {external_expr} AS external_id
+                    {expr} AS external_id
                 FROM faiss_idmap_mat
                 """
-            )
+            conn.execute(query_template.replace("{expr}", expr_sql))
             LOGGER.info(
                 "Configured DuckDB view",
                 extra=_log_extra(view="faiss_idmap", source="faiss_idmap_mat"),
@@ -1136,14 +1169,20 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         }
         perf_start = perf_counter()
         results: list[dict] = []
-        with span_context(
-            "catalog.hydrate",
-            stage="catalog.hydrate",
+        with ledger_step(
+            stage="hydrate",
+            op="duckdb.filter_chunks",
+            component="duckdb.catalog",
             attrs=span_attrs,
-            emit_checkpoint=True,
-        ) as (span, _):
-            start_time = perf_counter()
-            spec = self._build_scope_filter_spec(
+        ):
+            with span_context(
+                "catalog.hydrate",
+                stage="catalog.hydrate",
+                attrs=span_attrs,
+                emit_checkpoint=True,
+            ) as (span, _):
+                start_time = perf_counter()
+                spec = self._build_scope_filter_spec(
                 ids,
                 include_globs=include_globs,
                 exclude_globs=exclude_globs,
@@ -1834,7 +1873,7 @@ def ensure_faiss_idmap_view(
     conn.sql("SELECT * FROM read_parquet(?)", params=[idmap_parquet]).create_view(
         "v_faiss_idmap", replace=True
     )
-    chunk_files = glob(chunks_parquet, recursive=True)
+    chunk_files = list(Path().glob(chunks_parquet))
     if chunk_files:
         conn.sql("SELECT * FROM read_parquet(?)", params=[chunks_parquet]).create_view(
             "v_chunks", replace=True

@@ -10,15 +10,12 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal, cast
 
-try:  # pragma: no cover - optional dependency
-    from opentelemetry import trace
-except ImportError:  # pragma: no cover - fallback stub
-    trace = None  # type: ignore[assignment]
-
+from codeintel_rev.observability.execution_ledger import record as ledger_record
 from codeintel_rev.observability.ledger import RunLedger
 from codeintel_rev.observability.runtime_observer import current_run_ledger
 from codeintel_rev.observability.semantic_conventions import Attrs, to_label_str
-from codeintel_rev.telemetry.context import current_run_id, current_session
+from codeintel_rev.telemetry.context import current_run_id, current_session, current_stage
+from codeintel_rev.telemetry.otel_shim import trace_api
 
 LOGGER = logging.getLogger(__name__)
 _REPORTER_STATE: dict[str, object | None] = {"initialized": False, "hook": None}
@@ -45,7 +42,8 @@ def _now_iso() -> str:
 def emit_step(step: StepEvent, *, ledger: RunLedger | None = None) -> None:
     """Emit a structured step event to the current sinks."""
     active_ledger = ledger or current_run_ledger()
-    span = trace.get_current_span() if trace is not None else None
+    span = trace_api.get_current_span()
+    span = span if span and span.is_recording() else None
     attrs: MutableMapping[str, Any] = {
         Attrs.STEP_KIND: step.kind,
         Attrs.STEP_STATUS: step.status,
@@ -72,6 +70,25 @@ def emit_step(step: StepEvent, *, ledger: RunLedger | None = None) -> None:
             record["trace_id"] = f"{ctx.trace_id:032x}"
         if ctx.span_id:
             record["span_id"] = f"{ctx.span_id:016x}"
+    ledger_ok = step.status in {"completed", "skipped"}
+    ledger_attrs: dict[str, object] = {
+        Attrs.STEP_KIND: step.kind,
+        Attrs.STEP_STATUS: step.status,
+    }
+    if step.detail:
+        ledger_attrs[Attrs.STEP_DETAIL] = step.detail
+    if step.payload:
+        ledger_attrs[Attrs.STEP_PAYLOAD] = to_label_str(step.payload)
+    try:
+        ledger_record(
+            f"step.{step.kind}",
+            stage=current_stage(),
+            component="mcp.step",
+            ok=ledger_ok,
+            **ledger_attrs,
+        )
+    except Exception:  # pragma: no cover - telemetry mirroring best effort
+        LOGGER.debug("Failed to mirror step event into execution ledger", exc_info=True)
     if active_ledger is not None:
         active_ledger.append(record)
     _record_structured_event(record)

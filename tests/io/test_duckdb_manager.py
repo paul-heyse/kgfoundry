@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
+from typing import cast
 
 from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 from codeintel_rev.observability.timeline import Timeline, bind_timeline
@@ -18,9 +19,13 @@ def test_duckdb_manager_instruments_sql(monkeypatch, tmp_path) -> None:
         def close(self) -> None:
             pass
 
+    duckdb_stub = cast(
+        "ModuleType",
+        SimpleNamespace(connect=lambda _path: _StubConn()),
+    )
     monkeypatch.setattr(
         "codeintel_rev.io.duckdb_manager.duckdb",
-        SimpleNamespace(connect=lambda _path: _StubConn()),  # type: ignore[arg-type]
+        duckdb_stub,
     )
     manager = DuckDBManager(tmp_path / "catalog.duckdb", DuckDBConfig(log_queries=True))
     timeline = Timeline(session_id="sess-test", run_id="run-test", sampled=True)

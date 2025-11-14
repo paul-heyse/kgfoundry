@@ -17,6 +17,7 @@ import msgspec
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.metrics.registry import EMBED_BATCH_SIZE, EMBED_LATENCY_SECONDS
+from codeintel_rev.observability.execution_ledger import step as ledger_step
 from codeintel_rev.observability.otel import record_span_event
 from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.observability.timeline import current_timeline
@@ -323,11 +324,21 @@ class VLLMClient:
         )
         timeline_cm = timeline.step("embed.vllm", **step_attrs) if timeline else nullcontext()
         try:
-            with span_cm as (_span, _), timeline_cm:
-                if self._local_engine is not None:
-                    vectors = self._local_engine.embed_batch(texts)
-                else:
-                    vectors = self._embed_batch_http(texts)
+            with ledger_step(
+                stage="embed",
+                op="vllm.embed_batch",
+                component="io.vllm",
+                attrs={
+                    Attrs.VLLM_MODE: mode,
+                    Attrs.VLLM_MODEL_NAME: self.config.model,
+                    Attrs.VLLM_BATCH: batch_size,
+                },
+            ):
+                with span_cm as (_span, _), timeline_cm:
+                    if self._local_engine is not None:
+                        vectors = self._local_engine.embed_batch(texts)
+                    else:
+                        vectors = self._embed_batch_http(texts)
         except Exception as exc:
             error_attrs = dict(span_attrs)
             error_attrs["error"] = str(exc)
@@ -524,15 +535,26 @@ class VLLMClient:
 
         mode = "local" if self._local_engine is not None else "http"
         attrs = {"mode": mode, "n_texts": len(texts), "dim": self.config.embedding_dim}
+        ledger_attrs = {
+            Attrs.VLLM_MODE: mode,
+            Attrs.VLLM_MODEL_NAME: self.config.model,
+            Attrs.VLLM_BATCH: len(texts),
+        }
 
         if self._local_engine is not None:
-            with span_context(
-                "search.embed",
-                stage="search.embed",
-                attrs=attrs,
-                emit_checkpoint=True,
+            with ledger_step(
+                stage="embed",
+                op="vllm.embed_batch_async",
+                component="io.vllm",
+                attrs=ledger_attrs,
             ):
-                return await self._embed_batch_async_local(texts)
+                with span_context(
+                    "search.embed",
+                    stage="search.embed",
+                    attrs=attrs,
+                    emit_checkpoint=True,
+                ):
+                    return await self._embed_batch_async_local(texts)
 
         async_client = self._ensure_async_http_client()
         request = EmbeddingRequest(input=list(texts), model=self.config.model)
@@ -543,19 +565,25 @@ class VLLMClient:
             extra={"batch_size": len(texts), "model": self.config.model},
         )
 
-        with span_context(
-            "search.embed",
-            stage="search.embed",
-            attrs=attrs,
-            emit_checkpoint=True,
+        with ledger_step(
+            stage="embed",
+            op="vllm.embed_batch_async",
+            component="io.vllm",
+            attrs=ledger_attrs,
         ):
-            response = await async_client.post(
-                f"{self.config.base_url}/embeddings",
-                content=payload,
-                headers={"Content-Type": "application/json"},
-            )
-            response.raise_for_status()
-            result = self._decoder.decode(response.content)
+            with span_context(
+                "search.embed",
+                stage="search.embed",
+                attrs=attrs,
+                emit_checkpoint=True,
+            ):
+                response = await async_client.post(
+                    f"{self.config.base_url}/embeddings",
+                    content=payload,
+                    headers={"Content-Type": "application/json"},
+                )
+                response.raise_for_status()
+                result = self._decoder.decode(response.content)
 
         # Sort by index and extract vectors
         sorted_data = sorted(result.data, key=lambda d: d.index)

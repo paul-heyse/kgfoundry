@@ -20,68 +20,63 @@ _USE_REAL_DATA = os.getenv("KGFOUNDRY_TEST_USE_REAL_DATA", "1").strip().lower() 
 _REPO_ROOT_OVERRIDE = os.getenv("KGFOUNDRY_TEST_REPO_ROOT")
 
 
-def _prepare_paths(tmp_path: Path) -> ResolvedPaths:
-    """Return ResolvedPaths backed by either real repo data or synthetic fixtures."""
-    if _USE_REAL_DATA:
-        repo_root = (
-            Path(_REPO_ROOT_OVERRIDE).expanduser().resolve()
-            if _REPO_ROOT_OVERRIDE
-            else Path(__file__).resolve().parents[2]
+def _real_paths(repo_root: Path) -> ResolvedPaths:
+    data_dir = repo_root / "data"
+    vectors_dir = data_dir / "vectors"
+    faiss_dir = data_dir / "faiss"
+    coderank_vectors = data_dir / "coderank_vectors"
+    warp_dir = repo_root / "indexes" / "warp_xtr"
+    xtr_dir = data_dir / "xtr"
+    faiss_index = faiss_dir / "code.ivfpq.faiss"
+    faiss_idmap = faiss_dir / "faiss_idmap.parquet"
+    coderank_index = faiss_dir / "coderank.ivfpq.faiss"
+    duckdb_path = data_dir / "catalog.duckdb"
+    scip_index = repo_root / "codeintel_rev" / "index.scip.json"
+
+    missing = [
+        path
+        for path in (
+            data_dir,
+            vectors_dir,
+            faiss_dir,
+            faiss_index,
+            faiss_idmap,
+            duckdb_path,
+            scip_index,
         )
-        data_dir = repo_root / "data"
-        vectors_dir = data_dir / "vectors"
-        faiss_dir = data_dir / "faiss"
-        coderank_vectors = data_dir / "coderank_vectors"
-        warp_dir = repo_root / "indexes" / "warp_xtr"
-        xtr_dir = data_dir / "xtr"
-        faiss_index = faiss_dir / "code.ivfpq.faiss"
-        faiss_idmap = faiss_dir / "faiss_idmap.parquet"
-        coderank_index = faiss_dir / "coderank.ivfpq.faiss"
-        duckdb_path = data_dir / "catalog.duckdb"
-        scip_index = repo_root / "codeintel_rev" / "index.scip.json"
-
-        missing = [
-            path
-            for path in (
-                data_dir,
-                vectors_dir,
-                faiss_dir,
-                faiss_index,
-                faiss_idmap,
-                duckdb_path,
-                scip_index,
-            )
-            if not path.exists()
-        ]
-        if missing:
-            parts: list[str] = []
-            for path in missing:
-                try:
-                    parts.append(str(path.relative_to(repo_root)))
-                except ValueError:
-                    parts.append(str(path))
-            formatted = ", ".join(parts)
-            raise FileNotFoundError(
-                "Real-data fixtures enabled but missing required artifacts: "
-                f"{formatted}. Run the indexing pipeline or set "
-                "KGFOUNDRY_TEST_USE_REAL_DATA=0 to fall back to synthetic fixtures."
-            )
-
-        return ResolvedPaths(
-            repo_root=repo_root,
-            data_dir=data_dir,
-            vectors_dir=vectors_dir,
-            faiss_index=faiss_index,
-            faiss_idmap_path=faiss_idmap,
-            duckdb_path=duckdb_path,
-            scip_index=scip_index,
-            coderank_vectors_dir=coderank_vectors,
-            coderank_faiss_index=coderank_index,
-            warp_index_dir=warp_dir,
-            xtr_dir=xtr_dir,
+        if not path.exists()
+    ]
+    if missing:
+        parts: list[str] = []
+        for path in missing:
+            try:
+                parts.append(str(path.relative_to(repo_root)))
+            except ValueError:
+                parts.append(str(path))
+        formatted = ", ".join(parts)
+        message = (
+            "Real-data fixtures enabled but missing required artifacts: "
+            f"{formatted}. Run the indexing pipeline or set "
+            "KGFOUNDRY_TEST_USE_REAL_DATA=0 to fall back to synthetic fixtures."
         )
+        raise FileNotFoundError(message)
 
-    # Synthetic fallback used when real data is unavailable.
+    return ResolvedPaths(
+        repo_root=repo_root,
+        data_dir=data_dir,
+        vectors_dir=vectors_dir,
+        faiss_index=faiss_index,
+        faiss_idmap_path=faiss_idmap,
+        duckdb_path=duckdb_path,
+        scip_index=scip_index,
+        coderank_vectors_dir=coderank_vectors,
+        coderank_faiss_index=coderank_index,
+        warp_index_dir=warp_dir,
+        xtr_dir=xtr_dir,
+    )
+
+
+def _synthetic_paths(tmp_path: Path) -> ResolvedPaths:
     repo_root = tmp_path / "repo"
     repo_root.mkdir(parents=True, exist_ok=True)
     data_dir = repo_root / "data"
@@ -129,6 +124,30 @@ def _prepare_paths(tmp_path: Path) -> ResolvedPaths:
         warp_index_dir=warp_dir,
         xtr_dir=xtr_dir,
     )
+
+
+def _prepare_paths(tmp_path: Path) -> ResolvedPaths:
+    """Return ResolvedPaths backed by either real repo data or synthetic fixtures.
+
+    Parameters
+    ----------
+    tmp_path : Path
+        Temporary directory used when creating synthetic fixtures.
+
+    Returns
+    -------
+    ResolvedPaths
+        Paths pointing to either the real repository layout or synthetic test data.
+
+    """
+    if _USE_REAL_DATA:
+        repo_root = (
+            Path(_REPO_ROOT_OVERRIDE).expanduser().resolve()
+            if _REPO_ROOT_OVERRIDE
+            else Path(__file__).resolve().parents[2]
+        )
+        return _real_paths(repo_root)
+    return _synthetic_paths(tmp_path)
 
 
 def build_application_context(

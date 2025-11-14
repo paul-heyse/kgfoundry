@@ -35,6 +35,7 @@ if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
 
 SEARCH_TIMEOUT_SECONDS = 30
+SEARCH_MAX_RESULTS = 500
 MAX_PREVIEW_CHARS = 200
 GREP_SPLIT_PARTS = 3
 COMMAND_NOT_FOUND_RETURN_CODE = 127
@@ -288,19 +289,10 @@ async def search_text(
     return await asyncio.to_thread(_run_sync)
 
 
-def _search_text_sync(
-    context: ApplicationContext,
-    session_id: str,
+def _resolve_glob_filters(
     scope: ScopeIn | None,
     options: TextSearchOptions,
-    *,
-    telemetry_attrs: Mapping[str, object] | None = None,
-) -> dict:
-    repo_root = context.paths.repo_root
-
-    query = options.query
-    max_results = options.max_results
-
+) -> tuple[list[str] | None, Sequence[str] | None, Sequence[str] | None]:
     merged_filters = merge_scope_filters(
         scope,
         {
@@ -317,13 +309,32 @@ def _search_text_sync(
         },
     )
 
-    effective_paths = list(options.paths) if options.paths else None
-    # Explicit paths suppress scope-provided include globs unless explicitly overridden
-    if effective_paths and options.include_globs is None:
-        effective_include_globs: Sequence[str] | None = None
+    explicit_paths = list(options.paths) if options.paths else None
+    if explicit_paths and options.include_globs is None:
+        include_globs: Sequence[str] | None = None
     else:
-        effective_include_globs = merged_filters.get("include_globs")
-    effective_exclude_globs = merged_filters.get("exclude_globs")
+        include_globs = merged_filters.get("include_globs")
+    exclude_globs = merged_filters.get("exclude_globs")
+    return explicit_paths, include_globs, exclude_globs
+
+
+def _search_text_sync(
+    context: ApplicationContext,
+    session_id: str,
+    scope: ScopeIn | None,
+    options: TextSearchOptions,
+    *,
+    telemetry_attrs: Mapping[str, object] | None = None,
+) -> dict:
+    repo_root = context.paths.repo_root
+
+    query = options.query
+    max_results = options.max_results
+
+    effective_paths, effective_include_globs, effective_exclude_globs = _resolve_glob_filters(
+        scope,
+        options,
+    )
 
     LOGGER.debug(
         "Searching text with scope filters",
@@ -402,8 +413,7 @@ def _search_text_sync(
                     observation=observation,
                     repo_root=repo_root,
                     query=query,
-                    case_sensitive=options.case_sensitive,
-                    max_results=max_results,
+                    options=options,
                     telemetry_attrs=telemetry_attrs,
                 )
             else:
@@ -437,8 +447,7 @@ def _fallback_grep(
     observation: Observation,
     repo_root: Path,
     query: str,
-    case_sensitive: bool,
-    max_results: int,
+    options: TextSearchOptions,
     telemetry_attrs: Mapping[str, object] | None = None,
 ) -> dict:
     """Fallback to basic grep if ripgrep unavailable.
@@ -451,10 +460,8 @@ def _fallback_grep(
         Repository root directory.
     query : str
         Search query.
-    case_sensitive : bool
-        Case-sensitive search.
-    max_results : int
-        Maximum results.
+    options : TextSearchOptions
+        Search configuration controlling case sensitivity and limits.
     telemetry_attrs : Mapping[str, object] | None, optional
         Optional telemetry attributes to include in span context. These are
         merged with stage-specific attributes for observability. Defaults to None.
@@ -471,7 +478,7 @@ def _fallback_grep(
     """
     command = ["grep", "-r", "-n"]
 
-    if not case_sensitive:
+    if not options.case_sensitive:
         command.append("-i")
 
     command.extend(["--", query, "."])
@@ -519,6 +526,7 @@ def _fallback_grep(
         ) from exc
 
     matches: list[Match] = []
+    max_results = options.max_results or SEARCH_MAX_RESULTS
     for line in stdout.splitlines()[:max_results]:
         parts = line.split(":", GREP_SPLIT_PARTS - 1)
         if len(parts) < GREP_SPLIT_PARTS:

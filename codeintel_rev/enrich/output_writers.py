@@ -7,6 +7,7 @@ import json
 import os
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 try:  # pragma: no cover - optional dependency
     import orjson
@@ -22,6 +23,14 @@ except ImportError:  # pragma: no cover - optional dependency
     ds = None
     pq = None
 
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    import pyarrow as pa_typing
+
+    PaTable = pa_typing.Table
+else:  # pragma: no cover - runtime guard
+    PaTable = Any
+
+RowMapping = Mapping[str, object]
 
 _JSONL_WRITER_ENV = "ENRICH_JSONL_WRITER"
 _JSONL_V2 = "v2"
@@ -78,13 +87,21 @@ def _dump_jsonl_bytes(obj: object) -> bytes:
     bytes
         UTF-8 encoded JSON bytes with a trailing newline. The output uses
         deterministic key ordering (sorted keys) for consistent serialization.
+
+    Raises
+    ------
+    RuntimeError
+        Raised when deterministic serialization requires orjson but it is not installed.
     """
     if _ORJSON_JSONL_OPTS is not None:
+        if orjson is None:  # pragma: no cover - defensive
+            message = "orjson options configured without orjson installed"
+            raise RuntimeError(message)
         return orjson.dumps(obj, option=_ORJSON_JSONL_OPTS)
     return (json.dumps(obj, ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8")
 
 
-def _resolve_dictionary_fields(table: pa.Table, hints: Sequence[str] | None = None) -> list[str]:
+def _resolve_dictionary_fields(table: PaTable, hints: Sequence[str] | None = None) -> list[str]:
     """Return dictionary-encoded columns present in ``table``.
 
     Parameters
@@ -117,7 +134,7 @@ def write_json(path: str | Path, obj: object) -> None:
     target.write_text(_dump_json(obj), encoding="utf-8")
 
 
-def write_jsonl(path: str | Path, rows: Iterable[dict[str, object]]) -> None:
+def write_jsonl(path: str | Path, rows: Iterable[RowMapping]) -> None:
     """Write newline-delimited JSON records."""
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -125,20 +142,22 @@ def write_jsonl(path: str | Path, rows: Iterable[dict[str, object]]) -> None:
     if writer_version == _JSONL_V2 and _ORJSON_JSONL_OPTS is not None:
         with target.open("wb") as handle:
             for row in rows:
-                handle.write(_dump_jsonl_bytes(row))
+                payload = dict(row)
+                handle.write(_dump_jsonl_bytes(payload))
         return
     with target.open("w", encoding="utf-8") as handle:
         for row in rows:
+            payload = dict(row)
             if writer_version == _JSONL_V2:
-                handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True))
+                handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True))
             else:
-                handle.write(_dump_json(row))
+                handle.write(_dump_json(payload))
             handle.write("\n")
 
 
-def write_parquet(path: str | Path, rows: Iterable[dict[str, object]]) -> None:
+def write_parquet(path: str | Path, rows: Iterable[RowMapping]) -> None:
     """Persist ``rows`` to Parquet, falling back to JSONL when PyArrow is missing."""
-    records = list(rows)
+    records = [dict(row) for row in rows]
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     if pa is None or pq is None:
@@ -151,7 +170,7 @@ def write_parquet(path: str | Path, rows: Iterable[dict[str, object]]) -> None:
 
 def write_parquet_dataset(
     path: str | Path,
-    rows: Iterable[dict[str, object]],
+    rows: Iterable[RowMapping],
     *,
     partitioning: Sequence[str],
     dictionary_fields: Sequence[str] | None = None,
@@ -182,7 +201,7 @@ def write_parquet_dataset(
         Raised when partitioning is empty. Partitioning columns are required
         for dataset writes to organize data into separate files.
     """
-    records = list(rows)
+    records = [dict(row) for row in rows]
     target = Path(path)
     if not partitioning:
         message = "Partitioning columns are required for dataset writes."
@@ -201,7 +220,7 @@ def write_parquet_dataset(
 
 
 def _write_dataset_table(
-    table: pa.Table,
+    table: PaTable,
     destination: Path,
     *,
     partitioning: Sequence[str] | None = None,
@@ -210,22 +229,22 @@ def _write_dataset_table(
     """Write ``table`` to Parquet using dataset writer settings."""
     if pa is None or pq is None:
         return
-    use_dictionary = _resolve_dictionary_fields(table, dictionary_fields)
+    dictionary_columns = _resolve_dictionary_fields(table, dictionary_fields)
     if not partitioning or ds is None:
         destination.parent.mkdir(parents=True, exist_ok=True)
         pq.write_table(
             table,
             destination,
             compression="zstd",
-            use_dictionary=use_dictionary or None,
+            use_dictionary=bool(dictionary_columns),
         )
         return
     destination.mkdir(parents=True, exist_ok=True)
     fmt = ds.ParquetFileFormat()
-    file_options = fmt.make_write_options(
-        compression="zstd",
-        use_dictionary=use_dictionary or None,
-    )
+    file_options = fmt.make_write_options()
+    file_options.update(compression="zstd")
+    if dictionary_columns:
+        file_options.update(use_dictionary=list(dictionary_columns))
     partition_fields = [
         table.schema.field(name)
         for name in partitioning

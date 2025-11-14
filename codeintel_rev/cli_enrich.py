@@ -75,6 +75,22 @@ except ImportError:  # pragma: no cover - optional dependency
     yaml_module = None
 
 
+def _yaml_errors() -> tuple[type[BaseException], ...]:
+    """Return YAML loader exceptions supported in this environment.
+
+    Returns
+    -------
+    tuple[type[BaseException], ...]
+        Tuple of exception classes thrown by the configured YAML parser.
+    """
+    if yaml_module is not None:  # pragma: no cover - optional dependency
+        return (yaml_module.YAMLError,)
+    return (ValueError,)
+
+
+YAML_ERRORS = _yaml_errors()
+
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -102,11 +118,6 @@ def _stage_span(stage: str, **start_meta: object) -> Iterator[dict[str, object]]
         Mutable dictionary that can be populated with additional metadata prior
         to logging the ``event=finish`` line.
 
-    Raises
-    ------
-    Exception
-        Any exception raised within the context is re-raised after logging an
-        error event. The original exception is preserved.
     """
     start = time.perf_counter()
     LOGGER.debug("stage=%s event=start %s", stage, _format_stage_meta(start_meta))
@@ -844,7 +855,12 @@ def _execute_pipeline_or_exit(ctx: typer.Context) -> tuple[PipelineResult, CLICo
         raise typer.Exit(1) from exc
 
 
-def _handle_dry_run(command: str, dry_run: bool, result: PipelineResult) -> bool:
+def _handle_dry_run(
+    command: str,
+    *,
+    dry_run: bool,
+    result: PipelineResult,
+) -> bool:
     """Emit deterministic dry-run summaries and signal whether callers should return.
 
     Parameters
@@ -941,7 +957,7 @@ def run_all(  # lint-ignore[PLR0913,PLR0917]: Typer CLI requires enumerating sha
         slices_filter=slices_filter,
     )
     result, state = _execute_pipeline_or_exit(ctx)
-    if _handle_dry_run("all", dry_run, result):
+    if _handle_dry_run("all", dry_run=dry_run, result=result):
         return
     if state.analytics.owners:
         _apply_ownership(
@@ -1088,7 +1104,7 @@ def exports(
         slices_filter=slices_filter,
     )
     result, state = _execute_pipeline_or_exit(ctx)
-    if _handle_dry_run("exports", dry_run, result):
+    if _handle_dry_run("exports", dry_run=dry_run, result=result):
         return
     if state.analytics.owners:
         _apply_ownership(
@@ -1144,7 +1160,7 @@ def graph(
         slices_filter=slices_filter,
     )
     result, state = _execute_pipeline_or_exit(ctx)
-    if _handle_dry_run("graph", dry_run, result):
+    if _handle_dry_run("graph", dry_run=dry_run, result=result):
         return
     _write_graph_outputs(result, state.pipeline.out)
     typer.echo("[graph] Wrote symbol and import graphs.")
@@ -1187,7 +1203,7 @@ def uses(
         slices_filter=slices_filter,
     )
     result, state = _execute_pipeline_or_exit(ctx)
-    if _handle_dry_run("uses", dry_run, result):
+    if _handle_dry_run("uses", dry_run=dry_run, result=result):
         return
     _write_uses_output(result, state.pipeline.out)
     typer.echo("[uses] Wrote uses graph.")
@@ -1230,7 +1246,7 @@ def typedness(
         slices_filter=slices_filter,
     )
     result, state = _execute_pipeline_or_exit(ctx)
-    if _handle_dry_run("typedness", dry_run, result):
+    if _handle_dry_run("typedness", dry_run=dry_run, result=result):
         return
     _write_typedness_output(result, state.pipeline.out)
     typer.echo("[typedness] Wrote typedness analytics.")
@@ -1273,7 +1289,7 @@ def doc(
         slices_filter=slices_filter,
     )
     result, state = _execute_pipeline_or_exit(ctx)
-    if _handle_dry_run("doc", dry_run, result):
+    if _handle_dry_run("doc", dry_run=dry_run, result=result):
         return
     _write_doc_output(result, state.pipeline.out)
     typer.echo("[doc] Wrote doc health analytics.")
@@ -1316,7 +1332,7 @@ def coverage(
         slices_filter=slices_filter,
     )
     result, state = _execute_pipeline_or_exit(ctx)
-    if _handle_dry_run("coverage", dry_run, result):
+    if _handle_dry_run("coverage", dry_run=dry_run, result=result):
         return
     _write_coverage_output(result, state.pipeline.out)
     typer.echo("[coverage] Wrote coverage analytics.")
@@ -1359,7 +1375,7 @@ def config(
         slices_filter=slices_filter,
     )
     result, state = _execute_pipeline_or_exit(ctx)
-    if _handle_dry_run("config", dry_run, result):
+    if _handle_dry_run("config", dry_run=dry_run, result=result):
         return
     _write_config_output(result, state.pipeline.out)
     typer.echo("[config] Wrote config index.")
@@ -1402,7 +1418,7 @@ def hotspots(
         slices_filter=slices_filter,
     )
     result, state = _execute_pipeline_or_exit(ctx)
-    if _handle_dry_run("hotspots", dry_run, result):
+    if _handle_dry_run("hotspots", dry_run=dry_run, result=result):
         return
     _write_hotspot_output(result, state.pipeline.out)
     typer.echo("[hotspots] Wrote hotspot analytics.")
@@ -1668,7 +1684,7 @@ def _load_overlay_tagged_paths(out_dir: Path, overlay_tag: str) -> frozenset[str
         return frozenset()
     try:
         payload = yaml_module.safe_load(tags_file.read_text(encoding="utf-8"))
-    except Exception:  # pragma: no cover - defensive parsing
+    except YAML_ERRORS:  # pragma: no cover - defensive parsing
         LOGGER.debug("Failed to read tag index from %s", tags_file, exc_info=True)
         return frozenset()
     if not isinstance(payload, Mapping):

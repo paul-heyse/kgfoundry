@@ -2,44 +2,31 @@
 
 from __future__ import annotations
 
+import importlib
 import logging
-from typing import TYPE_CHECKING
+from typing import Any, cast
 
 import pytest
-
-if TYPE_CHECKING:
-    from opentelemetry.sdk.trace.export import (
-        InMemorySpanExporter,  # type: ignore[reportAttributeAccessIssue]
-        SimpleSpanProcessor,  # type: ignore[reportAttributeAccessIssue]
-    )
+from codeintel_rev.observability.otel import current_span_id, current_trace_id
 
 try:
-    from codeintel_rev.observability.otel import current_span_id, current_trace_id
-    from opentelemetry import trace
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import (
-        InMemorySpanExporter,  # type: ignore[reportAttributeAccessIssue]
-        SimpleSpanProcessor,  # type: ignore[reportAttributeAccessIssue]
-    )
-
-    _OTELEMETRY_AVAILABLE = True
+    trace_module = importlib.import_module("opentelemetry.trace")
+    sdk_trace_module = importlib.import_module("opentelemetry.sdk.trace")
+    exporter_module = importlib.import_module("opentelemetry.sdk.trace.export")
 except ImportError:
-    _OTELEMETRY_AVAILABLE = False
-    # Stub types for runtime when OTel is unavailable (tests will be skipped)
-    InMemorySpanExporter = object  # type: ignore[assignment,misc]
-    SimpleSpanProcessor = object  # type: ignore[assignment,misc]
+    pytest.skip("OpenTelemetry packages not available", allow_module_level=True)
 
-OTELEMETRY_AVAILABLE = _OTELEMETRY_AVAILABLE
+trace = cast("Any", trace_module)
+TracerProvider = cast("type[Any]", sdk_trace_module.TracerProvider)
+InMemorySpanExporter = cast("type[Any]", exporter_module.InMemorySpanExporter)
+SimpleSpanProcessor = cast("type[Any]", exporter_module.SimpleSpanProcessor)
 
 
-@pytest.mark.skipif(not OTELEMETRY_AVAILABLE, reason="OpenTelemetry packages not available")
-def test_trace_id_in_span_context():  # type: ignore[misc]
+def test_trace_id_in_span_context() -> None:
     """Verify trace_id is available in span context."""
-    if not OTELEMETRY_AVAILABLE:
-        pytest.skip("OpenTelemetry packages not available")
-    exporter = InMemorySpanExporter()  # type: ignore[misc]
+    exporter = InMemorySpanExporter()
     provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exporter))  # type: ignore[misc]
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
     trace.set_tracer_provider(provider)
     tracer = trace.get_tracer(__name__)
     with tracer.start_as_current_span("test_span"):
@@ -48,14 +35,11 @@ def test_trace_id_in_span_context():  # type: ignore[misc]
         assert len(trace_id) == 32  # Hex trace ID is 32 chars
 
 
-@pytest.mark.skipif(not OTELEMETRY_AVAILABLE, reason="OpenTelemetry packages not available")
-def test_span_id_in_span_context():  # type: ignore[misc]
+def test_span_id_in_span_context() -> None:
     """Verify span_id is available in span context."""
-    if not OTELEMETRY_AVAILABLE:
-        pytest.skip("OpenTelemetry packages not available")
-    exporter = InMemorySpanExporter()  # type: ignore[misc]
+    exporter = InMemorySpanExporter()
     provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exporter))  # type: ignore[misc]
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
     trace.set_tracer_provider(provider)
     tracer = trace.get_tracer(__name__)
     with tracer.start_as_current_span("test_span"):
@@ -64,14 +48,11 @@ def test_span_id_in_span_context():  # type: ignore[misc]
         assert len(span_id) == 16  # Hex span ID is 16 chars
 
 
-@pytest.mark.skipif(not OTELEMETRY_AVAILABLE, reason="OpenTelemetry packages not available")
-def test_log_record_contains_trace_context():  # type: ignore[misc]
+def test_log_record_contains_trace_context() -> None:
     """Verify log records can access trace context."""
-    if not OTELEMETRY_AVAILABLE:
-        pytest.skip("OpenTelemetry packages not available")
-    exporter = InMemorySpanExporter()  # type: ignore[misc]
+    exporter = InMemorySpanExporter()
     provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exporter))  # type: ignore[misc]
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
     trace.set_tracer_provider(provider)
     logger = logging.getLogger(__name__)
     tracer = trace.get_tracer(__name__)

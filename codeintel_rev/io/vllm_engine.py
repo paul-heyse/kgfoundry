@@ -24,12 +24,25 @@ if TYPE_CHECKING:
     from vllm.inputs import TokensPrompt
 
     from codeintel_rev.config.settings import VLLMConfig
-else:
-    np = cast("np", LazyModule("numpy", "in-process vLLM embeddings"))
-    transformers = LazyModule("transformers", "in-process vLLM tokenizer")
-    vllm = LazyModule("vllm", "in-process vLLM runtime")
-    vllm_config = LazyModule("vllm.config", "in-process vLLM config")
-    vllm_inputs = LazyModule("vllm.inputs", "in-process vLLM prompts")
+else:  # pragma: no cover - runtime imports
+    try:
+        import numpy as np
+    except ImportError:
+        np = cast("Any", LazyModule("numpy", "in-process vLLM embeddings"))
+
+    try:
+        import transformers
+    except ImportError:
+        transformers = cast("Any", LazyModule("transformers", "in-process vLLM tokenizer"))
+
+    try:
+        import vllm
+        import vllm.config as vllm_config
+        import vllm.inputs as vllm_inputs
+    except ImportError:
+        vllm = cast("Any", LazyModule("vllm", "in-process vLLM runtime"))
+        vllm_config = cast("Any", LazyModule("vllm.config", "in-process vLLM config"))
+        vllm_inputs = cast("Any", LazyModule("vllm.inputs", "in-process vLLM prompts"))
 
 LOGGER = get_logger(__name__)
 
