@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, cast
 import msgspec
 
 from codeintel_rev._lazy_imports import LazyModule
-from codeintel_rev.observability.otel import as_span, record_span_event
+from codeintel_rev.observability.otel import record_span_event
 from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.telemetry.decorators import span_context
@@ -314,17 +314,16 @@ class VLLMClient:
             Attrs.VLLM_BATCH: batch_size,
         }
         start = perf_counter()
+        span_cm = span_context(
+            "vllm.embed_batch",
+            kind="client",
+            stage="search.embed",
+            attrs=span_attrs,
+            emit_checkpoint=True,
+        )
+        timeline_cm = timeline.step("embed.vllm", **step_attrs) if timeline else nullcontext()
         try:
-            with (
-                span_context(
-                    "search.embed",
-                    stage="search.embed",
-                    attrs=step_attrs,
-                    emit_checkpoint=True,
-                ),
-                as_span("vllm.embed_batch", **span_attrs),
-                timeline.step("embed.vllm", **step_attrs) if timeline else nullcontext(),
-            ):
+            with span_cm as (_span, _), timeline_cm:
                 if self._local_engine is not None:
                     vectors = self._local_engine.embed_batch(texts)
                 else:

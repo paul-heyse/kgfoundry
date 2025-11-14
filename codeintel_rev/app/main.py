@@ -40,8 +40,6 @@ from codeintel_rev.observability.otel import (
     as_span,
     current_trace_id,
     init_all_telemetry,
-    instrument_fastapi,
-    instrument_httpx,
     set_current_span_attrs,
 )
 from codeintel_rev.observability.runtime_observer import TimelineRuntimeObserver
@@ -55,7 +53,9 @@ from codeintel_rev.telemetry.reporter import (
     build_report as build_run_report,
 )
 from codeintel_rev.telemetry.reporter import (
+    build_run_report_v2,
     render_markdown,
+    render_markdown_v2,
     render_mermaid,
     report_to_json,
 )
@@ -509,8 +509,6 @@ init_all_telemetry(
     service_name="codeintel-mcp",
     service_version=_DIST_VERSION,
 )
-instrument_fastapi(app)
-instrument_httpx()
 
 # CORS middleware for browser clients (handle preflight before session scope)
 app.add_middleware(
@@ -537,6 +535,43 @@ if metrics_router is not None:
 
 if os.getenv("CODEINTEL_ADMIN", "").strip().lower() in {"1", "true", "yes", "on"}:
     app.include_router(index_admin.router)
+
+
+@app.get("/observability/run_report")
+async def observability_run_report(
+    session_id: str, run_id: str | None = None, response_format: str | None = None
+) -> Response:
+    """Return RunReport V2 for observability dashboards.
+
+    Parameters
+    ----------
+    session_id : str
+        Session identifier to inspect.
+    run_id : str | None
+        Specific run identifier; when omitted the latest run is returned.
+    response_format : str | None
+        Optional format selector (``"md"`` or ``"markdown"`` for plaintext).
+
+    Returns
+    -------
+    Response
+        JSON response by default or plaintext Markdown when requested.
+
+    Raises
+    ------
+    HTTPException
+        Raised when the application context is missing or the run cannot be found.
+    """
+    context = getattr(app.state, "context", None)
+    if context is None:
+        raise HTTPException(status_code=503, detail="Application context not initialized")
+    report = build_run_report_v2(session_id, run_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    fmt = (response_format or "").lower()
+    if fmt in {"md", "markdown"}:
+        return PlainTextResponse(render_markdown_v2(report))
+    return JSONResponse(report.as_dict())
 
 
 @app.get("/reports/{session_id}")

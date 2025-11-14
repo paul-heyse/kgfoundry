@@ -10,31 +10,31 @@ Prometheus metrics for hybrid retrieval.
 
 - from **__future__** import annotations
 - from **collections.abc** import Iterable
-- from **kgfoundry_common.prometheus** import build_counter, build_gauge, build_histogram
+- from **codeintel_rev.telemetry.otel_metrics** import build_counter, build_gauge, build_histogram
 
 ## Definitions
 
-- variable: `QUERIES_TOTAL` (line 32)
-- variable: `QUERY_ERRORS_TOTAL` (line 38)
-- variable: `RRF_DURATION_SECONDS` (line 44)
-- variable: `CHANNEL_LATENCY_SECONDS` (line 51)
-- variable: `INDEX_VERSION_INFO` (line 59)
-- variable: `RRF_K` (line 65)
-- variable: `BUDGET_DEPTH` (line 70)
-- variable: `QUERY_AMBIGUITY` (line 76)
-- variable: `DEBUG_BUNDLE_TOTAL` (line 82)
-- variable: `RESULTS_TOTAL` (line 87)
-- variable: `RECENCY_BOOSTED_TOTAL` (line 92)
-- variable: `RECALL_AT_K` (line 97)
-- function: `observe_budget_depths` (line 104)
-- function: `record_recall` (line 110)
-- function: `set_index_version` (line 115)
+- variable: `QUERIES_TOTAL` (line 28)
+- variable: `QUERY_ERRORS_TOTAL` (line 34)
+- variable: `RRF_DURATION_SECONDS` (line 40)
+- variable: `CHANNEL_LATENCY_SECONDS` (line 47)
+- variable: `INDEX_VERSION_INFO` (line 55)
+- variable: `RRF_K` (line 61)
+- variable: `BUDGET_DEPTH` (line 66)
+- variable: `QUERY_AMBIGUITY` (line 72)
+- variable: `DEBUG_BUNDLE_TOTAL` (line 78)
+- variable: `RESULTS_TOTAL` (line 83)
+- variable: `RECENCY_BOOSTED_TOTAL` (line 88)
+- variable: `RECALL_AT_K` (line 93)
+- function: `observe_budget_depths` (line 100)
+- function: `record_recall` (line 106)
+- function: `set_index_version` (line 111)
 
 ## Graph Metrics
 
 - **fan_in**: 2
-- **fan_out**: 0
-- **cycle_group**: 53
+- **fan_out**: 1
+- **cycle_group**: 68
 
 ## Ownership
 
@@ -74,7 +74,7 @@ BUDGET_DEPTH, CHANNEL_LATENCY_SECONDS, DEBUG_BUNDLE_TOTAL, INDEX_VERSION_INFO, Q
 
 ## Hotspot
 
-- score: 1.52
+- score: 1.64
 
 ## Side Effects
 
@@ -84,7 +84,7 @@ BUDGET_DEPTH, CHANNEL_LATENCY_SECONDS, DEBUG_BUNDLE_TOTAL, INDEX_VERSION_INFO, Q
 
 - branches: 4
 - cyclomatic: 5
-- loc: 135
+- loc: 131
 
 ## Doc Coverage
 

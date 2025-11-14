@@ -21,15 +21,15 @@ Small in-process harness for exercising MCP tools without FastMCP.
 
 - **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 132
+- **cycle_group**: 133
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 1
-- recent churn 90: 1
+- recent churn 30: 2
+- recent churn 90: 2
 
 ## Usage
 

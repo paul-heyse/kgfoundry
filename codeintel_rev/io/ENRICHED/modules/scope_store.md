@@ -34,7 +34,7 @@ Scope store utilities for session state management.
 
 - **fan_in**: 2
 - **fan_out**: 2
-- **cycle_group**: 73
+- **cycle_group**: 47
 
 ## Ownership
 

@@ -29,12 +29,13 @@ from codeintel_rev.mcp_server.scope_utils import (
     path_matches_glob,
 )
 from codeintel_rev.observability.otel import record_span_event
+from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.observability.timeline import current_timeline
 from codeintel_rev.telemetry.decorators import span_context
+from codeintel_rev.telemetry.otel_metrics import build_histogram
 from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.logging import get_logger
-from kgfoundry_common.prometheus import build_histogram
 
 if TYPE_CHECKING:
     import duckdb
@@ -217,19 +218,28 @@ class _DuckDBQueryMixin:
             ORDER BY ids.position
             """
         params = [list(ids)]
+        otel_attrs = {
+            Attrs.COMPONENT: "duckdb",
+            Attrs.REQUEST_STAGE: "hydrate",
+            Attrs.DUCKDB_SQL_BYTES: len(sql.encode("utf-8")),
+        }
         perf_start = perf_counter()
-        with span_context(
+        span_cm = span_context(
             "catalog.hydrate",
             stage="catalog.hydrate",
-            attrs=span_attrs,
+            attrs=otel_attrs,
             emit_checkpoint=True,
-        ):
+        )
+        with span_cm as (span, _):
             with catalog._readonly_connection() as conn:
                 catalog._log_query(sql, params)
                 relation = conn.execute(sql, params)
                 rows = relation.fetchall()
                 cols = [desc[0] for desc in relation.description]
             payload = [dict(zip(cols, row, strict=True)) for row in rows]
+        if span is not None:
+            with suppress(AttributeError):  # pragma: no cover - noop span
+                span.set_attribute(Attrs.DUCKDB_ROWS, len(payload))
         if timeline is not None:
             duration_ms = (
                 int((perf_counter() - start_time) * 1000) if start_time is not None else None
@@ -1096,19 +1106,22 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         if not ids:
             return []
 
-        attrs = {
-            "op": "query_by_filters",
-            "ids": len(ids),
-            "include_globs": bool(include_globs),
-            "exclude_globs": bool(exclude_globs),
-            "languages": bool(languages),
+        span_attrs = {
+            Attrs.COMPONENT: "duckdb",
+            Attrs.REQUEST_STAGE: "hydrate",
+            "filters.include": bool(include_globs),
+            "filters.exclude": bool(exclude_globs),
+            "filters.languages": bool(languages),
+            Attrs.DUCKDB_SQL_BYTES: 0,
         }
+        perf_start = perf_counter()
+        results: list[dict] = []
         with span_context(
             "catalog.hydrate",
             stage="catalog.hydrate",
-            attrs=attrs,
+            attrs=span_attrs,
             emit_checkpoint=True,
-        ):
+        ) as (span, _):
             start_time = perf_counter()
             spec = self._build_scope_filter_spec(
                 ids,
@@ -1121,7 +1134,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):
                 self._observe_scope_filter_duration(
                     start_time, include_globs, exclude_globs, languages
                 )
-                results: list[dict] = []
             else:
                 options = DuckDBQueryOptions(
                     include_globs=spec.simple_include_globs,
@@ -1134,6 +1146,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
                     chunk_ids=spec.chunk_ids,
                     options=options,
                 )
+                span_attrs[Attrs.DUCKDB_SQL_BYTES] = len(sql.encode("utf-8"))
 
                 with self._readonly_connection() as conn:
                     relation = conn.execute(sql, sql_params)
@@ -1151,6 +1164,23 @@ class DuckDBCatalog(_DuckDBQueryMixin):
                 self._observe_scope_filter_duration(
                     start_time, include_globs, exclude_globs, languages
                 )
+
+            if span is not None and span.is_recording():
+                with suppress(AttributeError):
+                    span.set_attribute(Attrs.DUCKDB_SQL_BYTES, int(span_attrs[Attrs.DUCKDB_SQL_BYTES]))
+                    span.set_attribute(Attrs.DUCKDB_ROWS, len(results))
+
+        duration = max(perf_counter() - perf_start, 0.0)
+        _hydration_duration_seconds.labels(op="chunks_by_filters").observe(duration)
+        self._log_scope_filter_results(
+            include_globs,
+            exclude_globs,
+            languages,
+            results,
+            timeline=current_timeline(),
+            requested=len(ids),
+            duration=duration,
+        )
         return results
 
     def _build_scope_filter_spec(

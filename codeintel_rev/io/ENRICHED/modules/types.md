@@ -29,7 +29,7 @@ Typed DTOs and JSON Schema helpers for MCP search/fetch tools.
 
 - **fan_in**: 3
 - **fan_out**: 1
-- **cycle_group**: 124
+- **cycle_group**: 125
 
 ## Ownership
 

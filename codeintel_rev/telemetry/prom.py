@@ -4,18 +4,16 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, Any
 
-from kgfoundry_common.prometheus import (
-    CollectorRegistry,
-    build_counter,
-    build_histogram,
-    get_default_registry,
-)
+from codeintel_rev.telemetry.otel_metrics import build_counter, build_histogram
 
 if TYPE_CHECKING:  # pragma: no cover
     from fastapi import APIRouter
     from fastapi.responses import Response
+    ResponseType = Response
+else:
+    ResponseType = Any
 
 try:  # pragma: no cover - optional dependency
     from fastapi import APIRouter as RuntimeAPIRouter
@@ -23,61 +21,6 @@ try:  # pragma: no cover - optional dependency
 except ModuleNotFoundError:  # pragma: no cover - fallback for tests
     RuntimeAPIRouter = None
     RuntimeResponse = None
-
-
-class _GenerateLatest(Protocol):
-    def __call__(self, registry: CollectorRegistry = ..., escaping: str = ...) -> bytes: ...
-
-
-try:  # pragma: no cover - optional dependency
-    from prometheus_client import CONTENT_TYPE_LATEST as PROM_CONTENT_TYPE
-    from prometheus_client import generate_latest as _prometheus_generate_latest_impl
-except ImportError:  # pragma: no cover - fallback when prometheus missing
-    PROM_CONTENT_TYPE = "text/plain; version=0.0.4"
-
-    def _prometheus_generate_latest(registry: CollectorRegistry | None = None) -> bytes:
-        if registry is not None:
-            return b"# Registry provided but Prometheus client unavailable\n"
-        return b"# Prometheus metrics unavailable (prometheus_client not installed)\n"
-else:
-    _prometheus_generate_latest_typed = cast(
-        "_GenerateLatest",
-        _prometheus_generate_latest_impl,
-    )
-
-    def _prometheus_generate_latest(registry: CollectorRegistry | None = None) -> bytes:
-        if registry is None:
-            return _prometheus_generate_latest_typed()
-        return _prometheus_generate_latest_typed(registry)
-
-
-CONTENT_TYPE_LATEST = PROM_CONTENT_TYPE
-
-
-def generate_latest(registry: CollectorRegistry | None = None) -> bytes:
-    """Proxy to prometheus_client.generate_latest with graceful fallback.
-
-    This function generates OpenMetrics-formatted payload from Prometheus metrics
-    registry. It provides a graceful fallback when prometheus_client is unavailable,
-    returning an empty payload instead of raising an exception.
-
-    Parameters
-    ----------
-    registry : CollectorRegistry | None, optional
-        Optional Prometheus CollectorRegistry to scrape metrics from (default: None).
-        When None, uses the default global registry. Used to generate metrics payload
-        for scraping clients (e.g., Prometheus server).
-
-    Returns
-    -------
-    bytes
-        OpenMetrics payload for scraping clients. Returns empty bytes when
-        prometheus_client is unavailable. The payload contains all metrics
-        registered in the specified registry (or default registry if None).
-    """
-    if registry is None:
-        return _prometheus_generate_latest()
-    return _prometheus_generate_latest(registry)
 
 
 __all__ = [
@@ -178,67 +121,34 @@ class MetricsConfig:
     """Configuration container for exposing `/metrics`."""
 
     enabled: bool = _env_flag("PROMETHEUS_ENABLED", default=True)
-    registry: CollectorRegistry | None = None
 
 
 def build_metrics_router(config: MetricsConfig | None = None) -> APIRouter | None:
-    """Return an APIRouter exposing the Prometheus scrape endpoint.
+    """Return an APIRouter exposing a compatibility message.
 
-    This function creates a FastAPI APIRouter that exposes a `/metrics` endpoint
-    for Prometheus scraping. The router is configured with the provided metrics
-    configuration and returns None when FastAPI or prometheus components are
-    unavailable.
-
-    Parameters
-    ----------
-    config : MetricsConfig | None, optional
-        Optional metrics configuration (default: None). When None, uses default
-        MetricsConfig() with enabled=True. Used to configure metrics collection
-        and registry settings. When config.enabled is False, returns None.
+    The OpenTelemetry Prometheus reader now serves metrics directly. This
+    router informs operators where to scrape metrics instead of proxying
+    prometheus_client output from the application process.
 
     Returns
     -------
     APIRouter | None
-        Router exposing `/metrics` endpoint for Prometheus scraping, or ``None``
-        when FastAPI/prometheus components are unavailable or metrics are disabled.
-        The router can be mounted on a FastAPI application to expose metrics.
+        Router exposing `/metrics` or ``None`` when FastAPI is unavailable.
     """
     if RuntimeAPIRouter is None or RuntimeResponse is None:
         return None
-    router_cls = cast("type[APIRouter]", RuntimeAPIRouter)
-    response_cls = cast("type[Response]", RuntimeResponse)
     cfg = config or MetricsConfig()
     if not cfg.enabled:
         return None
-    registry_obj = cfg.registry or get_default_registry()
-    if registry_obj is None:
-        return None
-    registry = cast("CollectorRegistry", registry_obj)
-    router = router_cls()
+    router = RuntimeAPIRouter()  # type: ignore[call-arg]
 
     @router.get("/metrics")
-    def metrics_endpoint() -> Response:
-        """Handle GET requests to the /metrics endpoint.
-
-        This endpoint serves Prometheus metrics in OpenMetrics format. It
-        generates the metrics payload from the configured registry and returns
-        it as a text/plain response with the appropriate content type.
-
-        Returns
-        -------
-        Response
-            FastAPI Response containing OpenMetrics-formatted metrics payload.
-            The response has Content-Type set to CONTENT_TYPE_LATEST (typically
-            "text/plain; version=0.0.4") and contains all metrics registered
-            in the configured Prometheus registry.
-
-        Notes
-        -----
-        This endpoint is designed to be scraped by Prometheus servers or other
-        metrics collection systems. The metrics payload includes all counters,
-        histograms, and gauges registered in the application's metrics registry.
-        """
-        return response_cls(content=generate_latest(registry), media_type=CONTENT_TYPE_LATEST)
+    def metrics_endpoint() -> ResponseType:  # type: ignore[override]
+        message = (
+            "Metrics have moved to the OpenTelemetry Prometheus reader. "
+            "Scrape the reader port (default :9464) instead of /metrics."
+        )
+        return RuntimeResponse(content=message, media_type="text/plain", status_code=410)
 
     return router
 

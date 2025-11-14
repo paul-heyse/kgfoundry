@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import importlib
 import os
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from contextlib import AbstractContextManager, suppress
 from dataclasses import dataclass
 from types import ModuleType
@@ -13,6 +13,11 @@ from typing import Any, Protocol
 from codeintel_rev.observability.logs import init_otel_logging
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.observability import start_span
+
+try:  # pragma: no cover - optional dependency
+    from prometheus_client import start_http_server as _prom_start_http_server
+except ImportError:  # pragma: no cover - optional dependency
+    _prom_start_http_server = None
 
 try:  # pragma: no cover - optional dependency
     from codeintel_rev.observability.flight_recorder import (
@@ -34,6 +39,8 @@ class _TelemetryState:
         "httpx_instrumented",
         "initialized",
         "logging_instrumented",
+        "metrics_initialized",
+        "prometheus_running",
         "trace_module",
         "trace_provider",
         "tracing_enabled",
@@ -44,9 +51,11 @@ class _TelemetryState:
         self.tracing_enabled = False
         self.trace_module: ModuleType | None = None
         self.trace_provider: object | None = None
+        self.metrics_initialized = False
         self.fastapi_instrumented = False
         self.httpx_instrumented = False
         self.logging_instrumented = False
+        self.prometheus_running = False
 
 
 class SupportsState(Protocol):
@@ -67,6 +76,11 @@ class _TraceHandles:
 
 _STATE = _TelemetryState()
 _SPAN_STR_MAX = int(os.getenv("CODEINTEL_TELEMETRY_MAX_FIELD", "256"))
+_RESOURCE_DETECTORS: Sequence[tuple[str, str]] = (
+    ("opentelemetry_resourcedetector_process", "ProcessResourceDetector"),
+    ("opentelemetry_resourcedetector_docker", "DockerResourceDetector"),
+    ("opentelemetry_resourcedetector_kubernetes", "KubernetesResourceDetector"),
+)
 
 
 def _env_flag(name: str, *, default: bool = False) -> bool:
@@ -209,10 +223,65 @@ def _build_resource(
     service_name: str,
     service_version: str | None,
 ) -> object:
-    resource_attrs: dict[str, object] = {"service.name": service_name}
+    try:
+        semconv = importlib.import_module("opentelemetry.semconv.resource")
+        attributes = getattr(semconv, "ResourceAttributes", None)
+    except ImportError:  # pragma: no cover - optional dependency
+        attributes = None
+    service_name_key = (
+        getattr(attributes, "SERVICE_NAME", "service.name") if attributes is not None else "service.name"
+    )
+    service_version_key = (
+        getattr(attributes, "SERVICE_VERSION", "service.version")
+        if attributes is not None
+        else "service.version"
+    )
+    namespace_key = (
+        getattr(attributes, "SERVICE_NAMESPACE", "service.namespace")
+        if attributes is not None
+        else "service.namespace"
+    )
+    resource_attrs: dict[str, object] = {
+        service_name_key: service_name,
+        namespace_key: os.getenv("CODEINTEL_OTEL_SERVICE_NAMESPACE", "kgfoundry"),
+    }
     if service_version:
-        resource_attrs["service.version"] = service_version
-    return handles.resource.Resource.create(resource_attrs)
+        resource_attrs[service_version_key] = service_version
+    resource = handles.resource.Resource.create(resource_attrs)
+    return _merge_detected_resources(resource)
+
+
+def _merge_detected_resources(resource: object) -> object:
+    """Augment ``resource`` with optional detector-provided attributes.
+
+    Returns
+    -------
+    object
+        Resource merged with detector-provided metadata.
+    """
+    merged = resource
+    for module_name, detector_name in _RESOURCE_DETECTORS:
+        module = _optional_import(module_name)
+        if module is None:
+            continue
+        detector_cls = getattr(module, detector_name, None)
+        if detector_cls is None:
+            continue
+        try:
+            detector = detector_cls()
+            detected = detector.detect()
+        except (RuntimeError, ValueError, OSError):  # pragma: no cover - detector optional
+            LOGGER.debug("Resource detector %s failed; continuing", detector_name, exc_info=True)
+            continue
+        if detected is None:
+            continue
+        merge_fn = getattr(merged, "merge", None)
+        if callable(merge_fn):
+            try:
+                merged = merge_fn(detected)
+            except (RuntimeError, ValueError, OSError):  # pragma: no cover - defensive
+                LOGGER.debug("Failed to merge resource detector output", exc_info=True)
+    return merged
 
 
 def _build_provider(
@@ -318,8 +387,9 @@ def init_telemetry(
         app.state.telemetry_enabled = True
     if enable_logging_instrumentation:
         _install_logging_instrumentation()
-    if _env_flag("CODEINTEL_OTEL_METRICS_ENABLED", default=False):
-        metrics_endpoint = os.getenv("CODEINTEL_OTEL_METRICS_ENDPOINT", otlp_endpoint or "")
+    metrics_enabled = _env_flag("CODEINTEL_OTEL_METRICS_ENABLED", default=True)
+    if metrics_enabled:
+        metrics_endpoint = os.getenv("CODEINTEL_OTEL_METRICS_ENDPOINT", otlp_endpoint or None)
         _install_metrics_provider(resource, metrics_endpoint)
     if install_flight_recorder and _install_flight_recorder is not None:
         try:
@@ -365,6 +435,9 @@ def init_all_telemetry(
         service_version=service_version,
         install_flight_recorder=install_flight_recorder,
     )
+    if app is not None:
+        instrument_fastapi(app)
+    instrument_httpx()
     try:  # pragma: no cover - logging bridge optional
         resolved_name = service_name or os.getenv("CODEINTEL_OTEL_SERVICE_NAME", "codeintel-mcp")
         init_otel_logging(service_name=resolved_name)
@@ -513,27 +586,138 @@ def _install_logging_instrumentation() -> None:
 
 
 def _install_metrics_provider(resource: object, endpoint: str | None) -> None:
-    """Configure OTLP metric reader when SDK components are present."""
+    """Configure OTLP/Prometheus metric readers when SDK components are present."""
+    if _STATE.metrics_initialized:
+        return
     try:
         metrics_module = importlib.import_module("opentelemetry.sdk.metrics")
-        reader_module = importlib.import_module("opentelemetry.sdk.metrics.export")
-        exporter_module = importlib.import_module(
-            "opentelemetry.exporter.otlp.proto.http.metric_exporter"
-        )
+        view_module = importlib.import_module("opentelemetry.sdk.metrics.view")
+        export_module = importlib.import_module("opentelemetry.sdk.metrics.export")
         metrics_api = importlib.import_module("opentelemetry.metrics")
     except ImportError:  # pragma: no cover - optional dependency
         LOGGER.debug("OpenTelemetry metrics SDK unavailable; skipping metric provider setup")
         return
-    if not endpoint:
-        LOGGER.debug("OTLP metrics endpoint unset; skipping metric provider setup")
+    metric_readers: list[object] = []
+    exporter_endpoint = endpoint or os.getenv("CODEINTEL_OTEL_METRICS_ENDPOINT")
+    if exporter_endpoint:
+        try:
+            exporter_module = importlib.import_module(
+                "opentelemetry.exporter.otlp.proto.http.metric_exporter"
+            )
+        except ImportError:  # pragma: no cover - optional dependency
+            LOGGER.debug("OTLP metric exporter unavailable; skipping OTLP reader")
+        else:
+            try:
+                exporter = exporter_module.OTLPMetricExporter(endpoint=exporter_endpoint)
+                reader_cls = getattr(export_module, "PeriodicExportingMetricReader", None)
+                if reader_cls is not None:
+                    metric_readers.append(reader_cls(exporter))
+            except (RuntimeError, TypeError, ValueError):  # pragma: no cover - defensive
+                LOGGER.debug("Failed to configure OTLP metric exporter", exc_info=True)
+    if _env_flag("CODEINTEL_OTEL_PROMETHEUS_ENABLED", default=True):
+        reader = _build_prometheus_reader()
+        if reader is not None:
+            metric_readers.append(reader)
+            _start_prometheus_http_server()
+    if not metric_readers:
+        LOGGER.debug("No metric readers configured; skipping meter provider setup")
         return
+    views = _build_metric_views(view_module, export_module)
     try:
-        exporter = exporter_module.OTLPMetricExporter(endpoint=endpoint)
-        reader = reader_module.PeriodicExportingMetricReader(exporter)
-        provider = metrics_module.MeterProvider(resource=resource, metric_readers=[reader])
+        provider = metrics_module.MeterProvider(
+            resource=resource,
+            metric_readers=metric_readers,
+            views=views or None,
+        )
         metrics_api.set_meter_provider(provider)
+        _STATE.metrics_initialized = True
     except (RuntimeError, ValueError):  # pragma: no cover - defensive
-        LOGGER.debug("Failed to configure OTLP metrics exporter", exc_info=True)
+        LOGGER.debug("Failed to configure meter provider", exc_info=True)
+
+
+def _build_prometheus_reader() -> object | None:
+    """Return a PrometheusMetricReader when exporter is installed.
+
+    Returns
+    -------
+    object | None
+        Reader instance or ``None`` when unavailable.
+    """
+    module = _optional_import("opentelemetry.exporter.prometheus")
+    if module is None:
+        return None
+    reader_cls = getattr(module, "PrometheusMetricReader", None)
+    if reader_cls is None:
+        return None
+    try:
+        return reader_cls()
+    except (RuntimeError, ValueError, TypeError):  # pragma: no cover - defensive
+        LOGGER.debug("PrometheusMetricReader construction failed", exc_info=True)
+        return None
+
+
+def _start_prometheus_http_server() -> None:
+    """Expose the default Prometheus registry when supported."""
+    if _STATE.prometheus_running or _prom_start_http_server is None:
+        return
+    host = os.getenv("CODEINTEL_OTEL_PROMETHEUS_HOST", os.getenv("PROMETHEUS_HOST", "127.0.0.1"))
+    raw_port = os.getenv("CODEINTEL_OTEL_PROMETHEUS_PORT", os.getenv("PROMETHEUS_PORT", "9464"))
+    try:
+        port = int(raw_port)
+    except (TypeError, ValueError):
+        port = 9464
+    try:
+        _prom_start_http_server(port=port, addr=host)
+        LOGGER.info("Prometheus scrape endpoint listening", extra={"host": host, "port": port})
+        _STATE.prometheus_running = True
+    except OSError:  # pragma: no cover - defensive
+        LOGGER.warning("Failed to start Prometheus HTTP server", exc_info=True)
+
+
+def _build_metric_views(view_module: ModuleType, export_module: ModuleType) -> list[object]:
+    """Return default metric views for latency/counter instruments.
+
+    Returns
+    -------
+    list[object]
+        Collection of :class:`View` instances configuring histogram buckets and attributes.
+    """
+    view_cls = getattr(view_module, "View", None)
+    histogram_cls = getattr(export_module, "ExplicitBucketHistogramAggregation", None)
+    if view_cls is None or histogram_cls is None:
+        return []
+    bucket_defs = [
+        (
+            "codeintel_mcp_request_latency_seconds",
+            [0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0],
+            ("tool", "status"),
+        ),
+        (
+            "codeintel_embed_latency_seconds",
+            [0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10],
+            (),
+        ),
+        (
+            "codeintel_faiss_search_latency_seconds",
+            [0.001, 0.005, 0.01, 0.02, 0.05, 0.1, 0.25, 0.5, 1, 2],
+            (),
+        ),
+        (
+            "codeintel_rerank_exact_latency_ms",
+            [1, 5, 10, 25, 50, 100, 250, 500],
+            (),
+        ),
+    ]
+    views: list[object] = []
+    for instrument_name, buckets, attrs in bucket_defs:
+        kwargs: dict[str, object] = {
+            "instrument_name": instrument_name,
+            "aggregation": histogram_cls(buckets),
+        }
+        if attrs:
+            kwargs["attribute_keys"] = attrs
+        views.append(view_cls(**kwargs))
+    return views
 
 
 def instrument_fastapi(app: SupportsState) -> None:

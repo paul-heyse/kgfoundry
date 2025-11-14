@@ -124,7 +124,7 @@ Typer CLI for managing index lifecycle operations.
 
 - **fan_in**: 0
 - **fan_out**: 12
-- **cycle_group**: 137
+- **cycle_group**: 138
 
 ## Ownership
 

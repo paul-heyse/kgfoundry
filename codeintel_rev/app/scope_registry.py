@@ -58,7 +58,7 @@ from threading import RLock
 from typing import TYPE_CHECKING
 
 from kgfoundry_common.logging import get_logger
-from kgfoundry_common.prometheus import build_counter, build_gauge
+from codeintel_rev.telemetry.otel_metrics import build_counter, build_gauge
 
 if TYPE_CHECKING:
     from codeintel_rev.mcp_server.schemas import ScopeIn

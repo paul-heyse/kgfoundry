@@ -8,11 +8,13 @@ from contextlib import contextmanager
 
 from codeintel_rev.app.middleware import get_capability_stamp, get_session_id
 from codeintel_rev.observability.ledger import RunLedger, dated_run_dir
-from codeintel_rev.observability.otel import as_span, record_span_event
+from codeintel_rev.observability.otel import record_span_event
 from codeintel_rev.observability.reporting import render_run_report
 from codeintel_rev.observability.runtime_observer import bind_run_ledger, current_run_ledger
+from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.observability.timeline import Timeline, current_or_new_timeline
 from codeintel_rev.telemetry.context import telemetry_context
+from codeintel_rev.telemetry.decorators import span_context
 from codeintel_rev.telemetry.prom import observe_request_latency
 from codeintel_rev.telemetry.reporter import finalize_run, start_run
 from kgfoundry_common.logging import get_logger
@@ -84,13 +86,6 @@ def tool_operation_scope(
         tool_name=tool_name,
         capability_stamp=capability_stamp,
     )
-    span_attrs: dict[str, object] = {
-        "tool": tool_name,
-        "session_id": timeline.session_id,
-        "run_id": timeline.run_id,
-    }
-    for key, value in attrs.items():
-        span_attrs.setdefault(key, value)
     operation_name = f"mcp.tool:{tool_name}"
     ledger = current_run_ledger()
     ledger_owner = False
@@ -109,7 +104,18 @@ def tool_operation_scope(
         tool_name=tool_name,
     ):
         timing_start = time.perf_counter()
-        with bind_run_ledger(ledger), as_span(f"mcp.tool:{tool_name}", **span_attrs):
+        otel_attrs = {
+            Attrs.MCP_TOOL: tool_name,
+            Attrs.MCP_SESSION_ID: timeline.session_id or "",
+            Attrs.MCP_RUN_ID: timeline.run_id,
+        }
+        for key, value in attrs.items():
+            otel_attrs.setdefault(key, value)
+        with bind_run_ledger(ledger), span_context(
+            f"mcp.tool:{tool_name}",
+            kind="server",
+            attrs=otel_attrs,
+        ):
             try:
                 with timeline.operation(operation_name, **operation_attrs):
                     yield timeline

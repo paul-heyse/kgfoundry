@@ -1,11 +1,11 @@
 {
   "root": "/home/paul/kgfoundry/codeintel_rev",
   "repo_root": "/home/paul/kgfoundry",
-  "module_count": 175,
-  "symbol_edge_count": 14127,
-  "coverage_records": 175,
-  "config_files": 211,
-  "generated_at": "2025-11-14T01:59:09+00:00",
+  "module_count": 176,
+  "symbol_edge_count": 14218,
+  "coverage_records": 176,
+  "config_files": 212,
+  "generated_at": "2025-11-14T03:31:23+00:00",
   "tags": {
     "low-coverage": [
       "risk_hotspots.py",
@@ -96,6 +96,7 @@
       "telemetry/otel.py",
       "telemetry/prom.py",
       "telemetry/__init__.py",
+      "telemetry/otel_metrics.py",
       "io/rrf.py",
       "io/path_utils.py",
       "io/coderank_embedder.py",
@@ -230,6 +231,7 @@
       "telemetry/events.py",
       "telemetry/prom.py",
       "telemetry/__init__.py",
+      "telemetry/otel_metrics.py",
       "io/rrf.py",
       "io/vllm_engine.py",
       "io/splade_manager.py",

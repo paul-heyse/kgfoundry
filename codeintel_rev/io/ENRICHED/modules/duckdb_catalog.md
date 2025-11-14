@@ -30,7 +30,7 @@ chunk retrieval and joins.
 - from **codeintel_rev.telemetry.steps** import StepEvent, emit_step
 - from **codeintel_rev.typing** import NDArrayF32
 - from **kgfoundry_common.logging** import get_logger
-- from **kgfoundry_common.prometheus** import build_histogram
+- from **codeintel_rev.telemetry.otel_metrics** import build_histogram
 - from **(absolute)** import duckdb
 - from **(absolute)** import numpy
 
@@ -57,16 +57,16 @@ chunk retrieval and joins.
 ## Graph Metrics
 
 - **fan_in**: 9
-- **fan_out**: 9
-- **cycle_group**: 77
+- **fan_out**: 10
+- **cycle_group**: 78
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 41
-- recent churn 90: 41
+- recent churn 30: 42
+- recent churn 90: 42
 
 ## Usage
 
@@ -98,7 +98,7 @@ DuckDBCatalog, IdMapMeta, StructureAnnotations, ensure_faiss_idmap_view, refresh
 
 ## Hotspot
 
-- score: 3.23
+- score: 3.25
 
 ## Side Effects
 

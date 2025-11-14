@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
+from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from time import perf_counter
@@ -45,6 +46,7 @@ from codeintel_rev.retrieval.types import (
     StageSignals,
 )
 from codeintel_rev.telemetry.context import current_run_id, telemetry_metadata
+from codeintel_rev.telemetry.decorators import span_context
 from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
 from kgfoundry_common.logging import get_logger
@@ -1331,7 +1333,6 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
     fused = plan.fused
     effective_limit = plan.effective_limit
     options = plan.options
-    observation = plan.observation
     ordered_ids = _dedupe_preserve_order([_safe_int(doc.doc_id) for doc in fused.docs])
     timeline = current_timeline()
     requested = len(ordered_ids)
@@ -1349,11 +1350,18 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
         with track_stage("duckdb_hydration") as hydration_timer:
             hydrate_attrs = {
                 Attrs.COMPONENT: "retrieval",
-                Attrs.STAGE: "hydrate.duckdb",
+                Attrs.REQUEST_STAGE: "hydrate",
+                Attrs.DUCKDB_ROWS: 0,
                 "requested": requested,
                 "effective_limit": effective_limit,
             }
-            with as_span("hydrate.duckdb", **hydrate_attrs):
+            hydrate_span = span_context(
+                "hydrate.duckdb",
+                stage="hydrate.duckdb",
+                attrs=hydrate_attrs,
+                emit_checkpoint=True,
+            )
+            with hydrate_span as (span, _):
                 records = _hydrate_records(
                     context=context,
                     chunk_ids=ordered_ids[
@@ -1361,6 +1369,9 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
                     ],
                     scope=plan.scope,
                 )
+            if span is not None:
+                with suppress(AttributeError):  # pragma: no cover - noop span
+                    span.set_attribute(Attrs.DUCKDB_ROWS, len(records))
         snapshots = [hydration_timer.snapshot()]
     except (RuntimeError, OSError) as exc:
         if timeline is not None:
@@ -1371,7 +1382,7 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
                 message=str(exc),
                 attrs={"requested": requested, "returned": 0, "missing": requested},
             )
-        observation.mark_error()
+        plan.observation.mark_error()
         msg = "DuckDB hydration failed"
         raise VectorSearchError(msg, cause=exc) from exc
     else:
@@ -1388,37 +1399,30 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
                 },
             )
 
-    rerank_cfg = context.settings.coderank_llm
-    if not options.use_reranker:
-        record_stage_decision(
-            COMPONENT_NAME,
-            RERANK_STAGE_NAME,
-            decision=StageDecision(should_run=False, reason="disabled_option"),
+    rerank_decision = _rerank_gate_decision(options, context.settings.coderank_llm, records)
+    if not rerank_decision.should_run:
+        record_stage_decision(COMPONENT_NAME, RERANK_STAGE_NAME, decision=rerank_decision)
+        emit_step(
+            StepEvent(
+                kind="retrieval.rerank",
+                status="skipped",
+                detail=rerank_decision.reason,
+            )
         )
-    elif not rerank_cfg.enabled:
-        record_stage_decision(
-            COMPONENT_NAME,
-            RERANK_STAGE_NAME,
-            decision=StageDecision(should_run=False, reason="disabled_config"),
-        )
-    elif not records:
-        record_stage_decision(
-            COMPONENT_NAME,
-            RERANK_STAGE_NAME,
-            decision=StageDecision(should_run=False, reason="no_candidates"),
-        )
+        records = records[:effective_limit]
     else:
-        with (
-            track_stage(
-                RERANK_STAGE_NAME,
-                budget_ms=rerank_cfg.budget_ms,
-            ) as rerank_timer,
-            as_span(
-                "retrieval.coderank_llm",
-                component="retrieval",
-                stage="coderank_llm",
-                **{Attrs.RETRIEVAL_TOP_K: effective_limit},
-            ),
+        with track_stage(
+            RERANK_STAGE_NAME,
+            budget_ms=context.settings.coderank_llm.budget_ms,
+        ) as rerank_timer, span_context(
+            "retrieval.coderank_llm",
+            stage="coderank_llm",
+            attrs={
+                Attrs.COMPONENT: "retrieval",
+                Attrs.REQUEST_STAGE: "rerank",
+                Attrs.RETRIEVAL_TOP_K: effective_limit,
+            },
+            emit_checkpoint=True,
         ):
             records = _maybe_rerank(
                 query=plan.query,
@@ -1432,8 +1436,16 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
             RERANK_STAGE_NAME,
             decision=StageDecision(should_run=True, reason="executed"),
         )
+        records = records[:effective_limit]
+        emit_step(
+            StepEvent(
+                kind="retrieval.rerank",
+                status="completed",
+                payload={"records": len(records)},
+            )
+        )
 
-    return HydrationOutcome(records=records[:effective_limit], timings=snapshots)
+    return HydrationOutcome(records=records, timings=snapshots)
 
 
 def _maybe_rerank(
@@ -1479,6 +1491,18 @@ def _maybe_rerank(
     reordered = [by_id[cid] for cid in ordered_ids if cid in by_id]
     remaining = [record for record in records if int(record.get("id", -1)) not in ordered_ids]
     return reordered + remaining
+
+
+def _rerank_gate_decision(
+    options: SemanticProOptions, rerank_cfg: RerankConfig, records: list[dict]
+) -> StageDecision:
+    if not options.get("use_reranker", True):
+        return StageDecision(should_run=False, reason="disabled_option")
+    if not rerank_cfg.enabled:
+        return StageDecision(should_run=False, reason="disabled_config")
+    if not records:
+        return StageDecision(should_run=False, reason="no_candidates")
+    return StageDecision(should_run=True, reason="execute")
 
 
 def _build_findings(

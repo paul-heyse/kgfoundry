@@ -91,6 +91,7 @@ low-coverage:
 - telemetry/otel.py
 - telemetry/prom.py
 - telemetry/__init__.py
+- telemetry/otel_metrics.py
 - io/rrf.py
 - io/path_utils.py
 - io/coderank_embedder.py
@@ -224,6 +225,7 @@ public-api:
 - telemetry/events.py
 - telemetry/prom.py
 - telemetry/__init__.py
+- telemetry/otel_metrics.py
 - io/rrf.py
 - io/vllm_engine.py
 - io/splade_manager.py

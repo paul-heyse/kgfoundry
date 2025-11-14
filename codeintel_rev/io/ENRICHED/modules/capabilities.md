@@ -19,7 +19,7 @@ Capability snapshot helpers for conditional tool registration and /capz.
 - from **types** import ModuleType
 - from **typing** import TYPE_CHECKING, Final, cast
 - from **kgfoundry_common.logging** import get_logger
-- from **kgfoundry_common.prometheus** import GaugeLike, build_gauge
+- from **codeintel_rev.telemetry.otel_metrics** import GaugeLike, build_gauge
 - from **kgfoundry_common.typing.heavy_deps** import EXTRAS_HINT
 - from **codeintel_rev.app.config_context** import ApplicationContext
 - from **codeintel_rev.errors** import RuntimeLifecycleError
@@ -38,8 +38,8 @@ Capability snapshot helpers for conditional tool registration and /capz.
 ## Graph Metrics
 
 - **fan_in**: 6
-- **fan_out**: 4
-- **cycle_group**: 77
+- **fan_out**: 5
+- **cycle_group**: 78
 
 ## Ownership
 
@@ -83,7 +83,7 @@ Capabilities
 
 ## Hotspot
 
-- score: 2.49
+- score: 2.53
 
 ## Side Effects
 

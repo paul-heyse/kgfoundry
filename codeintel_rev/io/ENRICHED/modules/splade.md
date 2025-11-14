@@ -52,7 +52,7 @@ Command-line interface for SPLADE artifact management.
 
 - **fan_in**: 0
 - **fan_out**: 3
-- **cycle_group**: 139
+- **cycle_group**: 140
 
 ## Ownership
 

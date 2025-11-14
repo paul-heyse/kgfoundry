@@ -32,7 +32,7 @@ Exact reranking utilities for FAISS candidates.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 77
+- **cycle_group**: 78
 
 ## Ownership
 

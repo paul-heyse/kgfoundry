@@ -28,7 +28,7 @@ Utilities for generating opt-in LLM slice packs.
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 10
+- **cycle_group**: 13
 
 ## Ownership
 

@@ -18,6 +18,7 @@ except ImportError:  # pragma: no cover - fallback stub
 from codeintel_rev.observability.ledger import RunLedger
 from codeintel_rev.observability.runtime_observer import current_run_ledger
 from codeintel_rev.observability.semantic_conventions import Attrs, to_label_str
+from codeintel_rev.telemetry.context import current_run_id, current_session
 
 LOGGER = logging.getLogger(__name__)
 _REPORTER_STATE: dict[str, object | None] = {"initialized": False, "hook": None}
@@ -61,6 +62,8 @@ def emit_step(step: StepEvent, *, ledger: RunLedger | None = None) -> None:
         "ts": _now_iso(),
         "trace_id": None,
         "span_id": None,
+        "session_id": current_session(),
+        "run_id": current_run_id(),
         **asdict(step),
     }
     if span:

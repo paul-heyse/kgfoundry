@@ -59,15 +59,15 @@ through stable paths such as ``.../current/faiss.index`` and reload when
 
 - **fan_in**: 5
 - **fan_out**: 2
-- **cycle_group**: 54
+- **cycle_group**: 48
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 9
-- recent churn 90: 9
+- recent churn 30: 10
+- recent churn 90: 10
 
 ## Usage
 

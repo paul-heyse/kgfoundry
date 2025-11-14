@@ -43,27 +43,27 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 - class: `BM25Rm3Config` (line 63)
 - class: `BM25SearchProvider` (line 72)
 - class: `SpladeSearchProvider` (line 211)
-- class: `HybridSearchTuning` (line 423)
-- class: `HybridSearchOptions` (line 431)
-- class: `_MethodStats` (line 441)
-- class: `_FusionContext` (line 450)
-- class: `_SearchTelemetryContext` (line 464)
-- class: `_FusionWork` (line 470)
-- class: `HybridSearchEngine` (line 484)
+- class: `HybridSearchTuning` (line 429)
+- class: `HybridSearchOptions` (line 437)
+- class: `_MethodStats` (line 447)
+- class: `_FusionContext` (line 456)
+- class: `_SearchTelemetryContext` (line 470)
+- class: `_FusionWork` (line 476)
+- class: `HybridSearchEngine` (line 490)
 
 ## Graph Metrics
 
 - **fan_in**: 5
 - **fan_out**: 17
-- **cycle_group**: 77
+- **cycle_group**: 78
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 22
-- recent churn 90: 22
+- recent churn 30: 23
+- recent churn 90: 23
 
 ## Usage
 
@@ -105,7 +105,7 @@ BM25SearchProvider, HybridResultDoc, HybridSearchEngine, HybridSearchOptions, Hy
 
 - branches: 140
 - cyclomatic: 141
-- loc: 1447
+- loc: 1453
 
 ## Doc Coverage
 

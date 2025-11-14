@@ -13,7 +13,8 @@ from typing import TYPE_CHECKING, Protocol
 
 import codeintel_rev.observability.metrics as retrieval_metrics
 from codeintel_rev.evaluation.hybrid_pool import Hit, HybridPoolEvaluator
-from codeintel_rev.observability.otel import as_span, record_span_event
+from codeintel_rev.observability.otel import record_span_event
+from codeintel_rev.observability.semantic_conventions import Attrs, to_label_str
 from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.plugins.channels import Channel, ChannelContext, ChannelError
 from codeintel_rev.plugins.registry import ChannelRegistry
@@ -149,11 +150,6 @@ class BM25SearchProvider:
             List of search results with document IDs and BM25 scores, sorted by
             relevance descending. Returns empty list if top_k <= 0.
 
-        Raises
-        ------
-        Exception
-            Any exception raised by the underlying Pyserini searcher is re-raised
-            after emitting a failed step event for observability.
         """
         if top_k <= 0:
             emit_step(
@@ -311,11 +307,6 @@ class SpladeSearchProvider:
             score. Returns empty list if encoding fails, no terms are generated,
             or top_k is 0.
 
-        Raises
-        ------
-        Exception
-            Any exception raised by the SPLADE encoder or Lucene impact searcher
-            is re-raised after emitting a failed step event for observability.
         """
         if top_k <= 0:
             emit_step(
@@ -886,14 +877,27 @@ class HybridSearchEngine:
             if telemetry.timeline
             else nullcontext()
         )
-        with op_ctx:
+        with span_context(
+            "retrieval.search",
+            kind="internal",
+            attrs={
+                Attrs.QUERY_TEXT: query,
+                Attrs.QUERY_LEN: len(query),
+                Attrs.TOP_K: limit,
+            },
+        ), op_ctx:
             retrieval_metrics.QUERIES_TOTAL.labels(kind="search").inc()
             gate_cfg = self._make_stage_gate_config()
             budget_decision, budget_info = self._profile_query(query, gate_cfg, telemetry.timeline)
-            with as_span(
-                "hybrid.collect_channels",
-                limit=limit,
-                semantic_hits=len(semantic_hits),
+            with span_context(
+                "retrieval.gather_channels",
+                stage="retrieval.gather",
+                attrs={
+                    Attrs.REQUEST_STAGE: "gather",
+                    Attrs.CHANNEL_DEPTHS: to_label_str(budget_decision.per_channel_depths),
+                    Attrs.TOP_K: limit,
+                },
+                emit_checkpoint=True,
             ):
                 runs, warnings = self._gather_channel_hits(
                     query,
@@ -949,7 +953,16 @@ class HybridSearchEngine:
                 else nullcontext()
             )
             fusion_start = perf_counter()
-            with as_span("hybrid.fuse", limit=limit, channels=len(channel_counts) or 1), fusion_ctx:
+            with span_context(
+                "retrieval.fuse",
+                stage="retrieval.fuse",
+                attrs={
+                    Attrs.REQUEST_STAGE: "fuse",
+                    Attrs.RRF_K: budget_decision.rrf_k,
+                    Attrs.CHANNELS_USED: to_label_str(list(channel_counts)),
+                },
+                emit_checkpoint=True,
+            ), fusion_ctx:
                 result = self._fuse_runs(ctx)
             duration_ms = round((perf_counter() - fusion_start) * 1000, 2)
             telemetry.stage_records.append(

@@ -84,15 +84,15 @@ corpus size for optimal performance.
 
 - **fan_in**: 8
 - **fan_out**: 13
-- **cycle_group**: 77
+- **cycle_group**: 78
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 47
-- recent churn 90: 47
+- recent churn 30: 48
+- recent churn 90: 48
 
 ## Usage
 

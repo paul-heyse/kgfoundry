@@ -62,7 +62,7 @@ codeintel_rev.app.middleware : get_session_id for retrieving session ID
 - from **time** import perf_counter
 - from **typing** import TYPE_CHECKING
 - from **kgfoundry_common.logging** import get_logger
-- from **kgfoundry_common.prometheus** import build_histogram
+- from **codeintel_rev.telemetry.otel_metrics** import build_histogram
 - from **codeintel_rev.app.config_context** import ApplicationContext
 - from **codeintel_rev.mcp_server.schemas** import ScopeIn
 
@@ -79,8 +79,8 @@ codeintel_rev.app.middleware : get_session_id for retrieving session ID
 ## Graph Metrics
 
 - **fan_in**: 5
-- **fan_out**: 3
-- **cycle_group**: 77
+- **fan_out**: 4
+- **cycle_group**: 78
 
 ## Ownership
 
@@ -120,7 +120,7 @@ LANGUAGE_EXTENSIONS, apply_language_filter, apply_path_filters, get_effective_sc
 
 ## Hotspot
 
-- score: 2.29
+- score: 2.33
 
 ## Side Effects
 

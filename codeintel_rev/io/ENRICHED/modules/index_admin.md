@@ -48,15 +48,15 @@ Admin endpoints for staging, publishing, and rolling back index versions.
 
 - **fan_in**: 0
 - **fan_out**: 7
-- **cycle_group**: 155
+- **cycle_group**: 156
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 9
-- recent churn 90: 9
+- recent churn 30: 10
+- recent churn 90: 10
 
 ## Usage
 

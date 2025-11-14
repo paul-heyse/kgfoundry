@@ -6,14 +6,11 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from time import perf_counter
-from typing import cast
-
-from prometheus_client import CollectorRegistry
 
 from codeintel_rev.retrieval.types import StageDecision
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.observability import MetricsProvider
-from kgfoundry_common.prometheus import build_counter, get_default_registry
+from codeintel_rev.telemetry.otel_metrics import build_counter
 
 
 @dataclass(slots=True, frozen=True)
@@ -198,7 +195,6 @@ _STAGE_DECISION_COUNTER = build_counter(
     "kgfoundry_stage_decisions_total",
     "Stage gating outcomes grouped by component, stage, and decision type.",
     ("component", "stage", "decision"),
-    registry=cast("CollectorRegistry | None", get_default_registry()),
 )
 
 

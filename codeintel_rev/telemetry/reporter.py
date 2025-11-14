@@ -30,12 +30,15 @@ __all__ = [
     "RUN_REPORT_STORE",
     "RunReport",
     "RunReportStore",
+    "RunReportV2",
     "build_report",
+    "build_run_report_v2",
     "emit_checkpoint",
     "finalize_run",
     "record_step_payload",
     "record_timeline_payload",
     "render_markdown",
+    "render_markdown_v2",
     "render_mermaid",
     "report_to_json",
     "start_run",
@@ -133,6 +136,60 @@ def _compute_ops_coverage(checkpoints: Sequence[Mapping[str, Any]]) -> dict[str,
     }
 
 
+_STAGE_SEQUENCE: list[tuple[str, str]] = [
+    ("retrieval.gather_channels", "gather"),
+    ("retrieval.fuse", "fuse"),
+    ("duckdb.query", "hydrate"),
+    ("retrieval.rerank", "rerank"),
+]
+
+
+def _normalize_stage_event(kind: str | None) -> str | None:
+    if not kind:
+        return None
+    if kind.startswith("duckdb."):
+        return "hydrate"
+    for event_name, label in _STAGE_SEQUENCE:
+        if kind == event_name:
+            return label
+    return None
+
+
+def _build_stage_summary(record: RunRecord) -> tuple[list[RunReportStage], str | None]:
+    """Return ordered stage summaries and the last completed stage.
+
+    Parameters
+    ----------
+    record : RunRecord
+        Run record containing structured step events.
+
+    Returns
+    -------
+    tuple[list[RunReportStage], str | None]
+        Ordered stage summaries alongside the name of the last completed stage,
+        or ``None`` when no stage completed.
+    """
+    stage_map: dict[str, Mapping[str, Any]] = {}
+    for event in record.structured_events:
+        stage_label = _normalize_stage_event(event.get("kind"))
+        if stage_label is None or stage_label in stage_map:
+            continue
+        stage_map[stage_label] = event
+    stages: list[RunReportStage] = []
+    last_completed: str | None = None
+    for _, label in _STAGE_SEQUENCE:
+        event = stage_map.get(label)
+        if event is None:
+            stages.append(RunReportStage(name=label, status="pending", detail=None))
+            continue
+        status = str(event.get("status") or "unknown")
+        detail = event.get("detail")
+        if status == "completed":
+            last_completed = label
+        stages.append(RunReportStage(name=label, status=status, detail=detail))
+    return stages, last_completed
+
+
 def _budgets_from_timeline(
     events: Sequence[Mapping[str, Any]],
     structured_events: Sequence[Mapping[str, Any]] | None = None,
@@ -219,6 +276,7 @@ class RunReport:
     summary: dict[str, Any]
     capabilities: dict[str, Any]
     structured_events: list[dict[str, Any]]
+
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable representation.
@@ -613,6 +671,53 @@ def build_report(
     )
 
 
+def build_run_report_v2(
+    session_id: str,
+    run_id: str | None = None,
+) -> RunReportV2 | None:
+    """Return a compact stage-centric report for ``session_id``/``run_id``.
+
+    Parameters
+    ----------
+    session_id : str
+        Session identifier to summarize.
+    run_id : str | None, optional
+        Specific run identifier. When ``None``, the most recent run is used.
+
+    Returns
+    -------
+    RunReportV2 | None
+        Compact run summary when available, otherwise ``None``.
+    """
+    record = RUN_REPORT_STORE.get_run(session_id, run_id)
+    if record is None:
+        return None
+    stages, stopped_after = _build_stage_summary(record)
+    warnings = [
+        str(event.get("detail"))
+        for event in record.structured_events
+        if event.get("detail") and event.get("status") in {"degraded", "failed"}
+    ]
+    trace_id = next(
+        (
+            str(event.get("trace_id"))
+            for event in record.structured_events
+            if event.get("trace_id")
+        ),
+        None,
+    )
+    if not trace_id:
+        trace_id = record.run_id
+    return RunReportV2(
+        trace_id=trace_id,
+        session_id=record.session_id,
+        run_id=record.run_id,
+        stages=stages,
+        warnings=warnings,
+        stopped_after_stage=stopped_after,
+    )
+
+
 def report_to_json(report: RunReport) -> dict[str, Any]:
     """Return JSON-serializable payload for the report.
 
@@ -661,6 +766,58 @@ def report_to_json(report: RunReport) -> dict[str, Any]:
     except (RuntimeError, ValueError, TypeError):  # pragma: no cover - defensive
         payload["hints"] = []
     return payload
+
+
+@dataclass(slots=True, frozen=True)
+class RunReportStage:
+    """Normalized stage summary for RunReportV2."""
+
+    name: str
+    status: str
+    detail: str | None
+
+    def as_dict(self) -> dict[str, object]:
+        """Return a JSON-serializable representation of the stage.
+
+        Returns
+        -------
+        dict[str, object]
+            Stage summary payload.
+        """
+        return {
+            "name": self.name,
+            "status": self.status,
+            "detail": self.detail,
+        }
+
+
+@dataclass(slots=True, frozen=True)
+class RunReportV2:
+    """Compact narrative describing key retrieval stages."""
+
+    trace_id: str | None
+    session_id: str | None
+    run_id: str
+    stages: list[RunReportStage]
+    warnings: list[str]
+    stopped_after_stage: str | None
+
+    def as_dict(self) -> dict[str, object]:
+        """Return a JSON-serializable payload for the V2 report.
+
+        Returns
+        -------
+        dict[str, object]
+            Serialized report dictionary.
+        """
+        return {
+            "trace_id": self.trace_id,
+            "session_id": self.session_id,
+            "run_id": self.run_id,
+            "stages": [stage.as_dict() for stage in self.stages],
+            "warnings": list(self.warnings),
+            "stopped_after_stage": self.stopped_after_stage,
+        }
 
 
 def render_mermaid(report: RunReport) -> str:
@@ -775,4 +932,31 @@ def render_markdown(report: RunReport) -> str:
         "Warnings",
         [f"- `{warning['name']}`: {warning.get('message', '')}" for warning in report.warnings],
     )
+    return "\n".join(lines)
+
+
+def render_markdown_v2(report: RunReportV2) -> str:
+    """Render a RunReportV2 payload as Markdown text.
+
+    Returns
+    -------
+    str
+        Markdown-formatted representation of the V2 report.
+    """
+    lines = [
+        f"# Run {report.run_id}",
+        f"- Trace ID: {report.trace_id or 'n/a'}",
+        f"- Session ID: {report.session_id or 'n/a'}",
+    ]
+    if report.stopped_after_stage:
+        lines.append(f"- Stopped after stage: `{report.stopped_after_stage}`")
+    lines.append("")
+    lines.append("## Stages")
+    for stage in report.stages:
+        detail_suffix = f" — {stage.detail}" if stage.detail else ""
+        lines.append(f"- **{stage.name}**: {stage.status}{detail_suffix}")
+    if report.warnings:
+        lines.append("")
+        lines.append("## Warnings")
+        lines.extend(f"- {warning}" for warning in report.warnings)
     return "\n".join(lines)

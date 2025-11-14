@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from kgfoundry_common.prometheus import build_counter, build_gauge, build_histogram
+from codeintel_rev.telemetry.otel_metrics import build_counter, build_gauge, build_histogram
 
 FAISS_BUILD_TOTAL = build_counter("faiss_build_total", "Number of FAISS index builds.")
 FAISS_BUILD_SECONDS_LAST = build_gauge(

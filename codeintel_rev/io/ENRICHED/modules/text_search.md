@@ -49,7 +49,7 @@ Fast text search with regex support.
 
 - **fan_in**: 0
 - **fan_out**: 6
-- **cycle_group**: 152
+- **cycle_group**: 153
 
 ## Ownership
 

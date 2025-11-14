@@ -46,7 +46,7 @@ from codeintel_rev.metrics.registry import (
     set_compile_flags_id,
     set_factory_id,
 )
-from codeintel_rev.observability.otel import as_span, record_span_event
+from codeintel_rev.observability.otel import record_span_event
 from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.retrieval.rerank_flat import FlatReranker
@@ -1928,13 +1928,30 @@ class FAISSManager(
         the combined candidate set. Time complexity: O(search_k * log n)
         for HNSW, O(nprobe * search_k) for IVF-family indexes.
         """
-        with as_span("faiss.search", k=search_k, nprobe=params.nprobe, use_gpu=params.use_gpu):
+        search_attrs = {
+            Attrs.REQUEST_STAGE: "dense",
+            Attrs.FAISS_TOP_K: search_k,
+            Attrs.FAISS_NPROBE: params.nprobe or -1,
+            Attrs.FAISS_GPU: params.use_gpu,
+            Attrs.FAISS_INDEX_TYPE: str(self.faiss_family or "auto"),
+        }
+        search_span = span_context(
+            "faiss.search",
+            stage="search.faiss",
+            attrs=search_attrs,
+            emit_checkpoint=True,
+        )
+        with search_span:
             self._apply_runtime_parameters(
                 nprobe=params.nprobe,
                 ef_search=params.ef_search,
                 quantizer_ef_search=params.quantizer_ef_search,
             )
-            with as_span("faiss.search.primary", nprobe=params.nprobe or -1):
+            with span_context(
+                "faiss.search.primary",
+                stage="search.faiss.primary",
+                attrs={Attrs.FAISS_NPROBE: params.nprobe or -1},
+            ):
                 primary_dists, primary_ids = self._search_primary(query, search_k, params.nprobe)
             if self.secondary_index is None:
                 record_span_event(
@@ -1942,9 +1959,20 @@ class FAISSManager(
                     candidates=int(primary_ids.shape[1]),
                 )
                 return primary_dists, primary_ids
-            with as_span("faiss.search.secondary"):
+            with span_context(
+                "faiss.search.secondary",
+                stage="search.faiss.secondary",
+                attrs={Attrs.FAISS_INDEX_TYPE: "secondary"},
+            ):
                 secondary_dists, secondary_ids = self._search_secondary(query, search_k)
-            with as_span("faiss.search.merge"):
+            with span_context(
+                "faiss.search.merge",
+                stage="search.faiss.merge",
+                attrs={
+                    "primary_candidates": int(primary_ids.shape[1]),
+                    "secondary_candidates": int(secondary_ids.shape[1]),
+                },
+            ):
                 merged_dists, merged_ids = self._merge_results(
                     primary_dists,
                     primary_ids,

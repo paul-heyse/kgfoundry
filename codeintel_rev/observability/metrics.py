@@ -4,11 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from kgfoundry_common.prometheus import (
-    build_counter,
-    build_gauge,
-    build_histogram,
-)
+from codeintel_rev.telemetry.otel_metrics import build_counter, build_gauge, build_histogram
 
 __all__ = [
     "BUDGET_DEPTH",

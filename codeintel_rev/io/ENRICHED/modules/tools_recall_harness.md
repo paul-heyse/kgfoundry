@@ -63,7 +63,7 @@ Notes
 
 - **fan_in**: 0
 - **fan_out**: 0
-- **cycle_group**: 154
+- **cycle_group**: 155
 
 ## Ownership
 
@@ -130,6 +130,7 @@ Notes
 - patches/MCP_through_search_hardening_phase2.md
 - patches/DuckDB_data_expansion_FAISS.md
 - patches/Type_Gating_Followup.md
+- patches/OpenTelemetry_Reconfig_for_efficient_libraries.md
 - patches/Cli_enrich_fix.md
 - patches/AST_Data_Build.md
 - patches/audit_closeout.md

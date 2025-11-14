@@ -63,7 +63,7 @@ codeintel_rev.mcp_server.scope_utils : Scope merging and filtering utilities
 - from **threading** import RLock
 - from **typing** import TYPE_CHECKING
 - from **kgfoundry_common.logging** import get_logger
-- from **kgfoundry_common.prometheus** import build_counter, build_gauge
+- from **codeintel_rev.telemetry.otel_metrics** import build_counter, build_gauge
 - from **codeintel_rev.mcp_server.schemas** import ScopeIn
 
 ## Definitions
@@ -74,8 +74,8 @@ codeintel_rev.mcp_server.scope_utils : Scope merging and filtering utilities
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 2
-- **cycle_group**: 40
+- **fan_out**: 3
+- **cycle_group**: 41
 
 ## Ownership
 
@@ -119,7 +119,7 @@ ScopeRegistry
 
 ## Hotspot
 
-- score: 1.78
+- score: 1.89
 
 ## Side Effects
 

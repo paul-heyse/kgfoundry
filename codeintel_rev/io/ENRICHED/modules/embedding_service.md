@@ -23,7 +23,7 @@ Embedding provider abstractions for chunk ingestion and runtime services.
 - from **codeintel_rev.io.vllm_engine** import InprocessVLLMEmbedder
 - from **codeintel_rev.typing** import NDArrayF32, gate_import
 - from **kgfoundry_common.logging** import get_logger
-- from **kgfoundry_common.prometheus** import build_counter, build_gauge, build_histogram
+- from **codeintel_rev.telemetry.otel_metrics** import build_counter, build_gauge, build_histogram
 
 ## Definitions
 
@@ -50,8 +50,8 @@ Embedding provider abstractions for chunk ingestion and runtime services.
 ## Graph Metrics
 
 - **fan_in**: 1
-- **fan_out**: 3
-- **cycle_group**: 98
+- **fan_out**: 4
+- **cycle_group**: 99
 
 ## Ownership
 
@@ -91,7 +91,7 @@ Embedding provider abstractions for chunk ingestion and runtime services.
 
 ## Hotspot
 
-- score: 2.44
+- score: 2.52
 
 ## Side Effects
 

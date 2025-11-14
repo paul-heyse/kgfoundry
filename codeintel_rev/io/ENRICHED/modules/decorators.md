@@ -65,15 +65,15 @@ Decorators for consistent span/timeline instrumentation.
 
 - **fan_in**: 6
 - **fan_out**: 5
-- **cycle_group**: 64
+- **cycle_group**: 55
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 5
-- recent churn 90: 5
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 

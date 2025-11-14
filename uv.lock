@@ -3278,6 +3278,7 @@ dependencies = [
     { name = "opentelemetry-distro" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
     { name = "opentelemetry-instrumentation-fastapi" },
+    { name = "opentelemetry-instrumentation-httpx" },
     { name = "opentelemetry-instrumentation-logging" },
     { name = "opentelemetry-proto" },
     { name = "opentelemetry-sdk" },
@@ -3618,6 +3619,7 @@ requires-dist = [
     { name = "opentelemetry-distro", specifier = ">=0.59b0" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.38.0" },
     { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.59b0" },
+    { name = "opentelemetry-instrumentation-httpx", specifier = ">=0.59b0" },
     { name = "opentelemetry-instrumentation-logging", specifier = ">=0.59b0" },
     { name = "opentelemetry-proto", specifier = ">=1.38.0" },
     { name = "opentelemetry-sdk", specifier = ">=1.24.0" },
@@ -5942,6 +5944,22 @@ wheels = [
 ]
 
 [[package]]
+name = "opentelemetry-instrumentation-httpx"
+version = "0.59b0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-instrumentation" },
+    { name = "opentelemetry-semantic-conventions" },
+    { name = "opentelemetry-util-http" },
+    { name = "wrapt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/18/6b/1bdf36b68cace9b4eae3cbbade4150c71c90aa392b127dda5bb5c2a49307/opentelemetry_instrumentation_httpx-0.59b0.tar.gz", hash = "sha256:a1cb9b89d9f05a82701cc9ab9cfa3db54fd76932489449778b350bc1b9f0e872", size = 19886, upload-time = "2025-10-16T08:39:48.428Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/58/16/c1e0745d20af392ec9060693531d7f01239deb2d81e460d0c379719691b8/opentelemetry_instrumentation_httpx-0.59b0-py3-none-any.whl", hash = "sha256:7dc9f66aef4ca3904d877f459a70c78eafd06131dc64d713b9b1b5a7d0a48f05", size = 15197, upload-time = "2025-10-16T08:38:55.507Z" },
+]
+
+[[package]]
 name = "opentelemetry-instrumentation-logging"
 version = "0.59b0"
 source = { registry = "https://pypi.org/simple" }
@@ -6410,7 +6428,7 @@ wheels = [
 
 [[package]]
 name = "prefect"
-version = "3.6.2.dev1"
+version = "3.6.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiosqlite" },
@@ -6468,9 +6486,9 @@ dependencies = [
     { name = "websockets" },
     { name = "whenever" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ac/f6/fd7585a71de8e3bd3d5c9e2ba57c7795f2fe9ea7be3924a9882f3a7eae71/prefect-3.6.2.dev1.tar.gz", hash = "sha256:0e9222f5ec40354835d303f57de6a5c082f851b5197168a23c5af5a318be5ccc", size = 5642112, upload-time = "2025-11-13T08:10:08.33Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/60/83/4f9b459560f09d8369a4ad9d5384f1fadc066f19a91a092778e505d64abe/prefect-3.6.2.tar.gz", hash = "sha256:4b25335dc3e3beaf7635444252cf67181f3fdcb04f44c0061122f84458abde14", size = 5641752, upload-time = "2025-11-14T01:02:41.677Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ca/7a/d35203ec8eeac7520e63c30e979eb55b3d07c3dd3388058dbb752a20e0c2/prefect-3.6.2.dev1-py3-none-any.whl", hash = "sha256:c774003d0e131e01a17ec3038bbaa88401ed2ed8060591c4b4a0fe280db62b3f", size = 6168837, upload-time = "2025-11-13T08:10:05.357Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/d2/c0e7aff4836a99346cb62f255a7f7d101173019afe7b93767806ad759ab1/prefect-3.6.2-py3-none-any.whl", hash = "sha256:cb741e4968c9a0126371c328723d2171ee4f7b4d4af0f93babdf4db7125e4e86", size = 6168581, upload-time = "2025-11-14T01:02:39.126Z" },
 ]
 
 [[package]]
