@@ -150,6 +150,11 @@ class BM25SearchProvider:
             List of search results with document IDs and BM25 scores, sorted by
             relevance descending. Returns empty list if top_k <= 0.
 
+        Raises
+        ------
+        Exception
+            Any exception raised by the underlying Pyserini searcher is re-raised
+            after emitting a failed step event for observability.
         """
         if top_k <= 0:
             emit_step(
@@ -307,6 +312,11 @@ class SpladeSearchProvider:
             score. Returns empty list if encoding fails, no terms are generated,
             or top_k is 0.
 
+        Raises
+        ------
+        Exception
+            Any exception raised by the SPLADE encoder or Lucene impact searcher
+            is re-raised after emitting a failed step event for observability.
         """
         if top_k <= 0:
             emit_step(
@@ -877,15 +887,18 @@ class HybridSearchEngine:
             if telemetry.timeline
             else nullcontext()
         )
-        with span_context(
-            "retrieval.search",
-            kind="internal",
-            attrs={
-                Attrs.QUERY_TEXT: query,
-                Attrs.QUERY_LEN: len(query),
-                Attrs.TOP_K: limit,
-            },
-        ), op_ctx:
+        with (
+            span_context(
+                "retrieval.search",
+                kind="internal",
+                attrs={
+                    Attrs.QUERY_TEXT: query,
+                    Attrs.QUERY_LEN: len(query),
+                    Attrs.TOP_K: limit,
+                },
+            ),
+            op_ctx,
+        ):
             retrieval_metrics.QUERIES_TOTAL.labels(kind="search").inc()
             gate_cfg = self._make_stage_gate_config()
             budget_decision, budget_info = self._profile_query(query, gate_cfg, telemetry.timeline)
@@ -953,16 +966,19 @@ class HybridSearchEngine:
                 else nullcontext()
             )
             fusion_start = perf_counter()
-            with span_context(
-                "retrieval.fuse",
-                stage="retrieval.fuse",
-                attrs={
-                    Attrs.REQUEST_STAGE: "fuse",
-                    Attrs.RRF_K: budget_decision.rrf_k,
-                    Attrs.CHANNELS_USED: to_label_str(list(channel_counts)),
-                },
-                emit_checkpoint=True,
-            ), fusion_ctx:
+            with (
+                span_context(
+                    "retrieval.fuse",
+                    stage="retrieval.fuse",
+                    attrs={
+                        Attrs.REQUEST_STAGE: "fuse",
+                        Attrs.RRF_K: budget_decision.rrf_k,
+                        Attrs.CHANNELS_USED: to_label_str(list(channel_counts)),
+                    },
+                    emit_checkpoint=True,
+                ),
+                fusion_ctx,
+            ):
                 result = self._fuse_runs(ctx)
             duration_ms = round((perf_counter() - fusion_start) * 1000, 2)
             telemetry.stage_records.append(

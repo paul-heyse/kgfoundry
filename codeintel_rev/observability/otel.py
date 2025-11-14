@@ -229,7 +229,9 @@ def _build_resource(
     except ImportError:  # pragma: no cover - optional dependency
         attributes = None
     service_name_key = (
-        getattr(attributes, "SERVICE_NAME", "service.name") if attributes is not None else "service.name"
+        getattr(attributes, "SERVICE_NAME", "service.name")
+        if attributes is not None
+        else "service.name"
     )
     service_version_key = (
         getattr(attributes, "SERVICE_VERSION", "service.version")

@@ -48,7 +48,7 @@ Trace-anchored flight recorder that mirrors run execution timelines.
 
 - **fan_in**: 3
 - **fan_out**: 2
-- **cycle_group**: 43
+- **cycle_group**: 45
 
 ## Ownership
 

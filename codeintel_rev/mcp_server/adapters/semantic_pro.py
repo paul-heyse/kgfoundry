@@ -1411,18 +1411,21 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
         )
         records = records[:effective_limit]
     else:
-        with track_stage(
-            RERANK_STAGE_NAME,
-            budget_ms=context.settings.coderank_llm.budget_ms,
-        ) as rerank_timer, span_context(
-            "retrieval.coderank_llm",
-            stage="coderank_llm",
-            attrs={
-                Attrs.COMPONENT: "retrieval",
-                Attrs.REQUEST_STAGE: "rerank",
-                Attrs.RETRIEVAL_TOP_K: effective_limit,
-            },
-            emit_checkpoint=True,
+        with (
+            track_stage(
+                RERANK_STAGE_NAME,
+                budget_ms=context.settings.coderank_llm.budget_ms,
+            ) as rerank_timer,
+            span_context(
+                "retrieval.coderank_llm",
+                stage="coderank_llm",
+                attrs={
+                    Attrs.COMPONENT: "retrieval",
+                    Attrs.REQUEST_STAGE: "rerank",
+                    Attrs.RETRIEVAL_TOP_K: effective_limit,
+                },
+                emit_checkpoint=True,
+            ),
         ):
             records = _maybe_rerank(
                 query=plan.query,

@@ -26,7 +26,7 @@ Structured logging bridge + optional OTLP exporter.
 
 - **fan_in**: 2
 - **fan_out**: 2
-- **cycle_group**: 50
+- **cycle_group**: 62
 
 ## Ownership
 

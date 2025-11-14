@@ -9,29 +9,34 @@ Exact reranking utilities for FAISS candidates.
 ## Imports
 
 - from **__future__** import annotations
+- from **time** import perf_counter
 - from **(absolute)** import numpy
 - from **codeintel_rev.io.duckdb_catalog** import DuckDBCatalog
+- from **codeintel_rev.observability.semantic_conventions** import Attrs
+- from **codeintel_rev.telemetry.decorators** import span_context
+- from **codeintel_rev.telemetry.otel_metrics** import build_histogram
 - from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 10)
-- function: `_perform_exact_rerank` (line 16)
-- function: `_normalize_queries` (line 125)
-- function: `_prepare_candidate_matrix` (line 159)
-- function: `_hydrate_embeddings` (line 205)
-- function: `_build_candidate_vectors` (line 261)
-- function: `_compute_similarity` (line 330)
-- function: `_effective_top_k` (line 399)
-- function: `_select_topk` (line 449)
-- function: `_empty_result` (line 508)
-- class: `FlatReranker` (line 554)
-- function: `exact_rerank` (line 615)
+- variable: `LOGGER` (line 15)
+- variable: `RERANK_LATENCY_MS` (line 20)
+- function: `_perform_exact_rerank` (line 27)
+- function: `_normalize_queries` (line 153)
+- function: `_prepare_candidate_matrix` (line 187)
+- function: `_hydrate_embeddings` (line 233)
+- function: `_build_candidate_vectors` (line 289)
+- function: `_compute_similarity` (line 358)
+- function: `_effective_top_k` (line 427)
+- function: `_select_topk` (line 477)
+- function: `_empty_result` (line 536)
+- class: `FlatReranker` (line 582)
+- function: `exact_rerank` (line 643)
 
 ## Graph Metrics
 
 - **fan_in**: 1
-- **fan_out**: 1
+- **fan_out**: 4
 - **cycle_group**: 78
 
 ## Ownership
@@ -39,8 +44,8 @@ Exact reranking utilities for FAISS candidates.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 
@@ -72,7 +77,7 @@ FlatReranker, exact_rerank
 
 ## Hotspot
 
-- score: 1.82
+- score: 2.11
 
 ## Side Effects
 
@@ -80,9 +85,9 @@ FlatReranker, exact_rerank
 
 ## Complexity
 
-- branches: 14
-- cyclomatic: 15
-- loc: 678
+- branches: 15
+- cyclomatic: 16
+- loc: 706
 
 ## Doc Coverage
 

@@ -15,9 +15,9 @@ from typing import Any, Protocol, Self, cast, runtime_checkable
 
 from codeintel_rev.config.settings import EmbeddingsConfig, IndexConfig, Settings, VLLMConfig
 from codeintel_rev.io.vllm_engine import InprocessVLLMEmbedder
+from codeintel_rev.telemetry.otel_metrics import build_counter, build_gauge, build_histogram
 from codeintel_rev.typing import NDArrayF32, gate_import
 from kgfoundry_common.logging import get_logger
-from codeintel_rev.telemetry.otel_metrics import build_counter, build_gauge, build_histogram
 
 LOGGER = get_logger(__name__)
 EMBEDDING_RANK = 2

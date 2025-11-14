@@ -111,10 +111,13 @@ def tool_operation_scope(
         }
         for key, value in attrs.items():
             otel_attrs.setdefault(key, value)
-        with bind_run_ledger(ledger), span_context(
-            f"mcp.tool:{tool_name}",
-            kind="server",
-            attrs=otel_attrs,
+        with (
+            bind_run_ledger(ledger),
+            span_context(
+                f"mcp.tool:{tool_name}",
+                kind="server",
+                attrs=otel_attrs,
+            ),
         ):
             try:
                 with timeline.operation(operation_name, **operation_attrs):

@@ -34,15 +34,15 @@ Prometheus metrics for hybrid retrieval.
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 68
+- **cycle_group**: 55
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 3
-- recent churn 90: 3
+- recent churn 30: 4
+- recent churn 90: 4
 
 ## Usage
 

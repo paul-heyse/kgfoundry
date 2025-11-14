@@ -19,9 +19,9 @@ Shared OpenTelemetry semantic convention helpers for CodeIntel.
 
 ## Graph Metrics
 
-- **fan_in**: 12
+- **fan_in**: 16
 - **fan_out**: 0
-- **cycle_group**: 42
+- **cycle_group**: 44
 
 ## Ownership
 
@@ -61,7 +61,7 @@ Attrs, as_kv, to_label_str
 
 ## Hotspot
 
-- score: 1.99
+- score: 2.10
 
 ## Side Effects
 

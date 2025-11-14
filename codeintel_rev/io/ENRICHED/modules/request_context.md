@@ -26,7 +26,7 @@ can exchange session metadata without introducing circular imports between the
 
 - **fan_in**: 3
 - **fan_out**: 1
-- **cycle_group**: 51
+- **cycle_group**: 42
 
 ## Ownership
 

@@ -20,21 +20,22 @@ Structured step event helpers.
 - from **codeintel_rev.observability.ledger** import RunLedger
 - from **codeintel_rev.observability.runtime_observer** import current_run_ledger
 - from **codeintel_rev.observability.semantic_conventions** import Attrs, to_label_str
+- from **codeintel_rev.telemetry.context** import current_run_id, current_session
 
 ## Definitions
 
 - variable: `trace` (line 16)
-- variable: `LOGGER` (line 22)
-- variable: `StepStatus` (line 25)
-- class: `StepEvent` (line 31)
-- function: `_now_iso` (line 40)
-- function: `emit_step` (line 44)
-- function: `_record_structured_event` (line 82)
+- variable: `LOGGER` (line 23)
+- variable: `StepStatus` (line 26)
+- class: `StepEvent` (line 32)
+- function: `_now_iso` (line 41)
+- function: `emit_step` (line 45)
+- function: `_record_structured_event` (line 85)
 
 ## Graph Metrics
 
 - **fan_in**: 9
-- **fan_out**: 4
+- **fan_out**: 5
 - **cycle_group**: 78
 
 ## Ownership
@@ -42,8 +43,8 @@ Structured step event helpers.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 1
-- recent churn 90: 1
+- recent churn 30: 2
+- recent churn 90: 2
 
 ## Usage
 
@@ -75,7 +76,7 @@ StepEvent, StepStatus, emit_step
 
 ## Hotspot
 
-- score: 2.47
+- score: 2.50
 
 ## Side Effects
 
@@ -85,7 +86,7 @@ StepEvent, StepStatus, emit_step
 
 - branches: 16
 - cyclomatic: 17
-- loc: 99
+- loc: 102
 
 ## Doc Coverage
 

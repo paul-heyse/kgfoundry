@@ -25,39 +25,40 @@ chunk retrieval and joins.
 - from **codeintel_rev.io.parquet_store** import extract_embeddings
 - from **codeintel_rev.mcp_server.scope_utils** import LANGUAGE_EXTENSIONS, path_matches_glob
 - from **codeintel_rev.observability.otel** import record_span_event
+- from **codeintel_rev.observability.semantic_conventions** import Attrs
 - from **codeintel_rev.observability.timeline** import current_timeline
 - from **codeintel_rev.telemetry.decorators** import span_context
+- from **codeintel_rev.telemetry.otel_metrics** import build_histogram
 - from **codeintel_rev.telemetry.steps** import StepEvent, emit_step
 - from **codeintel_rev.typing** import NDArrayF32
 - from **kgfoundry_common.logging** import get_logger
-- from **codeintel_rev.telemetry.otel_metrics** import build_histogram
 - from **(absolute)** import duckdb
 - from **(absolute)** import numpy
 
 ## Definitions
 
-- variable: `duckdb` (line 43)
-- variable: `np` (line 44)
-- variable: `LOGGER` (line 46)
-- class: `IdMapMeta` (line 50)
-- function: `_log_extra` (line 59)
-- class: `_ScopeFilterSpec` (line 133)
-- class: `StructureAnnotations` (line 150)
-- class: `DuckDBCatalogOptions` (line 160)
-- class: `_DuckDBQueryMixin` (line 169)
-- class: `_LegacyOptions` (line 435)
-- class: `DuckDBCatalog` (line 442)
-- function: `_relation_exists` (line 1632)
-- function: `relation_exists` (line 1666)
-- function: `_file_checksum` (line 1684)
-- function: `_parquet_hash` (line 1706)
-- function: `ensure_faiss_idmap_view` (line 1734)
-- function: `refresh_faiss_idmap_materialized` (line 1765)
+- variable: `duckdb` (line 44)
+- variable: `np` (line 45)
+- variable: `LOGGER` (line 47)
+- class: `IdMapMeta` (line 51)
+- function: `_log_extra` (line 60)
+- class: `_ScopeFilterSpec` (line 134)
+- class: `StructureAnnotations` (line 151)
+- class: `DuckDBCatalogOptions` (line 161)
+- class: `_DuckDBQueryMixin` (line 170)
+- class: `_LegacyOptions` (line 445)
+- class: `DuckDBCatalog` (line 452)
+- function: `_relation_exists` (line 1664)
+- function: `relation_exists` (line 1698)
+- function: `_file_checksum` (line 1716)
+- function: `_parquet_hash` (line 1738)
+- function: `ensure_faiss_idmap_view` (line 1766)
+- function: `refresh_faiss_idmap_materialized` (line 1797)
 
 ## Graph Metrics
 
 - **fan_in**: 9
-- **fan_out**: 10
+- **fan_out**: 11
 - **cycle_group**: 78
 
 ## Ownership
@@ -65,8 +66,8 @@ chunk retrieval and joins.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 42
-- recent churn 90: 42
+- recent churn 30: 43
+- recent churn 90: 43
 
 ## Usage
 
@@ -98,7 +99,7 @@ DuckDBCatalog, IdMapMeta, StructureAnnotations, ensure_faiss_idmap_view, refresh
 
 ## Hotspot
 
-- score: 3.25
+- score: 3.27
 
 ## Side Effects
 
@@ -107,9 +108,9 @@ DuckDBCatalog, IdMapMeta, StructureAnnotations, ensure_faiss_idmap_view, refresh
 
 ## Complexity
 
-- branches: 147
-- cyclomatic: 148
-- loc: 1864
+- branches: 152
+- cyclomatic: 153
+- loc: 1896
 
 ## Doc Coverage
 

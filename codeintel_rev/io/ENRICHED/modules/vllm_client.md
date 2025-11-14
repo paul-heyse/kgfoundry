@@ -20,7 +20,7 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 - from **typing** import TYPE_CHECKING, cast
 - from **(absolute)** import msgspec
 - from **codeintel_rev._lazy_imports** import LazyModule
-- from **codeintel_rev.observability.otel** import as_span, record_span_event
+- from **codeintel_rev.observability.otel** import record_span_event
 - from **codeintel_rev.observability.semantic_conventions** import Attrs
 - from **codeintel_rev.observability.timeline** import current_timeline
 - from **codeintel_rev.telemetry.decorators** import span_context
@@ -54,8 +54,8 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 25
-- recent churn 90: 25
+- recent churn 30: 26
+- recent churn 90: 26
 
 ## Usage
 
@@ -98,7 +98,7 @@ EmbeddingData, EmbeddingRequest, EmbeddingResponse, VLLMClient
 
 - branches: 32
 - cyclomatic: 33
-- loc: 658
+- loc: 657
 
 ## Doc Coverage
 

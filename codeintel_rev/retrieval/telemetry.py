@@ -8,9 +8,9 @@ from dataclasses import dataclass, field
 from time import perf_counter
 
 from codeintel_rev.retrieval.types import StageDecision
+from codeintel_rev.telemetry.otel_metrics import build_counter
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.observability import MetricsProvider
-from codeintel_rev.telemetry.otel_metrics import build_counter
 
 
 @dataclass(slots=True, frozen=True)

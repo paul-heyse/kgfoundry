@@ -62,8 +62,8 @@ codeintel_rev.mcp_server.scope_utils : Scope merging and filtering utilities
 - from **copy** import deepcopy
 - from **threading** import RLock
 - from **typing** import TYPE_CHECKING
-- from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.telemetry.otel_metrics** import build_counter, build_gauge
+- from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.mcp_server.schemas** import ScopeIn
 
 ## Definitions
@@ -82,8 +82,8 @@ codeintel_rev.mcp_server.scope_utils : Scope merging and filtering utilities
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 8
+- recent churn 90: 8
 
 ## Usage
 

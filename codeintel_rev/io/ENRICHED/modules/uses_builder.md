@@ -28,7 +28,7 @@ SCIP-based symbol use graph helpers.
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 21
+- **cycle_group**: 23
 
 ## Ownership
 

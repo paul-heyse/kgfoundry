@@ -1167,7 +1167,9 @@ class DuckDBCatalog(_DuckDBQueryMixin):
 
             if span is not None and span.is_recording():
                 with suppress(AttributeError):
-                    span.set_attribute(Attrs.DUCKDB_SQL_BYTES, int(span_attrs[Attrs.DUCKDB_SQL_BYTES]))
+                    span.set_attribute(
+                        Attrs.DUCKDB_SQL_BYTES, int(span_attrs[Attrs.DUCKDB_SQL_BYTES])
+                    )
                     span.set_attribute(Attrs.DUCKDB_ROWS, len(results))
 
         duration = max(perf_counter() - perf_start, 0.0)

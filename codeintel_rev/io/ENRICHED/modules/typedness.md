@@ -23,7 +23,7 @@ Typedness utilities that build on Pyrefly/Pyright summaries.
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 17
+- **cycle_group**: 22
 
 ## Ownership
 

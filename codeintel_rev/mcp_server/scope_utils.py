@@ -56,8 +56,8 @@ import fnmatch
 from time import perf_counter
 from typing import TYPE_CHECKING
 
-from kgfoundry_common.logging import get_logger
 from codeintel_rev.telemetry.otel_metrics import build_histogram
+from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext

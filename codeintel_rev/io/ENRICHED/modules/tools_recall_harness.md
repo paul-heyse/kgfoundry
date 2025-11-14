@@ -120,6 +120,7 @@ Notes
 - patches/FAISS_detailed_implementation_plan.md
 - patches/Enrich_Expansion.md
 - patches/OpenTelemetry_ExtensionPhase2addon.md
+- patches/Front_End_Hardening_Phase2.md
 - patches/Enrich_Extension.md
 - patches/Networking_Implementation.md
 - patches/FAISS-Hardening.md

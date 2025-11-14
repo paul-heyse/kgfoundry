@@ -63,9 +63,9 @@ Decorators for consistent span/timeline instrumentation.
 
 ## Graph Metrics
 
-- **fan_in**: 6
+- **fan_in**: 9
 - **fan_out**: 5
-- **cycle_group**: 55
+- **cycle_group**: 65
 
 ## Ownership
 
@@ -105,7 +105,7 @@ emit_event, span_context, trace_span, trace_step
 
 ## Hotspot
 
-- score: 2.62
+- score: 2.71
 
 ## Side Effects
 

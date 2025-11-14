@@ -61,8 +61,8 @@ codeintel_rev.app.middleware : get_session_id for retrieving session ID
 - from **(absolute)** import fnmatch
 - from **time** import perf_counter
 - from **typing** import TYPE_CHECKING
-- from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.telemetry.otel_metrics** import build_histogram
+- from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.app.config_context** import ApplicationContext
 - from **codeintel_rev.mcp_server.schemas** import ScopeIn
 
@@ -87,8 +87,8 @@ codeintel_rev.app.middleware : get_session_id for retrieving session ID
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 

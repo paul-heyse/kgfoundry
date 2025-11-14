@@ -145,6 +145,24 @@ _STAGE_SEQUENCE: list[tuple[str, str]] = [
 
 
 def _normalize_stage_event(kind: str | None) -> str | None:
+    """Normalize event kind to a stage label.
+
+    This function maps event kind strings to normalized stage labels used in
+    run reports. It is called during stage summary construction to identify
+    which stage an event belongs to. Used by telemetry reporting to group
+    events by retrieval stage.
+
+    Parameters
+    ----------
+    kind : str | None
+        Event kind string to normalize, or None.
+
+    Returns
+    -------
+    str | None
+        Normalized stage label (e.g., "gather", "fuse", "hydrate", "rerank"),
+        or None if the kind does not match any known stage.
+    """
     if not kind:
         return None
     if kind.startswith("duckdb."):
@@ -276,7 +294,6 @@ class RunReport:
     summary: dict[str, Any]
     capabilities: dict[str, Any]
     structured_events: list[dict[str, Any]]
-
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-serializable representation.
@@ -699,11 +716,7 @@ def build_run_report_v2(
         if event.get("detail") and event.get("status") in {"degraded", "failed"}
     ]
     trace_id = next(
-        (
-            str(event.get("trace_id"))
-            for event in record.structured_events
-            if event.get("trace_id")
-        ),
+        (str(event.get("trace_id")) for event in record.structured_events if event.get("trace_id")),
         None,
     )
     if not trace_id:
@@ -938,10 +951,20 @@ def render_markdown(report: RunReport) -> str:
 def render_markdown_v2(report: RunReportV2) -> str:
     """Render a RunReportV2 payload as Markdown text.
 
+    This function formats a compact stage-centric run report as Markdown suitable
+    for display in documentation or web interfaces. It is called by HTTP endpoints
+    and CLI commands to provide human-readable run summaries.
+
+    Parameters
+    ----------
+    report : RunReportV2
+        Compact run report containing stages, warnings, and metadata.
+
     Returns
     -------
     str
-        Markdown-formatted representation of the V2 report.
+        Markdown-formatted representation of the V2 report including run ID,
+        trace ID, session ID, stage summaries, and warnings.
     """
     lines = [
         f"# Run {report.run_id}",

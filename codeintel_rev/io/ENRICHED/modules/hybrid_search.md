@@ -19,7 +19,8 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 - from **typing** import TYPE_CHECKING, Protocol
 - from **(absolute)** import codeintel_rev.observability.metrics
 - from **codeintel_rev.evaluation.hybrid_pool** import Hit, HybridPoolEvaluator
-- from **codeintel_rev.observability.otel** import as_span, record_span_event
+- from **codeintel_rev.observability.otel** import record_span_event
+- from **codeintel_rev.observability.semantic_conventions** import Attrs, to_label_str
 - from **codeintel_rev.observability.timeline** import Timeline, current_timeline
 - from **codeintel_rev.plugins.channels** import Channel, ChannelContext, ChannelError
 - from **codeintel_rev.plugins.registry** import ChannelRegistry
@@ -37,24 +38,24 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 
 ## Definitions
 
-- variable: `LOGGER` (line 40)
-- class: `_LuceneHit` (line 43)
-- class: `_LuceneSearcher` (line 48)
-- class: `BM25Rm3Config` (line 63)
-- class: `BM25SearchProvider` (line 72)
-- class: `SpladeSearchProvider` (line 211)
-- class: `HybridSearchTuning` (line 429)
-- class: `HybridSearchOptions` (line 437)
-- class: `_MethodStats` (line 447)
-- class: `_FusionContext` (line 456)
-- class: `_SearchTelemetryContext` (line 470)
-- class: `_FusionWork` (line 476)
-- class: `HybridSearchEngine` (line 490)
+- variable: `LOGGER` (line 41)
+- class: `_LuceneHit` (line 44)
+- class: `_LuceneSearcher` (line 49)
+- class: `BM25Rm3Config` (line 64)
+- class: `BM25SearchProvider` (line 73)
+- class: `SpladeSearchProvider` (line 212)
+- class: `HybridSearchTuning` (line 430)
+- class: `HybridSearchOptions` (line 438)
+- class: `_MethodStats` (line 448)
+- class: `_FusionContext` (line 457)
+- class: `_SearchTelemetryContext` (line 471)
+- class: `_FusionWork` (line 477)
+- class: `HybridSearchEngine` (line 491)
 
 ## Graph Metrics
 
 - **fan_in**: 5
-- **fan_out**: 17
+- **fan_out**: 18
 - **cycle_group**: 78
 
 ## Ownership
@@ -62,8 +63,8 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 23
-- recent churn 90: 23
+- recent churn 30: 24
+- recent churn 90: 24
 
 ## Usage
 
@@ -95,7 +96,7 @@ BM25SearchProvider, HybridResultDoc, HybridSearchEngine, HybridSearchOptions, Hy
 
 ## Hotspot
 
-- score: 3.29
+- score: 3.30
 
 ## Side Effects
 
@@ -103,9 +104,9 @@ BM25SearchProvider, HybridResultDoc, HybridSearchEngine, HybridSearchOptions, Hy
 
 ## Complexity
 
-- branches: 140
-- cyclomatic: 141
-- loc: 1453
+- branches: 139
+- cyclomatic: 140
+- loc: 1482
 
 ## Doc Coverage
 

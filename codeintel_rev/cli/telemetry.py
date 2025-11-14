@@ -81,10 +81,20 @@ def runpack(
     session_id: SessionArg,
     run_id: RunIdOption = None,
     reason: Annotated[
-        str | None, typer.Option("--reason", help="Optional reason stored in metadata.")
+        str | None,
+        typer.Option(
+            None,
+            "--reason",
+            help="Optional reason stored in metadata.",
+        ),
     ] = None,
     trace_id: Annotated[
-        str | None, typer.Option("--trace-id", help="Optional trace identifier to record.")
+        str | None,
+        typer.Option(
+            None,
+            "--trace-id",
+            help="Optional trace identifier to record.",
+        ),
     ] = None,
 ) -> None:
     """Create a runpack zip for the specified session/run.

@@ -281,7 +281,12 @@ def session_report(  # pragma: no cover - exercised via pytests
 def ledger_report(
     run_id: Annotated[str, typer.Argument(..., help="Run identifier returned via X-Run-Id")],
     data_dir: Annotated[
-        Path, typer.Option(Path("data"), help="Data directory (default: ./data)")
+        Path,
+        typer.Option(
+            Path("data"),
+            "--data-dir",
+            help="Telemetry data directory (default: ./data).",
+        ),
     ] = Path("data"),
 ) -> None:
     """Render structured JSON for a run ledger stored under ``data/telemetry``.

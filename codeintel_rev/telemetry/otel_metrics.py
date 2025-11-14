@@ -143,7 +143,7 @@ class HistogramLike:
         self._default_handle.observe(value)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class _GaugeEntry:
     attributes: Mapping[str, object]
     value: float = 0.0
@@ -212,7 +212,9 @@ class GaugeLike:
         """Set the gauge without attributes."""
         self.set_value(self._default_key, value)
 
-    def _key_from_attributes(self, attributes: Mapping[str, object]) -> tuple[tuple[str, object], ...]:
+    def _key_from_attributes(
+        self, attributes: Mapping[str, object]
+    ) -> tuple[tuple[str, object], ...]:
         """Return a canonical attribute key tuple.
 
         Returns

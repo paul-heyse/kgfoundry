@@ -11,6 +11,7 @@ from codeintel_rev.telemetry.otel_metrics import build_counter, build_histogram
 if TYPE_CHECKING:  # pragma: no cover
     from fastapi import APIRouter
     from fastapi.responses import Response
+
     ResponseType = Response
 else:
     ResponseType = Any
@@ -130,10 +131,17 @@ def build_metrics_router(config: MetricsConfig | None = None) -> APIRouter | Non
     router informs operators where to scrape metrics instead of proxying
     prometheus_client output from the application process.
 
+    Parameters
+    ----------
+    config : MetricsConfig | None
+        Optional metrics configuration. If None, uses default configuration
+        from environment variables. Defaults to None.
+
     Returns
     -------
     APIRouter | None
-        Router exposing `/metrics` or ``None`` when FastAPI is unavailable.
+        Router exposing `/metrics` or ``None`` when FastAPI is unavailable
+        or metrics are disabled.
     """
     if RuntimeAPIRouter is None or RuntimeResponse is None:
         return None
@@ -144,6 +152,18 @@ def build_metrics_router(config: MetricsConfig | None = None) -> APIRouter | Non
 
     @router.get("/metrics")
     def metrics_endpoint() -> ResponseType:  # type: ignore[override]
+        """Return a compatibility message directing operators to the OpenTelemetry reader.
+
+        This endpoint returns HTTP 410 (Gone) with a message informing operators
+        that metrics have moved to the OpenTelemetry Prometheus reader. It is
+        maintained for backward compatibility to prevent confusion when operators
+        attempt to scrape the legacy `/metrics` endpoint.
+
+        Returns
+        -------
+        ResponseType
+            Plain text response with HTTP 410 status code and redirect message.
+        """
         message = (
             "Metrics have moved to the OpenTelemetry Prometheus reader. "
             "Scrape the reader port (default :9464) instead of /metrics."

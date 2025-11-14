@@ -24,21 +24,23 @@ Compatibility layer exposing Prometheus-like helpers backed by OpenTelemetry.
 - class: `_GaugeEntry` (line 147)
 - class: `GaugeHandle` (line 152)
 - class: `GaugeLike` (line 166)
-- function: `build_counter` (line 261)
-- function: `build_histogram` (line 276)
-- function: `build_gauge` (line 300)
+- function: `build_counter` (line 263)
+- function: `build_histogram` (line 278)
+- function: `build_gauge` (line 302)
 
 ## Graph Metrics
 
-- **fan_in**: 9
+- **fan_in**: 10
 - **fan_out**: 0
 - **cycle_group**: 39
 
 ## Ownership
 
-- bus factor: 0.00
-- recent churn 30: 0
-- recent churn 90: 0
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 1
+- recent churn 90: 1
 
 ## Usage
 
@@ -70,7 +72,7 @@ CounterLike, GaugeLike, HistogramLike, build_counter, build_gauge, build_histogr
 
 ## Hotspot
 
-- score: 2.35
+- score: 2.42
 
 ## Side Effects
 
@@ -78,9 +80,9 @@ CounterLike, GaugeLike, HistogramLike, build_counter, build_gauge, build_histogr
 
 ## Complexity
 
-- branches: 17
-- cyclomatic: 18
-- loc: 320
+- branches: 19
+- cyclomatic: 20
+- loc: 322
 
 ## Doc Coverage
 

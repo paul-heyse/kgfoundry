@@ -12,6 +12,7 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 - from **(absolute)** import asyncio
 - from **collections.abc** import Mapping, Sequence
 - from **concurrent.futures** import Future, ThreadPoolExecutor
+- from **contextlib** import suppress
 - from **dataclasses** import dataclass, field
 - from **pathlib** import Path
 - from **time** import perf_counter
@@ -34,6 +35,7 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 - from **codeintel_rev.retrieval.telemetry** import StageTiming, record_stage_decision, record_stage_metric, track_stage
 - from **codeintel_rev.retrieval.types** import HybridResultDoc, HybridSearchResult, SearchHit, StageDecision, StageSignals
 - from **codeintel_rev.telemetry.context** import current_run_id, telemetry_metadata
+- from **codeintel_rev.telemetry.decorators** import span_context
 - from **codeintel_rev.telemetry.steps** import StepEvent, emit_step
 - from **kgfoundry_common.errors** import EmbeddingError, VectorSearchError
 - from **kgfoundry_common.logging** import get_logger
@@ -43,68 +45,69 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 
 ## Definitions
 
-- variable: `SNIPPET_PREVIEW_CHARS` (line 57)
-- variable: `COMPONENT_NAME` (line 58)
-- variable: `RERANK_STAGE_NAME` (line 59)
-- variable: `LOGGER` (line 60)
-- class: `RerankOptionPayload` (line 63)
-- class: `SemanticProOptions` (line 72)
-- class: `RerankRuntimeOptions` (line 85)
-- class: `RerankPlan` (line 95)
-- class: `SemanticProRuntimeOptions` (line 106)
-- variable: `WideSearchHandle` (line 118)
-- class: `StageOnePlan` (line 122)
-- class: `HydrationPlan` (line 134)
-- class: `HydrationOutcome` (line 147)
-- function: `build_runtime_options` (line 154)
-- function: `_summarize_options` (line 236)
-- function: `semantic_search_pro` (line 249)
-- function: `_semantic_search_pro_sync` (line 342)
-- function: `_run_coderank_stage` (line 537)
-- function: `_timed_coderank_stage` (line 605)
-- function: `_maybe_run_warp` (line 625)
-- function: `_should_execute_stage_two` (line 650)
-- function: `_execute_stage_two` (line 704)
-- function: `_run_fusion_stage` (line 738)
-- function: `_maybe_apply_rerank_stage` (line 772)
-- class: `_RerankOutcome` (line 850)
-- function: `_reorder_docs` (line 855)
-- function: `_emit_rerank_decision` (line 897)
-- function: `_build_rerank_plan` (line 903)
-- function: `_resolve_reranker` (line 924)
-- function: `_maybe_schedule_xtr_wide` (line 939)
-- function: `_resolve_stage_one_outcome` (line 972)
-- function: `_run_xtr_wide_stage` (line 1050)
-- function: `_calculate_xtr_k` (line 1082)
-- function: `_build_extra_channels` (line 1089)
-- function: `_append_budget_notes` (line 1109)
-- function: `_safe_int` (line 1124)
-- function: `_merge_rrf_weights` (line 1132)
-- function: `_run_warp_stage` (line 1148)
-- function: `_warp_executor_hits` (line 1171)
-- function: `_xtr_rescore_hits` (line 1212)
-- function: `_hydrate_records` (line 1260)
-- function: `_hydrate_and_rerank_records` (line 1284)
-- function: `_maybe_rerank` (line 1439)
-- function: `_build_findings` (line 1484)
-- function: `merge_explainability_into_findings` (line 1524)
-- function: `_build_method_explainability` (line 1589)
-- function: `_build_method` (line 1656)
-- function: `_assemble_extras` (line 1695)
-- function: `_make_envelope` (line 1760)
-- function: `_observability_links` (line 1779)
-- function: `build_observability_links` (line 1806)
-- function: `_clamp_limit` (line 1817)
-- function: `_coerce_positive_int` (line 1828)
-- function: `_dedupe_preserve_order` (line 1838)
-- class: `WarpOutcome` (line 1850)
-- class: `FusionRequest` (line 1861)
-- class: `MethodContext` (line 1875)
+- variable: `SNIPPET_PREVIEW_CHARS` (line 59)
+- variable: `COMPONENT_NAME` (line 60)
+- variable: `RERANK_STAGE_NAME` (line 61)
+- variable: `LOGGER` (line 62)
+- class: `RerankOptionPayload` (line 65)
+- class: `SemanticProOptions` (line 74)
+- class: `RerankRuntimeOptions` (line 87)
+- class: `RerankPlan` (line 97)
+- class: `SemanticProRuntimeOptions` (line 108)
+- variable: `WideSearchHandle` (line 120)
+- class: `StageOnePlan` (line 124)
+- class: `HydrationPlan` (line 136)
+- class: `HydrationOutcome` (line 149)
+- function: `build_runtime_options` (line 156)
+- function: `_summarize_options` (line 238)
+- function: `semantic_search_pro` (line 251)
+- function: `_semantic_search_pro_sync` (line 344)
+- function: `_run_coderank_stage` (line 539)
+- function: `_timed_coderank_stage` (line 607)
+- function: `_maybe_run_warp` (line 627)
+- function: `_should_execute_stage_two` (line 652)
+- function: `_execute_stage_two` (line 706)
+- function: `_run_fusion_stage` (line 740)
+- function: `_maybe_apply_rerank_stage` (line 774)
+- class: `_RerankOutcome` (line 852)
+- function: `_reorder_docs` (line 857)
+- function: `_emit_rerank_decision` (line 899)
+- function: `_build_rerank_plan` (line 905)
+- function: `_resolve_reranker` (line 926)
+- function: `_maybe_schedule_xtr_wide` (line 941)
+- function: `_resolve_stage_one_outcome` (line 974)
+- function: `_run_xtr_wide_stage` (line 1052)
+- function: `_calculate_xtr_k` (line 1084)
+- function: `_build_extra_channels` (line 1091)
+- function: `_append_budget_notes` (line 1111)
+- function: `_safe_int` (line 1126)
+- function: `_merge_rrf_weights` (line 1134)
+- function: `_run_warp_stage` (line 1150)
+- function: `_warp_executor_hits` (line 1173)
+- function: `_xtr_rescore_hits` (line 1214)
+- function: `_hydrate_records` (line 1262)
+- function: `_hydrate_and_rerank_records` (line 1286)
+- function: `_maybe_rerank` (line 1454)
+- function: `_rerank_gate_decision` (line 1499)
+- function: `_build_findings` (line 1511)
+- function: `merge_explainability_into_findings` (line 1551)
+- function: `_build_method_explainability` (line 1616)
+- function: `_build_method` (line 1683)
+- function: `_assemble_extras` (line 1722)
+- function: `_make_envelope` (line 1787)
+- function: `_observability_links` (line 1806)
+- function: `build_observability_links` (line 1833)
+- function: `_clamp_limit` (line 1844)
+- function: `_coerce_positive_int` (line 1855)
+- function: `_dedupe_preserve_order` (line 1865)
+- class: `WarpOutcome` (line 1877)
+- class: `FusionRequest` (line 1888)
+- class: `MethodContext` (line 1902)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 23
+- **fan_out**: 24
 - **cycle_group**: 151
 
 ## Ownership
@@ -112,8 +115,8 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 16
-- recent churn 90: 16
+- recent churn 30: 17
+- recent churn 90: 17
 
 ## Usage
 
@@ -141,7 +144,7 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 
 ## Hotspot
 
-- score: 3.37
+- score: 3.39
 
 ## Side Effects
 
@@ -150,9 +153,9 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 
 ## Complexity
 
-- branches: 172
-- cyclomatic: 173
-- loc: 1888
+- branches: 175
+- cyclomatic: 176
+- loc: 1915
 
 ## Doc Coverage
 

@@ -26,28 +26,34 @@ In-memory run report builder fed by timeline events.
 
 ## Definitions
 
-- function: `_env_retention` (line 45)
-- function: `_infer_stop_reason_from_events` (line 54)
-- function: `_default_budget_snapshot` (line 68)
-- function: `_checkpoint_hit` (line 85)
-- function: `_checkpoint_summaries` (line 98)
-- function: `_compute_ops_coverage` (line 119)
-- function: `_budgets_from_timeline` (line 136)
-- class: `RunRecord` (line 161)
-- class: `RunReport` (line 203)
-- class: `RunReportStore` (line 251)
-- variable: `RUN_REPORT_STORE` (line 408)
-- function: `start_run` (line 411)
-- function: `finalize_run` (line 429)
-- function: `record_timeline_payload` (line 447)
-- function: `record_step_payload` (line 452)
-- function: `emit_checkpoint` (line 457)
-- function: `_build_operations` (line 474)
-- function: `_collect` (line 513)
-- function: `build_report` (line 534)
-- function: `report_to_json` (line 616)
-- function: `render_mermaid` (line 666)
-- function: `render_markdown` (line 704)
+- function: `_env_retention` (line 48)
+- function: `_infer_stop_reason_from_events` (line 57)
+- function: `_default_budget_snapshot` (line 71)
+- function: `_checkpoint_hit` (line 88)
+- function: `_checkpoint_summaries` (line 101)
+- function: `_compute_ops_coverage` (line 122)
+- function: `_normalize_stage_event` (line 147)
+- function: `_build_stage_summary` (line 176)
+- function: `_budgets_from_timeline` (line 211)
+- class: `RunRecord` (line 236)
+- class: `RunReport` (line 278)
+- class: `RunReportStore` (line 326)
+- variable: `RUN_REPORT_STORE` (line 483)
+- function: `start_run` (line 486)
+- function: `finalize_run` (line 504)
+- function: `record_timeline_payload` (line 522)
+- function: `record_step_payload` (line 527)
+- function: `emit_checkpoint` (line 532)
+- function: `_build_operations` (line 549)
+- function: `_collect` (line 588)
+- function: `build_report` (line 609)
+- function: `build_run_report_v2` (line 691)
+- function: `report_to_json` (line 734)
+- class: `RunReportStage` (line 785)
+- class: `RunReportV2` (line 808)
+- function: `render_mermaid` (line 836)
+- function: `render_markdown` (line 874)
+- function: `render_markdown_v2` (line 951)
 
 ## Graph Metrics
 
@@ -60,8 +66,8 @@ In-memory run report builder fed by timeline events.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 
@@ -70,7 +76,7 @@ In-memory run report builder fed by timeline events.
 
 ## Declared Exports (__all__)
 
-RUN_REPORT_STORE, RunReport, RunReportStore, build_report, emit_checkpoint, finalize_run, record_step_payload, record_timeline_payload, render_markdown, render_mermaid, report_to_json, start_run
+RUN_REPORT_STORE, RunReport, RunReportStore, RunReportV2, build_report, build_run_report_v2, emit_checkpoint, finalize_run, record_step_payload, record_timeline_payload, render_markdown, render_markdown_v2, render_mermaid, report_to_json, start_run
 
 ## Doc Health
 
@@ -93,7 +99,7 @@ RUN_REPORT_STORE, RunReport, RunReportStore, build_report, emit_checkpoint, fina
 
 ## Hotspot
 
-- score: 3.01
+- score: 3.06
 
 ## Side Effects
 
@@ -101,9 +107,9 @@ RUN_REPORT_STORE, RunReport, RunReportStore, build_report, emit_checkpoint, fina
 
 ## Complexity
 
-- branches: 107
-- cyclomatic: 108
-- loc: 779
+- branches: 127
+- cyclomatic: 128
+- loc: 986
 
 ## Doc Coverage
 
@@ -113,10 +119,10 @@ RUN_REPORT_STORE, RunReport, RunReportStore, build_report, emit_checkpoint, fina
 - `_checkpoint_hit` (function): summary=no, examples=no
 - `_checkpoint_summaries` (function): summary=no, examples=no
 - `_compute_ops_coverage` (function): summary=no, examples=no
+- `_normalize_stage_event` (function): summary=yes, params=ok, examples=no — Normalize event kind to a stage label.
+- `_build_stage_summary` (function): summary=yes, params=ok, examples=no — Return ordered stage summaries and the last completed stage.
 - `_budgets_from_timeline` (function): summary=no, examples=no
 - `RunRecord` (class): summary=yes, examples=no — Mutable storage for a sampled run.
-- `RunReport` (class): summary=yes, examples=no — Structured run summary consumable by humans and automation.
-- `RunReportStore` (class): summary=yes, examples=no — Thread-safe circular buffer of run data.
 
 ## Tags
 

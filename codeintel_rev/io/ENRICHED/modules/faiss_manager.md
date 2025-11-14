@@ -29,7 +29,7 @@ corpus size for optimal performance.
 - from **codeintel_rev.errors** import VectorIndexIncompatibleError, VectorIndexStateError
 - from **codeintel_rev.io.duckdb_catalog** import DuckDBCatalog
 - from **codeintel_rev.metrics.registry** import FAISS_ANN_LATENCY_SECONDS, FAISS_BUILD_SECONDS_LAST, FAISS_BUILD_TOTAL, FAISS_INDEX_CODE_SIZE_BYTES, FAISS_INDEX_CUVS_ENABLED, FAISS_INDEX_DIM, FAISS_INDEX_GPU_ENABLED, FAISS_INDEX_SIZE_VECTORS, FAISS_POSTFILTER_DENSITY, FAISS_REFINE_KEPT_RATIO, FAISS_REFINE_LATENCY_SECONDS, FAISS_SEARCH_ERRORS_TOTAL, FAISS_SEARCH_LAST_K, FAISS_SEARCH_LAST_MS, FAISS_SEARCH_NPROBE, FAISS_SEARCH_TOTAL, HNSW_SEARCH_EF, set_compile_flags_id, set_factory_id
-- from **codeintel_rev.observability.otel** import as_span, record_span_event
+- from **codeintel_rev.observability.otel** import record_span_event
 - from **codeintel_rev.observability.semantic_conventions** import Attrs
 - from **codeintel_rev.observability.timeline** import Timeline, current_timeline
 - from **codeintel_rev.retrieval.rerank_flat** import FlatReranker
@@ -68,17 +68,17 @@ corpus size for optimal performance.
 - class: `_SearchPlan` (line 290)
 - class: `_FAISSIdMapMixin` (line 300)
 - class: `FAISSManager` (line 477)
-- class: `AutoTuner` (line 3689)
-- function: `_coerce_to_int` (line 3819)
-- function: `_configure_direct_map` (line 3842)
-- function: `_set_direct_map_type` (line 3850)
-- function: `_wrap_bool_contains` (line 3893)
-- function: `_wrap_index_contains` (line 3929)
-- function: `_coerce_optional_int` (line 3967)
-- function: `_coerce_optional_float` (line 4001)
-- function: `_parse_tuning_overrides` (line 4035)
-- function: `_persist_tuning_profile` (line 4061)
-- function: `_get_compile_options` (line 4073)
+- class: `AutoTuner` (line 3717)
+- function: `_coerce_to_int` (line 3847)
+- function: `_configure_direct_map` (line 3870)
+- function: `_set_direct_map_type` (line 3878)
+- function: `_wrap_bool_contains` (line 3921)
+- function: `_wrap_index_contains` (line 3957)
+- function: `_coerce_optional_int` (line 3995)
+- function: `_coerce_optional_float` (line 4029)
+- function: `_parse_tuning_overrides` (line 4063)
+- function: `_persist_tuning_profile` (line 4089)
+- function: `_get_compile_options` (line 4101)
 
 ## Graph Metrics
 
@@ -91,8 +91,8 @@ corpus size for optimal performance.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 48
-- recent churn 90: 48
+- recent churn 30: 49
+- recent churn 90: 49
 
 ## Usage
 
@@ -124,7 +124,7 @@ AutoTuner, FAISSManager, apply_parameters
 
 ## Hotspot
 
-- score: 3.45
+- score: 3.46
 
 ## Side Effects
 
@@ -132,9 +132,9 @@ AutoTuner, FAISSManager, apply_parameters
 
 ## Complexity
 
-- branches: 260
-- cyclomatic: 261
-- loc: 4090
+- branches: 262
+- cyclomatic: 263
+- loc: 4118
 
 ## Doc Coverage
 

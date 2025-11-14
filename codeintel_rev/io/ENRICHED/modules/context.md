@@ -35,9 +35,9 @@ Context variable helpers for telemetry metadata.
 
 ## Graph Metrics
 
-- **fan_in**: 10
+- **fan_in**: 11
 - **fan_out**: 2
-- **cycle_group**: 52
+- **cycle_group**: 64
 
 ## Ownership
 
@@ -77,7 +77,7 @@ attach_context_attrs, capability_stamp_var, current_run_id, current_session, cur
 
 ## Hotspot
 
-- score: 2.36
+- score: 2.39
 
 ## Side Effects
 

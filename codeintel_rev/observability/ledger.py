@@ -50,7 +50,7 @@ def dated_run_dir(base_dir: Path | None, *, stamp: datetime | None = None) -> Pa
     return ensure_ledger_root(resolved_base / "telemetry" / "runs" / day)
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, frozen=True)
 class RunLedger:
     """Append-only JSONL ledger scoped to a single run."""
 

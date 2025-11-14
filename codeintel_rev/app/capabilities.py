@@ -12,8 +12,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, Final, cast
 
-from kgfoundry_common.logging import get_logger
 from codeintel_rev.telemetry.otel_metrics import GaugeLike, build_gauge
+from kgfoundry_common.logging import get_logger
 from kgfoundry_common.typing.heavy_deps import EXTRAS_HINT
 
 if TYPE_CHECKING:
