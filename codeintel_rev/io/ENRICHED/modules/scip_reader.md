@@ -38,7 +38,7 @@ with precise ranges for chunking and code intelligence.
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 34
+- **cycle_group**: 31
 
 ## Ownership
 

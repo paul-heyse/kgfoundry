@@ -18,7 +18,7 @@ Phase-0 telemetry helpers (tracing, metrics, logging, run reports).
 
 - **fan_in**: 1
 - **fan_out**: 4
-- **cycle_group**: 16
+- **cycle_group**: 23
 
 ## Ownership
 

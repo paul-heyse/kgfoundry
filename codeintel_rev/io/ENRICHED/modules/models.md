@@ -24,15 +24,15 @@ Dataclasses and helpers shared across enrichment stages.
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 83
+- **cycle_group**: 90
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 1
-- recent churn 90: 1
+- recent churn 30: 2
+- recent churn 90: 2
 
 ## Usage
 

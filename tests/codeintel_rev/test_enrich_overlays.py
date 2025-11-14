@@ -87,3 +87,56 @@ def test_generate_overlay_skips_private_only_module(tmp_path: Path) -> None:
 
     assert not result.created
     assert result.pyi_path is None
+
+
+def test_overlay_hub_threshold_controls_generation(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    package_root = repo_root / "pkg"
+    package_root.mkdir(parents=True)
+    (package_root / "__init__.py").write_text("", encoding="utf-8")
+    module_path = package_root / "hub.py"
+    exports = ", ".join(f"'name{i}'" for i in range(5))
+    module_path.write_text(f"__all__ = [{exports}]\n", encoding="utf-8")
+
+    result = generate_overlay_for_file(
+        module_path,
+        package_root,
+        policy=OverlayPolicy(export_hub_threshold=5),
+        inputs=OverlayInputs(),
+    )
+    assert result.created
+
+
+def test_overlay_skips_small_export_sets(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    package_root = repo_root / "pkg"
+    package_root.mkdir(parents=True)
+    (package_root / "__init__.py").write_text("", encoding="utf-8")
+    module_path = package_root / "helpers.py"
+    module_path.write_text("__all__ = ['helper_a', 'helper_b']\n", encoding="utf-8")
+
+    result = generate_overlay_for_file(
+        module_path,
+        package_root,
+        policy=OverlayPolicy(export_hub_threshold=3),
+        inputs=OverlayInputs(),
+    )
+    assert not result.created
+
+
+def test_overlay_needed_tag_forces_generation(tmp_path: Path) -> None:
+    repo_root = tmp_path / "repo"
+    package_root = repo_root / "pkg"
+    package_root.mkdir(parents=True)
+    (package_root / "__init__.py").write_text("", encoding="utf-8")
+    module_path = package_root / "feature.py"
+    module_path.write_text("VALUE = 1\n", encoding="utf-8")
+    rel_key = module_path.relative_to(package_root).as_posix()
+
+    result = generate_overlay_for_file(
+        module_path,
+        package_root,
+        policy=OverlayPolicy(export_hub_threshold=100),
+        inputs=OverlayInputs(overlay_tagged_paths=frozenset({rel_key})),
+    )
+    assert result.created

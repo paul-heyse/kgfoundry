@@ -28,14 +28,13 @@ corpus size for optimal performance.
 - from **codeintel_rev._lazy_imports** import LazyModule
 - from **codeintel_rev.errors** import VectorIndexIncompatibleError, VectorIndexStateError
 - from **codeintel_rev.io.duckdb_catalog** import DuckDBCatalog
-- from **codeintel_rev.metrics.registry** import FAISS_ANN_LATENCY_SECONDS, FAISS_BUILD_SECONDS_LAST, FAISS_BUILD_TOTAL, FAISS_INDEX_CODE_SIZE_BYTES, FAISS_INDEX_CUVS_ENABLED, FAISS_INDEX_DIM, FAISS_INDEX_GPU_ENABLED, FAISS_INDEX_SIZE_VECTORS, FAISS_POSTFILTER_DENSITY, FAISS_REFINE_KEPT_RATIO, FAISS_REFINE_LATENCY_SECONDS, FAISS_SEARCH_ERRORS_TOTAL, FAISS_SEARCH_LAST_K, FAISS_SEARCH_LAST_MS, FAISS_SEARCH_NPROBE, FAISS_SEARCH_TOTAL, HNSW_SEARCH_EF, set_compile_flags_id, set_factory_id
+- from **codeintel_rev.metrics.registry** import FAISS_ANN_LATENCY_SECONDS, FAISS_BUILD_SECONDS_LAST, FAISS_BUILD_TOTAL, FAISS_INDEX_CODE_SIZE_BYTES, FAISS_INDEX_CUVS_ENABLED, FAISS_INDEX_DIM, FAISS_INDEX_GPU_ENABLED, FAISS_INDEX_SIZE_VECTORS, FAISS_POSTFILTER_DENSITY, FAISS_REFINE_KEPT_RATIO, FAISS_REFINE_LATENCY_SECONDS, FAISS_SEARCH_ERRORS_TOTAL, FAISS_SEARCH_LAST_K, FAISS_SEARCH_LAST_MS, FAISS_SEARCH_LATENCY_SECONDS, FAISS_SEARCH_NPROBE, FAISS_SEARCH_TOTAL, HNSW_SEARCH_EF, set_compile_flags_id, set_factory_id
 - from **codeintel_rev.observability.otel** import record_span_event
 - from **codeintel_rev.observability.semantic_conventions** import Attrs
 - from **codeintel_rev.observability.timeline** import Timeline, current_timeline
 - from **codeintel_rev.retrieval.rerank_flat** import FlatReranker
 - from **codeintel_rev.retrieval.types** import SearchHit
 - from **codeintel_rev.telemetry.decorators** import span_context
-- from **codeintel_rev.metrics.registry** import FAISS_SEARCH_LATENCY_SECONDS
 - from **codeintel_rev.telemetry.steps** import StepEvent, emit_step
 - from **codeintel_rev.typing** import NDArrayF32, NDArrayI64, gate_import
 - from **kgfoundry_common.errors** import VectorSearchError

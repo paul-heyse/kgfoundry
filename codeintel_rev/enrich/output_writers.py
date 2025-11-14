@@ -208,38 +208,37 @@ def _write_dataset_table(
     dictionary_fields: Sequence[str] | None = None,
 ) -> None:
     """Write ``table`` to Parquet using dataset writer settings."""
-    if ds is None:
-        pq.write_table(table, destination)
+    if pa is None or pq is None:
         return
-    if table.num_rows == 0 and not partitioning:
-        pq.write_table(table, destination)
-        return
-    fmt = ds.ParquetFileFormat()
     use_dictionary = _resolve_dictionary_fields(table, dictionary_fields)
+    if not partitioning or ds is None:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        pq.write_table(
+            table,
+            destination,
+            compression="zstd",
+            use_dictionary=use_dictionary or None,
+        )
+        return
+    destination.mkdir(parents=True, exist_ok=True)
+    fmt = ds.ParquetFileFormat()
     file_options = fmt.make_write_options(
         compression="zstd",
         use_dictionary=use_dictionary or None,
     )
-    if partitioning:
-        destination.mkdir(parents=True, exist_ok=True)
-        base_dir = destination
-        basename_template = "part-{i}.parquet"
-        partitioning_descriptor = ds.partitioning(field_names=list(partitioning))
-    else:
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        base_dir = destination.parent
-        basename_template = destination.name
-        partitioning_descriptor = None
-    max_rows = max(1, table.num_rows)
+    partition_fields = [
+        table.schema.field(name)
+        for name in partitioning
+        if name in table.schema.names
+    ]
+    partition_schema = pa.schema(partition_fields)
     ds.write_dataset(
         data=table,
         format=fmt,
-        base_dir=str(base_dir),
-        partitioning=partitioning_descriptor,
+        base_dir=str(destination),
+        partitioning=ds.partitioning(schema=partition_schema, flavor="hive"),
         file_options=file_options,
         existing_data_behavior="delete_matching",
-        basename_template=basename_template,
-        max_rows_per_file=max_rows,
     )
 
 

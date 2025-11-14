@@ -45,11 +45,11 @@ Fast text search with regex support.
 - function: `search_text` (line 208)
 - function: `_search_text_sync` (line 291)
 - function: `_fallback_grep` (line 435)
-- class: `RipgrepCommandParams` (line 551)
-- function: `_build_ripgrep_command` (line 563)
-- function: `_parse_ripgrep_output` (line 603)
-- function: `_preview_text` (line 670)
-- function: `_clean_attrs` (line 678)
+- class: `RipgrepCommandParams` (line 554)
+- function: `_build_ripgrep_command` (line 566)
+- function: `_parse_ripgrep_output` (line 606)
+- function: `_preview_text` (line 673)
+- function: `_clean_attrs` (line 698)
 
 ## Graph Metrics
 
@@ -62,8 +62,8 @@ Fast text search with regex support.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 25
-- recent churn 90: 25
+- recent churn 30: 27
+- recent churn 90: 27
 
 ## Usage
 
@@ -106,7 +106,7 @@ search_text
 
 - branches: 64
 - cyclomatic: 65
-- loc: 684
+- loc: 718
 
 ## Doc Coverage
 
@@ -116,7 +116,7 @@ search_text
 - `_int_override` (function): summary=yes, params=ok, examples=no — Return an integer override for the given key.
 - `search_text` (function): summary=yes, params=mismatch, examples=no — Fast text search using ripgrep (async wrapper).
 - `_search_text_sync` (function): summary=no, examples=no
-- `_fallback_grep` (function): summary=yes, params=mismatch, examples=no — Fallback to basic grep if ripgrep unavailable.
+- `_fallback_grep` (function): summary=yes, params=ok, examples=no — Fallback to basic grep if ripgrep unavailable.
 - `RipgrepCommandParams` (class): summary=yes, examples=no — Parameter bundle for constructing ripgrep commands.
 - `_build_ripgrep_command` (function): summary=yes, params=ok, examples=no — Assemble the ripgrep command arguments.
 - `_parse_ripgrep_output` (function): summary=yes, params=ok, examples=no — Parse ripgrep JSON output into structured matches.

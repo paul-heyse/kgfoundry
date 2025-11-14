@@ -19,37 +19,38 @@ Targeted overlay generation with opt-in activation.
 
 ## Definitions
 
-- class: `OverlayPolicy` (line 17)
-- class: `OverlayResult` (line 31)
-- class: `OverlayInputs` (line 41)
-- class: `OverlayRenderContext` (line 50)
-- function: `generate_overlay_for_file` (line 61)
-- function: `activate_overlays` (line 181)
-- function: `deactivate_all` (line 230)
-- function: `_overlay_path` (line 268)
-- function: `_normalized_module_key` (line 292)
-- function: `_module_name_from_path` (line 312)
-- function: `_collect_star_reexports` (line 336)
-- function: `_extract_simple_name` (line 367)
-- function: `_build_overlay_text` (line 394)
-- function: `_render_star_exports` (line 441)
-- function: `_render_public_defs` (line 466)
-- function: `_collect_import_reexports` (line 497)
-- function: `_is_windows` (line 528)
+- variable: `DEFAULT_EXPORT_HUB_THRESHOLD` (line 16)
+- class: `OverlayPolicy` (line 20)
+- class: `OverlayResult` (line 35)
+- class: `OverlayInputs` (line 45)
+- class: `OverlayRenderContext` (line 55)
+- function: `generate_overlay_for_file` (line 66)
+- function: `activate_overlays` (line 194)
+- function: `deactivate_all` (line 243)
+- function: `_overlay_path` (line 281)
+- function: `_normalized_module_key` (line 305)
+- function: `_module_name_from_path` (line 325)
+- function: `_collect_star_reexports` (line 349)
+- function: `_extract_simple_name` (line 380)
+- function: `_build_overlay_text` (line 407)
+- function: `_render_star_exports` (line 454)
+- function: `_render_public_defs` (line 479)
+- function: `_collect_import_reexports` (line 510)
+- function: `_is_windows` (line 541)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 99
+- **cycle_group**: 89
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 11
-- recent churn 90: 11
+- recent churn 30: 12
+- recent churn 90: 12
 
 ## Usage
 
@@ -83,7 +84,7 @@ Targeted overlay generation with opt-in activation.
 
 ## Hotspot
 
-- score: 2.46
+- score: 2.48
 
 ## Side Effects
 
@@ -91,9 +92,9 @@ Targeted overlay generation with opt-in activation.
 
 ## Complexity
 
-- branches: 68
-- cyclomatic: 69
-- loc: 537
+- branches: 72
+- cyclomatic: 73
+- loc: 550
 
 ## Doc Coverage
 

@@ -53,33 +53,33 @@ Deep-Research compatible search/fetch orchestration helpers.
 - class: `FetchResponse` (line 340)
 - class: `FetchDependencies` (line 347)
 - function: `run_search` (line 355)
-- function: `run_fetch` (line 516)
-- function: `_normalize_str_list` (line 582)
-- function: `_embed_query` (line 588)
-- function: `_compute_fanout` (line 610)
-- function: `_build_runtime_overrides` (line 619)
-- function: `_flatten_ids` (line 646)
-- function: `_flatten_scores` (line 652)
-- function: `_hydrate_chunks` (line 658)
-- function: `_build_results` (line 682)
-- function: `_matches_symbols` (line 714)
-- function: `_build_metadata` (line 721)
-- function: `_build_hit_reasons` (line 746)
-- function: `_build_title` (line 768)
-- function: `_build_url` (line 775)
-- function: `_build_snippet` (line 782)
-- function: `_truncate_content` (line 790)
-- function: `_build_fetch_metadata` (line 798)
-- function: `_write_pool_rows` (line 809)
-- function: `_record_postfilter_density` (line 851)
-- function: `_log_search_completion` (line 858)
-- function: `_coerce_int` (line 878)
-- function: `_string_sequence` (line 893)
-- function: `_repair_single_result` (line 899)
-- function: `_resolve_snippet` (line 914)
-- function: `_merge_metadata` (line 924)
-- class: `_RepairStats` (line 954)
-- function: `post_search_validate_and_fill` (line 962)
+- function: `run_fetch` (line 518)
+- function: `_normalize_str_list` (line 584)
+- function: `_embed_query` (line 590)
+- function: `_compute_fanout` (line 612)
+- function: `_build_runtime_overrides` (line 621)
+- function: `_flatten_ids` (line 648)
+- function: `_flatten_scores` (line 654)
+- function: `_hydrate_chunks` (line 660)
+- function: `_build_results` (line 684)
+- function: `_matches_symbols` (line 716)
+- function: `_build_metadata` (line 723)
+- function: `_build_hit_reasons` (line 748)
+- function: `_build_title` (line 770)
+- function: `_build_url` (line 777)
+- function: `_build_snippet` (line 784)
+- function: `_truncate_content` (line 792)
+- function: `_build_fetch_metadata` (line 800)
+- function: `_write_pool_rows` (line 811)
+- function: `_record_postfilter_density` (line 853)
+- function: `_log_search_completion` (line 860)
+- function: `_coerce_int` (line 880)
+- function: `_string_sequence` (line 895)
+- function: `_repair_single_result` (line 901)
+- function: `_resolve_snippet` (line 916)
+- function: `_merge_metadata` (line 926)
+- class: `_RepairStats` (line 956)
+- function: `post_search_validate_and_fill` (line 964)
 
 ## Graph Metrics
 
@@ -92,8 +92,8 @@ Deep-Research compatible search/fetch orchestration helpers.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 
@@ -135,7 +135,7 @@ FetchDependencies, FetchObjectResult, FetchRequest, FetchResponse, SearchDepende
 
 - branches: 104
 - cyclomatic: 105
-- loc: 1021
+- loc: 1023
 
 ## Doc Coverage
 

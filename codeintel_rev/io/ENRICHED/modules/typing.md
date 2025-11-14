@@ -47,7 +47,7 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 
 ## Graph Metrics
 
-- **fan_in**: 112
+- **fan_in**: 111
 - **fan_out**: 0
 - **cycle_group**: 1
 
@@ -89,7 +89,7 @@ FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, Polars
 
 ## Hotspot
 
-- score: 2.77
+- score: 2.76
 
 ## Side Effects
 

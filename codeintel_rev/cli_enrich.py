@@ -15,11 +15,6 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Annotated, Any, Protocol, cast
 
-try:  # pragma: no cover - optional dependency
-    import polars as pl
-except ImportError:  # pragma: no cover - optional dependency
-    pl = None
-
 import typer
 
 from codeintel_rev.config_indexer import index_config_files
@@ -49,6 +44,7 @@ from codeintel_rev.enrich.output_writers import (
     write_jsonl,
     write_markdown_module,
     write_parquet,
+    write_parquet_dataset,
 )
 from codeintel_rev.enrich.ownership import OwnershipIndex, compute_ownership
 from codeintel_rev.enrich.pathnorm import (
@@ -292,7 +288,18 @@ DRY_RUN_OPTION = typer.Option(
 )
 
 
-app = typer.Typer(add_completion=True, help="Repo enrichment utilities (scan + overlays).")
+GLOBAL_OPTIONS_HELP = """Repo enrichment utilities (scan + overlays).
+
+Global options (pass after the command, e.g. `codeintel-enrich all --root src --scip index.scip.json`):
+  --root PATH           Repo or subfolder to scan.
+  --scip PATH           Path to SCIP index.json (required for most commands).
+  --out PATH            Output directory for enrichment artifacts.
+  --pyrefly-json PATH   Optional Pyrefly report for typedness correlation.
+  --tags-yaml PATH      Optional tagging rules YAML.
+  --dry-run             Compute artifacts without writing to disk.
+"""
+
+app = typer.Typer(add_completion=True, help=GLOBAL_OPTIONS_HELP)
 
 
 def _ensure_state(ctx: typer.Context) -> CLIContextState:
@@ -2279,6 +2286,12 @@ def _write_slices_output(
         return
     slices_dir = out / "slices"
     write_parquet(slices_dir / "index.parquet", index_rows)
+    write_parquet_dataset(
+        slices_dir / "index_dataset",
+        index_rows,
+        partitioning=["module_name"],
+        dictionary_fields=("path", "module_name"),
+    )
     write_jsonl(slices_dir / "slices.jsonl", slice_records)
 
 
@@ -2397,9 +2410,7 @@ def _write_symbol_graph(out: Path, symbol_edges: list[tuple[str, str]]) -> None:
 
 
 def _write_tabular_records(parquet_path: Path, rows: list[dict[str, Any]]) -> None:
-    parquet_path.parent.mkdir(parents=True, exist_ok=True)
-    if pl is not None and rows:
-        pl.DataFrame(rows).write_parquet(parquet_path)
+    write_parquet(parquet_path, rows)
     write_jsonl(parquet_path.with_suffix(".jsonl"), rows)
 
 

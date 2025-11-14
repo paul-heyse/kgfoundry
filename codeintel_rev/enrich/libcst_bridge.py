@@ -146,6 +146,21 @@ def _literal_string_values(node: cst.BaseExpression) -> Iterator[str]:
 
 
 def _string_literal_value(node: cst.BaseExpression | None) -> str | None:
+    """Extract the evaluated string value from a LibCST string literal node.
+
+    Parameters
+    ----------
+    node : cst.BaseExpression | None
+        LibCST expression node that may be a string literal. If None or not a
+        SimpleString node, returns None.
+
+    Returns
+    -------
+    str | None
+        Evaluated string value from the literal, or None if the node is not a
+        string literal or evaluation fails. Handles both string and bytes
+        literals, decoding bytes to UTF-8 strings when necessary.
+    """
     if isinstance(node, cst.SimpleString):
         with suppress(ValueError):
             evaluated = node.evaluated_value
@@ -158,6 +173,21 @@ def _string_literal_value(node: cst.BaseExpression | None) -> str | None:
 
 
 def _extract_def_docstring(body: cst.BaseSuite) -> str | None:
+    """Extract the docstring from a function or class body suite.
+
+    Parameters
+    ----------
+    body : cst.BaseSuite
+        LibCST suite node representing the body of a function or class definition.
+        The docstring is expected to be the first statement in the body if present.
+
+    Returns
+    -------
+    str | None
+        Docstring text if found as the first statement in the body, or None if
+        no docstring is present. Handles both string and bytes literals, decoding
+        bytes to UTF-8 strings when necessary.
+    """
     if not getattr(body, "body", None):
         return None
     first_stmt = body.body[0]
@@ -175,6 +205,24 @@ def _extract_def_docstring(body: cst.BaseSuite) -> str | None:
 
 
 def _summarize_docstring(text: str, max_length: int = 200) -> str:
+    """Extract a one-line summary from a docstring.
+
+    Parameters
+    ----------
+    text : str
+        Full docstring text to summarize. May be empty or multi-line.
+    max_length : int, optional
+        Maximum length for the summary string. If the summary exceeds this length,
+        it is truncated with "..." appended. Defaults to 200.
+
+    Returns
+    -------
+    str
+        One-line summary extracted from the first line of the docstring or from
+        the parsed short_description if docstring_parser is available. The summary
+        is truncated to max_length characters if necessary. Returns an empty string
+        if text is empty.
+    """
     summary = text.strip().splitlines()[0].strip() if text else ""
     if parse_docstring is not None:
         with suppress(Exception):
@@ -190,6 +238,28 @@ def _analyze_docstring(
     text: str | None,
     param_names: list[str],
 ) -> tuple[str | None, bool, bool, bool]:
+    """Analyze a docstring for completeness and quality metrics.
+
+    Parameters
+    ----------
+    text : str | None
+        Docstring text to analyze, or None if no docstring exists. If None,
+        returns a tuple indicating no summary, no summary present, no parameter
+        parity, and no examples.
+    param_names : list[str]
+        List of parameter names from the function signature (excluding "self"
+        and "cls"). Used to check if all parameters are documented in the
+        docstring.
+
+    Returns
+    -------
+    tuple[str | None, bool, bool, bool]
+        Tuple containing:
+        - Summary string (one-line) or None if no summary found
+        - Whether a summary is present (has_summary)
+        - Whether all parameters are documented (param_parity)
+        - Whether examples are present in the docstring (has_examples)
+    """
     if not text:
         return None, False, False, False
     summary = _summarize_docstring(text)
@@ -445,6 +515,17 @@ class _IndexVisitor(cst.CSTVisitor):
         except KeyError:
             return self._class_depth == 0 and self._function_depth == 0
 
+    def _qualified_name(self, node: cst.CSTNode) -> str | None:
+        try:
+            qualnames = self.get_metadata(cst_metadata.QualifiedNameProvider, node)
+        except KeyError:
+            return None
+        for qualified in qualnames:
+            if qualified.source is cst_metadata.QualifiedNameSource.LOCAL:
+                return qualified.name
+        first = next(iter(qualnames), None)
+        return first.name if first else None
+
     def finalize(self) -> None:
         """Finalize visitor state after AST traversal completes.
 
@@ -560,9 +641,11 @@ class _IndexVisitor(cst.CSTVisitor):
         if is_public and has_examples:
             self.doc_metrics["examples_present"] = True
 
+        qualname = self._qualified_name(node)
         self.doc_items.append(
             {
                 "name": name,
+                "qualname": qualname,
                 "kind": "function",
                 "public": is_public,
                 "lineno": lineno,
@@ -588,9 +671,11 @@ class _IndexVisitor(cst.CSTVisitor):
         if is_public and has_examples:
             self.doc_metrics["examples_present"] = True
 
+        qualname = self._qualified_name(node)
         self.doc_items.append(
             {
                 "name": name,
+                "qualname": qualname,
                 "kind": "class",
                 "public": is_public,
                 "lineno": lineno,
@@ -630,7 +715,12 @@ class _IndexVisitor(cst.CSTVisitor):
             return
         if isinstance(value, cst.Call) and value.args:
             func_expr = value.func
-            if isinstance(func_expr, cst.Name) and func_expr.value in {"list", "tuple", "set", "sorted"}:
+            if isinstance(func_expr, cst.Name) and func_expr.value in {
+                "list",
+                "tuple",
+                "set",
+                "sorted",
+            }:
                 self._extend_exports_from_node(value.args[0].value)
                 return
         for literal in _literal_string_values(value):
@@ -901,6 +991,36 @@ class _IndexVisitor(cst.CSTVisitor):
 
     @staticmethod
     def handle_expr_node(visitor: _IndexVisitor, node: cst.CSTNode, *, is_top_level: bool) -> None:
+        """Handle expression node during AST traversal.
+
+        This static method processes expression nodes (e.g., `__all__.append("name")`)
+        during LibCST AST traversal. It detects calls to `__all__.append()` and
+        `__all__.extend()` at module level to extract explicit export lists. Nested
+        expressions (inside functions/classes) are ignored to focus on module-level
+        exports.
+
+        Parameters
+        ----------
+        visitor : _IndexVisitor
+            The visitor instance collecting module definitions, imports, and exports.
+            The visitor's exports set is updated with names added via __all__ method
+            calls.
+        node : cst.CSTNode
+            The CST node being visited, cast to cst.Expr. Contains a call expression
+            that may be a __all__ modification (append or extend).
+        is_top_level : bool
+            Flag indicating whether the expression is at module level (True) or nested
+            inside a function/class (False). Only top-level expressions are processed
+            to track module-level exports.
+
+        Notes
+        -----
+        This method is part of the LibCST visitor pattern and is called automatically
+        during AST traversal. It handles dynamic __all__ modifications that cannot be
+        detected from static assignments. The method only processes calls to __all__
+        methods, ignoring other expression statements. Thread-safe if the visitor
+        instance is thread-safe.
+        """
         if not is_top_level:
             return
         expr = cast("cst.Expr", node)
@@ -919,6 +1039,35 @@ class _IndexVisitor(cst.CSTVisitor):
     def handle_aug_assign_node(
         visitor: _IndexVisitor, node: cst.CSTNode, *, is_top_level: bool
     ) -> None:
+        """Handle augmented assignment node during AST traversal.
+
+        This static method processes augmented assignment nodes (e.g., `__all__ += ["name"]`)
+        during LibCST AST traversal. It detects augmented assignments to `__all__` at
+        module level to extract explicit export list modifications. Nested assignments
+        (inside functions/classes) are ignored to focus on module-level exports.
+
+        Parameters
+        ----------
+        visitor : _IndexVisitor
+            The visitor instance collecting module definitions, imports, and exports.
+            The visitor's exports set is updated with names added via __all__ augmented
+            assignments.
+        node : cst.CSTNode
+            The CST node being visited, cast to cst.AugAssign. Contains an augmented
+            assignment (e.g., +=, -=) that may modify __all__.
+        is_top_level : bool
+            Flag indicating whether the augmented assignment is at module level (True)
+            or nested inside a function/class (False). Only top-level assignments are
+            processed to track module-level exports.
+
+        Notes
+        -----
+        This method is part of the LibCST visitor pattern and is called automatically
+        during AST traversal. It handles dynamic __all__ modifications via augmented
+        assignments (e.g., `__all__ += ["new_export"]`). The method delegates to
+        `_extend_exports_from_node()` to extract literal values from the right-hand
+        side expression. Thread-safe if the visitor instance is thread-safe.
+        """
         if not is_top_level:
             return
         aug = cast("cst.AugAssign", node)

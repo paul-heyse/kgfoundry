@@ -15,18 +15,17 @@ Append-only run ledger utilities.
 - from **dataclasses** import dataclass
 - from **datetime** import UTC, datetime
 - from **pathlib** import Path
-- from **typing** import Any
 
 ## Definitions
 
-- function: `ensure_ledger_root` (line 16)
-- function: `dated_run_dir` (line 33)
-- class: `RunLedger` (line 54)
+- function: `ensure_ledger_root` (line 15)
+- function: `dated_run_dir` (line 32)
+- class: `RunLedger` (line 53)
 
 ## Graph Metrics
 
 - **fan_in**: 4
-- **fan_out**: 2
+- **fan_out**: 1
 - **cycle_group**: 41
 
 ## Ownership
@@ -34,8 +33,8 @@ Append-only run ledger utilities.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 
@@ -67,7 +66,7 @@ RunLedger, dated_run_dir, ensure_ledger_root
 
 ## Hotspot
 
-- score: 1.91
+- score: 1.85
 
 ## Side Effects
 
@@ -77,7 +76,7 @@ RunLedger, dated_run_dir, ensure_ledger_root
 
 - branches: 5
 - cyclomatic: 6
-- loc: 111
+- loc: 114
 
 ## Doc Coverage
 

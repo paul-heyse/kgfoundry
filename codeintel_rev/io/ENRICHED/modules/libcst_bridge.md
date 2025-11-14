@@ -15,42 +15,44 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 - from **pathlib** import Path
 - from **typing** import Any, ClassVar, Protocol, cast
 - from **(absolute)** import libcst
+- from **libcst** import matchers
 - from **libcst** import metadata
 - from **libcst.helpers** import get_full_name_for_node
 - from **docstring_parser** import parse
 
 ## Definitions
 
-- variable: `parse_docstring` (line 21)
-- class: `NodeHandler` (line 24)
-- class: `ImportEntry` (line 33)
-- class: `DefEntry` (line 44)
-- class: `ModuleIndex` (line 53)
-- function: `_extract_module_docstring` (line 90)
-- function: `_literal_string_values` (line 120)
-- function: `_extract_def_docstring` (line 158)
-- function: `_summarize_docstring` (line 175)
-- function: `_analyze_docstring` (line 187)
-- function: `_iter_params` (line 213)
-- function: `_exception_name` (line 228)
-- function: `_infer_side_effects` (line 258)
-- class: `_IndexVisitor` (line 307)
-- function: `index_module` (line 929)
-- function: `_lineno` (line 976)
+- variable: `parse_docstring` (line 22)
+- class: `NodeHandler` (line 25)
+- class: `ImportEntry` (line 34)
+- class: `DefEntry` (line 45)
+- class: `ModuleIndex` (line 54)
+- function: `_extract_module_docstring` (line 91)
+- function: `_literal_string_values` (line 121)
+- function: `_string_literal_value` (line 148)
+- function: `_extract_def_docstring` (line 160)
+- function: `_summarize_docstring` (line 177)
+- function: `_analyze_docstring` (line 189)
+- function: `_iter_params` (line 215)
+- function: `_exception_name` (line 230)
+- function: `_infer_side_effects` (line 260)
+- class: `_IndexVisitor` (line 309)
+- function: `index_module` (line 998)
+- function: `_lineno` (line 1045)
 
 ## Graph Metrics
 
 - **fan_in**: 4
 - **fan_out**: 1
-- **cycle_group**: 80
+- **cycle_group**: 84
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 12
-- recent churn 90: 12
+- recent churn 30: 13
+- recent churn 90: 13
 
 ## Usage
 
@@ -84,7 +86,7 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 
 ## Hotspot
 
-- score: 2.70
+- score: 2.74
 
 ## Side Effects
 
@@ -94,9 +96,9 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 
 ## Complexity
 
-- branches: 117
-- cyclomatic: 118
-- loc: 997
+- branches: 135
+- cyclomatic: 136
+- loc: 1066
 
 ## Doc Coverage
 
@@ -106,10 +108,10 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 - `ModuleIndex` (class): summary=yes, examples=no — Aggregate module metadata returned by :func:`index_module`.
 - `_extract_module_docstring` (function): summary=yes, params=ok, examples=no — Return the module docstring if present.
 - `_literal_string_values` (function): summary=yes, params=ok, examples=no — Yield literal string values from constant containers.
+- `_string_literal_value` (function): summary=no, examples=no
 - `_extract_def_docstring` (function): summary=no, examples=no
 - `_summarize_docstring` (function): summary=no, examples=no
 - `_analyze_docstring` (function): summary=no, examples=no
-- `_iter_params` (function): summary=no, examples=no
 
 ## Tags
 

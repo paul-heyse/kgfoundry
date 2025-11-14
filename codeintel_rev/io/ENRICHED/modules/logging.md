@@ -22,15 +22,15 @@ Structured logging bridge + optional OTLP exporter.
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 9
+- **cycle_group**: 20
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 3
-- recent churn 90: 3
+- recent churn 30: 4
+- recent churn 90: 4
 
 ## Usage
 
@@ -68,7 +68,7 @@ Structured logging bridge + optional OTLP exporter.
 
 - branches: 2
 - cyclomatic: 3
-- loc: 24
+- loc: 27
 
 ## Doc Coverage
 

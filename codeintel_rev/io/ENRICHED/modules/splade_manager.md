@@ -78,7 +78,7 @@ SPLADE artifact management, encoding, and Lucene impact index builders.
 
 - **fan_in**: 3
 - **fan_out**: 3
-- **cycle_group**: 20
+- **cycle_group**: 19
 
 ## Ownership
 

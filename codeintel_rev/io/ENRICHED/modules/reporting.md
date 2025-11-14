@@ -39,7 +39,7 @@ Timeline-based run report builder and CLI helpers.
 
 - **fan_in**: 5
 - **fan_out**: 2
-- **cycle_group**: 46
+- **cycle_group**: 48
 
 ## Ownership
 

@@ -50,31 +50,31 @@ Decorators for consistent span/timeline instrumentation.
 - variable: `LOGGER` (line 175)
 - variable: `F` (line 177)
 - function: `_record_stage_latency` (line 180)
-- variable: `TRACER` (line 195)
-- function: `_emit_checkpoint` (line 198)
-- function: `_set_span_attributes` (line 246)
-- function: `_span_scope` (line 281)
-- function: `_record_exception` (line 348)
-- function: `span_context` (line 382)
-- function: `trace_span` (line 470)
-- function: `trace_step` (line 622)
-- function: `emit_event` (line 670)
-- function: `_build_step_payload` (line 814)
-- function: `_with_duration` (line 830)
+- variable: `TRACER` (line 196)
+- function: `_emit_checkpoint` (line 199)
+- function: `_set_span_attributes` (line 247)
+- function: `_span_scope` (line 282)
+- function: `_record_exception` (line 349)
+- function: `span_context` (line 383)
+- function: `trace_span` (line 471)
+- function: `trace_step` (line 623)
+- function: `emit_event` (line 671)
+- function: `_build_step_payload` (line 815)
+- function: `_with_duration` (line 831)
 
 ## Graph Metrics
 
 - **fan_in**: 11
 - **fan_out**: 5
-- **cycle_group**: 16
+- **cycle_group**: 23
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 8
+- recent churn 90: 8
 
 ## Usage
 
@@ -116,7 +116,7 @@ emit_event, span_context, trace_span, trace_step
 
 - branches: 36
 - cyclomatic: 37
-- loc: 837
+- loc: 838
 
 ## Doc Coverage
 

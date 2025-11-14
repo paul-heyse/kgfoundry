@@ -25,10 +25,10 @@ echo "==> Generating SCIP index..."
 
 echo "==> Running enrichment pipeline (LibCST + AST + analytics)..."
 uv run python -m codeintel_rev.cli_enrich \
+  all \
   --root codeintel_rev \
   --scip "$SCIP_JSON" \
   --out "$ENRICH_OUT" \
-  all \
   --emit-ast
 
 echo "==> Building CST dataset..."

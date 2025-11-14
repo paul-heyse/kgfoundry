@@ -11,25 +11,32 @@ Tree-sitter outline helpers used for enrichment artifacts.
 - from **__future__** import annotations
 - from **(absolute)** import importlib
 - from **(absolute)** import importlib.util
+- from **(absolute)** import logging
+- from **(absolute)** import os
 - from **dataclasses** import dataclass, field
 - from **pathlib** import Path
 - from **typing** import Any
-- from **tree_sitter** import Language, Node, Parser
+- from **tree_sitter** import Language, Node, Parser, Query
 - from **tree_sitter_python** import language
 
 ## Definitions
 
-- function: `_lang_for_ext` (line 27)
-- class: `OutlineNode` (line 65)
-- class: `TSOutline` (line 75)
-- function: `build_outline` (line 82)
-- function: `_extract_identifier` (line 133)
+- variable: `LOGGER` (line 29)
+- function: `_lang_for_ext` (line 40)
+- class: `OutlineNode` (line 78)
+- class: `TSOutline` (line 88)
+- function: `build_outline` (line 95)
+- function: `_extract_identifier` (line 130)
+- function: `_outline_with_query` (line 156)
+- function: `_outline_with_dfs` (line 189)
+- function: `_get_outline_query` (line 211)
+- function: `_node_text` (line 228)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 88
+- **cycle_group**: 99
 
 ## Ownership
 
@@ -71,7 +78,7 @@ Tree-sitter outline helpers used for enrichment artifacts.
 
 ## Hotspot
 
-- score: 1.87
+- score: 2.02
 
 ## Side Effects
 
@@ -79,9 +86,9 @@ Tree-sitter outline helpers used for enrichment artifacts.
 
 ## Complexity
 
-- branches: 17
-- cyclomatic: 18
-- loc: 157
+- branches: 29
+- cyclomatic: 30
+- loc: 232
 
 ## Doc Coverage
 
@@ -90,6 +97,10 @@ Tree-sitter outline helpers used for enrichment artifacts.
 - `TSOutline` (class): summary=yes, examples=no — Bundle of outline nodes plus the originating Tree-sitter language.
 - `build_outline` (function): summary=yes, params=ok, examples=no — Produce a best-effort outline for ``path``'s contents.
 - `_extract_identifier` (function): summary=yes, params=ok, examples=no — Return the identifier name for ``node`` if available.
+- `_outline_with_query` (function): summary=no, examples=no
+- `_outline_with_dfs` (function): summary=no, examples=no
+- `_get_outline_query` (function): summary=no, examples=no
+- `_node_text` (function): summary=no, examples=no
 
 ## Tags
 

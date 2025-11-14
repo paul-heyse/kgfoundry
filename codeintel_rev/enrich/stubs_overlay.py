@@ -12,6 +12,8 @@ from codeintel_rev.enrich.libcst_bridge import DefEntry, ImportEntry, ModuleInde
 from codeintel_rev.enrich.output_writers import write_json
 from codeintel_rev.enrich.scip_reader import SCIPIndex
 
+DEFAULT_EXPORT_HUB_THRESHOLD = 10
+
 
 @dataclass(frozen=True, slots=True)
 class OverlayPolicy:
@@ -24,7 +26,7 @@ class OverlayPolicy:
     when_type_errors: bool = False
     min_type_errors: int = 25
     max_overlays: int = 200
-    export_hub_threshold: int = 0
+    export_hub_threshold: int = DEFAULT_EXPORT_HUB_THRESHOLD
     overlay_tag: str = "overlay-needed"
 
 

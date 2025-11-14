@@ -10,7 +10,7 @@ Compatibility layer exposing Prometheus-like helpers backed by OpenTelemetry.
 
 - from **__future__** import annotations
 - from **collections.abc** import Mapping, Sequence
-- from **dataclasses** import dataclass
+- from **dataclasses** import dataclass, replace
 - from **threading** import Lock
 - from **typing** import cast
 - from **opentelemetry** import metrics
@@ -23,12 +23,12 @@ Compatibility layer exposing Prometheus-like helpers backed by OpenTelemetry.
 - class: `HistogramHandle` (line 40)
 - class: `CounterLike` (line 54)
 - class: `HistogramLike` (line 98)
-- class: `_GaugeEntry` (line 151)
-- class: `GaugeHandle` (line 156)
-- class: `GaugeLike` (line 170)
-- function: `build_counter` (line 271)
-- function: `build_histogram` (line 286)
-- function: `build_gauge` (line 310)
+- class: `_GaugeEntry` (line 177)
+- class: `GaugeHandle` (line 182)
+- class: `GaugeLike` (line 196)
+- function: `build_counter` (line 297)
+- function: `build_histogram` (line 312)
+- function: `build_gauge` (line 336)
 
 ## Graph Metrics
 
@@ -41,8 +41,8 @@ Compatibility layer exposing Prometheus-like helpers backed by OpenTelemetry.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 
@@ -74,7 +74,7 @@ CounterLike, GaugeLike, HistogramLike, build_counter, build_gauge, build_histogr
 
 ## Hotspot
 
-- score: 2.43
+- score: 2.45
 
 ## Side Effects
 
@@ -82,9 +82,9 @@ CounterLike, GaugeLike, HistogramLike, build_counter, build_gauge, build_histogr
 
 ## Complexity
 
-- branches: 20
-- cyclomatic: 21
-- loc: 330
+- branches: 21
+- cyclomatic: 22
+- loc: 356
 
 ## Doc Coverage
 

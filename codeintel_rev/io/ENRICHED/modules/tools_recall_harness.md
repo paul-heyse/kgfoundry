@@ -148,6 +148,7 @@ Notes
 - patches/vllm scope.md
 - patches/Enrich_scope_addendum.md
 - patches/FAISS-Phase2-Refinements.md
+- patches/SCIP+CST+AST pipeline hardening_phase2.md
 - patches/Front_End_Hardening_Phase1.md
 - patches/Enrich_Scope.md
 - patches/Runtime_Cells_Followup_Scope.md

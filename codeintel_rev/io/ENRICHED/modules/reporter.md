@@ -49,26 +49,30 @@ In-memory run report builder fed by timeline events.
 - function: `_collect` (line 625)
 - function: `build_report` (line 646)
 - function: `build_run_report_v2` (line 728)
-- function: `report_to_json` (line 814)
-- class: `RunReportStage` (line 865)
-- class: `RunReportV2` (line 898)
-- function: `render_mermaid` (line 938)
-- function: `render_markdown` (line 976)
-- function: `render_markdown_v2` (line 1053)
+- function: `report_to_json` (line 812)
+- class: `RunReportStage` (line 863)
+- class: `RunReportV2` (line 896)
+- function: `render_mermaid` (line 936)
+- function: `render_markdown` (line 974)
+- function: `_format_markdown_header` (line 1051)
+- function: `_format_markdown_stages` (line 1077)
+- function: `_format_markdown_timeline` (line 1100)
+- function: `_format_markdown_events` (line 1126)
+- function: `render_markdown_v2` (line 1151)
 
 ## Graph Metrics
 
 - **fan_in**: 6
 - **fan_out**: 8
-- **cycle_group**: 44
+- **cycle_group**: 45
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 9
-- recent churn 90: 9
+- recent churn 30: 10
+- recent churn 90: 10
 
 ## Usage
 
@@ -110,7 +114,7 @@ RUN_REPORT_STORE, RunReport, RunReportStore, RunReportV2, build_report, build_ru
 
 - branches: 152
 - cyclomatic: 153
-- loc: 1128
+- loc: 1194
 
 ## Doc Coverage
 

@@ -32,7 +32,7 @@ Stage-level telemetry helpers used by multi-stage retrieval pipelines.
 
 - **fan_in**: 2
 - **fan_out**: 2
-- **cycle_group**: 25
+- **cycle_group**: 27
 
 ## Ownership
 

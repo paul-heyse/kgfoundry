@@ -22,7 +22,7 @@ Heuristics for toggling RM3 pseudo-relevance feedback per query.
 
 - **fan_in**: 2
 - **fan_out**: 0
-- **cycle_group**: 21
+- **cycle_group**: 25
 
 ## Ownership
 

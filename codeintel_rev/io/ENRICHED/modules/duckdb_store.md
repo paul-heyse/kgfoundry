@@ -10,24 +10,29 @@ Utilities for loading enrichment artifacts into DuckDB.
 
 - from **__future__** import annotations
 - from **(absolute)** import json
+- from **(absolute)** import os
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
+- from **typing** import Sequence
 - from **codeintel_rev.typing** import gate_import
 
 ## Definitions
 
-- class: `DuckConn` (line 54)
-- function: `_duckdb` (line 60)
-- function: `ensure_schema` (line 71)
-- function: `ingest_modules_jsonl` (line 115)
-- function: `_load_json_rows` (line 158)
-- function: `_coerce_value` (line 176)
+- class: `DuckConn` (line 60)
+- function: `_duckdb` (line 66)
+- function: `ensure_schema` (line 77)
+- function: `ingest_modules_jsonl` (line 121)
+- function: `_load_json_rows` (line 151)
+- function: `_coerce_value` (line 169)
+- function: `_apply_pragmas` (line 178)
+- function: `_ingest_via_native_json` (line 191)
+- function: `_ingest_via_python` (line 219)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 102
+- **cycle_group**: 86
 
 ## Ownership
 
@@ -73,7 +78,7 @@ DuckConn, ensure_schema, ingest_modules_jsonl
 
 ## Hotspot
 
-- score: 1.82
+- score: 1.95
 
 ## Side Effects
 
@@ -81,9 +86,9 @@ DuckConn, ensure_schema, ingest_modules_jsonl
 
 ## Complexity
 
-- branches: 14
-- cyclomatic: 15
-- loc: 183
+- branches: 23
+- cyclomatic: 24
+- loc: 237
 
 ## Doc Coverage
 
@@ -93,6 +98,9 @@ DuckConn, ensure_schema, ingest_modules_jsonl
 - `ingest_modules_jsonl` (function): summary=yes, params=ok, examples=no — Load modules.jsonl rows into DuckDB, replacing existing paths.
 - `_load_json_rows` (function): summary=no, examples=no
 - `_coerce_value` (function): summary=no, examples=no
+- `_apply_pragmas` (function): summary=no, examples=no
+- `_ingest_via_native_json` (function): summary=no, examples=no
+- `_ingest_via_python` (function): summary=no, examples=no
 
 ## Tags
 

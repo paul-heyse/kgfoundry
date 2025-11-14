@@ -15,59 +15,63 @@ Optional OpenTelemetry bootstrap helpers.
 - from **contextlib** import AbstractContextManager, suppress
 - from **dataclasses** import dataclass
 - from **types** import ModuleType
-- from **typing** import Any, Protocol
+- from **typing** import TYPE_CHECKING, Any, Protocol, cast
 - from **codeintel_rev.observability.logs** import init_otel_logging
 - from **kgfoundry_common.logging** import get_logger
 - from **kgfoundry_common.observability** import start_span
+- from **opentelemetry.sdk.resources** import Resource
 - from **codeintel_rev.observability.flight_recorder** import install_flight_recorder
 - from **codeintel_rev.observability.metrics** import install_metrics_provider
 
 ## Definitions
 
-- variable: `LOGGER` (line 24)
-- variable: `SpanAttribute` (line 26)
-- class: `_TelemetryState` (line 29)
-- class: `SupportsState` (line 52)
-- class: `_TraceHandles` (line 59)
-- function: `_env_flag` (line 77)
-- function: `_sanitize_span_attrs` (line 107)
-- function: `_coerce_span_value` (line 116)
-- function: `_should_enable` (line 130)
-- function: `_optional_import` (line 136)
-- function: `_load_trace_modules` (line 143)
-- function: `_parse_sampler_spec` (line 170)
-- function: `_build_sampler` (line 183)
-- function: `_build_resource` (line 212)
-- function: `_merge_detected_resources` (line 247)
-- function: `_build_provider` (line 280)
-- function: `telemetry_enabled` (line 308)
-- function: `init_telemetry` (line 319)
-- function: `init_otel` (line 401)
-- function: `init_all_telemetry` (line 424)
-- function: `as_span` (line 448)
-- function: `record_span_event` (line 476)
-- function: `_current_span` (line 500)
-- function: `set_current_span_attrs` (line 513)
-- function: `_current_span_context` (line 529)
-- function: `current_trace_id` (line 542)
-- function: `current_span_id` (line 558)
-- function: `_install_logging_instrumentation` (line 574)
-- function: `instrument_fastapi` (line 590)
-- function: `instrument_httpx` (line 605)
+- variable: `LOGGER` (line 27)
+- variable: `SpanAttribute` (line 29)
+- class: `_TelemetryState` (line 32)
+- class: `SupportsState` (line 55)
+- class: `_TraceHandles` (line 62)
+- function: `_env_flag` (line 80)
+- function: `_sanitize_span_attrs` (line 110)
+- function: `_coerce_span_value` (line 119)
+- function: `_should_enable` (line 133)
+- function: `_optional_import` (line 139)
+- function: `_load_trace_modules` (line 146)
+- function: `_parse_sampler_spec` (line 173)
+- function: `_build_sampler` (line 186)
+- function: `_build_resource` (line 215)
+- function: `_merge_detected_resources` (line 250)
+- function: `_build_provider` (line 293)
+- function: `telemetry_enabled` (line 321)
+- function: `_initialize_tracing_state` (line 332)
+- function: `_initialize_metrics_provider` (line 350)
+- function: `_initialize_flight_recorder` (line 377)
+- function: `init_telemetry` (line 393)
+- function: `init_otel` (line 459)
+- function: `init_all_telemetry` (line 482)
+- function: `as_span` (line 506)
+- function: `record_span_event` (line 534)
+- function: `_current_span` (line 558)
+- function: `set_current_span_attrs` (line 571)
+- function: `_current_span_context` (line 587)
+- function: `current_trace_id` (line 600)
+- function: `current_span_id` (line 616)
+- function: `_install_logging_instrumentation` (line 632)
+- function: `instrument_fastapi` (line 646)
+- function: `instrument_httpx` (line 661)
 
 ## Graph Metrics
 
 - **fan_in**: 22
 - **fan_out**: 4
-- **cycle_group**: 14
+- **cycle_group**: 10
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 11
-- recent churn 90: 11
+- recent churn 30: 13
+- recent churn 90: 13
 
 ## Usage
 
@@ -99,7 +103,7 @@ as_span, current_span_id, current_trace_id, init_all_telemetry, init_otel, init_
 
 ## Hotspot
 
-- score: 3.26
+- score: 3.25
 
 ## Side Effects
 
@@ -107,9 +111,9 @@ as_span, current_span_id, current_trace_id, init_all_telemetry, init_otel, init_
 
 ## Complexity
 
-- branches: 102
-- cyclomatic: 103
-- loc: 633
+- branches: 101
+- cyclomatic: 102
+- loc: 689
 
 ## Doc Coverage
 

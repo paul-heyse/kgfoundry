@@ -84,8 +84,8 @@ GitPython documentation : https://gitpython.readthedocs.io/
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 10
-- recent churn 90: 10
+- recent churn 30: 11
+- recent churn 90: 11
 
 ## Usage
 

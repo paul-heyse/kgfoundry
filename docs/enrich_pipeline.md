@@ -58,6 +58,10 @@ The `all`/`run` commands execute the entire stage flow described above. Narrow c
 stages but only execute the writers relevant to that command. All options are declared on
 the Typer command functions so `--help` always reflects the current surface.
 
+Add `--dry-run` after the command name to validate discovery/ingest/analytics without
+emitting artifacts. The CLI still logs stage timings and counts, but no files are written
+under `--out`.
+
 To materialize the `modules.jsonl` data into DuckDB for downstream SQL analysis:
 
 ```bash
@@ -76,6 +80,7 @@ Key options:
 | `--pyrefly-json PATH` | Optional Pyrefly JSON/JSONL report used in the type-signal stage. |
 | `--tags-yaml PATH` | Optional YAML rules to override default tagging heuristics. |
 | `--max-file-bytes N` | Skip files larger than `N` bytes but record a structured error. |
+| `--dry-run` | Execute all non-writer stages and print counts without writing artifacts. |
 
 ## Outputs
 
@@ -100,6 +105,11 @@ idempotent — re-running the CLI overwrites previous results with the same file
 All writers fall back to JSONL when optional dependencies (PyArrow, DuckDB) are missing,
 keeping the pipeline runnable on minimal hosts.
 
+When PyArrow is available the Parquet writers use `pyarrow.dataset.write_dataset` with
+ZSTD compression and dictionary encoding for string-heavy columns (paths, tags, owners).
+Partitioned datasets (e.g., slice indices) are organized with Hive-style directories so
+DuckDB predicates prune files efficiently.
+
 ## Failure handling & observability
 
 - Every stage logs `stage=<name> event=start|finish` with counts and duration (in seconds).
@@ -112,3 +122,19 @@ keeping the pipeline runnable on minimal hosts.
 
 For troubleshooting, rerun with `LOG_LEVEL=DEBUG` to see both start and finish events for
 each stage, then inspect the `errors` list on the affected module rows.
+
+## Rollout toggles & operator overrides
+
+The following environment variables can be set before invoking the CLI to revert or tune
+specific stages:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `ENRICH_JSONL_WRITER` | `v2` | Set to `v1` to fall back to the previous text-mode JSONL writer. |
+| `USE_TS_QUERY` | `1` | Set to `0` to disable Tree-sitter query captures and use the DFS fallback. |
+| `USE_DUCKDB_JSON` | `1` | Set to `0` to revert to the Python JSON ingestion path for DuckDB. |
+| `DUCKDB_PRAGMAS` | *(blank)* | Comma-separated list of `name=value` pairs forwarded as PRAGMAs before ingestion. |
+
+All toggles are evaluated per process, so operators can export them in their shell or pass
+them inline (e.g., `USE_DUCKDB_JSON=0 codeintel-enrich to-duckdb ...`) when performing
+rolling upgrades.

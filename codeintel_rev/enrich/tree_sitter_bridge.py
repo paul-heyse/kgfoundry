@@ -5,11 +5,13 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import logging
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from tree_sitter import Language, Node, Parser
+from tree_sitter import Language, Node, Parser, Query
 
 _languages_spec = importlib.util.find_spec("tree_sitter_languages")
 if _languages_spec is not None:  # pragma: no cover
@@ -24,7 +26,18 @@ except ImportError:  # pragma: no cover
     _python_language = None
 
 
-def _lang_for_ext(ext: str) -> Language | None:
+LOGGER = logging.getLogger(__name__)
+_USE_TS_QUERY = os.getenv("USE_TS_QUERY", "1") not in {"0", "false", "False"}
+_OUTLINE_QUERY_PATTERNS: dict[str, str] = {
+    "python": """
+        (function_definition name: (identifier) @name) @func
+        (class_definition name: (identifier) @name) @class
+    """,
+}
+_OUTLINE_QUERY_CACHE: dict[str, Query | None] = {}
+
+
+def _lang_for_ext(ext: str) -> tuple[str, Language] | None:
     """Resolve a Tree-sitter language for ``ext``.
 
     Parameters
@@ -35,8 +48,8 @@ def _lang_for_ext(ext: str) -> Language | None:
 
     Returns
     -------
-    Language | None
-        Tree-sitter language object when available, or None if no language
+    tuple[str, Language] | None
+        Language name paired with the Tree-sitter language object when available, or None if no language
         binding exists for the extension.
     """
     normalized = ext.lower()
@@ -53,11 +66,11 @@ def _lang_for_ext(ext: str) -> Language | None:
         if target:
             language_obj = _get_language(target)
             if isinstance(language_obj, Language):
-                return language_obj
+                return target, language_obj
     if normalized == ".py" and _python_language is not None:
         language_obj = _python_language()
         if isinstance(language_obj, Language):
-            return language_obj
+            return "python", language_obj
     return None
 
 
@@ -98,36 +111,20 @@ def build_outline(path: str | Path, content: bytes) -> TSOutline | None:
         function and class definitions with byte offsets. Returns None
         if no language binding is available for the file extension.
     """
-    language = _lang_for_ext(Path(path).suffix)
-    if language is None:
+    lang_info = _lang_for_ext(Path(path).suffix)
+    if lang_info is None:
         return None
+    language_name, language = lang_info
     parser: Any = Parser()
     parser.set_language(language)
     tree = parser.parse(content)
 
-    outline = TSOutline(language=str(language))
-    cursor = tree.walk()
-    current_node = getattr(cursor, "node", None)
-    if current_node is None:
-        return outline
-    stack = [current_node]
-    while stack:
-        node = stack.pop()
-        if node is None:
-            continue
-        node_type = getattr(node, "type", "")
-        if node_type in {"function_definition", "class_definition"}:
-            outline.nodes.append(
-                OutlineNode(
-                    kind=node_type,
-                    name=_extract_identifier(content, node),
-                    start_byte=getattr(node, "start_byte", 0),
-                    end_byte=getattr(node, "end_byte", 0),
-                )
-            )
-        children = list(getattr(node, "children", [])) if hasattr(node, "children") else []
-        stack.extend(reversed(children))
-    return outline
+    nodes: list[OutlineNode] = []
+    if _USE_TS_QUERY:
+        nodes = _outline_with_query(language_name, language, tree, content)
+    if not nodes:
+        nodes = _outline_with_dfs(tree.root_node, content)
+    return TSOutline(language=language_name, nodes=nodes)
 
 
 def _extract_identifier(content: bytes, node: Node | None) -> str:
@@ -154,3 +151,81 @@ def _extract_identifier(content: bytes, node: Node | None) -> str:
             end = getattr(child, "end_byte", start)
             return content[start:end].decode("utf-8", "ignore")
     return ""
+
+
+def _outline_with_query(
+    language_name: str,
+    language: Language,
+    tree: Any,
+    content: bytes,
+) -> list[OutlineNode]:
+    query = _get_outline_query(language_name, language)
+    if query is None:
+        return []
+    captures = query.captures(tree.root_node)
+    name_by_def: dict[int, str] = {}
+    def_nodes: list[tuple[str, Node]] = []
+    for capture_node, capture_name in captures:
+        if capture_name == "name":
+            parent = getattr(capture_node, "parent", None)
+            if parent is not None:
+                name_by_def[parent.id] = _node_text(content, capture_node)
+        elif capture_name in {"func", "class"}:
+            def_nodes.append((capture_name, capture_node))
+    outline_nodes: list[OutlineNode] = []
+    for capture_name, node in def_nodes:
+        name = name_by_def.get(node.id) or _extract_identifier(content, node)
+        outline_nodes.append(
+            OutlineNode(
+                kind="function_definition" if capture_name == "func" else "class_definition",
+                name=name,
+                start_byte=getattr(node, "start_byte", 0),
+                end_byte=getattr(node, "end_byte", 0),
+            )
+        )
+    return outline_nodes
+
+
+def _outline_with_dfs(root_node: Node | None, content: bytes) -> list[OutlineNode]:
+    if root_node is None:
+        return []
+    nodes: list[OutlineNode] = []
+    stack = [root_node]
+    while stack:
+        node = stack.pop()
+        node_type = getattr(node, "type", "")
+        if node_type in {"function_definition", "class_definition"}:
+            nodes.append(
+                OutlineNode(
+                    kind=node_type,
+                    name=_extract_identifier(content, node),
+                    start_byte=getattr(node, "start_byte", 0),
+                    end_byte=getattr(node, "end_byte", 0),
+                )
+            )
+        children = list(getattr(node, "children", [])) if hasattr(node, "children") else []
+        stack.extend(reversed(children))
+    return nodes
+
+
+def _get_outline_query(language_name: str, language: Language) -> Query | None:
+    if language_name in _OUTLINE_QUERY_CACHE:
+        return _OUTLINE_QUERY_CACHE[language_name]
+    pattern = _OUTLINE_QUERY_PATTERNS.get(language_name)
+    if not pattern:
+        _OUTLINE_QUERY_CACHE[language_name] = None
+        return None
+    try:
+        query = language.query(pattern)
+    except Exception as exc:  # pragma: no cover - query compilation failures are rare
+        LOGGER.debug("Tree-sitter query compile failed for %s: %s", language_name, exc)
+        _OUTLINE_QUERY_CACHE[language_name] = None
+        return None
+    _OUTLINE_QUERY_CACHE[language_name] = query
+    return query
+
+
+def _node_text(content: bytes, node: Node) -> str:
+    return content[getattr(node, "start_byte", 0) : getattr(node, "end_byte", 0)].decode(
+        "utf-8", "ignore"
+    )

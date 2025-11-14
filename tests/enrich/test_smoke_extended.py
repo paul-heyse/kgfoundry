@@ -204,6 +204,9 @@ def test_cli_enrich_emits_extended_artifacts(tmp_path: Path) -> None:
 
     slices_dir = out_dir / "slices"
     assert (slices_dir / "index.parquet").exists()
+    dataset_dir = slices_dir / "index_dataset"
+    if dataset_dir.exists():
+        assert any(dataset_dir.rglob("*.parquet"))
     slices_jsonl = slices_dir / "slices.jsonl"
     assert slices_jsonl.exists()
     slice_records = _read_jsonl(slices_jsonl)

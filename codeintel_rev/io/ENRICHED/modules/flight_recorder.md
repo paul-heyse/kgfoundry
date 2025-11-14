@@ -13,7 +13,7 @@ Trace-anchored flight recorder that mirrors run execution timelines.
 - from **(absolute)** import os
 - from **(absolute)** import threading
 - from **collections.abc** import Iterable, Mapping, Sequence
-- from **dataclasses** import dataclass, field
+- from **dataclasses** import dataclass, field, replace
 - from **datetime** import UTC, datetime
 - from **pathlib** import Path
 - from **typing** import Any, cast
@@ -32,31 +32,31 @@ Trace-anchored flight recorder that mirrors run execution timelines.
 - function: `build_report_uri` (line 106)
 - class: `_RunBuffer` (line 140)
 - class: `_FlightRecorder` (line 152)
-- class: `FlightRecorderSpanProcessor` (line 252)
-- function: `install_flight_recorder` (line 290)
-- function: `_trace_id` (line 310)
-- function: `_span_id` (line 320)
-- function: `_update_identities` (line 330)
-- function: `_update_status` (line 340)
-- function: `_is_root_span` (line 354)
-- function: `_build_event` (line 362)
-- function: `build_event_summary` (line 391)
-- function: `_convert_span_events` (line 432)
-- function: `_ts` (line 446)
+- class: `FlightRecorderSpanProcessor` (line 261)
+- function: `install_flight_recorder` (line 299)
+- function: `_trace_id` (line 319)
+- function: `_span_id` (line 329)
+- function: `_update_identities` (line 339)
+- function: `_update_status` (line 367)
+- function: `_is_root_span` (line 408)
+- function: `_build_event` (line 416)
+- function: `build_event_summary` (line 445)
+- function: `_convert_span_events` (line 486)
+- function: `_ts` (line 500)
 
 ## Graph Metrics
 
 - **fan_in**: 3
 - **fan_out**: 2
-- **cycle_group**: 13
+- **cycle_group**: 7
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 5
-- recent churn 90: 5
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 
@@ -84,7 +84,7 @@ Trace-anchored flight recorder that mirrors run execution timelines.
 
 ## Hotspot
 
-- score: 2.55
+- score: 2.58
 
 ## Side Effects
 
@@ -92,9 +92,9 @@ Trace-anchored flight recorder that mirrors run execution timelines.
 
 ## Complexity
 
-- branches: 72
-- cyclomatic: 73
-- loc: 451
+- branches: 80
+- cyclomatic: 81
+- loc: 505
 
 ## Doc Coverage
 
