@@ -83,6 +83,8 @@ def _empty_table() -> pa.Table:
             pa.array([], type=pa.int64()),
             pa.array([], type=pa.float32()),
             pa.array([], type=pa.string()),
+            pa.array([], type=pa.list_(pa.string())),
+            pa.array([], type=pa.string()),
         ],
         names=[
             "query_id",
@@ -90,6 +92,8 @@ def _empty_table() -> pa.Table:
             "rank",
             "id",
             "score",
+            "uri",
+            "symbol_hits",
             "meta",
         ],
     )
@@ -168,10 +172,22 @@ def write_pool(rows: Iterable[SearchPoolRow], out_path: Path, *, overwrite: bool
         pq.write_table(_empty_table(), out_path, compression="zstd")
         return 0
 
-    meta_payloads = [
-        json.dumps(_normalize_meta(row.meta), sort_keys=True) if row.meta else "{}"
+    normalized_meta = [
+        _normalize_meta(row.meta) if row.meta else {}
         for row in materialized
     ]
+    meta_payloads = [json.dumps(meta, sort_keys=True) if meta else "{}" for meta in normalized_meta]
+    uris: list[str] = []
+    symbol_hits: list[list[str]] = []
+    for meta in normalized_meta:
+        uri = str(meta.get("uri", ""))
+        hits = meta.get("symbol_hits", [])
+        if isinstance(hits, list):
+            coerced_hits = [str(item) for item in hits]
+        else:
+            coerced_hits = [str(hits)] if hits not in (None, "") else []
+        uris.append(uri)
+        symbol_hits.append(coerced_hits)
     table = pa.Table.from_arrays(
         [
             pa.array([row.query_id for row in materialized], type=pa.string()),
@@ -179,6 +195,8 @@ def write_pool(rows: Iterable[SearchPoolRow], out_path: Path, *, overwrite: bool
             pa.array([int(row.rank) for row in materialized], type=pa.int32()),
             pa.array([int(row.id) for row in materialized], type=pa.int64()),
             pa.array([float(row.score) for row in materialized], type=pa.float32()),
+            pa.array(uris, type=pa.string()),
+            pa.array(symbol_hits, type=pa.list_(pa.string())),
             pa.array(meta_payloads, type=pa.string()),
         ],
         names=[
@@ -187,6 +205,8 @@ def write_pool(rows: Iterable[SearchPoolRow], out_path: Path, *, overwrite: bool
             "rank",
             "id",
             "score",
+            "uri",
+            "symbol_hits",
             "meta",
         ],
     )

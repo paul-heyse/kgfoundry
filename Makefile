@@ -1,5 +1,5 @@
 UV ?= uv
-EDGE_MODE ?= nginx-terminate
+MCP_EDGE_MODE ?= edge-terminate
 HYPERCORN_CONFIG ?= ops/hypercorn.toml
 HYPERCORN_CERT_FILE ?= /etc/ssl/live/mcp.example.com/fullchain.pem
 HYPERCORN_KEY_FILE ?= /etc/ssl/live/mcp.example.com/privkey.pem
@@ -28,7 +28,7 @@ dev-down:
 	- pkill -f "codeintel_rev.app.main:asgi" >/dev/null 2>&1 || true
 
 run-hypercorn:
-	EDGE_MODE=$(EDGE_MODE) \
+	MCP_EDGE_MODE=$(MCP_EDGE_MODE) \
 	HYPERCORN_CONFIG=$(HYPERCORN_CONFIG) \
 	HYPERCORN_CERT_FILE=$(HYPERCORN_CERT_FILE) \
 	HYPERCORN_KEY_FILE=$(HYPERCORN_KEY_FILE) \
@@ -49,13 +49,15 @@ logs-nginx:
 install-systemd:
 	sudo install -D -m0755 ops/scripts/run_hypercorn.sh /opt/app/ops/scripts/run_hypercorn.sh
 	sudo install -D -m0644 ops/systemd/hypercorn.service /etc/systemd/system/hypercorn.service
+	sudo install -D -m0644 ops/systemd/nginx-reload.service /etc/systemd/system/nginx-reload.service
+	sudo install -D -m0644 ops/systemd/nginx-reload.timer /etc/systemd/system/nginx-reload.timer
 	sudo install -D -m0644 ops/systemd/nginx-pass-through.target /etc/systemd/system/nginx-pass-through.target
 	sudo systemctl daemon-reload
 	sudo systemctl enable --now $(APP_SERVICE)
 
-smoke-h3:
-	bash ops/scripts/smoke_h3.sh $(SMOKE_HOST)
+verify-h3:
+	bash ops/scripts/verify_h3.sh $(SMOKE_HOST)
 
-verify-h3: smoke-h3
+smoke-h3: verify-h3
 
 ci: format lint types test

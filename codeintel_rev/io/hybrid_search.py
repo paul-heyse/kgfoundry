@@ -152,9 +152,8 @@ class BM25SearchProvider:
 
         Raises
         ------
-        Exception
-            Any exception raised by the underlying Pyserini searcher is re-raised
-            after emitting a failed step event for observability.
+        RuntimeError
+            Raised when the underlying Pyserini searcher fails.
         """
         if top_k <= 0:
             emit_step(
@@ -182,7 +181,8 @@ class BM25SearchProvider:
                     payload={"top_k": top_k, "rm3": use_rm3},
                 )
             )
-            raise
+            msg = "BM25 search failed"
+            raise RuntimeError(msg) from exc
         duration_ms = int((perf_counter() - start) * 1000)
         results = [
             SearchHit(
@@ -314,9 +314,8 @@ class SpladeSearchProvider:
 
         Raises
         ------
-        Exception
-            Any exception raised by the SPLADE encoder or Lucene impact searcher
-            is re-raised after emitting a failed step event for observability.
+        RuntimeError
+            Raised when the SPLADE encoder or impact searcher fails.
         """
         if top_k <= 0:
             emit_step(
@@ -374,7 +373,8 @@ class SpladeSearchProvider:
                     payload={"top_k": top_k},
                 )
             )
-            raise
+            msg = "SPLADE search failed"
+            raise RuntimeError(msg) from exc
         duration_ms = int((perf_counter() - start) * 1000)
         results = [
             SearchHit(

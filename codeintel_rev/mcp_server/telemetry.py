@@ -104,7 +104,7 @@ def tool_operation_scope(
         tool_name=tool_name,
     ):
         timing_start = time.perf_counter()
-        otel_attrs = {
+        otel_attrs: dict[str, object] = {
             Attrs.MCP_TOOL: tool_name,
             Attrs.MCP_SESSION_ID: timeline.session_id or "",
             Attrs.MCP_RUN_ID: timeline.run_id,

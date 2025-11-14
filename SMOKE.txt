@@ -1,4 +1,4 @@
-bash ops/scripts/smoke_h3.sh https://example.com
+bash ops/scripts/verify_h3.sh https://example.com
 HTTP/3 404 
 accept-ranges: bytes
 content-type: text/html

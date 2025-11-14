@@ -9,6 +9,7 @@ chunk retrieval and joins.
 from __future__ import annotations
 
 import hashlib
+from glob import glob
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
@@ -30,7 +31,7 @@ from codeintel_rev.mcp_server.scope_utils import (
 )
 from codeintel_rev.observability.otel import record_span_event
 from codeintel_rev.observability.semantic_conventions import Attrs
-from codeintel_rev.observability.timeline import current_timeline
+from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.telemetry.decorators import span_context
 from codeintel_rev.telemetry.otel_metrics import build_histogram
 from codeintel_rev.telemetry.steps import StepEvent, emit_step
@@ -55,6 +56,16 @@ class IdMapMeta:
     parquet_hash: str
     row_count: int
     refreshed: bool
+
+
+@dataclass(slots=True)
+class _ScopeFilterLogInfo:
+    """Container for scope filter logging inputs."""
+
+    include_globs: list[str] | None
+    exclude_globs: list[str] | None
+    languages: list[str] | None
+    requested: int | None
 
 
 def _log_extra(**kwargs: object) -> dict[str, object]:
@@ -819,12 +830,22 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             return
 
         if _relation_exists(conn, "faiss_idmap_mat"):
+            columns = {
+                row[1]
+                for row in conn.execute("PRAGMA table_info('faiss_idmap_mat')").fetchall()
+            }
+            if "chunk_id" in columns:
+                external_expr = "chunk_id"
+            elif "external_id" in columns:
+                external_expr = "external_id"
+            else:
+                external_expr = "NULL"
             conn.execute(
-                """
+                f"""
                 CREATE OR REPLACE VIEW faiss_idmap AS
                 SELECT
                     faiss_row,
-                    external_id
+                    {external_expr} AS external_id
                 FROM faiss_idmap_mat
                 """
             )
@@ -1174,13 +1195,16 @@ class DuckDBCatalog(_DuckDBQueryMixin):
 
         duration = max(perf_counter() - perf_start, 0.0)
         _hydration_duration_seconds.labels(op="chunks_by_filters").observe(duration)
+        context = _ScopeFilterLogInfo(
+            include_globs=include_globs,
+            exclude_globs=exclude_globs,
+            languages=languages,
+            requested=len(ids),
+        )
         self._log_scope_filter_results(
-            include_globs,
-            exclude_globs,
-            languages,
+            context,
             results,
             timeline=current_timeline(),
-            requested=len(ids),
             duration=duration,
         )
         return results
@@ -1349,6 +1373,44 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         filter_type = self._determine_filter_type(include_globs, exclude_globs, languages)
         with suppress(ValueError):
             _scope_filter_duration_seconds.labels(filter_type=filter_type).observe(duration)
+
+    @staticmethod
+    def _log_scope_filter_results(
+        info: _ScopeFilterLogInfo,
+        results: Sequence[Mapping[str, object]],
+        *,
+        timeline: Timeline | None,
+        duration: float,
+    ) -> None:
+        """Emit structured logs and timeline events for scope filtering outcomes."""
+        returned = len(results)
+        requested = info.requested or 0
+        missing = max(0, requested - returned)
+        include_globs = info.include_globs or []
+        exclude_globs = info.exclude_globs or []
+        languages = info.languages or []
+        extras = _log_extra(
+            include_globs=include_globs,
+            exclude_globs=exclude_globs,
+            languages=languages,
+            returned=returned,
+            missing=missing,
+            duration_ms=round(duration * 1000, 2),
+        )
+        LOGGER.info("Scope filter hydration completed", extra=extras)
+        if timeline is not None:
+            timeline.event(
+                "duckdb.scope_filter",
+                "catalog",
+                attrs={
+                    "include_globs": include_globs,
+                    "exclude_globs": exclude_globs,
+                    "languages": languages,
+                    "returned": returned,
+                    "missing": missing,
+                    "duration_ms": round(duration * 1000, 2),
+                },
+            )
 
     @staticmethod
     def _determine_filter_type(
@@ -1773,9 +1835,25 @@ def ensure_faiss_idmap_view(
     conn.sql("SELECT * FROM read_parquet(?)", params=[idmap_parquet]).create_view(
         "v_faiss_idmap", replace=True
     )
-    conn.sql("SELECT * FROM read_parquet(?)", params=[chunks_parquet]).create_view(
-        "v_chunks", replace=True
-    )
+    chunk_files = glob(chunks_parquet, recursive=True)
+    if chunk_files:
+        conn.sql("SELECT * FROM read_parquet(?)", params=[chunks_parquet]).create_view(
+            "v_chunks", replace=True
+        )
+    else:
+        conn.execute(
+            """
+            CREATE OR REPLACE VIEW v_chunks AS
+            SELECT
+                CAST(NULL AS BIGINT) AS id,
+                CAST(NULL AS VARCHAR) AS uri,
+                CAST(NULL AS INTEGER) AS start_line,
+                CAST(NULL AS INTEGER) AS end_line,
+                CAST(NULL AS VARCHAR) AS language,
+                CAST(NULL AS VARCHAR) AS text
+            WHERE 1 = 0
+            """
+        )
     conn.execute(
         """
         CREATE OR REPLACE VIEW v_faiss_join AS

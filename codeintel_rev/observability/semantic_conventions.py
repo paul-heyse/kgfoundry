@@ -20,6 +20,7 @@ class Attrs:
     COMPONENT: str = "component"
     OPERATION: str = "operation"
     STAGE: str = "stage"
+    REQUEST_STAGE: str = "request.stage"
     WARN_DEGRADED: str = "warn.degraded"
     FALLBACK_REASON: str = "fallback.reason"
     FALLBACK_TARGET: str = "fallback.target"
@@ -28,9 +29,11 @@ class Attrs:
     QUERY_TEXT: str = "retrieval.query_text"
     QUERY_LEN: str = "retrieval.query_len"
     RETRIEVAL_TOP_K: str = "retrieval.top_k"
+    TOP_K: str = RETRIEVAL_TOP_K
     RETRIEVAL_CHANNELS: str = "retrieval.channels"
     RETRIEVAL_RRF_K: str = "retrieval.rrf_k"
     RETRIEVAL_EXPLAINABILITY: str = "retrieval.explainability"
+    CHANNEL_DEPTHS: str = "retrieval.channel_depths"
 
     # Budget + gating metadata
     BUDGET_MS: str = "budget.ms"

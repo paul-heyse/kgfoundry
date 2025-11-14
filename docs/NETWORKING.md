@@ -9,22 +9,24 @@ audited alongside the application.
 
 | Mode | Files | When to pick it | Notes |
 | ---- | ----- | --------------- | ----- |
-| **Topology A** – HTTP/3 terminates at NGINX | `ops/nginx/h3_terminating.conf`, `ops/hypercorn/hypercorn.toml` (default) | Preferred for most deployments; keeps TLS/H3 at the edge, uses HTTP/1.1 to Hypercorn | All L7 features available: rate limiting, header shaping, ACME webroot, buffering control. Hypercorn listens on `127.0.0.1:8080`. |
-| **Topology B** – Layer 4 pass-through (end-to-end H3) | `ops/nginx/h3_passthrough.conf`, uncomment `bind/quic_bind/certfile` in `ops/hypercorn/hypercorn.toml` | When you need literal QUIC all the way to Python or want to skip NGINX buffering entirely | NGINX only proxies TCP/UDP. Hypercorn terminates TLS/QUIC and must reload when certificates change. |
+| **Topology A** – HTTP/3 terminates at NGINX | `ops/nginx/mcp_edge_terminate.conf`, `ops/hypercorn.toml` (default) | Preferred for most deployments; keeps TLS/H3 at the edge, uses HTTP/1.1 to Hypercorn | All L7 features available: rate limiting, header shaping, ACME webroot, buffering control. Hypercorn listens on `127.0.0.1:8000`. |
+| **Topology B** – Layer 4 pass-through (end-to-end H3) | `ops/nginx/mcp_e2e_h3_stream.conf`, override bind/quic_bind/certfile via `MCP_EDGE_MODE=e2e-h3` | When you need literal QUIC all the way to Hypercorn or want to skip NGINX buffering entirely | NGINX only proxies TCP/UDP. Hypercorn terminates TLS/QUIC and must reload when certificates change. |
 
 Switching between modes is mechanical: swap the included NGINX file and flip
-the bind block inside `ops/hypercorn/hypercorn.toml`.
+the bind block inside `ops/hypercorn.toml`.
 
 ## File layout
 
 ```
 ops/
   nginx/
-    h3_terminating.conf     # L7 termination, streaming-friendly proxy
-    h3_passthrough.conf     # L4 pass-through for QUIC end-to-end
-  hypercorn/hypercorn.toml  # Workers, Alt-Svc, QUIC/TLS toggles
+    mcp_edge_terminate.conf   # L7 termination, streaming-friendly proxy
+    mcp_e2e_h3_stream.conf    # L4 pass-through for QUIC end-to-end
+  hypercorn.toml              # Workers, Alt-Svc, QUIC/TLS toggles
   systemd/
     hypercorn-codeintel.service
+    nginx-reload.service
+    nginx-reload.timer
     nginx.service.d/override.conf
   certbot/renewal-hook.sh   # Post-renewal hook (reload nginx + Hypercorn if needed)
 ```
@@ -43,7 +45,7 @@ and wraps the exported ASGI object with Hypercorn's `ProxyFixMiddleware`.
    ```
 
 3. Place the desired NGINX file under `/etc/nginx/conf.d/` (Topology A) or add
-   `include /opt/codeintel_rev/ops/nginx/h3_passthrough.conf;` inside the
+   `include /opt/codeintel_rev/ops/nginx/mcp_e2e_h3_stream.conf;` inside the
    `stream {}` block (Topology B). Run `nginx -t && sudo systemctl reload nginx`.
 4. For HTTPS, issue certificates via Certbot (webroot under
    `/var/www/codeintel_rev/acme`) and symlink `ops/certbot/renewal-hook.sh` into
@@ -51,19 +53,28 @@ and wraps the exported ASGI object with Hypercorn's `ProxyFixMiddleware`.
 5. Start Hypercorn:
 
    ```bash
-   make run-hypercorn        # local dev
+   MCP_EDGE_MODE=edge-terminate make run-hypercorn
    sudo systemctl start hypercorn-codeintel.service
+   ```
+
+6. (Optional) Enable the zero-downtime nginx reload timer. It runs the
+   validation script defined in `ops/systemd/nginx-reload.service` every
+   30 minutes:
+
+   ```bash
+   sudo systemctl enable --now nginx-reload.timer
    ```
 
 ## Verification workflow
 
 1. **Health** – `curl https://mcp.example.com/readyz` should return JSON with
-   `"ready": true`. The new `tests/app/test_networking_endpoints.py` ensures the
+   `"ready": true`. The new `tests/test_networking_mounts.py` ensures the
    route continues to respond even when proxied.
 2. **Capabilities** – `curl https://mcp.example.com/capz?refresh=true` should
    return a fresh capability snapshot plus a `stamp`.
 3. **Streaming** – `curl -N https://mcp.example.com/sse` produces events with
-   `X-Accel-Buffering: no` thanks to middleware covered by tests.
+   `X-Accel-Buffering: no` thanks to middleware covered by
+   `tests/test_streaming_through_proxy_headers.py`.
 4. **HTTP/3** – run `make verify-h3` (uses `curl --http3-only`). In browsers,
    open DevTools → Network → Protocol column; after a refresh it should read `h3`.
    Remember that Alt-Svc requires one successful TCP request before the browser
@@ -74,7 +85,7 @@ and wraps the exported ASGI object with Hypercorn's `ProxyFixMiddleware`.
 * NGINX config contains commented `limit_req` / `limit_conn` zones. Enable them
   when the service is internet-facing and tune burst limits per environment.
 * Hypercorn `keep_alive_timeout`, `ssl_handshake_timeout`, and
-  `h2_max_concurrent_streams` are pinned in `ops/hypercorn/hypercorn.toml`
+  `h2_max_concurrent_streams` are pinned in `ops/hypercorn.toml`
   to mitigate idle-socket DoS attempts.
 * `codeintel_rev/app/main.py` installs `TrustedHostMiddleware` (configurable via
   `CODEINTEL_SERVER_ALLOWED_HOSTS`) and wraps the ASGI app with
@@ -114,7 +125,7 @@ sync.
 | `curl --http3-only` hangs | UDP/443 blocked or Alt-Svc missing | Open UDP 443 on firewalls, reload nginx, ensure `add_header Alt-Svc 'h3=":443"; ma=86400' always;` is present. |
 | `/readyz` returns `503` via proxy | FastAPI app could not initialize, or Hypercorn not running | Check `journalctl -u hypercorn-codeintel`, confirm `make run-hypercorn` works, ensure `.env` settings valid. |
 | Browser sticks to `h2` | First TCP request cached, Alt-Svc stale | Hard refresh (Ctrl+Shift+R), lower `ma` in Alt-Svc, or publish HTTPS/SVCB DNS records. |
-| Streaming stalls mid-response | Proxy buffering accidentally enabled | Verify `proxy_buffering off` in `h3_terminating.conf` and that the app is still setting `X-Accel-Buffering: no`. |
+| Streaming stalls mid-response | Proxy buffering accidentally enabled | Verify `proxy_buffering off` in `mcp_edge_terminate.conf` and that the app is still setting `X-Accel-Buffering: no`. |
 | Certbot renewals succeed but Hypercorn still serves old certs | Hypercorn operates in Topology B but hook not installed | Install `ops/certbot/renewal-hook.sh` or set `FORCE_HYPERCORN_RELOAD=1` before running `certbot renew`. |
 
 All commands referenced above are encapsulated in the root `Makefile` so the

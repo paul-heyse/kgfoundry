@@ -1,0 +1,9 @@
+[Unit]
+Description=Validate and reload nginx configuration
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/codeintel_rev
+ExecStart=/usr/bin/env bash ops/scripts/reload_nginx.sh

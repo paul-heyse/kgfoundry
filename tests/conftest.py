@@ -10,6 +10,7 @@ This module provides reusable fixtures for:
 
 from __future__ import annotations
 
+import asyncio
 import importlib.util
 import json
 import logging
@@ -23,16 +24,11 @@ from types import ModuleType
 from typing import TYPE_CHECKING, Any, ParamSpec, Protocol, TypeVar, cast
 
 import pytest
+from fastapi import FastAPI
 from prometheus_client.registry import CollectorRegistry
 
-from tests.bootstrap import ensure_src_path
-
-# Import for side effects: registers FAISS stub early
-
-# Ensure src path is available before importing kgfoundry_common modules
-# Note: ensure_src_path() is idempotent and already called by importing tests.bootstrap,
-# but we call it explicitly here for clarity and to ensure it runs before lazy imports
-ensure_src_path()
+import tests.bootstrap  # noqa: F401
+from tests.app._context_factory import build_application_context
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator, Sequence
@@ -196,6 +192,81 @@ class MetricSample(Protocol):
     """
 
     value: float
+
+
+@fixture(name="networking_test_app")
+def _networking_test_app(tmp_path, monkeypatch: pytest.MonkeyPatch) -> FastAPI:
+    """Return a FastAPI app exposing readiness, capability, and SSE routes.
+
+    The fixture mirrors the production routes but swaps heavy dependencies for
+    lightweight stubs so HTTPX-based tests can exercise streaming and
+    capability refresh logic without touching FAISS or GPU runtimes.
+
+    Returns
+    -------
+    FastAPI
+        Test application wired with readiness and capability endpoints.
+    """
+    from codeintel_rev.app.capabilities import Capabilities
+    from codeintel_rev.app.main import capz, disable_nginx_buffering, readyz, sse_demo
+
+    class _FakeReadinessResult:
+        def __init__(self, *, healthy: bool = True, detail: str = "ok") -> None:
+            self.healthy = healthy
+            self._detail = detail
+
+        def as_payload(self) -> dict[str, object]:
+            return {"healthy": self.healthy, "detail": self._detail}
+
+    class _FakeReadinessProbe:
+        async def refresh(self) -> dict[str, _FakeReadinessResult]:
+            await asyncio.sleep(0)
+            return {"faiss": _FakeReadinessResult()}
+
+    ctx = build_application_context(tmp_path)
+    app = FastAPI()
+    app.state.context = ctx
+    app.state.readiness = _FakeReadinessProbe()
+
+    initial_caps = Capabilities(
+        faiss_index=True,
+        duckdb=True,
+        scip_index=True,
+        vllm_client=True,
+    )
+    app.state.capabilities = initial_caps
+    app.state.capability_stamp = initial_caps.stamp()
+
+    refreshed_caps = Capabilities(
+        faiss_index=False,
+        duckdb=False,
+        scip_index=False,
+        vllm_client=False,
+        faiss_importable=False,
+        duckdb_importable=False,
+        torch_importable=False,
+        onnxruntime_importable=False,
+        versions_available=2,
+        active_index_version="v2",
+    )
+
+    def _fake_from_context(
+        _cls: type[Capabilities],
+        _context: object,
+    ) -> Capabilities:
+        return refreshed_caps
+
+    monkeypatch.setattr(
+        Capabilities,
+        "from_context",
+        classmethod(_fake_from_context),
+    )
+
+    app.add_api_route("/readyz", readyz)
+    app.add_api_route("/capz", capz)
+    app.add_api_route("/sse", sse_demo)
+    app.middleware("http")(disable_nginx_buffering)
+    return app
 
 
 class MetricFamily(Protocol):

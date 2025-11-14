@@ -136,7 +136,7 @@ def build_report_uri(
     return str(_report_path(session_id, run_id, trace_id, started_ns, ensure_parent=False))
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class _RunBuffer:
     session_id: str | None = None
     run_id: str | None = None

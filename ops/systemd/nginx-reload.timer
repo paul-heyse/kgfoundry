@@ -1,0 +1,10 @@
+[Unit]
+Description=Periodic nginx reload (syntax check + reload)
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=30min
+Unit=nginx-reload.service
+
+[Install]
+WantedBy=timers.target

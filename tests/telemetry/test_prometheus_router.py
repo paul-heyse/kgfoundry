@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import types
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -19,12 +20,13 @@ if "codeintel_rev.runtime.cells" not in sys.modules:
 
     class _StubCloseResult: ...
 
-    stub.RuntimeCell = _StubCell
-    stub.RuntimeCellObserver = _StubObserver
-    stub.NullRuntimeCellObserver = _StubObserver
-    stub.RuntimeCellInitContext = _StubInitContext
-    stub.RuntimeCellInitResult = _StubInitResult
-    stub.RuntimeCellCloseResult = _StubCloseResult
+    stub_typed: Any = stub
+    stub_typed.RuntimeCell = _StubCell
+    stub_typed.RuntimeCellObserver = _StubObserver
+    stub_typed.NullRuntimeCellObserver = _StubObserver
+    stub_typed.RuntimeCellInitContext = _StubInitContext
+    stub_typed.RuntimeCellInitResult = _StubInitResult
+    stub_typed.RuntimeCellCloseResult = _StubCloseResult
     sys.modules["codeintel_rev.runtime.cells"] = stub
 
 from codeintel_rev.telemetry.prom import build_metrics_router

@@ -5,9 +5,11 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from threading import Lock
+from typing import cast
 
 from opentelemetry import metrics
-from opentelemetry.metrics import CallbackOptions, Observation
+from opentelemetry.metrics import CallbackOptions, Counter, Histogram, Observation
+from opentelemetry.util.types import Attributes
 
 __all__ = [
     "CounterLike",
@@ -26,9 +28,9 @@ class CounterHandle:
 
     __slots__ = ("_attributes", "_instrument")
 
-    def __init__(self, instrument: object, attributes: Mapping[str, object]) -> None:
+    def __init__(self, instrument: Counter, attributes: Mapping[str, object]) -> None:
         self._instrument = instrument
-        self._attributes = dict(attributes)
+        self._attributes: Attributes = cast("Attributes", dict(attributes))
 
     def inc(self, value: float = 1.0) -> None:
         """Increment the underlying counter."""
@@ -40,9 +42,9 @@ class HistogramHandle:
 
     __slots__ = ("_attributes", "_instrument")
 
-    def __init__(self, instrument: object, attributes: Mapping[str, object]) -> None:
+    def __init__(self, instrument: Histogram, attributes: Mapping[str, object]) -> None:
         self._instrument = instrument
-        self._attributes = dict(attributes)
+        self._attributes: Attributes = cast("Attributes", dict(attributes))
 
     def observe(self, value: float) -> None:
         """Record ``value`` on the histogram."""
@@ -52,7 +54,7 @@ class HistogramHandle:
 class CounterLike:
     """Counter facade exposing `.inc()` and `.labels().inc()`."""
 
-    __slots__ = ("_default_handle", "_instrument", "_labelnames")
+    __slots__ = ("_default_handle", "_instrument", "_instrument_name", "_labelnames")
 
     def __init__(
         self,
@@ -60,6 +62,7 @@ class CounterLike:
         description: str,
         labelnames: Sequence[str] | None = None,
     ) -> None:
+        self._instrument_name = name
         self._instrument = _METER.create_counter(name=name, description=description)
         self._labelnames = tuple(labelnames or ())
         self._default_handle = CounterHandle(self._instrument, {})
@@ -82,7 +85,7 @@ class CounterLike:
         bound: dict[str, object] = {}
         for key in self._labelnames:
             if key not in attributes:
-                msg = f"Missing attribute '{key}' for counter {self._instrument.name}"
+                msg = f"Missing attribute '{key}' for counter {self._instrument_name}"
                 raise ValueError(msg)
             bound[key] = attributes[key]
         return CounterHandle(self._instrument, bound)
@@ -95,7 +98,7 @@ class CounterLike:
 class HistogramLike:
     """Histogram facade exposing `.observe()` and `.labels().observe()`."""
 
-    __slots__ = ("_buckets", "_default_handle", "_instrument", "_labelnames")
+    __slots__ = ("_buckets", "_default_handle", "_instrument", "_instrument_name", "_labelnames")
 
     def __init__(
         self,
@@ -106,6 +109,7 @@ class HistogramLike:
         unit: str | None = None,
         buckets: Sequence[float] | None = None,
     ) -> None:
+        self._instrument_name = name
         self._instrument = _METER.create_histogram(
             name=name,
             description=description,
@@ -133,7 +137,7 @@ class HistogramLike:
         bound: dict[str, object] = {}
         for key in self._labelnames:
             if key not in attributes:
-                msg = f"Missing attribute '{key}' for histogram {self._instrument.name}"
+                msg = f"Missing attribute '{key}' for histogram {self._instrument_name}"
                 raise ValueError(msg)
             bound[key] = attributes[key]
         return HistogramHandle(self._instrument, bound)
@@ -143,7 +147,7 @@ class HistogramLike:
         self._default_handle.observe(value)
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(slots=True)
 class _GaugeEntry:
     attributes: Mapping[str, object]
     value: float = 0.0
@@ -257,7 +261,11 @@ class GaugeLike:
         """
         with self._lock:
             entries = list(self._entries.values())
-        return [Observation(entry.value, dict(entry.attributes)) for entry in entries]
+        observations: list[Observation] = []
+        for entry in entries:
+            attrs = cast("Attributes", dict(entry.attributes))
+            observations.append(Observation(entry.value, attrs))
+        return observations
 
 
 def build_counter(

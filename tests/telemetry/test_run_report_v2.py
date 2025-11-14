@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import sys
 import types
+from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Any
 
 if "codeintel_rev.runtime.cells" not in sys.modules:
     stub = types.ModuleType("codeintel_rev.runtime.cells")
@@ -17,12 +19,13 @@ if "codeintel_rev.runtime.cells" not in sys.modules:
 
     class _StubCloseResult: ...
 
-    stub.RuntimeCell = _StubCell
-    stub.RuntimeCellObserver = _StubObserver
-    stub.NullRuntimeCellObserver = _StubObserver
-    stub.RuntimeCellInitContext = _StubInitContext
-    stub.RuntimeCellInitResult = _StubInitResult
-    stub.RuntimeCellCloseResult = _StubCloseResult
+    stub_typed: Any = stub
+    stub_typed.RuntimeCell = _StubCell
+    stub_typed.RuntimeCellObserver = _StubObserver
+    stub_typed.NullRuntimeCellObserver = _StubObserver
+    stub_typed.RuntimeCellInitContext = _StubInitContext
+    stub_typed.RuntimeCellInitResult = _StubInitResult
+    stub_typed.RuntimeCellCloseResult = _StubCloseResult
     sys.modules["codeintel_rev.runtime.cells"] = stub
 
 from codeintel_rev.telemetry import reporter
@@ -31,7 +34,7 @@ from codeintel_rev.telemetry.steps import StepEvent, emit_step
 
 
 @contextmanager
-def _temporary_run_store() -> None:
+def _temporary_run_store() -> Iterator[None]:
     original = reporter.RUN_REPORT_STORE
     reporter.RUN_REPORT_STORE = reporter.RunReportStore(retention=10)
     try:
@@ -52,7 +55,9 @@ def test_run_report_v2_infers_stage_progression() -> None:
         ):
             emit_step(StepEvent(kind="retrieval.gather_channels", status="completed"))
             emit_step(
-                StepEvent(kind="retrieval.fuse", status="failed", detail="timeout waiting for FAISS")
+                StepEvent(
+                    kind="retrieval.fuse", status="failed", detail="timeout waiting for FAISS"
+                )
             )
         reporter.finalize_run("session", "run", status="error")
 

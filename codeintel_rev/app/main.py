@@ -237,6 +237,28 @@ def _env_flag(name: str) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _resolve_proxy_trusted_hops() -> int:
+    """Return ProxyFix trusted hop count with PROXY_TRUSTED_HOPS override.
+
+    Returns
+    -------
+    int
+        Number of upstream proxy hops to trust when applying ProxyFix.
+    """
+    raw_value = os.getenv("PROXY_TRUSTED_HOPS")
+    if raw_value is None:
+        return SERVER_SETTINGS.proxy_trusted_hops
+    try:
+        hops = int(raw_value)
+    except ValueError:
+        LOGGER.warning(
+            "Invalid PROXY_TRUSTED_HOPS value; falling back to server settings",
+            extra={"proxy_trusted_hops": raw_value},
+        )
+        return SERVER_SETTINGS.proxy_trusted_hops
+    return max(0, hops)
+
+
 def _log_gpu_warmup(status: Mapping[str, object]) -> None:
     """Log the GPU warmup status summary.
 
@@ -1178,7 +1200,7 @@ if SERVER_SETTINGS.enable_proxy_fix:
     proxy_wrapped = ProxyFixMiddleware(
         cast("ASGIFramework", app),
         mode=SERVER_SETTINGS.proxy_mode,
-        trusted_hops=SERVER_SETTINGS.proxy_trusted_hops,
+        trusted_hops=_resolve_proxy_trusted_hops(),
     )
     asgi: ASGIApp = cast("ASGIApp", proxy_wrapped)
 else:  # pragma: no cover - wrapper disabled via config

@@ -6,7 +6,7 @@ trap 'log "hook failed on line ${LINENO}" >&2' ERR
 NGINX_BIN=${NGINX_BIN:-/usr/sbin/nginx}
 SYSTEMCTL_BIN=${SYSTEMCTL_BIN:-/bin/systemctl}
 HYPERCORN_SERVICE=${HYPERCORN_SERVICE:-hypercorn-codeintel.service}
-HYPERCORN_CFG=${HYPERCORN_CFG:-/opt/codeintel_rev/ops/hypercorn/hypercorn.toml}
+HYPERCORN_CFG=${HYPERCORN_CFG:-/opt/codeintel_rev/ops/hypercorn.toml}
 
 log() {
     printf '[certbot-hook] %s\n' "$*"

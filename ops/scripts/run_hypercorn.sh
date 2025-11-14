@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-EDGE_MODE=${EDGE_MODE:-nginx-terminate}
+EDGE_MODE=${MCP_EDGE_MODE:-${EDGE_MODE:-edge-terminate}}
 HYPERCORN_APP=${HYPERCORN_APP:-codeintel_rev.app.main:asgi}
 HYPERCORN_CONFIG=${HYPERCORN_CONFIG:-ops/hypercorn.toml}
 HYPERCORN_CERT_FILE=${HYPERCORN_CERT_FILE:-/etc/ssl/live/mcp.example.com/fullchain.pem}
@@ -12,12 +12,12 @@ HYPERCORN_QUIC_BIND=${HYPERCORN_QUIC_BIND:-0.0.0.0:8443}
 BASE_CMD=(hypercorn --config "${HYPERCORN_CONFIG}")
 
 case "${EDGE_MODE}" in
-  nginx-terminate)
-    echo "[run_hypercorn] EDGE_MODE=nginx-terminate -> proxy expects HTTP/1.1 on loopback" >&2
+  edge-terminate)
+    echo "[run_hypercorn] MCP_EDGE_MODE=edge-terminate -> proxy expects HTTP/1.1 on loopback" >&2
     exec "${BASE_CMD[@]}" "${HYPERCORN_APP}"
     ;;
-  h3-pass-through)
-    echo "[run_hypercorn] EDGE_MODE=h3-pass-through -> Hypercorn terminates QUIC" >&2
+  e2e-h3)
+    echo "[run_hypercorn] MCP_EDGE_MODE=e2e-h3 -> Hypercorn terminates QUIC" >&2
     exec "${BASE_CMD[@]}" \
       --bind "${HYPERCORN_BIND}" \
       --quic-bind "${HYPERCORN_QUIC_BIND}" \
@@ -26,7 +26,7 @@ case "${EDGE_MODE}" in
       "${HYPERCORN_APP}"
     ;;
   *)
-    echo "Unknown EDGE_MODE '${EDGE_MODE}'. Expected nginx-terminate or h3-pass-through." >&2
+    echo "Unknown MCP_EDGE_MODE '${EDGE_MODE}'. Expected edge-terminate or e2e-h3." >&2
     exit 1
     ;;
  esac

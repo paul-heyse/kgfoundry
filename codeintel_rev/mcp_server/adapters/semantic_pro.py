@@ -53,7 +53,7 @@ from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
-    from codeintel_rev.config.settings import RerankConfig, XTRConfig
+    from codeintel_rev.config.settings import CodeRankLLMConfig, RerankConfig, XTRConfig
     from codeintel_rev.io.xtr_manager import XTRIndex
 
 SNIPPET_PREVIEW_CHARS = 500
@@ -1497,12 +1497,17 @@ def _maybe_rerank(
 
 
 def _rerank_gate_decision(
-    options: SemanticProOptions, rerank_cfg: RerankConfig, records: list[dict]
+    options: SemanticProRuntimeOptions,
+    rerank_cfg: CodeRankLLMConfig,
+    records: Sequence[dict],
 ) -> StageDecision:
-    if not options.get("use_reranker", True):
+    if not options.use_reranker:
         return StageDecision(should_run=False, reason="disabled_option")
-    if not rerank_cfg.enabled:
-        return StageDecision(should_run=False, reason="disabled_config")
+    override_enabled = options.rerank.enabled if options.rerank is not None else None
+    effective_enabled = override_enabled if override_enabled is not None else rerank_cfg.enabled
+    if not effective_enabled:
+        reason = "disabled_option" if override_enabled is False else "disabled_config"
+        return StageDecision(should_run=False, reason=reason)
     if not records:
         return StageDecision(should_run=False, reason="no_candidates")
     return StageDecision(should_run=True, reason="execute")

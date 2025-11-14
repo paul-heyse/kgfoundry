@@ -118,7 +118,11 @@ def _normalize_fetch_input(args: Mapping[str, object]) -> FetchInput:
     if raw_ids is None:
         msg = "objectIds is required"
         raise ValueError(msg)
-    object_ids = _coerce_object_ids(raw_ids)  # May raise TypeError
+    try:
+        object_ids = _coerce_object_ids(raw_ids)
+    except TypeError as exc:
+        msg = "objectIds must be a sequence of identifiers"
+        raise TypeError(msg) from exc
     max_tokens = _coerce_optional_int(args.get("max_tokens"))
     resolve = _coerce_resolve(args.get("resolve"))
     return FetchInput(objectIds=object_ids, max_tokens=max_tokens, resolve=resolve)

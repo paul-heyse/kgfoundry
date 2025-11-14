@@ -1,10 +1,10 @@
 # Hypercorn configuration for the MCP front-end stack.
 #
-# Topology A (default / EDGE_MODE=nginx-terminate)
+# Topology A (default / MCP_EDGE_MODE=edge-terminate)
 #   * nginx terminates TLS + HTTP/3 on :443
 #   * Hypercorn listens on loopback over HTTP/1.1 (keep-alive enabled)
 #
-# Topology B (EDGE_MODE=h3-pass-through)
+# Topology B (MCP_EDGE_MODE=e2e-h3)
 #   * nginx stream {} proxies TCP+UDP 443 directly to Hypercorn
 #   * Uncomment the block below (bind/quic_bind/cert files) or override via the
 #     run_hypercorn.sh wrapper to enable QUIC termination inside Hypercorn.
@@ -12,11 +12,12 @@
 # ---------------------------------------------------------------------------
 # Listener defaults
 # ---------------------------------------------------------------------------
-bind = ["127.0.0.1:8080"]
-# bind = ["0.0.0.0:8443"]            # Topology B: TCP/TLS endpoint
-# quic_bind = ["0.0.0.0:8443"]       # Topology B: UDP/QUIC endpoint
-# certfile = "/etc/ssl/live/mcp.example.com/fullchain.pem"
-# keyfile = "/etc/ssl/live/mcp.example.com/privkey.pem"
+bind = ["127.0.0.1:8000"]
+# bind = ["0.0.0.0:443"]           # Topology B: TCP/TLS endpoint
+# quic_bind = ["0.0.0.0:443"]      # Topology B: UDP/QUIC endpoint
+# certfile = "/etc/letsencrypt/live/mcp.example.com/fullchain.pem"
+# keyfile = "/etc/letsencrypt/live/mcp.example.com/privkey.pem"
+# alpn_protocols = ["h2", "http/1.1"]
 # alt_svc_headers = ["h3=\":443\"; ma=86400"]
 
 # ---------------------------------------------------------------------------
@@ -25,13 +26,13 @@ bind = ["127.0.0.1:8080"]
 workers = 2
 backlog = 256
 worker_class = "asyncio"
-graceful_timeout = 20
-keep_alive_timeout = 75
+graceful_timeout = 30
+keep_alive_timeout = 90
 max_requests = 0
 read_timeout = 60
 keep_alive_max_requests = 0
 include_server_header = false
-alpn_protocols = ["h2", "http/1.1", "h3"]
+alpn_protocols = ["h2", "http/1.1"]
 h2_max_concurrent_streams = 128
 websocket_max_message_size = 16777216
 

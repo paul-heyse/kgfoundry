@@ -145,10 +145,12 @@ def build_metrics_router(config: MetricsConfig | None = None) -> APIRouter | Non
     """
     if RuntimeAPIRouter is None or RuntimeResponse is None:
         return None
+    router_cls = RuntimeAPIRouter
+    response_cls = RuntimeResponse
     cfg = config or MetricsConfig()
     if not cfg.enabled:
         return None
-    router = RuntimeAPIRouter()  # type: ignore[call-arg]
+    router = router_cls()  # type: ignore[call-arg]
 
     @router.get("/metrics")
     def metrics_endpoint() -> ResponseType:  # type: ignore[override]
@@ -168,7 +170,7 @@ def build_metrics_router(config: MetricsConfig | None = None) -> APIRouter | Non
             "Metrics have moved to the OpenTelemetry Prometheus reader. "
             "Scrape the reader port (default :9464) instead of /metrics."
         )
-        return RuntimeResponse(content=message, media_type="text/plain", status_code=410)
+        return response_cls(content=message, media_type="text/plain", status_code=410)
 
     return router
 

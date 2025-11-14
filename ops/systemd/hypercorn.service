@@ -8,7 +8,7 @@ Type=simple
 User=app
 Group=app
 WorkingDirectory=/opt/app
-Environment=EDGE_MODE=nginx-terminate
+Environment=MCP_EDGE_MODE=edge-terminate
 Environment=HYPERCORN_CONFIG=/opt/app/ops/hypercorn.toml
 Environment=HYPERCORN_CERT_FILE=/etc/ssl/live/mcp.example.com/fullchain.pem
 Environment=HYPERCORN_KEY_FILE=/etc/ssl/live/mcp.example.com/privkey.pem
