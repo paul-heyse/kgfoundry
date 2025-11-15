@@ -244,7 +244,7 @@ class TestCliEnvelopeConstructor:
         assert envelope.generated_at.endswith(("+00:00", "Z"))
 
 
-class TestObservabilityIntegration:
+class TestLoggingIntegration:
     """Test integration with Problem Details and correlation IDs."""
 
     def test_correlation_context_manager(self) -> None:

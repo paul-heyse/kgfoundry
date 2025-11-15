@@ -1,4 +1,3 @@
-
 class PoolerConfig:
     pooling_type: str | None
     normalize: bool
@@ -9,6 +8,5 @@ class PoolerConfig:
         pooling_type: str | None = ...,
         normalize: bool = ...,
     ) -> None: ...
-
 
 __all__ = ["PoolerConfig"]

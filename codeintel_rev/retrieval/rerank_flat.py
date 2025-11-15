@@ -7,21 +7,12 @@ from time import perf_counter
 import numpy as np
 
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
-from codeintel_rev.observability.semantic_conventions import Attrs
-from codeintel_rev.telemetry.decorators import span_context
-from codeintel_rev.telemetry.otel_metrics import build_histogram
 from kgfoundry_common.logging import get_logger
 
 LOGGER = get_logger(__name__)
 _VECTOR_AXIS = 2
 _CANDIDATE_MATRIX_NDIM = 2
 _SIMILARITY_EPS = 1e-9
-
-RERANK_LATENCY_MS = build_histogram(
-    "codeintel_rerank_exact_latency_ms",
-    "Latency of the exact rerank stage.",
-    unit="ms",
-)
 
 
 def _perform_exact_rerank(
@@ -118,35 +109,21 @@ def _perform_exact_rerank(
     if not np.any(candidates >= 0):
         return _empty_result(query_mat.shape[0], min(top_k, candidates.shape[1]))
 
-    span_attrs = {
-        Attrs.REQUEST_STAGE: "rerank",
-        Attrs.RETRIEVAL_TOP_K: top_k,
-        "candidates": candidate_total,
-        "metric": metric,
-    }
-    with span_context(
-        "retrieval.rerank_exact",
-        stage="rerank.exact",
-        attrs=span_attrs,
-        emit_checkpoint=True,
-    ):
-        lookup, embedding_dim = _hydrate_embeddings(catalog, candidates)
-        if not lookup:
-            LOGGER.warning(
-                "Exact rerank skipped: no embeddings returned for %s ids",
-                np.unique(candidates[candidates >= 0]).size,
-            )
-            return _empty_result(query_mat.shape[0], min(top_k, candidates.shape[1]))
-        if embedding_dim != query_mat.shape[1]:
-            msg = f"Embedding dimension mismatch: {embedding_dim} != {query_mat.shape[1]}"
-            raise ValueError(msg)
+    lookup, embedding_dim = _hydrate_embeddings(catalog, candidates)
+    if not lookup:
+        LOGGER.warning(
+            "Exact rerank skipped: no embeddings returned for %s ids",
+            np.unique(candidates[candidates >= 0]).size,
+        )
+        return _empty_result(query_mat.shape[0], min(top_k, candidates.shape[1]))
+    if embedding_dim != query_mat.shape[1]:
+        msg = f"Embedding dimension mismatch: {embedding_dim} != {query_mat.shape[1]}"
+        raise ValueError(msg)
 
-        vectors, filled = _build_candidate_vectors(candidates, lookup, embedding_dim)
-        similarities = _compute_similarity(query_mat, vectors, filled, metric)
-        k_eff = _effective_top_k(top_k, candidates.shape[1])
-        scores, ids = _select_topk(candidates, similarities, k_eff)
-    duration_ms = (perf_counter() - start) * 1000.0
-    RERANK_LATENCY_MS.observe(duration_ms)
+    vectors, filled = _build_candidate_vectors(candidates, lookup, embedding_dim)
+    similarities = _compute_similarity(query_mat, vectors, filled, metric)
+    k_eff = _effective_top_k(top_k, candidates.shape[1])
+    scores, ids = _select_topk(candidates, similarities, k_eff)
     return scores, ids
 
 

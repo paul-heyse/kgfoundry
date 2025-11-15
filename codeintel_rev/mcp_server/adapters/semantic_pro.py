@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor
-from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
 from time import perf_counter
@@ -17,35 +16,17 @@ from codeintel_rev.io.duckdb_catalog import StructureAnnotations
 from codeintel_rev.io.hybrid_search import HybridSearchOptions, HybridSearchTuning
 from codeintel_rev.io.rerank_coderankllm import CodeRankListwiseReranker
 from codeintel_rev.io.warp_engine import WarpEngine, WarpUnavailableError
-from codeintel_rev.mcp_server.common.observability import Observation, observe_duration
 from codeintel_rev.mcp_server.schemas import (
     AnswerEnvelope,
     ExplanationPayload,
     Finding,
     MethodInfo,
     ScopeIn,
-    StageInfo,
 )
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
-from codeintel_rev.observability.execution_ledger import (
-    record as ledger_record,
-)
-from codeintel_rev.observability.execution_ledger import (
-    step as ledger_step,
-)
-from codeintel_rev.observability.flight_recorder import build_report_uri
-from codeintel_rev.observability.otel import as_span, current_span_id, current_trace_id
-from codeintel_rev.observability.semantic_conventions import Attrs, to_label_str
-from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.rerank.base import RerankRequest, RerankResult, ScoredDoc
 from codeintel_rev.rerank.xtr import XTRReranker
 from codeintel_rev.retrieval.gating import StageGateConfig, should_run_secondary_stage
-from codeintel_rev.retrieval.telemetry import (
-    StageTiming,
-    record_stage_decision,
-    record_stage_metric,
-    track_stage,
-)
 from codeintel_rev.retrieval.types import (
     HybridResultDoc,
     HybridSearchResult,
@@ -53,9 +34,6 @@ from codeintel_rev.retrieval.types import (
     StageDecision,
     StageSignals,
 )
-from codeintel_rev.telemetry.context import current_run_id, telemetry_metadata
-from codeintel_rev.telemetry.decorators import span_context
-from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
 from kgfoundry_common.logging import get_logger
 
@@ -136,7 +114,6 @@ class StageOnePlan:
     query: str
     candidates: Sequence[tuple[int, float]]
     options: SemanticProRuntimeOptions
-    coderank_stage: StageTiming
     wide_handle: WideSearchHandle | None
 
 
@@ -150,7 +127,6 @@ class HydrationPlan:
     scope: ScopeIn | None
     effective_limit: int
     options: SemanticProRuntimeOptions
-    observation: Observation
 
 
 @dataclass(slots=True, frozen=True)
@@ -158,7 +134,6 @@ class HydrationOutcome:
     """Result of DuckDB hydration and optional LLM rerank."""
 
     records: list[dict]
-    timings: list[StageTiming]
     annotations: Mapping[int, StructureAnnotations]
 
 
@@ -168,7 +143,6 @@ class _SemanticProRunState:
 
     effective_limit: int
     coderank_fanout: int
-    stage_timings: list[StageTiming] = field(default_factory=list)
     limits: list[str] = field(default_factory=list)
     wide_handle: WideSearchHandle | None = None
 
@@ -301,7 +275,7 @@ async def semantic_search_pro(
     CodeRankLLM listwise reranking. The function normalizes options, resolves scope filters,
     executes stages conditionally based on gating logic and user preferences, fuses results
     using weighted RRF, hydrates metadata from DuckDB, and assembles the final AnswerEnvelope
-    with findings, explanations, and telemetry. It is the primary entry point for semantic
+    with findings, explanations, and method metadata. It is the primary entry point for semantic
     code search in the MCP server, providing high-quality ranked results with explainability
     and performance budgets.
 
@@ -393,216 +367,177 @@ def _semantic_search_pro_sync(
     run_state = _SemanticProRunState.from_limit(limit)
 
     def _finish(findings_count: int, envelope: AnswerEnvelope) -> AnswerEnvelope:
-        emit_step(
-            StepEvent(
-                kind="tool.finish",
-                status="completed",
-                payload={
-                    "tool": "search:semantic_pro",
-                    "limit": limit,
-                    "results": findings_count,
-                },
-            )
+        LOGGER.info(
+            "semantic_pro.finish",
+            extra={"limit": limit, "results": findings_count},
         )
         return envelope
 
-    emit_step(
-        StepEvent(
-            kind="tool.begin",
-            status="completed",
-            payload={"tool": "search:semantic_pro", "limit": limit},
-        )
+    LOGGER.info(
+        "semantic_pro.start",
+        extra={
+            "limit": limit,
+            "scope_filters": bool(scope),
+            "options": _summarize_options(options),
+        },
     )
     try:
-        with observe_duration("semantic_search_pro", COMPONENT_NAME) as observation:
-            plan_attrs = {
-                Attrs.RETRIEVAL_TOP_K: limit,
-                Attrs.REQUEST_SCOPE: bool(scope),
+        run_state.effective_limit = _clamp_limit(
+            limit,
+            context.settings.limits.max_results,
+            run_state.limits,
+        )
+        run_state.wide_handle = _maybe_schedule_xtr_wide(
+            context=context,
+            query=query,
+            limit=run_state.effective_limit,
+            options=options,
+        )
+        run_state.coderank_fanout = max(
+            run_state.effective_limit,
+            run_state.effective_limit * context.settings.limits.semantic_overfetch_multiplier,
+        )
+        LOGGER.debug(
+            "semantic_pro.plan",
+            extra={
+                "limit": limit,
+                "effective_limit": run_state.effective_limit,
+                "scope_filters": bool(scope),
                 "use_warp": options.use_warp,
                 "use_reranker": options.use_reranker,
-            }
-            with ledger_step(
-                stage="channel_gather",
-                op="semantic_pro.plan",
-                component="mcp.semantic_pro",
-                attrs=plan_attrs,
-            ):
-                run_state.effective_limit = _clamp_limit(
-                    limit,
-                    context.settings.limits.max_results,
-                    run_state.limits,
-                )
-                run_state.wide_handle = _maybe_schedule_xtr_wide(
-                    context=context,
-                    query=query,
-                    limit=run_state.effective_limit,
-                    options=options,
-                )
-                run_state.coderank_fanout = max(
-                    run_state.effective_limit,
-                    run_state.effective_limit
-                    * context.settings.limits.semantic_overfetch_multiplier,
-                )
-            coderank_hits, coderank_stage = _timed_coderank_stage(
+                "wide_search": bool(run_state.wide_handle),
+                "coderank_fanout": run_state.coderank_fanout,
+            },
+        )
+        coderank_hits = _run_coderank_stage(
+            context=context,
+            query=query,
+            fanout=run_state.coderank_fanout,
+        )
+
+        warp_outcome = _resolve_stage_one_outcome(
+            StageOnePlan(
                 context=context,
                 query=query,
-                fanout=run_state.coderank_fanout,
-                observation=observation,
+                candidates=tuple(coderank_hits),
+                options=options,
+                wide_handle=run_state.wide_handle,
             )
-            run_state.stage_timings.append(coderank_stage)
+        )
 
-            warp_outcome = _resolve_stage_one_outcome(
-                StageOnePlan(
-                    context=context,
-                    query=query,
-                    candidates=tuple(coderank_hits),
-                    options=options,
-                    coderank_stage=coderank_stage,
-                    wide_handle=run_state.wide_handle,
-                )
-            )
-            if warp_outcome.timing is not None:
-                run_state.stage_timings.append(warp_outcome.timing)
-
-            fused = _run_fusion_stage(
-                context=context,
-                request=FusionRequest(
-                    query=query,
-                    coderank_hits=coderank_hits,
-                    warp_hits=warp_outcome.hits,
-                    warp_channel=warp_outcome.channel,
-                    effective_limit=run_state.effective_limit,
-                    weights=_merge_rrf_weights(
-                        context.settings.index.rrf_weights, options.stage_weights
-                    ),
-                    faiss_k=run_state.coderank_fanout,
-                    nprobe=context.settings.index.faiss_nprobe,
+        fused = _run_fusion_stage(
+            context=context,
+            request=FusionRequest(
+                query=query,
+                coderank_hits=coderank_hits,
+                warp_hits=warp_outcome.hits,
+                warp_channel=warp_outcome.channel,
+                effective_limit=run_state.effective_limit,
+                weights=_merge_rrf_weights(
+                    context.settings.index.rrf_weights, options.stage_weights
                 ),
-                stage_timings=run_state.stage_timings,
+                faiss_k=run_state.coderank_fanout,
+                nprobe=context.settings.index.faiss_nprobe,
+            ),
+        )
+        fused, rerank_metadata = _maybe_apply_rerank_stage(
+            context=context,
+            query=query,
+            fused=fused,
+            options=options,
+        )
+
+        if not fused.docs:
+            empty_envelope = _make_envelope(
+                answer=f"No results found for: {query}",
+                findings=[],
+                extras=_assemble_extras(
+                    method=_build_method(
+                        MethodContext(
+                            findings_count=0,
+                            requested_limit=limit,
+                            effective_limit=run_state.effective_limit,
+                            start_time=start_time,
+                            channels=fused.channels,
+                            notes=tuple(warp_outcome.notes),
+                            explainability=_build_method_explainability(
+                                warp_outcome.explainability
+                            ),
+                            rerank=rerank_metadata,
+                            hybrid_method=(
+                                cast("MethodInfo", dict(fused.method)) if fused.method else None
+                            ),
+                        )
+                    ),
+                    limits=run_state.limits + fused.warnings,
+                    scope=scope,
+                ),
             )
-            fused, rerank_metadata = _maybe_apply_rerank_stage(
+            LOGGER.info(
+                "semantic_pro.empty",
+                extra={"query": query, "effective_limit": run_state.effective_limit},
+            )
+            return _finish(
+                0,
+                empty_envelope,
+            )
+
+        hydration_result = _hydrate_and_rerank_records(
+            HydrationPlan(
                 context=context,
                 query=query,
                 fused=fused,
+                scope=scope,
+                effective_limit=run_state.effective_limit,
                 options=options,
-                stage_timings=run_state.stage_timings,
             )
+        )
 
-            if not fused.docs:
-                observation.mark_success()
-                with ledger_step(
-                    stage="envelope",
-                    op="semantic_pro.envelope",
-                    component="mcp.semantic_pro",
-                    attrs={
-                        Attrs.RETRIEVAL_TOP_K: run_state.effective_limit,
-                        "results": 0,
-                        Attrs.RETRIEVAL_CHANNELS: to_label_str(fused.channels),
-                    },
-                ):
-                    empty_envelope = _make_envelope(
-                        answer=f"No results found for: {query}",
-                        findings=[],
-                        extras=_assemble_extras(
-                            method=_build_method(
-                                MethodContext(
-                                    findings_count=0,
-                                    requested_limit=limit,
-                                    effective_limit=run_state.effective_limit,
-                                    start_time=start_time,
-                                    channels=fused.channels,
-                                    stages=tuple(run_state.stage_timings),
-                                    notes=tuple(warp_outcome.notes),
-                                    explainability=_build_method_explainability(
-                                        warp_outcome.explainability
-                                    ),
-                                    rerank=rerank_metadata,
-                                    hybrid_method=(
-                                        cast("MethodInfo", dict(fused.method))
-                                        if fused.method
-                                        else None
-                                    ),
-                                )
-                            ),
-                            limits=run_state.limits + fused.warnings,
-                            scope=scope,
+        findings = _build_findings(
+            records=hydration_result.records,
+            docs=fused.docs,
+            contribution_map=fused.contributions,
+            explain=options.explain,
+            annotations=hydration_result.annotations,
+        )
+        merge_explainability_into_findings(findings, warp_outcome.explainability)
+        LOGGER.info(
+            "semantic_pro.results",
+            extra={
+                "query": query,
+                "results": len(findings),
+                "channels": list(fused.channels),
+                "effective_limit": run_state.effective_limit,
+            },
+        )
+        success_envelope = _make_envelope(
+            answer=f"Found {len(findings)} semantic_pro results for: {query}",
+            findings=findings,
+            extras=_assemble_extras(
+                method=_build_method(
+                    MethodContext(
+                        findings_count=len(findings),
+                        requested_limit=limit,
+                        effective_limit=run_state.effective_limit,
+                        start_time=start_time,
+                        channels=fused.channels,
+                        notes=tuple(warp_outcome.notes),
+                        explainability=_build_method_explainability(warp_outcome.explainability),
+                        rerank=rerank_metadata,
+                        hybrid_method=(
+                            cast("MethodInfo", dict(fused.method)) if fused.method else None
                         ),
                     )
-                return _finish(
-                    0,
-                    empty_envelope,
-                )
-
-            hydration_result = _hydrate_and_rerank_records(
-                HydrationPlan(
-                    context=context,
-                    query=query,
-                    fused=fused,
-                    scope=scope,
-                    effective_limit=run_state.effective_limit,
-                    options=options,
-                    observation=observation,
-                )
-            )
-            run_state.stage_timings.extend(hydration_result.timings)
-
-            findings = _build_findings(
-                records=hydration_result.records,
-                docs=fused.docs,
-                contribution_map=fused.contributions,
-                explain=options.explain,
-                annotations=hydration_result.annotations,
-            )
-            merge_explainability_into_findings(findings, warp_outcome.explainability)
-            observation.mark_success()
-            _append_budget_notes(
-                COMPONENT_NAME, run_state.stage_timings, run_state.limits
-            )
-            with ledger_step(
-                stage="envelope",
-                op="semantic_pro.envelope",
-                component="mcp.semantic_pro",
-                attrs={
-                    Attrs.RETRIEVAL_TOP_K: run_state.effective_limit,
-                    "results": len(findings),
-                    Attrs.RETRIEVAL_CHANNELS: to_label_str(fused.channels),
-                },
-            ):
-                success_envelope = _make_envelope(
-                    answer=f"Found {len(findings)} semantic_pro results for: {query}",
-                    findings=findings,
-                    extras=_assemble_extras(
-                        method=_build_method(
-                                MethodContext(
-                                    findings_count=len(findings),
-                                    requested_limit=limit,
-                                    effective_limit=run_state.effective_limit,
-                                    start_time=start_time,
-                                    channels=fused.channels,
-                                    stages=tuple(run_state.stage_timings),
-                                    notes=tuple(warp_outcome.notes),
-                                    explainability=_build_method_explainability(
-                                        warp_outcome.explainability
-                                    ),
-                                rerank=rerank_metadata,
-                                hybrid_method=(
-                                    cast("MethodInfo", dict(fused.method)) if fused.method else None
-                                ),
-                            )
-                        ),
-                        limits=run_state.limits + fused.warnings,
-                        scope=scope,
-                    ),
-                )
-            return _finish(len(findings), success_envelope)
-    except Exception as exc:
-        emit_step(
-            StepEvent(
-                kind="tool.error",
-                status="failed",
-                detail=type(exc).__name__,
-                payload={"tool": "search:semantic_pro"},
-            )
+                ),
+                limits=run_state.limits + fused.warnings,
+                scope=scope,
+            ),
+        )
+        return _finish(len(findings), success_envelope)
+    except Exception:
+        LOGGER.exception(
+            "semantic_pro.failed",
+            extra={"limit": limit, "query": query},
         )
         raise
 
@@ -612,10 +547,8 @@ def _run_coderank_stage(
     context: ApplicationContext,
     query: str,
     fanout: int,
-    observation: Observation,
 ) -> list[tuple[int, float]]:
     if not context.paths.coderank_faiss_index.exists():
-        observation.mark_error()
         msg = "CodeRank FAISS index not found; build it via `python coderank.py build-index`."
         raise VectorSearchError(
             msg,
@@ -623,15 +556,12 @@ def _run_coderank_stage(
         )
 
     try:
-        with as_span(
-            "retrieval.coderank.embed",
-            component="retrieval",
-            stage="coderank.embed",
-            **{Attrs.VLLM_BATCH: 1},
-        ):
-            query_vec = context.vllm_client.embed_batch([query])
+        LOGGER.debug(
+            "semantic_pro.embed.start",
+            extra={"component": "retrieval", "stage": "coderank.embed"},
+        )
+        query_vec = context.vllm_client.embed_batch([query])
     except Exception as exc:
-        observation.mark_error()
         msg = f"CodeRank embedding failed: {exc}"
         raise EmbeddingError(
             msg,
@@ -644,24 +574,23 @@ def _run_coderank_stage(
     try:
         faiss_mgr = context.get_coderank_faiss_manager(query_vec.shape[1])
     except (FileNotFoundError, RuntimeError, ValueError) as exc:
-        observation.mark_error()
         msg = "Failed to load CodeRank FAISS index"
         raise VectorSearchError(msg, cause=exc) from exc
 
     try:
-        with as_span(
-            "retrieval.coderank.faiss",
-            component="retrieval",
-            stage="coderank.faiss",
-            **{Attrs.FAISS_TOP_K: fanout, Attrs.FAISS_NPROBE: context.settings.index.faiss_nprobe},
-        ):
-            distances, ids = faiss_mgr.search(
-                query_vec,
-                k=max(1, int(fanout)),
-                nprobe=context.settings.index.faiss_nprobe,
-            )
+        LOGGER.debug(
+            "semantic_pro.coderank.faiss",
+            extra={
+                "fanout": fanout,
+                "nprobe": context.settings.index.faiss_nprobe,
+            },
+        )
+        distances, ids = faiss_mgr.search(
+            query_vec,
+            k=max(1, int(fanout)),
+            nprobe=context.settings.index.faiss_nprobe,
+        )
     except RuntimeError as exc:
-        observation.mark_error()
         msg = "CodeRank FAISS search failed"
         raise VectorSearchError(msg, cause=exc) from exc
 
@@ -675,50 +604,20 @@ def _run_coderank_stage(
     return hits
 
 
-def _timed_coderank_stage(
-    *,
-    context: ApplicationContext,
-    query: str,
-    fanout: int,
-    observation: Observation,
-) -> tuple[list[tuple[int, float]], StageTiming]:
-    with (
-        ledger_step(
-            stage="embed",
-            op="coderank.stage_one",
-            component="retrieval.coderank",
-            attrs={Attrs.RETRIEVAL_TOP_K: fanout},
-        ),
-        track_stage(
-            "coderank_ann",
-            budget_ms=context.settings.coderank.budget_ms,
-        ) as timer,
-    ):
-        hits = _run_coderank_stage(
-            context=context,
-            query=query,
-            fanout=fanout,
-            observation=observation,
-        )
-    return hits, timer.snapshot()
-
-
 def _maybe_run_warp(
     *,
     context: ApplicationContext,
     query: str,
     candidates: list[tuple[int, float]],
     options: SemanticProRuntimeOptions,
-    coderank_stage: StageTiming,
 ) -> WarpOutcome:
     should_run, notes = _should_execute_stage_two(
         context=context,
         candidates=candidates,
         options=options,
-        coderank_stage=coderank_stage,
     )
     if not should_run:
-        return WarpOutcome(hits=[], notes=notes, timing=None, explainability=())
+        return WarpOutcome(hits=[], notes=notes, explainability=())
     return _execute_stage_two(
         context=context,
         query=query,
@@ -733,60 +632,33 @@ def _should_execute_stage_two(
     context: ApplicationContext,
     candidates: list[tuple[int, float]],
     options: SemanticProRuntimeOptions,
-    coderank_stage: StageTiming,
 ) -> tuple[bool, list[str]]:
     notes: list[str] = []
-    stage_name = "stage_b"
     if not candidates:
         notes.append("No CodeRank candidates; skipping Stage-B.")
-        record_stage_decision(
-            COMPONENT_NAME,
-            stage_name,
-            decision=StageDecision(should_run=False, reason="no_candidates"),
-        )
-        ledger_record(
-            "warp.skip",
-            stage="rerank",
-            component="retrieval.warp",
-            ok=False,
-            reason="no_candidates",
-            candidates=len(candidates),
+        LOGGER.info(
+            "semantic_pro.warp.skip",
+            extra={"reason": "no_candidates", "candidates": len(candidates)},
         )
         return False, notes
     if not options.use_warp:
         notes.append("Stage-B disabled via request option.")
-        record_stage_decision(
-            COMPONENT_NAME,
-            stage_name,
-            decision=StageDecision(should_run=False, reason="disabled_option"),
-        )
-        ledger_record(
-            "warp.skip",
-            stage="rerank",
-            component="retrieval.warp",
-            ok=False,
-            reason="disabled_option",
+        LOGGER.info(
+            "semantic_pro.warp.skip",
+            extra={"reason": "disabled_option"},
         )
         return False, notes
     stage_available = context.settings.warp.enabled or context.settings.xtr.enable
     if not stage_available:
         notes.append("WARP/XTR disabled via configuration flag.")
-        record_stage_decision(
-            COMPONENT_NAME,
-            stage_name,
-            decision=StageDecision(should_run=False, reason="disabled_config"),
-        )
-        ledger_record(
-            "warp.skip",
-            stage="rerank",
-            component="retrieval.warp",
-            ok=False,
-            reason="disabled_config",
+        LOGGER.info(
+            "semantic_pro.warp.skip",
+            extra={"reason": "disabled_config"},
         )
         return False, notes
     signals = StageSignals(
         candidate_count=len(candidates),
-        elapsed_ms=coderank_stage.duration_ms,
+        elapsed_ms=0.0,  # No timing available
         best_score=candidates[0][1] if candidates else None,
         second_best_score=candidates[1][1] if len(candidates) > 1 else None,
     )
@@ -796,16 +668,12 @@ def _should_execute_stage_two(
         budget_ms=context.settings.coderank.budget_ms,
     )
     decision = should_run_secondary_stage(signals, gate_config)
-    record_stage_decision(COMPONENT_NAME, stage_name, decision=decision)
     if not decision.should_run:
         notes.append(f"Stage-B gating: {decision.reason}")
         notes.extend(decision.notes)
-        ledger_record(
-            "warp.skip",
-            stage="rerank",
-            component="retrieval.warp",
-            ok=False,
-            reason=decision.reason,
+        LOGGER.info(
+            "semantic_pro.warp.skip",
+            extra={"reason": decision.reason},
         )
         return False, notes
     return True, notes
@@ -819,45 +687,29 @@ def _execute_stage_two(
     options: SemanticProRuntimeOptions,
     base_notes: list[str],
 ) -> WarpOutcome:
-    with (
-        ledger_step(
-            stage="rerank",
-            op="warp.stage_two",
-            component="retrieval.warp",
-            attrs={"candidates": len(candidates), "use_warp": options.use_warp},
-        ),
-        track_stage(
-            "warp_late_interaction",
-            budget_ms=context.settings.warp.budget_ms,
-        ) as warp_timer,
-    ):
-        hits, warp_notes, explain_payload, channel = _run_warp_stage(
-            context=context,
-            query=query,
-            candidates=candidates,
-            options=options,
-        )
+    LOGGER.debug(
+        "semantic_pro.warp.stage_two",
+        extra={"candidates": len(candidates), "use_warp": options.use_warp},
+    )
+    hits, warp_notes, explain_payload, channel = _run_warp_stage(
+        context=context,
+        query=query,
+        candidates=candidates,
+        options=options,
+    )
     notes = [*base_notes, *warp_notes]
-    outcome = WarpOutcome(
+    return WarpOutcome(
         hits=hits,
         notes=notes,
-        timing=warp_timer.snapshot(),
         explainability=tuple(explain_payload),
         channel=channel,
     )
-    record_stage_decision(
-        COMPONENT_NAME,
-        channel,
-        decision=StageDecision(should_run=True, reason="executed"),
-    )
-    return outcome
 
 
 def _run_fusion_stage(
     *,
     context: ApplicationContext,
     request: FusionRequest,
-    stage_timings: list[StageTiming],
 ) -> HybridSearchResult:
     engine = context.get_hybrid_engine()
     total_limit = max(
@@ -865,39 +717,23 @@ def _run_fusion_stage(
         request.effective_limit * context.settings.limits.semantic_overfetch_multiplier,
     )
     extra_channels = _build_extra_channels(request.warp_hits, request.warp_channel)
-    fusion_attrs = {
-        Attrs.COMPONENT: "retrieval",
-        Attrs.STAGE: "fusion",
-        Attrs.RETRIEVAL_TOP_K: total_limit,
-        Attrs.RETRIEVAL_CHANNELS: to_label_str((extra_channels or {}).keys() or ("semantic",)),
-    }
-    with (
-        ledger_step(
-            stage="fuse",
-            op="semantic_pro.fuse_rrf",
-            component="retrieval.fusion",
-            attrs={
-                Attrs.RETRIEVAL_TOP_K: total_limit,
-                Attrs.RETRIEVAL_CHANNELS: to_label_str(
-                    (extra_channels or {}).keys() or ("semantic",)
-                ),
-            },
+    LOGGER.debug(
+        "semantic_pro.fusion",
+        extra={
+            "limit": total_limit,
+            "channels": list((extra_channels or {}).keys()) or ["semantic"],
+        },
+    )
+    return engine.search(
+        request.query,
+        semantic_hits=request.coderank_hits,
+        limit=total_limit,
+        options=HybridSearchOptions(
+            extra_channels=extra_channels,
+            weights=request.weights,
+            tuning=HybridSearchTuning(k=request.faiss_k, nprobe=request.nprobe),
         ),
-        track_stage("fusion_rrf") as fusion_timer,
-        as_span("retrieval.fuse", **fusion_attrs),
-    ):
-        fused = engine.search(
-            request.query,
-            semantic_hits=request.coderank_hits,
-            limit=total_limit,
-            options=HybridSearchOptions(
-                extra_channels=extra_channels,
-                weights=request.weights,
-                tuning=HybridSearchTuning(k=request.faiss_k, nprobe=request.nprobe),
-            ),
-        )
-    stage_timings.append(fusion_timer.snapshot())
-    return fused
+    )
 
 
 def _maybe_apply_rerank_stage(
@@ -906,7 +742,6 @@ def _maybe_apply_rerank_stage(
     query: str,
     fused: HybridSearchResult,
     options: SemanticProRuntimeOptions,
-    stage_timings: list[StageTiming],
 ) -> tuple[HybridSearchResult, dict[str, object] | None]:
     plan = _build_rerank_plan(context.settings.rerank, options.rerank)
     metadata: dict[str, object] = {
@@ -914,29 +749,20 @@ def _maybe_apply_rerank_stage(
         "top_k": plan.top_k,
         "enabled": False,
     }
-    timeline = current_timeline()
     if not plan.enabled:
         metadata["reason"] = plan.reason or "disabled"
-        _emit_rerank_decision(timeline, metadata)
-        ledger_record(
-            "xtr.skip",
-            stage="rerank",
-            component="retrieval.xtr",
-            ok=False,
-            reason=str(metadata["reason"]),
+        LOGGER.info(
+            "semantic_pro.rerank.skip",
+            extra={"reason": metadata["reason"]},
         )
         return fused, metadata
 
     reranker = _resolve_reranker(context, plan.provider)
     if reranker is None:
         metadata["reason"] = "capability_off"
-        _emit_rerank_decision(timeline, metadata)
-        ledger_record(
-            "xtr.skip",
-            stage="rerank",
-            component="retrieval.xtr",
-            ok=False,
-            reason="capability_off",
+        LOGGER.info(
+            "semantic_pro.rerank.skip",
+            extra={"reason": "capability_off"},
         )
         return fused, metadata
 
@@ -945,13 +771,9 @@ def _maybe_apply_rerank_stage(
     ]
     if not scored_docs:
         metadata["reason"] = "no_candidates"
-        _emit_rerank_decision(timeline, metadata)
-        ledger_record(
-            "xtr.skip",
-            stage="rerank",
-            component="retrieval.xtr",
-            ok=False,
-            reason="no_candidates",
+        LOGGER.info(
+            "semantic_pro.rerank.skip",
+            extra={"reason": "no_candidates"},
         )
         return fused, metadata
 
@@ -963,44 +785,26 @@ def _maybe_apply_rerank_stage(
             "top_k": effective_top_k,
         }
     )
-    _emit_rerank_decision(timeline, metadata)
-    if timeline is not None:
-        timeline.event(
-            "rerank.start",
-            "rerank",
-            attrs={"provider": plan.provider, "top_k": effective_top_k},
+    LOGGER.debug(
+        "semantic_pro.rerank.start",
+        extra={"provider": plan.provider, "top_k": effective_top_k},
+    )
+    LOGGER.debug(
+        "semantic_pro.rerank.execute",
+        extra={"provider": plan.provider, "top_k": effective_top_k},
+    )
+    results = reranker.rescore(
+        RerankRequest(
+            query=query,
+            docs=scored_docs,
+            top_k=effective_top_k,
+            explain=plan.explain,
         )
-    rerank_attrs = {
-        Attrs.COMPONENT: "retrieval",
-        Attrs.STAGE: "rerank.xtr",
-        "provider": plan.provider,
-        Attrs.RETRIEVAL_TOP_K: effective_top_k,
-    }
-    with (
-        ledger_step(
-            stage="rerank",
-            op="xtr.rerank",
-            component="retrieval.xtr",
-            attrs={"provider": plan.provider, Attrs.RETRIEVAL_TOP_K: effective_top_k},
-        ),
-        track_stage("rerank_xtr") as rerank_timer,
-        as_span("retrieval.rerank", **rerank_attrs),
-    ):
-        results = reranker.rescore(
-            RerankRequest(
-                query=query,
-                docs=scored_docs,
-                top_k=effective_top_k,
-                explain=plan.explain,
-            )
-        )
-    stage_timings.append(rerank_timer.snapshot())
-    if timeline is not None:
-        timeline.event(
-            "rerank.end",
-            "rerank",
-            attrs={"provider": plan.provider, "returned": len(results)},
-        )
+    )
+    LOGGER.debug(
+        "semantic_pro.rerank.end",
+        extra={"provider": plan.provider, "returned": len(results)},
+    )
     reordered = _reorder_docs(fused, results)
     metadata["reordered"] = reordered.changes
     return reordered.result, metadata
@@ -1052,12 +856,6 @@ def _reorder_docs(
         method=fused.method,
     )
     return _RerankOutcome(result=updated_result, changes=changes)
-
-
-def _emit_rerank_decision(timeline: Timeline | None, attrs: dict[str, object]) -> None:
-    if timeline is None:
-        return
-    timeline.event("rerank.decision", "rerank", attrs=attrs)
 
 
 def _build_rerank_plan(
@@ -1168,20 +966,17 @@ def _resolve_stage_one_outcome(plan: StageOnePlan) -> WarpOutcome:
     query = plan.query
     candidates = list(plan.candidates)
     options = plan.options
-    coderank_stage = plan.coderank_stage
     wide_handle = plan.wide_handle
-    query = plan.query
     should_run, base_notes = _should_execute_stage_two(
         context=context,
         candidates=candidates,
         options=options,
-        coderank_stage=coderank_stage,
     )
     if not should_run:
         if wide_handle is not None:
             _, executor = wide_handle
             executor.shutdown(wait=False)
-        return WarpOutcome(hits=[], notes=base_notes, timing=None, explainability=())
+        return WarpOutcome(hits=[], notes=base_notes, explainability=())
 
     if wide_handle is not None:
         wide_future, wide_executor = wide_handle
@@ -1213,30 +1008,19 @@ def _run_xtr_wide_stage(
     k: int,
     *,
     explain: bool,
-    budget_ms: int | None,
+    budget_ms: int | None,  # noqa: ARG001
 ) -> WarpOutcome:
     notes: list[str] = []
-    with track_stage(
-        "xtr_wide_search",
-        budget_ms=budget_ms,
-    ) as timer:
-        hits = index.search(query=query, k=k, explain=explain)
+    hits = index.search(query=query, k=k, explain=explain)
     explain_payload = [(int(cid), payload) for cid, _score, payload in hits if payload]
     scored = [(int(cid), float(score)) for cid, score, _payload in hits]
     notes.append(f"XTR wide search returned {len(scored)} hits (k={k}).")
-    outcome = WarpOutcome(
+    return WarpOutcome(
         hits=scored,
         notes=notes,
-        timing=timer.snapshot(),
         explainability=tuple(explain_payload),
         channel="xtr",
     )
-    record_stage_decision(
-        COMPONENT_NAME,
-        "xtr",
-        decision=StageDecision(should_run=True, reason="executed"),
-    )
-    return outcome
 
 
 def _calculate_xtr_k(limit: int, cfg: XTRConfig, options: SemanticProRuntimeOptions) -> int:
@@ -1264,21 +1048,6 @@ def _build_extra_channels(
             for rank, (doc_id, score) in enumerate(warp_hits)
         ]
     }
-
-
-def _append_budget_notes(
-    component: str,
-    stage_timings: Sequence[StageTiming],
-    limits: list[str],
-) -> None:
-    for timing in stage_timings:
-        record_stage_metric(component, timing)
-        if timing.budget_ms is None:
-            continue
-        if timing.exceeded_budget:
-            limits.append(
-                f"{timing.name} exceeded budget ({timing.duration_ms:.1f}ms > {timing.budget_ms}ms)"
-            )
 
 
 def _safe_int(value: str) -> int:
@@ -1347,20 +1116,18 @@ def _warp_executor_hits(
         return None, notes
 
     try:
-        with as_span(
-            "retrieval.warp",
-            component="retrieval",
-            stage="warp",
-            **{
-                Attrs.RETRIEVAL_TOP_K: min(cfg.top_k, len(candidates)),
-                Attrs.XTR_CANDIDATES: len(candidates),
+        LOGGER.debug(
+            "semantic_pro.warp.rerank",
+            extra={
+                "top_k": min(cfg.top_k, len(candidates)),
+                "candidates": len(candidates),
             },
-        ):
-            hits = warp_engine.rerank(
-                query=query,
-                candidate_ids=[cid for cid, _ in candidates],
-                top_k=min(cfg.top_k, len(candidates)),
-            )
+        )
+        hits = warp_engine.rerank(
+            query=query,
+            candidate_ids=[cid for cid, _ in candidates],
+            top_k=min(cfg.top_k, len(candidates)),
+        )
     except WarpUnavailableError as exc:
         notes.append(str(exc))
         return None, notes
@@ -1397,20 +1164,15 @@ def _xtr_rescore_hits(
         notes.append("Insufficient candidates for XTR rescoring.")
         return [], notes, explain_payload
 
-    with as_span(
-        "retrieval.xtr_rescore",
-        component="retrieval",
-        stage="xtr.rescore",
-        **{
-            Attrs.XTR_CANDIDATES: len(candidate_ids),
-            Attrs.XTR_TOP_K: limit,
-        },
-    ):
-        rescored = xtr_index.rescore(
-            query=query,
-            candidate_chunk_ids=candidate_ids,
-            explain=options.explain,
-        )
+    LOGGER.debug(
+        "semantic_pro.xtr.rescore",
+        extra={"candidates": len(candidate_ids), "top_k": limit},
+    )
+    rescored = xtr_index.rescore(
+        query=query,
+        candidate_chunk_ids=candidate_ids,
+        explain=options.explain,
+    )
     hits = [(chunk_id, score) for chunk_id, score, _payload in rescored]
     explain_payload = [(chunk_id, payload) for chunk_id, _score, payload in rescored if payload]
     notes.append(f"XTR rescored {len(hits)} candidates.")
@@ -1467,9 +1229,8 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
     ----------
     plan : HydrationPlan
         Container holding hydration and reranking inputs including context, query,
-        fused hybrid search results, scope filters, effective limit, options, and
-        observation tracking. The plan encapsulates all state needed to hydrate
-        and rerank search results.
+        fused hybrid search results, scope filters, effective limit, and options.
+        The plan encapsulates all state needed to hydrate and rerank search results.
 
     Returns
     -------
@@ -1477,8 +1238,6 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
         Dataclass containing:
         - records: list[dict], hydrated records clipped to ``effective_limit``, each
           record is a dict with chunk metadata from DuckDB.
-        - timings: list[StageTiming], timing snapshots from hydration and reranking
-          stages for observability.
         - annotations: Mapping[int, StructureAnnotations], structure metadata keyed
           by chunk id for downstream explanation rendering.
 
@@ -1495,148 +1254,83 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
     effective_limit. The function performs database I/O for hydration and optional
     LLM API calls for reranking. Thread-safe for concurrent plan processing.
     Results are clipped to effective_limit to respect user constraints and prevent
-    memory exhaustion. Timing snapshots enable performance monitoring and debugging.
+    memory exhaustion.
     """
     context = plan.context
     fused = plan.fused
     effective_limit = plan.effective_limit
     options = plan.options
     ordered_ids = _dedupe_preserve_order([_safe_int(doc.doc_id) for doc in fused.docs])
-    timeline = current_timeline()
     requested = len(ordered_ids)
-    if timeline is not None:
-        timeline.event(
-            "hydration.start",
-            "duckdb",
-            attrs={
+    LOGGER.debug(
+        "semantic_pro.hydration.start",
+        extra={
+            "requested": requested,
+            "effective_limit": effective_limit,
+        },
+    )
+    try:
+        LOGGER.debug(
+            "semantic_pro.hydrate",
+            extra={"requested": requested, "effective_limit": effective_limit},
+        )
+        records, annotations = _hydrate_records(
+            context=context,
+            chunk_ids=ordered_ids[
+                : min(len(ordered_ids), max(effective_limit * 2, effective_limit))
+            ],
+            scope=plan.scope,
+        )
+    except (RuntimeError, OSError) as exc:
+        LOGGER.debug(
+            "semantic_pro.hydration.end",
+            extra={
+                "status": "error",
+                "error": str(exc),
                 "requested": requested,
-                "effective_limit": effective_limit,
-                "asked": requested,
+                "returned": 0,
+                "missing": requested,
             },
         )
-    try:
-        with ledger_step(
-            stage="hydrate",
-            op="duckdb.hydrate",
-            component="duckdb.catalog",
-            attrs={"requested": requested, "effective_limit": effective_limit},
-        ):
-            with track_stage("duckdb_hydration") as hydration_timer:
-                hydrate_attrs = {
-                    Attrs.COMPONENT: "retrieval",
-                    Attrs.REQUEST_STAGE: "hydrate",
-                    Attrs.DUCKDB_ROWS: 0,
-                    "requested": requested,
-                    "effective_limit": effective_limit,
-                }
-                hydrate_span = span_context(
-                    "hydrate.duckdb",
-                    stage="hydrate.duckdb",
-                    attrs=hydrate_attrs,
-                    emit_checkpoint=True,
-                )
-                with hydrate_span as (span, _):
-                    records, annotations = _hydrate_records(
-                        context=context,
-                        chunk_ids=ordered_ids[
-                            : min(len(ordered_ids), max(effective_limit * 2, effective_limit))
-                        ],
-                        scope=plan.scope,
-                    )
-                if span is not None:
-                    with suppress(AttributeError):  # pragma: no cover - noop span
-                        span.set_attribute(Attrs.DUCKDB_ROWS, len(records))
-            snapshots = [hydration_timer.snapshot()]
-    except (RuntimeError, OSError) as exc:
-        if timeline is not None:
-            timeline.event(
-                "hydration.end",
-                "duckdb",
-                status="error",
-                message=str(exc),
-                attrs={"requested": requested, "returned": 0, "missing": requested},
-            )
-        plan.observation.mark_error()
         msg = "DuckDB hydration failed"
         raise VectorSearchError(msg, cause=exc) from exc
     else:
-        if timeline is not None:
-            returned = len(records)
-            timeline.event(
-                "hydration.end",
-                "duckdb",
-                attrs={
-                    "requested": requested,
-                    "returned": returned,
-                    "missing": max(requested - returned, 0),
-                    "effective_limit": effective_limit,
-                },
-            )
+        returned = len(records)
+        LOGGER.debug(
+            "semantic_pro.hydration.end",
+            extra={
+                "requested": requested,
+                "returned": returned,
+                "missing": max(requested - returned, 0),
+                "effective_limit": effective_limit,
+            },
+        )
 
     rerank_decision = _rerank_gate_decision(options, context.settings.coderank_llm, records)
     if not rerank_decision.should_run:
-        record_stage_decision(COMPONENT_NAME, RERANK_STAGE_NAME, decision=rerank_decision)
-        emit_step(
-            StepEvent(
-                kind="retrieval.rerank",
-                status="skipped",
-                detail=rerank_decision.reason,
-            )
-        )
-        ledger_record(
-            "coderank_llm.skip",
-            stage="rerank",
-            component="retrieval.coderank_llm",
-            ok=False,
-            reason=rerank_decision.reason,
-            records=len(records),
+        LOGGER.info(
+            "semantic_pro.llm_rerank.skip",
+            extra={"reason": rerank_decision.reason, "records": len(records)},
         )
         records = records[:effective_limit]
     else:
-        with (
-            ledger_step(
-                stage="rerank",
-                op="coderank.llm",
-                component="retrieval.coderank_llm",
-                attrs={"records": len(records), Attrs.RETRIEVAL_TOP_K: effective_limit},
-            ),
-            track_stage(
-                RERANK_STAGE_NAME,
-                budget_ms=context.settings.coderank_llm.budget_ms,
-            ) as rerank_timer,
-            span_context(
-                "retrieval.coderank_llm",
-                stage="coderank_llm",
-                attrs={
-                    Attrs.COMPONENT: "retrieval",
-                    Attrs.REQUEST_STAGE: "rerank",
-                    Attrs.RETRIEVAL_TOP_K: effective_limit,
-                },
-                emit_checkpoint=True,
-            ),
-        ):
-            records = _maybe_rerank(
-                query=plan.query,
-                records=records,
-                context=context,
-                enabled=True,
-            )
-        snapshots.append(rerank_timer.snapshot())
-        record_stage_decision(
-            COMPONENT_NAME,
-            RERANK_STAGE_NAME,
-            decision=StageDecision(should_run=True, reason="executed"),
+        LOGGER.debug(
+            "semantic_pro.llm_rerank.execute",
+            extra={"records": len(records), "top_k": effective_limit},
+        )
+        records = _maybe_rerank(
+            query=plan.query,
+            records=records,
+            context=context,
+            enabled=True,
         )
         records = records[:effective_limit]
-        emit_step(
-            StepEvent(
-                kind="retrieval.rerank",
-                status="completed",
-                payload={"records": len(records)},
-            )
+        LOGGER.info(
+            "semantic_pro.llm_rerank.complete",
+            extra={"records": len(records)},
         )
 
-    return HydrationOutcome(records=records, timings=snapshots, annotations=annotations)
+    return HydrationOutcome(records=records, annotations=annotations)
 
 
 def _maybe_rerank(
@@ -1924,8 +1618,6 @@ def _build_method(context: MethodContext) -> MethodInfo:
             method["retrieval"] = retrieval
     else:
         method = base
-    if context.stages:
-        method["stages"] = [cast("StageInfo", stage.as_payload()) for stage in context.stages]
     if context.notes:
         existing_notes = (
             list(method.get("notes", [])) if isinstance(method.get("notes"), list) else []
@@ -1957,8 +1649,8 @@ def _assemble_extras(
     This helper function constructs the extras dictionary for an AnswerEnvelope,
     combining method metadata (retrieval channels, coverage, stage timings) with
     optional limits warnings and scope filters. It is called after the retrieval
-    pipeline completes to package telemetry and configuration context into the
-    response. The function ensures that only non-empty optional fields are included,
+    pipeline completes to package configuration context into the response.
+    The function ensures that only non-empty optional fields are included,
     keeping the response payload minimal.
 
     Parameters
@@ -2005,7 +1697,6 @@ def _assemble_extras(
         extras["limits"] = limits
     if scope:
         extras["scope"] = scope
-    extras.update(_observability_links())
     return extras
 
 
@@ -2021,49 +1712,8 @@ def _make_envelope(
         "findings": findings,
         "confidence": 0.9 if findings else 0.0,
     }
-    telemetry = telemetry_metadata()
-    if telemetry:
-        envelope["telemetry"] = telemetry
     envelope.update(extras)
     return envelope
-
-
-def _observability_links() -> AnswerEnvelope:
-    """Return trace/run metadata for semantic_pro envelopes.
-
-    Returns
-    -------
-    AnswerEnvelope
-        Observability extras populated with trace/run diagnostics.
-    """
-    extras: AnswerEnvelope = {}
-    trace_id = current_trace_id()
-    span_id = current_span_id()
-    timeline = current_timeline()
-    run_id = timeline.run_id if timeline else current_run_id()
-    session_id = timeline.session_id if timeline else None
-    started_at = cast("float | None", timeline.metadata.get("started_at")) if timeline else None
-    diag_uri = build_report_uri(session_id, run_id, trace_id=trace_id, started_at=started_at)
-    if trace_id:
-        extras["trace_id"] = trace_id
-    if span_id:
-        extras["span_id"] = span_id
-    if run_id:
-        extras["run_id"] = run_id
-    if diag_uri:
-        extras["diag_report_uri"] = diag_uri
-    return extras
-
-
-def build_observability_links() -> AnswerEnvelope:
-    """Return observability extras for semantic-pro responses.
-
-    Returns
-    -------
-    AnswerEnvelope
-        Extras populated with trace/run metadata.
-    """
-    return _observability_links()
 
 
 def _clamp_limit(requested: int, max_results: int, notes: list[str]) -> int:
@@ -2104,7 +1754,6 @@ class WarpOutcome:
 
     hits: list[tuple[int, float]]
     notes: list[str]
-    timing: StageTiming | None
     explainability: tuple[tuple[int, dict[str, Any]], ...]
     channel: str = "warp"
 
@@ -2132,7 +1781,6 @@ class MethodContext:
     effective_limit: int
     start_time: float
     channels: list[str]
-    stages: Sequence[StageTiming] | None
     notes: tuple[str, ...] | None = None
     explainability: dict[str, list[dict[str, Any]]] | None = None
     rerank: dict[str, object] | None = None

@@ -254,8 +254,8 @@ class TestFirstOrErrorMultiDevice:
         assert result == expected
 
 
-class TestErrorObservability:
-    """Tests for observability aspects of guards (logs, metrics)."""
+class TestErrorHandling:
+    """Tests for error handling aspects of guards (logs, exceptions)."""
 
     def test_error_is_vector_search_error_type(self, sequence_guard: SequenceGuard) -> None:
         """Verify guard raises the correct exception type."""

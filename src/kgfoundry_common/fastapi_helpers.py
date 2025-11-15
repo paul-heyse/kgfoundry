@@ -120,6 +120,9 @@ def typed_dependency[**P, T](
         ------
         TimeoutError
             If the dependency execution exceeds the timeout.
+        Exception
+            Any exception raised by the wrapped dependency function is
+            propagated unchanged after logging.
         """
         correlation_id = get_correlation_id()
         with with_fields(logger, operation=name, correlation_id=correlation_id) as log:
@@ -189,6 +192,9 @@ def typed_exception_handler[E: Exception](
         ------
         TimeoutError
             If the handler execution exceeds the timeout.
+        Exception
+            Any exception raised by the wrapped exception handler is
+            propagated unchanged after logging.
         """
         correlation_id = get_correlation_id()
         with with_fields(logger, operation=name, correlation_id=correlation_id) as log:
@@ -245,22 +251,20 @@ def typed_middleware(
     class _InstrumentedMiddleware(BaseHTTPMiddleware):
         """Middleware wrapper that adds logging, metrics, and timeout controls.
 
-        Instantiates the wrapped middleware and records configuration.
+        Extended Summary
+        ----------------
+        Creates an instrumented middleware wrapper that adds structured
+        logging, correlation ID tracking, and timeout enforcement to
+        the wrapped middleware. The wrapper delegates all request handling
+        to the original middleware while recording execution metrics.
 
         Parameters
         ----------
         app : ASGIApp
-            ASGI application instance.
+            ASGI application instance to wrap.
         """
 
         def __init__(self, app: ASGIApp) -> None:
-            """Initialize the instrumented middleware.
-
-            Parameters
-            ----------
-            app : ASGIApp
-                ASGI application instance to wrap.
-            """
             self._delegate = middleware_class(app, *factory_args, **options)
             super().__init__(app)
 
@@ -287,6 +291,9 @@ def typed_middleware(
             ------
             TimeoutError
                 If the middleware execution exceeds the timeout.
+            Exception
+                Any exception raised by the wrapped middleware is
+                propagated unchanged after logging.
             """
             correlation_id = get_correlation_id()
             with with_fields(logger, operation=name, correlation_id=correlation_id) as log:

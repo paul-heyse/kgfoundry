@@ -356,9 +356,7 @@ if TYPE_CHECKING:
             self,
             logger: logging.Logger,
             extra: LogContextExtra | Mapping[str, object] | None,
-        ) -> None:
-            """Initialize the logger adapter. See class docstring for full details."""
-            ...
+        ) -> None: ...
 
 else:
     _LoggerAdapterBase = logging.LoggerAdapter
@@ -909,7 +907,6 @@ class CorrelationContext:
     """
 
     def __init__(self, correlation_id: str | None) -> None:
-        """Initialize the correlation context. See class docstring for full details."""
         self.correlation_id = correlation_id
         self._token: contextvars.Token[str | None] | None = None
 
@@ -962,7 +959,6 @@ class _WithFieldsContext(AbstractContextManager[LoggerAdapter]):
     def __init__(
         self, logger: logging.Logger | LoggerAdapter, fields: Mapping[str, object]
     ) -> None:
-        """Initialize the context manager. See class docstring for full details."""
         self._logger = logger
         self._fields = dict(fields)
         self._token: contextvars.Token[str | None] | None = None
@@ -1084,7 +1080,6 @@ class _DefaultLoggingCache:
     """
 
     def __init__(self) -> None:
-        """Initialize the logging cache. See class docstring for full details."""
         self._formatter_cache: JsonFormatter | None = None
 
     def get_formatter(self) -> JsonFormatter:

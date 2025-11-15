@@ -454,7 +454,7 @@ class AnswerEnvelope(TypedDict, total=False):
         ``run_id`` (trace identifier) and ``session_id`` when available, enabling
         correlation with traces and run reports.
     trace_id : str
-        OpenTelemetry trace identifier associated with the request, when available.
+        Trace identifier associated with the request (observability removed).
     span_id : str
         Identifier of the span responsible for assembling the response envelope.
     run_id : str

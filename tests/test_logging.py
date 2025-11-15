@@ -1,4 +1,4 @@
-"""Tests for structured logging with correlation IDs and observability."""
+"""Tests for structured logging with correlation IDs."""
 
 from __future__ import annotations
 

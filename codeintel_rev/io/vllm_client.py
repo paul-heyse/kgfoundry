@@ -6,7 +6,6 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 from __future__ import annotations
 
 import asyncio
-from contextlib import nullcontext
 from functools import lru_cache
 from importlib import import_module
 from time import perf_counter
@@ -16,13 +15,6 @@ from typing import TYPE_CHECKING, cast
 import msgspec
 
 from codeintel_rev._lazy_imports import LazyModule
-from codeintel_rev.metrics.registry import EMBED_BATCH_SIZE, EMBED_LATENCY_SECONDS
-from codeintel_rev.observability.execution_ledger import step as ledger_step
-from codeintel_rev.observability.otel import record_span_event
-from codeintel_rev.observability.semantic_conventions import Attrs
-from codeintel_rev.observability.timeline import current_timeline
-from codeintel_rev.telemetry.decorators import span_context
-from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from codeintel_rev.typing import NDArrayF32, gate_import
 from kgfoundry_common.logging import get_logger
 
@@ -298,7 +290,6 @@ class VLLMClient:
         engine is thread-safe. Empty batches return shape (0, embedding_dim).
         """
         np_module = _get_numpy()
-        timeline = current_timeline()
         if not texts:
             return np_module.empty(
                 (0, self.config.embedding_dim),
@@ -307,59 +298,25 @@ class VLLMClient:
 
         mode = self._mode
         batch_size = len(texts)
-        step_attrs = {"mode": mode, "batch": batch_size, "dim": self.config.embedding_dim}
-        span_attrs = {
-            Attrs.VLLM_MODE: mode,
-            Attrs.VLLM_MODEL_NAME: self.config.model,
-            Attrs.VLLM_EMBED_DIM: self.config.embedding_dim,
-            Attrs.VLLM_BATCH: batch_size,
-        }
         start = perf_counter()
-        span_cm = span_context(
-            "vllm.embed_batch",
-            kind="client",
-            stage="search.embed",
-            attrs=span_attrs,
-            emit_checkpoint=True,
-        )
-        timeline_cm = timeline.step("embed.vllm", **step_attrs) if timeline else nullcontext()
         try:
-            with ledger_step(
-                stage="embed",
-                op="vllm.embed_batch",
-                component="io.vllm",
-                attrs={
-                    Attrs.VLLM_MODE: mode,
-                    Attrs.VLLM_MODEL_NAME: self.config.model,
-                    Attrs.VLLM_BATCH: batch_size,
-                },
-            ):
-                with span_cm as (_span, _), timeline_cm:
-                    if self._local_engine is not None:
-                        vectors = self._local_engine.embed_batch(texts)
-                    else:
-                        vectors = self._embed_batch_http(texts)
+            if self._local_engine is not None:
+                vectors = self._local_engine.embed_batch(texts)
+            else:
+                vectors = self._embed_batch_http(texts)
         except Exception as exc:
-            error_attrs = dict(span_attrs)
-            error_attrs["error"] = str(exc)
-            record_span_event("vllm.embed.error", **error_attrs)
-            if timeline is not None:
-                timeline.event(
-                    "error",
-                    "embed.vllm",
-                    message=str(exc),
-                    attrs={"mode": mode, "batch": batch_size},
-                )
-            emit_step(
-                StepEvent(
-                    kind="vllm.embed_batch",
-                    status="failed",
-                    detail=type(exc).__name__,
-                    payload={"mode": mode, "batch_size": batch_size},
-                )
+            LOGGER.warning(
+                "Batch embedding failed",
+                extra={
+                    "mode": mode,
+                    "batch_size": batch_size,
+                    "model": self.config.model,
+                    "error": str(exc),
+                },
             )
             raise
 
+        elapsed_ms = int(1000 * (perf_counter() - start))
         LOGGER.debug(
             "Batch embedding completed",
             extra={
@@ -367,24 +324,8 @@ class VLLMClient:
                 "vectors_shape": vectors.shape,
                 "model": self.config.model,
                 "mode": self._mode,
+                "duration_ms": elapsed_ms,
             },
-        )
-        elapsed_ms = int(1000 * (perf_counter() - start))
-        EMBED_BATCH_SIZE.observe(batch_size)
-        EMBED_LATENCY_SECONDS.observe(elapsed_ms / 1000)
-        record_span_event("embed.vllm.complete", duration_ms=elapsed_ms, **span_attrs)
-        emit_step(
-            StepEvent(
-                kind="vllm.embed_batch",
-                status="completed",
-                payload={
-                    "mode": mode,
-                    "batch_size": batch_size,
-                    "duration_ms": elapsed_ms,
-                    "model": self.config.model,
-                    "output_rows": int(getattr(vectors, "shape", (0, 0))[0]),
-                },
-            )
         )
         return vectors
 
@@ -534,27 +475,9 @@ class VLLMClient:
             )
 
         mode = "local" if self._local_engine is not None else "http"
-        attrs = {"mode": mode, "n_texts": len(texts), "dim": self.config.embedding_dim}
-        ledger_attrs = {
-            Attrs.VLLM_MODE: mode,
-            Attrs.VLLM_MODEL_NAME: self.config.model,
-            Attrs.VLLM_BATCH: len(texts),
-        }
 
         if self._local_engine is not None:
-            with ledger_step(
-                stage="embed",
-                op="vllm.embed_batch_async",
-                component="io.vllm",
-                attrs=ledger_attrs,
-            ):
-                with span_context(
-                    "search.embed",
-                    stage="search.embed",
-                    attrs=attrs,
-                    emit_checkpoint=True,
-                ):
-                    return await self._embed_batch_async_local(texts)
+            return await self._embed_batch_async_local(texts)
 
         async_client = self._ensure_async_http_client()
         request = EmbeddingRequest(input=list(texts), model=self.config.model)
@@ -565,25 +488,13 @@ class VLLMClient:
             extra={"batch_size": len(texts), "model": self.config.model},
         )
 
-        with ledger_step(
-            stage="embed",
-            op="vllm.embed_batch_async",
-            component="io.vllm",
-            attrs=ledger_attrs,
-        ):
-            with span_context(
-                "search.embed",
-                stage="search.embed",
-                attrs=attrs,
-                emit_checkpoint=True,
-            ):
-                response = await async_client.post(
-                    f"{self.config.base_url}/embeddings",
-                    content=payload,
-                    headers={"Content-Type": "application/json"},
-                )
-                response.raise_for_status()
-                result = self._decoder.decode(response.content)
+        response = await async_client.post(
+            f"{self.config.base_url}/embeddings",
+            content=payload,
+            headers={"Content-Type": "application/json"},
+        )
+        response.raise_for_status()
+        result = self._decoder.decode(response.content)
 
         # Sort by index and extract vectors
         sorted_data = sorted(result.data, key=lambda d: d.index)

@@ -309,44 +309,6 @@ class BM25Index:
     """
 
     def __init__(self, k1: float = 0.9, b: float = 0.4) -> None:
-        """Initialize BM25 index with ranking parameters.
-
-        Extended Summary
-        ----------------
-        Constructs an empty BM25 index instance with configurable ranking
-        parameters. The index starts with no documents and must be populated
-        via :meth:`build_from_duckdb` or :meth:`load` before use. Parameters
-        k1 and b control term frequency saturation and document length
-        normalization in the BM25 scoring formula.
-
-        Parameters
-        ----------
-        k1 : float, optional
-            Term frequency saturation parameter. Controls how quickly term
-            frequency saturates in scoring. Higher values (e.g., 1.2-2.0) allow
-            more influence from repeated query terms. Lower values (e.g., 0.5-0.9)
-            saturate quickly, reducing the impact of term repetition. Defaults to 0.9.
-        b : float, optional
-            Document length normalization parameter. Controls the degree of length
-            normalization. Values closer to 1.0 normalize more aggressively,
-            penalizing longer documents. Values closer to 0.0 reduce normalization.
-            Defaults to 0.4.
-
-        Notes
-        -----
-        Time O(1). The index is initially empty (no documents, no term frequencies).
-        After initialization, documents must be added via build_from_duckdb() or
-        load() before search operations will work. The parameters k1 and b are
-        stored and used in all subsequent scoring operations.
-
-        Examples
-        --------
-        >>> index = BM25Index(k1=1.2, b=0.75)
-        >>> index.k1
-        1.2
-        >>> len(index.docs)
-        0
-        """
         self.k1 = k1
         self.b = b
         self.docs: list[BM25Doc] = []

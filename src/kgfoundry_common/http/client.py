@@ -99,7 +99,6 @@ class HttpClient:
     """
 
     def __init__(self, settings: HttpSettings, retry_strategy: RetryStrategy | None = None) -> None:
-        """Initialize the HTTP client. See class docstring for full details."""
         self.s = settings
         self.retry_strategy = retry_strategy  # may be None for single-attempt
 

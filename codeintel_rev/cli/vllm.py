@@ -112,6 +112,21 @@ def _wait_until_ready(base_url: str, timeout_s: float) -> None:
 
 
 def cmd_serve_http(args: argparse.Namespace) -> int:
+    """Launch and manage a vLLM HTTP server process.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed command-line arguments containing model configuration, server
+        binding options, and process management settings.
+
+    Returns
+    -------
+    int
+        Exit code: 0 on success, non-zero on failure. The function launches
+        the server as a subprocess and optionally waits for it to become
+        healthy before returning.
+    """
     base_url = args.base_url or DEFAULT_BASE_URL
     host, port = _infer_host_port(base_url)
     model = args.model or DEFAULT_MODEL
@@ -156,6 +171,21 @@ def _wait_for_exit(pid: int, timeout: float) -> bool:
 
 
 def cmd_shutdown(args: argparse.Namespace) -> int:
+    """Shutdown a running vLLM server process.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed command-line arguments containing PID file path, timeout, and
+        force flag. The function reads the PID from the file and sends
+        termination signals.
+
+    Returns
+    -------
+    int
+        Exit code: 0 if the server stopped successfully, 1 if the PID file
+        is missing, unreadable, or the process did not exit within the timeout.
+    """
     if not args.pid_file.exists():
         print(f"[shutdown] PID file not found: {args.pid_file}", file=sys.stderr)
         return 1
@@ -185,6 +215,15 @@ def cmd_shutdown(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the command-line argument parser for vLLM server management.
+
+    Returns
+    -------
+    argparse.ArgumentParser
+        Configured argument parser with subcommands for "serve-http" and
+        "shutdown". The parser includes all necessary options for model
+        configuration, server binding, and process management.
+    """
     parser = argparse.ArgumentParser(description="vLLM HTTP server helper.")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -217,6 +256,18 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run the vLLM server management CLI.
+
+    Parameters
+    ----------
+    argv : Sequence[str] | None, optional
+        Command-line arguments. If None, uses sys.argv. Defaults to None.
+
+    Returns
+    -------
+    int
+        Exit code returned by the selected subcommand (serve-http or shutdown).
+    """
     parser = build_parser()
     args = parser.parse_args(argv)
     return args.func(args)

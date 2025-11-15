@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Iterator
-from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -91,47 +89,6 @@ def _run_search(context: Mock, options: TextSearchOptions) -> dict:
         Search result payload.
     """
     return asyncio.run(search_text(context, options.query, options=options))
-
-
-def test_search_text_uses_observe_duration(mock_context: Mock) -> None:
-    """Adapters record metrics using the shared observe_duration helper."""
-    scope: ScopeIn = {}
-    observation = Mock()
-    observation.mark_success = Mock()
-    observation.mark_error = Mock()
-    calls: list[tuple[str, str]] = []
-
-    @contextmanager
-    def fake_observe(operation: str, component: str, **_kwargs: object) -> Iterator[Mock]:
-        calls.append((operation, component))
-        yield observation
-
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_session_id",
-            return_value="session-observe",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.text_search.get_effective_scope",
-            return_value=scope,
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.text_search.observe_duration",
-            fake_observe,
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.text_search.run_subprocess",
-            return_value="",
-        ),
-    ):
-        options = TextSearchOptions(query="needle", max_results=5)
-        result = _run_search(mock_context, options)
-
-    assert result["matches"] == []
-    assert result["total"] == 0
-    assert calls == [("text_search", "codeintel_mcp")]
-    observation.mark_success.assert_called_once()
-    observation.mark_error.assert_not_called()
 
 
 def test_search_text_scope_include_and_exclude(mock_context: Mock) -> None:

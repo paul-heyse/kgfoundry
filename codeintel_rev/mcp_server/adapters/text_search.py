@@ -13,22 +13,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from codeintel_rev.app.middleware import get_session_id
-from codeintel_rev.mcp_server.common.observability import Observation, observe_duration
 from codeintel_rev.mcp_server.schemas import Match, ScopeIn
 from codeintel_rev.mcp_server.scope_utils import (
     get_effective_scope,
     merge_scope_filters,
 )
-from codeintel_rev.observability.execution_ledger import (
-    record as ledger_record,
-)
-from codeintel_rev.observability.execution_ledger import (
-    step as ledger_step,
-)
-from codeintel_rev.observability.otel import record_span_event
-from codeintel_rev.observability.semantic_conventions import Attrs, to_label_str
-from codeintel_rev.telemetry.context import current_run_id
-from codeintel_rev.telemetry.decorators import span_context
 from kgfoundry_common.errors import VectorSearchError
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.subprocess_utils import (
@@ -256,58 +245,55 @@ async def search_text(
     TypeError
         If both ``options`` and keyword ``overrides`` are provided simultaneously.
         Only one method of providing search options is allowed per call.
+    VectorSearchError
+        Raised when the underlying search operation fails (timeout, subprocess error,
+        or invalid query). The error includes context about the query and search tool.
     """
     session_id = get_session_id()
-    with ledger_step(
-        stage="gather",
-        op="text.scope",
-        component="mcp.text_search",
-        attrs={"session_id": session_id},
-    ):
-        scope = await get_effective_scope(context, session_id)
-    run_id = current_run_id()
+    scope = await get_effective_scope(context, session_id)
     if options is None:
         options = TextSearchOptions.from_overrides(query, overrides)
     elif overrides:
         msg = "Cannot pass keyword overrides when options is provided"
         raise TypeError(msg)
-    telemetry_attrs: dict[str, object] = {
-        Attrs.MCP_TOOL: "search.text",
-        Attrs.MCP_SESSION_ID: session_id or "",
-        Attrs.MCP_RUN_ID: run_id or "",
-        Attrs.QUERY_LEN: len(query),
-        "text.regex": options.regex,
-        "text.case_sensitive": options.case_sensitive,
-        "text.max_results": options.max_results,
-    }
-    record_span_event(
-        "mcp.request.accepted",
-        query_preview=_preview_text(query),
-        **telemetry_attrs,
+
+    LOGGER.info(
+        "text_search.accepted",
+        extra={
+            "session_id": session_id,
+            "query_preview": _preview_text(query),
+            "regex": options.regex,
+            "case_sensitive": options.case_sensitive,
+            "max_results": options.max_results,
+        },
     )
 
     def _run_sync() -> dict:
-        with span_context(
-            "search.text",
-            kind="internal",
-            attrs=telemetry_attrs,
-            emit_checkpoint=True,
-        ):
-            result = _search_text_sync(
-                context,
-                session_id,
-                scope,
-                options,
-                telemetry_attrs=telemetry_attrs,
-            )
-            record_span_event(
-                "search.text.completed",
-                total=result.get("total", 0),
-                truncated=result.get("truncated", False),
-            )
-            return result
+        return _search_text_sync(
+            context=context,
+            session_id=session_id or "",
+            scope=scope,
+            options=options,
+        )
 
-    return await asyncio.to_thread(_run_sync)
+    try:
+        result = await asyncio.to_thread(_run_sync)
+    except VectorSearchError as exc:
+        LOGGER.warning(
+            "text_search.failed",
+            extra={"session_id": session_id, "error": str(exc)},
+        )
+        raise
+
+    LOGGER.info(
+        "text_search.completed",
+        extra={
+            "session_id": session_id,
+            "results": result.get("total", 0),
+            "truncated": result.get("truncated", False),
+        },
+    )
+    return result
 
 
 def _resolve_glob_filters(
@@ -344,8 +330,6 @@ def _search_text_sync(
     session_id: str,
     scope: ScopeIn | None,
     options: TextSearchOptions,
-    *,
-    telemetry_attrs: Mapping[str, object] | None = None,
 ) -> dict:
     repo_root = context.paths.repo_root
 
@@ -392,121 +376,63 @@ def _search_text_sync(
 
     cmd = _build_ripgrep_command(params)
 
-    plan_attrs = _clean_attrs(
-        {
-            **(telemetry_attrs or {}),
-            "text.paths": to_label_str(filters.paths) if filters.paths else None,
-            "text.include_globs": to_label_str(filters.include_globs)
-            if filters.include_globs
-            else None,
-            "text.exclude_globs": to_label_str(filters.exclude_globs)
-            if filters.exclude_globs
-            else None,
-        }
-    )
-    record_span_event("search.text.plan", **plan_attrs)
-
-    with observe_duration("text_search", COMPONENT_NAME) as observation:
-        stage_attrs = {**plan_attrs, Attrs.STAGE: "gather_channels"}
-        try:
-            with (
-                ledger_step(
-                    stage="pool_search",
-                    op="text.ripgrep",
-                    component="tools.ripgrep",
-                    attrs=_clean_attrs(plan_attrs),
-                ),
-                span_context(
-                    "search.text.ripgrep",
-                    kind="client",
-                    attrs=stage_attrs,
-                    emit_checkpoint=True,
-                ),
-            ):
-                stdout = run_subprocess(cmd, cwd=repo_root, timeout=SEARCH_TIMEOUT_SECONDS)
-        except SubprocessTimeoutError as exc:
-            observation.mark_error()
-            error_msg = "Search timeout"
+    try:
+        stdout = run_subprocess(cmd, cwd=repo_root, timeout=SEARCH_TIMEOUT_SECONDS)
+    except SubprocessTimeoutError as exc:
+        error_msg = "Search timeout"
+        raise VectorSearchError(
+            error_msg,
+            context={"query": query},
+        ) from exc
+    except SubprocessError as exc:
+        if exc.returncode == 1:
+            stdout = ""
+        elif exc.returncode == COMMAND_NOT_FOUND_RETURN_CODE:
+            return _fallback_grep(
+                repo_root=repo_root,
+                query=query,
+                options=options,
+            )
+        else:
+            error_message = (exc.stderr or "").strip() or str(exc)
             raise VectorSearchError(
-                error_msg,
-                context={"query": query},
-            ) from exc
-        except SubprocessError as exc:
-            if exc.returncode == 1:
-                stdout = ""
-            elif exc.returncode == COMMAND_NOT_FOUND_RETURN_CODE:
-                ledger_record(
-                    "text_search.fallback",
-                    stage="pool_search",
-                    component="tools.ripgrep",
-                    ok=False,
-                    reason="ripgrep_missing",
-                )
-                record_span_event("search.text.fallback", reason="ripgrep_missing")
-                return _fallback_grep(
-                    observation=observation,
-                    repo_root=repo_root,
-                    query=query,
-                    options=options,
-                    telemetry_attrs=telemetry_attrs,
-                )
-            else:
-                observation.mark_error()
-                error_message = (exc.stderr or "").strip() or str(exc)
-                raise VectorSearchError(
-                    error_message,
-                    cause=exc,
-                    context={"query": query, "returncode": exc.returncode},
-                ) from exc
-        except ValueError as exc:
-            observation.mark_error()
-            error_msg = str(exc)
-            raise VectorSearchError(
-                error_msg,
+                error_message,
                 cause=exc,
-                context={"query": query},
+                context={"query": query, "returncode": exc.returncode},
             ) from exc
+    except ValueError as exc:
+        error_msg = str(exc)
+        raise VectorSearchError(
+            error_msg,
+            cause=exc,
+            context={"query": query},
+        ) from exc
 
-        matches, truncated = _parse_ripgrep_output(stdout, repo_root, options.max_results)
-        observation.mark_success()
-        result = {
-            "matches": matches,
-            "total": len(matches),
-            "truncated": truncated,
-        }
-        ledger_record(
-            "text_search.results",
-            stage="envelope",
-            component="mcp.text_search",
-            results=len(matches),
-            truncated=truncated,
-        )
-        return result
+    matches, truncated = _parse_ripgrep_output(stdout, repo_root, options.max_results)
+    result = {
+        "matches": matches,
+        "total": len(matches),
+        "truncated": truncated,
+    }
+    return result
 
 
 def _fallback_grep(
     *,
-    observation: Observation,
     repo_root: Path,
     query: str,
     options: TextSearchOptions,
-    telemetry_attrs: Mapping[str, object] | None = None,
 ) -> dict:
     """Fallback to basic grep if ripgrep unavailable.
 
     Parameters
     ----------
-    observation : Observation
-        Metrics observation context used to record success or failure.
     repo_root : Path
         Repository root directory.
     query : str
         Search query.
     options : TextSearchOptions
         Search configuration controlling case sensitivity and limits.
-    telemetry_attrs : Mapping[str, object] | None, optional
-        Optional telemetry attributes to include in span context. These are
-        merged with stage-specific attributes for observability. Defaults to None.
 
     Returns
     -------
@@ -525,31 +451,9 @@ def _fallback_grep(
 
     command.extend(["--", query, "."])
 
-    span_attrs = _clean_attrs(
-        {
-            **(telemetry_attrs or {}),
-            Attrs.STAGE: "gather_channels",
-            "text.fallback": "grep",
-        }
-    )
     try:
-        with (
-            ledger_step(
-                stage="pool_search",
-                op="text.grep",
-                component="tools.grep",
-                attrs=_clean_attrs(span_attrs),
-            ),
-            span_context(
-                "search.text.grep",
-                kind="client",
-                attrs=span_attrs,
-                emit_checkpoint=True,
-            ),
-        ):
-            stdout = run_subprocess(command, cwd=repo_root, timeout=SEARCH_TIMEOUT_SECONDS)
+        stdout = run_subprocess(command, cwd=repo_root, timeout=SEARCH_TIMEOUT_SECONDS)
     except SubprocessTimeoutError as exc:
-        observation.mark_error()
         error_msg = "Search tool unavailable"
         raise VectorSearchError(
             error_msg,
@@ -559,7 +463,6 @@ def _fallback_grep(
         if exc.returncode == 1:
             stdout = ""
         else:
-            observation.mark_error()
             error_message = (exc.stderr or "").strip() or str(exc)
             raise VectorSearchError(
                 error_message,
@@ -567,7 +470,6 @@ def _fallback_grep(
                 context={"query": query, "tool": "grep", "returncode": exc.returncode},
             ) from exc
     except ValueError as exc:
-        observation.mark_error()
         error_msg = str(exc)
         raise VectorSearchError(
             error_msg,
@@ -599,21 +501,11 @@ def _fallback_grep(
             matches.append(match)
         except (ValueError, IndexError):
             continue
-
-    observation.mark_success()
     result = {
         "matches": matches,
         "total": len(matches),
         "truncated": len(matches) >= max_results,
     }
-    ledger_record(
-        "text_search.results",
-        stage="envelope",
-        component="mcp.text_search",
-        results=len(matches),
-        truncated=result["truncated"],
-        fallback=True,
-    )
     return result
 
 
@@ -760,25 +652,6 @@ def _preview_text(value: str, *, limit: int = 200) -> str:
     if len(text) <= limit:
         return text
     return text[: max(limit - 3, 0)] + "..."
-
-
-def _clean_attrs(attrs: Mapping[str, object]) -> dict[str, object]:
-    """Filter out ``None`` values to keep span attributes compact.
-
-    Parameters
-    ----------
-    attrs : Mapping[str, object]
-        Dictionary of span attributes. May contain None values which will be
-        filtered out in the returned dictionary.
-
-    Returns
-    -------
-    dict[str, object]
-        Dictionary containing only non-None key-value pairs from the input.
-        Preserves the original key-value pairs, excluding any entries where
-        the value is None.
-    """
-    return {key: value for key, value in attrs.items() if value is not None}
 
 
 __all__ = ["search_text"]

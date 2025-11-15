@@ -65,11 +65,6 @@ from typing import TYPE_CHECKING, TypeVar, cast
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.errors import PathNotDirectoryError, PathNotFoundError
 from codeintel_rev.io.path_utils import PathOutsideRepositoryError
-from codeintel_rev.observability.otel import current_trace_id, record_span_event
-from codeintel_rev.observability.runpack import make_runpack
-from codeintel_rev.observability.timeline import current_timeline
-from codeintel_rev.telemetry.context import current_run_id
-from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from kgfoundry_common.errors import KgFoundryError
 from kgfoundry_common.logging import get_logger, with_fields
 from kgfoundry_common.problem_details import build_problem_details
@@ -418,29 +413,16 @@ def convert_exception_to_envelope(
 
 
 def _record_exception_event(exc: BaseException, operation: str) -> None:
-    """Emit an OpenTelemetry exception event for adapter errors."""
-    attrs = {
-        "operation": operation,
-        "exception.type": type(exc).__name__,
-        "exception.message": str(exc),
-    }
-    run_id = current_run_id()
-    if run_id:
-        attrs["run_id"] = run_id
+    """Log adapter errors with structured context."""
     stack = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-    if stack:
-        attrs["exception.stacktrace"] = stack[-2048:]
-    try:
-        record_span_event("adapter.exception", **attrs)
-    except (RuntimeError, ValueError):  # pragma: no cover - best-effort telemetry
-        LOGGER.debug("Failed to record exception span event", exc_info=True)
-    emit_step(
-        StepEvent(
-            kind=f"{operation}.error",
-            status="failed",
-            detail=type(exc).__name__,
-            payload={"message": str(exc)},
-        )
+    LOGGER.error(
+        "adapter.exception",
+        extra={
+            "operation": operation,
+            "exception_type": type(exc).__name__,
+            "exception_message": str(exc),
+            "exception_stacktrace": stack[-2048:] if stack else None,
+        },
     )
 
 
@@ -648,14 +630,7 @@ def handle_adapter_errors(
                     # SystemExit, GeneratorExit) are re-raised above.
                     # This is a boundary handler that MUST catch all user exceptions to
                     # guarantee consistent error responses for clients.
-                    envelope = convert_exception_to_envelope(exc, operation, empty_result)
-                    _maybe_attach_runpack(
-                        envelope,
-                        operation=operation,
-                        args=args,
-                        kwargs=kwargs,
-                    )
-                    return envelope
+                    return convert_exception_to_envelope(exc, operation, empty_result)
 
             return cast("F", async_wrapper)
 
@@ -714,14 +689,7 @@ def handle_adapter_errors(
                 # SystemExit, GeneratorExit) are re-raised above.
                 # This is a boundary handler that MUST catch all user exceptions to
                 # guarantee consistent error responses for clients.
-                envelope = convert_exception_to_envelope(exc, operation, empty_result)
-                _maybe_attach_runpack(
-                    envelope,
-                    operation=operation,
-                    args=args,
-                    kwargs=kwargs,
-                )
-                return envelope
+                return convert_exception_to_envelope(exc, operation, empty_result)
 
         return cast("F", sync_wrapper)
 
@@ -758,33 +726,3 @@ def _extract_context_from_args(
     except RuntimeError:
         return None
     return cast("ApplicationContext | None", resolved)
-
-
-def _maybe_attach_runpack(
-    envelope: dict[str, object],
-    *,
-    operation: str,
-    args: tuple[object, ...],
-    kwargs: Mapping[str, object],
-) -> None:
-    timeline = current_timeline()
-    if timeline is None or not timeline.session_id:
-        return
-    context = _extract_context_from_args(args, kwargs)
-    if context is None:
-        return
-    trace_id = current_trace_id()
-    try:
-        path = make_runpack(
-            context=context,
-            session_id=timeline.session_id,
-            run_id=timeline.run_id,
-            trace_id=trace_id,
-            reason=operation,
-        )
-    except (OSError, RuntimeError, ValueError):  # pragma: no cover - diagnostics must never raise
-        LOGGER.debug("runpack.create_failed", exc_info=True)
-        return
-    obs = envelope.setdefault("observability", {})
-    if isinstance(obs, dict):
-        obs["runpack_path"] = str(path)

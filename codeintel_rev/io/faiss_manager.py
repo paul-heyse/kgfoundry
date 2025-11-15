@@ -25,36 +25,8 @@ from typing import TYPE_CHECKING, Any, cast
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.errors import VectorIndexIncompatibleError, VectorIndexStateError
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
-from codeintel_rev.metrics.registry import (
-    FAISS_ANN_LATENCY_SECONDS,
-    FAISS_BUILD_SECONDS_LAST,
-    FAISS_BUILD_TOTAL,
-    FAISS_INDEX_CODE_SIZE_BYTES,
-    FAISS_INDEX_CUVS_ENABLED,
-    FAISS_INDEX_DIM,
-    FAISS_INDEX_GPU_ENABLED,
-    FAISS_INDEX_SIZE_VECTORS,
-    FAISS_POSTFILTER_DENSITY,
-    FAISS_REFINE_KEPT_RATIO,
-    FAISS_REFINE_LATENCY_SECONDS,
-    FAISS_SEARCH_ERRORS_TOTAL,
-    FAISS_SEARCH_LAST_K,
-    FAISS_SEARCH_LAST_MS,
-    FAISS_SEARCH_LATENCY_SECONDS,
-    FAISS_SEARCH_NPROBE,
-    FAISS_SEARCH_TOTAL,
-    HNSW_SEARCH_EF,
-    set_compile_flags_id,
-    set_factory_id,
-)
-from codeintel_rev.observability.execution_ledger import step as ledger_step
-from codeintel_rev.observability.otel import record_span_event
-from codeintel_rev.observability.semantic_conventions import Attrs
-from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.retrieval.rerank_flat import FlatReranker
 from codeintel_rev.retrieval.types import SearchHit
-from codeintel_rev.telemetry.decorators import span_context
-from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from codeintel_rev.typing import NDArrayF32, NDArrayI64, gate_import
 from kgfoundry_common.errors import VectorSearchError
 from kgfoundry_common.logging import get_logger
@@ -289,13 +261,12 @@ class _SearchExecutionParams:
 
 @dataclass(frozen=True, slots=True)
 class _SearchPlan:
-    """Resolved parameters, query buffer, and timeline metadata for a search."""
+    """Resolved parameters and query buffer for a search."""
 
     queries: NDArrayF32
     k: int
     search_k: int
     params: _SearchExecutionParams
-    timeline: Timeline | None
 
 
 class _FAISSIdMapMixin:
@@ -1442,7 +1413,6 @@ class FAISSManager(
         O(n) for Flat, O(nprobe * k) for IVF-family, O(log n * ef_search) for HNSW.
         """
         plan = self._prepare_search_plan(query, k, nprobe, runtime)
-        timeline = plan.timeline
         metric_labels = self._metric_labels(plan)
         FAISS_SEARCH_TOTAL.inc()
         FAISS_SEARCH_LAST_K.set(float(plan.k))
@@ -1450,128 +1420,70 @@ class FAISSManager(
             FAISS_SEARCH_NPROBE.set(float(plan.params.nprobe))
         if plan.params.ef_search is not None:
             HNSW_SEARCH_EF.set(float(plan.params.ef_search))
-        if timeline is not None:
-            timeline.event(
-                "faiss.search.start",
-                "faiss",
-                attrs={
+
+        start = perf_counter()
+        ann_timer_start = start
+        try:
+            distances, identifiers = self._execute_dual_search(
+                query=plan.queries,
+                search_k=plan.search_k,
+                params=plan.params,
+            )
+            if plan.search_k > 0:
+                FAISS_POSTFILTER_DENSITY.labels(**metric_labels).set(plan.k / float(plan.search_k))
+            duck_catalog = catalog if isinstance(catalog, DuckDBCatalog) else None
+            refined = self._maybe_refine_results(
+                catalog=duck_catalog,
+                plan=plan,
+                identifiers=identifiers,
+                metric_labels=metric_labels,
+            )
+            if refined is not None:
+                distances, identifiers = refined
+            result = (distances[:, : plan.k], identifiers[:, : plan.k])
+        except Exception as exc:
+            FAISS_SEARCH_ERRORS_TOTAL.inc()
+            LOGGER.debug(
+                "FAISS search failed",
+                extra={
                     "k": plan.k,
                     "nprobe": plan.params.nprobe,
                     "use_gpu": plan.params.use_gpu,
-                    "has_secondary": bool(self.secondary_index),
+                    "error": type(exc).__name__,
                 },
             )
-
-        span_attrs = {
-            Attrs.COMPONENT: "retrieval",
-            Attrs.STAGE: "faiss.search",
-            Attrs.FAISS_TOP_K: plan.k,
-            Attrs.FAISS_NPROBE: plan.params.nprobe,
-            Attrs.FAISS_GPU: plan.params.use_gpu,
-        }
-        with ledger_step(
-            stage="pool_search",
-            op="faiss.search",
-            component="retrieval.faiss",
-            attrs={
-                Attrs.FAISS_TOP_K: plan.k,
-                Attrs.FAISS_NPROBE: plan.params.nprobe,
-                Attrs.FAISS_GPU: plan.params.use_gpu,
-            },
-        ):
-            with span_context(
-                "search.faiss",
-                stage="search.faiss",
-                attrs=span_attrs,
-                emit_checkpoint=True,
-            ):
-                start = perf_counter()
-                ann_timer_start = start
-                try:
-                    distances, identifiers = self._execute_dual_search(
-                        query=plan.queries,
-                        search_k=plan.search_k,
-                        params=plan.params,
-                    )
-                    if plan.search_k > 0:
-                        FAISS_POSTFILTER_DENSITY.labels(**metric_labels).set(
-                            plan.k / float(plan.search_k)
-                        )
-                    duck_catalog = catalog if isinstance(catalog, DuckDBCatalog) else None
-                    refined = self._maybe_refine_results(
-                        catalog=duck_catalog,
-                        plan=plan,
-                        identifiers=identifiers,
-                        metric_labels=metric_labels,
-                    )
-                    if refined is not None:
-                        distances, identifiers = refined
-                    result = (distances[:, : plan.k], identifiers[:, : plan.k])
-                except Exception as exc:
-                    if timeline is not None:
-                        timeline.event(
-                            "faiss.search.end",
-                            "faiss",
-                            status="error",
-                            message=str(exc),
-                            attrs={
-                                "k": plan.k,
-                                "nprobe": plan.params.nprobe,
-                                "use_gpu": plan.params.use_gpu,
-                            },
-                        )
-                    FAISS_SEARCH_ERRORS_TOTAL.inc()
-                    emit_step(
-                        StepEvent(
-                            kind="faiss.search",
-                            status="failed",
-                            detail=type(exc).__name__,
-                            payload={
-                                "k": plan.k,
-                                "nprobe": plan.params.nprobe,
-                                "use_gpu": plan.params.use_gpu,
-                            },
-                        )
-                    )
-                    msg = "FAISS search failed"
-                    raise VectorSearchError(
-                        msg,
-                        cause=exc,
-                        context={
-                            "index_path": str(self.index_path),
-                            "use_gpu": plan.params.use_gpu,
-                            "search_k": plan.k,
-                        },
-                    ) from exc
-                finally:
-                    duration = max(perf_counter() - ann_timer_start, 0.0)
-                    FAISS_ANN_LATENCY_SECONDS.labels(**metric_labels).observe(duration)
+            msg = "FAISS search failed"
+            raise VectorSearchError(
+                msg,
+                cause=exc,
+                context={
+                    "index_path": str(self.index_path),
+                    "use_gpu": plan.params.use_gpu,
+                    "search_k": plan.k,
+                },
+            ) from exc
+        finally:
+            duration = max(perf_counter() - ann_timer_start, 0.0)
+            LOGGER.debug(
+                "FAISS ANN search completed",
+                extra={
+                    "duration_s": duration,
+                    "k": plan.k,
+                    "nprobe": plan.params.nprobe,
+                    "use_gpu": plan.params.use_gpu,
+                },
+            )
 
         elapsed_total = (perf_counter() - start) * 1000.0
-        FAISS_SEARCH_LATENCY_SECONDS.observe(elapsed_total / 1000.0)
-        if timeline is not None:
-            timeline.event(
-                "faiss.search.end",
-                "faiss",
-                attrs={
-                    "duration_ms": int(elapsed_total),
-                    "rows": result[0].shape[0],
-                    "k": plan.k,
-                    "nprobe": plan.params.nprobe,
-                    "use_gpu": plan.params.use_gpu,
-                },
-            )
-        emit_step(
-            StepEvent(
-                kind="faiss.search",
-                status="completed",
-                payload={
-                    "k": plan.k,
-                    "nprobe": plan.params.nprobe,
-                    "use_gpu": plan.params.use_gpu,
-                    "duration_ms": int(elapsed_total),
-                },
-            )
+        LOGGER.debug(
+            "FAISS search completed",
+            extra={
+                "duration_ms": int(elapsed_total),
+                "rows": result[0].shape[0],
+                "k": plan.k,
+                "nprobe": plan.params.nprobe,
+                "use_gpu": plan.params.use_gpu,
+            },
         )
         self._last_latency_ms = elapsed_total
         FAISS_SEARCH_LAST_MS.set(elapsed_total)
@@ -1716,7 +1628,6 @@ class FAISSManager(
             k=k_eff,
             search_k=search_k,
             params=params,
-            timeline=current_timeline(),
         )
 
     def get_runtime_tuning(self) -> dict[str, object]:
@@ -1961,78 +1872,40 @@ class FAISSManager(
         Notes
         -----
         This is an internal method that orchestrates dual-index search with
-        OpenTelemetry tracing. It applies runtime parameters, searches both
+        It applies runtime parameters, searches both
         indexes if secondary exists, merges results by score, and returns
         the combined candidate set. Time complexity: O(search_k * log n)
         for HNSW, O(nprobe * search_k) for IVF-family indexes.
         """
-        search_attrs = {
-            Attrs.REQUEST_STAGE: "dense",
-            Attrs.FAISS_TOP_K: search_k,
-            Attrs.FAISS_NPROBE: params.nprobe or -1,
-            Attrs.FAISS_GPU: params.use_gpu,
-            Attrs.FAISS_INDEX_TYPE: str(self.faiss_family or "auto"),
-        }
-        search_span = span_context(
-            "faiss.search",
-            stage="search.faiss",
-            attrs=search_attrs,
-            emit_checkpoint=True,
+        self._apply_runtime_parameters(
+            nprobe=params.nprobe,
+            ef_search=params.ef_search,
+            quantizer_ef_search=params.quantizer_ef_search,
         )
-        with search_span:
-            self._apply_runtime_parameters(
-                nprobe=params.nprobe,
-                ef_search=params.ef_search,
-                quantizer_ef_search=params.quantizer_ef_search,
-            )
-            with span_context(
-                "faiss.search.primary",
-                stage="search.faiss.primary",
-                attrs={Attrs.FAISS_NPROBE: params.nprobe or -1},
-            ):
-                primary_dists, primary_ids = self._search_primary(query, search_k, params.nprobe)
-            if self.secondary_index is None:
-                record_span_event(
-                    "faiss.search.primary_only",
-                    candidates=int(primary_ids.shape[1]),
-                )
-                return primary_dists, primary_ids
-            with span_context(
-                "faiss.search.secondary",
-                stage="search.faiss.secondary",
-                attrs={Attrs.FAISS_INDEX_TYPE: "secondary"},
-            ):
-                secondary_dists, secondary_ids = self._search_secondary(query, search_k)
-            with span_context(
-                "faiss.search.merge",
-                stage="search.faiss.merge",
-                attrs={
-                    "primary_candidates": int(primary_ids.shape[1]),
-                    "secondary_candidates": int(secondary_ids.shape[1]),
-                },
-            ):
-                merged_dists, merged_ids = self._merge_results(
-                    primary_dists,
-                    primary_ids,
-                    secondary_dists,
-                    secondary_ids,
-                    search_k,
-                )
-            record_span_event(
-                "faiss.search.merge_result",
-                primary=primary_ids.shape[1],
-                secondary=secondary_ids.shape[1],
-                merged=merged_ids.shape[1],
-            )
+        primary_dists, primary_ids = self._search_primary(query, search_k, params.nprobe)
+        if self.secondary_index is None:
             LOGGER.debug(
-                "Dual-index search completed",
-                extra=_log_extra(
-                    primary_results=primary_dists.shape[1],
-                    secondary_results=secondary_dists.shape[1],
-                    merged_results=merged_dists.shape[1],
-                ),
+                "FAISS primary-only search completed",
+                extra={"candidates": int(primary_ids.shape[1])},
             )
-            return merged_dists, merged_ids
+            return primary_dists, primary_ids
+        secondary_dists, secondary_ids = self._search_secondary(query, search_k)
+        merged_dists, merged_ids = self._merge_results(
+            primary_dists,
+            primary_ids,
+            secondary_dists,
+            secondary_ids,
+            search_k,
+        )
+        LOGGER.debug(
+            "FAISS dual-index search completed",
+            extra={
+                "primary_candidates": primary_ids.shape[1],
+                "secondary_candidates": secondary_ids.shape[1],
+                "merged_candidates": merged_ids.shape[1],
+            },
+        )
+        return merged_dists, merged_ids
 
     def _maybe_refine_results(
         self,
@@ -2069,7 +1942,7 @@ class FAISSManager(
             Candidate chunk IDs from ANN search, shape (n_queries, search_k).
             These IDs are used to retrieve embeddings for exact similarity computation.
         metric_labels : Mapping[str, str] | None, optional
-            Prometheus metric labels applied when recording refinement latency.
+            Metric labels (observability removed).
             When None, falls back to the unlabeled histogram variant.
 
         Returns
@@ -2095,24 +1968,14 @@ class FAISSManager(
         if catalog is None or plan.k <= 0 or plan.search_k <= plan.k or self.refine_k_factor <= 1.0:
             return None
         kept_ratio = plan.k / float(plan.search_k)
-        FAISS_REFINE_KEPT_RATIO.observe(kept_ratio)
         refine_start = perf_counter()
         try:
-            with ledger_step(
-                stage="rerank",
-                op="faiss.refine",
-                component="retrieval.faiss",
-                attrs={
-                    Attrs.RETRIEVAL_TOP_K: plan.k,
-                    Attrs.FAISS_TOP_K: plan.search_k,
-                },
-            ):
-                reranker = FlatReranker(catalog)
-                rerank_scores, rerank_ids = reranker.rerank(
-                    plan.queries,
-                    identifiers[:, : plan.search_k],
-                    top_k=plan.k,
-                )
+            reranker = FlatReranker(catalog)
+            rerank_scores, rerank_ids = reranker.rerank(
+                plan.queries,
+                identifiers[:, : plan.search_k],
+                top_k=plan.k,
+            )
         except (RuntimeError, ValueError) as exc:  # pragma: no cover - rerank is best-effort
             LOGGER.warning(
                 "Exact rerank failed; falling back to ANN ordering",
@@ -2120,10 +1983,15 @@ class FAISSManager(
             )
             return None
         duration = max(perf_counter() - refine_start, 0.0)
-        if metric_labels is not None:
-            FAISS_REFINE_LATENCY_SECONDS.labels(**metric_labels).observe(duration)
-        else:  # pragma: no cover - legacy path
-            FAISS_REFINE_LATENCY_SECONDS.observe(duration)
+        LOGGER.debug(
+            "FAISS refine completed",
+            extra={
+                "duration_s": duration,
+                "kept_ratio": kept_ratio,
+                "k": plan.k,
+                "search_k": plan.search_k,
+            },
+        )
         self._log_refine_delta(identifiers[:, : plan.k], rerank_ids)
         return rerank_scores, rerank_ids
 
@@ -2812,10 +2680,10 @@ class FAISSManager(
     ) -> None:
         """Record the selected index factory and persist metadata.
 
-        This method logs the index factory choice, updates Prometheus metrics,
+        This method logs the index factory choice,
         and persists index metadata to disk. It extracts the index type name
         (either from the provided label or by inspecting the index object),
-        records it in metrics, and writes a metadata snapshot including factory
+        and writes a metadata snapshot including factory
         name, vector count, and parameter space configuration.
 
         Parameters
@@ -2843,7 +2711,7 @@ class FAISSManager(
         -----
         This method is called after index construction or loading to record the
         index configuration for observability and persistence. It updates
-        Prometheus metrics (set_factory_id) and writes metadata to the meta JSON
+        Writes metadata to the meta JSON
         file. Time complexity: O(1) for logging and metrics, O(n) for metadata
         serialization where n is the metadata size. The method performs file I/O
         to persist metadata and is not thread-safe if called concurrently.
@@ -2920,14 +2788,12 @@ class FAISSManager(
                 index.nprobe = int(nprobe)
 
     def _metric_labels(self, plan: _SearchPlan) -> dict[str, str]:
-        """Generate Prometheus metric labels from a search plan.
+        """Generate metric labels from a search plan (observability removed).
 
-        This method constructs a dictionary of metric labels for Prometheus
-        histograms and counters based on the search plan parameters. The labels
-        include index family, nprobe setting, ef_search setting, and refine_k_factor
-        (computed as search_k / k). These labels enable fine-grained metric
-        aggregation and analysis of search performance across different index
-        configurations and parameter settings.
+        This method constructs a dictionary of metric labels based on the search plan
+        parameters. The labels include index family, nprobe setting, ef_search setting,
+        and refine_k_factor (computed as search_k / k). This method is kept for
+        compatibility but no longer records metrics.
 
         Parameters
         ----------
@@ -2939,18 +2805,17 @@ class FAISSManager(
         Returns
         -------
         dict[str, str]
-            Dictionary of Prometheus metric labels with keys:
+            Dictionary of metric labels with keys:
             - "index_family": Index family name ("auto", "ivf_pq", "hnsw", etc.)
             - "nprobe": nprobe value as string, or "default" if None
             - "ef_search": ef_search value as string, or empty string if None
             - "refine_k_factor": Ratio of search_k to k, formatted as "X.XX"
-            All values are strings as required by Prometheus label constraints.
+            All values are strings.
 
         Notes
         -----
-        This method is used by search() to label Prometheus metrics (e.g.,
-        FAISS_ANN_LATENCY_SECONDS, FAISS_REFINE_LATENCY_SECONDS) for dimensional
-        analysis. The refine_k_factor is computed as search_k / k to represent
+        This method is kept for compatibility but no longer records metrics.
+        The refine_k_factor is computed as search_k / k to represent
         candidate expansion ratio. Time complexity: O(1). The method is deterministic
         and produces consistent labels for the same search plan.
         """

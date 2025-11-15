@@ -12,7 +12,6 @@ from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, Final, cast
 
-from codeintel_rev.telemetry.otel_metrics import GaugeLike, build_gauge
 from kgfoundry_common.logging import get_logger
 from kgfoundry_common.typing.heavy_deps import EXTRAS_HINT
 
@@ -20,60 +19,9 @@ if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
 
 from codeintel_rev.errors import RuntimeLifecycleError
-from codeintel_rev.observability.otel import as_span, set_current_span_attrs
 
 LOGGER = get_logger(__name__)
 
-
-def _build_capability_gauge(metric: str, description: str) -> GaugeLike:
-    metric_name = f"codeintel_capability_{metric}"
-    return build_gauge(metric_name, description)
-
-
-_CAPABILITY_GAUGES: Final[dict[str, GaugeLike]] = {
-    "faiss_index_present": _build_capability_gauge(
-        "faiss_index_present", "FAISS index file available on disk"
-    ),
-    "duckdb_catalog_present": _build_capability_gauge(
-        "duckdb_catalog_present", "DuckDB catalog file available on disk"
-    ),
-    "scip_index_present": _build_capability_gauge(
-        "scip_index_present", "SCIP index file available on disk"
-    ),
-    "coderank_index_present": _build_capability_gauge(
-        "coderank_index_present", "CodeRank FAISS index available on disk"
-    ),
-    "warp_index_present": _build_capability_gauge(
-        "warp_index_present", "WARP/BM25 index directory available"
-    ),
-    "xtr_index_present": _build_capability_gauge(
-        "xtr_index_present", "XTR token index directory available"
-    ),
-    "vllm_client_ready": _build_capability_gauge(
-        "vllm_client_ready", "vLLM client configured in ApplicationContext"
-    ),
-    "faiss_importable": _build_capability_gauge(
-        "faiss_importable", "faiss module import succeeded"
-    ),
-    "duckdb_importable": _build_capability_gauge(
-        "duckdb_importable", "duckdb module import succeeded"
-    ),
-    "httpx_importable": _build_capability_gauge(
-        "httpx_importable", "httpx module import succeeded"
-    ),
-    "torch_importable": _build_capability_gauge(
-        "torch_importable", "torch module import succeeded"
-    ),
-    "lucene_importable": _build_capability_gauge(
-        "lucene_importable", "Pyserini Lucene module import succeeded"
-    ),
-    "onnxruntime_importable": _build_capability_gauge(
-        "onnxruntime_importable", "onnxruntime module import succeeded"
-    ),
-    "faiss_gpu_available": _build_capability_gauge(
-        "faiss_gpu_available", "FAISS GPU symbols detected"
-    ),
-}
 
 __all__ = ["Capabilities"]
 
@@ -181,12 +129,6 @@ def _path_exists(path: Path | None) -> bool:
     return bool(path and path.exists())
 
 
-def _record_metrics(payload: dict[str, object]) -> None:
-    """Update Prometheus gauges with the latest capability snapshot."""
-    for key, gauge in _CAPABILITY_GAUGES.items():
-        gauge.set(1.0 if payload.get(key) else 0.0)
-
-
 @dataclass(frozen=True, slots=True)
 class Capabilities:
     """Capability snapshot used for MCP tool gating and the /capz endpoint."""
@@ -273,7 +215,6 @@ class Capabilities:
                     hints[hint_key] = suggestion
         if hints:
             payload["hints"] = hints
-        _record_metrics(payload)
         return payload
 
     def stamp(self, payload: dict[str, object] | None = None) -> str:
@@ -326,56 +267,43 @@ class Capabilities:
         snapshot is used for MCP tool gating and the /capz endpoint. Time
         complexity: O(1) for most checks, O(module_load_time) for optional imports.
         """
-        with as_span("capabilities.detect"):
-            paths = getattr(context, "paths", None)
-            faiss_module = _import_optional("faiss")
-            duckdb_module = _import_optional("duckdb")
-            httpx_module = _import_optional("httpx")
-            torch_module = _import_optional("torch")
-            lucene_module = _import_optional("pyserini.search.lucene")
-            onnxruntime_module = _import_optional("onnxruntime")
-            faiss_gpu_available, faiss_gpu_reason = _probe_faiss_gpu(faiss_module)
-            active_version: str | None = None
-            version_count = 0
-            index_manager = getattr(context, "index_manager", None)
-            if index_manager is not None:
-                try:
-                    active_version = index_manager.current_version()
-                    version_count = len(index_manager.list_versions())
-                except RuntimeLifecycleError:
-                    active_version = None
+        paths = getattr(context, "paths", None)
+        faiss_module = _import_optional("faiss")
+        duckdb_module = _import_optional("duckdb")
+        httpx_module = _import_optional("httpx")
+        torch_module = _import_optional("torch")
+        lucene_module = _import_optional("pyserini.search.lucene")
+        onnxruntime_module = _import_optional("onnxruntime")
+        faiss_gpu_available, faiss_gpu_reason = _probe_faiss_gpu(faiss_module)
+        active_version: str | None = None
+        version_count = 0
+        index_manager = getattr(context, "index_manager", None)
+        if index_manager is not None:
+            try:
+                active_version = index_manager.current_version()
+                version_count = len(index_manager.list_versions())
+            except RuntimeLifecycleError:
+                active_version = None
 
-            snapshot = cls(
-                faiss_index=_path_exists(getattr(paths, "faiss_index", None))
-                and bool(faiss_module),
-                duckdb=_path_exists(getattr(paths, "duckdb_path", None)),
-                scip_index=_path_exists(getattr(paths, "scip_index", None)),
-                vllm_client=getattr(context, "vllm_client", None) is not None,
-                coderank_index_present=_path_exists(getattr(paths, "coderank_faiss_index", None)),
-                warp_index_present=_path_exists(getattr(paths, "warp_index_dir", None)),
-                xtr_index_present=_path_exists(getattr(paths, "xtr_dir", None)),
-                faiss_importable=faiss_module is not None,
-                duckdb_importable=duckdb_module is not None,
-                httpx_importable=httpx_module is not None,
-                torch_importable=torch_module is not None,
-                lucene_importable=lucene_module is not None,
-                onnxruntime_importable=onnxruntime_module is not None,
-                faiss_gpu_available=faiss_gpu_available,
-                faiss_gpu_disabled_reason=faiss_gpu_reason,
-                active_index_version=active_version,
-                versions_available=version_count,
-            )
-        set_current_span_attrs(
-            component="capabilities",
-            capability_faiss=int(snapshot.faiss_index),
-            capability_duckdb=int(snapshot.duckdb),
-            capability_scip=int(snapshot.scip_index),
-            capability_vllm=int(snapshot.vllm_client),
-            capability_xtr=int(snapshot.xtr_index_present),
-            capability_versions=snapshot.versions_available,
-            capability_active_version=snapshot.active_index_version or "unavailable",
+        snapshot = cls(
+            faiss_index=_path_exists(getattr(paths, "faiss_index", None)) and bool(faiss_module),
+            duckdb=_path_exists(getattr(paths, "duckdb_path", None)),
+            scip_index=_path_exists(getattr(paths, "scip_index", None)),
+            vllm_client=getattr(context, "vllm_client", None) is not None,
+            coderank_index_present=_path_exists(getattr(paths, "coderank_faiss_index", None)),
+            warp_index_present=_path_exists(getattr(paths, "warp_index_dir", None)),
+            xtr_index_present=_path_exists(getattr(paths, "xtr_dir", None)),
+            faiss_importable=faiss_module is not None,
+            duckdb_importable=duckdb_module is not None,
+            httpx_importable=httpx_module is not None,
+            torch_importable=torch_module is not None,
+            lucene_importable=lucene_module is not None,
+            onnxruntime_importable=onnxruntime_module is not None,
+            faiss_gpu_available=faiss_gpu_available,
+            faiss_gpu_disabled_reason=faiss_gpu_reason,
+            active_index_version=active_version,
+            versions_available=version_count,
         )
-
         payload = snapshot.model_dump()
         LOGGER.info("capabilities.snapshot", extra={"capabilities": payload})
         return snapshot

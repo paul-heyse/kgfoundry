@@ -52,8 +52,6 @@ from urllib.parse import urlparse
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.app.config_context import ApplicationContext
-from codeintel_rev.observability.otel import as_span, set_current_span_attrs
-from codeintel_rev.observability.semantic_conventions import Attrs
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -190,8 +188,7 @@ class ReadinessProbe:
         >>> results = await readiness.refresh()
         >>> faiss_healthy = results["faiss_index"].healthy
         """
-        with as_span("readiness.refresh"):
-            checks = await asyncio.to_thread(self._run_checks)
+        checks = await asyncio.to_thread(self._run_checks)
         async with self._lock:
             self._last_checks = checks
             return dict(self._last_checks)
@@ -307,19 +304,8 @@ class ReadinessProbe:
 
     @staticmethod
     def _record_check(span_name: str, fn: Callable[[], CheckResult]) -> CheckResult:
-        with as_span(span_name, component="readiness"):
-            result = fn()
-            attrs: dict[str, object] = {
-                Attrs.COMPONENT: "readiness",
-                Attrs.STAGE: span_name,
-                "readiness.healthy": int(result.healthy),
-            }
-            if result.detail:
-                attrs["readiness.detail"] = result.detail
-                if result.healthy:
-                    attrs[Attrs.WARN_DEGRADED] = True
-            set_current_span_attrs(**attrs)
-            return result
+        _ = span_name
+        return fn()
 
     @staticmethod
     def check_directory(path: Path, *, create: bool = False) -> CheckResult:

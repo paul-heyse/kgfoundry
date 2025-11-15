@@ -3,7 +3,7 @@ from __future__ import annotations
 import types
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Self, cast
@@ -20,100 +20,6 @@ from codeintel_rev.mcp_server.adapters.semantic import semantic_search
 from codeintel_rev.mcp_server.schemas import ScopeIn
 
 from kgfoundry_common.errors import EmbeddingError
-
-
-@dataclass(frozen=True)
-class _ObservationRecord:
-    operation: str
-    component: str
-    success: bool = False
-    error: bool = False
-
-    def mark_success(self) -> _ObservationRecord:
-        return _replace_observation(self, success=True)
-
-    def mark_error(self) -> _ObservationRecord:
-        return _replace_observation(self, error=True)
-
-
-OBSERVATION_RECORDS: list[_ObservationRecord] = []
-_OBSERVATION_INDEX: dict[int, int] = {}
-
-
-def _replace_observation(record: _ObservationRecord, **updates: object) -> _ObservationRecord:
-    index = _OBSERVATION_INDEX.get(id(record))
-    if index is None:
-        return record
-    updated = replace(record, **updates)
-    OBSERVATION_RECORDS[index] = updated
-    return updated
-
-
-@pytest.fixture(autouse=True)
-def _patch_observe_duration(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Patch observe_duration so tests do not touch real metrics."""
-    OBSERVATION_RECORDS.clear()
-    _OBSERVATION_INDEX.clear()
-
-    @contextmanager
-    def _fake_observe(operation: str, component: str, **_: object) -> Iterator[_ObservationRecord]:
-        record = _ObservationRecord(operation=operation, component=component)
-        OBSERVATION_RECORDS.append(record)
-        _OBSERVATION_INDEX[id(record)] = len(OBSERVATION_RECORDS) - 1
-        try:
-            yield record
-        finally:
-            _OBSERVATION_INDEX.pop(id(record), None)
-
-    monkeypatch.setattr(
-        "codeintel_rev.mcp_server.adapters.semantic.observe_duration",
-        _fake_observe,
-    )
-
-
-@pytest.fixture
-def observe_duration_calls() -> list[_ObservationRecord]:
-    """Return recorded observation calls from the semantic adapter.
-
-    Returns
-    -------
-    list[_ObservationRecord]
-        Recorded observation entries captured by the patched helper.
-    """
-    return OBSERVATION_RECORDS
-
-
-@pytest.mark.asyncio
-async def test_semantic_search_observes_duration(
-    observe_duration_calls: list[_ObservationRecord],
-) -> None:
-    context = StubContext(
-        faiss_manager=_BaseStubFAISSManager(should_fail_gpu=False),
-        config=StubContextConfig(limits=[], error=None),
-    )
-
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
-            return_value="session-observe",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
-            return_value=None,
-        ),
-    ):
-        result = await semantic_search(cast("ApplicationContext", context), "hello world", limit=1)
-
-    findings = result.get("findings") or []
-    assert findings
-    first_finding = findings[0]
-    explanations = cast("dict[str, object]", first_finding.get("explanations"))
-    assert explanations["matched_symbols"] == ["stub.symbol"]
-    assert observe_duration_calls
-    observation = observe_duration_calls[0]
-    assert observation.operation == "semantic_search"
-    assert observation.component == "codeintel_mcp"
-    assert observation.success is True
 
 
 class StubDuckDBCatalog:

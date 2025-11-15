@@ -1,10 +1,10 @@
-"""Shared pytest fixtures for table-driven testing and observability validation.
+"""Shared pytest fixtures for table-driven testing.
 
 This module provides reusable fixtures for:
 - Search options and configuration factories
 - Problem Details payload loading and validation
 - CLI command execution with captured output
-- Logging and metrics capture (logs, Prometheus, OpenTelemetry)
+- Logging capture
 - Idempotency and retry simulation
 """
 
@@ -21,25 +21,19 @@ from importlib import import_module, metadata
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, ParamSpec, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
 
 import pytest
 from fastapi import FastAPI
-from prometheus_client.registry import CollectorRegistry
 
 import tests.bootstrap  # noqa: F401
 from tests.app._context_factory import build_application_context
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Iterator, Sequence
+    from collections.abc import Callable, Iterable, Iterator
 
     from _pytest.logging import LogCaptureFixture
 
-    from kgfoundry_common.opentelemetry_types import (
-        SpanExporterProtocol,
-        SpanProtocol,
-        TracerProviderProtocol,
-    )
     from kgfoundry_common.problem_details import JsonValue
 
 P = ParamSpec("P")
@@ -182,18 +176,6 @@ else:
     ProblemDetailsDict = dict[str, _JsonValue]
 
 
-class MetricSample(Protocol):
-    """Protocol for Prometheus metric sample objects.
-
-    Attributes
-    ----------
-    value : float
-        Metric sample value.
-    """
-
-    value: float
-
-
 @fixture(name="networking_test_app")
 def _networking_test_app(tmp_path, monkeypatch: pytest.MonkeyPatch) -> FastAPI:
     """Return a FastAPI app exposing readiness, capability, and SSE routes.
@@ -269,21 +251,6 @@ def _networking_test_app(tmp_path, monkeypatch: pytest.MonkeyPatch) -> FastAPI:
     return app
 
 
-class MetricFamily(Protocol):
-    """Protocol for Prometheus metric family objects.
-
-    Attributes
-    ----------
-    name : str
-        Metric family name.
-    samples : Sequence[MetricSample] | Iterable[MetricSample]
-        Metric samples collection.
-    """
-
-    name: str
-    samples: Sequence[MetricSample] | Iterable[MetricSample]
-
-
 class SkipReturnedUnexpectedlyError(RuntimeError):
     """Raised when control reaches code after `pytest.skip`."""
 
@@ -357,107 +324,6 @@ def caplog_records(caplog: LogCaptureFixture) -> dict[str, list[logging.LogRecor
         return records_by_op
 
     return _collect_records()
-
-
-@fixture
-def prometheus_registry() -> CollectorRegistry:
-    """Provide an isolated Prometheus registry for metrics capture.
-
-    Returns
-    -------
-    CollectorRegistry
-        Fresh registry for this test; cleaned up after test completes.
-    """
-    return CollectorRegistry()
-
-
-# Optional OpenTelemetry fixtures
-
-
-@fixture
-def otel_span_exporter() -> SpanExporterProtocol:
-    """Provide an in-memory OpenTelemetry span exporter for testing.
-
-    Returns
-    -------
-    SpanExporterProtocol
-        In-memory span exporter instance.
-
-    Raises
-    ------
-    SkipReturnedUnexpectedlyError
-        If pytest.skip is called but control flow continues unexpectedly.
-    """
-    # Lazy import after path setup to avoid E402
-    otel_types = import_module("kgfoundry_common.opentelemetry_types")
-    load_exporter = cast(
-        "Callable[[], Callable[[], SpanExporterProtocol] | None]",
-        otel_types.load_in_memory_span_exporter_cls,
-    )
-    exporter_factory = load_exporter()
-    if exporter_factory is None:
-        skip_reason = "OpenTelemetry span exporter required for observability tests"
-        pytest.skip(skip_reason)
-        raise SkipReturnedUnexpectedlyError
-    return exporter_factory()
-
-
-@fixture
-def otel_tracer_provider(
-    otel_span_exporter: SpanExporterProtocol,
-) -> Iterator[TracerProviderProtocol]:
-    """Provide an OpenTelemetry tracer provider configured with in-memory exporter.
-
-    Parameters
-    ----------
-    otel_span_exporter : SpanExporterProtocol
-        Span exporter to use.
-
-    Yields
-    ------
-    TracerProviderProtocol
-        Configured tracer provider.
-
-    Raises
-    ------
-    SkipReturnedUnexpectedlyError
-        If pytest.skip is called but control flow continues unexpectedly.
-    """
-    # Lazy import after path setup to avoid E402
-    otel_types = import_module("kgfoundry_common.opentelemetry_types")
-    load_tracer_provider = cast(
-        "Callable[[], Callable[[], TracerProviderProtocol] | None]",
-        otel_types.load_tracer_provider_cls,
-    )
-
-    tracer_provider_factory = load_tracer_provider()
-    if tracer_provider_factory is None:
-        skip_reason = "OpenTelemetry SDK required for observability tests"
-        pytest.skip(skip_reason)
-        raise SkipReturnedUnexpectedlyError
-
-    otel_trace_mod = cast(
-        "ModuleType",
-        pytest.importorskip(
-            "opentelemetry.trace",
-            reason="OpenTelemetry API required for observability tests",
-        ),
-    )
-
-    provider = tracer_provider_factory()
-    span_processor = _SimpleSpanProcessor(otel_span_exporter)
-    provider.add_span_processor(span_processor)
-    set_tracer_provider = cast(
-        "Callable[[TracerProviderProtocol], None]", otel_trace_mod.set_tracer_provider
-    )
-    get_tracer_provider = cast(
-        "Callable[[], TracerProviderProtocol]", otel_trace_mod.get_tracer_provider
-    )
-    set_tracer_provider(provider)
-    try:
-        yield provider
-    finally:
-        set_tracer_provider(get_tracer_provider())
 
 
 def load_problem_details_example(example_name: str) -> ProblemDetailsDict:
@@ -541,114 +407,6 @@ def structured_log_asserter() -> Callable[[logging.LogRecord, set[str]], None]:
             raise AssertionError(msg)
 
     return assert_log_has_fields
-
-
-@fixture
-def metrics_asserter(
-    prometheus_registry: CollectorRegistry,
-) -> Callable[[str, int | float | None], None]:
-    """Provide helpers for asserting Prometheus metrics.
-
-    Parameters
-    ----------
-    prometheus_registry : CollectorRegistry
-        Prometheus registry to check metrics in.
-
-    Returns
-    -------
-    Callable[[str, int | float | None], None]
-        Function to assert metric exists and has expected value.
-    """
-
-    def assert_metric(name: str, value: float | None = None) -> None:
-        """Assert Prometheus metric exists and optionally has expected value.
-
-        This helper function verifies that a Prometheus metric exists in the
-        registry and optionally checks that it has the expected value. It
-        searches through all registered collectors to find the metric by name.
-
-        Parameters
-        ----------
-        name : str
-            Metric name to check.
-        value : float | None, optional
-            Expected value (if None, only checks existence).
-
-        Raises
-        ------
-        AssertionError
-            If metric not found or value mismatch.
-        """
-        # Collect all families and samples
-        families = [cast("MetricFamily", family) for family in prometheus_registry.collect()]
-        for family in families:
-            if family.name == name:
-                samples_raw = list(family.samples)
-                if samples_raw and value is not None:
-                    sample = samples_raw[0]
-                    actual = float(sample.value)
-                    if actual != value:
-                        msg = f"Metric {name}: expected {value}, got {actual}"
-                        raise AssertionError(msg)
-                return
-
-        msg = f"Metric not found: {name}"
-        raise AssertionError(msg)
-
-    return assert_metric
-
-
-class _SimpleSpanProcessor:
-    """Simple span processor for in-memory collection during tests.
-
-    This processor collects OpenTelemetry spans and immediately exports them
-    through the provided exporter. It's designed for testing scenarios where
-    spans need to be captured and inspected without the complexity of a full
-    production span processor.
-
-    Parameters
-    ----------
-    exporter : SpanExporterProtocol
-        OTEL span exporter used to export collected spans.
-    """
-
-    def __init__(self, exporter: SpanExporterProtocol) -> None:
-        self.exporter = exporter
-
-    def on_start(self, span: SpanProtocol, parent_context: object | None = None) -> None:
-        """No-op start hook to satisfy span processor protocol."""
-
-    def force_flush(self, timeout_millis: int | None = None) -> bool:
-        """Flush spans immediately (noop).
-
-        Parameters
-        ----------
-        timeout_millis : int | None, optional
-            Timeout in milliseconds (ignored).
-
-        Returns
-        -------
-        bool
-            Always returns True.
-        """
-        del timeout_millis
-        return True
-
-    def on_end(self, span: SpanProtocol) -> None:
-        """Process ended span.
-
-        This method is called by the OpenTelemetry SDK when a span ends.
-        It immediately exports the span through the configured exporter.
-
-        Parameters
-        ----------
-        span : SpanProtocol
-            The ended span to export.
-        """
-        self.exporter.export([span])
-
-    def shutdown(self) -> None:
-        """Allow graceful shutdown calls (noop)."""
 
 
 def _torch_smoke() -> tuple[bool, str]:
@@ -785,11 +543,7 @@ __all__ = [
     "caplog_records",
     "gpu_warmup_session",
     "load_problem_details_example",
-    "metrics_asserter",
-    "otel_span_exporter",
-    "otel_tracer_provider",
     "problem_details_loader",
-    "prometheus_registry",
     "pytest_plugins",
     "structured_log_asserter",
     "temp_index_dir",

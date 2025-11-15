@@ -14,10 +14,6 @@ from tests.helpers.immutability import (
     assert_frozen_mutation,
 )
 from tests.helpers.importing import load_attribute, load_module, load_typed_attribute
-from tests.helpers.opentelemetry import (
-    load_in_memory_span_exporter_type,
-    load_simple_span_processor_type,
-)
 from tests.helpers.typing_facades import (
     load_facade_attribute,
     load_facade_attribute_typed,
@@ -32,8 +28,6 @@ __all__ = [
     "load_facade_attribute",
     "load_facade_attribute_typed",
     "load_facade_module",
-    "load_in_memory_span_exporter_type",
     "load_module",
-    "load_simple_span_processor_type",
     "load_typed_attribute",
 ]

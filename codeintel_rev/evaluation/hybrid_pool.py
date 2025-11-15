@@ -7,17 +7,6 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from time import perf_counter
 
-from codeintel_rev.metrics.registry import (
-    HITS_ABOVE_THRESH,
-    HYBRID_LAST_MS,
-    HYBRID_RETRIEVE_TOTAL,
-    POOL_SHARE_BM25,
-    POOL_SHARE_FAISS,
-    POOL_SHARE_SPLADE,
-    POOL_SHARE_XTR,
-    RECALL_EST_AT_K,
-)
-
 _SOURCE_ALIAS = {
     "semantic": "faiss",
     "faiss": "faiss",
@@ -118,7 +107,6 @@ class HybridPoolEvaluator:
         still receive weighted scores. Time complexity: O(n * m) where n is the
         number of hits and m is the number of channels.
         """
-        HYBRID_RETRIEVE_TOTAL.inc()
         start = perf_counter()
         by_source: dict[str, list[Hit]] = {}
         meta_by_doc: dict[str, dict[str, object]] = {}
@@ -150,27 +138,7 @@ class HybridPoolEvaluator:
 
         blended.sort(key=lambda hit: hit.blended_score, reverse=True)
         top_hits = blended[:k]
-        elapsed_ms = (perf_counter() - start) * 1000.0
-        HYBRID_LAST_MS.set(elapsed_ms)
-        self._record_pool_metrics(top_hits, k)
         return top_hits
-
-    def _record_pool_metrics(self, hits: Sequence[PooledHit], k: int) -> None:
-        hits_above = sum(1 for hit in hits if hit.blended_score >= self._sim_threshold)
-        HITS_ABOVE_THRESH.set(hits_above)
-        pool_size = max(1, len(hits))
-        RECALL_EST_AT_K.set(hits_above / max(1, k))
-
-        alias_counts = {"faiss": 0, "bm25": 0, "splade": 0, "xtr": 0}
-        for hit in hits:
-            for source in hit.components:
-                alias = _SOURCE_ALIAS.get(source)
-                if alias:
-                    alias_counts[alias] += 1
-        POOL_SHARE_FAISS.set(alias_counts["faiss"] / pool_size)
-        POOL_SHARE_BM25.set(alias_counts["bm25"] / pool_size)
-        POOL_SHARE_SPLADE.set(alias_counts["splade"] / pool_size)
-        POOL_SHARE_XTR.set(alias_counts["xtr"] / pool_size)
 
 
 __all__ = ["Hit", "HybridPoolEvaluator", "PooledHit"]

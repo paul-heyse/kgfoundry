@@ -5,10 +5,7 @@ from __future__ import annotations
 import functools
 import json
 import sys
-import types
-from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
-from typing import Any, cast
 
 import duckdb
 import numpy as np
@@ -22,132 +19,8 @@ sys.path.append(str(Path(__file__).resolve().parents[2] / "src"))
 from codeintel_rev.embeddings.embedding_service import EmbeddingMetadata
 
 
-def _install_metric_stubs() -> None:
-    metric_mod = types.ModuleType("codeintel_rev.observability.metrics")
-
-    class _NoopMetric:
-        def labels(self, **_kwargs: object) -> _NoopMetric:
-            return self
-
-        def observe(self, *_args: object, **_kwargs: object) -> None:  # pragma: no cover - noop
-            return None
-
-        def inc(self, *_args: object, **_kwargs: object) -> None:  # pragma: no cover - noop
-            return None
-
-        def set(self, *_args: object, **_kwargs: object) -> None:  # pragma: no cover - noop
-            return None
-
-    def _build_metric(*_args: object, **_kwargs: object) -> _NoopMetric:
-        return _NoopMetric()
-
-    metrics_stub = cast("Any", metric_mod)
-    metrics_stub.build_counter = _build_metric
-    metrics_stub.build_histogram = _build_metric
-    metrics_stub.build_gauge = _build_metric
-    sys.modules.setdefault("codeintel_rev.observability.metrics", metric_mod)
-
-
-def _install_timeline_stubs() -> None:
-    timeline_mod = types.ModuleType("codeintel_rev.observability.timeline")
-
-    class _Timeline:
-        def __init__(
-            self,
-            session_id: str = "test",
-            run_id: str = "test",
-            *,
-            sampled: bool = True,
-        ) -> None:
-            self.session_id = session_id
-            self.run_id = run_id
-            self.sampled = sampled
-            self.metadata: dict[str, object] = {}
-
-        def event(self, *_args: object, **_kwargs: object) -> None:  # pragma: no cover - noop
-            return None
-
-        def operation(self, *_args: object, **_kwargs: object) -> AbstractContextManager[None]:
-            return nullcontext()
-
-        def step(self, *_args: object, **_kwargs: object) -> AbstractContextManager[None]:
-            return nullcontext()
-
-        def set_metadata(self, **attrs: object) -> None:
-            self.metadata.update(attrs)
-
-        def snapshot(self) -> list[dict[str, object]]:
-            return []
-
-    timeline_stub = cast("Any", timeline_mod)
-    timeline_stub.Timeline = _Timeline
-    timeline_stub.current_timeline = lambda: None
-    timeline_stub.new_timeline = lambda *_args, **_kwargs: _Timeline()
-    timeline_stub.bind_timeline = lambda *_args, **_kwargs: nullcontext()
-    sys.modules.setdefault("codeintel_rev.observability.timeline", timeline_mod)
-
-    sys.modules.setdefault(
-        "codeintel_rev.observability", types.ModuleType("codeintel_rev.observability")
-    )
-
-
-def _install_telemetry_stubs() -> None:
-    otel_mod = types.ModuleType("codeintel_rev.observability.otel")
-
-    def _as_span(*_args: object, **_kwargs: object) -> AbstractContextManager[None]:
-        return nullcontext()
-
-    cast("Any", otel_mod).as_span = _as_span
-    sys.modules.setdefault("codeintel_rev.observability.otel", otel_mod)
-    sys.modules.setdefault(
-        "codeintel_rev.observability.runtime_observer",
-        types.ModuleType("codeintel_rev.observability.runtime_observer"),
-    )
-
-    decorators_mod = types.ModuleType("codeintel_rev.telemetry.decorators")
-
-    def _span_context(*_args: object, **_kwargs: object) -> AbstractContextManager[None]:
-        return nullcontext()
-
-    cast("Any", decorators_mod).span_context = _span_context
-    sys.modules.setdefault("codeintel_rev.telemetry.decorators", decorators_mod)
-
-    sys.modules.setdefault("codeintel_rev.telemetry", types.ModuleType("codeintel_rev.telemetry"))
-    sys.modules.setdefault(
-        "codeintel_rev.telemetry.logging", types.ModuleType("codeintel_rev.telemetry.logging")
-    )
-
-
-def _install_reporting_stubs() -> None:
-    reporter_mod = types.ModuleType("codeintel_rev.telemetry.reporter")
-
-    def _noop_emit_checkpoint(*_: object, **__: object) -> None:
-        return None
-
-    reporter_stub = cast("Any", reporter_mod)
-    reporter_stub.emit_checkpoint = _noop_emit_checkpoint
-    reporter_stub.start_run = _noop_emit_checkpoint
-    reporter_stub.finalize_run = _noop_emit_checkpoint
-    sys.modules.setdefault("codeintel_rev.telemetry.reporter", reporter_mod)
-
-    reporting_mod = types.ModuleType("codeintel_rev.observability.reporting")
-    reporting_stub = cast("Any", reporting_mod)
-    reporting_stub.render_run_report = _noop_emit_checkpoint
-    reporting_stub.latest_run_report = lambda: None
-    reporting_stub.build_timeline_run_report = _noop_emit_checkpoint
-    sys.modules.setdefault("codeintel_rev.observability.reporting", reporting_mod)
-
-
-def _install_observability_stubs() -> None:
-    _install_metric_stubs()
-    _install_timeline_stubs()
-    _install_telemetry_stubs()
-    _install_reporting_stubs()
-
-
 @functools.lru_cache(maxsize=1)
 def _load_cli_app() -> Typer:
-    _install_observability_stubs()
     from codeintel_rev.cli.indexctl import app as loaded_app
 
     return loaded_app

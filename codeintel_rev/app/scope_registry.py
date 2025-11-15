@@ -57,25 +57,12 @@ from copy import deepcopy
 from threading import RLock
 from typing import TYPE_CHECKING
 
-from codeintel_rev.telemetry.otel_metrics import build_counter, build_gauge
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     from codeintel_rev.mcp_server.schemas import ScopeIn
 
 LOGGER = get_logger(__name__)
-
-# Prometheus metrics for scope management
-_active_sessions_gauge = build_gauge(
-    "codeintel_active_sessions",
-    "Number of active sessions in scope registry",
-)
-
-_scope_operations_total = build_counter(
-    "codeintel_scope_operations_total",
-    "Total scope operations",
-    ("operation",),
-)
 
 
 class ScopeRegistry:
@@ -133,9 +120,7 @@ class ScopeRegistry:
     def __init__(self) -> None:
         self._scopes: dict[str, tuple[ScopeIn, float]] = {}
         self._lock = RLock()
-        # Initialize metrics gauge to 0
-        _active_sessions_gauge.set(0)
-        LOGGER.info("Initialized ScopeRegistry with Prometheus metrics")
+        LOGGER.info("Initialized ScopeRegistry")
 
     def set_scope(self, session_id: str, scope: ScopeIn) -> None:
         """Store scope for session.
@@ -164,17 +149,9 @@ class ScopeRegistry:
         reuse or modify the original scope object after calling ``set_scope``.
         """
         timestamp = time.monotonic()
-        is_new_session = False
         with self._lock:
-            is_new_session = session_id not in self._scopes
             immutable_scope: ScopeIn = deepcopy(scope)
             self._scopes[session_id] = (immutable_scope, timestamp)
-            session_count = len(self._scopes)
-            if is_new_session:
-                # Update metrics while holding the lock to reflect the current registry state
-                _active_sessions_gauge.set(session_count)
-
-        _scope_operations_total.labels(operation="set").inc()
 
         LOGGER.info(
             "Set scope for session",
@@ -235,9 +212,6 @@ class ScopeRegistry:
             # Cast is safe because scope is ScopeIn from _scopes dict
             scope_copy: ScopeIn = deepcopy(scope)
 
-            # Update metrics
-            _scope_operations_total.labels(operation="get").inc()
-
             LOGGER.debug(
                 "Retrieved scope for session",
                 extra={
@@ -276,10 +250,6 @@ class ScopeRegistry:
         with self._lock:
             if session_id in self._scopes:
                 del self._scopes[session_id]
-                session_count = len(self._scopes)
-                # Update metrics
-                _active_sessions_gauge.set(session_count)
-                _scope_operations_total.labels(operation="clear").inc()
                 LOGGER.info(
                     "Cleared scope for session",
                     extra={"session_id": session_id},
@@ -349,13 +319,7 @@ class ScopeRegistry:
                 del self._scopes[session_id]
                 pruned_count += 1
 
-            session_count = len(self._scopes)
-            if pruned_count > 0:
-                # Update metrics while holding the lock to reflect the current registry state
-                _active_sessions_gauge.set(session_count)
-
         if pruned_count > 0:
-            _scope_operations_total.labels(operation="prune").inc(pruned_count)
             LOGGER.info(
                 "Pruned expired sessions",
                 extra={

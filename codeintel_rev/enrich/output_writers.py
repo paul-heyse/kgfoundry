@@ -106,7 +106,7 @@ def _resolve_dictionary_fields(table: PaTable, hints: Sequence[str] | None = Non
 
     Parameters
     ----------
-    table : pa.Table
+    table : PaTable
         PyArrow table to inspect for dictionary-encoded columns. The table's
         schema is checked to identify columns that use dictionary encoding.
     hints : Sequence[str] | None, optional
@@ -183,7 +183,7 @@ def write_parquet_dataset(
         Output directory path for the partitioned Parquet dataset. The directory
         will be created if it doesn't exist. If PyArrow is unavailable, falls back
         to writing a single JSONL file at this path.
-    rows : Iterable[dict[str, object]]
+    rows : Iterable[RowMapping]
         Iterable of dictionary records to write. Each dictionary represents a row
         in the dataset. Records are converted to a PyArrow table before writing.
     partitioning : Sequence[str]
@@ -246,9 +246,7 @@ def _write_dataset_table(
     if dictionary_columns:
         file_options.update(use_dictionary=list(dictionary_columns))
     partition_fields = [
-        table.schema.field(name)
-        for name in partitioning
-        if name in table.schema.names
+        table.schema.field(name) for name in partitioning if name in table.schema.names
     ]
     partition_schema = pa.schema(partition_fields)
     ds.write_dataset(

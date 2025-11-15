@@ -163,12 +163,12 @@ def test_adaptive_index_selection(tmp_index_path: Path, n_vectors: int, expected
     # Check for nlist attribute (IVF indexes have this)
     has_nlist = hasattr(underlying_any, "nlist")
 
-    # Log type information for telemetry
-    print(f"\n[TELEMETRY] n_vectors={n_vectors}, expected_type={expected_type}")
-    print(f"[TELEMETRY] underlying_type_name={underlying_type_name}")
-    print(f"[TELEMETRY] underlying_mro={underlying_mro}")
-    print(f"[TELEMETRY] has_metric_type={has_metric_type}, metric_type={metric_type}")
-    print(f"[TELEMETRY] has_nlist={has_nlist}")
+    # Log type information for debugging
+    print(f"\n[DEBUG] n_vectors={n_vectors}, expected_type={expected_type}")
+    print(f"[DEBUG] underlying_type_name={underlying_type_name}")
+    print(f"[DEBUG] underlying_mro={underlying_mro}")
+    print(f"[DEBUG] has_metric_type={has_metric_type}, metric_type={metric_type}")
+    print(f"[DEBUG] has_nlist={has_nlist}")
 
     if expected_type == "flat":
         # Flat index: should have metric_type (METRIC_INNER_PRODUCT = 0) and no nlist

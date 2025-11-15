@@ -15,10 +15,6 @@ from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.symbol_catalog import SymbolCatalog, SymbolDefRow
 from codeintel_rev.io.vllm_client import VLLMClient
-from codeintel_rev.metrics.registry import (
-    OFFLINE_EVAL_QUERY_COUNT,
-    OFFLINE_EVAL_RECALL_AT_K,
-)
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -122,7 +118,6 @@ class OfflineRecallEvaluator:
         summary = {k: (aggregate[k] / count if count else 0.0) for k in k_values}
         output_root = self._resolve_output_dir(output_dir or cfg.output_dir)
         self._write_artifacts(output_root, per_query, summary)
-        self._record_metrics(summary, count)
         LOGGER.info(
             "offline_eval.completed",
             extra={"queries": count, "output_dir": str(output_root), "summary": summary},
@@ -210,12 +205,6 @@ class OfflineRecallEvaluator:
             for record in per_query:
                 handle.write(json.dumps(record))
                 handle.write("\n")
-
-    @staticmethod
-    def _record_metrics(summary: dict[int, float], query_count: int) -> None:
-        OFFLINE_EVAL_QUERY_COUNT.set(float(query_count))
-        for k, score in summary.items():
-            OFFLINE_EVAL_RECALL_AT_K.labels(k=str(k)).set(float(score))
 
     def _prepare_queries(
         self,

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from contextlib import contextmanager, suppress
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
@@ -28,13 +28,6 @@ from codeintel_rev.mcp_server.scope_utils import (
     LANGUAGE_EXTENSIONS,
     path_matches_glob,
 )
-from codeintel_rev.observability.execution_ledger import step as ledger_step
-from codeintel_rev.observability.otel import record_span_event
-from codeintel_rev.observability.semantic_conventions import Attrs
-from codeintel_rev.observability.timeline import Timeline, current_timeline
-from codeintel_rev.telemetry.decorators import span_context
-from codeintel_rev.telemetry.otel_metrics import build_histogram
-from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.logging import get_logger
 
@@ -111,22 +104,6 @@ def _escape_identifier(expr: str) -> str:
     escaped = expr.replace('"', '""')
     return f'"{escaped}"'
 
-
-# Prometheus metrics for scope filtering
-_scope_filter_duration_seconds = build_histogram(
-    "codeintel_scope_filter_duration_seconds",
-    "Time to apply scope filters",
-    labelnames=("filter_type",),
-)
-_catalog_view_bootstrap_seconds = build_histogram(
-    "codeintel_duckdb_view_bootstrap_seconds",
-    "Time spent ensuring DuckDB catalog views are installed",
-)
-_hydration_duration_seconds = build_histogram(
-    "codeintel_duckdb_hydration_seconds",
-    "Time to hydrate chunks or embeddings by id",
-    labelnames=("op",),
-)
 
 _EMPTY_CHUNKS_SELECT = """
 SELECT
@@ -230,17 +207,6 @@ class _DuckDBQueryMixin:
             return []
 
         catalog = cast("DuckDBCatalog", self)
-        timeline = current_timeline()
-        span_attrs = {"op": "query_by_ids", "asked_for": len(ids)}
-        start_time = None
-        if timeline is not None:
-            start_time = perf_counter()
-            timeline.event(
-                "duckdb.hydrate.start",
-                "catalog",
-                attrs=span_attrs,
-            )
-
         sql = """
             SELECT c.*
             FROM chunks AS c
@@ -249,63 +215,21 @@ class _DuckDBQueryMixin:
             ORDER BY ids.position
             """
         params = [list(ids)]
-        otel_attrs = {
-            Attrs.COMPONENT: "duckdb",
-            Attrs.REQUEST_STAGE: "hydrate",
-            Attrs.DUCKDB_SQL_BYTES: len(sql.encode("utf-8")),
-        }
         perf_start = perf_counter()
-        span_cm = span_context(
-            "catalog.hydrate",
-            stage="catalog.hydrate",
-            attrs=otel_attrs,
-            emit_checkpoint=True,
-        )
-        with ledger_step(
-            stage="hydrate",
-            op="duckdb.query_by_ids",
-            component="duckdb.catalog",
-            attrs={
+        with catalog._readonly_connection() as conn:
+            catalog._log_query(sql, params)
+            relation = conn.execute(sql, params)
+            rows = relation.fetchall()
+            cols = [desc[0] for desc in relation.description]
+        payload = [dict(zip(cols, row, strict=True)) for row in rows]
+        duration_ms = round((perf_counter() - perf_start) * 1000, 2)
+        LOGGER.debug(
+            "duckdb_catalog.hydrate_by_ids",
+            extra={
                 "requested": len(ids),
-                Attrs.DUCKDB_SQL_BYTES: len(sql.encode("utf-8")),
+                "returned": len(payload),
+                "duration_ms": duration_ms,
             },
-        ):
-            with span_cm as (span, _):
-                with catalog._readonly_connection() as conn:
-                    catalog._log_query(sql, params)
-                    relation = conn.execute(sql, params)
-                    rows = relation.fetchall()
-                    cols = [desc[0] for desc in relation.description]
-                payload = [dict(zip(cols, row, strict=True)) for row in rows]
-        if span is not None:
-            with suppress(AttributeError):  # pragma: no cover - noop span
-                span.set_attribute(Attrs.DUCKDB_ROWS, len(payload))
-        if timeline is not None:
-            duration_ms = (
-                int((perf_counter() - start_time) * 1000) if start_time is not None else None
-            )
-            timeline.event(
-                "duckdb.hydrate.end",
-                "catalog",
-                attrs={
-                    "returned": len(payload),
-                    "missing": max(0, len(ids) - len(payload)),
-                    "duration_ms": duration_ms,
-                },
-            )
-        _hydration_duration_seconds.labels(op="chunks_by_ids").observe(
-            max(perf_counter() - perf_start, 0.0)
-        )
-        emit_step(
-            StepEvent(
-                kind="duckdb.query",
-                status="completed",
-                payload={
-                    "op": "chunks_by_ids",
-                    "returned": len(payload),
-                    "requested": len(ids),
-                },
-            )
         )
         return payload
 
@@ -655,15 +579,11 @@ class DuckDBCatalog(_DuckDBQueryMixin):
 
     def _ensure_views(self, conn: duckdb.DuckDBPyConnection) -> None:
         """Create required views and tables to hydrate chunk metadata."""
-        start = perf_counter()
-        try:
-            self._install_chunks_view(conn)
-            self._install_optional_views(conn)
-            self._ensure_idmap_tables(conn)
-            self._ensure_faiss_idmap_view(conn, None)
-            self._ensure_faiss_join_view(conn)
-        finally:
-            _catalog_view_bootstrap_seconds.observe(max(perf_counter() - start, 0.0))
+        self._install_chunks_view(conn)
+        self._install_optional_views(conn)
+        self._ensure_idmap_tables(conn)
+        self._ensure_faiss_idmap_view(conn, None)
+        self._ensure_faiss_join_view(conn)
 
     def _install_chunks_view(self, conn: duckdb.DuckDBPyConnection) -> None:
         chunks_ready = _relation_exists(conn, "chunks")
@@ -913,9 +833,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             else:
                 external_expr = "NULL"
             expr_sql = (
-                "NULL"
-                if external_expr.upper() == "NULL"
-                else _escape_identifier(external_expr)
+                "NULL" if external_expr.upper() == "NULL" else _escape_identifier(external_expr)
             )
             query_template = """
                 CREATE OR REPLACE VIEW faiss_idmap AS
@@ -1272,92 +1190,45 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         if not ids:
             return []
 
-        span_attrs = {
-            Attrs.COMPONENT: "duckdb",
-            Attrs.REQUEST_STAGE: "hydrate",
-            "filters.include": bool(include_globs),
-            "filters.exclude": bool(exclude_globs),
-            "filters.languages": bool(languages),
-            Attrs.DUCKDB_SQL_BYTES: 0,
-        }
-        perf_start = perf_counter()
+        start_time = perf_counter()
         results: list[dict] = []
-        with ledger_step(
-            stage="hydrate",
-            op="duckdb.filter_chunks",
-            component="duckdb.catalog",
-            attrs=span_attrs,
-        ):
-            with span_context(
-                "catalog.hydrate",
-                stage="catalog.hydrate",
-                attrs=span_attrs,
-                emit_checkpoint=True,
-            ) as (span, _):
-                start_time = perf_counter()
-                spec = self._build_scope_filter_spec(
-                ids,
-                include_globs=include_globs,
-                exclude_globs=exclude_globs,
-                languages=languages,
+        spec = self._build_scope_filter_spec(
+            ids,
+            include_globs=include_globs,
+            exclude_globs=exclude_globs,
+            languages=languages,
+        )
+        if not (languages and not spec.language_extensions):
+            options = DuckDBQueryOptions(
+                include_globs=spec.simple_include_globs,
+                exclude_globs=spec.simple_exclude_globs,
+                select_columns=("c.*",),
+                preserve_order=True,
             )
+            sql, sql_params = self._query_builder.build_filter_query(
+                chunk_ids=spec.chunk_ids,
+                options=options,
+            )
+            with self._readonly_connection() as conn:
+                relation = conn.execute(sql, sql_params)
+                rows = relation.fetchall()
+                cols = [desc[0] for desc in relation.description]
+            results = [dict(zip(cols, row, strict=True)) for row in rows]
+            results = self._apply_complex_glob_filters(
+                results,
+                spec.complex_include_patterns,
+                spec.complex_exclude_patterns,
+            )
+            results = self._apply_language_filters(results, spec.language_extensions)
 
-            if languages and not spec.language_extensions:
-                self._observe_scope_filter_duration(
-                    start_time, include_globs, exclude_globs, languages
-                )
-            else:
-                options = DuckDBQueryOptions(
-                    include_globs=spec.simple_include_globs,
-                    exclude_globs=spec.simple_exclude_globs,
-                    select_columns=("c.*",),
-                    preserve_order=True,
-                )
-
-                sql, sql_params = self._query_builder.build_filter_query(
-                    chunk_ids=spec.chunk_ids,
-                    options=options,
-                )
-                span_attrs[Attrs.DUCKDB_SQL_BYTES] = len(sql.encode("utf-8"))
-
-                with self._readonly_connection() as conn:
-                    relation = conn.execute(sql, sql_params)
-                    rows = relation.fetchall()
-                    cols = [desc[0] for desc in relation.description]
-                results = [dict(zip(cols, row, strict=True)) for row in rows]
-
-                results = self._apply_complex_glob_filters(
-                    results,
-                    spec.complex_include_patterns,
-                    spec.complex_exclude_patterns,
-                )
-                results = self._apply_language_filters(results, spec.language_extensions)
-
-                self._observe_scope_filter_duration(
-                    start_time, include_globs, exclude_globs, languages
-                )
-
-            if span is not None and span.is_recording():
-                with suppress(AttributeError):
-                    span.set_attribute(
-                        Attrs.DUCKDB_SQL_BYTES, int(span_attrs[Attrs.DUCKDB_SQL_BYTES])
-                    )
-                    span.set_attribute(Attrs.DUCKDB_ROWS, len(results))
-
-        duration = max(perf_counter() - perf_start, 0.0)
-        _hydration_duration_seconds.labels(op="chunks_by_filters").observe(duration)
+        duration = max(perf_counter() - start_time, 0.0)
         context = _ScopeFilterLogInfo(
             include_globs=include_globs,
             exclude_globs=exclude_globs,
             languages=languages,
             requested=len(ids),
         )
-        self._log_scope_filter_results(
-            context,
-            results,
-            timeline=current_timeline(),
-            duration=duration,
-        )
+        self._log_scope_filter_results(context, results, duration=duration)
         return results
 
     def _build_scope_filter_spec(
@@ -1512,28 +1383,14 @@ class DuckDBCatalog(_DuckDBQueryMixin):
                 filtered_results.append(chunk)
         return filtered_results
 
-    def _observe_scope_filter_duration(
-        self,
-        start_time: float,
-        include_globs: list[str] | None,
-        exclude_globs: list[str] | None,
-        languages: list[str] | None,
-    ) -> None:
-        """Record how long scope filtering took for observability."""
-        duration = perf_counter() - start_time
-        filter_type = self._determine_filter_type(include_globs, exclude_globs, languages)
-        with suppress(ValueError):
-            _scope_filter_duration_seconds.labels(filter_type=filter_type).observe(duration)
-
     @staticmethod
     def _log_scope_filter_results(
         info: _ScopeFilterLogInfo,
         results: Sequence[Mapping[str, object]],
         *,
-        timeline: Timeline | None,
         duration: float,
     ) -> None:
-        """Emit structured logs and timeline events for scope filtering outcomes."""
+        """Emit structured logs summarizing scope filtering outcomes."""
         returned = len(results)
         requested = info.requested or 0
         missing = max(0, requested - returned)
@@ -1549,19 +1406,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             duration_ms=round(duration * 1000, 2),
         )
         LOGGER.info("Scope filter hydration completed", extra=extras)
-        if timeline is not None:
-            timeline.event(
-                "duckdb.scope_filter",
-                "catalog",
-                attrs={
-                    "include_globs": include_globs,
-                    "exclude_globs": exclude_globs,
-                    "languages": languages,
-                    "returned": returned,
-                    "missing": missing,
-                    "duration_ms": round(duration * 1000, 2),
-                },
-            )
 
     @staticmethod
     def _determine_filter_type(
@@ -1569,11 +1413,10 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         exclude_globs: list[str] | None,
         languages: list[str] | None,
     ) -> str:
-        """Format the filter type label used for Prometheus metrics.
+        """Format the filter type label (observability removed).
 
         Determines the type of scope filtering being applied based on the
-        presence of glob patterns and language filters. Used to label metrics
-        for observability.
+        presence of glob patterns and language filters.
 
         Parameters
         ----------
@@ -1718,33 +1561,24 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             sql = "SELECT * FROM chunks WHERE uri = ? ORDER BY id LIMIT ?"
             params.append(limit)
 
-        timeline = current_timeline()
-        attrs = {"uri": uri, "limit": limit}
-        with (
-            span_context(
-                "duckdb.query_by_uri",
-                stage="catalog.query",
-                attrs=attrs,
-            ),
-            self._readonly_connection() as conn,
-        ):
+        start_time = perf_counter()
+        with self._readonly_connection() as conn:
             relation = conn.execute(sql, params)
             rows = relation.fetchall()
             cols = [desc[0] for desc in relation.description]
         payload = [dict(zip(cols, row, strict=True)) for row in rows]
         limited = bool(limit > 0 and len(payload) >= limit)
-        record_span_event(
-            "duckdb.query_by_uri.result",
-            uri=uri,
-            rows=len(payload),
-            limited=limited,
+        duration_ms = round((perf_counter() - start_time) * 1000, 2)
+        LOGGER.debug(
+            "duckdb_catalog.query_by_uri",
+            extra={
+                "uri": uri,
+                "limit": limit,
+                "rows": len(payload),
+                "duration_ms": duration_ms,
+                "limited": limited,
+            },
         )
-        if limited and timeline is not None:
-            timeline.event(
-                "duckdb.query.limit",
-                "duckdb",
-                attrs={"uri": uri, "limit": limit, "rows": len(payload)},
-            )
         return payload
 
     def get_embeddings_by_ids(self, ids: Sequence[int]) -> tuple[list[int], NDArrayF32]:
@@ -1778,17 +1612,8 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             dim = self._embedding_dim()
             return [], np.empty((0, dim), dtype=np.float32)
 
-        attrs = {"requested": len(requested_ids)}
         perf_start = perf_counter()
-        timeline = current_timeline()
-        with (
-            span_context(
-                "duckdb.get_embeddings_by_ids",
-                stage="catalog.hydrate",
-                attrs=attrs,
-            ),
-            self.connection() as conn,
-        ):
+        with self.connection() as conn:
             relation = conn.execute(
                 """
                 SELECT c.id, c.embedding, ids.position
@@ -1819,19 +1644,14 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             return [], np.empty((0, dim), dtype=np.float32)
 
         vectors = np.vstack(embeddings)
-        record_span_event(
-            "duckdb.get_embeddings_by_ids.result",
-            requested=len(requested_ids),
-            returned=len(ordered_ids),
-        )
-        if timeline is not None:
-            timeline.event(
-                "duckdb.embeddings",
-                "duckdb",
-                attrs={"requested": len(requested_ids), "returned": len(ordered_ids)},
-            )
-        _hydration_duration_seconds.labels(op="embeddings_by_ids").observe(
-            max(perf_counter() - perf_start, 0.0)
+        duration_ms = round((perf_counter() - perf_start) * 1000, 2)
+        LOGGER.debug(
+            "duckdb_catalog.embeddings_by_ids",
+            extra={
+                "requested": len(requested_ids),
+                "returned": len(ordered_ids),
+                "duration_ms": duration_ms,
+            },
         )
         return ordered_ids, vectors
 
@@ -2112,7 +1932,6 @@ def refresh_faiss_idmap_materialized(
         row_count=int(row_count or 0),
         refreshed=True,
     )
-
 
 
 __all__ = [

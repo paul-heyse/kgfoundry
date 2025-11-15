@@ -209,7 +209,6 @@ class KgFoundryError(Exception):
         config: KgFoundryErrorConfig | None = None,
         **legacy_kwargs: object,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         resolved_config = _coerce_error_config(config, dict(legacy_kwargs))
         self.message = message
         self.code = resolved_config.code
@@ -314,7 +313,6 @@ class DownloadError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.DOWNLOAD_FAILED,
@@ -354,7 +352,6 @@ class UnsupportedMIMEError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.UNSUPPORTED_MIME,
@@ -393,7 +390,6 @@ class DoclingError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.DOCLING_ERROR,
@@ -432,7 +428,6 @@ class OCRTimeoutError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.OCR_TIMEOUT,
@@ -471,7 +466,6 @@ class ChunkingError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.CHUNKING_ERROR,
@@ -510,7 +504,6 @@ class EmbeddingError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.EMBEDDING_ERROR,
@@ -550,7 +543,6 @@ class SpladeOOMError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.SPLADE_OOM,
@@ -589,7 +581,6 @@ class IndexBuildError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.INDEX_BUILD_ERROR,
@@ -629,7 +620,6 @@ class OntologyParseError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.ONTOLOGY_PARSE_ERROR,
@@ -669,7 +659,6 @@ class LinkerCalibrationError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.LINKER_CALIBRATION_ERROR,
@@ -708,7 +697,6 @@ class Neo4jError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.NEO4J_ERROR,
@@ -749,7 +737,6 @@ class ConfigurationError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.CONFIGURATION_ERROR,
@@ -835,7 +822,6 @@ class SettingsError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         combined_context: dict[str, object] = dict(context or {})
         if errors:
             combined_context.setdefault(
@@ -881,7 +867,6 @@ class SerializationError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.SERIALIZATION_ERROR,
@@ -921,7 +906,6 @@ class RegistryError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.REGISTRY_ERROR,
@@ -961,7 +945,6 @@ class DeserializationError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.DESERIALIZATION_ERROR,
@@ -1007,7 +990,6 @@ class SchemaValidationError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         combined_context: dict[str, object] = dict(context or {})
         if errors:
             combined_context.setdefault("validation_errors", list(errors))
@@ -1055,7 +1037,6 @@ class RetryExhaustedError(KgFoundryError):
         last_error: Exception | None = None,
         retry_after_seconds: int | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.RETRY_EXHAUSTED,
@@ -1138,7 +1119,6 @@ class VectorSearchError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.VECTOR_SEARCH_ERROR,
@@ -1180,7 +1160,6 @@ class AgentCatalogSearchError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.AGENT_CATALOG_SEARCH_ERROR,
@@ -1219,7 +1198,6 @@ class CatalogSessionError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.SESSION_ERROR,
@@ -1260,7 +1238,6 @@ class CatalogLoadError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.CATALOG_LOAD_ERROR,
@@ -1302,7 +1279,6 @@ class SymbolAttachmentError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.SYMBOL_ATTACHMENT_ERROR,
@@ -1344,7 +1320,6 @@ class ArtifactModelError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.ARTIFACT_MODEL_ERROR,
@@ -1386,7 +1361,6 @@ class ArtifactValidationError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.ARTIFACT_VALIDATION_ERROR,
@@ -1428,7 +1402,6 @@ class ArtifactSerializationError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.ARTIFACT_SERIALIZATION_ERROR,
@@ -1470,7 +1443,6 @@ class ArtifactDeserializationError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.ARTIFACT_DESERIALIZATION_ERROR,
@@ -1513,7 +1485,6 @@ class ArtifactDependencyError(KgFoundryError):
         cause: Exception | None = None,
         context: Mapping[str, object] | None = None,
     ) -> None:
-        """Initialize the exception. See class docstring for full details."""
         super().__init__(
             message,
             code=ErrorCode.ARTIFACT_DEPENDENCY_ERROR,

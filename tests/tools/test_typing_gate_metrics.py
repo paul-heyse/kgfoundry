@@ -3,7 +3,6 @@
 Tests verify:
 - Metrics recording and accumulation
 - Snapshot generation with compliance summary
-- Prometheus counter formatting
 - Structured log emission
 - JSON snapshot file writing
 
@@ -179,21 +178,6 @@ class TestTypingGateMetrics:
         assert "heavy_import" in violation_types
         assert "private_module" in violation_types
         assert "deprecated_shim" in violation_types
-
-    def test_prometheus_counters_format(self) -> None:
-        """Verify Prometheus counter format is correct."""
-        metrics = TypingGateMetrics()
-        metrics = metrics.record_check("file1.py", None)
-        metrics = metrics.record_check(
-            "file2.py",
-            [{"violation_type": "heavy_import", "module_name": "numpy", "lineno": 5}],
-        )
-
-        prometheus_output = metrics.emit_prometheus_counters()
-        assert "kgfoundry_typing_gate_checks_total 2" in prometheus_output
-        assert "kgfoundry_typing_gate_violations_total 1" in prometheus_output
-        assert "# HELP" in prometheus_output
-        assert "# TYPE kgfoundry_typing_gate_checks_total counter" in prometheus_output
 
     def test_structured_logs_format(self) -> None:
         """Verify structured logs are valid JSON."""

@@ -91,7 +91,6 @@ class OptionalDependencyError(ArtifactDependencyError):
         extra: Mapping[str, object] | None = None,
         cause: Exception | None = None,
     ) -> None:
-        """Initialize the optional dependency error. See class docstring for full details."""
         context = dict(extra or {})
         context["module_name"] = module_name
         context["correlation_id"] = str(uuid.uuid4())

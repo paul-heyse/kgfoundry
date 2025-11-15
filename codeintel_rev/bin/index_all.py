@@ -459,8 +459,29 @@ def _build_faiss_index(
 
 
 def _load_embeddings_from_artifacts(paths: PipelinePaths) -> NDArrayF32:
-    """Load stored embeddings from Parquet artifacts for FAISS-only runs."""
+    """Load stored embeddings from Parquet artifacts for FAISS-only runs.
 
+    Parameters
+    ----------
+    paths : PipelinePaths
+        Pipeline paths object containing vectors_dir path where Parquet shards
+        are expected to be located.
+
+    Returns
+    -------
+    NDArrayF32
+        Concatenated array of all embeddings loaded from Parquet shards. The
+        array shape is (num_vectors, embedding_dim) with float32 dtype.
+
+    Raises
+    ------
+    FileNotFoundError
+        Raised when no Parquet shards are found in the vectors directory.
+        Indicates that the embeddings phase must be run first.
+    RuntimeError
+        Raised when Parquet reading or embedding extraction fails during
+        the loading process.
+    """
     parquet_files = sorted(paths.vectors_dir.glob("*.parquet"))
     if not parquet_files:
         msg = f"No Parquet shards found under {paths.vectors_dir}; run --phase=embeddings first."

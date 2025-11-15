@@ -56,7 +56,6 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
 
 import numpy as np
 
-import codeintel_rev.observability.metrics as _retrieval_metrics
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.scope_store import ScopeStore
 from codeintel_rev.config.settings import IndexConfig, Settings, load_settings
@@ -132,8 +131,6 @@ class _RetrievalMetrics(Protocol):
         """
         ...
 
-
-retrieval_metrics = cast("_RetrievalMetrics", _retrieval_metrics)
 
 __all__ = ["ApplicationContext", "ResolvedPaths", "resolve_application_paths"]
 
@@ -1008,16 +1005,6 @@ class ApplicationContext:
         self.faiss_manager.gpu_index = None
         self.faiss_manager.secondary_gpu_index = None
         self.faiss_manager.gpu_resources = None
-        self._update_index_version_metrics()
-
-    def _update_index_version_metrics(self) -> None:
-        """Expose the active index version via Prometheus gauges."""
-        version: str | None = None
-        with suppress(RuntimeLifecycleError):
-            version = self.index_manager.current_version()
-        retrieval_metrics.set_index_version("faiss", version)
-        retrieval_metrics.set_index_version("bm25", version)
-        retrieval_metrics.set_index_version("splade", version)
 
     def _autotune_if_requested(self) -> None:
         """Run a quick ParameterSpace sweep when enabled and no profile exists."""

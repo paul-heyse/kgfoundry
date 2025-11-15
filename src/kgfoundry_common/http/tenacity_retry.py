@@ -318,7 +318,6 @@ class TenacityRetryStrategy(RetryStrategy[object]):
     """
 
     def __init__(self, policy: RetryPolicyDoc) -> None:
-        """Initialize the retry strategy. See class docstring for full details."""
         self.policy = policy
 
     def run(self, fn: Callable[[], object]) -> object:

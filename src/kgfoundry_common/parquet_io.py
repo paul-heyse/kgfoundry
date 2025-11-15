@@ -126,7 +126,6 @@ class ParquetVectorWriter:
         )
 
     def __init__(self, root: str) -> None:
-        """Initialize the Parquet vector writer. See class docstring for full details."""
         self.root = Path(root)
 
     def write_dense(
@@ -347,7 +346,6 @@ class ParquetChunkWriter:
         return pa.schema(chunk_fields)
 
     def __init__(self, root: str, model: str = "docling_hybrid", run_id: str = "dev") -> None:
-        """Initialize the Parquet chunk writer. See class docstring for full details."""
         self.root = Path(root) / f"model={model}" / f"run_id={run_id}" / "shard=00000"
         self.root.mkdir(parents=True, exist_ok=True)
 

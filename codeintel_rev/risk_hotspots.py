@@ -31,7 +31,7 @@ def compute_hotspot_score(record: Mapping[str, Any]) -> float:
 
     Parameters
     ----------
-    record : dict[str, Any]
+    record : Mapping[str, Any]
         Module metadata dictionary containing metrics such as fan_in, fan_out,
         complexity, type_errors, untyped_defs, covered_lines_ratio, and path.
 

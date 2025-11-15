@@ -12,8 +12,8 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src"
@@ -27,7 +27,20 @@ from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 
 
 def _run_index_pipeline(args: Sequence[str]) -> None:
-    """Invoke the existing indexing pipeline module with the requested flags."""
+    """Invoke the existing indexing pipeline module with the requested flags.
+
+    Parameters
+    ----------
+    args : Sequence[str]
+        Command-line arguments to pass to the index_all module. These arguments
+        control which phases of the indexing pipeline are executed.
+
+    Raises
+    ------
+    RuntimeError
+        Raised when the index_all subprocess exits with a non-zero return code.
+        The error message includes the exit code for debugging.
+    """
     cmd = [sys.executable, "-m", "codeintel_rev.bin.index_all", *args]
     completed = subprocess.run(cmd, check=False)
     if completed.returncode != 0:

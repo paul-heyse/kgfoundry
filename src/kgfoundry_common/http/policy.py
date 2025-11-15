@@ -150,7 +150,6 @@ class PolicyRegistry:
     """
 
     def __init__(self, root: Path) -> None:
-        """Initialize the registry. See class docstring for full details."""
         self.root = root
 
     def get(self, name: str) -> RetryPolicyDoc:

@@ -56,7 +56,6 @@ import fnmatch
 from time import perf_counter
 from typing import TYPE_CHECKING
 
-from codeintel_rev.telemetry.otel_metrics import build_histogram
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -64,13 +63,6 @@ if TYPE_CHECKING:
     from codeintel_rev.mcp_server.schemas import ScopeIn
 
 LOGGER = get_logger(__name__)
-
-# Prometheus metrics for scope filtering
-_scope_filter_duration_seconds = build_histogram(
-    "codeintel_scope_filter_duration_seconds",
-    "Time to apply scope filters",
-    labelnames=("filter_type",),
-)
 
 # Language to file extension mapping
 # Exhaustive list of common programming languages
@@ -410,7 +402,6 @@ def apply_language_filter(
 
     # Record filtering duration
     duration = perf_counter() - start_time
-    _scope_filter_duration_seconds.labels(filter_type="language").observe(duration)
 
     return filtered
 

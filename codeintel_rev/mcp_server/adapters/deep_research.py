@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import cast
 
 from codeintel_rev.app.config_context import ApplicationContext
+from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.mcp_server.schemas import (
     FetchObject,
     FetchObjectMetadata,
@@ -19,13 +20,6 @@ from codeintel_rev.mcp_server.schemas import (
     SearchStructuredContent,
     SearchToolArgs,
 )
-from codeintel_rev.observability.execution_ledger import (
-    record as ledger_record,
-)
-from codeintel_rev.observability.execution_ledger import (
-    step as ledger_step,
-)
-from codeintel_rev.observability.timeline import Timeline
 from codeintel_rev.retrieval.mcp_search import (
     FetchDependencies,
     FetchRequest,
@@ -145,7 +139,6 @@ def _serialize_fetch_response(response: FetchResponse) -> FetchStructuredContent
 
 async def search(
     context: ApplicationContext,
-    timeline: Timeline,
     payload: SearchToolArgs,
 ) -> SearchStructuredContent:
     """Execute the Deep-Research search pipeline.
@@ -162,9 +155,6 @@ async def search(
         Application context providing access to FAISS manager, catalog, embedding
         client, settings, and data directories. Used to construct search dependencies
         and validate index availability.
-    timeline : Timeline
-        Timeline instance for recording search events and observability. Used to
-        track search operations and provide session/run IDs for telemetry.
     payload : SearchToolArgs
         MCP search tool arguments containing query text, optional top_k, rerank
         flag, and optional filters (languages, include/exclude paths, symbols).
@@ -203,31 +193,30 @@ async def search(
 
     def _work() -> SearchStructuredContent:
         with context.open_catalog() as catalog:
+            try:
+                session_id = get_session_id()
+            except RuntimeError:
+                session_id = None
             deps = SearchDependencies(
                 faiss=context.faiss_manager,
                 embedder=context.vllm_client,
                 catalog=catalog,
                 settings=context.settings,
-                session_id=timeline.session_id,
-                run_id=timeline.run_id,
+                session_id=session_id,
+                run_id=None,
                 limits=limits,
                 pool_dir=_pool_dir(context.paths.data_dir),
-                timeline=timeline,
             )
-            with ledger_step(
-                stage="pool_search",
-                op="deep_research.run_search",
-                component="mcp.deep_research",
-                attrs={"top_k": request.top_k, "rerank": request.rerank},
-            ):
-                response = run_search(request=request, deps=deps)
+            response = run_search(request=request, deps=deps)
             payload = _serialize_search_response(response)
-            ledger_record(
-                "deep_research.search",
-                stage="envelope",
-                component="mcp.deep_research",
-                results=len(payload.get("results", ())),
-                top_k=request.top_k,
+            LOGGER.info(
+                "deep_research.search.completed",
+                extra={
+                    "session_id": session_id,
+                    "results": len(payload.get("results", ())),
+                    "top_k": request.top_k,
+                    "rerank": request.rerank,
+                },
             )
             return payload
 
@@ -237,7 +226,6 @@ async def search(
 
 async def fetch(
     context: ApplicationContext,
-    timeline: Timeline,
     payload: FetchToolArgs,
 ) -> FetchStructuredContent:
     """Hydrate chunk ids returned from the MCP search tool.
@@ -254,9 +242,6 @@ async def fetch(
         Application context providing access to DuckDB catalog, settings, and
         data directories. Used to construct fetch dependencies and open catalog
         connections.
-    timeline : Timeline
-        Timeline instance for recording fetch events and observability. Used to
-        track fetch operations and provide session/run IDs for telemetry.
     payload : FetchToolArgs
         MCP fetch tool arguments containing objectIds (list of chunk ID strings)
         and optional max_tokens limit. The objectIds are normalized to integers
@@ -280,21 +265,19 @@ async def fetch(
             deps = FetchDependencies(
                 catalog=catalog,
                 settings=context.settings,
-                timeline=timeline,
             )
-            with ledger_step(
-                stage="hydrate",
-                op="deep_research.run_fetch",
-                component="mcp.deep_research",
-                attrs={"object_ids": len(request.object_ids)},
-            ):
-                response = run_fetch(request=request, deps=deps)
+            response = run_fetch(request=request, deps=deps)
             payload = _serialize_fetch_response(response)
-            ledger_record(
-                "deep_research.fetch",
-                stage="envelope",
-                component="mcp.deep_research",
-                results=len(payload["objects"]),
+            try:
+                session_id = get_session_id()
+            except RuntimeError:
+                session_id = None
+            LOGGER.info(
+                "deep_research.fetch.completed",
+                extra={
+                    "session_id": session_id,
+                    "object_count": len(payload["objects"]),
+                },
             )
             return payload
 

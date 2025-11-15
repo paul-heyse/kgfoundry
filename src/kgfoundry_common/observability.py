@@ -134,7 +134,6 @@ class MetricsProvider:
     _registry: CollectorRegistry | None = field(default=None, repr=False)
 
     def __init__(self, registry: CollectorRegistry | None = None) -> None:
-        """Initialize the metrics provider. See class docstring for full details."""
         resolved_registry = cast("CollectorRegistry | None", registry or get_default_registry())
         histogram = build_histogram(
             "kgfoundry_operation_duration_seconds",
@@ -230,7 +229,6 @@ class MetricsRegistry:
         namespace: str = "kgfoundry",
         registry: CollectorRegistry | None = None,
     ) -> None:
-        """Initialize the metrics registry. See class docstring for full details."""
         resolved_registry = cast("CollectorRegistry | None", registry or get_default_registry())
         metric_prefix = namespace.replace("-", "_")
         labels = ("operation", "status")
@@ -316,7 +314,19 @@ class DurationObservation:
 
 
 class _DurationObservationContext:
-    """Context manager that finalises :class:`DurationObservation` instances."""
+    """Context manager that finalises :class:`DurationObservation` instances.
+
+    Parameters
+    ----------
+    metrics : MetricsProvider
+        Metrics provider instance for recording observations.
+    operation : str
+        Operation name being observed.
+    component : str
+        Component name executing the operation.
+    correlation_id : str | None
+        Correlation ID for tracing across services.
+    """
 
     def __init__(
         self,
@@ -326,19 +336,6 @@ class _DurationObservationContext:
         component: str,
         correlation_id: str | None,
     ) -> None:
-        """Initialize the duration observation context.
-
-        Parameters
-        ----------
-        metrics : MetricsProvider
-            Metrics provider instance for recording observations.
-        operation : str
-            Operation name being observed.
-        component : str
-            Component name executing the operation.
-        correlation_id : str | None
-            Correlation ID for tracing across services.
-        """
         self._observation = DurationObservation(
             metrics=metrics,
             operation=operation,

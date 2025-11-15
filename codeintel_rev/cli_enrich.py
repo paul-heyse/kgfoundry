@@ -118,6 +118,10 @@ def _stage_span(stage: str, **start_meta: object) -> Iterator[dict[str, object]]
         Mutable dictionary that can be populated with additional metadata prior
         to logging the ``event=finish`` line.
 
+    Raises
+    ------
+    Exception
+        Any exception raised within the context manager is logged and re-raised.
     """
     start = time.perf_counter()
     LOGGER.debug("stage=%s event=start %s", stage, _format_stage_meta(start_meta))

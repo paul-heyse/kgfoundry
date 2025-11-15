@@ -87,10 +87,7 @@ def call_tool(deps: McpDeps, name: str, arguments: dict[str, Any]) -> dict[str, 
             )
         except ValueError as exc:
             return _error_response(str(exc))
-        summary = (
-            f"search returned {len(search_out.results)} results "
-            f"for '{search_out.queryEcho}'"
-        )
+        summary = f"search returned {len(search_out.results)} results for '{search_out.queryEcho}'"
         return _success_response(summary, search_out)
     if name == "fetch":
         try:

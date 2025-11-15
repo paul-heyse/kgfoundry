@@ -3,16 +3,9 @@
 from __future__ import annotations
 
 import importlib
-import sys
-from contextlib import suppress
-from time import time
 from types import ModuleType
 
 import typer
-
-from codeintel_rev.observability.reporting import render_run_report
-from codeintel_rev.observability.timeline import Timeline, bind_timeline, new_timeline
-from codeintel_rev.telemetry.reporter import finalize_run, start_run
 
 app = typer.Typer(
     help="CodeIntel operational commands.",
@@ -48,7 +41,6 @@ def _load_cli_module(path: str) -> ModuleType:
 bm25_cli = _load_cli_module("codeintel_rev.cli.bm25")
 indexctl_cli = _load_cli_module("codeintel_rev.cli.indexctl")
 splade_cli = _load_cli_module("codeintel_rev.cli.splade")
-telemetry_cli = _load_cli_module("codeintel_rev.cli.telemetry")
 xtr_cli = _load_cli_module("codeintel_rev.cli.xtr")
 
 app.add_typer(
@@ -67,11 +59,6 @@ app.add_typer(
     help="SPLADE model and impact index management commands.",
 )
 app.add_typer(
-    telemetry_cli.app,
-    name="telemetry",
-    help="Telemetry diagnostics commands.",
-)
-app.add_typer(
     xtr_cli.app,
     name="xtr",
     help="XTR/WARP index management commands.",
@@ -80,47 +67,7 @@ app.add_typer(
 
 def main() -> None:
     """Run the aggregated CodeIntel CLI."""
-    timeline = new_timeline("cli", force=True)
-    timeline.set_metadata(
-        kind="cli",
-        command=" ".join(sys.argv[1:]) or app.info.name,
-        started_at=time(),
-    )
-    start_run(
-        timeline.session_id,
-        timeline.run_id,
-        tool_name="cli",
-        capability_stamp=None,
-        started_at=time(),
-    )
-    with bind_timeline(timeline):
-        try:
-            app()
-        except Exception as exc:  # pragma: no cover - CLI exception propagation
-            finalize_run(
-                timeline.session_id,
-                timeline.run_id,
-                status="error",
-                stop_reason=f"{type(exc).__name__}: {exc}",
-                finished_at=time(),
-            )
-            _maybe_write_cli_report(timeline)
-            raise
-        else:
-            finalize_run(
-                timeline.session_id,
-                timeline.run_id,
-                status="complete",
-                finished_at=time(),
-            )
-            _maybe_write_cli_report(timeline)
-
-
-def _maybe_write_cli_report(timeline: Timeline) -> None:
-    if not timeline.sampled:
-        return
-    with suppress(Exception):  # pragma: no cover - best-effort
-        render_run_report(timeline)
+    app()
 
 
 if __name__ == "__main__":  # pragma: no cover - manual execution entrypoint

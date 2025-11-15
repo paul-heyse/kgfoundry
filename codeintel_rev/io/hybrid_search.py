@@ -4,24 +4,13 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping, Sequence
-from contextlib import nullcontext
 from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
 from time import perf_counter
 from typing import TYPE_CHECKING, Protocol
 
-import codeintel_rev.observability.metrics as retrieval_metrics
 from codeintel_rev.evaluation.hybrid_pool import Hit, HybridPoolEvaluator
-from codeintel_rev.observability.execution_ledger import (
-    record as ledger_record,
-)
-from codeintel_rev.observability.execution_ledger import (
-    step as ledger_step,
-)
-from codeintel_rev.observability.otel import record_span_event
-from codeintel_rev.observability.semantic_conventions import Attrs, to_label_str
-from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.plugins.channels import Channel, ChannelContext, ChannelError
 from codeintel_rev.plugins.registry import ChannelRegistry
 from codeintel_rev.retrieval.boosters import RecencyConfig, apply_recency_boost
@@ -34,8 +23,6 @@ from codeintel_rev.retrieval.gating import (
 )
 from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
 from codeintel_rev.retrieval.types import HybridResultDoc, HybridSearchResult, SearchHit
-from codeintel_rev.telemetry.decorators import span_context
-from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -162,21 +149,9 @@ class BM25SearchProvider:
             Raised when the underlying Pyserini searcher fails.
         """
         if top_k <= 0:
-            ledger_record(
-                "bm25.search.skip",
-                stage="pool_search",
-                component="retrieval.bm25",
-                ok=False,
-                top_k=top_k,
-                reason="non_positive_top_k",
-            )
-            emit_step(
-                StepEvent(
-                    kind="bm25.search",
-                    status="skipped",
-                    detail="non_positive_top_k",
-                    payload={"top_k": top_k},
-                )
+            LOGGER.debug(
+                "BM25 search skipped",
+                extra={"top_k": top_k, "reason": "non_positive_top_k"},
             )
             return []
         use_rm3 = self._should_use_rm3(query)
@@ -185,30 +160,15 @@ class BM25SearchProvider:
         searcher = self._ensure_rm3_searcher() if use_rm3 else self._base_searcher
         start = perf_counter()
         try:
-            with ledger_step(
-                stage="pool_search",
-                op="bm25.search",
-                component="retrieval.bm25",
-                attrs={"top_k": top_k, "rm3": use_rm3},
-            ):
-                hits = searcher.search(query, k=top_k)
+            hits = searcher.search(query, k=top_k)
         except Exception as exc:
-            ledger_record(
-                "bm25.search.error",
-                stage="pool_search",
-                component="retrieval.bm25",
-                ok=False,
-                top_k=top_k,
-                rm3=use_rm3,
-                error_type=type(exc).__name__,
-            )
-            emit_step(
-                StepEvent(
-                    kind="bm25.search",
-                    status="failed",
-                    detail=type(exc).__name__,
-                    payload={"top_k": top_k, "rm3": use_rm3},
-                )
+            LOGGER.warning(
+                "BM25 search failed",
+                extra={
+                    "top_k": top_k,
+                    "rm3": use_rm3,
+                    "error": type(exc).__name__,
+                },
             )
             msg = "BM25 search failed"
             raise RuntimeError(msg) from exc
@@ -223,26 +183,14 @@ class BM25SearchProvider:
             )
             for rank, hit in enumerate(hits)
         ]
-        emit_step(
-            StepEvent(
-                kind="bm25.search",
-                status="completed",
-                payload={
-                    "top_k": top_k,
-                    "rm3": use_rm3,
-                    "hits": len(results),
-                    "duration_ms": duration_ms,
-                },
-            )
-        )
-        ledger_record(
-            "bm25.search",
-            stage="pool_search",
-            component="retrieval.bm25",
-            top_k=top_k,
-            rm3=use_rm3,
-            hits=len(results),
-            duration_ms=duration_ms,
+        LOGGER.debug(
+            "BM25 search completed",
+            extra={
+                "top_k": top_k,
+                "rm3": use_rm3,
+                "hits": len(results),
+                "duration_ms": duration_ms,
+            },
         )
         return results
 
@@ -356,106 +304,28 @@ class SpladeSearchProvider:
             Raised when the SPLADE encoder or impact searcher fails.
         """
         if top_k <= 0:
-            ledger_record(
-                "splade.search.skip",
-                stage="pool_search",
-                component="retrieval.splade",
-                ok=False,
-                top_k=top_k,
-                reason="non_positive_top_k",
-            )
-            emit_step(
-                StepEvent(
-                    kind="splade.search",
-                    status="skipped",
-                    detail="non_positive_top_k",
-                    payload={"top_k": top_k},
-                )
-            )
+            LOGGER.debug("SPLADE search skipped: non-positive top_k", extra={"top_k": top_k})
             return []
         embeddings = self._encoder.encode_query([query])
         decoded = self._encoder.decode(embeddings, top_k=None)
         if not decoded or not decoded[0]:
-            ledger_record(
-                "splade.search.skip",
-                stage="pool_search",
-                component="retrieval.splade",
-                ok=False,
-                top_k=top_k,
-                reason="encoder_empty",
-            )
-            emit_step(
-                StepEvent(
-                    kind="splade.search",
-                    status="skipped",
-                    detail="encoder_empty",
-                    payload={"top_k": top_k},
-                )
-            )
+            LOGGER.debug("SPLADE search skipped: encoder empty", extra={"top_k": top_k})
             return []
         filtered_pairs = self._filter_pairs(decoded[0])
         if not filtered_pairs:
-            ledger_record(
-                "splade.search.skip",
-                stage="pool_search",
-                component="retrieval.splade",
-                ok=False,
-                top_k=top_k,
-                reason="filtered_empty",
-            )
-            emit_step(
-                StepEvent(
-                    kind="splade.search",
-                    status="skipped",
-                    detail="filtered_empty",
-                    payload={"top_k": top_k},
-                )
-            )
+            LOGGER.debug("SPLADE search skipped: filtered empty", extra={"top_k": top_k})
             return []
         bow = self._build_bow(filtered_pairs)
         if not bow:
-            ledger_record(
-                "splade.search.skip",
-                stage="pool_search",
-                component="retrieval.splade",
-                ok=False,
-                top_k=top_k,
-                reason="bow_empty",
-            )
-            emit_step(
-                StepEvent(
-                    kind="splade.search",
-                    status="skipped",
-                    detail="bow_empty",
-                    payload={"top_k": top_k},
-                )
-            )
+            LOGGER.debug("SPLADE search skipped: bow empty", extra={"top_k": top_k})
             return []
         start = perf_counter()
         try:
-            with ledger_step(
-                stage="pool_search",
-                op="splade.search",
-                component="retrieval.splade",
-                attrs={"top_k": top_k},
-            ):
-                hits = self._searcher.search(bow, k=top_k)
+            hits = self._searcher.search(bow, k=top_k)
         except Exception as exc:
-            ledger_record(
-                "splade.search.error",
-                stage="pool_search",
-                component="retrieval.splade",
-                ok=False,
-                top_k=top_k,
-                error_type=type(exc).__name__,
-            )
-            emit_step(
-                StepEvent(
-                    kind="splade.search",
-                    status="failed",
-                    detail=type(exc).__name__,
-                    payload={"top_k": top_k},
-                )
+            LOGGER.debug(
+                "SPLADE search failed",
+                extra={"top_k": top_k, "error": type(exc).__name__},
             )
             msg = "SPLADE search failed"
             raise RuntimeError(msg) from exc
@@ -470,20 +340,9 @@ class SpladeSearchProvider:
             )
             for rank, hit in enumerate(hits)
         ]
-        emit_step(
-            StepEvent(
-                kind="splade.search",
-                status="completed",
-                payload={"top_k": top_k, "hits": len(results), "duration_ms": duration_ms},
-            )
-        )
-        ledger_record(
-            "splade.search",
-            stage="pool_search",
-            component="retrieval.splade",
-            top_k=top_k,
-            hits=len(results),
-            duration_ms=duration_ms,
+        LOGGER.debug(
+            "SPLADE search completed",
+            extra={"top_k": top_k, "hits": len(results), "duration_ms": duration_ms},
         )
         return results
 
@@ -556,13 +415,6 @@ class _FusionContext:
     options: HybridSearchOptions
     budget_decision: BudgetDecision
     budget_info: Mapping[str, object]
-    timeline: Timeline | None
-
-
-@dataclass(slots=True, frozen=True)
-class _SearchTelemetryContext:
-    timeline: Timeline | None
-    stage_records: list[dict[str, object]]
 
 
 @dataclass(slots=True, frozen=True)
@@ -577,7 +429,6 @@ class _FusionWork:
     active_channels: Sequence[str]
     budget_info: Mapping[str, object]
     budget_decision: BudgetDecision
-    timeline: Timeline | None
 
 
 class HybridSearchEngine:
@@ -652,20 +503,18 @@ class HybridSearchEngine:
     def _profile_query(
         query: str,
         gate_cfg: StageGateConfig,
-        timeline: Timeline | None,
     ) -> tuple[BudgetDecision, dict[str, object]]:
         profile = analyze_query(query, gate_cfg)
-        retrieval_metrics.QUERY_AMBIGUITY.observe(profile.ambiguity_score)
         decision = decide_budgets(profile, gate_cfg)
         budget_info = describe_budget_decision(profile, decision)
-        retrieval_metrics.RRF_K.set(float(decision.rrf_k))
-        retrieval_metrics.observe_budget_depths(decision.per_channel_depths.items())
-        if timeline is not None:
-            timeline.event(
-                "hybrid.query_profile",
-                "query_profile",
-                attrs=budget_info,
-            )
+        LOGGER.debug(
+            "Query profile analyzed",
+            extra={
+                "ambiguity_score": profile.ambiguity_score,
+                "rrf_k": decision.rrf_k,
+                **budget_info,
+            },
+        )
         return decision, budget_info
 
     def _rrf_fuse(
@@ -709,7 +558,7 @@ class HybridSearchEngine:
         runs = self._apply_extra_channels(ctx.runs, ctx.options.extra_channels)
         active_channels = self._resolve_active_channels(runs)
         runtime = ctx.options.tuning or HybridSearchTuning()
-        self._record_fusion_start(runs, ctx.timeline, ctx.budget_decision.rrf_k)
+        self._record_fusion_start(runs, ctx.budget_decision.rrf_k)
         work = _FusionWork(
             runs=runs,
             warnings=ctx.warnings,
@@ -719,7 +568,6 @@ class HybridSearchEngine:
             active_channels=active_channels,
             budget_info=ctx.budget_info,
             budget_decision=ctx.budget_decision,
-            timeline=ctx.timeline,
         )
         docs, contributions_for_docs, method = self._execute_fusion(
             work=work,
@@ -727,14 +575,13 @@ class HybridSearchEngine:
         )
         docs, boost_count = self._apply_recency_boost_if_needed(docs)
         if boost_count:
-            retrieval_metrics.RECENCY_BOOSTED_TOTAL.inc(boost_count)
+            LOGGER.debug("Applied recency boost", extra={"boost_count": boost_count})
         debug_bundle = self._build_debug_bundle(
             ctx.query, ctx.budget_info, runs, ctx.budget_decision.rrf_k
         )
-        retrieval_metrics.DEBUG_BUNDLE_TOTAL.inc()
-        if ctx.timeline is not None:
-            ctx.timeline.event("hybrid.debug_bundle", "debug", attrs={"bundle": debug_bundle})
-        retrieval_metrics.RESULTS_TOTAL.inc(len(docs))
+        LOGGER.debug(
+            "Hybrid search completed", extra={"results": len(docs), "bundle": debug_bundle}
+        )
         self._explain_last = method
         return HybridSearchResult(
             docs=docs,
@@ -764,16 +611,14 @@ class HybridSearchEngine:
     @staticmethod
     def _record_fusion_start(
         runs: Mapping[str, Sequence[SearchHit]],
-        timeline: Timeline | None,
         rrf_k: int,
     ) -> None:
-        if timeline is None or not runs:
+        if not runs:
             return
         total_candidates = sum(len(hits) for hits in runs.values())
-        timeline.event(
-            "hybrid.fuse.start",
-            "fusion",
-            attrs={
+        LOGGER.debug(
+            "Hybrid fusion starting",
+            extra={
                 "channels": list(runs.keys()),
                 "rrf_k": rrf_k,
                 "total": total_candidates,
@@ -803,7 +648,6 @@ class HybridSearchEngine:
                 work.runs,
                 limit=work.limit,
                 rrf_k=work.budget_decision.rrf_k,
-                timeline=work.timeline,
             )
             method = self._compose_method_metadata(
                 work.active_channels,
@@ -818,7 +662,6 @@ class HybridSearchEngine:
             work.runs,
             pooler=pooler,
             limit=work.limit,
-            timeline=work.timeline,
         )
         method = self._compose_method_metadata(
             work.active_channels,
@@ -835,28 +678,23 @@ class HybridSearchEngine:
         *,
         limit: int,
         rrf_k: int,
-        timeline: Timeline | None,
     ) -> tuple[list[HybridResultDoc], dict[str, list[tuple[str, int, float]]]]:
         start_rrf = perf_counter()
-        attrs = {"rrf_k": rrf_k, "channels": list(runs.keys())}
-        with span_context(
-            "search.rrf_fuse",
-            stage="search.rrf_fuse",
-            attrs=attrs,
-            emit_checkpoint=True,
-        ):
-            docs, contributions_for_docs = self._rrf_fuse(
-                runs,
-                limit=limit,
-                rrf_k=rrf_k,
-            )
-        retrieval_metrics.RRF_DURATION_SECONDS.observe(perf_counter() - start_rrf)
-        if timeline is not None:
-            timeline.event(
-                "hybrid.fuse.rrf",
-                "fusion",
-                attrs={"rrf_k": rrf_k, "returned": len(docs)},
-            )
+        docs, contributions_for_docs = self._rrf_fuse(
+            runs,
+            limit=limit,
+            rrf_k=rrf_k,
+        )
+        duration = perf_counter() - start_rrf
+        LOGGER.debug(
+            "RRF fusion completed",
+            extra={
+                "rrf_k": rrf_k,
+                "returned": len(docs),
+                "duration_s": duration,
+                "channels": list(runs.keys()),
+            },
+        )
         return docs, contributions_for_docs
 
     def _run_pool(
@@ -865,13 +703,11 @@ class HybridSearchEngine:
         *,
         pooler: HybridPoolEvaluator,
         limit: int,
-        timeline: Timeline | None,
     ) -> tuple[list[HybridResultDoc], dict[str, list[tuple[str, int, float]]]]:
         flattened = self._flatten_hits_for_pool(runs)
         contributions = self._build_contribution_map(runs)
         if not flattened:
-            if timeline is not None:
-                timeline.event("hybrid.fuse.pool", "fusion", attrs={"returned": 0})
+            LOGGER.debug("Pool fusion skipped: no flattened hits")
             return [], {}
         pooled_hits = pooler.pool(flattened, k=limit)
         docs = [
@@ -879,12 +715,7 @@ class HybridSearchEngine:
             for pooled in pooled_hits
         ]
         contributions_for_docs = {doc.doc_id: contributions.get(doc.doc_id, []) for doc in docs}
-        if timeline is not None:
-            timeline.event(
-                "hybrid.fuse.pool",
-                "fusion",
-                attrs={"returned": len(docs)},
-            )
+        LOGGER.debug("Pool fusion completed", extra={"returned": len(docs)})
         return docs, contributions_for_docs
 
     def _apply_recency_boost_if_needed(
@@ -928,12 +759,6 @@ class HybridSearchEngine:
             Structured result set containing fused documents, per-document channel
             contributions, warnings, and explainability metadata.
         """
-        telemetry_ctx = _SearchTelemetryContext(
-            timeline=current_timeline(),
-            stage_records=[
-                {"name": "embed", "status": "skip", "duration_ms": 0.0, "reason": "upstream"},
-            ],
-        )
         opts = options or HybridSearchOptions()
         normalized_hits, readiness_warnings = self._filter_semantic_hits(
             semantic_hits,
@@ -944,9 +769,8 @@ class HybridSearchEngine:
             semantic_hits=normalized_hits,
             limit=limit,
             options=opts,
-            telemetry=telemetry_ctx,
         )
-        method_payload = self._with_stage_metadata(result.method, telemetry_ctx.stage_records)
+        method_payload = result.method
         enriched = HybridSearchResult(
             docs=result.docs,
             contributions=result.contributions,
@@ -971,143 +795,48 @@ class HybridSearchEngine:
         semantic_hits: Sequence[tuple[int, float]],
         limit: int,
         options: HybridSearchOptions,
-        telemetry: _SearchTelemetryContext,
     ) -> HybridSearchResult:
-        op_attrs = {"query_chars": len(query), "limit": int(limit)}
-        op_ctx = (
-            telemetry.timeline.operation("hybrid.search", **op_attrs)
-            if telemetry.timeline
-            else nullcontext()
+        LOGGER.debug(
+            "Starting hybrid search",
+            extra={"query_chars": len(query), "limit": int(limit)},
         )
-        with (
-            span_context(
-                "retrieval.search",
-                kind="internal",
-                attrs={
-                    Attrs.QUERY_TEXT: query,
-                    Attrs.QUERY_LEN: len(query),
-                    Attrs.TOP_K: limit,
-                },
-            ),
-            op_ctx,
-        ):
-            retrieval_metrics.QUERIES_TOTAL.labels(kind="search").inc()
-            gate_cfg = self._make_stage_gate_config()
-            budget_decision, budget_info = self._profile_query(query, gate_cfg, telemetry.timeline)
-            with span_context(
-                "retrieval.gather_channels",
-                stage="retrieval.gather",
-                attrs={
-                    Attrs.REQUEST_STAGE: "gather",
-                    Attrs.CHANNEL_DEPTHS: to_label_str(budget_decision.per_channel_depths),
-                    Attrs.TOP_K: limit,
-                },
-                emit_checkpoint=True,
-            ):
-                runs, warnings = self._gather_channel_hits(
-                    query,
-                    semantic_hits,
-                    channel_limits=budget_decision.per_channel_depths,
-                    stage_records=telemetry.stage_records,
-                )
-            channel_counts = {name: len(hits) for name, hits in runs.items()}
-            record_span_event(
-                "hybrid.channels.collected",
-                semantic=channel_counts.get("semantic", 0),
-                bm25=channel_counts.get("bm25", 0),
-                splade=channel_counts.get("splade", 0),
-                extra=len(channel_counts) - min(len(channel_counts), 3),
-            )
-            if telemetry.timeline is not None and channel_counts:
-                telemetry.timeline.event(
-                    "hybrid.channels.collected",
-                    "hybrid",
-                    attrs={
-                        **{f"{name}_hits": count for name, count in channel_counts.items()},
-                        "channels": list(channel_counts),
-                    },
-                )
-            if channel_counts:
-                emit_step(
-                    StepEvent(
-                        kind="retrieval.gather_channels",
-                        status="completed",
-                        payload={
-                            "channels": list(channel_counts),
-                            "counts": channel_counts,
-                            "warnings": warnings,
-                        },
-                    )
-                )
-            ctx = _FusionContext(
-                query=query,
-                runs=runs,
-                warnings=warnings,
-                limit=limit,
-                options=options,
-                budget_decision=budget_decision,
-                budget_info=budget_info,
-                timeline=telemetry.timeline,
-            )
-            fusion_stage_name = (
-                "fusion.rrf" if self._settings.index.hybrid_use_rrf else "fusion.pool"
-            )
-            fusion_ctx = (
-                telemetry.timeline.step(fusion_stage_name, channels=len(channel_counts) or 0)
-                if telemetry.timeline
-                else nullcontext()
-            )
-            fusion_start = perf_counter()
-            with (
-                span_context(
-                    "retrieval.fuse",
-                    stage="retrieval.fuse",
-                    attrs={
-                        Attrs.REQUEST_STAGE: "fuse",
-                        Attrs.RRF_K: budget_decision.rrf_k,
-                        Attrs.CHANNELS_USED: to_label_str(list(channel_counts)),
-                    },
-                    emit_checkpoint=True,
-                ),
-                fusion_ctx,
-            ):
-                result = self._fuse_runs(ctx)
-            duration_ms = round((perf_counter() - fusion_start) * 1000, 2)
-            telemetry.stage_records.append(
-                {
-                    "name": fusion_stage_name,
-                    "status": "run",
-                    "duration_ms": duration_ms,
-                    "output": {"documents": len(result.docs)},
-                }
-            )
-            record_span_event(
-                "hybrid.fuse.result",
-                documents=len(result.docs),
-                warnings=len(result.warnings),
-                channels=len(result.channels),
-            )
-            if telemetry.timeline is not None:
-                telemetry.timeline.event(
-                    "hybrid.fuse.result",
-                    "fusion",
-                    attrs={
-                        "documents": len(result.docs),
-                        "warnings": len(result.warnings),
-                        "channels": result.channels,
-                    },
-                )
-            emit_step(
-                StepEvent(
-                    kind="retrieval.fuse",
-                    status="completed",
-                    payload={
-                        "documents": len(result.docs),
-                        "warnings": len(result.warnings),
-                        "channels": result.channels,
-                    },
-                )
-            )
+        gate_cfg = self._make_stage_gate_config()
+        budget_decision, budget_info = self._profile_query(query, gate_cfg)
+        runs, warnings = self._gather_channel_hits(
+            query,
+            semantic_hits,
+            channel_limits=budget_decision.per_channel_depths,
+        )
+        channel_counts = {name: len(hits) for name, hits in runs.items()}
+        LOGGER.debug(
+            "Channels collected",
+            extra={
+                **{f"{name}_hits": count for name, count in channel_counts.items()},
+                "channels": list(channel_counts),
+                "warnings": warnings,
+            },
+        )
+        ctx = _FusionContext(
+            query=query,
+            runs=runs,
+            warnings=warnings,
+            limit=limit,
+            options=options,
+            budget_decision=budget_decision,
+            budget_info=budget_info,
+        )
+        fusion_start = perf_counter()
+        result = self._fuse_runs(ctx)
+        duration_ms = round((perf_counter() - fusion_start) * 1000, 2)
+        LOGGER.debug(
+            "Fusion completed",
+            extra={
+                "documents": len(result.docs),
+                "warnings": len(result.warnings),
+                "channels": len(result.channels),
+                "duration_ms": duration_ms,
+            },
+        )
         return result
 
     def _gather_channel_hits(
@@ -1116,7 +845,6 @@ class HybridSearchEngine:
         semantic_hits: Sequence[tuple[int, float]],
         *,
         channel_limits: Mapping[str, int] | None = None,
-        stage_records: list[dict[str, object]],
     ) -> tuple[dict[str, list[SearchHit]], list[str]]:
         """Collect per-channel search hits and warnings for ``query``.
 
@@ -1142,12 +870,6 @@ class HybridSearchEngine:
             Optional per-channel depth overrides derived from budget decisions.
             Keys correspond to channel names (e.g., "semantic", "bm25"). When
             provided, each channel fetches at most the specified number of hits.
-        stage_records : list[dict[str, object]]
-            Mutable list of stage timing records. This method appends timing
-            and status records for each channel search stage (e.g., "search.faiss",
-            "search.bm25", "search.splade") to this list. Each record contains
-            "name", "status", "duration_seconds", and optional channel-specific
-            metadata. Used for telemetry and performance analysis.
 
         Returns
         -------
@@ -1160,43 +882,31 @@ class HybridSearchEngine:
               initialization errors, search failures, and availability issues.
         """
         runs: dict[str, list[SearchHit]] = {}
-        warnings: list[str] = []
-        timeline = current_timeline()
 
         semantic_limit = channel_limits.get("semantic") if channel_limits else None
-        faiss_attrs = {"input_hits": len(semantic_hits)}
-        faiss_ctx = timeline.step("search.faiss", **faiss_attrs) if timeline else nullcontext()
         faiss_start = perf_counter()
-        with faiss_ctx:
-            semantic_channel_hits = self._build_semantic_channel_hits(
-                semantic_hits, limit=semantic_limit
-            )
+        semantic_channel_hits = self._build_semantic_channel_hits(
+            semantic_hits, limit=semantic_limit
+        )
         faiss_duration = perf_counter() - faiss_start
-        stage_records.append(
-            {
-                "name": "search.faiss",
-                "status": "run",
+        LOGGER.debug(
+            "Semantic channel hits collected",
+            extra={
+                "input_hits": len(semantic_hits),
+                "output_hits": len(semantic_channel_hits),
                 "duration_ms": round(faiss_duration * 1000, 2),
-                "output": {"hits": len(semantic_channel_hits)},
-            }
+            },
         )
         if semantic_channel_hits:
             runs["semantic"] = semantic_channel_hits
-        if timeline is not None:
-            timeline.event(
-                "hybrid.semantic.run",
-                "semantic",
-                attrs={"hits": len(semantic_channel_hits)},
-            )
 
+        warnings: list[str] = []
         default_limit = self._settings.index.hybrid_top_k_per_channel
         for channel in self._registry.channels():
             limit = default_limit
             if channel_limits and channel.name in channel_limits:
                 limit = channel_limits[channel.name]
-            hits, warning = self._collect_channel_hits(
-                channel, query, limit, timeline, stage_records
-            )
+            hits, warning = self._collect_channel_hits(channel, query, limit)
             if warning:
                 warnings.append(warning)
             if hits:
@@ -1229,167 +939,50 @@ class HybridSearchEngine:
         channel: Channel,
         query: str,
         limit: int,
-        timeline: Timeline | None,
-        stage_records: list[dict[str, object]],
     ) -> tuple[list[SearchHit], str | None]:
-        stage_name = f"search.{channel.name}"
-
-        def _record_stage(
-            status: str,
-            *,
-            duration: float = 0.0,
-            reason: str | None = None,
-            output: Mapping[str, object] | None = None,
-        ) -> None:
-            entry: dict[str, object] = {
-                "name": stage_name,
-                "status": status,
-                "duration_ms": round(duration * 1000, 2),
-            }
-            if reason:
-                entry["reason"] = reason
-            if output is not None:
-                entry["output"] = dict(output)
-            stage_records.append(entry)
-
         disabled_reason = self._channel_disabled_reason(channel)
         if disabled_reason is not None:
-            ledger_record(
-                "channel.skip",
-                stage="pool_search",
-                component="retrieval.channel",
-                ok=False,
-                channel=channel.name,
-                limit=limit,
-                reason=disabled_reason,
+            LOGGER.debug(
+                "Channel skipped",
+                extra={"channel": channel.name, "reason": disabled_reason},
             )
-            self._emit_channel_skip(channel.name, timeline, {"reason": disabled_reason})
-            _record_stage("skip", reason=disabled_reason)
             return [], None
         missing = self._missing_capabilities(channel)
         if missing:
-            ledger_record(
-                "channel.skip",
-                stage="pool_search",
-                component="retrieval.channel",
-                ok=False,
-                channel=channel.name,
-                limit=limit,
-                reason="capability_off",
-                missing=sorted(missing),
+            LOGGER.debug(
+                "Channel skipped: missing capabilities",
+                extra={"channel": channel.name, "missing": sorted(missing)},
             )
-            self._emit_channel_skip(
-                channel.name,
-                timeline,
-                {"reason": "capability_off", "missing": sorted(missing)},
-            )
-            _record_stage("skip", reason="capability_off")
             return [], None
         start = perf_counter()
         try:
-            attrs = {"channel": channel.name, "limit": limit}
-            with span_context(
-                stage_name,
-                stage=stage_name,
-                attrs=attrs,
-                emit_checkpoint=True,
-            ):
-                step_ctx = timeline.step(stage_name, **attrs) if timeline else nullcontext()
-                with step_ctx:
-                    with ledger_step(
-                        stage="pool_search",
-                        op=stage_name,
-                        component="retrieval.channel",
-                        attrs=attrs,
-                    ):
-                        hits = list(channel.search(query, limit))
+            hits = list(channel.search(query, limit))
         except ChannelError as exc:
             warning = str(exc)
-            retrieval_metrics.QUERY_ERRORS_TOTAL.labels(kind="search", channel=channel.name).inc()
-            self._emit_channel_skip(
-                channel.name,
-                timeline,
-                {"reason": exc.reason, "message": str(exc)},
-            )
-            _record_stage("error", duration=perf_counter() - start, reason=exc.reason)
-            ledger_record(
-                "channel.error",
-                stage="pool_search",
-                component="retrieval.channel",
-                ok=False,
-                channel=channel.name,
-                limit=limit,
-                reason=exc.reason,
+            LOGGER.debug(
+                "Channel search failed",
+                extra={
+                    "channel": channel.name,
+                    "reason": exc.reason,
+                    "error": str(exc),
+                },
             )
             return [], warning
         except (OSError, RuntimeError, ValueError, ImportError) as exc:  # pragma: no cover
             warning = f"{channel.name} channel failed: {exc}"
             LOGGER.warning(warning, exc_info=exc)
-            retrieval_metrics.QUERY_ERRORS_TOTAL.labels(kind="search", channel=channel.name).inc()
-            self._emit_channel_skip(
-                channel.name,
-                timeline,
-                {"reason": "provider_error", "message": str(exc)},
-            )
-            _record_stage("error", duration=perf_counter() - start, reason="provider_error")
-            ledger_record(
-                "channel.error",
-                stage="pool_search",
-                component="retrieval.channel",
-                ok=False,
-                channel=channel.name,
-                limit=limit,
-                reason="provider_error",
-            )
             return [], warning
         duration = perf_counter() - start
-        retrieval_metrics.CHANNEL_LATENCY_SECONDS.labels(channel=channel.name).observe(duration)
-        self._emit_channel_run(channel, hits, timeline)
-        _record_stage(
-            "run",
-            duration=duration,
-            output={"hits": len(hits), "limit": limit},
-        )
-        ledger_record(
-            "channel.search",
-            stage="pool_search",
-            component="retrieval.channel",
-            channel=channel.name,
-            limit=limit,
-            hits=len(hits),
-            duration_ms=round(duration * 1000, 2),
-        )
-        return hits, None
-
-    @staticmethod
-    def _emit_channel_skip(
-        name: str,
-        timeline: Timeline | None,
-        attrs: dict[str, object],
-    ) -> None:
-        if timeline is None:
-            return
-        enriched = dict(attrs)
-        enriched["name"] = name
-        timeline.event("channel", "channel.skip", attrs=enriched)
-
-    @staticmethod
-    def _emit_channel_run(
-        channel: Channel,
-        hits: Sequence[SearchHit],
-        timeline: Timeline | None,
-    ) -> None:
-        if timeline is None:
-            return
-        timeline.event(
-            "channel",
-            "channel.run",
-            attrs={
-                "name": channel.name,
+        LOGGER.debug(
+            "Channel search completed",
+            extra={
+                "channel": channel.name,
                 "hits": len(hits),
-                "cost": getattr(channel, "cost", 1.0),
+                "limit": limit,
+                "duration_s": duration,
             },
         )
+        return hits, None
 
     @staticmethod
     def _with_stage_metadata(
@@ -1579,7 +1172,7 @@ class HybridSearchEngine:
         This method filters semantic search results based on FAISS availability and
         minimum score thresholds. It is called during hybrid search execution to
         ensure only valid semantic hits are included in the final results. When FAISS
-        is unavailable or scores are too low, warnings are generated for telemetry.
+        is unavailable or scores are too low, warnings are generated.
 
         Parameters
         ----------

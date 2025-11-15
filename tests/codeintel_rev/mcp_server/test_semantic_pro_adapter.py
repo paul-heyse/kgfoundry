@@ -202,23 +202,10 @@ class _FakeContext:
 
 
 @pytest.fixture(autouse=True)
-def _stub_observer(monkeypatch: pytest.MonkeyPatch) -> None:
-    @contextmanager
-    def _observer(*_: object, **__: object) -> Iterator[object]:
-        class _Obs:
-            def mark_error(self) -> None:
-                self.errored = True
-
-            def mark_success(self) -> None:
-                self.succeeded = True
-
-        obs = _Obs()
-        yield obs
-
+def _stub_scope(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _fake_scope(*_: object, **__: object) -> None:
         await asyncio.sleep(0)
 
-    monkeypatch.setattr(semantic_pro, "observe_duration", _observer)
     monkeypatch.setattr(semantic_pro, "get_session_id", lambda: "test-session")
     monkeypatch.setattr(semantic_pro, "get_effective_scope", _fake_scope)
 

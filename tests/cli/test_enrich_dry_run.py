@@ -29,8 +29,15 @@ def _git() -> str:
 def _init_repo(repo_root: Path) -> None:
     env = _git_env()
     subprocess.run([_git(), "init"], cwd=repo_root, check=True, env=env)
-    subprocess.run([_git(), "config", "user.name", env["GIT_AUTHOR_NAME"]], cwd=repo_root, check=True, env=env)
-    subprocess.run([_git(), "config", "user.email", env["GIT_AUTHOR_EMAIL"]], cwd=repo_root, check=True, env=env)
+    subprocess.run(
+        [_git(), "config", "user.name", env["GIT_AUTHOR_NAME"]], cwd=repo_root, check=True, env=env
+    )
+    subprocess.run(
+        [_git(), "config", "user.email", env["GIT_AUTHOR_EMAIL"]],
+        cwd=repo_root,
+        check=True,
+        env=env,
+    )
 
 
 def _write_repo(repo_root: Path) -> None:

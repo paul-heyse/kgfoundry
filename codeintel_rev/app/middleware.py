@@ -51,23 +51,13 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 
 from __future__ import annotations
 
-import time
 import uuid
-from datetime import UTC, datetime
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from starlette.middleware.base import BaseHTTPMiddleware, DispatchFunction
 from starlette.types import ASGIApp
 
-from codeintel_rev.observability.ledger import RunLedger, dated_run_dir
-from codeintel_rev.observability.otel import current_trace_id, set_current_span_attrs
-from codeintel_rev.observability.runtime_observer import bind_run_ledger
-from codeintel_rev.observability.semantic_conventions import Attrs
-from codeintel_rev.observability.timeline import bind_timeline, new_timeline
 from codeintel_rev.runtime.request_context import capability_stamp_var, session_id_var
-from codeintel_rev.telemetry.context import telemetry_context
-from codeintel_rev.telemetry.reporter import start_run
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -243,82 +233,29 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
                 extra={"session_id": session_id, "path": request.url.path},
             )
 
-        run_id_header = request.headers.get("X-Run-ID")
-        if run_id_header:
+        run_id = request.headers.get("X-Run-ID")
+        if run_id is None:
+            run_id = uuid.uuid4().hex
+        else:
             self._logger.debug(
                 "Using client-provided run ID",
-                extra={"run_id": run_id_header, "path": request.url.path},
+                extra={"run_id": run_id, "path": request.url.path},
             )
 
-        # Store in request.state (FastAPI convention)
         request.state.session_id = session_id
-        timeline = new_timeline(session_id, run_id=run_id_header)
-        request.state.run_id = timeline.run_id
-        request.state.timeline = timeline
-        started_at = time.time()
-        timeline.set_metadata(
-            kind="http",
-            path=str(request.url.path),
-            method=request.method,
-            started_at=started_at,
-            run_date=datetime.fromtimestamp(started_at, tz=UTC).strftime("%Y%m%d"),
-        )
+        request.state.run_id = run_id
 
         capability_stamp = getattr(request.app.state, "capability_stamp", None)
-        start_run(
-            session_id,
-            timeline.run_id,
-            tool_name=None,
-            capability_stamp=capability_stamp,
-            started_at=time.time(),
-        )
 
-        ledger_root: Path | None = None
-        context = getattr(request.app.state, "context", None)
-        if context is not None:
-            paths = getattr(context, "paths", None)
-            ledger_root = getattr(paths, "data_dir", None)
-        ledger: RunLedger | None = None
-        try:
-            ledger_dir = dated_run_dir(ledger_root)
-            ledger = RunLedger.open(ledger_dir, run_id=timeline.run_id, session_id=session_id)
-            request.state.run_ledger = ledger
-        except (OSError, RuntimeError, ValueError):  # pragma: no cover - defensive
-            self._logger.debug("Failed to initialize run ledger", exc_info=True)
-            ledger = None
-
-        # Store in ContextVar (for adapter access)
         session_token = session_id_var.set(session_id)
         capability_token = capability_stamp_var.set(capability_stamp)
         try:
-            with (
-                bind_timeline(timeline),
-                bind_run_ledger(ledger),
-                telemetry_context(
-                    session_id=session_id,
-                    run_id=timeline.run_id,
-                    capability_stamp=capability_stamp,
-                    tool_name=None,
-                ),
-            ):
-                set_current_span_attrs(
-                    **{
-                        Attrs.MCP_SESSION_ID: session_id,
-                        Attrs.MCP_RUN_ID: timeline.run_id,
-                        "http.method": request.method,
-                        "http.target": str(request.url.path),
-                    }
-                )
-                response = await call_next(request)
+            response = await call_next(request)
         finally:
             session_id_var.reset(session_token)
             capability_stamp_var.reset(capability_token)
-            if ledger is not None:
-                ledger.close()
-        trace_id = current_trace_id()
-        if trace_id:
-            response.headers.setdefault("X-Trace-Id", trace_id)
-        response.headers.setdefault("X-Run-Id", timeline.run_id)
+        response.headers.setdefault("X-Run-Id", run_id)
+        response.headers.setdefault("X-Session-Id", session_id)
         return response
 
 

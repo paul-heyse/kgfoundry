@@ -16,11 +16,11 @@ from contextlib import asynccontextmanager, suppress
 from importlib.metadata import PackageNotFoundError, version
 from time import perf_counter
 from types import FrameType
-from typing import Any, cast
+from typing import cast
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from hypercorn.middleware import ProxyFixMiddleware
 from hypercorn.typing import ASGIFramework
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -32,33 +32,11 @@ from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.gpu_warmup import warmup_gpu
 from codeintel_rev.app.middleware import SessionScopeMiddleware
 from codeintel_rev.app.readiness import ReadinessProbe
-from codeintel_rev.app.routers import diagnostics, index_admin
+from codeintel_rev.app.routers import index_admin
 from codeintel_rev.app.server_settings import get_server_settings
 from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.mcp_server.server import app_context, build_http_app
-from codeintel_rev.observability import execution_ledger
-from codeintel_rev.observability.otel import (
-    as_span,
-    current_trace_id,
-    init_all_telemetry,
-    set_current_span_attrs,
-)
-from codeintel_rev.observability.runtime_observer import TimelineRuntimeObserver
-from codeintel_rev.observability.semantic_conventions import Attrs
-from codeintel_rev.observability.timeline import bind_timeline, new_timeline
 from codeintel_rev.runtime.cells import RuntimeCellObserver
-from codeintel_rev.telemetry.context import current_run_id
-from codeintel_rev.telemetry.logging import install_structured_logging
-from codeintel_rev.telemetry.reporter import (
-    build_report as build_run_report,
-)
-from codeintel_rev.telemetry.reporter import (
-    build_run_report_v2,
-    render_markdown,
-    render_markdown_v2,
-    render_mermaid,
-    report_to_json,
-)
 from kgfoundry_common.errors import ConfigurationError
 from kgfoundry_common.logging import get_logger
 
@@ -68,8 +46,6 @@ try:
     _DIST_VERSION = version("kgfoundry")
 except PackageNotFoundError:
     _DIST_VERSION = None
-
-install_structured_logging()
 
 _DEFAULT_SSE_KEEPALIVE_SECONDS = 25.0
 
@@ -402,17 +378,7 @@ async def _initialize_context(
         else:  # pragma: no cover - defensive
             raise
     app.state.context = context
-    with as_span("readiness.gpu_warmup", component="startup"):
-        warmup_status = warmup_gpu()
-        status = warmup_status.get("overall_status")
-        attrs: dict[str, object] = {
-            Attrs.COMPONENT: "startup",
-            Attrs.STAGE: "gpu_warmup",
-            "readiness.status": status or "unknown",
-        }
-        if status == "degraded":
-            attrs[Attrs.WARN_DEGRADED] = True
-        set_current_span_attrs(**attrs)
+    warmup_status = warmup_gpu()
     _log_gpu_warmup(warmup_status)
     readiness = ReadinessProbe(context)
     await readiness.initialize()
@@ -493,13 +459,10 @@ async def lifespan(
     context: ApplicationContext | None = None
     readiness: ReadinessProbe | None = None
 
-    startup_timeline = new_timeline("startup", force=True)
-    observer = TimelineRuntimeObserver(startup_timeline)
     hup_handler_installed = False
     previous_sighup = None
     try:
-        with bind_timeline(startup_timeline):
-            context, readiness = await _initialize_context(app, runtime_observer=observer)
+        context, readiness = await _initialize_context(app)
         capabilities = Capabilities.from_context(context)
         app.state.capabilities = capabilities
         app.state.capability_stamp = capabilities.stamp()
@@ -547,33 +510,6 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
-
-
-def _log_execution_ledger_state() -> None:
-    status = "enabled" if execution_ledger.SETTINGS.enabled else "disabled"
-    app.state.execution_ledger_enabled = execution_ledger.SETTINGS.enabled
-    app.state.execution_ledger_store = execution_ledger.STORE
-    LOGGER.info(
-        "execution_ledger.ready",
-        extra={
-            Attrs.LEDGER_STATUS: status,
-            "ledger.max_runs": execution_ledger.SETTINGS.max_runs,
-            "ledger.flush_path": str(execution_ledger.SETTINGS.flush_path)
-            if execution_ledger.SETTINGS.flush_path
-            else None,
-        },
-    )
-
-
-app.add_event_handler("startup", _log_execution_ledger_state)
-
-
-init_all_telemetry(
-    app=app,
-    service_name="codeintel-mcp",
-    service_version=_DIST_VERSION,
-)
-
 # CORS middleware for browser clients (handle preflight before session scope)
 app.add_middleware(
     CORSMiddleware,
@@ -594,226 +530,6 @@ if SERVER_SETTINGS.enable_trusted_hosts:
 
 if os.getenv("CODEINTEL_ADMIN", "").strip().lower() in {"1", "true", "yes", "on"}:
     app.include_router(index_admin.router)
-
-app.include_router(diagnostics.router)
-
-
-@app.get("/observability/run_report")
-async def observability_run_report(
-    session_id: str, run_id: str | None = None, response_format: str | None = None
-) -> Response:
-    """Return RunReport V2 for observability dashboards.
-
-    Parameters
-    ----------
-    session_id : str
-        Session identifier to inspect.
-    run_id : str | None
-        Specific run identifier; when omitted the latest run is returned.
-    response_format : str | None
-        Optional format selector (``"md"`` or ``"markdown"`` for plaintext).
-
-    Returns
-    -------
-    Response
-        JSON response by default or plaintext Markdown when requested.
-
-    Raises
-    ------
-    HTTPException
-        Raised when the application context is missing or the run cannot be found.
-    """
-    context = getattr(app.state, "context", None)
-    if context is None:
-        raise HTTPException(status_code=503, detail="Application context not initialized")
-    report = build_run_report_v2(session_id, run_id)
-    if report is None:
-        raise HTTPException(status_code=404, detail="Run not found")
-    fmt = (response_format or "").lower()
-    if fmt in {"md", "markdown"}:
-        return PlainTextResponse(render_markdown_v2(report))
-    return JSONResponse(report.as_dict())
-
-
-@app.get("/reports/{session_id}")
-async def get_run_report(session_id: str, run_id: str | None = None) -> dict[str, Any]:
-    """Return JSON run report for the session/run identifier.
-
-    This endpoint retrieves a run report for the specified session and optional
-    run identifier. The report contains telemetry data, metrics, and execution
-    details for the requested run. If no run_id is provided, returns the most
-    recent run for the session.
-
-    Parameters
-    ----------
-    session_id : str
-        Session identifier extracted from the URL path. Used to identify the
-        telemetry session containing the run report.
-    run_id : str | None, optional
-        Optional run identifier to retrieve a specific run report. If None
-        (default), returns the most recent run for the session. Used to
-        retrieve historical run reports within a session.
-
-    Returns
-    -------
-    dict[str, Any]
-        Run report payload serialisable to JSON containing telemetry data,
-        metrics, timing information, and execution details for the requested run.
-        The payload structure matches the RunReport schema.
-
-    Raises
-    ------
-    HTTPException
-        Raised in the following cases:
-        - Status 503: Application context is not initialized (missing from app.state)
-        - Status 404: Run not found for the specified session_id and run_id
-    """
-    context = getattr(app.state, "context", None)
-    if context is None:
-        raise HTTPException(status_code=503, detail="Application context not initialized")
-    report = build_run_report(context, session_id, run_id)
-    if report is None:
-        raise HTTPException(status_code=404, detail="Run not found")
-    return report_to_json(report)
-
-
-@app.get("/reports/{session_id}.md", response_class=PlainTextResponse)
-async def get_run_report_markdown(session_id: str, run_id: str | None = None) -> PlainTextResponse:
-    """Return Markdown run report for the session/run identifier.
-
-    This endpoint retrieves a run report for the specified session and optional
-    run identifier, formatted as Markdown. The report contains telemetry data,
-    metrics, and execution details rendered in human-readable Markdown format.
-    If no run_id is provided, returns the most recent run for the session.
-
-    Parameters
-    ----------
-    session_id : str
-        Session identifier extracted from the URL path. Used to identify the
-        telemetry session containing the run report.
-    run_id : str | None, optional
-        Optional run identifier to retrieve a specific run report. If None
-        (default), returns the most recent run for the session. Used to
-        retrieve historical run reports within a session.
-
-    Returns
-    -------
-    PlainTextResponse
-        FastAPI PlainTextResponse containing Markdown-formatted run report body.
-        The response includes telemetry data, metrics, timing information, and
-        execution details rendered in Markdown format suitable for display in
-        documentation or web interfaces.
-
-    Raises
-    ------
-    HTTPException
-        Raised in the following cases:
-        - Status 503: Application context is not initialized (missing from app.state)
-        - Status 404: Run not found for the specified session_id and run_id
-    """
-    context = getattr(app.state, "context", None)
-    if context is None:
-        raise HTTPException(status_code=503, detail="Application context not initialized")
-    report = build_run_report(context, session_id, run_id)
-    if report is None:
-        raise HTTPException(status_code=404, detail="Run not found")
-    return PlainTextResponse(render_markdown(report))
-
-
-@app.get("/reports/{session_id}.mmd", response_class=PlainTextResponse)
-async def get_run_report_mermaid(session_id: str, run_id: str | None = None) -> PlainTextResponse:
-    """Return a Mermaid representation of the run.
-
-    Parameters
-    ----------
-    session_id : str
-        Session identifier to retrieve the run report for.
-    run_id : str | None
-        Optional run identifier when multiple runs share a session. If None,
-        returns the latest run for the session.
-
-    Returns
-    -------
-    PlainTextResponse
-        Mermaid `graph TD` body describing the run.
-
-    Raises
-    ------
-    HTTPException
-        Raised when the application context is not initialized or the run cannot
-        be found.
-    """
-    context = getattr(app.state, "context", None)
-    if context is None:
-        raise HTTPException(status_code=503, detail="Application context not initialized")
-    report = build_run_report(context, session_id, run_id)
-    if report is None:
-        raise HTTPException(status_code=404, detail="Run not found")
-    return PlainTextResponse(render_mermaid(report))
-
-
-@app.get("/runs/{session_id}/report")
-async def get_run_report_v2(session_id: str, run_id: str | None = None) -> dict[str, Any]:
-    """Alias for `/reports/{session_id}` retaining backwards compatibility.
-
-    Parameters
-    ----------
-    session_id : str
-        Session identifier to retrieve the run report for.
-    run_id : str | None
-        Optional run identifier when multiple runs share a session. If None,
-        returns the latest run for the session.
-
-    Returns
-    -------
-    dict[str, Any]
-        JSON run report payload.
-    """
-    return await get_run_report(session_id, run_id)
-
-
-@app.get("/runs/{session_id}/report.md", response_class=PlainTextResponse)
-async def get_run_report_markdown_v2(
-    session_id: str, run_id: str | None = None
-) -> PlainTextResponse:
-    """Alias for `/reports/{session_id}.md`.
-
-    Parameters
-    ----------
-    session_id : str
-        Session identifier to retrieve the run report for.
-    run_id : str | None
-        Optional run identifier when multiple runs share a session. If None,
-        returns the latest run for the session.
-
-    Returns
-    -------
-    PlainTextResponse
-        Markdown run report body.
-    """
-    return await get_run_report_markdown(session_id, run_id)
-
-
-@app.get("/runs/{session_id}/report.mmd", response_class=PlainTextResponse)
-async def get_run_report_mermaid_v2(
-    session_id: str, run_id: str | None = None
-) -> PlainTextResponse:
-    """Alias for `/reports/{session_id}.mmd`.
-
-    Parameters
-    ----------
-    session_id : str
-        Session identifier to retrieve the run report for.
-    run_id : str | None
-        Optional run identifier when multiple runs share a session. If None,
-        returns the latest run for the session.
-
-    Returns
-    -------
-    PlainTextResponse
-        Mermaid graph for the run.
-    """
-    return await get_run_report_mermaid(session_id, run_id)
 
 
 @app.middleware("http")
@@ -869,56 +585,36 @@ async def set_mcp_context(
     ------
     Exception
         Propagated from `call_next()` if the downstream handler raises any
-        exception. Also propagates exceptions from timeline event recording.
+        exception.
 
     Notes
     -----
     This middleware extracts the ApplicationContext from `request.app.state`
     and sets it in a context variable (`app_context`) for MCP tool handlers.
-    It also records timeline events for request processing. Time complexity:
-    O(1) for context variable operations, plus downstream handler time.
+    Time complexity: O(1) for context variable operations, plus downstream
+    handler time.
     """
     # Set context in context variable for MCP tool handlers
     context: ApplicationContext | None = getattr(request.app.state, "context", None)
     if context is not None:
         app_context.set(context)
 
-    timeline = getattr(request.state, "timeline", None)
     start = perf_counter()
     try:
-        with as_span("http.request", path=request.url.path, method=request.method):
-            response = await call_next(request)
+        response = await call_next(request)
     except Exception as exc:
         duration_ms = int((perf_counter() - start) * 1000)
-        if timeline is not None:
-            timeline.event(
-                "http.request",
-                request.url.path,
-                status="error",
-                message=str(exc),
-                attrs={"method": request.method},
-            )
         status_code = getattr(exc, "status_code", 500)
         _log_request_summary(request, status_code=status_code, duration_ms=duration_ms)
         raise
     duration_ms = int((perf_counter() - start) * 1000)
-    if timeline is not None:
-        timeline.event(
-            "http.request",
-            request.url.path,
-            attrs={
-                "method": request.method,
-                "status_code": response.status_code,
-                "duration_ms": duration_ms,
-            },
-        )
     _log_request_summary(request, status_code=response.status_code, duration_ms=duration_ms)
-    trace_id = current_trace_id()
-    if trace_id:
-        response.headers.setdefault("X-Trace-Id", trace_id)
-    run_id = getattr(request.state, "run_id", None) or current_run_id()
+    run_id = getattr(request.state, "run_id", None)
     if run_id:
         response.headers.setdefault("X-Run-Id", run_id)
+    session_id = getattr(request.state, "session_id", None)
+    if session_id:
+        response.headers.setdefault("X-Session-Id", session_id)
     return response
 
 

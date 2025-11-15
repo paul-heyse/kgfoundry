@@ -10,7 +10,6 @@ from functools import lru_cache
 from typing import SupportsInt, cast
 
 from codeintel_rev._lazy_imports import LazyModule
-from codeintel_rev.metrics.registry import GPU_AVAILABLE, GPU_TEMP_SCRATCH_BYTES
 from codeintel_rev.typing import FaissModule, NumpyModule, TorchModule, gate_import
 from kgfoundry_common.logging import get_logger
 
@@ -198,7 +197,6 @@ def warmup_gpu() -> dict[str, bool | str]:
     # Step 1: Check CUDA availability via PyTorch
     cuda_available, cuda_msg = _check_cuda_availability()
     results["cuda_available"] = cuda_available
-    GPU_AVAILABLE.set(1 if cuda_available else 0)
     if not cuda_available:
         results["details"] = cuda_msg
 
@@ -222,8 +220,7 @@ def warmup_gpu() -> dict[str, bool | str]:
     if faiss_gpu_available:
         faiss_test_passed, _faiss_test_msg, scratch_bytes = _test_faiss_gpu_resources()
         results["faiss_gpu_test"] = faiss_test_passed
-        if scratch_bytes is not None:
-            GPU_TEMP_SCRATCH_BYTES.set(scratch_bytes)
+        # scratch_bytes available but not recorded (observability removed)
 
     # Determine overall status
     # Count boolean checks only (exclude string fields)

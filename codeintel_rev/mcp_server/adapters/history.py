@@ -13,12 +13,6 @@ import git.exc
 
 from codeintel_rev.errors import GitOperationError, PathNotFoundError
 from codeintel_rev.io.path_utils import resolve_within_repo
-from codeintel_rev.observability.execution_ledger import (
-    record as ledger_record,
-)
-from codeintel_rev.observability.execution_ledger import (
-    step as ledger_step,
-)
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -83,13 +77,7 @@ async def blame_range(
     repo_root = context.paths.repo_root
 
     try:
-        with ledger_step(
-            stage="gather",
-            op="history.resolve_path",
-            component="mcp.history",
-            attrs={"path": path},
-        ):
-            file_path = resolve_within_repo(repo_root, path, allow_nonexistent=False)
+        file_path = resolve_within_repo(repo_root, path, allow_nonexistent=False)
     except FileNotFoundError as exc:
         error_msg = f"Path not found: {path}"
         raise PathNotFoundError(error_msg, path=path, cause=exc) from exc
@@ -103,17 +91,11 @@ async def blame_range(
     )
 
     try:
-        with ledger_step(
-            stage="pool_search",
-            op="history.git_blame",
-            component="git",
-            attrs={"path": relative_path, "lines": max(end_line - start_line + 1, 0)},
-        ):
-            entries = await context.async_git_client.blame_range(
-                path=relative_path,
-                start_line=start_line,
-                end_line=end_line,
-            )
+        entries = await context.async_git_client.blame_range(
+            path=relative_path,
+            start_line=start_line,
+            end_line=end_line,
+        )
     except git.exc.GitCommandError as exc:
         error_msg = "Git blame failed"
         raise GitOperationError(
@@ -131,14 +113,7 @@ async def blame_range(
             "entries_count": len(entries),
         },
     )
-    result = {"blame": entries}
-    ledger_record(
-        "history.blame",
-        stage="envelope",
-        component="mcp.history",
-        results=len(entries),
-    )
-    return result
+    return {"blame": entries}
 
 
 async def file_history(
@@ -195,13 +170,7 @@ async def file_history(
     repo_root = context.paths.repo_root
 
     try:
-        with ledger_step(
-            stage="gather",
-            op="history.resolve_path",
-            component="mcp.history",
-            attrs={"path": path},
-        ):
-            file_path = resolve_within_repo(repo_root, path, allow_nonexistent=False)
+        file_path = resolve_within_repo(repo_root, path, allow_nonexistent=False)
     except FileNotFoundError as exc:
         error_msg = f"Path not found: {path}"
         raise PathNotFoundError(error_msg, path=path, cause=exc) from exc
@@ -215,13 +184,7 @@ async def file_history(
     )
 
     try:
-        with ledger_step(
-            stage="pool_search",
-            op="history.git_log",
-            component="git",
-            attrs={"path": relative_path, "limit": limit},
-        ):
-            commits = await context.async_git_client.file_history(path=relative_path, limit=limit)
+        commits = await context.async_git_client.file_history(path=relative_path, limit=limit)
     except git.exc.GitCommandError as exc:
         error_msg = "Git log failed"
         raise GitOperationError(
@@ -234,14 +197,7 @@ async def file_history(
         "Git history completed",
         extra={"path": relative_path, "limit": limit, "commits_count": len(commits)},
     )
-    result = {"commits": commits}
-    ledger_record(
-        "history.commits",
-        stage="envelope",
-        component="mcp.history",
-        results=len(commits),
-    )
-    return result
+    return {"commits": commits}
 
 
 __all__ = ["blame_range", "file_history"]

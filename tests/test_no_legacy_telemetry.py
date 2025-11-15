@@ -9,7 +9,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1] / "codeintel_rev"
 
 
 def _python_files() -> list[pathlib.Path]:
-    """Return all Python files in codeintel_rev, excluding observability/metrics.py.
+    """Return all Python files in codeintel_rev.
 
     Returns
     -------
@@ -18,8 +18,6 @@ def _python_files() -> list[pathlib.Path]:
     """
     files: list[pathlib.Path] = []
     for p in ROOT.rglob("*.py"):
-        if "observability/metrics.py" in str(p):
-            continue  # allowed to import prometheus_client.start_http_server
         if "__pycache__" in str(p):
             continue
         files.append(p)
@@ -46,8 +44,8 @@ def test_no_legacy_prometheus_client_imports():
 
 
 def test_no_legacy_telemetry_otel_imports():
-    """Verify no files import telemetry.otel (should use observability.otel)."""
-    banned = {"codeintel_rev.telemetry.otel"}
+    """Verify no files import telemetry.otel (observability removed)."""
+    banned = {"codeintel_rev.telemetry.otel", "codeintel_rev.observability.otel"}
     offenders = []
     for py in _python_files():
         try:
@@ -59,4 +57,4 @@ def test_no_legacy_telemetry_otel_imports():
                 mod = node.module or ""
                 if mod in banned:
                     offenders.append((py, mod))
-    assert not offenders, f"Legacy telemetry.otel imports found: {offenders}"
+    assert not offenders, f"Legacy telemetry/observability imports found: {offenders}"

@@ -15,38 +15,11 @@ from typing import Any, Protocol, Self, cast, runtime_checkable
 
 from codeintel_rev.config.settings import EmbeddingsConfig, IndexConfig, Settings, VLLMConfig
 from codeintel_rev.io.vllm_engine import InprocessVLLMEmbedder
-from codeintel_rev.telemetry.otel_metrics import build_counter, build_gauge, build_histogram
 from codeintel_rev.typing import NDArrayF32, gate_import
 from kgfoundry_common.logging import get_logger
 
 LOGGER = get_logger(__name__)
 EMBEDDING_RANK = 2
-
-_LATENCY = build_histogram(
-    "embedding_latency_seconds",
-    "Latency per embedding batch",
-    labelnames=("provider", "device"),
-)
-_BATCH_SIZE = build_histogram(
-    "embedding_batch_size",
-    "Items per embedding batch",
-    labelnames=("provider",),
-)
-_BATCH_COUNTER = build_counter(
-    "embeddings_total",
-    "Total embedding batches completed",
-    labelnames=("provider",),
-)
-_ERROR_COUNTER = build_counter(
-    "embedding_errors_total",
-    "Embedding batch failures",
-    labelnames=("provider", "reason"),
-)
-_INFLIGHT = build_gauge(
-    "embedding_inflight_batches",
-    "In-flight embedding batches",
-    labelnames=("provider",),
-)
 
 
 class EmbeddingRuntimeError(RuntimeError):
@@ -180,7 +153,6 @@ class _FailureCounter:
     ) -> bool:
         if exc_type is not None:
             reason = exc_type.__name__
-            _ERROR_COUNTER.labels(provider=self._provider_name, reason=reason).inc()
         return False
 
 
@@ -588,12 +560,6 @@ class _ProviderBase(EmbeddingProvider):
             batch, token_count = self._run_inference(texts)
             duration = time.perf_counter() - start
         vectors = self._post_process(batch)
-        self._record_metrics(
-            batch_size=len(texts),
-            duration=duration,
-            tokens=token_count,
-            dimension=vectors.shape[1] if vectors.size else self._state.index.vec_dim,
-        )
         return vectors
 
     def _post_process(self, vectors: NDArrayF32) -> NDArrayF32:
@@ -619,45 +585,16 @@ class _ProviderBase(EmbeddingProvider):
         _ = self.metadata  # ensure cache populated with detected dimension
         return array
 
-    def _record_metrics(
-        self, *, batch_size: int, duration: float, tokens: int, dimension: int
-    ) -> None:
-        provider = self._state.provider_name
-        device = self._state.device_label
-        if duration <= 0:
-            duration = 1e-9
-        token_rate = tokens / duration
-        item_rate = batch_size / duration
-        _LATENCY.labels(provider=provider, device=device).observe(duration)
-        _BATCH_SIZE.labels(provider=provider).observe(batch_size)
-        _BATCH_COUNTER.labels(provider=provider).inc()
-        LOGGER.info(
-            "embedding.batch",
-            extra={
-                "provider": provider,
-                "device": device,
-                "count": batch_size,
-                "tokens": tokens,
-                "token_rate": round(token_rate, 2),
-                "item_rate": round(item_rate, 2),
-                "duration_ms": round(duration * 1000, 2),
-                "dimension": dimension,
-                "mem_bytes": self._memory_bytes(),
-            },
-        )
-
     @contextmanager
     def _inflight_guard(self) -> Iterator[None]:
-        """Track in-flight batches for Prometheus gauges."""
+        """Track in-flight batches."""
         with self._gauge_lock:
             self._inflight += 1
-            _INFLIGHT.labels(provider=self._state.provider_name).set(self._inflight)
         try:
             yield
         finally:
             with self._gauge_lock:
                 self._inflight = max(self._inflight - 1, 0)
-                _INFLIGHT.labels(provider=self._state.provider_name).set(self._inflight)
 
     @staticmethod
     def _memory_bytes() -> int:
@@ -824,9 +761,7 @@ class HFEmbeddingProvider(_ProviderBase):
             embeddings.model_name,
             trust_remote_code=True,
         )
-        torch_dtype = (
-            torch_mod.float16 if self._device.type == "cuda" else torch_mod.float32
-        )
+        torch_dtype = torch_mod.float16 if self._device.type == "cuda" else torch_mod.float32
         self._model = transformers_mod.AutoModel.from_pretrained(
             embeddings.model_name,
             trust_remote_code=True,

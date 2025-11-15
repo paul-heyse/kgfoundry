@@ -35,21 +35,19 @@ class ValidationErrorProtocol(Protocol):
 
 # [nav:anchor Draft202012ValidatorProtocol]
 class Draft202012ValidatorProtocol(Protocol):
-    """Typed facade for :class:`jsonschema.validators.Draft202012Validator`."""
+    """Typed facade for :class:`jsonschema.validators.Draft202012Validator`.
 
-    def __init__(self, schema: Mapping[str, object], *args: object, **kwargs: object) -> None:
-        """Initialize validator with schema.
+    Parameters
+    ----------
+    schema : Mapping[str, object]
+        JSON Schema document to validate against.
+    *args : object
+        Additional positional arguments passed to validator.
+    **kwargs : object
+        Additional keyword arguments passed to validator.
+    """
 
-        Parameters
-        ----------
-        schema : Mapping[str, object]
-            JSON Schema document to validate against.
-        *args : object
-            Additional positional arguments passed to validator.
-        **kwargs : object
-            Additional keyword arguments passed to validator.
-        """
-        ...
+    def __init__(self, schema: Mapping[str, object], *args: object, **kwargs: object) -> None: ...
 
     @classmethod
     def check_schema(cls, schema: Mapping[str, object]) -> None:

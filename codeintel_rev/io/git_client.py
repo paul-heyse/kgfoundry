@@ -49,11 +49,6 @@ from typing import TYPE_CHECKING, cast
 import git
 import git.exc
 
-from codeintel_rev.observability.otel import as_span
-from codeintel_rev.observability.semantic_conventions import Attrs
-from codeintel_rev.observability.timeline import current_timeline
-from codeintel_rev.telemetry.decorators import span_context
-from codeintel_rev.telemetry.steps import StepEvent, emit_step
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -304,94 +299,61 @@ class GitClient:
         Line numbers are 1-indexed to match editor conventions and Git's
         output format. Internally, GitPython uses 0-indexed lines.
         """
-        attrs = {
-            Attrs.GIT_OPERATION: "blame_range",
-            Attrs.GIT_PATH: path,
-            Attrs.LINE_START: start_line,
-            Attrs.LINE_END: end_line,
-            Attrs.GIT_LINE_RANGE: f"{start_line}:{end_line}",
-        }
-        with span_context(
-            "git.blame",
-            kind="client",
-            stage="git.blame",
-            attrs=attrs,
-            emit_checkpoint=True,
-        ):
-            line_count = max(0, end_line - start_line + 1)
-            timeline = current_timeline()
-            if timeline is not None:
-                timeline.event("git.blame.start", path, attrs={"n_lines": line_count})
-
-            try:
-                blame_iter_raw = self.repo.blame_incremental(
-                    rev="HEAD",
-                    file=path,
-                    L=f"{start_line},{end_line}",
-                )
-            except git.exc.GitCommandError as exc:
-                # Check if error is "does not exist" (file not found)
-                error_msg = str(exc)
-                if "does not exist" in error_msg.lower() or "bad file" in error_msg.lower():
-                    file_not_found_msg = f"File not found: {path}"
-                    LOGGER.warning(
-                        "File not found for blame",
-                        extra={"path": path, "error": error_msg},
-                    )
-                    raise FileNotFoundError(file_not_found_msg) from exc
-                # Other Git errors (permission denied, etc.)
-                LOGGER.exception(
-                    "Git blame failed",
-                    extra={"path": path},
-                )
-                raise
-
-            entries: list[GitBlameEntry] = []
-            blame_iter = cast("Iterable[Sequence[object]]", blame_iter_raw)
-            # blame_incremental returns iterator of (commit, line_numbers) tuples
-            # line_numbers is a list of line numbers (1-indexed)
-            # Tuple may have more than 2 elements, so we index instead of unpacking
-            for blame_tuple in blame_iter:
-                normalized = _coerce_blame_tuple(blame_tuple)
-                if normalized is None:
-                    continue
-                commit, line_numbers = normalized
-                for line_num in line_numbers:
-                    # Filter to requested range (GitPython may return extra lines)
-                    if start_line <= line_num <= end_line:
-                        entry: GitBlameEntry = {
-                            "line": int(line_num),
-                            "commit": _short_sha(commit),
-                            "author": _author_field(commit, "name"),
-                            "date": _commit_iso_date(commit),
-                            "message": _string_attr(commit, "summary"),
-                        }
-                        entries.append(entry)
-
-            LOGGER.debug(
-                "Git blame completed",
-                extra={
-                    "path": path,
-                    "start_line": start_line,
-                    "end_line": end_line,
-                    "entries_count": len(entries),
-                },
+        try:
+            blame_iter_raw = self.repo.blame_incremental(
+                rev="HEAD",
+                file=path,
+                L=f"{start_line},{end_line}",
             )
-
-            if timeline is not None:
-                timeline.event("git.blame.end", path, attrs={"n_lines": len(entries)})
-            emit_step(
-                StepEvent(
-                    kind="git.blame",
-                    status="completed",
-                    payload={
-                        "path": path,
-                        "range": [start_line, end_line],
-                        "count": len(entries),
-                    },
+        except git.exc.GitCommandError as exc:
+            # Check if error is "does not exist" (file not found)
+            error_msg = str(exc)
+            if "does not exist" in error_msg.lower() or "bad file" in error_msg.lower():
+                file_not_found_msg = f"File not found: {path}"
+                LOGGER.warning(
+                    "File not found for blame",
+                    extra={"path": path, "error": error_msg},
                 )
+                raise FileNotFoundError(file_not_found_msg) from exc
+            # Other Git errors (permission denied, etc.)
+            LOGGER.exception(
+                "Git blame failed",
+                extra={"path": path},
             )
-            return entries
+            raise
+
+        entries: list[GitBlameEntry] = []
+        blame_iter = cast("Iterable[Sequence[object]]", blame_iter_raw)
+        # blame_incremental returns iterator of (commit, line_numbers) tuples
+        # line_numbers is a list of line numbers (1-indexed)
+        # Tuple may have more than 2 elements, so we index instead of unpacking
+        for blame_tuple in blame_iter:
+            normalized = _coerce_blame_tuple(blame_tuple)
+            if normalized is None:
+                continue
+            commit, line_numbers = normalized
+            for line_num in line_numbers:
+                # Filter to requested range (GitPython may return extra lines)
+                if start_line <= line_num <= end_line:
+                    entry: GitBlameEntry = {
+                        "line": int(line_num),
+                        "commit": _short_sha(commit),
+                        "author": _author_field(commit, "name"),
+                        "date": _commit_iso_date(commit),
+                        "message": _string_attr(commit, "summary"),
+                    }
+                    entries.append(entry)
+
+        LOGGER.debug(
+            "Git blame completed",
+            extra={
+                "path": path,
+                "start_line": start_line,
+                "end_line": end_line,
+                "entries_count": len(entries),
+            },
+        )
+        return entries
 
     def file_history(
         self,
@@ -462,66 +424,47 @@ class GitClient:
         not work perfectly. Consider using Git's --follow flag via subprocess
         if rename tracking is critical.
         """
-        attrs = {
-            Attrs.GIT_OPERATION: "file_history",
-            Attrs.GIT_PATH: path,
-            Attrs.LINE_LIMIT: limit,
-        }
-        with span_context(
-            "git.file_history",
-            kind="client",
-            stage="git.file_history",
-            attrs=attrs,
-            emit_checkpoint=True,
-        ):
-            timeline = current_timeline()
-            if timeline is not None:
-                timeline.event("git.history.start", path, attrs={"max": limit})
-
-            try:
-                # iter_commits with paths parameter gets commits affecting that file
-                commits_iter = self.repo.iter_commits(
-                    rev="HEAD",
-                    paths=path,
-                    max_count=limit,
-                )
-            except git.exc.GitCommandError as exc:
-                # Check if error is "does not exist" (file not found)
-                error_msg = str(exc)
-                if "does not exist" in error_msg.lower() or "bad file" in error_msg.lower():
-                    file_not_found_msg = f"File not found: {path}"
-                    LOGGER.warning(
-                        "File not found for history",
-                        extra={"path": path, "error": error_msg},
-                    )
-                    raise FileNotFoundError(file_not_found_msg) from exc
-                # Other Git errors
-                LOGGER.exception(
-                    "Git log failed",
-                    extra={"path": path},
-                )
-                raise
-
-            commits = [
-                {
-                    "sha": _short_sha(commit),
-                    "full_sha": _string_attr(commit, "hexsha"),
-                    "author": _author_field(commit, "name"),
-                    "email": _author_field(commit, "email"),
-                    "date": _commit_iso_date(commit),
-                    "message": _string_attr(commit, "summary"),
-                }
-                for commit in cast("Iterable[object]", commits_iter)
-            ]
-
-            LOGGER.debug(
-                "Git history completed",
-                extra={"path": path, "limit": limit, "commits_count": len(commits)},
+        try:
+            # iter_commits with paths parameter gets commits affecting that file
+            commits_iter = self.repo.iter_commits(
+                rev="HEAD",
+                paths=path,
+                max_count=limit,
             )
+        except git.exc.GitCommandError as exc:
+            # Check if error is "does not exist" (file not found)
+            error_msg = str(exc)
+            if "does not exist" in error_msg.lower() or "bad file" in error_msg.lower():
+                file_not_found_msg = f"File not found: {path}"
+                LOGGER.warning(
+                    "File not found for history",
+                    extra={"path": path, "error": error_msg},
+                )
+                raise FileNotFoundError(file_not_found_msg) from exc
+            # Other Git errors
+            LOGGER.exception(
+                "Git log failed",
+                extra={"path": path},
+            )
+            raise
 
-            if timeline is not None:
-                timeline.event("git.history.end", path, attrs={"n_commits": len(commits)})
-            return commits
+        commits = [
+            {
+                "sha": _short_sha(commit),
+                "full_sha": _string_attr(commit, "hexsha"),
+                "author": _author_field(commit, "name"),
+                "email": _author_field(commit, "email"),
+                "date": _commit_iso_date(commit),
+                "message": _string_attr(commit, "summary"),
+            }
+            for commit in cast("Iterable[object]", commits_iter)
+        ]
+
+        LOGGER.debug(
+            "Git history completed",
+            extra={"path": path, "limit": limit, "commits_count": len(commits)},
+        )
+        return commits
 
 
 class AsyncGitClient:
@@ -606,21 +549,12 @@ class AsyncGitClient:
         >>> len(blame)
         10
         """
-        with as_span(
-            "git.blame",
-            **{
-                Attrs.GIT_COMMAND: "blame",
-                Attrs.FILE_PATH: path,
-                Attrs.LINE_START: start_line,
-                Attrs.LINE_END: end_line,
-            },
-        ):
-            return await asyncio.to_thread(
-                self._sync_client.blame_range,
-                path,
-                start_line,
-                end_line,
-            )
+        return await asyncio.to_thread(
+            self._sync_client.blame_range,
+            path,
+            start_line,
+            end_line,
+        )
 
     async def file_history(
         self,
@@ -651,19 +585,11 @@ class AsyncGitClient:
         >>> len(history)
         5
         """
-        with as_span(
-            "git.history",
-            **{
-                Attrs.GIT_COMMAND: "history",
-                Attrs.FILE_PATH: path,
-                Attrs.LINE_LIMIT: limit,
-            },
-        ):
-            return await asyncio.to_thread(
-                self._sync_client.file_history,
-                path,
-                limit,
-            )
+        return await asyncio.to_thread(
+            self._sync_client.file_history,
+            path,
+            limit,
+        )
 
 
 __all__ = ["AsyncGitClient", "GitClient"]

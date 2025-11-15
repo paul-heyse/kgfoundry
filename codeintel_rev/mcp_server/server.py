@@ -18,8 +18,6 @@ from codeintel_rev.mcp_server.adapters import history as history_adapter
 from codeintel_rev.mcp_server.adapters import text_search as text_search_adapter
 from codeintel_rev.mcp_server.error_handling import handle_adapter_errors
 from codeintel_rev.mcp_server.schemas import ScopeIn
-from codeintel_rev.mcp_server.telemetry import tool_operation_scope
-from codeintel_rev.observability.reporting import latest_run_report
 
 # Create FastMCP instance
 mcp = FastMCP("CodeIntel MCP")
@@ -74,8 +72,7 @@ async def set_scope(scope: ScopeIn) -> dict:
         Effective scope configuration.
     """
     context = get_context()
-    with tool_operation_scope("scope.set", has_scope=bool(scope)):
-        return await files_adapter.set_scope(context, scope)
+    return await files_adapter.set_scope(context, scope)
 
 
 @mcp.tool()
@@ -116,19 +113,14 @@ async def list_paths(
     """
     context = get_context()
     filters_present = bool(path or include_globs or exclude_globs or languages)
-    with tool_operation_scope(
-        "files.list_paths",
+    return await files_adapter.list_paths(
+        context,
+        path=path,
+        include_globs=include_globs,
+        exclude_globs=exclude_globs,
+        languages=languages,
         max_results=max_results,
-        has_filters=filters_present,
-    ):
-        return await files_adapter.list_paths(
-            context,
-            path=path,
-            include_globs=include_globs,
-            exclude_globs=exclude_globs,
-            languages=languages,
-            max_results=max_results,
-        )
+    )
 
 
 @mcp.tool()
@@ -162,11 +154,7 @@ def open_file(
         empty result fields and Problem Details.
     """
     context = get_context()
-    with tool_operation_scope(
-        "files.open_file",
-        has_range=start_line is not None or end_line is not None,
-    ):
-        return files_adapter.open_file(context, path, start_line, end_line)
+    return files_adapter.open_file(context, path, start_line, end_line)
 
 
 # ==================== Search ====================
@@ -210,21 +198,14 @@ async def search_text(
         fields and Problem Details.
     """
     context = get_context()
-    with tool_operation_scope(
-        "search.text",
-        query_chars=len(query),
+    return await text_search_adapter.search_text(
+        context,
+        query,
         regex=regex,
         case_sensitive=case_sensitive,
+        paths=paths,
         max_results=max_results,
-    ):
-        return await text_search_adapter.search_text(
-            context,
-            query,
-            regex=regex,
-            case_sensitive=case_sensitive,
-            paths=paths,
-            max_results=max_results,
-        )
+    )
 
 
 # ==================== Git History ====================
@@ -261,13 +242,7 @@ async def blame_range(
         empty result fields and Problem Details.
     """
     context = get_context()
-    with tool_operation_scope(
-        "git.blame_range",
-        path=path,
-        start_line=start_line,
-        end_line=end_line,
-    ):
-        return await history_adapter.blame_range(context, path, start_line, end_line)
+    return await history_adapter.blame_range(context, path, start_line, end_line)
 
 
 @mcp.tool()
@@ -298,37 +273,20 @@ async def file_history(
         fields and Problem Details.
     """
     context = get_context()
-    with tool_operation_scope(
-        "git.file_history",
-        path=path,
-        limit=limit,
-    ):
-        return await history_adapter.file_history(context, path, limit)
+    return await history_adapter.file_history(context, path, limit)
 
 
 @mcp.tool(name="report:latest_run")
 def report_latest_run() -> dict[str, object]:
-    """Return metadata about the most recent run report artifact.
+    """Return metadata about recent run reports (disabled in the simplified runtime).
 
     Returns
     -------
     dict[str, object]
-        Dictionary containing report metadata. When a report is available,
-        includes keys: "available" (True), "run_id", "session_id", "markdown_path",
-        "json_path", and "summary". When no report is available, returns
-        {"available": False}.
+        Dictionary with "available" key set to False, indicating that run reports
+        are not available in the simplified runtime.
     """
-    report = latest_run_report()
-    if report is None:
-        return {"available": False}
-    return {
-        "available": True,
-        "run_id": report["run_id"],
-        "session_id": report["session_id"],
-        "markdown_path": str(report["markdown"]),
-        "json_path": str(report["json"]),
-        "summary": report["summary"],
-    }
+    return {"available": False}
 
 
 # ==================== Resources ====================

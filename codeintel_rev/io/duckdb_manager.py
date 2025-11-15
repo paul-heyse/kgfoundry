@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
-from contextlib import contextmanager, nullcontext, suppress
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from pathlib import Path
 from queue import Empty, Full, LifoQueue
@@ -12,10 +12,7 @@ from time import perf_counter
 from typing import TYPE_CHECKING, cast
 
 from codeintel_rev._lazy_imports import LazyModule
-from codeintel_rev.metrics.registry import DUCKDB_EXECUTE_SECONDS
-from codeintel_rev.observability.otel import as_span, record_span_event
-from codeintel_rev.observability.semantic_conventions import Attrs
-from codeintel_rev.observability.timeline import current_timeline
+from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     import duckdb
@@ -68,16 +65,15 @@ class _InstrumentedDuckDBConnection:
         query: duckdb.Statement | str,
         parameters: object | None = None,
     ) -> duckdb.DuckDBPyConnection:
-        """Execute a SQL query with instrumentation and telemetry.
+        """Execute a SQL query with logging.
 
-        This method wraps DuckDB connection execution with telemetry tracking,
+        This method wraps DuckDB connection execution with logging,
         recording query execution time, SQL length, and optionally the SQL
-        text itself. It creates timeline steps and OpenTelemetry spans for
-        observability.
+        text itself.
 
         Parameters
         ----------
-        query : object
+        query : duckdb.Statement | str
             SQL query to execute. Accepts raw SQL strings or DuckDB ``Statement``
             objects that expose precompiled statements.
         parameters : object | None, optional
@@ -91,55 +87,27 @@ class _InstrumentedDuckDBConnection:
 
         Notes
         -----
-        This method instruments SQL execution with:
-        - Timeline step ("sql.exec") with SQL length and optionally SQL text
-        - OpenTelemetry span ("duckdb.exec") with query metadata
-        - Timeline event ("sql.exec.done") with execution duration
-        - Span event ("duckdb.exec.complete") with completion metadata
-
         The method tracks execution time and records it in milliseconds. When
         log_queries is enabled in the config, the SQL text (truncated to 5000
-        characters) is included in telemetry attributes.
+        characters) is included in log messages.
         """
         sql_text = str(query)
-        timeline = current_timeline()
         sql_bytes = len(sql_text.encode("utf-8"))
-        attrs: dict[str, object] = {
-            Attrs.DUCKDB_SQL_BYTES: sql_bytes,
-        }
-        if self._config.log_queries:
-            attrs["duckdb.sql"] = sql_text[:5000]
-        step_ctx = timeline.step("sql.exec", **attrs) if timeline else nullcontext()
         start = perf_counter()
-        span_attrs = {
-            Attrs.COMPONENT: "duckdb",
-            Attrs.STAGE: "duckdb.query",
-            Attrs.DUCKDB_SQL_BYTES: sql_bytes,
-        }
-        with step_ctx, as_span("duckdb.query", **span_attrs):
-            if parameters is not None:
-                self._conn.execute(query, parameters)
-            else:
-                self._conn.execute(query)
+        if parameters is not None:
+            self._conn.execute(query, parameters)
+        else:
+            self._conn.execute(query)
         duration_ms = round((perf_counter() - start) * 1000, 2)
-        duration_s = duration_ms / 1000
-        DUCKDB_EXECUTE_SECONDS.record(
-            duration_s,
-            {
-                "object_cache": str(self._config.enable_object_cache),
-                "threads": str(self._config.threads),
-            },
-        )
-        record_span_event(
-            "duckdb.query.complete",
-            duration_ms=duration_ms,
-            sql_bytes=sql_bytes,
-        )
-        if timeline is not None:
-            timeline.event(
-                "io",
-                "duckdb.query",
-                attrs={"duration_ms": duration_ms, Attrs.DUCKDB_SQL_BYTES: sql_bytes},
+        if self._config.log_queries:
+            logger = get_logger(__name__)
+            logger.debug(
+                "DuckDB query executed",
+                extra={
+                    "duration_ms": duration_ms,
+                    "sql_bytes": sql_bytes,
+                    "sql": sql_text[:5000],
+                },
             )
         return cast("duckdb.DuckDBPyConnection", self)
 

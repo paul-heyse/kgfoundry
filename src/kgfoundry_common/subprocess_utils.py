@@ -327,8 +327,8 @@ class _ToolExecutionErrorConstructor(Protocol):
 
         Returns
         -------
-        Exception
-            Exception instance.
+        RuntimeError
+            Exception instance representing the tool execution error.
         """
         ...
 
@@ -387,6 +387,9 @@ def _raise_tool_execution_error(
     ------
     TypeError
         If the constructed error is not a RuntimeError subclass.
+    RuntimeError
+        The tool execution error instance constructed from the tools surface.
+        This is raised to signal that the subprocess execution failed.
     """
     tool_error_constructor = cast(
         "_ToolExecutionErrorConstructor", tools_surface.ToolExecutionError
@@ -395,7 +398,11 @@ def _raise_tool_execution_error(
     if not isinstance(error_instance, RuntimeError):
         msg = "ToolExecutionError must be a subclass of RuntimeError"
         raise TypeError(msg)
-    raise error_instance
+    # After isinstance check, error_instance is guaranteed to be RuntimeError
+    # Raise it to signal subprocess execution failure
+    # Type narrowing: error_instance is RuntimeError after isinstance check
+    runtime_error: RuntimeError = error_instance
+    raise runtime_error
 
 
 _subprocess_module = import_module("sub" + "process")
@@ -409,14 +416,20 @@ TimeoutExpired = cast("type[TimeoutError]", _subprocess_module.TimeoutExpired)
 class SubprocessTimeoutError(TimeoutError):
     """Raised when subprocess exceeds configured timeout.
 
+    Extended Summary
+    ----------------
+    Signals that a subprocess execution exceeded the configured timeout
+    duration. Includes the command that timed out and the timeout value
+    for debugging and error reporting.
+
     Parameters
     ----------
     message : str
-        Error description.
+        Human-readable error description.
     command : list[str] | None, optional
-        The command that timed out.
+        The command sequence that timed out. Defaults to None.
     timeout_seconds : int | None, optional
-        The timeout that was configured.
+        The timeout duration in seconds that was configured. Defaults to None.
     """
 
     def __init__(
@@ -425,7 +438,6 @@ class SubprocessTimeoutError(TimeoutError):
         command: list[str] | None = None,
         timeout_seconds: int | None = None,
     ) -> None:
-        """Initialize the timeout error. See class docstring for full details."""
         super().__init__(message)
         self.command = command
         self.timeout_seconds = timeout_seconds
@@ -435,20 +447,26 @@ class SubprocessTimeoutError(TimeoutError):
 class SubprocessError(RuntimeError):
     """Raised when subprocess execution fails.
 
+    Extended Summary
+    ----------------
+    Signals that a subprocess execution failed with a non-zero exit code
+    or encountered an error during execution. Includes the exit code and
+    captured stderr output for debugging and error reporting.
+
     Parameters
     ----------
     message : str
-        Error description.
+        Human-readable error description.
     returncode : int | None, optional
-        Exit code from subprocess. Defaults to None.
+        Exit code from subprocess. None if the process did not exit normally.
+        Defaults to None.
     stderr : str | None, optional
-        Captured stderr output. Defaults to None.
+        Captured stderr output from the failed process. Defaults to None.
     """
 
     def __init__(
         self, message: str, returncode: int | None = None, stderr: str | None = None
     ) -> None:
-        """Initialize the subprocess error. See class docstring for full details."""
         super().__init__(message)
         self.returncode = returncode
         self.stderr = stderr

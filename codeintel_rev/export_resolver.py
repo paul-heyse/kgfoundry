@@ -23,14 +23,14 @@ def build_module_name_map(
 
     Parameters
     ----------
-    rows : list[dict[str, Any]]
+    rows : Sequence[Mapping[str, Any]]
         Module metadata rows to index by module name.
     package_prefix : str | None, optional
         Optional package prefix for module name normalization.
 
     Returns
     -------
-    dict[str, dict[str, Any]]
+    dict[str, Mapping[str, Any]]
         Mapping of dotted module names to the associated row dictionaries.
     """
     mapping: dict[str, Mapping[str, Any]] = {}

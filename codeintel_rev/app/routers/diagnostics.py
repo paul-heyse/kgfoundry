@@ -14,6 +14,11 @@ router = APIRouter(prefix="/diagnostics", tags=["diagnostics"])
 def get_run_report(run_id: str) -> JSONResponse:
     """Return the execution ledger report for ``run_id`` as JSON.
 
+    Parameters
+    ----------
+    run_id : str
+        Unique identifier for the execution run to retrieve.
+
     Returns
     -------
     JSONResponse
@@ -34,6 +39,11 @@ def get_run_report(run_id: str) -> JSONResponse:
 @router.get("/run_report/{run_id}.md", response_class=PlainTextResponse)
 def get_run_report_markdown(run_id: str) -> PlainTextResponse:
     """Return execution ledger report rendered as Markdown.
+
+    Parameters
+    ----------
+    run_id : str
+        Unique identifier for the execution run to retrieve.
 
     Returns
     -------

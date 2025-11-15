@@ -115,7 +115,6 @@ class UnsafeSerializationError(ValueError):
     """
 
     def __init__(self, message: str, reason: str | None = None) -> None:
-        """Initialize the unsafe serialization error. See class docstring for full details."""
         super().__init__(message)
         self.reason = reason
 
@@ -125,6 +124,19 @@ class _UnpicklerProtocol(Protocol):
 
     This protocol defines the interface for unpickler instances that can
     deserialize pickle streams with allow-list validation.
+
+    Parameters
+    ----------
+    file : BinaryIO
+        Binary file handle to read from.
+    fix_imports : bool, optional
+        Whether to fix imports for Python 2 compatibility.
+    encoding : str, optional
+        Text encoding for Python 2 compatibility.
+    errors : str, optional
+        Error handling mode for encoding.
+    buffers : object | None, optional
+        Buffer protocol support.
     """
 
     def __init__(
@@ -135,23 +147,7 @@ class _UnpicklerProtocol(Protocol):
         encoding: str = ...,
         errors: str = ...,
         buffers: object | None = ...,
-    ) -> None:
-        """Initialize unpickler with file handle.
-
-        Parameters
-        ----------
-        file : BinaryIO
-            Binary file handle to read from.
-        fix_imports : bool, optional
-            Whether to fix imports for Python 2 compatibility.
-        encoding : str, optional
-            Text encoding for Python 2 compatibility.
-        errors : str, optional
-            Error handling mode for encoding.
-        buffers : object | None, optional
-            Buffer protocol support.
-        """
-        ...
+    ) -> None: ...
 
     def load(self) -> object:
         """Load and return unpickled object.
@@ -230,7 +226,21 @@ class _PickleModule(Protocol):
 if TYPE_CHECKING:
 
     class _StdlibUnpickler(_UnpicklerProtocol):
-        """Static typing shim for the stdlib Unpickler."""
+        """Static typing shim for the stdlib Unpickler.
+
+        Parameters
+        ----------
+        file : BinaryIO
+            Binary file handle to read from.
+        fix_imports : bool, optional
+            Whether to fix imports for Python 2 compatibility.
+        encoding : str, optional
+            Text encoding for Python 2 compatibility.
+        errors : str, optional
+            Error handling mode for encoding.
+        buffers : object | None, optional
+            Buffer protocol support.
+        """
 
         def __init__(
             self,
@@ -240,23 +250,7 @@ if TYPE_CHECKING:
             encoding: str = ...,
             errors: str = ...,
             buffers: object | None = ...,
-        ) -> None:
-            """Initialize stdlib unpickler with file handle.
-
-            Parameters
-            ----------
-            file : BinaryIO
-                Binary file handle to read from.
-            fix_imports : bool, optional
-                Whether to fix imports for Python 2 compatibility.
-            encoding : str, optional
-                Text encoding for Python 2 compatibility.
-            errors : str, optional
-                Error handling mode for encoding.
-            buffers : object | None, optional
-                Buffer protocol support.
-            """
-            ...
+        ) -> None: ...
 
         def load(self) -> object:
             """Load and return unpickled object.
@@ -334,7 +328,6 @@ class _SafeUnpickler(_StdlibUnpickler):
         errors: str = "strict",
         buffers: object | None = None,
     ) -> None:
-        """Initialize the safe unpickler. See class docstring for full details."""
         super().__init__(
             file,
             fix_imports=fix_imports,
@@ -480,7 +473,6 @@ class SignedPickleWrapper:
     """
 
     def __init__(self, signing_key: bytes) -> None:
-        """Initialize the signed pickle wrapper. See class docstring for full details."""
         if len(signing_key) < _MIN_SIGNING_KEY_BYTES:
             logger.warning("Signing key < 32 bytes; consider using a longer key")
         self.signing_key = signing_key

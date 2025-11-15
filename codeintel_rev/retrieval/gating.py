@@ -6,17 +6,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from codeintel_rev.metrics.registry import (
-    GATING_DECISIONS_TOTAL,
-    GATING_QUERY_AMBIGUITY,
-    GATING_RRF_K,
-)
-from codeintel_rev.observability.otel import record_span_event, set_current_span_attrs
-from codeintel_rev.observability.semantic_conventions import Attrs, to_label_str
-from codeintel_rev.observability.timeline import current_timeline
-from codeintel_rev.retrieval.telemetry import record_stage_decision
 from codeintel_rev.retrieval.types import StageDecision, StageSignals
-from codeintel_rev.telemetry.steps import StepEvent, emit_step
 
 
 @dataclass(slots=True, frozen=True)
@@ -111,49 +101,25 @@ def should_run_secondary_stage(
     3. Score margin (high margin suggests good results already)
     """
     notes: list[str] = []
-    timeline = current_timeline()
     margin_value = signals.margin()
 
-    def _emit(decision: StageDecision) -> StageDecision:
-        record_stage_decision("retrieval.gating", "secondary", decision=decision)
-        attrs = {
-            "should_run": decision.should_run,
-            "reason": decision.reason,
-            "candidate_count": signals.candidate_count,
-            "elapsed_ms": signals.elapsed_ms,
-            "margin": margin_value if margin_value is not None else -1.0,
-        }
-        record_span_event("retrieval.gating.secondary", **attrs)
-        if timeline is not None:
-            timeline.event("decision", "retrieval.gating.secondary", attrs=attrs)
-        emit_step(
-            StepEvent(
-                kind="retrieval.gate.secondary",
-                status="completed",
-                payload=attrs,
-            )
-        )
-        return decision
-
     if signals.candidate_count <= 0:
-        return _emit(StageDecision(should_run=False, reason="no_candidates"))
+        return StageDecision(should_run=False, reason="no_candidates")
     if signals.candidate_count < config.min_candidates:
         notes.append(f"{signals.candidate_count}/{config.min_candidates} candidates available")
-        return _emit(
-            StageDecision(should_run=False, reason="insufficient_candidates", notes=tuple(notes))
-        )
+        return StageDecision(should_run=False, reason="insufficient_candidates", notes=tuple(notes))
 
     if signals.elapsed_ms > config.budget_ms:
         notes.append(f"stage elapsed {signals.elapsed_ms:.1f}ms > budget {config.budget_ms}ms")
-        return _emit(
-            StageDecision(should_run=False, reason="upstream_budget_exceeded", notes=tuple(notes))
+        return StageDecision(
+            should_run=False, reason="upstream_budget_exceeded", notes=tuple(notes)
         )
 
     if margin_value is not None and margin_value >= config.margin_threshold > 0:
         notes.append(f"margin {margin_value:.4f} >= threshold {config.margin_threshold:.4f}")
-        return _emit(StageDecision(should_run=False, reason="high_margin", notes=tuple(notes)))
+        return StageDecision(should_run=False, reason="high_margin", notes=tuple(notes))
 
-    return _emit(StageDecision(should_run=True, reason="within_budget", notes=tuple(notes)))
+    return StageDecision(should_run=True, reason="within_budget", notes=tuple(notes))
 
 
 @dataclass(frozen=True)
@@ -373,37 +339,7 @@ def decide_budgets(profile: QueryProfile, cfg: StageGateConfig) -> BudgetDecisio
             and (profile.ambiguity_score >= _RM3_AMBIGUITY_THRESHOLD or cfg.rm3_enable_on_ambiguity)
         )
 
-    decision = BudgetDecision(depths, rrf_k, rm3_enabled)
-    attrs = describe_budget_decision(profile, decision)
-    record_span_event("decision.gate.budget", **attrs)
-    set_current_span_attrs(
-        **{
-            Attrs.DECISION_CHANNEL_DEPTHS: to_label_str(attrs["per_channel_depths"]),
-            Attrs.DECISION_RRF_K: attrs["rrf_k"],
-            Attrs.BM25_RM3_ENABLED: attrs["rm3_enabled"],
-            Attrs.QUERY_LEN: profile.length,
-        }
-    )
-    klass = "literal" if profile.looks_literal else "vague" if profile.looks_vague else "default"
-    rm3_enabled = bool(attrs.get("rm3_enabled"))
-    GATING_DECISIONS_TOTAL.labels(klass=klass, rm3_enabled=str(rm3_enabled)).inc()
-    rrf_value = attrs.get("rrf_k")
-    if isinstance(rrf_value, (int, float)):
-        GATING_RRF_K.observe(float(rrf_value))
-    else:
-        GATING_RRF_K.observe(float(decision.rrf_k))
-    GATING_QUERY_AMBIGUITY.observe(profile.ambiguity_score)
-    timeline = current_timeline()
-    if timeline is not None:
-        timeline.event("decision", "gate.budget", attrs=attrs)
-    emit_step(
-        StepEvent(
-            kind="retrieval.budget",
-            status="completed",
-            payload=attrs,
-        )
-    )
-    return decision
+    return BudgetDecision(depths, rrf_k, rm3_enabled)
 
 
 def describe_budget_decision(profile: QueryProfile, decision: BudgetDecision) -> dict[str, object]:
@@ -412,8 +348,8 @@ def describe_budget_decision(profile: QueryProfile, decision: BudgetDecision) ->
     Extended Summary
     ----------------
     Converts query profile and budget decision into a dictionary format suitable
-    for logging, metrics, or API responses. Includes rounded ratios and all
-    decision parameters for observability and debugging.
+    for logging or API responses. Includes rounded ratios and all
+    decision parameters for debugging.
 
     Parameters
     ----------
@@ -427,7 +363,7 @@ def describe_budget_decision(profile: QueryProfile, decision: BudgetDecision) ->
     dict[str, object]
         Dictionary containing query profile fields (length, ratios rounded to
         3 decimals) and budget decision fields (per_channel_depths, rrf_k,
-        rm3_enabled). Used for logging and observability.
+        rm3_enabled). Used for logging.
     """
     return {
         "length": profile.length,

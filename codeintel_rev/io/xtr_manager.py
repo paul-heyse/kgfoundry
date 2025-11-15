@@ -11,9 +11,6 @@ from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.config.settings import XTRConfig
-from codeintel_rev.metrics.registry import XTR_SEARCH_LATENCY_SECONDS
-from codeintel_rev.observability.otel import as_span
-from codeintel_rev.observability.semantic_conventions import Attrs
 from codeintel_rev.runtime import RuntimeCell
 from codeintel_rev.typing import NDArrayF32, TorchModule, gate_import
 from kgfoundry_common.logging import get_logger
@@ -260,24 +257,26 @@ class XTRIndex:
         if state is None or state.meta is None:
             return []
         start = perf_counter()
-        attrs = {
-            Attrs.COMPONENT: "retrieval",
-            Attrs.STAGE: "xtr.search",
-            Attrs.XTR_TOP_K: k,
-            Attrs.XTR_VERSION: self.config.model_id,
-        }
-        with as_span("xtr.search", **attrs):
-            meta = state.meta
-            query_vecs = self.encode_query_tokens(query)
-            candidates = meta["chunk_ids"]
-            results = self.score_candidates(
-                query_vecs,
-                candidates,
-                explain=explain,
-                topk_explanations=topk_explanations,
-                limit=k,
-            )
-        XTR_SEARCH_LATENCY_SECONDS.observe(perf_counter() - start)
+        meta = state.meta
+        query_vecs = self.encode_query_tokens(query)
+        candidates = meta["chunk_ids"]
+        results = self.score_candidates(
+            query_vecs,
+            candidates,
+            explain=explain,
+            topk_explanations=topk_explanations,
+            limit=k,
+        )
+        duration_ms = round((perf_counter() - start) * 1000, 2)
+        LOGGER.debug(
+            "XTR search completed",
+            extra={
+                "duration_ms": duration_ms,
+                "k": k,
+                "results_count": len(results),
+                "model_id": self.config.model_id,
+            },
+        )
         return results
 
     def rescore(
@@ -347,21 +346,23 @@ class XTRIndex:
         if not materialized or not self.ready:
             return []
         start = perf_counter()
-        attrs = {
-            Attrs.COMPONENT: "retrieval",
-            Attrs.STAGE: "xtr.rescore",
-            Attrs.XTR_CANDIDATES: len(materialized),
-            Attrs.XTR_VERSION: self.config.model_id,
-        }
-        with as_span("xtr.rescore", **attrs):
-            query_vecs = self.encode_query_tokens(query)
-            results = self.score_candidates(
-                query_vecs,
-                materialized,
-                explain=explain,
-                topk_explanations=topk_explanations,
-            )
-        XTR_SEARCH_LATENCY_SECONDS.observe(perf_counter() - start)
+        query_vecs = self.encode_query_tokens(query)
+        results = self.score_candidates(
+            query_vecs,
+            materialized,
+            explain=explain,
+            topk_explanations=topk_explanations,
+        )
+        duration_ms = round((perf_counter() - start) * 1000, 2)
+        LOGGER.debug(
+            "XTR rescore completed",
+            extra={
+                "duration_ms": duration_ms,
+                "candidates_count": len(materialized),
+                "results_count": len(results),
+                "model_id": self.config.model_id,
+            },
+        )
         return results
 
     def score_candidates(

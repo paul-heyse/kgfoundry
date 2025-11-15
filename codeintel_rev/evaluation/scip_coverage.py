@@ -14,11 +14,6 @@ from codeintel_rev.config.settings import Settings
 from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.faiss_manager import SearchRuntimeOverrides
 from codeintel_rev.io.symbol_catalog import SymbolCatalog, SymbolDefRow
-from codeintel_rev.metrics.registry import (
-    SCIP_CHUNK_COVERAGE_RATIO,
-    SCIP_INDEX_COVERAGE_RATIO,
-    SCIP_RETRIEVAL_COVERAGE_RATIO,
-)
 from kgfoundry_common.logging import get_logger
 
 LOGGER = get_logger(__name__)
@@ -166,7 +161,6 @@ class SCIPCoverageEvaluator:
             "retrieval_coverage": retrieval_hits / total if total else 0.0,
             "k": k,
         }
-        self._record_metrics(summary)
         resolved_output = output_dir or self._settings.eval.output_dir
         self._write_artifacts(per_symbol, summary, resolved_output)
         LOGGER.info(
@@ -201,12 +195,6 @@ class SCIPCoverageEvaluator:
         if language:
             return f"{base} in {language}"
         return base
-
-    @staticmethod
-    def _record_metrics(summary: CoverageSummary) -> None:
-        SCIP_CHUNK_COVERAGE_RATIO.set(summary["chunk_coverage"])
-        SCIP_INDEX_COVERAGE_RATIO.set(summary["index_coverage"])
-        SCIP_RETRIEVAL_COVERAGE_RATIO.labels(k=str(summary["k"])).set(summary["retrieval_coverage"])
 
     def _write_artifacts(
         self,

@@ -12,9 +12,8 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import sys
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 import numpy as np
 import torch
@@ -114,6 +113,37 @@ def embed_file(
     normalize: bool,
     jsonl_path: Path | None,
 ) -> None:
+    """Generate embeddings for text file using SentenceTransformer.
+
+    Parameters
+    ----------
+    input_path : Path
+        Path to input text file. Each line is treated as a separate text
+        to embed. Empty lines are skipped.
+    output_path : Path
+        Path where embeddings will be saved as a NumPy array (.npy format).
+        The parent directory is created if it doesn't exist.
+    model_name : str | None
+        Optional SentenceTransformer model name or path. If None, uses the
+        default model from _resolve_model_name().
+    batch_size : int
+        Batch size for embedding generation. Larger batches improve throughput
+        but require more memory.
+    device_name : str | None
+        Optional device name ("cpu", "cuda", etc.). If None, auto-detected
+        based on CUDA availability.
+    normalize : bool
+        Whether to L2-normalize embeddings. Normalized embeddings are suitable
+        for cosine similarity calculations.
+    jsonl_path : Path | None
+        Optional path to write a JSONL preview file containing text-embedding
+        pairs. Useful for inspection and debugging.
+
+    Raises
+    ------
+    ValueError
+        Raised when the input file contains no non-empty lines.
+    """
     texts = _read_texts(input_path)
     if not texts:
         msg = f"No non-empty lines found in {input_path}"
@@ -144,6 +174,18 @@ def embed_file(
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the SentenceTransformer embedding CLI.
+
+    Parameters
+    ----------
+    argv : list[str] | None, optional
+        Command-line arguments. If None, uses sys.argv. Defaults to None.
+
+    Returns
+    -------
+    int
+        Exit code: 0 on success, 1 on error.
+    """
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     args = _parse_args(argv)
     try:

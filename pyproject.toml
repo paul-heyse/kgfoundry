@@ -185,8 +185,6 @@ dependencies = [
     "pytestarch>=4.0.1",
     "build>=1.2.2",
     "prometheus-client>=0.23.1",
-    "opentelemetry-api>=1.24.0",
-    "opentelemetry-sdk>=1.24.0",
     "msgspec>=0.19.0",
     "pyyaml>=6",
     "pyright>=1.1.407",
@@ -257,14 +255,7 @@ dependencies = [
     "grimp>=3.13",
     "tree-sitter-language-pack>=0.10.0",
     "pyre-check>=0.9.25",
-    "opentelemetry-proto>=1.38.0",
-    "opentelemetry-distro>=0.59b0",
-    "pytest-opentelemetry>=1.1.0",
     "grafana-client>=5.0.1",
-    "opentelemetry-instrumentation-logging>=0.59b0",
-    "opentelemetry-instrumentation-fastapi>=0.59b0",
-    "opentelemetry-exporter-otlp-proto-http>=1.38.0",
-    "opentelemetry-instrumentation-httpx>=0.59b0",
     "uuid6>=2025.0.1",
 ]
 
@@ -298,8 +289,6 @@ http-bridge = [
 tools = [
     "build>=1.2.2",
     "prometheus-client>=0.23.1",
-    "opentelemetry-api>=1.24.0",
-    "opentelemetry-sdk>=1.24.0",
     "msgspec>=0.19.0",
     "pyyaml>=6",
 ]
@@ -551,13 +540,14 @@ runtime-evaluated-base-classes = [
 "codeintel_rev/mcp_server/telemetry.py" = ["DOC502"]  # BaseException re-raised via bare `raise` in context manager; correctly documented in Raises section
 "codeintel_rev/telemetry/decorators.py" = ["DOC502"]  # BaseException re-raised via bare `raise` in context manager; correctly documented in Raises section
 "codeintel_rev/embeddings/embedding_service.py" = ["DOC502"]  # Exception re-raised via bare `raise`; correctly documented in Raises section
+"src/kgfoundry_common/subprocess_utils.py" = ["DOC502"]  # RuntimeError raised via variable (error_instance) after isinstance check; correctly documented in Raises section
 "docs/_scripts/**" = ["PLC2701"]  # docs._scripts is internal tooling; importing from docs._types and tools._shared is expected
 "docs/types/artifacts.py" = ["PLC2701"]  # docs/types is a facade re-exporting from private docs._types module
 "tools/lint/codemod_typing_migration.py" = ["N802"]  # LibCST visitor protocol requires CamelCase method names (leave_ImportFrom, leave_Call)
 "tools/codemods/blind_except_fix.py" = ["N802"]
 "tools/codemods/pathlib_fix.py" = ["N815"]
 # Typer callbacks/options require extensive parameter lists; splitting would break CLI UX.
-"codeintel_rev/cli_enrich.py" = ["PLR0913", "PLR0914", "PLR0917"]
+"codeintel_rev/cli_enrich.py" = ["PLR0913", "PLR0914", "PLR0917", "DOC502"]  # Exception re-raised via bare `raise` after logging; correctly documented in Raises section
 # New: Façade modules are allowed to import from private sources (controlled re-export)
 "src/kgfoundry_common/typing/__init__.py" = []  # Canonical typing façade
 "tools/typing/__init__.py" = []  # Tooling typing façade
@@ -758,9 +748,11 @@ emit-build-options    = true  # include only/no-binary flags if you use them
 
 
 [tool.pydoclint]
-exclude = "codeintel_rev/patches"
+exclude = "codeintel_rev/patches|codeintel_rev/cli/telemetry.py|codeintel_rev/diagnostics/report_cli.py"
 # DOC105: `**_` parameter type annotation limitation in Click decorators
 # The type annotation matches the signature, but pydoclint cannot parse underscore-prefixed kwargs
+# DOC105: Typer CLI commands use Annotated types for argument parsing, but docstrings document underlying types
+# This is correct - docstrings should document the actual types users interact with, not Annotated wrappers
 # DOC503: RuntimeCell.get_or_initialize raises exceptions via variable (cooldown_error), not directly
 # Pydoclint doesn't recognize that cooldown_error is a variable containing an exception, not an exception type
 skipCheckingCode = ["DOC503"]
