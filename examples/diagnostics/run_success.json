@@ -1,0 +1,36 @@
+{
+  "run_id": "demo-success",
+  "session_id": "demo-session",
+  "tool": "mcp.tool:semantic",
+  "status": "ok",
+  "stop_reason": "completed",
+  "stages_reached": [
+    "request",
+    "embed",
+    "pool_search",
+    "fuse",
+    "hydrate",
+    "envelope"
+  ],
+  "stage_durations_ms": {
+    "embed": 3.2,
+    "pool_search": 7.8,
+    "fuse": 1.4,
+    "hydrate": 5.0,
+    "envelope": 0.4
+  },
+  "warnings": [],
+  "envelope": {
+    "results": 3,
+    "channels": ["semantic", "bm25"],
+    "diagnostics_uri": "http://localhost:8000/diagnostics/run_report/demo-success"
+  },
+  "entries": [
+    {"stage": "embed", "op": "retrieval.embed", "component": "io.vllm", "ok": true},
+    {"stage": "pool_search", "op": "faiss.search", "component": "retrieval.faiss", "ok": true},
+    {"stage": "pool_search", "op": "bm25.search", "component": "retrieval.bm25", "ok": true},
+    {"stage": "fuse", "op": "semantic.fuse_rrf", "component": "retrieval.fusion", "ok": true},
+    {"stage": "hydrate", "op": "duckdb.hydrate", "component": "duckdb.catalog", "ok": true},
+    {"stage": "envelope", "op": "semantic.envelope", "component": "mcp.semantic", "ok": true}
+  ]
+}

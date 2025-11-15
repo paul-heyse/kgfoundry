@@ -15,6 +15,7 @@ import pytest
 if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
 
+from codeintel_rev.io.duckdb_catalog import StructureAnnotations
 from codeintel_rev.mcp_server.adapters.semantic import semantic_search
 from codeintel_rev.mcp_server.schemas import ScopeIn
 
@@ -103,7 +104,11 @@ async def test_semantic_search_observes_duration(
     ):
         result = await semantic_search(cast("ApplicationContext", context), "hello world", limit=1)
 
-    assert result.get("findings")
+    findings = result.get("findings") or []
+    assert findings
+    first_finding = findings[0]
+    explanations = cast("dict[str, object]", first_finding.get("explanations"))
+    assert explanations["matched_symbols"] == ["stub.symbol"]
     assert observe_duration_calls
     observation = observe_duration_calls[0]
     assert observation.operation == "semantic_search"
@@ -265,6 +270,17 @@ class StubDuckDBCatalog:
 
         return filtered
 
+    def get_structure_annotations(self, ids: Sequence[int]) -> dict[int, StructureAnnotations]:
+        annotations: dict[int, StructureAnnotations] = {}
+        for chunk_id in ids:
+            annotations[int(chunk_id)] = StructureAnnotations(
+                uri=str(self._chunk.get("uri", "")),
+                symbol_hits=("stub.symbol",),
+                ast_node_kinds=("FunctionDef",),
+                cst_matches=(),
+            )
+        return annotations
+
 
 class StubVLLMClient:
     """Stub vLLM client for testing.
@@ -289,10 +305,10 @@ class StubVLLMClient:
         Returns
         -------
         np.ndarray
-            Mock embedding vector (2560 dimensions).
+            Mock embedding vector (3584 dimensions).
         """
         assert query
-        return np.array([0.1] * 2560, dtype=np.float32)
+        return np.array([0.1] * 3584, dtype=np.float32)
 
 
 class _BaseStubFAISSManager:
@@ -456,6 +472,7 @@ class StubContext:
                 enable_splade_channel=config.enable_splade_channel,
                 hybrid_top_k_per_channel=config.hybrid_top_k_per_channel,
                 rrf_k=config.rrf_k,
+                semantic_min_score=0.0,
             ),
         )
         # Use tempfile for secure temporary paths in tests

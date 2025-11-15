@@ -11,36 +11,41 @@ Utilities for loading enrichment artifacts into DuckDB.
 - from **__future__** import annotations
 - from **(absolute)** import json
 - from **(absolute)** import os
+- from **(absolute)** import re
+- from **collections.abc** import Sequence
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
-- from **typing** import Sequence
+- from **typing** import TYPE_CHECKING, Any
 - from **codeintel_rev.typing** import gate_import
+- from **(absolute)** import duckdb
 
 ## Definitions
 
-- class: `DuckConn` (line 60)
-- function: `_duckdb` (line 66)
-- function: `ensure_schema` (line 77)
-- function: `ingest_modules_jsonl` (line 121)
-- function: `_load_json_rows` (line 151)
-- function: `_coerce_value` (line 169)
-- function: `_apply_pragmas` (line 178)
-- function: `_ingest_via_native_json` (line 191)
-- function: `_ingest_via_python` (line 219)
+- variable: `DuckDBConnection` (line 63)
+- variable: `DuckDBConnection` (line 65)
+- class: `DuckConn` (line 69)
+- function: `_duckdb` (line 75)
+- function: `ensure_schema` (line 86)
+- function: `ingest_modules_jsonl` (line 130)
+- function: `_load_json_rows` (line 160)
+- function: `_coerce_value` (line 178)
+- function: `_apply_pragmas` (line 187)
+- function: `_ingest_via_native_json` (line 200)
+- function: `_ingest_via_python` (line 231)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 86
+- **cycle_group**: 94
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 1
-- recent churn 90: 1
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 
@@ -78,17 +83,18 @@ DuckConn, ensure_schema, ingest_modules_jsonl
 
 ## Hotspot
 
-- score: 1.95
+- score: 1.98
 
 ## Side Effects
 
+- database
 - filesystem
 
 ## Complexity
 
-- branches: 23
-- cyclomatic: 24
-- loc: 237
+- branches: 25
+- cyclomatic: 26
+- loc: 249
 
 ## Doc Coverage
 

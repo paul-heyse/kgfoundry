@@ -9,7 +9,7 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 ## Imports
 
 - from **__future__** import annotations
-- from **collections.abc** import Iterator, Sequence
+- from **collections.abc** import Collection, Iterator, Sequence
 - from **contextlib** import suppress
 - from **dataclasses** import dataclass, field
 - from **pathlib** import Path
@@ -30,29 +30,29 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 - function: `_extract_module_docstring` (line 91)
 - function: `_literal_string_values` (line 121)
 - function: `_string_literal_value` (line 148)
-- function: `_extract_def_docstring` (line 160)
-- function: `_summarize_docstring` (line 177)
-- function: `_analyze_docstring` (line 189)
-- function: `_iter_params` (line 215)
-- function: `_exception_name` (line 230)
-- function: `_infer_side_effects` (line 260)
-- class: `_IndexVisitor` (line 309)
-- function: `index_module` (line 998)
-- function: `_lineno` (line 1045)
+- function: `_extract_def_docstring` (line 175)
+- function: `_summarize_docstring` (line 207)
+- function: `_analyze_docstring` (line 237)
+- function: `_iter_params` (line 285)
+- function: `_exception_name` (line 300)
+- function: `_infer_side_effects` (line 330)
+- class: `_IndexVisitor` (line 379)
+- function: `index_module` (line 1134)
+- function: `_lineno` (line 1181)
 
 ## Graph Metrics
 
 - **fan_in**: 4
 - **fan_out**: 1
-- **cycle_group**: 84
+- **cycle_group**: 103
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 13
-- recent churn 90: 13
+- recent churn 30: 15
+- recent churn 90: 15
 
 ## Usage
 
@@ -96,9 +96,9 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 
 ## Complexity
 
-- branches: 135
-- cyclomatic: 136
-- loc: 1066
+- branches: 136
+- cyclomatic: 137
+- loc: 1202
 
 ## Doc Coverage
 
@@ -108,10 +108,10 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 - `ModuleIndex` (class): summary=yes, examples=no — Aggregate module metadata returned by :func:`index_module`.
 - `_extract_module_docstring` (function): summary=yes, params=ok, examples=no — Return the module docstring if present.
 - `_literal_string_values` (function): summary=yes, params=ok, examples=no — Yield literal string values from constant containers.
-- `_string_literal_value` (function): summary=no, examples=no
-- `_extract_def_docstring` (function): summary=no, examples=no
-- `_summarize_docstring` (function): summary=no, examples=no
-- `_analyze_docstring` (function): summary=no, examples=no
+- `_string_literal_value` (function): summary=yes, params=ok, examples=no — Extract the evaluated string value from a LibCST string literal node.
+- `_extract_def_docstring` (function): summary=yes, params=ok, examples=no — Extract the docstring from a function or class body suite.
+- `_summarize_docstring` (function): summary=yes, params=ok, examples=no — Extract a one-line summary from a docstring.
+- `_analyze_docstring` (function): summary=yes, params=ok, examples=yes — Analyze a docstring for completeness and quality metrics.
 
 ## Tags
 

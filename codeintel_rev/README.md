@@ -562,7 +562,7 @@ The FAISS index type is **automatically selected** based on corpus size for opti
 ```python
 from codeintel_rev.io.faiss_manager import FAISSManager
 
-manager = FAISSManager(index_path=Path("index.faiss"), vec_dim=2560)
+manager = FAISSManager(index_path=Path("index.faiss"), vec_dim=3584)
 estimates = manager.estimate_memory_usage(n_vectors=100_000)
 print(f"CPU: {estimates['cpu_index_bytes']/1e9:.2f} GB")
 print(f"GPU: {estimates['gpu_index_bytes']/1e9:.2f} GB")
@@ -601,7 +601,7 @@ python bin/index_all.py --incremental
 ```python
 from codeintel_rev.io.faiss_manager import FAISSManager
 
-manager = FAISSManager(index_path=Path("index.faiss"), vec_dim=2560)
+manager = FAISSManager(index_path=Path("index.faiss"), vec_dim=3584)
 manager.load_cpu_index()
 manager.load_secondary_index()  # If exists
 manager.merge_indexes()  # Rebuilds primary with all vectors

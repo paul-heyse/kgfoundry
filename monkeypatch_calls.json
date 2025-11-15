@@ -1,0 +1,2404 @@
+{
+  "tests/test_cli_runtime.py": [
+    {
+      "line": 18,
+      "func": "setattr",
+      "args": [
+        "Paths",
+        "\"discover\"",
+        "staticmethod(lambda: _stub_paths(tmp_path))"
+      ],
+      "kwargs": [],
+      "test": "test_success"
+    },
+    {
+      "line": 34,
+      "func": "setattr",
+      "args": [
+        "Paths",
+        "\"discover\"",
+        "staticmethod(lambda: _stub_paths(tmp_path))"
+      ],
+      "kwargs": [],
+      "test": "test_error"
+    }
+  ],
+  "tests/test_typing_facade.py": [
+    {
+      "line": 54,
+      "func": "setattr",
+      "args": [
+        "typing_module",
+        "\"gate_import\"",
+        "_patched_gate_import"
+      ],
+      "kwargs": [],
+      "test": "_install_fake_faiss"
+    }
+  ],
+  "tests/test_minimal_profile.py": [
+    {
+      "line": 33,
+      "func": "setattr",
+      "args": [
+        "importlib.util",
+        "\"find_spec\"",
+        "fake_find_spec"
+      ],
+      "kwargs": [],
+      "test": "test_import_package_in_minimal_env"
+    }
+  ],
+  "tests/test_networking_mounts.py": [
+    {
+      "line": 95,
+      "func": "setattr",
+      "args": [
+        "app_main",
+        "\"_initialize_context\"",
+        "_fake_initialize"
+      ],
+      "kwargs": [],
+      "test": "test_main_mounts_mcp_sub_application"
+    },
+    {
+      "line": 96,
+      "func": "setattr",
+      "args": [
+        "app_main",
+        "\"_shutdown_context\"",
+        "_fake_shutdown"
+      ],
+      "kwargs": [],
+      "test": "test_main_mounts_mcp_sub_application"
+    },
+    {
+      "line": 97,
+      "func": "setattr",
+      "args": [
+        "Capabilities",
+        "\"from_context\"",
+        "classmethod(_fake_caps)"
+      ],
+      "kwargs": [],
+      "test": "test_main_mounts_mcp_sub_application"
+    },
+    {
+      "line": 98,
+      "func": "setattr",
+      "args": [
+        "app_main",
+        "\"build_http_app\"",
+        "_fake_build_http_app"
+      ],
+      "kwargs": [],
+      "test": "test_main_mounts_mcp_sub_application"
+    }
+  ],
+  "tests/conftest.py": [
+    {
+      "line": 259,
+      "func": "setattr",
+      "args": [
+        "Capabilities",
+        "\"from_context\"",
+        "classmethod(_fake_from_context)"
+      ],
+      "kwargs": [],
+      "test": "_networking_test_app"
+    }
+  ],
+  "tests/test_streaming_through_proxy_headers.py": [
+    {
+      "line": 13,
+      "func": "setenv",
+      "args": [
+        "\"SSE_MAX_KEEPALIVES\"",
+        "\"0\""
+      ],
+      "kwargs": [],
+      "test": "test_sse_stream_flushes_events"
+    }
+  ],
+  "tests/ops/test_xtr_open.py": [
+    {
+      "line": 25,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.ops.runtime.xtr_open.load_settings\"",
+        "lambda: _settings(enabled=False)"
+      ],
+      "kwargs": [],
+      "test": "test_xtr_open_disabled_feature"
+    },
+    {
+      "line": 29,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.ops.runtime.xtr_open.resolve_application_paths\"",
+        "lambda _settings: _paths(tmp_path)"
+      ],
+      "kwargs": [],
+      "test": "test_xtr_open_disabled_feature"
+    },
+    {
+      "line": 41,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.ops.runtime.xtr_open.load_settings\"",
+        "lambda: _settings(enabled=True)"
+      ],
+      "kwargs": [],
+      "test": "test_xtr_open_missing_artifacts"
+    },
+    {
+      "line": 45,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.ops.runtime.xtr_open.resolve_application_paths\"",
+        "lambda _settings: _paths(missing_root)"
+      ],
+      "kwargs": [],
+      "test": "test_xtr_open_missing_artifacts"
+    },
+    {
+      "line": 59,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.ops.runtime.xtr_open.load_settings\"",
+        "lambda: _settings(enabled=True)"
+      ],
+      "kwargs": [],
+      "test": "test_xtr_open_success"
+    },
+    {
+      "line": 63,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.ops.runtime.xtr_open.resolve_application_paths\"",
+        "lambda _settings: _paths(root)"
+      ],
+      "kwargs": [],
+      "test": "test_xtr_open_success"
+    },
+    {
+      "line": 78,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.ops.runtime.xtr_open.XTRIndex\"",
+        "_StubIndex"
+      ],
+      "kwargs": [],
+      "test": "test_xtr_open_success"
+    },
+    {
+      "line": 90,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.ops.runtime.xtr_open.load_settings\"",
+        "lambda: _settings(enabled=True)"
+      ],
+      "kwargs": [],
+      "test": "test_xtr_open_reports_corruption"
+    },
+    {
+      "line": 94,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.ops.runtime.xtr_open.resolve_application_paths\"",
+        "lambda _settings: _paths(root)"
+      ],
+      "kwargs": [],
+      "test": "test_xtr_open_reports_corruption"
+    },
+    {
+      "line": 110,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.ops.runtime.xtr_open.XTRIndex\"",
+        "_ExplodingIndex"
+      ],
+      "kwargs": [],
+      "test": "test_xtr_open_reports_corruption"
+    }
+  ],
+  "tests/app/test_admin_index.py": [
+    {
+      "line": 28,
+      "func": "setenv",
+      "args": [
+        "\"CODEINTEL_ADMIN\"",
+        "\"1\""
+      ],
+      "kwargs": [],
+      "test": "test_admin_tuning_updates_context"
+    },
+    {
+      "line": 44,
+      "func": "setenv",
+      "args": [
+        "\"CODEINTEL_ADMIN\"",
+        "\"1\""
+      ],
+      "kwargs": [],
+      "test": "test_admin_faiss_runtime_status_endpoint"
+    },
+    {
+      "line": 52,
+      "func": "setattr",
+      "args": [
+        "ctx.__class__",
+        "\"get_coderank_faiss_manager\"",
+        "_fake_get_manager"
+      ],
+      "kwargs": [],
+      "test": "test_admin_faiss_runtime_status_endpoint"
+    },
+    {
+      "line": 63,
+      "func": "setenv",
+      "args": [
+        "\"CODEINTEL_ADMIN\"",
+        "\"1\""
+      ],
+      "kwargs": [],
+      "test": "test_admin_faiss_runtime_session_override"
+    },
+    {
+      "line": 81,
+      "func": "setenv",
+      "args": [
+        "\"CODEINTEL_ADMIN\"",
+        "\"1\""
+      ],
+      "kwargs": [],
+      "test": "test_admin_faiss_runtime_reset_session"
+    }
+  ],
+  "tests/app/test_lifespan_runtime_cleanup.py": [
+    {
+      "line": 86,
+      "func": "setattr",
+      "args": [
+        "ApplicationContext",
+        "\"create\"",
+        "classmethod(_fake_create)"
+      ],
+      "kwargs": [],
+      "test": "test_lifespan_preload_and_cleanup"
+    },
+    {
+      "line": 91,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.app.main.warmup_gpu\"",
+        "_fake_warmup"
+      ],
+      "kwargs": [],
+      "test": "test_lifespan_preload_and_cleanup"
+    },
+    {
+      "line": 92,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.app.main.ReadinessProbe\"",
+        "_probe_factory"
+      ],
+      "kwargs": [],
+      "test": "test_lifespan_preload_and_cleanup"
+    },
+    {
+      "line": 93,
+      "func": "setenv",
+      "args": [
+        "\"XTR_PRELOAD\"",
+        "\"1\""
+      ],
+      "kwargs": [],
+      "test": "test_lifespan_preload_and_cleanup"
+    },
+    {
+      "line": 94,
+      "func": "setenv",
+      "args": [
+        "\"HYBRID_PRELOAD\"",
+        "\"1\""
+      ],
+      "kwargs": [],
+      "test": "test_lifespan_preload_and_cleanup"
+    },
+    {
+      "line": 126,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.app.config_context.HybridSearchEngine\"",
+        "_factory"
+      ],
+      "kwargs": [],
+      "test": "test_close_all_runtimes_idempotent"
+    }
+  ],
+  "tests/app/test_runtime_gates.py": [
+    {
+      "line": 35,
+      "func": "setattr",
+      "args": [
+        "config_module",
+        "\"gate_import\"",
+        "fake_gate"
+      ],
+      "kwargs": [],
+      "test": "test_coderank_faiss_missing_dependency_propagates"
+    },
+    {
+      "line": 63,
+      "func": "setattr",
+      "args": [
+        "config_module",
+        "\"gate_import\"",
+        "fake_gate"
+      ],
+      "kwargs": [],
+      "test": "test_xtr_missing_dependency_raise"
+    }
+  ],
+  "tests/app/test_capz.py": [
+    {
+      "line": 43,
+      "func": "setattr",
+      "args": [
+        "capabilities_module",
+        "\"_import_optional\"",
+        "fake_import_optional"
+      ],
+      "kwargs": [],
+      "test": "test_capabilities_snapshot_reports_paths"
+    },
+    {
+      "line": 80,
+      "func": "setattr",
+      "args": [
+        "capabilities_module.Capabilities",
+        "\"from_context\"",
+        "classmethod(_fake_from_context)"
+      ],
+      "kwargs": [],
+      "test": "test_capz_endpoint_refresh"
+    }
+  ],
+  "tests/orchestration/test_cli_envelopes.py": [
+    {
+      "line": 29,
+      "func": "setattr",
+      "args": [
+        "orchestration_cli",
+        "\"CLI_ENVELOPE_DIR\"",
+        "tmp_path"
+      ],
+      "kwargs": [],
+      "test": "test_index_bm25_emits_success_envelope"
+    },
+    {
+      "line": 40,
+      "func": "setattr",
+      "args": [
+        "orchestration_cli",
+        "\"_build_bm25_index\"",
+        "fake_build"
+      ],
+      "kwargs": [],
+      "test": "test_index_bm25_emits_success_envelope"
+    },
+    {
+      "line": 68,
+      "func": "setattr",
+      "args": [
+        "orchestration_cli",
+        "\"CLI_ENVELOPE_DIR\"",
+        "tmp_path"
+      ],
+      "kwargs": [],
+      "test": "test_index_faiss_records_validation_failure"
+    },
+    {
+      "line": 76,
+      "func": "setattr",
+      "args": [
+        "orchestration_cli",
+        "\"run_index_faiss\"",
+        "fake_run"
+      ],
+      "kwargs": [],
+      "test": "test_index_faiss_records_validation_failure"
+    }
+  ],
+  "tests/orchestration/test_index_cli_idempotency.py": [
+    {
+      "line": 212,
+      "func": "setattr",
+      "args": [
+        "typer",
+        "\"echo\"",
+        "_fake_echo"
+      ],
+      "kwargs": [],
+      "test": "test_index_faiss_malformed_vectors"
+    }
+  ],
+  "tests/enrich/test_duckdb_ingest.py": [
+    {
+      "line": 16,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.enrich.duckdb_store._USE_NATIVE_JSON\"",
+        "True"
+      ],
+      "kwargs": [
+        {
+          "key": "raising",
+          "value": "False"
+        }
+      ],
+      "test": "test_ingest_modules_jsonl_native_path"
+    }
+  ],
+  "tests/enrich/test_tree_sitter_outline.py": [
+    {
+      "line": 22,
+      "func": "setattr",
+      "args": [
+        "tsb",
+        "\"_USE_TS_QUERY\"",
+        "True"
+      ],
+      "kwargs": [],
+      "test": "test_outline_query_matches_fallback"
+    },
+    {
+      "line": 29,
+      "func": "setattr",
+      "args": [
+        "tsb",
+        "\"_USE_TS_QUERY\"",
+        "False"
+      ],
+      "kwargs": [],
+      "test": "test_outline_query_matches_fallback"
+    }
+  ],
+  "tests/observability/test_timeline.py": [
+    {
+      "line": 21,
+      "func": "setenv",
+      "args": [
+        "\"CODEINTEL_DIAG_DIR\"",
+        "str(tmp_path)"
+      ],
+      "kwargs": [],
+      "test": "test_timeline_event_writes_jsonl"
+    },
+    {
+      "line": 33,
+      "func": "setenv",
+      "args": [
+        "\"CODEINTEL_DIAG_DIR\"",
+        "str(tmp_path)"
+      ],
+      "kwargs": [],
+      "test": "test_operation_context_records_duration"
+    },
+    {
+      "line": 50,
+      "func": "setenv",
+      "args": [
+        "\"CODEINTEL_DIAG_DIR\"",
+        "str(tmp_path)"
+      ],
+      "kwargs": [],
+      "test": "test_long_strings_are_scrubbed"
+    },
+    {
+      "line": 51,
+      "func": "setenv",
+      "args": [
+        "\"CODEINTEL_DIAG_MAX_FIELD_LEN\"",
+        "\"4\""
+      ],
+      "kwargs": [],
+      "test": "test_long_strings_are_scrubbed"
+    }
+  ],
+  "tests/observability/test_run_report_writer.py": [
+    {
+      "line": 11,
+      "func": "setenv",
+      "args": [
+        "\"CODEINTEL_DIAG_DIR\"",
+        "str(tmp_path / \"diag\")"
+      ],
+      "kwargs": [],
+      "test": "test_render_run_report_writes_artifacts"
+    }
+  ],
+  "tests/observability/test_flight_recorder.py": [
+    {
+      "line": 10,
+      "func": "setenv",
+      "args": [
+        "\"DATA_DIR\"",
+        "str(tmp_path)"
+      ],
+      "kwargs": [],
+      "test": "test_build_report_uri_uses_data_dir"
+    }
+  ],
+  "tests/io/test_output_writers.py": [
+    {
+      "line": 12,
+      "func": "setenv",
+      "args": [
+        "\"ENRICH_JSONL_WRITER\"",
+        "\"v2\""
+      ],
+      "kwargs": [],
+      "test": "test_jsonl_writer_is_deterministic"
+    }
+  ],
+  "tests/io/test_duckdb_manager.py": [
+    {
+      "line": 26,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.io.duckdb_manager.duckdb\"",
+        "duckdb_stub"
+      ],
+      "kwargs": [],
+      "test": "test_duckdb_manager_instruments_sql"
+    }
+  ],
+  "tests/io/test_hybrid_search_paths.py": [
+    {
+      "line": 59,
+      "func": "setenv",
+      "args": [
+        "\"HOME\"",
+        "str(fake_home)"
+      ],
+      "kwargs": [],
+      "test": "test_resolve_path_expands_user_home"
+    }
+  ],
+  "tests/plugins/test_registry.py": [
+    {
+      "line": 45,
+      "func": "setattr",
+      "args": [
+        "registry_module",
+        "\"entry_points\"",
+        "fake_entry_points"
+      ],
+      "kwargs": [],
+      "test": "test_registry_discovers_entry_points"
+    }
+  ],
+  "tests/tools/test_cli_context_registry.py": [
+    {
+      "line": 88,
+      "func": "setattr",
+      "args": [
+        "shared_registry",
+        "\"load_cli_tooling_context\"",
+        "_fake_loader"
+      ],
+      "kwargs": [],
+      "test": "test_context_for_is_cached"
+    },
+    {
+      "line": 95,
+      "func": "undo",
+      "args": [],
+      "kwargs": [],
+      "test": "test_context_for_is_cached"
+    },
+    {
+      "line": 152,
+      "func": "setattr",
+      "args": [
+        "registry_module.REGISTRY",
+        "\"augment_for\"",
+        "fake_augment_for"
+      ],
+      "kwargs": [],
+      "test": "test_operation_override_dispatch"
+    }
+  ],
+  "tests/tools/test_repo_scan.py": [
+    {
+      "line": 58,
+      "func": "setattr",
+      "args": [
+        "sys",
+        "\"argv\"",
+        "argv"
+      ],
+      "kwargs": [],
+      "test": "_run_repo_scan_cli"
+    }
+  ],
+  "tests/codeintel_rev/test_service_context_paths.py": [
+    {
+      "line": 96,
+      "func": "setenv",
+      "args": [
+        "\"REPO_ROOT\"",
+        "str(repo_root)"
+      ],
+      "kwargs": [],
+      "test": "test_service_context_resolves_paths"
+    },
+    {
+      "line": 97,
+      "func": "setenv",
+      "args": [
+        "\"FAISS_INDEX\"",
+        "faiss_rel"
+      ],
+      "kwargs": [],
+      "test": "test_service_context_resolves_paths"
+    },
+    {
+      "line": 98,
+      "func": "setenv",
+      "args": [
+        "\"DUCKDB_PATH\"",
+        "duckdb_rel"
+      ],
+      "kwargs": [],
+      "test": "test_service_context_resolves_paths"
+    },
+    {
+      "line": 99,
+      "func": "setenv",
+      "args": [
+        "\"VECTORS_DIR\"",
+        "vectors_rel"
+      ],
+      "kwargs": [],
+      "test": "test_service_context_resolves_paths"
+    },
+    {
+      "line": 109,
+      "func": "setattr",
+      "args": [
+        "config_context",
+        "\"_import_faiss_manager_cls\"",
+        "lambda: RecordingFAISSManager"
+      ],
+      "kwargs": [],
+      "test": "test_service_context_resolves_paths"
+    },
+    {
+      "line": 110,
+      "func": "setattr",
+      "args": [
+        "config_context",
+        "\"DuckDBCatalog\"",
+        "RecordingDuckDBCatalog"
+      ],
+      "kwargs": [],
+      "test": "test_service_context_resolves_paths"
+    },
+    {
+      "line": 111,
+      "func": "setattr",
+      "args": [
+        "config_context",
+        "\"VLLMClient\"",
+        "DummyVLLMClient"
+      ],
+      "kwargs": [],
+      "test": "test_service_context_resolves_paths"
+    }
+  ],
+  "tests/codeintel_rev/test_splade_cli.py": [
+    {
+      "line": 139,
+      "func": "setattr",
+      "args": [
+        "Paths",
+        "\"discover\"",
+        "staticmethod(fake_discover)"
+      ],
+      "kwargs": [],
+      "test": "_patch_paths"
+    },
+    {
+      "line": 146,
+      "func": "setattr",
+      "args": [
+        "splade_cli",
+        "\"_create_artifacts_manager\"",
+        "lambda: stub"
+      ],
+      "kwargs": [],
+      "test": "test_export_onnx_cli"
+    },
+    {
+      "line": 172,
+      "func": "setattr",
+      "args": [
+        "splade_cli",
+        "\"_create_encoder_service\"",
+        "lambda: stub"
+      ],
+      "kwargs": [],
+      "test": "test_encode_cli"
+    },
+    {
+      "line": 202,
+      "func": "setattr",
+      "args": [
+        "splade_cli",
+        "\"_create_index_manager\"",
+        "lambda: stub"
+      ],
+      "kwargs": [],
+      "test": "test_build_index_cli"
+    },
+    {
+      "line": 237,
+      "func": "setattr",
+      "args": [
+        "splade_cli",
+        "\"_create_encoder_service\"",
+        "lambda: stub"
+      ],
+      "kwargs": [],
+      "test": "test_bench_cli"
+    }
+  ],
+  "tests/codeintel_rev/test_observability_common.py": [
+    {
+      "line": 168,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.mcp_server.common.observability._base_observe_duration\"",
+        "_raise_value_error"
+      ],
+      "kwargs": [],
+      "test": "test_observe_duration_noop_when_base_observer_raises_value_error"
+    }
+  ],
+  "tests/codeintel_rev/test_config_context.py": [
+    {
+      "line": 96,
+      "func": "setenv",
+      "args": [
+        "\"REPO_ROOT\"",
+        "str(repo_root)"
+      ],
+      "kwargs": [],
+      "test": "test_application_context_create"
+    },
+    {
+      "line": 97,
+      "func": "setenv",
+      "args": [
+        "\"VLLM_URL\"",
+        "\"http://localhost:8001/v1\""
+      ],
+      "kwargs": [],
+      "test": "test_application_context_create"
+    },
+    {
+      "line": 101,
+      "func": "setattr",
+      "args": [
+        "context.faiss_manager",
+        "\"load_cpu_index\"",
+        "lambda: None"
+      ],
+      "kwargs": [],
+      "test": "test_application_context_create"
+    },
+    {
+      "line": 102,
+      "func": "setattr",
+      "args": [
+        "context.faiss_manager",
+        "\"clone_to_gpu\"",
+        "lambda: False"
+      ],
+      "kwargs": [],
+      "test": "test_application_context_create"
+    },
+    {
+      "line": 118,
+      "func": "setenv",
+      "args": [
+        "\"REPO_ROOT\"",
+        "\"/nonexistent/path\""
+      ],
+      "kwargs": [],
+      "test": "test_application_context_create_invalid_config"
+    },
+    {
+      "line": 119,
+      "func": "setenv",
+      "args": [
+        "\"VLLM_URL\"",
+        "\"http://localhost:8001/v1\""
+      ],
+      "kwargs": [],
+      "test": "test_application_context_create_invalid_config"
+    },
+    {
+      "line": 140,
+      "func": "setenv",
+      "args": [
+        "\"REPO_ROOT\"",
+        "str(repo_root)"
+      ],
+      "kwargs": [],
+      "test": "test_application_context_ensure_faiss_ready"
+    },
+    {
+      "line": 141,
+      "func": "setenv",
+      "args": [
+        "\"VLLM_URL\"",
+        "\"http://localhost:8001/v1\""
+      ],
+      "kwargs": [],
+      "test": "test_application_context_ensure_faiss_ready"
+    },
+    {
+      "line": 144,
+      "func": "setattr",
+      "args": [
+        "context.faiss_manager",
+        "\"load_cpu_index\"",
+        "lambda: None"
+      ],
+      "kwargs": [],
+      "test": "test_application_context_ensure_faiss_ready"
+    },
+    {
+      "line": 145,
+      "func": "setattr",
+      "args": [
+        "context.faiss_manager",
+        "\"clone_to_gpu\"",
+        "lambda: False"
+      ],
+      "kwargs": [],
+      "test": "test_application_context_ensure_faiss_ready"
+    },
+    {
+      "line": 172,
+      "func": "setenv",
+      "args": [
+        "\"REPO_ROOT\"",
+        "str(repo_root)"
+      ],
+      "kwargs": [],
+      "test": "test_application_context_ensure_faiss_ready_cached"
+    },
+    {
+      "line": 173,
+      "func": "setenv",
+      "args": [
+        "\"VLLM_URL\"",
+        "\"http://localhost:8001/v1\""
+      ],
+      "kwargs": [],
+      "test": "test_application_context_ensure_faiss_ready_cached"
+    },
+    {
+      "line": 176,
+      "func": "setattr",
+      "args": [
+        "context.faiss_manager",
+        "\"load_cpu_index\"",
+        "lambda: None"
+      ],
+      "kwargs": [],
+      "test": "test_application_context_ensure_faiss_ready_cached"
+    },
+    {
+      "line": 177,
+      "func": "setattr",
+      "args": [
+        "context.faiss_manager",
+        "\"clone_to_gpu\"",
+        "lambda: False"
+      ],
+      "kwargs": [],
+      "test": "test_application_context_ensure_faiss_ready_cached"
+    },
+    {
+      "line": 206,
+      "func": "setenv",
+      "args": [
+        "\"REPO_ROOT\"",
+        "str(repo_root)"
+      ],
+      "kwargs": [],
+      "test": "test_application_context_open_catalog"
+    },
+    {
+      "line": 207,
+      "func": "setenv",
+      "args": [
+        "\"VLLM_URL\"",
+        "\"http://localhost:8001/v1\""
+      ],
+      "kwargs": [],
+      "test": "test_application_context_open_catalog"
+    },
+    {
+      "line": 234,
+      "func": "setenv",
+      "args": [
+        "\"REPO_ROOT\"",
+        "str(repo_root)"
+      ],
+      "kwargs": [],
+      "test": "test_build_factory_adjuster_from_settings"
+    }
+  ],
+  "tests/codeintel_rev/test_duckdb_manager.py": [
+    {
+      "line": 134,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.io.duckdb_manager.duckdb.connect\"",
+        "_instrumented_connect"
+      ],
+      "kwargs": [],
+      "test": "test_connection_pool_reuses_connections"
+    }
+  ],
+  "tests/codeintel_rev/test_mcp_server.py": [
+    {
+      "line": 50,
+      "func": "setenv",
+      "args": [
+        "\"REPO_ROOT\"",
+        "str(repo_root)"
+      ],
+      "kwargs": [],
+      "test": "test_repo"
+    },
+    {
+      "line": 51,
+      "func": "setenv",
+      "args": [
+        "\"VLLM_URL\"",
+        "\"http://localhost:8001/v1\""
+      ],
+      "kwargs": [],
+      "test": "test_repo"
+    }
+  ],
+  "tests/codeintel_rev/test_semantic_adapter.py": [
+    {
+      "line": 67,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.mcp_server.adapters.semantic.observe_duration\"",
+        "_fake_observe"
+      ],
+      "kwargs": [],
+      "test": "_patch_observe_duration"
+    }
+  ],
+  "tests/codeintel_rev/test_vllm_client.py": [
+    {
+      "line": 44,
+      "func": "setattr",
+      "args": [
+        "client",
+        "\"embed_batch\"",
+        "mock_embed_batch"
+      ],
+      "kwargs": [],
+      "test": "test_embed_chunks_empty_uses_configured_dimension"
+    },
+    {
+      "line": 67,
+      "func": "setattr",
+      "args": [
+        "httpx",
+        "\"AsyncClient\"",
+        "async_client_mock"
+      ],
+      "kwargs": [],
+      "test": "test_embed_batch_async_empty_uses_configured_dimension"
+    },
+    {
+      "line": 88,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.io.vllm_engine.InprocessVLLMEmbedder\"",
+        "MagicMock(return_value=fake_engine)"
+      ],
+      "kwargs": [],
+      "test": "test_vllm_client_inprocess_uses_local_engine"
+    }
+  ],
+  "tests/codeintel_rev/test_duckdb_catalog.py": [
+    {
+      "line": 621,
+      "func": "setattr",
+      "args": [
+        "test_catalog",
+        "\"_query_builder\"",
+        "SimpleNamespace(build_filter_query=_fake_build_filter_query)"
+      ],
+      "kwargs": [],
+      "test": "test_query_by_filters_uses_query_builder"
+    }
+  ],
+  "tests/codeintel_rev/test_app_lifespan.py": [
+    {
+      "line": 47,
+      "func": "setenv",
+      "args": [
+        "\"REPO_ROOT\"",
+        "str(repo_root)"
+      ],
+      "kwargs": [],
+      "test": "test_repo"
+    },
+    {
+      "line": 48,
+      "func": "setenv",
+      "args": [
+        "\"VLLM_URL\"",
+        "\"http://localhost:8001/v1\""
+      ],
+      "kwargs": [],
+      "test": "test_repo"
+    },
+    {
+      "line": 95,
+      "func": "setenv",
+      "args": [
+        "\"REPO_ROOT\"",
+        "\"/nonexistent/path\""
+      ],
+      "kwargs": [],
+      "test": "test_app_startup_fails_invalid_repo_root"
+    },
+    {
+      "line": 96,
+      "func": "setenv",
+      "args": [
+        "\"VLLM_URL\"",
+        "\"http://localhost:8001/v1\""
+      ],
+      "kwargs": [],
+      "test": "test_app_startup_fails_invalid_repo_root"
+    },
+    {
+      "line": 115,
+      "func": "setenv",
+      "args": [
+        "\"REPO_ROOT\"",
+        "str(repo_root)"
+      ],
+      "kwargs": [],
+      "test": "test_app_readyz_shows_unhealthy_resources"
+    },
+    {
+      "line": 116,
+      "func": "setenv",
+      "args": [
+        "\"VLLM_URL\"",
+        "\"http://localhost:8001/v1\""
+      ],
+      "kwargs": [],
+      "test": "test_app_readyz_shows_unhealthy_resources"
+    },
+    {
+      "line": 151,
+      "func": "setenv",
+      "args": [
+        "\"FAISS_PRELOAD\"",
+        "\"1\""
+      ],
+      "kwargs": [],
+      "test": "test_app_startup_with_preload_enabled"
+    }
+  ],
+  "tests/codeintel_rev/test_splade_manager.py": [
+    {
+      "line": 61,
+      "func": "setenv",
+      "args": [
+        "\"REPO_ROOT\"",
+        "str(repo_root)"
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 62,
+      "func": "setenv",
+      "args": [
+        "\"DATA_DIR\"",
+        "str(repo_root / \"data\")"
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 63,
+      "func": "setenv",
+      "args": [
+        "\"FAISS_INDEX\"",
+        "str(faiss_dir / \"code.ivfpq.faiss\")"
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 64,
+      "func": "setenv",
+      "args": [
+        "\"DUCKDB_PATH\"",
+        "str(repo_root / \"data\" / \"catalog.duckdb\")"
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 65,
+      "func": "setenv",
+      "args": [
+        "\"SCIP_INDEX\"",
+        "str(repo_root / \"index.scip\")"
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 66,
+      "func": "setenv",
+      "args": [
+        "\"BM25_JSONL_DIR\"",
+        "str(repo_root / \"data\" / \"jsonl\")"
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 67,
+      "func": "setenv",
+      "args": [
+        "\"BM25_INDEX_DIR\"",
+        "str(bm25_dir)"
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 68,
+      "func": "setenv",
+      "args": [
+        "\"VLLM_URL\"",
+        "\"http://localhost:8001/v1\""
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 70,
+      "func": "setenv",
+      "args": [
+        "\"SPLADE_MODEL_ID\"",
+        "\"naver/splade-v3\""
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 71,
+      "func": "setenv",
+      "args": [
+        "\"SPLADE_MODEL_DIR\"",
+        "str(repo_root / \"models\" / \"splade-v3\")"
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 72,
+      "func": "setenv",
+      "args": [
+        "\"SPLADE_ONNX_DIR\"",
+        "str(models_dir)"
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 73,
+      "func": "setenv",
+      "args": [
+        "\"SPLADE_ONNX_FILE\"",
+        "\"model_qint8.onnx\""
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 74,
+      "func": "setenv",
+      "args": [
+        "\"SPLADE_VECTORS_DIR\"",
+        "str(vectors_dir)"
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 75,
+      "func": "setenv",
+      "args": [
+        "\"SPLADE_INDEX_DIR\"",
+        "str(splade_index_dir)"
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 76,
+      "func": "setenv",
+      "args": [
+        "\"SPLADE_PROVIDER\"",
+        "\"CPUExecutionProvider\""
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 77,
+      "func": "setenv",
+      "args": [
+        "\"SPLADE_QUANTIZATION\"",
+        "\"100\""
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 78,
+      "func": "setenv",
+      "args": [
+        "\"SPLADE_MAX_TERMS\"",
+        "\"3000\""
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 79,
+      "func": "setenv",
+      "args": [
+        "\"SPLADE_MAX_CLAUSE\"",
+        "\"4096\""
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 80,
+      "func": "setenv",
+      "args": [
+        "\"SPLADE_BATCH_SIZE\"",
+        "\"8\""
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 81,
+      "func": "setenv",
+      "args": [
+        "\"SPLADE_THREADS\"",
+        "\"4\""
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 130,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.io.splade_manager._require_sparse_encoder\"",
+        "lambda: _StubEncoder"
+      ],
+      "kwargs": [],
+      "test": "test_export_onnx_writes_metadata"
+    },
+    {
+      "line": 145,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.io.splade_manager._require_export_helpers\"",
+        "fake_export_helpers"
+      ],
+      "kwargs": [],
+      "test": "test_export_onnx_writes_metadata"
+    },
+    {
+      "line": 191,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.io.splade_manager._require_sparse_encoder\"",
+        "lambda: _StubEncoder"
+      ],
+      "kwargs": [],
+      "test": "test_encode_corpus_writes_vectors"
+    },
+    {
+      "line": 222,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.io.splade_manager._require_sparse_encoder\"",
+        "lambda: _StubEncoder"
+      ],
+      "kwargs": [],
+      "test": "test_benchmark_queries_reports_latency"
+    },
+    {
+      "line": 227,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.io.splade_manager.perf_counter\"",
+        "lambda: next(timings)"
+      ],
+      "kwargs": [],
+      "test": "test_benchmark_queries_reports_latency"
+    },
+    {
+      "line": 280,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.io.splade_manager.run_subprocess\"",
+        "fake_run"
+      ],
+      "kwargs": [],
+      "test": "test_build_index_persists_metadata"
+    },
+    {
+      "line": 281,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.io.splade_manager._detect_pyserini_version\"",
+        "lambda: \"test\""
+      ],
+      "kwargs": [],
+      "test": "test_build_index_persists_metadata"
+    },
+    {
+      "line": 315,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.io.splade_manager.run_subprocess\"",
+        "fake_run"
+      ],
+      "kwargs": [],
+      "test": "test_build_index_raises_when_subprocess_fails"
+    }
+  ],
+  "tests/codeintel_rev/test_faiss_dual_index.py": [
+    {
+      "line": 206,
+      "func": "setitem",
+      "args": [
+        "sys.modules",
+        "\"torch\"",
+        "torch_stub"
+      ],
+      "kwargs": [],
+      "test": "test_gpu_secondary_clone_reuses_cloner_options"
+    },
+    {
+      "line": 216,
+      "func": "setattr",
+      "args": [
+        "faiss_module",
+        "\"index_cpu_to_gpu\"",
+        "fake_index_cpu_to_gpu"
+      ],
+      "kwargs": [
+        {
+          "key": "raising",
+          "value": "False"
+        }
+      ],
+      "test": "test_gpu_secondary_clone_reuses_cloner_options"
+    }
+  ],
+  "tests/codeintel_rev/test_telemetry_reporter.py": [
+    {
+      "line": 34,
+      "func": "setattr",
+      "args": [
+        "reporter_module",
+        "\"RUN_REPORT_STORE\"",
+        "store"
+      ],
+      "kwargs": [],
+      "test": "isolated_report_store"
+    },
+    {
+      "line": 40,
+      "func": "setattr",
+      "args": [
+        "reporter_module.Capabilities",
+        "\"from_context\"",
+        "classmethod(lambda _cls, _context: Capabilities())"
+      ],
+      "kwargs": [],
+      "test": "stub_capabilities"
+    }
+  ],
+  "tests/codeintel_rev/test_bm25_manager.py": [
+    {
+      "line": 46,
+      "func": "setenv",
+      "args": [
+        "\"REPO_ROOT\"",
+        "str(repo_root)"
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 47,
+      "func": "setenv",
+      "args": [
+        "\"DATA_DIR\"",
+        "str(data_dir)"
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 48,
+      "func": "setenv",
+      "args": [
+        "\"FAISS_INDEX\"",
+        "str(repo_root / \"data\" / \"faiss\" / \"code.ivfpq.faiss\")"
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 49,
+      "func": "setenv",
+      "args": [
+        "\"DUCKDB_PATH\"",
+        "str(repo_root / \"data\" / \"catalog.duckdb\")"
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 50,
+      "func": "setenv",
+      "args": [
+        "\"SCIP_INDEX\"",
+        "str(repo_root / \"index.scip\")"
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 51,
+      "func": "setenv",
+      "args": [
+        "\"BM25_JSONL_DIR\"",
+        "str(bm25_json_dir)"
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 52,
+      "func": "setenv",
+      "args": [
+        "\"BM25_INDEX_DIR\"",
+        "str(lucene_dir / \"bm25\")"
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 53,
+      "func": "setenv",
+      "args": [
+        "\"VLLM_URL\"",
+        "\"http://localhost:8001/v1\""
+      ],
+      "kwargs": [],
+      "test": "_bootstrap_repo"
+    },
+    {
+      "line": 137,
+      "func": "setenv",
+      "args": [
+        "\"BM25_THREADS\"",
+        "\"2\""
+      ],
+      "kwargs": [],
+      "test": "test_build_index_writes_metadata"
+    },
+    {
+      "line": 138,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.io.bm25_manager._run_pyserini_index\"",
+        "fake_run"
+      ],
+      "kwargs": [],
+      "test": "test_build_index_writes_metadata"
+    },
+    {
+      "line": 139,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.io.bm25_manager._detect_pyserini_version\"",
+        "lambda: \"test\""
+      ],
+      "kwargs": [],
+      "test": "test_build_index_writes_metadata"
+    }
+  ],
+  "tests/codeintel_rev/test_observability_runpack.py": [
+    {
+      "line": 104,
+      "func": "setattr",
+      "args": [
+        "runpack_module",
+        "\"build_timeline_run_report\"",
+        "_fake_timeline_report"
+      ],
+      "kwargs": [],
+      "test": "stub_report_builders"
+    },
+    {
+      "line": 105,
+      "func": "setattr",
+      "args": [
+        "runpack_module",
+        "\"latest_run_report\"",
+        "lambda: {\"json\": str(tmp_path / \"latest.json\")}"
+      ],
+      "kwargs": [],
+      "test": "stub_report_builders"
+    },
+    {
+      "line": 110,
+      "func": "setattr",
+      "args": [
+        "runpack_module",
+        "\"build_report\"",
+        "_fake_run_report"
+      ],
+      "kwargs": [],
+      "test": "stub_report_builders"
+    },
+    {
+      "line": 111,
+      "func": "setattr",
+      "args": [
+        "runpack_module",
+        "\"resolve_timeline_dir\"",
+        "lambda _=None: tmp_path"
+      ],
+      "kwargs": [],
+      "test": "stub_report_builders"
+    }
+  ],
+  "tests/codeintel_rev/test_faiss_manager.py": [
+    {
+      "line": 38,
+      "func": "setattr",
+      "args": [
+        "faiss_module",
+        "\"GpuClonerOptions\"",
+        "DummyGpuClonerOptions"
+      ],
+      "kwargs": [
+        {
+          "key": "raising",
+          "value": "False"
+        }
+      ],
+      "test": "faiss_manager"
+    },
+    {
+      "line": 47,
+      "func": "setattr",
+      "args": [
+        "faiss_module",
+        "\"StandardGpuResources\"",
+        "lambda: gpu_resources"
+      ],
+      "kwargs": [
+        {
+          "key": "raising",
+          "value": "False"
+        }
+      ],
+      "test": "test_clone_to_gpu_success"
+    },
+    {
+      "line": 58,
+      "func": "setattr",
+      "args": [
+        "faiss_module",
+        "\"index_cpu_to_gpu\"",
+        "fake_index_cpu_to_gpu"
+      ],
+      "kwargs": [
+        {
+          "key": "raising",
+          "value": "False"
+        }
+      ],
+      "test": "test_clone_to_gpu_success"
+    },
+    {
+      "line": 77,
+      "func": "setattr",
+      "args": [
+        "faiss_module",
+        "\"StandardGpuResources\"",
+        "failing_resources"
+      ],
+      "kwargs": [
+        {
+          "key": "raising",
+          "value": "False"
+        }
+      ],
+      "test": "test_clone_to_gpu_falls_back"
+    }
+  ],
+  "tests/codeintel_rev/test_bm25_cli.py": [
+    {
+      "line": 86,
+      "func": "setattr",
+      "args": [
+        "Paths",
+        "\"discover\"",
+        "staticmethod(fake_discover)"
+      ],
+      "kwargs": [],
+      "test": "_patch_paths"
+    },
+    {
+      "line": 93,
+      "func": "setattr",
+      "args": [
+        "bm25_cli",
+        "\"_create_bm25_manager\"",
+        "lambda: stub"
+      ],
+      "kwargs": [],
+      "test": "test_prepare_corpus_cli"
+    },
+    {
+      "line": 111,
+      "func": "setattr",
+      "args": [
+        "bm25_cli",
+        "\"_create_bm25_manager\"",
+        "lambda: stub"
+      ],
+      "kwargs": [],
+      "test": "test_build_index_cli"
+    }
+  ],
+  "tests/codeintel_rev/test_integration_full.py": [
+    {
+      "line": 53,
+      "func": "setenv",
+      "args": [
+        "\"REPO_ROOT\"",
+        "str(repo_root)"
+      ],
+      "kwargs": [],
+      "test": "test_repo"
+    },
+    {
+      "line": 54,
+      "func": "setenv",
+      "args": [
+        "\"VLLM_URL\"",
+        "\"http://127.0.0.1:8001/v1\""
+      ],
+      "kwargs": [],
+      "test": "test_repo"
+    },
+    {
+      "line": 55,
+      "func": "setenv",
+      "args": [
+        "\"FAISS_PRELOAD\"",
+        "\"0\""
+      ],
+      "kwargs": [],
+      "test": "test_repo"
+    },
+    {
+      "line": 101,
+      "func": "setenv",
+      "args": [
+        "\"REPO_ROOT\"",
+        "str(invalid_path)"
+      ],
+      "kwargs": [],
+      "test": "test_app_startup_fails_invalid_repo_root"
+    },
+    {
+      "line": 102,
+      "func": "setenv",
+      "args": [
+        "\"VLLM_URL\"",
+        "\"http://127.0.0.1:8001/v1\""
+      ],
+      "kwargs": [],
+      "test": "test_app_startup_fails_invalid_repo_root"
+    },
+    {
+      "line": 118,
+      "func": "setenv",
+      "args": [
+        "\"FAISS_PRELOAD\"",
+        "\"0\""
+      ],
+      "kwargs": [],
+      "test": "test_app_startup_with_preload_disabled"
+    },
+    {
+      "line": 137,
+      "func": "setenv",
+      "args": [
+        "\"FAISS_PRELOAD\"",
+        "\"1\""
+      ],
+      "kwargs": [],
+      "test": "test_app_startup_with_preload_enabled"
+    }
+  ],
+  "tests/codeintel_rev/test_hybrid_explainability.py": [
+    {
+      "line": 16,
+      "func": "setenv",
+      "args": [
+        "\"HYBRID_ENABLE_BM25\"",
+        "\"0\""
+      ],
+      "kwargs": [],
+      "test": "_build_engine"
+    },
+    {
+      "line": 17,
+      "func": "setenv",
+      "args": [
+        "\"HYBRID_ENABLE_SPLADE\"",
+        "\"0\""
+      ],
+      "kwargs": [],
+      "test": "_build_engine"
+    },
+    {
+      "line": 18,
+      "func": "setenv",
+      "args": [
+        "\"BM25_INDEX_DIR\"",
+        "str(tmp_path / \"bm25\")"
+      ],
+      "kwargs": [],
+      "test": "_build_engine"
+    },
+    {
+      "line": 19,
+      "func": "setenv",
+      "args": [
+        "\"SPLADE_INDEX_DIR\"",
+        "str(tmp_path / \"splade\")"
+      ],
+      "kwargs": [],
+      "test": "_build_engine"
+    },
+    {
+      "line": 20,
+      "func": "setenv",
+      "args": [
+        "\"SPLADE_MODEL_DIR\"",
+        "str(tmp_path / \"splade-model\")"
+      ],
+      "kwargs": [],
+      "test": "_build_engine"
+    },
+    {
+      "line": 21,
+      "func": "setenv",
+      "args": [
+        "\"SPLADE_ONNX_DIR\"",
+        "str(tmp_path / \"splade-onnx\")"
+      ],
+      "kwargs": [],
+      "test": "_build_engine"
+    }
+  ],
+  "tests/codeintel_rev/test_text_search.py": [
+    {
+      "line": 54,
+      "func": "setattr",
+      "args": [
+        "text_search",
+        "\"run_subprocess\"",
+        "fake_run_subprocess"
+      ],
+      "kwargs": [],
+      "test": "test_search_text_flag_prefixed_query"
+    },
+    {
+      "line": 93,
+      "func": "setattr",
+      "args": [
+        "text_search",
+        "\"run_subprocess\"",
+        "fake_run_subprocess"
+      ],
+      "kwargs": [],
+      "test": "test_search_text_surfaces_ripgrep_failure"
+    },
+    {
+      "line": 121,
+      "func": "setattr",
+      "args": [
+        "text_search",
+        "\"run_subprocess\"",
+        "fake_run_subprocess"
+      ],
+      "kwargs": [],
+      "test": "test_search_text_falls_back_to_grep"
+    },
+    {
+      "line": 157,
+      "func": "setattr",
+      "args": [
+        "text_search",
+        "\"run_subprocess\"",
+        "fake_run_subprocess"
+      ],
+      "kwargs": [],
+      "test": "test_search_text_fallback_normalizes_relative_paths"
+    }
+  ],
+  "tests/codeintel_rev/test_integration_smoke.py": [
+    {
+      "line": 97,
+      "func": "setattr",
+      "args": [
+        "text_search_adapter",
+        "\"run_subprocess\"",
+        "_fake_run_subprocess"
+      ],
+      "kwargs": [],
+      "test": "test_text_search"
+    }
+  ],
+  "tests/codeintel_rev/test_polars_writers.py": [
+    {
+      "line": 93,
+      "func": "setattr",
+      "args": [
+        "graph_builder",
+        "\"gate_import\"",
+        "lambda *_args, **_kwargs: cast(\"PolarsModule\", polars)"
+      ],
+      "kwargs": [],
+      "test": "test_write_import_graph_supports_dataframe_only_polars"
+    },
+    {
+      "line": 115,
+      "func": "setattr",
+      "args": [
+        "uses_builder",
+        "\"gate_import\"",
+        "lambda *_args, **_kwargs: cast(\"PolarsModule\", polars)"
+      ],
+      "kwargs": [],
+      "test": "test_write_use_graph_supports_dataframe_only_polars"
+    }
+  ],
+  "tests/codeintel_rev/test_typing_gate_import.py": [
+    {
+      "line": 31,
+      "func": "setattr",
+      "args": [
+        "\"builtins.__import__\"",
+        "fake_import"
+      ],
+      "kwargs": [],
+      "test": "test_gate_import_missing_module_includes_extra_hint"
+    }
+  ],
+  "tests/vector_ingestion/test_vector_cli.py": [
+    {
+      "line": 132,
+      "func": "setattr",
+      "args": [
+        "\"orchestration.cli.uuid4\"",
+        "deterministic_uuid_factory"
+      ],
+      "kwargs": [],
+      "test": "test_index_faiss_cli_problem_details"
+    }
+  ],
+  "tests/runtime/test_runtime_cell.py": [
+    {
+      "line": 164,
+      "func": "setenv",
+      "args": [
+        "\"KGFOUNDRY_ALLOW_RUNTIME_SEED\"",
+        "\"1\""
+      ],
+      "kwargs": [],
+      "test": "test_runtime_cell_seed_constraints"
+    },
+    {
+      "line": 177,
+      "func": "delenv",
+      "args": [
+        "\"KGFOUNDRY_ALLOW_RUNTIME_SEED\""
+      ],
+      "kwargs": [
+        {
+          "key": "raising",
+          "value": "False"
+        }
+      ],
+      "test": "test_runtime_cell_seed_requires_guard"
+    },
+    {
+      "line": 178,
+      "func": "setenv",
+      "args": [
+        "\"PYTEST_CURRENT_TEST\"",
+        "\"\""
+      ],
+      "kwargs": [],
+      "test": "test_runtime_cell_seed_requires_guard"
+    },
+    {
+      "line": 185,
+      "func": "setenv",
+      "args": [
+        "\"KGFOUNDRY_ALLOW_RUNTIME_SEED\"",
+        "\"1\""
+      ],
+      "kwargs": [],
+      "test": "test_runtime_cell_close_invokes_close_and_observer"
+    },
+    {
+      "line": 221,
+      "func": "setenv",
+      "args": [
+        "\"KGFOUNDRY_ALLOW_RUNTIME_SEED\"",
+        "\"1\""
+      ],
+      "kwargs": [],
+      "test": "test_runtime_cell_close_exception_paths"
+    },
+    {
+      "line": 245,
+      "func": "setenv",
+      "args": [
+        "\"KGFOUNDRY_ALLOW_RUNTIME_SEED\"",
+        "\"1\""
+      ],
+      "kwargs": [],
+      "test": "test_runtime_cell_repr_masks_inner"
+    }
+  ],
+  "tests/cli/test_indexctl_health.py": [
+    {
+      "line": 90,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.cli.indexctl._get_settings\"",
+        "lambda: _Settings(tmp_path)"
+      ],
+      "kwargs": [],
+      "test": "test_health_command_reports_ok"
+    },
+    {
+      "line": 91,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.cli.indexctl._faiss_manager\"",
+        "lambda *_: manager"
+      ],
+      "kwargs": [],
+      "test": "test_health_command_reports_ok"
+    },
+    {
+      "line": 92,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.cli.indexctl._duckdb_catalog\"",
+        "lambda *_: catalog"
+      ],
+      "kwargs": [],
+      "test": "test_health_command_reports_ok"
+    },
+    {
+      "line": 93,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.cli.indexctl._duckdb_embedding_dim\"",
+        "lambda _c: 4"
+      ],
+      "kwargs": [],
+      "test": "test_health_command_reports_ok"
+    },
+    {
+      "line": 94,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.cli.indexctl._count_idmap_rows\"",
+        "lambda _p: 4"
+      ],
+      "kwargs": [],
+      "test": "test_health_command_reports_ok"
+    }
+  ],
+  "tests/cli/test_indexctl_embeddings.py": [
+    {
+      "line": 187,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.cli.indexctl.get_embedding_provider\"",
+        "_provider_factory"
+      ],
+      "kwargs": [],
+      "test": "stub_provider"
+    }
+  ],
+  "tests/dist/test_extras_minimal_import.py": [
+    {
+      "line": 22,
+      "func": "setattr",
+      "args": [
+        "importlib",
+        "\"import_module\"",
+        "fake_import"
+      ],
+      "kwargs": [],
+      "test": "test_package_imports_without_heavy_deps"
+    }
+  ],
+  "tests/download/test_cli.py": [
+    {
+      "line": 15,
+      "func": "setattr",
+      "args": [
+        "cli",
+        "\"CLI_ENVELOPE_DIR\"",
+        "tmp_path"
+      ],
+      "kwargs": [],
+      "test": "test_harvest_emits_envelope"
+    }
+  ],
+  "tests/mcp/test_semantic_observability.py": [
+    {
+      "line": 18,
+      "func": "setenv",
+      "args": [
+        "\"DATA_DIR\"",
+        "str(tmp_path)"
+      ],
+      "kwargs": [],
+      "test": "test_semantic_observability_links"
+    },
+    {
+      "line": 19,
+      "func": "setattr",
+      "args": [
+        "semantic",
+        "\"current_trace_id\"",
+        "lambda: \"trace-123\""
+      ],
+      "kwargs": [],
+      "test": "test_semantic_observability_links"
+    },
+    {
+      "line": 20,
+      "func": "setattr",
+      "args": [
+        "semantic",
+        "\"current_span_id\"",
+        "lambda: \"span-456\""
+      ],
+      "kwargs": [],
+      "test": "test_semantic_observability_links"
+    },
+    {
+      "line": 35,
+      "func": "setenv",
+      "args": [
+        "\"DATA_DIR\"",
+        "str(tmp_path)"
+      ],
+      "kwargs": [],
+      "test": "test_semantic_pro_observability_links"
+    },
+    {
+      "line": 36,
+      "func": "setattr",
+      "args": [
+        "semantic_pro",
+        "\"current_timeline\"",
+        "lambda: timeline"
+      ],
+      "kwargs": [],
+      "test": "test_semantic_pro_observability_links"
+    },
+    {
+      "line": 37,
+      "func": "setattr",
+      "args": [
+        "semantic_pro",
+        "\"current_trace_id\"",
+        "lambda: \"trace-abc\""
+      ],
+      "kwargs": [],
+      "test": "test_semantic_pro_observability_links"
+    },
+    {
+      "line": 38,
+      "func": "setattr",
+      "args": [
+        "semantic_pro",
+        "\"current_span_id\"",
+        "lambda: \"span-def\""
+      ],
+      "kwargs": [],
+      "test": "test_semantic_pro_observability_links"
+    },
+    {
+      "line": 39,
+      "func": "setattr",
+      "args": [
+        "semantic_pro",
+        "\"current_run_id\"",
+        "lambda: \"run-xyz\""
+      ],
+      "kwargs": [],
+      "test": "test_semantic_pro_observability_links"
+    }
+  ],
+  "tests/codeintel_rev/io/test_xtr_manager.py": [
+    {
+      "line": 70,
+      "func": "setattr",
+      "args": [
+        "XTRIndex",
+        "\"encode_query_tokens\"",
+        "_encode_query"
+      ],
+      "kwargs": [],
+      "test": "test_xtr_search_and_rescore"
+    }
+  ],
+  "tests/codeintel_rev/io/test_vllm_engine.py": [
+    {
+      "line": 53,
+      "func": "setitem",
+      "args": [
+        "sys.modules",
+        "\"vllm\"",
+        "fake_vllm"
+      ],
+      "kwargs": [],
+      "test": "_patch_vllm"
+    },
+    {
+      "line": 54,
+      "func": "setitem",
+      "args": [
+        "sys.modules",
+        "\"vllm.config\"",
+        "fake_config"
+      ],
+      "kwargs": [],
+      "test": "_patch_vllm"
+    },
+    {
+      "line": 55,
+      "func": "setitem",
+      "args": [
+        "sys.modules",
+        "\"vllm.inputs\"",
+        "fake_inputs"
+      ],
+      "kwargs": [],
+      "test": "_patch_vllm"
+    },
+    {
+      "line": 62,
+      "func": "setattr",
+      "args": [
+        "engine_module",
+        "\"transformers\"",
+        "SimpleNamespace(AutoTokenizer=SimpleNamespace(from_pretrained=_tokenizer_factory))"
+      ],
+      "kwargs": [
+        {
+          "key": "raising",
+          "value": "False"
+        }
+      ],
+      "test": "_patch_vllm"
+    },
+    {
+      "line": 68,
+      "func": "setattr",
+      "args": [
+        "engine_module",
+        "\"vllm_inputs\"",
+        "SimpleNamespace(TokensPrompt=_StubTokensPrompt)"
+      ],
+      "kwargs": [
+        {
+          "key": "raising",
+          "value": "False"
+        }
+      ],
+      "test": "_patch_vllm"
+    },
+    {
+      "line": 74,
+      "func": "setattr",
+      "args": [
+        "engine_module",
+        "\"vllm_config\"",
+        "SimpleNamespace(PoolerConfig=_StubPooler)"
+      ],
+      "kwargs": [
+        {
+          "key": "raising",
+          "value": "False"
+        }
+      ],
+      "test": "_patch_vllm"
+    },
+    {
+      "line": 80,
+      "func": "setattr",
+      "args": [
+        "engine_module",
+        "\"vllm\"",
+        "SimpleNamespace(LLM=_StubLLM)"
+      ],
+      "kwargs": [
+        {
+          "key": "raising",
+          "value": "False"
+        }
+      ],
+      "test": "_patch_vllm"
+    }
+  ],
+  "tests/codeintel_rev/io/test_rerank_coderankllm.py": [
+    {
+      "line": 64,
+      "func": "setattr",
+      "args": [
+        "rerank_module",
+        "\"gate_import\"",
+        "_gate_import"
+      ],
+      "kwargs": [],
+      "test": "_patch_gate"
+    }
+  ],
+  "tests/codeintel_rev/io/test_coderank_embedder.py": [
+    {
+      "line": 29,
+      "func": "setattr",
+      "args": [
+        "\"codeintel_rev.io.coderank_embedder.gate_import\"",
+        "_gate_import"
+      ],
+      "kwargs": [],
+      "test": "_patch_gate"
+    }
+  ],
+  "tests/codeintel_rev/retrieval/test_telemetry.py": [
+    {
+      "line": 39,
+      "func": "setattr",
+      "args": [
+        "telemetry_module",
+        "\"_STAGE_DECISION_COUNTER\"",
+        "counter"
+      ],
+      "kwargs": [
+        {
+          "key": "raising",
+          "value": "False"
+        }
+      ],
+      "test": "test_record_stage_decision_emits_counter"
+    }
+  ],
+  "tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py": [
+    {
+      "line": 209,
+      "func": "setattr",
+      "args": [
+        "semantic_pro",
+        "\"observe_duration\"",
+        "_observer"
+      ],
+      "kwargs": [],
+      "test": "_stub_observer"
+    },
+    {
+      "line": 210,
+      "func": "setattr",
+      "args": [
+        "semantic_pro",
+        "\"get_session_id\"",
+        "lambda: \"test-session\""
+      ],
+      "kwargs": [],
+      "test": "_stub_observer"
+    },
+    {
+      "line": 211,
+      "func": "setattr",
+      "args": [
+        "semantic_pro",
+        "\"get_effective_scope\"",
+        "_fake_scope"
+      ],
+      "kwargs": [],
+      "test": "_stub_observer"
+    }
+  ]
+}

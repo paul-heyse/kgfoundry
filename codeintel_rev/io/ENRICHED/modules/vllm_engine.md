@@ -27,31 +27,36 @@ In-process vLLM embedding engine for Stage-0 retrieval.
 - from **vllm.config** import PoolerConfig
 - from **vllm.inputs** import TokensPrompt
 - from **codeintel_rev.config.settings** import VLLMConfig
+- from **(absolute)** import numpy
+- from **(absolute)** import transformers
+- from **(absolute)** import vllm
+- from **(absolute)** import vllm.config
+- from **(absolute)** import vllm.inputs
 
 ## Definitions
 
-- variable: `np` (line 28)
-- variable: `transformers` (line 29)
-- variable: `vllm` (line 30)
-- variable: `vllm_config` (line 31)
-- variable: `vllm_inputs` (line 32)
-- variable: `LOGGER` (line 34)
-- class: `_InprocessVLLMRuntime` (line 37)
-- class: `InprocessVLLMEmbedder` (line 60)
+- variable: `np` (line 31)
+- variable: `transformers` (line 36)
+- variable: `vllm` (line 43)
+- variable: `vllm_config` (line 44)
+- variable: `vllm_inputs` (line 45)
+- variable: `LOGGER` (line 47)
+- class: `_InprocessVLLMRuntime` (line 50)
+- class: `InprocessVLLMEmbedder` (line 73)
 
 ## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 4
-- **cycle_group**: 39
+- **cycle_group**: 33
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 9
-- recent churn 90: 9
+- recent churn 30: 10
+- recent churn 90: 10
 
 ## Usage
 
@@ -83,7 +88,7 @@ InprocessVLLMEmbedder
 
 ## Hotspot
 
-- score: 2.09
+- score: 2.16
 
 ## Side Effects
 
@@ -91,9 +96,9 @@ InprocessVLLMEmbedder
 
 ## Complexity
 
-- branches: 11
-- cyclomatic: 12
-- loc: 244
+- branches: 14
+- cyclomatic: 15
+- loc: 257
 
 ## Doc Coverage
 

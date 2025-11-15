@@ -12,31 +12,25 @@ OpenTelemetry logging bootstrap helpers.
 - from **(absolute)** import importlib
 - from **(absolute)** import logging
 - from **(absolute)** import os
-- from **collections.abc** import Iterable
+- from **collections.abc** import Callable, Iterable
+- from **dataclasses** import dataclass
+- from **functools** import lru_cache
+- from **typing** import Any
 - from **kgfoundry_common.logging** import get_logger
-- from **opentelemetry._logs** import set_logger_provider
-- from **opentelemetry.sdk._logs** import LoggerProvider, LoggingHandler
-- from **opentelemetry.sdk._logs.export** import BatchLogRecordProcessor
-- from **opentelemetry.sdk.resources** import Resource
-- from **opentelemetry.exporter.otlp.proto.http.log_exporter** import OTLPLogExporter
 
 ## Definitions
 
-- variable: `set_logger_provider` (line 18)
-- variable: `LoggerProvider` (line 19)
-- variable: `LoggingHandler` (line 20)
-- variable: `BatchLogRecordProcessor` (line 21)
-- variable: `Resource` (line 22)
-- variable: `OTLPLogExporter` (line 29)
-- variable: `LOGGER` (line 32)
-- function: `_should_enable` (line 38)
-- function: `_instrument_stdlib_logging` (line 47)
-- function: `init_otel_logging` (line 66)
+- variable: `LOGGER` (line 15)
+- class: `_LoggingAPI` (line 22)
+- function: `_load_logging_api` (line 32)
+- function: `_should_enable` (line 70)
+- function: `_instrument_stdlib_logging` (line 79)
+- function: `init_otel_logging` (line 98)
 
 ## Graph Metrics
 
 - **fan_in**: 2
-- **fan_out**: 0
+- **fan_out**: 1
 - **cycle_group**: 8
 
 ## Ownership
@@ -44,8 +38,8 @@ OpenTelemetry logging bootstrap helpers.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 1
-- recent churn 90: 1
+- recent churn 30: 2
+- recent churn 90: 2
 
 ## Usage
 
@@ -77,7 +71,7 @@ init_otel_logging
 
 ## Hotspot
 
-- score: 1.90
+- score: 2.00
 
 ## Side Effects
 
@@ -85,12 +79,14 @@ init_otel_logging
 
 ## Complexity
 
-- branches: 19
-- cyclomatic: 20
-- loc: 115
+- branches: 18
+- cyclomatic: 19
+- loc: 150
 
 ## Doc Coverage
 
+- `_LoggingAPI` (class): summary=no, examples=no
+- `_load_logging_api` (function): summary=yes, params=ok, examples=no — Return Otel logging classes when the dependency is installed.
 - `_should_enable` (function): summary=no, examples=no
 - `_instrument_stdlib_logging` (function): summary=yes, params=ok, examples=no — Enable OpenTelemetry's stdlib logging bridge when the package is installed.
 - `init_otel_logging` (function): summary=yes, params=mismatch, examples=no — Bridge stdlib logging into OpenTelemetry logs when available.

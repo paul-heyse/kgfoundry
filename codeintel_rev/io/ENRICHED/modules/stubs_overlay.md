@@ -19,38 +19,40 @@ Targeted overlay generation with opt-in activation.
 
 ## Definitions
 
-- variable: `DEFAULT_EXPORT_HUB_THRESHOLD` (line 16)
-- class: `OverlayPolicy` (line 20)
-- class: `OverlayResult` (line 35)
-- class: `OverlayInputs` (line 45)
-- class: `OverlayRenderContext` (line 55)
-- function: `generate_overlay_for_file` (line 66)
-- function: `activate_overlays` (line 194)
-- function: `deactivate_all` (line 243)
-- function: `_overlay_path` (line 281)
-- function: `_normalized_module_key` (line 305)
-- function: `_module_name_from_path` (line 325)
-- function: `_collect_star_reexports` (line 349)
-- function: `_extract_simple_name` (line 380)
-- function: `_build_overlay_text` (line 407)
-- function: `_render_star_exports` (line 454)
-- function: `_render_public_defs` (line 479)
-- function: `_collect_import_reexports` (line 510)
-- function: `_is_windows` (line 541)
+- variable: `DEFAULT_EXPORT_HUB_THRESHOLD` (line 15)
+- class: `OverlayPolicy` (line 19)
+- class: `OverlayResult` (line 34)
+- class: `OverlayInputs` (line 44)
+- class: `OverlayRenderContext` (line 54)
+- class: `OverlayDecisionInputs` (line 66)
+- function: `_should_generate_overlay` (line 75)
+- function: `generate_overlay_for_file` (line 94)
+- function: `activate_overlays` (line 217)
+- function: `deactivate_all` (line 266)
+- function: `_overlay_path` (line 304)
+- function: `_normalized_module_key` (line 328)
+- function: `_module_name_from_path` (line 348)
+- function: `_collect_star_reexports` (line 372)
+- function: `_extract_simple_name` (line 403)
+- function: `_build_overlay_text` (line 430)
+- function: `_render_star_exports` (line 477)
+- function: `_render_public_defs` (line 502)
+- function: `_collect_import_reexports` (line 533)
+- function: `_is_windows` (line 564)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 89
+- **cycle_group**: 104
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 12
-- recent churn 90: 12
+- recent churn 30: 14
+- recent churn 90: 14
 
 ## Usage
 
@@ -94,7 +96,7 @@ Targeted overlay generation with opt-in activation.
 
 - branches: 72
 - cyclomatic: 73
-- loc: 550
+- loc: 573
 
 ## Doc Coverage
 
@@ -102,12 +104,12 @@ Targeted overlay generation with opt-in activation.
 - `OverlayResult` (class): summary=yes, examples=no — Summary of overlay creation for a single module.
 - `OverlayInputs` (class): summary=yes, examples=no — Runtime inputs influencing overlay generation.
 - `OverlayRenderContext` (class): summary=yes, examples=no — Bundle of values required to render overlay text.
+- `OverlayDecisionInputs` (class): summary=yes, examples=no — Data needed to decide whether an overlay should be generated.
+- `_should_generate_overlay` (function): summary=no, examples=no
 - `generate_overlay_for_file` (function): summary=yes, params=ok, examples=no — Generate a .pyi overlay for ``py_file`` when it meets the policy gates.
 - `activate_overlays` (function): summary=yes, params=ok, examples=no — Activate overlays by linking or copying into ``stubs_root``.
 - `deactivate_all` (function): summary=yes, params=ok, examples=no — Remove overlays under ``stubs_root`` that originated from ``overlays_root``.
 - `_overlay_path` (function): summary=yes, params=ok, examples=no — Return the overlay destination path for ``py_file``.
-- `_normalized_module_key` (function): summary=yes, params=ok, examples=no — Return a normalized module key used for lookups.
-- `_module_name_from_path` (function): summary=yes, params=ok, examples=no — Return the dotted module name for ``py_file``.
 
 ## Tags
 

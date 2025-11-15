@@ -32,68 +32,74 @@ Deep-Research compatible search/fetch orchestration helpers.
 
 ## Definitions
 
-- variable: `Timeline` (line 37)
-- variable: `StructureAnnotations` (line 38)
-- variable: `SearchFilterPayload` (line 39)
-- variable: `LOGGER` (line 43)
-- class: `EmbeddingClient` (line 46)
-- class: `IndexConfigLike` (line 54)
-- class: `LimitsConfigLike` (line 84)
-- class: `SearchSettings` (line 118)
-- class: `CatalogLike` (line 132)
-- class: `VectorIndex` (line 155)
-- class: `SearchFilters` (line 180)
-- class: `SearchRequest` (line 265)
-- class: `SearchResult` (line 275)
-- class: `SearchResponse` (line 288)
-- class: `HydrationPayload` (line 298)
-- class: `SearchDependencies` (line 306)
-- class: `FetchRequest` (line 321)
-- class: `FetchObjectResult` (line 329)
-- class: `FetchResponse` (line 340)
-- class: `FetchDependencies` (line 347)
-- function: `run_search` (line 355)
-- function: `run_fetch` (line 518)
-- function: `_normalize_str_list` (line 584)
-- function: `_embed_query` (line 590)
-- function: `_compute_fanout` (line 612)
-- function: `_build_runtime_overrides` (line 621)
-- function: `_flatten_ids` (line 648)
-- function: `_flatten_scores` (line 654)
-- function: `_hydrate_chunks` (line 660)
-- function: `_build_results` (line 684)
-- function: `_matches_symbols` (line 716)
-- function: `_build_metadata` (line 723)
-- function: `_build_hit_reasons` (line 748)
-- function: `_build_title` (line 770)
-- function: `_build_url` (line 777)
-- function: `_build_snippet` (line 784)
-- function: `_truncate_content` (line 792)
-- function: `_build_fetch_metadata` (line 800)
-- function: `_write_pool_rows` (line 811)
-- function: `_record_postfilter_density` (line 853)
-- function: `_log_search_completion` (line 860)
-- function: `_coerce_int` (line 880)
-- function: `_string_sequence` (line 895)
-- function: `_repair_single_result` (line 901)
-- function: `_resolve_snippet` (line 916)
-- function: `_merge_metadata` (line 926)
-- class: `_RepairStats` (line 956)
-- function: `post_search_validate_and_fill` (line 964)
+- variable: `LOGGER` (line 39)
+- class: `EmbeddingClient` (line 42)
+- class: `IndexConfigLike` (line 50)
+- class: `LimitsConfigLike` (line 80)
+- class: `SearchSettings` (line 114)
+- class: `CatalogLike` (line 128)
+- class: `VectorIndex` (line 151)
+- class: `SearchFilters` (line 176)
+- class: `SearchRequest` (line 261)
+- class: `SearchResult` (line 271)
+- class: `SearchResponse` (line 284)
+- class: `HydrationPayload` (line 294)
+- class: `_StageDurations` (line 302)
+- class: `SearchDependencies` (line 311)
+- class: `FetchRequest` (line 326)
+- class: `FetchObjectResult` (line 334)
+- class: `FetchResponse` (line 345)
+- class: `FetchDependencies` (line 352)
+- function: `run_search` (line 360)
+- function: `run_fetch` (line 458)
+- function: `_normalize_str_list` (line 524)
+- function: `_build_search_attrs` (line 530)
+- function: `_embed_with_metrics` (line 566)
+- function: `_run_ann_search` (line 596)
+- function: `_hydrate_with_metrics` (line 640)
+- function: `_rerank_with_metrics` (line 685)
+- function: `_compose_limits` (line 735)
+- function: `_embed_query` (line 767)
+- function: `_compute_fanout` (line 789)
+- function: `_build_runtime_overrides` (line 798)
+- function: `_flatten_ids` (line 825)
+- function: `_flatten_scores` (line 831)
+- function: `_hydrate_chunks` (line 837)
+- function: `_build_results` (line 861)
+- function: `_matches_symbols` (line 893)
+- function: `_build_metadata` (line 900)
+- function: `_build_hit_reasons` (line 925)
+- function: `_build_title` (line 947)
+- function: `_build_url` (line 954)
+- function: `_build_snippet` (line 961)
+- function: `_truncate_content` (line 969)
+- function: `_build_fetch_metadata` (line 977)
+- function: `_build_ann_snapshot` (line 988)
+- function: `_write_pool_rows` (line 1005)
+- function: `_build_pool_reason` (line 1058)
+- function: `_record_postfilter_density` (line 1069)
+- function: `_log_search_completion` (line 1076)
+- function: `_coerce_int` (line 1096)
+- function: `_string_sequence` (line 1111)
+- function: `_repair_single_result` (line 1117)
+- function: `_resolve_snippet` (line 1132)
+- function: `_merge_metadata` (line 1142)
+- class: `_RepairStats` (line 1172)
+- function: `post_search_validate_and_fill` (line 1180)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 11
-- **cycle_group**: 128
+- **cycle_group**: 135
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 
@@ -125,7 +131,7 @@ FetchDependencies, FetchObjectResult, FetchRequest, FetchResponse, SearchDepende
 
 ## Hotspot
 
-- score: 2.97
+- score: 3.01
 
 ## Side Effects
 
@@ -133,9 +139,9 @@ FetchDependencies, FetchObjectResult, FetchRequest, FetchResponse, SearchDepende
 
 ## Complexity
 
-- branches: 104
-- cyclomatic: 105
-- loc: 1023
+- branches: 119
+- cyclomatic: 120
+- loc: 1239
 
 ## Doc Coverage
 

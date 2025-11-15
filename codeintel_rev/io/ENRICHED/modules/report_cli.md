@@ -39,22 +39,22 @@ Diagnostics CLI for rendering run reports from session event ledgers.
 - function: `_render_markdown` (line 166)
 - function: `_structured_report` (line 180)
 - function: `session_report` (line 199)
-- function: `ledger_report` (line 281)
-- function: `main` (line 316)
+- function: `ledger_report` (line 282)
+- function: `main` (line 321)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 114
+- **cycle_group**: 121
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 
@@ -96,7 +96,7 @@ app, main
 
 - branches: 43
 - cyclomatic: 44
-- loc: 349
+- loc: 354
 
 ## Doc Coverage
 

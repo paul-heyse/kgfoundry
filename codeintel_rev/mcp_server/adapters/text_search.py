@@ -19,6 +19,12 @@ from codeintel_rev.mcp_server.scope_utils import (
     get_effective_scope,
     merge_scope_filters,
 )
+from codeintel_rev.observability.execution_ledger import (
+    record as ledger_record,
+)
+from codeintel_rev.observability.execution_ledger import (
+    step as ledger_step,
+)
 from codeintel_rev.observability.otel import record_span_event
 from codeintel_rev.observability.semantic_conventions import Attrs, to_label_str
 from codeintel_rev.telemetry.context import current_run_id
@@ -117,6 +123,15 @@ class TextSearchOptions:
             exclude_globs=_sequence_override(overrides, "exclude_globs"),
             max_results=max_results_value,
         )
+
+
+@dataclass(slots=True)
+class _ResolvedFilters:
+    """Normalized scope and override filters for ripgrep."""
+
+    paths: list[str] | None
+    include_globs: Sequence[str] | None
+    exclude_globs: Sequence[str] | None
 
 
 def _bool_override(overrides: Mapping[str, object], key: str) -> bool:
@@ -243,7 +258,13 @@ async def search_text(
         Only one method of providing search options is allowed per call.
     """
     session_id = get_session_id()
-    scope = await get_effective_scope(context, session_id)
+    with ledger_step(
+        stage="gather",
+        op="text.scope",
+        component="mcp.text_search",
+        attrs={"session_id": session_id},
+    ):
+        scope = await get_effective_scope(context, session_id)
     run_id = current_run_id()
     if options is None:
         options = TextSearchOptions.from_overrides(query, overrides)
@@ -292,7 +313,7 @@ async def search_text(
 def _resolve_glob_filters(
     scope: ScopeIn | None,
     options: TextSearchOptions,
-) -> tuple[list[str] | None, Sequence[str] | None, Sequence[str] | None]:
+) -> _ResolvedFilters:
     merged_filters = merge_scope_filters(
         scope,
         {
@@ -315,7 +336,7 @@ def _resolve_glob_filters(
     else:
         include_globs = merged_filters.get("include_globs")
     exclude_globs = merged_filters.get("exclude_globs")
-    return explicit_paths, include_globs, exclude_globs
+    return _ResolvedFilters(explicit_paths, include_globs, exclude_globs)
 
 
 def _search_text_sync(
@@ -329,9 +350,8 @@ def _search_text_sync(
     repo_root = context.paths.repo_root
 
     query = options.query
-    max_results = options.max_results
 
-    effective_paths, effective_include_globs, effective_exclude_globs = _resolve_glob_filters(
+    filters = _resolve_glob_filters(
         scope,
         options,
     )
@@ -354,9 +374,9 @@ def _search_text_sync(
             "scope_exclude_globs": (
                 cast("Sequence[str] | None", scope.get("exclude_globs")) if scope else None
             ),
-            "effective_paths": effective_paths,
-            "effective_include_globs": effective_include_globs,
-            "effective_exclude_globs": effective_exclude_globs,
+            "effective_paths": filters.paths,
+            "effective_include_globs": filters.include_globs,
+            "effective_exclude_globs": filters.exclude_globs,
         },
     )
 
@@ -364,9 +384,9 @@ def _search_text_sync(
         query=query,
         regex=options.regex,
         case_sensitive=options.case_sensitive,
-        include_globs=effective_include_globs,
-        exclude_globs=effective_exclude_globs,
-        paths=effective_paths,
+        include_globs=filters.include_globs,
+        exclude_globs=filters.exclude_globs,
+        paths=filters.paths,
         max_results=options.max_results,
     )
 
@@ -375,26 +395,33 @@ def _search_text_sync(
     plan_attrs = _clean_attrs(
         {
             **(telemetry_attrs or {}),
-            "text.paths": to_label_str(effective_paths) if effective_paths else None,
-            "text.include_globs": to_label_str(effective_include_globs)
-            if effective_include_globs
+            "text.paths": to_label_str(filters.paths) if filters.paths else None,
+            "text.include_globs": to_label_str(filters.include_globs)
+            if filters.include_globs
             else None,
-            "text.exclude_globs": to_label_str(effective_exclude_globs)
-            if effective_exclude_globs
+            "text.exclude_globs": to_label_str(filters.exclude_globs)
+            if filters.exclude_globs
             else None,
         }
     )
     record_span_event("search.text.plan", **plan_attrs)
 
     with observe_duration("text_search", COMPONENT_NAME) as observation:
-        span_attrs = dict(plan_attrs)
-        span_attrs[Attrs.STAGE] = "gather_channels"
+        stage_attrs = {**plan_attrs, Attrs.STAGE: "gather_channels"}
         try:
-            with span_context(
-                "search.text.ripgrep",
-                kind="client",
-                attrs=span_attrs,
-                emit_checkpoint=True,
+            with (
+                ledger_step(
+                    stage="pool_search",
+                    op="text.ripgrep",
+                    component="tools.ripgrep",
+                    attrs=_clean_attrs(plan_attrs),
+                ),
+                span_context(
+                    "search.text.ripgrep",
+                    kind="client",
+                    attrs=stage_attrs,
+                    emit_checkpoint=True,
+                ),
             ):
                 stdout = run_subprocess(cmd, cwd=repo_root, timeout=SEARCH_TIMEOUT_SECONDS)
         except SubprocessTimeoutError as exc:
@@ -408,6 +435,13 @@ def _search_text_sync(
             if exc.returncode == 1:
                 stdout = ""
             elif exc.returncode == COMMAND_NOT_FOUND_RETURN_CODE:
+                ledger_record(
+                    "text_search.fallback",
+                    stage="pool_search",
+                    component="tools.ripgrep",
+                    ok=False,
+                    reason="ripgrep_missing",
+                )
                 record_span_event("search.text.fallback", reason="ripgrep_missing")
                 return _fallback_grep(
                     observation=observation,
@@ -433,13 +467,21 @@ def _search_text_sync(
                 context={"query": query},
             ) from exc
 
-        matches, truncated = _parse_ripgrep_output(stdout, repo_root, max_results)
+        matches, truncated = _parse_ripgrep_output(stdout, repo_root, options.max_results)
         observation.mark_success()
-        return {
+        result = {
             "matches": matches,
             "total": len(matches),
             "truncated": truncated,
         }
+        ledger_record(
+            "text_search.results",
+            stage="envelope",
+            component="mcp.text_search",
+            results=len(matches),
+            truncated=truncated,
+        )
+        return result
 
 
 def _fallback_grep(
@@ -491,11 +533,19 @@ def _fallback_grep(
         }
     )
     try:
-        with span_context(
-            "search.text.grep",
-            kind="client",
-            attrs=span_attrs,
-            emit_checkpoint=True,
+        with (
+            ledger_step(
+                stage="pool_search",
+                op="text.grep",
+                component="tools.grep",
+                attrs=_clean_attrs(span_attrs),
+            ),
+            span_context(
+                "search.text.grep",
+                kind="client",
+                attrs=span_attrs,
+                emit_checkpoint=True,
+            ),
         ):
             stdout = run_subprocess(command, cwd=repo_root, timeout=SEARCH_TIMEOUT_SECONDS)
     except SubprocessTimeoutError as exc:
@@ -551,11 +601,20 @@ def _fallback_grep(
             continue
 
     observation.mark_success()
-    return {
+    result = {
         "matches": matches,
         "total": len(matches),
         "truncated": len(matches) >= max_results,
     }
+    ledger_record(
+        "text_search.results",
+        stage="envelope",
+        component="mcp.text_search",
+        results=len(matches),
+        truncated=result["truncated"],
+        fallback=True,
+    )
+    return result
 
 
 @dataclass(slots=True, frozen=True)

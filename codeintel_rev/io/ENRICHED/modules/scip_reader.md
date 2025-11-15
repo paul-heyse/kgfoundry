@@ -24,21 +24,21 @@ with precise ranges for chunking and code intelligence.
 
 - variable: `RANGE_TUPLE_LENGTH` (line 21)
 - function: `_range_from_list` (line 24)
-- function: `_parse_occurrence` (line 36)
-- class: `Range` (line 66)
-- class: `Occurrence` (line 101)
-- class: `Document` (line 134)
-- class: `SCIPIndex` (line 166)
-- class: `SymbolDef` (line 189)
-- function: `parse_scip_json` (line 225)
-- function: `extract_definitions` (line 289)
-- function: `get_top_level_definitions` (line 339)
+- function: `_parse_occurrence` (line 40)
+- class: `Range` (line 70)
+- class: `Occurrence` (line 105)
+- class: `Document` (line 138)
+- class: `SCIPIndex` (line 170)
+- class: `SymbolDef` (line 193)
+- function: `parse_scip_json` (line 229)
+- function: `extract_definitions` (line 293)
+- function: `get_top_level_definitions` (line 343)
 
 ## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 31
+- **cycle_group**: 34
 
 ## Ownership
 
@@ -78,7 +78,7 @@ Document, Occurrence, Range, SCIPIndex, SymbolDef, extract_definitions, get_top_
 
 ## Hotspot
 
-- score: 2.17
+- score: 2.18
 
 ## Side Effects
 
@@ -86,9 +86,9 @@ Document, Occurrence, Range, SCIPIndex, SymbolDef, extract_definitions, get_top_
 
 ## Complexity
 
-- branches: 33
-- cyclomatic: 34
-- loc: 422
+- branches: 35
+- cyclomatic: 36
+- loc: 426
 
 ## Doc Coverage
 

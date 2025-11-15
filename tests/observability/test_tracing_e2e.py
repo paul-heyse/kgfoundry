@@ -11,17 +11,21 @@ import pytest
 from codeintel_rev.app.main import app
 from fastapi.testclient import TestClient
 
+from tests.helpers import (
+    load_in_memory_span_exporter_type,
+    load_simple_span_processor_type,
+)
+
 try:
     trace_module = importlib.import_module("opentelemetry.trace")
     sdk_trace_module = importlib.import_module("opentelemetry.sdk.trace")
-    exporter_module = importlib.import_module("opentelemetry.sdk.trace.export")
-except ImportError:
+    InMemorySpanExporter = load_in_memory_span_exporter_type()
+    SimpleSpanProcessor = load_simple_span_processor_type()
+except (ImportError, AttributeError):
     pytest.skip("OpenTelemetry packages not available", allow_module_level=True)
 
 trace = cast("Any", trace_module)
 TracerProvider = cast("type[Any]", sdk_trace_module.TracerProvider)
-InMemorySpanExporter = cast("type[Any]", exporter_module.InMemorySpanExporter)
-SimpleSpanProcessor = cast("type[Any]", exporter_module.SimpleSpanProcessor)
 
 
 @pytest.fixture

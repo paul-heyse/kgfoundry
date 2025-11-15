@@ -17,7 +17,7 @@ from types import SimpleNamespace
 import duckdb
 import numpy as np
 import pytest
-from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, relation_exists
 from codeintel_rev.io.duckdb_manager import DuckDBQueryOptions
 
 ALL_CHUNK_IDS = list(range(1, 12))
@@ -97,6 +97,106 @@ def _table_exists(db_path: Path, table_name: str) -> bool:
             [table_name],
         ).fetchone()
         return bool(row and row[0])
+    finally:
+        connection.close()
+
+
+def test_ensure_struct_views_materializes(tmp_path: Path) -> None:
+    """Structured assets register views and materialized tables."""
+    vectors_dir = tmp_path / "vectors"
+    vectors_dir.mkdir()
+    chunks_path = vectors_dir / "chunks.parquet"
+    _write_single_row_parquet(
+        chunks_path,
+        """
+        SELECT
+            1::BIGINT AS id,
+            'repo://module.py'::VARCHAR AS uri,
+            0::INTEGER AS start_line,
+            4::INTEGER AS end_line,
+            0::BIGINT AS start_byte,
+            40::BIGINT AS end_byte,
+            'preview'::VARCHAR AS preview,
+            'content'::VARCHAR AS content,
+            'python'::VARCHAR AS lang,
+            ['symbol.mod']::VARCHAR[] AS symbols,
+            [0.1, 0.2]::FLOAT[] AS embedding
+        """,
+    )
+    modules_path = tmp_path / "modules.parquet"
+    _write_single_row_parquet(
+        modules_path,
+        """
+        SELECT
+            'repo://module.py'::VARCHAR AS uri,
+            'repo://module.py'::VARCHAR AS repo_path,
+            'module.mod'::VARCHAR AS module_name
+        """,
+    )
+    scip_path = tmp_path / "scip.parquet"
+    _write_single_row_parquet(
+        scip_path,
+        """
+        SELECT
+            'symbol.mod'::VARCHAR AS symbol,
+            'definition'::VARCHAR AS role,
+            'repo://module.py'::VARCHAR AS uri
+        """,
+    )
+    ast_path = tmp_path / "ast.parquet"
+    _write_single_row_parquet(
+        ast_path,
+        """
+        SELECT
+            'repo://module.py'::VARCHAR AS uri,
+            'FunctionDef'::VARCHAR AS node_type,
+            0::BIGINT AS start_byte,
+            10::BIGINT AS end_byte
+        """,
+    )
+    cst_path = tmp_path / "cst.parquet"
+    _write_single_row_parquet(
+        cst_path,
+        """
+        SELECT
+            'repo://module.py'::VARCHAR AS uri,
+            'function_definition'::VARCHAR AS kind,
+            0::INTEGER AS start_line,
+            4::INTEGER AS end_line
+        """,
+    )
+
+    catalog_path = tmp_path / "catalog.duckdb"
+    catalog = DuckDBCatalog(catalog_path, vectors_dir)
+    catalog.ensure_struct_views(
+        modules_parquet=modules_path,
+        scip_occurrences_parquet=scip_path,
+        ast_nodes_parquet=ast_path,
+        cst_nodes_parquet=cst_path,
+        materialize=True,
+    )
+
+    with duckdb.connect(str(catalog_path)) as connection:
+        for view_name in ("modules", "scip_occurrences", "ast_nodes", "cst_nodes"):
+            assert relation_exists(connection, view_name)
+        assert relation_exists(connection, "v_chunk_symbols")
+        for table_name in (
+            "modules_mat",
+            "scip_occurrences_mat",
+            "ast_nodes_mat",
+            "cst_nodes_mat",
+        ):
+            assert relation_exists(connection, table_name)
+            row = connection.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
+            assert row is not None and row[0] == 1
+
+
+def _write_single_row_parquet(path: Path, select_sql: str) -> None:
+    """Write a Parquet file from a single SELECT statement."""
+    connection = duckdb.connect(database=":memory:")
+    try:
+        connection.execute(f"CREATE TABLE tmp AS {select_sql}")
+        connection.execute("COPY tmp TO ? (FORMAT PARQUET)", [str(path)])
     finally:
         connection.close()
 

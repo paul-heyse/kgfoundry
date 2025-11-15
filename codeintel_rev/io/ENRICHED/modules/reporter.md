@@ -64,7 +64,7 @@ In-memory run report builder fed by timeline events.
 
 - **fan_in**: 6
 - **fan_out**: 8
-- **cycle_group**: 45
+- **cycle_group**: 48
 
 ## Ownership
 

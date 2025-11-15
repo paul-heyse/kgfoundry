@@ -19,6 +19,12 @@ from codeintel_rev.mcp_server.schemas import (
     SearchStructuredContent,
     SearchToolArgs,
 )
+from codeintel_rev.observability.execution_ledger import (
+    record as ledger_record,
+)
+from codeintel_rev.observability.execution_ledger import (
+    step as ledger_step,
+)
 from codeintel_rev.observability.timeline import Timeline
 from codeintel_rev.retrieval.mcp_search import (
     FetchDependencies,
@@ -208,8 +214,22 @@ async def search(
                 pool_dir=_pool_dir(context.paths.data_dir),
                 timeline=timeline,
             )
-            response = run_search(request=request, deps=deps)
-            return _serialize_search_response(response)
+            with ledger_step(
+                stage="pool_search",
+                op="deep_research.run_search",
+                component="mcp.deep_research",
+                attrs={"top_k": request.top_k, "rerank": request.rerank},
+            ):
+                response = run_search(request=request, deps=deps)
+            payload = _serialize_search_response(response)
+            ledger_record(
+                "deep_research.search",
+                stage="envelope",
+                component="mcp.deep_research",
+                results=len(payload.get("results", ())),
+                top_k=request.top_k,
+            )
+            return payload
 
     async with _bounded("search", _DEFAULT_SEARCH_TIMEOUT_S):
         return await asyncio.to_thread(_work)
@@ -262,8 +282,21 @@ async def fetch(
                 settings=context.settings,
                 timeline=timeline,
             )
-            response = run_fetch(request=request, deps=deps)
-            return _serialize_fetch_response(response)
+            with ledger_step(
+                stage="hydrate",
+                op="deep_research.run_fetch",
+                component="mcp.deep_research",
+                attrs={"object_ids": len(request.object_ids)},
+            ):
+                response = run_fetch(request=request, deps=deps)
+            payload = _serialize_fetch_response(response)
+            ledger_record(
+                "deep_research.fetch",
+                stage="envelope",
+                component="mcp.deep_research",
+                results=len(payload["objects"]),
+            )
+            return payload
 
     async with _bounded("fetch", _DEFAULT_FETCH_TIMEOUT_S):
         return await asyncio.to_thread(_work)

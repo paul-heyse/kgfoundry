@@ -40,40 +40,40 @@ All configuration loaded from environment variables with sensible defaults.
 - class: `CodeRankLLMConfig` (line 374)
 - class: `VLLMRunMode` (line 386)
 - class: `VLLMConfig` (line 392)
-- class: `EmbeddingsConfig` (line 459)
-- class: `BM25Config` (line 511)
-- class: `PRFConfig` (line 528)
-- class: `SpladeConfig` (line 540)
-- class: `PathsConfig` (line 608)
-- class: `IndexConfig` (line 681)
-- class: `ServerLimits` (line 755)
-- class: `RedisConfig` (line 801)
-- class: `Settings` (line 822)
-- function: `load_settings` (line 892)
-- function: `_build_paths_config` (line 1130)
-- function: `_load_rrf_weights` (line 1151)
-- function: `_load_hybrid_prefetch` (line 1172)
-- function: `_load_hybrid_weights_override` (line 1193)
-- function: `_build_prf_config` (line 1212)
-- function: `_load_hybrid_channel_settings` (line 1224)
-- function: `_build_index_config` (line 1233)
-- function: `_build_server_limits` (line 1273)
-- function: `_build_redis_config` (line 1283)
-- function: `_build_duckdb_config` (line 1297)
-- function: `_build_eval_config` (line 1313)
-- function: `_resolve_bm25_analyzer` (line 1325)
-- function: `_resolve_splade_analyzer` (line 1332)
-- function: `_build_bm25_config` (line 1339)
-- function: `_build_splade_config` (line 1370)
-- function: `_build_coderank_config` (line 1393)
-- function: `_build_warp_config` (line 1411)
-- function: `_build_coderank_llm_config` (line 1422)
+- class: `EmbeddingsConfig` (line 460)
+- class: `BM25Config` (line 512)
+- class: `PRFConfig` (line 529)
+- class: `SpladeConfig` (line 541)
+- class: `PathsConfig` (line 609)
+- class: `IndexConfig` (line 682)
+- class: `ServerLimits` (line 756)
+- class: `RedisConfig` (line 802)
+- class: `Settings` (line 823)
+- function: `load_settings` (line 893)
+- function: `_build_paths_config` (line 1131)
+- function: `_load_rrf_weights` (line 1152)
+- function: `_load_hybrid_prefetch` (line 1173)
+- function: `_load_hybrid_weights_override` (line 1194)
+- function: `_build_prf_config` (line 1213)
+- function: `_load_hybrid_channel_settings` (line 1225)
+- function: `_build_index_config` (line 1234)
+- function: `_build_server_limits` (line 1274)
+- function: `_build_redis_config` (line 1284)
+- function: `_build_duckdb_config` (line 1298)
+- function: `_build_eval_config` (line 1314)
+- function: `_resolve_bm25_analyzer` (line 1326)
+- function: `_resolve_splade_analyzer` (line 1333)
+- function: `_build_bm25_config` (line 1340)
+- function: `_build_splade_config` (line 1371)
+- function: `_build_coderank_config` (line 1394)
+- function: `_build_warp_config` (line 1412)
+- function: `_build_coderank_llm_config` (line 1423)
 
 ## Graph Metrics
 
-- **fan_in**: 23
+- **fan_in**: 25
 - **fan_out**: 2
-- **cycle_group**: 17
+- **cycle_group**: 18
 
 ## Ownership
 
@@ -113,7 +113,7 @@ BM25Config, CodeRankConfig, CodeRankLLMConfig, EmbeddingsConfig, IndexConfig, PR
 
 ## Hotspot
 
-- score: 3.02
+- score: 3.05
 
 ## Side Effects
 
@@ -123,7 +123,7 @@ BM25Config, CodeRankConfig, CodeRankLLMConfig, EmbeddingsConfig, IndexConfig, PR
 
 - branches: 47
 - cyclomatic: 48
-- loc: 1453
+- loc: 1454
 
 ## Doc Coverage
 

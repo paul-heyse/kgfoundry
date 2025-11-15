@@ -75,7 +75,7 @@ class ParquetWriteOptions:
     """Configuration for Parquet persistence."""
 
     start_id: int = 0
-    vec_dim: int = 2560
+    vec_dim: int = 3584
     preview_max_chars: int = 240
     id_strategy: Literal["sequence", "stable_hash"] = "sequence"
     id_hash_salt: str = ""

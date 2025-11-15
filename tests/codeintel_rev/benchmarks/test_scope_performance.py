@@ -96,7 +96,7 @@ def _generate_chunk_data(
     preview = f"Code chunk {chunk_id} in {uri}"
     # Use a simpler embedding representation for performance
     # Generate smaller embedding array (100 dims) for faster insertion
-    # Real embeddings are 2560-dim, but for benchmarks we only need realistic data size
+    # Real embeddings are 3584-dim, but for benchmarks we only need realistic data size
     embedding = [float(x % 100) / 100.0 for x in range(100)]  # 100-dim embedding for speed
 
     return (

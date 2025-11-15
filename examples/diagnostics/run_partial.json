@@ -1,0 +1,34 @@
+{
+  "run_id": "demo-partial",
+  "session_id": "demo-session",
+  "tool": "mcp.tool:semantic_pro",
+  "status": "error:TimeoutError",
+  "stop_reason": "hydrate:error",
+  "warnings": ["warp.skip: disabled_option"],
+  "stages_reached": [
+    "request",
+    "embed",
+    "pool_search",
+    "fuse"
+  ],
+  "stage_durations_ms": {
+    "embed": 4.8,
+    "pool_search": 11.2,
+    "fuse": 2.3
+  },
+  "errors": [
+    {
+      "stage": "hydrate",
+      "op": "duckdb.hydrate",
+      "component": "duckdb.catalog",
+      "attrs": {"error": "TimeoutError"}
+    }
+  ],
+  "envelope": {},
+  "entries": [
+    {"stage": "embed", "op": "coderank.stage_one", "component": "retrieval.coderank", "ok": true},
+    {"stage": "pool_search", "op": "faiss.search", "component": "retrieval.faiss", "ok": true},
+    {"stage": "fuse", "op": "semantic_pro.fuse_rrf", "component": "retrieval.fusion", "ok": true},
+    {"stage": "hydrate", "op": "duckdb.hydrate", "component": "duckdb.catalog", "ok": false, "attrs": {"error": "TimeoutError"}}
+  ]
+}

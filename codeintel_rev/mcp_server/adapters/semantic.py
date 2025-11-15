@@ -12,17 +12,19 @@ from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.errors import CatalogConsistencyError
+from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, StructureAnnotations
 from codeintel_rev.io.faiss_manager import SearchRuntimeOverrides
 from codeintel_rev.io.hybrid_search import HybridSearchOptions, HybridSearchTuning
 from codeintel_rev.io.vllm_client import VLLMClient
 from codeintel_rev.mcp_server.common.observability import Observation, observe_duration
 from codeintel_rev.mcp_server.schemas import (
     AnswerEnvelope,
+    ExplanationPayload,
     Finding,
     MethodInfo,
     ScopeIn,
@@ -52,10 +54,9 @@ if TYPE_CHECKING:
     import numpy as np
 
     from codeintel_rev.app.config_context import ApplicationContext
-    from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 else:
-    httpx = cast("httpx", LazyModule("httpx", "semantic adapter HTTP error handling"))
-    np = cast("np", LazyModule("numpy", "semantic adapter embeddings"))
+    httpx = cast("Any", LazyModule("httpx", "semantic adapter HTTP error handling"))
+    np = cast("Any", LazyModule("numpy", "semantic adapter embeddings"))
 
 SNIPPET_PREVIEW_CHARS = 500
 COMPONENT_NAME = "codeintel_mcp"
@@ -468,14 +469,13 @@ def _execute_semantic_pipeline(request: _SemanticPipelineRequest) -> _SemanticPi
                     Attrs.QUERY_LEN: len(request.query),
                     Attrs.RETRIEVAL_TOP_K: plan.effective_limit,
                 },
-            ):
-                with as_span("retrieval.embed", **embed_attrs):
-                    query_vector = _embed_query_or_raise(
-                        request.context.vllm_client,
-                        request.query,
-                        request.observation,
-                        request.context.settings.vllm.base_url,
-                    )
+            ), as_span("retrieval.embed", **embed_attrs):
+                query_vector = _embed_query_or_raise(
+                    request.context.vllm_client,
+                    request.query,
+                    request.observation,
+                    request.context.settings.vllm.base_url,
+                )
         with request.context.open_catalog() as catalog:
             with ledger_step(
                 stage="pool_search",
@@ -499,30 +499,32 @@ def _execute_semantic_pipeline(request: _SemanticPipelineRequest) -> _SemanticPi
                 Attrs.CHANNELS_USED: to_label_str(["semantic", "faiss"]),
                 Attrs.RETRIEVAL_TOP_K: plan.effective_limit,
             }
-            with ledger_step(
-                stage="fuse",
-                op="retrieval.hybrid",
-                component="retrieval",
-                attrs={
-                    Attrs.CHANNELS_USED: to_label_str(["semantic", "faiss"]),
-                    Attrs.RETRIEVAL_TOP_K: plan.effective_limit,
-                },
+            with (
+                ledger_step(
+                    stage="fuse",
+                    op="retrieval.hybrid",
+                    component="retrieval",
+                    attrs={
+                        Attrs.CHANNELS_USED: to_label_str(["semantic", "faiss"]),
+                        Attrs.RETRIEVAL_TOP_K: plan.effective_limit,
+                    },
+                ),
+                as_span("retrieval.hybrid", **hybrid_attrs),
             ):
-                with as_span("retrieval.hybrid", **hybrid_attrs):
-                    hybrid_result = _resolve_hybrid_results(
-                        request.context,
-                        _HybridSearchState(
-                            request.query,
-                            faiss_stage.ids,
-                            faiss_stage.scores,
-                            plan.effective_limit,
-                            plan.fanout.faiss_k,
-                            plan.nprobe,
-                            plan.faiss_ready,
-                        ),
-                        limits_metadata,
-                        ("semantic", "faiss"),
-                    )
+                hybrid_result = _resolve_hybrid_results(
+                    request.context,
+                    _HybridSearchState(
+                        request.query,
+                        faiss_stage.ids,
+                        faiss_stage.scores,
+                        plan.effective_limit,
+                        plan.fanout.faiss_k,
+                        plan.nprobe,
+                        plan.faiss_ready,
+                    ),
+                    limits_metadata,
+                    ("semantic", "faiss"),
+                )
             hydration = _run_hydration_stage(request, hybrid_result, catalog)
     _ensure_hydration_success(hydration.exception, request.observation, request.context)
     return _SemanticPipelineResult(
@@ -621,20 +623,23 @@ def _run_hydration_stage(
         else nullcontext()
     )
     hydrate_start = perf_counter()
-    with ledger_step(
-        stage="hydrate",
-        op="hydrate.duckdb",
-        component="retrieval",
-        attrs={"requested": len(hybrid_result.hydration_ids)},
+    with (
+        ledger_step(
+            stage="hydrate",
+            op="hydrate.duckdb",
+            component="retrieval",
+            attrs={"requested": len(hybrid_result.hydration_ids)},
+        ),
+        hydrate_ctx,
+        as_span("hydrate.duckdb", **hydrate_attrs),
     ):
-        with hydrate_ctx, as_span("hydrate.duckdb", **hydrate_attrs):
-            findings, hydrate_exc = _hydrate_findings(
-                request.context,
-                hybrid_result.hydration_ids,
-                hybrid_result.hydration_scores,
-                scope=request.scope,
-                catalog=catalog,
-            )
+        findings, hydrate_exc = _hydrate_findings(
+            request.context,
+            hybrid_result.hydration_ids,
+            hybrid_result.hydration_scores,
+            scope=request.scope,
+            catalog=catalog,
+        )
     duration_ms = round((perf_counter() - hydrate_start) * 1000, 2)
     return _HydrationOutcome(findings, hydrate_exc, duration_ms)
 
@@ -1402,6 +1407,7 @@ def _hydrate_findings(
                 )
             else:
                 records = active_catalog.query_by_ids(valid_ids)
+            annotations = active_catalog.get_structure_annotations(valid_ids)
             chunk_by_id = {int(record["id"]): record for record in records if "id" in record}
 
             for chunk_id, score in zip(chunk_ids, scores, strict=True):
@@ -1426,6 +1432,9 @@ def _hydrate_findings(
                     "why": f"Semantic similarity: {score:.3f}",
                     "chunk_id": int(chunk_id),
                 }
+                finding["explanations"] = _structure_explanations(
+                    annotations.get(int(chunk_id))
+                )
                 findings.append(finding)
         except (RuntimeError, OSError) as exc:
             return findings, exc
@@ -1435,6 +1444,38 @@ def _hydrate_findings(
         return _hydrate(catalog)
     with context.open_catalog() as owned_catalog:
         return _hydrate(owned_catalog)
+
+
+def _structure_explanations(annotation: StructureAnnotations | None) -> ExplanationPayload:
+    """Build structure-aware explanation payload for MCP findings.
+
+    Parameters
+    ----------
+    annotation : StructureAnnotations | None
+        Optional annotation payload produced during hydrate. When omitted, the
+        function returns empty placeholders so clients can still render a
+        consistent structure.
+
+    Returns
+    -------
+    ExplanationPayload
+        Explanation payload containing matched symbols, AST kind, and CST hits
+        derived from ``annotation``.
+    """
+    if annotation is None:
+        return {
+            "matched_symbols": [],
+            "ast_kind": None,
+            "cst_hits": [],
+        }
+    matched = [str(sym) for sym in annotation.symbol_hits]
+    ast_kind = annotation.ast_node_kinds[0] if annotation.ast_node_kinds else None
+    cst_hits = [str(hit) for hit in annotation.cst_matches] if annotation.cst_matches else []
+    return {
+        "matched_symbols": matched,
+        "ast_kind": ast_kind,
+        "cst_hits": cst_hits,
+    }
 
 
 def _build_method(

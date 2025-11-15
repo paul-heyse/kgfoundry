@@ -1,11 +1,11 @@
 {
   "root": "/home/paul/kgfoundry/codeintel_rev",
   "repo_root": "/home/paul/kgfoundry",
-  "module_count": 179,
+  "module_count": 185,
   "symbol_edge_count": 0,
-  "coverage_records": 179,
-  "config_files": 221,
-  "generated_at": "2025-11-14T08:21:58+00:00",
+  "coverage_records": 185,
+  "config_files": 229,
+  "generated_at": "2025-11-15T19:04:04+00:00",
   "tags": {
     "low-coverage": [
       "__init__.py",
@@ -18,6 +18,7 @@
       "app/middleware.py",
       "app/readiness.py",
       "app/routers/__init__.py",
+      "app/routers/diagnostics.py",
       "app/routers/index_admin.py",
       "app/scope_registry.py",
       "app/scope_store.py",
@@ -33,7 +34,9 @@
       "cli/build_indexes.py",
       "cli/indexctl.py",
       "cli/splade.py",
+      "cli/st_embed.py",
       "cli/telemetry.py",
+      "cli/vllm.py",
       "cli/xtr.py",
       "cli_enrich.py",
       "config/__init__.py",
@@ -136,6 +139,7 @@
       "metrics/registry.py",
       "module_utils.py",
       "observability/__init__.py",
+      "observability/execution_ledger.py",
       "observability/flight_recorder.py",
       "observability/ledger.py",
       "observability/logs.py",
@@ -176,12 +180,14 @@
       "runtime/cells.py",
       "runtime/factory_adjustment.py",
       "runtime/request_context.py",
+      "startup/run_startup_pipeline.py",
       "telemetry/__init__.py",
       "telemetry/context.py",
       "telemetry/decorators.py",
       "telemetry/events.py",
       "telemetry/logging.py",
       "telemetry/otel_metrics.py",
+      "telemetry/otel_shim.py",
       "telemetry/reporter.py",
       "telemetry/steps.py",
       "typedness.py",
@@ -253,7 +259,7 @@
       "mcp_server/service_context.py",
       "mcp_server/telemetry.py",
       "metrics/registry.py",
-      "observability/__init__.py",
+      "observability/execution_ledger.py",
       "observability/ledger.py",
       "observability/logs.py",
       "observability/metrics.py",
@@ -281,17 +287,18 @@
       "runtime/cells.py",
       "runtime/factory_adjustment.py",
       "runtime/request_context.py",
-      "telemetry/__init__.py",
       "telemetry/context.py",
       "telemetry/decorators.py",
       "telemetry/events.py",
       "telemetry/otel_metrics.py",
+      "telemetry/otel_shim.py",
       "telemetry/reporter.py",
       "telemetry/steps.py",
       "typing.py"
     ],
     "fastapi": [
       "app/main.py",
+      "app/routers/diagnostics.py",
       "app/routers/index_admin.py"
     ],
     "pydantic": [
@@ -305,21 +312,22 @@
       "io/splade_manager.py",
       "mcp_server/schemas.py",
       "metrics/registry.py",
+      "observability/execution_ledger.py",
       "observability/metrics.py",
       "observability/otel.py",
       "retrieval/mcp_search.py",
       "retrieval/types.py",
-      "telemetry/__init__.py",
       "telemetry/context.py",
+      "telemetry/otel_shim.py",
       "telemetry/reporter.py",
       "typing.py"
     ]
   },
   "tag_counts": {
-    "low-coverage": 179,
+    "low-coverage": 185,
     "public-api": 100,
-    "fastapi": 2,
+    "fastapi": 3,
     "pydantic": 2,
-    "reexport-hub": 14
+    "reexport-hub": 15
   }
 }

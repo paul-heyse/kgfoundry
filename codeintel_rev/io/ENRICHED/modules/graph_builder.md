@@ -29,7 +29,7 @@ Import graph builder utilities.
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 101
+- **cycle_group**: 99
 
 ## Ownership
 

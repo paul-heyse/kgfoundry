@@ -39,7 +39,12 @@ from codeintel_rev.indexing.scip_reader import (
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager, FAISSRuntimeOptions
-from codeintel_rev.io.parquet_store import ParquetWriteOptions, write_chunks_parquet
+from codeintel_rev.io.parquet_store import (
+    ParquetWriteOptions,
+    extract_embeddings,
+    read_chunks_parquet,
+    write_chunks_parquet,
+)
 from codeintel_rev.io.symbol_catalog import (  # new
     SymbolCatalog,
     SymbolDefRow,
@@ -97,12 +102,43 @@ def main() -> None:
         default=None,
         help="Optional JSONL payload for offline evaluation queries.",
     )
+    parser.add_argument(
+        "--phase",
+        choices=("full", "embeddings", "faiss"),
+        default="full",
+        help=(
+            "full: perform chunk→embed→FAISS (default); "
+            "embeddings: stop after writing Parquet/DuckDB; "
+            "faiss: reuse existing Parquet/DuckDB artifacts to rebuild FAISS only."
+        ),
+    )
     args = parser.parse_args()
 
     settings = load_settings()
     paths = _resolve_paths(settings)
+    phase = args.phase
+    if args.incremental and phase != "full":
+        parser.error("--incremental is only supported with --phase=full")
+    if args.eval_after_index and phase != "full":
+        parser.error("--eval-after-index is only supported with --phase=full")
 
     logger.info("Starting indexing for repo root %s", paths.repo_root)
+
+    if phase == "faiss":
+        embeddings = _load_embeddings_from_artifacts(paths)
+        _build_faiss_index(embeddings, paths, settings.index)
+        catalog_count = _initialize_duckdb(
+            paths,
+            materialize=settings.index.duckdb_materialize,
+        )
+        logger.info(
+            "FAISS rebuild complete (phase=faiss); vectors=%s faiss_index=%s duckdb_rows=%s",
+            len(embeddings),
+            paths.faiss_index,
+            catalog_count,
+        )
+        return
+
     scip_index = _load_scip_index(paths)
     grouped_defs = _group_definitions_by_file(scip_index)
     chunks = _chunk_repository(paths, grouped_defs, settings.index.chunk_budget)
@@ -120,16 +156,28 @@ def main() -> None:
         settings.index.preview_max_chars,
     )
 
-    if args.incremental:
-        _update_faiss_index_incremental(chunks, embeddings, paths, settings.index)
-    else:
-        _build_faiss_index(embeddings, paths, settings.index)
-
     catalog_count = _initialize_duckdb(
         paths,
         materialize=settings.index.duckdb_materialize,
     )
-    _write_symbols(paths, scip_index, chunks)
+    if phase == "full":
+        _write_symbols(paths, scip_index, chunks)
+
+    if phase == "embeddings":
+        logger.info(
+            "Embedding phase complete; chunks=%s embeddings=%s parquet=%s duckdb_rows=%s "
+            "(skipped FAISS by request)",
+            len(chunks),
+            len(embeddings),
+            parquet_path,
+            catalog_count,
+        )
+        return
+
+    if args.incremental:
+        _update_faiss_index_incremental(chunks, embeddings, paths, settings.index)
+    else:
+        _build_faiss_index(embeddings, paths, settings.index)
 
     mode_str = "incremental" if args.incremental else "full rebuild"
     logger.info(
@@ -408,6 +456,31 @@ def _build_faiss_index(
     faiss_mgr.add_vectors(embeddings, ids)
     faiss_mgr.save_cpu_index()
     logger.info("Persisted FAISS index to %s", paths.faiss_index)
+
+
+def _load_embeddings_from_artifacts(paths: PipelinePaths) -> NDArrayF32:
+    """Load stored embeddings from Parquet artifacts for FAISS-only runs."""
+
+    parquet_files = sorted(paths.vectors_dir.glob("*.parquet"))
+    if not parquet_files:
+        msg = f"No Parquet shards found under {paths.vectors_dir}; run --phase=embeddings first."
+        raise FileNotFoundError(msg)
+
+    tensors: list[NDArrayF32] = []
+    for shard in parquet_files:
+        table = read_chunks_parquet(shard)
+        vectors = extract_embeddings(table)
+        if vectors.size:
+            tensors.append(vectors)
+
+    if not tensors:
+        msg = f"Could not load embeddings from {paths.vectors_dir}"
+        raise RuntimeError(msg)
+
+    if len(tensors) == 1:
+        return tensors[0]
+
+    return np.vstack(tensors)
 
 
 def _update_faiss_index_incremental(

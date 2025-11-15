@@ -79,7 +79,7 @@ The configuration lifecycle follows this sequence during application startup:
 | `DATA_DIR` | Base directory for data storage | `data` | `data` |
 | `VECTORS_DIR` | Directory containing Parquet files | `data/vectors` | `data/vectors` |
 | `SCIP_INDEX` | Path to SCIP index file | `index.scip` | `index.scip.json` |
-| `VEC_DIM` | Embedding vector dimension | `2560` | `2560` |
+| `VEC_DIM` | Embedding vector dimension | `3584` | `3584` |
 | `CHUNK_BUDGET` | Target chunk size in characters | `2200` | `2200` |
 | `FAISS_NLIST` | Number of IVF centroids | `8192` | `16384` |
 | `FAISS_NPROBE` | Number of IVF cells to probe per live search (higher = better recall, slower queries) | `128` | `256` |

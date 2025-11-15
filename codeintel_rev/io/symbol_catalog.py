@@ -170,8 +170,37 @@ class SymbolCatalog:
         if not rows:
             return
         with self._manager.connection() as conn:
-            conn.register("_tmp_occs", rows)
-            conn.execute("INSERT INTO symbol_occurrences SELECT * FROM _tmp_occs")
+            conn.executemany(
+                """
+                INSERT INTO symbol_occurrences(
+                    symbol,
+                    uri,
+                    start_line,
+                    start_col,
+                    end_line,
+                    end_col,
+                    roles,
+                    kind,
+                    language,
+                    chunk_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                [
+                    (
+                        row.symbol,
+                        row.uri,
+                        row.start_line,
+                        row.start_col,
+                        row.end_line,
+                        row.end_col,
+                        row.roles,
+                        row.kind,
+                        row.language,
+                        row.chunk_id,
+                    )
+                    for row in rows
+                ],
+            )
 
     def bulk_insert_chunk_symbols(self, pairs: Iterable[tuple[int, str]]) -> None:
         """Associate chunks with the symbols they contain."""

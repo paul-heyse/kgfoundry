@@ -29,6 +29,7 @@ corpus size for optimal performance.
 - from **codeintel_rev.errors** import VectorIndexIncompatibleError, VectorIndexStateError
 - from **codeintel_rev.io.duckdb_catalog** import DuckDBCatalog
 - from **codeintel_rev.metrics.registry** import FAISS_ANN_LATENCY_SECONDS, FAISS_BUILD_SECONDS_LAST, FAISS_BUILD_TOTAL, FAISS_INDEX_CODE_SIZE_BYTES, FAISS_INDEX_CUVS_ENABLED, FAISS_INDEX_DIM, FAISS_INDEX_GPU_ENABLED, FAISS_INDEX_SIZE_VECTORS, FAISS_POSTFILTER_DENSITY, FAISS_REFINE_KEPT_RATIO, FAISS_REFINE_LATENCY_SECONDS, FAISS_SEARCH_ERRORS_TOTAL, FAISS_SEARCH_LAST_K, FAISS_SEARCH_LAST_MS, FAISS_SEARCH_LATENCY_SECONDS, FAISS_SEARCH_NPROBE, FAISS_SEARCH_TOTAL, HNSW_SEARCH_EF, set_compile_flags_id, set_factory_id
+- from **codeintel_rev.observability.execution_ledger** import step
 - from **codeintel_rev.observability.otel** import record_span_event
 - from **codeintel_rev.observability.semantic_conventions** import Attrs
 - from **codeintel_rev.observability.timeline** import Timeline, current_timeline
@@ -46,44 +47,44 @@ corpus size for optimal performance.
 
 ## Definitions
 
-- variable: `FaissIndex` (line 65)
-- variable: `np` (line 67)
-- variable: `FaissIndex` (line 68)
-- variable: `pa` (line 74)
-- variable: `pq` (line 75)
-- variable: `LOGGER` (line 77)
-- variable: `logger` (line 78)
-- class: `_LazyFaissProxy` (line 81)
-- variable: `faiss` (line 125)
-- function: `_faiss_module` (line 128)
-- function: `_has_faiss_gpu_support` (line 139)
-- function: `apply_parameters` (line 155)
-- function: `_log_extra` (line 212)
-- class: `FAISSRuntimeOptions` (line 230)
-- class: `SearchRuntimeOverrides` (line 251)
-- class: `RefineSearchConfig` (line 260)
-- class: `_TuningOverrides` (line 269)
-- class: `_SearchExecutionParams` (line 280)
-- class: `_SearchPlan` (line 290)
-- class: `_FAISSIdMapMixin` (line 300)
-- class: `FAISSManager` (line 477)
-- class: `AutoTuner` (line 3717)
-- function: `_coerce_to_int` (line 3847)
-- function: `_configure_direct_map` (line 3870)
-- function: `_set_direct_map_type` (line 3878)
-- function: `_wrap_bool_contains` (line 3921)
-- function: `_wrap_index_contains` (line 3957)
-- function: `_coerce_optional_int` (line 3995)
-- function: `_coerce_optional_float` (line 4029)
-- function: `_parse_tuning_overrides` (line 4063)
-- function: `_persist_tuning_profile` (line 4089)
-- function: `_get_compile_options` (line 4101)
+- variable: `FaissIndex` (line 66)
+- variable: `np` (line 68)
+- variable: `FaissIndex` (line 69)
+- variable: `pa` (line 75)
+- variable: `pq` (line 76)
+- variable: `LOGGER` (line 78)
+- variable: `logger` (line 79)
+- class: `_LazyFaissProxy` (line 82)
+- variable: `faiss` (line 126)
+- function: `_faiss_module` (line 129)
+- function: `_has_faiss_gpu_support` (line 140)
+- function: `apply_parameters` (line 156)
+- function: `_log_extra` (line 213)
+- class: `FAISSRuntimeOptions` (line 231)
+- class: `SearchRuntimeOverrides` (line 252)
+- class: `RefineSearchConfig` (line 261)
+- class: `_TuningOverrides` (line 270)
+- class: `_SearchExecutionParams` (line 281)
+- class: `_SearchPlan` (line 291)
+- class: `_FAISSIdMapMixin` (line 301)
+- class: `FAISSManager` (line 485)
+- class: `AutoTuner` (line 3766)
+- function: `_coerce_to_int` (line 3896)
+- function: `_configure_direct_map` (line 3919)
+- function: `_set_direct_map_type` (line 3927)
+- function: `_wrap_bool_contains` (line 3970)
+- function: `_wrap_index_contains` (line 4006)
+- function: `_coerce_optional_int` (line 4044)
+- function: `_coerce_optional_float` (line 4078)
+- function: `_parse_tuning_overrides` (line 4112)
+- function: `_persist_tuning_profile` (line 4138)
+- function: `_get_compile_options` (line 4150)
 
 ## Graph Metrics
 
 - **fan_in**: 8
-- **fan_out**: 12
-- **cycle_group**: 41
+- **fan_out**: 13
+- **cycle_group**: 42
 
 ## Ownership
 
@@ -123,7 +124,7 @@ AutoTuner, FAISSManager, apply_parameters
 
 ## Hotspot
 
-- score: 3.44
+- score: 3.46
 
 ## Side Effects
 
@@ -131,9 +132,9 @@ AutoTuner, FAISSManager, apply_parameters
 
 ## Complexity
 
-- branches: 262
-- cyclomatic: 263
-- loc: 4118
+- branches: 269
+- cyclomatic: 270
+- loc: 4167
 
 ## Doc Coverage
 

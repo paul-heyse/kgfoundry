@@ -25,9 +25,9 @@ Typed event helpers shared across telemetry modules.
 
 ## Graph Metrics
 
-- **fan_in**: 2
+- **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 21
+- **cycle_group**: 47
 
 ## Ownership
 
@@ -67,7 +67,7 @@ RunCheckpoint, RunEventRecord, TimelineEvent, checkpoint_event, coerce_event, no
 
 ## Hotspot
 
-- score: 1.79
+- score: 1.68
 
 ## Side Effects
 

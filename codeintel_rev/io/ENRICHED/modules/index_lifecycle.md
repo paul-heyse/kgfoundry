@@ -49,17 +49,17 @@ through stable paths such as ``.../current/faiss.index`` and reload when
 - function: `_file_checksum` (line 121)
 - function: `_read_json` (line 131)
 - function: `collect_asset_attrs` (line 138)
-- function: `_attrs_from_meta` (line 172)
-- function: `_attrs_from_idmap` (line 195)
-- function: `_attrs_from_tuning` (line 201)
-- class: `VersionMeta` (line 222)
-- class: `IndexLifecycleManager` (line 247)
+- function: `_attrs_from_meta` (line 176)
+- function: `_attrs_from_idmap` (line 199)
+- function: `_attrs_from_tuning` (line 208)
+- class: `VersionMeta` (line 233)
+- class: `IndexLifecycleManager` (line 258)
 
 ## Graph Metrics
 
 - **fan_in**: 5
 - **fan_out**: 2
-- **cycle_group**: 37
+- **cycle_group**: 39
 
 ## Ownership
 
@@ -109,7 +109,7 @@ IndexAssets, IndexLifecycleManager, LuceneAssets, VersionMeta, collect_asset_att
 
 - branches: 71
 - cyclomatic: 72
-- loc: 761
+- loc: 772
 
 ## Doc Coverage
 

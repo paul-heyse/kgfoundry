@@ -29,7 +29,7 @@ and when exporting the Hypercorn-facing ASGI callable.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 46
+- **cycle_group**: 44
 
 ## Ownership
 

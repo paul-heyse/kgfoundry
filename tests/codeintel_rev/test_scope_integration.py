@@ -79,7 +79,7 @@ def _build_context(repo_root: Path) -> ApplicationContext:
             warp_index_dir="indexes/warp_xtr",
             xtr_dir="data/xtr",
         ),
-        index=IndexConfig(vec_dim=2560, chunk_budget=2200, faiss_nlist=8192, use_cuvs=True),
+        index=IndexConfig(vec_dim=3584, chunk_budget=2200, faiss_nlist=8192, use_cuvs=True),
         limits=ServerLimits(),
         eval=EvalConfig(),
         redis=RedisConfig(

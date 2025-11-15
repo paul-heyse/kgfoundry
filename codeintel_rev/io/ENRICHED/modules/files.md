@@ -23,34 +23,36 @@ Provides file listing, reading, and scope configuration.
 - from **codeintel_rev.io.path_utils** import PathOutsideRepositoryError, resolve_within_repo
 - from **codeintel_rev.mcp_server.schemas** import ScopeIn
 - from **codeintel_rev.mcp_server.scope_utils** import LANGUAGE_EXTENSIONS, get_effective_scope, merge_scope_filters
+- from **codeintel_rev.observability.execution_ledger** import record
+- from **codeintel_rev.observability.execution_ledger** import step
 - from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.app.config_context** import ApplicationContext
 
 ## Definitions
 
-- variable: `LOGGER` (line 35)
-- class: `FileListFilters` (line 39)
-- class: `DirectoryFilters` (line 49)
-- function: `set_scope` (line 58)
-- function: `list_paths` (line 102)
-- function: `_normalize_list_paths_arguments` (line 203)
-- function: `_list_paths_sync` (line 235)
-- function: `_collect_filtered_paths` (line 354)
-- function: `_prune_directories` (line 419)
-- function: `_create_file_entry` (line 441)
-- function: `open_file` (line 498)
-- function: `_resolve_search_root` (line 607)
-- function: `_matches_any` (line 654)
-- function: `_relative_path_str` (line 659)
-- function: `_safe_stat` (line 671)
-- function: `_collect_language_extensions` (line 678)
-- function: `_matches_language` (line 697)
+- variable: `LOGGER` (line 41)
+- class: `FileListFilters` (line 45)
+- class: `DirectoryFilters` (line 55)
+- function: `set_scope` (line 64)
+- function: `list_paths` (line 114)
+- function: `_normalize_list_paths_arguments` (line 244)
+- function: `_list_paths_sync` (line 276)
+- function: `_collect_filtered_paths` (line 395)
+- function: `_prune_directories` (line 460)
+- function: `_create_file_entry` (line 482)
+- function: `open_file` (line 539)
+- function: `_resolve_search_root` (line 658)
+- function: `_matches_any` (line 705)
+- function: `_relative_path_str` (line 710)
+- function: `_safe_stat` (line 722)
+- function: `_collect_language_extensions` (line 729)
+- function: `_matches_language` (line 748)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 7
-- **cycle_group**: 130
+- **fan_out**: 8
+- **cycle_group**: 137
 
 ## Ownership
 
@@ -90,7 +92,7 @@ list_paths, open_file, set_scope
 
 ## Hotspot
 
-- score: 2.56
+- score: 2.63
 
 ## Side Effects
 
@@ -99,9 +101,9 @@ list_paths, open_file, set_scope
 
 ## Complexity
 
-- branches: 49
-- cyclomatic: 50
-- loc: 715
+- branches: 54
+- cyclomatic: 55
+- loc: 766
 
 ## Doc Coverage
 

@@ -35,7 +35,7 @@ Offline hybrid evaluator with oracle reranking and pool exports.
 
 - **fan_in**: 2
 - **fan_out**: 6
-- **cycle_group**: 72
+- **cycle_group**: 77
 
 ## Ownership
 
@@ -75,7 +75,7 @@ EvalConfig, EvalReport, HybridPoolEvaluator
 
 ## Hotspot
 
-- score: 2.44
+- score: 2.46
 
 ## Side Effects
 
@@ -83,9 +83,9 @@ EvalConfig, EvalReport, HybridPoolEvaluator
 
 ## Complexity
 
-- branches: 27
-- cyclomatic: 28
-- loc: 337
+- branches: 29
+- cyclomatic: 30
+- loc: 336
 
 ## Doc Coverage
 

@@ -76,7 +76,7 @@ with suppress(AttributeError, TypeError):  # pragma: no cover - ndarray may forb
     VectorArray.__doc__ = (
         "Type alias for float32 vector arrays used in FAISS operations.\n\n"
         "All vectors must be normalized to unit length for inner-product search.\n"
-        "Dimensions are typically 2560 for dense embeddings or configurable for\n"
+        "Dimensions are typically 3584 for dense embeddings or configurable for\n"
         "sparse representations."
     )
 
@@ -276,7 +276,7 @@ class FaissModuleProtocol(Protocol):
         Examples
         --------
         >>> # Create quantized index for large-scale search
-        >>> index = faiss.index_factory(2560, "OPQ64,IVF8192,PQ64", faiss.METRIC_INNER_PRODUCT)
+        >>> index = faiss.index_factory(3584, "OPQ64,IVF8192,PQ64", faiss.METRIC_INNER_PRODUCT)
         """
         ...
 

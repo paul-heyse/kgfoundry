@@ -80,7 +80,7 @@ codeintel_rev.app.middleware : get_session_id for retrieving session ID
 
 - **fan_in**: 5
 - **fan_out**: 4
-- **cycle_group**: 41
+- **cycle_group**: 42
 
 ## Ownership
 

@@ -37,7 +37,7 @@ The FAISS index type is automatically selected based on corpus size:
 - from **codeintel_rev.io.duckdb_catalog** import DuckDBCatalog
 - from **codeintel_rev.io.duckdb_manager** import DuckDBManager
 - from **codeintel_rev.io.faiss_manager** import FAISSManager, FAISSRuntimeOptions
-- from **codeintel_rev.io.parquet_store** import ParquetWriteOptions, write_chunks_parquet
+- from **codeintel_rev.io.parquet_store** import ParquetWriteOptions, extract_embeddings, read_chunks_parquet, write_chunks_parquet
 - from **codeintel_rev.io.symbol_catalog** import SymbolCatalog, SymbolDefRow, SymbolOccurrenceRow
 - from **codeintel_rev.io.vllm_client** import VLLMClient
 - from **codeintel_rev.typing** import NDArrayF32
@@ -45,31 +45,32 @@ The FAISS index type is automatically selected based on corpus size:
 
 ## Definitions
 
-- variable: `np` (line 54)
-- variable: `logger` (line 57)
-- variable: `EMBED_PREVIEW_CHARS` (line 59)
-- variable: `TRAINING_LIMIT` (line 60)
-- class: `PipelinePaths` (line 64)
-- function: `main` (line 74)
-- function: `_resolve_paths` (line 149)
-- function: `_load_scip_index` (line 179)
-- function: `_group_definitions_by_file` (line 206)
-- function: `_chunk_repository` (line 227)
-- function: `_embed_chunks` (line 279)
-- function: `_write_parquet` (line 309)
-- function: `_build_faiss_index` (line 352)
-- function: `_update_faiss_index_incremental` (line 413)
-- function: `_runtime_options_from_index` (line 522)
-- function: `_resolve_nlist` (line 573)
-- function: `_run_offline_evaluation` (line 591)
-- function: `_initialize_duckdb` (line 626)
-- function: `_write_symbols` (line 657)
+- variable: `np` (line 59)
+- variable: `logger` (line 62)
+- variable: `EMBED_PREVIEW_CHARS` (line 64)
+- variable: `TRAINING_LIMIT` (line 65)
+- class: `PipelinePaths` (line 69)
+- function: `main` (line 79)
+- function: `_resolve_paths` (line 197)
+- function: `_load_scip_index` (line 227)
+- function: `_group_definitions_by_file` (line 254)
+- function: `_chunk_repository` (line 275)
+- function: `_embed_chunks` (line 327)
+- function: `_write_parquet` (line 357)
+- function: `_build_faiss_index` (line 400)
+- function: `_load_embeddings_from_artifacts` (line 461)
+- function: `_update_faiss_index_incremental` (line 486)
+- function: `_runtime_options_from_index` (line 595)
+- function: `_resolve_nlist` (line 646)
+- function: `_run_offline_evaluation` (line 664)
+- function: `_initialize_duckdb` (line 699)
+- function: `_write_symbols` (line 730)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 13
-- **cycle_group**: 66
+- **cycle_group**: 71
 
 ## Ownership
 
@@ -105,7 +106,7 @@ The FAISS index type is automatically selected based on corpus size:
 
 ## Hotspot
 
-- score: 2.71
+- score: 2.79
 
 ## Side Effects
 
@@ -113,9 +114,9 @@ The FAISS index type is automatically selected based on corpus size:
 
 ## Complexity
 
-- branches: 38
-- cyclomatic: 39
-- loc: 728
+- branches: 50
+- cyclomatic: 51
+- loc: 801
 
 ## Doc Coverage
 
@@ -128,7 +129,7 @@ The FAISS index type is automatically selected based on corpus size:
 - `_embed_chunks` (function): summary=yes, params=ok, examples=no — Generate embeddings for the supplied chunks using vLLM.
 - `_write_parquet` (function): summary=yes, params=ok, examples=no — Persist chunk metadata and embeddings to Parquet.
 - `_build_faiss_index` (function): summary=yes, params=ok, examples=no — Train and persist the FAISS index with adaptive type selection.
-- `_update_faiss_index_incremental` (function): summary=yes, params=ok, examples=no — Update FAISS index incrementally by adding new chunks to secondary index.
+- `_load_embeddings_from_artifacts` (function): summary=yes, params=mismatch, examples=no — Load stored embeddings from Parquet artifacts for FAISS-only runs.
 
 ## Tags
 

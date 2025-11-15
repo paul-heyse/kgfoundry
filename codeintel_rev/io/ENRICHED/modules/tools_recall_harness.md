@@ -63,7 +63,7 @@ Notes
 
 - **fan_in**: 0
 - **fan_out**: 0
-- **cycle_group**: 156
+- **cycle_group**: 162
 
 ## Ownership
 
@@ -116,6 +116,7 @@ Notes
 - patches/OpenTelemetry_ExtensionPhase2.md
 - patches/CST_Data_Build.md
 - patches/SCIP+CST+AST pipeline hardening.md
+- patches/MCP_through_search_hardening_phase3.md
 - patches/OpenTelemetry_ExtensionPhase4.md
 - patches/Typing_gating_follow_small_architecture_changes.md
 - patches/FAISS_detailed_implementation_plan.md
@@ -124,6 +125,8 @@ Notes
 - patches/OpenTelemetry_Reconfig_for_efficient_libraries_phase2.md
 - patches/Front_End_Hardening_Phase2.md
 - patches/Enrich_Extension.md
+- patches/Startup - Chunking through Embedding and Storage.md
+- patches/Telemetry_Execution_Ledger.md
 - patches/Networking_Implementation.md
 - patches/FAISS-Hardening.md
 - patches/Type_Gating_Factory_Scope_phase2.md

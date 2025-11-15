@@ -29,7 +29,7 @@ Lightweight search helpers used by the in-process MCP harness.
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 141
+- **cycle_group**: 148
 
 ## Ownership
 

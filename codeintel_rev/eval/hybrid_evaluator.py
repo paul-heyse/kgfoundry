@@ -275,20 +275,19 @@ class HybridPoolEvaluator:
         for rank_idx, (chunk_id, score) in enumerate(zip(ids, scores, strict=True), start=1):
             chunk_key = int(chunk_id)
             info = self._structure_cache.get(chunk_key)
-            meta = {
-                "uri": info.uri if info else "",
-                "symbol_hits": list(info.symbol_hits) if info else [],
-                "ast_node_kinds": list(info.ast_node_kinds) if info else [],
-                "cst_matches": list(info.cst_matches) if info else [],
+            reason = {
+                "matched_symbols": list(info.symbol_hits) if info and info.symbol_hits else [],
+                "ast_kind": info.ast_node_kinds[0] if info and info.ast_node_kinds else None,
+                "cst_hits": list(info.cst_matches) if info and info.cst_matches else None,
             }
             pool.append(
                 SearchPoolRow(
                     query_id=query_id,
                     channel=channel,
                     rank=rank_idx,
-                    id=chunk_key,
+                    chunk_id=chunk_key,
                     score=float(score),
-                    meta=meta,
+                    reason=reason,
                 )
             )
 

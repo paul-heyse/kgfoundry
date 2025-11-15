@@ -19,6 +19,8 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 - from **typing** import TYPE_CHECKING, Protocol
 - from **(absolute)** import codeintel_rev.observability.metrics
 - from **codeintel_rev.evaluation.hybrid_pool** import Hit, HybridPoolEvaluator
+- from **codeintel_rev.observability.execution_ledger** import record
+- from **codeintel_rev.observability.execution_ledger** import step
 - from **codeintel_rev.observability.otel** import record_span_event
 - from **codeintel_rev.observability.semantic_conventions** import Attrs, to_label_str
 - from **codeintel_rev.observability.timeline** import Timeline, current_timeline
@@ -38,25 +40,25 @@ Hybrid retrieval utilities combining FAISS, BM25, and SPLADE.
 
 ## Definitions
 
-- variable: `LOGGER` (line 41)
-- class: `_LuceneHit` (line 44)
-- class: `_LuceneSearcher` (line 49)
-- class: `BM25Rm3Config` (line 64)
-- class: `BM25SearchProvider` (line 73)
-- class: `SpladeSearchProvider` (line 212)
-- class: `HybridSearchTuning` (line 430)
-- class: `HybridSearchOptions` (line 438)
-- class: `_MethodStats` (line 448)
-- class: `_FusionContext` (line 457)
-- class: `_SearchTelemetryContext` (line 471)
-- class: `_FusionWork` (line 477)
-- class: `HybridSearchEngine` (line 491)
+- variable: `LOGGER` (line 47)
+- class: `_LuceneHit` (line 50)
+- class: `_LuceneSearcher` (line 55)
+- class: `BM25Rm3Config` (line 70)
+- class: `BM25SearchProvider` (line 79)
+- class: `SpladeSearchProvider` (line 250)
+- class: `HybridSearchTuning` (line 522)
+- class: `HybridSearchOptions` (line 530)
+- class: `_MethodStats` (line 540)
+- class: `_FusionContext` (line 549)
+- class: `_SearchTelemetryContext` (line 563)
+- class: `_FusionWork` (line 569)
+- class: `HybridSearchEngine` (line 583)
 
 ## Graph Metrics
 
 - **fan_in**: 5
-- **fan_out**: 18
-- **cycle_group**: 41
+- **fan_out**: 19
+- **cycle_group**: 42
 
 ## Ownership
 
@@ -96,7 +98,7 @@ BM25SearchProvider, HybridResultDoc, HybridSearchEngine, HybridSearchOptions, Hy
 
 ## Hotspot
 
-- score: 3.30
+- score: 3.33
 
 ## Side Effects
 
@@ -104,9 +106,9 @@ BM25SearchProvider, HybridResultDoc, HybridSearchEngine, HybridSearchOptions, Hy
 
 ## Complexity
 
-- branches: 139
-- cyclomatic: 140
-- loc: 1482
+- branches: 142
+- cyclomatic: 143
+- loc: 1626
 
 ## Doc Coverage
 

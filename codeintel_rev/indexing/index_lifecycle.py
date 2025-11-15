@@ -159,13 +159,17 @@ def collect_asset_attrs(assets: IndexAssets) -> dict[str, object]:
     """
     attrs: dict[str, object] = {}
     attrs.setdefault("faiss_bytes_sha256", _file_checksum(assets.faiss_index))
+    attrs.setdefault("duckdb_bytes_sha256", _file_checksum(assets.duckdb_path))
+    attrs.setdefault("scip_bytes_sha256", _file_checksum(assets.scip_index))
     attrs.update(_attrs_from_meta(assets.faiss_index.with_suffix(".meta.json")))
     attrs.update(_attrs_from_idmap(assets.faiss_idmap))
     attrs.update(_attrs_from_tuning(assets.tuning_profile, attrs))
     if assets.faiss_idmap and assets.faiss_idmap.exists():
         attrs.setdefault("faiss_idmap", assets.faiss_idmap.name)
+        attrs.setdefault("faiss_idmap_path", assets.faiss_idmap.name)
     if assets.tuning_profile and assets.tuning_profile.exists():
         attrs.setdefault("faiss_profile", assets.tuning_profile.name)
+        attrs.setdefault("faiss_tuning_profile_path", assets.tuning_profile.name)
     return attrs
 
 
@@ -195,7 +199,10 @@ def _attrs_from_meta(meta_path: Path) -> dict[str, object]:
 def _attrs_from_idmap(idmap_path: Path | None) -> dict[str, object]:
     if idmap_path is None or not idmap_path.exists():
         return {}
-    return {"faiss_idmap_checksum": _file_checksum(idmap_path)}
+    return {
+        "faiss_idmap_checksum": _file_checksum(idmap_path),
+        "faiss_idmap_path": idmap_path.name,
+    }
 
 
 def _attrs_from_tuning(
@@ -207,7 +214,11 @@ def _attrs_from_tuning(
     payload = _read_json(tuning_path)
     if not payload:
         return {}
-    attrs: dict[str, object] = {"faiss_tuning_profile": payload}
+    attrs: dict[str, object] = {
+        "faiss_tuning_profile": payload,
+        "faiss_tuning_profile_checksum": _file_checksum(tuning_path),
+        "faiss_tuning_profile_path": tuning_path.name,
+    }
     if "param_str" in payload:
         attrs["faiss_parameters"] = payload["param_str"]
     if "refine_k_factor" in payload:

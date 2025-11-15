@@ -135,7 +135,7 @@ diff --git a/codeintel_rev/io/parquet_store.py b/codeintel_rev/io/parquet_store.
  
 -    start_id: int = 0
 +    start_id: int = 0
-     vec_dim: int = 2560
+     vec_dim: int = 3584
      preview_max_chars: int = 240
 +    # New: id strategy ("sequence" keeps current behavior).
 +    # "stable_hash" uses blake2b(uri,start_byte,end_byte) for deterministic ids.

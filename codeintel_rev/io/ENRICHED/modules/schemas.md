@@ -20,33 +20,34 @@ TypedDict provides automatic JSON Schema generation for FastMCP tools.
 - class: `ScopeIn` (line 35)
 - class: `Match` (line 92)
 - class: `Location` (line 130)
-- class: `Finding` (line 168)
-- class: `MethodInfo` (line 218)
-- class: `StageInfo` (line 256)
-- class: `SearchFilterPayload` (line 268)
-- class: `SearchToolArgs` (line 290)
-- class: `SearchExplainability` (line 299)
-- class: `SearchResultMetadata` (line 308)
-- class: `SearchResultItem` (line 321)
-- class: `SearchStructuredContent` (line 333)
-- class: `FetchToolArgs` (line 342)
-- class: `FetchObjectMetadata` (line 349)
-- class: `FetchObject` (line 360)
-- class: `FetchStructuredContent` (line 370)
-- class: `AnswerEnvelope` (line 376)
-- class: `SymbolInfo` (line 480)
-- class: `GitBlameEntry` (line 511)
-- class: `OpenFileResponse` (line 544)
-- class: `ListPathsResponse` (line 568)
-- class: `BlameRangeResponse` (line 589)
-- class: `FileHistoryResponse` (line 604)
-- class: `SearchTextResponse` (line 619)
+- class: `ExplanationPayload` (line 168)
+- class: `Finding` (line 176)
+- class: `MethodInfo` (line 230)
+- class: `StageInfo` (line 268)
+- class: `SearchFilterPayload` (line 280)
+- class: `SearchToolArgs` (line 302)
+- class: `SearchExplainability` (line 311)
+- class: `SearchResultMetadata` (line 320)
+- class: `SearchResultItem` (line 333)
+- class: `SearchStructuredContent` (line 345)
+- class: `FetchToolArgs` (line 354)
+- class: `FetchObjectMetadata` (line 361)
+- class: `FetchObject` (line 372)
+- class: `FetchStructuredContent` (line 382)
+- class: `AnswerEnvelope` (line 388)
+- class: `SymbolInfo` (line 492)
+- class: `GitBlameEntry` (line 523)
+- class: `OpenFileResponse` (line 556)
+- class: `ListPathsResponse` (line 580)
+- class: `BlameRangeResponse` (line 601)
+- class: `FileHistoryResponse` (line 616)
+- class: `SearchTextResponse` (line 631)
 
 ## Graph Metrics
 
 - **fan_in**: 13
 - **fan_out**: 1
-- **cycle_group**: 30
+- **cycle_group**: 31
 
 ## Ownership
 
@@ -96,7 +97,7 @@ AnswerEnvelope, BaseErrorFields, BlameRangeResponse, FetchObject, FetchObjectMet
 
 - branches: 0
 - cyclomatic: 1
-- loc: 666
+- loc: 678
 
 ## Doc Coverage
 
@@ -104,12 +105,12 @@ AnswerEnvelope, BaseErrorFields, BlameRangeResponse, FetchObject, FetchObjectMet
 - `ScopeIn` (class): summary=yes, examples=no — Query scope parameters for filtering search results.
 - `Match` (class): summary=yes, examples=no — Search match result from text or semantic search.
 - `Location` (class): summary=yes, examples=no — Source code location with precise line and column positions.
+- `ExplanationPayload` (class): summary=yes, examples=no — Structure-aware explanation metadata attached to findings.
 - `Finding` (class): summary=yes, examples=no — Generic finding result from code intelligence queries.
 - `MethodInfo` (class): summary=yes, examples=no — Retrieval method metadata for search operations.
 - `StageInfo` (class): summary=yes, examples=no — Timing metadata for an individual retrieval stage.
 - `SearchFilterPayload` (class): summary=yes, examples=no — Structured filter payload for Deep Research search requests.
 - `SearchToolArgs` (class): summary=yes, examples=no — Input schema for the MCP ``search`` tool.
-- `SearchExplainability` (class): summary=yes, examples=no — Explainability payload attached to each search result.
 
 ## Tags
 

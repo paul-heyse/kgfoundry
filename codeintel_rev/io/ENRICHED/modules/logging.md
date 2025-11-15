@@ -20,9 +20,9 @@ Structured logging bridge + optional OTLP exporter.
 
 ## Graph Metrics
 
-- **fan_in**: 2
+- **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 20
+- **cycle_group**: 57
 
 ## Ownership
 
@@ -58,7 +58,7 @@ Structured logging bridge + optional OTLP exporter.
 
 ## Hotspot
 
-- score: 1.52
+- score: 1.40
 
 ## Side Effects
 

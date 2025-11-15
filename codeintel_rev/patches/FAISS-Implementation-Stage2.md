@@ -499,7 +499,7 @@ new file mode 100644
 from pathlib import Path
 from codeintel_rev.io.faiss_manager import FAISSManager
 
-fm = FAISSManager(index_path=Path(".../faiss.index"), vec_dim=2560)
+fm = FAISSManager(index_path=Path(".../faiss.index"), vec_dim=3584)
 fm.load_cpu_index()
 written = fm.export_idmap(Path(".../faiss.idmap.parquet"))
 print("rows:", written)
@@ -532,7 +532,7 @@ from codeintel_rev.io.coderank_embedder import CodeRankEmbedder
 
 embedder = CodeRankEmbedder(settings=...)  # your existing settings object
 evalset = [EvalQuery(qid=r["qid"], text=r["query"], positive_ids=tuple(r["positive_ids"])) for r in ...]  # from JSONL
-hp = HybridPoolEvaluator(fm, catalog, vec_dim=2560)
+hp = HybridPoolEvaluator(fm, catalog, vec_dim=3584)
 grid = hp.evaluate(embedder.encode_queries, evalset, k=10, nprobes=(32,64,128), efs=(96,128), k_factors=(1.0,1.5,2.0))
 ```
 
@@ -565,13 +565,13 @@ from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 @pytest.mark.slow
 def test_eval_runs_with_small_pool(tmp_path: Path):
     # assumes tiny index + duckdb fixtures are present
-    fm = FAISSManager(index_path=Path(".../faiss.index"), vec_dim=2560)
+    fm = FAISSManager(index_path=Path(".../faiss.index"), vec_dim=3584)
     fm.load_cpu_index()
     cat = DuckDBCatalog(db_path=Path(".../chunks.duckdb"), vectors_dir=Path(".../parquet"))
-    hp = HybridPoolEvaluator(fm, cat, vec_dim=2560)
+    hp = HybridPoolEvaluator(fm, cat, vec_dim=3584)
     evalset = [EvalQuery(qid="q1", text="init database connection", positive_ids=tuple())]
     # Embedder mocked as lambda; supply 1xD vector
-    embed_fn = lambda qs: np.random.randn(len(qs), 2560).astype(np.float32)
+    embed_fn = lambda qs: np.random.randn(len(qs), 3584).astype(np.float32)
     pts = hp.evaluate(embed_fn, evalset, k=5, nprobes=(32,), efs=(96,), k_factors=(1.5,))
     assert pts and pts[0].k == 5
 ```

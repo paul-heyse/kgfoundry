@@ -5,7 +5,11 @@ from pathlib import Path
 
 import pytest
 from codeintel_rev.errors import RuntimeLifecycleError
-from codeintel_rev.indexing.index_lifecycle import IndexAssets, IndexLifecycleManager
+from codeintel_rev.indexing.index_lifecycle import (
+    IndexAssets,
+    IndexLifecycleManager,
+    collect_asset_attrs,
+)
 
 
 def _make_assets(tmp_path: Path, prefix: str = "a") -> IndexAssets:
@@ -73,7 +77,7 @@ def test_write_attrs_updates_manifest(tmp_path: Path) -> None:
     manager.prepare("v3", assets, attrs={"initial": True})
     manager.publish("v3")
 
-    manifest_path = manager.versions_dir / "v3" / "version.json"
+    manifest_path = manager.versions_dir / "v3" / "manifest.json"
     initial = json.loads(manifest_path.read_text())
     assert initial["attrs"]["initial"] is True
 
@@ -81,3 +85,24 @@ def test_write_attrs_updates_manifest(tmp_path: Path) -> None:
     updated = json.loads(manifest_path.read_text())
     assert updated["attrs"]["faiss_factory"] == "Flat"
     assert updated["attrs"]["initial"] is False
+
+
+def test_collect_asset_attrs_includes_checksums(tmp_path: Path) -> None:
+    assets = _make_assets(tmp_path, "meta")
+    idmap = tmp_path / "meta" / "faiss.idmap.parquet"
+    idmap.write_bytes(b"idmap")
+    tuning = tmp_path / "meta" / "faiss.tuning.json"
+    tuning.write_text("{}", encoding="utf-8")
+    assets = IndexAssets(
+        faiss_index=assets.faiss_index,
+        duckdb_path=assets.duckdb_path,
+        scip_index=assets.scip_index,
+        faiss_idmap=idmap,
+        tuning_profile=tuning,
+    )
+    attrs = collect_asset_attrs(assets)
+    assert "faiss_bytes_sha256" in attrs
+    assert "duckdb_bytes_sha256" in attrs
+    assert "scip_bytes_sha256" in attrs
+    assert attrs["faiss_idmap_path"] == "faiss.idmap.parquet"
+    assert attrs["faiss_tuning_profile_path"] == "faiss.tuning.json"

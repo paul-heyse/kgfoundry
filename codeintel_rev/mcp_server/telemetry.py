@@ -144,53 +144,31 @@ def tool_operation_scope(
                 ),
             ):
                 try:
-                    with timeline.operation(operation_name, **operation_attrs):
-                        with ledger_step(
+                    with (
+                        timeline.operation(operation_name, **operation_attrs),
+                        ledger_step(
                             stage="request",
                             op="dispatch",
                             component="mcp.adapter",
                             attrs=step_attrs,
-                        ):
-                            yield timeline
+                        ),
+                    ):
+                        yield timeline
                 except BaseException as exc:
-                    ledger_status = f"error:{type(exc).__name__}"
-                    ledger_stop_reason = f"{type(exc).__name__}: {exc}"
-                    record_span_event(
-                        "mcp.tool.error",
-                        tool=tool_name,
-                        error=str(exc),
-                    )
-                    finalize_run(
-                        timeline.session_id,
-                        timeline.run_id,
-                        status="error",
-                        stop_reason=f"{type(exc).__name__}: {exc}",
-                        finished_at=time.time(),
-                    )
-                    _maybe_render_report(timeline)
-                    MCP_REQUEST_LATENCY_SECONDS.record(
-                        time.perf_counter() - timing_start,
-                        {"tool": tool_name, "status": "error"},
+                    duration = time.perf_counter() - timing_start
+                    ledger_status, ledger_stop_reason = _record_tool_error(
+                        timeline=timeline,
+                        tool_name=tool_name,
+                        exc=exc,
+                        duration=duration,
                     )
                     raise
                 else:
-                    ledger_status = "complete"
                     duration = time.perf_counter() - timing_start
-                    record_span_event(
-                        "mcp.tool.complete",
-                        tool=tool_name,
-                        duration_ms=int(duration * 1000),
-                    )
-                    finalize_run(
-                        timeline.session_id,
-                        timeline.run_id,
-                        status="complete",
-                        finished_at=time.time(),
-                    )
-                    _maybe_render_report(timeline)
-                    MCP_REQUEST_LATENCY_SECONDS.record(
-                        duration,
-                        {"tool": tool_name, "status": "complete"},
+                    ledger_status = _record_tool_success(
+                        timeline=timeline,
+                        tool_name=tool_name,
+                        duration=duration,
                     )
         finally:
             ledger_end_run(status=ledger_status, stop_reason=ledger_stop_reason)
@@ -205,3 +183,60 @@ def _maybe_render_report(timeline: Timeline) -> None:
         render_run_report(timeline)
     except (OSError, RuntimeError, ValueError) as exc:  # pragma: no cover - best-effort reporting
         LOGGER.debug("Failed to render run report", exc_info=exc)
+
+
+def _record_tool_error(
+    *,
+    timeline: Timeline,
+    tool_name: str,
+    exc: BaseException,
+    duration: float,
+) -> tuple[str, str]:
+    """Record telemetry for an errored tool invocation.
+
+    Returns
+    -------
+    tuple[str, str]
+        Tuple of ledger status string and stop reason.
+    """
+    stop_reason = f"{type(exc).__name__}: {exc}"
+    record_span_event("mcp.tool.error", tool=tool_name, error=str(exc))
+    finalize_run(
+        timeline.session_id,
+        timeline.run_id,
+        status="error",
+        stop_reason=stop_reason,
+        finished_at=time.time(),
+    )
+    _maybe_render_report(timeline)
+    MCP_REQUEST_LATENCY_SECONDS.record(duration, {"tool": tool_name, "status": "error"})
+    return f"error:{type(exc).__name__}", stop_reason
+
+
+def _record_tool_success(
+    *,
+    timeline: Timeline,
+    tool_name: str,
+    duration: float,
+) -> str:
+    """Record telemetry for a successful tool invocation.
+
+    Returns
+    -------
+    str
+        Ledger status string for the completed run.
+    """
+    record_span_event(
+        "mcp.tool.complete",
+        tool=tool_name,
+        duration_ms=int(duration * 1000),
+    )
+    finalize_run(
+        timeline.session_id,
+        timeline.run_id,
+        status="complete",
+        finished_at=time.time(),
+    )
+    _maybe_render_report(timeline)
+    MCP_REQUEST_LATENCY_SECONDS.record(duration, {"tool": tool_name, "status": "complete"})
+    return "complete"

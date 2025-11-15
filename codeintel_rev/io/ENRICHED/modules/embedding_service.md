@@ -45,13 +45,13 @@ Embedding provider abstractions for chunk ingestion and runtime services.
 - class: `VLLMProvider` (line 693)
 - function: `get_embedding_provider` (line 718)
 - class: `HFEmbeddingProvider` (line 805)
-- variable: `EmbeddingProviderBase` (line 877)
+- variable: `EmbeddingProviderBase` (line 881)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 4
-- **cycle_group**: 64
+- **cycle_group**: 69
 
 ## Ownership
 
@@ -103,9 +103,9 @@ NotImplementedError
 
 ## Complexity
 
-- branches: 63
-- cyclomatic: 64
-- loc: 878
+- branches: 64
+- cyclomatic: 65
+- loc: 882
 
 ## Doc Coverage
 

@@ -1,0 +1,42 @@
+{
+  "version": "1.1.0",
+  "command_path": [
+    "-"
+  ],
+  "operation": "-",
+  "command": "-",
+  "subcommand": null,
+  "run_id": "47dac2",
+  "correlation_id": "3136d2",
+  "started_at": "2025-11-14T12:37:18Z",
+  "status": "error",
+  "args": [
+    "model=None",
+    "base_url=None",
+    "host=None",
+    "port=None",
+    "hf_cache=/home/paul/.cache/huggingface",
+    "offline=True",
+    "tensor_parallel_size=None",
+    "gpu_memory_utilization=0.9",
+    "max_num_batched_tokens=65536",
+    "served_model_name=None",
+    "no_wait=False",
+    "print_cmd=True"
+  ],
+  "env": {
+    "PYTHONPATH": "",
+    "VIRTUAL_ENV": "/home/paul/kgfoundry/.venv",
+    "CUDA_VISIBLE_DEVICES": ""
+  },
+  "artifacts": [],
+  "problem": {
+    "type": "urn:kgf:problem:timeouterror",
+    "title": "TimeoutError",
+    "detail": "vLLM server did not become healthy at http://127.0.0.1:8001/v1/health in 120.0s. Last error: ConnectError('[Errno 111] Connection refused')",
+    "status": 500,
+    "instance": "urn:kgf:op:-:run:47dac2"
+  },
+  "finished_at": "2025-11-14T12:39:19Z",
+  "duration_ms": 120392
+}

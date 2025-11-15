@@ -1,0 +1,794 @@
+{
+  "\"builtins.__import__\".fake_import": [
+    [
+      "tests/codeintel_rev/test_typing_gate_import.py",
+      31,
+      "test_gate_import_missing_module_includes_extra_hint"
+    ]
+  ],
+  "\"codeintel_rev.app.config_context.HybridSearchEngine\"._factory": [
+    [
+      "tests/app/test_lifespan_runtime_cleanup.py",
+      126,
+      "test_close_all_runtimes_idempotent"
+    ]
+  ],
+  "\"codeintel_rev.app.main.ReadinessProbe\"._probe_factory": [
+    [
+      "tests/app/test_lifespan_runtime_cleanup.py",
+      92,
+      "test_lifespan_preload_and_cleanup"
+    ]
+  ],
+  "\"codeintel_rev.app.main.warmup_gpu\"._fake_warmup": [
+    [
+      "tests/app/test_lifespan_runtime_cleanup.py",
+      91,
+      "test_lifespan_preload_and_cleanup"
+    ]
+  ],
+  "\"codeintel_rev.cli.indexctl._count_idmap_rows\".lambda _p: 4": [
+    [
+      "tests/cli/test_indexctl_health.py",
+      94,
+      "test_health_command_reports_ok"
+    ]
+  ],
+  "\"codeintel_rev.cli.indexctl._duckdb_catalog\".lambda *_: catalog": [
+    [
+      "tests/cli/test_indexctl_health.py",
+      92,
+      "test_health_command_reports_ok"
+    ]
+  ],
+  "\"codeintel_rev.cli.indexctl._duckdb_embedding_dim\".lambda _c: 4": [
+    [
+      "tests/cli/test_indexctl_health.py",
+      93,
+      "test_health_command_reports_ok"
+    ]
+  ],
+  "\"codeintel_rev.cli.indexctl._faiss_manager\".lambda *_: manager": [
+    [
+      "tests/cli/test_indexctl_health.py",
+      91,
+      "test_health_command_reports_ok"
+    ]
+  ],
+  "\"codeintel_rev.cli.indexctl._get_settings\".lambda: _Settings(tmp_path)": [
+    [
+      "tests/cli/test_indexctl_health.py",
+      90,
+      "test_health_command_reports_ok"
+    ]
+  ],
+  "\"codeintel_rev.cli.indexctl.get_embedding_provider\"._provider_factory": [
+    [
+      "tests/cli/test_indexctl_embeddings.py",
+      187,
+      "stub_provider"
+    ]
+  ],
+  "\"codeintel_rev.enrich.duckdb_store._USE_NATIVE_JSON\".True": [
+    [
+      "tests/enrich/test_duckdb_ingest.py",
+      16,
+      "test_ingest_modules_jsonl_native_path"
+    ]
+  ],
+  "\"codeintel_rev.io.bm25_manager._detect_pyserini_version\".lambda: \"test\"": [
+    [
+      "tests/codeintel_rev/test_bm25_manager.py",
+      139,
+      "test_build_index_writes_metadata"
+    ]
+  ],
+  "\"codeintel_rev.io.bm25_manager._run_pyserini_index\".fake_run": [
+    [
+      "tests/codeintel_rev/test_bm25_manager.py",
+      138,
+      "test_build_index_writes_metadata"
+    ]
+  ],
+  "\"codeintel_rev.io.coderank_embedder.gate_import\"._gate_import": [
+    [
+      "tests/codeintel_rev/io/test_coderank_embedder.py",
+      29,
+      "_patch_gate"
+    ]
+  ],
+  "\"codeintel_rev.io.duckdb_manager.duckdb\".duckdb_stub": [
+    [
+      "tests/io/test_duckdb_manager.py",
+      26,
+      "test_duckdb_manager_instruments_sql"
+    ]
+  ],
+  "\"codeintel_rev.io.duckdb_manager.duckdb.connect\"._instrumented_connect": [
+    [
+      "tests/codeintel_rev/test_duckdb_manager.py",
+      134,
+      "test_connection_pool_reuses_connections"
+    ]
+  ],
+  "\"codeintel_rev.io.splade_manager._detect_pyserini_version\".lambda: \"test\"": [
+    [
+      "tests/codeintel_rev/test_splade_manager.py",
+      281,
+      "test_build_index_persists_metadata"
+    ]
+  ],
+  "\"codeintel_rev.io.splade_manager._require_export_helpers\".fake_export_helpers": [
+    [
+      "tests/codeintel_rev/test_splade_manager.py",
+      145,
+      "test_export_onnx_writes_metadata"
+    ]
+  ],
+  "\"codeintel_rev.io.splade_manager._require_sparse_encoder\".lambda: _StubEncoder": [
+    [
+      "tests/codeintel_rev/test_splade_manager.py",
+      130,
+      "test_export_onnx_writes_metadata"
+    ],
+    [
+      "tests/codeintel_rev/test_splade_manager.py",
+      191,
+      "test_encode_corpus_writes_vectors"
+    ],
+    [
+      "tests/codeintel_rev/test_splade_manager.py",
+      222,
+      "test_benchmark_queries_reports_latency"
+    ]
+  ],
+  "\"codeintel_rev.io.splade_manager.perf_counter\".lambda: next(timings)": [
+    [
+      "tests/codeintel_rev/test_splade_manager.py",
+      227,
+      "test_benchmark_queries_reports_latency"
+    ]
+  ],
+  "\"codeintel_rev.io.splade_manager.run_subprocess\".fake_run": [
+    [
+      "tests/codeintel_rev/test_splade_manager.py",
+      280,
+      "test_build_index_persists_metadata"
+    ],
+    [
+      "tests/codeintel_rev/test_splade_manager.py",
+      315,
+      "test_build_index_raises_when_subprocess_fails"
+    ]
+  ],
+  "\"codeintel_rev.io.vllm_engine.InprocessVLLMEmbedder\".MagicMock(return_value=fake_engine)": [
+    [
+      "tests/codeintel_rev/test_vllm_client.py",
+      88,
+      "test_vllm_client_inprocess_uses_local_engine"
+    ]
+  ],
+  "\"codeintel_rev.mcp_server.adapters.semantic.observe_duration\"._fake_observe": [
+    [
+      "tests/codeintel_rev/test_semantic_adapter.py",
+      67,
+      "_patch_observe_duration"
+    ]
+  ],
+  "\"codeintel_rev.mcp_server.common.observability._base_observe_duration\"._raise_value_error": [
+    [
+      "tests/codeintel_rev/test_observability_common.py",
+      168,
+      "test_observe_duration_noop_when_base_observer_raises_value_error"
+    ]
+  ],
+  "\"codeintel_rev.ops.runtime.xtr_open.XTRIndex\"._ExplodingIndex": [
+    [
+      "tests/ops/test_xtr_open.py",
+      110,
+      "test_xtr_open_reports_corruption"
+    ]
+  ],
+  "\"codeintel_rev.ops.runtime.xtr_open.XTRIndex\"._StubIndex": [
+    [
+      "tests/ops/test_xtr_open.py",
+      78,
+      "test_xtr_open_success"
+    ]
+  ],
+  "\"codeintel_rev.ops.runtime.xtr_open.load_settings\".lambda: _settings(enabled=False)": [
+    [
+      "tests/ops/test_xtr_open.py",
+      25,
+      "test_xtr_open_disabled_feature"
+    ]
+  ],
+  "\"codeintel_rev.ops.runtime.xtr_open.load_settings\".lambda: _settings(enabled=True)": [
+    [
+      "tests/ops/test_xtr_open.py",
+      41,
+      "test_xtr_open_missing_artifacts"
+    ],
+    [
+      "tests/ops/test_xtr_open.py",
+      59,
+      "test_xtr_open_success"
+    ],
+    [
+      "tests/ops/test_xtr_open.py",
+      90,
+      "test_xtr_open_reports_corruption"
+    ]
+  ],
+  "\"codeintel_rev.ops.runtime.xtr_open.resolve_application_paths\".lambda _settings: _paths(missing_root)": [
+    [
+      "tests/ops/test_xtr_open.py",
+      45,
+      "test_xtr_open_missing_artifacts"
+    ]
+  ],
+  "\"codeintel_rev.ops.runtime.xtr_open.resolve_application_paths\".lambda _settings: _paths(root)": [
+    [
+      "tests/ops/test_xtr_open.py",
+      63,
+      "test_xtr_open_success"
+    ],
+    [
+      "tests/ops/test_xtr_open.py",
+      94,
+      "test_xtr_open_reports_corruption"
+    ]
+  ],
+  "\"codeintel_rev.ops.runtime.xtr_open.resolve_application_paths\".lambda _settings: _paths(tmp_path)": [
+    [
+      "tests/ops/test_xtr_open.py",
+      29,
+      "test_xtr_open_disabled_feature"
+    ]
+  ],
+  "\"orchestration.cli.uuid4\".deterministic_uuid_factory": [
+    [
+      "tests/vector_ingestion/test_vector_cli.py",
+      132,
+      "test_index_faiss_cli_problem_details"
+    ]
+  ],
+  "ApplicationContext.\"create\"": [
+    [
+      "tests/app/test_lifespan_runtime_cleanup.py",
+      86,
+      "test_lifespan_preload_and_cleanup"
+    ]
+  ],
+  "Capabilities.\"from_context\"": [
+    [
+      "tests/test_networking_mounts.py",
+      97,
+      "test_main_mounts_mcp_sub_application"
+    ],
+    [
+      "tests/conftest.py",
+      259,
+      "_networking_test_app"
+    ]
+  ],
+  "Paths.\"discover\"": [
+    [
+      "tests/test_cli_runtime.py",
+      18,
+      "test_success"
+    ],
+    [
+      "tests/test_cli_runtime.py",
+      34,
+      "test_error"
+    ],
+    [
+      "tests/codeintel_rev/test_splade_cli.py",
+      139,
+      "_patch_paths"
+    ],
+    [
+      "tests/codeintel_rev/test_bm25_cli.py",
+      86,
+      "_patch_paths"
+    ]
+  ],
+  "XTRIndex.\"encode_query_tokens\"": [
+    [
+      "tests/codeintel_rev/io/test_xtr_manager.py",
+      70,
+      "test_xtr_search_and_rescore"
+    ]
+  ],
+  "app_main.\"_initialize_context\"": [
+    [
+      "tests/test_networking_mounts.py",
+      95,
+      "test_main_mounts_mcp_sub_application"
+    ]
+  ],
+  "app_main.\"_shutdown_context\"": [
+    [
+      "tests/test_networking_mounts.py",
+      96,
+      "test_main_mounts_mcp_sub_application"
+    ]
+  ],
+  "app_main.\"build_http_app\"": [
+    [
+      "tests/test_networking_mounts.py",
+      98,
+      "test_main_mounts_mcp_sub_application"
+    ]
+  ],
+  "bm25_cli.\"_create_bm25_manager\"": [
+    [
+      "tests/codeintel_rev/test_bm25_cli.py",
+      93,
+      "test_prepare_corpus_cli"
+    ],
+    [
+      "tests/codeintel_rev/test_bm25_cli.py",
+      111,
+      "test_build_index_cli"
+    ]
+  ],
+  "capabilities_module.\"_import_optional\"": [
+    [
+      "tests/app/test_capz.py",
+      43,
+      "test_capabilities_snapshot_reports_paths"
+    ]
+  ],
+  "capabilities_module.Capabilities.\"from_context\"": [
+    [
+      "tests/app/test_capz.py",
+      80,
+      "test_capz_endpoint_refresh"
+    ]
+  ],
+  "cli.\"CLI_ENVELOPE_DIR\"": [
+    [
+      "tests/download/test_cli.py",
+      15,
+      "test_harvest_emits_envelope"
+    ]
+  ],
+  "client.\"embed_batch\"": [
+    [
+      "tests/codeintel_rev/test_vllm_client.py",
+      44,
+      "test_embed_chunks_empty_uses_configured_dimension"
+    ]
+  ],
+  "config_context.\"DuckDBCatalog\"": [
+    [
+      "tests/codeintel_rev/test_service_context_paths.py",
+      110,
+      "test_service_context_resolves_paths"
+    ]
+  ],
+  "config_context.\"VLLMClient\"": [
+    [
+      "tests/codeintel_rev/test_service_context_paths.py",
+      111,
+      "test_service_context_resolves_paths"
+    ]
+  ],
+  "config_context.\"_import_faiss_manager_cls\"": [
+    [
+      "tests/codeintel_rev/test_service_context_paths.py",
+      109,
+      "test_service_context_resolves_paths"
+    ]
+  ],
+  "config_module.\"gate_import\"": [
+    [
+      "tests/app/test_runtime_gates.py",
+      35,
+      "test_coderank_faiss_missing_dependency_propagates"
+    ],
+    [
+      "tests/app/test_runtime_gates.py",
+      63,
+      "test_xtr_missing_dependency_raise"
+    ]
+  ],
+  "context.faiss_manager.\"clone_to_gpu\"": [
+    [
+      "tests/codeintel_rev/test_config_context.py",
+      102,
+      "test_application_context_create"
+    ],
+    [
+      "tests/codeintel_rev/test_config_context.py",
+      145,
+      "test_application_context_ensure_faiss_ready"
+    ],
+    [
+      "tests/codeintel_rev/test_config_context.py",
+      177,
+      "test_application_context_ensure_faiss_ready_cached"
+    ]
+  ],
+  "context.faiss_manager.\"load_cpu_index\"": [
+    [
+      "tests/codeintel_rev/test_config_context.py",
+      101,
+      "test_application_context_create"
+    ],
+    [
+      "tests/codeintel_rev/test_config_context.py",
+      144,
+      "test_application_context_ensure_faiss_ready"
+    ],
+    [
+      "tests/codeintel_rev/test_config_context.py",
+      176,
+      "test_application_context_ensure_faiss_ready_cached"
+    ]
+  ],
+  "ctx.__class__.\"get_coderank_faiss_manager\"": [
+    [
+      "tests/app/test_admin_index.py",
+      52,
+      "test_admin_faiss_runtime_status_endpoint"
+    ]
+  ],
+  "engine_module.\"transformers\"": [
+    [
+      "tests/codeintel_rev/io/test_vllm_engine.py",
+      62,
+      "_patch_vllm"
+    ]
+  ],
+  "engine_module.\"vllm\"": [
+    [
+      "tests/codeintel_rev/io/test_vllm_engine.py",
+      80,
+      "_patch_vllm"
+    ]
+  ],
+  "engine_module.\"vllm_config\"": [
+    [
+      "tests/codeintel_rev/io/test_vllm_engine.py",
+      74,
+      "_patch_vllm"
+    ]
+  ],
+  "engine_module.\"vllm_inputs\"": [
+    [
+      "tests/codeintel_rev/io/test_vllm_engine.py",
+      68,
+      "_patch_vllm"
+    ]
+  ],
+  "faiss_module.\"GpuClonerOptions\"": [
+    [
+      "tests/codeintel_rev/test_faiss_manager.py",
+      38,
+      "faiss_manager"
+    ]
+  ],
+  "faiss_module.\"StandardGpuResources\"": [
+    [
+      "tests/codeintel_rev/test_faiss_manager.py",
+      47,
+      "test_clone_to_gpu_success"
+    ],
+    [
+      "tests/codeintel_rev/test_faiss_manager.py",
+      77,
+      "test_clone_to_gpu_falls_back"
+    ]
+  ],
+  "faiss_module.\"index_cpu_to_gpu\"": [
+    [
+      "tests/codeintel_rev/test_faiss_dual_index.py",
+      216,
+      "test_gpu_secondary_clone_reuses_cloner_options"
+    ],
+    [
+      "tests/codeintel_rev/test_faiss_manager.py",
+      58,
+      "test_clone_to_gpu_success"
+    ]
+  ],
+  "graph_builder.\"gate_import\"": [
+    [
+      "tests/codeintel_rev/test_polars_writers.py",
+      93,
+      "test_write_import_graph_supports_dataframe_only_polars"
+    ]
+  ],
+  "httpx.\"AsyncClient\"": [
+    [
+      "tests/codeintel_rev/test_vllm_client.py",
+      67,
+      "test_embed_batch_async_empty_uses_configured_dimension"
+    ]
+  ],
+  "importlib.\"import_module\"": [
+    [
+      "tests/dist/test_extras_minimal_import.py",
+      22,
+      "test_package_imports_without_heavy_deps"
+    ]
+  ],
+  "importlib.util.\"find_spec\"": [
+    [
+      "tests/test_minimal_profile.py",
+      33,
+      "test_import_package_in_minimal_env"
+    ]
+  ],
+  "orchestration_cli.\"CLI_ENVELOPE_DIR\"": [
+    [
+      "tests/orchestration/test_cli_envelopes.py",
+      29,
+      "test_index_bm25_emits_success_envelope"
+    ],
+    [
+      "tests/orchestration/test_cli_envelopes.py",
+      68,
+      "test_index_faiss_records_validation_failure"
+    ]
+  ],
+  "orchestration_cli.\"_build_bm25_index\"": [
+    [
+      "tests/orchestration/test_cli_envelopes.py",
+      40,
+      "test_index_bm25_emits_success_envelope"
+    ]
+  ],
+  "orchestration_cli.\"run_index_faiss\"": [
+    [
+      "tests/orchestration/test_cli_envelopes.py",
+      76,
+      "test_index_faiss_records_validation_failure"
+    ]
+  ],
+  "registry_module.\"entry_points\"": [
+    [
+      "tests/plugins/test_registry.py",
+      45,
+      "test_registry_discovers_entry_points"
+    ]
+  ],
+  "registry_module.REGISTRY.\"augment_for\"": [
+    [
+      "tests/tools/test_cli_context_registry.py",
+      152,
+      "test_operation_override_dispatch"
+    ]
+  ],
+  "reporter_module.\"RUN_REPORT_STORE\"": [
+    [
+      "tests/codeintel_rev/test_telemetry_reporter.py",
+      34,
+      "isolated_report_store"
+    ]
+  ],
+  "reporter_module.Capabilities.\"from_context\"": [
+    [
+      "tests/codeintel_rev/test_telemetry_reporter.py",
+      40,
+      "stub_capabilities"
+    ]
+  ],
+  "rerank_module.\"gate_import\"": [
+    [
+      "tests/codeintel_rev/io/test_rerank_coderankllm.py",
+      64,
+      "_patch_gate"
+    ]
+  ],
+  "runpack_module.\"build_report\"": [
+    [
+      "tests/codeintel_rev/test_observability_runpack.py",
+      110,
+      "stub_report_builders"
+    ]
+  ],
+  "runpack_module.\"build_timeline_run_report\"": [
+    [
+      "tests/codeintel_rev/test_observability_runpack.py",
+      104,
+      "stub_report_builders"
+    ]
+  ],
+  "runpack_module.\"latest_run_report\"": [
+    [
+      "tests/codeintel_rev/test_observability_runpack.py",
+      105,
+      "stub_report_builders"
+    ]
+  ],
+  "runpack_module.\"resolve_timeline_dir\"": [
+    [
+      "tests/codeintel_rev/test_observability_runpack.py",
+      111,
+      "stub_report_builders"
+    ]
+  ],
+  "semantic.\"current_span_id\"": [
+    [
+      "tests/mcp/test_semantic_observability.py",
+      20,
+      "test_semantic_observability_links"
+    ]
+  ],
+  "semantic.\"current_trace_id\"": [
+    [
+      "tests/mcp/test_semantic_observability.py",
+      19,
+      "test_semantic_observability_links"
+    ]
+  ],
+  "semantic_pro.\"current_run_id\"": [
+    [
+      "tests/mcp/test_semantic_observability.py",
+      39,
+      "test_semantic_pro_observability_links"
+    ]
+  ],
+  "semantic_pro.\"current_span_id\"": [
+    [
+      "tests/mcp/test_semantic_observability.py",
+      38,
+      "test_semantic_pro_observability_links"
+    ]
+  ],
+  "semantic_pro.\"current_timeline\"": [
+    [
+      "tests/mcp/test_semantic_observability.py",
+      36,
+      "test_semantic_pro_observability_links"
+    ]
+  ],
+  "semantic_pro.\"current_trace_id\"": [
+    [
+      "tests/mcp/test_semantic_observability.py",
+      37,
+      "test_semantic_pro_observability_links"
+    ]
+  ],
+  "semantic_pro.\"get_effective_scope\"": [
+    [
+      "tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py",
+      211,
+      "_stub_observer"
+    ]
+  ],
+  "semantic_pro.\"get_session_id\"": [
+    [
+      "tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py",
+      210,
+      "_stub_observer"
+    ]
+  ],
+  "semantic_pro.\"observe_duration\"": [
+    [
+      "tests/codeintel_rev/mcp_server/test_semantic_pro_adapter.py",
+      209,
+      "_stub_observer"
+    ]
+  ],
+  "shared_registry.\"load_cli_tooling_context\"": [
+    [
+      "tests/tools/test_cli_context_registry.py",
+      88,
+      "test_context_for_is_cached"
+    ]
+  ],
+  "splade_cli.\"_create_artifacts_manager\"": [
+    [
+      "tests/codeintel_rev/test_splade_cli.py",
+      146,
+      "test_export_onnx_cli"
+    ]
+  ],
+  "splade_cli.\"_create_encoder_service\"": [
+    [
+      "tests/codeintel_rev/test_splade_cli.py",
+      172,
+      "test_encode_cli"
+    ],
+    [
+      "tests/codeintel_rev/test_splade_cli.py",
+      237,
+      "test_bench_cli"
+    ]
+  ],
+  "splade_cli.\"_create_index_manager\"": [
+    [
+      "tests/codeintel_rev/test_splade_cli.py",
+      202,
+      "test_build_index_cli"
+    ]
+  ],
+  "sys.\"argv\"": [
+    [
+      "tests/tools/test_repo_scan.py",
+      58,
+      "_run_repo_scan_cli"
+    ]
+  ],
+  "telemetry_module.\"_STAGE_DECISION_COUNTER\"": [
+    [
+      "tests/codeintel_rev/retrieval/test_telemetry.py",
+      39,
+      "test_record_stage_decision_emits_counter"
+    ]
+  ],
+  "test_catalog.\"_query_builder\"": [
+    [
+      "tests/codeintel_rev/test_duckdb_catalog.py",
+      621,
+      "test_query_by_filters_uses_query_builder"
+    ]
+  ],
+  "text_search.\"run_subprocess\"": [
+    [
+      "tests/codeintel_rev/test_text_search.py",
+      54,
+      "test_search_text_flag_prefixed_query"
+    ],
+    [
+      "tests/codeintel_rev/test_text_search.py",
+      93,
+      "test_search_text_surfaces_ripgrep_failure"
+    ],
+    [
+      "tests/codeintel_rev/test_text_search.py",
+      121,
+      "test_search_text_falls_back_to_grep"
+    ],
+    [
+      "tests/codeintel_rev/test_text_search.py",
+      157,
+      "test_search_text_fallback_normalizes_relative_paths"
+    ]
+  ],
+  "text_search_adapter.\"run_subprocess\"": [
+    [
+      "tests/codeintel_rev/test_integration_smoke.py",
+      97,
+      "test_text_search"
+    ]
+  ],
+  "tsb.\"_USE_TS_QUERY\"": [
+    [
+      "tests/enrich/test_tree_sitter_outline.py",
+      22,
+      "test_outline_query_matches_fallback"
+    ],
+    [
+      "tests/enrich/test_tree_sitter_outline.py",
+      29,
+      "test_outline_query_matches_fallback"
+    ]
+  ],
+  "typer.\"echo\"": [
+    [
+      "tests/orchestration/test_index_cli_idempotency.py",
+      212,
+      "test_index_faiss_malformed_vectors"
+    ]
+  ],
+  "typing_module.\"gate_import\"": [
+    [
+      "tests/test_typing_facade.py",
+      54,
+      "_install_fake_faiss"
+    ]
+  ],
+  "uses_builder.\"gate_import\"": [
+    [
+      "tests/codeintel_rev/test_polars_writers.py",
+      115,
+      "test_write_use_graph_supports_dataframe_only_polars"
+    ]
+  ]
+}

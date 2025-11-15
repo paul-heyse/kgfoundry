@@ -13,6 +13,12 @@ from typing import TYPE_CHECKING, Protocol
 
 import codeintel_rev.observability.metrics as retrieval_metrics
 from codeintel_rev.evaluation.hybrid_pool import Hit, HybridPoolEvaluator
+from codeintel_rev.observability.execution_ledger import (
+    record as ledger_record,
+)
+from codeintel_rev.observability.execution_ledger import (
+    step as ledger_step,
+)
 from codeintel_rev.observability.otel import record_span_event
 from codeintel_rev.observability.semantic_conventions import Attrs, to_label_str
 from codeintel_rev.observability.timeline import Timeline, current_timeline
@@ -156,6 +162,14 @@ class BM25SearchProvider:
             Raised when the underlying Pyserini searcher fails.
         """
         if top_k <= 0:
+            ledger_record(
+                "bm25.search.skip",
+                stage="pool_search",
+                component="retrieval.bm25",
+                ok=False,
+                top_k=top_k,
+                reason="non_positive_top_k",
+            )
             emit_step(
                 StepEvent(
                     kind="bm25.search",
@@ -171,8 +185,23 @@ class BM25SearchProvider:
         searcher = self._ensure_rm3_searcher() if use_rm3 else self._base_searcher
         start = perf_counter()
         try:
-            hits = searcher.search(query, k=top_k)
+            with ledger_step(
+                stage="pool_search",
+                op="bm25.search",
+                component="retrieval.bm25",
+                attrs={"top_k": top_k, "rm3": use_rm3},
+            ):
+                hits = searcher.search(query, k=top_k)
         except Exception as exc:
+            ledger_record(
+                "bm25.search.error",
+                stage="pool_search",
+                component="retrieval.bm25",
+                ok=False,
+                top_k=top_k,
+                rm3=use_rm3,
+                error_type=type(exc).__name__,
+            )
             emit_step(
                 StepEvent(
                     kind="bm25.search",
@@ -205,6 +234,15 @@ class BM25SearchProvider:
                     "duration_ms": duration_ms,
                 },
             )
+        )
+        ledger_record(
+            "bm25.search",
+            stage="pool_search",
+            component="retrieval.bm25",
+            top_k=top_k,
+            rm3=use_rm3,
+            hits=len(results),
+            duration_ms=duration_ms,
         )
         return results
 
@@ -318,6 +356,14 @@ class SpladeSearchProvider:
             Raised when the SPLADE encoder or impact searcher fails.
         """
         if top_k <= 0:
+            ledger_record(
+                "splade.search.skip",
+                stage="pool_search",
+                component="retrieval.splade",
+                ok=False,
+                top_k=top_k,
+                reason="non_positive_top_k",
+            )
             emit_step(
                 StepEvent(
                     kind="splade.search",
@@ -330,6 +376,14 @@ class SpladeSearchProvider:
         embeddings = self._encoder.encode_query([query])
         decoded = self._encoder.decode(embeddings, top_k=None)
         if not decoded or not decoded[0]:
+            ledger_record(
+                "splade.search.skip",
+                stage="pool_search",
+                component="retrieval.splade",
+                ok=False,
+                top_k=top_k,
+                reason="encoder_empty",
+            )
             emit_step(
                 StepEvent(
                     kind="splade.search",
@@ -341,6 +395,14 @@ class SpladeSearchProvider:
             return []
         filtered_pairs = self._filter_pairs(decoded[0])
         if not filtered_pairs:
+            ledger_record(
+                "splade.search.skip",
+                stage="pool_search",
+                component="retrieval.splade",
+                ok=False,
+                top_k=top_k,
+                reason="filtered_empty",
+            )
             emit_step(
                 StepEvent(
                     kind="splade.search",
@@ -352,6 +414,14 @@ class SpladeSearchProvider:
             return []
         bow = self._build_bow(filtered_pairs)
         if not bow:
+            ledger_record(
+                "splade.search.skip",
+                stage="pool_search",
+                component="retrieval.splade",
+                ok=False,
+                top_k=top_k,
+                reason="bow_empty",
+            )
             emit_step(
                 StepEvent(
                     kind="splade.search",
@@ -363,8 +433,22 @@ class SpladeSearchProvider:
             return []
         start = perf_counter()
         try:
-            hits = self._searcher.search(bow, k=top_k)
+            with ledger_step(
+                stage="pool_search",
+                op="splade.search",
+                component="retrieval.splade",
+                attrs={"top_k": top_k},
+            ):
+                hits = self._searcher.search(bow, k=top_k)
         except Exception as exc:
+            ledger_record(
+                "splade.search.error",
+                stage="pool_search",
+                component="retrieval.splade",
+                ok=False,
+                top_k=top_k,
+                error_type=type(exc).__name__,
+            )
             emit_step(
                 StepEvent(
                     kind="splade.search",
@@ -392,6 +476,14 @@ class SpladeSearchProvider:
                 status="completed",
                 payload={"top_k": top_k, "hits": len(results), "duration_ms": duration_ms},
             )
+        )
+        ledger_record(
+            "splade.search",
+            stage="pool_search",
+            component="retrieval.splade",
+            top_k=top_k,
+            hits=len(results),
+            duration_ms=duration_ms,
         )
         return results
 
@@ -1162,11 +1254,30 @@ class HybridSearchEngine:
 
         disabled_reason = self._channel_disabled_reason(channel)
         if disabled_reason is not None:
+            ledger_record(
+                "channel.skip",
+                stage="pool_search",
+                component="retrieval.channel",
+                ok=False,
+                channel=channel.name,
+                limit=limit,
+                reason=disabled_reason,
+            )
             self._emit_channel_skip(channel.name, timeline, {"reason": disabled_reason})
             _record_stage("skip", reason=disabled_reason)
             return [], None
         missing = self._missing_capabilities(channel)
         if missing:
+            ledger_record(
+                "channel.skip",
+                stage="pool_search",
+                component="retrieval.channel",
+                ok=False,
+                channel=channel.name,
+                limit=limit,
+                reason="capability_off",
+                missing=sorted(missing),
+            )
             self._emit_channel_skip(
                 channel.name,
                 timeline,
@@ -1185,7 +1296,13 @@ class HybridSearchEngine:
             ):
                 step_ctx = timeline.step(stage_name, **attrs) if timeline else nullcontext()
                 with step_ctx:
-                    hits = list(channel.search(query, limit))
+                    with ledger_step(
+                        stage="pool_search",
+                        op=stage_name,
+                        component="retrieval.channel",
+                        attrs=attrs,
+                    ):
+                        hits = list(channel.search(query, limit))
         except ChannelError as exc:
             warning = str(exc)
             retrieval_metrics.QUERY_ERRORS_TOTAL.labels(kind="search", channel=channel.name).inc()
@@ -1195,6 +1312,15 @@ class HybridSearchEngine:
                 {"reason": exc.reason, "message": str(exc)},
             )
             _record_stage("error", duration=perf_counter() - start, reason=exc.reason)
+            ledger_record(
+                "channel.error",
+                stage="pool_search",
+                component="retrieval.channel",
+                ok=False,
+                channel=channel.name,
+                limit=limit,
+                reason=exc.reason,
+            )
             return [], warning
         except (OSError, RuntimeError, ValueError, ImportError) as exc:  # pragma: no cover
             warning = f"{channel.name} channel failed: {exc}"
@@ -1206,6 +1332,15 @@ class HybridSearchEngine:
                 {"reason": "provider_error", "message": str(exc)},
             )
             _record_stage("error", duration=perf_counter() - start, reason="provider_error")
+            ledger_record(
+                "channel.error",
+                stage="pool_search",
+                component="retrieval.channel",
+                ok=False,
+                channel=channel.name,
+                limit=limit,
+                reason="provider_error",
+            )
             return [], warning
         duration = perf_counter() - start
         retrieval_metrics.CHANNEL_LATENCY_SECONDS.labels(channel=channel.name).observe(duration)
@@ -1214,6 +1349,15 @@ class HybridSearchEngine:
             "run",
             duration=duration,
             output={"hits": len(hits), "limit": limit},
+        )
+        ledger_record(
+            "channel.search",
+            stage="pool_search",
+            component="retrieval.channel",
+            channel=channel.name,
+            limit=limit,
+            hits=len(hits),
+            duration_ms=round(duration * 1000, 2),
         )
         return hits, None
 

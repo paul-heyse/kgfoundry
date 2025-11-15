@@ -30,7 +30,7 @@ Lightweight heuristics over run reports to surface diagnostics hints.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 44
+- **cycle_group**: 46
 
 ## Ownership
 

@@ -15,66 +15,44 @@ Decorators for consistent span/timeline instrumentation.
 - from **(absolute)** import logging
 - from **collections.abc** import Awaitable, Callable, Iterator, Mapping
 - from **contextlib** import contextmanager, nullcontext
-- from **dataclasses** import dataclass, field
 - from **time** import perf_counter
-- from **types** import SimpleNamespace
-- from **typing** import TYPE_CHECKING, TypeVar, cast
-- from **opentelemetry** import trace
-- from **opentelemetry.trace** import Span, SpanKind, Status, StatusCode
-- from **opentelemetry.trace** import Span
-- from **opentelemetry.trace** import SpanKind
-- from **opentelemetry.trace** import Status
-- from **opentelemetry.trace** import StatusCode
+- from **typing** import TypeVar, cast
 - from **codeintel_rev.metrics.registry** import MCP_STAGE_LATENCY_SECONDS
 - from **codeintel_rev.observability.timeline** import current_timeline
 - from **codeintel_rev.telemetry** import steps
 - from **codeintel_rev.telemetry.context** import attach_context_attrs, set_request_stage
+- from **codeintel_rev.telemetry.otel_shim** import SpanKind, SpanKindType, SpanType, Status, StatusCode, StatusCodeType, StatusFactory, trace_api
 
 ## Definitions
 
-- class: `_NullSpan` (line 22)
-- class: `_SpanContext` (line 94)
-- class: `_NoopTracer` (line 101)
-- class: `_SpanKindEnum` (line 139)
-- class: `_StatusCodeEnum` (line 146)
-- class: `_StatusStub` (line 150)
-- variable: `trace` (line 153)
-- variable: `Span` (line 154)
-- variable: `SpanKind` (line 155)
-- variable: `Status` (line 156)
-- variable: `StatusCode` (line 157)
-- variable: `SpanType` (line 165)
-- variable: `SpanKindType` (line 166)
-- variable: `StatusType` (line 167)
-- variable: `StatusCodeType` (line 168)
-- variable: `LOGGER` (line 175)
-- variable: `F` (line 177)
-- function: `_record_stage_latency` (line 180)
-- variable: `TRACER` (line 196)
-- function: `_emit_checkpoint` (line 199)
-- function: `_set_span_attributes` (line 247)
-- function: `_span_scope` (line 282)
-- function: `_record_exception` (line 349)
-- function: `span_context` (line 383)
-- function: `trace_span` (line 471)
-- function: `trace_step` (line 623)
-- function: `emit_event` (line 671)
-- function: `_build_step_payload` (line 815)
-- function: `_with_duration` (line 831)
+- variable: `LOGGER` (line 29)
+- variable: `F` (line 31)
+- function: `_record_stage_latency` (line 34)
+- variable: `TRACER` (line 50)
+- function: `_emit_checkpoint` (line 53)
+- function: `_set_span_attributes` (line 101)
+- function: `_span_scope` (line 136)
+- function: `_record_exception` (line 203)
+- function: `span_context` (line 237)
+- function: `trace_span` (line 325)
+- function: `trace_step` (line 477)
+- function: `emit_event` (line 525)
+- function: `_build_step_payload` (line 669)
+- function: `_with_duration` (line 685)
 
 ## Graph Metrics
 
-- **fan_in**: 11
-- **fan_out**: 5
-- **cycle_group**: 23
+- **fan_in**: 10
+- **fan_out**: 6
+- **cycle_group**: 26
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 8
-- recent churn 90: 8
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 
@@ -106,7 +84,7 @@ emit_event, span_context, trace_span, trace_step
 
 ## Hotspot
 
-- score: 2.77
+- score: 2.75
 
 ## Side Effects
 
@@ -114,22 +92,22 @@ emit_event, span_context, trace_span, trace_step
 
 ## Complexity
 
-- branches: 36
-- cyclomatic: 37
-- loc: 838
+- branches: 34
+- cyclomatic: 35
+- loc: 692
 
 ## Doc Coverage
 
-- `_NullSpan` (class): summary=yes, examples=no — Minimal span stub used when OpenTelemetry is unavailable.
-- `_SpanContext` (class): summary=no, examples=no
-- `_NoopTracer` (class): summary=no, examples=no
-- `_SpanKindEnum` (class): summary=no, examples=no
-- `_StatusCodeEnum` (class): summary=no, examples=no
-- `_StatusStub` (class): summary=no, examples=no
 - `_record_stage_latency` (function): summary=yes, params=mismatch, examples=no — Record latency for a retrieval stage.
 - `_emit_checkpoint` (function): summary=yes, params=ok, examples=no — Emit a checkpoint event for telemetry reporting.
 - `_set_span_attributes` (function): summary=yes, params=ok, examples=no — Set attributes on an OpenTelemetry span from a mapping.
 - `_span_scope` (function): summary=yes, params=ok, examples=no — Create a context manager for OpenTelemetry span and timeline step coordination.
+- `_record_exception` (function): summary=yes, params=ok, examples=no — Record an exception on an OpenTelemetry span and mark it as an error.
+- `span_context` (function): summary=yes, params=ok, examples=no — Create a span/timeline scope for the wrapped block.
+- `trace_span` (function): summary=yes, params=ok, examples=no — Wrap callable execution in an OpenTelemetry span + timeline step.
+- `trace_step` (function): summary=yes, params=ok, examples=no — Specialized decorator that records checkpoints for pipeline stages.
+- `emit_event` (function): summary=yes, params=ok, examples=no — Emit a :class:`StepEvent` reflecting the wrapped callable's outcome.
+- `_build_step_payload` (function): summary=no, examples=no
 
 ## Tags
 

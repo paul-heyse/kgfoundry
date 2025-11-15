@@ -36,7 +36,7 @@ ASGI stack without relying on shell-specific wrappers.
 
 - **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 59
+- **cycle_group**: 64
 
 ## Ownership
 

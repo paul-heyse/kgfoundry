@@ -112,9 +112,9 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 
 ## Graph Metrics
 
-- **fan_in**: 26
+- **fan_in**: 27
 - **fan_out**: 17
-- **cycle_group**: 41
+- **cycle_group**: 42
 
 ## Ownership
 
@@ -158,7 +158,7 @@ ApplicationContext, ResolvedPaths, resolve_application_paths
 
 ## Hotspot
 
-- score: 3.34
+- score: 3.35
 
 ## Side Effects
 

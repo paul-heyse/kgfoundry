@@ -96,7 +96,7 @@ class EmbeddingRequest(msgspec.Struct):
     model : str
         Model identifier string. Must match a model loaded by the vLLM server.
         Defaults to "nomic-ai/nomic-embed-code" which is a code-specific
-        embedding model with 2560 dimensions. The embedding dimensionality is
+        embedding model with 3584 dimensions. The embedding dimensionality is
         surfaced via :class:`codeintel_rev.config.settings.VLLMConfig` ``embedding_dim``.
     """
 
@@ -116,7 +116,7 @@ class EmbeddingData(msgspec.Struct):
     ----------
     embedding : list[float]
         Embedding vector as a list of floats. The length matches the model's
-        dimension (e.g., 2560 for nomic-embed-code). Values are typically
+        dimension (e.g., 3584 for nomic-embed-code). Values are typically
         normalized for cosine similarity. The expected size is available as
         ``VLLMConfig.embedding_dim``.
     index : int
@@ -186,7 +186,7 @@ class VLLMClient:
     >>> client = VLLMClient(config)
     >>> vectors = client.embed_batch(["def hello(): pass", "def world(): pass"])
     >>> vectors.shape
-    (2, 2560)
+    (2, 3584)
 
     Cleanup during shutdown:
 
@@ -471,7 +471,7 @@ class VLLMClient:
         -------
         NDArrayF32
             Embeddings array of shape (len(texts), vec_dim) where vec_dim is the
-            model's embedding dimension (e.g., 2560). Dtype is float32 for memory
+            model's embedding dimension (e.g., 3584). Dtype is float32 for memory
             efficiency. Returns an empty array of shape (0, self.config.embedding_dim)
             when texts is empty. The order matches the input texts.
         """

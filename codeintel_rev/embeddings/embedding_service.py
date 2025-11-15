@@ -824,9 +824,13 @@ class HFEmbeddingProvider(_ProviderBase):
             embeddings.model_name,
             trust_remote_code=True,
         )
+        torch_dtype = (
+            torch_mod.float16 if self._device.type == "cuda" else torch_mod.float32
+        )
         self._model = transformers_mod.AutoModel.from_pretrained(
             embeddings.model_name,
             trust_remote_code=True,
+            torch_dtype=torch_dtype,
         )
         self._model.to(self._device)
         self._model.eval()

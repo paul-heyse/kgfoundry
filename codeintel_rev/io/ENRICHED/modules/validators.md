@@ -20,7 +20,7 @@ Schema validation helpers for enrichment rows.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 87
+- **cycle_group**: 101
 
 ## Ownership
 

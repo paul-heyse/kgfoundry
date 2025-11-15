@@ -26,7 +26,7 @@ Listwise reranking using the CodeRankLLM checkpoint.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 122
+- **cycle_group**: 129
 
 ## Ownership
 

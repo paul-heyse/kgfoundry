@@ -414,6 +414,11 @@ def run_search(*, request: SearchRequest, deps: SearchDependencies) -> SearchRes
             ranked_ids,
             request,
         )
+        ann_snapshot = _build_ann_snapshot(
+            ranked_ids,
+            _flatten_scores(distances),
+            hydration_bundle.rows,
+        )
         results, repair_stats, durations.rerank = _rerank_with_metrics(
             ranked_ids=ranked_ids,
             scores=_flatten_scores(distances),
@@ -428,7 +433,13 @@ def run_search(*, request: SearchRequest, deps: SearchDependencies) -> SearchRes
         total_duration = max(perf_counter() - start, 0.0)
         MCP_SEARCH_LATENCY_SECONDS.observe(total_duration)
         _record_postfilter_density(len(results), repair_stats.inspected)
-        _write_pool_rows(results, deps, hydration_bundle.annotations)
+        _write_pool_rows(
+            deps=deps,
+            annotations=hydration_bundle.annotations,
+            ann_snapshot=ann_snapshot,
+            final_results=results,
+            rerank_enabled=request.rerank,
+        )
         _log_search_completion(request, deps, len(results), faiss_k)
         record_span_event(
             "retrieval.search.complete",
@@ -974,12 +985,34 @@ def _build_fetch_metadata(row: Mapping[str, object]) -> dict[str, object]:
     }
 
 
+def _build_ann_snapshot(
+    ranked_ids: Sequence[int],
+    scores: Sequence[float],
+    hydrated_rows: Mapping[int, Mapping[str, object]],
+) -> list[tuple[int, float]]:
+    """Return ANN candidates that survived hydration."""
+    if not ranked_ids or not scores or not hydrated_rows:
+        return []
+    hydrated_ids = {int(chunk_id) for chunk_id in hydrated_rows.keys()}
+    snapshot: list[tuple[int, float]] = []
+    for chunk_id, score in zip(ranked_ids, scores, strict=True):
+        normalized = int(chunk_id)
+        if normalized in hydrated_ids:
+            snapshot.append((normalized, float(score)))
+    return snapshot
+
+
 def _write_pool_rows(
-    results: Sequence[SearchResult],
+    *,
     deps: SearchDependencies,
     annotations: Mapping[int, StructureAnnotations],
+    ann_snapshot: Sequence[tuple[int, float]] | None,
+    final_results: Sequence[SearchResult],
+    rerank_enabled: bool,
 ) -> None:
-    if not results or deps.pool_dir is None:
+    if deps.pool_dir is None:
+        return
+    if not ann_snapshot and (not rerank_enabled or not final_results):
         return
     try:
         deps.pool_dir.mkdir(parents=True, exist_ok=True)
@@ -987,33 +1020,50 @@ def _write_pool_rows(
         return
     query_id = deps.run_id or uuid4().hex
     rows: list[SearchPoolRow] = []
-    for rank, result in enumerate(results, start=1):
-        annotation = annotations.get(result.chunk_id)
-        symbol_hits = annotation.symbol_hits if annotation else ()
-        ast_node_kinds = annotation.ast_node_kinds if annotation else ()
-        cst_matches = annotation.cst_matches if annotation else ()
-        meta = {
-            "uri": str(result.metadata.get("uri")),
-            "symbol_hits": list(symbol_hits),
-            "ast_node_kinds": list(ast_node_kinds),
-            "cst_matches": list(cst_matches),
-            "score": result.score,
-        }
-        rows.append(
-            SearchPoolRow(
-                query_id=query_id,
-                channel="faiss",
-                rank=rank,
-                id=result.chunk_id,
-                score=result.score,
-                meta=meta,
+    if ann_snapshot:
+        for rank, (chunk_id, score) in enumerate(ann_snapshot, start=1):
+            annotation = annotations.get(int(chunk_id))
+            rows.append(
+                SearchPoolRow(
+                    query_id=query_id,
+                    channel="faiss",
+                    rank=rank,
+                    chunk_id=int(chunk_id),
+                    score=float(score),
+                    reason=_build_pool_reason(annotation),
+                )
             )
-        )
+    if rerank_enabled and final_results:
+        for rank, result in enumerate(final_results, start=1):
+            annotation = annotations.get(result.chunk_id)
+            rows.append(
+                SearchPoolRow(
+                    query_id=query_id,
+                    channel="faiss_refine",
+                    rank=rank,
+                    chunk_id=result.chunk_id,
+                    score=result.score,
+                    reason=_build_pool_reason(annotation),
+                )
+            )
+    if not rows:
+        return
     destination = deps.pool_dir / f"{query_id}.parquet"
     try:
         write_pool(rows, destination)
     except RuntimeError:  # pragma: no cover - optional dependency
         LOGGER.debug("pool_writer.pyarrow_missing", extra={"path": str(destination)})
+
+
+def _build_pool_reason(annotation: StructureAnnotations | None) -> dict[str, object]:
+    matched = list(annotation.symbol_hits) if annotation and annotation.symbol_hits else []
+    ast_kind = annotation.ast_node_kinds[0] if annotation and annotation.ast_node_kinds else None
+    cst_hits = list(annotation.cst_matches) if annotation and annotation.cst_matches else None
+    return {
+        "matched_symbols": matched,
+        "ast_kind": ast_kind,
+        "cst_hits": cst_hits,
+    }
 
 
 def _record_postfilter_density(retained: int, initial: int) -> None:

@@ -28,7 +28,7 @@ Rule-based tagging helpers for enrichment outputs.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 95
+- **cycle_group**: 90
 
 ## Ownership
 

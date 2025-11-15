@@ -363,15 +363,22 @@ class _FAISSIdMapMixin:
             raise RuntimeError(msg)
         idmap = self.get_idmap_array()
         rows = np.arange(idmap.shape[0], dtype=np.int64)
+        index_label = self.index_path.name or self.index_path.stem or str(self.index_path)
+        exported_at = datetime.now(UTC)
         table = pa.Table.from_arrays(
             [
                 pa.array(rows),
                 pa.array(idmap),
+                pa.array([index_label] * len(rows)),
+                pa.array(
+                    [exported_at] * len(rows),
+                    type=pa.timestamp("ns", tz="UTC"),
+                ),
             ],
-            names=["faiss_row", "external_id"],
+            names=["faiss_row", "external_id", "index_name", "ts"],
         )
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        pq.write_table(table, out_path, compression="zstd", use_dictionary=True)
+        pq.write_table(table, out_path, compression="snappy", use_dictionary=True)
         LOGGER.info(
             "Exported FAISS ID map",
             extra=_log_extra(path=str(out_path), rows=int(idmap.shape[0])),
@@ -535,7 +542,7 @@ class FAISSManager(
     def __init__(
         self,
         index_path: Path,
-        vec_dim: int = 2560,
+        vec_dim: int = 3584,
         nlist: int = 8192,
         *,
         use_cuvs: bool = True,
@@ -629,8 +636,8 @@ class FAISSManager(
 
         Examples
         --------
-        >>> manager = FAISSManager(index_path=Path("index.faiss"), vec_dim=2560)
-        >>> vectors = np.random.randn(1000, 2560).astype(np.float32)
+        >>> manager = FAISSManager(index_path=Path("index.faiss"), vec_dim=3584)
+        >>> vectors = np.random.randn(1000, 3584).astype(np.float32)
         >>> manager.build_index(vectors)
         >>> # Uses IndexFlatIP for 1000 vectors (small corpus)
         """
@@ -713,7 +720,7 @@ class FAISSManager(
 
         Examples
         --------
-        >>> manager = FAISSManager(index_path=Path("index.faiss"), vec_dim=2560)
+        >>> manager = FAISSManager(index_path=Path("index.faiss"), vec_dim=3584)
         >>> estimates = manager.estimate_memory_usage(10000)
         >>> print(f"CPU index: {estimates['cpu_index_bytes'] / 1e9:.2f} GB")
         CPU index: 0.26 GB
@@ -1164,7 +1171,15 @@ class FAISSManager(
         FAISS_INDEX_SIZE_VECTORS.set(cpu_index.ntotal)
         FAISS_INDEX_DIM.set(self.vec_dim)
         FAISS_INDEX_GPU_ENABLED.set(0)
-        self._load_tuned_profile()
+        profile = self._load_tuned_profile()
+        if profile:
+            try:
+                self._apply_profile_payload(profile, persist=False)
+            except VectorIndexIncompatibleError as exc:
+                LOGGER.warning(
+                    "Unable to apply tuning profile during load; continuing with defaults",
+                    extra=_log_extra(error=str(exc)),
+                )
         self._write_meta_snapshot(
             vector_count=cpu_index.ntotal,
             parameter_space=self._format_parameter_string(self._runtime_overrides),
@@ -1474,63 +1489,63 @@ class FAISSManager(
                 ann_timer_start = start
                 try:
                     distances, identifiers = self._execute_dual_search(
-                    query=plan.queries,
-                    search_k=plan.search_k,
-                    params=plan.params,
-                )
-                if plan.search_k > 0:
-                    FAISS_POSTFILTER_DENSITY.labels(**metric_labels).set(
-                        plan.k / float(plan.search_k)
+                        query=plan.queries,
+                        search_k=plan.search_k,
+                        params=plan.params,
                     )
-                duck_catalog = catalog if isinstance(catalog, DuckDBCatalog) else None
-                refined = self._maybe_refine_results(
-                    catalog=duck_catalog,
-                    plan=plan,
-                    identifiers=identifiers,
-                    metric_labels=metric_labels,
-                )
-                if refined is not None:
-                    distances, identifiers = refined
-                result = (distances[:, : plan.k], identifiers[:, : plan.k])
-            except Exception as exc:
-                if timeline is not None:
-                    timeline.event(
-                        "faiss.search.end",
-                        "faiss",
-                        status="error",
-                        message=str(exc),
-                        attrs={
-                            "k": plan.k,
-                            "nprobe": plan.params.nprobe,
+                    if plan.search_k > 0:
+                        FAISS_POSTFILTER_DENSITY.labels(**metric_labels).set(
+                            plan.k / float(plan.search_k)
+                        )
+                    duck_catalog = catalog if isinstance(catalog, DuckDBCatalog) else None
+                    refined = self._maybe_refine_results(
+                        catalog=duck_catalog,
+                        plan=plan,
+                        identifiers=identifiers,
+                        metric_labels=metric_labels,
+                    )
+                    if refined is not None:
+                        distances, identifiers = refined
+                    result = (distances[:, : plan.k], identifiers[:, : plan.k])
+                except Exception as exc:
+                    if timeline is not None:
+                        timeline.event(
+                            "faiss.search.end",
+                            "faiss",
+                            status="error",
+                            message=str(exc),
+                            attrs={
+                                "k": plan.k,
+                                "nprobe": plan.params.nprobe,
+                                "use_gpu": plan.params.use_gpu,
+                            },
+                        )
+                    FAISS_SEARCH_ERRORS_TOTAL.inc()
+                    emit_step(
+                        StepEvent(
+                            kind="faiss.search",
+                            status="failed",
+                            detail=type(exc).__name__,
+                            payload={
+                                "k": plan.k,
+                                "nprobe": plan.params.nprobe,
+                                "use_gpu": plan.params.use_gpu,
+                            },
+                        )
+                    )
+                    msg = "FAISS search failed"
+                    raise VectorSearchError(
+                        msg,
+                        cause=exc,
+                        context={
+                            "index_path": str(self.index_path),
                             "use_gpu": plan.params.use_gpu,
+                            "search_k": plan.k,
                         },
-                    )
-                FAISS_SEARCH_ERRORS_TOTAL.inc()
-                emit_step(
-                    StepEvent(
-                        kind="faiss.search",
-                        status="failed",
-                        detail=type(exc).__name__,
-                        payload={
-                            "k": plan.k,
-                            "nprobe": plan.params.nprobe,
-                            "use_gpu": plan.params.use_gpu,
-                        },
-                    )
-                )
-                msg = "FAISS search failed"
-                raise VectorSearchError(
-                    msg,
-                    cause=exc,
-                    context={
-                        "index_path": str(self.index_path),
-                        "use_gpu": plan.params.use_gpu,
-                        "search_k": plan.k,
-                    },
-                ) from exc
-            finally:
-                duration = max(perf_counter() - ann_timer_start, 0.0)
-                FAISS_ANN_LATENCY_SECONDS.labels(**metric_labels).observe(duration)
+                    ) from exc
+                finally:
+                    duration = max(perf_counter() - ann_timer_start, 0.0)
+                    FAISS_ANN_LATENCY_SECONDS.labels(**metric_labels).observe(duration)
 
         elapsed_total = (perf_counter() - start) * 1000.0
         FAISS_SEARCH_LATENCY_SECONDS.observe(elapsed_total / 1000.0)
@@ -1827,6 +1842,15 @@ class FAISSManager(
             msg = "Tuning profile payload is empty."
             raise VectorIndexIncompatibleError(msg)
 
+        snapshot = self._apply_profile_payload(profile, persist=True)
+        return snapshot
+
+    def _apply_profile_payload(
+        self,
+        profile: Mapping[str, Any],
+        *,
+        persist: bool,
+    ) -> dict[str, object]:
         overrides = _parse_tuning_overrides(profile)
         try:
             if overrides.param_str:
@@ -1849,7 +1873,10 @@ class FAISSManager(
         if overrides.k_factor is not None:
             with self._tuning_lock:
                 self.refine_k_factor = overrides.k_factor
-        _persist_tuning_profile(self, profile)
+        if persist:
+            _persist_tuning_profile(self, profile)
+        else:
+            self._tuned_parameters = dict(profile)
         return snapshot
 
     def _search_primary(
@@ -2271,7 +2298,7 @@ class FAISSManager(
 
         Examples
         --------
-        >>> manager = FAISSManager(index_path=Path("index.faiss"), vec_dim=2560)
+        >>> manager = FAISSManager(index_path=Path("index.faiss"), vec_dim=3584)
         >>> manager.build_index(initial_vectors)
         >>> manager.update_index(new_vectors, new_ids)  # Add incrementally
         >>> # Periodically merge to optimize performance
@@ -2604,7 +2631,9 @@ class FAISSManager(
         """
         tuner = AutoTuner(self)
         profile = tuner.run_sweep(queries, truths, k=k, sweep=sweep)
-        profile["updated_at"] = datetime.now(UTC).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
+        profile["profile_at"] = timestamp
+        profile.setdefault("updated_at", timestamp)
         try:
             self._save_tuning_profile(profile)
         except OSError as exc:  # pragma: no cover - best-effort logging

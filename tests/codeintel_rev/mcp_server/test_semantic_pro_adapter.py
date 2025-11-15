@@ -10,6 +10,7 @@ from typing import cast
 import numpy as np
 import pytest
 from codeintel_rev.app.config_context import ApplicationContext
+from codeintel_rev.io.duckdb_catalog import StructureAnnotations
 from codeintel_rev.mcp_server.adapters import semantic_pro
 from codeintel_rev.retrieval.types import HybridResultDoc, HybridSearchResult
 
@@ -53,6 +54,17 @@ class _FakeCatalog:
 
     def query_by_filters(self, ids: list[int], **_: object) -> list[dict]:
         return self.query_by_ids(ids)
+
+    def get_structure_annotations(self, ids: list[int]) -> dict[int, StructureAnnotations]:
+        annotations: dict[int, StructureAnnotations] = {}
+        for chunk_id in ids:
+            annotations[int(chunk_id)] = StructureAnnotations(
+                uri="src/file.py",
+                symbol_hits=("fake.symbol",),
+                ast_node_kinds=("FunctionDef",),
+                cst_matches=(),
+            )
+        return annotations
 
 
 class _FakeHybridEngine:
@@ -228,6 +240,10 @@ def test_semantic_pro_produces_findings(tmp_path: Path) -> None:
     )
 
     assert "findings" in envelope
+    findings = cast("list[dict[str, object]]", envelope["findings"])
+    assert findings
+    explanations = cast("dict[str, object]", findings[0].get("explanations"))
+    assert explanations["matched_symbols"] == ["fake.symbol"]
 
 
 def test_semantic_pro_rerank_skips_without_capability(tmp_path: Path) -> None:

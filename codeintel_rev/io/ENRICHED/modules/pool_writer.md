@@ -9,11 +9,10 @@ Lightweight Parquet writer for evaluator pools.
 ## Imports
 
 - from **__future__** import annotations
-- from **(absolute)** import json
-- from **collections.abc** import Iterable, Mapping
+- from **collections.abc** import Iterable
 - from **pathlib** import Path
 - from **types** import ModuleType
-- from **typing** import TYPE_CHECKING, Literal, Protocol, cast, runtime_checkable
+- from **typing** import TYPE_CHECKING, Literal, cast
 - from **codeintel_rev.retrieval.types** import SearchPoolRow
 - from **(absolute)** import pyarrow
 - from **(absolute)** import pyarrow.parquet
@@ -22,31 +21,29 @@ Lightweight Parquet writer for evaluator pools.
 
 ## Definitions
 
-- variable: `pa` (line 17)
-- variable: `pq` (line 18)
-- variable: `pa` (line 23)
-- variable: `pq` (line 24)
-- variable: `pa` (line 26)
-- variable: `pq` (line 27)
-- variable: `Channel` (line 29)
-- class: `_SupportsToList` (line 42)
-- function: `_empty_table` (line 62)
-- function: `_normalize_meta` (line 102)
-- function: `write_pool` (line 140)
+- variable: `pa` (line 16)
+- variable: `pq` (line 17)
+- variable: `pa` (line 22)
+- variable: `pq` (line 23)
+- variable: `pa` (line 25)
+- variable: `pq` (line 26)
+- variable: `Channel` (line 28)
+- function: `_empty_table` (line 40)
+- function: `write_pool` (line 87)
 
 ## Graph Metrics
 
 - **fan_in**: 3
 - **fan_out**: 2
-- **cycle_group**: 71
+- **cycle_group**: 76
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 10
-- recent churn 90: 10
+- recent churn 30: 11
+- recent churn 90: 11
 
 ## Usage
 
@@ -78,7 +75,7 @@ Channel, SearchPoolRow, write_pool
 
 ## Hotspot
 
-- score: 2.18
+- score: 2.08
 
 ## Side Effects
 
@@ -86,15 +83,13 @@ Channel, SearchPoolRow, write_pool
 
 ## Complexity
 
-- branches: 19
-- cyclomatic: 20
-- loc: 215
+- branches: 13
+- cyclomatic: 14
+- loc: 169
 
 ## Doc Coverage
 
-- `_SupportsToList` (class): summary=yes, examples=no — Protocol describing array-like objects exposing ``tolist``.
 - `_empty_table` (function): summary=yes, params=ok, examples=no — Return an empty evaluator table with the expected schema.
-- `_normalize_meta` (function): summary=yes, params=ok, examples=no — Return a JSON-serialisable copy of ``meta``.
 - `write_pool` (function): summary=yes, params=ok, examples=no — Write `(query_id, channel, rank, chunk_id, score, uri, ...)` rows to Parquet.
 
 ## Tags

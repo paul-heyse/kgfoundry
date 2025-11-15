@@ -61,9 +61,9 @@ Optional OpenTelemetry bootstrap helpers.
 
 ## Graph Metrics
 
-- **fan_in**: 22
+- **fan_in**: 23
 - **fan_out**: 4
-- **cycle_group**: 10
+- **cycle_group**: 9
 
 ## Ownership
 
@@ -103,7 +103,7 @@ as_span, current_span_id, current_trace_id, init_all_telemetry, init_otel, init_
 
 ## Hotspot
 
-- score: 3.25
+- score: 3.27
 
 ## Side Effects
 

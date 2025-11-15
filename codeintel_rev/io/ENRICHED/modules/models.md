@@ -24,7 +24,7 @@ Dataclasses and helpers shared across enrichment stages.
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 90
+- **cycle_group**: 89
 
 ## Ownership
 

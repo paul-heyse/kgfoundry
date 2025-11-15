@@ -12,6 +12,7 @@ from codeintel_rev.mcp_server.fetch_tool import handle_fetch
 from codeintel_rev.mcp_server.search_tool import SearchDeps, handle_search
 from codeintel_rev.mcp_server.types import (
     FetchOutput,
+    SearchOutput,
     fetch_input_schema,
     fetch_output_schema,
     search_input_schema,
@@ -86,13 +87,18 @@ def call_tool(deps: McpDeps, name: str, arguments: dict[str, Any]) -> dict[str, 
             )
         except ValueError as exc:
             return _error_response(str(exc))
-        return {"structuredContent": msgspec.to_builtins(search_out)}
+        summary = (
+            f"search returned {len(search_out.results)} results "
+            f"for '{search_out.queryEcho}'"
+        )
+        return _success_response(summary, search_out)
     if name == "fetch":
         try:
             fetch_out: FetchOutput = handle_fetch(deps.catalog, arguments or {})
         except ValueError as exc:
             return _error_response(str(exc))
-        return {"structuredContent": msgspec.to_builtins(fetch_out)}
+        summary = f"fetch returned {len(fetch_out.objects)} objects"
+        return _success_response(summary, fetch_out)
     return _error_response(f"Unknown tool: {name}")
 
 
@@ -114,4 +120,31 @@ def _error_response(message: str) -> dict[str, Any]:
         "content": [
             {"type": "text", "text": message},
         ],
+    }
+
+
+def _success_response(summary: str, payload: SearchOutput | FetchOutput) -> dict[str, Any]:
+    """Return MCP-compatible success payload with summary text and structured content.
+
+    Parameters
+    ----------
+    summary : str
+        Human-readable summary describing the tool result.
+    payload : SearchOutput | FetchOutput
+        Structured response payload emitted by the tool handler.
+
+    Returns
+    -------
+    dict[str, Any]
+        Envelope containing a text summary and structuredContent ready for MCP clients.
+    """
+    structured = msgspec.to_builtins(payload)
+    return {
+        "content": [
+            {
+                "type": "text",
+                "text": summary,
+            }
+        ],
+        "structuredContent": structured,
     }

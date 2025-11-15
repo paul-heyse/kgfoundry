@@ -16,7 +16,6 @@ chunk retrieval and joins.
 - from **collections.abc** import Callable, Iterator, Mapping, Sequence
 - from **contextlib** import contextmanager, suppress
 - from **dataclasses** import dataclass
-- from **glob** import glob
 - from **pathlib** import Path
 - from **threading** import Lock
 - from **time** import perf_counter
@@ -25,6 +24,7 @@ chunk retrieval and joins.
 - from **codeintel_rev.io.duckdb_manager** import DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 - from **codeintel_rev.io.parquet_store** import extract_embeddings
 - from **codeintel_rev.mcp_server.scope_utils** import LANGUAGE_EXTENSIONS, path_matches_glob
+- from **codeintel_rev.observability.execution_ledger** import step
 - from **codeintel_rev.observability.otel** import record_span_event
 - from **codeintel_rev.observability.semantic_conventions** import Attrs
 - from **codeintel_rev.observability.timeline** import Timeline, current_timeline
@@ -44,32 +44,33 @@ chunk retrieval and joins.
 - class: `IdMapMeta` (line 52)
 - class: `_ScopeFilterLogInfo` (line 62)
 - function: `_log_extra` (line 71)
-- class: `_ScopeFilterSpec` (line 145)
-- class: `StructureAnnotations` (line 162)
-- class: `DuckDBCatalogOptions` (line 172)
-- class: `_DuckDBQueryMixin` (line 181)
-- class: `_LegacyOptions` (line 456)
-- class: `DuckDBCatalog` (line 463)
-- function: `_relation_exists` (line 1725)
-- function: `relation_exists` (line 1759)
-- function: `_file_checksum` (line 1777)
-- function: `_parquet_hash` (line 1799)
-- function: `ensure_faiss_idmap_view` (line 1827)
-- function: `refresh_faiss_idmap_materialized` (line 1874)
+- function: `_escape_identifier` (line 95)
+- class: `_ScopeFilterSpec` (line 165)
+- class: `StructureAnnotations` (line 182)
+- class: `DuckDBCatalogOptions` (line 192)
+- class: `_DuckDBQueryMixin` (line 201)
+- class: `_LegacyOptions` (line 485)
+- class: `DuckDBCatalog` (line 492)
+- function: `_relation_exists` (line 1877)
+- function: `relation_exists` (line 1911)
+- function: `_file_checksum` (line 1929)
+- function: `_parquet_hash` (line 1951)
+- function: `ensure_faiss_idmap_view` (line 1979)
+- function: `refresh_faiss_idmap_materialized` (line 2026)
 
 ## Graph Metrics
 
-- **fan_in**: 9
-- **fan_out**: 11
-- **cycle_group**: 41
+- **fan_in**: 11
+- **fan_out**: 12
+- **cycle_group**: 42
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 46
-- recent churn 90: 46
+- recent churn 30: 47
+- recent churn 90: 47
 
 ## Usage
 
@@ -101,7 +102,7 @@ DuckDBCatalog, IdMapMeta, StructureAnnotations, ensure_faiss_idmap_view, refresh
 
 ## Hotspot
 
-- score: 3.29
+- score: 3.39
 
 ## Side Effects
 
@@ -110,22 +111,22 @@ DuckDBCatalog, IdMapMeta, StructureAnnotations, ensure_faiss_idmap_view, refresh
 
 ## Complexity
 
-- branches: 160
-- cyclomatic: 161
-- loc: 1973
+- branches: 188
+- cyclomatic: 189
+- loc: 2126
 
 ## Doc Coverage
 
 - `IdMapMeta` (class): summary=yes, examples=no — Metadata describing a materialized FAISS ID map join.
 - `_ScopeFilterLogInfo` (class): summary=yes, examples=no — Container for scope filter logging inputs.
 - `_log_extra` (function): summary=yes, params=mismatch, examples=no — Return structured log extras for catalog events.
+- `_escape_identifier` (function): summary=yes, params=ok, examples=no — Return a DuckDB-escaped identifier string.
 - `_ScopeFilterSpec` (class): summary=yes, examples=no — Structured scope filter metadata used during scoped queries.
 - `StructureAnnotations` (class): summary=yes, examples=no — Structure-aware metadata joined onto explainability pools.
 - `DuckDBCatalogOptions` (class): summary=yes, examples=no — Optional configuration bundle for DuckDB catalog instantiation.
 - `_DuckDBQueryMixin` (class): summary=yes, examples=no — Chunk-level query helpers shared by :class:`DuckDBCatalog`.
 - `_LegacyOptions` (class): summary=no, examples=no
 - `DuckDBCatalog` (class): summary=yes, examples=no — DuckDB catalog for querying chunks.
-- `_relation_exists` (function): summary=yes, params=ok, examples=no — Return True when a table or view with ``name`` exists in the main schema.
 
 ## Tags
 

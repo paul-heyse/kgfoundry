@@ -32,7 +32,7 @@ from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.gpu_warmup import warmup_gpu
 from codeintel_rev.app.middleware import SessionScopeMiddleware
 from codeintel_rev.app.readiness import ReadinessProbe
-from codeintel_rev.app.routers import index_admin
+from codeintel_rev.app.routers import diagnostics, index_admin
 from codeintel_rev.app.server_settings import get_server_settings
 from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.mcp_server.server import app_context, build_http_app
@@ -549,8 +549,7 @@ app = FastAPI(
 )
 
 
-@app.on_event("startup")
-async def _log_execution_ledger_state() -> None:
+def _log_execution_ledger_state() -> None:
     status = "enabled" if execution_ledger.SETTINGS.enabled else "disabled"
     app.state.execution_ledger_enabled = execution_ledger.SETTINGS.enabled
     app.state.execution_ledger_store = execution_ledger.STORE
@@ -564,6 +563,9 @@ async def _log_execution_ledger_state() -> None:
             else None,
         },
     )
+
+
+app.add_event_handler("startup", _log_execution_ledger_state)
 
 
 init_all_telemetry(
@@ -592,6 +594,8 @@ if SERVER_SETTINGS.enable_trusted_hosts:
 
 if os.getenv("CODEINTEL_ADMIN", "").strip().lower() in {"1", "true", "yes", "on"}:
     app.include_router(index_admin.router)
+
+app.include_router(diagnostics.router)
 
 
 @app.get("/observability/run_report")

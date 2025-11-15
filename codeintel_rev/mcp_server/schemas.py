@@ -165,6 +165,14 @@ class Location(TypedDict):
     end_column: int
 
 
+class ExplanationPayload(TypedDict, total=False):
+    """Structure-aware explanation metadata attached to findings."""
+
+    matched_symbols: list[str]
+    ast_kind: str | None
+    cst_hits: list[str]
+
+
 class Finding(TypedDict, total=False):
     """Generic finding result from code intelligence queries.
 
@@ -204,6 +212,9 @@ class Finding(TypedDict, total=False):
         Internal chunk identifier used for hydration bookkeeping and hybrid fusion.
         Not all clients need this value; it is primarily used by the server when
         combining multiple retrieval channels.
+    explanations : ExplanationPayload
+        Structure-aware explanation payload describing matched symbols, AST node
+        kinds, and CST hits contributing to the finding.
     """
 
     type: Literal["definition", "reference", "usage", "doc", "security", "api"]
@@ -213,6 +224,7 @@ class Finding(TypedDict, total=False):
     score: float
     why: str
     chunk_id: int
+    explanations: ExplanationPayload
 
 
 class MethodInfo(TypedDict, total=False):

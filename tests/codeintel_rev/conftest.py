@@ -119,7 +119,7 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
             xtr_dir="data/xtr",
         ),
         index=IndexConfig(
-            vec_dim=2560,
+            vec_dim=3584,
             chunk_budget=2200,
             faiss_nlist=8192,
             use_cuvs=True,

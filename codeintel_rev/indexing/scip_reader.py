@@ -22,14 +22,18 @@ RANGE_TUPLE_LENGTH = 4
 
 
 def _range_from_list(rng: Sequence[object]) -> tuple[int, int, int, int] | None:
-    if len(rng) != RANGE_TUPLE_LENGTH:
+    if len(rng) not in {RANGE_TUPLE_LENGTH, 3}:
         return None
     normalized: list[int] = []
     for value in rng:
         if not isinstance(value, (int, float)):
             return None
         normalized.append(int(value))
-    sl, sc, el, ec = normalized
+    if len(normalized) == RANGE_TUPLE_LENGTH:
+        sl, sc, el, ec = normalized
+    else:
+        sl, sc, ec = normalized
+        el = sl
     return (sl, sc, el, ec)
 
 
@@ -37,7 +41,7 @@ def _parse_occurrence(record: dict) -> tuple[str, tuple[int, int, int, int], int
     symbol = record.get("symbol", "")
     if not symbol:
         return None
-    rng = record.get("range") or record.get("enclosingRange")
+    rng = record.get("range") or record.get("enclosingRange") or record.get("enclosing_range")
     range_tuple: tuple[int, int, int, int] | None = None
     if isinstance(rng, list):
         range_tuple = _range_from_list(rng)

@@ -25,7 +25,8 @@ from datetime import UTC, datetime
 from functools import wraps
 from pathlib import Path
 from threading import RLock
-from typing import Any
+from types import TracebackType
+from typing import Any, Self, TypedDict
 
 import msgspec
 
@@ -60,7 +61,7 @@ _SENSITIVE_REQUEST_KEYS: tuple[str, ...] = (
 )
 
 
-def _env_flag(name: str, default: bool) -> bool:
+def _env_flag(name: str, *, default: bool) -> bool:
     raw = os.getenv(name)
     if raw is None:
         return default
@@ -123,6 +124,42 @@ class LedgerRun(msgspec.Struct, frozen=True):
     completed_at_ns: int
     stage_durations_ms: dict[str, float]
     warnings: list[str]
+
+
+class LedgerReportEntry(TypedDict, total=False):
+    """Structured dictionary representing a single ledger entry."""
+
+    stage: str | None
+    op: str
+    component: str
+    ok: bool
+    attrs: dict[str, object] | None
+    ts_start: int
+    ts_end: int | None
+
+
+class LedgerReportPayload(TypedDict, total=False):
+    """Serialized ledger run enriched with derived diagnostics."""
+
+    run_id: str
+    session_id: str | None
+    tool: str
+    status: str
+    stopped_because: str | None
+    stage_durations_ms: dict[str, float]
+    warnings: list[str]
+    entries: list[LedgerReportEntry]
+    request: dict[str, object]
+    trace_id: str | None
+    root_span_id: str | None
+    started_at: str
+    completed_at: str
+    duration_ms: float
+    stages_reached: list[str]
+    last_stage: str | None
+    envelope: dict[str, object]
+    errors: list[dict[str, object]]
+    stop_reason: str | None
 
 
 class ExecutionLedgerStore:
@@ -304,13 +341,15 @@ class _ActiveRun:
         """
         return time.perf_counter_ns() - self._perf_origin_ns
 
-    def new_op_id(self) -> str:
-        """Generate a new unique operation identifier.
+    @staticmethod
+    def new_op_id() -> str:
+        """Return a new unique operation identifier.
 
         Returns
         -------
         str
-            Hexadecimal UUID string identifying a new operation within this run.
+            Randomly generated hexadecimal identifier suitable for correlating
+            nested ledger operations.
         """
         return uuid.uuid4().hex
 
@@ -508,7 +547,11 @@ def _infer_stop_reason(entries: Sequence[LedgerEntry], stage_sequence: Sequence[
         reason = str(detail) if detail else "error"
         return f"{(last_entry.stage or last_entry.op)}:{reason}"
     order_map = {stage: idx for idx, stage in enumerate(stage_sequence)}
-    seen = {entry.stage for entry in entries if entry.stage in order_map}
+    seen: set[str] = {
+        entry.stage
+        for entry in entries
+        if entry.stage is not None and entry.stage in order_map
+    }
     if not seen:
         return "completed"
     highest = max(order_map[stage] for stage in seen)
@@ -580,10 +623,10 @@ def _load_settings() -> LedgerSettings:
     flush_path_str = os.getenv("LEDGER_FLUSH_PATH")
     flush_path = Path(flush_path_str).resolve() if flush_path_str else None
     return LedgerSettings(
-        enabled=_env_flag("LEDGER_ENABLED", True),
+        enabled=_env_flag("LEDGER_ENABLED", default=True),
         max_runs=_env_int("LEDGER_MAX_RUNS", 512),
         flush_path=flush_path,
-        include_request_body=_env_flag("LEDGER_INCLUDE_REQUEST_BODY", False),
+        include_request_body=_env_flag("LEDGER_INCLUDE_REQUEST_BODY", default=False),
     )
 
 
@@ -664,7 +707,7 @@ def begin_run(
         "run.begin",
         stage="request",
         component="mcp.run",
-        **{
+        attrs={
             Attrs.MCP_TOOL: tool,
             Attrs.MCP_SESSION_ID: session_id,
             Attrs.MCP_RUN_ID: resolved_id,
@@ -713,7 +756,7 @@ def end_run(*, status: str | None = None, stop_reason: str | None = None) -> Led
         stage="envelope",
         component="mcp.run",
         ok=is_ok,
-        **{
+        attrs={
             Attrs.LEDGER_STATUS: status or ("ok" if is_ok else "error"),
             Attrs.LEDGER_STOP_REASON: stop_reason,
             Attrs.MCP_RUN_ID: run.run_id,
@@ -798,7 +841,7 @@ class LedgerStep(ContextDecorator):
 
         return wrapper
 
-    def __enter__(self) -> LedgerStep:
+    def __enter__(self) -> Self:
         """Enter the ledger step context manager.
 
         Returns
@@ -821,7 +864,12 @@ class LedgerStep(ContextDecorator):
         record_span_event("ledger.step.start", **as_kv(**payload))
         return self
 
-    def __exit__(self, exc_type, exc, _tb) -> bool:
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        _tb: TracebackType | None,
+    ) -> bool:
         """Exit the ledger step context manager.
 
         Parameters
@@ -923,7 +971,8 @@ def record(
     ok: bool = True,
     stage: str | None = None,
     component: str = "mcp",
-    **attrs: object,
+    attrs: Mapping[str, object] | None = None,
+    **extra_attrs: object,
 ) -> None:
     """Record a fine-grained ledger event outside of a context manager.
 
@@ -941,9 +990,13 @@ def record(
     component : str, optional
         Component name identifying the subsystem emitting the event. Defaults
         to "mcp".
-    **attrs : object
+    attrs : Mapping[str, object] | None, optional
         Additional attributes to attach to the ledger entry. These attributes
-        are included in the entry and span events for observability.
+        are included in the entry and span events for observability. Use this
+        parameter when attribute keys are not valid Python identifiers.
+    **extra_attrs : object
+        Convenience keyword attributes merged with ``attrs``. These should be
+        valid Python identifiers.
     """
     if not SETTINGS.enabled:
         return
@@ -952,6 +1005,8 @@ def record(
         return
     now = run.monotonic_offset()
     parent = run.current_parent()
+    merged_attrs: dict[str, object] = dict(attrs or {})
+    merged_attrs.update(extra_attrs)
     entry = LedgerEntry(
         ts_start=now,
         ts_end=now,
@@ -959,7 +1014,7 @@ def record(
         stage=stage,
         op=event_name,
         component=component,
-        attrs=_normalize_attrs(attrs),
+        attrs=_normalize_attrs(merged_attrs),
         trace_id=current_trace_id(),
         span_id=current_span_id(),
         session_id=run.session_id,
@@ -998,7 +1053,27 @@ def get_run(run_id: str) -> LedgerRun | None:
     return STORE.get(run_id)
 
 
-def to_json(run_id: str) -> dict[str, object]:
+def build_run_report(run_id: str) -> LedgerReportPayload:
+    """Return a structured report payload for ``run_id``.
+
+    Returns
+    -------
+    LedgerReportPayload
+        Structured payload describing the run timeline, warnings, and envelope.
+
+    Raises
+    ------
+    KeyError
+        Raised when ``run_id`` does not exist in the in-memory ledger.
+    """
+    run = STORE.get(run_id)
+    if run is None:
+        msg = f"Run {run_id} not found"
+        raise KeyError(msg)
+    return _build_report_payload(run)
+
+
+def to_json(run_id: str) -> LedgerReportPayload:
     """Return a JSON-serializable payload for the specified run.
 
     Parameters
@@ -1032,49 +1107,18 @@ def to_markdown(run_id: str) -> str:
     Parameters
     ----------
     run_id : str
-        Unique identifier for the ledger run to generate a Markdown report for.
+        Unique identifier for the ledger run to render.
 
     Returns
     -------
     str
-        Markdown-formatted report string containing run metadata, entries, and
-        execution timeline. The report is suitable for display in documentation
-        or markdown viewers.
-
-    Raises
-    ------
-    KeyError
-        Raised when the run_id does not exist in the store. The error is
-        propagated from to_json().
+        Markdown string describing the run timeline, durations, and envelope.
     """
-    payload = to_json(run_id)
-    sections = [
-        f"### Run `{payload['run_id']}`",
-        "",
-        f"*Tool*: `{payload['tool']}`",
-        f"*Session*: `{payload.get('session_id') or 'unknown'}`",
-        f"*Status*: {payload['status']} ({payload['stopped_because']})",
-        "",
-        "#### Stage durations (ms)",
-    ]
-    stage_lines = [
-        f"- {stage}: {duration:.2f} ms" for stage, duration in payload["stage_durations_ms"].items()
-    ]
-    sections.extend(stage_lines or ["- none"])
-    sections.append("\n#### Events")
-    for entry in payload["entries"]:
-        duration_ms = 0.0
-        if entry["ts_end"] is not None:
-            duration_ms = (entry["ts_end"] - entry["ts_start"]) / 1_000_000
-        sections.append(
-            textwrap.dedent(
-                f"- `{entry['stage'] or entry['op']}` {entry['component']} :: {entry['op']} :: {'ok' if entry['ok'] else 'error'} ({duration_ms:.2f} ms)"
-            ).strip()
-        )
-    return "\n".join(sections)
+    payload = build_run_report(run_id)
+    return report_to_markdown(payload)
 
 
-def _serialize_run(run: LedgerRun) -> dict[str, object]:
+def _serialize_run(run: LedgerRun) -> LedgerReportPayload:
     """Serialize a LedgerRun to a JSON-serializable dictionary.
 
     Parameters
@@ -1109,18 +1153,92 @@ def _serialize_run(run: LedgerRun) -> dict[str, object]:
     }
 
 
+def _build_report_payload(run: LedgerRun) -> LedgerReportPayload:
+    payload = _serialize_run(run)
+    entries = list(run.entries)
+    stage_sequence = [entry.stage for entry in entries if entry.stage]
+    payload["duration_ms"] = (run.completed_at_ns - run.started_at_ns) / 1_000_000
+    payload["stages_reached"] = stage_sequence
+    payload["last_stage"] = stage_sequence[-1] if stage_sequence else None
+    payload["stop_reason"] = run.stopped_because
+    payload["errors"] = [
+        {
+            "stage": entry.stage,
+            "op": entry.op,
+            "component": entry.component,
+            "attrs": entry.attrs or {},
+        }
+        for entry in entries
+        if not entry.ok
+    ]
+    payload["envelope"] = _extract_envelope_summary(entries)
+    return payload
+
+
+def _extract_envelope_summary(entries: Sequence[LedgerEntry]) -> dict[str, object]:
+    for entry in reversed(entries):
+        if entry.stage == "envelope" and entry.attrs:
+            return dict(entry.attrs)
+    return {}
+
+
+def report_to_markdown(payload: LedgerReportPayload) -> str:
+    """Render a run report payload as Markdown.
+
+    Parameters
+    ----------
+    payload : LedgerReportPayload
+        Serialized payload returned by :func:`build_run_report`.
+
+    Returns
+    -------
+    str
+        Markdown-encoded report suitable for diagnostics tooling.
+    """
+    sections = [
+        f"### Run `{payload.get('run_id', 'unknown')}`",
+        "",
+        f"*Tool*: `{payload.get('tool', 'unknown')}`",
+        f"*Session*: `{payload.get('session_id') or 'unknown'}`",
+        f"*Status*: {payload.get('status')} ({payload.get('stop_reason')})",
+        f"*Duration*: {payload.get('duration_ms', 0.0):.2f} ms",
+        "",
+        "#### Stage durations (ms)",
+    ]
+    stage_durations = payload.get("stage_durations_ms") or {}
+    stage_lines = [f"- {stage}: {duration:.2f} ms" for stage, duration in stage_durations.items()]
+    sections.extend(stage_lines or ["- none"])
+    sections.append("\n#### Events")
+    for entry in payload.get("entries", []):
+        ts_end = entry.get("ts_end")
+        ts_start = entry.get("ts_start")
+        duration_ms = 0.0
+        if ts_end is not None and ts_start is not None:
+            duration_ms = (ts_end - ts_start) / 1_000_000
+        sections.append(
+            textwrap.dedent(
+                f"- `{entry.get('stage') or entry.get('op')}` {entry.get('component')} :: {entry.get('op')} :: {'ok' if entry.get('ok') else 'error'} ({duration_ms:.2f} ms)"
+            ).strip()
+        )
+    return "\n".join(sections)
+
+
 __all__ = [
     "DEFAULT_STAGE_SEQUENCE",
     "ExecutionLedgerStore",
     "LedgerEntry",
+    "LedgerReportEntry",
+    "LedgerReportPayload",
     "LedgerRun",
     "LedgerSettings",
     "LedgerStep",
     "begin_run",
+    "build_run_report",
     "current_run",
     "end_run",
     "get_run",
     "record",
+    "report_to_markdown",
     "step",
     "to_json",
     "to_markdown",

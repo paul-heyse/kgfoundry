@@ -27,6 +27,12 @@ from codeintel_rev.mcp_server.scope_utils import (
     get_effective_scope,
     merge_scope_filters,
 )
+from codeintel_rev.observability.execution_ledger import (
+    record as ledger_record,
+)
+from codeintel_rev.observability.execution_ledger import (
+    step as ledger_step,
+)
 from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
@@ -89,7 +95,13 @@ async def set_scope(context: ApplicationContext, scope: ScopeIn) -> dict:
     If no session ID is available, this function will raise RuntimeError.
     """
     session_id = get_session_id()
-    await context.scope_store.set(session_id, scope)
+    with ledger_step(
+        stage="gather",
+        op="files.set_scope",
+        component="mcp.files",
+        attrs={"session_id": session_id},
+    ):
+        await context.scope_store.set(session_id, scope)
 
     LOGGER.info(
         "Set scope for session",
@@ -176,7 +188,13 @@ async def list_paths(context: ApplicationContext, *args: object, **kwargs: objec
     folders are pruned without visiting their contents.
     """
     session_id = get_session_id()
-    scope = await get_effective_scope(context, session_id)
+    with ledger_step(
+        stage="gather",
+        op="files.scope",
+        component="mcp.files",
+        attrs={"session_id": session_id},
+    ):
+        scope = await get_effective_scope(context, session_id)
     path, include_globs, exclude_globs, languages, max_results = _normalize_list_paths_arguments(
         args, kwargs
     )
@@ -190,14 +208,37 @@ async def list_paths(context: ApplicationContext, *args: object, **kwargs: objec
         "Listing paths (async)",
         extra={"path": path, "max_results": max_results},
     )
-    return await asyncio.to_thread(
-        _list_paths_sync,
-        context,
-        session_id,
-        scope,
-        path,
-        filters,
+    attrs = {
+        "path": path or ".",
+        "max_results": filters.max_results,
+    }
+
+    async def _run() -> dict:
+        with ledger_step(
+            stage="pool_search",
+            op="files.list_paths",
+            component="mcp.files",
+            attrs=attrs,
+        ):
+            result = await asyncio.to_thread(
+                _list_paths_sync,
+                context,
+                session_id,
+                scope,
+                path,
+                filters,
+            )
+        return result
+
+    result = await _run()
+    ledger_record(
+        "files.list_paths",
+        stage="envelope",
+        component="mcp.files",
+        results=result.get("total", 0),
+        truncated=result.get("truncated", False),
     )
+    return result
 
 
 def _normalize_list_paths_arguments(
@@ -543,24 +584,28 @@ def open_file(
     """
     repo_root = context.paths.repo_root
 
-    # Path validation (raises PathOutsideRepositoryError or FileNotFoundError)
-    try:
-        file_path = resolve_within_repo(repo_root, path, allow_nonexistent=False)
-    except FileNotFoundError as exc:
-        error_msg = f"Path not found: {path}"
-        raise PathNotFoundError(error_msg, path=path, cause=exc) from exc
+    with ledger_step(
+        stage="hydrate",
+        op="files.open_file",
+        component="mcp.files",
+        attrs={"path": path},
+    ):
+        # Path validation
+        try:
+            file_path = resolve_within_repo(repo_root, path, allow_nonexistent=False)
+        except FileNotFoundError as exc:
+            error_msg = f"Path not found: {path}"
+            raise PathNotFoundError(error_msg, path=path, cause=exc) from exc
 
-    # File type check
-    if not file_path.is_file():
-        error_msg = f"Not a file: {path}"
-        raise PathNotFoundError(error_msg, path=path)
+        if not file_path.is_file():
+            error_msg = f"Not a file: {path}"
+            raise PathNotFoundError(error_msg, path=path)
 
-    # Read content (raises UnicodeDecodeError → wrapped by decorator)
-    try:
-        content = file_path.read_text(encoding="utf-8")
-    except UnicodeDecodeError as exc:
-        error_msg = "Binary file or encoding error"
-        raise FileReadError(error_msg, path=path) from exc
+        try:
+            content = file_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as exc:
+            error_msg = "Binary file or encoding error"
+            raise FileReadError(error_msg, path=path) from exc
 
     # Line validation (raise typed exceptions)
     if start_line is not None and start_line <= 0:
@@ -592,13 +637,19 @@ def open_file(
         end_idx = end_line if end_line is not None else len(lines)
         content = "".join(lines[start_idx:end_idx])
 
-    # Success case
-    return {
+    result = {
         "path": path,
         "content": content,
         "lines": len(content.splitlines()),
         "size": len(content),
     }
+    ledger_record(
+        "files.open_file",
+        stage="envelope",
+        component="mcp.files",
+        results=result["lines"],
+    )
+    return result
 
 
 __all__ = ["list_paths", "open_file", "set_scope"]

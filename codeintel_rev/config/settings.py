@@ -182,18 +182,18 @@ def _optional_int(raw: str | None) -> int | None:
 def _build_vllm_config() -> VLLMConfig:
     run_mode_env = os.environ.get("VLLM_RUN_MODE", "inprocess").lower()
     run_mode = VLLMRunMode(mode="http" if run_mode_env == "http" else "inprocess")
-    pooling_env = os.environ.get("VLLM_POOLING_TYPE", "lasttoken").lower()
+    pooling_env = os.environ.get("VLLM_POOLING_TYPE", "last").strip().lower()
     if pooling_env == "cls":
-        pooling_type: Literal["lasttoken", "cls", "mean"] = "cls"
+        pooling_type: Literal["LAST", "CLS", "MEAN"] = "CLS"
     elif pooling_env == "mean":
-        pooling_type = "mean"
+        pooling_type = "MEAN"
     else:
-        pooling_type = "lasttoken"
+        pooling_type = "LAST"
     return VLLMConfig(
         base_url=os.environ.get("VLLM_URL", "http://127.0.0.1:8001/v1"),
         model=os.environ.get("VLLM_MODEL", "nomic-ai/nomic-embed-code"),
         batch_size=int(os.environ.get("VLLM_BATCH_SIZE", "64")),
-        embedding_dim=int(os.environ.get("VLLM_EMBED_DIM", "2560")),
+        embedding_dim=int(os.environ.get("VLLM_EMBED_DIM", "3584")),
         timeout_s=float(os.environ.get("VLLM_TIMEOUT_S", "120.0")),
         run=run_mode,
         gpu_memory_utilization=float(os.environ.get("VLLM_GPU_MEMORY_UTILIZATION", "0.92")),
@@ -408,14 +408,14 @@ class VLLMConfig(msgspec.Struct, frozen=True):
     model : str
         Model identifier for embeddings. This should match a model that the
         vLLM server has loaded. Defaults to "nomic-ai/nomic-embed-code" which
-        is a code-specific embedding model with 2560 dimensions.
+        is a code-specific embedding model with 3584 dimensions.
     batch_size : int
         Number of texts to embed in a single batch request. Larger batches improve
         throughput but increase memory usage. Defaults to 64, which is a good
         balance for most GPU setups.
     embedding_dim : int
         Dimensionality of embeddings returned by the configured model. Defaults to
-        2560 to match the deployed nomic-embed-code checkpoint. Consumers should
+        3584 to match the deployed nomic-embed-code checkpoint. Consumers should
         keep this aligned with :class:`IndexConfig` ``vec_dim``.
     timeout_s : float
         HTTP request timeout in seconds. Embedding requests can take time for
@@ -434,10 +434,11 @@ class VLLMConfig(msgspec.Struct, frozen=True):
     normalize : bool
         Whether to L2-normalize embeddings after generation. Normalized embeddings
         enable cosine similarity computation via dot product. Defaults to True.
-    pooling_type : Literal["lasttoken", "cls", "mean"]
+    pooling_type : Literal["LAST", "CLS", "MEAN"]
         Token pooling strategy for generating embeddings from token-level outputs.
-        "lasttoken" uses the final token embedding, "cls" uses a special CLS token,
-        "mean" averages all token embeddings. Defaults to "lasttoken".
+        Values are case-insensitive and normalized to ``LAST``, ``CLS``, or ``MEAN``.
+        "last" uses the final token embedding, "cls" uses a special CLS token,
+        "mean" averages all token embeddings. Defaults to "last".
     max_concurrent_requests : int
         Maximum number of concurrent embedding requests allowed when using HTTP mode.
         Higher values improve throughput but increase memory usage. Defaults to 4.
@@ -446,13 +447,13 @@ class VLLMConfig(msgspec.Struct, frozen=True):
     base_url: str = "http://127.0.0.1:8001/v1"
     model: str = "nomic-ai/nomic-embed-code"
     batch_size: int = 64
-    embedding_dim: int = 2560
+    embedding_dim: int = 3584
     timeout_s: float = 120.0
     run: VLLMRunMode = VLLMRunMode()
     gpu_memory_utilization: float = 0.92
     max_num_batched_tokens: int = 65_536
     normalize: bool = True
-    pooling_type: Literal["lasttoken", "cls", "mean"] = "lasttoken"
+    pooling_type: Literal["LAST", "CLS", "MEAN"] = "LAST"
     max_concurrent_requests: int = 4
 
 
@@ -690,7 +691,7 @@ class IndexConfig(msgspec.Struct, frozen=True):
     controls introduced here.
     """
 
-    vec_dim: int = 2560
+    vec_dim: int = 3584
     chunk_budget: int = 2200
     faiss_nlist: int = 8192
     faiss_nprobe: int = 128
@@ -926,7 +927,7 @@ def load_settings() -> Settings:
         HTTP timeout for vLLM requests in seconds (default: 120.0).
     VLLM_EMBED_DIM : int, optional
         Embedding vector dimension for empty responses and validation
-        (default: 2560).
+        (default: 3584).
     REPO_ROOT : str, optional
         Repository root directory path (default: current working directory).
     DATA_DIR : str, optional
@@ -946,7 +947,7 @@ def load_settings() -> Settings:
     SCIP_INDEX : str, optional
         SCIP index file path (default: "index.scip").
     VEC_DIM : int, optional
-        Embedding vector dimension (default: 2560).
+        Embedding vector dimension (default: 3584).
     CHUNK_BUDGET : int, optional
         Target chunk size in characters (default: 2200).
     FAISS_NLIST : int, optional
@@ -1243,7 +1244,7 @@ def _build_index_config(
     recency_max_boost = float(os.environ.get("INDEX_RECENCY_MAX_BOOST", "0.15"))
     recency_table = os.environ.get("INDEX_RECENCY_TABLE", "chunks")
     return IndexConfig(
-        vec_dim=int(os.environ.get("VEC_DIM", "2560")),
+        vec_dim=int(os.environ.get("VEC_DIM", "3584")),
         chunk_budget=int(os.environ.get("CHUNK_BUDGET", "2200")),
         faiss_nlist=int(os.environ.get("FAISS_NLIST", "8192")),
         faiss_nprobe=int(os.environ.get("FAISS_NPROBE", "128")),

@@ -36,10 +36,11 @@ Provides health/readiness endpoints, CORS, and streaming support.
 - from **codeintel_rev.app.gpu_warmup** import warmup_gpu
 - from **codeintel_rev.app.middleware** import SessionScopeMiddleware
 - from **codeintel_rev.app.readiness** import ReadinessProbe
-- from **codeintel_rev.app.routers** import index_admin
+- from **codeintel_rev.app.routers** import diagnostics, index_admin
 - from **codeintel_rev.app.server_settings** import get_server_settings
 - from **codeintel_rev.errors** import RuntimeUnavailableError
 - from **codeintel_rev.mcp_server.server** import app_context, build_http_app
+- from **codeintel_rev.observability** import execution_ledger
 - from **codeintel_rev.observability.otel** import as_span, current_trace_id, init_all_telemetry, set_current_span_attrs
 - from **codeintel_rev.observability.runtime_observer** import TimelineRuntimeObserver
 - from **codeintel_rev.observability.semantic_conventions** import Attrs
@@ -54,58 +55,60 @@ Provides health/readiness endpoints, CORS, and streaming support.
 
 ## Definitions
 
-- variable: `LOGGER` (line 64)
-- variable: `SERVER_SETTINGS` (line 65)
-- function: `_sse_keepalive_interval` (line 76)
-- function: `_sse_keepalive_budget` (line 94)
-- function: `_client_address` (line 114)
-- function: `_log_request_summary` (line 136)
-- function: `_stream_log_extra` (line 152)
-- function: `_preload_faiss_index` (line 191)
-- function: `_env_flag` (line 222)
-- function: `_resolve_proxy_trusted_hops` (line 239)
-- function: `_log_gpu_warmup` (line 261)
-- function: `_preload_faiss_if_configured` (line 282)
-- function: `_preload_xtr_if_configured` (line 292)
-- function: `_preload_hybrid_if_configured` (line 306)
-- function: `_initialize_context` (line 317)
-- function: `_shutdown_context` (line 405)
-- function: `lifespan` (line 428)
-- variable: `app` (line 523)
-- function: `observability_run_report` (line 557)
-- function: `get_run_report` (line 594)
-- function: `get_run_report_markdown` (line 636)
-- function: `get_run_report_mermaid` (line 679)
-- function: `get_run_report_v2` (line 711)
-- function: `get_run_report_markdown_v2` (line 731)
-- function: `get_run_report_mermaid_v2` (line 753)
-- function: `inject_request_id` (line 775)
-- function: `set_mcp_context` (line 802)
-- function: `disable_nginx_buffering` (line 881)
-- function: `healthz` (line 917)
-- function: `readyz` (line 929)
-- function: `capz` (line 964)
-- function: `_stream_with_logging` (line 1006)
-- function: `sse_demo` (line 1068)
-- function: `http_exception_handler_with_request_id` (line 1121)
-- function: `unhandled_exception_handler` (line 1153)
-- variable: `proxy_wrapped` (line 1194)
-- variable: `asgi` (line 1199)
-- variable: `asgi` (line 1201)
+- variable: `LOGGER` (line 65)
+- variable: `SERVER_SETTINGS` (line 66)
+- function: `request_identity` (line 77)
+- function: `_sse_keepalive_interval` (line 98)
+- function: `_sse_keepalive_budget` (line 116)
+- function: `_client_address` (line 136)
+- function: `_log_request_summary` (line 158)
+- function: `_stream_log_extra` (line 174)
+- function: `_preload_faiss_index` (line 213)
+- function: `_env_flag` (line 244)
+- function: `_resolve_proxy_trusted_hops` (line 261)
+- function: `_log_gpu_warmup` (line 283)
+- function: `_preload_faiss_if_configured` (line 304)
+- function: `_preload_xtr_if_configured` (line 314)
+- function: `_preload_hybrid_if_configured` (line 328)
+- function: `_initialize_context` (line 339)
+- function: `_shutdown_context` (line 427)
+- function: `lifespan` (line 450)
+- variable: `app` (line 545)
+- function: `_log_execution_ledger_state` (line 552)
+- function: `observability_run_report` (line 602)
+- function: `get_run_report` (line 639)
+- function: `get_run_report_markdown` (line 681)
+- function: `get_run_report_mermaid` (line 724)
+- function: `get_run_report_v2` (line 756)
+- function: `get_run_report_markdown_v2` (line 776)
+- function: `get_run_report_mermaid_v2` (line 798)
+- function: `inject_request_id` (line 820)
+- function: `set_mcp_context` (line 847)
+- function: `disable_nginx_buffering` (line 926)
+- function: `healthz` (line 962)
+- function: `readyz` (line 974)
+- function: `capz` (line 1009)
+- function: `_stream_with_logging` (line 1051)
+- function: `sse_demo` (line 1113)
+- function: `http_exception_handler_with_request_id` (line 1166)
+- function: `unhandled_exception_handler` (line 1198)
+- variable: `proxy_wrapped` (line 1239)
+- variable: `asgi` (line 1244)
+- variable: `asgi` (line 1246)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 18
-- **cycle_group**: 55
+- **fan_out**: 19
+- **cycle_group**: 59
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 35
-- recent churn 90: 35
+- recent churn 30: 36
+- recent churn 90: 36
 
 ## Usage
 
@@ -141,7 +144,7 @@ app, asgi
 
 ## Hotspot
 
-- score: 3.07
+- score: 3.10
 
 ## Side Effects
 
@@ -150,12 +153,13 @@ app, asgi
 
 ## Complexity
 
-- branches: 87
-- cyclomatic: 88
-- loc: 1205
+- branches: 89
+- cyclomatic: 90
+- loc: 1250
 
 ## Doc Coverage
 
+- `request_identity` (function): summary=yes, params=ok, examples=no — Return the session/run identifiers bound to ``request``.
 - `_sse_keepalive_interval` (function): summary=yes, params=ok, examples=no — Return the configured SSE keep-alive interval (seconds).
 - `_sse_keepalive_budget` (function): summary=yes, params=ok, examples=no — Return optional cap on keep-alive frames for long-lived SSE streams.
 - `_client_address` (function): summary=yes, params=ok, examples=no — Return a printable representation of the originating client address.
@@ -165,7 +169,6 @@ app, asgi
 - `_env_flag` (function): summary=yes, params=ok, examples=no — Return ``True`` when an environment flag is explicitly enabled.
 - `_resolve_proxy_trusted_hops` (function): summary=yes, params=ok, examples=no — Return ProxyFix trusted hop count with PROXY_TRUSTED_HOPS override.
 - `_log_gpu_warmup` (function): summary=yes, params=ok, examples=no — Log the GPU warmup status summary.
-- `_preload_faiss_if_configured` (function): summary=yes, params=mismatch, examples=no — Preload FAISS indexes when configured to do so.
 
 ## Tags
 

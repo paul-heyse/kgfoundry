@@ -30,9 +30,9 @@ class SearchPoolRow:
     query_id: str
     channel: str
     rank: int
-    id: ChunkId
+    chunk_id: ChunkId
     score: float
-    meta: Mapping[str, object] = field(default_factory=dict)
+    reason: Mapping[str, object] = field(default_factory=dict)
 
 
 @dataclass(slots=True, frozen=True)

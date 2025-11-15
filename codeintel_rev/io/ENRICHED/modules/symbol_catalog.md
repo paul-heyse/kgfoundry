@@ -23,7 +23,7 @@ DuckDB symbol catalog writer.
 
 - **fan_in**: 3
 - **fan_out**: 1
-- **cycle_group**: 38
+- **cycle_group**: 41
 
 ## Ownership
 
@@ -69,7 +69,7 @@ DuckDB symbol catalog writer.
 
 - branches: 10
 - cyclomatic: 11
-- loc: 241
+- loc: 270
 
 ## Doc Coverage
 

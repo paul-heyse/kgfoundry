@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -32,9 +33,14 @@ def test_export_idmap_round_trip(tmp_path: Path) -> None:
     assert rows == 32
 
     table = pq.read_table(out_path)
-    assert set(table.column_names) == {"faiss_row", "external_id"}
+    assert set(table.column_names) == {"faiss_row", "external_id", "index_name", "ts"}
     assert table.num_rows == 32
     assert table.column("external_id").to_pylist()[:5] == [0, 1, 2, 3, 4]
+    index_names = table.column("index_name").to_pylist()
+    assert all(name == "index.faiss" for name in index_names)
+    timestamps = table.column("ts").to_pylist()
+    assert isinstance(timestamps[0], datetime)
+    assert timestamps[0].tzinfo is not None
 
 
 def test_duckdb_join_with_idmap(tmp_path: Path) -> None:
@@ -86,6 +92,31 @@ def test_duckdb_join_with_idmap(tmp_path: Path) -> None:
     row = conn.execute("SELECT COUNT(*) FROM v_faiss_join WHERE faiss_row IS NOT NULL").fetchone()
     assert row is not None
     assert row[0] == len(ids)
+
+
+def test_load_cpu_index_applies_tuning_profile(tmp_path: Path) -> None:
+    """Persisted tuning profile is applied when loading a CPU index."""
+    vec_dim = 8
+    vectors = np.random.RandomState(7).randn(64, vec_dim).astype(np.float32)
+    manager = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim, use_cuvs=False)
+    manager.build_index(vectors)
+    manager.save_cpu_index()
+    profile_payload = {
+        "nprobe": 12,
+        "efSearch": 64,
+        "k_factor": 1.25,
+        "factory": "Flat",
+    }
+    (tmp_path / "tuning.json").write_text(json.dumps(profile_payload), encoding="utf-8")
+
+    reloaded = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim, use_cuvs=False)
+    reloaded.load_cpu_index()
+
+    runtime = reloaded.get_runtime_tuning()
+    active = cast("Mapping[str, object]", runtime["active"])
+    assert active["nprobe"] == 12
+    assert active["efSearch"] == 64
+    assert reloaded.refine_k_factor == pytest.approx(1.25)
 
 
 def _meta_path(manager: FAISSManager) -> Path:

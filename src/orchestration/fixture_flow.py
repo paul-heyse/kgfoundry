@@ -118,11 +118,11 @@ def _t_write_fixture_dense_impl(dense_root: str) -> tuple[str, int]:
         Tuple of (dataset_root_path, row_count).
     """
     writer = ParquetVectorWriter(dense_root)
-    vector = [0.0] * 2560
+    vector = [0.0] * 3584
     out_root = writer.write_dense(
         "Qwen3-Embedding-4B",
         "fixture",
-        2560,
+        3584,
         [("urn:chunk:fixture:0-28", vector, 1.0)],
         shard=0,
     )
@@ -193,7 +193,7 @@ def _t_register_in_duckdb_impl(
         Dictionary with "runs" key containing list of run IDs.
     """
     registry = DuckDBRegistryHelper(db_path)
-    dense_run = registry.new_run("dense_embed", "Qwen3-Embedding-4B", "main", {"dim": 2560})
+    dense_run = registry.new_run("dense_embed", "Qwen3-Embedding-4B", "main", {"dim": 3584})
     sparse_run = registry.new_run("splade_encode", "SPLADE-v3-distilbert", "main", {"topk": 256})
 
     ds_chunks = registry.begin_dataset("chunks", dense_run)
