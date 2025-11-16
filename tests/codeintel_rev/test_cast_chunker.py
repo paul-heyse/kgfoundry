@@ -5,6 +5,8 @@ from pathlib import Path
 from codeintel_rev.indexing.cast_chunker import chunk_file
 from codeintel_rev.indexing.scip_reader import Range, SymbolDef
 
+from tests._helpers import assertions
+
 
 def test_chunk_with_mid_line_bounds_uses_correct_line_indices() -> None:
     """Chunk boundaries inside lines should map to the containing lines."""
@@ -25,10 +27,10 @@ def test_chunk_with_mid_line_bounds_uses_correct_line_indices() -> None:
 
     chunks = chunk_file(Path("file.py"), text, definitions, budget=2200)
 
-    assert len(chunks) == 1
+    assertions.expect_equal(len(chunks), 1)
     chunk = chunks[0]
-    assert chunk.start_line == 1
-    assert chunk.end_line == 2
+    assertions.expect_equal(chunk.start_line, 1)
+    assertions.expect_equal(chunk.end_line, 2)
 
 
 def test_chunk_bytes_align_with_multibyte_characters() -> None:
@@ -52,14 +54,14 @@ def test_chunk_bytes_align_with_multibyte_characters() -> None:
 
     chunks = chunk_file(Path("file.py"), text, definitions, budget=2200)
 
-    assert len(chunks) == 1
+    assertions.expect_equal(len(chunks), 1)
     chunk = chunks[0]
 
     expected_start = len("intro = 1\náéíóú = 2\n".encode())
     expected_end = expected_start + len("目标 = 3".encode())
 
-    assert chunk.start_byte == expected_start
-    assert chunk.end_byte == expected_end
+    assertions.expect_equal(chunk.start_byte, expected_start)
+    assertions.expect_equal(chunk.end_byte, expected_end)
 
     round_trip = encoded[chunk.start_byte : chunk.end_byte].decode("utf-8")
-    assert round_trip == chunk.text
+    assertions.expect_equal(round_trip, chunk.text)

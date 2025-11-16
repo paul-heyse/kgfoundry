@@ -34,14 +34,10 @@ import io
 from importlib import import_module
 from typing import TYPE_CHECKING, BinaryIO, Protocol, cast
 
-from kgfoundry_common.logging import get_logger
 from kgfoundry_common.navmap_loader import load_nav_metadata
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
-logger = get_logger(__name__)
-
 
 def _load_cloudpickle_dumps() -> Callable[[object], bytes] | None:
     """Load cloudpickle.dumps function if available.
@@ -455,8 +451,7 @@ class SignedPickleWrapper:
     Parameters
     ----------
     signing_key : bytes
-        HMAC signing key (≥32 bytes recommended). A warning is logged if
-        the key is shorter than 32 bytes.
+        HMAC signing key (≥32 bytes recommended).
 
     Examples
     --------
@@ -473,8 +468,6 @@ class SignedPickleWrapper:
     """
 
     def __init__(self, signing_key: bytes) -> None:
-        if len(signing_key) < _MIN_SIGNING_KEY_BYTES:
-            logger.warning("Signing key < 32 bytes; consider using a longer key")
         self.signing_key = signing_key
 
     def dump(self, obj: object, file: BinaryIO) -> None:
@@ -497,8 +490,6 @@ class SignedPickleWrapper:
         payload = _stdlib_pickle.dumps(obj)
         signature = hmac.new(self.signing_key, payload, hashlib.sha256).digest()
         file.write(signature + payload)
-
-        logger.debug("Serialized object with HMAC signature", extra={"size": len(payload)})
 
     def load(self, file: BinaryIO) -> object:
         """Load and verify object signature.
@@ -535,7 +526,6 @@ class SignedPickleWrapper:
 
         result = _load_with_allow_list(io.BytesIO(payload))
 
-        logger.debug("Deserialized object with verified signature", extra={"size": len(payload)})
         return result
 
 

@@ -1,21 +1,4 @@
-"""Typing gate compliance metrics collection and emission.
-
-This module provides utilities for collecting and emitting typing gate
-compliance metrics to Prometheus and structured logs. It enables observability
-into the typing gates enforcement system across the codebase.
-
-Metrics:
-- kgfoundry_typing_gate_checks_total: Total number of typing gate checks performed
-- kgfoundry_typing_gate_violations_total: Total number of violations detected
-
-Usage:
-    from tools.lint.typing_gate_metrics import TypingGateMetrics
-
-    metrics = TypingGateMetrics()
-    metrics = metrics.record_check(filepath, num_violations)
-    snapshot = metrics.to_snapshot()
-    metrics.write_snapshot(path)
-"""
+"""Typing gate compliance metrics collection."""
 
 from __future__ import annotations
 
@@ -138,24 +121,6 @@ class TypingGateMetrics:
         output_path.parent.mkdir(parents=True, exist_ok=True)
         snapshot = self.to_snapshot()
         output_path.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
-
-    def emit_prometheus_counters(self) -> str:
-        """Emit metrics in Prometheus text format.
-
-        Returns
-        -------
-        str
-            Prometheus-formatted metrics.
-        """
-        lines: list[str] = [
-            "# HELP kgfoundry_typing_gate_checks_total Total number of typing gate checks performed",
-            "# TYPE kgfoundry_typing_gate_checks_total counter",
-            f"kgfoundry_typing_gate_checks_total {self.checks_total}",
-            "# HELP kgfoundry_typing_gate_violations_total Total number of violations detected",
-            "# TYPE kgfoundry_typing_gate_violations_total counter",
-            f"kgfoundry_typing_gate_violations_total {self.violations_total}",
-        ]
-        return "\n".join(lines)
 
     def emit_structured_logs(self) -> list[str]:
         """Emit metrics as structured log lines.

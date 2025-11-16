@@ -38,7 +38,7 @@ to Python.
 
 ## Tuning profiles
 
-`FAISSManager.apply_tuning_profile()` understands the `tuning.json` format,
+`FAISSManager.runtime.apply_tuning_profile()` understands the `tuning.json` format,
 applying ParameterSpace strings (`nprobe`, `efSearch`, `quantizer_efSearch`)
 and the rerank `k_factor` without rebuilding the index. The CLI surface:
 

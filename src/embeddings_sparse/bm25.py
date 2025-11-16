@@ -9,7 +9,6 @@ implementation specifics.
 
 from __future__ import annotations
 
-import logging
 import math
 import re
 from collections import defaultdict
@@ -32,8 +31,6 @@ if TYPE_CHECKING:
     from re import Pattern
 
     from kgfoundry_common.problem_details import JsonValue
-
-logger = logging.getLogger(__name__)
 
 _BM25_SCHEMA_PATH: Final[Path] = (
     Path(__file__).resolve().parents[2] / "schema" / "models" / "bm25_metadata.v1.json"
@@ -341,15 +338,13 @@ class PurePythonBM25:
         if metadata_path.exists():
             try:
                 return _load_json_metadata(metadata_path, _BM25_SCHEMA_PATH)
-            except DeserializationError as exc:
-                logger.warning("Failed to load JSON index, trying legacy pickle: %s", exc)
+            except DeserializationError:
                 if legacy_path.exists():
                     return self._load_legacy_payload(legacy_path)
                 raise
 
         if legacy_path.exists():
             payload = self._load_legacy_payload(legacy_path)
-            logger.warning("Loaded legacy pickle index. Consider migrating to JSON format.")
             return payload
 
         msg = f"Index metadata not found at {metadata_path} or {legacy_path}"

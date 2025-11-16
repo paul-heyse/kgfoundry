@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import logging
 import time
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
 import typer
 from tools import (
@@ -15,13 +13,10 @@ from tools import (
     ProblemDetailsDict,
     ProblemDetailsParams,
     build_problem_details,
-    get_logger,
     render_cli_envelope,
-    with_fields,
 )
 
 from download import cli_context
-from kgfoundry_common.logging import LoggerAdapter as KGFLoggerAdapter
 from kgfoundry_common.navmap_loader import load_nav_metadata
 
 __all__ = [
@@ -42,13 +37,11 @@ CLI_CONFIG = cli_context.get_cli_config()
 REPO_ROOT = cli_context.REPO_ROOT
 CLI_ENVELOPE_DIR = REPO_ROOT / "site" / "_build" / "cli"
 
-HARVEST_OPERATION_ID = CLI_OPERATION_IDS["harvest"]
 HARVEST_OVERRIDE = cli_context.get_operation_override("harvest")
 if HARVEST_OVERRIDE and HARVEST_OVERRIDE.description:
     HARVEST_DESCRIPTION = HARVEST_OVERRIDE.description
 else:
     HARVEST_DESCRIPTION = "Harvest documents from OpenAlex matching query parameters."
-LOGGER = get_logger(__name__)
 
 DEFAULT_YEARS = ">=2018"
 DEFAULT_MAX_WORKS = 20_000
@@ -75,16 +68,11 @@ def _emit_envelope(
     envelope: CliEnvelope,
     *,
     subcommand: str,
-    logger: logging.Logger | KGFLoggerAdapter,
 ) -> Path:
     path = _envelope_path(subcommand)
     CLI_ENVELOPE_DIR.mkdir(parents=True, exist_ok=True)
     rendered = render_cli_envelope(envelope)
     path.write_text(rendered + "\n", encoding="utf-8")
-    logger.debug(
-        "CLI envelope written",
-        extra={"status": envelope.status, "cli_envelope": str(path)},
-    )
     return path
 
 
@@ -145,16 +133,6 @@ def harvest(
         status="success",
         subcommand="harvest",
     )
-    logger = with_fields(
-        LOGGER,
-        correlation_id=str(uuid4()),
-        operation_id=HARVEST_OPERATION_ID,
-        topic=topic,
-        years=years,
-        max_works=max_works,
-    )
-
-    logger.info("Harvest command started", extra={"status": "start"})
     try:
         message = f"[dry-run] would harvest topic={topic!r} years={years!r} max_works={max_works}"
         builder = builder.add_file(path="openalex", status="success", message=message)
@@ -173,27 +151,16 @@ def harvest(
         )
         failure_builder = failure_builder.set_problem(problem)
         envelope = failure_builder.finish(duration_seconds=time.monotonic() - start)
-        path = _emit_envelope(envelope, subcommand="harvest", logger=logger)
-        logger.exception(
-            "Harvest command failed",
-            extra={
-                "status": "error",
-                "cli_envelope": str(path),
-                "duration_seconds": envelope.duration_seconds,
-            },
+        path = _emit_envelope(envelope, subcommand="harvest")
+        typer.echo(
+            f"Harvest command failed; envelope saved to {path}",
+            err=True,
         )
         raise typer.Exit(code=1) from exc
 
     envelope = builder.finish(duration_seconds=time.monotonic() - start)
-    path = _emit_envelope(envelope, subcommand="harvest", logger=logger)
-    logger.info(
-        "Harvest command completed",
-        extra={
-            "status": "success",
-            "cli_envelope": str(path),
-            "duration_seconds": envelope.duration_seconds,
-        },
-    )
+    path = _emit_envelope(envelope, subcommand="harvest")
+    typer.echo(f"Harvest command completed; envelope saved to {path}")
 
 
 if __name__ == "__main__":  # pragma: no cover - manual execution entrypoint

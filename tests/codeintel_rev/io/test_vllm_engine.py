@@ -1,23 +1,29 @@
+"""Tests for the VLLM embedding engine wrapper."""
+
 from __future__ import annotations
 
+import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
 from types import ModuleType, SimpleNamespace
-from typing import Any
 
 import numpy as np
 import pytest
 from codeintel_rev.config.settings import VLLMConfig, VLLMRunMode
+from codeintel_rev.io import vllm_engine as engine_module
+from codeintel_rev.io.vllm_engine import InprocessVLLMEmbedder
+
+from tests._helpers import assertions
 
 
 class _StubTokenizer:
-    def __call__(self, texts: list[str], **_: Any) -> dict[str, list[list[int]]]:
+    def __call__(self, texts: list[str], **_: object) -> dict[str, list[list[int]]]:
         input_ids = [[len(text)] for text in texts]
         return {"input_ids": input_ids}
 
 
 class _StubPooler:
-    def __init__(self, **_: Any) -> None:  # pragma: no cover - configuration stub
+    def __init__(self, **_: object) -> None:  # pragma: no cover - configuration stub
         pass
 
 
@@ -27,7 +33,7 @@ class _StubTokensPrompt:
 
 
 class _StubLLM:
-    def __init__(self, *_: Any, **__: Any) -> None:
+    def __init__(self, *_: object, **__: object) -> None:
         self.calls: list[list[list[int]]] = []
 
     def embed(self, prompts: Sequence[_StubTokensPrompt]) -> list[SimpleNamespace]:
@@ -42,7 +48,6 @@ class _StubLLM:
 
 @pytest.fixture(autouse=True)
 def _patch_vllm(monkeypatch: pytest.MonkeyPatch) -> None:
-    import sys
 
     fake_vllm = ModuleType("vllm")
     fake_config = ModuleType("vllm.config")
@@ -53,8 +58,6 @@ def _patch_vllm(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(sys.modules, "vllm", fake_vllm)
     monkeypatch.setitem(sys.modules, "vllm.config", fake_config)
     monkeypatch.setitem(sys.modules, "vllm.inputs", fake_inputs)
-
-    from codeintel_rev.io import vllm_engine as engine_module
 
     def _tokenizer_factory(*_: object, **__: object) -> _StubTokenizer:
         return _StubTokenizer()
@@ -81,28 +84,28 @@ def _patch_vllm(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_embed_batch_returns_expected_shape() -> None:
+    """Batch embedding produces the configured dimensionality."""
     config = VLLMConfig(
         model="nomic-ai/nomic-embed-code",
         embedding_dim=2,
         run=VLLMRunMode(mode="inprocess"),
     )
-    from codeintel_rev.io.vllm_engine import InprocessVLLMEmbedder
 
     embedder = InprocessVLLMEmbedder(config)
     vectors = embedder.embed_batch(["alpha", "beta"])
-    assert vectors.shape == (2, config.embedding_dim)
-    assert vectors.dtype == np.float32
+    assertions.expect_equal(vectors.shape, (2, config.embedding_dim))
+    assertions.expect_equal(vectors.dtype, np.float32)
 
 
 def test_embed_batch_handles_empty_input() -> None:
+    """Empty inputs produce zero-row embeddings."""
     config = VLLMConfig(
         model="nomic-ai/nomic-embed-code",
         embedding_dim=3,
         run=VLLMRunMode(mode="inprocess"),
     )
-    from codeintel_rev.io.vllm_engine import InprocessVLLMEmbedder
 
     embedder = InprocessVLLMEmbedder(config)
     vectors = embedder.embed_batch([])
-    assert vectors.shape == (0, config.embedding_dim)
-    assert np.allclose(vectors, 0.0)
+    assertions.expect_equal(vectors.shape, (0, config.embedding_dim))
+    assertions.expect_true(np.allclose(vectors, 0.0))

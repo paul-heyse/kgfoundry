@@ -14,7 +14,6 @@
     "kg_builder": {"owner": "@kgfoundry-core", "stability": "experimental", "since": "0.0.0"},
     "kgfoundry_common": {"owner": "@kgfoundry-core", "stability": "experimental", "since": "0.0.0"},
     "linking": {"owner": "@kgfoundry-core", "stability": "experimental", "since": "0.0.0"},
-    "observability": {"owner": "@kgfoundry-core", "stability": "experimental", "since": "0.0.0"},
     "ontology": {"owner": "@kgfoundry-core", "stability": "experimental", "since": "0.0.0"},
     "orchestration": {"owner": "@kgfoundry-core", "stability": "experimental", "since": "0.0.0"},
     "registry": {"owner": "@kgfoundry-core", "stability": "experimental", "since": "0.0.0"},
@@ -23,4 +22,3 @@
     "vectorstore_faiss": {"owner": "@kgfoundry-core", "stability": "experimental", "since": "0.0.0"}
   }
 }
-

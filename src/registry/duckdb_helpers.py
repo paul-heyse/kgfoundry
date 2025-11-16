@@ -1,10 +1,9 @@
-"""Typed DuckDB helper utilities for parameterized queries and logging."""
+"""Typed DuckDB helper utilities for parameterized queries."""
 
 # [nav:section public-api]
 
 from __future__ import annotations
 
-import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from functools import lru_cache
@@ -13,9 +12,7 @@ from types import ModuleType
 from typing import TYPE_CHECKING, Final, cast
 
 from kgfoundry_common.errors import RegistryError
-from kgfoundry_common.logging import get_logger, with_fields
 from kgfoundry_common.navmap_loader import load_nav_metadata
-from kgfoundry_common.observability import MetricsProvider, observe_duration
 from kgfoundry_common.typing import gate_import
 
 if TYPE_CHECKING:
@@ -55,10 +52,6 @@ __all__ = [
     "validate_identifier",
 ]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
-
-logger = get_logger(__name__)
-metrics = MetricsProvider.default()
-
 
 @lru_cache(maxsize=1)
 def _duckdb_module() -> ModuleType:
@@ -115,11 +108,11 @@ def connect(
 
 
 def _format_sql(sql: str) -> str:
-    """Format SQL query for logging preview.
+    """Format SQL query for preview displays.
 
     Compacts whitespace and truncates long SQL queries to MAX_SQL_PREVIEW_CHARS
-    for safe logging. Used internally to prevent logging sensitive data or
-    overwhelming logs with very long queries.
+    for safe previews. Used internally to prevent leaking sensitive data or
+    overwhelming diagnostics with very long queries.
 
     Parameters
     ----------
@@ -139,11 +132,11 @@ def _format_sql(sql: str) -> str:
 
 
 def _truncate_value(value: object) -> object:
-    """Truncate string values for logging preview.
+    """Truncate string values for preview displays.
 
     Truncates string values longer than MAX_SQL_PREVIEW_CHARS to prevent
-    logging sensitive data or overwhelming logs. Other types are returned
-    unchanged.
+    preview payloads from leaking sensitive data or overwhelming diagnostics.
+    Other types are returned unchanged.
 
     Parameters
     ----------
@@ -162,10 +155,10 @@ def _truncate_value(value: object) -> object:
 
 
 def _format_params(params: Params) -> object:
-    """Format query parameters for logging preview.
+    """Format query parameters for preview displays.
 
-    Formats query parameters for safe logging by truncating string values.
-    Returns a dict for named parameters or a list for positional parameters.
+    Formats query parameters by truncating string values. Returns a dict for
+    named parameters or a list for positional parameters.
 
     Parameters
     ----------
@@ -256,12 +249,12 @@ def execute(
     params: Params = None,
     *,
     options: DuckDBQueryOptions | None = None,
-) -> DuckDBPyConnection:
-    """Execute a DuckDB query with parameter binding, logging, and metrics.
+) -> duckdb_module.Relation:
+    """Execute a DuckDB query with parameter binding.
 
-    Executes a SQL query with optional parameter binding, structured logging,
-    performance metrics, and timeout enforcement. Validates parameterization
-    when required and logs slow queries.
+    Executes a SQL query with optional parameter binding and timeout enforcement.
+    Validates parameterization when required and raises RegistryError with
+    contextual details when execution fails.
 
     Parameters
     ----------
@@ -274,22 +267,19 @@ def execute(
         Query parameters (Sequence for positional, Mapping for named).
         Defaults to None.
     options : DuckDBQueryOptions | None, optional
-        Query execution options including timeout, logging metadata, and
-        parameter enforcement. Defaults to None (uses module defaults).
+        Query execution options including timeout settings and parameter
+        enforcement. Defaults to None (uses module defaults).
 
     Returns
     -------
-    DuckDBPyConnection
-        Connection with query result relation (use .fetchall() or .fetchone()
-        to retrieve rows).
+    duckdb_module.Relation
+        Relation object representing the executed query.
 
     Raises
     ------
     RegistryError
         If query execution fails, parameterization is required but missing,
         or timeout is exceeded.
-    RuntimeError
-        Raised if query execution completes without returning a relation.
     """
     opts = _coerce_options(options, operation="duckdb.execute")
     require_flag = (
@@ -302,50 +292,17 @@ def execute(
 
     duckdb_module = _duckdb_module()
 
-    with (
-        with_fields(
-            logger,
-            component="registry",
-            operation=opts.operation,
-            sql_preview=sql_preview,
-        ) as log,
-        observe_duration(metrics, opts.operation, component="registry") as observer,
-    ):
-        start = time.perf_counter()
-        try:
-            _set_timeout(conn, opts.timeout_s)
-            relation = conn.execute(sql) if params is None else conn.execute(sql, params)
-        except duckdb_module.Error as exc:
-            observer.error()
-            log.exception(
-                "DuckDB query failed",
-                extra={"params": query_params},
-            )
-            error_message = "DuckDB query failed"
-            raise RegistryError(
-                error_message,
-                cause=exc,
-                context={"sql_preview": sql_preview, "params": query_params},
-            ) from exc
-        else:
-            observer.success()
-            duration = time.perf_counter() - start
-            if duration >= opts.slow_query_threshold_s:
-                log.warning(
-                    "Slow DuckDB query",
-                    extra={
-                        "duration_ms": round(duration * 1000, 2),
-                        "params": query_params,
-                    },
-                )
-            else:
-                log.debug(
-                    "DuckDB query executed",
-                    extra={"duration_ms": round(duration * 1000, 2)},
-                )
-            return relation
-    message = "DuckDB query execution completed without returning a relation"
-    raise RuntimeError(message)
+    try:
+        _set_timeout(conn, opts.timeout_s)
+        relation = conn.execute(sql) if params is None else conn.execute(sql, params)
+    except duckdb_module.Error as exc:
+        error_message = "DuckDB query failed"
+        raise RegistryError(
+            error_message,
+            cause=exc,
+            context={"sql_preview": sql_preview, "params": query_params},
+        ) from exc
+    return relation
 
 
 # [nav:anchor fetch_all]
@@ -359,7 +316,7 @@ def fetch_all(
     """Execute a query and return all rows as a list of tuples.
 
     Executes a SQL query and returns all result rows as a list of tuples.
-    Uses execute() internally for logging and metrics.
+    Uses execute() internally for connection and timeout management.
 
     Parameters
     ----------
@@ -401,7 +358,8 @@ def fetch_one(
     """Execute a query and return the first row or None.
 
     Executes a SQL query and returns the first result row as a tuple, or None
-    if no rows are returned. Uses execute() internally for logging and metrics.
+    if no rows are returned. Uses execute() internally for connection and timeout
+    management.
 
     Parameters
     ----------

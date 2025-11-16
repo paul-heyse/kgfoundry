@@ -1,9 +1,7 @@
-"""Typed FastAPI helper utilities with structured logging and timeouts.
+"""Typed FastAPI helper utilities with timeout enforcement.
 
 The helpers in this module wrap FastAPI primitives so that dependency injection, middleware, and
-exception handlers retain precise type information while also emitting kgfoundry-standard structured
-logs and respecting correlation identifiers. All operations enforce a configurable timeout to
-prevent runaway tasks inside the request lifecycle.
+exception handlers retain precise type information while enforcing uniform timeout behaviour.
 """
 
 # [nav:section public-api]
@@ -11,14 +9,12 @@ prevent runaway tasks inside the request lifecycle.
 from __future__ import annotations
 
 import asyncio
-import time
 import typing as t
 from collections.abc import Callable
 from typing import TYPE_CHECKING, cast
 
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from kgfoundry_common.logging import get_correlation_id, get_logger, with_fields
 from kgfoundry_common.navmap_loader import load_nav_metadata
 from kgfoundry_common.typing import gate_import
 
@@ -44,8 +40,6 @@ __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 # [nav:anchor DEFAULT_TIMEOUT_SECONDS]
 DEFAULT_TIMEOUT_SECONDS = 10.0
 """Default timeout applied to FastAPI helpers (in seconds)."""
-
-logger = get_logger(__name__)
 
 MiddlewareFactory = Callable[..., BaseHTTPMiddleware]
 
@@ -79,15 +73,14 @@ def typed_dependency[**P, T](
 ) -> object:
     """Return a dependency marker suitable for ``Annotated`` parameters.
 
-    The wrapped dependency records structured logs, includes any correlation ID
-    stored in :mod:`kgfoundry_common.logging`, and enforces ``timeout``.
+    The wrapped dependency enforces ``timeout`` while preserving the underlying type signature.
 
     Parameters
     ----------
     dependency : Callable[P, t.Awaitable[T]]
         Dependency function to wrap.
     name : str
-        Operation name for logging.
+        Human-readable operation name used in error messages.
     timeout : float | None, optional
         Timeout in seconds. Defaults to DEFAULT_TIMEOUT_SECONDS.
 
@@ -102,57 +95,16 @@ def typed_dependency[**P, T](
     """
 
     async def _instrumented(*args: P.args, **kwargs: P.kwargs) -> T:
-        """Instrumented dependency wrapper with logging and timeout.
+        """Instrumented dependency wrapper with timeout enforcement."""
 
-        Parameters
-        ----------
-        *args : P.args
-            Positional arguments passed to the dependency function.
-        **kwargs : P.kwargs
-            Keyword arguments passed to the dependency function.
-
-        Returns
-        -------
-        T
-            Result from the dependency function.
-
-        Raises
-        ------
-        TimeoutError
-            If the dependency execution exceeds the timeout.
-        Exception
-            Any exception raised by the wrapped dependency function is
-            propagated unchanged after logging.
-        """
-        correlation_id = get_correlation_id()
-        with with_fields(logger, operation=name, correlation_id=correlation_id) as log:
-            start = time.perf_counter()
-            log.info("dependency.start", extra={"status": "started"})
-            try:
-                result = await _await_with_timeout(
-                    dependency(*args, **kwargs),
-                    timeout_seconds=timeout,
-                )
-            except TimeoutError:
-                duration_ms = (time.perf_counter() - start) * 1000.0
-                log.exception(
-                    "dependency.timeout",
-                    extra={"status": "timeout", "duration_ms": duration_ms},
-                )
-                raise
-            except Exception:  # pragma: no cover - propagated to caller
-                duration_ms = (time.perf_counter() - start) * 1000.0
-                log.exception(
-                    "dependency.error",
-                    extra={"status": "error", "duration_ms": duration_ms},
-                )
-                raise
-            duration_ms = (time.perf_counter() - start) * 1000.0
-            log.info(
-                "dependency.success",
-                extra={"status": "success", "duration_ms": duration_ms},
+        try:
+            return await _await_with_timeout(
+                dependency(*args, **kwargs),
+                timeout_seconds=timeout,
             )
-            return result
+        except TimeoutError as exc:
+            message = f"{name} dependency timed out after {timeout} seconds"
+            raise TimeoutError(message) from exc
 
     marker: DependsMarker = Depends(_instrumented)
     return cast("object", marker)
@@ -167,10 +119,10 @@ def typed_exception_handler[E: Exception](
     name: str,
     timeout: float | None = DEFAULT_TIMEOUT_SECONDS,
 ) -> None:
-    """Register ``handler`` for ``exception_type`` with logging and timeouts."""
+    """Register ``handler`` for ``exception_type`` with timeouts."""
 
     async def _wrapped(request: Request, exc: E) -> Response:
-        """Wrap exception handler with logging and timeout.
+        """Wrap exception handler with timeout enforcement.
 
         Parameters
         ----------
@@ -194,44 +146,16 @@ def typed_exception_handler[E: Exception](
             If the handler execution exceeds the timeout.
         Exception
             Any exception raised by the wrapped exception handler is
-            propagated unchanged after logging.
+            propagated unchanged.
         """
-        correlation_id = get_correlation_id()
-        with with_fields(logger, operation=name, correlation_id=correlation_id) as log:
-            start = time.perf_counter()
-            exception_name = cast(
-                "str",
-                getattr(exception_type, "__name__", exception_type.__class__.__name__),
+        try:
+            return await _await_with_timeout(
+                handler(request, exc),
+                timeout_seconds=timeout,
             )
-            log.info(
-                "exception_handler.start",
-                extra={"status": "started", "exception_type": exception_name},
-            )
-            try:
-                result = await _await_with_timeout(
-                    handler(request, exc),
-                    timeout_seconds=timeout,
-                )
-            except TimeoutError:
-                duration_ms = (time.perf_counter() - start) * 1000.0
-                log.exception(
-                    "exception_handler.timeout",
-                    extra={"status": "timeout", "duration_ms": duration_ms},
-                )
-                raise
-            except Exception:  # pragma: no cover - FastAPI surfaces this
-                duration_ms = (time.perf_counter() - start) * 1000.0
-                log.exception(
-                    "exception_handler.error",
-                    extra={"status": "error", "duration_ms": duration_ms},
-                )
-                raise
-            duration_ms = (time.perf_counter() - start) * 1000.0
-            log.info(
-                "exception_handler.success",
-                extra={"status": "success", "duration_ms": duration_ms},
-            )
-            return result
+        except TimeoutError as exc:
+            message = f"{name} exception handler timed out after {timeout} seconds"
+            raise TimeoutError(message) from exc
 
     handler_callable = cast("Callable[[Request, Exception], t.Awaitable[Response]]", _wrapped)
     app.add_exception_handler(exception_type, handler_callable)
@@ -246,23 +170,10 @@ def typed_middleware(
     timeout: float | None = DEFAULT_TIMEOUT_SECONDS,
     **options: object,
 ) -> None:
-    """Register ``middleware_class`` with instrumentation and timeouts."""
+    """Register ``middleware_class`` with timeout enforcement."""
 
     class _InstrumentedMiddleware(BaseHTTPMiddleware):
-        """Middleware wrapper that adds logging, metrics, and timeout controls.
-
-        Extended Summary
-        ----------------
-        Creates an instrumented middleware wrapper that adds structured
-        logging, correlation ID tracking, and timeout enforcement to
-        the wrapped middleware. The wrapper delegates all request handling
-        to the original middleware while recording execution metrics.
-
-        Parameters
-        ----------
-        app : ASGIApp
-            ASGI application instance to wrap.
-        """
+        """Middleware wrapper that enforces timeout controls."""
 
         def __init__(self, app: ASGIApp) -> None:
             self._delegate = middleware_class(app, *factory_args, **options)
@@ -273,58 +184,16 @@ def typed_middleware(
             request: StarletteRequest,
             call_next: Callable[[StarletteRequest], t.Awaitable[Response]],
         ) -> Response:
-            """Dispatch request through middleware with logging and timeout.
+            """Dispatch request through middleware with timeout enforcement."""
 
-            Parameters
-            ----------
-            request : StarletteRequest
-                Incoming HTTP request.
-            call_next : Callable[[StarletteRequest], t.Awaitable[Response]]
-                Next middleware or application handler in the chain.
-
-            Returns
-            -------
-            Response
-                HTTP response from the next handler.
-
-            Raises
-            ------
-            TimeoutError
-                If the middleware execution exceeds the timeout.
-            Exception
-                Any exception raised by the wrapped middleware is
-                propagated unchanged after logging.
-            """
-            correlation_id = get_correlation_id()
-            with with_fields(logger, operation=name, correlation_id=correlation_id) as log:
-                start = time.perf_counter()
-                log.info("middleware.start", extra={"status": "started"})
-                try:
-                    response = await _await_with_timeout(
-                        self._delegate.dispatch(request, call_next),
-                        timeout_seconds=timeout,
-                    )
-                except TimeoutError:
-                    duration_ms = (time.perf_counter() - start) * 1000.0
-                    log.exception(
-                        "middleware.timeout",
-                        extra={"status": "timeout", "duration_ms": duration_ms},
-                    )
-                    raise
-                except Exception:  # pragma: no cover - propagated to caller
-                    duration_ms = (time.perf_counter() - start) * 1000.0
-                    log.exception(
-                        "middleware.error",
-                        extra={"status": "error", "duration_ms": duration_ms},
-                    )
-                    raise
-
-                duration_ms = (time.perf_counter() - start) * 1000.0
-                log.info(
-                    "middleware.success",
-                    extra={"status": "success", "duration_ms": duration_ms},
+            try:
+                return await _await_with_timeout(
+                    self._delegate.dispatch(request, call_next),
+                    timeout_seconds=timeout,
                 )
-                return response
+            except TimeoutError as exc:
+                message = f"{name} middleware timed out after {timeout} seconds"
+                raise TimeoutError(message) from exc
 
     name_attr: object = getattr(middleware_class, "__name__", None)
     original_name = name_attr if isinstance(name_attr, str) else middleware_class.__class__.__name__

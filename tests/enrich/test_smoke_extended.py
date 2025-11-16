@@ -6,12 +6,13 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import subprocess
 from pathlib import Path
 from typing import Any
 
 from codeintel_rev.cli_enrich import app
 from typer.testing import CliRunner
+
+from tests._helpers import run_process
 
 
 def _git_env() -> dict[str, str]:
@@ -30,14 +31,11 @@ def _git_env() -> dict[str, str]:
 def _init_repo(repo_root: Path) -> None:
     env = _git_env()
     git_bin = _git_executable()
-    subprocess.run([git_bin, "init"], cwd=repo_root, check=True, env=env)
-    subprocess.run(
-        [git_bin, "config", "user.name", "Smoke Tester"], cwd=repo_root, check=True, env=env
-    )
-    subprocess.run(
+    run_process([git_bin, "init"], cwd=repo_root, env=env)
+    run_process([git_bin, "config", "user.name", "Smoke Tester"], cwd=repo_root, env=env)
+    run_process(
         [git_bin, "config", "user.email", "smoke@example.com"],
         cwd=repo_root,
-        check=True,
         env=env,
     )
 
@@ -74,8 +72,8 @@ def beta_fn() -> str:
 def _seed_initial_commit(repo_root: Path) -> None:
     env = _git_env()
     git_bin = _git_executable()
-    subprocess.run([git_bin, "add", "."], cwd=repo_root, check=True, env=env)
-    subprocess.run([git_bin, "commit", "-m", "initial"], cwd=repo_root, check=True, env=env)
+    run_process([git_bin, "add", "."], cwd=repo_root, env=env)
+    run_process([git_bin, "commit", "-m", "initial"], cwd=repo_root, env=env)
 
 
 def _write_scip(repo_root: Path) -> Path:

@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import importlib
-import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
@@ -62,9 +61,6 @@ __all__ = [
     "VecArray",
 ]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
-
-
-logger = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=1)
@@ -192,7 +188,6 @@ def _load_libcuvs() -> LoadLibraryFn | None:
         ):  # pragma: no cover - optional dependency
             continue
         except (RuntimeError, OSError):  # pragma: no cover - optional dependency
-            logger.debug("Failed to import %s: runtime error", name)
             continue
         else:
             break
@@ -210,8 +205,6 @@ def _load_libcuvs() -> LoadLibraryFn | None:
 _typed_load_cuvs = _load_libcuvs()
 if _typed_load_cuvs is not None:  # pragma: no cover - optional dependency
     _typed_load_cuvs()
-else:  # pragma: no cover - optional dependency
-    logger.debug("cuVS library not available; continuing with FAISS CPU helpers")
 
 
 def _load_faiss_module() -> FaissModuleProtocol | None:
@@ -234,10 +227,9 @@ def _load_faiss_module() -> FaissModuleProtocol | None:
     Notes
     -----
     Time O(1) amortized after first call (uses lru_cache). Side effects: may
-    attempt to import optional FAISS module. Failures are logged at debug level
-    and do not prevent adapter from functioning (falls back to NumPy-based
-    search). This function is called at module load time to detect FAISS
-    availability.
+    attempt to import optional FAISS module. Failures do not prevent the adapter
+    from functioning (it falls back to NumPy-based search). This function is
+    called at module load time to detect FAISS availability.
 
     Examples
     --------
@@ -252,8 +244,7 @@ def _load_faiss_module() -> FaissModuleProtocol | None:
         AttributeError,
         OSError,
         RuntimeError,
-    ) as exc:  # pragma: no cover - optional dependency
-        logger.debug("FAISS import failed: %s", exc, exc_info=True)
+    ):  # pragma: no cover - optional dependency
         return None
     return cast("FaissModuleProtocol", module)
 
@@ -731,7 +722,6 @@ class FaissAdapter:
 
         module = faiss
         if not HAVE_FAISS or module is None:
-            logger.debug("FAISS unavailable; CPU search fallback will be used")
             self.index = None
             return
         faiss_module: FaissModuleProtocol = module
@@ -819,13 +809,8 @@ class FaissAdapter:
                     RuntimeError,
                     OSError,
                     ValueError,
-                ) as exc:  # pragma: no cover - defensive fallback
-                    logger.warning(
-                        "Failed to load FAISS index from %s: %s",
-                        index_path,
-                        exc,
-                        exc_info=True,
-                    )
+                ):  # pragma: no cover - defensive fallback
+                    continue
                 else:
                     configure_search_parameters(
                         faiss_module,
@@ -834,11 +819,7 @@ class FaissAdapter:
                         gpu_enabled=gpu_context is not None,
                     )
 
-                    if not _is_faiss_index(cpu_index):
-                        logger.warning(
-                            "Loaded FAISS index failed protocol validation; rebuilding",
-                        )
-                    else:
+                    if _is_faiss_index(cpu_index):
                         self.index = cpu_index
                         self._gpu_context = gpu_context
                         return

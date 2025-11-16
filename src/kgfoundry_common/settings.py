@@ -19,7 +19,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from kgfoundry_common.errors import SettingsError
-from kgfoundry_common.logging import get_logger
 from kgfoundry_common.navmap_loader import load_nav_metadata
 from kgfoundry_common.typing import gate_import
 
@@ -37,15 +36,12 @@ else:  # pragma: no cover - runtime import guarded
 __all__ = [
     "FaissConfig",
     "KgFoundrySettings",
-    "ObservabilityConfig",
     "RuntimeSettings",
     "SearchConfig",
     "SparseEmbeddingConfig",
     "load_settings",
 ]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
-
-logger = get_logger(__name__)
 
 
 # [nav:anchor SearchConfig]
@@ -75,20 +71,6 @@ class SearchConfig(BaseSettings):
         default=False,
         description="Enable response schema validation (dev/staging only)",
     )
-
-
-# [nav:anchor ObservabilityConfig]
-class ObservabilityConfig(BaseSettings):
-    """Logging and telemetry toggles (``KGFOUNDRY_*`` namespace)."""
-
-    model_config = SettingsConfigDict(env_prefix="KGFOUNDRY_", extra="forbid")
-
-    log_level: str = Field(
-        default="INFO", description="Logging level (DEBUG, INFO, WARNING, ERROR)"
-    )
-    metrics_enabled: bool = Field(default=True, description="Enable Prometheus metrics export")
-    traces_enabled: bool = Field(default=False, description="Enable OpenTelemetry tracing")
-    metrics_port: int = Field(default=9090, description="Port for Prometheus metrics endpoint")
 
 
 # [nav:anchor SparseEmbeddingConfig]
@@ -145,8 +127,6 @@ class RuntimeSettings(BaseSettings):
         Pydantic model configuration dictionary (class variable).
     search : SearchConfig
         Search service configuration.
-    observability : ObservabilityConfig
-        Observability configuration.
     sparse_embedding : SparseEmbeddingConfig
         Sparse embedding configuration.
     faiss : FaissConfig
@@ -168,9 +148,6 @@ class RuntimeSettings(BaseSettings):
     search: SearchConfig = Field(
         default_factory=SearchConfig, description="Search service configuration"
     )
-    observability: ObservabilityConfig = Field(
-        default_factory=ObservabilityConfig, description="Observability configuration"
-    )
     sparse_embedding: SparseEmbeddingConfig = Field(
         default_factory=SparseEmbeddingConfig,
         description="Sparse embedding configuration",
@@ -186,10 +163,6 @@ class RuntimeSettings(BaseSettings):
         except Exception as exc:
             # Convert Pydantic validation errors to SettingsError with Problem Details
             msg = f"Configuration validation failed: {exc}"
-            logger.exception(
-                "Settings validation failed",
-                extra={"error": str(exc), "error_type": type(exc).__name__},
-            )
             raise SettingsError(
                 msg,
                 cause=exc,

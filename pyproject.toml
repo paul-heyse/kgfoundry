@@ -63,9 +63,8 @@ dependencies = [
     "transformers>=4.57.1",
     "lupyne",
     # ============================================================================
-    # Observability & Reliability
+    # Reliability
     # ============================================================================
-    "prometheus-client>=0.23.1",
     "tenacity>=9.1.2",
     "pybreaker",
     # ============================================================================
@@ -184,7 +183,6 @@ dependencies = [
     "pytest-asyncio>=1.2.0",
     "pytestarch>=4.0.1",
     "build>=1.2.2",
-    "prometheus-client>=0.23.1",
     "msgspec>=0.19.0",
     "pyyaml>=6",
     "pyright>=1.1.407",
@@ -288,7 +286,6 @@ http-bridge = [
 ]
 tools = [
     "build>=1.2.2",
-    "prometheus-client>=0.23.1",
     "msgspec>=0.19.0",
     "pyyaml>=6",
 ]
@@ -476,83 +473,7 @@ runtime-evaluated-base-classes = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# Blanket suppressions for most test files
-"tests/**" = [
-    "S404",  # subprocess module is safe in tests with fixed arguments
-    "S603",  # subprocess.Popen with list args and shell=False is safe in tests
-    "S608",  # SQL injection warnings in tests - paths validated via _safe_sql_path helper
-    "PLC0415",  # Late imports acceptable in test fixtures for module state setup
-    "D100",
-    "D101",
-    "D102",
-    "D103",
-    "D104",
-    "ANN001",
-    "ANN201",
-    "ANN401",
-    "PLR2004",
-    "N806",
-    "C401",
-    "S101",
-    "T20",
-    "PLR6301",  # pytest test classes require instance methods for test isolation
-]
-# codeintel_rev tests inherit from tests/** suppressions
-"codeintel_rev/tests/**" = [
-    "D103",  # Missing docstring in public function
-    "ANN001",  # Missing type annotation for function argument
-    "S101",  # Use of assert detected
-    "PLR2004",  # Magic value used in comparison
-    "ARG001",  # Unused function argument
-]
-# Openspec implementation files need explicit exception handling for DOC502 compliance
-"openspec/changes/codeintel-config-lifecycle-management/implementation/config_context.py" = ["TRY203"]
-"openspec/changes/codeintel-performance-optimization/implementation/git_client.py" = ["TRY203"]
-"openspec/changes/codeintel-error-handling-standardization/implementation/errors.py" = ["ERA001"]  # Documentation examples in comments
-# tests/kgfoundry_common tests have proper docstrings and annotations - no blanket suppressions needed
-# Explicitly exclude from blanket suppression (empty list = no suppressions)
-"tests/kgfoundry_common/**" = []
-"tests/test_namespace_proxy.py" = ["PLC2701", "TID251", "TRY003", "EM101"]  # Tests of internal _namespace_proxy module
-"codeintel_rev/io/faiss_manager.py" = ["PLR0904"]
-"codeintel_rev/mcp_server/server_semantic.py" = ["N803"]
-"codeintel_rev/observability/otel.py" = ["PLR0911", "PLR0913", "C901"]
-"tests/docs/test_griffe_facade.py" = ["PLC2701"]  # Tests of docs._types and docs._scripts facades; imports from private modules expected
-"**/*.pyi" = ["PIE790", "N815", "N802"]  # Stub files require ... literals and match external API naming
-"src/kgfoundry/tooling_bridge.py" = ["PLC2701", "TID251"]
-"docs/_types/**" = ["PLC2701"]  # docs._types is a special module namespace for typed facades
-# DOC502 false positives: ruff doesn't recognize `raise exc` as explicitly raising Exception
-"codeintel_rev/app/main.py" = ["DOC502"]
-"codeintel_rev/io/vllm_client.py" = ["DOC502"]  # Exception re-raised via bare `raise` from transport layer
-"codeintel_rev/runtime/cells.py" = ["DOC502"]  # Exception re-raised via variable (cooldown_error); DOC503 is globally skipped via skipCheckingCode
-"tools/repo_scan.py" = ["BLE001"]  # Best-effort file counting; any I/O error is acceptable
-"tools/_shared/cli_runtime.py" = ["DOC502"]  # Exception re-raised via variable `raise error`; types already documented
-"tools/_shared/cli_context_registry.py" = ["DOC502"]  # Exceptions raised through helper methods (_normalise_key, REGISTRY methods); correctly documented
-"codeintel_rev/app/config_context.py" = ["DOC502"]  # ConfigurationError raised indirectly through resolve_application_paths(); correctly documented
-"src/kgfoundry_common/fastapi_helpers.py" = ["DOC502"]  # Exceptions re-raised via bare `raise` after logging; correctly documented in docstrings
-"tools/_shared/metrics.py" = ["DOC502"]
-"tools/docs/observability.py" = ["DOC502"]
-"tools/navmap/observability.py" = ["DOC502"]
-"tools/docs/scan_observability.py" = ["DOC502"]
-# DOC502 false positives: exceptions are explicitly raised but ruff doesn't recognize conditional raises
-"codeintel_rev/mcp_server/adapters/semantic.py" = ["DOC502"]
-"codeintel_rev/mcp_server/adapters/files.py" = ["DOC502"]  # PathOutsideRepositoryError raised by resolve_within_repo helper
-"codeintel_rev/mcp_server/adapters/history.py" = ["DOC502"]  # PathOutsideRepositoryError raised by resolve_within_repo helper
-"codeintel_rev/mcp_server/telemetry.py" = ["DOC502"]  # BaseException re-raised via bare `raise` in context manager; correctly documented in Raises section
-"codeintel_rev/telemetry/decorators.py" = ["DOC502"]  # BaseException re-raised via bare `raise` in context manager; correctly documented in Raises section
-"codeintel_rev/embeddings/embedding_service.py" = ["DOC502"]  # Exception re-raised via bare `raise`; correctly documented in Raises section
-"src/kgfoundry_common/subprocess_utils.py" = ["DOC502"]  # RuntimeError raised via variable (error_instance) after isinstance check; correctly documented in Raises section
-"docs/_scripts/**" = ["PLC2701"]  # docs._scripts is internal tooling; importing from docs._types and tools._shared is expected
-"docs/types/artifacts.py" = ["PLC2701"]  # docs/types is a facade re-exporting from private docs._types module
-"tools/lint/codemod_typing_migration.py" = ["N802"]  # LibCST visitor protocol requires CamelCase method names (leave_ImportFrom, leave_Call)
-"tools/codemods/blind_except_fix.py" = ["N802"]
-"tools/codemods/pathlib_fix.py" = ["N815"]
-# Typer callbacks/options require extensive parameter lists; splitting would break CLI UX.
-"codeintel_rev/cli_enrich.py" = ["PLR0913", "PLR0914", "PLR0917", "DOC502"]  # Exception re-raised via bare `raise` after logging; correctly documented in Raises section
-"codeintel_rev/app/routers/diagnostics.py" = ["DOC202"]  # Functions have return annotations but always raise; Returns section required by pydoclint DOC201/DOC203
-# New: Façade modules are allowed to import from private sources (controlled re-export)
-"src/kgfoundry_common/typing/__init__.py" = []  # Canonical typing façade
-"tools/typing/__init__.py" = []  # Tooling typing façade
-"docs/typing/__init__.py" = []  # Docs typing façade
+# Intentionally empty; suppressions removed pending holistic fixes.
 
 [tool.ruff.lint.isort]
 known-first-party = [

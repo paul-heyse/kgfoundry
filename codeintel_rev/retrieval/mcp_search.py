@@ -136,6 +136,14 @@ class CatalogLike(Protocol):
         ...
 
 
+class VectorRuntime(Protocol):
+    """Runtime tuning controls exposed by FAISS managers."""
+
+    def get_runtime_tuning(self) -> Mapping[str, object]:
+        """Return runtime FAISS tuning metadata."""
+        ...
+
+
 class VectorIndex(Protocol):
     """FAISS manager surface consumed by MCP search."""
 
@@ -143,8 +151,9 @@ class VectorIndex(Protocol):
     faiss_family: str | None
     refine_k_factor: float
 
-    def get_runtime_tuning(self) -> Mapping[str, object]:
-        """Return runtime FAISS tuning metadata."""
+    @property
+    def runtime(self) -> VectorRuntime:
+        """Return runtime tuning controller for the index."""
         ...
 
     def search(
@@ -964,7 +973,7 @@ def _log_search_completion(
             "filters": request.filters.describe(),
             "rerank": request.rerank,
             "index_family": deps.faiss.faiss_family or "auto",
-            "faiss_runtime": dict(deps.faiss.get_runtime_tuning() or {}),
+            "faiss_runtime": dict(deps.faiss.runtime.get_runtime_tuning() or {}),
             "session_id": deps.session_id,
             "run_id": deps.run_id,
         },

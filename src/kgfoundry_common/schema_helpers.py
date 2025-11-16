@@ -29,7 +29,6 @@ from kgfoundry_common.jsonschema_utils import (
 from kgfoundry_common.jsonschema_utils import (
     validate as jsonschema_validate,
 )
-from kgfoundry_common.logging import get_logger
 from kgfoundry_common.navmap_loader import load_nav_metadata
 
 if TYPE_CHECKING:
@@ -49,8 +48,6 @@ __all__ = [
 ]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
-
-logger = get_logger(__name__)
 
 
 # [nav:anchor load_schema]
@@ -232,12 +229,3 @@ def assert_model_roundtrip(
     # Validate round-trip data against schema if provided
     if schema_obj is not None:
         validate_model_against_schema(instance, schema_obj)
-
-    logger.debug(
-        "Model round-trip validated",
-        extra={
-            "model": model_cls.__name__,
-            "example_path": str(example_path),
-            "schema_path": str(schema_path) if schema_path else None,
-        },
-    )

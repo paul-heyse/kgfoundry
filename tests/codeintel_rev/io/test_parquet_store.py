@@ -23,6 +23,8 @@ from codeintel_rev.io.parquet_store import (
     write_chunks_parquet,
 )
 
+from tests._helpers import assertions, constants
+
 
 def _make_chunks() -> list[Chunk]:
     return [
@@ -54,18 +56,21 @@ def test_schema_uses_fixed_size_embedding_and_uint64_hash() -> None:
     schema = get_chunks_schema(3)
 
     hash_field = schema.field("content_hash")
-    assert hash_field.type == pa.uint64()
+    assertions.expect_equal(hash_field.type, pa.uint64())
 
     embedding_field = schema.field("embedding")
-    assert isinstance(embedding_field.type, pa.FixedSizeListType)
-    assert embedding_field.type.list_size == 3
-    assert embedding_field.type.value_field.type == pa.float32()
+    assertions.expect_true(isinstance(embedding_field.type, pa.FixedSizeListType))
+    assertions.expect_equal(
+        embedding_field.type.list_size,
+        constants.VECTOR_DIMS.tiny,
+    )
+    assertions.expect_equal(embedding_field.type.value_field.type, pa.float32())
 
 
 def test_write_chunks_parquet_roundtrip(tmp_path: Path) -> None:
     """Writer persists symbols and embeddings with stable hashes."""
     chunks = _make_chunks()
-    vec_dim = 4
+    vec_dim = constants.VECTOR_DIMS.small
     embeddings = np.arange(len(chunks) * vec_dim, dtype=np.float32).reshape(len(chunks), vec_dim)
     out_path = tmp_path / "chunks.parquet"
 
@@ -76,9 +81,9 @@ def test_write_chunks_parquet_roundtrip(tmp_path: Path) -> None:
         options=ParquetWriteOptions(vec_dim=vec_dim),
     )
 
-    assert out_path.exists()
+    assertions.expect_true(out_path.exists())
     table = pq.read_table(out_path)
-    assert table.num_rows == len(chunks)
+    assertions.expect_equal(table.num_rows, len(chunks))
 
     hashes = table.column("content_hash").to_pylist()
 
@@ -89,13 +94,13 @@ def test_write_chunks_parquet_roundtrip(tmp_path: Path) -> None:
         return int.from_bytes(hashlib.blake2b(encoded, digest_size=8).digest(), "little")
 
     expected_hashes = [_expected_hash(chunk.text) for chunk in chunks]
-    assert hashes == expected_hashes
+    assertions.expect_sequence_equal(hashes, expected_hashes)
 
     symbols_column = table.column("symbols").to_pylist()
-    assert symbols_column == [list(chunk.symbols) for chunk in chunks]
+    assertions.expect_sequence_equal(symbols_column, [list(chunk.symbols) for chunk in chunks])
 
     emb = extract_embeddings(table)
-    assert emb.shape == (len(chunks), vec_dim)
+    assertions.expect_equal(emb.shape, (len(chunks), vec_dim))
     np.testing.assert_array_equal(emb, embeddings)
 
 
@@ -117,7 +122,7 @@ def test_write_chunks_parquet_rejects_dimension_mismatch(tmp_path: Path) -> None
 def test_write_chunks_parquet_supports_stable_ids(tmp_path: Path) -> None:
     """Writer emits deterministic ids when requested."""
     chunks = _make_chunks()
-    vec_dim = 2
+    vec_dim = constants.VECTOR_DIMS.pair
     embeddings = np.arange(len(chunks) * vec_dim, dtype=np.float32).reshape(len(chunks), vec_dim)
     out_path = tmp_path / "stable_ids.parquet"
 
@@ -133,4 +138,4 @@ def test_write_chunks_parquet_supports_stable_ids(tmp_path: Path) -> None:
     expected = [
         stable_chunk_id(chunk.uri, chunk.start_byte, chunk.end_byte, salt="s1") for chunk in chunks
     ]
-    assert ids == expected
+    assertions.expect_sequence_equal(ids, expected)

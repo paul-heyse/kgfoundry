@@ -22,11 +22,8 @@ from tools import (
     ProblemDetailsDict,
     ProblemDetailsParams,
     build_problem_details,
-    get_logger,
     render_cli_envelope,
-    with_fields,
 )
-from tools._shared.logging import LoggerAdapter
 
 from kgfoundry.embeddings_sparse.bm25 import get_bm25
 from kgfoundry_common.errors import ConfigurationError, IndexBuildError
@@ -77,7 +74,6 @@ class _CommandContext:
     subcommand: str
     operation_id: str
     correlation_id: str
-    logger: LoggerAdapter
     start: float
 
     def extensions(self, extras: Mapping[str, object] | None = None) -> dict[str, JsonValue]:
@@ -126,9 +122,6 @@ STATUS_CLIENT_CLOSED = 499
 STATUS_MIN_CLIENT_ERROR = 400
 STATUS_MAX_CLIENT_ERROR = 499
 
-LOGGER = get_logger(__name__)
-
-
 _e2e_flow: Callable[[], list[str]] | None = None
 with contextlib.suppress(ImportError):
     from orchestration.flows import e2e_flow as _loaded_flow
@@ -158,19 +151,13 @@ def _start_command(
     subcommand: str, **log_fields: object
 ) -> tuple[_CommandContext, CliEnvelopeBuilder]:
     operation_id = CLI_OPERATION_IDS.get(subcommand, subcommand)
-    operation_alias = subcommand.replace("-", "_")
     correlation_id = uuid4().hex
     filtered_fields = {key: value for key, value in log_fields.items() if value is not None}
-    logger = with_fields(
-        LOGGER,
-        correlation_id=correlation_id,
-        operation_id=operation_id,
-        operation=operation_alias,
-        command=CLI_COMMAND,
-        subcommand=subcommand,
-        **filtered_fields,
-    )
-    logger.info("Command started", extra={"status": "start"})
+    if filtered_fields:
+        typer.echo(
+            f"Starting {subcommand} with "
+            + ", ".join(f"{key}={value}" for key, value in filtered_fields.items())
+        )
     builder = CliEnvelopeBuilder.create(
         command=CLI_COMMAND, status="success", subcommand=subcommand
     )
@@ -178,7 +165,6 @@ def _start_command(
         subcommand=subcommand,
         operation_id=operation_id,
         correlation_id=correlation_id,
-        logger=logger,
         start=time.monotonic(),
     )
     return context, builder
@@ -236,28 +222,20 @@ def _envelope_path(subcommand: str) -> Path:
     return CLI_ENVELOPE_DIR / filename
 
 
-def _emit_envelope(envelope: CliEnvelope, *, subcommand: str, logger: LoggerAdapter) -> Path:
+def _emit_envelope(envelope: CliEnvelope, *, subcommand: str) -> Path:
     path = _envelope_path(subcommand)
     CLI_ENVELOPE_DIR.mkdir(parents=True, exist_ok=True)
     payload = render_cli_envelope(envelope)
     path.write_text(payload + "\n", encoding="utf-8")
-    logger.debug(
-        "CLI envelope written",
-        extra={"status": envelope.status, "cli_envelope": str(path)},
-    )
     return path
 
 
 def _finish_success(context: _CommandContext, builder: CliEnvelopeBuilder) -> CliEnvelope:
     envelope = builder.finish(duration_seconds=time.monotonic() - context.start)
-    path = _emit_envelope(envelope, subcommand=context.subcommand, logger=context.logger)
-    context.logger.info(
-        "Command completed",
-        extra={
-            "status": "success",
-            "duration_seconds": envelope.duration_seconds,
-            "cli_envelope": str(path),
-        },
+    path = _emit_envelope(envelope, subcommand=context.subcommand)
+    typer.echo(
+        f"{context.subcommand} completed in {envelope.duration_seconds:.2f}s "
+        f"(envelope: {path})"
     )
     return envelope
 
@@ -285,16 +263,13 @@ def _handle_failure(
     builder = builder.add_error(status=cli_error_status, message=detail, problem=problem_payload)
     builder = builder.set_problem(problem_payload)
     envelope = builder.finish(duration_seconds=time.monotonic() - context.start)
-    path = _emit_envelope(envelope, subcommand=context.subcommand, logger=context.logger)
-    log_kwargs = {
-        "extra": {
-            "status": cli_run_status,
-            "detail": detail,
-            "duration_seconds": envelope.duration_seconds,
-            "cli_envelope": str(path),
-        }
-    }
-    context.logger.error("Command failed", exc_info=exc, **log_kwargs)
+    path = _emit_envelope(envelope, subcommand=context.subcommand)
+    typer.echo(
+        f"{context.subcommand} failed ({cli_run_status}); envelope: {path}",
+        err=True,
+    )
+    if exc is not None:
+        typer.echo(str(exc), err=True)
     typer.echo(json.dumps(problem_payload, sort_keys=True), err=True)
     typer.echo(detail, err=True)
 
@@ -314,9 +289,7 @@ def _extract_bm25_document(
     return chunk_id, {"title": title, "section": section, "body": text}
 
 
-def _load_bm25_documents(
-    chunks_path: str, *, logger: LoggerAdapter
-) -> list[tuple[str, dict[str, str]]]:
+def _load_bm25_documents(chunks_path: str) -> list[tuple[str, dict[str, str]]]:
     docs: list[tuple[str, dict[str, str]]] = []
     path = Path(chunks_path)
     if chunks_path.endswith(".jsonl"):
@@ -324,11 +297,7 @@ def _load_bm25_documents(
             for line in handle:
                 try:
                     payload: object = json.loads(line)
-                except json.JSONDecodeError as exc:
-                    logger.warning(
-                        "Skipping invalid JSON line",
-                        extra={"status": "warning", "error": str(exc)},
-                    )
+                except json.JSONDecodeError:
                     continue
                 if isinstance(payload, Mapping) and (document := _extract_bm25_document(payload)):
                     docs.append(document)
@@ -350,27 +319,17 @@ def _get_bm25_index_path(index_dir: Path, backend: str) -> Path:
     return index_dir / "pure_bm25.pkl" if backend == "pure" else index_dir / "bm25_index"
 
 
-def _instantiate_bm25_builder(
-    config: BM25BuildConfig, *, logger: LoggerAdapter
-) -> tuple[_BM25Builder, str]:
+def _instantiate_bm25_builder(config: BM25BuildConfig) -> tuple[_BM25Builder, str]:
     requested_backend = config.backend.strip().lower()
     try:
         builder = cast(
             "_BM25Builder",
             get_bm25(requested_backend, config.index_dir, k1=0.9, b=0.4, load_existing=False),
         )
-    except RuntimeError as exc:
+    except RuntimeError:
         if requested_backend != "lucene":
             raise
-        logger.warning(
-            "Lucene backend unavailable; using pure backend",
-            extra={
-                "status": "warning",
-                "backend": requested_backend,
-                "fallback_backend": "pure",
-            },
-            exc_info=exc,
-        )
+        typer.echo("Lucene backend unavailable; using pure backend", err=True)
         fallback = cast(
             "_BM25Builder",
             get_bm25("pure", config.index_dir, k1=0.9, b=0.4, load_existing=False),
@@ -379,23 +338,15 @@ def _instantiate_bm25_builder(
     return builder, requested_backend
 
 
-def _build_bm25_index(config: BM25BuildConfig, *, logger: LoggerAdapter) -> tuple[str, int]:
-    documents = _load_bm25_documents(config.chunks_path, logger=logger)
-    builder, backend_used = _instantiate_bm25_builder(config, logger=logger)
+def _build_bm25_index(config: BM25BuildConfig) -> tuple[str, int]:
+    documents = _load_bm25_documents(config.chunks_path)
+    builder, backend_used = _instantiate_bm25_builder(config)
     try:
         builder.build(documents)
-    except RuntimeError as exc:
+    except RuntimeError:
         if backend_used != "lucene":
             raise
-        logger.warning(
-            "Lucene build failed; retrying with pure backend",
-            extra={
-                "status": "warning",
-                "backend": backend_used,
-                "fallback_backend": "pure",
-            },
-            exc_info=exc,
-        )
+        typer.echo("Lucene build failed; retrying with pure backend", err=True)
         fallback_builder = cast(
             "_BM25Builder",
             get_bm25("pure", config.index_dir, k1=0.9, b=0.4, load_existing=False),
@@ -532,7 +483,7 @@ def index_bm25(
     config = BM25BuildConfig(chunks_path=chunks_parquet, backend=backend, index_dir=index_dir)
     try:
         _prepare_index_directory(config.index_dir)
-        backend_used, doc_count = _build_bm25_index(config, logger=context.logger)
+        backend_used, doc_count = _build_bm25_index(config)
         index_path = _get_bm25_index_path(Path(index_dir), backend_used)
         builder = builder.add_file(
             path=str(index_path),
@@ -680,14 +631,6 @@ def index_faiss(
     )
     try:
         metadata = run_index_faiss(config=config)
-        context.logger.info(
-            "Building FAISS index",
-            extra={
-                "status": "success",
-                "vectors": metadata.get("vector_count"),
-                "dimension": metadata.get("dimension"),
-            },
-        )
         builder = builder.add_file(
             path=str(Path(index_path)),
             status="success",

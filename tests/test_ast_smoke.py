@@ -65,10 +65,10 @@ def test_ast_collection_and_duckdb_join(tmp_path: Path) -> None:
 
     con = duckdb.connect()
     try:
-        modules_path = modules_stub.as_posix().replace("'", "''")
-        nodes_path = (ast_dir / "ast_nodes.parquet").as_posix().replace("'", "''")
-        con.execute(f"CREATE TABLE modules AS SELECT * FROM read_json_auto('{modules_path}');")
-        con.execute(f"CREATE TABLE ast_nodes AS SELECT * FROM read_parquet('{nodes_path}');")
+        modules_path = modules_stub.as_posix()
+        nodes_path = (ast_dir / "ast_nodes.parquet").as_posix()
+        con.execute("CREATE TABLE modules AS SELECT * FROM read_json_auto(?)", [modules_path])
+        con.execute("CREATE TABLE ast_nodes AS SELECT * FROM read_parquet(?)", [nodes_path])
         result = con.execute("SELECT COUNT(*) FROM ast_nodes JOIN modules USING(path);").fetchone()
         assert result is not None
         joined = result[0]

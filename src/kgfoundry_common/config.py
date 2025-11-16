@@ -29,7 +29,6 @@ from typing import (
     cast,
 )
 
-from kgfoundry_common.logging import get_logger
 from kgfoundry_common.navmap_loader import load_nav_metadata
 from kgfoundry_common.types import JsonPrimitive, JsonValue
 from kgfoundry_common.typing import gate_import
@@ -59,8 +58,6 @@ __all__ = [
     "load_config",
 ]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
-
-logger = get_logger(__name__)
 
 # Security constants
 _MIN_SIGNING_KEY_BYTES: Final[int] = 32  # Minimum recommended key length
@@ -434,23 +431,7 @@ def _load_config_impl() -> AppSettings:
     """
     try:
         settings = AppSettings()
-        logger.log_success(
-            "Configuration loaded",
-            operation="config.load",
-            extra={
-                "log_level": settings.log_level,
-                "log_format": settings.log_format,
-                "signing_key_present": settings.signing_key is not None,
-                "subprocess_timeout": settings.subprocess_timeout,
-                "request_timeout": settings.request_timeout,
-            },
-        )
-    except ValueError as exc:
-        logger.log_failure(
-            "Configuration validation failed",
-            exception=exc,
-            operation="config.load",
-        )
+    except ValueError:
         raise
     else:
         return settings

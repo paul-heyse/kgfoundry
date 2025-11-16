@@ -1,11 +1,14 @@
+"""Tests for the CodeRank LLAMA-based reranker shim."""
+
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Any
 
 import pytest
 from codeintel_rev.io import rerank_coderankllm as rerank_module
 from codeintel_rev.io.rerank_coderankllm import CodeRankListwiseReranker
+
+from tests._helpers import assertions
 
 
 class _FakeTensor:
@@ -19,11 +22,11 @@ class _FakeTokenizer:
         self.decode_calls = 0
 
     def __call__(self, _prompt: str, *, return_tensors: str) -> dict[str, _FakeTensor]:
-        assert return_tensors == "pt"
+        assertions.expect_equal(return_tensors, "pt")
         return {"input_ids": _FakeTensor()}
 
-    def decode(self, _output_ids: Any, *, skip_special_tokens: bool) -> str:
-        assert skip_special_tokens
+    def decode(self, _output_ids: object, *, skip_special_tokens: bool) -> str:
+        assertions.expect_true(skip_special_tokens)
         self.decode_calls += 1
         return self.response
 
@@ -35,10 +38,11 @@ class _FakeModel:
     def to(self, _device: str) -> _FakeModel:
         return self
 
-    def eval(self) -> None:
+    @staticmethod
+    def eval() -> None:
         return None
 
-    def generate(self, **_: Any) -> list[list[int]]:
+    def generate(self, **_: object) -> list[list[int]]:
         self.generate_calls += 1
         return [[0]]
 
@@ -68,7 +72,8 @@ def _patch_gate(
     )
 
 
-def test_reranker_reorders_when_json_valid(monkeypatch) -> None:
+def test_reranker_reorders_when_json_valid(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Valid JSON output produces reordered identifiers."""
     tokenizer = _FakeTokenizer("[2, 1]")
     model = _FakeModel()
     _patch_gate(monkeypatch, tokenizer, model)
@@ -82,12 +87,13 @@ def test_reranker_reorders_when_json_valid(monkeypatch) -> None:
 
     result = reranker.rerank("query", [(1, "code1"), (2, "code2")])
 
-    assert result == [2, 1]
-    assert tokenizer.decode_calls == 1
-    assert model.generate_calls == 1
+    assertions.expect_sequence_equal(result, [2, 1])
+    assertions.expect_equal(tokenizer.decode_calls, 1)
+    assertions.expect_equal(model.generate_calls, 1)
 
 
-def test_reranker_falls_back_on_invalid_output(monkeypatch) -> None:
+def test_reranker_falls_back_on_invalid_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Invalid JSON preserves the original ordering."""
     tokenizer = _FakeTokenizer("no json")
     model = _FakeModel()
     _patch_gate(monkeypatch, tokenizer, model)
@@ -101,4 +107,4 @@ def test_reranker_falls_back_on_invalid_output(monkeypatch) -> None:
 
     result = reranker.rerank("query", [(1, "code1"), (2, "code2")])
 
-    assert result == [1, 2]
+    assertions.expect_sequence_equal(result, [1, 2])

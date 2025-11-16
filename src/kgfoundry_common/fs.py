@@ -23,10 +23,6 @@ import tempfile
 from pathlib import Path
 from typing import Literal
 
-from kgfoundry_common.logging import get_logger
-
-logger = get_logger(__name__)
-
 
 def ensure_dir(path: Path, *, exist_ok: bool = True) -> Path:
     """Create directory if it does not exist, including parent directories.

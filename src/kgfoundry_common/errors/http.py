@@ -20,7 +20,6 @@ from typing import TYPE_CHECKING, cast
 
 from kgfoundry_common.errors.exceptions import KgFoundryError
 from kgfoundry_common.fastapi_helpers import typed_exception_handler
-from kgfoundry_common.logging import get_logger
 from kgfoundry_common.navmap_loader import load_nav_metadata
 from kgfoundry_common.typing import gate_import
 
@@ -39,9 +38,6 @@ __all__ = [
     "register_problem_details_handler",
 ]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
-
-
-logger = get_logger(__name__)
 
 
 # [nav:anchor problem_details_response]
@@ -84,9 +80,6 @@ def problem_details_response(
             instance += f"?{request.url.query}"
 
     details: ProblemDetails = error.to_problem_details(instance=instance)
-
-    # Log the error at appropriate level
-    logger.log(error.log_level, "Error: %s", error.message, exc_info=error.__cause__)
 
     return JSONResponse(
         status_code=error.http_status,

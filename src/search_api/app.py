@@ -54,9 +54,7 @@ from kgfoundry_common.jsonschema_utils import (
 from kgfoundry_common.jsonschema_utils import (
     validate as jsonschema_validate,
 )
-from kgfoundry_common.logging import get_logger, set_correlation_id, with_fields
 from kgfoundry_common.navmap_loader import load_nav_metadata
-from kgfoundry_common.observability import MetricsProvider, observe_duration
 from kgfoundry_common.schema_helpers import load_schema
 from kgfoundry_common.settings import RuntimeSettings
 from kgfoundry_common.typing import gate_import
@@ -100,9 +98,6 @@ __all__ = [
 ]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
-
-logger = get_logger(__name__)
-metrics = MetricsProvider.default()
 
 MIDDLEWARE_TIMEOUT_SECONDS = DEFAULT_TIMEOUT_SECONDS
 DEPENDENCY_TIMEOUT_SECONDS = 5.0
@@ -164,7 +159,6 @@ class CorrelationIDMiddleware(BaseHTTPMiddleware):
         correlation_id = request.headers.get(header_name)
         if not correlation_id:
             correlation_id = str(uuid.uuid4())
-        set_correlation_id(correlation_id)
         response = await call_next(request)
         response.headers[header_name] = correlation_id
         return response
@@ -212,16 +206,7 @@ class ResponseValidationMiddleware(BaseHTTPMiddleware):
         if self.enabled and self.schema_path.exists():
             try:
                 self.schema = load_schema(self.schema_path)
-                logger.info(
-                    "Response validation enabled",
-                    extra={"schema_path": str(self.schema_path)},
-                )
-            except (FileNotFoundError, DeserializationError) as exc:
-                logger.warning(
-                    "Failed to load response schema, validation disabled",
-                    extra={"schema_path": str(self.schema_path), "error": str(exc)},
-                    exc_info=True,
-                )
+            except (FileNotFoundError, DeserializationError):
                 self.enabled = False
 
     async def dispatch(
@@ -270,13 +255,7 @@ class ResponseValidationMiddleware(BaseHTTPMiddleware):
             else:
                 body_bytes = bytes(body_buffer)
             response_body: JsonValue = json.loads(body_bytes.decode("utf-8"))
-        except (json.JSONDecodeError, AttributeError) as exc:
-            with with_fields(logger, operation="response_validation") as log_adapter:
-                log_adapter.warning(
-                    "Failed to parse response body for validation",
-                    extra={"error": str(exc)},
-                    exc_info=True,
-                )
+        except (json.JSONDecodeError, AttributeError):
             # Return original response if parsing fails
             return response
 
@@ -284,16 +263,7 @@ class ResponseValidationMiddleware(BaseHTTPMiddleware):
         try:
             jsonschema_validate(instance=response_body, schema=self.schema)
         except JsonSchemaValidationError as exc:
-            with with_fields(logger, operation="response_validation") as log_adapter:
-                error_details = cast("ValidationErrorProtocol", exc)
-                log_adapter.exception(
-                    "Response validation failed",
-                    extra={
-                        "status": "error",
-                        "validation_error": error_details.message,
-                        "path": "/".join(str(part) for part in error_details.path),
-                    },
-                )
+            error_details = cast("ValidationErrorProtocol", exc)
             # Return Problem Details for validation failure
             error_msg = f"Response validation failed: {error_details.message}"
             problem = SerializationError(
@@ -326,10 +296,8 @@ typed_middleware(
 try:
     settings = RuntimeSettings()
 except SettingsError:
-    logger.exception("Failed to load settings, using defaults")
     from kgfoundry_common.settings import (
         FaissConfig,
-        ObservabilityConfig,
         SearchConfig,
         SparseEmbeddingConfig,
     )
@@ -338,7 +306,6 @@ except SettingsError:
         search=SearchConfig(),
         sparse_embedding=SparseEmbeddingConfig(),
         faiss=FaissConfig(),
-        observability=ObservabilityConfig(),
     )
 
 # Initialize response validation middleware if enabled
@@ -363,8 +330,8 @@ try:
         k1=settings.sparse_embedding.bm25_k1,
         b=settings.sparse_embedding.bm25_b,
     )
-except (FileNotFoundError, DeserializationError, RuntimeError) as exc:
-    logger.warning("BM25 index not available: %s", exc, exc_info=True)
+except (FileNotFoundError, DeserializationError, RuntimeError):
+    bm25 = None
 
 try:
     splade = get_splade(
@@ -372,8 +339,8 @@ try:
         index_dir=settings.sparse_embedding.splade_index_dir,
         query_encoder=settings.sparse_embedding.splade_query_encoder,
     )
-except (FileNotFoundError, DeserializationError, RuntimeError) as exc:
-    logger.warning("SPLADE index not available: %s", exc, exc_info=True)
+except (FileNotFoundError, DeserializationError, RuntimeError):
+    splade = None
 
 
 # [nav:anchor auth]
@@ -442,7 +409,7 @@ def search(req: SearchRequest, _: AuthDependency = None) -> SearchResponse:
 
     Combines dense (FAISS), sparse (BM25/SPLADE), and knowledge graph signals
     using Reciprocal Rank Fusion and KG boosts. Returns ranked results with
-    structured logging and metrics.
+    fused scoring details.
 
     Parameters
     ----------
@@ -453,7 +420,7 @@ def search(req: SearchRequest, _: AuthDependency = None) -> SearchResponse:
     Returns
     -------
     SearchResponse
-        Search results with metadata and performance metrics. Results are
+        Search results with metadata and fused scoring details. Results are
         ranked by combined relevance scores from all search channels.
 
     Raises
@@ -473,116 +440,64 @@ def search(req: SearchRequest, _: AuthDependency = None) -> SearchResponse:
     >>> len(response.results) <= 5
     True
     """
-    # Correlation ID is set by middleware, use with_fields for structured logging
-    response: SearchResponse | None = None
-    with (
-        with_fields(logger, operation="search", query=req.query, k=req.k),
-        observe_duration(metrics, "search", component="search_api") as obs,
-    ):
-        log_adapter = logger  # Use logger directly since with_fields provides context
-        log_adapter.info("Search request received", extra={"status": "started"})
-
-        try:
-            # Retrieve from each channel
-            # We don't have a query embedder here; fallback to empty or demo vector
-            dense_hits: list[tuple[str, float]] = []
-            # sparse via BM25 (preferred) and SPLADE
-            bm25_hits: list[tuple[str, float]] = []
-            if bm25:
-                try:
-                    bm25_hits = bm25.search(req.query, k=settings.search.sparse_candidates)
-                except (RuntimeError, ValueError, AttributeError, OSError) as exc:
-                    log_adapter.warning(
-                        "BM25 search failed, falling back to empty results: %s",
-                        exc,
-                        extra={"status": "warning"},
-                        exc_info=True,
-                    )
-                    bm25_hits = []
+    try:
+        dense_hits: list[tuple[str, float]] = []
+        bm25_hits: list[tuple[str, float]] = []
+        if bm25:
             try:
-                splade_hits = (
-                    splade.search(req.query, k=settings.search.sparse_candidates) if splade else []
-                )
-            except (RuntimeError, ValueError, AttributeError, OSError) as exc:
-                log_adapter.warning(
-                    "SPLADE search failed, falling back to empty results: %s",
-                    exc,
-                    extra={"status": "warning"},
-                    exc_info=True,
-                )
-                splade_hits = []
+                bm25_hits = bm25.search(req.query, k=settings.search.sparse_candidates)
+            except (RuntimeError, ValueError, AttributeError, OSError):
+                bm25_hits = []
+        try:
+            splade_hits = (
+                splade.search(req.query, k=settings.search.sparse_candidates) if splade else []
+            )
+        except (RuntimeError, ValueError, AttributeError, OSError):
+            splade_hits = []
 
-            # RRF fusion
-            fused = rrf_fuse([dense_hits, bm25_hits, splade_hits], k_rrf=settings.search.rrf_k)
-            # KG boosts
-            boosted = apply_kg_boosts(
-                fused,
-                req.query,
-                direct=settings.search.kg_boosts_direct,
-                one_hop=settings.search.kg_boosts_one_hop,
+        fused = rrf_fuse([dense_hits, bm25_hits, splade_hits], k_rrf=settings.search.rrf_k)
+        boosted = apply_kg_boosts(
+            fused,
+            req.query,
+            direct=settings.search.kg_boosts_direct,
+            one_hop=settings.search.kg_boosts_one_hop,
+        )
+
+        def sort_key(item: tuple[str, float]) -> float:
+            """Sort key function for ranking results."""
+            return item[1]
+
+        top = sorted(boosted.items(), key=sort_key, reverse=True)[: req.k]
+        results: list[SearchResult] = []
+        for chunk_id, score in top:
+            results.append(
+                SearchResult(
+                    doc_id=f"doc-of-{chunk_id}",
+                    chunk_id=chunk_id,
+                    title=f"Title for {chunk_id}",
+                    section="Methods",
+                    score=float(score),
+                    signals={
+                        "rrf": float(fused.get(chunk_id, 0.0)),
+                        "kg_boost": float(boosted[chunk_id] - fused.get(chunk_id, 0.0)),
+                    },
+                    spans={"start_char": 0, "end_char": 50},
+                    concepts=[
+                        {
+                            "concept_id": c,
+                            "label": c,
+                            "match": ("direct" if c in req.query else "nearby"),
+                        }
+                        for c in kg.linked_concepts(chunk_id)
+                    ],
+                )
             )
 
-            # Rank and craft results
-            def sort_key(item: tuple[str, float]) -> float:
-                """Sort key function for ranking results.
-
-                Parameters
-                ----------
-                item : tuple[str, float]
-                    Result tuple containing (chunk_id, score).
-
-                Returns
-                -------
-                float
-                    Score value for sorting.
-                """
-                return item[1]
-
-            top = sorted(boosted.items(), key=sort_key, reverse=True)[: req.k]
-            results: list[SearchResult] = []
-            for chunk_id, score in top:
-                # In real system we'd hydrate title/section via DuckDB; here we echo ids
-                results.append(
-                    SearchResult(
-                        doc_id=f"doc-of-{chunk_id}",
-                        chunk_id=chunk_id,
-                        title=f"Title for {chunk_id}",
-                        section="Methods",
-                        score=float(score),
-                        signals={
-                            "rrf": float(fused.get(chunk_id, 0.0)),
-                            "kg_boost": float(boosted[chunk_id] - fused.get(chunk_id, 0.0)),
-                        },
-                        spans={"start_char": 0, "end_char": 50},
-                        concepts=[
-                            {
-                                "concept_id": c,
-                                "label": c,
-                                "match": ("direct" if c in req.query else "nearby"),
-                            }
-                            for c in kg.linked_concepts(chunk_id)
-                        ],
-                    )
-                )
-
-            log_adapter.info(
-                "Search completed",
-                extra={"status": "success", "result_count": len(results)},
-            )
-            obs.success()
-
-            response = SearchResponse(results=results)
-        except (RuntimeError, ValueError, AttributeError, OSError) as exc:
-            obs.error()
-            # Convert to VectorSearchError for proper Problem Details handling
-            error_msg = f"Search operation failed: {exc}"
-            # context accepts Mapping[str, object], dict[str, str | int] is compatible
-            context_dict: Mapping[str, object] = {"query": req.query, "k": req.k}
-            raise VectorSearchError(error_msg, cause=exc, context=context_dict) from exc
-    if response is None:
-        message = "Search operation completed without producing a response"
-        raise RuntimeError(message)
-    return response
+        return SearchResponse(results=results)
+    except (RuntimeError, ValueError, AttributeError, OSError) as exc:
+        error_msg = f"Search operation failed: {exc}"
+        context_dict: Mapping[str, object] = {"query": req.query, "k": req.k}
+        raise VectorSearchError(error_msg, cause=exc, context=context_dict) from exc
 
 
 # [nav:anchor graph_concepts]
@@ -594,7 +509,7 @@ def graph_concepts(
 
     Returns concepts from the knowledge graph that match the query string.
     Searches concept labels for substring matches and returns a limited number
-    of results. Includes structured logging and error handling.
+    of results.
 
     Parameters
     ----------
@@ -623,36 +538,27 @@ def graph_concepts(
     >>> "concepts" in result
     True
     """
-    with with_fields(logger, operation="graph_concepts") as log_adapter:
-        q: str = ""
+    q: str = ""
+    try:
+        q = str((body or {}).get("q", "")).lower()
+        limit_raw = body.get("limit", 50) if body else 50
         try:
-            q = str((body or {}).get("q", "")).lower()
-            limit_raw = body.get("limit", 50) if body else 50
-            try:
-                limit = int(cast("int | float | str", limit_raw))
-                if limit < 0:
-                    limit = 50
-            except (ValueError, TypeError):
+            limit = int(cast("int | float | str", limit_raw))
+            if limit < 0:
                 limit = 50
+        except (ValueError, TypeError):
+            limit = 50
 
-            # toy: return nodes that contain the query substring
-            concepts: list[dict[str, str]] = [
-                {"concept_id": c, "label": c}
-                for c in sorted({c for cs in kg.chunk2concepts.values() for c in cs})
-                if q in c.lower()
-            ][:limit]
-
-            log_adapter.info(
-                "Graph concepts retrieved",
-                extra={"status": "success", "count": len(concepts)},
-            )
-        except (RuntimeError, ValueError, AttributeError, OSError) as exc:
-            error_msg = f"Graph concepts operation failed: {exc}"
-            # context accepts Mapping[str, object], dict[str, str] is compatible
-            context_dict: Mapping[str, object] = {"query": q}
-            raise VectorSearchError(error_msg, cause=exc, context=context_dict) from exc
-        else:
-            return {"concepts": concepts}
+        concepts: list[dict[str, str]] = [
+            {"concept_id": c, "label": c}
+            for c in sorted({c for cs in kg.chunk2concepts.values() for c in cs})
+            if q in c.lower()
+        ][:limit]
+    except (RuntimeError, ValueError, AttributeError, OSError) as exc:
+        error_msg = f"Graph concepts operation failed: {exc}"
+        context_dict: Mapping[str, object] = {"query": q}
+        raise VectorSearchError(error_msg, cause=exc, context=context_dict) from exc
+    return {"concepts": concepts}
 
 
 app.get("/healthz")(healthz)

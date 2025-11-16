@@ -39,7 +39,6 @@ from kgfoundry_common.jsonschema_utils import (
 from kgfoundry_common.jsonschema_utils import (
     validate as jsonschema_validate,
 )
-from kgfoundry_common.logging import get_logger
 from kgfoundry_common.navmap_loader import load_nav_metadata
 
 # JSON Schema type (from jsonschema stubs: Mapping[str, object])
@@ -54,8 +53,6 @@ __all__ = [
 ]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
-
-logger = get_logger(__name__)
 
 # Schema cache: module-level dict mapping schema paths (as strings) to parsed schema objects
 _schema_cache: dict[str, dict[str, object]] = {}
@@ -357,15 +354,6 @@ def serialize_json(
             msg = f"Failed to write checksum file {checksum_path}: {exc}"
             raise SerializationError(msg) from exc
 
-    logger.debug(
-        "Serialized JSON",
-        extra={
-            "output_path": str(output_path),
-            "schema_path": str(schema_path),
-            "checksum": checksum,
-        },
-    )
-
     return checksum
 
 
@@ -384,10 +372,6 @@ def _verify_checksum_file(data_path: Path) -> None:
     """
     checksum_path = data_path.with_suffix(data_path.suffix + ".sha256")
     if not checksum_path.exists():
-        logger.warning(
-            "Checksum file not found, skipping verification",
-            extra={"data_path": str(data_path), "checksum_path": str(checksum_path)},
-        )
         return
 
     expected_checksum = read_text(checksum_path).strip()
@@ -533,13 +517,5 @@ def deserialize_json(
     except SchemaValidationError as exc:
         msg = f"Schema validation failed for {data_path} against {schema_path}: {exc}"
         raise SchemaValidationError(msg) from exc
-
-    logger.debug(
-        "Deserialized JSON",
-        extra={
-            "data_path": str(data_path),
-            "schema_path": str(schema_path),
-        },
-    )
 
     return obj

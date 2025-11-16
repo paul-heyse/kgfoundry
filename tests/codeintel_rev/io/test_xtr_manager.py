@@ -1,3 +1,5 @@
+"""Tests for the XTR index manager helpers."""
+
 from __future__ import annotations
 
 import json
@@ -8,8 +10,11 @@ import pytest
 from codeintel_rev.config.settings import XTRConfig
 from codeintel_rev.io.xtr_manager import XTRIndex
 
+from tests._helpers import assertions, constants
+
 
 def _write_token_artifacts(root: Path) -> None:
+    """Create token artifacts + metadata for XTR index tests."""
     token_path = root / "tokens.f16"
     token_path.parent.mkdir(parents=True, exist_ok=True)
     data = np.asarray(
@@ -37,31 +42,34 @@ def _write_token_artifacts(root: Path) -> None:
 
 
 def test_xtr_index_open_and_metadata(tmp_path: Path) -> None:
+    """Index loads token artifacts and exposes metadata."""
     _write_token_artifacts(tmp_path)
     index = XTRIndex(tmp_path, XTRConfig(enable=True, dim=2, dtype="float16"))
     index.open()
-    assert index.ready
+    assertions.expect_true(index.ready)
     meta = index.metadata()
-    assert meta is not None
-    assert meta["chunk_ids"] == [1, 2]
-    assert meta["offsets"] == [0, 2]
+    assertions.expect_true(meta is not None, reason="Metadata should be available after open().")
+    assertions.expect_sequence_equal(meta["chunk_ids"], [1, 2])
+    assertions.expect_sequence_equal(meta["offsets"], [0, constants.BATCH_SIZES.small])
 
 
 def test_xtr_index_not_ready_without_artifacts(tmp_path: Path) -> None:
+    """Index stays unready when artifacts are missing."""
     index = XTRIndex(tmp_path, XTRConfig(enable=True))
     index.open()
-    assert not index.ready
+    assertions.expect_false(index.ready)
 
 
 def test_xtr_search_and_rescore(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Search returns k hits and rescoring narrows the result set."""
     _write_token_artifacts(tmp_path)
     config = XTRConfig(enable=True, dim=2, dtype="float16")
     index = XTRIndex(tmp_path, config)
     index.open()
-    assert index.ready
+    assertions.expect_true(index.ready)
 
     def _encode_query(self: XTRIndex, text: str) -> np.ndarray:
         del text, self
@@ -69,7 +77,7 @@ def test_xtr_search_and_rescore(
 
     monkeypatch.setattr(XTRIndex, "encode_query_tokens", _encode_query)
     wide_hits = index.search("query", k=2, explain=True)
-    assert len(wide_hits) == 2
-    assert wide_hits[0][0] in {1, 2}
+    assertions.expect_equal(len(wide_hits), 2)
+    assertions.expect_true(wide_hits[0][0] in {1, 2})
     narrow_hits = index.rescore("query", [1], explain=False)
-    assert len(narrow_hits) == 1
+    assertions.expect_equal(len(narrow_hits), 1)

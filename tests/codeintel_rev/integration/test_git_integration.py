@@ -7,13 +7,14 @@ correctness with real repository data and edge cases.
 from __future__ import annotations
 
 import shutil
-import subprocess
 from datetime import datetime
 from pathlib import Path
 
 import pytest
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 from git.exc import GitCommandError
+
+from tests._helpers import run_process
 
 
 @pytest.fixture
@@ -48,26 +49,11 @@ def git_repo(tmp_path: Path) -> Path:
         raise RuntimeError(msg)
 
     # Initialize Git repository
-    subprocess.run(
-        [git_cmd, "init"],
-        cwd=repo_root,
-        check=True,
-        capture_output=True,
-    )
+    run_process([git_cmd, "init"], cwd=repo_root)
 
     # Configure Git user (required for commits)
-    subprocess.run(
-        [git_cmd, "config", "user.name", "Test User"],
-        cwd=repo_root,
-        check=True,
-        capture_output=True,
-    )
-    subprocess.run(
-        [git_cmd, "config", "user.email", "test@example.com"],
-        cwd=repo_root,
-        check=True,
-        capture_output=True,
-    )
+    run_process([git_cmd, "config", "user.name", "Test User"], cwd=repo_root)
+    run_process([git_cmd, "config", "user.email", "test@example.com"], cwd=repo_root)
 
     # Create test file with multiple lines
     test_file = repo_root / "test.py"
@@ -107,13 +93,8 @@ def function3():
         )
 
         # Stage and commit
-        subprocess.run(
-            [git_cmd, "add", "test.py"],
-            cwd=repo_root,
-            check=True,
-            capture_output=True,
-        )
-        subprocess.run(
+        run_process([git_cmd, "add", "test.py"], cwd=repo_root)
+        run_process(
             [
                 git_cmd,
                 "commit",
@@ -122,8 +103,6 @@ def function3():
                 f"--author={name} <{email}>",
             ],
             cwd=repo_root,
-            check=True,
-            capture_output=True,
         )
 
     return repo_root
@@ -173,14 +152,8 @@ class TestGitClientIntegration:
         if git_cmd is None:
             msg = "git command not found in PATH"
             raise RuntimeError(msg)
-        result = subprocess.run(
-            [git_cmd, "log", "--format=%H", "test.py"],
-            cwd=git_repo,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        actual_shas = [line[:8] for line in result.stdout.strip().split("\n") if line]
+        output = run_process([git_cmd, "log", "--format=%H", "test.py"], cwd=git_repo)
+        actual_shas = [line[:8] for line in output.strip().splitlines() if line]
 
         # Verify blame entries reference valid commits
         entry_shas = {entry["commit"] for entry in entries}

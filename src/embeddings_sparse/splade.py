@@ -12,7 +12,6 @@ from __future__ import annotations
 import base64
 import binascii
 import importlib
-import logging
 import math
 import re
 from collections import Counter, defaultdict
@@ -76,8 +75,7 @@ def _decode_signing_key() -> bytes | None:
     """
     try:
         settings = load_config()
-    except ValueError as exc:
-        logger.warning("Configuration invalid; proceeding without signing key", exc_info=exc)
+    except ValueError:
         return None
 
     encoded_key = settings.signing_key
@@ -86,11 +84,7 @@ def _decode_signing_key() -> bytes | None:
 
     try:
         return base64.b64decode(encoded_key)
-    except binascii.Error as exc:
-        logger.warning(
-            "Signing key is not valid base64; ignoring secure pickle signature",
-            exc_info=exc,
-        )
+    except binascii.Error:
         return None
 
 
@@ -158,11 +152,6 @@ def _load_legacy_metadata(legacy_path: Path) -> dict[str, JsonValue]:
                 try:
                     payload_obj = wrapper.load(handle)
                 except UnsafeSerializationError:
-                    logger.warning(
-                        "Signed pickle validation failed for legacy SPLADE index; "
-                        "falling back to unsigned loader",
-                        extra={"legacy_path": str(legacy_path)},
-                    )
                     handle.seek(0)
                     payload = _load_unsigned_payload(handle, legacy_path)
                 else:
@@ -173,10 +162,6 @@ def _load_legacy_metadata(legacy_path: Path) -> dict[str, JsonValue]:
                         raise DeserializationError(msg)
                     payload = cast("dict[str, JsonValue]", payload_obj)
             else:
-                logger.warning(
-                    "Missing signing key; using unsigned legacy pickle loader",
-                    extra={"legacy_path": str(legacy_path)},
-                )
                 payload = _load_unsigned_payload(handle, legacy_path)
     except OSError as exc:
         msg = f"Failed to read legacy SPLADE index at {legacy_path}: {exc}"
@@ -208,9 +193,6 @@ class LuceneImpactSearcherFactory(Protocol):
     ) -> LuceneImpactSearcherProtocol:
         """Build a searcher for ``index_dir`` using an optional query encoder."""
         ...
-
-
-logger = logging.getLogger(__name__)
 
 __all__ = [
     "LuceneImpactIndex",
@@ -442,13 +424,6 @@ class PureImpactIndex:
             try:
                 data_raw = deserialize_json(metadata_path, schema_path)
             except DeserializationError:
-                logger.warning(
-                    "Failed to load JSON index, trying legacy pickle",
-                    extra={
-                        "metadata_path": str(metadata_path),
-                        "legacy_path": str(legacy_path),
-                    },
-                )
                 if legacy_path.exists():
                     data_dict = _load_legacy_metadata(legacy_path)
                 else:
@@ -460,7 +435,6 @@ class PureImpactIndex:
                 data_dict = cast("dict[str, JsonValue]", data_raw)
         elif legacy_path.exists():
             data_dict = _load_legacy_metadata(legacy_path)
-            logger.warning("Loaded legacy pickle index. Consider migrating to JSON format.")
         else:
             msg = f"Index metadata not found at {metadata_path} or {legacy_path}"
             raise FileNotFoundError(msg)
@@ -583,7 +557,6 @@ class LuceneImpactIndex:
             AttributeError,
         ) as exc:  # pragma: no cover - optional dependency
             message = "Pyserini not available for SPLADE impact search"
-            logger.exception("Failed to import LuceneImpactSearcher")
             raise RuntimeError(message) from exc
         searcher = lucene_impact_searcher_cls(self.index_dir, query_encoder=self.query_encoder)
         self._searcher = searcher
@@ -660,22 +633,13 @@ def get_splade(
         SPLADE index instance. Returns PureImpactIndex if Lucene backend is
         requested but unavailable.
 
-    Notes
-    -----
-    If "lucene" backend is requested but Pyserini is not available, the function
-    logs a warning and falls back to PureImpactIndex. This allows graceful
-    degradation when optional dependencies are missing.
     """
     if backend == "lucene":
         lucene_index = LuceneImpactIndex(index_dir=index_dir, query_encoder=query_encoder)
         try:
             lucene_index.ensure_available()
-        except RuntimeError as exc:
-            logger.warning(
-                "Lucene backend unavailable, falling back to PureImpactIndex",
-                extra={"index_dir": index_dir, "query_encoder": query_encoder},
-                exc_info=exc,
-            )
+        except RuntimeError:
+            pass
         else:
             return lucene_index
     return PureImpactIndex(index_dir)

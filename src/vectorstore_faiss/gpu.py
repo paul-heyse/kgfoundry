@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 from weakref import WeakKeyDictionary
@@ -49,9 +48,6 @@ __all__ = [
     "VecArray",
 ]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
-
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True, frozen=True)
@@ -170,8 +166,8 @@ class FaissGpuIndex:
         """Clone ``trained_index`` to GPU when possible and set search parameters.
 
         The method is safe to call repeatedly; once a GPU index has been prepared it is reused on
-        subsequent invocations. Any failures during cloning or configuration are logged and the CPU
-        index is returned.
+        subsequent invocations. Any failures during cloning or configuration fall back to the CPU
+        index without emitting diagnostics.
 
         Parameters
         ----------
@@ -184,7 +180,6 @@ class FaissGpuIndex:
             GPU index if available, otherwise CPU index.
         """
         if not self.use_gpu:
-            logger.debug("GPU acceleration disabled; using CPU index only")
             _set_gpu_state(self, context=None, prepared=trained_index)
             return trained_index
 
@@ -194,7 +189,6 @@ class FaissGpuIndex:
             device_ids=self.devices,
         )
         if context is None:
-            logger.debug("GPU helpers missing; falling back to CPU index")
             _set_gpu_state(self, context=None, prepared=trained_index)
             return trained_index
 

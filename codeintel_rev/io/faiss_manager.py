@@ -211,6 +211,173 @@ def apply_parameters(index: FaissIndex, param_str: str) -> None:
         raise ValueError(msg) from exc
 
 
+class FAISSRuntimeController:
+    """Encapsulate runtime tuning operations for :class:`FAISSManager`."""
+
+    def __init__(self, manager: FAISSManager) -> None:
+        self._manager = manager
+
+    def get_runtime_tuning(self) -> dict[str, object]:
+        """Return the effective runtime tuning parameters and overrides.
+
+        Returns
+        -------
+        dict[str, object]
+            Dictionary with keys:
+            - "active": dict with current effective parameters (nprobe, efSearch,
+              quantizer_efSearch, k_factor)
+            - "overrides": dict with runtime override parameters
+            - "autotune_profile": dict with persisted autotune profile or empty dict
+        """
+        manager = self._manager
+        nprobe, ef_search, k_factor, quantizer = manager._resolve_search_knobs(None)
+        with manager._tuning_lock:
+            overrides = dict(manager._runtime_overrides)
+        profile = manager._load_tuned_profile()
+        return {
+            "active": {
+                "nprobe": nprobe,
+                "efSearch": ef_search,
+                "quantizer_efSearch": quantizer,
+                "k_factor": k_factor,
+            },
+            "overrides": overrides,
+            "autotune_profile": profile,
+        }
+
+    def apply_runtime_tuning(
+        self,
+        *,
+        nprobe: int | None = None,
+        ef_search: int | None = None,
+        quantizer_ef_search: int | None = None,
+        k_factor: float | None = None,
+    ) -> dict[str, object]:
+        """Apply runtime overrides (nprobe/efSearch/k_factor) to the active index.
+
+        Parameters
+        ----------
+        nprobe : int | None, optional
+            Override for IVF nprobe parameter. If None, uses current value.
+        ef_search : int | None, optional
+            Override for HNSW ef_search parameter. If None, uses current value.
+        quantizer_ef_search : int | None, optional
+            Override for IVF quantizer ef_search parameter. If None, uses current value.
+        k_factor : float | None, optional
+            Override for search k factor (multiplier for candidate retrieval).
+            If None, uses current value.
+
+        Returns
+        -------
+        dict[str, object]
+            Updated runtime tuning dictionary (same format as :meth:`get_runtime_tuning`).
+
+        Raises
+        ------
+        ValueError
+            If no tuning parameters are provided (all parameters are None).
+        """
+        manager = self._manager
+        sanitized = manager._sanitize_runtime_overrides(
+            nprobe=nprobe,
+            ef_search=ef_search,
+            quantizer_ef_search=quantizer_ef_search,
+            k_factor=k_factor,
+        )
+        if not sanitized:
+            msg = "No tuning parameters provided."
+            raise ValueError(msg)
+        with manager._tuning_lock:
+            manager._runtime_overrides.update(sanitized)
+        manager._maybe_apply_runtime_parameters(sanitized)
+        manager._write_meta_snapshot(
+            parameter_space=manager._format_parameter_string(manager._runtime_overrides)
+        )
+        return self.get_runtime_tuning()
+
+    def reset_runtime_tuning(self) -> dict[str, object]:
+        """Clear runtime overrides and revert to default (or autotuned) parameters.
+
+        Returns
+        -------
+        dict[str, object]
+            Updated runtime tuning dictionary with cleared overrides (same format
+            as :meth:`get_runtime_tuning`).
+        """
+        manager = self._manager
+        with manager._tuning_lock:
+            manager._runtime_overrides.clear()
+        manager._maybe_apply_runtime_parameters(
+            {
+                "nprobe": manager.default_nprobe,
+                "efSearch": manager.hnsw_ef_search,
+            }
+        )
+        return self.get_runtime_tuning()
+
+    def apply_tuning_profile(self, profile: Mapping[str, Any]) -> dict[str, object]:
+        """Apply a persisted tuning profile (typically from ``tuning.json``).
+
+        Parameters
+        ----------
+        profile : Mapping[str, Any]
+            Tuning profile dictionary containing runtime parameter overrides.
+            Expected keys include "param_str", "nprobe", "efSearch", "k_factor",
+            etc. The profile is typically loaded from a tuning.json file created
+            by the tuning process.
+
+        Returns
+        -------
+        dict[str, object]
+            Current runtime tuning parameters after applying the profile. Returns
+            the same dictionary as :meth:`get_runtime_tuning`, containing all active
+            runtime parameter overrides.
+
+        Raises
+        ------
+        VectorIndexIncompatibleError
+            Raised when the profile is empty or invalid. Profiles must contain
+            at least one valid parameter override.
+        """
+        if not profile:
+            msg = "Tuning profile payload is empty."
+            raise VectorIndexIncompatibleError(msg)
+        return self._manager._apply_profile_payload(profile, persist=True)
+
+    def set_search_parameters(self, param_str: str) -> dict[str, object]:
+        """Apply FAISS ParameterSpace string and persist overrides.
+
+        Parameters
+        ----------
+        param_str : str
+            Comma-separated FAISS ParameterSpace string
+            (e.g., ``"nprobe=64,efSearch=128"``).
+
+        Returns
+        -------
+        dict[str, object]
+            Runtime tuning snapshot as returned by :meth:`get_runtime_tuning`.
+
+        Raises
+        ------
+        ValueError
+            If the parameter string is invalid or FAISS rejects the override.
+        """
+        manager = self._manager
+        faiss_spec, sanitized = manager._prepare_parameter_string(param_str)
+        if faiss_spec:
+            try:
+                apply_parameters(manager._active_index(), faiss_spec)
+            except ValueError as exc:
+                raise ValueError(str(exc)) from exc
+        with manager._tuning_lock:
+            manager._runtime_overrides.update(sanitized)
+        manager._write_meta_snapshot(
+            parameter_space=manager._format_parameter_string(manager._runtime_overrides)
+        )
+        return self.get_runtime_tuning()
+
+
 # Adaptive indexing thresholds
 _SMALL_CORPUS_THRESHOLD = 5000
 _MEDIUM_CORPUS_THRESHOLD = 50000
@@ -598,6 +765,12 @@ class FAISSManager(
         self._meta_path = Path(f"{self.index_path}.meta.json")
         self._runtime_overrides: dict[str, float] = {}
         self._tuning_lock = RLock()
+        self._runtime_controller = FAISSRuntimeController(self)
+
+    @property
+    def runtime(self) -> FAISSRuntimeController:
+        """Runtime tuning controller for this manager."""
+        return self._runtime_controller
 
     def _write_profile(self, path: Path) -> None:
         """Persist a minimal profile snapshot describing the active CPU index."""
@@ -1642,130 +1815,7 @@ class FAISSManager(
             params=params,
         )
 
-    def get_runtime_tuning(self) -> dict[str, object]:
-        """Return the effective runtime tuning parameters and overrides.
-
-        Returns
-        -------
-        dict[str, object]
-            Dictionary with keys:
-            - "active": dict with current effective parameters (nprobe, efSearch,
-              quantizer_efSearch, k_factor)
-            - "overrides": dict with runtime override parameters
-            - "autotune_profile": dict with persisted autotune profile or empty dict
-        """
-        nprobe, ef_search, k_factor, quantizer = self._resolve_search_knobs(None)
-        with self._tuning_lock:
-            overrides = dict(self._runtime_overrides)
-        profile = self._load_tuned_profile()
-        return {
-            "active": {
-                "nprobe": nprobe,
-                "efSearch": ef_search,
-                "quantizer_efSearch": quantizer,
-                "k_factor": k_factor,
-            },
-            "overrides": overrides,
-            "autotune_profile": profile,
-        }
-
-    def apply_runtime_tuning(
-        self,
-        *,
-        nprobe: int | None = None,
-        ef_search: int | None = None,
-        quantizer_ef_search: int | None = None,
-        k_factor: float | None = None,
-    ) -> dict[str, object]:
-        """Apply runtime overrides (nprobe/efSearch/k_factor) to the active index.
-
-        Parameters
-        ----------
-        nprobe : int | None, optional
-            Override for IVF nprobe parameter. If None, uses current value.
-        ef_search : int | None, optional
-            Override for HNSW ef_search parameter. If None, uses current value.
-        quantizer_ef_search : int | None, optional
-            Override for IVF quantizer ef_search parameter. If None, uses current value.
-        k_factor : float | None, optional
-            Override for search k factor (multiplier for candidate retrieval).
-            If None, uses current value.
-
-        Returns
-        -------
-        dict[str, object]
-            Updated runtime tuning dictionary (same format as `get_runtime_tuning()`).
-
-        Raises
-        ------
-        ValueError
-            If no tuning parameters are provided (all parameters are None).
-        """
-        sanitized = self._sanitize_runtime_overrides(
-            nprobe=nprobe,
-            ef_search=ef_search,
-            quantizer_ef_search=quantizer_ef_search,
-            k_factor=k_factor,
-        )
-        if not sanitized:
-            msg = "No tuning parameters provided."
-            raise ValueError(msg)
-        with self._tuning_lock:
-            self._runtime_overrides.update(sanitized)
-        self._maybe_apply_runtime_parameters(sanitized)
-        self._write_meta_snapshot(
-            parameter_space=self._format_parameter_string(self._runtime_overrides)
-        )
-        return self.get_runtime_tuning()
-
-    def reset_runtime_tuning(self) -> dict[str, object]:
-        """Clear runtime overrides and revert to default (or autotuned) parameters.
-
-        Returns
-        -------
-        dict[str, object]
-            Updated runtime tuning dictionary with cleared overrides (same format
-            as `get_runtime_tuning()`).
-        """
-        with self._tuning_lock:
-            self._runtime_overrides.clear()
-        self._maybe_apply_runtime_parameters(
-            {
-                "nprobe": self.default_nprobe,
-                "efSearch": self.hnsw_ef_search,
-            }
-        )
-        return self.get_runtime_tuning()
-
-    def apply_tuning_profile(self, profile: Mapping[str, Any]) -> dict[str, object]:
-        """Apply a persisted tuning profile (typically from ``tuning.json``).
-
-        Parameters
-        ----------
-        profile : Mapping[str, Any]
-            Tuning profile dictionary containing runtime parameter overrides.
-            Expected keys include "param_str", "nprobe", "efSearch", "k_factor",
-            etc. The profile is typically loaded from a tuning.json file created
-            by the tuning process.
-
-        Returns
-        -------
-        dict[str, object]
-            Current runtime tuning parameters after applying the profile. Returns
-            the same dictionary as get_runtime_tuning(), containing all active
-            runtime parameter overrides.
-
-        Raises
-        ------
-        VectorIndexIncompatibleError
-            Raised when the profile is empty or invalid. Profiles must contain
-            at least one valid parameter override.
-        """
-        if not profile:
-            msg = "Tuning profile payload is empty."
-            raise VectorIndexIncompatibleError(msg)
-
-        return self._apply_profile_payload(profile, persist=True)
+    # Runtime tuning is handled by FAISSRuntimeController via the ``runtime`` property.
 
     def _apply_profile_payload(
         self,
@@ -1776,9 +1826,9 @@ class FAISSManager(
         overrides = _parse_tuning_overrides(profile)
         try:
             if overrides.param_str:
-                snapshot = self.set_search_parameters(overrides.param_str)
+                snapshot = self.runtime.set_search_parameters(overrides.param_str)
             else:
-                snapshot = self.apply_runtime_tuning(
+                snapshot = self.runtime.apply_runtime_tuning(
                     nprobe=overrides.nprobe,
                     ef_search=overrides.ef_search,
                     quantizer_ef_search=overrides.quantizer_ef_search,
@@ -2873,38 +2923,6 @@ class FAISSManager(
             sanitized["k_factor"] = kf_val
         return sanitized
 
-    def set_search_parameters(self, param_str: str) -> dict[str, object]:
-        """Apply FAISS ParameterSpace string and persist overrides.
-
-        Parameters
-        ----------
-        param_str : str
-            Comma-separated FAISS ParameterSpace string
-            (e.g., ``"nprobe=64,efSearch=128"``).
-
-        Returns
-        -------
-        dict[str, object]
-            Runtime tuning snapshot as returned by :meth:`get_runtime_tuning`.
-
-        Raises
-        ------
-        ValueError
-            If the parameter string is invalid or FAISS rejects the override.
-        """
-        faiss_spec, sanitized = self._prepare_parameter_string(param_str)
-        if faiss_spec:
-            try:
-                apply_parameters(self._active_index(), faiss_spec)
-            except ValueError as exc:
-                raise ValueError(str(exc)) from exc
-        with self._tuning_lock:
-            self._runtime_overrides.update(sanitized)
-        self._write_meta_snapshot(
-            parameter_space=self._format_parameter_string(self._runtime_overrides)
-        )
-        return self.get_runtime_tuning()
-
     def _prepare_parameter_string(self, param_str: str) -> tuple[str | None, dict[str, float]]:
         """Return FAISS ParameterSpace spec and sanitized overrides for ``param_str``.
 
@@ -3817,4 +3835,4 @@ def _get_compile_options() -> str:
     return options
 
 
-__all__ = ["AutoTuner", "FAISSManager", "apply_parameters"]
+__all__ = ["AutoTuner", "FAISSManager", "FAISSRuntimeController", "apply_parameters"]

@@ -6,11 +6,11 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import subprocess
 from pathlib import Path
 
 from codeintel_rev.cli_enrich import app
-from typer.testing import CliRunner
+
+from tests._helpers import assertions, cli, run_process
 
 
 def _git_env() -> dict[str, str]:
@@ -28,14 +28,11 @@ def _git() -> str:
 
 def _init_repo(repo_root: Path) -> None:
     env = _git_env()
-    subprocess.run([_git(), "init"], cwd=repo_root, check=True, env=env)
-    subprocess.run(
-        [_git(), "config", "user.name", env["GIT_AUTHOR_NAME"]], cwd=repo_root, check=True, env=env
-    )
-    subprocess.run(
+    run_process([_git(), "init"], cwd=repo_root, env=env)
+    run_process([_git(), "config", "user.name", env["GIT_AUTHOR_NAME"]], cwd=repo_root, env=env)
+    run_process(
         [_git(), "config", "user.email", env["GIT_AUTHOR_EMAIL"]],
         cwd=repo_root,
-        check=True,
         env=env,
     )
 
@@ -63,8 +60,8 @@ def beta_fn() -> str:
         encoding="utf-8",
     )
     env = _git_env()
-    subprocess.run([_git(), "add", "."], cwd=repo_root, check=True, env=env)
-    subprocess.run([_git(), "commit", "-m", "initial"], cwd=repo_root, check=True, env=env)
+    run_process([_git(), "add", "."], cwd=repo_root, env=env)
+    run_process([_git(), "commit", "-m", "initial"], cwd=repo_root, env=env)
 
 
 def _write_scip(repo_root: Path) -> Path:
@@ -83,6 +80,7 @@ def _write_scip(repo_root: Path) -> Path:
 
 
 def test_dry_run_skips_artifact_writes(tmp_path: Path) -> None:
+    """Dry runs do not persist artifacts to disk."""
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     _init_repo(repo_root)
@@ -90,8 +88,7 @@ def test_dry_run_skips_artifact_writes(tmp_path: Path) -> None:
     scip_path = _write_scip(repo_root)
     out_dir = tmp_path / "out"
 
-    runner = CliRunner()
-    result = runner.invoke(
+    result = cli.invoke(
         app,
         [
             "all",
@@ -105,6 +102,6 @@ def test_dry_run_skips_artifact_writes(tmp_path: Path) -> None:
         ],
         catch_exceptions=False,
     )
-    assert result.exit_code == 0, result.output
-    assert "DRY RUN" in result.stdout
-    assert not (out_dir / "modules").exists()
+    assertions.expect_equal(result.exit_code, 0, reason=result.output)
+    assertions.expect_in("DRY RUN", result.stdout)
+    assertions.expect_false((out_dir / "modules").exists(), reason="Artifacts should not be written.")

@@ -87,11 +87,15 @@ def test_clone_to_gpu_falls_back(
 
 def test_runtime_tuning_apply_and_reset(faiss_manager: FAISSManager) -> None:
     """Runtime tuning overrides surface through describe API."""
-    snapshot = faiss_manager.get_runtime_tuning()
+    snapshot = faiss_manager.runtime.get_runtime_tuning()
     snapshot_overrides = cast("Mapping[str, object]", snapshot["overrides"])
     assert snapshot_overrides == {}
 
-    updated = faiss_manager.apply_runtime_tuning(nprobe=32, ef_search=64, k_factor=1.5)
+    updated = faiss_manager.runtime.apply_runtime_tuning(
+        nprobe=32,
+        ef_search=64,
+        k_factor=1.5,
+    )
     updated_overrides = cast("Mapping[str, object]", updated["overrides"])
     updated_active = cast("Mapping[str, object]", updated["active"])
     assert updated_overrides["nprobe"] == 32
@@ -99,6 +103,6 @@ def test_runtime_tuning_apply_and_reset(faiss_manager: FAISSManager) -> None:
     assert updated_active["efSearch"] == 64
     assert updated_active["k_factor"] == pytest.approx(1.5)
 
-    reset = faiss_manager.reset_runtime_tuning()
+    reset = faiss_manager.runtime.reset_runtime_tuning()
     reset_overrides = cast("Mapping[str, object]", reset["overrides"])
     assert reset_overrides == {}

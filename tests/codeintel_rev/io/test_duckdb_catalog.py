@@ -9,13 +9,15 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, relation_exists
 
+from tests._helpers import assertions, constants
+
 
 def test_relation_exists_detects_tables() -> None:
     """Tables reported by information_schema are considered relations."""
     conn = duckdb.connect(":memory:")
     try:
         conn.execute("CREATE TABLE foo(id INTEGER)")
-        assert relation_exists(conn, "foo")
+        assertions.expect_true(relation_exists(conn, "foo"), reason="Table should be detected.")
     finally:
         conn.close()
 
@@ -26,7 +28,10 @@ def test_relation_exists_detects_views() -> None:
     try:
         conn.execute("CREATE TABLE foo(id INTEGER)")
         conn.execute("CREATE VIEW foo_view AS SELECT * FROM foo")
-        assert relation_exists(conn, "foo_view")
+        assertions.expect_true(
+            relation_exists(conn, "foo_view"),
+            reason="Views exposed via information_schema should count as relations.",
+        )
     finally:
         conn.close()
 
@@ -35,7 +40,7 @@ def test_relation_exists_returns_false_for_missing_relation() -> None:
     """Missing relations return False."""
     conn = duckdb.connect(":memory:")
     try:
-        assert not relation_exists(conn, "does_not_exist")
+        assertions.expect_false(relation_exists(conn, "does_not_exist"))
     finally:
         conn.close()
 
@@ -60,17 +65,17 @@ def test_refresh_idmap_guard(tmp_path: Path) -> None:
     vector_dir.mkdir()
     catalog = DuckDBCatalog(db_path=db_path, vectors_dir=vector_dir)
     idmap = tmp_path / "faiss_idmap.parquet"
-    _write_idmap(idmap, 3)
+    _write_idmap(idmap, constants.BATCH_SIZES.small)
 
     first = catalog.refresh_faiss_idmap_mat_if_changed(idmap)
-    assert first["refreshed"] is True
-    assert first["rows"] == 3
+    assertions.expect_true(first["refreshed"])
+    assertions.expect_equal(first["rows"], constants.BATCH_SIZES.small)
 
     second = catalog.refresh_faiss_idmap_mat_if_changed(idmap)
-    assert second["refreshed"] is False
-    assert second["rows"] == 3
+    assertions.expect_false(second["refreshed"])
+    assertions.expect_equal(second["rows"], constants.BATCH_SIZES.small)
 
-    _write_idmap(idmap, 4)
+    _write_idmap(idmap, constants.BATCH_SIZES.medium)
     third = catalog.refresh_faiss_idmap_mat_if_changed(idmap)
-    assert third["refreshed"] is True
-    assert third["rows"] == 4
+    assertions.expect_true(third["refreshed"])
+    assertions.expect_equal(third["rows"], constants.BATCH_SIZES.medium)

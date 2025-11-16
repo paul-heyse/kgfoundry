@@ -30,13 +30,18 @@ class _StubEmbedder:
         return [float(len(text))] * self._dim
 
 
+class _StubFaissRuntime:
+    def get_runtime_tuning(self) -> dict[str, object]:
+        return {"active": {}}
+
+
 class _StubFaiss:
     vec_dim = 4
     faiss_family: str | None = "ivf_pq"
     refine_k_factor = 1.0
 
-    def get_runtime_tuning(self) -> dict[str, object]:
-        return {"active": {}}
+    def __init__(self) -> None:
+        self.runtime = _StubFaissRuntime()
 
     def search(
         self,

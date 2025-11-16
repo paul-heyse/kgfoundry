@@ -13,11 +13,8 @@ Production systems should use structured formats like Protocol Buffers or Messag
 
 from __future__ import annotations
 
-import logging
 from importlib import import_module
 from typing import TYPE_CHECKING, BinaryIO, Protocol, cast
-
-logger = logging.getLogger(__name__)
 
 # Allow-list of safe builtin types for FAISS index serialization
 _ALLOWED_TYPES = frozenset(

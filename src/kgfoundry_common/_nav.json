@@ -15,7 +15,6 @@
     "logging": {"owner": "@kgfoundry-common", "stability": "stable", "since": "0.1.0"},
     "models": {"owner": "@kgfoundry-common", "stability": "stable", "since": "0.1.0"},
     "navmap_types": {"owner": "@kgfoundry-common", "stability": "stable", "since": "0.1.0"},
-    "observability": {"owner": "@kgfoundry-common", "stability": "stable", "since": "0.1.0"},
     "parquet_io": {"owner": "@kgfoundry-common", "stability": "stable", "since": "0.1.0"},
     "safe_pickle_v2": {"owner": "@kgfoundry-common", "stability": "stable", "since": "0.1.0"},
     "schema_helpers": {"owner": "@kgfoundry-common", "stability": "stable", "since": "0.1.0"},
@@ -26,4 +25,3 @@
     "vector_types": {"owner": "@kgfoundry-common", "stability": "stable", "since": "0.1.0"}
   }
 }
-

@@ -1,44 +1,16 @@
-"""Observability helpers for tooling subprocess execution.
-
-This module defines Prometheus metrics and OpenTelemetry span helpers that are
-consumed by :mod:`tools._shared.proc`. The helpers degrade gracefully when the
-optional Prometheus or OpenTelemetry dependencies are not installed so the
-calling code never needs to guard imports. Metrics are registered once at import
-time using well-known names to make it easy for dashboards to scrape the values
-exposed by tooling processes.
-
-For the authoritative contract (typed metric interfaces, structured logging
-fields, and fallback semantics) see ``tools/_shared/observability_facade.md``
-and the spec scenario documented in
-``openspec/changes/pyrefly-suppression-bust/specs/code-quality/spec.md``.
-"""
+"""Lightweight subprocess observation helpers for tooling."""
 
 from __future__ import annotations
 
 import time
-from contextlib import contextmanager, nullcontext
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Final
-
-from kgfoundry_common.observability import start_span
-from tools._shared.logging import get_logger, with_fields
-from tools._shared.prometheus import (
-    build_counter,
-    build_histogram,
-)
-from tools._shared.settings import get_runtime_settings
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from collections.abc import Iterator, Sequence
 
-    from tools._shared.logging import StructuredLoggerAdapter
-    from tools._shared.prometheus import (
-        CounterLike,
-        HistogramLike,
-    )
-
-LOGGER = get_logger(__name__)
 _SET_FROZEN_ATTR = object.__setattr__
 
 
@@ -46,25 +18,6 @@ def _thaw(instance: object, **updates: object) -> None:
     """Mutate attributes on a frozen dataclass instance."""
     for name, value in updates.items():
         _SET_FROZEN_ATTR(instance, name, value)
-
-
-TOOL_RUNS_TOTAL: CounterLike = build_counter(
-    "tool_runs_total",
-    "Total tooling subprocess invocations",
-    labelnames=["tool", "status"],
-)
-
-TOOL_FAILURES_TOTAL: CounterLike = build_counter(
-    "tool_failures_total",
-    "Count of tooling subprocess failures grouped by reason",
-    labelnames=["tool", "reason"],
-)
-
-TOOL_DURATION_SECONDS: HistogramLike = build_histogram(
-    "tool_duration_seconds",
-    "Tooling subprocess duration in seconds",
-    labelnames=["tool", "status"],
-)
 
 
 @dataclass(slots=True, frozen=True)
@@ -80,8 +33,6 @@ class ToolRunObservation:
     returncode: int | None = field(default=None, init=False)
     timed_out: bool = field(default=False, init=False)
     start_time: float = field(default_factory=time.monotonic, init=False)
-    metrics_enabled: bool = True
-    tracing_enabled: bool = True
 
     def __post_init__(self) -> None:
         """Derive convenience fields after dataclass initialisation."""
@@ -132,12 +83,7 @@ def observe_tool_run(
     cwd: Path | None,
     timeout: float | None,
 ) -> Iterator[ToolRunObservation]:
-    """Record metrics and tracing for a subprocess invocation.
-
-    This context manager wraps subprocess execution with observability features,
-    including Prometheus metrics, OpenTelemetry tracing, and structured logging.
-    It yields a ToolRunObservation object that tracks the subprocess lifecycle
-    and automatically records metrics when the context exits.
+    """Yield a ToolRunObservation for the subprocess lifecycle.
 
     Parameters
     ----------
@@ -176,79 +122,20 @@ def observe_tool_run(
     The specific exception type depends on what the tool raises (e.g.,
     subprocess errors, timeout errors, etc.).
     """
-    settings = get_runtime_settings()
     observation = ToolRunObservation(
         command=command,
         cwd=cwd,
         timeout=timeout,
-        metrics_enabled=settings.metrics_enabled,
-        tracing_enabled=settings.tracing_enabled,
     )
-    command_parts: list[str] = list(command)
-    logger = with_fields(
-        LOGGER,
-        tool=observation.tool,
-        command=command_parts,
-        cwd=str(cwd) if cwd else None,
-        timeout_seconds=timeout,
-    )
-    span_name = f"tools.run.{observation.tool}"
-    span_attributes: dict[str, str | int | float | bool | None]
-    span_attributes = {
-        "tool": observation.tool,
-        "cwd": str(cwd) if cwd else "",
-        "timeout_s": timeout if timeout is not None else -1.0,
-    }
-
-    span_context = (
-        start_span(
-            span_name,
-            attributes={k: v for k, v in span_attributes.items() if v is not None},
-        )
-        if observation.tracing_enabled
-        else nullcontext()
-    )
-
-    with span_context:
-        try:
-            yield observation
-        except Exception:
-            if observation.status == "success":
-                observation.failure("exception")
-            _record(observation, logger)
-            raise
-        else:
-            _record(observation, logger)
+    try:
+        yield observation
+    except Exception:
+        if observation.status == "success":
+            observation.failure("exception")
+        raise
 
 
-def _record(
-    observation: ToolRunObservation,
-    logger: StructuredLoggerAdapter,
-) -> None:
-    """Persist metrics and structured logs for the finished observation."""
-    duration = observation.duration_seconds()
-    status = observation.status
-    if observation.metrics_enabled:
-        TOOL_RUNS_TOTAL.labels(tool=observation.tool, status=status).inc()
-        TOOL_DURATION_SECONDS.labels(tool=observation.tool, status=status).observe(duration)
-    extra: dict[str, object] = {
-        "duration_ms": duration * 1000,
-        "tool": observation.tool,
-        "status": status,
-        "returncode": observation.returncode,
-        "timed_out": observation.timed_out,
-    }
-    if status == "error":
-        reason = observation.failure_reason or "unknown"
-        if observation.metrics_enabled:
-            TOOL_FAILURES_TOTAL.labels(tool=observation.tool, reason=reason).inc()
-        extra["reason"] = reason
-        logger.error("Tool run failed", extra=extra)
-    else:
-        logger.info("Tool run succeeded", extra=extra)
-
-
-__all__: Final[list[str]] = [
+__all__ = [
     "ToolRunObservation",
     "observe_tool_run",
 ]

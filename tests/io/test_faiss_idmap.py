@@ -112,7 +112,7 @@ def test_load_cpu_index_applies_tuning_profile(tmp_path: Path) -> None:
     reloaded = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim, use_cuvs=False)
     reloaded.load_cpu_index()
 
-    runtime = reloaded.get_runtime_tuning()
+    runtime = reloaded.runtime.get_runtime_tuning()
     active = cast("Mapping[str, object]", runtime["active"])
     assert active["nprobe"] == 12
     assert active["efSearch"] == 64
@@ -151,7 +151,7 @@ def test_set_search_parameters_updates_overrides(tmp_path: Path) -> None:
     )
     manager.build_index(vectors)
 
-    tuning = manager.set_search_parameters("nprobe=12,k_factor=1.5")
+    tuning = manager.runtime.set_search_parameters("nprobe=12,k_factor=1.5")
     overrides = cast("Mapping[str, float]", tuning["overrides"])
     assert overrides["nprobe"] == 12
     assert overrides["k_factor"] == pytest.approx(1.5)
@@ -169,4 +169,4 @@ def test_set_search_parameters_rejects_unknown_keys(tmp_path: Path) -> None:
     manager = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim, use_cuvs=False)
     manager.build_index(vectors)
     with pytest.raises(ValueError, match="Unsupported"):
-        manager.set_search_parameters("bad_param=1")
+        manager.runtime.set_search_parameters("bad_param=1")

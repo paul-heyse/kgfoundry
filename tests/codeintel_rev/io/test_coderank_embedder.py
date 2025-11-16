@@ -1,3 +1,5 @@
+"""Tests for the CodeRank embedder helpers."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,6 +8,8 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 from codeintel_rev.io.coderank_embedder import CodeRankEmbedder
+
+from tests._helpers import assertions
 
 
 class _FakeModel:
@@ -33,6 +37,7 @@ def _patch_gate(monkeypatch: pytest.MonkeyPatch, fake_model: _FakeModel) -> None
 
 
 def test_encode_queries_applies_instruction_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Query encoding prepends the configured prefix."""
     fake_model = _FakeModel()
     _patch_gate(monkeypatch, fake_model)
 
@@ -47,12 +52,13 @@ def test_encode_queries_applies_instruction_prefix(monkeypatch: pytest.MonkeyPat
     embedder = CodeRankEmbedder(settings=settings)
     vectors = embedder.encode_queries(["search scope"])
 
-    assert fake_model.last_inputs[0].startswith("Represent this query: ")
-    assert vectors.shape == (1, 2)
-    assert vectors.dtype == np.float32
+    assertions.expect_true(fake_model.last_inputs[0].startswith("Represent this query: "))
+    assertions.expect_equal(vectors.shape, (1, 2))
+    assertions.expect_equal(vectors.dtype, np.float32)
 
 
 def test_encode_codes_requires_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Code encoding requires at least one snippet."""
     fake_model = _FakeModel()
     _patch_gate(monkeypatch, fake_model)
     settings = _EmbedderSettings(

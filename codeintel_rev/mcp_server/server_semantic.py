@@ -82,7 +82,7 @@ async def deep_research_search(
     empty_result={"objects": []},
 )
 async def deep_research_fetch(
-    objectIds: list[str],  # lint-ignore[N803]: MCP schema uses camelCase
+    object_ids: list[str],
     max_tokens: int | None = None,
 ) -> FetchStructuredContent:
     """Hydrate chunk ids produced by :func:`deep_research_search`.
@@ -94,7 +94,7 @@ async def deep_research_fetch(
 
     Parameters
     ----------
-    objectIds : list[str]
+    object_ids : list[str]
         List of chunk ID strings to hydrate. IDs are normalized to integers and
         queried from the DuckDB catalog. Missing chunks are omitted from results.
         Must be non-empty for meaningful results.
@@ -108,10 +108,10 @@ async def deep_research_fetch(
     FetchStructuredContent
         Structured MCP payload containing chunk contents and provenance metadata.
         Contains FetchObject objects with id, title, url, content, and metadata
-        fields. Chunks are returned in the order specified by objectIds.
+        fields. Chunks are returned in the order specified by ``object_ids``.
     """
     context = get_context()
-    args: FetchToolArgs = {"objectIds": objectIds}
+    args: FetchToolArgs = {"objectIds": object_ids}
     if max_tokens is not None:
         args["max_tokens"] = max_tokens
 

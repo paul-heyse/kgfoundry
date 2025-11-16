@@ -44,7 +44,8 @@ def test_admin_faiss_runtime_status_endpoint(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("CODEINTEL_ADMIN", "1")
     ctx = build_application_context(tmp_path)
     manager = MagicMock()
-    manager.get_runtime_tuning.return_value = {"active": {"nprobe": 32}}
+    manager.runtime = MagicMock()
+    manager.runtime.get_runtime_tuning.return_value = {"active": {"nprobe": 32}}
 
     def _fake_get_manager(_self, _vec_dim, _manager=manager) -> MagicMock:
         return _manager

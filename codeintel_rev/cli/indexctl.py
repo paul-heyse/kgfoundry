@@ -1119,7 +1119,7 @@ def tune_command(
     ef_override = overrides.get("ef_search")
     quantizer_override = overrides.get("quantizer_ef_search")
     k_factor_override = overrides.get("k_factor")
-    tuning = manager.apply_runtime_tuning(
+    tuning = manager.runtime.apply_runtime_tuning(
         nprobe=int(nprobe_override) if nprobe_override is not None else None,
         ef_search=int(ef_override) if ef_override is not None else None,
         quantizer_ef_search=int(quantizer_override) if quantizer_override is not None else None,
@@ -1163,7 +1163,7 @@ def tune_params_command(
     """
     manager = _faiss_manager(index)
     try:
-        tuning = manager.set_search_parameters(params)
+        tuning = manager.runtime.set_search_parameters(params)
     except ValueError as exc:
         msg = str(exc)
         raise typer.BadParameter(msg) from exc
@@ -1175,7 +1175,7 @@ def tune_params_command(
 def show_profile_command(index: IndexOption = None) -> None:
     """Print the active tuning profile, overrides, and saved ParameterSpace."""
     manager = _faiss_manager(index)
-    typer.echo(json.dumps(manager.get_runtime_tuning(), indent=2))
+    typer.echo(json.dumps(manager.runtime.get_runtime_tuning(), indent=2))
 
 
 def _write_tuning_audit(manager: FAISSManager, tuning: dict[str, object]) -> Path:

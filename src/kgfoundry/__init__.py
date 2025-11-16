@@ -23,7 +23,6 @@ _ALIASES: dict[str, str] = {
     "kg_builder": "kgfoundry.kg_builder",
     "kgfoundry_common": "kgfoundry_common",
     "linking": "kgfoundry.linking",
-    "observability": "kgfoundry.observability",
     "ontology": "kgfoundry.ontology",
     "orchestration": "kgfoundry.orchestration",
     "registry": "kgfoundry.registry",
@@ -40,7 +39,6 @@ __all__ = [
     "kg_builder",
     "kgfoundry_common",
     "linking",
-    "observability",
     "ontology",
     "orchestration",
     "registry",
@@ -79,7 +77,6 @@ if _TYPE_CHECKING:
     embeddings_sparse: ModuleType = _import_module("kgfoundry.embeddings_sparse")
     kg_builder: ModuleType = _import_module("kgfoundry.kg_builder")
     linking: ModuleType = _import_module("kgfoundry.linking")
-    observability: ModuleType = _import_module("kgfoundry.observability")
     ontology: ModuleType = _import_module("kgfoundry.ontology")
     orchestration: ModuleType = _import_module("kgfoundry.orchestration")
     registry: ModuleType = _import_module("kgfoundry.registry")

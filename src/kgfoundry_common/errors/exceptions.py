@@ -24,14 +24,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 from kgfoundry_common.errors.codes import ErrorCode, get_type_uri
-from kgfoundry_common.logging import get_logger
 from kgfoundry_common.navmap_loader import load_nav_metadata
 from kgfoundry_common.problem_details import build_problem_details
 
 if TYPE_CHECKING:
     from kgfoundry_common.problem_details import JsonValue, ProblemDetails
-
-logger = get_logger(__name__)
 
 __all__ = [
     "AgentCatalogSearchError",

@@ -1,8 +1,7 @@
-"""Sequence access guards for observability-critical code paths.
+"""Sequence access guards for critical code paths.
 
-This module provides typed helpers for validating sequence length before indexing,
-emitting structured logs, metrics, and RFC 9457 Problem Details when inputs are empty.
-Guards prevent raw IndexError exceptions and ensure consistent observability.
+This module provides typed helpers for validating sequence length before indexing and emitting
+RFC 9457 Problem Details when inputs are empty.
 
 Examples
 --------
@@ -37,13 +36,7 @@ else:
     Sequence = _abc.Sequence
 
 from kgfoundry_common.errors import VectorSearchError
-from kgfoundry_common.logging import get_logger, with_fields
-from kgfoundry_common.problem_details import (
-    build_problem_details,
-    render_problem,
-)
-
-logger = get_logger(__name__)
+from kgfoundry_common.problem_details import build_problem_details
 
 __all__ = [
     "first_or_error",
@@ -71,7 +64,7 @@ def first_or_error[T](
         The sequence from which to extract the first element.
     context : str
         Human-readable description of why the sequence was accessed
-        (e.g., "gpu_device_selection", "prometheus_parameter_extraction").
+        (e.g., "gpu_device_selection", "parameter_extraction").
     operation : str, optional
         Name of the operation being performed. Defaults to "sequence_access".
 
@@ -113,22 +106,14 @@ def first_or_error[T](
             },
         )
 
-        # Log structured error with correlation ID
-        with with_fields(
-            logger,
-            operation=operation,
-            status="error",
-            context=context,
-        ) as structured_logger:
-            structured_logger.error(
-                "Sequence access guard triggered: %s",
-                msg,
-                extra={
-                    "problem_details": render_problem(problem),
-                },
-            )
-
-        raise VectorSearchError(msg) from None
+        raise VectorSearchError(
+            msg,
+            context={
+                "problem_details": problem,
+                "operation": operation,
+                "sequence_length": 0,
+            },
+        ) from None
 
     return sequence[0]
 
@@ -189,22 +174,13 @@ def first_or_error_multi_device[T](
             },
         )
 
-        # Log structured error
-        with with_fields(
-            logger,
-            operation=operation,
-            status="error",
-            context=context,
-            device_count=0,
-        ) as structured_logger:
-            structured_logger.error(
-                "Multi-device access guard triggered: %s",
-                msg,
-                extra={
-                    "problem_details": render_problem(problem),
-                },
-            )
-
-        raise VectorSearchError(msg) from None
+        raise VectorSearchError(
+            msg,
+            context={
+                "problem_details": problem,
+                "operation": operation,
+                "device_count": 0,
+            },
+        ) from None
 
     return sequence[0]

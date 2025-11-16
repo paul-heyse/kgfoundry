@@ -2,31 +2,17 @@
 
 from __future__ import annotations
 
-import functools
 import json
-import sys
 from pathlib import Path
 
 import duckdb
 import numpy as np
 import pyarrow.parquet as pq
 import pytest
-from typer import Typer
-from typer.testing import CliRunner
-
-sys.path.append(str(Path(__file__).resolve().parents[2] / "src"))
-
+from codeintel_rev.cli.indexctl import app as indexctl_app
 from codeintel_rev.embeddings.embedding_service import EmbeddingMetadata
 
-
-@functools.lru_cache(maxsize=1)
-def _load_cli_app() -> Typer:
-    from codeintel_rev.cli.indexctl import app as loaded_app
-
-    return loaded_app
-
-
-indexctl_app = _load_cli_app()
+from tests._helpers import assertions, cli, constants
 
 
 class _StubProvider:
@@ -42,10 +28,12 @@ class _StubProvider:
             device="cpu",
         )
 
-    def fingerprint(self) -> str:
+    @staticmethod
+    def fingerprint() -> str:
         return "stub-fingerprint"
 
-    def embed_texts(self, texts: list[str]) -> np.ndarray:
+    @staticmethod
+    def embed_texts(texts: list[str]) -> np.ndarray:
         return np.vstack([np.arange(2, dtype=np.float32) + idx for idx in range(len(texts))])
 
     def close(self) -> None:
@@ -54,6 +42,7 @@ class _StubProvider:
 
 @pytest.fixture
 def stub_provider(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Install the deterministic stub provider for the duration of a test."""
     def _provider_factory(_settings: object) -> _StubProvider:
         return _StubProvider()
 
@@ -94,12 +83,12 @@ def _create_duckdb(path: Path) -> None:
 
 @pytest.mark.usefixtures("stub_provider")
 def test_embeddings_build_writes_parquet_and_manifest(tmp_path: Path) -> None:
+    """`indexctl embeddings build` writes artifacts and manifest metadata."""
     db_path = tmp_path / "catalog.duckdb"
     _create_duckdb(db_path)
     output = tmp_path / "embeddings.parquet"
 
-    runner = CliRunner()
-    result = runner.invoke(
+    result = cli.invoke(
         indexctl_app,
         [
             "embeddings",
@@ -112,24 +101,25 @@ def test_embeddings_build_writes_parquet_and_manifest(tmp_path: Path) -> None:
             "1",
             "--force",
         ],
+        catch_exceptions=False,
     )
-    assert result.exit_code == 0, result.output
+    assertions.expect_equal(result.exit_code, 0, reason=result.output)
 
     manifest = json.loads(output.with_suffix(".manifest.json").read_text(encoding="utf-8"))
-    assert manifest["vectors"] == 2
-    assert manifest["provider"] == "stub"
+    assertions.expect_equal(manifest["vectors"], constants.BATCH_SIZES.minimal)
+    assertions.expect_equal(manifest["provider"], "stub")
 
     table = pq.read_table(output)
-    assert table.num_rows == 2
+    assertions.expect_equal(table.num_rows, constants.BATCH_SIZES.minimal)
 
 
 @pytest.mark.usefixtures("stub_provider")
 def test_embeddings_validate_passes_with_stub(tmp_path: Path) -> None:
+    """`indexctl embeddings validate` succeeds with the stub provider."""
     db_path = tmp_path / "catalog.duckdb"
     _create_duckdb(db_path)
     output = tmp_path / "embeddings.parquet"
-    runner = CliRunner()
-    build_result = runner.invoke(
+    build_result = cli.invoke(
         indexctl_app,
         [
             "embeddings",
@@ -142,11 +132,20 @@ def test_embeddings_validate_passes_with_stub(tmp_path: Path) -> None:
             "1",
             "--force",
         ],
+        catch_exceptions=False,
     )
-    assert build_result.exit_code == 0
+    assertions.expect_equal(build_result.exit_code, 0, reason=build_result.output)
 
-    validate_result = runner.invoke(
+    validate_result = cli.invoke(
         indexctl_app,
-        ["embeddings", "validate", "--parquet", str(output), "--samples", "2"],
+        [
+            "embeddings",
+            "validate",
+            "--parquet",
+            str(output),
+            "--samples",
+            str(constants.BATCH_SIZES.minimal),
+        ],
+        catch_exceptions=False,
     )
-    assert validate_result.exit_code == 0, validate_result.output
+    assertions.expect_equal(validate_result.exit_code, 0, reason=validate_result.output)

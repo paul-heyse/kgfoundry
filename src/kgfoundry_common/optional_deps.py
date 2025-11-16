@@ -21,7 +21,6 @@ Examples
 from __future__ import annotations
 
 import importlib
-import logging
 import uuid
 from typing import TYPE_CHECKING, TypeVar, cast
 
@@ -42,8 +41,6 @@ __all__ = [
 ]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
-
-logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
@@ -156,17 +153,6 @@ def safe_import_griffe() -> object:
     except ImportError as exc:
         remediation = _make_remediation_guidance("griffe")
         message = f"Griffe is not installed. Install it with: {remediation['install']}"
-        logger.exception(
-            "Griffe import failed",
-            extra={
-                "operation": "optional_dependency_import",
-                "dependency_module": "griffe",
-                "status": "error",
-                "correlation_id": correlation_id,
-                "reason": str(exc),
-            },
-        )
-
         # Build Problem Details
         problem = build_problem_details(
             problem_type="https://docs.kgfoundry.dev/problems/optional-dependency-missing",
@@ -195,15 +181,6 @@ def safe_import_griffe() -> object:
             cause=exc,
         ) from exc
     else:
-        logger.info(
-            "Griffe imported successfully",
-            extra={
-                "operation": "optional_dependency_import",
-                "dependency_module": "griffe",
-                "status": "success",
-                "correlation_id": correlation_id,
-            },
-        )
         return griffe
 
 
@@ -236,16 +213,6 @@ def safe_import_autoapi() -> object:
     except ImportError as exc:
         remediation = _make_remediation_guidance("autoapi")
         message = f"AutoAPI is not installed. Install it with: {remediation['install']}"
-        logger.exception(
-            "AutoAPI import failed",
-            extra={
-                "operation": "optional_dependency_import",
-                "dependency_module": "autoapi",
-                "status": "error",
-                "correlation_id": correlation_id,
-                "reason": str(exc),
-            },
-        )
 
         problem = build_problem_details(
             problem_type="https://docs.kgfoundry.dev/problems/optional-dependency-missing",
@@ -274,15 +241,6 @@ def safe_import_autoapi() -> object:
             cause=exc,
         ) from exc
     else:
-        logger.info(
-            "AutoAPI imported successfully",
-            extra={
-                "operation": "optional_dependency_import",
-                "dependency_module": "autoapi",
-                "status": "success",
-                "correlation_id": correlation_id,
-            },
-        )
         return autoapi
 
 
@@ -315,16 +273,6 @@ def safe_import_sphinx() -> object:
     except ImportError as exc:
         remediation = _make_remediation_guidance("sphinx")
         message = f"Sphinx is not installed. Install it with: {remediation['install']}"
-        logger.exception(
-            "Sphinx import failed",
-            extra={
-                "operation": "optional_dependency_import",
-                "dependency_module": "sphinx",
-                "status": "error",
-                "correlation_id": correlation_id,
-                "reason": str(exc),
-            },
-        )
 
         problem = build_problem_details(
             problem_type="https://docs.kgfoundry.dev/problems/optional-dependency-missing",
@@ -353,13 +301,4 @@ def safe_import_sphinx() -> object:
             cause=exc,
         ) from exc
     else:
-        logger.info(
-            "Sphinx imported successfully",
-            extra={
-                "operation": "optional_dependency_import",
-                "dependency_module": "sphinx",
-                "status": "success",
-                "correlation_id": correlation_id,
-            },
-        )
         return sphinx

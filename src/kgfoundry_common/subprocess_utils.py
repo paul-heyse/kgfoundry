@@ -23,7 +23,6 @@ hello
 
 from __future__ import annotations
 
-import logging
 from importlib import import_module
 from typing import TYPE_CHECKING, Final, NoReturn, Protocol, cast
 
@@ -33,8 +32,6 @@ if TYPE_CHECKING:
     import io
     from collections.abc import Mapping, Sequence
     from pathlib import Path
-
-logger = logging.getLogger(__name__)
 
 # Default timeouts (seconds)
 DEFAULT_TIMEOUT: Final[int] = 300
@@ -566,7 +563,6 @@ def run_subprocess(
         if _is_timeout_error(tool_error):
             timeout_seconds = int(effective_timeout)
             msg = f"Subprocess exceeded timeout of {timeout_seconds} seconds: {' '.join(cmd)}"
-            logger.exception(msg, extra={"command": " ".join(cmd), "timeout": timeout_seconds})
             raise SubprocessTimeoutError(msg, command=cmd, timeout_seconds=timeout_seconds) from exc
 
         returncode = tool_error.returncode
@@ -575,21 +571,11 @@ def run_subprocess(
             message = str(tool_error)
         else:
             message = f"Subprocess failed with exit code {returncode}: {' '.join(cmd)}"
-        logger.exception(
-            message,
-            extra={
-                "command": " ".join(cmd),
-                "returncode": returncode,
-                "stderr": stderr_output,
-            },
-        )
-        raise SubprocessError(message, returncode=returncode, stderr=stderr_output) from exc
+        raise SubprocessError(message, command=cmd, returncode=returncode, stderr=stderr_output) from exc
     except Exception as exc:  # pragma: no cover - defensive fallback
         msg = f"Unexpected error executing subprocess: {exc}"
-        logger.exception(msg, extra={"command": " ".join(cmd)})
         raise SubprocessError(msg) from exc
 
-    logger.debug("Subprocess completed successfully", extra={"returncode": run_result.returncode})
     return run_result.stdout
 
 

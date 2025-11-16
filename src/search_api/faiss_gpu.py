@@ -9,7 +9,6 @@ missing GPU extras and fall back to CPU behaviour automatically.
 
 from __future__ import annotations
 
-import logging
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import cast
@@ -25,8 +24,6 @@ from search_api.types import (
     GpuClonerOptionsProtocol,
     GpuResourcesProtocol,
 )
-
-logger = logging.getLogger(__name__)
 
 __all__ = [
     "GpuContext",
@@ -98,9 +95,9 @@ def detect_gpu_context(
 def clone_index_to_gpu(index: FaissIndexProtocol, context: GpuContext) -> FaissIndexProtocol:
     """Clone ``index`` onto GPU hardware described by ``context``.
 
-    If GPU helpers are unavailable or cloning fails, the original CPU index is returned. All
-    exceptions are caught and logged at debug level so callers can emit typed Problem Details
-    without leaking driver internals to clients.
+    If GPU helpers are unavailable or cloning fails, the original CPU index is returned. Exceptions
+    are caught so callers can emit typed Problem Details without leaking driver internals to
+    clients.
 
     Parameters
     ----------
@@ -163,8 +160,7 @@ def clone_index_to_gpu(index: FaissIndexProtocol, context: GpuContext) -> FaissI
         RuntimeError,
         OSError,
         ValueError,
-    ) as exc:  # pragma: no cover - defensive fallback
-        logger.debug("FAISS GPU cloning failed: %s", exc, exc_info=True)
+    ):  # pragma: no cover - defensive fallback
         return index
 
 

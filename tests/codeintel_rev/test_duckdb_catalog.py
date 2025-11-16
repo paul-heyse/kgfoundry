@@ -187,7 +187,11 @@ def test_ensure_struct_views_materializes(tmp_path: Path) -> None:
             "cst_nodes_mat",
         ):
             assert relation_exists(connection, table_name)
-            row = connection.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
+            row = (
+                connection.table(table_name)
+                .aggregate("count(*) AS row_count")
+                .fetchone()
+            )
             assert row is not None
             assert row[0] == 1
 
@@ -196,7 +200,9 @@ def _write_single_row_parquet(path: Path, select_sql: str) -> None:
     """Write a Parquet file from a single SELECT statement."""
     connection = duckdb.connect(database=":memory:")
     try:
-        connection.execute(f"CREATE TABLE tmp AS {select_sql}")
+        connection.execute("DROP TABLE IF EXISTS tmp")
+        relation = connection.sql(select_sql)
+        relation.create("tmp")
         connection.execute("COPY tmp TO ? (FORMAT PARQUET)", [str(path)])
     finally:
         connection.close()
@@ -777,12 +783,11 @@ def test_query_by_uri_supports_unlimited_results(tmp_path: Path) -> None:
 
     db_path = tmp_path / "catalog.duckdb"
     catalog = DuckDBCatalog(db_path, vectors_dir)
-    # DuckDB's read_parquet() requires a string literal, not a parameter
-    # Path is validated and escaped via helper function to prevent SQL injection
     safe_path = _safe_sql_path(parquet_path, tmp_path)
     with duckdb.connect(str(db_path)) as connection:
         connection.execute(
-            f"CREATE OR REPLACE VIEW chunks AS SELECT * FROM read_parquet('{safe_path}')"
+            "CREATE OR REPLACE VIEW chunks AS SELECT * FROM read_parquet(?)",
+            [safe_path],
         )
 
     limited = catalog.query_by_uri("example.py", limit=1)

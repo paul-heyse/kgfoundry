@@ -504,7 +504,7 @@ async def faiss_runtime_status(
     """
     ctx = _context(request)
     manager = ctx.get_coderank_faiss_manager(ctx.settings.index.vec_dim)
-    return JSONResponse(manager.get_runtime_tuning())
+    return JSONResponse(manager.runtime.get_runtime_tuning())
 
 
 @router.post("/tuning/faiss")
@@ -575,7 +575,7 @@ async def faiss_runtime_tuning_endpoint(
 
     manager = ctx.get_coderank_faiss_manager(ctx.settings.index.vec_dim)
     try:
-        result = manager.apply_runtime_tuning(
+        result = manager.runtime.apply_runtime_tuning(
             nprobe=body.get("nprobe"),
             ef_search=body.get("ef_search"),
             quantizer_ef_search=body.get("quantizer_ef_search"),
@@ -633,7 +633,7 @@ async def faiss_runtime_reset_endpoint(
             await ctx.scope_store.set(session_id, updated)
         return JSONResponse({"session_id": session_id, "faiss_tuning": None})
     manager = ctx.get_coderank_faiss_manager(ctx.settings.index.vec_dim)
-    return JSONResponse(manager.reset_runtime_tuning())
+    return JSONResponse(manager.runtime.reset_runtime_tuning())
 
 
 __all__ = ["router"]

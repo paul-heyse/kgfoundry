@@ -37,7 +37,6 @@ from kgfoundry_common.jsonschema_utils import (
 from kgfoundry_common.jsonschema_utils import (
     validate as jsonschema_validate,
 )
-from kgfoundry_common.logging import get_logger
 from kgfoundry_common.navmap_loader import load_nav_metadata
 from kgfoundry_common.types import JsonPrimitive, JsonValue
 
@@ -73,8 +72,6 @@ __all__ = [
     "validate_problem_details",
 ]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
-logger = get_logger(__name__)
-
 # Path to canonical Problem Details schema
 _SCHEMA_PATH = Path(__file__).parent.parent.parent / "schema" / "common" / "problem_details.json"
 
