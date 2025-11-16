@@ -33,7 +33,7 @@ from codeintel_rev.app.middleware import SessionScopeMiddleware
 from codeintel_rev.app.readiness import ReadinessProbe
 from codeintel_rev.app.routers import index_admin
 from codeintel_rev.app.server_settings import get_server_settings
-from codeintel_rev.errors import RuntimeUnavailableError
+from codeintel_rev.errors import RequestContextError, RuntimeUnavailableError
 from codeintel_rev.mcp_server.server import app_context, build_http_app
 from codeintel_rev.runtime.cells import RuntimeCellObserver
 
@@ -299,7 +299,7 @@ async def _initialize_context(
     Time complexity depends on runtime pre-loading configuration. The FAISS health check and
     optional pre-loading operations may take several seconds. The function performs
     I/O operations (filesystem access, network requests for readiness checks) and
-    may allocate GPU resources. Thread-safe if called from a single async context
+    performs CPU-bound index work. Thread-safe if called from a single async context
     during startup. The function is not idempotent - it should only be called once
     per application lifecycle.
 
@@ -503,9 +503,10 @@ async def set_mcp_context(
 
     Raises
     ------
-    Exception
-        Any exception raised by the downstream handler (`call_next`) is
-        logged and re-raised unchanged.
+    HTTPException
+        Propagated unchanged when the downstream handler raises an HTTPException.
+    RequestContextError
+        Raised when a non-HTTP exception bubbles up from the downstream handler.
 
     Notes
     -----
@@ -522,11 +523,22 @@ async def set_mcp_context(
     start = perf_counter()
     try:
         response = await call_next(request)
+    except HTTPException as http_exc:
+        duration_ms = int((perf_counter() - start) * 1000)
+        status_code = getattr(http_exc, "status_code", 500)
+        _log_request_summary(request, status_code=status_code, duration_ms=duration_ms)
+        raise
     except Exception as exc:
         duration_ms = int((perf_counter() - start) * 1000)
         status_code = getattr(exc, "status_code", 500)
         _log_request_summary(request, status_code=status_code, duration_ms=duration_ms)
-        raise
+        message = "MCP context middleware failed to process request"
+        raise RequestContextError(
+            message,
+            path=request.url.path,
+            method=request.method,
+            cause=exc,
+        ) from exc
     duration_ms = int((perf_counter() - start) * 1000)
     _log_request_summary(request, status_code=response.status_code, duration_ms=duration_ms)
     run_id = getattr(request.state, "run_id", None)

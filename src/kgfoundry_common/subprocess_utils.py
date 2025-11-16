@@ -39,6 +39,40 @@ MIN_TIMEOUT: Final[int] = 1
 MAX_TIMEOUT: Final[int] = 3600
 
 
+class ToolExecutionError(RuntimeError):
+    """Proxy error mirroring the `tools` module surface."""
+
+    _factory: type[RuntimeError] | None = None
+
+    def __new__(
+        cls,
+        message: str,
+        *,
+        command: list[str] | None = None,
+        problem: Mapping[str, object] | None = None,
+    ):
+        if cls is ToolExecutionError and cls._factory is not None:
+            return cls._factory(message, command=list(command or []), problem=problem)
+        return super().__new__(cls)
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        command: list[str] | None = None,
+        problem: Mapping[str, object] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.command = list(command or [])
+        self.problem = problem
+
+    @classmethod
+    def bind_factory(cls, error_type: type[RuntimeError]) -> None:
+        """Register the tools-supplied error type for proxy instantiation."""
+
+        cls._factory = error_type
+
+
 class _PopenFactory(Protocol):
     """Protocol for subprocess.Popen factory callable.
 
@@ -304,33 +338,6 @@ class _ToolExecutionErrorSurface(Protocol):
     stderr: str
 
 
-class _ToolExecutionErrorConstructor(Protocol):
-    """Protocol for tool execution error constructor.
-
-    This protocol defines the interface for constructing tool execution
-    errors with command context and optional Problem Details.
-    """
-
-    def __call__(self, message: str, *, command: Sequence[str], **kwargs: object) -> RuntimeError:
-        """Create tool execution error.
-
-        Parameters
-        ----------
-        message : str
-            Error message.
-        command : Sequence[str]
-            Command that failed.
-        **kwargs : object
-            Additional error context.
-
-        Returns
-        -------
-        RuntimeError
-            Exception instance representing the tool execution error.
-        """
-        ...
-
-
 def _load_tools_surface() -> _ToolsSurface:
     """Load tools module surface for subprocess execution.
 
@@ -358,6 +365,8 @@ def _load_tools_surface() -> _ToolsSurface:
             "Install the 'kgfoundry[tools]' extra and retry."
         )
         raise RuntimeError(msg) from exc
+    tool_error_type = cast("type[RuntimeError]", module.ToolExecutionError)
+    ToolExecutionError.bind_factory(tool_error_type)
     return cast("_ToolsSurface", module)
 
 
@@ -385,22 +394,18 @@ def _raise_tool_execution_error(
     ------
     TypeError
         If the constructed error is not a RuntimeError subclass.
-    RuntimeError
-        The tool execution error instance constructed from the tools surface.
-        This is raised to signal that the subprocess execution failed.
+    ToolExecutionError
+        Raised to signal that the subprocess execution failed with the provided
+        message and command context.
     """
-    tool_error_constructor = cast(
-        "_ToolExecutionErrorConstructor", tools_surface.ToolExecutionError
+    tool_error_type = cast(
+        "type[RuntimeError]", tools_surface.ToolExecutionError
     )
-    error_instance = tool_error_constructor(message, command=list(command))
-    if not isinstance(error_instance, RuntimeError):
+    if not issubclass(tool_error_type, RuntimeError):
         msg = "ToolExecutionError must be a subclass of RuntimeError"
         raise TypeError(msg)
-    # After isinstance check, error_instance is guaranteed to be RuntimeError
-    # Raise it to signal subprocess execution failure
-    # Type narrowing: error_instance is RuntimeError after isinstance check
-    runtime_error: RuntimeError = error_instance
-    raise runtime_error
+    ToolExecutionError.bind_factory(tool_error_type)
+    raise ToolExecutionError(message, command=list(command))
 
 
 _subprocess_module = import_module("sub" + "process")

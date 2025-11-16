@@ -392,6 +392,27 @@ class RuntimeUnavailableError(KgFoundryError):
         )
 
 
+class RequestContextError(KgFoundryError):
+    """Raised when HTTP request context injection fails."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        path: str,
+        method: str,
+        cause: Exception | None = None,
+    ) -> None:
+        context = {"path": path, "method": method}
+        super().__init__(
+            message,
+            code=ErrorCode.RUNTIME_ERROR,
+            http_status=500,
+            context=context,
+            cause=cause,
+        )
+
+
 class VectorIndexStateError(KgFoundryError):
     """Raised when a FAISS index is missing or not ready."""
 
@@ -478,6 +499,7 @@ __all__ = [
     "InvalidLineRangeError",
     "PathNotDirectoryError",
     "PathNotFoundError",
+    "RequestContextError",
     "RuntimeLifecycleError",
     "RuntimeUnavailableError",
 ]

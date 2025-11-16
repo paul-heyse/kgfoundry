@@ -182,10 +182,6 @@ class TuningBody(TypedDict, total=False):
         FAISS IVF nprobe parameter override. Controls the number of IVF clusters
         probed during search. Higher values improve recall but increase latency.
         Applied to FAISS manager factory configuration.
-    faiss_gpu_preference : bool, optional
-        GPU preference flag for FAISS operations. If True, prefers GPU execution
-        when CUDA is available. If False, forces CPU execution. Applied to FAISS
-        manager factory configuration.
     hybrid_rrf_k : int, optional
         Reciprocal Rank Fusion k parameter for hybrid search. Controls the
         fusion algorithm's rank aggregation behavior. Higher k values give more
@@ -208,7 +204,6 @@ class TuningBody(TypedDict, total=False):
     """
 
     faiss_nprobe: int
-    faiss_gpu_preference: bool
     hybrid_rrf_k: int
     hybrid_bm25_weight: float
     hybrid_splade_weight: float
@@ -423,7 +418,7 @@ async def tuning_endpoint(
     This endpoint applies runtime tuning parameters to the application context's
     factory adjuster, affecting how runtime cells (FAISS manager, hybrid search
     engine) are created and configured. Tuning parameters include FAISS search
-    knobs (nprobe, GPU preference) and hybrid search fusion weights (BM25, SPLADE).
+    knobs (nprobe) and hybrid search fusion weights (BM25, SPLADE).
     Changes take effect immediately for new runtime cell instances.
 
     Parameters
@@ -431,7 +426,6 @@ async def tuning_endpoint(
     body : TuningBody
         Request body containing optional tuning parameters:
         - "faiss_nprobe": int | None, FAISS IVF nprobe override
-        - "faiss_gpu_preference": str | None, GPU preference ("gpu", "cpu", "auto")
         - "hybrid_rrf_k": int | None, Reciprocal Rank Fusion k parameter
         - "hybrid_bm25_weight": float | None, BM25 weight in hybrid fusion
         - "hybrid_splade_weight": float | None, SPLADE weight in hybrid fusion
@@ -457,7 +451,6 @@ async def tuning_endpoint(
     ctx = _context(request)
     adjuster = DefaultFactoryAdjuster(
         faiss_nprobe=body.get("faiss_nprobe"),
-        faiss_gpu_preference=body.get("faiss_gpu_preference"),
         hybrid_rrf_k=body.get("hybrid_rrf_k"),
         hybrid_bm25_weight=body.get("hybrid_bm25_weight"),
         hybrid_splade_weight=body.get("hybrid_splade_weight"),

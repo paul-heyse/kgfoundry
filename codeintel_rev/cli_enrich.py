@@ -120,18 +120,28 @@ def _stage_span(stage: str, **start_meta: object) -> Iterator[dict[str, object]]
 
     Raises
     ------
-    Exception
-        Any exception raised within the context manager is logged and re-raised
-        unchanged.
+    StageError
+        Propagated when the inner block raises a StageError or when an unexpected
+        exception is wrapped into a StageError with ``reason='unexpected-error'``.
     """
     start = time.perf_counter()
     LOGGER.debug("stage=%s event=start %s", stage, _format_stage_meta(start_meta))
     outcome: dict[str, Any] = {}
     try:
         yield outcome
-    except Exception:
-        LOGGER.exception("stage=%s event=error %s", stage, _format_stage_meta(start_meta))
+    except StageError as stage_exc:
+        error_meta = {**start_meta, **stage_exc.log_extra()}
+        LOGGER.exception("stage=%s event=error %s", stage, _format_stage_meta(error_meta))
         raise
+    except Exception as exc:
+        LOGGER.exception("stage=%s event=error %s", stage, _format_stage_meta(start_meta))
+        detail = str(exc)
+        raise StageError(
+            stage,
+            "unexpected-error",
+            detail=detail,
+            data=dict(start_meta),
+        ) from exc
     finally:
         outcome.setdefault("duration_sec", round(time.perf_counter() - start, 3))
         LOGGER.info(

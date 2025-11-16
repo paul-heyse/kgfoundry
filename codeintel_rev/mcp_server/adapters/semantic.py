@@ -1,4 +1,4 @@
-"""Semantic search adapter using FAISS GPU and DuckDB.
+"""Semantic search adapter using FAISS and DuckDB.
 
 Implements semantic code search by embedding queries and searching
 the FAISS index, then hydrating results from DuckDB.

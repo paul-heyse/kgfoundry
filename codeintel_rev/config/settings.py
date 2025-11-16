@@ -633,7 +633,7 @@ class PathsConfig(msgspec.Struct, frozen=True):
         efficient zero-copy access. Defaults to "data/vectors".
     faiss_index : str
         Path to the FAISS IVF-PQ index file (CPU version). This is the persisted
-        index that can be loaded and cloned to GPU. Defaults to
+        index loaded at runtime for semantic search. Defaults to
         "data/faiss/code.ivfpq.faiss".
     faiss_idmap_path : str
         Path to the FAISS ID map Parquet sidecar. This file stores the mapping
@@ -965,7 +965,7 @@ def load_settings() -> Settings:
         ("1"/"true" to enable, default enabled).
     HYBRID_TOP_K_PER_CHANNEL : int, optional
         Per-channel candidate fan-out gathered prior to RRF fusion (default: 50).
-FAISS_PRELOAD : str, optional
+    FAISS_PRELOAD : str, optional
         Pre-load FAISS index at startup: "1", "true", or "yes" (default: "0").
         When enabled, startup takes 2-10 seconds longer but first request is faster.
     MAX_RESULTS : int, optional

@@ -76,7 +76,6 @@ class DefaultFactoryAdjuster:
     """Reference adjuster that tunes common runtimes after creation."""
 
     faiss_nprobe: int | None = None
-    faiss_gpu_preference: bool | None = None
     hybrid_rrf_k: int | None = None
     hybrid_bm25_weight: float | None = None
     hybrid_splade_weight: float | None = None
@@ -89,7 +88,7 @@ class DefaultFactoryAdjuster:
         Extended Summary
         ----------------
         This adjuster wraps factory functions with runtime-specific tuning hooks based
-        on the cell identifier. It applies FAISS tuning (nprobe, GPU preference), hybrid
+        on the cell identifier. It applies FAISS tuning (nprobe), hybrid
         search tuning (RRF k, channel weights), or XTR tuning based on the cell name.
         Used to customize runtime initialization from application settings.
 
@@ -123,8 +122,8 @@ class DefaultFactoryAdjuster:
         Extended Summary
         ----------------
         This helper wraps a FAISS factory function with tuning hooks that apply
-        nprobe and GPU preference settings after object creation. It handles both
-        setter methods and attribute assignment, suppressing errors if tuning fails.
+        nprobe settings after object creation. It handles both setter methods and
+        attribute assignment, suppressing errors if tuning fails.
 
         Parameters
         ----------
@@ -134,8 +133,8 @@ class DefaultFactoryAdjuster:
         Returns
         -------
         Callable[[], T]
-            Wrapped factory that enforces FAISS settings (nprobe, GPU preference)
-            after object creation. Tuning failures are suppressed.
+            Wrapped factory that enforces FAISS settings (nprobe) after object
+            creation. Tuning failures are suppressed.
         """
 
         def _wrapped() -> T:
@@ -148,11 +147,6 @@ class DefaultFactoryAdjuster:
                 elif hasattr(obj, "nprobe"):
                     with SuppressException():
                         obj.nprobe = self.faiss_nprobe
-            if self.faiss_gpu_preference is not None:
-                gpu_setter = getattr(obj, "set_gpu_preference", None)
-                if callable(gpu_setter):
-                    with SuppressException():
-                        gpu_setter(self.faiss_gpu_preference)
             return cast("T", obj)
 
         return _wrapped

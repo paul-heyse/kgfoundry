@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse, PlainTextResponse
 
 router = APIRouter(prefix="/diagnostics", tags=["diagnostics"])
+
+
+_DIAGNOSTICS_DISABLED_DETAIL = (
+    "Diagnostics endpoints disabled - observability removed"
+)
 
 
 @router.get("/run_report/{run_id}")
@@ -20,23 +25,14 @@ def get_run_report(run_id: str) -> JSONResponse:  # noqa: ARG001
     Returns
     -------
     JSONResponse
-        Never returned; function always raises HTTPException. Return type
-        annotation is present for API compatibility only.
-
-    Raises
-    ------
-    HTTPException
-        Always raised with status 501 to indicate the endpoint is disabled.
+        JSON payload describing that the endpoint is unavailable.
 
     Notes
     -----
-    This endpoint is disabled and always raises HTTPException. The return type
-    annotation (JSONResponse) is kept for API compatibility but the function
-    never returns normally.
+    This endpoint is disabled and returns HTTP 501 to signal that telemetry was removed.
     """
-    raise HTTPException(
-        status_code=501, detail="Diagnostics endpoints disabled - observability removed"
-    )
+    payload = {"available": False, "detail": _DIAGNOSTICS_DISABLED_DETAIL}
+    return JSONResponse(payload, status_code=501)
 
 
 @router.get("/run_report/{run_id}.md", response_class=PlainTextResponse)
@@ -51,20 +47,11 @@ def get_run_report_markdown(run_id: str) -> PlainTextResponse:  # noqa: ARG001
     Returns
     -------
     PlainTextResponse
-        Never returned; function always raises HTTPException. Return type
-        annotation is present for API compatibility only.
-
-    Raises
-    ------
-    HTTPException
-        Always raised with status 501 to indicate the endpoint is disabled.
+        Plain text message describing that the endpoint is unavailable.
 
     Notes
     -----
-    This endpoint is disabled and always raises HTTPException. The return type
-    annotation (PlainTextResponse) is kept for API compatibility but the function
-    never returns normally.
+    This endpoint is disabled and returns HTTP 501 to signal that telemetry was removed.
     """
-    raise HTTPException(
-        status_code=501, detail="Diagnostics endpoints disabled - observability removed"
-    )
+    text = f"{_DIAGNOSTICS_DISABLED_DETAIL}\n"
+    return PlainTextResponse(text, status_code=501)

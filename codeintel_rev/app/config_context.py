@@ -320,8 +320,6 @@ def _faiss_runtime_options_from_index(index_cfg: IndexConfig) -> FAISSRuntimeOpt
         hnsw_ef_construction=index_cfg.hnsw_ef_construction,
         hnsw_ef_search=index_cfg.hnsw_ef_search,
         refine_k_factor=index_cfg.refine_k_factor,
-        use_gpu=index_cfg.use_gpu,
-        gpu_clone_mode=index_cfg.gpu_clone_mode,
         autotune_on_start=index_cfg.autotune_on_start,
         enable_range_search=index_cfg.enable_range_search,
         semantic_min_score=index_cfg.semantic_min_score,

@@ -443,8 +443,8 @@ class AnswerEnvelope(TypedDict, total=False):
         values indicate high-quality, complete results.
     limits : list[str]
         List of limitations or degraded service notices. Explains any constraints
-        on the search (e.g., "Index incomplete", "GPU unavailable - using CPU",
-        "Limited to 1000 results"). Used for transparency and debugging.
+        on the search (e.g., "Index incomplete", "Limited to 1000 results").
+        Used for transparency and debugging.
     next_steps : list[str]
         Suggested follow-up queries or actions. Provides guidance on how to
         refine the search or explore related topics (e.g., "Try searching for
