@@ -1134,18 +1134,6 @@ wheels = [
 ]
 
 [[package]]
-name = "cuvs-cu12"
-version = "25.10.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "cuda-python" },
-    { name = "libcuvs-cu12" },
-    { name = "numpy" },
-    { name = "pylibraft-cu12" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/b5/6c/76679c0822bf15806e08afea3a0cd9e23e47d4d54a34b44ea535a05f641d/cuvs_cu12-25.10.0.tar.gz", hash = "sha256:b076abf77fa3a6feba29d64b07c002439d0bcf7e3487c23dd7384fb3943df586", size = 1010, upload-time = "2025-10-09T09:10:28.993Z" }
-
-[[package]]
 name = "cycler"
 version = "0.12.1"
 source = { registry = "https://pypi.org/simple" }
@@ -3442,7 +3430,6 @@ gpu = [
     { name = "accelerate" },
     { name = "apache-tvm-ffi" },
     { name = "compressed-tensors" },
-    { name = "cuvs-cu12" },
     { name = "cython" },
     { name = "docling" },
     { name = "docling-ibm-models" },
@@ -3451,9 +3438,6 @@ gpu = [
     { name = "flashinfer-cubin" },
     { name = "flashinfer-python" },
     { name = "keybert" },
-    { name = "libcuvs-cu12" },
-    { name = "libraft-cu12" },
-    { name = "librmm-cu12" },
     { name = "openai" },
     { name = "openai-harmony" },
     { name = "openai-whisper" },
@@ -3519,7 +3503,6 @@ requires-dist = [
     { name = "certifi", specifier = ">=2025.10.5" },
     { name = "click" },
     { name = "compressed-tensors", marker = "extra == 'gpu'" },
-    { name = "cuvs-cu12", marker = "extra == 'gpu'" },
     { name = "cyclonedx-python-lib", specifier = ">=11.5.0" },
     { name = "cyclopts", specifier = ">=5.0.0a1" },
     { name = "cython", marker = "extra == 'gpu'", specifier = ">=3.2.0b1" },
@@ -3537,7 +3520,6 @@ requires-dist = [
     { name = "easyocr", marker = "extra == 'gpu'" },
     { name = "faiss", marker = "python_full_version == '3.13.*' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'gpu'", specifier = "==1.12.0", index = "file:///home/paul/kgfoundry/.wheelhouse" },
     { name = "faiss-cpu", marker = "extra == 'faiss-cpu'", specifier = ">=1.8.0" },
-    { name = "faiss-gpu", marker = "python_full_version < '3.11' and extra == 'faiss-gpu'", specifier = "==1.7.2" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "fastapi", marker = "extra == 'http-bridge'", specifier = ">=0.115.0" },
     { name = "fastapi", marker = "extra == 'minimal'", specifier = ">=0.115.0" },
@@ -3576,9 +3558,6 @@ requires-dist = [
     { name = "libarchive-c", specifier = ">=5.3" },
     { name = "libcst", specifier = ">=1.4.0" },
     { name = "libcst", marker = "extra == 'scan-plus'", specifier = ">=1.4.0" },
-    { name = "libcuvs-cu12", marker = "extra == 'gpu'" },
-    { name = "libraft-cu12", marker = "extra == 'gpu'" },
-    { name = "librmm-cu12", marker = "extra == 'gpu'" },
     { name = "linkify-it-py", specifier = ">=2.0.3" },
     { name = "lupyne" },
     { name = "mcp", extras = ["cli"], specifier = ">=1.20.0" },
@@ -3755,7 +3734,7 @@ requires-dist = [
     { name = "xdoctest", specifier = ">=1.1.4" },
     { name = "xgrammar", marker = "extra == 'gpu'" },
 ]
-provides-extras = ["docs", "codeintel", "http-bridge", "tools", "scan-plus", "gpu", "minimal", "faiss-cpu", "faiss-gpu", "duckdb", "splade", "xtr", "dev", "all"]
+provides-extras = ["docs", "codeintel", "http-bridge", "tools", "scan-plus", "gpu", "minimal", "faiss-cpu", "duckdb", "splade", "xtr", "dev", "all"]
 
 [package.metadata.requires-dev]
 dev = []
@@ -3927,18 +3906,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/39/c3/829092ead738b71e96a4e96896c96f276976e5a8a58b4473ed813d7c962b/libcst-1.8.6-cp314-cp314t-win_amd64.whl", hash = "sha256:bdb14bc4d4d83a57062fed2c5da93ecb426ff65b0dc02ddf3481040f5f074a82", size = 2181581, upload-time = "2025-11-03T22:33:14.514Z" },
     { url = "https://files.pythonhosted.org/packages/98/6d/5d6a790a02eb0d9d36c4aed4f41b277497e6178900b2fa29c35353aa45ed/libcst-1.8.6-cp314-cp314t-win_arm64.whl", hash = "sha256:819c8081e2948635cab60c603e1bbdceccdfe19104a242530ad38a36222cb88f", size = 2065000, upload-time = "2025-11-03T22:33:16.257Z" },
 ]
-
-[[package]]
-name = "libcuvs-cu12"
-version = "25.10.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "cuda-toolkit", extra = ["cublas", "curand", "cusolver", "cusparse"] },
-    { name = "libraft-cu12" },
-    { name = "librmm-cu12" },
-    { name = "nvidia-nccl-cu12" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/ee/43/870e39ac218b8895cc9f25f48e446f7a0d9dd3483014927c9d074c507074/libcuvs_cu12-25.10.0.tar.gz", hash = "sha256:c5a2e06126f3a84d9cbb15eeac238d94aefac80c9ff25b08ab62dbdf8b29ff06", size = 4926, upload-time = "2025-10-09T09:07:27.321Z" }
 
 [[package]]
 name = "libraft-cu12"

@@ -122,7 +122,6 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
             vec_dim=3584,
             chunk_budget=2200,
             faiss_nlist=8192,
-            use_cuvs=True,
         ),
         limits=ServerLimits(),
         eval=EvalConfig(),

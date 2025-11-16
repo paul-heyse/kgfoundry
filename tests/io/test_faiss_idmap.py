@@ -23,7 +23,7 @@ def test_export_idmap_round_trip(tmp_path: Path) -> None:
     vectors = np.random.RandomState(0).randn(32, vec_dim).astype(np.float32)
     ids = np.arange(32, dtype=np.int64)
 
-    manager = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim, use_cuvs=False)
+    manager = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim)
     manager.build_index(vectors)
     manager.add_vectors(vectors, ids)
     manager.save_cpu_index()
@@ -58,7 +58,7 @@ def test_duckdb_join_with_idmap(tmp_path: Path) -> None:
     vec_dim = 4
     vectors = np.random.RandomState(1).randn(4, vec_dim).astype(np.float32)
     ids = np.array([10, 11, 12, 13], dtype=np.int64)
-    manager = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim, use_cuvs=False)
+    manager = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim)
     manager.build_index(vectors)
     manager.add_vectors(vectors, ids)
     manager.save_cpu_index()
@@ -108,7 +108,7 @@ def test_load_cpu_index_applies_tuning_profile(tmp_path: Path) -> None:
     """Persisted tuning profile is applied when loading a CPU index."""
     vec_dim = 8
     vectors = np.random.RandomState(7).randn(64, vec_dim).astype(np.float32)
-    manager = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim, use_cuvs=False)
+    manager = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim)
     manager.build_index(vectors)
     manager.save_cpu_index()
     profile_payload = {
@@ -119,7 +119,7 @@ def test_load_cpu_index_applies_tuning_profile(tmp_path: Path) -> None:
     }
     (tmp_path / "tuning.json").write_text(json.dumps(profile_payload), encoding="utf-8")
 
-    reloaded = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim, use_cuvs=False)
+    reloaded = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim)
     reloaded.load_cpu_index()
 
     runtime = reloaded.runtime.get_runtime_tuning()
@@ -137,7 +137,7 @@ def test_build_index_writes_meta_snapshot(tmp_path: Path) -> None:
     """Building an index writes a metadata sidecar with defaults."""
     vec_dim = 8
     vectors = np.random.RandomState(42).randn(128, vec_dim).astype(np.float32)
-    manager = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim, use_cuvs=False)
+    manager = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim)
     manager.build_index(vectors)
 
     meta_file = _meta_path(manager)
@@ -157,7 +157,6 @@ def test_set_search_parameters_updates_overrides(tmp_path: Path) -> None:
         index_path=tmp_path / "index.faiss",
         vec_dim=vec_dim,
         runtime=FAISSRuntimeOptions(faiss_family="ivf_flat"),
-        use_cuvs=False,
     )
     manager.build_index(vectors)
 
@@ -180,7 +179,7 @@ def test_set_search_parameters_rejects_unknown_keys(tmp_path: Path) -> None:
     """Test that unknown parameter keys are rejected."""
     vec_dim = 8
     vectors = np.random.RandomState(9).randn(64, vec_dim).astype(np.float32)
-    manager = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim, use_cuvs=False)
+    manager = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim)
     manager.build_index(vectors)
     with pytest.raises(ValueError, match="Unsupported"):
         manager.runtime.set_search_parameters("bad_param=1")

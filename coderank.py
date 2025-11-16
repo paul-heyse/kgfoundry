@@ -74,8 +74,6 @@ def build_index() -> None:
         hnsw_ef_construction=settings.index.hnsw_ef_construction,
         hnsw_ef_search=settings.index.hnsw_ef_search,
         refine_k_factor=settings.index.refine_k_factor,
-        use_gpu=settings.index.use_gpu,
-        gpu_clone_mode=settings.index.gpu_clone_mode,
         autotune_on_start=settings.index.autotune_on_start,
         enable_range_search=settings.index.enable_range_search,
         semantic_min_score=settings.index.semantic_min_score,
@@ -84,7 +82,6 @@ def build_index() -> None:
         index_path=index_path,
         vec_dim=vectors.shape[1],
         nlist=settings.index.nlist,
-        use_cuvs=settings.index.use_cuvs,
         runtime=runtime_opts,
     )
     manager.build_index(vectors.copy(), family=settings.index.faiss_family)

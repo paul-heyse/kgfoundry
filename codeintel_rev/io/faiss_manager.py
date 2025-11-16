@@ -397,8 +397,6 @@ class FAISSRuntimeOptions:
     hnsw_ef_construction: int = 200
     hnsw_ef_search: int = 128
     refine_k_factor: float = 2.0
-    use_gpu: bool = False
-    gpu_clone_mode: str = "replicate"
     autotune_on_start: bool = False
     enable_range_search: bool = False
     semantic_min_score: float = 0.0
@@ -440,7 +438,6 @@ class _SearchExecutionParams:
     nprobe: int
     ef_search: int | None
     quantizer_ef_search: int | None
-    use_gpu: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -681,12 +678,10 @@ class FAISSManager(
         Number of IVF centroids (used as fallback for large corpora if dynamic
         calculation yields smaller value). For adaptive indexing, this parameter
         is typically overridden by dynamic nlist calculation.
-    use_cuvs : bool
-        Deprecated flag retained for compatibility. Ignored in CPU-only builds.
     runtime : FAISSRuntimeOptions | None, optional
-        Runtime configuration overrides for FAISS index behavior. GPU-related
-        options are ignored; only CPU parameters (nprobe, PQ shape, etc.) are
-        applied. If None, uses default options from ``FAISSRuntimeOptions()``.
+        Runtime configuration overrides for FAISS index behavior (nprobe, PQ
+        shape, HNSW tuning). If None, uses default options from
+        ``FAISSRuntimeOptions()``.
     """
 
     def __init__(
@@ -695,13 +690,11 @@ class FAISSManager(
         vec_dim: int = 3584,
         nlist: int = 8192,
         *,
-        use_cuvs: bool = True,
         runtime: FAISSRuntimeOptions | None = None,
     ) -> None:
         self.index_path = index_path
         self.vec_dim = vec_dim
         self.nlist = nlist
-        self.use_cuvs = use_cuvs
         opts = runtime or FAISSRuntimeOptions()
         self.faiss_family: str | None = opts.faiss_family
         self.pq_m = opts.pq_m
@@ -713,19 +706,13 @@ class FAISSManager(
         self.hnsw_ef_construction = opts.hnsw_ef_construction
         self.hnsw_ef_search = opts.hnsw_ef_search
         self.refine_k_factor = opts.refine_k_factor
-        self.use_gpu = False
-        self.gpu_clone_mode = opts.gpu_clone_mode
         self.autotune_on_start = opts.autotune_on_start
         self.enable_range_search = opts.enable_range_search
         self.semantic_min_score = opts.semantic_min_score
         self.cpu_index: _faiss.Index | None = None
-        self.gpu_index: _faiss.Index | None = None
-        self.gpu_resources: _faiss.StandardGpuResources | None = None
-        self.gpu_disabled_reason: str | None = None
 
         # Secondary index for incremental updates (dual-index architecture)
         self.secondary_index: _faiss.Index | None = None
-        self.secondary_gpu_index: _faiss.Index | None = None
         self.incremental_ids: set[int] = set()
         # Secondary index path: same directory as primary, with .secondary suffix
         self.secondary_index_path = (
@@ -1345,28 +1332,6 @@ class FAISSManager(
             else:
                 self.incremental_ids = set(range(n_vectors))
 
-    def clone_to_gpu(self, device: int = 0) -> bool:
-        """Return False; GPU acceleration is deprecated and disabled.
-
-        GPU acceleration was removed from the manager; this method now logs that
-        the build is CPU-only and always returns ``False``.
-
-        Parameters
-        ----------
-        device : int, optional
-            Deprecated CUDA device identifier; retained for compatibility.
-
-        Returns
-        -------
-        bool
-            Always ``False``. GPU acceleration is no longer available.
-        """
-        del device
-        self.gpu_disabled_reason = "GPU acceleration removed"
-        self.gpu_resources = None
-        self.gpu_index = None
-        return False
-
     def search(
         self,
         query: NDArrayF32,
@@ -1464,7 +1429,6 @@ class FAISSManager(
                 cause=exc,
                 context={
                     "index_path": str(self.index_path),
-                    "use_gpu": plan.params.use_gpu,
                     "search_k": plan.k,
                 },
             ) from exc
@@ -1603,7 +1567,6 @@ class FAISSManager(
             nprobe=resolved_nprobe,
             ef_search=ef_eff,
             quantizer_ef_search=quantizer_ef,
-            use_gpu=bool(self.use_gpu and self.gpu_index is not None),
         )
         return _SearchPlan(
             queries=normalized,
@@ -1719,8 +1682,7 @@ class FAISSManager(
             Typically larger than final k to improve recall after merging.
         params : _SearchExecutionParams
             Runtime parameters describing IVF/HNSW traversal (nprobe, ef_search,
-            quantizer efSearch). The legacy GPU flag is retained for compatibility
-            but always ``False``.
+            quantizer efSearch).
 
         Returns
         -------
@@ -2020,7 +1982,6 @@ class FAISSManager(
 
         # Clear secondary index
         self.secondary_index = None
-        self.secondary_gpu_index = None
         self.incremental_ids.clear()
 
     def _extract_all_vectors(self, index: _faiss.Index) -> tuple[NDArrayF32, NDArrayI64]:

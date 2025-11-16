@@ -191,7 +191,6 @@ def _build_faiss_manager(settings: Settings, paths: ResolvedPaths) -> FAISSManag
         index_path=paths.faiss_index,
         vec_dim=settings.index.vec_dim,
         nlist=nlist_value,
-        use_cuvs=settings.index.use_cuvs,
         runtime=runtime_opts,
     )
 
@@ -1118,7 +1117,7 @@ class ApplicationContext:
         and loading the pre-built index from disk. This method gates
         access to the CodeRank runtime, failing fast if dependencies
         or resources are missing. The manager is configured with
-        application settings (nlist, cuvs preference) and loaded
+        application settings (nlist and runtime tuning) and loaded
         into CPU memory for immediate use.
 
         Parameters
@@ -1133,15 +1132,12 @@ class ApplicationContext:
         FAISSManager
             Ready-to-use FAISS manager configured for the CodeRank index.
             The index is loaded into CPU memory and ready for search queries.
-            GPU support is enabled if `use_cuvs` is True and CUDA is available.
 
         Notes
         -----
         Time O(1) for validation; index loading time depends on index size.
-        The manager loads the index synchronously; no lazy loading.
-        GPU support (cuvs) is determined by application settings and
-        runtime availability. This method is called during ApplicationContext
-        initialization, not per-request.
+        The manager loads the index synchronously; no lazy loading. This method
+        is called during ApplicationContext initialization, not per-request.
 
         May propagate `RuntimeUnavailableError` from `_ensure_path_exists()`
         if the index path does not exist, or from `_require_dependency()`
@@ -1173,7 +1169,6 @@ class ApplicationContext:
             index_path=index_path,
             vec_dim=vec_dim,
             nlist=nlist,
-            use_cuvs=self.settings.index.use_cuvs,
             runtime=runtime_opts,
         )
         manager.load_cpu_index()

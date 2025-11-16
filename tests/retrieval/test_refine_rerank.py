@@ -32,7 +32,7 @@ class _CatalogStub:
 def test_search_with_refine_returns_ordered_hits(tmp_path: Path) -> None:
     vec_dim = 4
     base_vectors = np.eye(vec_dim, dtype=np.float32)
-    manager = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim, use_cuvs=False)
+    manager = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim)
     manager.build_index(base_vectors)
     manager.add_vectors(base_vectors, np.arange(vec_dim, dtype=np.int64))
     manager.save_cpu_index()

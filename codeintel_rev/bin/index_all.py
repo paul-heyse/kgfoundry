@@ -434,7 +434,6 @@ def _build_faiss_index(
         index_path=paths.faiss_index,
         vec_dim=index_config.vec_dim,
         nlist=_resolve_nlist(index_config),
-        use_cuvs=index_config.use_cuvs,
         runtime=runtime_opts,
     )
 
@@ -544,7 +543,6 @@ def _update_faiss_index_incremental(
         index_path=paths.faiss_index,
         vec_dim=index_config.vec_dim,
         nlist=_resolve_nlist(index_config),
-        use_cuvs=index_config.use_cuvs,
         runtime=runtime_opts,
     )
 
@@ -619,7 +617,7 @@ def _runtime_options_from_index(index_config: IndexConfig) -> FAISSRuntimeOption
     ----------------
     This helper converts structured IndexConfig (from index manifest or settings)
     into FAISS-specific runtime options. It maps configuration parameters (family,
-    PQ settings, HNSW parameters, GPU options) to FAISSRuntimeOptions fields.
+    PQ settings and HNSW parameters) to FAISSRuntimeOptions fields.
     Used during index building to configure FAISS manager with index-specific
     runtime behavior.
 
@@ -628,7 +626,7 @@ def _runtime_options_from_index(index_config: IndexConfig) -> FAISSRuntimeOption
     index_config : IndexConfig
         Structured index configuration containing FAISS parameters: family type,
         quantization settings (pq_m, pq_nbits, opq_m), HNSW parameters (m,
-        ef_construction, ef_search), GPU preferences, and search tuning defaults.
+        ef_construction, ef_search), and search tuning defaults.
 
     Returns
     -------
@@ -655,8 +653,6 @@ def _runtime_options_from_index(index_config: IndexConfig) -> FAISSRuntimeOption
         hnsw_ef_construction=index_config.hnsw_ef_construction,
         hnsw_ef_search=index_config.hnsw_ef_search,
         refine_k_factor=index_config.refine_k_factor,
-        use_gpu=index_config.use_gpu,
-        gpu_clone_mode=index_config.gpu_clone_mode,
         autotune_on_start=index_config.autotune_on_start,
         enable_range_search=index_config.enable_range_search,
         semantic_min_score=index_config.semantic_min_score,
@@ -697,7 +693,6 @@ def _run_offline_evaluation(
         index_path=paths.faiss_index,
         vec_dim=settings.index.vec_dim,
         nlist=_resolve_nlist(settings.index),
-        use_cuvs=settings.index.use_cuvs,
         runtime=runtime_opts,
     )
     faiss_mgr.load_cpu_index()

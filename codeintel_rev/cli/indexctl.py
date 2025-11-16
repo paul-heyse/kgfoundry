@@ -752,7 +752,6 @@ def _faiss_manager(index_override: Path | None = None) -> FAISSManager:
         index_path=index_path,
         vec_dim=settings.index.vec_dim,
         nlist=nlist,
-        use_cuvs=settings.index.use_cuvs,
     )
     manager.load_cpu_index()
     return manager

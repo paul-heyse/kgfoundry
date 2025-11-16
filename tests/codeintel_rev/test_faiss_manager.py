@@ -23,32 +23,10 @@ faiss_module: Any = FAISS_MODULE
 
 @pytest.fixture
 def faiss_manager(tmp_path: Path) -> FAISSManager:
-    manager = FAISSManager(index_path=tmp_path / "index.faiss", use_cuvs=False)
+    manager = FAISSManager(index_path=tmp_path / "index.faiss")
     # Use a lightweight flat index stub for type stability
     manager.cpu_index = faiss_module.IndexFlatIP(2)
     return manager
-
-
-def test_clone_to_gpu_is_noop(faiss_manager: FAISSManager) -> None:
-    """GPU cloning now returns False and records CPU-only reason."""
-    success = faiss_manager.clone_to_gpu()
-
-    assertions.expect_false(success, reason="clone_to_gpu should be disabled")
-    assertions.expect_equal(faiss_manager.gpu_index, None)
-    assertions.expect_equal(faiss_manager.gpu_resources, None)
-    assertions.expect_equal(faiss_manager.gpu_disabled_reason, "GPU acceleration removed")
-
-
-def test_clone_to_gpu_is_idempotent(faiss_manager: FAISSManager) -> None:
-    """Calling clone_to_gpu multiple times keeps state consistent."""
-    first = faiss_manager.clone_to_gpu()
-    second = faiss_manager.clone_to_gpu()
-
-    assertions.expect_false(first)
-    assertions.expect_false(second)
-    assertions.expect_equal(faiss_manager.gpu_index, None)
-    assertions.expect_equal(faiss_manager.gpu_resources, None)
-    assertions.expect_equal(faiss_manager.gpu_disabled_reason, "GPU acceleration removed")
 
 
 def test_runtime_tuning_apply_and_reset(faiss_manager: FAISSManager) -> None:

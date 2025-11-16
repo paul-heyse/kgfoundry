@@ -73,7 +73,6 @@ class _Paths(SimpleNamespace):
 class _IndexCfg(SimpleNamespace):
     nlist: int = 1
     vec_dim: int = constants.VECTOR_DIMS.small
-    use_cuvs: bool = False
     duckdb_materialize: bool = False
 
 

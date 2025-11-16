@@ -21,13 +21,11 @@ class RecordingFAISSManager:
         index_path: Path,
         vec_dim: int,
         nlist: int,
-        use_cuvs: bool,
         runtime: object | None = None,
     ) -> None:
         self.index_path = index_path
         self.vec_dim = vec_dim
         self.nlist = nlist
-        self.use_cuvs = use_cuvs
         self.cpu_index = None
         self.load_calls = 0
         self.runtime = runtime

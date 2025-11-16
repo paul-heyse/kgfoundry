@@ -180,7 +180,6 @@ def build_application_context(
 
     index_cfg = SimpleNamespace(
         faiss_nlist=64,
-        use_cuvs=False,
         enable_bm25_channel=enable_bm25,
         enable_splade_channel=enable_splade,
         vec_dim=2,

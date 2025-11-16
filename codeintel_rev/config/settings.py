@@ -685,8 +685,7 @@ class IndexConfig(msgspec.Struct, frozen=True):
     This configuration controls chunking, embedding dimensionality, FAISS build and
     search-time parameters, and the hybrid retrieval stacks (BM25, SPLADE, fusion).
     The defaults favor accuracy-first personal RAG deployments: IVF/PQ with OPQ
-    pre-rotation, higher search fan-out, structured logging, and GPU/cuVS when
-    available. Backwards-compatible legacy knobs (``faiss_nlist`` / ``faiss_nprobe``)
+    pre-rotation, higher search fan-out, and structured logging. Backwards-compatible legacy knobs (``faiss_nlist`` / ``faiss_nprobe``)
     remain but new code should prefer the richer ``faiss_family`` + runtime tuning
     controls introduced here.
     """
@@ -701,7 +700,6 @@ class IndexConfig(msgspec.Struct, frozen=True):
     enable_bm25_channel: bool = True
     enable_splade_channel: bool = True
     hybrid_top_k_per_channel: int = 50
-    use_cuvs: bool = True
     faiss_preload: bool = False
     duckdb_materialize: bool = False
     preview_max_chars: int = 240
@@ -739,8 +737,6 @@ class IndexConfig(msgspec.Struct, frozen=True):
     default_nprobe: int | None = None
     hnsw_ef_search: int = 128
     refine_k_factor: float = 2.0
-    use_gpu: bool = True
-    gpu_clone_mode: Literal["replicate", "shard"] = "replicate"
     autotune_on_start: bool = False
     enable_range_search: bool = False
     semantic_min_score: float = 0.0
@@ -969,9 +965,7 @@ def load_settings() -> Settings:
         ("1"/"true" to enable, default enabled).
     HYBRID_TOP_K_PER_CHANNEL : int, optional
         Per-channel candidate fan-out gathered prior to RRF fusion (default: 50).
-    USE_CUVS : str, optional
-        Enable cuVS acceleration: "1", "true", or "yes" (default: "1").
-    FAISS_PRELOAD : str, optional
+FAISS_PRELOAD : str, optional
         Pre-load FAISS index at startup: "1", "true", or "yes" (default: "0").
         When enabled, startup takes 2-10 seconds longer but first request is faster.
     MAX_RESULTS : int, optional
@@ -1254,7 +1248,6 @@ def _build_index_config(
         enable_bm25_channel=channel_settings.bm25_enabled,
         enable_splade_channel=channel_settings.splade_enabled,
         hybrid_top_k_per_channel=int(os.environ.get("HYBRID_TOP_K_PER_CHANNEL", "50")),
-        use_cuvs=_env_bool("USE_CUVS", default=True),
         faiss_preload=_env_bool("FAISS_PRELOAD"),
         duckdb_materialize=_env_bool("DUCKDB_MATERIALIZE"),
         preview_max_chars=int(os.environ.get("PREVIEW_MAX_CHARS", "240")),
