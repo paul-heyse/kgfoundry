@@ -354,13 +354,15 @@ class NumpyLinalgNamespace(Protocol):
             If True, keep reduced dimensions with size 1 in the result. If False,
             remove reduced dimensions.
 
-        Returns
-        -------
-        NDArrayF32
-            Norm values computed along the specified axis, dtype float32. Shape
-            depends on input shape and keepdims parameter.
+        Raises
+        ------
+        NotImplementedError
+            This is a protocol stub method that must be implemented by concrete classes.
+            When implemented, returns NDArrayF32 norm values computed along the specified
+            axis, dtype float32. Shape depends on input shape and keepdims parameter.
         """
-        ...
+        _ = (array, axis, keepdims)
+        raise NotImplementedError
 
 
 class NumpyModule(Protocol):

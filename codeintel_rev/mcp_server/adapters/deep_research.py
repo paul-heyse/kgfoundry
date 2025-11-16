@@ -92,7 +92,7 @@ def _serialize_search_response(response: SearchResponse) -> SearchStructuredCont
     ]
     payload = SearchStructuredContent(
         results=results,
-        queryEcho=response.query_echo,
+        query_echo=response.query_echo,
         top_k=response.top_k,
     )
     if response.limits:

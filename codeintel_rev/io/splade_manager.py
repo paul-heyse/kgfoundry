@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
-from typing import TYPE_CHECKING, TextIO, cast
+from typing import TYPE_CHECKING, TextIO, TypedDict, Unpack, cast
 
 import msgspec
 
@@ -65,14 +65,6 @@ if TYPE_CHECKING:
                 document from the corpus. The encoder processes the batch together
                 for efficiency.
 
-            Returns
-            -------
-            Sequence[object]
-                Sparse vector embeddings for the input documents. The exact type
-                depends on the encoder implementation (typically numpy arrays or
-                PyTorch tensors). Each embedding represents one input document
-                and can be decoded into token-weight pairs using decode().
-
             Notes
             -----
             The embeddings produced by this method are optimized for document
@@ -81,7 +73,8 @@ if TYPE_CHECKING:
             different use cases. Time complexity: O(batch_size * avg_doc_length)
             for encoding, plus model inference overhead.
             """
-            ...
+            _ = (self, sentences)
+            raise NotImplementedError
 
         def encode_query(self, queries: Sequence[str]) -> Sequence[object]:
             """Encode query texts into sparse vector embeddings.
@@ -97,14 +90,6 @@ if TYPE_CHECKING:
                 Batch of query texts to encode. Each string represents one search
                 query. The encoder processes the batch together for efficiency.
 
-            Returns
-            -------
-            Sequence[object]
-                Sparse vector embeddings for the input queries. The exact type
-                depends on the encoder implementation (typically numpy arrays or
-                PyTorch tensors). Each embedding represents one input query and
-                can be decoded into token-weight pairs using decode().
-
             Notes
             -----
             Query embeddings are optimized for retrieval against document embeddings.
@@ -112,7 +97,8 @@ if TYPE_CHECKING:
             document embeddings to improve query-document matching. Time complexity:
             O(batch_size * avg_query_length) for encoding, plus model inference overhead.
             """
-            ...
+            _ = (self, queries)
+            raise NotImplementedError
 
         def decode(
             self,
@@ -138,15 +124,6 @@ if TYPE_CHECKING:
                 returns all non-zero tokens. If specified, returns only the
                 top-k tokens by weight (descending order). Defaults to None.
 
-            Returns
-            -------
-            Sequence[Sequence[tuple[str, float]]]
-                Decoded token-weight pairs for each input embedding. Outer sequence
-                has one entry per input embedding. Inner sequence contains
-                (token, weight) tuples sorted by weight (descending). Tokens are
-                vocabulary strings; weights are floating-point relevance scores
-                (typically non-negative, higher is more relevant).
-
             Notes
             -----
             The decode operation is typically used for:
@@ -156,7 +133,8 @@ if TYPE_CHECKING:
             Time complexity: O(n_embeddings * embedding_dim) for full decoding,
             O(n_embeddings * top_k * log(embedding_dim)) if top_k is specified.
             """
-            ...
+            _ = (self, embeddings, top_k)
+            raise NotImplementedError
 
         def save_pretrained(self, output_path: str) -> None:
             """Save the encoder model to disk for later loading.
@@ -185,28 +163,33 @@ if TYPE_CHECKING:
             complexity: O(model_size) for writing model files to disk. The method
             performs I/O operations and may take several seconds for large models.
             """
-            ...
+            _ = (self, output_path)
+            raise NotImplementedError
+
+    class _OptimizerKwargs(TypedDict):
+        optimization_config: str
+        model_name_or_path: str
+        push_to_hub: bool
+        create_pr: bool
 
     class _OptimizerFunction(Protocol):
         def __call__(
             self,
             model: _SparseEncoderProtocol,
-            *,
-            optimization_config: str,
-            model_name_or_path: str,
-            push_to_hub: bool,
-            create_pr: bool,
+            **kwargs: Unpack[_OptimizerKwargs],
         ) -> None: ...
+
+    class _QuantizerKwargs(TypedDict):
+        quantization_config: str | None
+        model_name_or_path: str
+        push_to_hub: bool
+        create_pr: bool
 
     class _QuantizerFunction(Protocol):
         def __call__(
             self,
             model: _SparseEncoderProtocol,
-            *,
-            quantization_config: str | None,
-            model_name_or_path: str,
-            push_to_hub: bool,
-            create_pr: bool,
+            **kwargs: Unpack[_QuantizerKwargs],
         ) -> None: ...
 
 

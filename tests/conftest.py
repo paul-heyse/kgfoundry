@@ -25,7 +25,6 @@ from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.main import capz, disable_nginx_buffering, readyz, sse_demo
 from fastapi import FastAPI
 
-import tests.bootstrap  # noqa: F401
 from tests.app._context_factory import build_application_context
 
 if TYPE_CHECKING:

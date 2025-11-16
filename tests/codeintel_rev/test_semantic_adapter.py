@@ -119,6 +119,7 @@ class StubDuckDBCatalog:
         bool
             Always returns False.
         """
+        del tb
         return False
 
     def get_chunk_by_id(self, chunk_id: int) -> ChunkRow | None:

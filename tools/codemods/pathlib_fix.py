@@ -146,7 +146,7 @@ class PathlibTransformer(WithTransformerMixin, cst.CSTTransformer):
                     self.needs_pathlib_import = True
         return True
 
-    def leave_Call(  # noqa: N802 - LibCST hook signature
+    def leave_Call(
         self,
         original_node: cst.Call,
         updated_node: cst.Call,

@@ -13,37 +13,22 @@ available in the current environment before importing this module.
 
 from __future__ import annotations
 
-# ruff: noqa: TID251 - tooling bridge proxies internal namespace helper
+from importlib import import_module
 from typing import TYPE_CHECKING
-
-from kgfoundry._namespace_proxy import (
-    NamespaceRegistry as _NamespaceRegistry,
-)
-from kgfoundry._namespace_proxy import (
-    namespace_attach as _namespace_attach,
-)
-from kgfoundry._namespace_proxy import (
-    namespace_dir as _namespace_dir,
-)
-from kgfoundry._namespace_proxy import (
-    namespace_exports as _namespace_exports,
-)
-from kgfoundry._namespace_proxy import (
-    namespace_getattr as _namespace_getattr,
-)
 from kgfoundry_common.navmap_loader import load_nav_metadata
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, MutableMapping
     from types import ModuleType
 
-__all__ = [
-    "NamespaceRegistry",
-    "namespace_attach",
-    "namespace_dir",
-    "namespace_exports",
-    "namespace_getattr",
-]
+_namespace_proxy = import_module("kgfoundry._namespace_proxy")
+NamespaceRegistry = getattr(_namespace_proxy, "NamespaceRegistry")
+namespace_attach = getattr(_namespace_proxy, "namespace_attach")
+namespace_dir = getattr(_namespace_proxy, "namespace_dir")
+namespace_exports = getattr(_namespace_proxy, "namespace_exports")
+namespace_getattr = getattr(_namespace_proxy, "namespace_getattr")
+
+__all__ = ["NamespaceRegistry", "namespace_attach", "namespace_dir", "namespace_exports", "namespace_getattr"]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 from http import HTTPStatus
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
 
 import pytest
 from codeintel_rev.app import capabilities as capabilities_module
@@ -18,7 +17,7 @@ from tests._helpers import assertions
 from tests.app._context_factory import build_application_context
 
 
-def _mock_module(**attrs: object) -> Any:  # noqa: ANN401
+def _mock_module(**attrs: object) -> SimpleNamespace:
     """Create a mock module namespace with the given attributes.
 
     Returns
@@ -48,7 +47,7 @@ def test_capabilities_snapshot_reports_paths(
         "torch": object(),
     }
 
-    def fake_import_optional(name: str) -> Any:  # noqa: ANN401
+    def fake_import_optional(name: str) -> object | None:
         """Mock import_optional to return fake modules.
 
         Returns
@@ -65,10 +64,10 @@ def test_capabilities_snapshot_reports_paths(
     assertions.expect_true(snapshot.duckdb, reason="duckdb should be True")
     assertions.expect_true(snapshot.scip_index, reason="scip_index should be True")
     assertions.expect_true(snapshot.vllm_client, reason="vllm_client should be True")
-    assertions.expect_equal(snapshot.faiss_importable, True)  # noqa: FBT003
-    assertions.expect_equal(snapshot.httpx_importable, False)  # noqa: FBT003
+    assertions.expect_equal(actual=snapshot.faiss_importable, expected=True)
+    assertions.expect_equal(actual=snapshot.httpx_importable, expected=False)
     payload = snapshot.model_dump()
-    assertions.expect_equal(payload["duckdb_catalog_present"], True)  # noqa: FBT003
+    assertions.expect_equal(actual=payload["duckdb_catalog_present"], expected=True)
     assertions.expect_equal(payload["active_index_version"], None)
     assertions.expect_equal(payload["versions_available"], 0)
 
@@ -109,14 +108,14 @@ def test_capz_endpoint_refresh(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
         resp = client.get("/capz")
         assertions.expect_equal(resp.status_code, HTTPStatus.OK)
         body = resp.json()
-        assertions.expect_equal(body["faiss_index_present"], True)  # noqa: FBT003
+        assertions.expect_equal(actual=body["faiss_index_present"], expected=True)
         assertions.expect_in("active_index_version", body)
         assertions.expect_in("stamp", body)
 
         refreshed_resp = client.get("/capz", params={"refresh": "true"})
         assertions.expect_equal(refreshed_resp.status_code, HTTPStatus.OK)
         body = refreshed_resp.json()
-        assertions.expect_equal(body["faiss_index_present"], False)  # noqa: FBT003
+        assertions.expect_equal(body["faiss_index_present"], expected=False)
         assertions.expect_equal(body["active_index_version"], "v2")
         assertions.expect_equal(body["versions_available"], 2)
         assertions.expect_equal(body["hints"]["faiss"], "faiss-cpu")

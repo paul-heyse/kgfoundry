@@ -54,7 +54,8 @@ def _patch_gate(
         def __init__(self, instance: object) -> None:
             self._instance = instance
 
-        def from_pretrained(self, *_args: object, **__kwargs: object) -> object:
+        def from_pretrained(self, *_args: object, **kwargs: object) -> object:
+            del kwargs
             return self._instance
 
     module = SimpleNamespace(

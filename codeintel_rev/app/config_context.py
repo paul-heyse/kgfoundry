@@ -66,7 +66,7 @@ from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager, FAISSRuntimeOptions
 from codeintel_rev.io.git_client import AsyncGitClient, GitClient
-from codeintel_rev.io.vllm_client import VLLMClient
+from codeintel_rev.io.vllm_client import VLLMClient, build_vllm_client
 from codeintel_rev.runtime import (
     NullRuntimeCellObserver,
     RuntimeCell,
@@ -887,7 +887,7 @@ class ApplicationContext:
         # This exception propagates to the caller, causing application startup to fail
         paths = resolve_application_paths(settings)
 
-        vllm_client = VLLMClient(settings.vllm)
+        vllm_client = build_vllm_client(settings.vllm)
         faiss_manager = _build_faiss_manager(settings, paths)
         scope_store = _build_scope_store(settings)
         git_client, async_git_client = _build_git_clients(paths)

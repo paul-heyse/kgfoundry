@@ -12,11 +12,11 @@ if TYPE_CHECKING:
     from codeintel_rev.config.settings import Settings
 
 
-_USE_REAL_DATA = os.getenv("KGFOUNDRY_TEST_USE_REAL_DATA", "1").strip().lower() not in {
-    "0",
-    "false",
-    "no",
-}
+_REAL_DATA_ENV = os.getenv("KGFOUNDRY_TEST_USE_REAL_DATA")
+if _REAL_DATA_ENV is None:
+    _USE_REAL_DATA = False
+else:
+    _USE_REAL_DATA = _REAL_DATA_ENV.strip().lower() not in {"0", "false", "no"}
 _REPO_ROOT_OVERRIDE = os.getenv("KGFOUNDRY_TEST_REPO_ROOT")
 
 

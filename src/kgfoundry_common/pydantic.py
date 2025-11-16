@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar, Self, cast
+from typing import TYPE_CHECKING, ClassVar, Self
 
 if TYPE_CHECKING:
     # [nav:anchor BaseModel]
@@ -36,68 +36,16 @@ if TYPE_CHECKING:
 
         @classmethod
         def model_validate(cls, obj: object) -> Self:
-            """Validate ``obj`` using the underlying Pydantic implementation.
-
-            Parameters
-            ----------
-            obj : object
-                Instance or mapping to validate.
-
-            Returns
-            -------
-            Self
-                Validated instance.
-
-            Raises
-            ------
-            NotImplementedError
-                This is a stub implementation.
-            """
+            """Validate ``obj`` using the underlying Pydantic implementation."""
             raise NotImplementedError
 
         def model_dump(self, **model_dump_kwargs: object) -> dict[str, object]:
-            """Return the dictionary representation produced by Pydantic.
-
-            Parameters
-            ----------
-            **model_dump_kwargs : object
-                Keyword arguments forwarded to :meth:`pydantic.BaseModel.model_dump`.
-
-            Returns
-            -------
-            dict[str, object]
-                Mapping produced by ``pydantic.BaseModel.model_dump``.
-
-            Raises
-            ------
-            NotImplementedError
-                This is a stub implementation.
-            """
-            del self, model_dump_kwargs
+            """Return the dictionary representation produced by Pydantic."""
             raise NotImplementedError
-            return cast("dict[str, object]", {})
 
         def model_dump_json(self, **model_dump_json_kwargs: object) -> str:
-            """Return the JSON representation produced by Pydantic.
-
-            Parameters
-            ----------
-            **model_dump_json_kwargs : object
-                Keyword arguments forwarded to :meth:`pydantic.BaseModel.model_dump_json`.
-
-            Returns
-            -------
-            str
-                JSON string produced by ``pydantic.BaseModel.model_dump_json``.
-
-            Raises
-            ------
-            NotImplementedError
-                This is a stub implementation.
-            """
-            del self, model_dump_json_kwargs
+            """Return the JSON representation produced by Pydantic."""
             raise NotImplementedError
-            return cast("str", "")
 
 else:
     from pydantic import BaseModel as _PydanticBaseModel

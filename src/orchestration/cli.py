@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import importlib
 import json
+import logging
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -147,6 +148,24 @@ def _coerce_extension_value(value: object) -> JsonValue:
     return str(value)
 
 
+def _log_cli_event(
+    level: int,
+    message: str,
+    context: _CommandContext,
+    **fields: object,
+) -> None:
+    """Emit structured log events with correlation metadata."""
+    operation_name = context.subcommand.replace("-", "_")
+    payload: dict[str, object] = {
+        "operation": operation_name,
+        "subcommand": context.subcommand,
+        "operation_id": context.operation_id,
+        "correlation_id": context.correlation_id,
+    }
+    payload.update({key: value for key, value in fields.items() if value is not None})
+    LOGGER.log(level, message, extra=payload)
+
+
 def _start_command(
     subcommand: str, **log_fields: object
 ) -> tuple[_CommandContext, CliEnvelopeBuilder]:
@@ -166,6 +185,13 @@ def _start_command(
         operation_id=operation_id,
         correlation_id=correlation_id,
         start=time.monotonic(),
+    )
+    _log_cli_event(
+        logging.INFO,
+        f"{subcommand} starting",
+        context,
+        status="starting",
+        metadata=filtered_fields or None,
     )
     return context, builder
 
@@ -236,6 +262,14 @@ def _finish_success(context: _CommandContext, builder: CliEnvelopeBuilder) -> Cl
     typer.echo(
         f"{context.subcommand} completed in {envelope.duration_seconds:.2f}s (envelope: {path})"
     )
+    _log_cli_event(
+        logging.INFO,
+        f"{context.subcommand} completed",
+        context,
+        status="success",
+        duration=envelope.duration_seconds,
+        envelope=str(path),
+    )
     return envelope
 
 
@@ -271,6 +305,16 @@ def _handle_failure(
         typer.echo(str(exc), err=True)
     typer.echo(json.dumps(problem_payload, sort_keys=True), err=True)
     typer.echo(detail, err=True)
+    _log_cli_event(
+        logging.ERROR,
+        detail,
+        context,
+        status="failure",
+        cli_status=cli_run_status,
+        http_status=status,
+        envelope=str(path),
+        problem=problem_payload,
+    )
 
 
 def _extract_bm25_document(
@@ -337,11 +381,17 @@ def _instantiate_bm25_builder(config: BM25BuildConfig) -> tuple[_BM25Builder, st
     return builder, requested_backend
 
 
-def _build_bm25_index(config: BM25BuildConfig) -> tuple[str, int]:
+def _build_bm25_index(
+    config: BM25BuildConfig,
+    *,
+    logger: logging.Logger | None = None,
+) -> tuple[str, int]:
     documents = _load_bm25_documents(config.chunks_path)
     builder, backend_used = _instantiate_bm25_builder(config)
+    log = logger or LOGGER
     try:
         builder.build(documents)
+        log.info("bm25-build", extra={"documents": len(documents), "backend": backend_used})
     except RuntimeError:
         if backend_used != "lucene":
             raise
@@ -480,9 +530,17 @@ def index_bm25(
     )
 
     config = BM25BuildConfig(chunks_path=chunks_parquet, backend=backend, index_dir=index_dir)
+    _log_cli_event(
+        logging.INFO,
+        "Building BM25 index",
+        context,
+        backend=backend,
+        index_dir=index_dir,
+        chunks_path=chunks_parquet,
+    )
     try:
         _prepare_index_directory(config.index_dir)
-        backend_used, doc_count = _build_bm25_index(config)
+        backend_used, doc_count = _build_bm25_index(config, logger=LOGGER)
         index_path = _get_bm25_index_path(Path(index_dir), backend_used)
         builder = builder.add_file(
             path=str(index_path),
@@ -490,6 +548,14 @@ def index_bm25(
             message=f"Indexed {doc_count} documents using backend={backend_used}",
         )
         typer.echo(f"BM25 index built at {index_dir} using backend={backend_used}")
+        _log_cli_event(
+            logging.INFO,
+            "BM25 index built",
+            context,
+            backend=backend_used,
+            documents=doc_count,
+            index_path=str(index_path),
+        )
         _finish_success(context, builder)
     except FileNotFoundError as exc:
         detail = f"Chunk dataset not found: {exc}"
@@ -628,6 +694,15 @@ def index_faiss(
         factory=factory,
         metric=metric,
     )
+    _log_cli_event(
+        logging.INFO,
+        "Building FAISS index",
+        context,
+        factory=factory,
+        metric=metric,
+        index_path=index_path,
+        dense_vectors=dense_vectors,
+    )
     try:
         metadata = run_index_faiss(config=config)
         builder = builder.add_file(
@@ -643,6 +718,16 @@ def index_faiss(
             message=json.dumps({"factory": factory, "metric": metric}, sort_keys=True),
         )
         typer.echo(f"FAISS index vectors stored at {index_path}")
+        _log_cli_event(
+            logging.INFO,
+            "Building FAISS index",
+            context,
+            vectors=metadata.get("vector_count"),
+            dimension=metadata.get("dimension"),
+            index_path=index_path,
+            factory=factory,
+            metric=metric,
+        )
         _finish_success(context, builder)
     except VectorValidationError as exc:
         detail = str(exc)
@@ -787,3 +872,4 @@ __all__ = ["api", "app", "e2e", "index_bm25", "index_faiss", "run_index_faiss"]
 
 if __name__ == "__main__":  # pragma: no cover - manual execution entrypoint
     app()
+LOGGER = logging.getLogger(__name__)

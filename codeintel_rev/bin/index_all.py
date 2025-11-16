@@ -50,7 +50,7 @@ from codeintel_rev.io.symbol_catalog import (  # new
     SymbolDefRow,
     SymbolOccurrenceRow,
 )
-from codeintel_rev.io.vllm_client import VLLMClient
+from codeintel_rev.io.vllm_client import build_vllm_client
 from codeintel_rev.typing import NDArrayF32
 
 if TYPE_CHECKING:
@@ -687,7 +687,7 @@ def _run_offline_evaluation(
         logger.info("Offline evaluation disabled; skipping.")
         return
     duckdb_manager = DuckDBManager(paths.duckdb_path, settings.duckdb)
-    vllm_client = VLLMClient(settings.vllm)
+    vllm_client = build_vllm_client(settings.vllm)
     runtime_opts = _runtime_options_from_index(settings.index)
     faiss_mgr = FAISSManager(
         index_path=paths.faiss_index,

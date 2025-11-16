@@ -12,6 +12,7 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import inspect
+import os
 import sys
 from importlib import import_module
 from pathlib import Path
@@ -102,6 +103,11 @@ def load_optional_attr(module_name: str, attr_name: str) -> object | None:
 
 # Ensure the src layout is active as soon as the bootstrap module is imported.
 ensure_src_path()
+
+# Default test environment configuration: synthetic data + stubbed heavy deps.
+os.environ.setdefault("KGFOUNDRY_TEST_USE_REAL_DATA", "0")
+os.environ.setdefault("KGFOUNDRY_TEST_MODE", "1")
+os.environ.setdefault("KGFOUNDRY_TEST_VLLM_STUB", "1")
 
 
 class _CliRunnerProtocol(Protocol):

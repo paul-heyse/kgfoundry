@@ -14,7 +14,7 @@ from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import Annotated, Any, Protocol, cast
+from typing import Annotated, Any, Protocol, TypedDict, Unpack, cast
 
 import typer
 
@@ -192,8 +192,16 @@ def _stage(meta: StageMeta) -> Iterator[dict[str, object]]:
         yield payload
 
 
+class _YamlDumpKwargs(TypedDict, total=False):
+    sort_keys: bool
+
+
 class _YamlDumpFn(Protocol):
-    def __call__(self, data: Mapping[str, list[str]], *, sort_keys: bool = ...) -> str: ...
+    def __call__(
+        self,
+        data: Mapping[str, list[str]],
+        **kwargs: Unpack[_YamlDumpKwargs],
+    ) -> str: ...
 
 
 EXPORT_HUB_THRESHOLD = 10
@@ -433,9 +441,9 @@ def normalize_global_cli_args(argv: Sequence[str]) -> list[str]:
 
 
 app = typer.Typer(add_completion=True, help=GLOBAL_OPTIONS_HELP)
+app.__kgf_normalize_args__ = normalize_global_cli_args
 
 
-# ruff: noqa: PLR0913,PLR0917
 @app.callback()
 def shared_options(  # pragma: no cover - Typer wiring
     ctx: typer.Context,

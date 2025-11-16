@@ -882,9 +882,10 @@ def _run_xtr_wide_stage(
     k: int,
     *,
     explain: bool,
-    budget_ms: int | None,  # noqa: ARG001
+    budget_ms: int | None,
 ) -> WarpOutcome:
     notes: list[str] = []
+    _ = budget_ms
     hits = index.search(query=query, k=k, explain=explain)
     explain_payload = [(int(cid), payload) for cid, _score, payload in hits if payload]
     scored = [(int(cid), float(score)) for cid, score, _payload in hits]

@@ -32,7 +32,7 @@ def test_faiss_manager_imports_are_lazy() -> None:
     import sys
     sys.modules.pop("faiss", None)
     import numpy  # required at runtime
-    import codeintel_rev.io.faiss_manager  # noqa: F401
+    import codeintel_rev.io.faiss_manager
     assert "faiss" not in sys.modules
 """
     _run_python(script)
@@ -43,7 +43,7 @@ def test_coderank_embedder_does_not_eager_import_sentence_transformers() -> None
     script = """
 import sys
 sys.modules.pop("sentence_transformers", None)
-import codeintel_rev.io.coderank_embedder  # noqa: F401
+import codeintel_rev.io.coderank_embedder
 assert "sentence_transformers" not in sys.modules
 """
     _run_python(script)

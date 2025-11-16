@@ -40,7 +40,7 @@ def handle_fetch(catalog: CatalogProtocol, args: dict[str, object]) -> FetchOutp
     """
     payload = _normalize_fetch_input(args)
     object_ids: list[int] = []
-    for obj in payload.objectIds:
+    for obj in payload.object_ids:
         try:
             object_ids.append(int(obj))
         except ValueError:
@@ -125,7 +125,7 @@ def _normalize_fetch_input(args: Mapping[str, object]) -> FetchInput:
         raise TypeError(msg) from exc
     max_tokens = _coerce_optional_int(args.get("max_tokens"))
     resolve = _coerce_resolve(args.get("resolve"))
-    return FetchInput(objectIds=object_ids, max_tokens=max_tokens, resolve=resolve)
+    return FetchInput(object_ids=object_ids, max_tokens=max_tokens, resolve=resolve)
 
 
 def _coerce_optional_int(value: object | None) -> int | None:

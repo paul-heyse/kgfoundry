@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
+from typing import Protocol, cast
 
 from click.testing import Result
 from typer.main import Typer
 from typer.testing import CliRunner
 
 _RUNNER = CliRunner(mix_stderr=False)
+
+
+class _ArgNormalizer(Protocol):
+    def __call__(self, argv: Sequence[str]) -> list[str]: ...
 
 
 def invoke(
@@ -54,4 +59,10 @@ def invoke(
         command. Uses a shared CliRunner instance for efficiency. Thread-safe for
         concurrent test invocations (Typer runner handles isolation).
     """
-    return _RUNNER.invoke(app, list(args), env=env, catch_exceptions=catch_exceptions)
+    arg_list = list(args)
+    normalizer_obj = getattr(app, "__kgf_normalize_args__", None)
+    if normalizer_obj is not None and callable(normalizer_obj):
+        normalizer = cast("_ArgNormalizer", normalizer_obj)
+        normalized = normalizer(["cli", *arg_list])
+        arg_list = normalized[1:]
+    return _RUNNER.invoke(app, arg_list, env=env, catch_exceptions=catch_exceptions)

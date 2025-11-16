@@ -7,7 +7,6 @@ corpus size for optimal performance.
 
 from __future__ import annotations
 
-# ruff: noqa: SLF001
 import json
 import math
 from collections.abc import Callable, Mapping, Sequence
@@ -211,10 +210,10 @@ class FAISSRuntimeController:
             - "autotune_profile": dict with persisted autotune profile or empty dict
         """
         manager = self._manager
-        nprobe, ef_search, k_factor, quantizer = manager._resolve_search_knobs(None)
-        with manager._tuning_lock:
-            overrides = dict(manager._runtime_overrides)
-        profile = manager._load_tuned_profile()
+        nprobe, ef_search, k_factor, quantizer = manager.resolve_search_knobs(None)
+        with manager.tuning_lock:
+            overrides = dict(manager.runtime_overrides)
+        profile = manager.load_tuned_profile()
         return {
             "active": {
                 "nprobe": nprobe,
@@ -259,7 +258,7 @@ class FAISSRuntimeController:
             If no tuning parameters are provided (all parameters are None).
         """
         manager = self._manager
-        sanitized = manager._sanitize_runtime_overrides(
+        sanitized = manager.sanitize_runtime_overrides(
             nprobe=nprobe,
             ef_search=ef_search,
             quantizer_ef_search=quantizer_ef_search,
@@ -268,11 +267,11 @@ class FAISSRuntimeController:
         if not sanitized:
             msg = "No tuning parameters provided."
             raise ValueError(msg)
-        with manager._tuning_lock:
-            manager._runtime_overrides.update(sanitized)
-        manager._maybe_apply_runtime_parameters(sanitized)
-        manager._write_meta_snapshot(
-            parameter_space=manager._format_parameter_string(manager._runtime_overrides)
+        with manager.tuning_lock:
+            manager.runtime_overrides.update(sanitized)
+        manager.apply_runtime_parameters(sanitized)
+        manager.write_meta_snapshot(
+            parameter_space=manager.format_parameter_string(manager.runtime_overrides)
         )
         return self.get_runtime_tuning()
 
@@ -286,9 +285,9 @@ class FAISSRuntimeController:
             as :meth:`get_runtime_tuning`).
         """
         manager = self._manager
-        with manager._tuning_lock:
-            manager._runtime_overrides.clear()
-        manager._maybe_apply_runtime_parameters(
+        with manager.tuning_lock:
+            manager.runtime_overrides.clear()
+        manager.apply_runtime_parameters(
             {
                 "nprobe": manager.default_nprobe,
                 "efSearch": manager.hnsw_ef_search,
@@ -323,7 +322,7 @@ class FAISSRuntimeController:
         if not profile:
             msg = "Tuning profile payload is empty."
             raise VectorIndexIncompatibleError(msg)
-        return self._manager._apply_profile_payload(profile, persist=True)
+        return self._manager.apply_profile_payload(profile, persist=True)
 
     def set_search_parameters(self, param_str: str) -> dict[str, object]:
         """Apply FAISS ParameterSpace string and persist overrides.
@@ -345,16 +344,16 @@ class FAISSRuntimeController:
             If the parameter string is invalid or FAISS rejects the override.
         """
         manager = self._manager
-        faiss_spec, sanitized = manager._prepare_parameter_string(param_str)
+        faiss_spec, sanitized = manager.prepare_parameter_string(param_str)
         if faiss_spec:
             try:
-                apply_parameters(manager._active_index(), faiss_spec)
+                apply_parameters(manager.active_index(), faiss_spec)
             except ValueError as exc:
                 raise ValueError(str(exc)) from exc
-        with manager._tuning_lock:
-            manager._runtime_overrides.update(sanitized)
-        manager._write_meta_snapshot(
-            parameter_space=manager._format_parameter_string(manager._runtime_overrides)
+        with manager.tuning_lock:
+            manager.runtime_overrides.update(sanitized)
+        manager.write_meta_snapshot(
+            parameter_space=manager.format_parameter_string(manager.runtime_overrides)
         )
         return self.get_runtime_tuning()
 
@@ -418,6 +417,16 @@ class RefineSearchConfig:
     nprobe: int | None = None
     runtime: SearchRuntimeOverrides | None = None
     source: str = "faiss"
+
+
+@dataclass(frozen=True, slots=True)
+class SecondaryUpdateSnapshot:
+    """Metadata recorded for the most recent secondary index refresh."""
+
+    added: int
+    total_secondary_vectors: int
+    skipped_duplicates: int
+    recorded_at: datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -718,7 +727,7 @@ class FAISSManager(
         self.secondary_index_path = (
             index_path.parent / f"{index_path.stem}.secondary{index_path.suffix}"
         )
-        self._tuned_parameters: dict[str, float | str] | None = None
+        self.tuned_parameters: dict[str, float | str] | None = None
         self._last_latency_ms: float | None = None
         self.autotune_profile_path = self.index_path.with_name("tuning.json")
         self._legacy_autotune_profile_path = self.index_path.with_suffix(".tune.json")
@@ -726,11 +735,27 @@ class FAISSManager(
         self._runtime_overrides: dict[str, float] = {}
         self._tuning_lock = RLock()
         self._runtime_controller = FAISSRuntimeController(self)
+        self._last_secondary_update: SecondaryUpdateSnapshot | None = None
 
     @property
     def runtime(self) -> FAISSRuntimeController:
         """Runtime tuning controller for this manager."""
         return self._runtime_controller
+
+    @property
+    def tuning_lock(self) -> RLock:
+        """Lock guarding runtime tuning mutations."""
+        return self._tuning_lock
+
+    @property
+    def runtime_overrides(self) -> dict[str, float]:
+        """Mutable mapping of runtime search overrides."""
+        return self._runtime_overrides
+
+    @property
+    def last_secondary_update(self) -> SecondaryUpdateSnapshot | None:
+        """Metadata for the most recent secondary index ingestion."""
+        return self._last_secondary_update
 
     def _write_profile(self, path: Path) -> None:
         """Persist a minimal profile snapshot describing the active CPU index."""
@@ -809,7 +834,7 @@ class FAISSManager(
         self._record_factory_choice(
             cpu_id_map,
             factory_label,
-            parameter_space=self._format_parameter_string(self._runtime_overrides),
+            parameter_space=self.format_parameter_string(self._runtime_overrides),
             vector_count=n_vectors,
         )
 
@@ -1157,44 +1182,30 @@ class FAISSManager(
 
         return unique_indices
 
-    @staticmethod
     def _log_secondary_added(
+        self,
         *,
         added: int,
         total_secondary_vectors: int,
         skipped_duplicates: int,
     ) -> None:
-        """Emit structured log event for secondary index vector additions.
-
-        This helper method logs information about vectors added to the secondary
-        index, including the number of vectors added in the current operation,
-        the total number of vectors in the secondary index after the addition,
-        and the number of duplicate IDs that were skipped. Used for debugging
-        of incremental update operations.
+        """Record metadata for secondary index updates without emitting logs.
 
         Parameters
         ----------
         added : int
-            Number of vectors successfully added to the secondary index in the
-            current operation. Must be non-negative. Represents the count of
-            unique vectors that passed duplicate filtering.
+            Number of vectors successfully added to the secondary index.
         total_secondary_vectors : int
-            Total number of vectors in the secondary index after the current
-            addition. Must be >= added. Used to track the size of the secondary
-            index over time.
+            Total number of vectors in the secondary index after the update.
         skipped_duplicates : int
-            Number of duplicate IDs that were filtered out and not added to the
-            secondary index. Must be non-negative. Includes IDs that were already
-            in the primary index, already in the secondary index, or duplicated
-            within the current batch.
-
-        Notes
-        -----
-        This method emits structured logs with component="faiss_manager" for
-        consistent log filtering and analysis. The log event is emitted at INFO
-        level and includes all three metrics. Time complexity: O(1). The method
-        performs no I/O operations beyond logging.
+            Number of duplicate IDs skipped during the update.
         """
+        self._last_secondary_update = SecondaryUpdateSnapshot(
+            added=added,
+            total_secondary_vectors=total_secondary_vectors,
+            skipped_duplicates=skipped_duplicates,
+            recorded_at=datetime.now(tz=UTC),
+        )
 
     def save_cpu_index(self) -> None:
         """Save CPU index to disk for persistence.
@@ -1260,12 +1271,12 @@ class FAISSManager(
             cpu_index = faiss.IndexIDMap2(cpu_index)
         _configure_direct_map(cpu_index)
         self.cpu_index = cpu_index
-        profile = self._load_tuned_profile()
+        profile = self.load_tuned_profile()
         if profile:
-            self._apply_profile_payload(profile, persist=False)
-        self._write_meta_snapshot(
+            self.apply_profile_payload(profile, persist=False)
+        self.write_meta_snapshot(
             vector_count=cpu_index.ntotal,
-            parameter_space=self._format_parameter_string(self._runtime_overrides),
+            parameter_space=self.format_parameter_string(self._runtime_overrides),
         )
         if export_idmap is not None:
             self.export_idmap(export_idmap)
@@ -1468,7 +1479,7 @@ class FAISSManager(
         """
         config = config or RefineSearchConfig()
         runtime = config.runtime or SearchRuntimeOverrides()
-        _, _, resolved_k_factor, _ = self._resolve_search_knobs(
+        _, _, resolved_k_factor, _ = self.resolve_search_knobs(
             override_nprobe=config.nprobe,
             override_ef=runtime.ef_search,
             override_k_factor=runtime.k_factor,
@@ -1549,11 +1560,11 @@ class FAISSManager(
         for normalization plus O(1) for parameter resolution.
         """
         self._require_cpu_index()
-        normalized = self._ensure_2d(query).copy().astype(np.float32)
+        normalized = self.ensure_2d(query).copy().astype(np.float32)
         faiss.normalize_L2(normalized)
         k_eff = max(1, int(k or self.default_k))
         runtime = runtime or SearchRuntimeOverrides()
-        nprobe_eff, ef_eff, k_factor, quantizer_ef = self._resolve_search_knobs(
+        nprobe_eff, ef_eff, k_factor, quantizer_ef = self.resolve_search_knobs(
             override_nprobe=nprobe,
             override_ef=runtime.ef_search,
             override_k_factor=runtime.k_factor,
@@ -1577,12 +1588,38 @@ class FAISSManager(
 
     # Runtime tuning is handled by FAISSRuntimeController via the ``runtime`` property.
 
-    def _apply_profile_payload(
+    def apply_profile_payload(
         self,
         profile: Mapping[str, Any],
         *,
         persist: bool,
     ) -> dict[str, object]:
+        """Apply a persisted tuning profile to the runtime configuration.
+
+        Parameters
+        ----------
+        profile : Mapping[str, Any]
+            Tuning profile dictionary containing search parameter overrides.
+            May include param_str (FAISS ParameterSpace string) or individual
+            parameters (nprobe, ef_search, quantizer_ef_search, k_factor).
+        persist : bool
+            Whether to persist the profile to disk. If True, the profile is
+            written to the autotune profile path. If False, the profile is
+            cached in memory only.
+
+        Returns
+        -------
+        dict[str, object]
+            Applied profile payload dictionary containing the effective runtime
+            tuning state after applying the profile.
+
+        Raises
+        ------
+        VectorIndexIncompatibleError
+            When the profile parameters are invalid or incompatible with the
+            current index configuration. Wraps ValueError or TypeError from
+            parameter validation with context about the failing parameter.
+        """
         overrides = _parse_tuning_overrides(profile)
         try:
             if overrides.param_str:
@@ -1608,7 +1645,7 @@ class FAISSManager(
         if persist:
             _persist_tuning_profile(self, profile)
         else:
-            self._tuned_parameters = dict(profile)
+            self.tuned_parameters = dict(profile)
         return snapshot
 
     def _search_primary(
@@ -1643,7 +1680,7 @@ class FAISSManager(
             If primary index is not available.
         """
         try:
-            index = self._active_index()
+            index = self.active_index()
         except RuntimeError as exc:
             msg = "Cannot search primary index: no FAISS index is available."
             raise RuntimeError(msg) from exc
@@ -2118,9 +2155,9 @@ class FAISSManager(
         ParameterSpace settings directly. Useful for ad-hoc tuning experiments.
         Time complexity depends on index type and param_str settings.
         """
-        xq = self._ensure_2d(query)
+        xq = self.ensure_2d(query)
         faiss.normalize_L2(xq)
-        index = self._active_index()
+        index = self.active_index()
         if param_str:
             apply_parameters(index, param_str)
         distances, ids = _run_index_search(index, xq, k)
@@ -2128,7 +2165,7 @@ class FAISSManager(
             distances, ids = self._refine_with_flat(xq, ids, k)
         return distances, ids
 
-    def _save_tuning_profile(
+    def save_tuning_profile(
         self,
         profile: Mapping[str, Any],
         *,
@@ -2213,7 +2250,7 @@ class FAISSManager(
         This method performs brute-force ground truth computation, then evaluates
         each parameter combination in the sweep. The best configuration (highest
         recall, breaking ties by lowest latency) is persisted to
-        `autotune_profile_path` and stored in `_tuned_parameters` for future use.
+        `autotune_profile_path` and stored in `tuned_parameters` for future use.
         Time complexity: O(n_queries * n_truths) for ground truth + O(len(sweep) * search_time).
         """
         tuner = AutoTuner(self)
@@ -2221,8 +2258,8 @@ class FAISSManager(
         timestamp = datetime.now(UTC).isoformat()
         profile["profile_at"] = timestamp
         profile.setdefault("updated_at", timestamp)
-        self._save_tuning_profile(profile)
-        self._tuned_parameters = dict(profile)
+        self.save_tuning_profile(profile)
+        self.tuned_parameters = dict(profile)
         return profile
 
     # ------------------------------------------------------------------
@@ -2421,7 +2458,7 @@ class FAISSManager(
         except (AttributeError, RuntimeError):
             name = label or type(index).__name__
         effective_count = index.ntotal if vector_count is None else int(vector_count)
-        self._write_meta_snapshot(
+        self.write_meta_snapshot(
             factory=name,
             vector_count=effective_count,
             parameter_space=parameter_space,
@@ -2477,14 +2514,14 @@ class FAISSManager(
             params.append(f"quantizer_efSearch={int(quantizer_ef_search)}")
         if not params:
             return
-        index = self._active_index()
+        index = self.active_index()
         try:
             faiss.ParameterSpace().set_index_parameters(index, ",".join(params))
         except (RuntimeError, AttributeError, ValueError):
             if nprobe is not None and hasattr(index, "nprobe"):
                 index.nprobe = int(nprobe)
 
-    def _maybe_apply_runtime_parameters(self, overrides: Mapping[str, float | int]) -> None:
+    def apply_runtime_parameters(self, overrides: Mapping[str, float | int]) -> None:
         """Best-effort application of overrides to the live index if available.
 
         This method attempts to apply runtime parameter overrides to the active
@@ -2523,13 +2560,44 @@ class FAISSManager(
         )
 
     @staticmethod
-    def _sanitize_runtime_overrides(
+    def sanitize_runtime_overrides(
         *,
         nprobe: int | None,
         ef_search: int | None,
         quantizer_ef_search: int | None,
         k_factor: float | None,
     ) -> dict[str, float]:
+        """Normalize and validate runtime override parameters.
+
+        Parameters
+        ----------
+        nprobe : int | None, optional
+            Number of IVF clusters to search. Must be positive if provided.
+            Defaults to None (not set).
+        ef_search : int | None, optional
+            HNSW search width parameter. Must be positive if provided.
+            Defaults to None (not set).
+        quantizer_ef_search : int | None, optional
+            Quantizer search width for IVF-PQ indexes. Must be positive if provided.
+            Defaults to None (not set).
+        k_factor : float | None, optional
+            Refinement factor for hybrid search. Must be >= 1.0 if provided.
+            Defaults to None (not set).
+
+        Returns
+        -------
+        dict[str, float]
+            Sanitized override dictionary with validated parameters. Keys use
+            camelCase for FAISS compatibility (nprobe, efSearch, quantizer_efSearch,
+            k_factor). Only includes parameters that were provided and validated.
+
+        Raises
+        ------
+        ValueError
+            When any provided parameter fails validation (e.g., negative values
+            for integer parameters, k_factor < 1.0). The error message indicates
+            which parameter failed and the invalid value.
+        """
         sanitized: dict[str, float] = {}
         if nprobe is not None:
             nprobe_int = int(nprobe)
@@ -2557,7 +2625,7 @@ class FAISSManager(
             sanitized["k_factor"] = kf_val
         return sanitized
 
-    def _prepare_parameter_string(self, param_str: str) -> tuple[str | None, dict[str, float]]:
+    def prepare_parameter_string(self, param_str: str) -> tuple[str | None, dict[str, float]]:
         """Return FAISS ParameterSpace spec and sanitized overrides for ``param_str``.
 
         Parameters
@@ -2601,7 +2669,7 @@ class FAISSManager(
                 raise ValueError(msg)
             int_params[key] = int(numeric_value)
             faiss_pairs.append(f"{key}={value}")
-        sanitized = self._sanitize_runtime_overrides(
+        sanitized = self.sanitize_runtime_overrides(
             nprobe=int_params.get("nprobe"),
             ef_search=int_params.get("efSearch"),
             quantizer_ef_search=int_params.get("quantizer_efSearch"),
@@ -2613,7 +2681,7 @@ class FAISSManager(
         return (",".join(faiss_pairs) if faiss_pairs else None, sanitized)
 
     @staticmethod
-    def _format_parameter_string(overrides: Mapping[str, float]) -> str | None:
+    def format_parameter_string(overrides: Mapping[str, float]) -> str | None:
         """Format runtime override dictionary into a parameter string.
 
         This method converts a dictionary of runtime parameter overrides into a
@@ -2658,7 +2726,7 @@ class FAISSManager(
                 ordered.append(f"{key}={int(value)}")
         return ",".join(ordered) if ordered else None
 
-    def _meta_snapshot(self) -> dict[str, object]:
+    def meta_snapshot(self) -> dict[str, object]:
         """Return persisted metadata merged with current configuration.
 
         Returns
@@ -2690,7 +2758,7 @@ class FAISSManager(
         )
         return snapshot
 
-    def _write_meta_snapshot(
+    def write_meta_snapshot(
         self,
         *,
         factory: str | None = None,
@@ -2698,7 +2766,7 @@ class FAISSManager(
         parameter_space: str | None = None,
     ) -> None:
         """Write the metadata snapshot to disk with updated overrides."""
-        meta = self._meta_snapshot()
+        meta = self.meta_snapshot()
         if factory is not None:
             meta["factory"] = factory
         if vector_count is not None:
@@ -2724,7 +2792,7 @@ class FAISSManager(
         """
         return _get_compile_options()
 
-    def _resolve_search_knobs(
+    def resolve_search_knobs(
         self,
         override_nprobe: int | None,
         *,
@@ -2732,7 +2800,47 @@ class FAISSManager(
         override_k_factor: float | None = None,
         override_quantizer: int | None = None,
     ) -> tuple[int | None, int | None, float, int | None]:
-        profile = self._load_tuned_profile()
+        """Resolve effective search parameters from overrides, runtime state, and profile.
+
+        This method determines the final search parameters by checking multiple
+        sources in priority order: explicit overrides > runtime overrides >
+        persisted profile > defaults. This allows callers to provide immediate
+        overrides while respecting runtime configuration and persisted tuning.
+
+        Parameters
+        ----------
+        override_nprobe : int | None
+            Explicit override for nprobe parameter. Takes highest priority if provided.
+        override_ef : int | None, optional
+            Explicit override for ef_search parameter. Takes highest priority if provided.
+            Defaults to None.
+        override_k_factor : float | None, optional
+            Explicit override for k_factor parameter. Takes highest priority if provided.
+            Defaults to None.
+        override_quantizer : int | None, optional
+            Explicit override for quantizer_ef_search parameter. Takes highest priority
+            if provided. Defaults to None.
+
+        Returns
+        -------
+        tuple[int | None, int | None, float, int | None]
+            Tuple of (nprobe, ef_search, k_factor, quantizer_ef_search) representing
+            the effective search parameters. Values are resolved from overrides,
+            runtime state, profile, or defaults in that priority order. k_factor
+            always returns a float (defaults to refine_k_factor if not overridden).
+
+        Notes
+        -----
+        Parameter resolution priority:
+        1. Explicit override arguments (highest priority)
+        2. Runtime overrides dictionary (set via apply_runtime_tuning)
+        3. Persisted tuning profile (loaded from disk)
+        4. Manager defaults (default_nprobe, hnsw_ef_search, refine_k_factor)
+
+        Runtime overrides use camelCase keys (efSearch, quantizer_efSearch) for
+        FAISS compatibility, but snake_case keys are also checked for convenience.
+        """
+        profile = self.load_tuned_profile()
         with self._tuning_lock:
             overrides = dict(self._runtime_overrides)
 
@@ -2797,7 +2905,7 @@ class FAISSManager(
         quantizer_ef = int(quantizer_candidate) if quantizer_candidate is not None else None
         return nprobe_eff, ef_eff, k_factor, quantizer_ef
 
-    def _load_tuned_profile(self) -> dict[str, float | str]:
+    def load_tuned_profile(self) -> dict[str, float | str]:
         """Load the autotune profile from disk, caching the result.
 
         Returns
@@ -2806,8 +2914,8 @@ class FAISSManager(
             Dictionary containing tuned FAISS parameters. Returns empty
             dictionary if no profile exists or loading fails.
         """
-        if self._tuned_parameters is not None:
-            return self._tuned_parameters
+        if self.tuned_parameters is not None:
+            return self.tuned_parameters
         profile_path = self._profile_path_for_read()
         if profile_path is None:
             return {}
@@ -2819,7 +2927,7 @@ class FAISSManager(
             profile = cast("dict[str, float | str]", json.loads(raw))
         except json.JSONDecodeError:
             return {}
-        self._tuned_parameters = profile
+        self.tuned_parameters = profile
         return profile
 
     def _profile_path_for_read(self) -> Path | None:
@@ -2853,7 +2961,7 @@ class FAISSManager(
             return self._legacy_autotune_profile_path
         return None
 
-    def _timed_search_with_params(
+    def timed_search_with_params(
         self, queries: NDArrayF32, k: int, param_str: str
     ) -> tuple[float, tuple[NDArrayF32, NDArrayI64]]:
         """Execute a parameterized search and measure its latency.
@@ -2903,7 +3011,7 @@ class FAISSManager(
         return elapsed, result
 
     @staticmethod
-    def _brute_force_truth_ids(queries: NDArrayF32, truths: NDArrayF32, k: int) -> NDArrayI64:
+    def brute_force_truth_ids(queries: NDArrayF32, truths: NDArrayF32, k: int) -> NDArrayI64:
         """Compute ground-truth nearest neighbor IDs via exact brute-force search.
 
         This method performs exact nearest neighbor search by computing the full
@@ -2956,7 +3064,7 @@ class FAISSManager(
         return idx.astype(np.int64)
 
     @staticmethod
-    def _estimate_recall(candidates: NDArrayI64, truth: NDArrayI64) -> float:
+    def estimate_recall(candidates: NDArrayI64, truth: NDArrayI64) -> float:
         """Compute average recall@k between candidate and ground-truth IDs.
 
         Parameters
@@ -2985,7 +3093,7 @@ class FAISSManager(
         return hits / max(1, total)
 
     @staticmethod
-    def _ensure_2d(array: NDArrayF32) -> NDArrayF32:
+    def ensure_2d(array: NDArrayF32) -> NDArrayF32:
         """Normalize query arrays to shape (n_queries, vec_dim).
 
         Parameters
@@ -3061,7 +3169,7 @@ class FAISSManager(
         except (AttributeError, RuntimeError):
             return index
 
-    def _active_index(self) -> _faiss.Index:
+    def active_index(self) -> _faiss.Index:
         """Return the active CPU search index.
 
         Returns
@@ -3129,24 +3237,24 @@ class AutoTuner:
             ``refine_k_factor`` (float). Additional metadata such as the index
             ``factory`` is included when available.
         """
-        xq = self._manager._ensure_2d(queries).astype(
+        xq = self._manager.ensure_2d(queries).astype(
             np.float32
         )  # lint-ignore[SLF001]: share private helper inside module
-        xt = self._manager._ensure_2d(truths).astype(
+        xt = self._manager.ensure_2d(truths).astype(
             np.float32
         )  # lint-ignore[SLF001]: share private helper inside module
         faiss.normalize_L2(xq)
         faiss.normalize_L2(xt)
         eval_sweep = tuple(sweep) if sweep else self._DEFAULT_SWEEP
-        truth_ids = self._manager._brute_force_truth_ids(
+        truth_ids = self._manager.brute_force_truth_ids(
             xq, xt, min(k, xt.shape[0])
         )  # lint-ignore[SLF001]: reuse internal helper for evaluation
         candidates: list[dict[str, float | str]] = []
         for spec in eval_sweep:
-            latency_ms, (_, ids) = self._manager._timed_search_with_params(
+            latency_ms, (_, ids) = self._manager.timed_search_with_params(
                 xq, k, spec
             )  # lint-ignore[SLF001]: reuse internal helper for evaluation
-            recall = self._manager._estimate_recall(
+            recall = self._manager.estimate_recall(
                 ids, truth_ids
             )  # lint-ignore[SLF001]: reuse internal helper for evaluation
             candidates.append(
@@ -3161,7 +3269,7 @@ class AutoTuner:
             refine_k_factor if refine_k_factor is not None else self._manager.refine_k_factor
         )
         meta = (
-            self._manager._meta_snapshot()
+            self._manager.meta_snapshot()
         )  # lint-ignore[SLF001]: reuse internal helper for evaluation
         if "factory" in meta:
             profile["factory"] = meta["factory"]
@@ -3429,10 +3537,10 @@ def _parse_tuning_overrides(profile: Mapping[str, Any]) -> _TuningOverrides:
 def _persist_tuning_profile(manager: FAISSManager, profile: Mapping[str, Any]) -> None:
     """Persist tuning metadata without interrupting the caller."""
     try:
-        manager._save_tuning_profile(dict(profile))
+        manager.save_tuning_profile(dict(profile))
     except OSError:  # pragma: no cover - best effort
         return
-    manager._tuned_parameters = dict(profile)
+    manager.tuned_parameters = dict(profile)
 
 
 def _get_compile_options() -> str:

@@ -623,4 +623,3 @@ def collect_api_symbols_with_griffe(
                     exc,
                 )
     return symbols
-    return symbols

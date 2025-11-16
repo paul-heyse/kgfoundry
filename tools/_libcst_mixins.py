@@ -23,28 +23,6 @@ class ImportFromTransformerMixin:
     should override. The default implementation returns the updated node unchanged.
     """
 
-    # ruff: noqa: N802 - LibCST requires CamelCase hook names
-    def leave_ImportFrom(
-        self,
-        original_node: cst.ImportFrom,
-        updated_node: cst.ImportFrom,
-    ) -> cst.ImportFrom | cst.RemovalSentinel | cst.FlattenSentinel[cst.BaseSmallStatement]:
-        """LibCST hook called when exiting ImportFrom nodes.
-
-        Parameters
-        ----------
-        original_node : cst.ImportFrom
-            Original ImportFrom node before any transformations.
-        updated_node : cst.ImportFrom
-            ImportFrom node after child transformations.
-
-        Returns
-        -------
-        cst.ImportFrom | cst.RemovalSentinel | cst.FlattenSentinel[cst.BaseSmallStatement]
-            Delegates to ``leave_import_from`` for snake_case override pattern.
-        """
-        return self.leave_import_from(original_node, updated_node)
-
     def leave_import_from(
         self,
         original_node: cst.ImportFrom,
@@ -88,6 +66,8 @@ class ImportFromTransformerMixin:
         del self, original_node
         return updated_node
 
+    leave_ImportFrom = leave_import_from
+
 
 class CallTransformerMixin:
     """Provide a snake_case hook for ``leave_Call``.
@@ -105,7 +85,6 @@ class CallTransformerMixin:
     should override. The default implementation returns the updated node unchanged.
     """
 
-    # ruff: noqa: N802 - LibCST requires CamelCase hook names
     def leave_Call(self, original_node: cst.Call, updated_node: cst.Call) -> cst.Call:
         """LibCST hook called when exiting Call nodes.
 
@@ -179,7 +158,6 @@ class ExceptHandlerTransformerMixin:
     should override. The default implementation returns the updated node unchanged.
     """
 
-    # ruff: noqa: N802 - LibCST requires CamelCase hook names
     def leave_ExceptHandler(
         self,
         original_node: cst.ExceptHandler,
@@ -262,7 +240,6 @@ class WithTransformerMixin:
     should override. The default implementation returns the updated node unchanged.
     """
 
-    # ruff: noqa: N802 - LibCST requires CamelCase hook names
     def leave_With(self, original_node: cst.With, updated_node: cst.With) -> cst.With:
         """LibCST hook called when exiting With nodes.
 
@@ -337,7 +314,6 @@ class IfTransformerMixin:
     should override. The default implementation returns the updated node unchanged.
     """
 
-    # ruff: noqa: N802 - LibCST requires CamelCase hook names
     def leave_If(self, original_node: cst.If, updated_node: cst.If) -> cst.If:
         """LibCST hook called when exiting If nodes.
 

@@ -6,6 +6,8 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 from __future__ import annotations
 
 import asyncio
+import os
+from collections.abc import Sequence
 from functools import lru_cache
 from importlib import import_module
 from types import ModuleType
@@ -14,17 +16,25 @@ from typing import TYPE_CHECKING, cast
 import msgspec
 
 from codeintel_rev._lazy_imports import LazyModule
+from codeintel_rev.config.settings import VLLMConfig
 from codeintel_rev.typing import NDArrayF32, gate_import
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     import httpx
 
-    from codeintel_rev.config.settings import VLLMConfig
     from codeintel_rev.io.vllm_engine import InprocessVLLMEmbedder
 else:
     httpx = cast("httpx", LazyModule("httpx", "vLLM HTTP client"))
+
+
+def _truthy_env(value: str | None) -> bool:
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _use_stub_client() -> bool:
+    return _truthy_env(os.getenv("KGFOUNDRY_TEST_VLLM_STUB"))
 
 
 @lru_cache(maxsize=1)
@@ -499,9 +509,54 @@ class VLLMClient:
         return self._client
 
 
+class _StubVLLMClient:
+    """Minimal stand-in for :class:`VLLMClient` used in test environments."""
+
+    def __init__(self, config: VLLMConfig) -> None:
+        self.config = config
+
+    def _zeros(self, count: int) -> NDArrayF32:
+        np_mod = _get_numpy()
+        return np_mod.zeros((count, self.config.embedding_dim), dtype=np_mod.float32)
+
+    def embed_single(self, text: str) -> NDArrayF32:
+        del text
+        return self._zeros(1)[0]
+
+    def embed_batch(self, texts: Sequence[str]) -> NDArrayF32:
+        text_list = list(texts)
+        return self._zeros(len(text_list))
+
+    async def embed_batch_async(self, texts: Sequence[str]) -> NDArrayF32:
+        return self.embed_batch(texts)
+
+    def close(self) -> None:  # pragma: no cover - no resources to release
+        """Close stubbed client (no-op)."""
+
+
+def build_vllm_client(config: VLLMConfig) -> VLLMClient:
+    """Return a real or stubbed VLLM client based on environment configuration.
+
+    Parameters
+    ----------
+    config : VLLMConfig
+        vLLM configuration object propagated from settings.
+
+    Returns
+    -------
+    VLLMClient
+        Concrete client implementation (real or stubbed) adhering to the
+        ``VLLMClient`` interface.
+    """
+    if _use_stub_client():
+        return cast("VLLMClient", _StubVLLMClient(config))
+    return VLLMClient(config)
+
+
 __all__ = [
     "EmbeddingData",
     "EmbeddingRequest",
     "EmbeddingResponse",
     "VLLMClient",
+    "build_vllm_client",
 ]

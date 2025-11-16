@@ -4,8 +4,6 @@ Provides SQL views over Parquet directories and query helpers for fast
 chunk retrieval and joins.
 """
 
-# ruff: noqa: SLF001
-
 from __future__ import annotations
 
 import hashlib
@@ -13,6 +11,7 @@ import logging
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
+from glob import glob as _glob
 from pathlib import Path
 from threading import Lock
 from typing import TYPE_CHECKING, Any, ClassVar, Self, TypedDict, Unpack, cast
@@ -806,11 +805,12 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             """
             CREATE OR REPLACE VIEW v_faiss_join AS
             SELECT
-                c.*,
-                f.faiss_row
-            FROM chunks AS c
-            LEFT JOIN faiss_idmap AS f
-              ON f.external_id = c.id
+                f.faiss_row,
+                f.external_id AS chunk_id,
+                c.*
+            FROM faiss_idmap AS f
+            LEFT JOIN chunks AS c
+              ON c.id = f.external_id
             """
         )
 
@@ -1717,7 +1717,7 @@ def ensure_faiss_idmap_view(
     conn.sql("SELECT * FROM read_parquet(?)", params=[idmap_parquet]).create_view(
         "v_faiss_idmap", replace=True
     )
-    chunk_files = list(Path().glob(chunks_parquet))
+    chunk_files = _glob(chunks_parquet)
     if chunk_files:
         conn.sql("SELECT * FROM read_parquet(?)", params=[chunks_parquet]).create_view(
             "v_chunks", replace=True
@@ -1742,11 +1742,7 @@ def ensure_faiss_idmap_view(
         SELECT
             idmap.faiss_row,
             idmap.external_id AS chunk_id,
-            chunks.uri,
-            chunks.start_line,
-            chunks.end_line,
-            chunks.language,
-            chunks.text
+            chunks.*
         FROM v_faiss_idmap AS idmap
         LEFT JOIN v_chunks AS chunks
           ON chunks.id = idmap.external_id

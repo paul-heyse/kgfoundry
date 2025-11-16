@@ -252,6 +252,25 @@ class HttpClient:
         return self._policy_strategy_for(method)
 
     @staticmethod
+    def _http_not_implemented(
+        *,
+        method: str,
+        url: str,
+        options: RequestOptions,
+    ) -> NoReturn:
+        """Raise NotImplementedError for placeholder HTTP attempts."""
+        _ = (
+            method,
+            url,
+            options.params,
+            options.json_body,
+            options.data,
+            options.timeout_s,
+        )
+        msg = "HTTP request not yet implemented"
+        raise NotImplementedError(msg)
+
+    @staticmethod
     def _build_attempt(method: str, url: str, options: RequestOptions) -> Callable[[], object]:
         """Build the callable that performs a single HTTP attempt.
 
@@ -285,17 +304,6 @@ class HttpClient:
             is implemented. When implemented, it will return an HTTP response object
             matching the return type annotation.
 
-            Returns
-            -------
-            object
-                HTTP response object from the underlying HTTP library. The exact type
-                depends on the library implementation (e.g., httpx.Response, requests.Response).
-                Currently not returned as the implementation always raises NotImplementedError.
-                The Returns section is required by pydoclint DOC201/DOC203 to document the
-                return type annotation, even though Ruff DOC202 flags it due to the current
-                implementation always raising. This will be resolved when the HTTP client
-                integration is completed.
-
             Raises
             ------
             NotImplementedError
@@ -313,17 +321,11 @@ class HttpClient:
             The return type annotation indicates the intended return type when the
             implementation is complete, but currently all code paths raise.
             """
-            _ = (
-                method,
-                url,
-                options.params,
-                options.json_body,
-                options.data,
-                options.timeout_s,
+            HttpClient._http_not_implemented(
+                method=method,
+                url=url,
+                options=options,
             )
-            msg = "HTTP request not yet implemented"
-            raise NotImplementedError(msg)
-            return None  # Unreachable; satisfies type checker and Ruff DOC202 analysis
 
         return _attempt
 

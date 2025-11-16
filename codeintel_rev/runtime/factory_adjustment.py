@@ -226,7 +226,7 @@ class SuppressException:
         self,
         exc_type: type[BaseException] | None,
         exc: BaseException | None,
-        tb: TracebackType | None,
+        _tb: TracebackType | None,
     ) -> bool:  # pragma: no cover - trivial
         return True
 

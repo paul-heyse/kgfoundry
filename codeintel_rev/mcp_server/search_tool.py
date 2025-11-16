@@ -53,7 +53,7 @@ def handle_search(deps: SearchDeps, args: dict[str, object]) -> SearchOutput:
     top_k = max(1, min(50, payload.top_k))
     query = payload.query.strip()
     if not query:
-        return SearchOutput(results=[], queryEcho="", top_k=top_k, limits=[])
+        return SearchOutput(results=[], query_echo="", top_k=top_k, limits=[])
 
     dense = deps.faiss_search(query, top_k) if deps.faiss_search else []
     sparse = deps.sparse_search(query, top_k) if deps.sparse_search else []
@@ -92,7 +92,7 @@ def handle_search(deps: SearchDeps, args: dict[str, object]) -> SearchOutput:
         limits.append("filters_applied")
     return SearchOutput(
         results=results,
-        queryEcho=query,
+        query_echo=query,
         top_k=top_k,
         limits=limits or None,
     )

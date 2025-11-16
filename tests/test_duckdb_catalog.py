@@ -107,9 +107,8 @@ def test_query_by_uri_supports_unlimited_results(tmp_path: Path) -> None:
     # Path is validated and escaped via helper function to prevent SQL injection
     safe_path = _safe_sql_path(parquet_path, tmp_path)
     with duckdb.connect(str(db_path)) as connection:
-        connection.execute(
-            "CREATE OR REPLACE VIEW chunks AS SELECT * FROM read_parquet(?)",
-            [safe_path],
+        connection.sql("SELECT * FROM read_parquet(?)", params=[safe_path]).create_view(
+            "chunks", replace=True
         )
 
     limited = catalog.query_by_uri("example.py", limit=1)

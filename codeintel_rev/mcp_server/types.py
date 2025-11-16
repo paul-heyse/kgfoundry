@@ -1,7 +1,5 @@
 """Typed DTOs and JSON Schema helpers for MCP search/fetch tools."""
 
-# ruff: noqa: N815
-
 from __future__ import annotations
 
 from typing import Any, Literal
@@ -33,7 +31,7 @@ class SearchOutput(msgspec.Struct, frozen=True):
     """Structured search response returned to the caller."""
 
     results: list[SearchResultItem]
-    queryEcho: str
+    query_echo: str = msgspec.field(name="queryEcho")
     top_k: int
     limits: list[str] | None = None
 
@@ -41,7 +39,7 @@ class SearchOutput(msgspec.Struct, frozen=True):
 class FetchInput(msgspec.Struct, frozen=True):
     """Incoming payload for the lightweight MCP fetch tool."""
 
-    objectIds: list[str]
+    object_ids: list[str] = msgspec.field(name="objectIds")
     max_tokens: int | None = None
     resolve: Literal["full", "summary", "metadata_only"] = "full"
 

@@ -264,11 +264,6 @@ class SPLADEv3Encoder:
         texts : list[str]
             List of text strings to encode.
 
-        Returns
-        -------
-        list[tuple[list[int], list[float]]]
-            Sparse SPLADE embeddings expressed as token indices and weights.
-
         Raises
         ------
         NotImplementedError
@@ -278,7 +273,9 @@ class SPLADEv3Encoder:
         Notes
         -----
         Use the Lucene impact index variant if available for production SPLADE
-        encoding and retrieval.
+        encoding and retrieval. When implemented, this method will return a list
+        of sparse vectors encoded as token-index and weight tuples matching the
+        SPLADE impact index format.
         """
         message = (
             "SPLADE encoding is not implemented in the skeleton. Use the Lucene "
@@ -286,7 +283,6 @@ class SPLADEv3Encoder:
             f"Requested device={self.device!r} with {len(texts)} texts."
         )
         raise NotImplementedError(message)
-        return []  # pragma: no cover
 
 
 # [nav:anchor PureImpactIndex]
