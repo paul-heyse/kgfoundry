@@ -1,3 +1,5 @@
+"""Tests for navigation map loader: CLI contracts and sidecar metadata validation."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
@@ -34,6 +36,7 @@ def _symbol_names(sections: object) -> set[str]:
 
 
 def test_cli_nav_metadata_derives_from_cli_contracts() -> None:
+    """Test that CLI navigation metadata is derived from CLI contracts."""
     metadata = load_nav_metadata("download.cli", ("app", "harvest"))
     assertions.expect_true(
         isinstance(metadata, NavMetadataModel), reason="metadata should be NavMetadataModel"
@@ -48,6 +51,7 @@ def test_cli_nav_metadata_derives_from_cli_contracts() -> None:
 
 
 def test_sidecar_metadata_validates() -> None:
+    """Test that sidecar metadata validates correctly."""
     metadata = load_nav_metadata("registry.helper", ("DuckDBRegistryHelper",))
     assertions.expect_true(
         isinstance(metadata, NavMetadataModel), reason="metadata should be NavMetadataModel"

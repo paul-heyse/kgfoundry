@@ -1,3 +1,5 @@
+"""Tests for index lifecycle management: prepare, publish, rollback, and manifest operations."""
+
 from __future__ import annotations
 
 import json
@@ -30,6 +32,7 @@ def _make_assets(tmp_path: Path, prefix: str = "a") -> IndexAssets:
 
 
 def test_prepare_and_publish(tmp_path: Path) -> None:
+    """Test that prepare and publish operations create staging and final index versions."""
     manager = IndexLifecycleManager(tmp_path / "indexes")
     assets = _make_assets(tmp_path, "v1")
     staging = manager.prepare("v1", assets)
@@ -46,12 +49,14 @@ def test_prepare_and_publish(tmp_path: Path) -> None:
 
 
 def test_publish_requires_staging(tmp_path: Path) -> None:
+    """Test that publish requires a staging version to exist."""
     manager = IndexLifecycleManager(tmp_path / "indexes")
     with pytest.raises(RuntimeLifecycleError):
         manager.publish("missing")
 
 
 def test_prepare_requires_assets(tmp_path: Path) -> None:
+    """Test that prepare requires all asset files to exist."""
     manager = IndexLifecycleManager(tmp_path / "indexes")
     bad_assets = IndexAssets(
         faiss_index=tmp_path / "not_there",
@@ -63,6 +68,7 @@ def test_prepare_requires_assets(tmp_path: Path) -> None:
 
 
 def test_rollback_switches_pointer(tmp_path: Path) -> None:
+    """Test that rollback switches the current version pointer to a previous version."""
     manager = IndexLifecycleManager(tmp_path / "indexes")
     assets_v1 = _make_assets(tmp_path, "v1")
     assets_v2 = _make_assets(tmp_path, "v2")
@@ -76,6 +82,7 @@ def test_rollback_switches_pointer(tmp_path: Path) -> None:
 
 
 def test_write_attrs_updates_manifest(tmp_path: Path) -> None:
+    """Test that write_attrs updates the manifest file with new attributes."""
     manager = IndexLifecycleManager(tmp_path / "indexes")
     assets = _make_assets(tmp_path, "v3")
     manager.prepare("v3", assets, attrs={"initial": True})
@@ -92,6 +99,7 @@ def test_write_attrs_updates_manifest(tmp_path: Path) -> None:
 
 
 def test_collect_asset_attrs_includes_checksums(tmp_path: Path) -> None:
+    """Test that collect_asset_attrs includes checksums for all asset files."""
     assets = _make_assets(tmp_path, "meta")
     idmap = tmp_path / "meta" / "faiss.idmap.parquet"
     idmap.write_bytes(b"idmap")

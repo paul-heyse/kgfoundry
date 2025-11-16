@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 import pyarrow.parquet as pq
+import pytest
 from codeintel_rev.eval.pool_writer import write_pool
 from codeintel_rev.retrieval.types import SearchPoolRow
 

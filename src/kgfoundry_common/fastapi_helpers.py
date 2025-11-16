@@ -119,9 +119,9 @@ def typed_dependency[**P, T](
                 dependency(*args, **kwargs),
                 timeout_seconds=timeout,
             )
-        except TimeoutError as exc:
+        except TimeoutError as timeout_exc:
             message = f"{name} dependency timed out after {timeout} seconds"
-            raise TimeoutError(message) from exc
+            raise TimeoutError(message) from timeout_exc
 
     marker: DependsMarker = Depends(_instrumented)
     return cast("object", marker)
@@ -167,9 +167,9 @@ def typed_exception_handler[E: Exception](
                 handler(request, exc),
                 timeout_seconds=timeout,
             )
-        except TimeoutError as exc:
+        except TimeoutError as timeout_exc:
             message = f"{name} exception handler timed out after {timeout} seconds"
-            raise TimeoutError(message) from exc
+            raise TimeoutError(message) from timeout_exc
 
     handler_callable = cast("Callable[[Request, Exception], t.Awaitable[Response]]", _wrapped)
     app.add_exception_handler(exception_type, handler_callable)

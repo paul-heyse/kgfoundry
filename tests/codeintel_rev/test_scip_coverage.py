@@ -1,3 +1,5 @@
+"""Tests for SCIP coverage evaluation and metrics reporting."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,7 +14,9 @@ from codeintel_rev.io.symbol_catalog import SymbolCatalog, SymbolDefRow
 from tests._helpers import assertions
 
 
-class _StubFAISSManager:
+class _StubFaissManager:
+    """Stub satisfying the SupportsFaissSearch protocol."""
+
     def search(
         self,
         query: np.ndarray,
@@ -29,9 +33,19 @@ class _StubFAISSManager:
 
 
 class _StubVLLMClient:
+    """Stub satisfying SupportsEmbedSingle."""
+
     def embed_single(self, text: str) -> list[float]:
         assertions.expect_true(bool(text), reason="text should be non-empty")
         return [0.0, 0.0]
+
+
+def _create_stub_faiss_manager() -> _StubFaissManager:
+    return _StubFaissManager()
+
+
+def _create_stub_vllm_client() -> _StubVLLMClient:
+    return _StubVLLMClient()
 
 
 def _prepare_catalog(path: Path) -> DuckDBManager:
@@ -61,6 +75,7 @@ def _prepare_catalog(path: Path) -> DuckDBManager:
 
 
 def test_scip_coverage_reports_full_metrics(tmp_path: Path) -> None:
+    """Test that SCIP coverage evaluator reports full coverage metrics."""
     base_settings = load_settings()
     paths = PathsConfig(
         repo_root=str(tmp_path),
@@ -80,8 +95,8 @@ def test_scip_coverage_reports_full_metrics(tmp_path: Path) -> None:
         settings=settings,
         repo_root=paths.repo_root,
         duckdb_manager=duckdb_manager,
-        faiss_manager=_StubFAISSManager(),
-        vllm_client=_StubVLLMClient(),
+        faiss_manager=_create_stub_faiss_manager(),
+        vllm_client=_create_stub_vllm_client(),
     )
     summary = evaluator.run(k=5)
     assertions.expect_equal(summary["chunk_coverage"], 1.0)

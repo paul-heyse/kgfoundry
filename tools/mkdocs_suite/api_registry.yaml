@@ -1,0 +1,23 @@
+interfaces:
+  download-cli:
+    module: download.cli
+    owner: kgfoundry
+    entrypoint: download.cli:app
+    description: CLI interface for download workflows.
+    operations:
+      harvest:
+        operation_id: cli.download.harvest
+        summary: Harvest documents from OpenAlex
+
+  orchestration-cli:
+    module: orchestration.cli
+    owner: kgfoundry
+    entrypoint: orchestration.cli:app
+    description: CLI interface for indexing/orchestration tasks.
+    operations:
+      index-bm25:
+        operation_id: cli.index_bm25
+        summary: Build BM25 index
+      index-faiss:
+        operation_id: cli.index_faiss
+        summary: Build FAISS index

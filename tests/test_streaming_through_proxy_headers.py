@@ -1,3 +1,5 @@
+"""Tests for streaming through proxy headers: SSE event flushing and buffering control."""
+
 from __future__ import annotations
 
 from http import HTTPStatus
@@ -14,6 +16,7 @@ async def test_sse_stream_flushes_events(  # streaming must survive proxies
     networking_test_app: FastAPI,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Test that SSE stream flushes events and sets proxy buffering headers correctly."""
     monkeypatch.setenv("SSE_MAX_KEEPALIVES", "0")
     transport = httpx.ASGITransport(app=networking_test_app)
     try:

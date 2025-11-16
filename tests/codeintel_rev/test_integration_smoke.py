@@ -5,9 +5,12 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from pathlib import Path
+from typing import cast
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from codeintel_rev.app.capabilities import Capabilities
+from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.io.path_utils import PathOutsideRepositoryError
 from codeintel_rev.mcp_server.adapters import files as files_adapter
 from codeintel_rev.mcp_server.adapters import history as history_adapter
@@ -34,7 +37,7 @@ def test_mcp_server_import() -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("mock_session_id")
-async def test_file_operations(mock_application_context) -> None:
+async def test_file_operations(mock_application_context: ApplicationContext) -> None:
     """Verify file listing and reading adapters respond with expected keys."""
     repo_root = mock_application_context.paths.repo_root
     (repo_root / "README.md").write_text("example content", encoding="utf-8")
@@ -59,7 +62,9 @@ async def test_file_operations(mock_application_context) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("mock_session_id")
-async def test_text_search(mock_application_context, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_text_search(
+    mock_application_context: ApplicationContext, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Exercise the text search adapter for basic responses."""
     repo_root = mock_application_context.paths.repo_root
     (repo_root / "module.py").write_text("def sample():\n    return 1\n", encoding="utf-8")
@@ -109,9 +114,10 @@ async def test_text_search(mock_application_context, monkeypatch: pytest.MonkeyP
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("mock_session_id")
-async def test_semantic_search_no_index(mock_application_context) -> None:
+async def test_semantic_search_no_index(mock_application_context: ApplicationContext) -> None:
     """Semantic search should gracefully handle missing FAISS index."""
-    mock_application_context.faiss_manager.search.side_effect = RuntimeError("missing index")
+    faiss_manager = cast("MagicMock", mock_application_context.faiss_manager)
+    faiss_manager.search.side_effect = RuntimeError("missing index")
     with pytest.raises(VectorSearchError):
         await semantic_adapter.semantic_search(
             mock_application_context,
@@ -122,11 +128,12 @@ async def test_semantic_search_no_index(mock_application_context) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("mock_session_id")
-async def test_git_history(mock_application_context) -> None:
+async def test_git_history(mock_application_context: ApplicationContext) -> None:
     """Ensure git history adapters expose expected keys."""
     repo_root = mock_application_context.paths.repo_root
     (repo_root / "README.md").write_text("sample\ncontent\n", encoding="utf-8")
-    mock_application_context.async_git_client.blame_range.return_value = [
+    async_git_client = cast("AsyncMock", mock_application_context.async_git_client)
+    async_git_client.blame_range.return_value = [
         {
             "line": 1,
             "commit": "abc",
@@ -135,7 +142,7 @@ async def test_git_history(mock_application_context) -> None:
             "message": "Line",
         }
     ]
-    mock_application_context.async_git_client.file_history.return_value = [
+    async_git_client.file_history.return_value = [
         {
             "sha": "abc",
             "full_sha": "abcdef",
@@ -166,7 +173,7 @@ async def test_git_history(mock_application_context) -> None:
 
 @pytest.mark.asyncio
 @pytest.mark.usefixtures("mock_session_id")
-async def test_scope_operations(mock_application_context) -> None:
+async def test_scope_operations(mock_application_context: ApplicationContext) -> None:
     """Verify scope configuration round-trips through the adapter."""
     scope_request: ScopeIn = {"repos": ["test"], "languages": ["python"]}
     result = await files_adapter.set_scope(mock_application_context, scope_request)
@@ -178,7 +185,9 @@ async def test_scope_operations(mock_application_context) -> None:
     )
 
 
-def test_path_escape_rejected_by_file_adapter(mock_application_context) -> None:
+def test_path_escape_rejected_by_file_adapter(
+    mock_application_context: ApplicationContext
+) -> None:
     """Adapters should reject attempts to escape the repository root."""
     with pytest.raises(PathOutsideRepositoryError) as excinfo:
         files_adapter.open_file(mock_application_context, "../etc/passwd")
@@ -191,7 +200,7 @@ def test_path_escape_rejected_by_file_adapter(mock_application_context) -> None:
 
 @pytest.mark.asyncio
 async def test_path_escape_rejected_by_history_adapter(
-    mock_application_context,
+    mock_application_context: ApplicationContext,
 ) -> None:
     """Git adapters should refuse to run commands on escaped paths."""
     with pytest.raises(PathOutsideRepositoryError) as excinfo:

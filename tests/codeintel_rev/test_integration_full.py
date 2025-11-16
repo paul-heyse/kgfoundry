@@ -7,15 +7,23 @@ and MCP tool endpoints with real configuration.
 from __future__ import annotations
 
 import time
+from dataclasses import FrozenInstanceError
 from http import HTTPStatus
 from pathlib import Path
 
 import pytest
+from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.main import app
+from codeintel_rev.app.readiness import ReadinessProbe
 from fastapi.testclient import TestClient
 
+from kgfoundry_common.errors import ConfigurationError
 from tests._helpers import assertions
 from tests.conftest import HAS_FAISS_SUPPORT
+
+# Test constants for startup time assertions
+_EXPECTED_STARTUP_TIME_WITHOUT_PRELOAD_SECONDS = 10.0
+_EXPECTED_STARTUP_TIME_WITH_PRELOAD_SECONDS = 30.0
 
 
 @pytest.fixture
@@ -110,10 +118,6 @@ def test_app_startup_fails_invalid_repo_root(
     monkeypatch.setenv("VLLM_URL", "http://127.0.0.1:8001/v1")
 
     # ApplicationContext.create() should raise ConfigurationError
-    from codeintel_rev.app.config_context import ApplicationContext
-
-    from kgfoundry_common.errors import ConfigurationError
-
     with pytest.raises(ConfigurationError, match="Repository root does not exist"):
         ApplicationContext.create()
 
@@ -130,7 +134,11 @@ def test_app_startup_with_preload_disabled(
         startup_time = time.monotonic() - start_time
         # Startup should remain responsive, but allow generous budget for cold caches.
         assertions.expect_true(
-            startup_time < 10.0, reason=f"Startup took {startup_time:.2f}s, expected < 10.0s"
+            startup_time < _EXPECTED_STARTUP_TIME_WITHOUT_PRELOAD_SECONDS,
+            reason=(
+                f"Startup took {startup_time:.2f}s, "
+                f"expected < {_EXPECTED_STARTUP_TIME_WITHOUT_PRELOAD_SECONDS}s"
+            ),
         )
 
         # Health check should work
@@ -151,7 +159,11 @@ def test_app_startup_with_preload_enabled(
         startup_time = time.monotonic() - start_time
         # Preloading is expensive; treat this as a smoke test rather than a perf gate.
         assertions.expect_true(
-            startup_time < 30.0, reason=f"Startup took {startup_time:.2f}s, expected < 30.0s"
+            startup_time < _EXPECTED_STARTUP_TIME_WITH_PRELOAD_SECONDS,
+            reason=(
+                f"Startup took {startup_time:.2f}s, "
+                f"expected < {_EXPECTED_STARTUP_TIME_WITH_PRELOAD_SECONDS}s"
+            ),
         )
 
         # Health check should work
@@ -166,7 +178,6 @@ def test_context_stored_in_app_state(test_repo: Path) -> None:
         assertions.expect_true(
             hasattr(app.state, "context"), reason="app.state should have context"
         )
-        from codeintel_rev.app.config_context import ApplicationContext
 
         context = app.state.context
         assertions.expect_true(
@@ -182,7 +193,6 @@ def test_readiness_probe_stored_in_app_state() -> None:
         assertions.expect_true(
             hasattr(app.state, "readiness"), reason="app.state should have readiness"
         )
-        from codeintel_rev.app.readiness import ReadinessProbe
 
         readiness = app.state.readiness
         assertions.expect_true(
@@ -222,8 +232,6 @@ def test_configuration_immutability() -> None:
             pass
 
         # ResolvedPaths is a frozen dataclass, should raise FrozenInstanceError
-        from dataclasses import FrozenInstanceError
-
         # Use setattr to trigger FrozenInstanceError properly
         with pytest.raises(FrozenInstanceError):
             context.paths.repo_root = Path("/new/path")

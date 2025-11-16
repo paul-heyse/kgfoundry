@@ -1,3 +1,5 @@
+"""Tests for CLI runtime: success and error envelope generation."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -17,6 +19,7 @@ def _stub_paths(tmp_path: Path) -> Paths:
 
 
 def test_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that successful CLI run generates success envelope."""
     monkeypatch.setattr(Paths, "discover", staticmethod(lambda: _stub_paths(tmp_path)))
     cfg = CliRunConfig.from_route("demo", "ok", write_envelope_on="always", exit_on_error=False)
     with cli_run(cfg) as (context, envelope):
@@ -33,6 +36,7 @@ def test_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that failed CLI run generates error envelope."""
     monkeypatch.setattr(Paths, "discover", staticmethod(lambda: _stub_paths(tmp_path)))
     cfg = CliRunConfig.from_route("demo", "fail", write_envelope_on="always", exit_on_error=False)
 

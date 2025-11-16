@@ -12,6 +12,7 @@ from tests._helpers import assertions
 
 
 def test_blind_except_transformer_records_changes() -> None:
+    """Test that blind except transformer records changes and fixes bare except clauses."""
     source = textwrap.dedent(
         """
         try:
@@ -31,6 +32,7 @@ def test_blind_except_transformer_records_changes() -> None:
 
 
 def test_pathlib_transformer_tracks_updates() -> None:
+    """Test that pathlib transformer tracks updates and adds pathlib import when needed."""
     source = textwrap.dedent(
         """
         import os

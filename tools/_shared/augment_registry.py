@@ -740,16 +740,13 @@ def load_tooling_metadata(
     ToolingMetadataModel
         Immutable composite of augment and registry metadata.
 
-    Raises
-    ------
-    AugmentRegistryError
-        Raised when either metadata payload cannot be loaded or validated.
+    Notes
+    -----
+    Propagates :class:`AugmentRegistryError` when augment or registry payloads
+    fail to load or validate.
     """
-    try:
-        augment = load_augment(augment_path, reader=augment_reader)
-        registry = load_registry(registry_path, reader=registry_reader)
-    except AugmentRegistryError as exc:
-        raise AugmentRegistryError(exc.problem) from exc
+    augment = load_augment(augment_path, reader=augment_reader)
+    registry = load_registry(registry_path, reader=registry_reader)
     return ToolingMetadataModel(augment=augment, registry=registry)
 
 
@@ -768,18 +765,15 @@ def load_augment(path: Path, *, reader: Reader | None = None) -> AugmentMetadata
     AugmentMetadataModel
         Immutable augment metadata bundle.
 
-    Raises
-    ------
-    AugmentRegistryError
-        Raised when the augment file is missing, unreadable, or fails validation.
+    Notes
+    -----
+    Propagates :class:`AugmentRegistryError` when the augment file is missing,
+    unreadable, or fails validation.
     """
     resolved = path.resolve()
-    try:
-        if reader is None:
-            return _cached_augment(str(resolved))
-        return _load_augment(resolved, reader)
-    except AugmentRegistryError:
-        raise
+    if reader is None:
+        return _cached_augment(str(resolved))
+    return _load_augment(resolved, reader)
 
 
 def load_registry(path: Path, *, reader: Reader | None = None) -> RegistryMetadataModel:
@@ -797,18 +791,15 @@ def load_registry(path: Path, *, reader: Reader | None = None) -> RegistryMetada
     RegistryMetadataModel
         Immutable registry metadata bundle.
 
-    Raises
-    ------
-    AugmentRegistryError
-        Raised when the registry file is missing, unreadable, or fails validation.
+    Notes
+    -----
+    Propagates :class:`AugmentRegistryError` when the registry file is missing,
+    unreadable, or fails validation.
     """
     resolved = path.resolve()
-    try:
-        if reader is None:
-            return _cached_registry(str(resolved))
-        return _load_registry(resolved, reader)
-    except AugmentRegistryError:
-        raise
+    if reader is None:
+        return _cached_registry(str(resolved))
+    return _load_registry(resolved, reader)
 
 
 def clear_cache() -> None:

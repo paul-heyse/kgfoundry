@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import cast
 
 import numpy as np
+import pytest
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.faiss_manager import FAISSManager
 
@@ -30,6 +31,7 @@ class _CatalogStub:
 
 
 def test_search_with_refine_returns_ordered_hits(tmp_path: Path) -> None:
+    """Test that search with refine returns hits ordered by similarity score."""
     vec_dim = 4
     base_vectors = np.eye(vec_dim, dtype=np.float32)
     manager = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim)
@@ -44,5 +46,7 @@ def test_search_with_refine_returns_ordered_hits(tmp_path: Path) -> None:
     assertions.expect_equal(int(hits[0].doc_id), 0)
     assertions.expect_equal(hits[0].rank, 0)
     k_factor = hits[0].explain.get("k_factor")
-    assertions.expect_true(isinstance(k_factor, float), reason="k_factor should be float")
-    assertions.expect_true(k_factor >= 1.0, reason="k_factor should be at least 1.0")
+    assertions.expect_true(isinstance(k_factor, (float, int)), reason="k_factor should be numeric")
+    if not isinstance(k_factor, (float, int)):  # pragma: no cover - defensive
+        pytest.fail("k_factor missing from explain payload")
+    assertions.expect_true(float(k_factor) >= 1.0, reason="k_factor should be at least 1.0")

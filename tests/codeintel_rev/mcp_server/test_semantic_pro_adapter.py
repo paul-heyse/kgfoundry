@@ -251,8 +251,11 @@ def test_semantic_pro_produces_findings(tmp_path: Path) -> None:
         )
     )
 
-    assertions.expect_in("findings", envelope)
-    findings = cast("list[dict[str, object]]", envelope["findings"])
+    findings_payload = envelope.get("findings")
+    assertions.expect_true(isinstance(findings_payload, list), reason="findings should be list")
+    if not isinstance(findings_payload, list):  # pragma: no cover - defensive
+        pytest.fail("findings should be present")
+    findings = cast("list[dict[str, object]]", findings_payload)
     assertions.expect_true(findings)
     explanation_payload = findings[0].get("explanations")
     assertions.expect_true(
@@ -320,7 +323,13 @@ def test_semantic_pro_rerank_reorders_when_ready(tmp_path: Path) -> None:
     if not isinstance(method_details, dict):  # pragma: no cover - defensive
         pytest.fail("method should be a dict")
     method_details_dict = cast("dict[str, object]", method_details)
-    assertions.expect_sequence_equal(method_details_dict.get("retrieval"), ["semantic"])
+    retrieval_methods = method_details_dict.get("retrieval")
+    assertions.expect_true(
+        isinstance(retrieval_methods, list), reason="retrieval metadata missing"
+    )
+    if not isinstance(retrieval_methods, list):  # pragma: no cover - defensive
+        pytest.fail("retrieval metadata missing")
+    assertions.expect_sequence_equal(retrieval_methods, ["semantic"])
     assertions.expect_true(method_details_dict.get("stages"))
 
 

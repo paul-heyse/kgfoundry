@@ -1,6 +1,9 @@
+"""Tests for hybrid search engine RRF fusion, channel coordination, and search behavior."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
+from pathlib import Path
 
 import pytest
 from codeintel_rev.app.capabilities import Capabilities
@@ -38,7 +41,7 @@ class _StubChannel(Channel):
 
 def _build_engine(
     _monkeypatch: pytest.MonkeyPatch,
-    _tmp_path,
+    _tmp_path: Path,
     *,
     channels: Sequence[_StubChannel] | None = None,
     capabilities: Capabilities | None = None,
@@ -58,7 +61,10 @@ def _build_engine(
     )
 
 
-def test_hybrid_search_engine_rrf_fuses_channels(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_hybrid_search_engine_rrf_fuses_channels(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Test that hybrid search engine fuses multiple channels using RRF (Reciprocal Rank Fusion)."""
     bm25_stub = _StubChannel(
         "bm25",
         [
@@ -103,8 +109,9 @@ def test_hybrid_search_engine_rrf_fuses_channels(monkeypatch: pytest.MonkeyPatch
 
 
 def test_hybrid_search_engine_respects_channel_flags(
-    monkeypatch: pytest.MonkeyPatch, tmp_path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """Test that hybrid search engine respects channel enable/disable flags."""
     bm25_stub = _StubChannel("bm25", [], requires=frozenset({"warp_index_present"}))
     splade_stub = _StubChannel("splade", [], requires=frozenset({"lucene_importable"}))
     engine = _build_engine(
@@ -129,8 +136,9 @@ def test_hybrid_search_engine_respects_channel_flags(
 
 
 def test_hybrid_search_engine_accepts_extra_channels(
-    monkeypatch: pytest.MonkeyPatch, tmp_path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """Test that hybrid search engine accepts extra channels via search options."""
     engine = _build_engine(
         monkeypatch,
         tmp_path,
@@ -153,7 +161,10 @@ def test_hybrid_search_engine_accepts_extra_channels(
     assertions.expect_in(("warp", 1, 5.0), result.contributions["999"])
 
 
-def test_hybrid_channel_skips_missing_capability(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_hybrid_channel_skips_missing_capability(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Test that hybrid search engine skips channels when required capabilities are missing."""
     splade_stub = _StubChannel(
         "splade",
         [SearchHit(doc_id="5", rank=0, score=2.0, source="splade")],
@@ -173,8 +184,9 @@ def test_hybrid_channel_skips_missing_capability(monkeypatch: pytest.MonkeyPatch
 
 
 def test_hybrid_search_falls_back_when_faiss_unavailable(
-    monkeypatch: pytest.MonkeyPatch, tmp_path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """Test that hybrid search falls back to other channels when FAISS is unavailable."""
     bm25_stub = _StubChannel(
         "bm25",
         [SearchHit(doc_id="5", rank=0, score=3.2, source="bm25")],
@@ -201,7 +213,10 @@ def test_hybrid_search_falls_back_when_faiss_unavailable(
     assertions.expect_equal(bm25_stub.calls, 1)
 
 
-def test_hybrid_search_drops_low_semantic_scores(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_hybrid_search_drops_low_semantic_scores(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Test that hybrid search drops semantic hits below minimum score threshold."""
     bm25_stub = _StubChannel(
         "bm25",
         [SearchHit(doc_id="7", rank=0, score=4.5, source="bm25")],
@@ -223,7 +238,10 @@ def test_hybrid_search_drops_low_semantic_scores(monkeypatch: pytest.MonkeyPatch
     )
 
 
-def test_hybrid_search_exposes_stage_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_hybrid_search_exposes_stage_metadata(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Test that hybrid search exposes stage metadata for observability."""
     engine = _build_engine(
         monkeypatch,
         tmp_path,

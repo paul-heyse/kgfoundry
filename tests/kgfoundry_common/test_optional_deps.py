@@ -35,170 +35,159 @@ def _expect_mapping(value: object, label: str) -> Mapping[str, Any]:
     return value
 
 
-class TestOptionalDependencyError:
-    """Test suite for OptionalDependencyError class."""
+def test_is_artifact_dependency_error() -> None:
+    """OptionalDependencyError extends ArtifactDependencyError."""
+    err = OptionalDependencyError("test message", module_name="griffe")
+    assertions.expect_true(
+        isinstance(err, ArtifactDependencyError), reason="should be ArtifactDependencyError"
+    )
 
-    def test_is_artifact_dependency_error(self) -> None:
-        """OptionalDependencyError extends ArtifactDependencyError."""
-        err = OptionalDependencyError("test message", module_name="griffe")
-        assertions.expect_true(
-            isinstance(err, ArtifactDependencyError), reason="should be ArtifactDependencyError"
-        )
 
-    def test_includes_correlation_id(self) -> None:
-        """OptionalDependencyError includes unique correlation ID."""
-        err = OptionalDependencyError("test message", module_name="griffe")
-        context: Mapping[str, Any] = _expect_mapping(err.context, "context")
-        correlation_id: str | Any = context.get("correlation_id")
-        assertions.expect_true(
-            isinstance(correlation_id, str), reason="correlation_id should be str"
-        )
-        assertions.expect_true(len(correlation_id) > 0, reason="correlation_id should not be empty")
+def test_includes_correlation_id() -> None:
+    """OptionalDependencyError includes unique correlation ID."""
+    err = OptionalDependencyError("test message", module_name="griffe")
+    context: Mapping[str, Any] = _expect_mapping(err.context, "context")
+    correlation_id: str | Any = context.get("correlation_id")
+    assertions.expect_true(isinstance(correlation_id, str), reason="correlation_id should be str")
+    assertions.expect_true(len(correlation_id) > 0, reason="correlation_id should not be empty")
 
-    def test_includes_module_name(self) -> None:
-        """OptionalDependencyError includes the missing module name."""
-        err = OptionalDependencyError("test message", module_name="griffe")
-        context: Mapping[str, Any] = _expect_mapping(err.context, "context")
+
+def test_includes_module_name() -> None:
+    """OptionalDependencyError includes the missing module name."""
+    err = OptionalDependencyError("test message", module_name="griffe")
+    context: Mapping[str, Any] = _expect_mapping(err.context, "context")
+    assertions.expect_equal(context.get("module_name"), "griffe")
+
+
+def test_extra_context_preserved() -> None:
+    """Extra context is preserved in error."""
+    extra = {"install": "pip install griffe"}
+    err = OptionalDependencyError("test message", module_name="griffe", extra=extra)
+    context = _expect_mapping(err.context, "context")
+    assertions.expect_equal(context.get("install"), "pip install griffe")
+
+
+@pytest.mark.parametrize(
+    ("module_name", "message"),
+    [
+        ("griffe", "Griffe failed to import"),
+        ("autoapi", "AutoAPI failed to import"),
+        ("sphinx", "Sphinx failed to import"),
+    ],
+)
+def test_error_with_various_modules(module_name: str, message: str) -> None:
+    """OptionalDependencyError works with various module names."""
+    err = OptionalDependencyError(message, module_name=module_name)
+    context = _expect_mapping(err.context, "context")
+    assertions.expect_equal(context.get("module_name"), module_name)
+
+
+def test_safe_import_griffe_success() -> None:
+    """safe_import_griffe returns griffe module when available."""
+    with mock.patch("importlib.import_module") as mock_import:
+        mock_griffe = mock.MagicMock()
+        mock_import.return_value = mock_griffe
+
+        result = safe_import_griffe()
+        assertions.expect_true(result is mock_griffe, reason="should return mock_griffe")
+        mock_import.assert_called_once_with("griffe")
+
+
+def test_safe_import_griffe_missing() -> None:
+    """safe_import_griffe raises OptionalDependencyError when missing."""
+    with mock.patch("importlib.import_module") as mock_import:
+        mock_import.side_effect = ImportError("No module named 'griffe'")
+
+        with pytest.raises(OptionalDependencyError) as exc_info:
+            safe_import_griffe()
+
+        err = exc_info.value
+        assertions.expect_true("griffe" in str(err).lower(), reason="error should mention griffe")
+        context = _expect_mapping(err.context, "context")
         assertions.expect_equal(context.get("module_name"), "griffe")
 
-    def test_extra_context_preserved(self) -> None:
-        """Extra context is preserved in error."""
-        extra = {"install": "pip install griffe"}
-        err = OptionalDependencyError("test message", module_name="griffe", extra=extra)
+
+def test_problem_details_in_context() -> None:
+    """safe_import_griffe includes Problem Details in error context."""
+    with mock.patch("importlib.import_module") as mock_import:
+        mock_import.side_effect = ImportError("No module named 'griffe'")
+
+        with pytest.raises(OptionalDependencyError) as exc_info:
+            safe_import_griffe()
+
+        err = exc_info.value
         context = _expect_mapping(err.context, "context")
-        assertions.expect_equal(context.get("install"), "pip install griffe")
+        details = _expect_mapping(context.get("problem_details"), "problem_details")
+        assertions.expect_equal(
+            details.get("type"),
+            "https://docs.kgfoundry.dev/problems/optional-dependency-missing",
+        )
+        assertions.expect_equal(details.get("status"), 400)
 
-    @pytest.mark.parametrize(
-        ("module_name", "message"),
-        [
-            ("griffe", "Griffe failed to import"),
-            ("autoapi", "AutoAPI failed to import"),
-            ("sphinx", "Sphinx failed to import"),
-        ],
-    )
-    def test_error_with_various_modules(self, module_name: str, message: str) -> None:
-        """OptionalDependencyError works with various module names."""
-        err = OptionalDependencyError(message, module_name=module_name)
+
+def test_correlation_id_in_problem_details() -> None:
+    """safe_import_griffe includes correlation ID in Problem Details."""
+    with mock.patch("importlib.import_module") as mock_import:
+        mock_import.side_effect = ImportError("No module named 'griffe'")
+
+        with pytest.raises(OptionalDependencyError) as exc_info:
+            safe_import_griffe()
+
+        err = exc_info.value
         context = _expect_mapping(err.context, "context")
-        assertions.expect_equal(context.get("module_name"), module_name)
+        assertions.expect_true(
+            "correlation_id" in context, reason="context should have correlation_id"
+        )
 
 
-class TestSafeImportGriffe:
-    """Test suite for safe_import_griffe function."""
+def test_safe_import_autoapi_success() -> None:
+    """safe_import_autoapi returns autoapi module when available."""
+    with mock.patch("importlib.import_module") as mock_import:
+        mock_autoapi = mock.MagicMock()
+        mock_import.return_value = mock_autoapi
 
-    def test_successful_import_when_available(self) -> None:
-        """safe_import_griffe returns griffe module when available."""
-        with mock.patch("importlib.import_module") as mock_import:
-            mock_griffe = mock.MagicMock()
-            mock_import.return_value = mock_griffe
-
-            result = safe_import_griffe()
-            assertions.expect_true(result is mock_griffe, reason="should return mock_griffe")
-            mock_import.assert_called_once_with("griffe")
-
-    def test_raises_optional_dependency_error_when_missing(self) -> None:
-        """safe_import_griffe raises OptionalDependencyError when missing."""
-        with mock.patch("importlib.import_module") as mock_import:
-            mock_import.side_effect = ImportError("No module named 'griffe'")
-
-            with pytest.raises(OptionalDependencyError) as exc_info:
-                safe_import_griffe()
-
-            err = exc_info.value
-            assertions.expect_true(
-                "griffe" in str(err).lower(), reason="error should mention griffe"
-            )
-            context = _expect_mapping(err.context, "context")
-            assertions.expect_equal(context.get("module_name"), "griffe")
-
-    def test_problem_details_in_context(self) -> None:
-        """safe_import_griffe includes Problem Details in error context."""
-        with mock.patch("importlib.import_module") as mock_import:
-            mock_import.side_effect = ImportError("No module named 'griffe'")
-
-            with pytest.raises(OptionalDependencyError) as exc_info:
-                safe_import_griffe()
-
-            err = exc_info.value
-            context = _expect_mapping(err.context, "context")
-            details = _expect_mapping(context.get("problem_details"), "problem_details")
-            assertions.expect_equal(
-                details.get("type"),
-                "https://docs.kgfoundry.dev/problems/optional-dependency-missing",
-            )
-            assertions.expect_equal(details.get("status"), 400)
-
-    def test_correlation_id_in_problem_details(self) -> None:
-        """safe_import_griffe includes correlation ID in Problem Details."""
-        with mock.patch("importlib.import_module") as mock_import:
-            mock_import.side_effect = ImportError("No module named 'griffe'")
-
-            with pytest.raises(OptionalDependencyError) as exc_info:
-                safe_import_griffe()
-
-            err = exc_info.value
-            context = _expect_mapping(err.context, "context")
-            assertions.expect_true(
-                "correlation_id" in context, reason="context should have correlation_id"
-            )
+        result = safe_import_autoapi()
+        assertions.expect_true(result is mock_autoapi, reason="should return mock_autoapi")
+        mock_import.assert_called_once_with("autoapi")
 
 
-class TestSafeImportAutoapi:
-    """Test suite for safe_import_autoapi function."""
+def test_safe_import_autoapi_missing() -> None:
+    """safe_import_autoapi raises OptionalDependencyError when missing."""
+    with mock.patch("importlib.import_module") as mock_import:
+        mock_import.side_effect = ImportError("No module named 'autoapi'")
 
-    def test_successful_import_when_available(self) -> None:
-        """safe_import_autoapi returns autoapi module when available."""
-        with mock.patch("importlib.import_module") as mock_import:
-            mock_autoapi = mock.MagicMock()
-            mock_import.return_value = mock_autoapi
+        with pytest.raises(OptionalDependencyError) as exc_info:
+            safe_import_autoapi()
 
-            result = safe_import_autoapi()
-            assertions.expect_true(result is mock_autoapi, reason="should return mock_autoapi")
-            mock_import.assert_called_once_with("autoapi")
-
-    def test_raises_optional_dependency_error_when_missing(self) -> None:
-        """safe_import_autoapi raises OptionalDependencyError when missing."""
-        with mock.patch("importlib.import_module") as mock_import:
-            mock_import.side_effect = ImportError("No module named 'autoapi'")
-
-            with pytest.raises(OptionalDependencyError) as exc_info:
-                safe_import_autoapi()
-
-            err = exc_info.value
-            assertions.expect_true(
-                "autoapi" in str(err).lower(), reason="error should mention autoapi"
-            )
-            context = _expect_mapping(err.context, "context")
-            assertions.expect_equal(context.get("module_name"), "autoapi")
+        err = exc_info.value
+        assertions.expect_true("autoapi" in str(err).lower(), reason="error should mention autoapi")
+        context = _expect_mapping(err.context, "context")
+        assertions.expect_equal(context.get("module_name"), "autoapi")
 
 
-class TestSafeImportSphinx:
-    """Test suite for safe_import_sphinx function."""
+def test_safe_import_sphinx_success() -> None:
+    """safe_import_sphinx returns sphinx module when available."""
+    with mock.patch("importlib.import_module") as mock_import:
+        mock_sphinx = mock.MagicMock()
+        mock_import.return_value = mock_sphinx
 
-    def test_successful_import_when_available(self) -> None:
-        """safe_import_sphinx returns sphinx module when available."""
-        with mock.patch("importlib.import_module") as mock_import:
-            mock_sphinx = mock.MagicMock()
-            mock_import.return_value = mock_sphinx
+        result = safe_import_sphinx()
+        assertions.expect_true(result is mock_sphinx, reason="should return mock_sphinx")
+        mock_import.assert_called_once_with("sphinx")
 
-            result = safe_import_sphinx()
-            assertions.expect_true(result is mock_sphinx, reason="should return mock_sphinx")
-            mock_import.assert_called_once_with("sphinx")
 
-    def test_raises_optional_dependency_error_when_missing(self) -> None:
-        """safe_import_sphinx raises OptionalDependencyError when missing."""
-        with mock.patch("importlib.import_module") as mock_import:
-            mock_import.side_effect = ImportError("No module named 'sphinx'")
+def test_safe_import_sphinx_missing() -> None:
+    """safe_import_sphinx raises OptionalDependencyError when missing."""
+    with mock.patch("importlib.import_module") as mock_import:
+        mock_import.side_effect = ImportError("No module named 'sphinx'")
 
-            with pytest.raises(OptionalDependencyError) as exc_info:
-                safe_import_sphinx()
+        with pytest.raises(OptionalDependencyError) as exc_info:
+            safe_import_sphinx()
 
-            err = exc_info.value
-            assertions.expect_true(
-                "sphinx" in str(err).lower(), reason="error should mention sphinx"
-            )
-            context = _expect_mapping(err.context, "context")
-            assertions.expect_equal(context.get("module_name"), "sphinx")
+        err = exc_info.value
+        assertions.expect_true("sphinx" in str(err).lower(), reason="error should mention sphinx")
+        context = _expect_mapping(err.context, "context")
+        assertions.expect_equal(context.get("module_name"), "sphinx")
 
 
 @pytest.mark.parametrize(
@@ -209,26 +198,21 @@ class TestSafeImportSphinx:
         (safe_import_sphinx, "sphinx"),
     ],
 )
-class TestImportFunctionsParametrized:
-    """Parametrized tests for all safe import functions."""
+def test_includes_remediation_guidance(import_func: Callable[[], Any], module_name: str) -> None:
+    """Safe import functions include remediation guidance."""
+    with mock.patch("importlib.import_module") as mock_import:
+        mock_import.side_effect = ImportError(f"No module named '{module_name}'")
 
-    def test_includes_remediation_guidance(
-        self, import_func: Callable[[], Any], module_name: str
-    ) -> None:
-        """Safe import functions include remediation guidance."""
-        with mock.patch("importlib.import_module") as mock_import:
-            mock_import.side_effect = ImportError(f"No module named '{module_name}'")
+        with pytest.raises(OptionalDependencyError) as exc_info:
+            import_func()
 
-            with pytest.raises(OptionalDependencyError) as exc_info:
-                import_func()
-
-            err = exc_info.value
-            context = _expect_mapping(err.context, "context")
-            remediation = _expect_mapping(context.get("remediation"), "remediation")
-            install = remediation.get("install")
-            assertions.expect_true(isinstance(install, str), reason="install should be str")
-            if not isinstance(install, str):  # pragma: no cover - defensive
-                pytest.fail("install should be a string")
-            assertions.expect_true(
-                "pip install kgfoundry[docs]" in install, reason="install should mention docs extra"
-            )
+        err = exc_info.value
+        context = _expect_mapping(err.context, "context")
+        remediation = _expect_mapping(context.get("remediation"), "remediation")
+        install = remediation.get("install")
+        assertions.expect_true(isinstance(install, str), reason="install should be str")
+        if not isinstance(install, str):  # pragma: no cover - defensive
+            pytest.fail("install should be a string")
+        assertions.expect_true(
+            "pip install kgfoundry[docs]" in install, reason="install should mention docs extra"
+        )

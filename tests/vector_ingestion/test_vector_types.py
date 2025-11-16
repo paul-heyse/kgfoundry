@@ -39,7 +39,7 @@ def test_coerce_vector_batch_produces_float32_matrix(
     assertions.expect_sequence_equal(batch.ids, (VectorId("vec-1"), VectorId("vec-2")))
     assertions.expect_equal(batch.count, 2)
     assertions.expect_equal(batch.dimension, 3)
-    assertions.expect_equal(batch.matrix.dtype, np.float32)
+    assertions.expect_equal(batch.matrix.dtype, np.dtype(np.float32))
     assertions.expect_true(batch.matrix.flags.c_contiguous, reason="matrix should be C-contiguous")
 
 
@@ -87,7 +87,7 @@ def test_assert_vector_matrix_accepts_float_lists() -> None:
     """`assert_vector_matrix` coerces nested sequences into contiguous float32 matrices."""
     matrix_input: Sequence[Sequence[float]] = ([1.0, 2.0], [3.0, 4.0])
     matrix = assert_vector_matrix(matrix_input)
-    assertions.expect_equal(matrix.dtype, np.float32)
+    assertions.expect_equal(matrix.dtype, np.dtype(np.float32))
     assertions.expect_equal(matrix.shape, (2, 2))
     assertions.expect_true(matrix.flags.c_contiguous, reason="matrix should be C-contiguous")
 

@@ -13,15 +13,10 @@ try:
     import libcst as cst
     from libcst import ParserSyntaxError
     from libcst import matchers as m
-
-    from tools._libcst_mixins import IfTransformerMixin as _IfTransformerMixin
 except ImportError:  # pragma: no cover - optional dependency at runtime
     cst = None
     ParserSyntaxError = Exception
     m = None
-
-    class _IfTransformerMixin:  # type: ignore[too-many-ancestors]
-        """Fallback mixin when LibCST is unavailable."""
 
 
 LOGGER = logging.getLogger(__name__)
@@ -60,6 +55,15 @@ class CSTImports:
 def _resolve_relative(module_name: str, level: int, attr: str | None) -> str | None:
     """Mimic runtime import name resolution without executing imports.
 
+    Parameters
+    ----------
+    module_name : str
+        Base module name for relative import resolution.
+    level : int
+        Relative import level (number of dots in ``from . import``).
+    attr : str | None
+        Optional attribute name to append to the resolved module path.
+
     Returns
     -------
     str | None
@@ -74,7 +78,7 @@ def _resolve_relative(module_name: str, level: int, attr: str | None) -> str | N
 
 if cst is not None:
 
-    class _ImportCollector(_IfTransformerMixin, cst.CSTVisitor):
+    class _ImportCollector(cst.CSTVisitor):
         """Collect imports/exports from a LibCST module."""
 
         def __init__(self, module_name: str) -> None:
@@ -99,6 +103,11 @@ if cst is not None:
         def visit_if(self, node: libcst_types.If) -> bool | None:
             """Track entry into TYPE_CHECKING guard blocks.
 
+            Parameters
+            ----------
+            node : libcst_types.If
+                If statement node being visited.
+
             Returns
             -------
             bool | None
@@ -115,6 +124,11 @@ if cst is not None:
 
         def visit_import(self, node: libcst_types.Import) -> bool | None:
             """Record modules imported via ``import ...``.
+
+            Parameters
+            ----------
+            node : libcst_types.Import
+                Import statement node being visited.
 
             Returns
             -------
@@ -134,6 +148,11 @@ if cst is not None:
         def visit_import_from(self, node: libcst_types.ImportFrom) -> bool | None:
             """Record modules imported via ``from ... import ...``.
 
+            Parameters
+            ----------
+            node : libcst_types.ImportFrom
+                ImportFrom statement node being visited.
+
             Returns
             -------
             bool | None
@@ -146,6 +165,11 @@ if cst is not None:
 
         def visit_assign(self, node: libcst_types.Assign) -> bool | None:
             """Capture ``__all__`` literal assignments.
+
+            Parameters
+            ----------
+            node : libcst_types.Assign
+                Assignment statement node being visited.
 
             Returns
             -------
@@ -166,6 +190,11 @@ if cst is not None:
         @staticmethod
         def _import_root(name: libcst_types.BaseExpression) -> str | None:
             """Return the absolute module string represented by ``name``.
+
+            Parameters
+            ----------
+            name : libcst_types.BaseExpression
+                LibCST expression node representing the import name.
 
             Returns
             -------
@@ -189,6 +218,11 @@ if cst is not None:
 
         def _absolute_from_module(self, node: libcst_types.ImportFrom) -> str | None:
             """Resolve the absolute module for a ``from`` import.
+
+            Parameters
+            ----------
+            node : libcst_types.ImportFrom
+                ImportFrom statement node to resolve.
 
             Returns
             -------
@@ -228,6 +262,11 @@ if cst is not None:
         ) -> list[libcst_types.ImportAlias | libcst_types.ImportStar]:
             """Return a list of import aliases regardless of LibCST representation.
 
+            Parameters
+            ----------
+            names : Sequence[libcst_types.ImportAlias] | libcst_types.ImportStar
+                Import aliases from LibCST node, either as a sequence or single ImportStar.
+
             Returns
             -------
             list[libcst_types.ImportAlias | libcst_types.ImportStar]
@@ -241,6 +280,11 @@ if cst is not None:
         def _assigns_dunder_all(node: libcst_types.Assign) -> bool:
             """Return ``True`` when the assignment targets ``__all__``.
 
+            Parameters
+            ----------
+            node : libcst_types.Assign
+                Assignment statement node to check.
+
             Returns
             -------
             bool
@@ -253,6 +297,11 @@ if cst is not None:
         @staticmethod
         def _literal_string_values(expr: libcst_types.BaseExpression) -> Iterable[str]:
             """Return literal string values from list/tuple expressions.
+
+            Parameters
+            ----------
+            expr : libcst_types.BaseExpression
+                Expression node to extract string literals from.
 
             Returns
             -------
@@ -284,8 +333,14 @@ else:
 
 
 def collect_imports_with_libcst(path: Path, module_name: str) -> CSTImports:
-    """
-    Parse a file with LibCST and extract import/export info.
+    """Parse a file with LibCST and extract import/export info.
+
+    Parameters
+    ----------
+    path : Path
+        File path to parse with LibCST.
+    module_name : str
+        Module name for the file being parsed.
 
     Returns
     -------

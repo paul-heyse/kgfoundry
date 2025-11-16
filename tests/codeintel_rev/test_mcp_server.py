@@ -10,6 +10,7 @@ import duckdb
 import pytest
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.main import app
+from codeintel_rev.mcp_server.server import app_context, get_context
 from fastapi.testclient import TestClient
 
 from tests._helpers import assertions
@@ -155,11 +156,6 @@ def test_file_resource_endpoint() -> None:
 
 def test_missing_context_raises_error() -> None:
     """Test that missing context raises RuntimeError."""
-    from codeintel_rev.mcp_server.server import (
-        app_context,
-        get_context,
-    )
-
     # Clear context variable
     app_context.set(None)
 
@@ -170,11 +166,6 @@ def test_missing_context_raises_error() -> None:
 
 def test_get_context_success(mock_application_context: ApplicationContext) -> None:
     """Test that get_context returns context when available."""
-    from codeintel_rev.mcp_server.server import (
-        app_context,
-        get_context,
-    )
-
     # Set context in context variable
     app_context.set(mock_application_context)
 

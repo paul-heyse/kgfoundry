@@ -314,8 +314,7 @@ def _semantic_search_sync(
     answer_message = (
         f"Found {len(artifacts.findings)} hybrid results for: {query}"
         if any(
-            channel in {"bm25", "splade"}
-            for channel in artifacts.hybrid_result.retrieval_channels
+            channel in {"bm25", "splade"} for channel in artifacts.hybrid_result.retrieval_channels
         )
         else f"Found {len(artifacts.findings)} semantically similar code chunks for: {query}"
     )

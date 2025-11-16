@@ -9,6 +9,8 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+import duckdb
+import pytest
 from codeintel_rev.cli_enrich import app
 from typer.testing import CliRunner
 
@@ -142,7 +144,6 @@ def _assert_duckdb_ingest(
         catch_exceptions=False,
     )
     assertions.expect_equal(result.exit_code, 0, reason=result.output)
-    import duckdb
 
     with duckdb.connect(str(db_path)) as con:
         result_row = con.execute("SELECT COUNT(*) FROM modules").fetchone()
@@ -205,6 +206,7 @@ def _assert_artifacts(out_dir: Path, module_rows: list[dict[str, object]]) -> No
 
 
 def test_cli_enrich_emits_extended_artifacts(tmp_path: Path) -> None:
+    """Test that CLI enrich command emits extended artifacts (graphs, imports, uses)."""
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     _init_repo(repo_root)

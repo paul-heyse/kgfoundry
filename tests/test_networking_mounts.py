@@ -1,3 +1,5 @@
+"""Tests for networking mounts: readiness checks, capability refresh, and MCP sub-application mounting."""
+
 from __future__ import annotations
 
 import asyncio
@@ -75,7 +77,15 @@ async def test_main_mounts_mcp_sub_application(monkeypatch: pytest.MonkeyPatch) 
     """The production app mounts the MCP ASGI sub-application under /mcp."""
 
     class _ReadyProbe:
-        async def refresh(self) -> dict[str, object]:
+        @staticmethod
+        async def refresh() -> dict[str, object]:
+            """Stub refresh method.
+
+            Returns
+            -------
+            dict[str, object]
+                Empty dict.
+            """
             return {}
 
     async def _fake_initialize(

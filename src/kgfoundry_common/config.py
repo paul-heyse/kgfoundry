@@ -424,17 +424,12 @@ def _load_config_impl() -> AppSettings:
     AppSettings
         Validated application settings.
 
-    Raises
-    ------
-    ValueError
-        If configuration validation fails.
+    Notes
+    -----
+    Propagates :class:`ValueError` from :class:`AppSettings` when validation
+    fails; callers should handle it if they need custom messaging.
     """
-    try:
-        settings = AppSettings()
-    except ValueError:
-        raise
-    else:
-        return settings
+    return AppSettings()
 
 
 _load_config_cached: functools._lru_cache_wrapper[AppSettings] = lru_cache(maxsize=1)(

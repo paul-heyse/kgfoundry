@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 import time
+from typing import cast
 
 import pytest
 from codeintel_rev.errors import RuntimeUnavailableError
@@ -40,6 +41,7 @@ class RecordingObserver(RuntimeCellObserver):
             self.init_started.append(cell)
 
     def on_init_end(self, event: RuntimeCellInitResult) -> None:
+        """Record init end event."""
         with self._lock:
             self.init_events.append(
                 {
@@ -55,6 +57,7 @@ class RecordingObserver(RuntimeCellObserver):
             )
 
     def on_close_end(self, event: RuntimeCellCloseResult) -> None:
+        """Record close end event."""
         with self._lock:
             self.close_events.append(
                 {
@@ -69,6 +72,7 @@ class RecordingObserver(RuntimeCellObserver):
 
 
 def test_runtime_cell_initializes_once_under_high_concurrency() -> None:
+    """Test that runtime cell initializes only once under high concurrency."""
     observer = RecordingObserver()
     cell: RuntimeCell[dict[str, int]] = RuntimeCell(name="xtr-runtime", observer=observer)
     barrier = threading.Barrier(100)
@@ -100,6 +104,7 @@ def test_runtime_cell_initializes_once_under_high_concurrency() -> None:
 
 
 def test_runtime_cell_init_failure_is_reported_and_retriable() -> None:
+    """Test that runtime cell reports initialization failures and allows retry."""
     observer = RecordingObserver()
     cell: RuntimeCell[int] = RuntimeCell(observer=observer)
     calls: list[str] = []
@@ -125,6 +130,7 @@ def test_runtime_cell_init_failure_is_reported_and_retriable() -> None:
 
 
 def test_runtime_cell_can_reinitialize_after_close() -> None:
+    """Test that runtime cell can reinitialize after being closed."""
     observer = RecordingObserver()
     cell: RuntimeCell[list[int]] = RuntimeCell(observer=observer)
     first = cell.get_or_initialize(list)
@@ -135,6 +141,7 @@ def test_runtime_cell_can_reinitialize_after_close() -> None:
 
 
 def test_runtime_cell_invalidate_triggers_new_generation() -> None:
+    """Test that invalidate triggers a new generation of the runtime cell."""
     observer = RecordingObserver()
     cell: RuntimeCell[list[int]] = RuntimeCell(observer=observer)
     first = cell.get_or_initialize(list)
@@ -145,6 +152,7 @@ def test_runtime_cell_invalidate_triggers_new_generation() -> None:
 
 
 def test_runtime_cell_record_failure_short_circuits_and_recovers() -> None:
+    """Test that record_failure short-circuits initialization and recovers after TTL."""
     cell: RuntimeCell[int] = RuntimeCell()
     calls = {"count": 0}
 
@@ -164,6 +172,7 @@ def test_runtime_cell_record_failure_short_circuits_and_recovers() -> None:
 
 
 def test_runtime_cell_seed_constraints(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that runtime cell seed enforces constraints (single seed, requires guard)."""
     monkeypatch.setenv("KGFOUNDRY_ALLOW_RUNTIME_SEED", "1")
     cell: RuntimeCell[int] = RuntimeCell()
     cell.seed(1)
@@ -177,6 +186,7 @@ def test_runtime_cell_seed_constraints(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_runtime_cell_seed_requires_guard(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that runtime cell seed requires guard environment variable."""
     monkeypatch.delenv("KGFOUNDRY_ALLOW_RUNTIME_SEED", raising=False)
     monkeypatch.setenv("PYTEST_CURRENT_TEST", "")
     cell: RuntimeCell[int] = RuntimeCell()
@@ -185,6 +195,7 @@ def test_runtime_cell_seed_requires_guard(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_runtime_cell_close_invokes_close_and_observer(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that runtime cell close invokes payload close method and observer."""
     monkeypatch.setenv("KGFOUNDRY_ALLOW_RUNTIME_SEED", "1")
     observer = RecordingObserver()
 
@@ -208,6 +219,7 @@ def test_runtime_cell_close_invokes_close_and_observer(monkeypatch: pytest.Monke
 
 
 def test_runtime_cell_close_handles_payload_without_close_method() -> None:
+    """Test that runtime cell close handles payloads without close method gracefully."""
     observer = RecordingObserver()
 
     class NoCloser:
@@ -225,6 +237,7 @@ def test_runtime_cell_close_handles_payload_without_close_method() -> None:
 
 
 def test_runtime_cell_close_exception_paths(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that runtime cell close handles exceptions in silent and non-silent modes."""
     monkeypatch.setenv("KGFOUNDRY_ALLOW_RUNTIME_SEED", "1")
     observer = RecordingObserver()
 
@@ -249,6 +262,7 @@ def test_runtime_cell_close_exception_paths(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_runtime_cell_repr_masks_inner(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that runtime cell repr masks inner payload representation."""
     monkeypatch.setenv("KGFOUNDRY_ALLOW_RUNTIME_SEED", "1")
 
     class SecretRuntime:

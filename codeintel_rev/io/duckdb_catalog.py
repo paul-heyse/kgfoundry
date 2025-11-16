@@ -9,10 +9,10 @@ chunk retrieval and joins.
 from __future__ import annotations
 
 import hashlib
+import logging
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-import logging
 from pathlib import Path
 from threading import Lock
 from typing import TYPE_CHECKING, Any, ClassVar, Self, TypedDict, Unpack, cast
@@ -38,6 +38,7 @@ else:
     np = cast("np", LazyModule("numpy", "DuckDB catalog embeddings"))
 
 LOGGER = logging.getLogger(__name__)
+
 
 @dataclass(slots=True, frozen=True)
 class IdMapMeta:
@@ -259,9 +260,10 @@ class _DuckDBQueryMixin:
         params = [list(ids)]
         with catalog._readonly_connection() as conn:
             relation = conn.execute(sql, params)
-            rows = relation.fetchall()
-            cols = [desc[0] for desc in relation.description]
-        return [dict(zip(cols, row, strict=True)) for row in rows]
+            return catalog._return_catalog_payload(
+                relation,
+                query_name="query_by_ids",
+            )
 
     def get_structure_annotations(self, ids: Sequence[int]) -> dict[int, StructureAnnotations]:
         """Return structural overlays (symbols/AST/CST) for chunk ``ids``.
@@ -595,6 +597,21 @@ class DuckDBCatalog(_DuckDBQueryMixin):
     def _log_query(_sql: str, _params: object | None = None) -> None:
         """Compatibility stub retained after removing catalog logging."""
         return
+
+    @staticmethod
+    def _return_catalog_payload(
+        relation: duckdb.DuckDBPyRelation | duckdb.DuckDBPyConnection,
+        *,
+        query_name: str,
+    ) -> list[dict[str, object]]:
+        rows = relation.fetchall()
+        cols = [desc[0] for desc in relation.description]
+        payload = [dict(zip(cols, row, strict=True)) for row in rows]
+        LOGGER.debug(
+            "duckdb catalog query complete",
+            extra={"query_name": query_name, "row_count": len(payload)},
+        )
+        return payload
 
     def _ensure_views(self, conn: duckdb.DuckDBPyConnection) -> None:
         """Create required views and tables to hydrate chunk metadata."""
@@ -1159,9 +1176,10 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             )
             with self._readonly_connection() as conn:
                 relation = conn.execute(sql, sql_params)
-                rows = relation.fetchall()
-                cols = [desc[0] for desc in relation.description]
-            results = [dict(zip(cols, row, strict=True)) for row in rows]
+                results = self._return_catalog_payload(
+                    relation,
+                    query_name="query_by_filters",
+                )
             results = self._apply_complex_glob_filters(
                 results,
                 spec.complex_include_patterns,
@@ -1479,9 +1497,10 @@ class DuckDBCatalog(_DuckDBQueryMixin):
 
         with self._readonly_connection() as conn:
             relation = conn.execute(sql, params)
-            rows = relation.fetchall()
-            cols = [desc[0] for desc in relation.description]
-        return [dict(zip(cols, row, strict=True)) for row in rows]
+            return self._return_catalog_payload(
+                relation,
+                query_name="get_chunks_by_uri",
+            )
 
     def get_embeddings_by_ids(self, ids: Sequence[int]) -> tuple[list[int], NDArrayF32]:
         """Extract embedding vectors for given chunk IDs.

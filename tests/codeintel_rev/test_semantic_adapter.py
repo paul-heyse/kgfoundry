@@ -1,12 +1,16 @@
+"""Tests for semantic search adapter and MCP semantic search integration."""
+
 from __future__ import annotations
 
+import fnmatch
+import tempfile
 import types
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, Self, cast
+from typing import TYPE_CHECKING, Self, cast
 from unittest.mock import patch
 
 import numpy as np
@@ -16,11 +20,15 @@ if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
 
 from codeintel_rev.io.duckdb_catalog import StructureAnnotations
+from codeintel_rev.io.hybrid_search import HybridSearchOptions
 from codeintel_rev.mcp_server.adapters.semantic import semantic_search
 from codeintel_rev.mcp_server.schemas import ScopeIn
 
 from kgfoundry_common.errors import EmbeddingError
 from tests._helpers import assertions
+
+# Test constants for chunk IDs
+_DEFAULT_CHUNK_ID = 123
 
 
 class StubDuckDBCatalog:
@@ -28,34 +36,33 @@ class StubDuckDBCatalog:
 
     Parameters
     ----------
-    _db_path : Any
+    _db_path : Path | None
         Database path (unused in stub).
-    _vectors_dir : Any
+    _vectors_dir : Path | None
         Vectors directory (unused in stub).
-    chunks : list[dict[str, Any]] | None, optional
+    chunks : list[dict[str, object]] | None, optional
         List of chunks to return. If None, uses default chunk.
     """
 
     def __init__(
         self,
-        _db_path: Any,
-        _vectors_dir: Any,
+        _db_path: Path | None,
+        _vectors_dir: Path | None,
         *,
-        chunks: list[dict[str, Any]] | None = None,
+        chunks: list[dict[str, object]] | None = None,
     ) -> None:
         if chunks is None:
-            self._chunks = [
-                {
-                    "id": 123,
-                    "uri": "src/module.py",
-                    "start_line": 0,
-                    "end_line": 0,
-                    "preview": "code snippet",
-                }
-            ]
+            default_chunk: dict[str, object] = {
+                "id": _DEFAULT_CHUNK_ID,
+                "uri": "src/module.py",
+                "start_line": 0,
+                "end_line": 0,
+                "preview": "code snippet",
+            }
+            self._chunks: list[dict[str, object]] = [default_chunk]
         else:
-            self._chunks = chunks
-        self._chunk = self._chunks[0] if self._chunks else {}
+            self._chunks = [dict(chunk) for chunk in chunks]
+        self._chunk: dict[str, object] = dict(self._chunks[0]) if self._chunks else {}
 
     def __enter__(self) -> Self:
         """Enter context manager.
@@ -91,10 +98,17 @@ class StubDuckDBCatalog:
         """
         return False
 
-    def get_chunk_by_id(self, chunk_id: int) -> dict[str, Any] | None:
-        return self._chunk if chunk_id == 123 else None
+    def get_chunk_by_id(self, chunk_id: int) -> dict[str, object] | None:
+        """Get chunk by ID.
 
-    def query_by_ids(self, chunk_ids: list[int]) -> list[dict[str, Any]]:
+        Returns
+        -------
+        dict[str, object] | None
+            Chunk dictionary if ID matches, None otherwise.
+        """
+        return self._chunk if chunk_id == _DEFAULT_CHUNK_ID else None
+
+    def query_by_ids(self, chunk_ids: list[int]) -> list[dict[str, object]]:
         """Query chunks by IDs.
 
         Parameters
@@ -104,7 +118,7 @@ class StubDuckDBCatalog:
 
         Returns
         -------
-        list[dict[str, Any]]
+        list[dict[str, object]]
             List of chunks matching the IDs.
         """
         return [dict(chunk) for chunk in self._chunks if chunk.get("id") in chunk_ids]
@@ -116,7 +130,7 @@ class StubDuckDBCatalog:
         include_globs: list[str] | None = None,
         exclude_globs: list[str] | None = None,
         languages: list[str] | None = None,
-    ) -> list[dict[str, Any]]:
+    ) -> list[dict[str, object]]:
         """Query chunks by IDs with filters.
 
         Parameters
@@ -132,11 +146,9 @@ class StubDuckDBCatalog:
 
         Returns
         -------
-        list[dict[str, Any]]
+        list[dict[str, object]]
             Filtered list of chunks.
         """
-        import fnmatch
-
         filtered = [dict(chunk) for chunk in self._chunks if chunk.get("id") in chunk_ids]
 
         # Apply language filter
@@ -150,34 +162,41 @@ class StubDuckDBCatalog:
             for lang in languages:
                 extensions.extend(language_exts.get(lang.lower(), []))
             if extensions:
-                filtered = [
-                    chunk
-                    for chunk in filtered
-                    if isinstance(chunk.get("uri"), str)
-                    and any(chunk["uri"].endswith(ext) for ext in extensions)
-                ]
+                filtered_chunks: list[dict[str, object]] = []
+                for chunk in filtered:
+                    uri = chunk.get("uri")
+                    if isinstance(uri, str) and any(uri.endswith(ext) for ext in extensions):
+                        filtered_chunks.append(chunk)
+                filtered = filtered_chunks
 
         # Apply include globs
         if include_globs:
-            filtered = [
-                chunk
-                for chunk in filtered
-                if isinstance(chunk.get("uri"), str)
-                and any(fnmatch.fnmatch(chunk["uri"], pattern) for pattern in include_globs)
-            ]
+            filtered_chunks = []
+            for chunk in filtered:
+                uri = chunk.get("uri")
+                if isinstance(uri, str) and any(fnmatch.fnmatch(uri, pattern) for pattern in include_globs):
+                    filtered_chunks.append(chunk)
+            filtered = filtered_chunks
 
         # Apply exclude globs
         if exclude_globs:
-            filtered = [
-                chunk
-                for chunk in filtered
-                if isinstance(chunk.get("uri"), str)
-                and not any(fnmatch.fnmatch(chunk["uri"], pattern) for pattern in exclude_globs)
-            ]
+            filtered_chunks = []
+            for chunk in filtered:
+                uri = chunk.get("uri")
+                if isinstance(uri, str) and not any(fnmatch.fnmatch(uri, pattern) for pattern in exclude_globs):
+                    filtered_chunks.append(chunk)
+            filtered = filtered_chunks
 
         return filtered
 
     def get_structure_annotations(self, ids: Sequence[int]) -> dict[int, StructureAnnotations]:
+        """Get structure annotations for chunk IDs.
+
+        Returns
+        -------
+        dict[int, StructureAnnotations]
+            Mapping of chunk ID to structure annotations.
+        """
         annotations: dict[int, StructureAnnotations] = {}
         for chunk_id in ids:
             annotations[int(chunk_id)] = StructureAnnotations(
@@ -189,19 +208,37 @@ class StubDuckDBCatalog:
         return annotations
 
 
+def _stub_vllm_embed_single(query: str) -> np.ndarray:
+    """Stub vLLM embed_single function for testing.
+
+    Parameters
+    ----------
+    query : str
+        Query text.
+
+    Returns
+    -------
+    np.ndarray
+        Mock embedding vector (3584 dimensions).
+    """
+    assertions.expect_true(bool(query), reason="query should be non-empty")
+    return np.array([0.1] * 3584, dtype=np.float32)
+
+
 class StubVLLMClient:
     """Stub vLLM client for testing.
 
     Parameters
     ----------
-    _config : Any
+    _config : object
         Configuration (unused in stub).
     """
 
-    def __init__(self, _config: Any) -> None:
+    def __init__(self, _config: object) -> None:
         pass
 
-    def embed_single(self, query: str) -> np.ndarray:
+    @staticmethod
+    def embed_single(query: str) -> np.ndarray:
         """Return mock embedding vector.
 
         Parameters
@@ -214,8 +251,7 @@ class StubVLLMClient:
         np.ndarray
             Mock embedding vector (3584 dimensions).
         """
-        assertions.expect_true(bool(query), reason="query should be non-empty")
-        return np.array([0.1] * 3584, dtype=np.float32)
+        return _stub_vllm_embed_single(query)
 
 
 class _BaseStubFAISSManager:
@@ -224,7 +260,7 @@ class _BaseStubFAISSManager:
     Parameters
     ----------
     search_ids : list[int] | None, optional
-        List of chunk IDs to return from search. If None, returns [123].
+        List of chunk IDs to return from search. If None, returns default chunk ID.
     """
 
     def __init__(self, *, search_ids: list[int] | None = None) -> None:
@@ -233,10 +269,11 @@ class _BaseStubFAISSManager:
         self.last_ef_search: int | None = None
         self.last_quantizer_ef_search: int | None = None
         self.last_k_factor: float | None = None
-        self._search_ids = search_ids or [123]
+        self._search_ids = search_ids or [_DEFAULT_CHUNK_ID]
         self._last_catalog: object | None = None
 
-    def load_cpu_index(self) -> None:
+    @staticmethod
+    def load_cpu_index() -> None:
         """Load CPU index (no-op for testing)."""
         return
 
@@ -281,32 +318,60 @@ class _BaseStubFAISSManager:
             self._last_catalog = catalog
         assertions.expect_true(nprobe >= 1, reason="nprobe should be at least 1")
         # Return k results (or fewer if k > available chunks)
-        # Use stored search_ids or default to [123]
+        # Use stored search_ids or default to default chunk ID
         result_ids = self._search_ids[:k]
         ids = np.array([result_ids], dtype=np.int64)
         distances = np.array([[0.9] * len(result_ids)], dtype=np.float32)
         return distances, ids
 
 
+def _default_stub_hybrid_search(
+    query: str,
+    *,
+    semantic_hits: Sequence[tuple[int, float]],
+    limit: int,
+    options: HybridSearchOptions | None = None,
+) -> SimpleNamespace:
+    """Return a default hybrid engine stub that yields no additional channels.
+
+    Parameters
+    ----------
+    query : str
+        Query text (unused in stub).
+    semantic_hits : Sequence[tuple[int, float]]
+        Semantic search hits (unused in stub).
+    limit : int
+        Result limit (unused in stub).
+    options : HybridSearchOptions | None, optional
+        Hybrid search options (unused in stub), by default None.
+
+    Returns
+    -------
+    SimpleNamespace
+        Empty hybrid search result.
+    """
+    del query, semantic_hits, limit, options
+    return SimpleNamespace(
+        docs=[],
+        contributions={},
+        channels=[],
+        warnings=[],
+        method=None,
+    )
+
+
 class _DefaultStubHybridEngine:
     """Default hybrid engine stub that yields no additional channels."""
 
+    @staticmethod
     def search(
-        self,
         query: str,
         *,
         semantic_hits: Sequence[tuple[int, float]],
         limit: int,
-        options: Any | None = None,
+        options: HybridSearchOptions | None = None,
     ) -> SimpleNamespace:
-        del query, semantic_hits, limit, options
-        return SimpleNamespace(
-            docs=[],
-            contributions={},
-            channels=[],
-            warnings=[],
-            method=None,
-        )
+        return _default_stub_hybrid_search(query, semantic_hits=semantic_hits, limit=limit, options=options)
 
 
 @dataclass(frozen=True)
@@ -317,9 +382,9 @@ class StubContextConfig:
     error: str | None = None
     max_results: int = 5
     semantic_overfetch_multiplier: int = 2
-    catalog_chunks: list[dict[str, Any]] | None = None
+    catalog_chunks: list[dict[str, object]] | None = None
     faiss_nprobe: int = 128
-    hybrid_engine: Any | None = None
+    hybrid_engine: object | None = None
     enable_bm25_channel: bool = True
     enable_splade_channel: bool = True
     hybrid_top_k_per_channel: int = 50
@@ -363,8 +428,6 @@ class StubContext:
             ),
         )
         # Use tempfile for secure temporary paths in tests
-        import tempfile
-
         temp_dir = Path(tempfile.gettempdir())
         self.paths = SimpleNamespace(
             faiss_index=temp_dir / "index.faiss",
@@ -398,12 +461,12 @@ class StubContext:
         """
         yield StubDuckDBCatalog(None, None, chunks=self._catalog_chunks)
 
-    def get_hybrid_engine(self) -> Any:
+    def get_hybrid_engine(self) -> object:
         """Return configured hybrid engine stub.
 
         Returns
         -------
-        Any
+        object
             Hybrid engine stub instance.
         """
         return self._hybrid_engine
@@ -411,6 +474,7 @@ class StubContext:
 
 @pytest.mark.asyncio
 async def test_semantic_search_applies_scope_faiss_tuning() -> None:
+    """Test that semantic search applies FAISS tuning parameters from session scope."""
     manager = _BaseStubFAISSManager()
     context = StubContext(
         faiss_manager=manager,
@@ -437,6 +501,7 @@ async def test_semantic_search_applies_scope_faiss_tuning() -> None:
 
 @pytest.mark.asyncio
 async def test_semantic_search_limit_truncates_to_max_results() -> None:
+    """Test that semantic search truncates results to max_results limit."""
     faiss_manager = _BaseStubFAISSManager()
     context = StubContext(
         faiss_manager=faiss_manager,
@@ -479,6 +544,7 @@ async def test_semantic_search_limit_truncates_to_max_results() -> None:
 
 @pytest.mark.asyncio
 async def test_semantic_search_limit_enforces_minimum() -> None:
+    """Test that semantic search enforces minimum limit value."""
     faiss_manager = _BaseStubFAISSManager()
     context = StubContext(
         faiss_manager=faiss_manager,
@@ -521,6 +587,7 @@ async def test_semantic_search_limit_enforces_minimum() -> None:
 
 @pytest.mark.asyncio
 async def test_semantic_search_respects_configured_nprobe() -> None:
+    """Test that semantic search respects configured FAISS nprobe parameter."""
     faiss_manager = _BaseStubFAISSManager()
     context = StubContext(
         faiss_manager=faiss_manager,
@@ -550,9 +617,9 @@ async def test_semantic_search_with_scope_filters() -> None:
     matching those languages are returned.
     """
     # Create catalog with mixed file types
-    catalog_chunks = [
+    catalog_chunks: list[dict[str, object]] = [
         {
-            "id": 123,
+            "id": _DEFAULT_CHUNK_ID,
             "uri": "src/main.py",
             "start_line": 0,
             "end_line": 10,
@@ -575,7 +642,7 @@ async def test_semantic_search_with_scope_filters() -> None:
     ]
 
     # FAISS returns all three chunk IDs
-    faiss_manager = _BaseStubFAISSManager(search_ids=[123, 456, 789])
+    faiss_manager = _BaseStubFAISSManager(search_ids=[_DEFAULT_CHUNK_ID, 456, 789])
 
     context = StubContext(
         faiss_manager=faiss_manager,
@@ -624,9 +691,9 @@ async def test_semantic_search_no_scope() -> None:
     (no filtering applied).
     """
     # Create catalog with mixed file types
-    catalog_chunks = [
+    catalog_chunks: list[dict[str, object]] = [
         {
-            "id": 123,
+            "id": _DEFAULT_CHUNK_ID,
             "uri": "src/main.py",
             "start_line": 0,
             "end_line": 10,
@@ -642,7 +709,7 @@ async def test_semantic_search_no_scope() -> None:
     ]
 
     # FAISS returns both chunk IDs
-    faiss_manager = _BaseStubFAISSManager(search_ids=[123, 456])
+    faiss_manager = _BaseStubFAISSManager(search_ids=[_DEFAULT_CHUNK_ID, 456])
 
     context = StubContext(
         faiss_manager=faiss_manager,
@@ -679,14 +746,15 @@ async def test_semantic_search_no_scope() -> None:
 
 @pytest.mark.asyncio
 async def test_semantic_search_hybrid_merges_channels() -> None:
+    """Test that semantic search merges channels when hybrid search is enabled."""
     class _HybridStub:
+        @staticmethod
         def search(
-            self,
             query: str,
             *,
             semantic_hits: Sequence[tuple[int, float]],
             limit: int,
-            options: Any | None = None,
+            options: HybridSearchOptions | None = None,
         ) -> SimpleNamespace:
             del query, semantic_hits, limit, options
             docs = [
@@ -706,7 +774,7 @@ async def test_semantic_search_hybrid_merges_channels() -> None:
             )
 
     faiss_manager = _BaseStubFAISSManager(search_ids=[101, 102])
-    chunks = [
+    chunks: list[dict[str, object]] = [
         {"id": 101, "uri": "src/a.py", "start_line": 0, "end_line": 2, "preview": "a"},
         {"id": 102, "uri": "src/b.py", "start_line": 5, "end_line": 9, "preview": "b"},
     ]

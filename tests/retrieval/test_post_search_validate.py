@@ -1,3 +1,5 @@
+"""Tests for post-search validation and field repair: missing field handling and row dropping."""
+
 from __future__ import annotations
 
 from codeintel_rev.io.duckdb_catalog import StructureAnnotations
@@ -24,6 +26,7 @@ def _row() -> dict[str, object]:
 
 
 def test_post_search_validate_and_fill_repairs_missing_fields() -> None:
+    """Test that post_search_validate_and_fill repairs missing fields in search results."""
     result = SearchResult(
         chunk_id=42,
         title="",
@@ -52,6 +55,7 @@ def test_post_search_validate_and_fill_repairs_missing_fields() -> None:
 
 
 def test_post_search_validate_and_fill_drops_missing_rows() -> None:
+    """Test that post_search_validate_and_fill drops results when catalog rows are missing."""
     result = SearchResult(
         chunk_id=100,
         title="orphan",

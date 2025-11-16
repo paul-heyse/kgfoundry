@@ -321,7 +321,6 @@ def convert_exception_to_envelope(
     """
     response = format_error_response(exc, instance=operation)
     problem = cast("ProblemDetails", response["problem"])
-    status = cast("int", response["status"])
 
     # Build envelope: empty result fields + error + problem
     envelope = dict(empty_result)

@@ -5,9 +5,9 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
 
 import msgspec
+import numpy as np
 import pytest
 from codeintel_rev.config.settings import load_settings
 from codeintel_rev.io.splade_manager import (
@@ -84,6 +84,20 @@ def _bootstrap_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return repo_root
 
 
+def _stub_save_pretrained(path: str) -> None:
+    """Stub save_pretrained function for testing.
+
+    Parameters
+    ----------
+    path : str
+        Path to save the model.
+    """
+    base = Path(path)
+    onnx_dir = base / "onnx"
+    onnx_dir.mkdir(parents=True, exist_ok=True)
+    (onnx_dir / "model.onnx").write_text("base", encoding="utf-8")
+
+
 class _StubEncoder:
     """Stub SparseEncoder implementation for encode/export tests."""
 
@@ -92,32 +106,75 @@ class _StubEncoder:
         model_dir: str,
         *,
         backend: str,
-        model_kwargs: dict[str, Any] | None = None,
+        model_kwargs: dict[str, object] | None = None,
     ) -> None:
         self.model_dir = model_dir
         self.backend = backend
         self.model_kwargs = model_kwargs or {}
         self._last_texts: list[str] = []
 
-    def save_pretrained(self, path: str) -> None:
-        base = Path(path)
-        onnx_dir = base / "onnx"
-        onnx_dir.mkdir(parents=True, exist_ok=True)
-        (onnx_dir / "model.onnx").write_text("base", encoding="utf-8")
+    @staticmethod
+    def save_pretrained(path: str) -> None:
+        """Save pretrained model stub.
+
+        Parameters
+        ----------
+        path : str
+            Path to save the model.
+        """
+        _stub_save_pretrained(path)
 
     def encode_document(self, texts: list[str]) -> list[int]:
+        """Encode document texts stub.
+
+        Parameters
+        ----------
+        texts : list[str]
+            Texts to encode.
+
+        Returns
+        -------
+        list[int]
+            Encoded token IDs.
+        """
         self._last_texts = list(texts)
         return list(range(len(texts)))
 
     def encode_query(self, texts: list[str]) -> list[int]:
+        """Encode query texts stub.
+
+        Parameters
+        ----------
+        texts : list[str]
+            Texts to encode.
+
+        Returns
+        -------
+        list[int]
+            Encoded token IDs.
+        """
         self._last_texts = list(texts)
         return list(range(len(texts)))
 
     def decode(
         self,
-        embeddings: Any,
+        embeddings: np.ndarray,
         top_k: int | None = None,
     ) -> list[list[tuple[str, float]]]:
+        """Decode embeddings stub.
+
+        Parameters
+        ----------
+        embeddings : np.ndarray
+            Embedding vectors to decode.
+        top_k : int | None, optional
+            Number of top tokens to return, by default None.
+
+        Returns
+        -------
+        list[list[tuple[str, float]]]
+            Decoded token scores.
+        """
         _ = embeddings, top_k
         return [[("solar", 0.4), ("energy", 0.2)] for _ in self._last_texts]
 

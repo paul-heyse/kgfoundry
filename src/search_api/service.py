@@ -134,8 +134,10 @@ def mmr_deduplicate(
 ) -> list[tuple[str, float]]:
     """Deduplicate results using Maximal Marginal Relevance (MMR).
 
-    Removes duplicate items while preserving diversity. Currently returns
-    results unchanged; full MMR implementation requires document embeddings.
+    Removes duplicate items while preserving diversity. Entries for the
+    same document replace earlier ones only when the new score improves on the
+    previous score by at least ``lambda_mmr`` (0 → always replace, 1 → only
+    accept equal-or-higher scores).
 
     Parameters
     ----------
@@ -143,12 +145,17 @@ def mmr_deduplicate(
         List of (item_id, score) tuples, sorted by score descending.
     lambda_mmr : float, optional
         MMR lambda parameter (0.0 = pure relevance, 1.0 = pure diversity).
-        Defaults to 0.7.
+        Defaults to 0.7. Values outside ``[0.0, 1.0]`` raise ValueError.
 
     Returns
     -------
     list[tuple[str, float]]
         Deduplicated list of (item_id, score) tuples.
+
+    Raises
+    ------
+    ValueError
+        If ``lambda_mmr`` is outside the inclusive ``[0.0, 1.0]`` range.
 
     Examples
     --------
@@ -157,12 +164,18 @@ def mmr_deduplicate(
     >>> len(deduped) <= len(results)
     True
     """
-    seen: set[str] = set()
+    if not 0.0 <= lambda_mmr <= 1.0:
+        message = "lambda_mmr must be between 0.0 and 1.0 inclusive"
+        raise ValueError(message)
+
+    seen_scores: dict[str, float] = {}
     deduped: list[tuple[str, float]] = []
     for item_id, score in results:
-        if item_id not in seen:
-            seen.add(item_id)
-            deduped.append((item_id, score))
+        previous = seen_scores.get(item_id)
+        if previous is not None and score < previous * lambda_mmr:
+            continue
+        seen_scores[item_id] = score
+        deduped.append((item_id, score))
     return deduped
 
 

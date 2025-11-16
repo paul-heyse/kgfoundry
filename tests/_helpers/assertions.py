@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any
+from typing import Any, TypeVar
 
 import pytest
+
+T = TypeVar("T")
+K = TypeVar("K")
+V = TypeVar("V")
 
 
 def expect_true(condition: object, *, reason: str | None = None) -> None:
@@ -29,7 +33,7 @@ def expect_false(condition: object, *, reason: str | None = None) -> None:
     pytest.fail(message, pytrace=False)
 
 
-def expect_equal(actual: Any, expected: Any, *, reason: str | None = None) -> None:
+def expect_equal(actual: T, expected: T, *, reason: str | None = None) -> None:
     """Fail when ``actual`` is not equal to ``expected`` according to ``==``."""
     if actual == expected:
         return
@@ -59,7 +63,7 @@ def expect_almost_equal(
     pytest.fail(message, pytrace=True)
 
 
-def expect_in(member: Any, container: Iterable[Any], *, reason: str | None = None) -> None:
+def expect_in(member: T, container: Iterable[T], *, reason: str | None = None) -> None:
     """Fail when ``member`` is not present inside ``container``."""
     if member in container:
         return
@@ -70,12 +74,17 @@ def expect_in(member: Any, container: Iterable[Any], *, reason: str | None = Non
 
 
 def expect_sequence_equal(
-    actual: Sequence[Any],
+    actual: Sequence[Any] | None,
     expected: Sequence[Any],
     *,
     reason: str | None = None,
 ) -> None:
     """Fail when the provided sequences differ."""
+    if actual is None:
+        message = "Expected a sequence but received None."
+        if reason:
+            message = f"{message} Reason: {reason}"
+        pytest.fail(message, pytrace=True)
     if len(actual) != len(expected):
         expect_equal(len(actual), len(expected), reason="Sequence lengths differ.")
     mismatches = [
@@ -95,8 +104,8 @@ def expect_sequence_equal(
 
 
 def expect_mapping_equal(
-    actual: Mapping[Any, Any],
-    expected: Mapping[Any, Any],
+    actual: Mapping[K, V],
+    expected: Mapping[K, V],
     *,
     reason: str | None = None,
 ) -> None:

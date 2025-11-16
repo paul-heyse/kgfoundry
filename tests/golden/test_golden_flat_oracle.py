@@ -1,3 +1,5 @@
+"""Tests for golden flat oracle: exact KNN search validation."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -59,6 +61,7 @@ def _mk_embeddings(chunks: list[Chunk]) -> np.ndarray:
 
 
 def test_golden_flat_exact_knn(tmp_path: Path) -> None:
+    """Test that golden flat oracle performs exact KNN search correctly."""
     chunks = _mk_chunks()
     embeddings = _mk_embeddings(chunks)
 

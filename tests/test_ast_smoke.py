@@ -18,8 +18,13 @@ from codeintel_rev.enrich.ast_indexer import (
 
 from tests._helpers import assertions
 
+# Test constants for AST metrics
+_MIN_EXPECTED_FUNCTION_COUNT = 2
+_MIN_EXPECTED_CYCLOMATIC_COMPLEXITY = 2
+
 
 def test_ast_collection_and_duckdb_join(tmp_path: Path) -> None:
+    """Test that AST collection and DuckDB join operations work correctly."""
     source = textwrap.dedent(
         '''
         """Doc."""
@@ -54,10 +59,14 @@ def test_ast_collection_and_duckdb_join(tmp_path: Path) -> None:
     assertions.expect_in("Cls.m", qualnames)
     assertions.expect_in("f", qualnames)
 
-    assertions.expect_true(metric_row.func_count >= 2, reason="should have at least 2 functions")
+    assertions.expect_true(
+        metric_row.func_count >= _MIN_EXPECTED_FUNCTION_COUNT,
+        reason=f"should have at least {_MIN_EXPECTED_FUNCTION_COUNT} functions",
+    )
     assertions.expect_true(metric_row.class_count >= 1, reason="should have at least 1 class")
     assertions.expect_true(
-        metric_row.cyclomatic >= 2, reason="should have cyclomatic complexity >= 2"
+        metric_row.cyclomatic >= _MIN_EXPECTED_CYCLOMATIC_COMPLEXITY,
+        reason=f"should have cyclomatic complexity >= {_MIN_EXPECTED_CYCLOMATIC_COMPLEXITY}",
     )
 
     ast_dir = tmp_path / "out" / "ast"

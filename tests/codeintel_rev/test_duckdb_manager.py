@@ -64,7 +64,10 @@ def test_query_builder_basic() -> None:
     sql, params = builder.build_filter_query(chunk_ids=[1, 2, 3])
 
     assertions.expect_in("id = ANY($ids)", sql)
-    assertions.expect_sequence_equal(params["ids"], [1, 2, 3])
+    ids_param = params.get("ids")
+    if not isinstance(ids_param, list):
+        pytest.fail("ids parameter should be a list")
+    assertions.expect_sequence_equal(ids_param, [1, 2, 3])
     assertions.expect_true("include" not in "".join(params.keys()))
 
 
@@ -83,7 +86,10 @@ def test_query_builder_with_filters() -> None:
     assertions.expect_in("c.uri NOT LIKE $exclude_0", sql)
     assertions.expect_equal(params["exclude_0"], "tests/%")
     assertions.expect_in("c.lang = ANY($languages)", sql)
-    assertions.expect_sequence_equal(params["languages"], ["python", "typescript"])
+    languages_param = params.get("languages")
+    if not isinstance(languages_param, list):
+        pytest.fail("languages parameter should be a list")
+    assertions.expect_sequence_equal(languages_param, ["python", "typescript"])
 
 
 def test_query_builder_preserve_order() -> None:
@@ -100,7 +106,10 @@ def test_query_builder_preserve_order() -> None:
     assertions.expect_in("JOIN UNNEST($ids) WITH ORDINALITY", sql)
     assertions.expect_in("ORDER BY ids.position", sql)
     assertions.expect_in("c.uri LIKE $include_0", sql)
-    assertions.expect_sequence_equal(params["ids"], [3, 1])
+    ordered_ids = params.get("ids")
+    if not isinstance(ordered_ids, list):
+        pytest.fail("ids parameter should be a list")
+    assertions.expect_sequence_equal(ordered_ids, [3, 1])
 
 
 def test_query_builder_join_flags() -> None:

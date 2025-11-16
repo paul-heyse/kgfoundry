@@ -5,9 +5,9 @@ from __future__ import annotations
 import importlib
 from dataclasses import dataclass
 
-problem_details = importlib.import_module("tools._shared.problem_details")
-
 from tests._helpers import assertions
+
+problem_details = importlib.import_module("tools._shared.problem_details")
 
 
 def test_coerce_optional_dict_handles_empty_values() -> None:

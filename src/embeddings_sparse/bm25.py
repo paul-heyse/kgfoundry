@@ -314,7 +314,7 @@ class PurePythonBM25:
             }
             for doc_id, doc in self.docs.items()
         ]
-        payload: dict[str, JsonValue] = {
+        return {
             "k1": float(self.k1),
             "b": float(self.b),
             "field_boosts": {
@@ -329,7 +329,6 @@ class PurePythonBM25:
             "N": int(self.N),
             "avgdl": float(self.avgdl),
         }
-        return payload
 
     def _read_metadata(self) -> dict[str, JsonValue]:
         metadata_path = Path(self.index_dir) / "pure_bm25.json"
@@ -344,8 +343,7 @@ class PurePythonBM25:
                 raise
 
         if legacy_path.exists():
-            payload = self._load_legacy_payload(legacy_path)
-            return payload
+            return self._load_legacy_payload(legacy_path)
 
         msg = f"Index metadata not found at {metadata_path} or {legacy_path}"
         raise FileNotFoundError(msg)

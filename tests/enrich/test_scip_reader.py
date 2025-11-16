@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: MIT
+"""Tests for SCIP index reader and document loading."""
+
 from __future__ import annotations
 
 import json
@@ -10,6 +12,7 @@ from tests._helpers import assertions
 
 
 def test_scip_reader_loads_documents(tmp_path: Path) -> None:
+    """Test that SCIPIndex loads documents, occurrences, and symbols correctly."""
     payload = {
         "documents": [
             {

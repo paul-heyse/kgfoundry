@@ -1,3 +1,5 @@
+"""Tests for flat reranker and exact rerank functionality."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -11,6 +13,7 @@ from tests._helpers import assertions
 
 
 def test_exact_rerank_prefers_vectors_with_higher_similarity(tmp_path: Path) -> None:
+    """Test that exact rerank prefers vectors with higher similarity scores."""
     catalog_path = tmp_path / "catalog.duckdb"
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir()
@@ -40,6 +43,7 @@ def test_exact_rerank_prefers_vectors_with_higher_similarity(tmp_path: Path) -> 
 
 
 def test_flat_reranker_supports_cosine_metric(tmp_path: Path) -> None:
+    """Test that flat reranker supports cosine similarity metric."""
     catalog_path = tmp_path / "catalog.duckdb"
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir()

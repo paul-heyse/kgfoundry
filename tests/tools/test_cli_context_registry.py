@@ -11,7 +11,7 @@ from uuid import uuid4
 import pytest
 from tools import CLIToolingContext
 from tools import cli_context_registry as registry_module
-from tools._shared.augment_registry import AugmentMetadataModel
+from tools._shared.augment_registry import AugmentMetadataModel, OperationOverrideModel
 from tools.cli_context_registry import (
     CLIContextDefinition,
     context_for,
@@ -147,9 +147,9 @@ def test_operation_override_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
             self,
             operation_id: str,
             tokens: Sequence[str] | None = None,
-        ) -> str:
+        ) -> OperationOverrideModel:
             self.calls.append((operation_id, tokens))
-            return "override-result"
+            return OperationOverrideModel(summary="override-result")
 
     dummy = DummyAugment()
     original_augment_for = registry_module.REGISTRY.augment_for
@@ -162,7 +162,10 @@ def test_operation_override_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(registry_module.REGISTRY, "augment_for", fake_augment_for)
 
     result = registry_module.operation_override_for(key, subcommand="run")
-    assertions.expect_equal(result, "override-result")
+    assertions.expect_true(isinstance(result, OperationOverrideModel))
+    if result is None:  # pragma: no cover - defensive
+        pytest.fail("expected OperationOverrideModel")
+    assertions.expect_equal(result.summary, "override-result")
     assertions.expect_sequence_equal(dummy.calls, [("override.run", None)])
 
     assertions.expect_equal(registry_module.operation_override_for(key, subcommand="missing"), None)

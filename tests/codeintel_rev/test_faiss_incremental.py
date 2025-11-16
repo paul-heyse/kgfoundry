@@ -35,6 +35,7 @@ _rng = np.random.default_rng(42)
 
 # Unit tests use reduced dimensions for speed
 _UNIT_TEST_VEC_DIM = 256
+_PRIMARY_ID_THRESHOLD = 100
 
 
 @pytest.fixture
@@ -156,16 +157,16 @@ def test_dual_index_search(tmp_index_path: Path) -> None:
     manager = FAISSManager(index_path=tmp_index_path, vec_dim=vec_dim)
 
     # Build primary index with initial vectors
-    primary_vectors = _rng.normal(0.5, 0.15, (100, vec_dim)).astype(np.float32)
+    primary_vectors = _rng.normal(0.5, 0.15, (_PRIMARY_ID_THRESHOLD, vec_dim)).astype(np.float32)
     primary_vectors = np.clip(primary_vectors, 0.0, 1.0)
     manager.build_index(primary_vectors)
-    primary_ids = np.arange(100, dtype=np.int64)
+    primary_ids = np.arange(_PRIMARY_ID_THRESHOLD, dtype=np.int64)
     manager.add_vectors(primary_vectors, primary_ids)
 
     # Add vectors to secondary index
     secondary_vectors = _rng.normal(0.5, 0.15, (20, vec_dim)).astype(np.float32)
     secondary_vectors = np.clip(secondary_vectors, 0.0, 1.0)
-    secondary_ids = np.arange(100, 120, dtype=np.int64)  # IDs 100-119
+    secondary_ids = np.arange(_PRIMARY_ID_THRESHOLD, _PRIMARY_ID_THRESHOLD + 20, dtype=np.int64)  # IDs 100-119
     manager.update_index(secondary_vectors, secondary_ids)
 
     # Create a query vector (similar to one in secondary index)
@@ -180,8 +181,8 @@ def test_dual_index_search(tmp_index_path: Path) -> None:
     # Verify results include IDs from both primary and secondary
     # (exact composition depends on similarity, but should have some from each)
     result_id_set = set(result_ids[0])
-    primary_result_count = sum(1 for rid in result_id_set if rid < 100)
-    secondary_result_count = sum(1 for rid in result_id_set if rid >= 100)
+    primary_result_count = sum(1 for rid in result_id_set if rid < _PRIMARY_ID_THRESHOLD)
+    secondary_result_count = sum(1 for rid in result_id_set if rid >= _PRIMARY_ID_THRESHOLD)
 
     # Should have results from both (exact counts depend on similarity)
     assertions.expect_true(
@@ -579,7 +580,7 @@ def test_incremental_workflow_end_to_end(
     manager.merge_indexes()
 
     # Verify merge completed
-    assertions.expect_equal(manager.secondary_index, None)
+    assertions.expect_true(manager.secondary_index is None, reason="secondary should be cleared")
     assertions.expect_true(manager.cpu_index is not None, reason="cpu index should exist")
     if manager.cpu_index is None:  # pragma: no cover - defensive
         pytest.fail("cpu index should exist after merge")

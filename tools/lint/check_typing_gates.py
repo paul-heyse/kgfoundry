@@ -373,7 +373,7 @@ def check_file(
         visitor.visit(tree)
     except SyntaxError:
         return []
-    except Exception:
+    except (OSError, ValueError):
         return []
     return visitor.violations
 

@@ -4,13 +4,14 @@
 from __future__ import annotations
 
 import pytest
+from codeintel_rev.enrich import tree_sitter_bridge as tsb
 
 from tests._helpers import assertions
 
 
-def test_outline_query_matches_fallback(monkeypatch):
+def test_outline_query_matches_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that Tree-sitter outline query matches fallback behavior."""
     pytest.importorskip("tree_sitter_python")
-    from codeintel_rev.enrich import tree_sitter_bridge as tsb
 
     source = b"""
 class Foo:

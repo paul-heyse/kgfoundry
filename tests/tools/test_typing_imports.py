@@ -23,172 +23,166 @@ TOOLS_DIRS = [
 ]
 
 
-class TestToolsTypingImports:
-    """Test that tools packages use proper typing imports."""
+def _is_in_type_checking_block(tree: ast.AST, target_node: ast.AST) -> bool:
+    """Return True if ``target_node`` resides within an ``if TYPE_CHECKING`` guard.
 
-    def test_tools_packages_have_postponed_annotations(self) -> None:
-        """Verify all tools modules have `from __future__ import annotations`."""
-        for tools_dir in TOOLS_DIRS:
-            if not tools_dir.exists():
+    Returns
+    -------
+    bool
+        ``True`` when ``target_node`` is nested under a TYPE_CHECKING block.
+    """
+    for node in ast.walk(tree):
+        if isinstance(node, ast.If):
+            is_type_checking = isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING"
+            if not is_type_checking:
+                continue
+            for child in ast.walk(node):
+                if child is target_node:
+                    return True
+    return False
+
+
+def test_tools_packages_have_postponed_annotations() -> None:
+    """Verify all tools modules have `from __future__ import annotations`."""
+    for tools_dir in TOOLS_DIRS:
+        if not tools_dir.exists():
+            continue
+
+        for py_file in tools_dir.rglob("*.py"):
+            if py_file.name.startswith("_"):
                 continue
 
-            for py_file in tools_dir.rglob("*.py"):
-                if py_file.name.startswith("_"):
-                    continue
+            source = py_file.read_text(encoding="utf-8")
 
-                source = py_file.read_text(encoding="utf-8")
+            assertions.expect_in(
+                "from __future__ import annotations",
+                source,
+                reason=f"{py_file.name} missing `from __future__ import annotations`",
+            )
 
-                assertions.expect_in(
-                    "from __future__ import annotations",
-                    source,
-                    reason=f"{py_file.name} missing `from __future__ import annotations`",
+
+def test_no_unguarded_heavy_imports_in_tools() -> None:
+    """Verify heavy optional dependencies are only imported in TYPE_CHECKING blocks."""
+    heavy_imports = {"numpy", "fastapi", "faiss", "torch", "tensorflow", "sklearn"}
+
+    for tools_dir in TOOLS_DIRS:
+        if not tools_dir.exists():
+            continue
+
+        for py_file in tools_dir.rglob("*.py"):
+            if py_file.name.startswith("_"):
+                continue
+
+            source = py_file.read_text(encoding="utf-8")
+            tree = ast.parse(source)
+
+            unguarded = [
+                (py_file.name, node.module)
+                for node in ast.walk(tree)
+                if (
+                    isinstance(node, ast.ImportFrom)
+                    and node.module
+                    and node.module.split(".")[0] in heavy_imports
+                    and not _is_in_type_checking_block(tree, node)
                 )
+            ]
 
-    def test_no_unguarded_heavy_imports_in_tools(self) -> None:
-        """Verify heavy optional dependencies are only imported in TYPE_CHECKING blocks."""
-        heavy_imports = {"numpy", "fastapi", "faiss", "torch", "tensorflow", "sklearn"}
+            assertions.expect_false(
+                bool(unguarded),
+                reason=(
+                    f"Found unguarded heavy imports in {py_file.name}: {unguarded}. "
+                    "Use TYPE_CHECKING blocks or gate_import() helper."
+                ),
+            )
 
-        for tools_dir in TOOLS_DIRS:
-            if not tools_dir.exists():
+
+def test_typing_facades_used_in_tools() -> None:
+    """Verify tools import from public docs.types and tools.typing facades."""
+    for tools_dir in TOOLS_DIRS:
+        if not tools_dir.exists():
+            continue
+
+        for py_file in tools_dir.rglob("*.py"):
+            if py_file.name.startswith("_"):
                 continue
 
-            for py_file in tools_dir.rglob("*.py"):
-                if py_file.name.startswith("_"):
-                    continue
+            source = py_file.read_text(encoding="utf-8")
+            tree = ast.parse(source)
 
-                source = py_file.read_text(encoding="utf-8")
-                tree = ast.parse(source)
-
-                unguarded = [
-                    (py_file.name, node.module)
-                    for node in ast.walk(tree)
-                    if (
-                        isinstance(node, ast.ImportFrom)
-                        and node.module
-                        and node.module.split(".")[0] in heavy_imports
-                        and not self._is_in_type_checking_block(tree, node)
+            # Collect all ImportFrom nodes with private docs._types imports
+            for node in ast.walk(tree):
+                if (
+                    isinstance(node, ast.ImportFrom)
+                    and node.module
+                    and node.module.startswith("docs._types")
+                ):
+                    pytest.fail(
+                        f"{py_file.name} imports from docs._types: {node.module}. "
+                        "Use public facade docs.types instead."
                     )
-                ]
 
-                assertions.expect_false(
-                    bool(unguarded),
-                    reason=(
-                        f"Found unguarded heavy imports in {py_file.name}: {unguarded}. "
-                        "Use TYPE_CHECKING blocks or gate_import() helper."
-                    ),
-                )
 
-    def test_typing_facades_used_in_tools(self) -> None:
-        """Verify tools import from public docs.types and tools.typing facades."""
-        for tools_dir in TOOLS_DIRS:
-            if not tools_dir.exists():
+def test_no_resolve_shims_in_tools() -> None:
+    """Verify tools don't import deprecated resolve_numpy/fastapi/faiss shims."""
+    deprecated_shims = {"resolve_numpy", "resolve_fastapi", "resolve_faiss"}
+    error_messages = {
+        "resolve_numpy": "Use tools.typing.gate_import('numpy', ...) instead.",
+        "resolve_fastapi": "Use tools.typing.gate_import('fastapi', ...) instead.",
+        "resolve_faiss": "Use tools.typing.gate_import('faiss', ...) instead.",
+    }
+
+    for tools_dir in TOOLS_DIRS:
+        if not tools_dir.exists():
+            continue
+
+        for py_file in tools_dir.rglob("*.py"):
+            # Skip typing façade module itself
+            if py_file.name == "__init__.py" and "tools/typing" in str(py_file):
                 continue
 
-            for py_file in tools_dir.rglob("*.py"):
-                if py_file.name.startswith("_"):
-                    continue
+            source = py_file.read_text(encoding="utf-8")
 
-                source = py_file.read_text(encoding="utf-8")
-                tree = ast.parse(source)
-
-                # Collect all ImportFrom nodes with private docs._types imports
-                for node in ast.walk(tree):
-                    if (
-                        isinstance(node, ast.ImportFrom)
-                        and node.module
-                        and node.module.startswith("docs._types")
-                    ):
-                        pytest.fail(
-                            f"{py_file.name} imports from docs._types: {node.module}. "
-                            "Use public facade docs.types instead."
-                        )
-
-    def test_no_resolve_shims_in_tools(self) -> None:
-        """Verify tools don't import deprecated resolve_numpy/fastapi/faiss shims."""
-        deprecated_shims = {"resolve_numpy", "resolve_fastapi", "resolve_faiss"}
-        error_messages = {
-            "resolve_numpy": "Use tools.typing.gate_import('numpy', ...) instead.",
-            "resolve_fastapi": "Use tools.typing.gate_import('fastapi', ...) instead.",
-            "resolve_faiss": "Use tools.typing.gate_import('faiss', ...) instead.",
-        }
-
-        for tools_dir in TOOLS_DIRS:
-            if not tools_dir.exists():
-                continue
-
-            for py_file in tools_dir.rglob("*.py"):
-                # Skip typing façade module itself
-                if py_file.name == "__init__.py" and "tools/typing" in str(py_file):
-                    continue
-
-                source = py_file.read_text(encoding="utf-8")
-
-                for shim in deprecated_shims:
-                    # Only flag if shim is imported/used, not just mentioned in comments
-                    if f"from tools.typing import {shim}" in source:
-                        pytest.fail(
-                            f"{py_file.name} imports deprecated {shim}. {error_messages[shim]}"
-                        )
-
-    @staticmethod
-    def _is_in_type_checking_block(tree: ast.AST, target_node: ast.AST) -> bool:
-        """Check if a node is inside an `if TYPE_CHECKING:` block.
-
-        Parameters
-        ----------
-        tree : ast.AST
-            AST root node.
-        target_node : ast.AST
-            Node to check location for.
-
-        Returns
-        -------
-        bool
-            True if target_node is inside a TYPE_CHECKING block.
-        """
-        for node in ast.walk(tree):
-            if isinstance(node, ast.If):
-                # Check if condition is NAME "TYPE_CHECKING"
-                is_type_checking = (
-                    isinstance(node.test, ast.Name) and node.test.id == "TYPE_CHECKING"
-                )
-
-                if is_type_checking:
-                    # Check if target_node is inside this if block
-                    for child in ast.walk(node):
-                        if child is target_node:
-                            return True
-        return False
+            _assert_no_deprecated_shims(py_file, source, deprecated_shims, error_messages)
 
 
-class TestToolsTypingFacade:
-    """Test that tools.typing provides the expected façade."""
+def _assert_no_deprecated_shims(
+    py_file: Path,
+    source: str,
+    deprecated_shims: set[str],
+    error_messages: dict[str, str],
+) -> None:
+    """Raise pytest failure when deprecated shim imports appear in ``source``."""
+    for shim in deprecated_shims:
+        if f"from tools.typing import {shim}" in source:
+            pytest.fail(f"{py_file.name} imports deprecated {shim}. {error_messages[shim]}")
 
-    def test_tools_typing_facade_is_available(self) -> None:
-        """Verify tools.typing module exists and provides helpers."""
-        module = load_module("tools.typing")
 
-        expected_attrs = ["gate_import", "TYPE_CHECKING"]
-        for attr in expected_attrs:
-            assertions.expect_true(
-                hasattr(module, attr), reason=f"tools.typing should provide {attr} helper"
-            )
+def test_tools_typing_facade_is_available() -> None:
+    """Verify tools.typing module exists and provides helpers."""
+    module = load_module("tools.typing")
 
-    def test_tools_typing_re_exports_common_typing(self) -> None:
-        """Verify tools.typing re-exports from kgfoundry_common.typing."""
-        tools_typing = load_module("tools.typing")
-        common_typing = load_module("kgfoundry_common.typing")
+    expected_attrs = ["gate_import", "TYPE_CHECKING"]
+    for attr in expected_attrs:
+        assertions.expect_true(
+            hasattr(module, attr), reason=f"tools.typing should provide {attr} helper"
+        )
 
-        # Verify some key symbols are exported
-        for symbol in ["NavMap", "ProblemDetails"]:
-            assertions.expect_true(
-                hasattr(tools_typing, symbol), reason=f"tools.typing should re-export {symbol}"
-            )
-            assertions.expect_equal(
-                getattr(tools_typing, symbol),
-                getattr(common_typing, symbol),
-                reason=f"tools.typing.{symbol} should be identical to kgfoundry_common.typing.{symbol}",
-            )
+
+def test_tools_typing_re_exports_common_typing() -> None:
+    """Verify tools.typing re-exports from kgfoundry_common.typing."""
+    tools_typing = load_module("tools.typing")
+    common_typing = load_module("kgfoundry_common.typing")
+
+    # Verify some key symbols are exported
+    for symbol in ["NavMap", "ProblemDetails"]:
+        assertions.expect_true(
+            hasattr(tools_typing, symbol), reason=f"tools.typing should re-export {symbol}"
+        )
+        assertions.expect_equal(
+            getattr(tools_typing, symbol),
+            getattr(common_typing, symbol),
+            reason=f"tools.typing.{symbol} should be identical to kgfoundry_common.typing.{symbol}",
+        )
 
 
 @pytest.mark.parametrize(

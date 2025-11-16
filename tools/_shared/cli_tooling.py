@@ -116,19 +116,16 @@ def load_cli_tooling_context(
         Composite context containing augment data, registry metadata, and the
         constructed CLI configuration.
 
-    Raises
-    ------
-    CLIConfigError
-        Raised when augment or registry metadata cannot be loaded or validated.
+    Notes
+    -----
+    Propagates :class:`CLIConfigError` when augment or registry payloads fail
+    to load or validate.
     """
-    try:
-        metadata = _load_tooling_metadata(
-            settings,
-            augment_reader=augment_reader,
-            registry_reader=registry_reader,
-        )
-    except CLIConfigError:
-        raise
+    metadata = _load_tooling_metadata(
+        settings,
+        augment_reader=augment_reader,
+        registry_reader=registry_reader,
+    )
     cli_config = build_cli_config(
         augment=metadata.augment,
         registry=metadata.registry,

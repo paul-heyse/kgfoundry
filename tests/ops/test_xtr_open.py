@@ -88,10 +88,20 @@ def test_xtr_open_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
         def __init__(self, *_: object, **__: object) -> None:
             self.ready = True
 
-        def open(self) -> None:
-            return None
+        @staticmethod
+        def open() -> None:
+            """Stub open method."""
+            return
 
-        def metadata(self) -> dict[str, object]:
+        @staticmethod
+        def metadata() -> dict[str, object]:
+            """Stub metadata method.
+
+            Returns
+            -------
+            dict[str, object]
+                Mock metadata dict.
+            """
             return {"doc_count": 1, "total_tokens": 4, "dim": 8, "dtype": "float16"}
 
     monkeypatch.setattr("codeintel_rev.ops.runtime.xtr_open.XTRIndex", _StubIndex)
@@ -120,11 +130,27 @@ def test_xtr_open_reports_corruption(monkeypatch: pytest.MonkeyPatch, tmp_path: 
         def __init__(self, *_: object, **__: object) -> None:
             self.ready = False
 
-        def open(self) -> None:
+        @staticmethod
+        def open() -> None:
+            """Stub open method that raises RuntimeError.
+
+            Raises
+            ------
+            RuntimeError
+                Always raised to simulate corruption.
+            """
             message = "boom"
             raise RuntimeError(message)
 
-        def metadata(self) -> dict[str, object]:
+        @staticmethod
+        def metadata() -> dict[str, object]:
+            """Stub metadata method.
+
+            Returns
+            -------
+            dict[str, object]
+                Empty metadata dict.
+            """
             return {}
 
     monkeypatch.setattr("codeintel_rev.ops.runtime.xtr_open.XTRIndex", _ExplodingIndex)

@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: MIT
+"""Tests for DuckDB module ingestion from JSONL files."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -11,6 +13,7 @@ from tests._helpers import assertions
 
 @pytest.mark.duckdb
 def test_ingest_modules_jsonl_native_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that ingest_modules_jsonl uses native JSON path for DuckDB operations."""
     duckdb = pytest.importorskip("duckdb")
     db_path = tmp_path / "catalog.duckdb"
     modules_jsonl = tmp_path / "modules.jsonl"

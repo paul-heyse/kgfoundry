@@ -292,18 +292,6 @@ class GitOperationError(KgFoundryError):
             cause=cause,
         )
 
-
-# ==================== Re-exports ====================
-
-# Search operation errors are already defined in kgfoundry_common.errors.
-# We don't redefine them here, but document them for reference:
-# - VectorSearchError: Raised for FAISS search failures, index not ready, etc.
-# - EmbeddingError: Raised for vLLM embedding generation failures
-# Usage example (documentation only, not executable code):
-#   from kgfoundry_common.errors import VectorSearchError, EmbeddingError
-#   raise VectorSearchError("Search timeout", context={"query": "..."})
-
-
 __all__ = [
     "FileOperationError",
     "FileReadError",

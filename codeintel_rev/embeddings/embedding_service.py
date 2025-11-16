@@ -678,14 +678,8 @@ def get_embedding_provider(
         For vLLM provider, falls back to HF if allow_hf_fallback is enabled.
         For HF provider, no fallback is available. Also raised when HF provider
         initialization fails and no fallback is configured. Wraps underlying
-        provider initialization exceptions with context. Provider-specific
-        exceptions are re-raised directly when fallback is disabled so callers
-        can inspect CUDA/model-loading failures without losing stack context.
-    Exception
-        Re-raised when vLLM provider initialization fails and fallback is
-        disabled. Allows underlying provider exceptions (e.g., CUDA errors,
-        import errors, model loading failures) to propagate with full stack
-        context for debugging.
+        provider initialization exceptions with context so callers can inspect
+        CUDA/model-loading failures without losing stack traces.
 
     Notes
     -----
@@ -693,7 +687,8 @@ def get_embedding_provider(
     provider initialization fails and allow_hf_fallback is True, it automatically
     falls back to HF provider. When fallback is disabled, provider-specific
     exceptions (e.g., CUDA errors, model loading failures, import errors) are
-    re-raised directly. The function ensures at least one provider is available
+    re-raised directly so callers can inspect the underlying failure without
+    losing stack context. The function ensures at least one provider is available
     when fallback is enabled, or raises appropriate errors when no provider can
     be initialized.
     """
@@ -709,12 +704,25 @@ def get_embedding_provider(
         raise EmbeddingConfigError(msg)
     try:
         return VLLMProvider(
-            embeddings=settings.embeddings, index=settings.index, vllm_config=settings.vllm
+            embeddings=settings.embeddings,
+            index=settings.index,
+            vllm_config=settings.vllm,
         )
-    except Exception:
+    except Exception as vllm_error:
         if settings.embeddings.allow_hf_fallback:
-            return HFEmbeddingProvider(embeddings=settings.embeddings, index=settings.index)
-        raise
+            try:
+                return HFEmbeddingProvider(
+                    embeddings=settings.embeddings,
+                    index=settings.index,
+                )
+            except Exception as hf_error:
+                message = (
+                    "vLLM provider failed and allow_hf_fallback could not recover; "
+                    "HF provider initialization also failed"
+                )
+                raise EmbeddingRuntimeError(message) from hf_error
+        message = "Failed to initialize vLLM provider"
+        raise EmbeddingRuntimeError(message) from vllm_error
 
 
 class HFEmbeddingProvider(_ProviderBase):

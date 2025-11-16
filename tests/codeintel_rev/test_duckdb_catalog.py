@@ -309,7 +309,8 @@ def test_catalog(tmp_path: Path) -> DuckDBCatalog:
 class TestQueryByFiltersIncludeGlobs:
     """Test include glob pattern filtering."""
 
-    def test_include_glob_python_files(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_include_glob_python_files(test_catalog: DuckDBCatalog) -> None:
         """Test filtering by Python file pattern."""
         results = test_catalog.query_by_filters(
             ALL_CHUNK_IDS,
@@ -331,7 +332,8 @@ class TestQueryByFiltersIncludeGlobs:
         )
         assertions.expect_equal(len(results), 7)
 
-    def test_include_glob_src_prefix(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_include_glob_src_prefix(test_catalog: DuckDBCatalog) -> None:
         """Test filtering by src/ prefix pattern."""
         results = test_catalog.query_by_filters(
             ALL_CHUNK_IDS,
@@ -352,7 +354,8 @@ class TestQueryByFiltersIncludeGlobs:
         )
         assertions.expect_equal(len(results), 6)
 
-    def test_include_glob_simple_suffix(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_include_glob_simple_suffix(test_catalog: DuckDBCatalog) -> None:
         """Test filtering by simple suffix pattern."""
         results = test_catalog.query_by_filters(
             ALL_CHUNK_IDS,
@@ -363,7 +366,8 @@ class TestQueryByFiltersIncludeGlobs:
         assertions.expect_equal(uris, {"src/app.ts"})
         assertions.expect_equal(len(results), 1)
 
-    def test_include_glob_multiple_patterns(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_include_glob_multiple_patterns(test_catalog: DuckDBCatalog) -> None:
         """Test filtering by multiple include patterns (OR logic)."""
         results = test_catalog.query_by_filters(
             ALL_CHUNK_IDS,
@@ -377,7 +381,8 @@ class TestQueryByFiltersIncludeGlobs:
         assertions.expect_in("main.py", uris)
         assertions.expect_equal(len(results), 8)  # 7 Python + 1 TSX
 
-    def test_include_glob_empty_list(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_include_glob_empty_list(test_catalog: DuckDBCatalog) -> None:
         """Test that empty include globs means include all."""
         results = test_catalog.query_by_filters(
             [1, 2, 3],
@@ -392,7 +397,8 @@ class TestQueryByFiltersIncludeGlobs:
 class TestQueryByFiltersExcludeGlobs:
     """Test exclude glob pattern filtering."""
 
-    def test_exclude_glob_test_files(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_exclude_glob_test_files(test_catalog: DuckDBCatalog) -> None:
         """Test excluding test files."""
         results = test_catalog.query_by_filters(
             ALL_CHUNK_IDS,
@@ -410,7 +416,8 @@ class TestQueryByFiltersExcludeGlobs:
         assertions.expect_in("main.py", uris)
         assertions.expect_equal(len(results), 9)
 
-    def test_exclude_glob_multiple_patterns(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_exclude_glob_multiple_patterns(test_catalog: DuckDBCatalog) -> None:
         """Test excluding multiple patterns."""
         results = test_catalog.query_by_filters(
             ALL_CHUNK_IDS,
@@ -429,7 +436,8 @@ class TestQueryByFiltersExcludeGlobs:
         )
         assertions.expect_equal(len(results), 8)
 
-    def test_exclude_glob_empty_list(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_exclude_glob_empty_list(test_catalog: DuckDBCatalog) -> None:
         """Test that empty exclude globs means exclude none."""
         results = test_catalog.query_by_filters(
             [1, 2, 3],
@@ -442,7 +450,8 @@ class TestQueryByFiltersExcludeGlobs:
 class TestQueryByFiltersLanguageFilter:
     """Test language-based filtering."""
 
-    def test_language_filter_python(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_language_filter_python(test_catalog: DuckDBCatalog) -> None:
         """Test filtering by Python language."""
         results = test_catalog.query_by_filters(
             ALL_CHUNK_IDS,
@@ -464,7 +473,8 @@ class TestQueryByFiltersLanguageFilter:
         )
         assertions.expect_equal(len(results), 7)
 
-    def test_language_filter_typescript(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_language_filter_typescript(test_catalog: DuckDBCatalog) -> None:
         """Test filtering by TypeScript language."""
         results = test_catalog.query_by_filters(
             ALL_CHUNK_IDS,
@@ -475,7 +485,8 @@ class TestQueryByFiltersLanguageFilter:
         assertions.expect_equal(uris, {"src/app.ts", "src/components/Button.tsx"})
         assertions.expect_equal(len(results), 2)
 
-    def test_language_filter_multiple(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_language_filter_multiple(test_catalog: DuckDBCatalog) -> None:
         """Test filtering by multiple languages."""
         results = test_catalog.query_by_filters(
             ALL_CHUNK_IDS,
@@ -490,7 +501,8 @@ class TestQueryByFiltersLanguageFilter:
         assertions.expect_in("main.py", uris)
         assertions.expect_equal(len(results), 9)  # 7 Python + 2 TypeScript
 
-    def test_language_filter_unknown_language(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_language_filter_unknown_language(test_catalog: DuckDBCatalog) -> None:
         """Test filtering by unknown language returns empty."""
         # Note: query_by_filters imports LANGUAGE_EXTENSIONS from scope_utils
         # If language has no extensions, the SQL query filters by empty extension set
@@ -503,7 +515,8 @@ class TestQueryByFiltersLanguageFilter:
         # Unknown language has no extensions, so no chunks match
         assertions.expect_equal(len(results), 0)
 
-    def test_language_filter_empty_list(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_language_filter_empty_list(test_catalog: DuckDBCatalog) -> None:
         """Test that empty language list means no filtering."""
         results = test_catalog.query_by_filters(
             [1, 2, 3],
@@ -516,7 +529,8 @@ class TestQueryByFiltersLanguageFilter:
 class TestQueryByFiltersCombined:
     """Test combined filters (include, exclude, languages)."""
 
-    def test_include_and_exclude(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_include_and_exclude(test_catalog: DuckDBCatalog) -> None:
         """Test combining include and exclude globs."""
         results = test_catalog.query_by_filters(
             ALL_CHUNK_IDS,
@@ -540,7 +554,8 @@ class TestQueryByFiltersCombined:
         )
         assertions.expect_equal(len(results), 5)
 
-    def test_include_and_language(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_include_and_language(test_catalog: DuckDBCatalog) -> None:
         """Test combining include globs and language filter."""
         results = test_catalog.query_by_filters(
             ALL_CHUNK_IDS,
@@ -561,7 +576,8 @@ class TestQueryByFiltersCombined:
         assertions.expect_false("src/config.json" in uris, reason="Not Python")
         assertions.expect_equal(len(results), 3)
 
-    def test_exclude_and_language(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_exclude_and_language(test_catalog: DuckDBCatalog) -> None:
         """Test combining exclude globs and language filter."""
         results = test_catalog.query_by_filters(
             ALL_CHUNK_IDS,
@@ -585,7 +601,8 @@ class TestQueryByFiltersCombined:
         )
         assertions.expect_equal(len(results), 5)
 
-    def test_all_filters_combined(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_all_filters_combined(test_catalog: DuckDBCatalog) -> None:
         """Test combining all three filter types."""
         results = test_catalog.query_by_filters(
             ALL_CHUNK_IDS,
@@ -609,7 +626,8 @@ class TestQueryByFiltersCombined:
 class TestQueryByFiltersComplexGlobs:
     """Test complex glob patterns that fall back to Python filtering."""
 
-    def test_complex_glob_recursive_middle(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_complex_glob_recursive_middle(test_catalog: DuckDBCatalog) -> None:
         """Test complex glob with ** in middle (requires Python filtering)."""
         results = test_catalog.query_by_filters(
             ALL_CHUNK_IDS,
@@ -620,7 +638,8 @@ class TestQueryByFiltersComplexGlobs:
         assertions.expect_equal(uris, {"src/nested/deep/file.py"})
         assertions.expect_equal(len(results), 1)
 
-    def test_complex_glob_bracket_expression(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_complex_glob_bracket_expression(test_catalog: DuckDBCatalog) -> None:
         """Test glob with bracket expression (requires Python filtering)."""
         # Note: fnmatch doesn't support bracket expressions the same way as bash,
         # but we test that complex patterns trigger Python filtering
@@ -638,7 +657,8 @@ class TestQueryByFiltersComplexGlobs:
 class TestQueryByFiltersEdgeCases:
     """Test edge cases and boundary conditions."""
 
-    def test_no_filters(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_no_filters(test_catalog: DuckDBCatalog) -> None:
         """Test that no filters behaves like query_by_ids."""
         ids = [1, 2, 3]
         results_filtered = test_catalog.query_by_filters(ids)
@@ -647,7 +667,8 @@ class TestQueryByFiltersEdgeCases:
         assertions.expect_equal(len(results_filtered), len(results_ids))
         assertions.expect_equal({r["id"] for r in results_filtered}, {r["id"] for r in results_ids})
 
-    def test_empty_ids(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_empty_ids(test_catalog: DuckDBCatalog) -> None:
         """Test that empty ID list returns empty results."""
         results = test_catalog.query_by_filters(
             [],
@@ -656,7 +677,8 @@ class TestQueryByFiltersEdgeCases:
 
         assertions.expect_equal(len(results), 0)
 
-    def test_no_matches(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_no_matches(test_catalog: DuckDBCatalog) -> None:
         """Test that filters matching no chunks return empty."""
         results = test_catalog.query_by_filters(
             [1, 2, 3],
@@ -665,7 +687,8 @@ class TestQueryByFiltersEdgeCases:
 
         assertions.expect_equal(len(results), 0)
 
-    def test_none_filters(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_none_filters(test_catalog: DuckDBCatalog) -> None:
         """Test that None filters behave like no filters."""
         ids = [1, 2, 3]
         results_none = test_catalog.query_by_filters(
@@ -678,7 +701,8 @@ class TestQueryByFiltersEdgeCases:
 
         assertions.expect_equal(len(results_none), len(results_no_filters))
 
-    def test_preserves_id_order(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_preserves_id_order(test_catalog: DuckDBCatalog) -> None:
         """Test that results preserve input ID order."""
         ids = [10, 5, 1, 8, 3]
         results = test_catalog.query_by_filters(
@@ -702,7 +726,8 @@ class TestQueryByFiltersEdgeCases:
 class TestConcurrentAccess:
     """Concurrency tests ensuring DuckDBCatalog handles parallel queries safely."""
 
-    def test_query_by_filters_thread_safe(self, test_catalog: DuckDBCatalog) -> None:
+    @staticmethod
+    def test_query_by_filters_thread_safe(test_catalog: DuckDBCatalog) -> None:
         """Execute 100 concurrent filter queries without race conditions."""
         test_catalog.open()
 
@@ -730,7 +755,8 @@ class TestConcurrentAccess:
         for uris in results:
             assertions.expect_equal(uris, expected_uris)
 
-    def test_query_without_explicit_open(self, tmp_path: Path) -> None:
+    @staticmethod
+    def test_query_without_explicit_open(tmp_path: Path) -> None:
         """query_by_filters should lazily initialize without calling open()."""
         db_path = tmp_path / "test.duckdb"
         vectors_dir = tmp_path / "vectors"
@@ -807,8 +833,8 @@ class TestQueryByFiltersParametrized:
             ("**/*.json", 1),
         ],
     )
+    @staticmethod
     def test_include_glob_patterns(
-        self,
         test_catalog: DuckDBCatalog,
         include_glob: str,
         expected_count: int,

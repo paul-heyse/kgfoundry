@@ -630,23 +630,51 @@ def _finalize_envelope(
 def cli_run(cfg: CliRunConfig) -> Iterator[tuple[CliContext, EnvelopeBuilder]]:
     """Execute a CLI command inside the standardised façade.
 
+    Extended Summary
+    ----------------
     This context manager provides a standardized execution environment for CLI
     commands, handling logging, metrics, envelope generation, and error handling.
     It yields a context object and envelope builder, then finalizes execution
-    metadata and optionally writes an envelope file.
+    metadata and optionally writes an envelope file. This function is the core
+    orchestration point for all CLI tools in the kgfoundry ecosystem, ensuring
+    consistent observability, error reporting, and envelope persistence across
+    all command invocations.
+
+    The context manager catches specific built-in exception types and
+    KgFoundryError explicitly to satisfy BLE001 (no blind exception catching).
+    System-level exceptions (SystemExit, KeyboardInterrupt, GeneratorExit)
+    are re-raised immediately without cleanup to allow proper system shutdown.
+    Custom exceptions not in the explicit list will propagate naturally, though
+    the finally block ensures cleanup always executes.
 
     Parameters
     ----------
     cfg : CliRunConfig
         Immutable configuration describing the intended CLI execution, including
-        route, operation name, error handling behavior, and output formatting.
+        route (normalized command path segments), operation name, error handling
+        behavior (exit_on_error flag), output formatting preferences, and envelope
+        persistence settings.
 
     Yields
     ------
     (CliContext, EnvelopeBuilder)
         Tuple containing the live :class:`CliContext` (providing runtime information
-        and logger) and the mutable :class:`EnvelopeBuilder` (for accumulating
-        execution results and metadata).
+        including command_path, operation, run_id, correlation_id, logger, and
+        paths) and the mutable :class:`EnvelopeBuilder` (for accumulating execution
+        results, artifacts, and metadata). The context is valid only within the
+        with-block; the envelope is finalized after block exit.
+
+    Raises
+    ------
+    SystemExit
+        When ``cfg.exit_on_error`` is ``True`` and user code raised an exception.
+        The exit code is 1 and the original exception is chained as the cause.
+        Also propagated immediately when user code explicitly raises SystemExit.
+    KeyboardInterrupt
+        When the user interrupts execution (e.g., Ctrl+C). Propagated immediately
+        so default signal handling semantics apply.
+    GeneratorExit
+        When the generator context is closed externally. Propagated immediately.
 
     Notes
     -----
@@ -665,7 +693,27 @@ def cli_run(cfg: CliRunConfig) -> Iterator[tuple[CliContext, EnvelopeBuilder]]:
         (problem details, status) will not occur for unlisted custom exceptions.
 
         When ``cfg.exit_on_error`` is ``False``, caught exceptions are re-raised
-        after cleanup to preserve their original type and traceback.
+        after cleanup via ``raise error`` to preserve their original type and
+        traceback. The re-raised exception type matches the original failure
+        (e.g., ValueError, TypeError, OSError, RuntimeError, KgFoundryError, or
+        any other built-in exception caught by the handler). When ``cfg.exit_on_error``
+        is ``True``, the exception is wrapped in ``SystemExit(1)`` and raised with
+        the original exception as the cause. When ``cfg.exit_on_error`` is ``False``,
+        the exception is re-raised directly via ``raise error`` (where ``error`` is
+        a variable containing the caught exception instance).
+
+    Performance & Side Effects:
+        Time complexity O(1) per invocation; I/O occurs during envelope finalization
+        (JSON serialization and file writes). Creates directories if needed for
+        envelope persistence. Emits metrics via the observability emitter. Logs
+        structured events at start and completion. Thread-safe for concurrent
+        CLI invocations (each has isolated context and envelope).
+
+    See Also
+    --------
+    CliRunConfig : Configuration dataclass for customizing execution behavior
+    CliContext : Runtime context object provided to user code
+    EnvelopeBuilder : Mutable builder for accumulating execution metadata
     """
     metadata = _prepare_execution_metadata(cfg)
     envelope = _build_envelope(
@@ -787,9 +835,6 @@ def cli_run(cfg: CliRunConfig) -> Iterator[tuple[CliContext, EnvelopeBuilder]]:
         return
     if cfg.exit_on_error:
         raise SystemExit(1) from error
-    # Re-raise the caught exception (error is BaseException from except clause)
-    # SystemExit and KeyboardInterrupt are re-raised immediately above
-    # All other exceptions are re-raised here after cleanup
     raise error
 
 

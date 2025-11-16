@@ -11,8 +11,10 @@ For stress tests with large corpora, see test_faiss_manager_stress.py.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from types import ModuleType
+from typing import cast
 
 import numpy as np
 import pytest
@@ -29,7 +31,7 @@ if not HAS_FAISS_SUPPORT:  # pragma: no cover - dependency-gated
 # Narrow FAISS module to concrete type for static checking
 if FAISS_MODULE is None:  # pragma: no cover - dependency-gated
     pytest.skip("FAISS bindings unavailable on this host", allow_module_level=True)
-faiss_module: Any = FAISS_MODULE
+faiss_module: ModuleType = cast("ModuleType", FAISS_MODULE)
 
 
 # Use modern numpy random generator
@@ -39,7 +41,7 @@ _rng = np.random.default_rng(42)
 _UNIT_TEST_VEC_DIM = 256
 
 
-def _nlist_value(index: Any) -> int | None:
+def _nlist_value(index: object) -> int | None:
     """Return nlist from nested FAISS index implementations.
 
     Returns
@@ -47,7 +49,7 @@ def _nlist_value(index: Any) -> int | None:
     int | None
         Extracted ``nlist`` value or ``None`` when unavailable.
     """
-    current: Any | None = index
+    current: object | None = index
     for _ in range(6):
         if current is None:
             break
@@ -64,7 +66,7 @@ def _nlist_value(index: Any) -> int | None:
     return None
 
 
-def _unwrap_primary_index(manager: FAISSManager) -> Any:
+def _unwrap_primary_index(manager: FAISSManager) -> object:
     """Return the concrete FAISS index implementation for assertions.
 
     Returns
@@ -73,13 +75,44 @@ def _unwrap_primary_index(manager: FAISSManager) -> Any:
         Underlying FAISS index object (downcast when available).
     """
     cpu_index = manager.require_cpu_index()
-    candidate: Any = getattr(cpu_index, "index", cpu_index)
+    candidate: object = getattr(cpu_index, "index", cpu_index)
     if hasattr(faiss_module, "downcast_index"):
         try:
             return faiss_module.downcast_index(candidate)
         except (AttributeError, RuntimeError):
             return candidate
     return candidate
+
+
+@dataclass(frozen=True)
+class IndexDescription:
+    """Structured description of FAISS index metadata for assertions."""
+
+    type_name: str
+    has_metric_type: bool
+    metric_type: int | None
+    has_nlist: bool
+
+
+def _describe_index(index: object) -> IndexDescription:
+    """Return diagnostic metadata for a FAISS index.
+
+    Returns
+    -------
+    IndexDescription
+        Structured metadata describing key properties (type name, metric info,
+        and nlist support) used in assertions.
+    """
+    type_name = type(index).__name__
+    has_metric_type = hasattr(index, "metric_type")
+    metric_type = getattr(index, "metric_type", None) if has_metric_type else None
+    has_nlist = hasattr(index, "nlist")
+    return IndexDescription(
+        type_name=type_name,
+        has_metric_type=has_metric_type,
+        metric_type=metric_type,
+        has_nlist=has_nlist,
+    )
 
 
 @pytest.fixture
@@ -152,37 +185,11 @@ def test_adaptive_index_selection(tmp_index_path: Path, n_vectors: int, expected
         isinstance(cpu_index, faiss_module.IndexIDMap2), reason="cpu_index should be IndexIDMap2"
     )
     underlying = _unwrap_primary_index(manager)
-    underlying_any = cast("Any", underlying)
-
-    # Get type information for debugging
-    underlying_type = type(underlying_any)
-    underlying_type_name = underlying_type.__name__
-    underlying_mro = [c.__name__ for c in underlying_type.__mro__]
-
-    # Check for metric_type attribute (IndexFlatIP uses METRIC_INNER_PRODUCT)
-    has_metric_type = hasattr(underlying_any, "metric_type")
-    metric_type = getattr(underlying_any, "metric_type", None) if has_metric_type else None
-
-    # Check for nlist attribute (IVF indexes have this)
-    has_nlist = hasattr(underlying_any, "nlist")
-
-    # Log type information for debugging (stored in variables for potential future assertions)
-    debug_n_vectors = n_vectors
-    debug_expected_type = expected_type
-    debug_underlying_type_name = underlying_type_name
-    debug_underlying_mro = underlying_mro
-    debug_has_metric_type = has_metric_type
-    debug_metric_type = metric_type
-    debug_has_nlist = has_nlist
-    _ = (
-        debug_n_vectors,
-        debug_expected_type,
-        debug_underlying_type_name,
-        debug_underlying_mro,
-        debug_has_metric_type,
-        debug_metric_type,
-        debug_has_nlist,
-    )
+    description = _describe_index(underlying)
+    underlying_type_name = description.type_name
+    has_metric_type = description.has_metric_type
+    metric_type = description.metric_type
+    has_nlist = description.has_nlist
 
     if expected_type == "flat":
         # Flat index: should have metric_type (METRIC_INNER_PRODUCT = 0) and no nlist
@@ -302,17 +309,17 @@ def test_medium_corpus_ivf_flat_nlist(tmp_index_path: Path) -> None:
         isinstance(cpu_index, faiss_module.IndexIDMap2), reason="cpu_index should be IndexIDMap2"
     )
     underlying = _unwrap_primary_index(manager)
-    underlying_any = cast("Any", underlying)
+    description = _describe_index(underlying)
     # Check by type name since isinstance may not work with dynamic types
     assertions.expect_true(
-        "IVFFlat" in type(underlying_any).__name__,
-        reason=f"Expected IVFFlat, got {type(underlying).__name__}",
+        "IVFFlat" in description.type_name,
+        reason=f"Expected IVFFlat, got {description.type_name}",
     )
 
     # Verify nlist is calculated correctly
     expected_nlist = min(int(np.sqrt(n_vectors)), n_vectors // 39)
     expected_nlist = max(expected_nlist, 100)
-    assertions.expect_equal(_nlist_value(underlying_any), expected_nlist)
+    assertions.expect_equal(_nlist_value(underlying), expected_nlist)
 
 
 def test_large_corpus_ivf_pq_nlist(tmp_index_path: Path) -> None:
@@ -343,12 +350,11 @@ def test_large_corpus_ivf_pq_nlist(tmp_index_path: Path) -> None:
         isinstance(cpu_index, faiss_module.IndexIDMap2), reason="cpu_index should be IndexIDMap2"
     )
     underlying = _unwrap_primary_index(manager)
-    underlying_any = cast("Any", underlying)
 
     # Verify nlist is calculated correctly
     expected_nlist = int(np.sqrt(n_vectors))
     expected_nlist = max(expected_nlist, 1024)
-    nlist_value = _nlist_value(underlying_any)
+    nlist_value = _nlist_value(underlying)
     assertions.expect_equal(
         nlist_value, expected_nlist, reason=f"Expected nlist {expected_nlist}, got {nlist_value}"
     )

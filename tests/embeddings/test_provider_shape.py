@@ -23,11 +23,26 @@ if "codeintel_rev.io.vllm_engine" not in sys.modules:  # pragma: no cover - test
         def __init__(self, *_args: object, **_kwargs: object) -> None:
             return None
 
-        def embed_batch_with_stats(self, texts: Sequence[str]) -> tuple[np.ndarray, int]:
+        @staticmethod
+        def embed_batch_with_stats(texts: Sequence[str]) -> tuple[np.ndarray, int]:
+            """Stub embed_batch_with_stats method.
+
+            Parameters
+            ----------
+            texts : Sequence[str]
+                Texts to embed.
+
+            Returns
+            -------
+            tuple[np.ndarray, int]
+                Zero vectors and text count.
+            """
             return np.zeros((len(texts), 1), dtype=np.float32), len(texts)
 
-        def close(self) -> None:
-            return None
+        @staticmethod
+        def close() -> None:
+            """Stub close method."""
+            return
 
     cast("Any", stub).InprocessVLLMEmbedder = _StubEmbedder
     sys.modules["codeintel_rev.io.vllm_engine"] = stub

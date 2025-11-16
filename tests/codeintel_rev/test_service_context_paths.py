@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, cast
+from typing import cast
 
 import pytest
 from codeintel_rev.app import config_context
+from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.mcp_server import service_context
 
 from tests._helpers import assertions
@@ -34,7 +35,8 @@ class RecordingFAISSManager:
         """Record CPU index load attempts."""
         self.load_calls += 1
 
-    def get_compile_options(self) -> dict[str, str]:
+    @staticmethod
+    def get_compile_options() -> dict[str, str]:
         """Return fake compile options for logging.
 
         Returns
@@ -119,12 +121,13 @@ def _assert_faiss_manager(manager: object, expected_path: Path) -> None:
         assertions.expect_equal(manager.index_path, expected_path)
 
 
-def _assert_faiss_ready(context: Any) -> None:
+def _assert_faiss_ready(context: ApplicationContext) -> None:
     ready, limits, error = context.ensure_faiss_ready()
     assertions.expect_true(ready, reason="faiss should be ready")
     assertions.expect_equal(limits, [])
     assertions.expect_equal(error, None)
-    assertions.expect_equal(context.faiss_manager.load_calls, 1)
+    manager = cast("RecordingFAISSManager", context.faiss_manager)
+    assertions.expect_equal(manager.load_calls, 1)
 
 
 def _assert_catalog(

@@ -37,15 +37,38 @@ def main() -> int:
 def run_demo(sql_path: Path) -> None:
     """Execute statements from the SQL script and print query results.
 
+    Extended Summary
+    ----------------
+    This function reads a SQL script file, splits it into executable statements,
+    and executes each statement against a DuckDB connection. Query results are
+    printed in a formatted table (up to 5 rows), while non-query statements
+    (CREATE, INSERT, etc.) are executed silently. This is used for demonstrating
+    DuckDB AST artifact queries in the kgfoundry documentation.
+
     Parameters
     ----------
-    sql_path :
-        Path to the SQL script (typically ``tools/demo_duckdb_ast.sql``).
+    sql_path : Path
+        Path to the SQL script file (typically ``tools/demo_duckdb_ast.sql``).
+        Must be readable and contain valid SQL statements terminated by semicolons.
 
     Raises
     ------
     ValueError
-        Raised when the script contains no executable SQL statements.
+        Raised when the script contains no executable SQL statements (empty file
+        or only comments/whitespace).
+
+    Notes
+    -----
+    Performance & Side Effects:
+        Time complexity O(n*m) where n is the number of statements and m is the
+        average statement size. Reads file from disk; executes SQL against DuckDB;
+        writes formatted output to stdout. Not thread-safe (uses global DuckDB
+        connection).
+
+    See Also
+    --------
+    _split_sql_statements : SQL statement splitting logic
+    _is_query : Query detection for result printing
     """
     sql_text = sql_path.read_text(encoding="utf-8")
     statements = list(_split_sql_statements(sql_text))
@@ -65,10 +88,19 @@ def run_demo(sql_path: Path) -> None:
 def _split_sql_statements(sql_text: str) -> list[str]:
     """Split a SQL script into executable statements.
 
+    Parameters
+    ----------
+    sql_text : str
+        Raw SQL script content containing one or more statements. Statements
+        are terminated by semicolons. Empty lines and lines starting with ``--``
+        (comments) are ignored.
+
     Returns
     -------
     list[str]
-        Statements ready to execute with DuckDB.
+        Statements ready to execute with DuckDB, with trailing semicolons and
+        whitespace removed. Returns empty list if sql_text contains no executable
+        statements (only comments/whitespace).
     """
     statements: list[str] = []
     buffer: list[str] = []
@@ -89,10 +121,17 @@ def _split_sql_statements(sql_text: str) -> list[str]:
 def _is_query(statement: str) -> bool:
     """Return True when the statement produces rows.
 
+    Parameters
+    ----------
+    statement : str
+        SQL statement text (with leading whitespace stripped). The function
+        checks if the statement starts with SELECT or WITH keywords (case-insensitive).
+
     Returns
     -------
     bool
-        ``True`` when the SQL statement yields a result set.
+        ``True`` when the SQL statement yields a result set (SELECT or WITH
+        queries), ``False`` for DDL/DML statements (CREATE, INSERT, etc.).
     """
     lowered = statement.lstrip().lower()
     return lowered.startswith(("select", "with"))
@@ -124,8 +163,15 @@ def _echo(message: str = "") -> None:
 
     Parameters
     ----------
-    message :
-        Text to emit. A newline is appended automatically.
+    message : str, optional
+        Text to emit (default: empty string). A newline is appended automatically.
+        Used for consistent output formatting in the demo script.
+
+    Notes
+    -----
+    Performance & Side Effects:
+        Time complexity O(1). Writes to stdout via sys.stdout.write. Thread-safe
+        for concurrent writes (though demo script is single-threaded).
     """
     sys.stdout.write(f"{message}\n")
 

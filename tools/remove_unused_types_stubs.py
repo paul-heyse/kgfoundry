@@ -138,17 +138,47 @@ def remove_packages_from_pyproject(packages_to_remove: list[str]) -> None:
 def main() -> int:
     """Run the removal workflow for unused types- stub packages.
 
+    Extended Summary
+    ----------------
+    This CLI tool automates the removal of unused type stub packages from
+    pyproject.toml dependencies. It reads an audit file listing removal candidates,
+    validates that type checking still passes after removal, and updates the
+    project configuration accordingly. This helps maintain a lean dependency
+    tree by removing stubs for packages that are no longer used.
+
     Returns
     -------
     int
-        Exit code (0 for success, non-zero for failure).
+        Exit code: 0 on success (stubs removed and type checking passes),
+        non-zero on failure (audit file missing, type checking fails, or
+        configuration update error).
+
+    Raises
+    ------
+    RuntimeError
+        When the audit file (types_stubs_deep_audit.json or
+        types_stubs_removal_candidates.json) is not found in the expected
+        location. This indicates the audit script must be run first.
+
+    Notes
+    -----
+    Performance & Side Effects:
+        Time complexity O(n) where n is the number of stub packages to remove.
+        Reads audit JSON and pyproject.toml from disk; writes updated pyproject.toml.
+        Runs type checkers (pyright/pyrefly) as validation, which may be slow.
+        Not thread-safe (modifies project configuration file).
+
+    See Also
+    --------
+    run_type_checkers : Type checking validation after removal
     """
     # Load removal candidates (try deep audit first, fallback to regular audit)
     candidates_file = REPO_ROOT / "tools" / "types_stubs_deep_audit.json"
     if not candidates_file.exists():
         candidates_file = REPO_ROOT / "tools" / "types_stubs_removal_candidates.json"
         if not candidates_file.exists():
-            raise RuntimeError("No audit file found. Run audit script first.")
+            message = "No audit file found. Run audit script first."
+            raise RuntimeError(message)
 
     with candidates_file.open(encoding="utf-8") as f:
         data = json.load(f)
@@ -158,7 +188,8 @@ def main() -> int:
     # Step 1: Baseline type checking
     success, output = run_type_checkers()
     if not success:
-        raise RuntimeError(f"Baseline type checking failed:\n{output}")
+        message = f"Baseline type checking failed:\n{output}"
+        raise RuntimeError(message)
 
     # Step 2: Remove packages
     remove_packages_from_pyproject(packages_to_remove)
@@ -166,7 +197,8 @@ def main() -> int:
     # Step 3: Verify type checking still passes
     success, output = run_type_checkers()
     if not success:
-        raise RuntimeError(f"Type checking failed after removal:\n{output}")
+        message = f"Type checking failed after removal:\n{output}"
+        raise RuntimeError(message)
 
     return 0
 

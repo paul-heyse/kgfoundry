@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from textwrap import dedent
+from typing import cast
 
 import pytest
 from codeintel_rev.cst_build.cst_collect import CSTCollector
@@ -69,8 +70,12 @@ def test_index_file_smoke(tmp_path: Path) -> None:
     assertions.expect_true(helper_node.doc is not None, reason="helper_node should have doc")
     if helper_node.doc is None:  # pragma: no cover - defensive
         pytest.fail("helper_node should have doc")
-    assertions.expect_in("def_", helper_node.doc)
-    assertions.expect_in("Sum incoming", helper_node.doc["def_"])
+    helper_doc = cast("dict[str, object]", helper_node.doc)
+    assertions.expect_in("def_", helper_doc)
+    def_section = helper_doc.get("def_")
+    assertions.expect_true(isinstance(def_section, str), reason="def_ section should be string")
+    if isinstance(def_section, str):
+        assertions.expect_in("Sum incoming", def_section)
 
 
 def test_qualified_names_and_call_targets(tmp_path: Path) -> None:
@@ -151,8 +156,11 @@ def test_stitching_links_module_and_scip(tmp_path: Path) -> None:
     assertions.expect_true(
         updated.stitch.scip_symbol is not None, reason="scip_symbol should be set"
     )
+    scip_symbol = updated.stitch.scip_symbol
+    if scip_symbol is None:  # pragma: no cover - defensive
+        pytest.fail("scip_symbol should be set")
     assertions.expect_true(
-        updated.stitch.scip_symbol.endswith("add#"), reason="scip_symbol should end with add#"
+        scip_symbol.endswith("add#"), reason="scip_symbol should end with add#"
     )
     assertions.expect_true(counters.module_matches >= 1, reason="should have module matches")
     assertions.expect_true(counters.scip_matches >= 1, reason="should have scip matches")

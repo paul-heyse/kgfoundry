@@ -107,10 +107,37 @@ def _format_section(title: str, values: Iterable[str]) -> str:
 def run() -> int:
     """Execute the drift checker CLI.
 
+    Extended Summary
+    ----------------
+    This CLI tool validates stub coverage for optional dependencies by comparing
+    the public API of runtime modules against their corresponding stub files.
+    It detects missing stubs, unexpected stubs, and import errors, ensuring
+    type checking remains accurate as optional dependencies evolve.
+
     Returns
     -------
     int
-        Exit code: 0 on success, 1 on failure.
+        Exit code: 0 on success (no drift detected), 1 on failure (drift detected
+        or import errors encountered).
+
+    Raises
+    ------
+    SystemExit
+        When stub drift is detected (missing or unexpected stubs) or when import
+        errors occur during module inspection. The exit code is 1, and the error
+        message includes a formatted summary of all drift issues found per module.
+
+    Notes
+    -----
+    Performance & Side Effects:
+        Time complexity O(n) where n is the number of modules inspected. Attempts
+        to import optional dependencies; may fail if dependencies are not installed.
+        Reads stub files from disk; no writes. Thread-safe for concurrent checks.
+
+    See Also
+    --------
+    _inspect_module : Core module inspection logic
+    MODULE_SPECS : Registry of modules to validate
     """
     parser = argparse.ArgumentParser(
         description="Validate stub coverage for optional dependencies."

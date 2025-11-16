@@ -39,6 +39,13 @@ MIN_TIMEOUT: Final[int] = 1
 MAX_TIMEOUT: Final[int] = 3600
 
 
+class _SupportsToolError(Protocol):
+    """Structural protocol describing optional tool error attributes."""
+
+    command: list[str]
+    problem: Mapping[str, object] | None
+
+
 class ToolExecutionError(RuntimeError):
     """Proxy error mirroring the `tools` module surface.
 
@@ -80,6 +87,7 @@ class ToolExecutionError(RuntimeError):
     single `message` parameter and return a RuntimeError instance.
     """
 
+    __slots__ = ("command", "problem")
     _factory: type[RuntimeError] | None = None
 
     def __new__(
@@ -94,8 +102,9 @@ class ToolExecutionError(RuntimeError):
             if not isinstance(error, RuntimeError):  # pragma: no cover - defensive
                 msg = "ToolExecutionError factory must return a RuntimeError instance"
                 raise TypeError(msg)
-            error.command = list(command or [])
-            error.problem = problem
+            tool_error = cast("_SupportsToolError", error)
+            tool_error.command = list(command or [])
+            tool_error.problem = problem
             return error
         return super().__new__(cls)
 

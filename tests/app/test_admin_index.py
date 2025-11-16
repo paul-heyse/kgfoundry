@@ -1,10 +1,14 @@
+"""Tests for admin index endpoints and runtime tuning functionality."""
+
 from __future__ import annotations
 
 from dataclasses import replace
 from http import HTTPStatus
+from pathlib import Path
 from typing import cast
 from unittest.mock import MagicMock
 
+import pytest
 from codeintel_rev.app.routers import index_admin
 from codeintel_rev.app.scope_store import ScopeStore
 from codeintel_rev.runtime.factory_adjustment import DefaultFactoryAdjuster
@@ -26,7 +30,10 @@ class _ScopeStoreStub:
         self.data[session_id] = dict(scope)
 
 
-def test_admin_tuning_updates_context(tmp_path, monkeypatch) -> None:
+def test_admin_tuning_updates_context(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that POST /admin/index/tuning updates the application context factory adjuster."""
     monkeypatch.setenv("CODEINTEL_ADMIN", "1")
     ctx = build_application_context(tmp_path)
     app = FastAPI()
@@ -46,14 +53,19 @@ def test_admin_tuning_updates_context(tmp_path, monkeypatch) -> None:
         assertions.expect_equal(adjuster.faiss_nprobe, 64)
 
 
-def test_admin_faiss_runtime_status_endpoint(tmp_path, monkeypatch) -> None:
+def test_admin_faiss_runtime_status_endpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that GET /admin/index/tuning/faiss returns current FAISS runtime tuning status."""
     monkeypatch.setenv("CODEINTEL_ADMIN", "1")
     ctx = build_application_context(tmp_path)
     manager = MagicMock()
     manager.runtime = MagicMock()
     manager.runtime.get_runtime_tuning.return_value = {"active": {"nprobe": 32}}
 
-    def _fake_get_manager(_self, _vec_dim, _manager=manager) -> MagicMock:
+    def _fake_get_manager(
+        _self: object, _vec_dim: int, _manager: MagicMock = manager
+    ) -> MagicMock:
         return _manager
 
     monkeypatch.setattr(ctx.__class__, "get_coderank_faiss_manager", _fake_get_manager)
@@ -66,7 +78,10 @@ def test_admin_faiss_runtime_status_endpoint(tmp_path, monkeypatch) -> None:
         assertions.expect_equal(resp.json()["active"]["nprobe"], 32)
 
 
-def test_admin_faiss_runtime_session_override(tmp_path, monkeypatch) -> None:
+def test_admin_faiss_runtime_session_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that POST /admin/index/tuning/faiss updates session-specific FAISS tuning."""
     monkeypatch.setenv("CODEINTEL_ADMIN", "1")
     ctx = build_application_context(tmp_path)
     stub = _ScopeStoreStub()
@@ -84,7 +99,10 @@ def test_admin_faiss_runtime_session_override(tmp_path, monkeypatch) -> None:
         assertions.expect_equal(stub.data["abc"]["faiss_tuning"]["nprobe"], 48)
 
 
-def test_admin_faiss_runtime_reset_session(tmp_path, monkeypatch) -> None:
+def test_admin_faiss_runtime_reset_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Test that DELETE /admin/index/tuning/faiss removes session-specific FAISS tuning."""
     monkeypatch.setenv("CODEINTEL_ADMIN", "1")
     ctx = build_application_context(tmp_path)
     stub = _ScopeStoreStub()

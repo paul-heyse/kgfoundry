@@ -8,9 +8,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 router = APIRouter(prefix="/diagnostics", tags=["diagnostics"])
 
 
-_DIAGNOSTICS_DISABLED_DETAIL = (
-    "Diagnostics endpoints disabled - observability removed"
-)
+_DIAGNOSTICS_DISABLED_DETAIL = "Diagnostics endpoints disabled - observability removed"
 
 
 @router.get("/run_report/{run_id}")

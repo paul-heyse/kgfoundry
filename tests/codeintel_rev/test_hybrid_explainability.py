@@ -1,4 +1,8 @@
+"""Tests for hybrid search engine explainability and method metadata recording."""
+
 from __future__ import annotations
+
+from pathlib import Path
 
 import pytest
 from codeintel_rev.app.capabilities import Capabilities
@@ -14,7 +18,7 @@ from codeintel_rev.plugins.registry import ChannelRegistry
 from tests._helpers import assertions
 
 
-def _build_engine(monkeypatch: pytest.MonkeyPatch, tmp_path) -> HybridSearchEngine:
+def _build_engine(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> HybridSearchEngine:
     monkeypatch.setenv("HYBRID_ENABLE_BM25", "0")
     monkeypatch.setenv("HYBRID_ENABLE_SPLADE", "0")
     monkeypatch.setenv("BM25_INDEX_DIR", str(tmp_path / "bm25"))
@@ -32,7 +36,10 @@ def _build_engine(monkeypatch: pytest.MonkeyPatch, tmp_path) -> HybridSearchEngi
     )
 
 
-def test_hybrid_engine_records_method_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_hybrid_engine_records_method_metadata(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Test that hybrid search engine records method metadata for explainability."""
     engine = _build_engine(monkeypatch, tmp_path)
     result = engine.search(
         "explainable query",

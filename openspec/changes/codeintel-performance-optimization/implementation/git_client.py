@@ -432,9 +432,21 @@ class AsyncGitClient:
         """
         try:
             return await asyncio.to_thread(
-                self._sync_client.blame_range, path, start_line, end_line
+                self._sync_client.blame_range,
+                path,
+                start_line,
+                end_line,
             )
-        except (FileNotFoundError, git.exc.GitCommandError):
+        except (FileNotFoundError, git.exc.GitCommandError) as exc:
+            LOGGER.exception(
+                "Async blame_range failed",
+                extra={
+                    "path": path,
+                    "start_line": start_line,
+                    "end_line": end_line,
+                    "error": str(exc),
+                },
+            )
             raise
 
     async def file_history(self, path: str, limit: int = 50) -> list[dict]:
@@ -463,7 +475,11 @@ class AsyncGitClient:
         """
         try:
             return await asyncio.to_thread(self._sync_client.file_history, path, limit)
-        except (FileNotFoundError, git.exc.GitCommandError):
+        except (FileNotFoundError, git.exc.GitCommandError) as exc:
+            LOGGER.exception(
+                "Async file_history failed",
+                extra={"path": path, "limit": limit, "error": str(exc)},
+            )
             raise
 
 

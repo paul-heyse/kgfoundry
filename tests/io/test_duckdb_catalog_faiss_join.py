@@ -1,3 +1,5 @@
+"""Tests for DuckDB catalog FAISS ID map view and materialized table operations."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -5,6 +7,7 @@ from pathlib import Path
 import duckdb
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pytest
 from codeintel_rev.io.duckdb_catalog import (
     IdMapMeta,
     ensure_faiss_idmap_view,
@@ -39,6 +42,7 @@ def _write_idmap(path: Path) -> None:
 
 
 def test_ensure_faiss_idmap_view_registers_join(tmp_path: Path) -> None:
+    """Test that ensure_faiss_idmap_view creates a join view between FAISS ID map and chunks."""
     chunks = tmp_path / "chunks.parquet"
     idmap = tmp_path / "faiss_idmap.parquet"
     _write_chunks(chunks)
@@ -57,6 +61,7 @@ def test_ensure_faiss_idmap_view_registers_join(tmp_path: Path) -> None:
 
 
 def test_refresh_faiss_idmap_materialized_skips_when_unchanged(tmp_path: Path) -> None:
+    """Test that refresh_faiss_idmap_materialized skips refresh when ID map hasn't changed."""
     chunks = tmp_path / "chunks.parquet"
     idmap = tmp_path / "faiss_idmap.parquet"
     _write_chunks(chunks)

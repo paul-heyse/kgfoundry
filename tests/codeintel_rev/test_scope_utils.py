@@ -36,7 +36,8 @@ async def test_get_effective_scope_valid_session_id_with_scope(
     result = await get_effective_scope(mock_application_context, session_id)
 
     # Assert
-    assertions.expect_equal(result, scope)
+    assert result is not None
+    assertions.expect_equal(dict(result), dict(scope))
 
 
 @pytest.mark.asyncio
@@ -76,7 +77,7 @@ def test_merge_scope_filters_scope_only() -> None:
     result = merge_scope_filters(scope, explicit_params)
 
     # Assert
-    assertions.expect_equal(result, scope)
+    assertions.expect_equal(result, dict(scope))
 
 
 def test_merge_scope_filters_explicit_params_only() -> None:

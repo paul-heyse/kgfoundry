@@ -93,7 +93,7 @@ def test_embed_batch_returns_expected_shape() -> None:
     embedder = InprocessVLLMEmbedder(config)
     vectors = embedder.embed_batch(["alpha", "beta"])
     assertions.expect_equal(vectors.shape, (2, config.embedding_dim))
-    assertions.expect_equal(vectors.dtype, np.float32)
+    assertions.expect_equal(vectors.dtype, np.dtype(np.float32))
 
 
 def test_embed_batch_handles_empty_input() -> None:

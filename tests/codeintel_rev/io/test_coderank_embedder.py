@@ -54,7 +54,7 @@ def test_encode_queries_applies_instruction_prefix(monkeypatch: pytest.MonkeyPat
 
     assertions.expect_true(fake_model.last_inputs[0].startswith("Represent this query: "))
     assertions.expect_equal(vectors.shape, (1, 2))
-    assertions.expect_equal(vectors.dtype, np.float32)
+    assertions.expect_equal(vectors.dtype, np.dtype(np.float32))
 
 
 def test_encode_codes_requires_input(monkeypatch: pytest.MonkeyPatch) -> None:

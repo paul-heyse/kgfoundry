@@ -1,3 +1,5 @@
+"""Tests for LibCST repository scanning: import collection and parse error handling."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -9,6 +11,7 @@ from tests._helpers import assertions
 
 
 def test_collect_imports_with_libcst(tmp_path: Path) -> None:
+    """Test that collect_imports_with_libcst collects imports, exports, and TYPE_CHECKING imports."""
     pytest.importorskip("libcst")
     module = tmp_path / "package" / "mod.py"
     module.parent.mkdir(parents=True)
@@ -37,6 +40,7 @@ def test_collect_imports_with_libcst(tmp_path: Path) -> None:
 
 
 def test_collect_imports_with_parse_error(tmp_path: Path) -> None:
+    """Test that collect_imports_with_libcst handles parse errors gracefully."""
     pytest.importorskip("libcst")
     faulty = tmp_path / "broken.py"
     faulty.write_text("def f(:\n", encoding="utf-8")

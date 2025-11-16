@@ -1,3 +1,5 @@
+"""Tests for minimal import validation of kgfoundry_common.config module."""
+
 from kgfoundry_common.config import AppSettings
 from tests._helpers import assertions
 

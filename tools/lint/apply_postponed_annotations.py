@@ -352,7 +352,7 @@ def process_directory(
             changed = rewrite_file(fpath, check_only=check_only)
             if changed:
                 modified += 1
-        except Exception:
+        except (OSError, RuntimeError):
             errors += 1
 
     return processed, modified, errors

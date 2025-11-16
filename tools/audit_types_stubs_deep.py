@@ -698,7 +698,6 @@ def _gather_initial_data() -> tuple[dict[str, str], dict[str, str], dict[str, li
     actual_imports = get_actual_imports()
     stdlib_modules = get_stdlib_modules()
 
-
     return types_packages, runtime_deps, actual_imports, stdlib_modules
 
 
@@ -712,7 +711,6 @@ def _gather_package_data() -> tuple[dict[str, str], set[str]]:
     """
     installed_packages = get_all_installed_packages()
     dependency_tree = get_full_dependency_tree()
-
 
     return installed_packages, dependency_tree
 
@@ -745,10 +743,9 @@ def _execute_audit_workflow(
         Tuple of (used_stubs, unused_stubs, stdlib_stubs, stub_to_package).
     """
     # Step 1: Map imports to packages
-    import_to_package, directly_used_packages = _map_imports_to_packages(
+    _import_to_package, directly_used_packages = _map_imports_to_packages(
         context.actual_imports, context.runtime_deps, context.installed_packages
     )
-
 
     # Step 2: All packages we need (direct + transitive from dependency tree)
     all_needed_packages = _determine_all_needed_packages(
@@ -758,12 +755,10 @@ def _execute_audit_workflow(
         context.installed_packages,
     )
 
-
     # Step 3: Check which packages ship py.typed
-    packages_with_typed, packages_needing_stubs = _check_packages_for_typed(
+    _packages_with_typed, packages_needing_stubs = _check_packages_for_typed(
         all_needed_packages, context.stdlib_modules
     )
-
 
     # Step 4: Map needed packages to types- stubs
     needed_stubs, stub_to_package = _map_packages_to_stubs(
@@ -779,7 +774,21 @@ def _execute_audit_workflow(
 
 
 def main() -> int:
-    """Run the deep types- stub packages audit."""
+    """Run the deep types- stub packages audit.
+
+    Extended Summary
+    ----------------
+    This CLI tool performs a comprehensive audit of type stub packages to identify
+    which stubs are actually used by the codebase and which can be safely removed.
+    It analyzes runtime dependencies, actual imports, and dependency trees to
+    determine stub usage patterns and generate removal recommendations.
+
+    Returns
+    -------
+    int
+        Exit code: 0 on success (audit completed), non-zero on failure
+        (data gathering or analysis error).
+    """
     # Gather initial data
     types_packages, runtime_deps, actual_imports, stdlib_modules = _gather_initial_data()
 
@@ -799,7 +808,6 @@ def main() -> int:
 
     # Save results
     _save_results(used_stubs, unused_stubs, stdlib_stubs, stub_to_package)
-
 
     return 0
 

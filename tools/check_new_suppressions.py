@@ -487,7 +487,21 @@ def _extract_guard_report(error: ConfigurationError) -> SuppressionGuardReport |
 
 
 def _format_violation_summary(report: SuppressionGuardReport) -> str:
-    """Return a human-readable summary of suppression violations."""
+    """Return a human-readable summary of suppression violations.
+
+    Parameters
+    ----------
+    report : SuppressionGuardReport
+        Suppression guard report containing violation details for one or more
+        files with untracked suppressions.
+
+    Returns
+    -------
+    str
+        Human-readable multi-line summary string listing all violations with
+        file paths, line numbers, and violation details. Formatted for console
+        output with emoji indicators.
+    """
     lines = [
         f"❌ Found {report.violation_count} suppression(s) without TICKET: tags",
         "",
@@ -516,19 +530,48 @@ def _format_violation_summary(report: SuppressionGuardReport) -> str:
 def main(argv: Sequence[str] | None = None) -> int:
     """Check source files for untracked suppressions.
 
+    Extended Summary
+    ----------------
+    This CLI tool scans Python source files for type suppression comments
+    (e.g., ``# type: ignore[...]``) that are not tracked in the suppression
+    registry. It validates that all suppressions have proper ticket references
+    and justification comments, ensuring code quality gates remain enforceable.
+
     Parameters
     ----------
     argv : Sequence[str] | None
-        Command-line arguments (None uses sys.argv).
+        Command-line arguments (None uses sys.argv). Must include at least one
+        directory path to scan. Each argument is resolved to an absolute path
+        and validated to exist.
 
     Returns
     -------
     int
-        Exit code: 0 on success, 1 on failure.
+        Exit code: 0 on success (no untracked suppressions found), 1 on failure
+        (untracked suppressions detected or configuration error).
+
+    Raises
+    ------
+    SystemExit
+        When no directories are provided in argv, or when a configuration error
+        occurs during directory resolution. The exit code is 1, and the error
+        message describes the issue.
+
+    Notes
+    -----
+    Performance & Side Effects:
+        Time complexity O(n) where n is the total number of Python files scanned.
+        Reads source files from disk; no writes. Thread-safe for concurrent scans.
+
+    See Also
+    --------
+    resolve_target_directories : Directory resolution and validation logic
+    run_suppression_guard : Core suppression checking algorithm
     """
     arguments = list(argv if argv is not None else sys.argv[1:])
     if not arguments:
-        raise SystemExit("Usage: python tools/check_new_suppressions.py <directories...>")
+        usage_message = "Usage: python tools/check_new_suppressions.py <directories...>"
+        raise SystemExit(usage_message)
 
     try:
         directories = resolve_target_directories(arguments)
@@ -542,7 +585,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if report is None:
             raise SystemExit(str(error)) from error
         message = _format_violation_summary(report)
-        raise SystemExit(message)
+        raise SystemExit(message) from error
 
     return 0
 

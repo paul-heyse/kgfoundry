@@ -1,3 +1,5 @@
+"""Tests for MCP registry contracts: tool calling and response formatting."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -32,6 +34,7 @@ def _faiss_search(query: str, top_k: int) -> list[tuple[int, float]]:
 
 
 def test_call_tool_includes_summary_for_search() -> None:
+    """Test that call_tool includes summary and structured content for search operations."""
     deps = McpDeps(catalog=_StubCatalog(), faiss_search=_faiss_search)
     response = call_tool(deps, "search", {"query": "foo", "top_k": 1})
     assertions.expect_in("content", response)
@@ -41,6 +44,7 @@ def test_call_tool_includes_summary_for_search() -> None:
 
 
 def test_call_tool_includes_summary_for_fetch() -> None:
+    """Test that call_tool includes summary and structured content for fetch operations."""
     deps = McpDeps(catalog=_StubCatalog())
     response = call_tool(deps, "fetch", {"objectIds": ["1"]})
     assertions.expect_in("content", response)

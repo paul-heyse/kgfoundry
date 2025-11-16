@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: MIT
+"""Tests for output writers: JSONL and Parquet dataset writing."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -23,6 +25,7 @@ def test_jsonl_writer_is_deterministic(tmp_path: Path, monkeypatch: pytest.Monke
 
 
 def test_parquet_dataset_partitions_by_column(tmp_path: Path) -> None:
+    """Test that parquet dataset writer partitions data by specified column."""
     ds = pytest.importorskip("pyarrow.dataset")
     rows = [
         {"module_name": "pkg.alpha", "path": "pkg/alpha.py", "language": "py"},

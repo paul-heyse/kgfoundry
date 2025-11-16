@@ -382,7 +382,6 @@ def main() -> int:
     actual_imports = get_actual_imports()
     stdlib_modules = get_stdlib_modules()
 
-
     # Analyze usage
     used_stubs, stdlib_stubs, unused_stubs = _analyze_usage(
         actual_imports, runtime_deps, types_packages, stdlib_modules
@@ -390,7 +389,6 @@ def main() -> int:
 
     # Save removal candidates
     removal_candidates = sorted(stdlib_stubs | unused_stubs)
-
 
     # Save to file
     output_file = REPO_ROOT / "tools" / "types_stubs_removal_candidates.json"
@@ -404,7 +402,6 @@ def main() -> int:
             f,
             indent=2,
         )
-
 
     return 0
 

@@ -1,3 +1,5 @@
+"""Tests for scope integration: persistence, filtering, and scope store operations."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -162,6 +164,7 @@ def _write_repo(repo_root: Path) -> None:
 
 @pytest.mark.asyncio
 async def test_set_scope_persists_in_store(tmp_path: Path, mock_session_id: str) -> None:
+    """Test that set_scope persists scope data in the scope store."""
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     context = _build_context(repo_root)
@@ -175,6 +178,7 @@ async def test_set_scope_persists_in_store(tmp_path: Path, mock_session_id: str)
 
 @pytest.mark.asyncio
 async def test_list_paths_honours_scope_filters(tmp_path: Path, mock_session_id: str) -> None:
+    """Test that list_paths respects scope filters (include_globs, languages)."""
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     _write_repo(repo_root)
@@ -193,6 +197,7 @@ async def test_list_paths_honours_scope_filters(tmp_path: Path, mock_session_id:
 
 
 def test_merge_scope_filters_precedence() -> None:
+    """Test that merge_scope_filters applies filters with correct precedence."""
     scope: ScopeIn = cast(
         "ScopeIn",
         {

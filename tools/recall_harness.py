@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import logging
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from itertools import product
@@ -14,6 +15,8 @@ from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.io.hybrid_search import BM25Rm3Config, BM25SearchProvider
 from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
 from codeintel_rev.retrieval.types import SearchHit
+
+LOGGER = logging.getLogger(__name__)
 
 MIN_TREC_FIELDS = 4
 
@@ -319,10 +322,17 @@ def _record_recall_metrics(rows: list[dict[str, object]], k_values: Sequence[int
             value = row.get(f"recall@{k}")
             if isinstance(value, (int, float)):
                 per_k[k].append(float(value))
-    for k, values in per_k.items():
-        if values:
-            average = sum(values) / len(values)
-            print(f"Recall summary: k={k} average_recall={round(average, 4)} samples={len(values)}")
+        for k, values in per_k.items():
+            if values:
+                average = sum(values) / len(values)
+                LOGGER.info(
+                    "Recall summary",
+                    extra={
+                        "k": k,
+                        "average_recall": round(average, 4),
+                        "samples": len(values),
+                    },
+                )
 
 
 def main() -> None:

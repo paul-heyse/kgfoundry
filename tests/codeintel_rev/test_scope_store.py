@@ -1,3 +1,5 @@
+"""Tests for scope store components: LRU cache, async single-flight, and scope store."""
+
 from __future__ import annotations
 
 import asyncio
@@ -11,6 +13,9 @@ from codeintel_rev.mcp_server.schemas import ScopeIn
 
 from tests._helpers import assertions
 
+# Test constants for single-flight test results
+_EXPECTED_SINGLE_FLIGHT_RESULT = 42
+
 
 class FakeClock:
     """Simple monotonic clock for deterministic TTL testing."""
@@ -19,13 +24,22 @@ class FakeClock:
         self._now = 0.0
 
     def now(self) -> float:
+        """Return current clock time.
+
+        Returns
+        -------
+        float
+            Current clock time value.
+        """
         return self._now
 
     def advance(self, seconds: float) -> None:
+        """Advance clock by specified seconds."""
         self._now += seconds
 
 
 def test_lru_cache_evicts_least_recently_used() -> None:
+    """Test that LRU cache evicts least recently used entries when capacity is exceeded."""
     clock = FakeClock()
     cache: LRUCache[str, int] = LRUCache(maxsize=2, ttl_seconds=None, now_fn=clock.now)
 
@@ -44,6 +58,7 @@ def test_lru_cache_evicts_least_recently_used() -> None:
 
 
 def test_lru_cache_ttl_expires_entries_on_access() -> None:
+    """Test that LRU cache expires entries based on TTL when accessed."""
     clock = FakeClock()
     cache: LRUCache[str, str] = LRUCache(maxsize=4, ttl_seconds=1.0, now_fn=clock.now)
 
@@ -60,6 +75,7 @@ def test_lru_cache_ttl_expires_entries_on_access() -> None:
 
 
 def test_lru_cache_is_thread_safe() -> None:
+    """Test that LRU cache operations are thread-safe under concurrent access."""
     cache: LRUCache[str, int] = LRUCache(maxsize=128, ttl_seconds=None)
 
     def writer_reader(idx: int) -> int | None:
@@ -84,6 +100,13 @@ class FakeRedis:
         self.setex_calls: list[int] = []
 
     async def get(self, name: str) -> bytes | None:
+        """Get value by key, returning None if expired or missing.
+
+        Returns
+        -------
+        bytes | None
+            Value associated with key, or None if expired or missing.
+        """
         self.get_calls += 1
         record = self._data.get(name)
         if record is None:
@@ -95,17 +118,38 @@ class FakeRedis:
         return value
 
     async def setex(self, name: str, time: int, value: bytes) -> bool | None:
+        """Set value with expiration time.
+
+        Returns
+        -------
+        bool | None
+            True on success.
+        """
         expires_at = time_module.monotonic() + time if time > 0 else None
         self.setex_calls.append(time)
         self._data[name] = (value, expires_at)
         return True
 
     async def set(self, name: str, value: bytes) -> bool | None:
+        """Set value without expiration.
+
+        Returns
+        -------
+        bool | None
+            True on success.
+        """
         self.set_calls += 1
         self._data[name] = (value, None)
         return True
 
     async def delete(self, *names: str) -> int | None:
+        """Delete one or more keys, returning count of deleted keys.
+
+        Returns
+        -------
+        int | None
+            Number of keys deleted.
+        """
         removed = 0
         for entry in names:
             if self._data.pop(entry, None) is not None:
@@ -113,9 +157,17 @@ class FakeRedis:
         return removed
 
     async def close(self) -> None:
+        """Clear all data."""
         self._data.clear()
 
     def contains(self, key: str) -> bool:
+        """Check if key exists in store.
+
+        Returns
+        -------
+        bool
+            True if key exists, False otherwise.
+        """
         return key in self._data
 
 
@@ -134,6 +186,7 @@ def _sample_scope() -> ScopeIn:
 
 @pytest.mark.asyncio
 async def test_scope_store_prefers_l1_cache() -> None:
+    """Test that scope store prefers L1 cache hits over L2 Redis lookups."""
     redis = FakeRedis()
     store = ScopeStore(redis, l1_maxsize=8, l1_ttl_seconds=30.0, l2_ttl_seconds=3600)
 
@@ -152,6 +205,7 @@ async def test_scope_store_prefers_l1_cache() -> None:
 
 @pytest.mark.asyncio
 async def test_scope_store_l2_fetch_coalesces_requests() -> None:
+    """Test that concurrent L2 fetches are coalesced via single-flight semantics."""
     redis = FakeRedis()
     store = ScopeStore(redis, l1_maxsize=8, l1_ttl_seconds=30.0, l2_ttl_seconds=3600)
 
@@ -172,6 +226,7 @@ async def test_scope_store_l2_fetch_coalesces_requests() -> None:
 
 @pytest.mark.asyncio
 async def test_scope_store_delete_clears_l1_and_l2() -> None:
+    """Test that delete operation clears both L1 cache and L2 Redis storage."""
     redis = FakeRedis()
     store = ScopeStore(redis, l1_maxsize=8, l1_ttl_seconds=30.0, l2_ttl_seconds=3600)
 
@@ -190,6 +245,7 @@ async def test_scope_store_delete_clears_l1_and_l2() -> None:
 
 @pytest.mark.asyncio
 async def test_scope_store_without_l2_ttl_uses_set() -> None:
+    """Test that scope store uses SET instead of SETEX when L2 TTL is None."""
     redis = FakeRedis()
     store = ScopeStore(redis, l1_maxsize=8, l1_ttl_seconds=30.0, l2_ttl_seconds=None)
 
@@ -205,6 +261,7 @@ async def test_scope_store_without_l2_ttl_uses_set() -> None:
 
 @pytest.mark.asyncio
 async def test_async_single_flight_coalesces_calls() -> None:
+    """Test that async single-flight coalesces concurrent calls to the same key."""
     flight: AsyncSingleFlight[str, int] = AsyncSingleFlight()
     call_count = 0
 
@@ -212,18 +269,20 @@ async def test_async_single_flight_coalesces_calls() -> None:
         nonlocal call_count
         call_count += 1
         await asyncio.sleep(0.01)
-        return 42
+        return _EXPECTED_SINGLE_FLIGHT_RESULT
 
     results = await asyncio.gather(*[flight.do("scope", expensive_call) for _ in range(10)])
 
     assertions.expect_true(
-        all(result == 42 for result in results), reason="all results should be 42"
+        all(result == _EXPECTED_SINGLE_FLIGHT_RESULT for result in results),
+        reason=f"all results should be {_EXPECTED_SINGLE_FLIGHT_RESULT}",
     )
     assertions.expect_equal(call_count, 1)
 
 
 @pytest.mark.asyncio
 async def test_async_single_flight_propagates_exceptions_and_allows_retry() -> None:
+    """Test that async single-flight propagates exceptions and allows retry after failure."""
     flight: AsyncSingleFlight[str, int] = AsyncSingleFlight()
     call_count = 0
 

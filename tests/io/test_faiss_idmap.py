@@ -45,14 +45,13 @@ def test_export_idmap_round_trip(tmp_path: Path) -> None:
         all(name == "index.faiss" for name in index_names), reason="all index names should match"
     )
     timestamps = table.column("ts").to_pylist()
-    assertions.expect_true(
-        isinstance(timestamps[0], datetime), reason="timestamp should be datetime"
-    )
     if not timestamps:  # pragma: no cover - defensive
         pytest.fail("timestamp column should be populated")
-    assertions.expect_true(
-        timestamps[0].tzinfo is not None, reason="timestamp should be timezone-aware"
-    )
+    first_ts = timestamps[0]
+    assertions.expect_true(isinstance(first_ts, datetime), reason="timestamp should be datetime")
+    if not isinstance(first_ts, datetime):  # pragma: no cover - defensive
+        pytest.fail("timestamp did not serialize as datetime")
+    assertions.expect_true(first_ts.tzinfo is not None, reason="timestamp should be timezone-aware")
 
 
 def test_duckdb_join_with_idmap(tmp_path: Path) -> None:

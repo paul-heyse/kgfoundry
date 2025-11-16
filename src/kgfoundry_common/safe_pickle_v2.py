@@ -525,9 +525,7 @@ class SignedPickleWrapper:
             )
             raise UnsafeSerializationError(msg, reason="signature_mismatch")
 
-        result = _load_with_allow_list(io.BytesIO(payload))
-
-        return result
+        return _load_with_allow_list(io.BytesIO(payload))
 
 
 # [nav:anchor load_unsigned_legacy]

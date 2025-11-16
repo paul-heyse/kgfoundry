@@ -39,7 +39,7 @@ def test_run_suppression_guard_detects_missing_ticket(tmp_path: Path) -> None:
 
     context = excinfo.value.context
     expected_report = check_directory(tmp_path)
-    assertions.expect_equal(context, build_guard_context(expected_report))
+    assertions.expect_equal(dict(context), dict(build_guard_context(expected_report)))
 
 
 def test_run_suppression_guard_allows_ticket_metadata(tmp_path: Path) -> None:

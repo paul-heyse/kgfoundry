@@ -284,8 +284,6 @@ class ScopeRegistry:
             for session_id in expired_sessions:
                 del self._scopes[session_id]
                 pruned_count += 1
-            remaining_sessions = len(self._scopes)
-
         return pruned_count
 
     def get_session_count(self) -> int:

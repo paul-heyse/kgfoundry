@@ -47,12 +47,19 @@ def main() -> int:
         action="store_true",
         help="Write a JSON envelope to stdout with detailed violations.",
     )
-    args: argparse.Namespace = parser.parse_args()
+    args = parser.parse_args()
 
     result = architecture.enforce_tooling_layers()
     envelope = _build_envelope(result)
 
-    sys.stdout.write(render_cli_envelope(envelope) + "\n")
+    if args.json:
+        sys.stdout.write(render_cli_envelope(envelope) + "\n")
+    elif result.is_success:
+        sys.stdout.write("No import violations detected.\n")
+    else:
+        sys.stdout.write("Import architecture violations detected:\n")
+        for violation in result.violations:
+            sys.stdout.write(f"- {violation}\n")
 
     return 0 if result.is_success else 1
 

@@ -133,10 +133,10 @@ def test_hybrid_evaluator_writes_metrics(tmp_path: Path) -> None:
     assertions.expect_true(0.0 < report.recall_at_k <= 1.0)
     assertions.expect_true(config.pool_path.exists())
     table = pq.read_table(config.pool_path)
-    assertions.expect_sequence_equal(
-        sorted(set(table.column("channel").to_pylist())),
-        ["faiss", "oracle"],
-    )
+    channel_values = [
+        value for value in table.column("channel").to_pylist() if isinstance(value, str)
+    ]
+    assertions.expect_sequence_equal(sorted(set(channel_values)), ["faiss", "oracle"])
     assertions.expect_in("symbol_hits", table.column_names)
     assertions.expect_true(
         all(isinstance(val, list) for val in table.column("symbol_hits").to_pylist())
@@ -157,4 +157,7 @@ def test_hybrid_evaluator_adds_xtr_rows(tmp_path: Path) -> None:
     config = _config(tmp_path, use_xtr_oracle=True)
     evaluator.run(config)
     table = pq.read_table(config.pool_path)
-    assertions.expect_in("xtr", set(table.column("channel").to_pylist()))
+    oracle_channels = {
+        value for value in table.column("channel").to_pylist() if isinstance(value, str)
+    }
+    assertions.expect_in("xtr", oracle_channels)

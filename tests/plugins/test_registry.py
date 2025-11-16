@@ -1,3 +1,5 @@
+"""Tests for plugin registry: channel discovery and entry point loading."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -20,14 +22,36 @@ class _ToyChannel(Channel):
     cost = 0.1
     requires = frozenset()
 
-    def search(self, query: str, limit: int) -> Sequence[SearchHit]:
+    @staticmethod
+    def search(query: str, limit: int) -> Sequence[SearchHit]:
+        """Stub search method.
+
+        Parameters
+        ----------
+        query : str
+            Search query string.
+        limit : int
+            Maximum number of results.
+
+        Returns
+        -------
+        Sequence[SearchHit]
+            List of search hits.
+        """
         assertions.expect_true(bool(query), reason="query should be non-empty")
         _ = limit
         return [SearchHit(doc_id="1", rank=0, score=1.0, source="toy")]
 
 
 class _FakeEntryPoint:
-    def __init__(self, factory) -> None:
+    def __init__(self, factory: object) -> None:
+        """Initialize fake entry point.
+
+        Parameters
+        ----------
+        factory : object
+            Factory function to return.
+        """
         self.name = "toy"
         self._factory = factory
 
@@ -36,6 +60,8 @@ class _FakeEntryPoint:
 
 
 def test_registry_discovers_entry_points(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test that channel registry discovers channels via entry points."""
+
     def fake_entry_points(*, group: str) -> list[_FakeEntryPoint]:
         assertions.expect_equal(group, "codeintel_rev.channels")
 

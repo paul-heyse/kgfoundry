@@ -1,7 +1,9 @@
+"""Tests for MCP search and fetch golden paths: structured results and content hydration."""
+
 from __future__ import annotations
 
 import importlib.util
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import cast
 
@@ -16,6 +18,7 @@ from codeintel_rev.retrieval.mcp_search import (
     SearchFilters,
     SearchRequest,
     SearchResponse,
+    VectorRuntime,
     run_fetch,
     run_search,
 )
@@ -32,8 +35,15 @@ class _StubEmbedder:
         return [float(len(text))] * self._dim
 
 
-class _StubFaissRuntime:
-    def get_runtime_tuning(self) -> dict[str, object]:
+class _StubFaissRuntime(VectorRuntime):
+    def get_runtime_tuning(self) -> Mapping[str, object]:
+        """Stub get_runtime_tuning method.
+
+        Returns
+        -------
+        Mapping[str, object]
+            Empty runtime tuning dict.
+        """
         return {"active": {}}
 
 
@@ -43,10 +53,14 @@ class _StubFaiss:
     refine_k_factor = 1.0
 
     def __init__(self) -> None:
-        self.runtime = _StubFaissRuntime()
+        self._runtime = _StubFaissRuntime()
 
+    @property
+    def runtime(self) -> VectorRuntime:
+        return self._runtime
+
+    @staticmethod
     def search(
-        self,
         query: NDArrayF32,
         k: int | None = None,
         *,
@@ -54,6 +68,26 @@ class _StubFaiss:
         runtime: SearchRuntimeOverrides | None = None,
         catalog: object | None = None,
     ) -> tuple[NDArrayF32, NDArrayI64]:
+        """Stub search method.
+
+        Parameters
+        ----------
+        query : NDArrayF32
+            Query vector.
+        k : int | None, optional
+            Number of results, by default None.
+        nprobe : int | None, optional
+            Number of probes, by default None.
+        runtime : SearchRuntimeOverrides | None, optional
+            Runtime overrides, by default None.
+        catalog : object | None, optional
+            Catalog object, by default None.
+
+        Returns
+        -------
+        tuple[NDArrayF32, NDArrayI64]
+            Distances and identifiers.
+        """
         _ = (query, k, nprobe, runtime, catalog)
         distances: NDArrayF32 = np.array([[0.91, 0.88]], dtype=np.float32)
         identifiers: NDArrayI64 = np.array([[1, 2]], dtype=np.int64)
@@ -139,6 +173,7 @@ class _StubSettings:
 
 
 def test_run_search_returns_structured_results(tmp_path: Path) -> None:
+    """Test that run_search returns structured results with metadata and explainability."""
     catalog = _StubCatalog()
     deps = SearchDependencies(
         faiss=_StubFaiss(),
@@ -171,6 +206,7 @@ def test_run_search_returns_structured_results(tmp_path: Path) -> None:
 
 
 def test_run_fetch_hydrates_content() -> None:
+    """Test that run_fetch hydrates content from catalog for requested object IDs."""
     catalog = _StubCatalog()
     deps = FetchDependencies(
         catalog=catalog,

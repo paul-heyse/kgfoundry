@@ -153,10 +153,18 @@ def _param_kind(p: object) -> str:
 def _section_kind(section: object) -> str:
     """Return a lowercase identifier describing a docstring section.
 
+    Parameters
+    ----------
+    section : object
+        Griffe docstring section object with a ``kind`` attribute containing
+        an enum value. The function extracts the enum value and converts it
+        to a lowercase string identifier.
+
     Returns
     -------
     str
-        Lowercase section identifier.
+        Lowercase section identifier (e.g., "parameters", "returns", "raises").
+        Returns empty string if section lacks a kind attribute.
     """
     kind = getattr(getattr(section, "kind", None), "value", "")
     return str(kind).lower()
@@ -165,10 +173,20 @@ def _section_kind(section: object) -> str:
 def _extract_doc_params(section_value: object) -> list[ApiParam]:
     """Return parameters documented in a docstring section.
 
+    Parameters
+    ----------
+    section_value : object
+        Griffe docstring section object containing parameter documentation.
+        May have a ``parameters`` attribute (list) or be a list directly.
+        Each item should have ``name``/``arg_name``, ``annotation``, and
+        ``description`` attributes.
+
     Returns
     -------
     list[ApiParam]
-        Parameters parsed from the docstring.
+        Parameters parsed from the docstring, each with name, annotated_type,
+        kind="doc", and optional doc string. Returns empty list if section_value
+        is neither a list nor has a parameters attribute.
     """
     params_source = getattr(section_value, "parameters", None)
     if isinstance(params_source, list):
@@ -194,10 +212,19 @@ def _extract_doc_params(section_value: object) -> list[ApiParam]:
 def _extract_doc_return(section_value: object) -> ApiReturn | None:
     """Return the documented return record, if any.
 
+    Parameters
+    ----------
+    section_value : object
+        Griffe docstring section object containing return documentation.
+        May have a ``returns`` attribute (list) or be a list directly.
+        Alternatively, may have a ``description`` attribute for simple
+        return documentation.
+
     Returns
     -------
     ApiReturn | None
-        Parsed return description, if present.
+        Parsed return description with annotated_type and doc, if present.
+        Returns None if no return documentation is found in section_value.
     """
     entries_source = getattr(section_value, "returns", None)
     if isinstance(entries_source, list):
@@ -220,10 +247,19 @@ def _extract_doc_return(section_value: object) -> ApiReturn | None:
 def _extract_doc_raises(section_value: object) -> list[ApiRaise]:
     """Return exceptions documented in the docstring.
 
+    Parameters
+    ----------
+    section_value : object
+        Griffe docstring section object containing exception documentation.
+        May have a ``raises`` attribute (list) or be a list directly.
+        Each item should have ``annotation`` (exception type) and ``description``
+        attributes.
+
     Returns
     -------
     list[ApiRaise]
-        Documented exceptions.
+        Documented exceptions, each with exception type name and optional doc.
+        Returns empty list if section_value lacks raises documentation.
     """
     entries_source = getattr(section_value, "raises", None)
     if isinstance(entries_source, list):
@@ -246,10 +282,21 @@ def _parse_doc_sections(
 ) -> tuple[list[ApiParam], ApiReturn | None, list[ApiRaise]]:
     """Parse structured docstring sections using Griffe's parser.
 
+    Parameters
+    ----------
+    text : str | None
+        Raw docstring text to parse, or None to return empty results.
+        Must be valid docstring content matching the specified style.
+    style : DocstringStyle
+        Griffe docstring style enum (e.g., DocstringStyle.GOOGLE, DocstringStyle.NUMPYDOC).
+        Determines the parsing rules applied to text.
+
     Returns
     -------
     tuple[list[ApiParam], ApiReturn | None, list[ApiRaise]]
         Parameter, return, and raises metadata derived from the docstring.
+        Returns empty lists and None if text is None, griffe is unavailable,
+        or parsing fails.
     """
     if not text or griffe is None or Docstring is None:
         return ([], None, [])
@@ -284,10 +331,17 @@ def _parse_doc_sections(
 def _symbol_kind(obj: GriffeObject) -> Kind:
     """Return a normalized symbol kind for a Griffe object.
 
+    Parameters
+    ----------
+    obj : GriffeObject
+        Griffe API object (function, class, module, or attribute) to classify.
+        Must have boolean properties ``is_function``, ``is_class``, and ``is_module``.
+
     Returns
     -------
     Kind
-        Symbol classification (module/class/function/attribute).
+        Symbol classification string: "function", "class", "module", or "attribute".
+        Returns "attribute" as the default fallback if obj doesn't match other kinds.
     """
     if obj.is_function:
         return "function"
@@ -301,10 +355,17 @@ def _symbol_kind(obj: GriffeObject) -> Kind:
 def _symbol_location(obj: GriffeObject) -> tuple[str | None, int | None]:
     """Return (filepath, lineno) for a Griffe object.
 
+    Parameters
+    ----------
+    obj : GriffeObject
+        Griffe API object with an optional ``location`` attribute containing
+        filepath and line number information.
+
     Returns
     -------
     tuple[str | None, int | None]
-        Path and starting line number if available.
+        Path and starting line number if available. Returns (None, None) if obj
+        lacks a location attribute or location lacks filepath/lineno.
     """
     loc = getattr(obj, "location", None)
     if not loc:
@@ -317,10 +378,18 @@ def _symbol_location(obj: GriffeObject) -> tuple[str | None, int | None]:
 def _parameters_from_signature(parameters: Iterable[object]) -> list[ApiParam]:
     """Return ApiParam objects derived from a Griffe parameter list.
 
+    Parameters
+    ----------
+    parameters : Iterable[object]
+        Iterable of Griffe Parameter objects, each with ``name``, ``kind``,
+        ``annotation``, and optional ``default`` attributes.
+
     Returns
     -------
     list[ApiParam]
-        Parameters extracted from the provided iterable.
+        Parameters extracted from the provided iterable, each with name, kind,
+        annotated_type (rendered expression), and optional default (rendered
+        expression). Returns empty list if parameters is empty.
     """
     return [
         ApiParam(
@@ -336,10 +405,18 @@ def _parameters_from_signature(parameters: Iterable[object]) -> list[ApiParam]:
 def _signature_from_object(obj: GriffeObject) -> tuple[list[ApiParam], ApiReturn | None]:
     """Extract signature parameters and return annotation from code.
 
+    Parameters
+    ----------
+    obj : GriffeObject
+        Griffe API object (function or class) to extract signature from.
+        For functions, extracts parameters and return annotation directly.
+        For classes, extracts parameters from ``__init__`` method if present.
+
     Returns
     -------
     tuple[list[ApiParam], ApiReturn | None]
-        Parameters derived from code plus return annotation.
+        Parameters derived from code plus return annotation. For classes,
+        returns empty parameter list if ``__init__`` is missing or not a function.
     """
     params: list[ApiParam] = []
     returns: ApiReturn | None = None
@@ -358,10 +435,21 @@ def _signature_from_object(obj: GriffeObject) -> tuple[list[ApiParam], ApiReturn
 def _merge_param_docs(code_params: list[ApiParam], doc_params: list[ApiParam]) -> list[ApiParam]:
     """Merge docstring parameter descriptions into code-derived parameters.
 
+    Parameters
+    ----------
+    code_params : list[ApiParam]
+        Parameters extracted from function/class signature (code-derived).
+        These provide the canonical parameter names, types, and defaults.
+    doc_params : list[ApiParam]
+        Parameters extracted from docstring (documentation-derived).
+        These provide optional doc strings that enrich code_params.
+
     Returns
     -------
     list[ApiParam]
-        Parameters enriched with docstring descriptions.
+        Parameters enriched with docstring descriptions. If code_params is empty,
+        returns doc_params as-is. Otherwise, merges doc strings from doc_params
+        into matching code_params by name.
     """
     if not code_params:
         return doc_params
@@ -381,10 +469,21 @@ def _merge_param_docs(code_params: list[ApiParam], doc_params: list[ApiParam]) -
 def _build_symbol(obj: GriffeObject, *, docstyle: DocstringStyle) -> ApiSymbol:
     """Construct an ApiSymbol for a Griffe object.
 
+    Parameters
+    ----------
+    obj : GriffeObject
+        Griffe API object (function, class, module, or attribute) to convert
+        to an ApiSymbol. Must have attributes for name, kind, location, decorators,
+        bases, docstring, and signature information.
+    docstyle : DocstringStyle
+        Griffe docstring style enum to use when parsing docstring sections.
+        Determines how Parameters/Returns/Raises are extracted from docstrings.
+
     Returns
     -------
     ApiSymbol
-        Normalized representation of ``obj``.
+        Normalized representation of ``obj`` with merged code and docstring
+        metadata, including parameters, return type, raises, decorators, and bases.
     """
     kind = _symbol_kind(obj)
     file, lineno = _symbol_location(obj)
@@ -430,10 +529,44 @@ def collect_api_symbols_with_griffe(
 ) -> list[ApiSymbol]:
     """Load one or more top-level packages with Griffe and emit normalized API symbols.
 
+    Extended Summary
+    ----------------
+    This function uses Griffe to parse Python packages and extract their public
+    API symbols (functions, classes, modules, attributes). It loads packages from
+    the repository root and system path, parses docstrings according to the
+    specified style, and returns normalized ApiSymbol objects suitable for
+    documentation generation and API cataloging.
+
+    Parameters
+    ----------
+    repo_root : Path
+        Root directory of the repository containing the packages to scan.
+        Added to Griffe's search paths along with sys.path entries.
+    package_names : Iterable[str]
+        Iterable of top-level package names (e.g., ["kgfoundry", "tools"]) to load
+        and scan. Each name must be importable from repo_root or sys.path.
+    docstyle : DocstringStyle, optional
+        Griffe docstring style enum (default: "google"). Determines how docstrings
+        are parsed to extract Parameters/Returns/Raises sections.
+
     Returns
     -------
     list[ApiSymbol]
-        Serialized API entries discovered in ``package_names``.
+        Serialized API entries discovered in ``package_names``. Returns empty list
+        if griffe is unavailable or all packages fail to load. Symbols are sorted
+        by full_name and include merged code and docstring metadata.
+
+    Notes
+    -----
+    Performance & Side Effects:
+        Time complexity O(n*m) where n is the number of packages and m is the
+        average number of symbols per package. Reads Python source files from disk;
+        may import modules during parsing. Thread-safe for concurrent scans.
+
+    See Also
+    --------
+    _build_symbol : Core symbol construction logic
+    ApiSymbol : Normalized symbol representation
     """
     if griffe is None:
         return []

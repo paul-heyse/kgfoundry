@@ -151,6 +151,46 @@ def _stage_span(stage: str, **start_meta: object) -> Iterator[dict[str, object]]
         )
 
 
+@dataclass(slots=True, frozen=True)
+class StageMeta:
+    """Structured metadata describing a stage run."""
+
+    name: str
+    start: Mapping[str, object] = field(default_factory=dict)
+
+
+@contextmanager
+def _stage(meta: StageMeta) -> Iterator[dict[str, object]]:
+    """Run a stage using the shared span helper.
+
+    Extended Summary
+    ----------------
+    This context manager wraps stage execution with observability instrumentation.
+    It creates a span for the stage and yields a mutable payload dictionary that
+    can be populated with stage-specific metadata during execution.
+
+    Parameters
+    ----------
+    meta : StageMeta
+        Stage metadata containing the stage name and initial payload key-value pairs
+        to include in the span context.
+
+    Yields
+    ------
+    dict[str, object]
+        Mutable payload dictionary that accumulates stage execution metadata.
+        The payload is automatically finalized when the context exits.
+
+    Notes
+    -----
+    Performance & Side Effects:
+        Time complexity O(1). Creates observability spans; no I/O or global state
+        mutations. Thread-safe for concurrent stage executions.
+    """
+    with _stage_span(meta.name, **meta.start) as payload:
+        yield payload
+
+
 class _YamlDumpFn(Protocol):
     def __call__(self, data: Mapping[str, list[str]], *, sort_keys: bool = ...) -> str: ...
 
@@ -328,77 +368,27 @@ Global options (pass after the command, e.g. `codeintel-enrich all --root src --
 app = typer.Typer(add_completion=True, help=GLOBAL_OPTIONS_HELP)
 
 
-def _ensure_state(ctx: typer.Context) -> CLIContextState:
-    state = ctx.obj
-    if not isinstance(state, CLIContextState):
-        state = CLIContextState()
-        ctx.obj = state
-    return state
-
-
-def _capture_shared_state(
+# ruff: noqa: PLR0913,PLR0917
+@app.callback()
+def shared_options(  # pragma: no cover - Typer wiring
     ctx: typer.Context,
+    root: Path = ROOT_OPTION,
+    scip: Path | None = SCIP_OPTION,
+    out: Path = OUT_OPTION,
+    pyrefly_json: Path | None = PYREFLY_OPTION,
+    tags_yaml: Path | None = TAGS_OPTION,
+    coverage_xml: Path = COVERAGE_OPTION,
+    only: list[str] | None = ONLY_OPTION,
+    max_file_bytes: int = MAX_FILE_BYTES_OPTION,
     *,
-    root: Path,
-    scip: Path | None,
-    out: Path,
-    pyrefly_json: Path | None,
-    tags_yaml: Path | None,
-    coverage_xml: Path,
-    only: list[str] | None,
-    max_file_bytes: int,
-    owners: bool,
-    history_window_days: int,
-    commits_window: int,
-    emit_slices: bool,
-    slices_filter: list[str] | None,
-) -> CLIContextState:
-    """Persist shared pipeline + analytics options on the Typer context.
-
-    Parameters
-    ----------
-    ctx : typer.Context
-        Typer context object to store the shared state. The state is attached
-        to ``ctx.obj`` for retrieval by downstream commands.
-    root : Path
-        Repository root directory path. Resolved to an absolute path before
-        storing in pipeline options.
-    scip : Path | None
-        Optional path to SCIP index file. Resolved to absolute path if provided.
-    out : Path
-        Output directory path for generated artifacts. Resolved to absolute path.
-    pyrefly_json : Path | None
-        Optional path to Pyrefly JSON report. Resolved to absolute path if provided.
-    tags_yaml : Path | None
-        Optional path to tags YAML configuration file. Resolved to absolute path
-        if provided.
-    coverage_xml : Path
-        Path to coverage XML report file. Resolved to absolute path.
-    only : list[str] | None
-        Optional list of file patterns to include. Converted to tuple for pipeline
-        options. If None, all files are processed.
-    max_file_bytes : int
-        Maximum file size in bytes. Files exceeding this limit are skipped during
-        processing.
-    owners : bool
-        Whether to include code ownership analytics in the pipeline.
-    history_window_days : int
-        Number of days to look back for git history analysis.
-    commits_window : int
-        Number of commits to analyze for git-based metrics.
-    emit_slices : bool
-        Whether to emit code slice analytics in the output.
-    slices_filter : list[str] | None
-        Optional list of slice filter patterns. Converted to tuple for analytics
-        options. If None, all slices are included.
-
-    Returns
-    -------
-    CLIContextState
-        New context state object containing pipeline and analytics options. The
-        state is also stored in ``ctx.obj`` for subsequent command invocations.
-    """
-    new_pipeline = PipelineOptions(
+    owners: bool = OWNERS_OPTION,
+    history_window_days: int = HISTORY_WINDOW_OPTION,
+    commits_window: int = COMMITS_WINDOW_OPTION,
+    emit_slices: bool = EMIT_SLICES_OPTION,
+    slices_filter: list[str] | None = SLICES_FILTER_OPTION,
+) -> None:
+    """Capture global enrichment options shared by all subcommands."""
+    pipeline_options = PipelineOptions(
         root=root.resolve(),
         scip=scip.resolve() if scip else None,
         out=out.resolve(),
@@ -408,15 +398,21 @@ def _capture_shared_state(
         only=tuple(only or ()),
         max_file_bytes=max_file_bytes,
     )
-    new_analytics = AnalyticsOptions(
+    analytics_options = AnalyticsOptions(
         owners=owners,
         history_window_days=history_window_days,
         commits_window=commits_window,
         emit_slices=emit_slices,
         slices_filter=tuple(slices_filter or ()),
     )
-    state = CLIContextState(pipeline=new_pipeline, analytics=new_analytics)
-    ctx.obj = state
+    ctx.obj = CLIContextState(pipeline=pipeline_options, analytics=analytics_options)
+
+
+def _ensure_state(ctx: typer.Context) -> CLIContextState:
+    state = ctx.obj
+    if not isinstance(state, CLIContextState):
+        state = CLIContextState()
+        ctx.obj = state
     return state
 
 
@@ -599,6 +595,35 @@ class PipelineResult:
     tag_index: dict[str, list[str]]
 
 
+@dataclass(slots=True, frozen=True)
+class PreparedPipeline:
+    """Resolved pipeline context plus discovered files."""
+
+    context: PipelineContext
+    files: list[Path]
+
+
+@dataclass(slots=True, frozen=True)
+class AnalyticsArtifacts:
+    """Derived analytics products emitted after scanning modules."""
+
+    import_graph: ImportGraph
+    use_graph: UseGraph
+    config_index: list[dict[str, Any]]
+    coverage_rows: list[dict[str, Any]]
+    hotspot_rows: list[dict[str, Any]]
+    tag_index: dict[str, list[str]]
+
+
+@dataclass(slots=True, frozen=True)
+class ConfigReferenceState:
+    """Intermediate config reference tracking used during augmentation."""
+
+    records: list[dict[str, Any]]
+    by_dir: Mapping[str, tuple[str, ...]]
+    references: dict[str, set[str]]
+
+
 def _discover_py_files(root: Path, patterns: tuple[str, ...]) -> list[Path]:
     """Return ordered Python files under ``root`` honoring include patterns.
 
@@ -617,7 +642,7 @@ def _discover_py_files(root: Path, patterns: tuple[str, ...]) -> list[Path]:
     list[Path]
         Sorted list of files relative to ``root`` matching the configured patterns.
     """
-    with _stage_span("discover", root=root, patterns=len(patterns)) as meta:
+    with _stage(StageMeta("discover", {"root": root, "patterns": len(patterns)})) as meta:
         files = sorted(_iter_files(root, patterns if patterns else None))
         meta["count"] = len(files)
     return files
@@ -641,7 +666,7 @@ def _load_scip_artifacts(path: Path) -> tuple[SCIPIndex, ScipContext]:
     IngestError
         Raised when the SCIP payload cannot be read or parsed.
     """
-    with _stage_span("ingest", scip=path) as meta:
+    with _stage(StageMeta("ingest", {"scip": path})) as meta:
         try:
             index = SCIPIndex.load(path)
         except Exception as exc:  # pragma: no cover - surface via CLI
@@ -678,7 +703,7 @@ def _collect_type_signal_map(
     TypeSignalError
         Raised when either tool report cannot be parsed.
     """
-    with _stage_span("type-signals", root=root) as meta:
+    with _stage(StageMeta("type-signals", {"root": root})) as meta:
         try:
             signals = collect_type_signals(
                 pyrefly_report=str(pyrefly_json) if pyrefly_json else None,
@@ -708,7 +733,9 @@ def _collect_coverage_map(root: Path, coverage_xml: Path | None) -> dict[str, Ma
     dict[str, Mapping[str, float]]
         Mapping of repo paths to coverage metrics (may be empty).
     """
-    with _stage_span("coverage", source=str(coverage_xml) if coverage_xml else "none") as meta:
+    with _stage(
+        StageMeta("coverage", {"source": str(coverage_xml) if coverage_xml else "none"})
+    ) as meta:
         raw_metrics = (
             collect_coverage(coverage_xml) if coverage_xml and coverage_xml.exists() else {}
         )
@@ -731,7 +758,7 @@ def _index_config_records(root: Path) -> list[dict[str, Any]]:
     list[dict[str, Any]]
         Config metadata rows consumed by downstream stages.
     """
-    with _stage_span("config-index", root=root) as meta:
+    with _stage(StageMeta("config-index", {"root": root})) as meta:
         records = index_config_files(root)
         meta["records"] = len(records)
         return records
@@ -757,7 +784,7 @@ def _load_tagging_rules(path: Path | None) -> Mapping[str, Any]:
         Raised when a custom rules file cannot be parsed.
     """
     source = str(path) if path else "defaults"
-    with _stage_span("tagging-rules", source=source) as meta:
+    with _stage(StageMeta("tagging-rules", {"source": source})) as meta:
         try:
             rules = load_rules(str(path) if path else None)
         except Exception as exc:  # pragma: no cover - defensive
@@ -793,9 +820,7 @@ def _iter_files(root: Path, patterns: tuple[str, ...] | None = None) -> Iterable
         yield candidate
 
 
-def _run_pipeline(
-    *, pipeline: PipelineOptions
-) -> PipelineResult:  # lint-ignore[PLR0914]: pipeline orchestration needs structured locals
+def _prepare_pipeline(pipeline: PipelineOptions) -> PreparedPipeline:
     if pipeline.scip is None:
         message = "The --scip option is required for enrichment commands."
         raise typer.BadParameter(message)
@@ -821,10 +846,14 @@ def _run_pipeline(
         tagging_rules=tagging_rules,
         package_prefix=root_resolved.name or None,
     )
+    return PreparedPipeline(context=ctx, files=files)
 
-    module_rows, symbol_edges = _scan_modules(ctx, pipeline, files)
 
-    with _stage_span("analytics", modules=len(module_rows)) as meta:
+def _compute_pipeline_analytics(
+    ctx: PipelineContext,
+    module_rows: list[ModuleRecord],
+) -> AnalyticsArtifacts:
+    with _stage(StageMeta("analytics", {"modules": len(module_rows)})) as meta:
         import_graph, use_graph, config_index = _augment_module_rows(
             module_rows,
             ctx.scip_index,
@@ -838,18 +867,32 @@ def _run_pipeline(
         meta["hotspots"] = len(hotspot_rows)
     _infer_tags(module_rows, ctx.tagging_rules)
     tag_index = _build_tag_index(module_rows)
-
-    return PipelineResult(
-        root=ctx.root,
-        repo_root=ctx.repo_root,
-        module_rows=module_rows,
-        symbol_edges=symbol_edges,
+    return AnalyticsArtifacts(
         import_graph=import_graph,
         use_graph=use_graph,
         config_index=config_index,
         coverage_rows=coverage_rows,
         hotspot_rows=hotspot_rows,
         tag_index=tag_index,
+    )
+
+
+def _run_pipeline(*, pipeline: PipelineOptions) -> PipelineResult:
+    prepared = _prepare_pipeline(pipeline)
+    ctx = prepared.context
+    module_rows, symbol_edges = _scan_modules(ctx, pipeline, prepared.files)
+    analytics = _compute_pipeline_analytics(ctx, module_rows)
+    return PipelineResult(
+        root=ctx.root,
+        repo_root=ctx.repo_root,
+        module_rows=module_rows,
+        symbol_edges=symbol_edges,
+        import_graph=analytics.import_graph,
+        use_graph=analytics.use_graph,
+        config_index=analytics.config_index,
+        coverage_rows=analytics.coverage_rows,
+        hotspot_rows=analytics.hotspot_rows,
+        tag_index=analytics.tag_index,
     )
 
 
@@ -925,7 +968,7 @@ def _scan_modules(
     )
     module_rows: list[ModuleRecord] = []
     symbol_edges: list[tuple[str, str]] = []
-    with _stage_span("index", files=len(files)) as meta:
+    with _stage(StageMeta("index", {"files": len(files)})) as meta:
         for fp in files:
             row_dict, edges = _build_module_row(fp, ctx.root, scan_inputs)
             module_rows.append(row_dict)
@@ -935,42 +978,13 @@ def _scan_modules(
 
 
 @app.command("all")
-def run_all(  # lint-ignore[PLR0913,PLR0917]: Typer CLI requires enumerating shared options
+def run_all(
     ctx: typer.Context,
-    root: Path = ROOT_OPTION,
-    scip: Path | None = SCIP_OPTION,
-    out: Path = OUT_OPTION,
-    pyrefly_json: Path | None = PYREFLY_OPTION,
-    tags_yaml: Path | None = TAGS_OPTION,
-    coverage_xml: Path = COVERAGE_OPTION,
-    only: list[str] | None = ONLY_OPTION,
-    max_file_bytes: int = MAX_FILE_BYTES_OPTION,
     *,
-    owners: bool = OWNERS_OPTION,
-    history_window_days: int = HISTORY_WINDOW_OPTION,
-    commits_window: int = COMMITS_WINDOW_OPTION,
-    emit_slices: bool = EMIT_SLICES_OPTION,
-    slices_filter: list[str] | None = SLICES_FILTER_OPTION,
     emit_ast: bool = EMIT_AST_OPTION,
     dry_run: bool = DRY_RUN_OPTION,
 ) -> None:
     """Run the full enrichment pipeline and emit all artifacts."""
-    _capture_shared_state(
-        ctx,
-        root=root,
-        scip=scip,
-        out=out,
-        pyrefly_json=pyrefly_json,
-        tags_yaml=tags_yaml,
-        coverage_xml=coverage_xml,
-        only=only,
-        max_file_bytes=max_file_bytes,
-        owners=owners,
-        history_window_days=history_window_days,
-        commits_window=commits_window,
-        emit_slices=emit_slices,
-        slices_filter=slices_filter,
-    )
     result, state = _execute_pipeline_or_exit(ctx)
     if _handle_dry_run("all", dry_run=dry_run, result=result):
         return
@@ -1002,122 +1016,33 @@ def run_all(  # lint-ignore[PLR0913,PLR0917]: Typer CLI requires enumerating sha
 @app.command("run")
 def run(
     ctx: typer.Context,
-    root: Path = ROOT_OPTION,
-    scip: Path | None = SCIP_OPTION,
-    out: Path = OUT_OPTION,
-    pyrefly_json: Path | None = PYREFLY_OPTION,
-    tags_yaml: Path | None = TAGS_OPTION,
-    coverage_xml: Path = COVERAGE_OPTION,
-    only: list[str] | None = ONLY_OPTION,
-    max_file_bytes: int = MAX_FILE_BYTES_OPTION,
     *,
-    owners: bool = OWNERS_OPTION,
-    history_window_days: int = HISTORY_WINDOW_OPTION,
-    commits_window: int = COMMITS_WINDOW_OPTION,
-    emit_slices: bool = EMIT_SLICES_OPTION,
-    slices_filter: list[str] | None = SLICES_FILTER_OPTION,
     emit_ast: bool = EMIT_AST_OPTION,
     dry_run: bool = DRY_RUN_OPTION,
 ) -> None:
     """Alias for ``all`` to match historical CLI entrypoints."""
-    run_all(
-        ctx,
-        root=root,
-        scip=scip,
-        out=out,
-        pyrefly_json=pyrefly_json,
-        tags_yaml=tags_yaml,
-        coverage_xml=coverage_xml,
-        only=only,
-        max_file_bytes=max_file_bytes,
-        owners=owners,
-        history_window_days=history_window_days,
-        commits_window=commits_window,
-        emit_slices=emit_slices,
-        slices_filter=slices_filter,
-        emit_ast=emit_ast,
-        dry_run=dry_run,
-    )
+    run_all(ctx, emit_ast=emit_ast, dry_run=dry_run)
 
 
 @app.command("scan")
 def scan(
     ctx: typer.Context,
-    root: Path = ROOT_OPTION,
-    scip: Path | None = SCIP_OPTION,
-    out: Path = OUT_OPTION,
-    pyrefly_json: Path | None = PYREFLY_OPTION,
-    tags_yaml: Path | None = TAGS_OPTION,
-    coverage_xml: Path = COVERAGE_OPTION,
-    only: list[str] | None = ONLY_OPTION,
-    max_file_bytes: int = MAX_FILE_BYTES_OPTION,
     *,
-    owners: bool = OWNERS_OPTION,
-    history_window_days: int = HISTORY_WINDOW_OPTION,
-    commits_window: int = COMMITS_WINDOW_OPTION,
-    emit_slices: bool = EMIT_SLICES_OPTION,
-    slices_filter: list[str] | None = SLICES_FILTER_OPTION,
     emit_ast: bool = EMIT_AST_OPTION,
     dry_run: bool = DRY_RUN_OPTION,
 ) -> None:
     """Backward-compatible alias for ``all``."""
     typer.echo("[scan] Deprecated alias for `all`; running full pipeline.")
-    run_all(
-        ctx,
-        root=root,
-        scip=scip,
-        out=out,
-        pyrefly_json=pyrefly_json,
-        tags_yaml=tags_yaml,
-        coverage_xml=coverage_xml,
-        only=only,
-        max_file_bytes=max_file_bytes,
-        owners=owners,
-        history_window_days=history_window_days,
-        commits_window=commits_window,
-        emit_slices=emit_slices,
-        slices_filter=slices_filter,
-        emit_ast=emit_ast,
-        dry_run=dry_run,
-    )
+    run_all(ctx, emit_ast=emit_ast, dry_run=dry_run)
 
 
 @app.command("exports")
 def exports(
     ctx: typer.Context,
-    root: Path = ROOT_OPTION,
-    scip: Path | None = SCIP_OPTION,
-    out: Path = OUT_OPTION,
-    pyrefly_json: Path | None = PYREFLY_OPTION,
-    tags_yaml: Path | None = TAGS_OPTION,
-    coverage_xml: Path = COVERAGE_OPTION,
-    only: list[str] | None = ONLY_OPTION,
-    max_file_bytes: int = MAX_FILE_BYTES_OPTION,
     *,
-    owners: bool = OWNERS_OPTION,
-    history_window_days: int = HISTORY_WINDOW_OPTION,
-    commits_window: int = COMMITS_WINDOW_OPTION,
-    emit_slices: bool = EMIT_SLICES_OPTION,
-    slices_filter: list[str] | None = SLICES_FILTER_OPTION,
     dry_run: bool = DRY_RUN_OPTION,
 ) -> None:
     """Emit modules.jsonl, repo map, tag index, and Markdown module sheets."""
-    _capture_shared_state(
-        ctx,
-        root=root,
-        scip=scip,
-        out=out,
-        pyrefly_json=pyrefly_json,
-        tags_yaml=tags_yaml,
-        coverage_xml=coverage_xml,
-        only=only,
-        max_file_bytes=max_file_bytes,
-        owners=owners,
-        history_window_days=history_window_days,
-        commits_window=commits_window,
-        emit_slices=emit_slices,
-        slices_filter=slices_filter,
-    )
     result, state = _execute_pipeline_or_exit(ctx)
     if _handle_dry_run("exports", dry_run=dry_run, result=result):
         return
@@ -1141,39 +1066,10 @@ def exports(
 @app.command("graph")
 def graph(
     ctx: typer.Context,
-    root: Path = ROOT_OPTION,
-    scip: Path | None = SCIP_OPTION,
-    out: Path = OUT_OPTION,
-    pyrefly_json: Path | None = PYREFLY_OPTION,
-    tags_yaml: Path | None = TAGS_OPTION,
-    coverage_xml: Path = COVERAGE_OPTION,
-    only: list[str] | None = ONLY_OPTION,
-    max_file_bytes: int = MAX_FILE_BYTES_OPTION,
     *,
-    owners: bool = OWNERS_OPTION,
-    history_window_days: int = HISTORY_WINDOW_OPTION,
-    commits_window: int = COMMITS_WINDOW_OPTION,
-    emit_slices: bool = EMIT_SLICES_OPTION,
-    slices_filter: list[str] | None = SLICES_FILTER_OPTION,
     dry_run: bool = DRY_RUN_OPTION,
 ) -> None:
     """Emit symbol and import graph artifacts."""
-    _capture_shared_state(
-        ctx,
-        root=root,
-        scip=scip,
-        out=out,
-        pyrefly_json=pyrefly_json,
-        tags_yaml=tags_yaml,
-        coverage_xml=coverage_xml,
-        only=only,
-        max_file_bytes=max_file_bytes,
-        owners=owners,
-        history_window_days=history_window_days,
-        commits_window=commits_window,
-        emit_slices=emit_slices,
-        slices_filter=slices_filter,
-    )
     result, state = _execute_pipeline_or_exit(ctx)
     if _handle_dry_run("graph", dry_run=dry_run, result=result):
         return
@@ -1184,39 +1080,10 @@ def graph(
 @app.command("uses")
 def uses(
     ctx: typer.Context,
-    root: Path = ROOT_OPTION,
-    scip: Path | None = SCIP_OPTION,
-    out: Path = OUT_OPTION,
-    pyrefly_json: Path | None = PYREFLY_OPTION,
-    tags_yaml: Path | None = TAGS_OPTION,
-    coverage_xml: Path = COVERAGE_OPTION,
-    only: list[str] | None = ONLY_OPTION,
-    max_file_bytes: int = MAX_FILE_BYTES_OPTION,
     *,
-    owners: bool = OWNERS_OPTION,
-    history_window_days: int = HISTORY_WINDOW_OPTION,
-    commits_window: int = COMMITS_WINDOW_OPTION,
-    emit_slices: bool = EMIT_SLICES_OPTION,
-    slices_filter: list[str] | None = SLICES_FILTER_OPTION,
     dry_run: bool = DRY_RUN_OPTION,
 ) -> None:
     """Emit the definition-to-use graph derived from SCIP."""
-    _capture_shared_state(
-        ctx,
-        root=root,
-        scip=scip,
-        out=out,
-        pyrefly_json=pyrefly_json,
-        tags_yaml=tags_yaml,
-        coverage_xml=coverage_xml,
-        only=only,
-        max_file_bytes=max_file_bytes,
-        owners=owners,
-        history_window_days=history_window_days,
-        commits_window=commits_window,
-        emit_slices=emit_slices,
-        slices_filter=slices_filter,
-    )
     result, state = _execute_pipeline_or_exit(ctx)
     if _handle_dry_run("uses", dry_run=dry_run, result=result):
         return
@@ -1227,39 +1094,10 @@ def uses(
 @app.command("typedness")
 def typedness(
     ctx: typer.Context,
-    root: Path = ROOT_OPTION,
-    scip: Path | None = SCIP_OPTION,
-    out: Path = OUT_OPTION,
-    pyrefly_json: Path | None = PYREFLY_OPTION,
-    tags_yaml: Path | None = TAGS_OPTION,
-    coverage_xml: Path = COVERAGE_OPTION,
-    only: list[str] | None = ONLY_OPTION,
-    max_file_bytes: int = MAX_FILE_BYTES_OPTION,
     *,
-    owners: bool = OWNERS_OPTION,
-    history_window_days: int = HISTORY_WINDOW_OPTION,
-    commits_window: int = COMMITS_WINDOW_OPTION,
-    emit_slices: bool = EMIT_SLICES_OPTION,
-    slices_filter: list[str] | None = SLICES_FILTER_OPTION,
     dry_run: bool = DRY_RUN_OPTION,
 ) -> None:
     """Emit typedness analytics (errors, annotation ratios, untyped defs)."""
-    _capture_shared_state(
-        ctx,
-        root=root,
-        scip=scip,
-        out=out,
-        pyrefly_json=pyrefly_json,
-        tags_yaml=tags_yaml,
-        coverage_xml=coverage_xml,
-        only=only,
-        max_file_bytes=max_file_bytes,
-        owners=owners,
-        history_window_days=history_window_days,
-        commits_window=commits_window,
-        emit_slices=emit_slices,
-        slices_filter=slices_filter,
-    )
     result, state = _execute_pipeline_or_exit(ctx)
     if _handle_dry_run("typedness", dry_run=dry_run, result=result):
         return
@@ -1270,39 +1108,10 @@ def typedness(
 @app.command("doc")
 def doc(
     ctx: typer.Context,
-    root: Path = ROOT_OPTION,
-    scip: Path | None = SCIP_OPTION,
-    out: Path = OUT_OPTION,
-    pyrefly_json: Path | None = PYREFLY_OPTION,
-    tags_yaml: Path | None = TAGS_OPTION,
-    coverage_xml: Path = COVERAGE_OPTION,
-    only: list[str] | None = ONLY_OPTION,
-    max_file_bytes: int = MAX_FILE_BYTES_OPTION,
     *,
-    owners: bool = OWNERS_OPTION,
-    history_window_days: int = HISTORY_WINDOW_OPTION,
-    commits_window: int = COMMITS_WINDOW_OPTION,
-    emit_slices: bool = EMIT_SLICES_OPTION,
-    slices_filter: list[str] | None = SLICES_FILTER_OPTION,
     dry_run: bool = DRY_RUN_OPTION,
 ) -> None:
     """Emit doc health analytics for module docstrings."""
-    _capture_shared_state(
-        ctx,
-        root=root,
-        scip=scip,
-        out=out,
-        pyrefly_json=pyrefly_json,
-        tags_yaml=tags_yaml,
-        coverage_xml=coverage_xml,
-        only=only,
-        max_file_bytes=max_file_bytes,
-        owners=owners,
-        history_window_days=history_window_days,
-        commits_window=commits_window,
-        emit_slices=emit_slices,
-        slices_filter=slices_filter,
-    )
     result, state = _execute_pipeline_or_exit(ctx)
     if _handle_dry_run("doc", dry_run=dry_run, result=result):
         return
@@ -1313,39 +1122,10 @@ def doc(
 @app.command("coverage")
 def coverage(
     ctx: typer.Context,
-    root: Path = ROOT_OPTION,
-    scip: Path | None = SCIP_OPTION,
-    out: Path = OUT_OPTION,
-    pyrefly_json: Path | None = PYREFLY_OPTION,
-    tags_yaml: Path | None = TAGS_OPTION,
-    coverage_xml: Path = COVERAGE_OPTION,
-    only: list[str] | None = ONLY_OPTION,
-    max_file_bytes: int = MAX_FILE_BYTES_OPTION,
     *,
-    owners: bool = OWNERS_OPTION,
-    history_window_days: int = HISTORY_WINDOW_OPTION,
-    commits_window: int = COMMITS_WINDOW_OPTION,
-    emit_slices: bool = EMIT_SLICES_OPTION,
-    slices_filter: list[str] | None = SLICES_FILTER_OPTION,
     dry_run: bool = DRY_RUN_OPTION,
 ) -> None:
     """Emit coverage analytics table."""
-    _capture_shared_state(
-        ctx,
-        root=root,
-        scip=scip,
-        out=out,
-        pyrefly_json=pyrefly_json,
-        tags_yaml=tags_yaml,
-        coverage_xml=coverage_xml,
-        only=only,
-        max_file_bytes=max_file_bytes,
-        owners=owners,
-        history_window_days=history_window_days,
-        commits_window=commits_window,
-        emit_slices=emit_slices,
-        slices_filter=slices_filter,
-    )
     result, state = _execute_pipeline_or_exit(ctx)
     if _handle_dry_run("coverage", dry_run=dry_run, result=result):
         return
@@ -1356,39 +1136,10 @@ def coverage(
 @app.command("config")
 def config(
     ctx: typer.Context,
-    root: Path = ROOT_OPTION,
-    scip: Path | None = SCIP_OPTION,
-    out: Path = OUT_OPTION,
-    pyrefly_json: Path | None = PYREFLY_OPTION,
-    tags_yaml: Path | None = TAGS_OPTION,
-    coverage_xml: Path = COVERAGE_OPTION,
-    only: list[str] | None = ONLY_OPTION,
-    max_file_bytes: int = MAX_FILE_BYTES_OPTION,
     *,
-    owners: bool = OWNERS_OPTION,
-    history_window_days: int = HISTORY_WINDOW_OPTION,
-    commits_window: int = COMMITS_WINDOW_OPTION,
-    emit_slices: bool = EMIT_SLICES_OPTION,
-    slices_filter: list[str] | None = SLICES_FILTER_OPTION,
     dry_run: bool = DRY_RUN_OPTION,
 ) -> None:
     """Emit config index (YAML/TOML/JSON/Markdown references)."""
-    _capture_shared_state(
-        ctx,
-        root=root,
-        scip=scip,
-        out=out,
-        pyrefly_json=pyrefly_json,
-        tags_yaml=tags_yaml,
-        coverage_xml=coverage_xml,
-        only=only,
-        max_file_bytes=max_file_bytes,
-        owners=owners,
-        history_window_days=history_window_days,
-        commits_window=commits_window,
-        emit_slices=emit_slices,
-        slices_filter=slices_filter,
-    )
     result, state = _execute_pipeline_or_exit(ctx)
     if _handle_dry_run("config", dry_run=dry_run, result=result):
         return
@@ -1399,39 +1150,10 @@ def config(
 @app.command("hotspots")
 def hotspots(
     ctx: typer.Context,
-    root: Path = ROOT_OPTION,
-    scip: Path | None = SCIP_OPTION,
-    out: Path = OUT_OPTION,
-    pyrefly_json: Path | None = PYREFLY_OPTION,
-    tags_yaml: Path | None = TAGS_OPTION,
-    coverage_xml: Path = COVERAGE_OPTION,
-    only: list[str] | None = ONLY_OPTION,
-    max_file_bytes: int = MAX_FILE_BYTES_OPTION,
     *,
-    owners: bool = OWNERS_OPTION,
-    history_window_days: int = HISTORY_WINDOW_OPTION,
-    commits_window: int = COMMITS_WINDOW_OPTION,
-    emit_slices: bool = EMIT_SLICES_OPTION,
-    slices_filter: list[str] | None = SLICES_FILTER_OPTION,
     dry_run: bool = DRY_RUN_OPTION,
 ) -> None:
     """Emit hotspot analytics (complexity x churn x centrality)."""
-    _capture_shared_state(
-        ctx,
-        root=root,
-        scip=scip,
-        out=out,
-        pyrefly_json=pyrefly_json,
-        tags_yaml=tags_yaml,
-        coverage_xml=coverage_xml,
-        only=only,
-        max_file_bytes=max_file_bytes,
-        owners=owners,
-        history_window_days=history_window_days,
-        commits_window=commits_window,
-        emit_slices=emit_slices,
-        slices_filter=slices_filter,
-    )
     result, state = _execute_pipeline_or_exit(ctx)
     if _handle_dry_run("hotspots", dry_run=dry_run, result=result):
         return
@@ -1440,33 +1162,18 @@ def hotspots(
 
 
 @app.command("overlays")
-def overlays(  # lint-ignore[PLR0913,PLR0917]: Typer CLI shared options
+def overlays(
     ctx: typer.Context,
-    root: Path = ROOT_OPTION,
-    scip: Path | None = SCIP_OPTION,
-    out: Path = OUT_OPTION,
-    pyrefly_json: Path | None = PYREFLY_OPTION,
-    tags_yaml: Path | None = TAGS_OPTION,
-    coverage_xml: Path = COVERAGE_OPTION,
-    only: list[str] | None = ONLY_OPTION,
-    max_file_bytes: int = MAX_FILE_BYTES_OPTION,
     *,
-    owners: bool = OWNERS_OPTION,
-    history_window_days: int = HISTORY_WINDOW_OPTION,
-    commits_window: int = COMMITS_WINDOW_OPTION,
-    emit_slices: bool = EMIT_SLICES_OPTION,
-    slices_filter: list[str] | None = SLICES_FILTER_OPTION,
     config_path: Path | None = OVERLAYS_CONFIG_OPTION,
     overrides: list[str] | None = OVERLAYS_SET_OPTION,
     dry_run: bool = DRY_RUN_OPTION,
 ) -> None:
     """Generate targeted overlays and optionally activate them into the stub path.
 
-    This command generates type stub overlays (.pyi files) for modules with type
-    errors, missing annotations, or other typing issues. Overlays are generated based
-    on SCIP index data, type error reports, and configurable policies. The command
-    can optionally activate overlays into the stub path for immediate use by type
-    checkers, or deactivate existing overlays before generating new ones.
+    Global repository options (e.g. ``--root``, ``--scip``) are configured via the
+    CLI callback. This command focuses on overlay configuration (`config_path`,
+    `overrides`) and whether to run in dry-run mode.
 
     Parameters
     ----------
@@ -1474,46 +1181,6 @@ def overlays(  # lint-ignore[PLR0913,PLR0917]: Typer CLI shared options
         Typer context object providing access to shared CLI state (pipeline options,
         analytics settings). The context is used to retrieve SCIP index path and
         other pipeline configuration required for overlay generation.
-    root : Path
-        Repository root directory path. Provided via typer.Option. Used as the
-        base directory for discovering Python files and resolving relative paths.
-    scip : Path | None, optional
-        Optional path to SCIP index file. Provided via typer.Option. If None,
-        overlay generation may be limited or disabled. Defaults to None.
-    out : Path
-        Output directory path for generated overlay files. Provided via typer.Option.
-        Overlays are written to a subdirectory within this output directory.
-    pyrefly_json : Path | None, optional
-        Optional path to Pyrefly JSON report. Provided via typer.Option. Used to
-        identify type errors and inform overlay generation decisions. Defaults to None.
-    tags_yaml : Path | None, optional
-        Optional path to tags YAML configuration file. Provided via typer.Option.
-        Used for filtering and tagging modules that require overlays. Defaults to None.
-    coverage_xml : Path
-        Path to coverage XML report file. Provided via typer.Option. Used for
-        identifying covered code paths that may need type annotations.
-    only : list[str] | None, optional
-        Optional list of file patterns to include. Provided via typer.Option.
-        If provided, only files matching these patterns are processed. Defaults to None.
-    max_file_bytes : int, optional
-        Maximum file size in bytes. Provided via typer.Option. Files exceeding
-        this limit are skipped during processing. Defaults to a configured maximum.
-    owners : bool, optional
-        Whether to include code ownership analytics. Provided via typer.Option.
-        Used for identifying code owners of modules requiring overlays. Defaults to False.
-    history_window_days : int, optional
-        Number of days to look back for git history analysis. Provided via typer.Option.
-        Used for computing code churn metrics. Defaults to a configured window.
-    commits_window : int, optional
-        Number of commits to analyze for git-based metrics. Provided via typer.Option.
-        Used for identifying frequently changed files that may need overlays. Defaults
-        to a configured window.
-    emit_slices : bool, optional
-        Whether to emit code slice analytics. Provided via typer.Option. Slices can
-        help identify code patterns that need type annotations. Defaults to False.
-    slices_filter : list[str] | None, optional
-        Optional list of slice filter patterns. Provided via typer.Option. If provided,
-        only slices matching these patterns are included. Defaults to None.
     config_path : Path | None, optional
         Path to a YAML/JSON configuration file describing overlay generation settings
         (e.g., min_errors, max_overlays, include_public_defs). If None, default
@@ -1550,22 +1217,6 @@ def overlays(  # lint-ignore[PLR0913,PLR0917]: Typer CLI shared options
     and cleanup. The command respects the --deactivate-all-first option to clear
     existing overlays before generating new ones.
     """
-    _capture_shared_state(
-        ctx,
-        root=root,
-        scip=scip,
-        out=out,
-        pyrefly_json=pyrefly_json,
-        tags_yaml=tags_yaml,
-        coverage_xml=coverage_xml,
-        only=only,
-        max_file_bytes=max_file_bytes,
-        owners=owners,
-        history_window_days=history_window_days,
-        commits_window=commits_window,
-        emit_slices=emit_slices,
-        slices_filter=slices_filter,
-    )
     state = _ensure_state(ctx)
     pipeline = state.pipeline
     if pipeline.scip is None:
@@ -2023,6 +1674,17 @@ def _coverage_value(rel_path: str, inputs: ScanInputs, key: str) -> float:
     return float(entry.get(key, 0.0))
 
 
+def _prepare_config_state(
+    records: list[dict[str, Any]] | None,
+) -> ConfigReferenceState:
+    materialized = records or []
+    return ConfigReferenceState(
+        records=materialized,
+        by_dir=_group_configs_by_dir(materialized),
+        references={record["path"]: set() for record in materialized},
+    )
+
+
 def _augment_module_rows(
     module_rows: list[ModuleRecord],
     scip_index: SCIPIndex,
@@ -2051,9 +1713,7 @@ def _augment_module_rows(
     module_name_map = build_module_name_map(module_rows, package_prefix)
     import_graph = build_import_graph(module_rows, package_prefix)
     use_graph = build_use_graph(scip_index)
-    config_records = config_records or []
-    config_by_dir = _group_configs_by_dir(config_records)
-    config_references: dict[str, set[str]] = {record["path"]: set() for record in config_records}
+    config_state = _prepare_config_state(config_records)
 
     for row in module_rows:
         exports_resolved, reexports = resolve_exports(
@@ -2076,10 +1736,10 @@ def _augment_module_rows(
         uses = use_graph.uses_by_file.get(path, set()) or set()
         row["used_by_files"] = len(uses)
         row["used_by_symbols"] = use_graph.symbol_usage.get(path, 0)
-        refs = _config_refs_for_row(path, config_by_dir)
+        refs = _config_refs_for_row(path, config_state.by_dir)
         row["config_refs"] = refs
         for ref in refs:
-            config_references.setdefault(ref, set()).add(path)
+            config_state.references.setdefault(ref, set()).add(path)
         overlay_needed = _should_mark_overlay(row)
         row["overlay_needed"] = overlay_needed
         if overlay_needed:
@@ -2089,10 +1749,10 @@ def _augment_module_rows(
             tag_set.add("overlay-needed")
             row["tags"] = sorted(tag_set)
         row["hotspot_score"] = compute_hotspot_score(row)
-    for record in config_records:
-        referenced = config_references.get(record["path"], set())
+    for record in config_state.records:
+        referenced = config_state.references.get(record["path"], set())
         record["references"] = sorted(referenced)
-    return import_graph, use_graph, config_records
+    return import_graph, use_graph, config_state.records
 
 
 def _build_tag_index(rows: Sequence[Mapping[str, Any]]) -> dict[str, list[str]]:
@@ -2111,7 +1771,7 @@ def _build_tag_index(rows: Sequence[Mapping[str, Any]]) -> dict[str, list[str]]:
 
 def _infer_tags(rows: list[ModuleRecord], rules: Mapping[str, Any]) -> None:
     """Apply tagging rules with logging/telemetry."""
-    with _stage_span("tagging", rules=len(rules)) as meta:
+    with _stage(StageMeta("tagging", {"rules": len(rules)})) as meta:
         _apply_tagging(rows, rules)
         meta["tagged"] = sum(1 for row in rows if row.get("tags"))
 
@@ -2224,7 +1884,7 @@ def _build_hotspot_rows(rows: Sequence[Mapping[str, Any]]) -> list[dict[str, Any
 
 
 def _write_exports_outputs(result: PipelineResult, out: Path) -> None:
-    with _stage_span("write-exports", modules=len(result.module_rows)) as meta:
+    with _stage(StageMeta("write-exports", {"modules": len(result.module_rows)})) as meta:
         _write_modules_json(out, result.module_rows)
         _write_markdown_modules(out, result.module_rows)
         _write_repo_map(out, result)
@@ -2233,14 +1893,14 @@ def _write_exports_outputs(result: PipelineResult, out: Path) -> None:
 
 
 def _write_graph_outputs(result: PipelineResult, out: Path) -> None:
-    with _stage_span("write-graphs", symbols=len(result.symbol_edges)) as meta:
+    with _stage(StageMeta("write-graphs", {"symbols": len(result.symbol_edges)})) as meta:
         _write_symbol_graph(out, result.symbol_edges)
         write_import_graph(result.import_graph, out / "graphs" / "imports.parquet")
         meta["imports"] = sum(len(edges) for edges in result.import_graph.edges.values())
 
 
 def _write_uses_output(result: PipelineResult, out: Path) -> None:
-    with _stage_span("write-uses", files=len(result.use_graph.uses_by_file)) as meta:
+    with _stage(StageMeta("write-uses", {"files": len(result.use_graph.uses_by_file)})) as meta:
         write_use_graph(result.use_graph, out / "graphs" / "uses.parquet")
         meta["edges"] = sum(len(paths) for paths in result.use_graph.uses_by_file.values())
 
@@ -2511,7 +2171,7 @@ def _normalize_path_key(path: str) -> str:
     return path.replace("\\", "/")
 
 
-def _group_configs_by_dir(records: list[dict[str, Any]]) -> dict[str, list[str]]:
+def _group_configs_by_dir(records: list[dict[str, Any]]) -> dict[str, tuple[str, ...]]:
     grouped: dict[str, list[str]] = {}
     for record in records:
         path = record.get("path")
@@ -2519,12 +2179,12 @@ def _group_configs_by_dir(records: list[dict[str, Any]]) -> dict[str, list[str]]
             continue
         dir_key = _dir_key_from_path(Path(path).parent)
         grouped.setdefault(dir_key, []).append(path)
-    return grouped
+    return {key: tuple(paths) for key, paths in grouped.items()}
 
 
 def _config_refs_for_row(
     module_path: str,
-    config_by_dir: Mapping[str, list[str]],
+    config_by_dir: Mapping[str, Sequence[str]],
 ) -> list[str]:
     dirs = _ancestor_dirs(module_path)
     seen: set[str] = set()
@@ -2590,7 +2250,7 @@ def _should_mark_overlay(row: Mapping[str, Any]) -> bool:
     )
 
 
-def _ensure_package_overlays(  # lint-ignore[PLR0913]: helper wires overlay paths atomically
+def _ensure_package_overlays(
     *,
     rel_path: Path,
     generated: list[str],

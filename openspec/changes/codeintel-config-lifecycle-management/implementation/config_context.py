@@ -315,6 +315,7 @@ class ApplicationContext:
         try:
             paths = resolve_application_paths(settings)
         except ConfigurationError:
+            LOGGER.exception("Failed to resolve application paths")
             raise
 
         vllm_client = VLLMClient(settings.vllm)

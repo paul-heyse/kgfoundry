@@ -51,19 +51,41 @@ else:
 def _get_underlying_index(cpu_index: faiss.Index | None) -> faiss.Index:
     """Return the underlying FAISS index from an ID map wrapper.
 
+    Extended Summary
+    ----------------
+    This helper function extracts the underlying FAISS index from wrapper types
+    like IndexIDMap2. It is used in benchmark tests to access the core index
+    implementation for performance measurements, bypassing wrapper overhead.
+
     Parameters
     ----------
-    cpu_index : Any
-        FAISS index wrapper (e.g., IndexIDMap2) containing the underlying index.
+    cpu_index : faiss.Index | None
+        FAISS index wrapper (e.g., IndexIDMap2) containing the underlying index,
+        or None (which triggers a RuntimeError). Must be a valid FAISS index
+        instance or wrapper.
 
     Returns
     -------
-    Any
-        Underlying FAISS index instance.
+    faiss.Index
+        Underlying FAISS index instance. If cpu_index is a wrapper (has ``index``
+        attribute), returns the wrapped index. Otherwise, returns cpu_index directly.
+
+    Raises
+    ------
+    RuntimeError
+        When cpu_index is None (defensive check). This should not occur in normal
+        operation as the function is called with validated indices.
+
+    Notes
+    -----
+    Performance & Side Effects:
+        Time complexity O(1). No I/O or state mutations. Thread-safe for concurrent
+        calls (read-only index access).
     """
     assertions.expect_true(cpu_index is not None, reason="FAISS index should not be None")
     if cpu_index is None:  # pragma: no cover - defensive
-        raise RuntimeError("FAISS index should not be None")
+        message = "FAISS index should not be None"
+        raise RuntimeError(message)
     if hasattr(cpu_index, "index"):
         index_map = cast("faiss.IndexIDMap2", cpu_index)
         return index_map.index

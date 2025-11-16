@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, Mock
 
 import git.exc
 import pytest
+from codeintel_rev.app.config_context import ResolvedPaths
 from codeintel_rev.errors import GitOperationError, PathNotFoundError
 from codeintel_rev.io.path_utils import PathOutsideRepositoryError
 from codeintel_rev.mcp_server.adapters.history import blame_range, file_history
@@ -34,8 +35,6 @@ def mock_context(tmp_path: Path) -> Mock:
     Mock
         Mock ApplicationContext with repo_root and async_git_client.
     """
-    from codeintel_rev.app.config_context import ResolvedPaths
-
     context = Mock()
     repo_root = tmp_path / "repo"
     repo_root.mkdir()

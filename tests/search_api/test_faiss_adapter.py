@@ -49,8 +49,9 @@ class _FakeIndex:
         """
         self.last_added = vectors
 
+    @staticmethod
     def search(
-        self, vectors: VectorArray, k: int
+        vectors: VectorArray, k: int
     ) -> tuple[
         npt.NDArray[np.float32], npt.NDArray[np.int64]
     ]:  # pragma: no cover - minimal protocol stub

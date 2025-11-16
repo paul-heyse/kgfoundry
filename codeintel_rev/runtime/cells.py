@@ -231,19 +231,25 @@ class RuntimeCell[T]:
         RuntimeError
             Raised when generation tracking becomes inconsistent (defensive check).
             Also raised when the initialization generation is missing (should not occur
-            in normal operation).
-        Exception
-            Re-raised when a cooldown period is active after a previous initialization
-            failure. The exception type matches the original failure (e.g., RuntimeError,
-            OSError, ImportError) and is preserved from the previous initialization attempt.
-            Callers should handle this to implement retry logic with backoff.
+            in normal operation). Additionally raised when the factory function raises
+            RuntimeError during initialization.
 
         Notes
         -----
         This method implements single-flight initialization: only one thread initializes
-        while others wait. It handles cooldown periods after failures and tracks generation
-        numbers to detect stale values. Time complexity: O(1) when cached, O(init_time)
-        when initialization is needed.
+        while others wait. It handles cooldown periods after failures and tracks
+        generation numbers to detect stale values. Time complexity: O(1) when cached,
+        O(init_time) when initialization is needed.
+
+        Exception Re-raising:
+            When a cooldown period is active after a previous initialization failure,
+            the original exception (e.g., RuntimeError, OSError, ImportError) is
+            re-raised via ``raise cooldown_error``. The exception type matches
+            the original failure and is preserved from the previous initialization
+            attempt. Callers should handle this to implement retry logic with
+            backoff. Additionally, exceptions raised by the factory function
+            during initialization are re-raised to preserve the original exception
+            type and stack trace.
         """
         adjusted_factory = self._adjust_factory(factory)
         deadline = time.monotonic() + (self._wait_timeout_s or 0)
@@ -316,21 +322,30 @@ class RuntimeCell[T]:
         Raises
         ------
         AttributeError
-            Propagated when ``silent=False`` and the payload lacks a close method.
+            When ``silent=False`` and the payload's close method raises AttributeError
+            or when the payload lacks a close method. Re-raised after recording error
+            status in the observer.
         OSError
-            Propagated when ``silent=False`` and file/resource cleanup fails.
+            When ``silent=False`` and the payload's close method raises OSError during
+            file/resource cleanup. Re-raised after recording error status in the observer.
         RuntimeError
-            Propagated when ``silent=False`` and runtime state errors occur.
-        Exception
-            Propagated when ``silent=False`` and an unexpected exception occurs during
-            payload disposal. This is a defensive catch-all for exceptions not covered
-            by the specific exception types above.
+            When ``silent=False`` and the payload's close method raises RuntimeError
+            during runtime state cleanup. Re-raised after recording error status in
+            the observer.
 
         Notes
         -----
         When ``silent`` is ``False`` the payload's ``close`` or cleanup hooks are invoked
         without suppression so AttributeError/OSError/RuntimeError bubble up directly.
         The default ``silent=True`` mode catches and swallows those exceptions.
+
+        Exception Re-raising:
+            When ``silent=False`` and an unexpected exception occurs during payload
+            disposal (not AttributeError, OSError, or RuntimeError), it is re-raised
+            to preserve the original exception type and stack trace. This defensive
+            catch-all ensures all exceptions propagate correctly when silent mode
+            is disabled even though the specific exception type is determined by
+            the payload being closed.
         """
         with self._condition:
             current = self._value

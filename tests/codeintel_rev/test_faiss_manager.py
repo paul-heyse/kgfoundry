@@ -1,3 +1,5 @@
+"""Tests for FAISS manager index operations and lifecycle."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -23,6 +25,13 @@ faiss_module: Any = FAISS_MODULE
 
 @pytest.fixture
 def faiss_manager(tmp_path: Path) -> FAISSManager:
+    """Create a FAISS manager instance for testing.
+
+    Returns
+    -------
+    FAISSManager
+        Configured FAISS manager with a flat index for testing.
+    """
     manager = FAISSManager(index_path=tmp_path / "index.faiss")
     # Use a lightweight flat index stub for type stability
     manager.cpu_index = faiss_module.IndexFlatIP(2)

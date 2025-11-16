@@ -222,7 +222,10 @@ def test_repo_scan_main_generates_expected_payload(
     assertions.expect_sequence_equal(payload["external_deps"], [])
 
     edge_set = {tuple(edge) for edge in payload["import_edges"]}
-    assertions.expect_in(("pkg", "pkg.mod_a"), edge_set)
+    assertions.expect_true(
+        ("pkg", "pkg.mod_a") in edge_set,
+        reason="import edge pkg -> pkg.mod_a should be present",
+    )
 
     assertions.expect_sequence_equal(payload["tests_to_modules"]["pkg"], ["tests.test_pkg"])
     assertions.expect_true(

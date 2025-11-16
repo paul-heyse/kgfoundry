@@ -1,3 +1,5 @@
+"""Tests for offline recall evaluation and query synthesis."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -88,6 +90,7 @@ def _prepare_symbol_catalog(db_path: Path) -> DuckDBManager:
 
 
 def test_offline_eval_synthesizes_queries(tmp_path: Path) -> None:
+    """Test that offline evaluator synthesizes queries from symbol catalog."""
     base_settings = load_settings()
     paths = PathsConfig(
         repo_root=str(tmp_path),

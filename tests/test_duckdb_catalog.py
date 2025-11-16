@@ -94,7 +94,8 @@ def _index_exists(db_path: Path, index_name: str) -> bool:
         connection.close()
 
 
-def test_query_by_uri_supports_unlimited_results(tmp_path) -> None:
+def test_query_by_uri_supports_unlimited_results(tmp_path: Path) -> None:
+    """Test that query_by_uri supports unlimited results when limit is 0 or negative."""
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir()
     parquet_path = vectors_dir / "chunks.parquet"
@@ -123,6 +124,7 @@ def test_query_by_uri_supports_unlimited_results(tmp_path) -> None:
 
 
 def test_get_embeddings_by_ids_skips_null_embeddings(tmp_path: Path) -> None:
+    """Test that get_embeddings_by_ids skips chunks with null embeddings."""
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir()
 
@@ -149,6 +151,7 @@ def test_get_embeddings_by_ids_skips_null_embeddings(tmp_path: Path) -> None:
 
 
 def test_query_by_filters_handles_literal_percent(tmp_path: Path) -> None:
+    """Test that query_by_filters handles literal percent characters in glob patterns."""
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir()
 
@@ -178,6 +181,7 @@ def test_query_by_filters_handles_literal_percent(tmp_path: Path) -> None:
 
 
 def test_query_by_filters_handles_literal_underscore(tmp_path: Path) -> None:
+    """Test that query_by_filters handles literal underscore characters in glob patterns."""
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir()
 
@@ -207,6 +211,7 @@ def test_query_by_filters_handles_literal_underscore(tmp_path: Path) -> None:
 
 
 def test_open_materialize_creates_table_and_index(tmp_path: Path) -> None:
+    """Test that opening catalog with materialize=True creates table and index."""
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir()
     parquet_path = vectors_dir / "chunks.parquet"
@@ -234,6 +239,7 @@ def test_open_materialize_creates_table_and_index(tmp_path: Path) -> None:
 
 
 def test_materialize_creates_empty_table_when_parquet_missing(tmp_path: Path) -> None:
+    """Test that materialize creates empty table when parquet file is missing."""
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir()
 

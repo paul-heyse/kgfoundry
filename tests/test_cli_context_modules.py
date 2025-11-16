@@ -39,8 +39,10 @@ def _assert_settings(module: object, settings: CLIToolSettings) -> None:
     )
     if not hasattr(module, "CLI_INTERFACE_ID") or not hasattr(module, "CLI_TITLE"):
         pytest.fail("module must define CLI interface metadata")
-    assertions.expect_equal(settings.interface_id, module.CLI_INTERFACE_ID)
-    assertions.expect_equal(settings.title, module.CLI_TITLE)
+    interface_id = module.CLI_INTERFACE_ID
+    title = module.CLI_TITLE
+    assertions.expect_equal(settings.interface_id, interface_id)
+    assertions.expect_equal(settings.title, title)
 
 
 def _assert_context(context: CLIToolingContext) -> None:

@@ -1,3 +1,5 @@
+"""Tests for vLLM client embedding operations and transport modes."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -26,7 +28,7 @@ def test_embed_batch_empty_uses_configured_dimension() -> None:
         finally:
             client.close()
         assertions.expect_equal(result.shape, (0, config.embedding_dim))
-        assertions.expect_equal(result.dtype, np.float32)
+        assertions.expect_equal(result.dtype, np.dtype(np.float32))
         mock_post.assert_not_called()
 
 
@@ -48,7 +50,7 @@ def test_embed_chunks_empty_uses_configured_dimension(
         result = client.embed_chunks([], batch_size=4)
 
         assertions.expect_equal(result.shape, (0, config.embedding_dim))
-        assertions.expect_equal(result.dtype, np.float32)
+        assertions.expect_equal(result.dtype, np.dtype(np.float32))
         mock_embed_batch.assert_not_called()
     finally:
         client.close()
@@ -74,7 +76,7 @@ async def test_embed_batch_async_empty_uses_configured_dimension(
         client.close()
 
     assertions.expect_equal(result.shape, (0, config.embedding_dim))
-    assertions.expect_equal(result.dtype, np.float32)
+    assertions.expect_equal(result.dtype, np.dtype(np.float32))
     async_client_mock.assert_not_called()
 
 

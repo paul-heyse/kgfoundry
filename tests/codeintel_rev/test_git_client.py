@@ -16,6 +16,10 @@ from codeintel_rev.io.git_client import AsyncGitClient, GitClient
 
 from tests._helpers import assertions
 
+# Test constants for line range comparisons
+_EXPECTED_LINE_RANGE_START = 10
+_EXPECTED_LINE_RANGE_END = 12
+
 
 @pytest.fixture
 def mock_repo() -> Mock:
@@ -145,8 +149,11 @@ def test_git_client_blame_range_filters_to_requested_lines(
 
     assertions.expect_equal(len(entries), 3)
     assertions.expect_true(
-        all(10 <= entry["line"] <= 12 for entry in entries),
-        reason="all entries should be in range 10-12",
+        all(
+            _EXPECTED_LINE_RANGE_START <= entry["line"] <= _EXPECTED_LINE_RANGE_END
+            for entry in entries
+        ),
+        reason=f"all entries should be in range {_EXPECTED_LINE_RANGE_START}-{_EXPECTED_LINE_RANGE_END}",
     )
 
 

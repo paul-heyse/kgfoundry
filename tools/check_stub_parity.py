@@ -240,6 +240,12 @@ def get_module_exports(module_name: str) -> set[str]:
     -------
     set[str]
         Names of public (non-private) exports.
+
+    Raises
+    ------
+    ConfigurationError
+        When the module cannot be imported (ImportError) or when module
+        introspection fails. The original ImportError is chained as the cause.
     """
     try:
         module = importlib.import_module(module_name)
@@ -304,12 +310,19 @@ def get_stub_exports(stub_path: Path) -> set[str]:
     Parameters
     ----------
     stub_path : Path
-        Path to the .pyi stub file.
+        Path to the .pyi stub file. Must exist and contain valid Python syntax.
 
     Returns
     -------
     set[str]
-        Names of symbols defined in the stub.
+        Names of symbols defined in the stub. Returns empty set if stub_path
+        does not exist.
+
+    Raises
+    ------
+    ConfigurationError
+        When the stub file cannot be parsed (SyntaxError) or when AST parsing
+        fails. The original SyntaxError is chained as the cause.
     """
     if not stub_path.exists():
         return set()
@@ -484,7 +497,21 @@ def _extract_stub_parity_report(error: ConfigurationError) -> StubParityReport |
 
 
 def _format_stub_parity_summary(report: StubParityReport) -> str:
-    """Return a human-readable summary of stub parity issues."""
+    """Return a human-readable summary of stub parity issues.
+
+    Parameters
+    ----------
+    report : StubParityReport
+        Stub parity report containing issue details for one or more modules
+        with mismatches between stubs and runtime implementations.
+
+    Returns
+    -------
+    str
+        Human-readable multi-line summary string listing all parity issues with
+        module names, stub paths, and specific mismatch details. Formatted for
+        console output.
+    """
     lines = [
         f"FAILED: {report.error_count} stub parity issue(s) across {report.issue_count} module(s)",
         "",
@@ -527,10 +554,37 @@ def _normalize_issues(
 def main() -> int:
     """Check parity between stubs and runtime modules.
 
+    Extended Summary
+    ----------------
+    This CLI tool validates that stub files (``.pyi``) accurately reflect the
+    public API of their corresponding runtime modules. It compares exports,
+    signatures, and type annotations to detect drift between stubs and implementation,
+    ensuring type checking remains accurate as code evolves.
+
     Returns
     -------
     int
-        Exit code: 0 on success, 1 on failure.
+        Exit code: 0 on success (stubs match runtime modules), 1 on failure
+        (parity issues detected or configuration error).
+
+    Raises
+    ------
+    SystemExit
+        When a configuration error occurs during stub parsing or when stub
+        parity issues are detected. The exit code is 1, and the error message
+        includes a formatted summary of all parity issues found.
+
+    Notes
+    -----
+    Performance & Side Effects:
+        Time complexity O(n*m) where n is the number of modules checked and m
+        is the average number of symbols per module. Reads stub and runtime files
+        from disk; no writes. Thread-safe for concurrent checks.
+
+    See Also
+    --------
+    run_stub_parity_checks : Core parity checking algorithm
+    _format_stub_parity_summary : Issue formatting and reporting
     """
     project_root = Path(__file__).parent.parent
     stubs_dir = project_root / "stubs" / "kgfoundry"
@@ -546,7 +600,7 @@ def main() -> int:
         if extracted_report is None:
             raise SystemExit(str(error)) from error
         message = _format_stub_parity_summary(extracted_report)
-        raise SystemExit(message)
+        raise SystemExit(message) from error
 
     return 0
 
