@@ -6,7 +6,6 @@ import json
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from time import perf_counter
 from typing import TYPE_CHECKING, Any, Literal, TypedDict, cast
 
 from codeintel_rev._lazy_imports import LazyModule
@@ -92,8 +91,9 @@ class XTRIndex:
                 mode="r",
                 shape=(meta["total_tokens"], meta["dim"]),
             )
-        except ValueError:
-            raise
+        except ValueError as exc:
+            message = f"Token matrix shape mismatch for {token_path}"
+            raise ValueError(message) from exc
         state = self._ensure_state()
         state.close()
         state.meta = meta
@@ -225,19 +225,16 @@ class XTRIndex:
         state = self._current_state()
         if state is None or state.meta is None:
             return []
-        start = perf_counter()
         meta = state.meta
         query_vecs = self.encode_query_tokens(query)
         candidates = meta["chunk_ids"]
-        results = self.score_candidates(
+        return self.score_candidates(
             query_vecs,
             candidates,
             explain=explain,
             topk_explanations=topk_explanations,
             limit=k,
         )
-        duration_ms = round((perf_counter() - start) * 1000, 2)
-        return results
 
     def rescore(
         self,
@@ -306,13 +303,12 @@ class XTRIndex:
         if not materialized or not self.ready:
             return []
         query_vecs = self.encode_query_tokens(query)
-        results = self.score_candidates(
+        return self.score_candidates(
             query_vecs,
             materialized,
             explain=explain,
             topk_explanations=topk_explanations,
         )
-        return results
 
     def score_candidates(
         self,

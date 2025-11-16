@@ -212,8 +212,8 @@ class Capabilities:
         -----
         This class method probes the application context to determine which
         features are available. It checks for index files, optional module
-        imports, GPU availability, and index version information. The resulting
-        snapshot is used for MCP tool gating and the /capz endpoint. Time
+        imports, and index version information. The resulting snapshot is used
+        for MCP tool gating and the /capz endpoint. Time
         complexity: O(1) for most checks, O(module_load_time) for optional imports.
         """
         paths = getattr(context, "paths", None)

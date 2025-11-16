@@ -188,9 +188,10 @@ class GitClient:
         if self._repo is None:
             try:
                 repo = git.Repo(self.repo_path, search_parent_directories=True)
-                _SET_GITCLIENT_ATTR(self, "_repo", repo)
-            except git.exc.InvalidGitRepositoryError:
-                raise
+            except git.exc.InvalidGitRepositoryError as exc:
+                message = f"Invalid Git repository: {self.repo_path}"
+                raise git.exc.InvalidGitRepositoryError(message) from exc
+            _SET_GITCLIENT_ATTR(self, "_repo", repo)
         return cast("git.Repo", self._repo)
 
     def with_cached_repo(self, repo: git.Repo) -> GitClient:
@@ -408,7 +409,7 @@ class GitClient:
             # Other Git errors
             raise
 
-        commits = [
+        return [
             {
                 "sha": _short_sha(commit),
                 "full_sha": _string_attr(commit, "hexsha"),
@@ -419,8 +420,6 @@ class GitClient:
             }
             for commit in cast("Iterable[object]", commits_iter)
         ]
-
-        return commits
 
 
 class AsyncGitClient:

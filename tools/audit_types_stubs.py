@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import ast
 import json
-import logging
 import re
 import shutil
 import sys
@@ -23,12 +22,8 @@ from collections import defaultdict
 from pathlib import Path
 
 from kgfoundry_common.subprocess_utils import run_subprocess
-from tools._shared.logging import get_logger
 
 REPO_ROOT = Path(__file__).parent.parent
-_MAX_DISPLAY_ITEMS = 20
-
-logger = get_logger(__name__)
 
 
 def get_types_packages() -> dict[str, str]:
@@ -111,7 +106,6 @@ def _extract_imports_from_file(py_file: Path) -> list[str]:
                 mod = node.module.split(".")[0]
                 imports.append(mod.lower())
     except (OSError, SyntaxError, UnicodeDecodeError) as exc:
-        logger.debug("Failed to parse %s: %s", py_file, exc)
     return imports
 
 
@@ -184,7 +178,6 @@ def check_package_has_typed(package_name: str) -> bool:
     # Sanitize package name to prevent injection
     safe_package = re.sub(r"[^a-zA-Z0-9._-]", "", package_name)
     if safe_package != package_name:
-        logger.warning("Package name sanitized: %s -> %s", package_name, safe_package)
         return False
 
     # Package name is sanitized above; python_exe is from shutil.which
@@ -374,44 +367,6 @@ def _analyze_usage(
     return _categorize_stubs(types_packages, used_stubs, stdlib_modules)
 
 
-def _report_results(
-    used_stubs: set[str],
-    stdlib_stubs: set[str],
-    unused_stubs: set[str],
-) -> None:
-    """Report audit results to logger.
-
-    Parameters
-    ----------
-    used_stubs : set[str]
-        Stubs that are used.
-    stdlib_stubs : set[str]
-        Stdlib stubs (not needed).
-    unused_stubs : set[str]
-        Potentially unused stubs.
-    """
-    logger.info("=" * 70)
-    logger.info("TYPES- STUB PACKAGES AUDIT")
-    logger.info("=" * 70)
-
-    logger.info("\n3. Results:")
-    logger.info("\n   Used types- packages (%d):", len(used_stubs))
-    for stub in sorted(used_stubs):
-        logger.info("     ✓ %s", stub)
-
-    logger.info("\n   Stdlib modules (not needed for Python 3.13+) (%d):", len(stdlib_stubs))
-    for stub in sorted(stdlib_stubs):
-        logger.info("     ✗ %s", stub)
-
-    logger.info("\n   Potentially unused (%d):", len(unused_stubs))
-    if len(unused_stubs) > 0:
-        logger.info("     (Showing first %d)", _MAX_DISPLAY_ITEMS)
-        for stub in sorted(unused_stubs)[:_MAX_DISPLAY_ITEMS]:
-            logger.info("     ? %s", stub)
-        if len(unused_stubs) > _MAX_DISPLAY_ITEMS:
-            logger.info("     ... and %d more", len(unused_stubs) - _MAX_DISPLAY_ITEMS)
-
-
 def main() -> int:
     """Run the types- stub packages audit.
 
@@ -420,39 +375,23 @@ def main() -> int:
     int
         Exit code (0 for success, non-zero for failure).
     """
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    logger.info("=" * 70)
-    logger.info("TYPES- STUB PACKAGES AUDIT")
-    logger.info("=" * 70)
 
     # Gather data
-    logger.info("\n1. Gathering data...")
     types_packages = get_types_packages()
     runtime_deps = get_runtime_dependencies()
     actual_imports = get_actual_imports()
     stdlib_modules = get_stdlib_modules()
 
-    logger.info("   Found %d types- packages", len(types_packages))
-    logger.info("   Found %d runtime dependencies", len(runtime_deps))
-    logger.info("   Found %d unique imports", len(actual_imports))
 
     # Analyze usage
-    logger.info("\n2. Analyzing usage...")
     used_stubs, stdlib_stubs, unused_stubs = _analyze_usage(
         actual_imports, runtime_deps, types_packages, stdlib_modules
     )
 
-    # Report
-    _report_results(used_stubs, stdlib_stubs, unused_stubs)
-
     # Save removal candidates
     removal_candidates = sorted(stdlib_stubs | unused_stubs)
 
-    logger.info("\n4. Summary:")
-    logger.info("   Total types- packages: %d", len(types_packages))
-    logger.info("   Keep: %d", len(used_stubs))
-    logger.info("   Remove candidates: %d", len(removal_candidates))
 
     # Save to file
     output_file = REPO_ROOT / "tools" / "types_stubs_removal_candidates.json"
@@ -467,7 +406,6 @@ def main() -> int:
             indent=2,
         )
 
-    logger.info("\n   Results saved to: %s", output_file.relative_to(REPO_ROOT))
 
     return 0
 

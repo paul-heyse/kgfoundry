@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 if __package__ in {
     None,
@@ -19,12 +19,9 @@ if __package__ in {
 
 from tools import architecture
 from tools._shared.cli import CliEnvelopeBuilder, render_cli_envelope
-from tools._shared.logging import get_logger
 
 if TYPE_CHECKING:
     from tools._shared.cli import CliEnvelope, CliStatus
-
-LOGGER = get_logger(__name__)
 
 
 def _build_envelope(result: architecture.ArchitectureResult) -> CliEnvelope:
@@ -55,15 +52,7 @@ def main() -> int:
     result = architecture.enforce_tooling_layers()
     envelope = _build_envelope(result)
 
-    output_json = cast("bool", getattr(args, "json", False))
-
-    if output_json:
-        sys.stdout.write(render_cli_envelope(envelope) + "\n")
-    elif result.is_success:
-        LOGGER.info("Tooling import layering verified (domain → adapters → io/cli).")
-    else:
-        for violation in result.violations:
-            LOGGER.error(violation)
+    sys.stdout.write(render_cli_envelope(envelope) + "\n")
 
     return 0 if result.is_success else 1
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
+from contextlib import suppress
 from pathlib import Path
 from typing import TypedDict, cast
 
@@ -89,10 +90,8 @@ async def status_endpoint(
     mgr = ctx.index_manager
     version = mgr.current_version()
     assets_ok = False
-    try:
+    with suppress(RuntimeLifecycleError):  # pragma: no cover - logged + returned
         assets_ok = mgr.read_assets() is not None
-    except RuntimeLifecycleError:  # pragma: no cover - logged + returned
-        pass
     payload = {
         "current": version,
         "dir": str(mgr.current_dir()) if version else None,

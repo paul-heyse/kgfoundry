@@ -17,6 +17,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from kgfoundry._namespace_proxy import (
+    NamespaceRegistry as _NamespaceRegistry,
+)
+from kgfoundry._namespace_proxy import (
     namespace_attach as _namespace_attach,
 )
 from kgfoundry._namespace_proxy import (
@@ -35,6 +38,7 @@ if TYPE_CHECKING:
     from types import ModuleType
 
 __all__ = [
+    "NamespaceRegistry",
     "namespace_attach",
     "namespace_dir",
     "namespace_exports",
@@ -122,4 +126,4 @@ def namespace_getattr(module: ModuleType, name: str) -> object:
     return _namespace_getattr(module, name)
 
 
-NamespaceRegistry = NamespaceRegistry
+NamespaceRegistry = _NamespaceRegistry

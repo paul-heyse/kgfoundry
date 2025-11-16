@@ -7,6 +7,7 @@ import json
 import os
 import uuid
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from functools import lru_cache
@@ -610,10 +611,8 @@ def _write_embedding_meta(
     *,
     version: str | None,
 ) -> None:
-    try:
+    with suppress(RuntimeLifecycleError):
         manager.write_embedding_metadata(payload, version=version)
-    except RuntimeLifecycleError:
-        pass
 
 
 @embeddings_app.command("build")
@@ -1224,10 +1223,8 @@ def eval_command(
     )
     evaluator = HybridPoolEvaluator(catalog, manager, xtr_index=xtr_index)
     report = evaluator.run(config)
-    try:
+    with suppress(OSError, RuntimeError, ValueError):  # pragma: no cover - defensive logging
         catalog.ensure_pool_views(pool_path)
-    except (OSError, RuntimeError, ValueError):  # pragma: no cover - defensive logging
-        pass
     typer.echo(json.dumps(report.__dict__, indent=2))
 
 

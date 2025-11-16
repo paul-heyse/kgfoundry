@@ -50,7 +50,7 @@ class ServerLaunchOptions:
     port: int
     served_model_name: str | None
     tensor_parallel_size: int | None
-    gpu_memory_utilization: float | None
+    memory_utilization: float | None
     max_num_batched_tokens: int | None
 
 
@@ -89,8 +89,10 @@ def _build_server_argv(options: ServerLaunchOptions) -> list[str]:
     ]
     if options.tensor_parallel_size and options.tensor_parallel_size > 1:
         argv += ["--tensor-parallel-size", str(options.tensor_parallel_size)]
-    if options.gpu_memory_utilization:
-        argv += ["--gpu-memory-utilization", str(options.gpu_memory_utilization)]
+    if options.memory_utilization:
+        # vLLM still expects the legacy --gpu-memory-utilization flag even when
+        # running on CPU-only hosts.
+        argv += ["--gpu-memory-utilization", str(options.memory_utilization)]
     if options.max_num_batched_tokens:
         argv += ["--max-num-batched-tokens", str(options.max_num_batched_tokens)]
     if options.served_model_name:
@@ -158,7 +160,7 @@ def cmd_serve_http(args: argparse.Namespace) -> int:
         port=port,
         served_model_name=args.served_model_name or DEFAULT_MODEL,
         tensor_parallel_size=args.tensor_parallel_size,
-        gpu_memory_utilization=args.gpu_memory_utilization,
+        memory_utilization=args.memory_utilization,
         max_num_batched_tokens=args.max_num_batched_tokens,
     )
     argv = _build_server_argv(options)
@@ -246,7 +248,17 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--hf-cache", type=str, default=None, help="HF cache root.")
     serve.add_argument("--online", action="store_true", help="Allow HF downloads.")
     serve.add_argument("--tensor-parallel-size", type=int, default=None)
-    serve.add_argument("--gpu-memory-utilization", type=float, default=0.6)
+    serve.add_argument(
+        "--memory-utilization",
+        "--gpu-memory-utilization",
+        dest="memory_utilization",
+        type=float,
+        default=0.6,
+        help=(
+            "Fraction of the vLLM server's memory budget allocated to the model. "
+            "Keeps the legacy flag name for compatibility with upstream vLLM."
+        ),
+    )
     serve.add_argument("--max-num-batched-tokens", type=int, default=4096)
     serve.add_argument("--pid-file", type=Path, default=DEFAULT_PID_FILE)
     serve.add_argument("--timeout", type=float, default=60.0, help="Seconds to wait for readiness.")

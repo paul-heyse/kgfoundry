@@ -184,8 +184,19 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
     >>> session_id = response.json()["session_id"]  # Use for subsequent requests
     """
 
-    def __init__(self, app: ASGIApp, dispatch: DispatchFunction | None = None) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        dispatch: DispatchFunction | None = None,
+        *,
+        capability_attr: str = "capability_stamp",
+        session_header: str = "X-Session-ID",
+        run_header: str = "X-Run-ID",
+    ) -> None:
         super().__init__(app, dispatch)
+        self._capability_attr = capability_attr
+        self._session_header = session_header
+        self._run_header = run_header
 
     async def dispatch(  # Required instance method for BaseHTTPMiddleware
         self,
@@ -216,18 +227,18 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
         Even if adapters are sync functions, FastAPI wraps them in asyncio.to_thread.
         """
         # Extract session ID from header or generate
-        session_id = request.headers.get("X-Session-ID")
+        session_id = request.headers.get(self._session_header)
         if session_id is None:
             session_id = str(uuid.uuid4())
 
-        run_id = request.headers.get("X-Run-ID")
+        run_id = request.headers.get(self._run_header)
         if run_id is None:
             run_id = uuid.uuid4().hex
 
         request.state.session_id = session_id
         request.state.run_id = run_id
 
-        capability_stamp = getattr(request.app.state, "capability_stamp", None)
+        capability_stamp = getattr(request.app.state, self._capability_attr, None)
 
         session_token = session_id_var.set(session_id)
         capability_token = capability_stamp_var.set(capability_stamp)
@@ -236,8 +247,8 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
         finally:
             session_id_var.reset(session_token)
             capability_stamp_var.reset(capability_token)
-        response.headers.setdefault("X-Run-Id", run_id)
-        response.headers.setdefault("X-Session-Id", session_id)
+        response.headers.setdefault(self._run_header, run_id)
+        response.headers.setdefault(self._session_header, session_id)
         return response
 
 

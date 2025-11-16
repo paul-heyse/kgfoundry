@@ -7,8 +7,6 @@ and emit Problem Details envelopes consistent with
 """
 
 from __future__ import annotations
-
-import logging
 from importlib import import_module
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Final, cast
@@ -57,11 +55,6 @@ from tools._shared.cli_tooling import (
     CLIToolSettings,
     load_cli_tooling_context,
 )
-from tools._shared.logging import (
-    StructuredLoggerAdapter,
-    get_logger,
-    with_fields,
-)
 from tools._shared.metrics import ToolRunObservation, observe_tool_run
 from tools._shared.observability import MetricEmitterError, emitter
 from tools._shared.paths import Paths
@@ -108,11 +101,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, MutableMapping
     from types import ModuleType
 
-    from tools import (
-        codemods,
-    )
-
-logging.getLogger(__name__).addHandler(logging.NullHandler())
+    from tools import codemods
 
 _PUBLIC_EXPORTS: dict[str, object] = {
     "AugmentMetadataModel": AugmentMetadataModel,
@@ -137,7 +126,6 @@ _PUBLIC_EXPORTS: dict[str, object] = {
     "ProblemDetailsParams": ProblemDetailsParams,
     "SchemaProblemDetailsParams": SchemaProblemDetailsParams,
     "SettingsError": SettingsError,
-    "StructuredLoggerAdapter": cast("object", StructuredLoggerAdapter),
     "CliContext": CliContext,
     "CliRunConfig": CliRunConfig,
     "cli_operation": cli_operation,
@@ -155,9 +143,7 @@ _PUBLIC_EXPORTS: dict[str, object] = {
     "build_schema_problem_details": build_schema_problem_details,
     "build_tool_problem_details": build_tool_problem_details,
     "get_process_runner": get_process_runner,
-    "get_logger": get_logger,
     "get_runtime_settings": get_runtime_settings,
-    "logging": logging,
     "new_cli_envelope": new_cli_envelope,
     "load_augment": load_augment,
     "load_cli_tooling_context": load_cli_tooling_context,
@@ -189,7 +175,6 @@ _PUBLIC_EXPORTS: dict[str, object] = {
     "tool_timeout_problem_details": tool_timeout_problem_details,
     "validate_cli_envelope": validate_cli_envelope,
     "validate_tools_payload": validate_tools_payload,
-    "with_fields": with_fields,
 }
 
 PUBLIC_EXPORTS: Final[Mapping[str, object]] = MappingProxyType(_PUBLIC_EXPORTS)
@@ -234,7 +219,6 @@ __all__: tuple[str, ...] = (
     "RegistryOperationModel",
     "SchemaProblemDetailsParams",
     "SettingsError",
-    "StructuredLoggerAdapter",
     "ToolExecutionError",
     "ToolProblemDetailsParams",
     "ToolRunObservation",
@@ -249,10 +233,8 @@ __all__: tuple[str, ...] = (
     "cli_run",
     "codemods",
     "emitter",
-    "get_logger",
     "get_process_runner",
     "get_runtime_settings",
-    "logging",
     "new_cli_envelope",
     "normalize_route",
     "normalize_token",
@@ -273,7 +255,6 @@ __all__: tuple[str, ...] = (
     "tool_timeout_problem_details",
     "validate_cli_envelope",
     "validate_tools_payload",
-    "with_fields",
 )
 
 

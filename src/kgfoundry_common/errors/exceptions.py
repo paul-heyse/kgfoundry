@@ -492,7 +492,9 @@ class EmbeddingError(KgFoundryError):
 
     Examples
     --------
-    >>> raise EmbeddingError("Failed to generate embeddings", cause=RuntimeError("GPU unavailable"))
+    >>> raise EmbeddingError(
+    ...     "Failed to generate embeddings", cause=RuntimeError("backend unavailable")
+    ... )
     """
 
     def __init__(

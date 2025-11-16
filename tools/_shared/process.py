@@ -19,8 +19,6 @@ from functools import lru_cache
 from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
-
-from tools._shared.logging import get_logger
 from tools._shared.metrics import ToolRunObservation, observe_tool_run
 from tools._shared.problem_details import (
     tool_digest_mismatch_problem_details,
@@ -32,10 +30,7 @@ from tools._shared.problem_details import (
 from tools._shared.settings import get_runtime_settings
 
 if TYPE_CHECKING:
-    from tools._shared.logging import StructuredLoggerAdapter
-    from tools._shared.problem_details import (
-        ProblemDetailsDict,
-    )
+    from tools._shared.problem_details import ProblemDetailsDict
     from tools._shared.settings import ToolRuntimeSettings
 
 
@@ -65,9 +60,6 @@ ObservationFactory = Callable[
     [Sequence[str], Path | None, float | None],
     AbstractContextManager[ToolRunObservation],
 ]
-
-
-LOGGER = get_logger(__name__)
 
 
 @lru_cache(maxsize=128)
@@ -120,13 +112,6 @@ class ExecutableDigestVerifier:
                 reason=reason,
             )
             message = "Executable digest verification failed (executable missing)"
-            LOGGER.exception(
-                message,
-                extra={
-                    "executable": executable.as_posix(),
-                    "reason": reason,
-                },
-            )
             raise ToolExecutionError(message, command=command, problem=problem) from exc
 
         if hmac.compare_digest(actual, expected):
@@ -141,14 +126,6 @@ class ExecutableDigestVerifier:
             reason=reason,
         )
         message = "Executable digest verification failed"
-        LOGGER.error(
-            message,
-            extra={
-                "executable": executable.as_posix(),
-                "expected_digest": expected,
-                "actual_digest": actual,
-            },
-        )
         raise ToolExecutionError(message, command=command, problem=problem)
 
 
@@ -281,13 +258,6 @@ class AllowListEnforcer:
             allowlist=settings.exec_allowlist,
         )
         message = f"Executable '{executable}' is not permitted by TOOLS_EXEC_ALLOWLIST"
-        LOGGER.warning(
-            message,
-            extra={
-                "executable": executable.as_posix(),
-                "command": list(command),
-            },
-        )
         raise ToolExecutionError(message, command=command, problem=problem)
 
 
@@ -358,7 +328,6 @@ class ProcessRunner:
     allowlist: AllowListPolicy = field(default_factory=AllowListEnforcer)
     environment: EnvironmentPolicy = field(default_factory=SanitisedEnvironment)
     observer_factory: ObservationFactory = field(default=_default_observer_factory)
-    logger: StructuredLoggerAdapter = field(default_factory=lambda: get_logger(__name__))
 
     def run(
         self,

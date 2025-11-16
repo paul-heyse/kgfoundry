@@ -4,8 +4,6 @@ system:
   os: ubuntu-24.04
 runtime:
   python: '3.13.9'
-  cuda: '13.0'
-  torch: '2.9'
   duckdb_min: 1.4.1
 search:
   sparse_backend: lucene   # 'lucene' or 'pure'
@@ -34,7 +32,5 @@ sparse_embedding:
     topk: 256
     query_encoder: naver/splade-v3-distilbert  # HF model powering Lucene SPLADE queries
 faiss:
-  gpu: true
-  cuvs: true
   index_factory: OPQ64,IVF8192,PQ64
   nprobe: 64

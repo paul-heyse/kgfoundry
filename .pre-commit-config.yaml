@@ -118,11 +118,6 @@ repos:
 
   - repo: local
     hooks:
-      - id: gpu-test-gate
-        name: Ensure GPU tests are gated
-        entry: uv run python tools/lint/check_gpu_marks.py
-        language: system
-        files: ^tests/.*\.py$
       - id: docstring-builder
         name: docstring-builder (check)
         entry: uv run python -m tools.docstring_builder.cli check

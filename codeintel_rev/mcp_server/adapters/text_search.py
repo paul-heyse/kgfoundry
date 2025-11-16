@@ -261,13 +261,11 @@ async def search_text(
     def _run_sync() -> dict:
         return _search_text_sync(
             context=context,
-            session_id=session_id or "",
             scope=scope,
             options=options,
         )
 
-    result = await asyncio.to_thread(_run_sync)
-    return result
+    return await asyncio.to_thread(_run_sync)
 
 
 def _resolve_glob_filters(
@@ -301,7 +299,6 @@ def _resolve_glob_filters(
 
 def _search_text_sync(
     context: ApplicationContext,
-    session_id: str,
     scope: ScopeIn | None,
     options: TextSearchOptions,
 ) -> dict:

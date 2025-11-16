@@ -155,7 +155,7 @@ class BM25SearchProvider:
         except Exception as exc:
             msg = "BM25 search failed"
             raise RuntimeError(msg) from exc
-        results = [
+        return [
             SearchHit(
                 doc_id=str(hit.docid),
                 rank=rank,
@@ -165,7 +165,6 @@ class BM25SearchProvider:
             )
             for rank, hit in enumerate(hits)
         ]
-        return results
 
 
 class SpladeSearchProvider:
@@ -293,7 +292,7 @@ class SpladeSearchProvider:
         except Exception as exc:
             msg = "SPLADE search failed"
             raise RuntimeError(msg) from exc
-        results = [
+        return [
             SearchHit(
                 doc_id=str(hit.docid),
                 rank=rank,
@@ -303,7 +302,6 @@ class SpladeSearchProvider:
             )
             for rank, hit in enumerate(hits)
         ]
-        return results
 
     def _filter_pairs(self, pairs: Sequence[tuple[str, float]]) -> list[tuple[str, float]]:
         filtered = [(token, weight) for token, weight in pairs if weight > 0]
@@ -708,8 +706,7 @@ class HybridSearchEngine:
             budget_decision=budget_decision,
             budget_info=budget_info,
         )
-        result = self._fuse_runs(ctx)
-        return result
+        return self._fuse_runs(ctx)
 
     def _gather_channel_hits(
         self,

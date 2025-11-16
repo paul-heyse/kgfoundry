@@ -14,7 +14,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
-from time import perf_counter
 from typing import TYPE_CHECKING, Any, ClassVar, Self, TypedDict, Unpack, cast
 
 from codeintel_rev._lazy_imports import LazyModule
@@ -260,8 +259,7 @@ class _DuckDBQueryMixin:
             relation = conn.execute(sql, params)
             rows = relation.fetchall()
             cols = [desc[0] for desc in relation.description]
-        payload = [dict(zip(cols, row, strict=True)) for row in rows]
-        return payload
+        return [dict(zip(cols, row, strict=True)) for row in rows]
 
     def get_structure_annotations(self, ids: Sequence[int]) -> dict[int, StructureAnnotations]:
         """Return structural overlays (symbols/AST/CST) for chunk ``ids``.
@@ -591,7 +589,8 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         with self._manager.readonly_connection() as conn:
             yield conn
 
-    def _log_query(self, sql: str, params: object | None = None) -> None:
+    @staticmethod
+    def _log_query(_sql: str, _params: object | None = None) -> None:
         """Compatibility stub retained after removing catalog logging."""
         return
 
@@ -1138,7 +1137,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         if not ids:
             return []
 
-        start_time = perf_counter()
         results: list[dict] = []
         spec = self._build_scope_filter_spec(
             ids,
@@ -1481,8 +1479,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             relation = conn.execute(sql, params)
             rows = relation.fetchall()
             cols = [desc[0] for desc in relation.description]
-        payload = [dict(zip(cols, row, strict=True)) for row in rows]
-        return payload
+        return [dict(zip(cols, row, strict=True)) for row in rows]
 
     def get_embeddings_by_ids(self, ids: Sequence[int]) -> tuple[list[int], NDArrayF32]:
         """Extract embedding vectors for given chunk IDs.

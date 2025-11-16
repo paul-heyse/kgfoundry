@@ -178,16 +178,13 @@ async def list_paths(context: ApplicationContext, *args: object, **kwargs: objec
         languages=languages,
         max_results=max_results,
     )
-    result = await asyncio.to_thread(
+    return await asyncio.to_thread(
         _list_paths_sync,
         context,
-        session_id,
         scope,
         path,
         filters,
     )
-
-    return result
 
 
 def _normalize_list_paths_arguments(
@@ -224,7 +221,6 @@ def _normalize_list_paths_arguments(
 
 def _list_paths_sync(
     context: ApplicationContext,
-    session_id: str,
     scope: ScopeIn | None,
     path: str | None = None,
     filters: FileListFilters | None = None,
@@ -239,8 +235,6 @@ def _list_paths_sync(
     ----------
     context : ApplicationContext
         Application context containing repo root and settings.
-    session_id : str
-        Session identifier for logging and scope resolution.
     scope : ScopeIn | None
         Session scope containing include/exclude globs and language filters.
         Overridden by explicit ``include_globs`` and ``exclude_globs`` parameters.
@@ -564,13 +558,12 @@ def open_file(
         end_idx = end_line if end_line is not None else len(lines)
         content = "".join(lines[start_idx:end_idx])
 
-    result = {
+    return {
         "path": path,
         "content": content,
         "lines": len(content.splitlines()),
         "size": len(content),
     }
-    return result
 
 
 __all__ = ["list_paths", "open_file", "set_scope"]

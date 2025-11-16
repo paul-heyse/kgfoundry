@@ -38,9 +38,6 @@ if TYPE_CHECKING:
 P = ParamSpec("P")
 R = TypeVar("R")
 
-# GPU acceleration has been removed; keep the exported flag for compatibility.
-HAS_GPU_STACK = False
-
 
 def _faiss_runtime_available() -> bool:
     try:
@@ -350,7 +347,6 @@ def structured_log_asserter() -> Callable[[logging.LogRecord, set[str]], None]:
 
 
 __all__ = [
-    "HAS_GPU_STACK",
     "caplog_records",
     "load_problem_details_example",
     "problem_details_loader",

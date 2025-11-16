@@ -17,7 +17,6 @@ from __future__ import annotations
 import ast
 import importlib.util
 import json
-import logging
 import re
 import shutil
 import sys
@@ -26,13 +25,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from kgfoundry_common.subprocess_utils import run_subprocess
-from tools._shared.logging import get_logger
 
 REPO_ROOT = Path(__file__).parent.parent
 _MAX_DISPLAY_ITEMS = 20
 _PROGRESS_INTERVAL = 20
-
-logger = get_logger(__name__)
 
 
 def _find_python_executable() -> str:
@@ -72,7 +68,6 @@ def _check_package_has_typed_via_subprocess(package_name: str) -> bool:
     # Sanitize package name to prevent injection
     safe_package = re.sub(r"[^a-zA-Z0-9._-]", "", package_name)
     if safe_package != package_name:
-        logger.debug("Package name sanitized: %s -> %s", package_name, safe_package)
         return False
 
     # Package name is sanitized above; python_exe is from shutil.which
@@ -110,7 +105,6 @@ def _get_all_installed_packages_via_subprocess() -> dict[str, str]:
         stdout = run_subprocess(cmd, timeout=10, cwd=REPO_ROOT)
         packages = json.loads(stdout)
     except (json.JSONDecodeError, OSError, RuntimeError) as exc:
-        logger.debug("Failed to get installed packages: %s", exc)
     return packages
 
 
@@ -211,7 +205,6 @@ def _extract_imports_from_file(py_file: Path) -> list[str]:
                 mod = node.module.split(".")[0]
                 imports.append(mod.lower())
     except (OSError, SyntaxError, UnicodeDecodeError) as exc:
-        logger.debug("Failed to parse %s: %s", py_file, exc)
     return imports
 
 
@@ -320,7 +313,6 @@ def get_full_dependency_tree() -> set[str]:
                 pkg_name = match.group(1).lower().replace("-", "_")
                 all_packages.add(pkg_name)
     except (OSError, RuntimeError) as exc:
-        logger.debug("Failed to get dependency tree: %s", exc)
     return all_packages
 
 
@@ -405,7 +397,6 @@ def check_package_has_typed(package_name: str) -> bool:
     try:
         spec = importlib.util.find_spec(package_name)
     except (ImportError, ValueError) as exc:
-        logger.debug("Failed to check stdlib for %s: %s", package_name, exc)
         return False
     else:
         # Likely stdlib if origin exists and is not in site-packages
@@ -579,7 +570,6 @@ def _check_packages_for_typed(
             continue
         checked += 1
         if checked % _PROGRESS_INTERVAL == 0:
-            logger.info("   Checked %d/%d packages...", checked, len(all_needed_packages))
 
         if check_package_has_typed(pkg):
             packages_with_typed.add(pkg)
@@ -655,44 +645,6 @@ def _categorize_all_stubs(
     return used_stubs, unused_stubs, stdlib_stubs
 
 
-def _report_results(
-    used_stubs: set[str],
-    stdlib_stubs: set[str],
-    unused_stubs: set[str],
-    stub_to_package: dict[str, str],
-) -> None:
-    """Report audit results to logger.
-
-    Parameters
-    ----------
-    used_stubs : set[str]
-        Stubs that are used.
-    stdlib_stubs : set[str]
-        Stdlib stubs (not needed).
-    unused_stubs : set[str]
-        Potentially unused stubs.
-    stub_to_package : dict[str, str]
-        Mapping from stub to package name.
-    """
-    logger.info("\n8. Results:")
-    logger.info("\n   Used types- packages (%d):", len(used_stubs))
-    for stub in sorted(used_stubs):
-        pkg = stub_to_package.get(stub, "?")
-        logger.info("     ✓ %-40s (for %s)", stub, pkg)
-
-    logger.info("\n   Stdlib modules (not needed for Python 3.13+) (%d):", len(stdlib_stubs))
-    for stub in sorted(stdlib_stubs):
-        logger.info("     ✗ %s", stub)
-
-    logger.info("\n   Unused types- packages (%d):", len(unused_stubs))
-    if len(unused_stubs) > 0:
-        logger.info("     (Showing first %d)", _MAX_DISPLAY_ITEMS)
-        for stub in sorted(unused_stubs)[:_MAX_DISPLAY_ITEMS]:
-            logger.info("     ? %s", stub)
-        if len(unused_stubs) > _MAX_DISPLAY_ITEMS:
-            logger.info("     ... and %d more", len(unused_stubs) - _MAX_DISPLAY_ITEMS)
-
-
 def _save_results(
     used_stubs: set[str],
     unused_stubs: set[str],
@@ -740,15 +692,11 @@ def _gather_initial_data() -> tuple[dict[str, str], dict[str, str], dict[str, li
     tuple[dict[str, str], dict[str, str], dict[str, list[str]], set[str]]
         Tuple of (types_packages, runtime_deps, actual_imports, stdlib_modules).
     """
-    logger.info("\n1. Gathering data...")
     types_packages = get_types_packages()
     runtime_deps = get_runtime_dependencies()
     actual_imports = get_actual_imports()
     stdlib_modules = get_stdlib_modules()
 
-    logger.info("   Found %d types- packages", len(types_packages))
-    logger.info("   Found %d runtime dependencies", len(runtime_deps))
-    logger.info("   Found %d unique imports", len(actual_imports))
 
     return types_packages, runtime_deps, actual_imports, stdlib_modules
 
@@ -761,12 +709,9 @@ def _gather_package_data() -> tuple[dict[str, str], set[str]]:
     tuple[dict[str, str], set[str]]
         Tuple of (installed_packages, dependency_tree).
     """
-    logger.info("\n2. Getting installed packages and dependency tree...")
     installed_packages = get_all_installed_packages()
     dependency_tree = get_full_dependency_tree()
 
-    logger.info("   Found %d installed packages", len(installed_packages))
-    logger.info("   Found %d packages in dependency tree", len(dependency_tree))
 
     return installed_packages, dependency_tree
 
@@ -799,16 +744,12 @@ def _execute_audit_workflow(
         Tuple of (used_stubs, unused_stubs, stdlib_stubs, stub_to_package).
     """
     # Step 1: Map imports to packages
-    logger.info("\n3. Mapping imports to packages...")
     import_to_package, directly_used_packages = _map_imports_to_packages(
         context.actual_imports, context.runtime_deps, context.installed_packages
     )
 
-    logger.info("   Mapped %d imports to packages", len(import_to_package))
-    logger.info("   Directly used packages: %d", len(directly_used_packages))
 
     # Step 2: All packages we need (direct + transitive from dependency tree)
-    logger.info("\n4. Determining all needed packages...")
     all_needed_packages = _determine_all_needed_packages(
         directly_used_packages,
         context.dependency_tree,
@@ -816,25 +757,19 @@ def _execute_audit_workflow(
         context.installed_packages,
     )
 
-    logger.info("   Total packages needed (direct + transitive): %d", len(all_needed_packages))
 
     # Step 3: Check which packages ship py.typed
-    logger.info("\n5. Checking which packages ship py.typed...")
     packages_with_typed, packages_needing_stubs = _check_packages_for_typed(
         all_needed_packages, context.stdlib_modules
     )
 
-    logger.info("   Packages with py.typed: %d", len(packages_with_typed))
-    logger.info("   Packages needing types- stubs: %d", len(packages_needing_stubs))
 
     # Step 4: Map needed packages to types- stubs
-    logger.info("\n6. Mapping packages to types- stubs...")
     needed_stubs, stub_to_package = _map_packages_to_stubs(
         packages_needing_stubs, context.types_packages
     )
 
     # Step 5: Categorize all stubs
-    logger.info("\n7. Categorizing types- packages...")
     used_stubs, unused_stubs, stdlib_stubs = _categorize_all_stubs(
         context.types_packages, needed_stubs, context.stdlib_modules
     )
@@ -843,19 +778,7 @@ def _execute_audit_workflow(
 
 
 def main() -> int:
-    """Run the deep types- stub packages audit.
-
-    Returns
-    -------
-    int
-        Exit code (0 for success, non-zero for failure).
-    """
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
-
-    logger.info("=" * 70)
-    logger.info("DEEP TYPES- STUB PACKAGES AUDIT")
-    logger.info("=" * 70)
-
+    """Run the deep types- stub packages audit."""
     # Gather initial data
     types_packages, runtime_deps, actual_imports, stdlib_modules = _gather_initial_data()
 
@@ -873,17 +796,9 @@ def main() -> int:
     )
     used_stubs, unused_stubs, stdlib_stubs, stub_to_package = _execute_audit_workflow(context)
 
-    # Report
-    _report_results(used_stubs, stdlib_stubs, unused_stubs, stub_to_package)
-
     # Save results
-    output_file = _save_results(used_stubs, unused_stubs, stdlib_stubs, stub_to_package)
+    _save_results(used_stubs, unused_stubs, stdlib_stubs, stub_to_package)
 
-    logger.info("\n9. Summary:")
-    logger.info("   Total types- packages: %d", len(types_packages))
-    logger.info("   Keep: %d", len(used_stubs))
-    logger.info("   Remove candidates: %d", len(unused_stubs) + len(stdlib_stubs))
-    logger.info("\n   Results saved to: %s", output_file.relative_to(REPO_ROOT))
 
     return 0
 

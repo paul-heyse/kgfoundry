@@ -133,6 +133,7 @@ class HydrationOutcome:
 
     records: list[dict]
     annotations: Mapping[int, StructureAnnotations]
+    notes: tuple[str, ...] = ()
 
 
 @dataclass(slots=True)
@@ -220,6 +221,7 @@ def build_runtime_options(
         try:
             parsed_xtr_k = int(xtr_k_value)
         except (TypeError, ValueError):
+            parsed_xtr_k = None
     rerank_payload = options.get("rerank")
     rerank_runtime = None
     if isinstance(rerank_payload, dict):
@@ -360,9 +362,6 @@ def _semantic_search_pro_sync(
     start_time = perf_counter()
     run_state = _SemanticProRunState.from_limit(limit)
 
-    def _finish(findings_count: int, envelope: AnswerEnvelope) -> AnswerEnvelope:
-        return envelope
-
     try:
         run_state.effective_limit = _clamp_limit(
             limit,
@@ -418,7 +417,7 @@ def _semantic_search_pro_sync(
         )
 
         if not fused.docs:
-            empty_envelope = _make_envelope(
+            return _make_envelope(
                 answer=f"No results found for: {query}",
                 findings=[],
                 extras=_assemble_extras(
@@ -441,11 +440,8 @@ def _semantic_search_pro_sync(
                     ),
                     limits=run_state.limits + fused.warnings,
                     scope=scope,
+                    result_count=0,
                 ),
-            )
-            return _finish(
-                0,
-                empty_envelope,
             )
 
         hydration_result = _hydrate_and_rerank_records(
@@ -797,7 +793,7 @@ def _maybe_schedule_xtr_wide(
         return None
     try:
         index = context.get_xtr_index()
-    except RuntimeUnavailableError as exc:
+    except RuntimeUnavailableError:
         return None
     if index is None or not index.ready:
         return None
@@ -870,6 +866,7 @@ def _resolve_stage_one_outcome(plan: StageOnePlan) -> WarpOutcome:
         try:
             outcome = wide_future.result()
         except (RuntimeError, ValueError, OSError) as exc:  # pragma: no cover - defensive path
+            base_notes.append(f"Wide search failed: {exc}")
         else:
             outcome.notes.extend(base_notes)
             return outcome
@@ -950,6 +947,7 @@ def _merge_rrf_weights(
         try:
             weights[channel] = float(raw_value)
         except (TypeError, ValueError):
+            continue
     return weights
 
 
@@ -1191,7 +1189,7 @@ def _maybe_rerank(
 
     try:
         ordered_ids = reranker.rerank(query, payload)
-    except RuntimeError as exc:
+    except RuntimeError:
         return records
 
     by_id = {int(record["id"]): record for record in records if "id" in record}

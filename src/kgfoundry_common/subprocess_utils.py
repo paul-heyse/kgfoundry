@@ -40,7 +40,45 @@ MAX_TIMEOUT: Final[int] = 3600
 
 
 class ToolExecutionError(RuntimeError):
-    """Proxy error mirroring the `tools` module surface."""
+    """Proxy error mirroring the `tools` module surface.
+
+    Extended Summary
+    ----------------
+    This class serves as a proxy for the actual ToolExecutionError from the
+    `tools` module. It allows subprocess utilities to raise tool execution
+    errors without requiring the `tools` module to be imported at module
+    load time. When the `tools` module is loaded, its error type is registered
+    via `bind_factory()`, and subsequent instantiations of this class delegate
+    to the real error type.
+
+    This pattern enables lazy loading of heavy dependencies while maintaining
+    type safety and explicit error raising for static analysis tools.
+
+    Parameters
+    ----------
+    message : str
+        Human-readable error message describing the subprocess execution failure.
+    command : list[str] | None, optional
+        Command that failed execution, as a list of strings. Included in the
+        error for debugging. Defaults to None.
+    problem : Mapping[str, object] | None, optional
+        Additional structured problem details (e.g., return code, stderr).
+        Included in the error for debugging. Defaults to None.
+
+    Notes
+    -----
+    This class uses a factory pattern where `__new__` delegates to a registered
+    factory function when available. When a factory is registered, `__new__`
+    creates an error instance via the factory, validates it is a RuntimeError
+    instance (raising TypeError if not), then sets the `command` and `problem`
+    attributes on the instance before returning it. This allows the actual error
+    type to be determined at runtime after the `tools` module is loaded, while
+    still providing a stable API for callers.
+
+    The class ensures that the underlying error type is always a RuntimeError
+    subclass, maintaining type safety guarantees. The factory must accept a
+    single `message` parameter and return a RuntimeError instance.
+    """
 
     _factory: type[RuntimeError] | None = None
 
@@ -50,9 +88,15 @@ class ToolExecutionError(RuntimeError):
         *,
         command: list[str] | None = None,
         problem: Mapping[str, object] | None = None,
-    ):
+    ) -> RuntimeError:
         if cls is ToolExecutionError and cls._factory is not None:
-            return cls._factory(message, command=list(command or []), problem=problem)
+            error = cls._factory(message)
+            if not isinstance(error, RuntimeError):  # pragma: no cover - defensive
+                msg = "ToolExecutionError factory must return a RuntimeError instance"
+                raise TypeError(msg)
+            error.command = list(command or [])
+            error.problem = problem
+            return error
         return super().__new__(cls)
 
     def __init__(
@@ -68,8 +112,28 @@ class ToolExecutionError(RuntimeError):
 
     @classmethod
     def bind_factory(cls, error_type: type[RuntimeError]) -> None:
-        """Register the tools-supplied error type for proxy instantiation."""
+        """Register the tools-supplied error type for proxy instantiation.
 
+        Parameters
+        ----------
+        error_type : type[RuntimeError]
+            The actual ToolExecutionError class from the `tools` module.
+            Must be a subclass of RuntimeError and accept a single `message`
+            parameter in its constructor. Subsequent instantiations of
+            `ToolExecutionError` will delegate to this type.
+
+        Notes
+        -----
+        This method is called once during module initialization when the
+        `tools` module is loaded. It enables lazy loading of the tools module
+        while maintaining type safety and explicit error raising for static
+        analysis tools.
+
+        The registered error type must be callable with a single `message`
+        parameter (e.g., `error_type(message)`), and must return a RuntimeError
+        instance. The `command` and `problem` attributes will be set on the
+        returned instance by `__new__`.
+        """
         cls._factory = error_type
 
 
@@ -398,9 +462,7 @@ def _raise_tool_execution_error(
         Raised to signal that the subprocess execution failed with the provided
         message and command context.
     """
-    tool_error_type = cast(
-        "type[RuntimeError]", tools_surface.ToolExecutionError
-    )
+    tool_error_type = cast("type[RuntimeError]", tools_surface.ToolExecutionError)
     if not issubclass(tool_error_type, RuntimeError):
         msg = "ToolExecutionError must be a subclass of RuntimeError"
         raise TypeError(msg)
@@ -453,13 +515,16 @@ class SubprocessError(RuntimeError):
     Extended Summary
     ----------------
     Signals that a subprocess execution failed with a non-zero exit code
-    or encountered an error during execution. Includes the exit code and
-    captured stderr output for debugging and error reporting.
+    or encountered an error during execution. Includes the command that failed,
+    the exit code, and captured stderr output for debugging and error reporting.
 
     Parameters
     ----------
     message : str
         Human-readable error description.
+    command : Sequence[str] | None, optional
+        Command that failed execution, as a sequence of strings. Included in
+        the error for debugging. Defaults to None.
     returncode : int | None, optional
         Exit code from subprocess. None if the process did not exit normally.
         Defaults to None.
@@ -468,9 +533,15 @@ class SubprocessError(RuntimeError):
     """
 
     def __init__(
-        self, message: str, returncode: int | None = None, stderr: str | None = None
+        self,
+        message: str,
+        *,
+        command: Sequence[str] | None = None,
+        returncode: int | None = None,
+        stderr: str | None = None,
     ) -> None:
         super().__init__(message)
+        self.command = list(command or [])
         self.returncode = returncode
         self.stderr = stderr
 
@@ -538,16 +609,6 @@ def run_subprocess(
     # Sanitize working directory
     if cwd is not None:
         cwd = cwd.resolve()
-        logger.debug("Subprocess working directory sanitized", extra={"cwd": str(cwd)})
-
-    logger.debug(
-        "Executing subprocess",
-        extra={
-            "command": " ".join(cmd),
-            "timeout": timeout,
-            "cwd": str(cwd) if cwd else None,
-        },
-    )
 
     effective_timeout = float(timeout)
 

@@ -16,6 +16,7 @@ Examples
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from kgfoundry_common.errors import SettingsError
@@ -42,6 +43,7 @@ __all__ = [
     "load_settings",
 ]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
+LOGGER = logging.getLogger(__name__)
 
 
 # [nav:anchor SearchConfig]
@@ -93,12 +95,15 @@ class SparseEmbeddingConfig(BaseSettings):
 
 # [nav:anchor FaissConfig]
 class FaissConfig(BaseSettings):
-    """FAISS index configuration (``KGFOUNDRY_FAISS_*`` namespace)."""
+    """FAISS index configuration (``KGFOUNDRY_FAISS_*`` namespace).
+
+    All FAISS operations run on CPU-only builds in this codebase. GPU toggles were
+    removed to keep runtime dependencies minimal, so this configuration focuses on
+    CPU factory strings and search parameters exclusively.
+    """
 
     model_config = SettingsConfigDict(env_prefix="KGFOUNDRY_FAISS_", extra="forbid")
 
-    gpu: bool = Field(default=True, description="Enable GPU acceleration")
-    cuvs: bool = Field(default=True, description="Enable cuVS support")
     index_factory: str = Field(
         default="OPQ64,IVF8192,PQ64", description="FAISS index factory string"
     )
@@ -202,7 +207,7 @@ def load_settings(**overrides: object) -> KgFoundrySettings:
     except Exception as exc:
         # Convert any other validation errors to SettingsError
         msg = f"Failed to load settings: {exc}"
-        logger.exception(
+        LOGGER.exception(
             "Settings loading failed",
             extra={"error": str(exc), "error_type": type(exc).__name__},
         )

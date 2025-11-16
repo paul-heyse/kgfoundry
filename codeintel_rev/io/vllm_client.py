@@ -430,12 +430,10 @@ class VLLMClient:
 
         # Sort by index and extract vectors
         sorted_data = sorted(result.data, key=lambda d: d.index)
-        vectors = np_module.array(
+        return np_module.array(
             [d.embedding for d in sorted_data],
             dtype=np_module.float32,
         )
-
-        return vectors
 
     def close(self) -> None:
         """Close HTTP clients, async clients, and the local engine."""

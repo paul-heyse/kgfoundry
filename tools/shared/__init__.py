@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, Final
 
 _SUBMODULES: Final[dict[str, str]] = {
     "cli": "tools._shared.cli",
-    "logging": "tools._shared.logging",
     "metrics": "tools._shared.metrics",
     "problem_details": "tools._shared.problem_details",
     "proc": "tools._shared.proc",
@@ -24,7 +23,6 @@ _SUBMODULES: Final[dict[str, str]] = {
 
 __all__: tuple[str, ...] = (
     "cli",
-    "logging",
     "metrics",
     "problem_details",
     "proc",
@@ -37,16 +35,7 @@ __all__: tuple[str, ...] = (
 if TYPE_CHECKING:
     from types import ModuleType
 
-    from tools._shared import (
-        cli,
-        logging,
-        metrics,
-        problem_details,
-        proc,
-        schema,
-        settings,
-        validation,
-    )
+    from tools._shared import cli, metrics, problem_details, proc, schema, settings, validation
 
 
 def _load_submodule(name: str) -> ModuleType:

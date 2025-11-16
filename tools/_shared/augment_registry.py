@@ -19,7 +19,6 @@ import yaml
 from pydantic_core import PydanticCustomError
 
 from kgfoundry_common.typing import gate_import
-from tools._shared.logging import get_logger
 from tools._shared.problem_details import (
     ProblemDetailsParams,
     build_problem_details,
@@ -50,8 +49,6 @@ else:  # pragma: no cover - runtime fallback for typing aliases
     ValidationInfo = _pydantic.ValidationInfo
     field_validator = _pydantic.field_validator
     model_validator = _pydantic.model_validator
-
-LOGGER = get_logger(__name__)
 
 Reader = Callable[[Path], object]
 
@@ -752,14 +749,6 @@ def load_tooling_metadata(
         augment = load_augment(augment_path, reader=augment_reader)
         registry = load_registry(registry_path, reader=registry_reader)
     except AugmentRegistryError as exc:
-        LOGGER.debug(
-            "Propagating augment/registry error during load_tooling_metadata",
-            extra={
-                "status": "error",
-                "augment_path": str(augment_path),
-                "registry_path": str(registry_path),
-            },
-        )
         raise AugmentRegistryError(exc.problem) from exc
     return ToolingMetadataModel(augment=augment, registry=registry)
 
@@ -790,10 +779,6 @@ def load_augment(path: Path, *, reader: Reader | None = None) -> AugmentMetadata
             return _cached_augment(str(resolved))
         return _load_augment(resolved, reader)
     except AugmentRegistryError:
-        LOGGER.debug(
-            "Augment metadata load failed",
-            extra={"status": "error", "path": str(resolved)},
-        )
         raise
 
 
@@ -823,10 +808,6 @@ def load_registry(path: Path, *, reader: Reader | None = None) -> RegistryMetada
             return _cached_registry(str(resolved))
         return _load_registry(resolved, reader)
     except AugmentRegistryError:
-        LOGGER.debug(
-            "Registry metadata load failed",
-            extra={"status": "error", "path": str(resolved)},
-        )
         raise
 
 
@@ -931,7 +912,6 @@ def _registry_error(
             extensions={"path": str(resolved)},
         )
     )
-    LOGGER.error(detail, extra={"status": "error", "path": str(resolved)})
     return AugmentRegistryError(problem)
 
 
@@ -969,7 +949,6 @@ def _validation_error(
             },
         )
     )
-    LOGGER.error(detail, extra={"status": "error", "path": str(resolved)})
     return AugmentRegistryValidationError(problem)
 
 

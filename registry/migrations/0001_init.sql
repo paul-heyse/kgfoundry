@@ -80,7 +80,6 @@ CREATE TABLE faiss_indexes (
   run_id TEXT REFERENCES dense_runs(run_id),
   shard_id INT,
   index_type TEXT, nlist INT, m INT, opq INT, nprobe INT,
-  gpu BOOLEAN, cuvs BOOLEAN,
   index_uri TEXT, idmap_uri TEXT,
   created_at TIMESTAMP,
   PRIMARY KEY (logical_index_id, shard_id)

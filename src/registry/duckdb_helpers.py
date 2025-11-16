@@ -18,7 +18,7 @@ from kgfoundry_common.typing import gate_import
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from duckdb import DuckDBPyConnection
+    from duckdb import DuckDBPyConnection, DuckDBPyRelation
 
 Params = Sequence[object] | Mapping[str, object] | None
 
@@ -250,7 +250,7 @@ def execute(
     params: Params = None,
     *,
     options: DuckDBQueryOptions | None = None,
-) -> duckdb_module.Relation:
+) -> DuckDBPyRelation:
     """Execute a DuckDB query with parameter binding.
 
     Executes a SQL query with optional parameter binding and timeout enforcement.
@@ -273,7 +273,7 @@ def execute(
 
     Returns
     -------
-    duckdb_module.Relation
+    DuckDBPyRelation
         Relation object representing the executed query.
 
     Raises

@@ -393,7 +393,35 @@ class RuntimeUnavailableError(KgFoundryError):
 
 
 class RequestContextError(KgFoundryError):
-    """Raised when HTTP request context injection fails."""
+    """Raised when HTTP request context injection fails.
+
+    This exception is raised by middleware when a non-HTTP exception occurs
+    during request processing and needs to be wrapped with request context
+    (path and method) for Problem Details generation.
+
+    This exception is appropriate for **system errors** during request handling
+    and maps to 500 Internal Server Error.
+
+    Parameters
+    ----------
+    message : str
+        Human-readable error message explaining what went wrong.
+    path : str
+        HTTP request path that was being processed when the error occurred.
+        Included in context for debugging and Problem Details.
+    method : str
+        HTTP request method (e.g., "GET", "POST") that was being processed.
+        Included in context for debugging and Problem Details.
+    cause : Exception | None, optional
+        Original exception that triggered this error. Preserved for stack trace
+        analysis. Defaults to None.
+
+    Notes
+    -----
+    This exception is used by the MCP context middleware to wrap unexpected
+    exceptions with request context, ensuring that Problem Details responses
+    include path and method information for observability.
+    """
 
     def __init__(
         self,

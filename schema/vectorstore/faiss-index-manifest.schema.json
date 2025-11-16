@@ -40,12 +40,12 @@
     },
     "accelerator": {
       "type": "string",
-      "enum": ["cpu", "gpu"],
-      "description": "Accelerator used during index build"
+      "enum": ["cpu"],
+      "description": "Accelerator used during index build (CPU-only stack)"
     },
     "index_uri": {
       "type": "string",
-      "description": "Path to the FAISS index file (cpu .idx or gpu binary format)"
+      "description": "Path to the FAISS index file (CPU .idx format)"
     },
     "ids_uri": {
       "type": "string",
@@ -77,7 +77,7 @@
       "factory": "OPQ64,IVF8192,PQ64",
       "metric": "ip",
       "embedding_dimension": 2560,
-      "accelerator": "gpu",
+      "accelerator": "cpu",
       "index_uri": "/indices/faiss/shard_000.idx",
       "ids_uri": "/indices/faiss/shard_000.ids.npy",
       "checksum": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

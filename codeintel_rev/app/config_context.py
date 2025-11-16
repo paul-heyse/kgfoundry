@@ -294,7 +294,7 @@ def _faiss_runtime_options_from_index(index_cfg: IndexConfig) -> FAISSRuntimeOpt
     ----------
     index_cfg : IndexConfig
         Structured index configuration containing FAISS parameters (family, PQ
-        settings, HNSW parameters, GPU options, etc.).
+        settings, and HNSW parameters).
 
     Returns
     -------
@@ -305,8 +305,9 @@ def _faiss_runtime_options_from_index(index_cfg: IndexConfig) -> FAISSRuntimeOpt
     Notes
     -----
     This helper converts structured `IndexConfig` (from settings or index manifest)
-    into FAISS-specific runtime options. It dynamically imports the FAISS runtime
-    options class and instantiates it with values from the config.
+    into FAISS-specific runtime options for the CPU-only runtime. It dynamically
+    imports the FAISS runtime options class and instantiates it with values from the
+    config.
     """
     runtime_cls = _import_faiss_runtime_opts_cls()
     return runtime_cls(
@@ -727,8 +728,8 @@ class ApplicationContext:
         vLLM embedding service client with persistent HTTP connection pool.
         Shared across all requests for efficiency.
     faiss_manager : FAISSManager
-        FAISS index manager that handles CPU and GPU indexes. GPU resources are
-        lazily initialized on first search or optionally pre-loaded at startup.
+        FAISS index manager backed by the CPU-only runtime. Index data is preloaded
+        into host memory during startup when configured to minimize cold-start cost.
     scope_store : ScopeStore
         Redis-backed scope store for session-scoped query filters with L1/L2 caching.
     duckdb_manager : DuckDBManager

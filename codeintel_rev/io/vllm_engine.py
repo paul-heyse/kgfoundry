@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from collections.abc import Sequence
+from contextlib import suppress
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
@@ -58,10 +59,8 @@ class _InprocessVLLMRuntime:
         if self.engine is not None:
             shutdown = getattr(self.engine, "shutdown", None)
             if callable(shutdown):
-                try:
+                with suppress(RuntimeError, OSError, ValueError):
                     shutdown()
-                except (RuntimeError, OSError, ValueError):
-                    pass
         self.engine = None
         self.tokenizer = None
 
@@ -206,7 +205,7 @@ class InprocessVLLMEmbedder:
             task="embed",
             trust_remote_code=True,
             enforce_eager=True,
-            gpu_memory_utilization=self.config.gpu_memory_utilization,
+            gpu_memory_utilization=self.config.memory_utilization,
             max_num_batched_tokens=self.config.max_num_batched_tokens,
             override_pooler_config=pooler_config_cls(
                 pooling_type=self.config.pooling_type,

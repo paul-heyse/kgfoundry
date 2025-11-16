@@ -16,10 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from tools._shared import augment_registry
-from tools._shared.logging import get_logger
 from tools._shared.problem_details import ProblemDetailsParams, build_problem_details
-
-LOGGER = get_logger(__name__)
 
 AugmentRegistryError = augment_registry.AugmentRegistryError
 load_augment = augment_registry.load_augment
@@ -131,15 +128,6 @@ def load_cli_tooling_context(
             registry_reader=registry_reader,
         )
     except CLIConfigError:
-        LOGGER.exception(
-            "Failed to load CLI tooling metadata",
-            extra={
-                "status": "error",
-                "operation": settings.bin_name,
-                "augment_path": str(settings.augment_path),
-                "registry_path": str(settings.registry_path),
-            },
-        )
         raise
     cli_config = build_cli_config(
         augment=metadata.augment,
@@ -333,7 +321,7 @@ def _build_cli_problem(
     ProblemDetailsDict
         RFC 9457 Problem Details mapping representing the failure.
     """
-    problem = build_problem_details(
+    return build_problem_details(
         ProblemDetailsParams(
             type=_CLI_CONFIG_PROBLEM_TYPE,
             title=_CLI_CONFIG_PROBLEM_TITLE,
@@ -343,8 +331,6 @@ def _build_cli_problem(
             extensions=extras,
         )
     )
-    LOGGER.error(detail, extra={**({} if extras is None else dict(extras)), "status": "error"})
-    return problem
 
 
 __all__ = [

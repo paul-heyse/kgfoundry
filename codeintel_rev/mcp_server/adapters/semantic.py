@@ -257,7 +257,6 @@ async def semantic_search(
         context,
         query,
         limit,
-        session_id,
         scope,
     )
 
@@ -266,7 +265,6 @@ def _semantic_search_sync(
     context: ApplicationContext,
     query: str,
     limit: int,
-    session_id: str,
     scope: ScopeIn | None,
 ) -> AnswerEnvelope:
     start_time = perf_counter()

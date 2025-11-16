@@ -11,17 +11,13 @@ Usage:
 from __future__ import annotations
 
 import json
-import logging
 import shutil
 import sys
 from pathlib import Path
 
-from tools._shared.logging import get_logger
 from tools._shared.proc import run_tool
 
 REPO_ROOT = Path(__file__).parent.parent
-
-logger = get_logger(__name__)
 
 
 def _find_uv_executable() -> str:
@@ -79,11 +75,9 @@ def run_type_checkers() -> tuple[bool, str]:
     tuple[bool, str]
         Tuple of (success boolean, output message).
     """
-    logger.info("Running type checkers...")
     uv_exe = _find_uv_executable()
 
     # Run pyright
-    logger.info("  Running pyright...")
     success, output = _run_type_checker(
         [uv_exe, "run", "pyright", "--warnings", "--pythonversion=3.13"],
         "pyright",
@@ -92,7 +86,6 @@ def run_type_checkers() -> tuple[bool, str]:
         return False, output
 
     # Run pyrefly
-    logger.info("  Running pyrefly...")
     success, output = _run_type_checker([uv_exe, "run", "pyrefly", "check"], "pyrefly")
     if not success:
         return False, output
@@ -150,68 +143,30 @@ def main() -> int:
     int
         Exit code (0 for success, non-zero for failure).
     """
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
-
-    logger.info("=" * 70)
-    logger.info("REMOVING UNUSED TYPES- STUB PACKAGES")
-    logger.info("=" * 70)
-
     # Load removal candidates (try deep audit first, fallback to regular audit)
     candidates_file = REPO_ROOT / "tools" / "types_stubs_deep_audit.json"
     if not candidates_file.exists():
         candidates_file = REPO_ROOT / "tools" / "types_stubs_removal_candidates.json"
         if not candidates_file.exists():
-            logger.error("No audit file found. Run audit script first.")
-            return 1
+            raise RuntimeError("No audit file found. Run audit script first.")
 
     with candidates_file.open(encoding="utf-8") as f:
         data = json.load(f)
 
     packages_to_remove = sorted(data.get("remove", []) + data.get("stdlib", []))
-    packages_to_keep = sorted(data.get("keep", []))
-
-    logger.info("\nPackages to keep: %d", len(packages_to_keep))
-    logger.info("Packages to remove: %d", len(packages_to_remove))
-
-    separator = "\n" + "=" * 70
 
     # Step 1: Baseline type checking
-    logger.info("%s", separator)
-    logger.info("STEP 1: Baseline type checking (BEFORE removal)")
-    logger.info("=" * 70)
     success, output = run_type_checkers()
     if not success:
-        logger.error("ERROR: Baseline type checking failed!")
-        logger.error("%s", output)
-        return 1
-    logger.info("✓ Baseline type checking passed")
+        raise RuntimeError(f"Baseline type checking failed:\n{output}")
 
     # Step 2: Remove packages
-    logger.info("%s", separator)
-    logger.info("STEP 2: Removing packages from pyproject.toml")
-    logger.info("=" * 70)
-    logger.info("Removing %d packages...", len(packages_to_remove))
     remove_packages_from_pyproject(packages_to_remove)
-    logger.info("✓ Packages removed")
 
     # Step 3: Verify type checking still passes
-    logger.info("%s", separator)
-    logger.info("STEP 3: Verification type checking (AFTER removal)")
-    logger.info("=" * 70)
     success, output = run_type_checkers()
     if not success:
-        logger.error("ERROR: Type checking failed after removal!")
-        logger.error("%s", output)
-        logger.warning("\n⚠️  Packages have been removed but type checking failed.")
-        logger.warning("   You may need to restore some packages.")
-        return 1
-    logger.info("✓ Verification type checking passed")
-
-    logger.info("%s", separator)
-    logger.info("SUCCESS: Removed unused types- packages")
-    logger.info("=" * 70)
-    logger.info("Removed %d packages", len(packages_to_remove))
-    logger.info("Kept %d packages", len(packages_to_keep))
+        raise RuntimeError(f"Type checking failed after removal:\n{output}")
 
     return 0
 

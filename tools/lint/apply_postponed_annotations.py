@@ -39,10 +39,6 @@ from typing import TYPE_CHECKING, cast
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from tools._shared.logging import LoggerAdapter
-
-from tools._shared.logging import get_logger
-
 
 def should_skip_file(path: Path) -> bool:
     """Determine if a file should be skipped.
@@ -289,7 +285,6 @@ def _aggregate_results(
     directories: Sequence[Path],
     *,
     check_only: bool,
-    logger: LoggerAdapter,
 ) -> tuple[int, int, int]:
     """Process each directory and return aggregate statistics.
 
@@ -299,8 +294,6 @@ def _aggregate_results(
         Directories to process.
     check_only : bool
         Whether to only check without modifying files.
-    logger : LoggerAdapter
-        Logger instance for reporting.
 
     Returns
     -------
@@ -313,14 +306,10 @@ def _aggregate_results(
 
     for directory in directories:
         if not directory.exists():
-            msg = f"Directory not found: {directory}"
-            logger.warning(msg)
             continue
-
         processed, modified, errors = process_directory(
             directory,
             check_only=check_only,
-            logger=logger,
         )
         total_processed += processed
         total_modified += modified
@@ -333,7 +322,6 @@ def process_directory(
     root: Path,
     *,
     check_only: bool = False,
-    logger: LoggerAdapter | None = None,
 ) -> tuple[int, int, int]:
     """Process all Python files in a directory.
 
@@ -343,23 +331,17 @@ def process_directory(
         Root directory to scan.
     check_only : bool, optional
         If True, don't modify files, only report (default: False).
-    logger : LoggerAdapter | None, optional
-        Logger instance (default: None).
 
     Returns
     -------
     tuple[int, int, int]
         (files_processed, files_modified, errors)
     """
-    active_logger = logger or get_logger(__name__)
-
     processed = 0
     modified = 0
     errors = 0
 
     py_files = sorted(root.rglob("*.py"))
-    msg = f"Scanning {len(py_files)} Python files in {root}"
-    active_logger.info(msg)
 
     for fpath in py_files:
         if should_skip_file(fpath):
@@ -368,15 +350,10 @@ def process_directory(
         processed += 1
         try:
             changed = rewrite_file(fpath, check_only=check_only)
-
             if changed:
                 modified += 1
-                relpath = fpath.relative_to(root)
-                active_logger.info("  %s: annotations added", relpath)
         except Exception:
             errors += 1
-            relpath = fpath.relative_to(root)
-            active_logger.exception("  %s: failed", relpath)
 
     return processed, modified, errors
 
@@ -414,26 +391,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
 
     args = parser.parse_args(argv)
-    logger = get_logger(__name__)
 
     check_attr: object = getattr(args, "check_only", False)
     check_flag = bool(check_attr)
 
     raw_directories = cast("Sequence[Path]", getattr(args, "directories", ()))
     directories = _normalize_directories(raw_directories)
-    total_processed, total_modified, total_errors = _aggregate_results(
+    _, _, total_errors = _aggregate_results(
         directories,
         check_only=check_flag,
-        logger=logger,
     )
-
-    # Summary
-    mode = "(CHECK-ONLY)" if check_flag else "(MODIFIED)"
-    summary_msg = (
-        f"Summary {mode}: processed={total_processed}, "
-        f"modified={total_modified}, errors={total_errors}"
-    )
-    logger.info(summary_msg)
 
     return 1 if total_errors > 0 else 0
 

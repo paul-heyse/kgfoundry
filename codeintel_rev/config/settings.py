@@ -189,6 +189,11 @@ def _build_vllm_config() -> VLLMConfig:
         pooling_type = "MEAN"
     else:
         pooling_type = "LAST"
+    memory_utilization_env = (
+        os.environ.get("VLLM_MEMORY_UTILIZATION")
+        or os.environ.get("VLLM_GPU_MEMORY_UTILIZATION")
+        or "0.92"
+    )
     return VLLMConfig(
         base_url=os.environ.get("VLLM_URL", "http://127.0.0.1:8001/v1"),
         model=os.environ.get("VLLM_MODEL", "nomic-ai/nomic-embed-code"),
@@ -196,7 +201,7 @@ def _build_vllm_config() -> VLLMConfig:
         embedding_dim=int(os.environ.get("VLLM_EMBED_DIM", "3584")),
         timeout_s=float(os.environ.get("VLLM_TIMEOUT_S", "120.0")),
         run=run_mode,
-        gpu_memory_utilization=float(os.environ.get("VLLM_GPU_MEMORY_UTILIZATION", "0.92")),
+        memory_utilization=float(memory_utilization_env),
         max_num_batched_tokens=_parse_int_with_suffix(
             os.environ.get("VLLM_MAX_BATCHED_TOKENS", "65536"),
             65_536,
@@ -396,9 +401,10 @@ class VLLMConfig(msgspec.Struct, frozen=True):
     OpenAI-compatible embeddings API. This is used for generating vector embeddings
     of code chunks during indexing and for query embeddings during semantic search.
 
-    The vLLM service runs separately (typically on a GPU-enabled machine) and
-    provides fast batch embedding generation. The configuration includes connection
-    details, model selection, and performance tuning parameters.
+    The vLLM service runs separately from the main application and can live on any
+    accelerator topology (CPU-only hosts, single-GPU nodes, etc.). This configuration
+    is hardware-agnostic and focuses on HTTP/runtime settings that the embedding
+    service exposes publicly.
 
     Attributes
     ----------
@@ -411,8 +417,8 @@ class VLLMConfig(msgspec.Struct, frozen=True):
         is a code-specific embedding model with 3584 dimensions.
     batch_size : int
         Number of texts to embed in a single batch request. Larger batches improve
-        throughput but increase memory usage. Defaults to 64, which is a good
-        balance for most GPU setups.
+        throughput but increase memory usage. Defaults to 64, which balances latency
+        and memory for most deployments.
     embedding_dim : int
         Dimensionality of embeddings returned by the configured model. Defaults to
         3584 to match the deployed nomic-embed-code checkpoint. Consumers should
@@ -424,10 +430,10 @@ class VLLMConfig(msgspec.Struct, frozen=True):
         Runtime execution mode for vLLM. Controls whether embeddings are generated
         via HTTP requests to a remote service ("http") or using an in-process vLLM
         engine ("inprocess"). Defaults to "inprocess" for local development.
-    gpu_memory_utilization : float
-        Fraction of GPU memory to allocate for vLLM model and KV cache. Range [0.0, 1.0].
-        Higher values improve throughput but reduce available memory for other operations.
-        Defaults to 0.92 (92% of GPU memory).
+    memory_utilization : float
+        Fraction of the embedding server's memory (system RAM or VRAM) to reserve
+        for the vLLM model and KV cache. Range [0.0, 1.0]. Higher values improve
+        throughput but reduce headroom for other processes. Defaults to 0.92.
     max_num_batched_tokens : int
         Maximum number of tokens to process in a single batch. Larger values improve
         throughput but increase memory usage and latency. Defaults to 65536 tokens.
@@ -450,7 +456,7 @@ class VLLMConfig(msgspec.Struct, frozen=True):
     embedding_dim: int = 3584
     timeout_s: float = 120.0
     run: VLLMRunMode = VLLMRunMode()
-    gpu_memory_utilization: float = 0.92
+    memory_utilization: float = 0.92
     max_num_batched_tokens: int = 65_536
     normalize: bool = True
     pooling_type: Literal["LAST", "CLS", "MEAN"] = "LAST"
@@ -468,8 +474,8 @@ class EmbeddingsConfig(msgspec.Struct, frozen=True):
     model_name : str
         Fully-qualified model identifier (e.g., ``nomic-ai/nomic-embed-code``).
     device : str
-        Target device string (``"auto"``, ``"cuda"``, ``"cpu"``). ``"auto"``
-        picks ``"cuda"`` when GPUs are available.
+        Target device string (``"auto"`` or ``"cpu"``). ``"auto"`` resolves to CPU
+        because in-process GPU execution has been removed from this stack.
     batch_size : int
         Maximum logical batch size requested by callers.
     micro_batch_size : int
@@ -496,7 +502,7 @@ class EmbeddingsConfig(msgspec.Struct, frozen=True):
 
     provider: Literal["vllm", "hf"] = "vllm"
     model_name: str = "nomic-ai/nomic-embed-code"
-    device: str = "auto"
+    device: str = "cpu"
     batch_size: int = 64
     micro_batch_size: int = 32
     normalize: bool = True

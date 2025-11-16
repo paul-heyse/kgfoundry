@@ -63,10 +63,6 @@ from typing import TYPE_CHECKING, cast
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from tools._shared.logging import LoggerAdapter
-
-from tools._shared.logging import get_logger
-
 try:  # pragma: no cover - executed in tooling context
     from kgfoundry_common.typing.heavy_deps import EXTRAS_HINT as _EXTRAS_HINT
 except ImportError:  # pragma: no cover - when package not importable
@@ -355,7 +351,6 @@ def _format_install_hint(module_root: str) -> str | None:
 def check_file(
     filepath: Path,
     heavy_modules: set[str],
-    logger: LoggerAdapter | None = None,
 ) -> list[TypeGateViolation]:
     """Check a single Python file for typing gate violations.
 
@@ -365,26 +360,20 @@ def check_file(
         File to check.
     heavy_modules : set[str]
         Heavy modules that must be guarded.
-    logger : LoggerAdapter | None, optional
-        Logger instance (default: None).
 
     Returns
     -------
     list[TypeGateViolation]
         List of violations found.
     """
-    active_logger = logger or get_logger(__name__)
-
     try:
         content = filepath.read_text(encoding="utf-8")
         tree = ast.parse(content, filename=str(filepath))
         visitor = TypeGateVisitor(filepath, heavy_modules)
         visitor.visit(tree)
     except SyntaxError:
-        active_logger.exception("Syntax error in %s", filepath)
         return []
     except Exception:
-        active_logger.exception("Error checking %s", filepath)
         return []
     return visitor.violations
 
@@ -392,7 +381,6 @@ def check_file(
 def check_directory(
     root: Path,
     heavy_modules: set[str],
-    logger: LoggerAdapter | None = None,
 ) -> list[TypeGateViolation]:
     """Check all Python files in a directory.
 
@@ -402,16 +390,12 @@ def check_directory(
         Directory to scan.
     heavy_modules : set[str]
         Heavy modules that must be guarded.
-    logger : LoggerAdapter | None, optional
-        Logger instance (default: None).
 
     Returns
     -------
     list[TypeGateViolation]
         All violations found.
     """
-    active_logger = logger or get_logger(__name__)
-
     all_violations: list[TypeGateViolation] = []
     py_files = sorted(root.rglob("*.py"))
 
@@ -422,7 +406,7 @@ def check_directory(
         if "__pycache__" in fpath.parts:
             continue
 
-        violations = check_file(fpath, heavy_modules, logger=active_logger)
+        violations = check_file(fpath, heavy_modules)
         all_violations.extend(violations)
 
     return all_violations
@@ -488,7 +472,6 @@ def _indent_block(block: list[str]) -> list[str]:
 def apply_fixes(
     filepath: Path,
     violations: list[TypeGateViolation],
-    logger: LoggerAdapter | None = None,
 ) -> bool:
     """Guard fixable heavy imports behind TYPE_CHECKING blocks.
 
@@ -498,8 +481,6 @@ def apply_fixes(
         Path to the file to modify.
     violations : list[TypeGateViolation]
         List of violations to fix (only fixable heavy imports are processed).
-    logger : LoggerAdapter | None, optional
-        Optional logger for reporting modifications.
 
     Returns
     -------
@@ -525,15 +506,12 @@ def apply_fixes(
         lines[start : end + 1] = guarded
 
     filepath.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    if logger:
-        logger.info("Guarded %s heavy import(s) in %s", len(fixable), filepath)
     return True
 
 
 def _apply_autofixes(
     violations_by_path: dict[Path, list[TypeGateViolation]],
     heavy_modules: set[str],
-    logger: LoggerAdapter | None = None,
 ) -> tuple[list[TypeGateViolation], set[str]]:
     """Apply autofixes for fixable violations and return refreshed results.
 
@@ -543,8 +521,6 @@ def _apply_autofixes(
         Dictionary mapping file paths to their violations.
     heavy_modules : set[str]
         Set of heavy module names for re-checking after fixes.
-    logger : LoggerAdapter | None, optional
-        Optional logger for reporting autofix operations.
 
     Returns
     -------
@@ -555,7 +531,7 @@ def _apply_autofixes(
     for path, violations in violations_by_path.items():
         if not path.exists():
             continue
-        if apply_fixes(path, violations, logger):
+        if apply_fixes(path, violations):
             refreshed_paths.append(path)
 
     if not refreshed_paths:
@@ -563,7 +539,7 @@ def _apply_autofixes(
 
     refreshed: list[TypeGateViolation] = []
     for path in refreshed_paths:
-        refreshed.extend(check_file(path, heavy_modules, logger))
+        refreshed.extend(check_file(path, heavy_modules))
 
     return refreshed, {str(path) for path in refreshed_paths}
 
@@ -662,7 +638,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
 
     args = parser.parse_args(argv)
-    logger = get_logger(__name__)
 
     all_violations: list[TypeGateViolation] = []
     violations_by_path: dict[Path, list[TypeGateViolation]] = {}
@@ -672,17 +647,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     directories = list(raw_directories) if raw_directories else [Path("src")]
     for directory in directories:
         if not directory.exists():
-            msg = f"Directory not found: {directory}"
-            logger.warning(msg)
             continue
 
-        violations = check_directory(directory, HEAVY_MODULES, logger=logger)
+        violations = check_directory(directory, HEAVY_MODULES)
         all_violations.extend(violations)
         for violation in violations:
             violations_by_path.setdefault(Path(violation.filepath), []).append(violation)
 
     if getattr(args, "write", False):
-        refreshed, stale_keys = _apply_autofixes(violations_by_path, HEAVY_MODULES, logger)
+        refreshed, stale_keys = _apply_autofixes(violations_by_path, HEAVY_MODULES)
         if stale_keys:
             all_violations = [v for v in all_violations if v.filepath not in stale_keys]
             all_violations.extend(refreshed)

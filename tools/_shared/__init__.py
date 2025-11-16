@@ -16,7 +16,6 @@ from tools._shared.cli import (
     render_cli_envelope,
     validate_cli_envelope,
 )
-from tools._shared.logging import StructuredLoggerAdapter, get_logger, with_fields
 from tools._shared.metrics import ToolRunObservation, observe_tool_run
 from tools._shared.problem_details import (
     ProblemDetailsDict,
@@ -65,7 +64,6 @@ __all__ = [
     "ProblemDetailsDict",
     "ProcessRunner",
     "SettingsError",
-    "StructuredLoggerAdapter",
     "ToolExecutionError",
     "ToolRunObservation",
     "ToolRunResult",
@@ -74,7 +72,6 @@ __all__ = [
     "build_problem_details",
     "build_schema_problem_details",
     "build_tool_problem_details",
-    "get_logger",
     "get_process_runner",
     "get_runtime_settings",
     "get_schema_path",
@@ -95,5 +92,4 @@ __all__ = [
     "tool_timeout_problem_details",
     "validate_cli_envelope",
     "validate_tools_payload",
-    "with_fields",
 ]
