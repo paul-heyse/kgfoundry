@@ -187,16 +187,13 @@ def _build_faiss_manager(settings: Settings, paths: ResolvedPaths) -> FAISSManag
     if nlist_value is None:
         msg = "IndexConfig.nlist cannot be None during context creation"
         raise ConfigurationError(msg)
-    manager = faiss_manager_cls(
+    return faiss_manager_cls(
         index_path=paths.faiss_index,
         vec_dim=settings.index.vec_dim,
         nlist=nlist_value,
         use_cuvs=settings.index.use_cuvs,
         runtime=runtime_opts,
     )
-    try:
-    except (RuntimeError, OSError, ValueError):
-    return manager
 
 
 def _build_scope_store(settings: Settings) -> ScopeStore:
@@ -653,8 +650,6 @@ def resolve_application_paths(settings: Settings) -> ResolvedPaths:
                 msg,
                 context={"path": str(directory), "source": "resolve_application_paths"},
             ) from exc
-        else:
-
     return paths
 
 
@@ -900,7 +895,6 @@ class ApplicationContext:
         git_client, async_git_client = _build_git_clients(paths)
         duckdb_manager = DuckDBManager(paths.duckdb_path, settings.duckdb)
 
-
         observer = runtime_observer or NullRuntimeCellObserver()
 
         adjuster = factory_adjuster or _build_factory_adjuster(settings)
@@ -929,10 +923,11 @@ class ApplicationContext:
 
     def reload_indices(self) -> None:
         """Close runtime cells so they reopen against the active index version."""
-        for name, cell in self._iter_runtime_cells():
+        for _, cell in self._iter_runtime_cells():
             try:
                 cell.close()
             except (RuntimeError, OSError, ValueError):  # pragma: no cover - defensive logging
+                continue
         faiss_state = self._runtime.faiss
         with faiss_state.lock:
             faiss_state.loaded = False
@@ -950,29 +945,30 @@ class ApplicationContext:
         try:
             with self.open_catalog() as catalog:
                 samples = catalog.sample_query_vectors(limit=_AUTOTUNE_SAMPLE_LIMIT)
-        except (OSError, RuntimeError, ValueError) as exc:  # pragma: no cover - defensive
+        except (OSError, RuntimeError, ValueError):  # pragma: no cover - defensive
             return
         if len(samples) < _MIN_AUTOTUNE_SAMPLES:
             return
         vectors = np.stack([vec for _, vec in samples], dtype=np.float32)
         queries = vectors[: min(32, vectors.shape[0])]
         try:
-            profile = self.faiss_manager.autotune(
+            self.faiss_manager.autotune(
                 queries,
                 vectors,
                 k=min(self.settings.index.default_k, queries.shape[0]),
             )
-        except (RuntimeError, ValueError) as exc:  # pragma: no cover - defensive logging
+        except (RuntimeError, ValueError):  # pragma: no cover - defensive logging
             return
 
     def apply_factory_adjuster(self, adjuster: FactoryAdjuster) -> None:
         """Update runtime tuning knobs and reset cells to pick up changes."""
         _assign_frozen(self, "factory_adjuster", adjuster)
         self._runtime.attach_adjuster(adjuster)
-        for name, cell in self._iter_runtime_cells():
+        for _, cell in self._iter_runtime_cells():
             try:
                 cell.close()
             except (RuntimeError, OSError, ValueError):  # pragma: no cover - defensive
+                continue
 
     def get_hybrid_engine(self) -> HybridSearchEngine:
         """Return the hybrid search engine, instantiating it lazily.
@@ -1105,7 +1101,7 @@ class ApplicationContext:
             cell.record_failure(exc, _RUNTIME_FAILURE_TTL_S)
             cell.close()
             raise
-        except (OSError, RuntimeError, ValueError) as exc:
+        except (OSError, RuntimeError, ValueError):
             cell.close()
             return None
         if index.ready:
@@ -1181,8 +1177,6 @@ class ApplicationContext:
             runtime=runtime_opts,
         )
         manager.load_cpu_index()
-        try:
-        except (RuntimeError, OSError, ValueError):
         return manager
 
     def _build_xtr_index(self) -> XTRIndex:
@@ -1234,6 +1228,7 @@ class ApplicationContext:
         try:
             capabilities = Capabilities.from_context(self)
         except RuntimeLifecycleError:  # pragma: no cover - defensive logging
+            capabilities = None
         return engine_cls(
             self.settings,
             self.paths,
@@ -1435,7 +1430,7 @@ class ApplicationContext:
     def close_all_runtimes(self) -> None:
         """Best-effort shutdown for mutable runtimes."""
         runtime = self._runtime
-        for name, cell in self._iter_runtime_cells():
+        for _, cell in self._iter_runtime_cells():
             with suppress(Exception):
                 cell.close()
         with suppress(Exception):

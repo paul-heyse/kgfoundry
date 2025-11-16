@@ -6,6 +6,8 @@ with various exception types and scenarios.
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import cast
 
 import pytest
@@ -26,6 +28,7 @@ from codeintel_rev.mcp_server.error_handling import (
 
 from kgfoundry_common.errors import EmbeddingError, KgFoundryError, VectorSearchError
 from kgfoundry_common.problem_details import ProblemDetails
+from tests._helpers import assertions
 
 
 def test_format_error_response_path_outside_repo() -> None:
@@ -34,16 +37,16 @@ def test_format_error_response_path_outside_repo() -> None:
     response = format_error_response(exc, instance="files:list_paths")
 
     problem = cast("ProblemDetails", response["problem"])
-    assert response["status"] == 400
+    assertions.expect_equal(response["status"], 400)
     code = problem.get("code")
     problem_type = problem.get("type")
     instance = problem.get("instance")
-    assert isinstance(code, str)
-    assert code == "path-outside-repo"
-    assert isinstance(problem_type, str)
-    assert problem_type == "https://kgfoundry.dev/problems/path-outside-repo"
-    assert isinstance(instance, str)
-    assert instance == "files:list_paths"
+    assertions.expect_true(isinstance(code, str), reason="code should be str")
+    assertions.expect_equal(code, "path-outside-repo")
+    assertions.expect_true(isinstance(problem_type, str), reason="problem_type should be str")
+    assertions.expect_equal(problem_type, "https://kgfoundry.dev/problems/path-outside-repo")
+    assertions.expect_true(isinstance(instance, str), reason="instance should be str")
+    assertions.expect_equal(instance, "files:list_paths")
 
 
 def test_format_error_response_path_not_directory() -> None:
@@ -52,13 +55,13 @@ def test_format_error_response_path_not_directory() -> None:
     response = format_error_response(exc, instance="files:list_paths")
 
     problem = cast("ProblemDetails", response["problem"])
-    assert response["status"] == 400
+    assertions.expect_equal(response["status"], 400)
     code = problem.get("code")
     title = problem.get("title")
-    assert isinstance(code, str)
-    assert code == "path-not-directory"
-    assert isinstance(title, str)
-    assert title == "PathNotDirectoryError"
+    assertions.expect_true(isinstance(code, str), reason="code should be str")
+    assertions.expect_equal(code, "path-not-directory")
+    assertions.expect_true(isinstance(title, str), reason="title should be str")
+    assertions.expect_equal(title, "PathNotDirectoryError")
 
 
 def test_format_error_response_path_not_found() -> None:
@@ -67,10 +70,10 @@ def test_format_error_response_path_not_found() -> None:
     response = format_error_response(exc, instance="files:open_file")
 
     problem = cast("ProblemDetails", response["problem"])
-    assert response["status"] == 404
+    assertions.expect_equal(response["status"], 404)
     code = problem.get("code")
-    assert isinstance(code, str)
-    assert code == "path-not-found"
+    assertions.expect_true(isinstance(code, str), reason="code should be str")
+    assertions.expect_equal(code, "path-not-found")
 
 
 def test_format_error_response_not_implemented() -> None:
@@ -79,16 +82,16 @@ def test_format_error_response_not_implemented() -> None:
     response = format_error_response(exc, instance="feature:todo")
 
     problem = cast("ProblemDetails", response["problem"])
-    assert response["status"] == 501
+    assertions.expect_equal(response["status"], 501)
     code = problem.get("code")
     status = problem.get("status")
     title = problem.get("title")
-    assert isinstance(code, str)
-    assert code == "not-implemented"
-    assert isinstance(status, int)
-    assert status == 501
-    assert isinstance(title, str)
-    assert title == "Not Implemented"
+    assertions.expect_true(isinstance(code, str), reason="code should be str")
+    assertions.expect_equal(code, "not-implemented")
+    assertions.expect_true(isinstance(status, int), reason="status should be int")
+    assertions.expect_equal(status, 501)
+    assertions.expect_true(isinstance(title, str), reason="title should be str")
+    assertions.expect_equal(title, "Not Implemented")
 
 
 def test_format_error_response_unknown_exception() -> None:
@@ -97,13 +100,14 @@ def test_format_error_response_unknown_exception() -> None:
     response = format_error_response(exc, instance="test:operation")
 
     problem = cast("ProblemDetails", response["problem"])
-    assert response["status"] == 500
+    assertions.expect_equal(response["status"], 500)
     code = problem.get("code")
     extensions = problem.get("extensions")
-    assert isinstance(code, str)
-    assert code == "internal-error"
-    assert isinstance(extensions, dict)
-    assert extensions.get("exception_type") == "RuntimeError"
+    assertions.expect_true(isinstance(code, str), reason="code should be str")
+    assertions.expect_equal(code, "internal-error")
+    assertions.expect_true(isinstance(extensions, dict), reason="extensions should be dict")
+    if extensions is not None:
+        assertions.expect_equal(extensions.get("exception_type"), "RuntimeError")
 
 
 # ==================== Exception Conversion Tests ====================
@@ -157,18 +161,21 @@ def test_kgfoundry_error_conversion(
 
     envelope = convert_exception_to_envelope(exception, operation, empty_result)
 
-    assert envelope["value"] == 0
-    assert "error" in envelope
-    assert "problem" in envelope
+    assertions.expect_equal(envelope["value"], 0)
+    assertions.expect_in("error", envelope)
+    assertions.expect_in("problem", envelope)
 
     problem = envelope["problem"]
-    assert problem["status"] == expected_status
-    assert problem["code"] == expected_code
-    assert problem["type"] == f"https://kgfoundry.dev/problems/{expected_code}"
-    assert problem["instance"] == operation
+    assertions.expect_equal(problem["status"], expected_status)
+    assertions.expect_equal(problem["code"], expected_code)
+    assertions.expect_equal(problem["type"], f"https://kgfoundry.dev/problems/{expected_code}")
+    assertions.expect_equal(problem["instance"], operation)
     # All exceptions in parametrize are KgFoundryError subclasses with message attribute
-    assert isinstance(exception, KgFoundryError)
-    assert problem["detail"] == exception.message
+    assertions.expect_true(
+        isinstance(exception, KgFoundryError), reason="exception should be KgFoundryError"
+    )
+    if isinstance(exception, KgFoundryError):
+        assertions.expect_equal(problem["detail"], exception.message)
 
 
 def test_file_not_found_error_conversion() -> None:
@@ -179,17 +186,17 @@ def test_file_not_found_error_conversion() -> None:
 
     envelope = convert_exception_to_envelope(exc, operation, empty_result)
 
-    assert not envelope["path"]
-    assert not envelope["content"]
-    assert envelope["lines"] == 0
-    assert envelope["size"] == 0
-    assert envelope["error"] == "File not found: test.py"
+    assertions.expect_false(bool(envelope["path"]), reason="path should be empty")
+    assertions.expect_false(bool(envelope["content"]), reason="content should be empty")
+    assertions.expect_equal(envelope["lines"], 0)
+    assertions.expect_equal(envelope["size"], 0)
+    assertions.expect_equal(envelope["error"], "File not found: test.py")
 
     problem = envelope["problem"]
-    assert problem["status"] == 404
-    assert problem["code"] == "path-not-found"
-    assert problem["type"] == "https://kgfoundry.dev/problems/path-not-found"
-    assert problem["title"] == "Path Not Found"
+    assertions.expect_equal(problem["status"], 404)
+    assertions.expect_equal(problem["code"], "path-not-found")
+    assertions.expect_equal(problem["type"], "https://kgfoundry.dev/problems/path-not-found")
+    assertions.expect_equal(problem["title"], "Path Not Found")
 
 
 def test_path_outside_repository_error_conversion() -> None:
@@ -201,10 +208,10 @@ def test_path_outside_repository_error_conversion() -> None:
     envelope = convert_exception_to_envelope(exc, operation, empty_result)
 
     problem = envelope["problem"]
-    assert problem["status"] == 400
-    assert problem["code"] == "path-outside-repo"
-    assert problem["type"] == "https://kgfoundry.dev/problems/path-outside-repo"
-    assert problem["title"] == "Path Outside Repository"
+    assertions.expect_equal(problem["status"], 400)
+    assertions.expect_equal(problem["code"], "path-outside-repo")
+    assertions.expect_equal(problem["type"], "https://kgfoundry.dev/problems/path-outside-repo")
+    assertions.expect_equal(problem["title"], "Path Outside Repository")
 
 
 def test_unicode_decode_error_conversion() -> None:
@@ -216,12 +223,12 @@ def test_unicode_decode_error_conversion() -> None:
     envelope = convert_exception_to_envelope(exc, operation, empty_result)
 
     problem = envelope["problem"]
-    assert problem["status"] == 415
-    assert problem["code"] == "unsupported-encoding"
-    assert problem["type"] == "https://kgfoundry.dev/problems/unsupported-encoding"
-    assert problem["title"] == "Unsupported Encoding"
-    assert "encoding" in problem.get("extensions", {})
-    assert "reason" in problem.get("extensions", {})
+    assertions.expect_equal(problem["status"], 415)
+    assertions.expect_equal(problem["code"], "unsupported-encoding")
+    assertions.expect_equal(problem["type"], "https://kgfoundry.dev/problems/unsupported-encoding")
+    assertions.expect_equal(problem["title"], "Unsupported Encoding")
+    assertions.expect_in("encoding", problem.get("extensions", {}))
+    assertions.expect_in("reason", problem.get("extensions", {}))
 
 
 def test_value_error_conversion() -> None:
@@ -233,10 +240,10 @@ def test_value_error_conversion() -> None:
     envelope = convert_exception_to_envelope(exc, operation, empty_result)
 
     problem = envelope["problem"]
-    assert problem["status"] == 400
-    assert problem["code"] == "invalid-parameter"
-    assert problem["type"] == "https://kgfoundry.dev/problems/invalid-parameter"
-    assert problem["title"] == "Invalid Parameter"
+    assertions.expect_equal(problem["status"], 400)
+    assertions.expect_equal(problem["code"], "invalid-parameter")
+    assertions.expect_equal(problem["type"], "https://kgfoundry.dev/problems/invalid-parameter")
+    assertions.expect_equal(problem["title"], "Invalid Parameter")
 
 
 def test_unknown_exception_conversion() -> None:
@@ -248,11 +255,11 @@ def test_unknown_exception_conversion() -> None:
     envelope = convert_exception_to_envelope(exc, operation, empty_result)
 
     problem = envelope["problem"]
-    assert problem["status"] == 500
-    assert problem["code"] == "internal-error"
-    assert problem["type"] == "https://kgfoundry.dev/problems/internal-error"
-    assert problem["title"] == "Internal Error"
-    assert problem.get("extensions", {}).get("exception_type") == "RuntimeError"
+    assertions.expect_equal(problem["status"], 500)
+    assertions.expect_equal(problem["code"], "internal-error")
+    assertions.expect_equal(problem["type"], "https://kgfoundry.dev/problems/internal-error")
+    assertions.expect_equal(problem["title"], "Internal Error")
+    assertions.expect_equal(problem.get("extensions", {}).get("exception_type"), "RuntimeError")
 
 
 def test_exception_conversion_preserves_empty_result() -> None:
@@ -269,13 +276,13 @@ def test_exception_conversion_preserves_empty_result() -> None:
 
     envelope = convert_exception_to_envelope(exc, operation, empty_result)
 
-    assert not envelope["path"]
-    assert not envelope["content"]
-    assert envelope["lines"] == 0
-    assert envelope["size"] == 0
-    assert envelope["truncated"] is False
-    assert "error" in envelope
-    assert "problem" in envelope
+    assertions.expect_false(bool(envelope["path"]), reason="path should be empty")
+    assertions.expect_false(bool(envelope["content"]), reason="content should be empty")
+    assertions.expect_equal(envelope["lines"], 0)
+    assertions.expect_equal(envelope["size"], 0)
+    assertions.expect_false(envelope["truncated"], reason="truncated should be False")
+    assertions.expect_in("error", envelope)
+    assertions.expect_in("problem", envelope)
 
 
 def test_exception_conversion_with_context() -> None:
@@ -288,12 +295,12 @@ def test_exception_conversion_with_context() -> None:
 
     problem = envelope["problem"]
     extensions = problem.get("extensions", {})
-    assert "path" in extensions
-    assert extensions["path"] == "test.py"
-    assert "start_line" in extensions
-    assert extensions["start_line"] == 0
-    assert "end_line" in extensions
-    assert extensions["end_line"] == 10
+    assertions.expect_in("path", extensions)
+    assertions.expect_equal(extensions["path"], "test.py")
+    assertions.expect_in("start_line", extensions)
+    assertions.expect_equal(extensions["start_line"], 0)
+    assertions.expect_in("end_line", extensions)
+    assertions.expect_equal(extensions["end_line"], 10)
 
 
 # ==================== Decorator Tests ====================
@@ -309,10 +316,10 @@ def test_decorator_success_case() -> None:
 
     result = test_func()
 
-    assert result["value"] == 42
-    assert result["other"] == "data"
-    assert "error" not in result
-    assert "problem" not in result
+    assertions.expect_equal(result["value"], 42)
+    assertions.expect_equal(result["other"], "data")
+    assertions.expect_false("error" in result, reason="should not have error")
+    assertions.expect_false("problem" in result, reason="should not have problem")
 
 
 def test_decorator_catches_exception() -> None:
@@ -326,10 +333,10 @@ def test_decorator_catches_exception() -> None:
 
     result = test_func()
 
-    assert result["value"] == 0
-    assert "error" in result
-    assert "problem" in result
-    assert result["problem"]["status"] == 404
+    assertions.expect_equal(result["value"], 0)
+    assertions.expect_in("error", result)
+    assertions.expect_in("problem", result)
+    assertions.expect_equal(result["problem"]["status"], 404)
 
 
 def test_decorator_preserves_function_signature() -> None:
@@ -353,19 +360,20 @@ def test_decorator_preserves_function_signature() -> None:
         _ = param  # Parameter used for signature testing only
         return {"value": 1}
 
-    assert test_func.__name__ == "test_func"
-    assert test_func.__doc__ is not None
-    assert "Test function docstring" in test_func.__doc__
-    assert "param" in test_func.__annotations__
+    assertions.expect_equal(test_func.__name__, "test_func")
+    assertions.expect_true(test_func.__doc__ is not None, reason="docstring should exist")
+    if test_func.__doc__ is not None:
+        assertions.expect_in("Test function docstring", test_func.__doc__)
+    assertions.expect_in("param", test_func.__annotations__)
     # Return annotation may be stored as string or type
-    assert test_func.__annotations__.get("return") in {dict, "dict"}
+    return_annotation = test_func.__annotations__.get("return")
+    if return_annotation is not None:
+        assertions.expect_in(return_annotation, {dict, "dict"})
 
 
 @pytest.mark.asyncio
 async def test_decorator_async_function() -> None:
     """Test decorator works with async functions."""
-    import asyncio
-
     empty_result = {"value": 0}
 
     @handle_adapter_errors(operation="test:operation", empty_result=empty_result)
@@ -375,15 +383,13 @@ async def test_decorator_async_function() -> None:
 
     result = await async_test_func()
 
-    assert result["value"] == 42
-    assert "error" not in result
+    assertions.expect_equal(result["value"], 42)
+    assertions.expect_false("error" in result, reason="should not have error")
 
 
 @pytest.mark.asyncio
 async def test_decorator_async_function_error() -> None:
     """Test decorator catches exceptions in async functions."""
-    import asyncio
-
     empty_result = {"value": 0}
 
     @handle_adapter_errors(operation="test:operation", empty_result=empty_result)
@@ -394,9 +400,9 @@ async def test_decorator_async_function_error() -> None:
 
     result = await async_test_func()
 
-    assert result["value"] == 0
-    assert "error" in result
-    assert result["problem"]["status"] == 400
+    assertions.expect_equal(result["value"], 0)
+    assertions.expect_in("error", result)
+    assertions.expect_equal(result["problem"]["status"], 400)
 
 
 def test_decorator_multiple_exception_types() -> None:
@@ -418,15 +424,15 @@ def test_decorator_multiple_exception_types() -> None:
 
     # Test FileNotFoundError
     result1 = test_func("FileNotFoundError")
-    assert result1["problem"]["status"] == 404
+    assertions.expect_equal(result1["problem"]["status"], 404)
 
     # Test ValueError
     result2 = test_func("ValueError")
-    assert result2["problem"]["status"] == 400
+    assertions.expect_equal(result2["problem"]["status"], 400)
 
     # Test RuntimeError (unknown)
     result3 = test_func("RuntimeError")
-    assert result3["problem"]["status"] == 500
+    assertions.expect_equal(result3["problem"]["status"], 500)
 
 
 def test_decorator_with_kgfoundry_error() -> None:
@@ -440,11 +446,11 @@ def test_decorator_with_kgfoundry_error() -> None:
 
     result = test_func()
 
-    assert result["matches"] == []
-    assert result["total"] == 0
-    assert "error" in result
-    assert result["problem"]["status"] == 503
-    assert result["problem"]["code"] == "vector-search-error"
+    assertions.expect_equal(result["matches"], [])
+    assertions.expect_equal(result["total"], 0)
+    assertions.expect_in("error", result)
+    assertions.expect_equal(result["problem"]["status"], 503)
+    assertions.expect_equal(result["problem"]["code"], "vector-search-error")
 
 
 def test_decorator_empty_result_variations() -> None:
@@ -458,10 +464,10 @@ def test_decorator_empty_result_variations() -> None:
         raise FileNotFoundError(msg)
 
     result1 = open_file_func()
-    assert not result1["path"]
-    assert not result1["content"]
-    assert result1["lines"] == 0
-    assert result1["size"] == 0
+    assertions.expect_false(bool(result1["path"]), reason="path should be empty")
+    assertions.expect_false(bool(result1["content"]), reason="content should be empty")
+    assertions.expect_equal(result1["lines"], 0)
+    assertions.expect_equal(result1["size"], 0)
 
     # Test with list_paths empty result
     list_paths_empty = {"items": [], "total": 0, "truncated": False}
@@ -472,9 +478,9 @@ def test_decorator_empty_result_variations() -> None:
         raise ValueError(msg)
 
     result2 = list_paths_func()
-    assert result2["items"] == []
-    assert result2["total"] == 0
-    assert result2["truncated"] is False
+    assertions.expect_equal(result2["items"], [])
+    assertions.expect_equal(result2["total"], 0)
+    assertions.expect_false(result2["truncated"], reason="truncated should be False")
 
 
 # ==================== Structured Logging Tests ====================
@@ -482,8 +488,6 @@ def test_decorator_empty_result_variations() -> None:
 
 def test_kgfoundry_error_logging(caplog: pytest.LogCaptureFixture) -> None:
     """Test that KgFoundryError exceptions are logged with structured context."""
-    import logging
-
     exc = VectorSearchError("Search timeout", context={"query": "test"})
     empty_result = {"matches": [], "total": 0}
     operation = "search:text"
@@ -491,19 +495,17 @@ def test_kgfoundry_error_logging(caplog: pytest.LogCaptureFixture) -> None:
     with caplog.at_level(logging.WARNING):
         convert_exception_to_envelope(exc, operation, empty_result)
 
-    assert len(caplog.records) > 0
+    assertions.expect_true(len(caplog.records) > 0, reason="should have log records")
     record = caplog.records[0]
     # Structured fields are added as attributes to LogRecord via LoggerAdapter
     operation_value = getattr(record, "operation", None)
-    assert operation_value == operation
+    assertions.expect_equal(operation_value, operation)
     error_code_value = getattr(record, "error_code", None)
-    assert error_code_value == "vector-search-error"
+    assertions.expect_equal(error_code_value, "vector-search-error")
 
 
 def test_file_not_found_error_logging(caplog: pytest.LogCaptureFixture) -> None:
     """Test that FileNotFoundError is logged at WARNING level."""
-    import logging
-
     exc = FileNotFoundError("File not found: test.py")
     empty_result = {"path": ""}
     operation = "files:open_file"
@@ -511,16 +513,14 @@ def test_file_not_found_error_logging(caplog: pytest.LogCaptureFixture) -> None:
     with caplog.at_level(logging.WARNING):
         convert_exception_to_envelope(exc, operation, empty_result)
 
-    assert len(caplog.records) > 0
+    assertions.expect_true(len(caplog.records) > 0, reason="should have log records")
     record = caplog.records[0]
-    assert record.levelno == logging.WARNING
-    assert "not found" in record.message.lower()
+    assertions.expect_equal(record.levelno, logging.WARNING)
+    assertions.expect_in("not found", record.message.lower())
 
 
 def test_unknown_exception_logging(caplog: pytest.LogCaptureFixture) -> None:
     """Test that unknown exceptions are logged at EXCEPTION level with stack trace."""
-    import logging
-
     exc = RuntimeError("Unexpected error")
     empty_result = {"value": 0}
     operation = "test:operation"
@@ -528,9 +528,9 @@ def test_unknown_exception_logging(caplog: pytest.LogCaptureFixture) -> None:
     with caplog.at_level(logging.ERROR):
         convert_exception_to_envelope(exc, operation, empty_result)
 
-    assert len(caplog.records) > 0
+    assertions.expect_true(len(caplog.records) > 0, reason="should have log records")
     record = caplog.records[0]
-    assert record.levelno == logging.ERROR
+    assertions.expect_equal(record.levelno, logging.ERROR)
     # Structured fields are added as attributes to LogRecord via LoggerAdapter
     exception_type_value = getattr(record, "exception_type", None)
-    assert exception_type_value == "RuntimeError"
+    assertions.expect_equal(exception_type_value, "RuntimeError")

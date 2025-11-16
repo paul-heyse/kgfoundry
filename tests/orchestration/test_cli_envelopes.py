@@ -11,6 +11,7 @@ from typer.testing import CliRunner
 
 from kgfoundry_common.vector_types import VectorValidationError
 from orchestration import cli as orchestration_cli
+from tests._helpers import assertions
 
 
 @pytest.fixture(name="runner")
@@ -33,8 +34,14 @@ def test_index_bm25_emits_success_envelope(
         *,
         logger: orchestration_cli.LoggerAdapter,
     ) -> tuple[str, int]:
-        assert isinstance(config, orchestration_cli.BM25BuildConfig)
-        assert isinstance(logger, orchestration_cli.LoggerAdapter)
+        assertions.expect_true(
+            isinstance(config, orchestration_cli.BM25BuildConfig),
+            reason="config should be orchestration_cli.BM25BuildConfig",
+        )
+        assertions.expect_true(
+            isinstance(logger, orchestration_cli.LoggerAdapter),
+            reason="logger should be orchestration_cli.LoggerAdapter",
+        )
         return "lucene", 3
 
     monkeypatch.setattr(orchestration_cli, "_build_bm25_index", fake_build)
@@ -54,12 +61,15 @@ def test_index_bm25_emits_success_envelope(
         ],
     )
 
-    assert result.exit_code == 0
+    assertions.expect_equal(result.exit_code, 0)
     envelope_path = tmp_path / "kgf-orchestration-index-bm25.json"
     envelope = _read_envelope(envelope_path)
-    assert envelope["status"] == "success"
+    assertions.expect_equal(envelope["status"], "success")
     files = cast("list[dict[str, object]]", envelope["files"])
-    assert any(cast("str", entry.get("path", "")).endswith("bm25_index") for entry in files)
+    assertions.expect_true(
+        any(cast("str", entry.get("path", "")).endswith("bm25_index") for entry in files),
+        reason="should have bm25_index file",
+    )
 
 
 def test_index_faiss_records_validation_failure(
@@ -70,7 +80,10 @@ def test_index_faiss_records_validation_failure(
     error = VectorValidationError("invalid payload", errors=["row 1: missing vector"])
 
     def fake_run(*, config: orchestration_cli.IndexCliConfig) -> dict[str, object]:
-        assert isinstance(config, orchestration_cli.IndexCliConfig)
+        assertions.expect_true(
+            isinstance(config, orchestration_cli.IndexCliConfig),
+            reason="config should be orchestration_cli.IndexCliConfig",
+        )
         raise error
 
     monkeypatch.setattr(orchestration_cli, "run_index_faiss", fake_run)
@@ -88,11 +101,13 @@ def test_index_faiss_records_validation_failure(
         ],
     )
 
-    assert result.exit_code == 1
+    assertions.expect_equal(result.exit_code, 1)
     envelope_path = tmp_path / "kgf-orchestration-index-faiss.json"
     envelope = _read_envelope(envelope_path)
-    assert envelope["status"] == "violation"
+    assertions.expect_equal(envelope["status"], "violation")
     problem = cast("dict[str, object]", envelope["problem"])
-    assert problem["type"] == "https://kgfoundry.dev/problems/vector-ingestion/invalid-payload"
-    assert problem["vector_path"] == str(vectors_file)
-    assert problem["errors"] == ["row 1: missing vector"]
+    assertions.expect_equal(
+        problem["type"], "https://kgfoundry.dev/problems/vector-ingestion/invalid-payload"
+    )
+    assertions.expect_equal(problem["vector_path"], str(vectors_file))
+    assertions.expect_equal(problem["errors"], ["row 1: missing vector"])

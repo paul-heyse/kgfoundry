@@ -7,7 +7,7 @@
 | Step | Status | Details |
 | --- | --- | --- |
 | `vllm.embed_batch` | ✅ completed | batch_size=4, model=nvidia/voyager |
-| `faiss.search` | ✅ completed | k=40, nprobe=32, use_gpu=true |
+| `faiss.search` | ✅ completed | k=40, nprobe=32 |
 | `duckdb.query` | ❌ failed | op=hydrate, rows=0 |
 
 Warnings:

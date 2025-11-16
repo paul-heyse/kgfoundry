@@ -11,6 +11,8 @@ from codeintel_rev.cst_build.cst_collect import CSTCollector
 from codeintel_rev.cst_build.cst_resolve import ModuleRow, SCIPResolver, stitch_nodes
 from codeintel_rev.enrich.scip_reader import Document, Occurrence
 
+from tests._helpers import assertions
+
 
 def _write_module(tmp_path: Path, relative: str, content: str) -> Path:
     file_path = tmp_path / relative
@@ -47,20 +49,24 @@ def test_index_file_smoke(tmp_path: Path) -> None:
     (tmp_path / "pkg" / "__init__.py").write_text("", encoding="utf-8")
     collector = CSTCollector(tmp_path, [module_path])
     nodes, stats = collector.collect_file(module_path)
-    assert stats.node_rows == len(nodes) > 0
+    assertions.expect_true(
+        stats.node_rows == len(nodes) > 0, reason="node_rows should match node count"
+    )
     kinds = {node.kind for node in nodes}
     for required in ("Module", "ClassDef", "FunctionDef", "For", "Return"):
-        assert required in kinds
+        assertions.expect_in(required, kinds)
     module_node = next(node for node in nodes if node.kind == "Module")
-    assert module_node.doc is not None
+    assertions.expect_true(module_node.doc is not None, reason="module_node should have doc")
     module_doc = module_node.doc.get("module", "")
-    assert module_doc.startswith("Top-level")
+    assertions.expect_true(
+        module_doc.startswith("Top-level"), reason="module doc should start with Top-level"
+    )
     helper_node = next(
         node for node in nodes if node.kind == "FunctionDef" and node.name == "helper"
     )
-    assert helper_node.doc is not None
-    assert "def_" in helper_node.doc
-    assert "Sum incoming" in helper_node.doc["def_"]
+    assertions.expect_true(helper_node.doc is not None, reason="helper_node should have doc")
+    assertions.expect_in("def_", helper_node.doc)
+    assertions.expect_in("Sum incoming", helper_node.doc["def_"])
 
 
 def test_qualified_names_and_call_targets(tmp_path: Path) -> None:
@@ -88,12 +94,21 @@ def test_qualified_names_and_call_targets(tmp_path: Path) -> None:
     method_node = next(
         node for node in nodes if node.kind == "FunctionDef" and node.name == "greet"
     )
-    assert any(name.endswith("Greeter.greet") for name in method_node.qnames)
-    assert any(name.startswith("pkg.greeter.") for name in method_node.qnames)
+    assertions.expect_true(
+        any(name.endswith("Greeter.greet") for name in method_node.qnames),
+        reason="qnames should include Greeter.greet",
+    )
+    assertions.expect_true(
+        any(name.startswith("pkg.greeter.") for name in method_node.qnames),
+        reason="qnames should start with pkg.greeter.",
+    )
     call_node = next(node for node in nodes if node.kind == "Call" and node.name == "greet")
     targets = call_node.call_target_qnames or []
-    assert targets
-    assert any(name.startswith("pkg.greeter.") for name in targets)
+    assertions.expect_true(bool(targets), reason="call targets should exist")
+    assertions.expect_true(
+        any(name.startswith("pkg.greeter.") for name in targets),
+        reason="targets should start with pkg.greeter.",
+    )
 
 
 def test_stitching_links_module_and_scip(tmp_path: Path) -> None:
@@ -125,12 +140,16 @@ def test_stitching_links_module_and_scip(tmp_path: Path) -> None:
     resolver = SCIPResolver({rel_path: document})
     stitched, counters = stitch_nodes(nodes, module_lookup=module_lookup, scip_resolver=resolver)
     updated = next(node for node in stitched if node.kind == "FunctionDef" and node.name == "add")
-    assert updated.stitch is not None
-    assert updated.stitch.module_id == "module::pkg.sample"
-    assert updated.stitch.scip_symbol is not None
-    assert updated.stitch.scip_symbol.endswith("add#")
-    assert counters.module_matches >= 1
-    assert counters.scip_matches >= 1
+    assertions.expect_true(updated.stitch is not None, reason="stitch should be set")
+    assertions.expect_equal(updated.stitch.module_id, "module::pkg.sample")
+    assertions.expect_true(
+        updated.stitch.scip_symbol is not None, reason="scip_symbol should be set"
+    )
+    assertions.expect_true(
+        updated.stitch.scip_symbol.endswith("add#"), reason="scip_symbol should end with add#"
+    )
+    assertions.expect_true(counters.module_matches >= 1, reason="should have module matches")
+    assertions.expect_true(counters.scip_matches >= 1, reason="should have scip matches")
 
 
 def test_node_id_determinism(tmp_path: Path) -> None:
@@ -139,7 +158,7 @@ def test_node_id_determinism(tmp_path: Path) -> None:
     collector = CSTCollector(tmp_path, [module_path])
     run_one, _ = collector.collect_file(module_path)
     run_two, _ = collector.collect_file(module_path)
-    assert {node.node_id for node in run_one} == {node.node_id for node in run_two}
+    assertions.expect_equal({node.node_id for node in run_one}, {node.node_id for node in run_two})
 
 
 def test_schema_payload_contains_required_fields(tmp_path: Path) -> None:
@@ -149,7 +168,7 @@ def test_schema_payload_contains_required_fields(tmp_path: Path) -> None:
     nodes, _ = collector.collect_file(module_path)
     payload = nodes[0].to_dict()
     for key in ("path", "node_id", "kind", "span", "parents", "scope", "qnames"):
-        assert key in payload
+        assertions.expect_in(key, payload)
     span = payload.get("span")
-    assert isinstance(span, dict)
-    assert isinstance(span.get("start"), list)
+    assertions.expect_true(isinstance(span, dict), reason="span should be dict")
+    assertions.expect_true(isinstance(span.get("start"), list), reason="start should be list")

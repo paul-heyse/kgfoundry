@@ -14,6 +14,7 @@ from unittest.mock import patch
 from orchestration import cli as cli_module
 from orchestration.cli import index_faiss, run_index_faiss
 from orchestration.config import IndexCliConfig
+from tests._helpers import assertions
 
 
 class TestRunIndexFaissSignature:
@@ -30,7 +31,7 @@ class TestRunIndexFaissSignature:
             )
             # Calling with keyword should work (when properly mocked)
             # Direct positional call would raise TypeError at runtime
-            assert config.dense_vectors == "vectors.json"
+            assertions.expect_equal(config.dense_vectors, "vectors.json")
 
     def test_run_index_faiss_accepts_config(self) -> None:
         """Test that run_index_faiss accepts IndexCliConfig."""
@@ -42,9 +43,11 @@ class TestRunIndexFaissSignature:
                 metric="ip",
             )
             # Verify config is properly structured
-            assert isinstance(config, IndexCliConfig)
-            assert config.factory == "Flat"
-            assert config.metric == "ip"
+            assertions.expect_true(
+                isinstance(config, IndexCliConfig), reason="config should be IndexCliConfig"
+            )
+            assertions.expect_equal(config.factory, "Flat")
+            assertions.expect_equal(config.metric, "ip")
 
 
 class TestIndexFaissCliBuildsConfig:
@@ -68,16 +71,18 @@ class TestIndexFaissCliBuildsConfig:
                     "ip",
                 )
                 # Verify run_index_faiss was called once
-                assert mock_run.call_count == 1
+                assertions.expect_equal(mock_run.call_count, 1)
                 # Extract the config from the call
                 call_kwargs = cast("dict[str, object]", mock_run.call_args[1])
-                assert "config" in call_kwargs
+                assertions.expect_in("config", call_kwargs)
                 config = call_kwargs["config"]
-                assert isinstance(config, IndexCliConfig)
-                assert config.dense_vectors == str(vectors_file)
-                assert config.index_path == str(index_file)
-                assert config.factory == "Flat"
-                assert config.metric == "ip"
+                assertions.expect_true(
+                    isinstance(config, IndexCliConfig), reason="config should be IndexCliConfig"
+                )
+                assertions.expect_equal(config.dense_vectors, str(vectors_file))
+                assertions.expect_equal(config.index_path, str(index_file))
+                assertions.expect_equal(config.factory, "Flat")
+                assertions.expect_equal(config.metric, "ip")
 
     def test_index_faiss_uses_defaults(self) -> None:
         """Test that index_faiss uses default values correctly."""
@@ -89,10 +94,12 @@ class TestIndexFaissCliBuildsConfig:
                 index_faiss(str(vectors_file))
                 call_kwargs = cast("dict[str, object]", mock_run.call_args[1])
                 config = call_kwargs["config"]
-                assert isinstance(config, IndexCliConfig)
-                assert config.index_path == "./_indices/faiss/shard_000.idx"
-                assert config.factory == "Flat"
-                assert config.metric == "ip"
+                assertions.expect_true(
+                    isinstance(config, IndexCliConfig), reason="config should be IndexCliConfig"
+                )
+                assertions.expect_equal(config.index_path, "./_indices/faiss/shard_000.idx")
+                assertions.expect_equal(config.factory, "Flat")
+                assertions.expect_equal(config.metric, "ip")
 
 
 class TestRunIndexFaissDocstring:
@@ -100,27 +107,30 @@ class TestRunIndexFaissDocstring:
 
     def test_docstring_present(self) -> None:
         """Test that run_index_faiss has a docstring."""
-        assert run_index_faiss.__doc__ is not None
-        assert len(run_index_faiss.__doc__) > 50
+        assertions.expect_true(run_index_faiss.__doc__ is not None, reason="docstring should exist")
+        if run_index_faiss.__doc__ is not None:
+            assertions.expect_true(
+                len(run_index_faiss.__doc__) > 50, reason="docstring should be substantial"
+            )
 
     def test_docstring_mentions_config(self) -> None:
         """Test that docstring mentions IndexCliConfig."""
         doc = run_index_faiss.__doc__ or ""
-        assert "IndexCliConfig" in doc
-        assert "config" in doc.lower()
+        assertions.expect_in("IndexCliConfig", doc)
+        assertions.expect_in("config", doc.lower())
 
     def test_docstring_has_examples(self) -> None:
         """Test that docstring has Examples section."""
         doc = run_index_faiss.__doc__ or ""
-        assert "Examples" in doc
-        assert "IndexCliConfig(" in doc
+        assertions.expect_in("Examples", doc)
+        assertions.expect_in("IndexCliConfig(", doc)
 
     def test_docstring_documents_errors(self) -> None:
         """Test that docstring documents error handling."""
         doc = run_index_faiss.__doc__ or ""
-        assert "Raises" in doc
-        assert "typer.Exit" in doc
-        assert "Problem Details" in doc
+        assertions.expect_in("Raises", doc)
+        assertions.expect_in("typer.Exit", doc)
+        assertions.expect_in("Problem Details", doc)
 
 
 class TestIndexFaissDocstring:
@@ -128,21 +138,24 @@ class TestIndexFaissDocstring:
 
     def test_index_faiss_docstring_present(self) -> None:
         """Test that index_faiss has a docstring."""
-        assert index_faiss.__doc__ is not None
-        assert len(index_faiss.__doc__) > 50
+        assertions.expect_true(index_faiss.__doc__ is not None, reason="docstring should exist")
+        if index_faiss.__doc__ is not None:
+            assertions.expect_true(
+                len(index_faiss.__doc__) > 50, reason="docstring should be substantial"
+            )
 
     def test_index_faiss_docstring_has_examples(self) -> None:
         """Test that index_faiss docstring has Examples."""
         doc = index_faiss.__doc__ or ""
-        assert "Examples" in doc
+        assertions.expect_in("Examples", doc)
 
     def test_index_faiss_docstring_documents_parameters(self) -> None:
         """Test that docstring documents all parameters."""
         doc = index_faiss.__doc__ or ""
-        assert "dense_vectors" in doc
-        assert "index_path" in doc
-        assert "factory" in doc
-        assert "metric" in doc
+        assertions.expect_in("dense_vectors", doc)
+        assertions.expect_in("index_path", doc)
+        assertions.expect_in("factory", doc)
+        assertions.expect_in("metric", doc)
 
 
 class TestConfigExportedInAll:
@@ -150,11 +163,11 @@ class TestConfigExportedInAll:
 
     def test_run_index_faiss_in_all(self) -> None:
         """Test that run_index_faiss is exported in __all__."""
-        assert "run_index_faiss" in cli_module.__all__
+        assertions.expect_in("run_index_faiss", cli_module.__all__)
 
     def test_index_faiss_in_all(self) -> None:
         """Test that index_faiss is still exported in __all__."""
-        assert "index_faiss" in cli_module.__all__
+        assertions.expect_in("index_faiss", cli_module.__all__)
 
 
 class TestIndexCliConfigIntegration:
@@ -168,9 +181,9 @@ class TestIndexCliConfigIntegration:
             factory="OPQ64,IVF8192,PQ64",
             metric="l2",
         )
-        assert config.dense_vectors == "my_vectors.json"
-        assert config.factory == "OPQ64,IVF8192,PQ64"
-        assert config.metric == "l2"
+        assertions.expect_equal(config.dense_vectors, "my_vectors.json")
+        assertions.expect_equal(config.factory, "OPQ64,IVF8192,PQ64")
+        assertions.expect_equal(config.metric, "l2")
 
     def test_config_with_custom_paths(self) -> None:
         """Test IndexCliConfig with custom file paths."""
@@ -181,8 +194,14 @@ class TestIndexCliConfigIntegration:
                 factory="Flat",
                 metric="ip",
             )
-            assert config.dense_vectors.endswith("custom_vectors.json")
-            assert config.index_path.endswith("custom_index.idx")
+            assertions.expect_true(
+                config.dense_vectors.endswith("custom_vectors.json"),
+                reason="dense_vectors should end with custom_vectors.json",
+            )
+            assertions.expect_true(
+                config.index_path.endswith("custom_index.idx"),
+                reason="index_path should end with custom_index.idx",
+            )
 
 
 class TestAPIConsistency:
@@ -203,7 +222,7 @@ class TestAPIConsistency:
             )
 
             # Both functions should accept the same data
-            assert config.dense_vectors == str(vectors_file)
-            assert config.index_path == str(index_file)
-            assert config.factory == "Flat"
-            assert config.metric == "ip"
+            assertions.expect_equal(config.dense_vectors, str(vectors_file))
+            assertions.expect_equal(config.index_path, str(index_file))
+            assertions.expect_equal(config.factory, "Flat")
+            assertions.expect_equal(config.metric, "ip")

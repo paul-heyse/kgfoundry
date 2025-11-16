@@ -9,6 +9,8 @@ import pytest
 from codeintel_rev.app.scope_store import AsyncSingleFlight, LRUCache, ScopeStore
 from codeintel_rev.mcp_server.schemas import ScopeIn
 
+from tests._helpers import assertions
+
 
 class FakeClock:
     """Simple monotonic clock for deterministic TTL testing."""
@@ -30,14 +32,14 @@ def test_lru_cache_evicts_least_recently_used() -> None:
     cache.set("a", 1)
     cache.set("b", 2)
 
-    assert cache.get("a") == 1  # refresh recency of "a"
+    assertions.expect_equal(cache.get("a"), 1)  # refresh recency of "a"
 
     cache.set("c", 3)  # should evict "b"
 
-    assert "a" in cache
-    assert "c" in cache
-    assert cache.get("b") is None
-    assert cache.snapshot() == {"a": 1, "c": 3}
+    assertions.expect_in("a", cache)
+    assertions.expect_in("c", cache)
+    assertions.expect_equal(cache.get("b"), None)
+    assertions.expect_equal(cache.snapshot(), {"a": 1, "c": 3})
 
 
 def test_lru_cache_ttl_expires_entries_on_access() -> None:
@@ -45,15 +47,15 @@ def test_lru_cache_ttl_expires_entries_on_access() -> None:
     cache: LRUCache[str, str] = LRUCache(maxsize=4, ttl_seconds=1.0, now_fn=clock.now)
 
     cache.set("token", "value")
-    assert cache.get("token") == "value"
+    assertions.expect_equal(cache.get("token"), "value")
 
     clock.advance(0.9)
-    assert cache.get("token") == "value"
+    assertions.expect_equal(cache.get("token"), "value")
 
     clock.advance(0.2)
-    assert cache.get("token") is None
-    assert "token" not in cache
-    assert len(cache) == 0
+    assertions.expect_equal(cache.get("token"), None)
+    assertions.expect_false("token" in cache, reason="token should be expired")
+    assertions.expect_equal(len(cache), 0)
 
 
 def test_lru_cache_is_thread_safe() -> None:
@@ -67,8 +69,8 @@ def test_lru_cache_is_thread_safe() -> None:
         results = list(executor.map(writer_reader, range(64)))
 
     observed = {value for value in results if value is not None}
-    assert observed == set(range(64))
-    assert len(cache) == 64
+    assertions.expect_equal(observed, set(range(64)))
+    assertions.expect_equal(len(cache), 64)
 
 
 class FakeRedis:
@@ -139,10 +141,10 @@ async def test_scope_store_prefers_l1_cache() -> None:
 
     result = await store.get("session-1")
 
-    assert result == scope
-    assert store.metrics.l1_hits == 1
-    assert store.metrics.l2_hits == 0
-    assert redis.get_calls == 0
+    assertions.expect_equal(result, scope)
+    assertions.expect_equal(store.metrics.l1_hits, 1)
+    assertions.expect_equal(store.metrics.l2_hits, 0)
+    assertions.expect_equal(redis.get_calls, 0)
 
     await store.close()
 
@@ -159,10 +161,10 @@ async def test_scope_store_l2_fetch_coalesces_requests() -> None:
 
     results = await asyncio.gather(*(store.get("session-2") for _ in range(5)))
 
-    assert results == [scope] * 5
-    assert redis.get_calls == 1
-    assert store.metrics.l2_hits == 1
-    assert store.metrics.l2_misses == 0
+    assertions.expect_sequence_equal(results, [scope] * 5)
+    assertions.expect_equal(redis.get_calls, 1)
+    assertions.expect_equal(store.metrics.l2_hits, 1)
+    assertions.expect_equal(store.metrics.l2_misses, 0)
 
     await store.close()
 
@@ -176,9 +178,11 @@ async def test_scope_store_delete_clears_l1_and_l2() -> None:
     await store.set("session-3", scope)
     await store.delete("session-3")
 
-    assert store.metrics.l1_hits == 0
-    assert await store.get("session-3") is None
-    assert not redis.contains("scope:session-3")
+    assertions.expect_equal(store.metrics.l1_hits, 0)
+    assertions.expect_equal(await store.get("session-3"), None)
+    assertions.expect_false(
+        redis.contains("scope:session-3"), reason="session-3 should be deleted from redis"
+    )
 
     await store.close()
 
@@ -190,8 +194,10 @@ async def test_scope_store_without_l2_ttl_uses_set() -> None:
 
     await store.set("session-4", _sample_scope())
 
-    assert redis.set_calls == 1
-    assert not redis.setex_calls
+    assertions.expect_equal(redis.set_calls, 1)
+    assertions.expect_false(
+        bool(redis.setex_calls), reason="should not use setex when l2_ttl_seconds is None"
+    )
 
     await store.close()
 
@@ -209,8 +215,10 @@ async def test_async_single_flight_coalesces_calls() -> None:
 
     results = await asyncio.gather(*[flight.do("scope", expensive_call) for _ in range(10)])
 
-    assert all(result == 42 for result in results)
-    assert call_count == 1
+    assertions.expect_true(
+        all(result == 42 for result in results), reason="all results should be 42"
+    )
+    assertions.expect_equal(call_count, 1)
 
 
 @pytest.mark.asyncio
@@ -228,11 +236,11 @@ async def test_async_single_flight_propagates_exceptions_and_allows_retry() -> N
     with pytest.raises(RuntimeError):
         await asyncio.gather(flight.do("scope", failing_call), flight.do("scope", failing_call))
 
-    assert call_count == 1
+    assertions.expect_equal(call_count, 1)
 
     async def succeeding_call() -> int:
         await asyncio.sleep(0)
         return 7
 
     result = await flight.do("scope", succeeding_call)
-    assert result == 7
+    assertions.expect_equal(result, 7)

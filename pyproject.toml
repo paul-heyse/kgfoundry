@@ -306,10 +306,6 @@ gpu = [
     "compressed-tensors",
     "accelerate",
     "easyocr",
-    "libcuvs-cu12",
-    "libraft-cu12",
-    "librmm-cu12",
-    "cuvs-cu12",
     "docling",
     "docling-ibm-models",
     "openai",
@@ -331,7 +327,6 @@ minimal = [
     "uvicorn>=0.38.0",
 ]
 faiss-cpu = ["faiss-cpu>=1.8.0"]
-faiss-gpu = ["faiss-gpu==1.7.2 ; python_version < '3.11'"]
 duckdb = ["duckdb>=1.0.0"]
 splade = ["onnxruntime", "pyserini"]
 xtr = ["torch", "sentencepiece"]

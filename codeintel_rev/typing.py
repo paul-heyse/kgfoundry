@@ -258,55 +258,19 @@ class TorchModule(Protocol):
         ...
 
 
-class FaissStandardGpuResources(Protocol):
-    """GPU resource handle for FAISS."""
-
-
-class FaissGpuClonerOptions(Protocol):
-    """Options controlling FAISS GPU cloning behavior."""
-
-    use_cuvs: bool
-
-    def __init__(self) -> None: ...
-
-
 class FaissIndex(Protocol):
     """Minimal FAISS index surface used in diagnostics."""
 
     ntotal: int
 
 
-class FaissGpuIndexFlatIP(FaissIndex, Protocol):
-    """GPU FAISS index used for smoke testing."""
-
-    def add(self, vectors: NDArrayF32) -> None:
-        """Add vectors to the index."""
-        ...
-
-    def search(self, queries: NDArrayF32, k: int) -> tuple[NDArrayF32, NDArrayI64]:
-        """Search for k nearest neighbors."""
-        ...
-
-
 class FaissModule(Protocol):
     """Subset of the FAISS module accessed via gate_import."""
 
-    class _ResourceCtor(Protocol):
-        def __call__(self) -> FaissStandardGpuResources: ...
-
-    class _IndexCtor(Protocol):
-        def __call__(
-            self, resources: FaissStandardGpuResources, dim: int
-        ) -> FaissGpuIndexFlatIP: ...
-
-    StandardGpuResources: _ResourceCtor
-    GpuClonerOptions: type[FaissGpuClonerOptions]
-    GpuIndexFlatIP: _IndexCtor
-    GpuIndexCagra: object | None
-
-    def get_num_gpus(self) -> int:
-        """Return the number of available GPUs."""
-        ...
+    METRIC_INNER_PRODUCT: int
+    METRIC_L2: int
+    IndexFlatIP: Callable[[int], FaissIndex]
+    IndexIDMap2: Callable[[FaissIndex], FaissIndex]
 
     def normalize_l2(self, vectors: NDArrayF32) -> None:
         """Normalize vectors using L2 norm in-place."""
@@ -316,14 +280,16 @@ class FaissModule(Protocol):
         """Provide FAISS-compatible alias for ``normalize_L2``."""
         ...
 
-    def index_cpu_to_gpu(
-        self,
-        resources: FaissStandardGpuResources,
-        device: int,
-        index: FaissIndex,
-        options: FaissGpuClonerOptions | None = None,
-    ) -> FaissIndex:
-        """Clone CPU index to GPU."""
+    def index_factory(self, dimension: int, factory: str, metric: int) -> FaissIndex:
+        """Build an index via factory string."""
+        ...
+
+    def write_index(self, index: FaissIndex, path: str | PathLike[str]) -> None:
+        """Persist an index to disk."""
+        ...
+
+    def read_index(self, path: str | PathLike[str]) -> FaissIndex:
+        """Load an index from disk."""
         ...
 
 

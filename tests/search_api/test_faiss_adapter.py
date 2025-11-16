@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from search_api.types import wrap_faiss_module
+from tests._helpers import assertions
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -345,29 +346,35 @@ def test_wrap_faiss_module_adapts_legacy_surface(dimension: int, tmp_path: Path)
 
     # Adapter exposes the modern PEP-8 surface while dispatching to legacy functions.
     index = adapted.index_flat_ip(dimension)
-    assert isinstance(index, _FakeIndex)
-    assert legacy.index_flat_ip_dimension == dimension
+    assertions.expect_true(isinstance(index, _FakeIndex), reason="index should be _FakeIndex")
+    assertions.expect_equal(legacy.index_flat_ip_dimension, dimension)
 
     mapped_index = adapted.index_id_map2(index)
-    assert isinstance(mapped_index, _FakeIndex)
-    assert legacy.index_id_map2_index is index
+    assertions.expect_true(
+        isinstance(mapped_index, _FakeIndex), reason="mapped_index should be _FakeIndex"
+    )
+    assertions.expect_true(legacy.index_id_map2_index is index, reason="should be same object")
 
     vectors = np.ones((2, dimension), dtype=np.float32)
     adapted.normalize_l2(vectors)
-    assert legacy.normalize_vectors is not None
-    assert legacy.normalize_vectors.shape == vectors.shape
+    assertions.expect_true(legacy.normalize_vectors is not None, reason="should be same object")
+    assertions.expect_equal(legacy.normalize_vectors.shape, vectors.shape)
 
     factory_index = adapted.index_factory(dimension, "Flat", adapted.metric_l2)
-    assert isinstance(factory_index, _FakeIndex)
-    assert legacy.index_factory_calls[-1] == (dimension, "Flat", adapted.metric_l2)
+    assertions.expect_true(
+        isinstance(factory_index, _FakeIndex), reason="factory_index should be _FakeIndex"
+    )
+    assertions.expect_equal(legacy.index_factory_calls[-1], (dimension, "Flat", adapted.metric_l2))
 
     index_path = tmp_path / "index.faiss"
     adapted.write_index(factory_index, str(index_path))
-    assert legacy.write_calls[-1] == (factory_index, str(index_path))
+    assertions.expect_equal(legacy.write_calls[-1], (factory_index, str(index_path)))
 
     read_index = adapted.read_index(str(index_path))
-    assert isinstance(read_index, _FakeIndex)
-    assert legacy.read_path == str(index_path)
+    assertions.expect_true(
+        isinstance(read_index, _FakeIndex), reason="read_index should be _FakeIndex"
+    )
+    assertions.expect_equal(legacy.read_path, str(index_path))
 
 
 def test_wrap_faiss_module_returns_pep8_module_directly() -> None:
@@ -376,9 +383,11 @@ def test_wrap_faiss_module_returns_pep8_module_directly() -> None:
     wrapped = wrap_faiss_module(modern)
 
     # The helper should return the module unchanged when it already satisfies the protocol.
-    assert isinstance(wrapped, _ModernFaissModule)
-    assert wrapped is modern
+    assertions.expect_true(
+        isinstance(wrapped, _ModernFaissModule), reason="wrapped should be _ModernFaissModule"
+    )
+    assertions.expect_true(wrapped is modern, reason="should be same object")
 
     result = wrapped.index_flat_ip(10)
-    assert isinstance(result, _FakeIndex)
-    assert modern.records[0] == ("flat", 10)
+    assertions.expect_true(isinstance(result, _FakeIndex), reason="result should be _FakeIndex")
+    assertions.expect_equal(modern.records[0], ("flat", 10))

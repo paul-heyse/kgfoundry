@@ -233,7 +233,7 @@ class Capabilities:
             except RuntimeLifecycleError:
                 active_version = None
 
-        snapshot = cls(
+        return cls(
             faiss_index=_path_exists(getattr(paths, "faiss_index", None)) and bool(faiss_module),
             duckdb=_path_exists(getattr(paths, "duckdb_path", None)),
             scip_index=_path_exists(getattr(paths, "scip_index", None)),
@@ -250,4 +250,3 @@ class Capabilities:
             active_index_version=active_version,
             versions_available=version_count,
         )
-        return snapshot

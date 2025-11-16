@@ -14,6 +14,8 @@ from src.download import cli_context as download_context
 from src.orchestration import cli_context as orchestration_context
 from tools import CLIToolingContext, CLIToolSettings, OperationOverrideModel
 
+from tests._helpers import assertions
+
 try:
     codeintel_module = importlib.import_module("codeintel.cli_context")
 except ImportError:
@@ -22,7 +24,7 @@ else:
     codeintel_context = cast("Any", codeintel_module)
 
 
-def _assert_settings(module, settings: CLIToolSettings) -> None:
+def _assert_settings(module: object, settings: CLIToolSettings) -> None:
     """Assert that settings match the module's CLI configuration.
 
     Parameters
@@ -32,9 +34,11 @@ def _assert_settings(module, settings: CLIToolSettings) -> None:
     settings : CLIToolSettings
         Settings object to validate.
     """
-    assert isinstance(settings, CLIToolSettings)
-    assert settings.interface_id == module.CLI_INTERFACE_ID
-    assert settings.title == module.CLI_TITLE
+    assertions.expect_true(
+        isinstance(settings, CLIToolSettings), reason="settings should be CLIToolSettings"
+    )
+    assertions.expect_equal(settings.interface_id, module.CLI_INTERFACE_ID)
+    assertions.expect_equal(settings.title, module.CLI_TITLE)
 
 
 def _assert_context(context: CLIToolingContext) -> None:
@@ -45,9 +49,11 @@ def _assert_context(context: CLIToolingContext) -> None:
     context : CLIToolingContext
         Context object to validate.
     """
-    assert isinstance(context, CLIToolingContext)
-    assert hasattr(context, "augment")
-    assert hasattr(context, "registry")
+    assertions.expect_true(
+        isinstance(context, CLIToolingContext), reason="context should be CLIToolingContext"
+    )
+    assertions.expect_true(hasattr(context, "augment"), reason="context should have augment")
+    assertions.expect_true(hasattr(context, "registry"), reason="context should have registry")
 
 
 def test_download_cli_context_helpers() -> None:
@@ -58,8 +64,11 @@ def test_download_cli_context_helpers() -> None:
     context = download_context.get_cli_context()
     _assert_context(context)
 
-    assert download_context.get_cli_config().operation_context is not None
-    assert download_context.get_operation_override("missing") is None
+    assertions.expect_true(
+        download_context.get_cli_config().operation_context is not None,
+        reason="operation_context should not be None",
+    )
+    assertions.expect_equal(download_context.get_operation_override("missing"), None)
 
 
 def test_orchestration_cli_context_helpers() -> None:
@@ -71,7 +80,10 @@ def test_orchestration_cli_context_helpers() -> None:
     _assert_context(context)
 
     override = orchestration_context.get_operation_override("index-bm25")
-    assert override is None or isinstance(override, OperationOverrideModel)
+    assertions.expect_true(
+        override is None or isinstance(override, OperationOverrideModel),
+        reason="override should be None or OperationOverrideModel",
+    )
 
 
 def test_codeintel_cli_context_helpers() -> None:
@@ -85,4 +97,7 @@ def test_codeintel_cli_context_helpers() -> None:
     _assert_context(context)
 
     override = codeintel_context.get_operation_override("symbols")
-    assert override is None or isinstance(override, OperationOverrideModel)
+    assertions.expect_true(
+        override is None or isinstance(override, OperationOverrideModel),
+        reason="override should be None or OperationOverrideModel",
+    )

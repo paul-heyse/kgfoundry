@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, cast
 from typer.testing import CliRunner
 
 from orchestration.cli import app
+from tests._helpers import assertions
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -79,7 +80,7 @@ def _parse_problem(stderr: str) -> dict[str, object]:
         raise AssertionError(msg)
 
     problem_raw: object = json.loads(json_line)
-    assert isinstance(problem_raw, dict)
+    assertions.expect_true(isinstance(problem_raw, dict), reason="problem_raw should be dict")
     return cast("dict[str, object]", problem_raw)
 
 
@@ -107,19 +108,21 @@ def test_index_faiss_cli_success(
             mix_stderr=False,
         )
 
-    assert result.exit_code == 0, result.output
-    assert "FAISS index vectors stored" in result.stdout
-    assert index_path.exists(), "Expected index artifact to be created"
+    assertions.expect_equal(result.exit_code, 0, reason=result.output)
+    assertions.expect_in("FAISS index vectors stored", result.stdout)
+    assertions.expect_true(index_path.exists(), reason="Expected index artifact to be created")
 
     build_records = _filter_index_records(caplog.records, message="Building FAISS index")
-    assert build_records, "Expected structured build log with operation metadata"
+    assertions.expect_true(
+        bool(build_records), reason="Expected structured build log with operation metadata"
+    )
     build_record = build_records[-1]
     vectors = cast("int | None", getattr(build_record, "vectors", None))
     dimension = cast("int | None", getattr(build_record, "dimension", None))
     correlation_id = cast("str | None", getattr(build_record, "correlation_id", None))
-    assert vectors == 2
-    assert dimension == 3
-    assert correlation_id
+    assertions.expect_equal(vectors, 2)
+    assertions.expect_equal(dimension, 3)
+    assertions.expect_true(bool(correlation_id), reason="correlation_id should be set")
 
 
 def test_index_faiss_cli_problem_details(
@@ -149,17 +152,21 @@ def test_index_faiss_cli_problem_details(
             mix_stderr=False,
         )
 
-    assert result.exit_code == 1
-    assert not index_path.exists()
+    assertions.expect_equal(result.exit_code, 1)
+    assertions.expect_false(index_path.exists(), reason="index should not exist on error")
 
     stderr_text = result.stderr if result.stderr_bytes is not None else result.output
     problem = _parse_problem(stderr_text)
-    assert problem.get("type") == "https://kgfoundry.dev/problems/vector-ingestion/invalid-payload"
-    assert problem.get("status") == 422
+    assertions.expect_equal(
+        problem.get("type"), "https://kgfoundry.dev/problems/vector-ingestion/invalid-payload"
+    )
+    assertions.expect_equal(problem.get("status"), 422)
     validation_errors = cast("list[str]", problem.get("errors", []))
-    assert validation_errors, "Expected validation error details"
+    assertions.expect_true(bool(validation_errors), reason="Expected validation error details")
 
     failure_records = _filter_index_records(caplog.records, level="ERROR")
-    assert failure_records, "Expected error log with correlation metadata"
+    assertions.expect_true(
+        bool(failure_records), reason="Expected error log with correlation metadata"
+    )
     failure_correlation = cast("str | None", getattr(failure_records[-1], "correlation_id", None))
-    assert failure_correlation == "12345678123456781234567812345678"
+    assertions.expect_equal(failure_correlation, "12345678123456781234567812345678")

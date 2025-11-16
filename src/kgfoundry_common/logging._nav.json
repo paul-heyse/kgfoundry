@@ -106,6 +106,6 @@
       "stability": "stable"
     }
   },
-  "synopsis": "Structured logging helpers with correlation IDs and observability",
+  "synopsis": "Structured logging helpers (doc/CST only; runtime no longer imports these APIs)",
   "title": "kgfoundry_common.logging"
 }

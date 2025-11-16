@@ -1,18 +1,31 @@
+"""Tests for capabilities endpoint and snapshot generation."""
+
 from __future__ import annotations
 
+from http import HTTPStatus
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
 from codeintel_rev.app import capabilities as capabilities_module
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.main import capz as capz_route
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from tests._helpers import assertions
 from tests.app._context_factory import build_application_context
 
 
-def _mock_module(**attrs: object) -> Any:
+def _mock_module(**attrs: object) -> Any:  # noqa: ANN401
+    """Create a mock module namespace with the given attributes.
+
+    Returns
+    -------
+    Any
+        SimpleNamespace instance with the provided attributes.
+    """
     namespace = SimpleNamespace()
     for key, value in attrs.items():
         setattr(namespace, key, value)
@@ -23,7 +36,10 @@ def _noop(*_: object, **__: object) -> None:
     """Provide a no-op callable for lazy import stubs."""
 
 
-def test_capabilities_snapshot_reports_paths(tmp_path, monkeypatch) -> None:
+def test_capabilities_snapshot_reports_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Verify capabilities snapshot reports all expected paths and flags."""
     ctx = build_application_context(tmp_path)
     fake_modules = {
         "faiss": _mock_module(normalize_L2=_noop),
@@ -32,25 +48,33 @@ def test_capabilities_snapshot_reports_paths(tmp_path, monkeypatch) -> None:
         "torch": object(),
     }
 
-    def fake_import_optional(name: str) -> Any:
+    def fake_import_optional(name: str) -> Any:  # noqa: ANN401
+        """Mock import_optional to return fake modules.
+
+        Returns
+        -------
+        Any
+            Mock module object or None if not found.
+        """
         return fake_modules.get(name)
 
     monkeypatch.setattr(capabilities_module, "_import_optional", fake_import_optional)
 
     snapshot = Capabilities.from_context(ctx)
-    assert snapshot.faiss_index
-    assert snapshot.duckdb
-    assert snapshot.scip_index
-    assert snapshot.vllm_client
-    assert snapshot.faiss_importable is True
-    assert snapshot.httpx_importable is False
+    assertions.expect_true(snapshot.faiss_index, reason="faiss_index should be True")
+    assertions.expect_true(snapshot.duckdb, reason="duckdb should be True")
+    assertions.expect_true(snapshot.scip_index, reason="scip_index should be True")
+    assertions.expect_true(snapshot.vllm_client, reason="vllm_client should be True")
+    assertions.expect_equal(snapshot.faiss_importable, True)  # noqa: FBT003
+    assertions.expect_equal(snapshot.httpx_importable, False)  # noqa: FBT003
     payload = snapshot.model_dump()
-    assert payload["duckdb_catalog_present"] is True
-    assert payload["active_index_version"] is None
-    assert payload["versions_available"] == 0
+    assertions.expect_equal(payload["duckdb_catalog_present"], True)  # noqa: FBT003
+    assertions.expect_equal(payload["active_index_version"], None)
+    assertions.expect_equal(payload["versions_available"], 0)
 
 
-def test_capz_endpoint_refresh(tmp_path, monkeypatch) -> None:
+def test_capz_endpoint_refresh(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify capz endpoint refreshes capabilities when requested."""
     ctx = build_application_context(tmp_path)
     initial = Capabilities(faiss_index=True, duckdb=True, scip_index=True, vllm_client=True)
     refreshed = Capabilities(
@@ -83,17 +107,17 @@ def test_capz_endpoint_refresh(tmp_path, monkeypatch) -> None:
 
     with TestClient(app) as client:
         resp = client.get("/capz")
-        assert resp.status_code == 200
+        assertions.expect_equal(resp.status_code, HTTPStatus.OK)
         body = resp.json()
-        assert body["faiss_index_present"] is True
-        assert "active_index_version" in body
-        assert "stamp" in body
+        assertions.expect_equal(body["faiss_index_present"], True)  # noqa: FBT003
+        assertions.expect_in("active_index_version", body)
+        assertions.expect_in("stamp", body)
 
         refreshed_resp = client.get("/capz", params={"refresh": "true"})
-        assert refreshed_resp.status_code == 200
+        assertions.expect_equal(refreshed_resp.status_code, HTTPStatus.OK)
         body = refreshed_resp.json()
-        assert body["faiss_index_present"] is False
-        assert body["active_index_version"] == "v2"
-        assert body["versions_available"] == 2
-        assert body["hints"]["faiss"] == "faiss-cpu"
-        assert body["hints"]["duckdb"] == "duckdb"
+        assertions.expect_equal(body["faiss_index_present"], False)  # noqa: FBT003
+        assertions.expect_equal(body["active_index_version"], "v2")
+        assertions.expect_equal(body["versions_available"], 2)
+        assertions.expect_equal(body["hints"]["faiss"], "faiss-cpu")
+        assertions.expect_equal(body["hints"]["duckdb"], "duckdb")

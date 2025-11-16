@@ -482,7 +482,7 @@ def _annotation_to_str(node: ast.AST | None) -> str:
         return ""
     try:
         return ast.unparse(node)
-    except Exception:
+    except (AttributeError, ValueError, TypeError, RecursionError):
         return ""
 
 

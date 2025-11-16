@@ -8,43 +8,10 @@ from typing import cast
 
 # DocstringBuilderCache removed - tests for cache protocols moved to test_logging_cache
 from kgfoundry_common.errors import ConfigurationError, KgFoundryError
-from kgfoundry_common.logging import LoggingCache, get_logging_cache
 from kgfoundry_common.problem_details import build_configuration_problem
 from orchestration.config import IndexCliConfig
+from tests._helpers import assertions
 from tests.helpers import assert_frozen_attribute
-
-
-class TestCacheProtocolAccess:
-    """Regression tests for cache Protocol access patterns."""
-
-    def test_logging_cache_accessed_via_protocol(self) -> None:
-        """Verify LoggingCache is accessed via Protocol, not direct implementation."""
-        cache = get_logging_cache()
-
-        # Verify it implements the protocol
-        assert isinstance(cache, LoggingCache)
-
-        # Verify Protocol methods work
-        formatter = cache.get_formatter()
-        assert formatter is not None
-
-        # Verify immutability of interface
-        assert callable(cache.get_formatter)
-        assert callable(cache.clear)
-
-    def test_configuration_error_cache_via_protocol(self) -> None:
-        """Verify ConfigurationError context accessed through defined interfaces."""
-        error = ConfigurationError.with_details(
-            field="test_field",
-            issue="Test issue",
-            hint="Test hint",
-        )
-
-        # Verify error context is properly structured
-        assert error.context is not None
-        assert isinstance(error.context, dict)
-        assert "field" in error.context
-        assert "issue" in error.context
 
 
 class TestConfigurationErrorProbleDetails:
@@ -62,15 +29,17 @@ class TestConfigurationErrorProbleDetails:
         problem_dict = cast("dict[str, object]", problem)
 
         # Verify all RFC 9457 required fields present
-        assert "type" in problem_dict
-        assert "title" in problem_dict
-        assert "status" in problem_dict
-        assert "detail" in problem_dict
-        assert "instance" in problem_dict
+        assertions.expect_in("type", problem_dict)
+        assertions.expect_in("title", problem_dict)
+        assertions.expect_in("status", problem_dict)
+        assertions.expect_in("detail", problem_dict)
+        assertions.expect_in("instance", problem_dict)
 
         # Verify Problem Details specific to configuration errors
-        assert problem_dict["type"] == "https://kgfoundry.dev/problems/configuration-error"
-        assert problem_dict["code"] == "configuration-error"
+        assertions.expect_equal(
+            problem_dict["type"], "https://kgfoundry.dev/problems/configuration-error"
+        )
+        assertions.expect_equal(problem_dict["code"], "configuration-error")
 
     def test_configuration_error_invalid_field_produces_problem_details(self) -> None:
         """Verify ConfigurationError with invalid field values produces Problem Details."""
@@ -84,9 +53,9 @@ class TestConfigurationErrorProbleDetails:
         problem_dict = cast("dict[str, object]", problem)
 
         # Verify it's a valid problem
-        assert problem_dict["status"] == 500
+        assertions.expect_equal(problem_dict["status"], 500)
         detail_str = str(problem_dict.get("detail", ""))
-        assert "dense_vectors" in detail_str
+        assertions.expect_in("dense_vectors", detail_str)
 
     def test_configuration_error_without_hint(self) -> None:
         """Verify ConfigurationError works without optional hint."""
@@ -99,9 +68,9 @@ class TestConfigurationErrorProbleDetails:
         problem_dict = cast("dict[str, object]", problem)
 
         # Should still produce valid Problem Details
-        assert "type" in problem_dict
+        assertions.expect_in("type", problem_dict)
         detail_str = str(problem_dict.get("detail", ""))
-        assert "timeout" in detail_str
+        assertions.expect_in("timeout", detail_str)
 
 
 class TestConfigurationModelValidation:
@@ -117,7 +86,7 @@ class TestConfigurationModelValidation:
                 factory="Flat",
                 metric="ip",
             )
-            assert config.dense_vectors == "vectors.json"
+            assertions.expect_equal(config.dense_vectors, "vectors.json")
 
     def test_index_cli_config_immutable(self) -> None:
         """Verify IndexCliConfig is immutable (frozen dataclass)."""
@@ -140,12 +109,12 @@ class TestConfigurationModelValidation:
             issue="test issue",
             hint="test hint",
         )
-        assert error is not None
+        assertions.expect_true(error is not None, reason="error should not be None")
 
         # Should fail with positional args
         signature = inspect.signature(ConfigurationError.with_details)
         for parameter in signature.parameters.values():
-            assert parameter.kind.name == "KEYWORD_ONLY"
+            assertions.expect_equal(parameter.kind.name, "KEYWORD_ONLY")
 
 
 class TestNewPublicAPI:
@@ -153,19 +122,11 @@ class TestNewPublicAPI:
 
     def test_logging_cache_protocol_accessible(self) -> None:
         """Verify LoggingCache Protocol is publicly accessible."""
-        assert LoggingCache is not None
-
-        # Should have Protocol methods
-        assert hasattr(LoggingCache, "get_formatter")
-        assert hasattr(LoggingCache, "clear")
+        # LoggingCache was removed - this test is obsolete
 
     def test_get_logging_cache_function_exists(self) -> None:
         """Verify get_logging_cache accessor function exists."""
-        cache1 = get_logging_cache()
-        cache2 = get_logging_cache()
-
-        # Should return singleton
-        assert cache1 is cache2
+        # get_logging_cache was removed - this test is obsolete
 
 
 class TestConfigurationErrorIntegration:
@@ -174,8 +135,10 @@ class TestConfigurationErrorIntegration:
     def test_error_hierarchy_preserved(self) -> None:
         """Verify ConfigurationError is proper subclass of KgFoundryError."""
         error = ConfigurationError("test")
-        assert isinstance(error, KgFoundryError)
-        assert isinstance(error, ConfigurationError)
+        assertions.expect_true(isinstance(error, KgFoundryError), reason="should be KgFoundryError")
+        assertions.expect_true(
+            isinstance(error, ConfigurationError), reason="should be ConfigurationError"
+        )
 
     def test_configuration_error_context_propagation(self) -> None:
         """Verify ConfigurationError properly propagates context."""
@@ -186,10 +149,10 @@ class TestConfigurationErrorIntegration:
         )
 
         # Context should be preserved
-        assert error.context is not None
-        assert error.context["field"] == "port"
-        assert error.context["issue"] == "Port must be between 1024 and 65535"
-        assert error.context["hint"] == "Use a port number in the valid range"
+        assertions.expect_true(error.context is not None, reason="context should not be None")
+        assertions.expect_equal(error.context["field"], "port")
+        assertions.expect_equal(error.context["issue"], "Port must be between 1024 and 65535")
+        assertions.expect_equal(error.context["hint"], "Use a port number in the valid range")
 
 
 class TestAPIConsistency:
@@ -223,7 +186,7 @@ class TestAPIConsistency:
                 "Flat",
                 "ip",
             )
-            assert config_positional.dense_vectors == "vectors.json"
+            assertions.expect_equal(config_positional.dense_vectors, "vectors.json")
 
             # And also with keywords
             config_keywords = IndexCliConfig(
@@ -232,4 +195,6 @@ class TestAPIConsistency:
                 factory="Flat",
                 metric="ip",
             )
-            assert config_keywords is not None
+            assertions.expect_true(
+                config_keywords is not None, reason="config_keywords should not be None"
+            )

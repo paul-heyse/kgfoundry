@@ -22,15 +22,12 @@ from codeintel_rev.retrieval.gating import (
 )
 from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
 from codeintel_rev.retrieval.types import HybridResultDoc, HybridSearchResult, SearchHit
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     from codeintel_rev.app.capabilities import Capabilities
     from codeintel_rev.app.config_context import ResolvedPaths
     from codeintel_rev.config.settings import Settings, SpladeConfig
     from codeintel_rev.io.duckdb_manager import DuckDBManager
-
-LOGGER = get_logger(__name__)
 
 
 class _LuceneHit(Protocol):

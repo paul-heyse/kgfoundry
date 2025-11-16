@@ -1,3 +1,5 @@
+"""Tests for CLI context registry and context loading."""
+
 from __future__ import annotations
 
 import sys
@@ -17,6 +19,8 @@ from tools.cli_context_registry import (
     register_cli,
     settings_for,
 )
+
+from tests._helpers import assertions
 
 
 def _unique_key(prefix: str = "test-cli") -> str:
@@ -55,6 +59,7 @@ def _register_test_cli(
 
 
 def test_settings_for_returns_expected_fields() -> None:
+    """Verify settings_for returns expected configuration fields."""
     command = _unique_key()
     key = _register_test_cli(
         command=command,
@@ -64,15 +69,16 @@ def test_settings_for_returns_expected_fields() -> None:
 
     settings = settings_for(key)
 
-    assert settings.bin_name == command
-    assert settings.title == "Test CLI"
-    assert settings.interface_id == "download-cli"
+    assertions.expect_equal(settings.bin_name, command)
+    assertions.expect_equal(settings.title, "Test CLI")
+    assertions.expect_equal(settings.interface_id, "download-cli")
     augment_path, registry_path = _default_paths()
-    assert settings.augment_path == augment_path
-    assert settings.registry_path == registry_path
+    assertions.expect_equal(settings.augment_path, augment_path)
+    assertions.expect_equal(settings.registry_path, registry_path)
 
 
 def test_context_for_is_cached() -> None:
+    """Verify context_for caches contexts to avoid repeated loading."""
     command = _unique_key("cached-cli")
     key = _register_test_cli(command=command)
 
@@ -90,12 +96,13 @@ def test_context_for_is_cached() -> None:
     ctx_one = context_for(key)
     ctx_two = context_for(key)
 
-    assert ctx_one is ctx_two
-    assert call_count["value"] == 1
+    assertions.expect_true(ctx_one is ctx_two, reason="context should be cached")
+    assertions.expect_equal(call_count["value"], 1)
     monkeypatch.undo()
 
 
 def test_duplicate_registration_raises() -> None:
+    """Verify duplicate CLI registration raises ValueError."""
     command = _unique_key("duplicate-cli")
     key = _register_test_cli(command=command)
     conflicting = CLIContextDefinition(
@@ -111,21 +118,24 @@ def test_duplicate_registration_raises() -> None:
 
 
 def test_unknown_key_raises_key_error() -> None:
+    """Verify unknown CLI key raises KeyError."""
     with pytest.raises(KeyError):
         settings_for("unknown-cli")
 
 
 def test_version_resolver_fallback() -> None:
+    """Verify version resolver falls back to available packages."""
     command = _unique_key("version-cli")
     # First package missing, second (kgfoundry) present.
     key = _register_test_cli(command=command, packages=("nonexistent-package", "kgfoundry"))
 
     settings = settings_for(key)
 
-    assert settings.version != "0.0.0"
+    assertions.expect_true(settings.version != "0.0.0", reason="version should be resolved")
 
 
 def test_operation_override_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify operation override dispatch calls augment correctly."""
     command = _unique_key("override-cli")
     key = _register_test_cli(command=command, operation_ids={"run": "override.run"})
 
@@ -152,7 +162,7 @@ def test_operation_override_dispatch(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(registry_module.REGISTRY, "augment_for", fake_augment_for)
 
     result = registry_module.operation_override_for(key, subcommand="run")
-    assert result == "override-result"
-    assert dummy.calls == [("override.run", None)]
+    assertions.expect_equal(result, "override-result")
+    assertions.expect_sequence_equal(dummy.calls, [("override.run", None)])
 
-    assert registry_module.operation_override_for(key, subcommand="missing") is None
+    assertions.expect_equal(registry_module.operation_override_for(key, subcommand="missing"), None)

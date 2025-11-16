@@ -15,6 +15,8 @@ from codeintel_rev.runtime import (
     RuntimeCellObserver,
 )
 
+from tests._helpers import assertions
+
 
 class RecordingObserver(RuntimeCellObserver):
     """Thread-safe observer that records cell events for assertions."""
@@ -32,6 +34,7 @@ class RecordingObserver(RuntimeCellObserver):
         generation: int,
         context: RuntimeCellInitContext | None = None,
     ) -> None:
+        """Record init start event."""
         _ = (generation, context)
         with self._lock:
             self.init_started.append(cell)
@@ -89,11 +92,11 @@ def test_runtime_cell_initializes_once_under_high_concurrency() -> None:
     for thread in threads:
         thread.join()
 
-    assert len({id(item) for item in results}) == 1
-    assert factory_calls == 1
-    assert len(observer.init_started) == 1
-    assert observer.init_events[-1]["status"] == "ok"
-    assert observer.init_events[-1]["generation"] == 1
+    assertions.expect_equal(len({id(item) for item in results}), 1)
+    assertions.expect_equal(factory_calls, 1)
+    assertions.expect_equal(len(observer.init_started), 1)
+    assertions.expect_equal(observer.init_events[-1]["status"], "ok")
+    assertions.expect_equal(observer.init_events[-1]["generation"], 1)
 
 
 def test_runtime_cell_init_failure_is_reported_and_retriable() -> None:
@@ -113,12 +116,12 @@ def test_runtime_cell_init_failure_is_reported_and_retriable() -> None:
         cell.get_or_initialize(factory)
 
     value = cell.get_or_initialize(factory)
-    assert value == 7
-    assert calls == ["fail", "success"]
-    assert observer.init_events[0]["status"] == "error"
-    assert observer.init_events[-1]["status"] == "ok"
-    assert observer.init_events[0]["generation"] == 1
-    assert observer.init_events[-1]["generation"] == 2
+    assertions.expect_equal(value, 7)
+    assertions.expect_equal(calls, ["fail", "success"])
+    assertions.expect_equal(observer.init_events[0]["status"], "error")
+    assertions.expect_equal(observer.init_events[-1]["status"], "ok")
+    assertions.expect_equal(observer.init_events[0]["generation"], 1)
+    assertions.expect_equal(observer.init_events[-1]["generation"], 2)
 
 
 def test_runtime_cell_can_reinitialize_after_close() -> None:
@@ -127,8 +130,8 @@ def test_runtime_cell_can_reinitialize_after_close() -> None:
     first = cell.get_or_initialize(list)
     cell.close()
     second = cell.get_or_initialize(list)
-    assert first is not second
-    assert observer.close_events[-1]["status"] == "ok"
+    assertions.expect_true(first is not second, reason="should be same object")
+    assertions.expect_equal(observer.close_events[-1]["status"], "ok")
 
 
 def test_runtime_cell_invalidate_triggers_new_generation() -> None:
@@ -137,8 +140,8 @@ def test_runtime_cell_invalidate_triggers_new_generation() -> None:
     first = cell.get_or_initialize(list)
     cell.invalidate()
     second = cell.get_or_initialize(list)
-    assert first is not second
-    assert observer.init_events[-1]["generation"] == 2
+    assertions.expect_true(first is not second, reason="should be same object")
+    assertions.expect_equal(observer.init_events[-1]["generation"], 2)
 
 
 def test_runtime_cell_record_failure_short_circuits_and_recovers() -> None:
@@ -153,11 +156,11 @@ def test_runtime_cell_record_failure_short_circuits_and_recovers() -> None:
     cell.record_failure(failure, ttl_seconds=0.05)
     with pytest.raises(RuntimeUnavailableError):
         cell.get_or_initialize(factory)
-    assert calls["count"] == 0
+    assertions.expect_equal(calls["count"], 0)
     time.sleep(0.06)
     result = cell.get_or_initialize(factory)
-    assert result == 7
-    assert calls["count"] == 1
+    assertions.expect_equal(result, 7)
+    assertions.expect_equal(calls["count"], 1)
 
 
 def test_runtime_cell_seed_constraints(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -166,9 +169,9 @@ def test_runtime_cell_seed_constraints(monkeypatch: pytest.MonkeyPatch) -> None:
     cell.seed(1)
     with pytest.raises(RuntimeError):
         cell.seed(2)
-    assert cell.get_or_initialize(lambda: 3) == 1
+    assertions.expect_equal(cell.get_or_initialize(lambda: 3), 1)
     cell.close()
-    assert cell.get_or_initialize(lambda: 5) == 5
+    assertions.expect_equal(cell.get_or_initialize(lambda: 5), 5)
     with pytest.raises(RuntimeError):
         cell.seed(4)
 
@@ -196,10 +199,12 @@ def test_runtime_cell_close_invokes_close_and_observer(monkeypatch: pytest.Monke
     cell: RuntimeCell[DummyRuntime] = RuntimeCell(name="dummy", observer=observer)
     cell.seed(runtime)
     cell.close()
-    assert runtime.closed is True
+    assertions.expect_true(runtime.closed, reason="runtime should be closed")
     close_event = observer.close_events[-1]
-    assert close_event["status"] == "ok"
-    assert close_event["close_called"] is True
+    assertions.expect_equal(close_event["status"], "ok")
+    assertions.expect_true(
+        cast("bool", close_event["close_called"]), reason="close_called should be True"
+    )
 
 
 def test_runtime_cell_close_handles_payload_without_close_method() -> None:
@@ -210,11 +215,13 @@ def test_runtime_cell_close_handles_payload_without_close_method() -> None:
 
     cell: RuntimeCell[NoCloser] = RuntimeCell(observer=observer)
     instance = cell.get_or_initialize(NoCloser)
-    assert instance is cell.peek()
+    assertions.expect_true(instance is cell.peek(), reason="should be same object")
     cell.close()
     close_event = observer.close_events[-1]
-    assert close_event["close_called"] is False
-    assert close_event["status"] == "ok"
+    assertions.expect_false(
+        cast("bool", close_event["close_called"]), reason="close_called should be False"
+    )
+    assertions.expect_equal(close_event["status"], "ok")
 
 
 def test_runtime_cell_close_exception_paths(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -234,7 +241,7 @@ def test_runtime_cell_close_exception_paths(monkeypatch: pytest.MonkeyPatch) -> 
     payload = ExplodingRuntime()
     cell.seed(payload)
     cell.close(silent=True)
-    assert observer.close_events[-1]["status"] == "error"
+    assertions.expect_equal(observer.close_events[-1]["status"], "error")
 
     cell.seed(ExplodingRuntime())
     with pytest.raises(RuntimeError):
@@ -251,5 +258,7 @@ def test_runtime_cell_repr_masks_inner(monkeypatch: pytest.MonkeyPatch) -> None:
     cell: RuntimeCell[SecretRuntime] = RuntimeCell(name="secret")
     cell.seed(SecretRuntime())
     representation = repr(cell)
-    assert "SECRET_VALUE" not in representation
-    assert "secret" in representation
+    assertions.expect_false(
+        "SECRET_VALUE" in representation, reason="should not expose SECRET_VALUE"
+    )
+    assertions.expect_in("secret", representation)

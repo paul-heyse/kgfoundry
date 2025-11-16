@@ -98,10 +98,7 @@
       "spec": "docs/api/openapi.yaml",
       "description": "FastAPI application exposing search operations via the public HTTP API.",
       "tags": ["search", "http"],
-      "problem_details": [
-        "schema/examples/problem_details/search-missing-index.json",
-        "schema/examples/problem_details/search-gpu-unavailable.json"
-      ]
+      "problem_details": ["schema/examples/problem_details/search-missing-index.json"]
     }
   ]
 }

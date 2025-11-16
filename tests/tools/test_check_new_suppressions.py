@@ -14,6 +14,7 @@ from tools.check_new_suppressions import (
 )
 
 from kgfoundry_common.errors import ConfigurationError
+from tests._helpers import assertions
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -38,7 +39,7 @@ def test_run_suppression_guard_detects_missing_ticket(tmp_path: Path) -> None:
 
     context = excinfo.value.context
     expected_report = check_directory(tmp_path)
-    assert context == build_guard_context(expected_report)
+    assertions.expect_equal(context, build_guard_context(expected_report))
 
 
 def test_run_suppression_guard_allows_ticket_metadata(tmp_path: Path) -> None:
@@ -46,8 +47,8 @@ def test_run_suppression_guard_allows_ticket_metadata(tmp_path: Path) -> None:
     _write(tmp_path, "module.py", SUPPRESSION_WITH_TICKET)
 
     report = run_suppression_guard([tmp_path])
-    assert report.is_clean
-    assert report.violation_count == 0
+    assertions.expect_true(report.is_clean, reason="report should be clean")
+    assertions.expect_equal(report.violation_count, 0)
 
 
 @pytest.mark.parametrize("violation_count", [-1, 42])
@@ -81,4 +82,4 @@ def test_resolve_target_directories_accepts_existing_directory(tmp_path: Path) -
     """Valid directories should be resolved and returned."""
     resolved = resolve_target_directories([str(tmp_path)])
 
-    assert resolved == [tmp_path.resolve()]
+    assertions.expect_sequence_equal(resolved, [tmp_path.resolve()])

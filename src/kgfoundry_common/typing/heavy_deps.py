@@ -18,7 +18,7 @@ HEAVY_DEPS: dict[str, str | None] = {
 
 # Mapping from module roots to pip extras exposed by this project
 EXTRAS_HINT: dict[str, str] = {
-    "faiss": "faiss-cpu or faiss-gpu",
+    "faiss": "faiss-cpu",
     "duckdb": "duckdb",
     "torch": "xtr",
     "onnxruntime": "splade",

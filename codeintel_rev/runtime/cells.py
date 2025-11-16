@@ -316,10 +316,6 @@ class RuntimeCell[T]:
             Propagated when ``silent=False`` and file/resource cleanup fails.
         RuntimeError
             Propagated when ``silent=False`` and runtime state errors occur.
-        Exception
-            Any other exception raised by the payload's disposal is propagated when
-            ``silent=False``. When ``silent=True`` (default), all exceptions are caught
-            and logged.
 
         Notes
         -----

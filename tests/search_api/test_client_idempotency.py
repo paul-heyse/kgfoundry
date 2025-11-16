@@ -13,6 +13,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from tests._helpers import assertions
+
 if TYPE_CHECKING:
     from _pytest.logging import LogCaptureFixture
 
@@ -146,8 +148,8 @@ class TestHttpGetIdempotency:
             result2 = client.get()
             result3 = client.get()
 
-            assert result1 is result2 is result3
-            assert client.get_call_count == 3
+            assertions.expect_true(result1 is result2 is result3, reason="should be same object")
+            assertions.expect_equal(client.get_call_count, 3)
 
     def test_get_with_missing_resource_returns_404_problem_details(self) -> None:
         """Verify GET to missing resource returns RFC 9457 Problem Details."""
@@ -169,10 +171,10 @@ class TestHttpGetIdempotency:
 
         result = client.get()
         problem = result.json()
-        assert isinstance(problem, dict)
-        assert problem.get("type") == "https://kgfoundry.dev/problems/not-found"
-        assert problem.get("status") == 404
-        assert problem.get("correlation_id") == "req-xyz789"
+        assertions.expect_true(isinstance(problem, dict), reason="problem should be dict")
+        assertions.expect_equal(problem.get("type"), "https://kgfoundry.dev/problems/not-found")
+        assertions.expect_equal(problem.get("status"), 404)
+        assertions.expect_equal(problem.get("correlation_id"), "req-xyz789")
 
 
 class TestHttpPostIdempotency:
@@ -200,10 +202,10 @@ class TestHttpPostIdempotency:
             for _ in range(3):
                 result = client.post(json=body, headers={"Idempotency-Key": idempotency_key})
                 payload = result.json()
-                assert isinstance(payload, dict)
-                assert payload.get("id") == "created_001"
+                assertions.expect_true(isinstance(payload, dict), reason="payload should be dict")
+                assertions.expect_equal(payload.get("id"), "created_001")
 
-            assert client.post_call_count == 3
+            assertions.expect_equal(client.post_call_count, 3)
 
     def test_post_conflict_on_duplicate_returns_409_with_details(self) -> None:
         """Verify POST duplicate returns 409 Conflict with Problem Details."""
@@ -233,19 +235,19 @@ class TestHttpPostIdempotency:
         )
 
         result1 = client.post()
-        assert result1.status_code == 201
+        assertions.expect_equal(result1.status_code, 201)
 
         result2 = client.post()
-        assert result2.status_code == 409
+        assertions.expect_equal(result2.status_code, 409)
 
         conflict = result2.json()
-        assert isinstance(conflict, dict)
-        assert conflict.get("type") == "https://kgfoundry.dev/problems/conflict"
-        assert conflict.get("status") == 409
+        assertions.expect_true(isinstance(conflict, dict), reason="conflict should be dict")
+        assertions.expect_equal(conflict.get("type"), "https://kgfoundry.dev/problems/conflict")
+        assertions.expect_equal(conflict.get("status"), 409)
         detail_value = conflict.get("detail")
-        assert isinstance(detail_value, str)
-        assert "doc_001" in detail_value
-        assert client.post_call_count == 2
+        assertions.expect_true(isinstance(detail_value, str), reason="detail_value should be str")
+        assertions.expect_in("doc_001", detail_value)
+        assertions.expect_equal(client.post_call_count, 2)
 
 
 class TestTransientErrorRetries:
@@ -277,17 +279,18 @@ class TestTransientErrorRetries:
         )
 
         result1 = client.get()
-        assert result1.status_code == 500
+        assertions.expect_equal(result1.status_code, 500)
 
         result2 = client.get()
-        assert result2.status_code == 200
+        assertions.expect_equal(result2.status_code, 200)
 
         payload1 = result1.json()
         payload2 = result2.json()
-        assert isinstance(payload1, dict)
-        assert isinstance(payload2, dict)
-        assert payload1.get("correlation_id") == payload2.get("correlation_id") == "req-error-1"
-        assert caplog is not None
+        assertions.expect_true(isinstance(payload1, dict), reason="payload1 should be dict")
+        assertions.expect_true(isinstance(payload2, dict), reason="payload2 should be dict")
+        assertions.expect_equal(payload1.get("correlation_id"), "req-error-1")
+        assertions.expect_equal(payload2.get("correlation_id"), "req-error-1")
+        assertions.expect_true(caplog is not None, reason="should be same object")
 
     def test_status_codes_retry_policy(self) -> None:
         """Verify retry policy for various HTTP status codes."""
@@ -301,7 +304,7 @@ class TestTransientErrorRetries:
         ]
         for status_code, should_retry in cases:
             is_retryable = status_code >= 500 or status_code == 429
-            assert is_retryable == should_retry
+            assertions.expect_equal(is_retryable, should_retry)
 
 
 class TestCorrelationIdPropagation:
@@ -323,11 +326,16 @@ class TestCorrelationIdPropagation:
 
         result = client.get()
         response_data = result.json()
-        assert isinstance(response_data, dict)
+        assertions.expect_true(
+            isinstance(response_data, dict), reason="response_data should be dict"
+        )
         extensions = response_data.get("extensions")
         has_direct = "correlation_id" in response_data
         has_extension = isinstance(extensions, dict) and "correlation_id" in extensions
-        assert has_direct or has_extension
+        assertions.expect_true(
+            has_direct or has_extension,
+            reason="should have correlation_id in response_data or extensions",
+        )
 
     def test_correlation_id_consistency_across_retries(self) -> None:
         """Verify correlation ID remains consistent when request is retried."""
@@ -344,9 +352,10 @@ class TestCorrelationIdPropagation:
 
         payload1 = result1.json()
         payload2 = result2.json()
-        assert isinstance(payload1, dict)
-        assert isinstance(payload2, dict)
-        assert payload1.get("correlation_id") == payload2.get("correlation_id") == correlation_id
+        assertions.expect_true(isinstance(payload1, dict), reason="payload1 should be dict")
+        assertions.expect_true(isinstance(payload2, dict), reason="payload2 should be dict")
+        assertions.expect_equal(payload1.get("correlation_id"), correlation_id)
+        assertions.expect_equal(payload2.get("correlation_id"), correlation_id)
 
 
 __all__ = [

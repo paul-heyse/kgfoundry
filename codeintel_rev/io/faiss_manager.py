@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import math
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from numbers import Integral, Real
@@ -27,7 +28,6 @@ from codeintel_rev.retrieval.rerank_flat import FlatReranker
 from codeintel_rev.retrieval.types import SearchHit
 from codeintel_rev.typing import NDArrayF32, NDArrayI64, gate_import
 from kgfoundry_common.errors import VectorSearchError
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     import faiss as _faiss
@@ -45,8 +45,6 @@ except ModuleNotFoundError:  # pragma: no cover - optional runtime extra
     pa = None
     pq = None
 
-LOGGER = get_logger(__name__)
-logger = LOGGER  # Alias for compatibility
 _SEARCH_RESULT_DIM = 2
 
 
@@ -538,13 +536,10 @@ class _FAISSIdMapMixin:
         )
         out_path.parent.mkdir(parents=True, exist_ok=True)
         pq.write_table(table, out_path, compression="snappy", use_dictionary=True)
-        LOGGER.info(
-            "Exported FAISS ID map",
-            extra=_log_extra(path=str(out_path), rows=int(idmap.shape[0])),
-        )
         return int(idmap.shape[0])
 
-    def hydrate_by_ids(self, catalog: DuckDBCatalog, ids: Sequence[int]) -> list[dict]:
+    @staticmethod
+    def hydrate_by_ids(catalog: DuckDBCatalog, ids: Sequence[int]) -> list[dict]:
         """Hydrate chunk metadata for ``ids`` via the provided DuckDB catalog.
 
         This method queries the DuckDB catalog to retrieve full chunk metadata
@@ -580,11 +575,6 @@ class _FAISSIdMapMixin:
         """
         if not ids:
             return []
-        manager = cast("FAISSManager", self)
-        LOGGER.debug(
-            "Hydrating chunk metadata",
-            extra=_log_extra(count=len(ids), index=str(manager.index_path)),
-        )
         return catalog.query_by_ids(list(ids))
 
     def reconstruct_batch(self, ids: Sequence[int]) -> NDArrayF32:
@@ -723,10 +713,6 @@ class FAISSManager(
         self.hnsw_ef_construction = opts.hnsw_ef_construction
         self.hnsw_ef_search = opts.hnsw_ef_search
         self.refine_k_factor = opts.refine_k_factor
-        if opts.use_gpu:
-            LOGGER.debug("Ignoring deprecated use_gpu option; CPU-only mode active")
-        if use_cuvs:
-            LOGGER.debug("Ignoring deprecated use_cuvs option; CPU-only mode active")
         self.use_gpu = False
         self.gpu_clone_mode = opts.gpu_clone_mode
         self.autotune_on_start = opts.autotune_on_start
@@ -774,7 +760,6 @@ class FAISSManager(
         }
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(profile, indent=2, sort_keys=True), encoding="utf-8")
-        LOGGER.debug("Persisted FAISS profile snapshot", extra=_log_extra(path=str(path)))
 
     def build_index(self, vectors: NDArrayF32, *, family: str | None = None) -> None:
         """Build and train FAISS index with adaptive type selection.
@@ -821,14 +806,6 @@ class FAISSManager(
             cpu_index, factory_label = self._build_adaptive_index(vectors, n_vectors)
         else:
             factory = self._factory_string_for(resolved_family, n_vectors)
-            LOGGER.info(
-                "Building FAISS index via factory",
-                extra=_log_extra(
-                    n_vectors=n_vectors,
-                    factory=factory,
-                    family=resolved_family,
-                ),
-            )
             cpu_index = faiss.index_factory(
                 self.vec_dim,
                 factory,
@@ -837,17 +814,6 @@ class FAISSManager(
             if getattr(cpu_index, "is_trained", False) and not cpu_index.is_trained:
                 cpu_index.train(vectors)
             factory_label = factory
-
-        # Log memory estimate
-        mem_est = self.estimate_memory_usage(n_vectors)
-        LOGGER.info(
-            "Memory estimate for index",
-            extra=_log_extra(
-                n_vectors=n_vectors,
-                cpu_index_bytes=mem_est["cpu_index_bytes"],
-                total_bytes=mem_est["total_bytes"],
-            ),
-        )
 
         # Wrap in IDMap for ID management
         cpu_id_map = faiss.IndexIDMap2(cpu_index)
@@ -998,10 +964,6 @@ class FAISSManager(
         unique_indices = self._collect_unique_indices(new_ids, primary_contains)
 
         if not unique_indices:
-            LOGGER.info(
-                "All vectors already indexed in secondary index",
-                extra=_log_extra(total=len(new_ids)),
-            )
             return
 
         unique_vectors = new_vectors[unique_indices]
@@ -1051,10 +1013,6 @@ class FAISSManager(
         index = faiss.IndexIDMap2(flat_index)
         _configure_direct_map(index)
         self.secondary_index = index
-        LOGGER.info(
-            "Created secondary flat index for incremental updates",
-            extra=_log_extra(event="secondary_index_created"),
-        )
 
     def _build_primary_contains(self) -> Callable[[int], bool]:
         """Build a function to check if chunk IDs exist in the primary index.
@@ -1250,14 +1208,6 @@ class FAISSManager(
         level and includes all three metrics. Time complexity: O(1). The method
         performs no I/O operations beyond logging.
         """
-        LOGGER.info(
-            "Added vectors to secondary index",
-            extra=_log_extra(
-                added=added,
-                total_secondary_vectors=total_secondary_vectors,
-                skipped_duplicates=skipped_duplicates,
-            ),
-        )
 
     def save_cpu_index(self) -> None:
         """Save CPU index to disk for persistence.
@@ -1325,34 +1275,16 @@ class FAISSManager(
         self.cpu_index = cpu_index
         profile = self._load_tuned_profile()
         if profile:
-            try:
-                self._apply_profile_payload(profile, persist=False)
-            except VectorIndexIncompatibleError as exc:
-                LOGGER.warning(
-                    "Unable to apply tuning profile during load; continuing with defaults",
-                    extra=_log_extra(error=str(exc)),
-                )
+            self._apply_profile_payload(profile, persist=False)
         self._write_meta_snapshot(
             vector_count=cpu_index.ntotal,
             parameter_space=self._format_parameter_string(self._runtime_overrides),
         )
         if export_idmap is not None:
-            try:
-                self.export_idmap(export_idmap)
-            except RuntimeError as exc:
-                LOGGER.warning(
-                    "faiss.idmap.export_failed",
-                    extra=_log_extra(path=str(export_idmap), error=str(exc)),
-                )
+            self.export_idmap(export_idmap)
         profile_target = profile_path or self.autotune_profile_path
         if profile_target is not None:
-            try:
-                self._write_profile(profile_target)
-            except OSError as exc:
-                LOGGER.warning(
-                    "faiss.profile.persist_failed",
-                    extra=_log_extra(path=str(profile_target), error=str(exc)),
-                )
+            self._write_profile(profile_target)
 
     def save_secondary_index(self) -> None:
         """Save secondary index to disk.
@@ -1377,10 +1309,6 @@ class FAISSManager(
 
         self.secondary_index_path.parent.mkdir(parents=True, exist_ok=True)
         faiss.write_index(self.secondary_index, str(self.secondary_index_path))
-        LOGGER.info(
-            "Persisted secondary FAISS index",
-            extra=_log_extra(path=str(self.secondary_index_path)),
-        )
 
     def load_secondary_index(self) -> None:
         """Load secondary index from disk.
@@ -1417,14 +1345,6 @@ class FAISSManager(
             else:
                 self.incremental_ids = set(range(n_vectors))
 
-        LOGGER.info(
-            "Loaded secondary FAISS index",
-            extra=_log_extra(
-                path=str(self.secondary_index_path),
-                vectors=len(self.incremental_ids),
-            ),
-        )
-
     def clone_to_gpu(self, device: int = 0) -> bool:
         """Return False; GPU acceleration is deprecated and disabled.
 
@@ -1441,13 +1361,10 @@ class FAISSManager(
         bool
             Always ``False``. GPU acceleration is no longer available.
         """
+        del device
         self.gpu_disabled_reason = "GPU acceleration removed"
         self.gpu_resources = None
         self.gpu_index = None
-        LOGGER.info(
-            "Skipping GPU clone; CPU-only configuration in effect",
-            extra=_log_extra(device=device, reason=self.gpu_disabled_reason),
-        )
         return False
 
     def search(
@@ -1525,7 +1442,6 @@ class FAISSManager(
         plan = self._prepare_search_plan(query, k, nprobe, runtime)
 
         start = perf_counter()
-        ann_timer_start = start
         try:
             distances, identifiers = self._execute_dual_search(
                 query=plan.queries,
@@ -1542,15 +1458,6 @@ class FAISSManager(
                 distances, identifiers = refined
             result = (distances[:, : plan.k], identifiers[:, : plan.k])
         except Exception as exc:
-            LOGGER.debug(
-                "FAISS search failed",
-                extra={
-                    "k": plan.k,
-                    "nprobe": plan.params.nprobe,
-                    "use_gpu": plan.params.use_gpu,
-                    "error": type(exc).__name__,
-                },
-            )
             msg = "FAISS search failed"
             raise VectorSearchError(
                 msg,
@@ -1561,29 +1468,7 @@ class FAISSManager(
                     "search_k": plan.k,
                 },
             ) from exc
-        finally:
-            duration = max(perf_counter() - ann_timer_start, 0.0)
-            LOGGER.debug(
-                "FAISS ANN search completed",
-                extra={
-                    "duration_s": duration,
-                    "k": plan.k,
-                    "nprobe": plan.params.nprobe,
-                    "use_gpu": plan.params.use_gpu,
-                },
-            )
-
         elapsed_total = (perf_counter() - start) * 1000.0
-        LOGGER.debug(
-            "FAISS search completed",
-            extra={
-                "duration_ms": int(elapsed_total),
-                "rows": result[0].shape[0],
-                "k": plan.k,
-                "nprobe": plan.params.nprobe,
-                "use_gpu": plan.params.use_gpu,
-            },
-        )
         self._last_latency_ms = elapsed_total
         return result
 
@@ -1858,10 +1743,6 @@ class FAISSManager(
         )
         primary_dists, primary_ids = self._search_primary(query, search_k, params.nprobe)
         if self.secondary_index is None:
-            LOGGER.debug(
-                "FAISS primary-only search completed",
-                extra={"candidates": int(primary_ids.shape[1])},
-            )
             return primary_dists, primary_ids
         secondary_dists, secondary_ids = self._search_secondary(query, search_k)
         merged_dists, merged_ids = self._merge_results(
@@ -1870,14 +1751,6 @@ class FAISSManager(
             secondary_dists,
             secondary_ids,
             search_k,
-        )
-        LOGGER.debug(
-            "FAISS dual-index search completed",
-            extra={
-                "primary_candidates": primary_ids.shape[1],
-                "secondary_candidates": secondary_ids.shape[1],
-                "merged_candidates": merged_ids.shape[1],
-            },
         )
         return merged_dists, merged_ids
 
@@ -1936,8 +1809,6 @@ class FAISSManager(
         """
         if catalog is None or plan.k <= 0 or plan.search_k <= plan.k or self.refine_k_factor <= 1.0:
             return None
-        kept_ratio = plan.k / float(plan.search_k)
-        refine_start = perf_counter()
         try:
             reranker = FlatReranker(catalog)
             rerank_scores, rerank_ids = reranker.rerank(
@@ -1945,22 +1816,8 @@ class FAISSManager(
                 identifiers[:, : plan.search_k],
                 top_k=plan.k,
             )
-        except (RuntimeError, ValueError) as exc:  # pragma: no cover - rerank is best-effort
-            LOGGER.warning(
-                "Exact rerank failed; falling back to ANN ordering",
-                extra=_log_extra(error=str(exc)),
-            )
+        except (RuntimeError, ValueError):  # pragma: no cover - rerank is best-effort
             return None
-        duration = max(perf_counter() - refine_start, 0.0)
-        LOGGER.debug(
-            "FAISS refine completed",
-            extra={
-                "duration_s": duration,
-                "kept_ratio": kept_ratio,
-                "k": plan.k,
-                "search_k": plan.search_k,
-            },
-        )
         self._log_refine_delta(identifiers[:, : plan.k], rerank_ids)
         return rerank_scores, rerank_ids
 
@@ -1982,14 +1839,6 @@ class FAISSManager(
             replacements.append(max(len(ref_set) - overlap, 0))
         if not overlaps:
             return
-        LOGGER.debug(
-            "faiss.refine.delta",
-            extra=_log_extra(
-                avg_overlap=round(sum(overlaps) / len(overlaps), 4),
-                avg_replacements=round(sum(replacements) / max(len(replacements), 1), 2),
-                k=k,
-            ),
-        )
 
     def _search_secondary(self, query: NDArrayF32, k: int) -> tuple[NDArrayF32, NDArrayI64]:
         """Search the secondary index (flat, no training required).
@@ -2148,10 +1997,6 @@ class FAISSManager(
             (e.g., index does not support reconstruction or ID mapping).
         """
         if self.secondary_index is None or len(self.incremental_ids) == 0:
-            LOGGER.info(
-                "No secondary index to merge - skipping merge operation",
-                extra=_log_extra(secondary_size=len(self.incremental_ids)),
-            )
             return
 
         try:
@@ -2161,25 +2006,12 @@ class FAISSManager(
             raise RuntimeError(msg) from exc
 
         # Extract vectors from both indexes
-        LOGGER.info(
-            "Extracting vectors from primary and secondary indexes",
-            extra=_log_extra(secondary_vectors=len(self.incremental_ids)),
-        )
         primary_vectors, primary_ids = self._extract_all_vectors(cpu_index)
         secondary_vectors, secondary_ids = self._extract_all_vectors(self.secondary_index)
 
         # Combine vectors and IDs
         all_vectors = np.vstack([primary_vectors, secondary_vectors])
         all_ids = np.concatenate([primary_ids, secondary_ids])
-
-        LOGGER.info(
-            "Merging indexes",
-            extra=_log_extra(
-                primary_vectors=len(primary_ids),
-                secondary_vectors=len(secondary_ids),
-                total_vectors=len(all_ids),
-            ),
-        )
 
         # Rebuild primary index with combined dataset
         # Note: build_index normalizes vectors internally
@@ -2190,15 +2022,6 @@ class FAISSManager(
         self.secondary_index = None
         self.secondary_gpu_index = None
         self.incremental_ids.clear()
-
-        LOGGER.info(
-            "Successfully merged secondary vectors into primary index",
-            extra=_log_extra(
-                merged_secondary=len(secondary_ids),
-                total_vectors=len(all_ids),
-                primary_vectors=len(primary_ids),
-            ),
-        )
 
     def _extract_all_vectors(self, index: _faiss.Index) -> tuple[NDArrayF32, NDArrayI64]:
         """Extract all vectors and IDs from a FAISS index.
@@ -2338,13 +2161,7 @@ class FAISSManager(
         faiss.normalize_L2(xq)
         index = self._active_index()
         if param_str:
-            try:
-                apply_parameters(index, param_str)
-            except ValueError as exc:
-                LOGGER.warning(
-                    "Failed to apply FAISS parameters",
-                    extra=_log_extra(param_str=param_str, error=str(exc)),
-                )
+            apply_parameters(index, param_str)
         distances, ids = _run_index_search(index, xq, k)
         if refine_k_factor and refine_k_factor > 1.0:
             distances, ids = self._refine_with_flat(xq, ids, k)
@@ -2443,13 +2260,7 @@ class FAISSManager(
         timestamp = datetime.now(UTC).isoformat()
         profile["profile_at"] = timestamp
         profile.setdefault("updated_at", timestamp)
-        try:
-            self._save_tuning_profile(profile)
-        except OSError as exc:  # pragma: no cover - best-effort logging
-            LOGGER.warning(
-                "Failed to persist FAISS autotune profile",
-                extra=_log_extra(path=str(self.autotune_profile_path), error=str(exc)),
-            )
+        self._save_tuning_profile(profile)
         self._tuned_parameters = dict(profile)
         return profile
 
@@ -2488,10 +2299,6 @@ class FAISSManager(
         Training time: O(n_vectors) for Flat, O(n_vectors * log(nlist)) for IVF-family.
         """
         if n_vectors < _SMALL_CORPUS_THRESHOLD:
-            LOGGER.info(
-                "Using IndexFlatIP for small corpus",
-                extra=_log_extra(n_vectors=n_vectors, index_type="flat"),
-            )
             return faiss.IndexFlatIP(self.vec_dim), "Flat"
         if n_vectors < _MEDIUM_CORPUS_THRESHOLD:
             nlist = self._dynamic_nlist(n_vectors, minimum=100)
@@ -2503,19 +2310,11 @@ class FAISSManager(
                 faiss.METRIC_INNER_PRODUCT,
             )
             cpu_index.train(vectors)
-            LOGGER.info(
-                "Using IVFFlat for medium corpus",
-                extra=_log_extra(n_vectors=n_vectors, nlist=nlist, index_type="ivf_flat"),
-            )
             return cpu_index, f"IVF{nlist},Flat"
         nlist = self._dynamic_nlist(n_vectors, minimum=1024)
         index_string = f"OPQ64,IVF{nlist},PQ64"
         cpu_index = faiss.index_factory(self.vec_dim, index_string, faiss.METRIC_INNER_PRODUCT)
         cpu_index.train(vectors)
-        LOGGER.info(
-            "Using IVF-PQ for large corpus",
-            extra=_log_extra(n_vectors=n_vectors, nlist=nlist, index_type="ivf_pq"),
-        )
         return cpu_index, index_string
 
     def _dynamic_nlist(self, n_vectors: int, *, minimum: int) -> int:
@@ -2660,8 +2459,6 @@ class FAISSManager(
             name = label or type(self._downcast_index(index)).__name__
         except (AttributeError, RuntimeError):
             name = label or type(index).__name__
-        extra = _log_extra(index_type=name, vec_dim=self.vec_dim, nlist=self.nlist)
-        LOGGER.info("FAISS index configured", extra=extra)
         effective_count = index.ntotal if vector_count is None else int(vector_count)
         self._write_meta_snapshot(
             factory=name,
@@ -2756,21 +2553,13 @@ class FAISSManager(
         """
         if not overrides:
             return
-        try:
-            self._apply_runtime_parameters(
-                nprobe=int(overrides["nprobe"]) if "nprobe" in overrides else None,
-                ef_search=int(overrides["efSearch"]) if "efSearch" in overrides else None,
-                quantizer_ef_search=(
-                    int(overrides["quantizer_efSearch"])
-                    if "quantizer_efSearch" in overrides
-                    else None
-                ),
-            )
-        except RuntimeError as exc:
-            LOGGER.debug(
-                "Unable to apply FAISS runtime overrides immediately",
-                extra=_log_extra(reason=str(exc)),
-            )
+        self._apply_runtime_parameters(
+            nprobe=int(overrides["nprobe"]) if "nprobe" in overrides else None,
+            ef_search=int(overrides["efSearch"]) if "efSearch" in overrides else None,
+            quantizer_ef_search=(
+                int(overrides["quantizer_efSearch"]) if "quantizer_efSearch" in overrides else None
+            ),
+        )
 
     @staticmethod
     def _sanitize_runtime_overrides(
@@ -3063,19 +2852,11 @@ class FAISSManager(
             return {}
         try:
             raw = profile_path.read_text()
-        except OSError as exc:
-            LOGGER.warning(
-                "Failed to load FAISS autotune profile",
-                extra=_log_extra(path=str(profile_path), error=str(exc)),
-            )
+        except OSError:
             return {}
         try:
             profile = cast("dict[str, float | str]", json.loads(raw))
-        except json.JSONDecodeError as exc:
-            LOGGER.warning(
-                "Failed to parse FAISS autotune profile",
-                extra=_log_extra(path=str(profile_path), error=str(exc)),
-            )
+        except json.JSONDecodeError:
             return {}
         self._tuned_parameters = profile
         return profile
@@ -3507,19 +3288,13 @@ def _set_direct_map_type(index: _faiss.Index) -> None:
     modifies the index object in-place and is not thread-safe if the index is being
     used concurrently.
     """
-    try:
+    concrete = index
+    with suppress(AttributeError, RuntimeError):
         concrete = faiss.downcast_index(index)
-    except (AttributeError, RuntimeError):
-        concrete = index
     make_direct_map = getattr(concrete, "make_direct_map", None)
     if callable(make_direct_map):
-        try:
+        with suppress(AttributeError, RuntimeError):
             make_direct_map()
-        except (AttributeError, RuntimeError) as exc:
-            LOGGER.debug(
-                "FAISS make_direct_map failed",
-                extra=_log_extra(index_type=type(index).__name__, error=str(exc)),
-            )
 
 
 def _wrap_bool_contains(raw: Callable[[int], object]) -> Callable[[int], bool]:
@@ -3695,10 +3470,7 @@ def _persist_tuning_profile(manager: FAISSManager, profile: Mapping[str, Any]) -
     try:
         manager._save_tuning_profile(dict(profile))
     except OSError:  # pragma: no cover - best effort
-        LOGGER.debug(
-            "Unable to persist tuning profile",
-            extra=_log_extra(path=str(manager.autotune_profile_path)),
-        )
+        return
     manager._tuned_parameters = dict(profile)
 
 

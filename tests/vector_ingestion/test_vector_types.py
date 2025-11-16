@@ -20,6 +20,7 @@ from kgfoundry_common.vector_types import (
     coerce_vector_batch,
     validate_vector_batch,
 )
+from tests._helpers import assertions
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
@@ -35,11 +36,11 @@ def test_coerce_vector_batch_produces_float32_matrix(
     """`coerce_vector_batch` converts payloads into contiguous float32 batches."""
     batch = coerce_vector_batch(canonical_vector_payload)
 
-    assert batch.ids == (VectorId("vec-1"), VectorId("vec-2"))
-    assert batch.count == 2
-    assert batch.dimension == 3
-    assert batch.matrix.dtype == np.float32
-    assert batch.matrix.flags.c_contiguous
+    assertions.expect_sequence_equal(batch.ids, (VectorId("vec-1"), VectorId("vec-2")))
+    assertions.expect_equal(batch.count, 2)
+    assertions.expect_equal(batch.dimension, 3)
+    assertions.expect_equal(batch.matrix.dtype, np.float32)
+    assertions.expect_true(batch.matrix.flags.c_contiguous, reason="matrix should be C-contiguous")
 
 
 def test_coerce_vector_batch_rejects_inconsistent_dimensions(
@@ -86,9 +87,9 @@ def test_assert_vector_matrix_accepts_float_lists() -> None:
     """`assert_vector_matrix` coerces nested sequences into contiguous float32 matrices."""
     matrix_input: Sequence[Sequence[float]] = ([1.0, 2.0], [3.0, 4.0])
     matrix = assert_vector_matrix(matrix_input)
-    assert matrix.dtype == np.float32
-    assert matrix.shape == (2, 2)
-    assert matrix.flags.c_contiguous
+    assertions.expect_equal(matrix.dtype, np.float32)
+    assertions.expect_equal(matrix.shape, (2, 2))
+    assertions.expect_true(matrix.flags.c_contiguous, reason="matrix should be C-contiguous")
 
 
 def test_assert_vector_matrix_invalid_inputs() -> None:
@@ -107,7 +108,7 @@ def test_validate_vector_batch_returns_same_instance(
     batch = coerce_vector_batch(canonical_vector_payload)
     validated = validate_vector_batch(batch)
 
-    assert validated is batch
+    assertions.expect_true(validated is batch, reason="should return same instance when valid")
 
 
 def test_validate_vector_batch_detects_mismatched_ids(
@@ -133,5 +134,5 @@ def test_vector_batch_dimension_and_count_properties(
     """`VectorBatch` exposes convenience properties for dimension and count."""
     batch = coerce_vector_batch(canonical_vector_payload)
 
-    assert batch.count == 2
-    assert batch.dimension == 3
+    assertions.expect_equal(batch.count, 2)
+    assertions.expect_equal(batch.dimension, 3)

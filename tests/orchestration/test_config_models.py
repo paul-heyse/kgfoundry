@@ -9,6 +9,7 @@ from __future__ import annotations
 import tempfile
 
 from orchestration.config import ArtifactValidationConfig, IndexCliConfig
+from tests._helpers import assertions
 from tests.helpers import assert_frozen_attribute
 
 
@@ -24,10 +25,10 @@ class TestIndexCliConfig:
                 factory="Flat",
                 metric="ip",
             )
-            assert config.dense_vectors == "vectors.json"
-            assert config.index_path == f"{tmpdir}/index.idx"
-            assert config.factory == "Flat"
-            assert config.metric == "ip"
+            assertions.expect_equal(config.dense_vectors, "vectors.json")
+            assertions.expect_equal(config.index_path, f"{tmpdir}/index.idx")
+            assertions.expect_equal(config.factory, "Flat")
+            assertions.expect_equal(config.metric, "ip")
 
     def test_custom_factory(self) -> None:
         """Test with custom FAISS factory string."""
@@ -38,8 +39,8 @@ class TestIndexCliConfig:
                 factory="OPQ64,IVF8192,PQ64",
                 metric="l2",
             )
-            assert config.factory == "OPQ64,IVF8192,PQ64"
-            assert config.metric == "l2"
+            assertions.expect_equal(config.factory, "OPQ64,IVF8192,PQ64")
+            assertions.expect_equal(config.metric, "l2")
 
     def test_immutability(self) -> None:
         """Test that IndexCliConfig is frozen."""
@@ -67,7 +68,7 @@ class TestIndexCliConfig:
                 factory="Flat",
                 metric="ip",
             )
-            assert config1 == config2
+            assertions.expect_equal(config1, config2)
 
     def test_inequality(self) -> None:
         """Test inequality comparison."""
@@ -84,7 +85,7 @@ class TestIndexCliConfig:
                 factory="Flat",
                 metric="l2",
             )
-            assert config1 != config2
+            assertions.expect_true(config1 != config2, reason="should not be equal")
 
 
 class TestArtifactValidationConfig:
@@ -93,8 +94,10 @@ class TestArtifactValidationConfig:
     def test_default_construction(self) -> None:
         """Test construction with default values."""
         config = ArtifactValidationConfig()
-        assert config.strict_mode is True
-        assert config.fail_on_warnings is False
+        assertions.expect_true(config.strict_mode, reason="config.strict_mode should be True")
+        assertions.expect_false(
+            config.fail_on_warnings, reason="config.fail_on_warnings should be False"
+        )
 
     def test_custom_construction(self) -> None:
         """Test construction with custom values."""
@@ -102,14 +105,18 @@ class TestArtifactValidationConfig:
             strict_mode=False,
             fail_on_warnings=True,
         )
-        assert config.strict_mode is False
-        assert config.fail_on_warnings is True
+        assertions.expect_false(config.strict_mode, reason="config.strict_mode should be False")
+        assertions.expect_true(
+            config.fail_on_warnings, reason="config.fail_on_warnings should be True"
+        )
 
     def test_partial_construction(self) -> None:
         """Test construction with partial overrides."""
         config = ArtifactValidationConfig(strict_mode=False)
-        assert config.strict_mode is False
-        assert config.fail_on_warnings is False
+        assertions.expect_false(config.strict_mode, reason="config.strict_mode should be False")
+        assertions.expect_false(
+            config.fail_on_warnings, reason="config.fail_on_warnings should be False"
+        )
 
     def test_immutability(self) -> None:
         """Test that ArtifactValidationConfig is frozen."""
@@ -120,13 +127,13 @@ class TestArtifactValidationConfig:
         """Test equality comparison."""
         config1 = ArtifactValidationConfig(strict_mode=True, fail_on_warnings=False)
         config2 = ArtifactValidationConfig(strict_mode=True, fail_on_warnings=False)
-        assert config1 == config2
+        assertions.expect_equal(config1, config2)
 
     def test_inequality(self) -> None:
         """Test inequality comparison."""
         config1 = ArtifactValidationConfig(strict_mode=True, fail_on_warnings=False)
         config2 = ArtifactValidationConfig(strict_mode=False, fail_on_warnings=False)
-        assert config1 != config2
+        assertions.expect_true(config1 != config2, reason="should not be equal")
 
 
 class TestConfigComparison:
@@ -142,8 +149,14 @@ class TestConfigComparison:
                 metric="ip",
             )
             validation_config = ArtifactValidationConfig()
-            assert isinstance(index_config, IndexCliConfig)
-            assert isinstance(validation_config, ArtifactValidationConfig)
+            assertions.expect_true(
+                isinstance(index_config, IndexCliConfig),
+                reason="index_config should be IndexCliConfig",
+            )
+            assertions.expect_true(
+                isinstance(validation_config, ArtifactValidationConfig),
+                reason="validation_config should be ArtifactValidationConfig",
+            )
 
     def test_attribute_presence(self) -> None:
         """Test that configs have expected attributes."""
@@ -154,14 +167,23 @@ class TestConfigComparison:
                 factory="Flat",
                 metric="ip",
             )
-            assert hasattr(index_config, "dense_vectors")
-            assert hasattr(index_config, "index_path")
-            assert hasattr(index_config, "factory")
-            assert hasattr(index_config, "metric")
+            assertions.expect_true(
+                hasattr(index_config, "dense_vectors"), reason='should have "dense_vectors"'
+            )
+            assertions.expect_true(
+                hasattr(index_config, "index_path"), reason='should have "index_path"'
+            )
+            assertions.expect_true(hasattr(index_config, "factory"), reason='should have "factory"')
+            assertions.expect_true(hasattr(index_config, "metric"), reason='should have "metric"')
 
             validation_config = ArtifactValidationConfig()
-            assert hasattr(validation_config, "strict_mode")
-            assert hasattr(validation_config, "fail_on_warnings")
+            assertions.expect_true(
+                hasattr(validation_config, "strict_mode"), reason='should have "strict_mode"'
+            )
+            assertions.expect_true(
+                hasattr(validation_config, "fail_on_warnings"),
+                reason='should have "fail_on_warnings"',
+            )
 
 
 class TestConfigDefaults:
@@ -171,18 +193,24 @@ class TestConfigDefaults:
         """Test ArtifactValidationConfig default values."""
         config1 = ArtifactValidationConfig()
         config2 = ArtifactValidationConfig()
-        assert config1 == config2
-        assert config1.strict_mode is True
-        assert config1.fail_on_warnings is False
+        assertions.expect_equal(config1, config2)
+        assertions.expect_true(config1.strict_mode, reason="config1.strict_mode should be True")
+        assertions.expect_false(
+            config1.fail_on_warnings, reason="config1.fail_on_warnings should be False"
+        )
 
     def test_both_flags_false(self) -> None:
         """Test with both validation flags set to False."""
         config = ArtifactValidationConfig(strict_mode=False, fail_on_warnings=False)
-        assert config.strict_mode is False
-        assert config.fail_on_warnings is False
+        assertions.expect_false(config.strict_mode, reason="config.strict_mode should be False")
+        assertions.expect_false(
+            config.fail_on_warnings, reason="config.fail_on_warnings should be False"
+        )
 
     def test_both_flags_true(self) -> None:
         """Test with both validation flags set to True."""
         config = ArtifactValidationConfig(strict_mode=True, fail_on_warnings=True)
-        assert config.strict_mode is True
-        assert config.fail_on_warnings is True
+        assertions.expect_true(config.strict_mode, reason="config.strict_mode should be True")
+        assertions.expect_true(
+            config.fail_on_warnings, reason="config.fail_on_warnings should be True"
+        )

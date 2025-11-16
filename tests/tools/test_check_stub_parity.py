@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 
 from kgfoundry_common.errors import ConfigurationError
+from tests._helpers import assertions
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -56,9 +57,9 @@ def test_evaluate_stub_reports_any_usage(tmp_path: Path) -> None:
 
     outcome = evaluate_stub(module_name, stub_path)
 
-    assert outcome.any_usages
-    assert outcome.any_usages[0][0] == 3  # First element is line_number
-    assert outcome.has_errors
+    assertions.expect_true(bool(outcome.any_usages), reason="should have any_usages")
+    assertions.expect_equal(outcome.any_usages[0][0], 3)  # First element is line_number
+    assertions.expect_true(outcome.has_errors, reason="should have errors")
 
 
 def test_run_stub_parity_checks_success(tmp_path: Path) -> None:
@@ -71,8 +72,8 @@ def test_run_stub_parity_checks_success(tmp_path: Path) -> None:
 
     report = run_stub_parity_checks([(module_name, stub_path)])
 
-    assert report.issue_count == 0
-    assert not report.has_issues
+    assertions.expect_equal(report.issue_count, 0)
+    assertions.expect_false(report.has_issues, reason="should not have issues")
 
 
 def test_report_from_context_validates_counts(tmp_path: Path) -> None:
@@ -86,7 +87,7 @@ def test_report_from_context_validates_counts(tmp_path: Path) -> None:
         run_stub_parity_checks([(module_name, stub_path)])
 
     context = cast("StubParityContext | None", excinfo.value.context)
-    assert context is not None
+    assertions.expect_true(context is not None, reason="context should not be None")
     report = StubParityReport.from_context(context)
     mutated_context: StubParityContext = build_stub_parity_context(report)
     mutated_context["issue_count"] = 0
@@ -121,4 +122,4 @@ def test_run_stub_parity_checks_raises_with_context(tmp_path: Path) -> None:
         ),
     )
 
-    assert context == build_stub_parity_context(expected_report)
+    assertions.expect_equal(context, build_stub_parity_context(expected_report))

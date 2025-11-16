@@ -1,3 +1,5 @@
+"""Tests for repository scanning CLI and import analysis."""
+
 from __future__ import annotations
 
 import json
@@ -8,6 +10,8 @@ from typing import Any
 
 import pytest
 from tools import repo_scan
+
+from tests._helpers import assertions
 
 
 def _run_repo_scan_cli(
@@ -74,8 +78,10 @@ def test_iter_py_files_skips_virtual_env_content(tmp_path: Path) -> None:
     skip.write_text("SHOULD_SKIP = True\n", encoding="utf-8")
 
     discovered = {path.relative_to(root) for path in repo_scan.iter_py_files(root)}
-    assert Path("pkg/module.py") in discovered
-    assert Path(".venv/module.py") not in discovered
+    assertions.expect_in(Path("pkg/module.py"), discovered)
+    assertions.expect_false(
+        Path(".venv/module.py") in discovered, reason="should exclude .venv files"
+    )
 
 
 def test_iter_py_files_include_subdir_filters(tmp_path: Path) -> None:
@@ -89,8 +95,10 @@ def test_iter_py_files_include_subdir_filters(tmp_path: Path) -> None:
     discovered = {
         path.relative_to(root) for path in repo_scan.iter_py_files(root, include_subdirs=("src",))
     }
-    assert Path("src/pkg/module.py") in discovered
-    assert Path("tests/test_pkg.py") not in discovered
+    assertions.expect_in(Path("src/pkg/module.py"), discovered)
+    assertions.expect_false(
+        Path("tests/test_pkg.py") in discovered, reason="should exclude tests directory"
+    )
 
 
 @pytest.mark.parametrize(
@@ -109,7 +117,7 @@ def test_is_test_file_heuristics(
     file_path = tmp_path.joinpath(*relative_parts)
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text("CONST = 1\n", encoding="utf-8")
-    assert repo_scan.is_test_file(file_path, module_name) is expected
+    assertions.expect_equal(repo_scan.is_test_file(file_path, module_name), expected)
 
 
 def test_repo_scan_main_generates_expected_payload(
@@ -189,7 +197,8 @@ def test_repo_scan_main_generates_expected_payload(
             def test_helper_round_trip() -> None:
                 \"\"\"Ensure the helper behavior lines up with expectations.\"\"\"
 
-                assert mod_a.helper(3, 1) == 2
+                from tests._helpers import assertions as test_assertions
+                test_assertions.expect_equal(mod_a.helper(3, 1), 2)
             """
         ),
         encoding="utf-8",
@@ -204,26 +213,36 @@ def test_repo_scan_main_generates_expected_payload(
     )
     modules = {entry["module"]: entry for entry in payload["modules"]}
 
-    assert payload["summary"] == {"files": 4, "parsed_ok": 4, "tests": 1}
-    assert modules["pkg"]["doc"]["module_doc"] is True
-    assert modules["pkg.mod_a"]["typing"]["functions"] >= 1
-    assert payload["api_symbols"] == []
-    assert payload["external_deps"] == []
+    assertions.expect_equal(payload["summary"], {"files": 4, "parsed_ok": 4, "tests": 1})
+    assertions.expect_true(modules["pkg"]["doc"]["module_doc"], reason="module_doc should be True")
+    assertions.expect_true(
+        modules["pkg.mod_a"]["typing"]["functions"] >= 1, reason="should have typed functions"
+    )
+    assertions.expect_sequence_equal(payload["api_symbols"], [])
+    assertions.expect_sequence_equal(payload["external_deps"], [])
 
     edge_set = {tuple(edge) for edge in payload["import_edges"]}
-    assert ("pkg", "pkg.mod_a") in edge_set
+    assertions.expect_in(("pkg", "pkg.mod_a"), edge_set)
 
-    assert payload["tests_to_modules"]["pkg"] == ["tests.test_pkg"]
-    assert Path(dot_path).read_text(encoding="utf-8").startswith("digraph imports")
+    assertions.expect_sequence_equal(payload["tests_to_modules"]["pkg"], ["tests.test_pkg"])
+    assertions.expect_true(
+        Path(dot_path).read_text(encoding="utf-8").startswith("digraph imports"),
+        reason="dot file should start with digraph imports",
+    )
     if enriched_path is not None:
-        assert enriched_path.exists()
+        assertions.expect_true(enriched_path.exists(), reason="enriched path should exist")
     public_details = modules["pkg"]["public_api_details"]
-    assert any(entry["name"] == "public_func" for entry in public_details)
-    assert modules["pkg.mod_a"]["raises"]["helper"] == ["ValueError"]
-    assert modules["pkg.mod_a"]["test_count"] >= 1
-    assert modules["pkg.utils"]["public_api_without_tests"] == ["orphan"]
-    assert payload["graph_summary"]["nodes"]
-    assert "pkg.mod_a" in payload["graph_summary"]["nodes"]
+    assertions.expect_true(
+        any(entry["name"] == "public_func" for entry in public_details),
+        reason="should have public_func in public_api_details",
+    )
+    assertions.expect_sequence_equal(modules["pkg.mod_a"]["raises"]["helper"], ["ValueError"])
+    assertions.expect_true(modules["pkg.mod_a"]["test_count"] >= 1, reason="should have test count")
+    assertions.expect_sequence_equal(modules["pkg.utils"]["public_api_without_tests"], ["orphan"])
+    assertions.expect_true(
+        bool(payload["graph_summary"]["nodes"]), reason="graph_summary should have nodes"
+    )
+    assertions.expect_in("pkg.mod_a", payload["graph_summary"]["nodes"])
 
 
 def test_module_name_strips_src_prefix(tmp_path: Path) -> None:
@@ -234,7 +253,7 @@ def test_module_name_strips_src_prefix(tmp_path: Path) -> None:
     target.write_text("VALUE = 1\n", encoding="utf-8")
 
     name = repo_scan.module_name_from_path(scan_root, target, strip_prefixes=("src",))
-    assert name == "pkg.mod"
+    assertions.expect_equal(name, "pkg.mod")
 
 
 def test_repo_scan_with_libcst_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -259,11 +278,15 @@ def test_repo_scan_with_libcst_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     payload, _, _ = _run_repo_scan_cli(monkeypatch, scan_root, tmp_path, ["--no-griffe"])
     modules = {entry["module"]: entry for entry in payload["modules"]}
     module_report = modules["pkg.mod"]
-    assert module_report["imports_cst"] is not None
-    assert "json_alias" in module_report["imports_cst"]["imports"]
-    assert module_report["imports_cst"]["type_checking_imports"] == ["vendor.tools.FancyType"]
-    assert "json" in payload["external_deps"]
-    assert "vendor" in payload["external_deps"]
+    assertions.expect_true(
+        module_report["imports_cst"] is not None, reason="imports_cst should be set"
+    )
+    assertions.expect_in("json_alias", module_report["imports_cst"]["imports"])
+    assertions.expect_sequence_equal(
+        module_report["imports_cst"]["type_checking_imports"], ["vendor.tools.FancyType"]
+    )
+    assertions.expect_in("json", payload["external_deps"])
+    assertions.expect_in("vendor", payload["external_deps"])
 
     payload_disabled, _, _ = _run_repo_scan_cli(
         monkeypatch,
@@ -272,8 +295,8 @@ def test_repo_scan_with_libcst_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         ["--no-libcst", "--no-griffe"],
     )
     modules_disabled = {entry["module"]: entry for entry in payload_disabled["modules"]}
-    assert modules_disabled["pkg.mod"]["imports_cst"] is None
-    assert payload_disabled["external_deps"] == []
+    assertions.expect_equal(modules_disabled["pkg.mod"]["imports_cst"], None)
+    assertions.expect_sequence_equal(payload_disabled["external_deps"], [])
 
 
 def test_repo_scan_with_griffe_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -319,10 +342,15 @@ def test_repo_scan_with_griffe_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         tmp_path,
         ["--docstyle", "google"],
     )
-    assert payload["api_symbols"], "Expected Griffe symbols to be emitted"
+    assertions.expect_true(
+        bool(payload["api_symbols"]), reason="Expected Griffe symbols to be emitted"
+    )
     greeter_symbol = next((s for s in payload["api_symbols"] if s["short_name"] == "Greeter"), None)
-    assert greeter_symbol is not None
-    assert any(param["name"] == "prefix" for param in greeter_symbol["params"])
+    assertions.expect_true(greeter_symbol is not None, reason="should have Greeter symbol")
+    assertions.expect_true(
+        any(param["name"] == "prefix" for param in greeter_symbol["params"]),
+        reason="should have prefix parameter",
+    )
 
     payload_disabled, _, _ = _run_repo_scan_cli(
         monkeypatch,
@@ -330,7 +358,7 @@ def test_repo_scan_with_griffe_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPa
         tmp_path,
         ["--no-griffe"],
     )
-    assert payload_disabled["api_symbols"] == []
+    assertions.expect_sequence_equal(payload_disabled["api_symbols"], [])
 
 
 def test_repo_scan_handles_missing_repo_root(
@@ -348,4 +376,4 @@ def test_repo_scan_handles_missing_repo_root(
         ["--no-griffe"],
         repo_root_override=str(scan_root / "nonexistent"),
     )
-    assert payload["summary"]["files"] == 1
+    assertions.expect_equal(payload["summary"]["files"], 1)

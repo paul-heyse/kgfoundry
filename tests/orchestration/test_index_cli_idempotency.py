@@ -26,6 +26,7 @@ else:  # pragma: no cover - runtime alias for type checking convenience
 
 pytest.importorskip("orchestration.cli")
 from orchestration.cli import index_bm25, index_faiss
+from tests._helpers import assertions
 
 
 class TestIndexBM25Idempotency:
@@ -73,7 +74,7 @@ class TestIndexBM25Idempotency:
                 index_dir=str(index_dir_1),
             )
 
-            assert index_dir_1.exists()
+            assertions.expect_true(index_dir_1.exists(), reason="index_dir_1 should exist")
 
             index_dir_2 = temp_index_dir / f"index_{backend}_2"
             index_bm25(
@@ -82,14 +83,14 @@ class TestIndexBM25Idempotency:
                 index_dir=str(index_dir_2),
             )
 
-            assert index_dir_1.exists()
-            assert index_dir_2.exists()
+            assertions.expect_true(index_dir_1.exists(), reason="index_dir_1 should still exist")
+            assertions.expect_true(index_dir_2.exists(), reason="index_dir_2 should exist")
 
             found_operation = any(
                 cast("str | None", getattr(record, "operation", None)) == "index_bm25"
                 for record in caplog.records
             )
-            assert found_operation
+            assertions.expect_true(found_operation, reason="found_operation should be True")
 
 
 class TestIndexFAISSIdempotency:
@@ -127,7 +128,7 @@ class TestIndexFAISSIdempotency:
         )
 
         # Verify index was created
-        assert index_path_1.exists()
+        assertions.expect_true(index_path_1.exists(), reason="index_path_1 should exist")
 
         # Second run (idempotent)
         index_path_2 = temp_index_dir / "index_2.idx"
@@ -137,15 +138,15 @@ class TestIndexFAISSIdempotency:
         )
 
         # Both should exist
-        assert index_path_1.exists()
-        assert index_path_2.exists()
+        assertions.expect_true(index_path_1.exists(), reason="index_path_1 should still exist")
+        assertions.expect_true(index_path_2.exists(), reason="index_path_2 should exist")
 
         # Verify structured logs indicate operation
         found_operation = any(
             cast("str | None", getattr(record, "operation", None)) == "index_faiss"
             for record in caplog.records
         )
-        assert found_operation
+        assertions.expect_true(found_operation, reason="found_operation should be True")
 
 
 class TestIndexingErrorHandling:
@@ -174,10 +175,13 @@ class TestIndexingErrorHandling:
                 index_dir=str(temp_index_dir / "output"),
             )
 
-        assert exc_info.value.exit_code == 1
+        assertions.expect_equal(exc_info.value.exit_code, 1)
 
         # Verify error was logged
-        assert any(record.levelname == "ERROR" for record in caplog.records)
+        assertions.expect_true(
+            any(record.levelname == "ERROR" for record in caplog.records),
+            reason="should have ERROR log",
+        )
 
     def test_index_faiss_malformed_vectors(
         self,
@@ -217,29 +221,36 @@ class TestIndexingErrorHandling:
                 index_path=str(temp_index_dir / "output.idx"),
             )
 
-        assert exc_info.value.exit_code == 1
-        assert messages, "Expected Problem Details payload to be emitted"
+        assertions.expect_equal(exc_info.value.exit_code, 1)
+        assertions.expect_true(
+            bool(messages), reason="Expected Problem Details payload to be emitted"
+        )
 
         json_messages = [msg for msg, err in messages if err and msg.strip().startswith("{")]
-        assert json_messages, "Expected structured Problem Details output"
-        problem_raw: object = json.loads(json_messages[-1])
-        assert isinstance(problem_raw, dict)
-        problem = cast("dict[str, object]", problem_raw)
-        assert (
-            problem.get("type") == "https://kgfoundry.dev/problems/vector-ingestion/invalid-payload"
+        assertions.expect_true(
+            bool(json_messages), reason="Expected structured Problem Details output"
         )
-        assert problem.get("status") == 422
-        assert problem.get("vector_path") == str(vectors_file)
-        assert (
-            problem.get("schema_id")
-            == "https://kgfoundry.dev/schema/vector-ingestion/vector-batch.v1.json"
+        problem_raw: object = json.loads(json_messages[-1])
+        assertions.expect_true(isinstance(problem_raw, dict), reason="problem_raw should be dict")
+        problem = cast("dict[str, object]", problem_raw)
+        assertions.expect_equal(
+            problem.get("type"), "https://kgfoundry.dev/problems/vector-ingestion/invalid-payload"
+        )
+        assertions.expect_equal(problem.get("status"), 422)
+        assertions.expect_equal(problem.get("vector_path"), str(vectors_file))
+        assertions.expect_equal(
+            problem.get("schema_id"),
+            "https://kgfoundry.dev/schema/vector-ingestion/vector-batch.v1.json",
         )
         errors_list = cast("list[str]", problem.get("errors", []))
-        assert errors_list, "Expected validation error details"
-        assert "vector" in errors_list[0].lower()
+        assertions.expect_true(bool(errors_list), reason="Expected validation error details")
+        assertions.expect_in("vector", errors_list[0].lower())
 
         # Verify error was logged with correlation id metadata
-        assert any(record.levelname == "ERROR" for record in caplog.records)
+        assertions.expect_true(
+            any(record.levelname == "ERROR" for record in caplog.records),
+            reason="should have ERROR log",
+        )
 
 
 __all__ = [

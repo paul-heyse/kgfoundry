@@ -1,3 +1,5 @@
+"""Tests for typing gate import helper with error message hints."""
+
 from __future__ import annotations
 
 import builtins
@@ -8,12 +10,15 @@ from typing import Any
 import pytest
 from codeintel_rev.typing import gate_import
 
+from tests._helpers import assertions
+
 ImportFunc = Callable[
     [str, Mapping[str, Any] | None, Mapping[str, Any] | None, Sequence[str], int], ModuleType
 ]
 
 
 def test_gate_import_missing_module_includes_extra_hint(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify gate_import includes pip install hint when module is missing."""
     original_import: ImportFunc = builtins.__import__
 
     def fake_import(
@@ -34,4 +39,4 @@ def test_gate_import_missing_module_includes_extra_hint(monkeypatch: pytest.Monk
         gate_import("faiss", "testing extras hint")
 
     message = str(excinfo.value)
-    assert "pip install codeintel-rev[faiss-cpu]" in message
+    assertions.expect_in("pip install codeintel-rev[faiss-cpu]", message)

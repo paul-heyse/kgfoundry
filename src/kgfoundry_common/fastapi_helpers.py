@@ -161,9 +161,6 @@ def typed_exception_handler[E: Exception](
         ------
         TimeoutError
             If the handler execution exceeds the timeout.
-        Exception
-            Any exception raised by the wrapped exception handler is
-            propagated unchanged.
         """
         try:
             return await _await_with_timeout(

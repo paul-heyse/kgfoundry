@@ -11,6 +11,8 @@ from codeintel_rev.app.config_context import ResolvedPaths
 from codeintel_rev.config.settings import Settings
 from codeintel_rev.io.hybrid_search import HybridSearchEngine
 
+from tests._helpers import assertions
+
 
 def _make_engine(repo_root: Path) -> HybridSearchEngine:
     """Create a ``HybridSearchEngine`` with a minimal settings object.
@@ -31,6 +33,7 @@ def _make_engine(repo_root: Path) -> HybridSearchEngine:
 
 
 def test_resolve_path_absolute() -> None:
+    """Verify absolute paths are resolved correctly."""
     repo_root = Path("/repository-root")
     engine = _make_engine(repo_root)
 
@@ -38,10 +41,11 @@ def test_resolve_path_absolute() -> None:
 
     resolved = engine.resolve_path(absolute)
 
-    assert resolved == Path(absolute)
+    assertions.expect_equal(resolved, Path(absolute))
 
 
 def test_resolve_path_relative() -> None:
+    """Verify relative paths are resolved against repo root."""
     repo_root = Path("/repository-root")
     engine = _make_engine(repo_root)
 
@@ -49,10 +53,11 @@ def test_resolve_path_relative() -> None:
 
     resolved = engine.resolve_path(relative)
 
-    assert resolved == (repo_root / relative).resolve()
+    assertions.expect_equal(resolved, (repo_root / relative).resolve())
 
 
 def test_resolve_path_expands_user_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Verify user home expansion (~) works correctly."""
     repo_root = Path("/repository-root")
     engine = _make_engine(repo_root)
     fake_home = tmp_path / "fake-home"
@@ -60,4 +65,4 @@ def test_resolve_path_expands_user_home(monkeypatch: pytest.MonkeyPatch, tmp_pat
 
     resolved = engine.resolve_path("~/.cache/splade")
 
-    assert resolved == fake_home / ".cache/splade"
+    assertions.expect_equal(resolved, fake_home / ".cache/splade")

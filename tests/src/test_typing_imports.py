@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 
 import kgfoundry_common.typing
+from tests._helpers import assertions
 
 RUNTIME_DIRS = [
     Path(__file__).parent.parent.parent / "src" / "kgfoundry_common",
@@ -66,17 +67,23 @@ class TestRuntimePackagesTypingImports:
                 source = py_file.read_text(encoding="utf-8")
 
                 for shim in deprecated_shims:
-                    assert f"from kgfoundry_common.typing import {shim}" not in source, (
-                        f"{py_file.name} imports deprecated {shim}. "
-                        "Use gate_import() directly instead."
+                    assertions.expect_false(
+                        f"from kgfoundry_common.typing import {shim}" in source,
+                        reason=f"{py_file.name} imports deprecated {shim}. Use gate_import() directly instead.",
                     )
 
     def test_gate_import_available_in_kgfoundry_common_typing(self) -> None:
         """Verify gate_import is available in the typing facade."""
-        assert hasattr(kgfoundry_common.typing, "gate_import")
-        assert callable(kgfoundry_common.typing.gate_import)
+        assertions.expect_true(
+            hasattr(kgfoundry_common.typing, "gate_import"), reason="should have gate_import"
+        )
+        assertions.expect_true(
+            callable(kgfoundry_common.typing.gate_import), reason="gate_import should be callable"
+        )
         gate_import = kgfoundry_common.typing.gate_import
-        assert gate_import.__doc__, "gate_import should have a docstring"
+        assertions.expect_true(
+            gate_import.__doc__ is not None, reason="gate_import should have a docstring"
+        )
 
     @staticmethod
     def _is_in_type_checking_block(tree: ast.AST, target_node: ast.AST) -> bool:
@@ -137,6 +144,7 @@ def test_typing_facade_symbols_available() -> None:
     ]
 
     for symbol in essential_symbols:
-        assert hasattr(kgfoundry_common.typing, symbol), (
-            f"kgfoundry_common.typing should provide {symbol}"
+        assertions.expect_true(
+            hasattr(kgfoundry_common.typing, symbol),
+            reason=f"kgfoundry_common.typing should provide {symbol}",
         )

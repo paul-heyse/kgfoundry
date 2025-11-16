@@ -10,6 +10,7 @@ from kgfoundry_common.problem_details import (
     render_problem,
 )
 from orchestration.config import IndexCliConfig
+from tests._helpers import assertions
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -28,10 +29,12 @@ class TestConfigurationErrorHandling:
         problem = build_configuration_problem(error)
         problem_dict = cast("dict[str, object]", problem)
 
-        assert problem_dict["type"] == "https://kgfoundry.dev/problems/configuration-error"
-        assert problem_dict["status"] == 500
-        assert problem_dict["code"] == "configuration-error"
-        assert "extensions" in problem_dict
+        assertions.expect_equal(
+            problem_dict["type"], "https://kgfoundry.dev/problems/configuration-error"
+        )
+        assertions.expect_equal(problem_dict["status"], 500)
+        assertions.expect_equal(problem_dict["code"], "configuration-error")
+        assertions.expect_in("extensions", problem_dict)
 
     def test_configuration_error_renders_to_json(self) -> None:
         """Test that ConfigurationError can be rendered to JSON."""
@@ -44,9 +47,9 @@ class TestConfigurationErrorHandling:
         json_str = render_problem(problem)
 
         # Verify it's valid JSON
-        assert json_str.startswith("{")
-        assert '"type"' in json_str
-        assert '"status"' in json_str
+        assertions.expect_true(json_str.startswith("{"), reason="should be valid JSON")
+        assertions.expect_in('"type"', json_str)
+        assertions.expect_in('"status"', json_str)
 
     def test_configuration_error_has_correct_exit_code(self, tmp_path: Path) -> None:
         """Verify that ConfigurationError handling uses exit code 2."""
@@ -60,7 +63,7 @@ class TestConfigurationErrorHandling:
         )
 
         # The config validation should not fail
-        assert config.dense_vectors == "vectors.json"
+        assertions.expect_equal(config.dense_vectors, "vectors.json")
 
 
 class TestConfigurationErrorIntegration:
@@ -77,11 +80,11 @@ class TestConfigurationErrorIntegration:
         problem_dict = cast("dict[str, object]", problem)
 
         # RFC 9457 required fields
-        assert "type" in problem_dict
-        assert "title" in problem_dict
-        assert "status" in problem_dict
-        assert "detail" in problem_dict
-        assert "instance" in problem_dict
+        assertions.expect_in("type", problem_dict)
+        assertions.expect_in("title", problem_dict)
+        assertions.expect_in("status", problem_dict)
+        assertions.expect_in("detail", problem_dict)
+        assertions.expect_in("instance", problem_dict)
 
     def test_multiple_configuration_errors_render_correctly(self) -> None:
         """Test various ConfigurationError scenarios render as Problem Details."""
@@ -101,6 +104,8 @@ class TestConfigurationErrorIntegration:
         for error in errors:
             problem = build_configuration_problem(error)
             problem_dict = cast("dict[str, object]", problem)
-            assert problem_dict["type"] == "https://kgfoundry.dev/problems/configuration-error"
-            assert problem_dict["status"] == 500
-            assert problem_dict["code"] == "configuration-error"
+            assertions.expect_equal(
+                problem_dict["type"], "https://kgfoundry.dev/problems/configuration-error"
+            )
+            assertions.expect_equal(problem_dict["status"], 500)
+            assertions.expect_equal(problem_dict["code"], "configuration-error")

@@ -11,6 +11,8 @@ from codeintel_rev.io.parquet_store import (
     write_chunks_parquet,
 )
 
+from tests._helpers import assertions
+
 
 def _mk_chunks() -> list[Chunk]:
     return [
@@ -69,11 +71,13 @@ def test_golden_flat_exact_knn(tmp_path: Path) -> None:
     )
 
     table = read_chunks_parquet(parquet_path)
-    assert table.num_rows == len(chunks)
+    assertions.expect_equal(table.num_rows, len(chunks))
 
     index = faiss.IndexFlatIP(embeddings.shape[1])
     index.add(embeddings)
     distances, ids = index.search(embeddings[0:1], 2)
-    assert int(ids[0, 0]) == 0
-    assert int(ids[0, 1]) == 2
-    assert distances[0, 0] > distances[0, 1]
+    assertions.expect_equal(int(ids[0, 0]), 0)
+    assertions.expect_equal(int(ids[0, 1]), 2)
+    assertions.expect_true(
+        distances[0, 0] > distances[0, 1], reason="first distance should be greater than second"
+    )

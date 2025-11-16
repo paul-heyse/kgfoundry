@@ -1,3 +1,5 @@
+"""Tests for runtime availability gates."""
+
 from __future__ import annotations
 
 import shutil
@@ -7,22 +9,25 @@ import pytest
 from codeintel_rev.app import config_context as config_module
 from codeintel_rev.errors import RuntimeUnavailableError
 
+from tests._helpers import assertions
 from tests.app._context_factory import build_application_context
 
 
 def test_coderank_faiss_missing_index_raises_runtime_unavailable(tmp_path: Path) -> None:
+    """Verify missing coderank FAISS index raises RuntimeUnavailableError."""
     ctx = build_application_context(tmp_path)
     ctx.paths.coderank_faiss_index.unlink(missing_ok=True)
 
     with pytest.raises(RuntimeUnavailableError) as excinfo:
         ctx.get_coderank_faiss_manager(vec_dim=256)
 
-    assert excinfo.value.context["runtime"] == "coderank-faiss"
+    assertions.expect_equal(excinfo.value.context["runtime"], "coderank-faiss")
 
 
 def test_coderank_faiss_missing_dependency_propagates(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Verify missing FAISS dependency propagates as RuntimeUnavailableError."""
     ctx = build_application_context(tmp_path)
     original_gate = config_module.gate_import
 
@@ -37,20 +42,22 @@ def test_coderank_faiss_missing_dependency_propagates(
     with pytest.raises(RuntimeUnavailableError) as excinfo:
         ctx.get_coderank_faiss_manager(vec_dim=64)
 
-    assert "faiss" in str(excinfo.value)
+    assertions.expect_in("faiss", str(excinfo.value))
 
 
 def test_xtr_missing_artifacts_raise(tmp_path: Path) -> None:
+    """Verify missing XTR artifacts raise RuntimeUnavailableError."""
     ctx = build_application_context(tmp_path, xtr_enabled=True)
     shutil.rmtree(ctx.paths.xtr_dir)
 
     with pytest.raises(RuntimeUnavailableError) as excinfo:
         ctx.get_xtr_index()
 
-    assert excinfo.value.context["runtime"] == "xtr"
+    assertions.expect_equal(excinfo.value.context["runtime"], "xtr")
 
 
 def test_xtr_missing_dependency_raise(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify missing XTR dependency raises RuntimeUnavailableError."""
     ctx = build_application_context(tmp_path, xtr_enabled=True)
     original_gate = config_module.gate_import
 

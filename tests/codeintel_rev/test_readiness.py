@@ -14,6 +14,8 @@ from codeintel_rev.app.readiness import CheckResult, ReadinessProbe
 from codeintel_rev.config.settings import IndexConfig, Settings, VLLMConfig, VLLMRunMode
 from codeintel_rev.config.utils import replace_settings, replace_struct
 
+from tests._helpers import assertions
+
 
 def _materialized_index_config(index: IndexConfig, *, enabled: bool) -> IndexConfig:
     """Return a copy of IndexConfig with duckdb_materialize toggled.
@@ -57,7 +59,7 @@ def test_check_result_as_payload_healthy() -> None:
     payload = result.as_payload()
 
     # Assert
-    assert payload == {"healthy": True}
+    assertions.expect_equal(payload, {"healthy": True})
 
 
 def test_check_result_as_payload_unhealthy() -> None:
@@ -69,7 +71,7 @@ def test_check_result_as_payload_unhealthy() -> None:
     payload = result.as_payload()
 
     # Assert
-    assert payload == {"healthy": False, "detail": "FAISS index not found"}
+    assertions.expect_equal(payload, {"healthy": False, "detail": "FAISS index not found"})
 
 
 @pytest.mark.asyncio
@@ -85,8 +87,8 @@ async def test_readiness_probe_initialize(
 
     # Assert
     snapshot = probe.snapshot()
-    assert len(snapshot) > 0
-    assert "repo_root" in snapshot
+    assertions.expect_true(len(snapshot) > 0, reason="snapshot should have checks")
+    assertions.expect_in("repo_root", snapshot)
 
 
 @pytest.mark.asyncio
@@ -101,12 +103,14 @@ async def test_readiness_probe_all_healthy(
     results = await probe.refresh()
 
     # Assert
-    assert results["repo_root"].healthy is True
-    assert results["data_dir"].healthy is True
-    assert results["vectors_dir"].healthy is True
-    assert results["faiss_index"].healthy is True
-    assert results["duckdb_catalog"].healthy is True
-    assert results["scip_index"].healthy is True
+    assertions.expect_true(results["repo_root"].healthy, reason="repo_root should be healthy")
+    assertions.expect_true(results["data_dir"].healthy, reason="data_dir should be healthy")
+    assertions.expect_true(results["vectors_dir"].healthy, reason="vectors_dir should be healthy")
+    assertions.expect_true(results["faiss_index"].healthy, reason="faiss_index should be healthy")
+    assertions.expect_true(
+        results["duckdb_catalog"].healthy, reason="duckdb_catalog should be healthy"
+    )
+    assertions.expect_true(results["scip_index"].healthy, reason="scip_index should be healthy")
 
 
 @pytest.mark.asyncio
@@ -125,9 +129,12 @@ async def test_readiness_probe_materialize_reports_missing_table(
     results = await probe.refresh()
     duckdb_result = results["duckdb_catalog"]
 
-    assert duckdb_result.healthy is False
-    assert duckdb_result.detail is not None
-    assert "chunks_materialized" in duckdb_result.detail
+    assertions.expect_false(
+        duckdb_result.healthy, reason="duckdb should be unhealthy when table missing"
+    )
+    assertions.expect_true(duckdb_result.detail is not None, reason="duckdb should have detail")
+    if duckdb_result.detail is not None:
+        assertions.expect_in("chunks_materialized", duckdb_result.detail)
 
 
 @pytest.mark.asyncio
@@ -166,7 +173,9 @@ async def test_readiness_probe_materialize_validates_index(
     probe = ReadinessProbe(context)
     results = await probe.refresh()
 
-    assert results["duckdb_catalog"].healthy is True
+    assertions.expect_true(
+        results["duckdb_catalog"].healthy, reason="duckdb should be healthy when table exists"
+    )
 
 
 @pytest.mark.asyncio
@@ -180,9 +189,14 @@ async def test_readiness_probe_missing_faiss(mock_application_context: Applicati
     results = await probe.refresh()
 
     # Assert
-    assert results["faiss_index"].healthy is False
-    assert results["faiss_index"].detail is not None
-    assert "not found" in results["faiss_index"].detail.lower()
+    assertions.expect_false(
+        results["faiss_index"].healthy, reason="faiss_index should be unhealthy when missing"
+    )
+    assertions.expect_true(
+        results["faiss_index"].detail is not None, reason="faiss_index should have detail"
+    )
+    if results["faiss_index"].detail is not None:
+        assertions.expect_in("not found", results["faiss_index"].detail.lower())
 
 
 @pytest.mark.asyncio
@@ -207,9 +221,14 @@ async def test_readiness_probe_vllm_unreachable(
         results = await probe.refresh()
 
     # Assert
-    assert results["vllm_service"].healthy is False
-    assert results["vllm_service"].detail is not None
-    assert "unreachable" in results["vllm_service"].detail.lower()
+    assertions.expect_false(
+        results["vllm_service"].healthy, reason="vllm_service should be unhealthy when unreachable"
+    )
+    assertions.expect_true(
+        results["vllm_service"].detail is not None, reason="vllm_service should have detail"
+    )
+    if results["vllm_service"].detail is not None:
+        assertions.expect_in("unreachable", results["vllm_service"].detail.lower())
 
 
 @pytest.mark.asyncio
@@ -228,12 +247,14 @@ async def test_readiness_probe_caching(mock_application_context: ApplicationCont
     snapshot2 = probe.snapshot()
 
     # Assert - cached results should be identical
-    assert snapshot1 == snapshot2
+    assertions.expect_equal(snapshot1, snapshot2)
 
     # Refresh should update cache
     await probe.refresh()
     snapshot3 = probe.snapshot()
-    assert snapshot3["faiss_index"].healthy is False
+    assertions.expect_false(
+        snapshot3["faiss_index"].healthy, reason="faiss_index should be unhealthy after refresh"
+    )
 
 
 @pytest.mark.asyncio
@@ -261,8 +282,8 @@ def test_readiness_probe_check_directory_exists() -> None:
         result = ReadinessProbe.check_directory(path)
 
         # Assert
-        assert result.healthy is True
-        assert result.detail is None
+        assertions.expect_true(result.healthy, reason="directory check should be healthy")
+        assertions.expect_equal(result.detail, None)
 
 
 def test_readiness_probe_check_directory_create() -> None:
@@ -275,9 +296,9 @@ def test_readiness_probe_check_directory_create() -> None:
         result = ReadinessProbe.check_directory(new_dir, create=True)
 
         # Assert
-        assert result.healthy is True
-        assert new_dir.exists()
-        assert new_dir.is_dir()
+        assertions.expect_true(result.healthy, reason="directory check should be healthy")
+        assertions.expect_true(new_dir.exists(), reason="new_dir should exist")
+        assertions.expect_true(new_dir.is_dir(), reason="new_dir should be a directory")
 
 
 def test_readiness_probe_check_file_exists() -> None:
@@ -291,7 +312,7 @@ def test_readiness_probe_check_file_exists() -> None:
         result = ReadinessProbe.check_file(path, description="test file")
 
         # Assert
-        assert result.healthy is True
+        assertions.expect_true(result.healthy, reason="file check should be healthy")
     finally:
         path.unlink()
 
@@ -305,9 +326,10 @@ def test_readiness_probe_check_file_optional() -> None:
     result = ReadinessProbe.check_file(path, description="test file", optional=True)
 
     # Assert
-    assert result.healthy is True  # Optional files don't fail readiness
-    assert result.detail is not None
-    assert "not found" in result.detail.lower()
+    assertions.expect_true(result.healthy, reason="optional files don't fail readiness")
+    assertions.expect_true(result.detail is not None, reason="optional file should have detail")
+    if result.detail is not None:
+        assertions.expect_in("not found", result.detail.lower())
 
 
 def test_readiness_probe_check_file_required() -> None:
@@ -319,9 +341,10 @@ def test_readiness_probe_check_file_required() -> None:
     result = ReadinessProbe.check_file(path, description="test file", optional=False)
 
     # Assert
-    assert result.healthy is False
-    assert result.detail is not None
-    assert "not found" in result.detail.lower()
+    assertions.expect_false(result.healthy, reason="required file should fail when missing")
+    assertions.expect_true(result.detail is not None, reason="required file should have detail")
+    if result.detail is not None:
+        assertions.expect_in("not found", result.detail.lower())
 
 
 def test_readiness_probe_check_vllm_invalid_url(
@@ -338,9 +361,10 @@ def test_readiness_probe_check_vllm_invalid_url(
     result = probe.check_vllm_connection()
 
     # Assert
-    assert result.healthy is False
-    assert result.detail is not None
-    assert "invalid" in result.detail.lower()
+    assertions.expect_false(result.healthy, reason="vllm should be unhealthy with invalid URL")
+    assertions.expect_true(result.detail is not None, reason="vllm should have detail")
+    if result.detail is not None:
+        assertions.expect_in("invalid", result.detail.lower())
 
 
 def test_readiness_probe_check_vllm_success(mock_application_context: ApplicationContext) -> None:
@@ -362,7 +386,7 @@ def test_readiness_probe_check_vllm_success(mock_application_context: Applicatio
         result = probe.check_vllm_connection()
 
     # Assert
-    assert result.healthy is True
+    assertions.expect_true(result.healthy, reason="vllm should be healthy when connection succeeds")
 
 
 def test_readiness_probe_check_vllm_http_error(
@@ -384,6 +408,7 @@ def test_readiness_probe_check_vllm_http_error(
         result = probe.check_vllm_connection()
 
     # Assert
-    assert result.healthy is False
-    assert result.detail is not None
-    assert "unreachable" in result.detail.lower()
+    assertions.expect_false(result.healthy, reason="vllm should be unhealthy on HTTP error")
+    assertions.expect_true(result.detail is not None, reason="vllm should have detail")
+    if result.detail is not None:
+        assertions.expect_in("unreachable", result.detail.lower())

@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, TypeGuard
 
 import pytest
 
+from tests._helpers import assertions
 from tests.helpers import load_attribute, load_module
 
 if TYPE_CHECKING:
@@ -52,11 +53,15 @@ class TestPostponedAnnotations:
             pytest.skip(f"{module_name} not in Python path")
 
         source_file = module.__file__
-        assert source_file is not None, f"{module_name} module has no __file__ attribute"
+        assertions.expect_true(
+            source_file is not None, reason=f"{module_name} module has no __file__ attribute"
+        )
 
         content = Path(source_file).read_text(encoding="utf-8")
-        assert "from __future__ import annotations" in content, (
-            f"{module_name} missing postponed annotations directive"
+        assertions.expect_in(
+            "from __future__ import annotations",
+            content,
+            reason=f"{module_name} missing postponed annotations directive",
         )
 
 
@@ -67,13 +72,15 @@ class TestTypingFacadeModules:
         """gate_import is available from canonical source."""
         gate_import_raw = load_attribute("kgfoundry_common.typing", "gate_import")
         gate_import = _require_callable(gate_import_raw, "gate_import")
-        assert _is_callable(gate_import)
+        assertions.expect_true(_is_callable(gate_import), reason="gate_import should be callable")
 
     def test_kgfoundry_common_typing_exports_safe_get_type(self) -> None:
         """safe_get_type is available from canonical source."""
         safe_get_type_raw = load_attribute("kgfoundry_common.typing", "safe_get_type")
         safe_get_type = _require_callable(safe_get_type_raw, "safe_get_type")
-        assert _is_callable(safe_get_type)
+        assertions.expect_true(
+            _is_callable(safe_get_type), reason="safe_get_type should be callable"
+        )
 
     def test_kgfoundry_common_typing_exports_type_aliases(self) -> None:
         """Type aliases are accessible."""
@@ -84,7 +91,7 @@ class TestTypingFacadeModules:
             # Type narrowing: verify attribute exists and is not None
             if attr_value is None:
                 pytest.fail(f"{module.__name__}.{name} is None or missing")
-            assert attr_value is not None
+            assertions.expect_true(attr_value is not None, reason=f"{name} should not be None")
 
     def test_tools_typing_re_exports_facade(self) -> None:
         """tools.typing re-exports from canonical source."""
@@ -97,7 +104,7 @@ class TestTypingFacadeModules:
             pytest.fail("gate_import not found in modules")
         typed_tools = _require_callable(tools_gate_import, "tools.typing.gate_import")
         typed_common = _require_callable(common_gate_import, "kgfoundry_common.typing.gate_import")
-        assert typed_tools is typed_common
+        assertions.expect_true(typed_tools is typed_common, reason="should be same object")
 
     def test_docs_typing_re_exports_facade(self) -> None:
         """docs.typing re-exports from canonical source."""
@@ -113,7 +120,7 @@ class TestTypingFacadeModules:
             typed_common = _require_callable(
                 common_gate_import, "kgfoundry_common.typing.gate_import"
             )
-            assert typed_docs is typed_common
+            assertions.expect_true(typed_docs is typed_common, reason="should be same object")
         except ImportError:
             pytest.skip("docs.typing not in Python path")
 
@@ -126,19 +133,19 @@ class TestTypeOnlyImportGuarding:
         module = load_module("kgfoundry_common.typing")
 
         source_file = module.__file__
-        assert source_file is not None
+        assertions.expect_true(source_file is not None, reason="module should have __file__")
 
         content = Path(source_file).read_text(encoding="utf-8")
         # Verify TYPE_CHECKING is imported and used
-        assert "from typing import" in content
-        assert "if TYPE_CHECKING:" in content
+        assertions.expect_in("from typing import", content)
+        assertions.expect_in("if TYPE_CHECKING:", content)
 
     def test_no_eager_numpy_import_in_facade(self) -> None:
         """Numpy is not imported at module level in source."""
         module = load_module("kgfoundry_common.typing")
 
         source_file = module.__file__
-        assert source_file is not None
+        assertions.expect_true(source_file is not None, reason="module should have __file__")
 
         content = Path(source_file).read_text(encoding="utf-8")
         # Verify numpy is only imported inside TYPE_CHECKING block
@@ -166,7 +173,7 @@ class TestRuntimeImportSafety:
         with pytest.raises(ImportError) as exc_info:
             gate_import("nonexistent_module_xyz", "test")
 
-        assert "not installed" in str(exc_info.value)
+        assertions.expect_in("not installed", str(exc_info.value))
 
     def test_safe_get_type_missing_module_returns_none(self) -> None:
         """safe_get_type returns None gracefully for missing modules."""
@@ -176,7 +183,7 @@ class TestRuntimeImportSafety:
         # Type narrowing: verify None type
         if result_raw is not None:
             pytest.fail(f"Expected None, got {type(result_raw)}")
-        assert result_raw is None
+        assertions.expect_equal(result_raw, None)
 
     def test_safe_get_type_respects_default(self) -> None:
         """safe_get_type uses provided default value."""
@@ -187,7 +194,7 @@ class TestRuntimeImportSafety:
         # Type narrowing: verify result matches default type
         if not isinstance(result_raw, str):
             pytest.fail(f"Expected str, got {type(result_raw)}")
-        assert result_raw == default
+        assertions.expect_equal(result_raw, default)
 
 
 class TestCLIEntryPointImportClean:
@@ -205,7 +212,9 @@ class TestCLIEntryPointImportClean:
         """CLI linting tools are importable without optional dependencies."""
         try:
             module = load_module(module_name)
-            assert module is not None, f"{module_name} failed to load"
-            assert hasattr(module, "__file__"), f"{module_name} has no __file__ attribute"
+            assertions.expect_true(module is not None, reason=f"{module_name} failed to load")
+            assertions.expect_true(
+                hasattr(module, "__file__"), reason=f"{module_name} has no __file__ attribute"
+            )
         except ImportError as e:
             pytest.fail(f"Failed to import {module_name}: {e}")

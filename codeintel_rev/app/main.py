@@ -9,7 +9,6 @@ import asyncio
 import os
 import signal
 import threading
-import traceback
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager, suppress
@@ -342,15 +341,11 @@ async def _shutdown_context(
         with suppress(Exception):
             context.close_all_runtimes()
         if hasattr(context, "scope_store"):
-            try:
+            with suppress(RuntimeError, OSError, ValueError):
                 await context.scope_store.close()
-            except (RuntimeError, OSError, ValueError):
-                pass
     if readiness is not None:
-        try:
+        with suppress(RuntimeError, OSError, ValueError):
             await readiness.shutdown()
-        except (RuntimeError, OSError, ValueError):
-            pass
 
 
 @asynccontextmanager
@@ -377,7 +372,7 @@ async def lifespan(
     -----
     Startup sequence:
     1. Load configuration from environment (fail fast if invalid)
-    2. Perform GPU warmup sequence (verify CUDA/torch/FAISS GPU availability)
+    2. Run FAISS CPU health check plus optional preloading
     3. Initialize long-lived clients (vLLM, FAISS manager)
     4. Initialize scope registry for session-scoped query constraints
     5. Run readiness checks (verify indexes exist, vLLM reachable)
@@ -505,6 +500,12 @@ async def set_mcp_context(
     -------
     Response
         Response from the next handler.
+
+    Raises
+    ------
+    Exception
+        Any exception raised by the downstream handler (`call_next`) is
+        logged and re-raised unchanged.
 
     Notes
     -----
@@ -669,38 +670,25 @@ async def _stream_with_logging(
     request: Request,
     stream_name: str,
 ) -> AsyncIterator[bytes]:
-    """Wrap a streaming iterator and emit lifecycle logs for observability.
+    """Pass through streaming bytes source without instrumentation.
 
     Parameters
     ----------
     source : AsyncIterator[bytes]
-        Source iterator to wrap and log.
+        Source iterator to wrap and pass through.
     request : Request
-        FastAPI request object for logging context.
+        FastAPI request object (unused, kept for API compatibility).
     stream_name : str
-        Name identifier for the stream being logged.
+        Name identifier for the stream (unused, kept for API compatibility).
 
     Yields
     ------
     bytes
-        Chunks from the source iterator, passed through unchanged.
-
-    Raises
-    ------
-    asyncio.CancelledError
-        Re-raised if the source iterator is cancelled, after logging cancellation.
+        Chunks from ``source`` yielded verbatim.
     """
-    try:
-        async for chunk in source:
-            if isinstance(chunk, (bytes, bytearray)):
-                byte_count = len(chunk)
-            elif isinstance(chunk, str):
-                byte_count = len(chunk.encode("utf-8"))
-            else:  # pragma: no cover - defensive path
-                byte_count = 0
-            yield chunk
-    except asyncio.CancelledError:
-        raise
+    del request, stream_name
+    async for chunk in source:
+        yield chunk
 
 
 @app.get("/sse")
@@ -806,7 +794,6 @@ def unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespons
         if available.
     """
     request_id = getattr(request.state, "request_id", None)
-    stacktrace = "".join(traceback.format_exception(exc.__class__, exc, exc.__traceback__))
     payload: dict[str, object] = {
         "ok": False,
         "error": {"type": exc.__class__.__name__, "message": str(exc)},

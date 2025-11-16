@@ -1,3 +1,10 @@
+"""Tests for import gates and lazy loading behavior.
+
+These tests verify that heavy dependencies are not eagerly imported when modules
+are imported. The assertions are within subprocess script strings and execute
+in a separate interpreter, so they don't need to be converted to assertion helpers.
+"""
+
 from __future__ import annotations
 
 import os
