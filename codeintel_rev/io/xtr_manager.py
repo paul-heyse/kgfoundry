@@ -467,7 +467,8 @@ class XTRIndex:
         the device ordinal. It handles malformed input gracefully by returning None
         when the format is invalid or when no ordinal is specified. This is used
         internally by the XTR index to resolve device assignments from configuration
-        strings and ensure proper GPU device selection for tensor operations.
+        strings and ensure proper device selection for tensor operations on hosts that
+        still expose CUDA devices.
 
         Parameters
         ----------

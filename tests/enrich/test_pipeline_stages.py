@@ -121,6 +121,8 @@ def test_apply_tagging_assigns_cli_tag() -> None:
     _APPLY_TAGGING([record], {"cli": {"any_import": ["typer"], "reason": "cli detected"}})
     tags = record.get("tags")
     assertions.expect_true(isinstance(tags, list), reason="tags should be list")
+    if not isinstance(tags, list):  # pragma: no cover - defensive
+        pytest.fail("tags should be a list")
     assertions.expect_in("cli", tags)
 
 

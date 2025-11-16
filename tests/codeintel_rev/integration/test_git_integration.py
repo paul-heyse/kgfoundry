@@ -202,7 +202,8 @@ def test_blame_range_file_not_found(git_repo: Path) -> None:
     """blame_range should raise FileNotFoundError for missing files."""
     client = GitClient(repo_path=git_repo)
 
-    with pytest.raises((FileNotFoundError, GitCommandError)):
+    allowed_exceptions: tuple[type[BaseException], ...] = (FileNotFoundError, GitCommandError)
+    with pytest.raises(allowed_exceptions):
         client.blame_range("nonexistent.py", start_line=1, end_line=10)
 
 

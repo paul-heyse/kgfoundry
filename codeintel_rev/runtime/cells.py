@@ -232,6 +232,11 @@ class RuntimeCell[T]:
             Raised when generation tracking becomes inconsistent (defensive check).
             Also raised when the initialization generation is missing (should not occur
             in normal operation).
+        Exception
+            Re-raised when a cooldown period is active after a previous initialization
+            failure. The exception type matches the original failure (e.g., RuntimeError,
+            OSError, ImportError) and is preserved from the previous initialization attempt.
+            Callers should handle this to implement retry logic with backoff.
 
         Notes
         -----
@@ -316,6 +321,10 @@ class RuntimeCell[T]:
             Propagated when ``silent=False`` and file/resource cleanup fails.
         RuntimeError
             Propagated when ``silent=False`` and runtime state errors occur.
+        Exception
+            Propagated when ``silent=False`` and an unexpected exception occurs during
+            payload disposal. This is a defensive catch-all for exceptions not covered
+            by the specific exception types above.
 
         Notes
         -----

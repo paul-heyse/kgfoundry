@@ -180,8 +180,8 @@ class AnswerOrchestrator:
         return self._build_envelope(answer, findings, plan, limits, confidence)
 
     async def _faiss_retrieve(self, query_vec, k: int, scope: ScopeIn) -> list[int]:
-        """Retrieve from FAISS (handles GPU/CPU fallback internally)."""
-        # FAISSManager.search already handles GPU clone/fallback
+        """Retrieve from FAISS (handles CPU runtime tuning internally)."""
+        # FAISSManager.search already handles loading and tuning
         results = await asyncio.to_thread(
             self.faiss_manager.search, query_vec, k=k, nprobe=64
         )
@@ -896,230 +896,10 @@ class DuckDBManager:
 
 ## 6. FAISS Dual-Index (`codeintel_rev/io/faiss_dual_index.py`)
 
-**Purpose**: Primary (trained IVF-PQ) + secondary (Flat incremental) with compaction.
+This module was removed during the CPU-only migration; see the design document for
+historical context. No runtime code remains for this component.
 
-```python
-"""FAISS dual-index manager with GPU clone and compaction."""
-from __future__ import annotations
-
-import json
-from dataclasses import dataclass
-from pathlib import Path
-from typing import TYPE_CHECKING
-
-import faiss
-import numpy as np
-import structlog
-
-if TYPE_CHECKING:
-    from codeintel_rev.config.settings import FAISSConfig
-
-logger = structlog.get_logger()
-
-
-@dataclass
-class SearchHit:
-    """FAISS search result."""
-    id: int
-    score: float
-
-
-@dataclass
-class IndexManifest:
-    """FAISS index metadata."""
-    version: str
-    vec_dim: int
-    index_type: str
-    nlist: int
-    pq_m: int
-    metric: str
-    trained_on: str
-    gpu_enabled: bool
-    cuvs: str | None
-    secondary_size: int
-
-
-class FAISSDualIndex:
-    """
-    FAISS manager with dual-index architecture.
-    
-    - Primary: Trained IVF-PQ index (CPU persisted, GPU clone optional)
-    - Secondary: Flat index for incremental updates
-    - Compaction: Merge secondary into primary on threshold
-    """
-
-    def __init__(self, index_dir: Path, config: FAISSConfig):
-        self.index_dir = index_dir
-        self.config = config
-        self.primary_path = index_dir / "primary.faiss"
-        self.secondary_path = index_dir / "secondary.faiss"
-        self.manifest_path = index_dir / "primary.manifest.json"
-        
-        self.primary_cpu: faiss.Index | None = None
-        self.primary_gpu: faiss.Index | None = None
-        self.secondary: faiss.IndexFlatIP | None = None
-        self.gpu_enabled = False
-        self.gpu_disabled_reason: str | None = None
-
-    def ensure_ready(self):
-        """
-        Load indexes and clone to GPU if available.
-        
-        Sets gpu_enabled=True on success, else sets gpu_disabled_reason.
-        """
-        # Load primary index (CPU)
-        if not self.primary_path.exists():
-            raise FileNotFoundError(f"Primary index not found: {self.primary_path}")
-        
-        self.primary_cpu = faiss.read_index(str(self.primary_path))
-        logger.info("primary_index_loaded", path=self.primary_path, ntotal=self.primary_cpu.ntotal)
-        
-        # Try GPU clone
-        try:
-            if faiss.get_num_gpus() > 0:
-                res = faiss.StandardGpuResources()
-                cloner_opts = faiss.GpuClonerOptions()
-                if hasattr(cloner_opts, "use_cuvs"):
-                    cloner_opts.use_cuvs = self.config.use_cuvs
-                
-                self.primary_gpu = faiss.index_cpu_to_gpu(res, 0, self.primary_cpu, cloner_opts)
-                self.gpu_enabled = True
-                logger.info("gpu_clone_success", use_cuvs=self.config.use_cuvs)
-            else:
-                self.gpu_disabled_reason = "no_gpu_devices"
-                logger.warning("gpu_clone_skipped", reason="no_gpu_devices")
-        except Exception as e:
-            self.gpu_disabled_reason = f"gpu_clone_failed: {str(e)}"
-            logger.warning("gpu_clone_failed", error=str(e))
-        
-        # Load secondary index (or create empty)
-        if self.secondary_path.exists():
-            self.secondary = faiss.read_index(str(self.secondary_path))
-            logger.info("secondary_index_loaded", ntotal=self.secondary.ntotal)
-        else:
-            vec_dim = self.primary_cpu.d
-            self.secondary = faiss.IndexIDMap2(faiss.IndexFlatIP(vec_dim))
-            logger.info("secondary_index_created", vec_dim=vec_dim)
-
-    def search(self, query_vec: np.ndarray, k: int, nprobe: int = 64) -> list[SearchHit]:
-        """
-        Search both primary and secondary indexes, merge results.
-        
-        Parameters
-        ----------
-        query_vec : np.ndarray
-            Query vector (shape: [vec_dim])
-        k : int
-            Number of results
-        nprobe : int
-            FAISS nprobe parameter (for IVF indexes)
-        
-        Returns
-        -------
-        list[SearchHit]
-            Top-k results (deduplicated by ID)
-        """
-        if query_vec.ndim == 1:
-            query_vec = query_vec.reshape(1, -1)
-        
-        # Search primary (GPU if available, else CPU)
-        index = self.primary_gpu if self.gpu_enabled else self.primary_cpu
-        if hasattr(index, "nprobe"):
-            index.nprobe = nprobe
-        
-        D_pri, I_pri = index.search(query_vec, k)
-        primary_hits = [
-            SearchHit(id=int(I_pri[0, i]), score=float(D_pri[0, i]))
-            for i in range(len(I_pri[0])) if I_pri[0, i] != -1
-        ]
-        
-        # Search secondary (always CPU Flat)
-        if self.secondary.ntotal > 0:
-            D_sec, I_sec = self.secondary.search(query_vec, k)
-            secondary_hits = [
-                SearchHit(id=int(I_sec[0, i]), score=float(D_sec[0, i]))
-                for i in range(len(I_sec[0])) if I_sec[0, i] != -1
-            ]
-        else:
-            secondary_hits = []
-        
-        # Merge and deduplicate by ID (keep highest score)
-        merged = {}
-        for hit in primary_hits + secondary_hits:
-            if hit.id not in merged or hit.score > merged[hit.id].score:
-                merged[hit.id] = hit
-        
-        # Sort by score descending
-        results = sorted(merged.values(), key=lambda x: x.score, reverse=True)
-        return results[:k]
-
-    def add_incremental(self, ids: np.ndarray, vectors: np.ndarray):
-        """
-        Add vectors to secondary index (incremental).
-        
-        Parameters
-        ----------
-        ids : np.ndarray
-            Chunk IDs (shape: [N])
-        vectors : np.ndarray
-            Vectors (shape: [N, vec_dim])
-        """
-        if self.secondary is None:
-            raise RuntimeError("Secondary index not initialized. Call ensure_ready() first.")
-        
-        self.secondary.add_with_ids(vectors, ids)
-        logger.info("incremental_add", count=len(ids), secondary_total=self.secondary.ntotal)
-        
-        # Persist secondary
-        faiss.write_index(self.secondary, str(self.secondary_path))
-        
-        # Check compaction threshold
-        if self.secondary.ntotal >= self.config.compaction_threshold:
-            logger.warning("compaction_threshold_exceeded", secondary_size=self.secondary.ntotal)
-
-    def compact(self):
-        """
-        Compact: Merge secondary into primary and rebuild.
-        
-        This is a heavyweight operation. Consider running during maintenance window.
-        """
-        if self.secondary is None or self.secondary.ntotal == 0:
-            logger.info("compact_skipped", reason="secondary_empty")
-            return
-        
-        logger.info("compaction_start", primary_size=self.primary_cpu.ntotal, secondary_size=self.secondary.ntotal)
-        
-        # Extract vectors from primary and secondary
-        # (This requires IndexIDMap2 or similar to map IDs to vectors)
-        # For simplicity, assume we can reconstruct from Parquet (not shown here)
-        
-        # Rebuild primary with merged vectors
-        # (Detailed implementation depends on your data pipeline)
-        
-        # Clear secondary
-        vec_dim = self.secondary.d
-        self.secondary = faiss.IndexIDMap2(faiss.IndexFlatIP(vec_dim))
-        faiss.write_index(self.secondary, str(self.secondary_path))
-        
-        # Write manifest
-        manifest = IndexManifest(
-            version="2025-11-08",
-            vec_dim=self.primary_cpu.d,
-            index_type="IVFPQ",
-            nlist=getattr(self.primary_cpu, "nlist", 0),
-            pq_m=getattr(self.primary_cpu, "pq_m", 0),
-            metric="IP",
-            trained_on="compact",
-            gpu_enabled=self.gpu_enabled,
-            cuvs=str(self.config.use_cuvs) if hasattr(self.config, "use_cuvs") else None,
-            secondary_size=0,
-        )
-        with open(self.manifest_path, "w") as f:
-            json.dump(manifest.__dict__, f, indent=2)
-        
-        logger.info("compaction_complete")
-```
-
+---
 ---
 
 ## Integration Notes
@@ -1219,7 +999,7 @@ async def test_answer_query_e2e(context: ApplicationContext):
 | `vllm_chat.py` | TTFT | <800ms | Time to first token |
 | `scope_store.py` | L1 hit rate | >90% | In-memory cache |
 | `duckdb_manager.py` | Query latency | <150ms p95 | 100 chunk hydration |
-| `faiss_dual_index.py` | GPU search | <50ms p95 | 10K index, k=50 |
+| `faiss_dual_index.py` | CPU search | <50ms p95 | 10K index, k=50 |
 
 ---
 
@@ -1227,4 +1007,3 @@ async def test_answer_query_e2e(context: ApplicationContext):
 **Status**: 🟢 Ready for Adaptation
 
 Adapt these implementations to your specific `ApplicationContext`, error handling patterns, and logging framework.
-

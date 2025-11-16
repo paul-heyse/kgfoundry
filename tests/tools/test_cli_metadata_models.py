@@ -121,7 +121,10 @@ def test_load_augment_reports_validation_errors(tmp_path: Path) -> None:
     assertions.expect_true(
         _has_problem_details(excinfo.value), reason="should have problem details"
     )
-    problem = excinfo.value.problem
+    error = excinfo.value
+    if not isinstance(error, augment_registry.AugmentRegistryValidationError):  # pragma: no cover
+        pytest.fail("Expected AugmentRegistryValidationError")
+    problem = error.problem
     assertions.expect_equal(problem["status"], 422)
     errors = problem.get("errors")
     assertions.expect_true(isinstance(errors, list), reason="errors should be a list")

@@ -347,6 +347,8 @@ def test_repo_scan_with_griffe_flag(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     )
     greeter_symbol = next((s for s in payload["api_symbols"] if s["short_name"] == "Greeter"), None)
     assertions.expect_true(greeter_symbol is not None, reason="should have Greeter symbol")
+    if greeter_symbol is None:  # pragma: no cover - defensive
+        pytest.fail("Greeter symbol should be present")
     assertions.expect_true(
         any(param["name"] == "prefix" for param in greeter_symbol["params"]),
         reason="should have prefix parameter",

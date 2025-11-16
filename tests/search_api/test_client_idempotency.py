@@ -13,6 +13,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+import pytest
+
 from tests._helpers import assertions
 
 if TYPE_CHECKING:
@@ -329,6 +331,8 @@ class TestCorrelationIdPropagation:
         assertions.expect_true(
             isinstance(response_data, dict), reason="response_data should be dict"
         )
+        if not isinstance(response_data, dict):  # pragma: no cover - defensive
+            pytest.fail("response_data should be dict")
         extensions = response_data.get("extensions")
         has_direct = "correlation_id" in response_data
         has_extension = isinstance(extensions, dict) and "correlation_id" in extensions
@@ -354,6 +358,8 @@ class TestCorrelationIdPropagation:
         payload2 = result2.json()
         assertions.expect_true(isinstance(payload1, dict), reason="payload1 should be dict")
         assertions.expect_true(isinstance(payload2, dict), reason="payload2 should be dict")
+        if not isinstance(payload1, dict) or not isinstance(payload2, dict):  # pragma: no cover
+            pytest.fail("payloads should be dict")
         assertions.expect_equal(payload1.get("correlation_id"), correlation_id)
         assertions.expect_equal(payload2.get("correlation_id"), correlation_id)
 

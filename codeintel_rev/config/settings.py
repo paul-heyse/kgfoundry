@@ -189,11 +189,7 @@ def _build_vllm_config() -> VLLMConfig:
         pooling_type = "MEAN"
     else:
         pooling_type = "LAST"
-    memory_utilization_env = (
-        os.environ.get("VLLM_MEMORY_UTILIZATION")
-        or os.environ.get("VLLM_GPU_MEMORY_UTILIZATION")
-        or "0.92"
-    )
+    memory_utilization_env = os.environ.get("VLLM_MEMORY_UTILIZATION", "0.92")
     return VLLMConfig(
         base_url=os.environ.get("VLLM_URL", "http://127.0.0.1:8001/v1"),
         model=os.environ.get("VLLM_MODEL", "nomic-ai/nomic-embed-code"),
@@ -402,7 +398,7 @@ class VLLMConfig(msgspec.Struct, frozen=True):
     of code chunks during indexing and for query embeddings during semantic search.
 
     The vLLM service runs separately from the main application and can live on any
-    accelerator topology (CPU-only hosts, single-GPU nodes, etc.). This configuration
+    deployment topology (from developer laptops to dedicated inference servers). This configuration
     is hardware-agnostic and focuses on HTTP/runtime settings that the embedding
     service exposes publicly.
 

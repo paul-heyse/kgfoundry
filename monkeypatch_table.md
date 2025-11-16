@@ -2,7 +2,7 @@
 |---|---|---|---|
 | tests/app/test_admin_index.py:28 | CODEINTEL_ADMIN@28, CODEINTEL_ADMIN@44, CODEINTEL_ADMIN@63, CODEINTEL_ADMIN@81 | ctx.__class__."get_coderank_faiss_manager"@52 | - |
 | tests/app/test_capz.py:43 | - | capabilities_module."_import_optional"@43, capabilities_module.Capabilities."from_context"@80 | - |
-| tests/app/test_lifespan_runtime_cleanup.py:86 | XTR_PRELOAD@93, HYBRID_PRELOAD@94 | ApplicationContext."create"@86, "codeintel_rev.app.main.warmup_gpu"._fake_warmup@91, "codeintel_rev.app.main.ReadinessProbe"._probe_factory@92, "codeintel_rev.app.config_context.HybridSearchEngine"._factory@126 | - |
+| tests/app/test_lifespan_runtime_cleanup.py:86 | XTR_PRELOAD@93, HYBRID_PRELOAD@94 | ApplicationContext."create"@86, "codeintel_rev.app.main.check_faiss_health"@91, "codeintel_rev.app.main.ReadinessProbe"._probe_factory@92 | - |
 | tests/app/test_runtime_gates.py:35 | - | config_module."gate_import"@35, config_module."gate_import"@63 | - |
 | tests/cli/test_indexctl_embeddings.py:187 | - | "codeintel_rev.cli.indexctl.get_embedding_provider"._provider_factory@187 | - |
 | tests/cli/test_indexctl_health.py:90 | - | "codeintel_rev.cli.indexctl._get_settings".lambda: _Settings(tmp_path)@90, "codeintel_rev.cli.indexctl._faiss_manager".lambda *_: manager@91, "codeintel_rev.cli.indexctl._duckdb_catalog".lambda *_: catalog@92, "codeintel_rev.cli.indexctl._duckdb_embedding_dim".lambda _c: 4@93, "codeintel_rev.cli.indexctl._count_idmap_rows".lambda _p: 4@94 | - |
@@ -15,11 +15,9 @@
 | tests/codeintel_rev/test_app_lifespan.py:47 | REPO_ROOT@47, VLLM_URL@48, REPO_ROOT@95, VLLM_URL@96, REPO_ROOT@115, VLLM_URL@116, FAISS_PRELOAD@151 | - | - |
 | tests/codeintel_rev/test_bm25_cli.py:86 | - | Paths."discover"@86, bm25_cli."_create_bm25_manager"@93, bm25_cli."_create_bm25_manager"@111 | - |
 | tests/codeintel_rev/test_bm25_manager.py:46 | REPO_ROOT@46, DATA_DIR@47, FAISS_INDEX@48, DUCKDB_PATH@49, SCIP_INDEX@50, BM25_JSONL_DIR@51, BM25_INDEX_DIR@52, VLLM_URL@53, BM25_THREADS@137 | "codeintel_rev.io.bm25_manager._run_pyserini_index".fake_run@138, codeintel_rev.io.bm25_manager._detect_pyserini_version".lambda: "test@139 | - |
-| tests/codeintel_rev/test_config_context.py:96 | REPO_ROOT@96, VLLM_URL@97, REPO_ROOT@118, VLLM_URL@119, REPO_ROOT@140, VLLM_URL@141, REPO_ROOT@172, VLLM_URL@173, REPO_ROOT@206, VLLM_URL@207, REPO_ROOT@234 | context.faiss_manager."load_cpu_index"@101, context.faiss_manager."clone_to_gpu"@102, context.faiss_manager."load_cpu_index"@144, context.faiss_manager."clone_to_gpu"@145, context.faiss_manager."load_cpu_index"@176, context.faiss_manager."clone_to_gpu"@177 | - |
+| tests/codeintel_rev/test_config_context.py:96 | REPO_ROOT@96, VLLM_URL@97, REPO_ROOT@118, VLLM_URL@119, REPO_ROOT@140, VLLM_URL@141, REPO_ROOT@172, VLLM_URL@173, REPO_ROOT@206, VLLM_URL@207, REPO_ROOT@234 | context.faiss_manager."load_cpu_index"@101, context.faiss_manager."load_cpu_index"@144, context.faiss_manager."load_cpu_index"@176 | - |
 | tests/codeintel_rev/test_duckdb_catalog.py:621 | - | test_catalog."_query_builder"@621 | - |
 | tests/codeintel_rev/test_duckdb_manager.py:134 | - | "codeintel_rev.io.duckdb_manager.duckdb.connect"._instrumented_connect@134 | - |
-| tests/codeintel_rev/test_faiss_dual_index.py:206 | - | faiss_module."index_cpu_to_gpu"@216 | sys.modules["torch"]@206 |
-| tests/codeintel_rev/test_faiss_manager.py:38 | - | faiss_module."GpuClonerOptions"@38, faiss_module."StandardGpuResources"@47, faiss_module."index_cpu_to_gpu"@58, faiss_module."StandardGpuResources"@77 | - |
 | tests/codeintel_rev/test_hybrid_explainability.py:16 | HYBRID_ENABLE_BM25@16, HYBRID_ENABLE_SPLADE@17, BM25_INDEX_DIR@18, SPLADE_INDEX_DIR@19, SPLADE_MODEL_DIR@20, SPLADE_ONNX_DIR@21 | - | - |
 | tests/codeintel_rev/test_integration_full.py:53 | REPO_ROOT@53, VLLM_URL@54, FAISS_PRELOAD@55, REPO_ROOT@101, VLLM_URL@102, FAISS_PRELOAD@118, FAISS_PRELOAD@137 | - | - |
 | tests/codeintel_rev/test_integration_smoke.py:97 | - | text_search_adapter."run_subprocess"@97 | - |

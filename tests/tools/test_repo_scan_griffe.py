@@ -83,6 +83,8 @@ def calculate_value(left: int, right: int) -> int:
 
     func = names["calculate_value"]
     assertions.expect_true(func.returns is not None, reason="should have returns")
+    if func.returns is None:  # pragma: no cover - defensive
+        pytest.fail("returns should not be None")
     assertions.expect_true(bool(func.returns.doc), reason="returns should have doc")
     assertions.expect_true(any(param.doc for param in func.params), reason="should have param docs")
 

@@ -316,7 +316,7 @@ async def semantic_search_pro(
     where k is fanout and n is index size), WARP reranking (O(m * d) where m is candidates
     and d is sequence length), fusion (O(n * c) where n is hits and c is channels), DuckDB
     hydration (O(r) where r is result count), optional reranking (O(r * model_latency)).
-    The function performs extensive I/O (FAISS, DuckDB, optional GPU models) and is not
+    The function performs extensive I/O (FAISS, DuckDB, optional local rerankers) and is not
     thread-safe (uses context managers and shared state). Performance budgets are tracked
     per stage and violations are reported in the limits field. The function uses asyncio
     to offload synchronous work to a thread pool. Note that EmbeddingError may be propagated
@@ -362,114 +362,65 @@ def _semantic_search_pro_sync(
     start_time = perf_counter()
     run_state = _SemanticProRunState.from_limit(limit)
 
-    try:
-        run_state.effective_limit = _clamp_limit(
-            limit,
-            context.settings.limits.max_results,
-            run_state.limits,
-        )
-        run_state.wide_handle = _maybe_schedule_xtr_wide(
+    run_state.effective_limit = _clamp_limit(
+        limit,
+        context.settings.limits.max_results,
+        run_state.limits,
+    )
+    run_state.wide_handle = _maybe_schedule_xtr_wide(
+        context=context,
+        query=query,
+        limit=run_state.effective_limit,
+        options=options,
+    )
+    run_state.coderank_fanout = max(
+        run_state.effective_limit,
+        run_state.effective_limit * context.settings.limits.semantic_overfetch_multiplier,
+    )
+    coderank_hits = _run_coderank_stage(
+        context=context,
+        query=query,
+        fanout=run_state.coderank_fanout,
+    )
+
+    warp_outcome = _resolve_stage_one_outcome(
+        StageOnePlan(
             context=context,
             query=query,
-            limit=run_state.effective_limit,
+            candidates=tuple(coderank_hits),
             options=options,
+            wide_handle=run_state.wide_handle,
         )
-        run_state.coderank_fanout = max(
-            run_state.effective_limit,
-            run_state.effective_limit * context.settings.limits.semantic_overfetch_multiplier,
-        )
-        coderank_hits = _run_coderank_stage(
-            context=context,
+    )
+
+    fused = _run_fusion_stage(
+        context=context,
+        request=FusionRequest(
             query=query,
-            fanout=run_state.coderank_fanout,
-        )
+            coderank_hits=coderank_hits,
+            warp_hits=warp_outcome.hits,
+            warp_channel=warp_outcome.channel,
+            effective_limit=run_state.effective_limit,
+            weights=_merge_rrf_weights(context.settings.index.rrf_weights, options.stage_weights),
+            faiss_k=run_state.coderank_fanout,
+            nprobe=context.settings.index.faiss_nprobe,
+        ),
+    )
+    fused, rerank_metadata = _maybe_apply_rerank_stage(
+        context=context,
+        query=query,
+        fused=fused,
+        options=options,
+    )
 
-        warp_outcome = _resolve_stage_one_outcome(
-            StageOnePlan(
-                context=context,
-                query=query,
-                candidates=tuple(coderank_hits),
-                options=options,
-                wide_handle=run_state.wide_handle,
-            )
-        )
-
-        fused = _run_fusion_stage(
-            context=context,
-            request=FusionRequest(
-                query=query,
-                coderank_hits=coderank_hits,
-                warp_hits=warp_outcome.hits,
-                warp_channel=warp_outcome.channel,
-                effective_limit=run_state.effective_limit,
-                weights=_merge_rrf_weights(
-                    context.settings.index.rrf_weights, options.stage_weights
-                ),
-                faiss_k=run_state.coderank_fanout,
-                nprobe=context.settings.index.faiss_nprobe,
-            ),
-        )
-        fused, rerank_metadata = _maybe_apply_rerank_stage(
-            context=context,
-            query=query,
-            fused=fused,
-            options=options,
-        )
-
-        if not fused.docs:
-            return _make_envelope(
-                answer=f"No results found for: {query}",
-                findings=[],
-                extras=_assemble_extras(
-                    method=_build_method(
-                        MethodContext(
-                            findings_count=0,
-                            requested_limit=limit,
-                            effective_limit=run_state.effective_limit,
-                            start_time=start_time,
-                            channels=fused.channels,
-                            notes=tuple(warp_outcome.notes),
-                            explainability=_build_method_explainability(
-                                warp_outcome.explainability
-                            ),
-                            rerank=rerank_metadata,
-                            hybrid_method=(
-                                cast("MethodInfo", dict(fused.method)) if fused.method else None
-                            ),
-                        )
-                    ),
-                    limits=run_state.limits + fused.warnings,
-                    scope=scope,
-                    result_count=0,
-                ),
-            )
-
-        hydration_result = _hydrate_and_rerank_records(
-            HydrationPlan(
-                context=context,
-                query=query,
-                fused=fused,
-                scope=scope,
-                effective_limit=run_state.effective_limit,
-                options=options,
-            )
-        )
-
-        findings = _build_findings(
-            records=hydration_result.records,
-            docs=fused.docs,
-            contribution_map=fused.contributions,
-            explain=options.explain,
-            annotations=hydration_result.annotations,
-        )
-        merge_explainability_into_findings(findings, warp_outcome.explainability)
-        success_envelope = _make_envelope(
-            answer=f"Found {len(findings)} semantic_pro results for: {query}",
-            findings=findings,
+    if not fused.docs:
+        return _make_envelope(
+            answer=f"No results found for: {query}",
+            findings=[],
             extras=_assemble_extras(
                 method=_build_method(
                     MethodContext(
-                        findings_count=len(findings),
+                        findings_count=0,
                         requested_limit=limit,
                         effective_limit=run_state.effective_limit,
                         start_time=start_time,
@@ -484,11 +435,54 @@ def _semantic_search_pro_sync(
                 ),
                 limits=run_state.limits + fused.warnings,
                 scope=scope,
+                result_count=0,
             ),
         )
-        return _finish(len(findings), success_envelope)
-    except Exception:
-        raise
+
+    hydration_result = _hydrate_and_rerank_records(
+        HydrationPlan(
+            context=context,
+            query=query,
+            fused=fused,
+            scope=scope,
+            effective_limit=run_state.effective_limit,
+            options=options,
+        )
+    )
+
+    findings = _build_findings(
+        records=hydration_result.records,
+        docs=fused.docs,
+        contribution_map=fused.contributions,
+        explain=options.explain,
+        annotations=hydration_result.annotations,
+    )
+    merge_explainability_into_findings(findings, warp_outcome.explainability)
+    method_notes = (*warp_outcome.notes, *hydration_result.notes)
+    return _make_envelope(
+        answer=f"Found {len(findings)} semantic_pro results for: {query}",
+        findings=findings,
+        extras=_assemble_extras(
+            method=_build_method(
+                MethodContext(
+                    findings_count=len(findings),
+                    requested_limit=limit,
+                    effective_limit=run_state.effective_limit,
+                    start_time=start_time,
+                    channels=fused.channels,
+                    notes=method_notes,
+                    explainability=_build_method_explainability(warp_outcome.explainability),
+                    rerank=rerank_metadata,
+                    hybrid_method=(
+                        cast("MethodInfo", dict(fused.method)) if fused.method else None
+                    ),
+                )
+            ),
+            limits=run_state.limits + fused.warnings,
+            scope=scope,
+            result_count=len(findings),
+        ),
+    )
 
 
 def _run_coderank_stage(
@@ -1128,6 +1122,7 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
     options = plan.options
     ordered_ids = _dedupe_preserve_order([_safe_int(doc.doc_id) for doc in fused.docs])
     requested = len(ordered_ids)
+    summary_notes: list[str] = []
     try:
         records, annotations = _hydrate_records(
             context=context,
@@ -1141,10 +1136,14 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
         raise VectorSearchError(msg, cause=exc) from exc
     else:
         returned = len(records)
+        summary_notes.append(f"DuckDB hydration returned {returned}/{requested} chunks.")
 
     rerank_decision = _rerank_gate_decision(options, context.settings.coderank_llm, records)
     if not rerank_decision.should_run:
         records = records[:effective_limit]
+        summary_notes.append(
+            f"CodeRank reranker skipped ({rerank_decision.reason.replace('_', ' ')})"
+        )
     else:
         records = _maybe_rerank(
             query=plan.query,
@@ -1153,8 +1152,13 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
             enabled=True,
         )
         records = records[:effective_limit]
+        summary_notes.append("CodeRank reranker executed.")
 
-    return HydrationOutcome(records=records, annotations=annotations)
+    return HydrationOutcome(
+        records=records,
+        annotations=annotations,
+        notes=tuple(summary_notes),
+    )
 
 
 def _maybe_rerank(
@@ -1461,6 +1465,7 @@ def _assemble_extras(
     method: MethodInfo,
     limits: list[str],
     scope: ScopeIn | None,
+    result_count: int | None = None,
 ) -> AnswerEnvelope:
     """Assemble response metadata extras dictionary.
 
@@ -1487,12 +1492,15 @@ def _assemble_extras(
         Scope filters that were applied during search (include_globs, exclude_globs,
         languages). None means no scope filtering was applied. Non-None values are
         included in the extras as the "scope" field.
+    result_count : int | None, optional
+        Number of findings produced by the pipeline. When provided, added under
+        a ``results`` key to help downstream consumers reason about totals.
 
     Returns
     -------
     AnswerEnvelope
         Dictionary containing the method field (always present) and optionally
-        limits and scope fields if they are non-empty/non-None. This dictionary
+        limits, scope, and results metadata if provided. This dictionary
         is merged into the final AnswerEnvelope by _make_envelope().
 
     Notes
@@ -1513,6 +1521,8 @@ def _assemble_extras(
     True
     """
     extras: AnswerEnvelope = {"method": method}
+    if result_count is not None:
+        extras["results"] = {"count": result_count}
     if limits:
         extras["limits"] = limits
     if scope:

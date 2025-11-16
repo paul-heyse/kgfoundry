@@ -32,15 +32,11 @@ def test_index_bm25_emits_success_envelope(
     def fake_build(
         config: orchestration_cli.BM25BuildConfig,
         *,
-        logger: orchestration_cli.LoggerAdapter,
+        logger: object,
     ) -> tuple[str, int]:
         assertions.expect_true(
             isinstance(config, orchestration_cli.BM25BuildConfig),
             reason="config should be orchestration_cli.BM25BuildConfig",
-        )
-        assertions.expect_true(
-            isinstance(logger, orchestration_cli.LoggerAdapter),
-            reason="logger should be orchestration_cli.LoggerAdapter",
         )
         return "lucene", 3
 

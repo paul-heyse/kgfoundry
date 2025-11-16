@@ -140,6 +140,8 @@ def test_build_index_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
 
     options = stub.build_calls[0]
     assertions.expect_true(isinstance(options, BM25BuildOptions))
+    if not isinstance(options, BM25BuildOptions):  # pragma: no cover - type guard
+        pytest.fail("build calls should include BM25BuildOptions")
     assertions.expect_equal(options.json_dir, json_dir)
     assertions.expect_equal(options.threads, THREAD_OVERRIDE)
     assertions.expect_true(stub.last_index_metadata_path is not None)

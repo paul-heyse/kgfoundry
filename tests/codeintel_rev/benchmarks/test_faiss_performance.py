@@ -26,6 +26,7 @@ from tests.conftest import FAISS_MODULE, HAS_FAISS_SUPPORT
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
     import faiss
+    from pytest_benchmark.fixture import BenchmarkFixture
 
 # Use modern numpy random generator
 _rng = np.random.default_rng(42)
@@ -47,7 +48,7 @@ else:
     pytestmark = [_benchmark_gate]
 
 
-def _get_underlying_index(cpu_index: faiss.IndexIDMap2) -> faiss.Index:
+def _get_underlying_index(cpu_index: faiss.Index | None) -> faiss.Index:
     """Return the underlying FAISS index from an ID map wrapper.
 
     Parameters
@@ -60,12 +61,13 @@ def _get_underlying_index(cpu_index: faiss.IndexIDMap2) -> faiss.Index:
     Any
         Underlying FAISS index instance.
     """
-    assertions.expect_true(
-        hasattr(cpu_index, "index"),
-        reason="Expected FAISS index wrapper to expose `index` attribute",
-    )
-    index_map = cast("faiss.IndexIDMap2", cpu_index)
-    return index_map.index
+    assertions.expect_true(cpu_index is not None, reason="FAISS index should not be None")
+    if cpu_index is None:  # pragma: no cover - defensive
+        raise RuntimeError("FAISS index should not be None")
+    if hasattr(cpu_index, "index"):
+        index_map = cast("faiss.IndexIDMap2", cpu_index)
+        return index_map.index
+    return cpu_index
 
 
 @pytest.fixture
@@ -87,7 +89,7 @@ def tmp_index_path(tmp_path: Path) -> Path:
 
 @pytest.mark.benchmark
 def test_small_corpus_flat_vs_ivf_pq(
-    benchmark: pytest.BenchmarkFixture,
+    benchmark: BenchmarkFixture,
     tmp_index_path: Path,
 ) -> None:
     """Benchmark small corpus: flat index vs fixed IVF-PQ.
@@ -128,7 +130,7 @@ def test_small_corpus_flat_vs_ivf_pq(
 
 @pytest.mark.benchmark
 def test_medium_corpus_ivf_flat_vs_ivf_pq(
-    benchmark: pytest.BenchmarkFixture,
+    benchmark: BenchmarkFixture,
     tmp_index_path: Path,
 ) -> None:
     """Benchmark medium corpus: IVFFlat vs fixed IVF-PQ.
@@ -169,7 +171,7 @@ def test_medium_corpus_ivf_flat_vs_ivf_pq(
 
 @pytest.mark.benchmark
 def test_large_corpus_adaptive_vs_fixed(
-    benchmark: pytest.BenchmarkFixture,
+    benchmark: BenchmarkFixture,
     tmp_index_path: Path,
 ) -> None:
     """Benchmark large corpus: adaptive vs fixed IVF-PQ.
@@ -213,7 +215,7 @@ def test_large_corpus_adaptive_vs_fixed(
 
 @pytest.mark.benchmark
 def test_training_time_scaling(
-    benchmark: pytest.BenchmarkFixture,
+    benchmark: BenchmarkFixture,
     tmp_index_path: Path,
 ) -> None:
     """Benchmark training time scaling across corpus sizes.

@@ -111,7 +111,10 @@ def test_load_tooling_metadata_missing_augment(tmp_path: Path) -> None:
     assertions.expect_true(
         _has_problem_details(excinfo.value), reason="should have problem details"
     )
-    problem = excinfo.value.problem
+    error = excinfo.value
+    if not isinstance(error, facade.AugmentRegistryError):  # pragma: no cover - defensive
+        pytest.fail("Expected AugmentRegistryError")
+    problem = error.problem
     assertions.expect_equal(problem["status"], 404)
     assertions.expect_equal(problem["type"], "https://kgfoundry.dev/problems/augment-registry")
 
@@ -132,7 +135,10 @@ def test_load_tooling_metadata_invalid_registry(tmp_path: Path) -> None:
     assertions.expect_true(
         _has_problem_details(excinfo.value), reason="should have problem details"
     )
-    problem = excinfo.value.problem
+    error = excinfo.value
+    if not isinstance(error, facade.AugmentRegistryError):  # pragma: no cover - defensive
+        pytest.fail("Expected AugmentRegistryError")
+    problem = error.problem
     assertions.expect_equal(problem["status"], 422)
     detail = problem.get("detail")
     assertions.expect_true(isinstance(detail, str), reason="detail should be str")

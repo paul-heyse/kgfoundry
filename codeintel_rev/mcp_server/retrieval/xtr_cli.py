@@ -118,8 +118,8 @@ def search(
     Time complexity depends on search mode: O(N * T * D) for wide-mode where N is
     total chunks, T is tokens per chunk, D is embedding dimension; O(C * T * D) for
     narrow-mode where C is candidate count. Space complexity O(k) for results.
-    The function performs file I/O to load the XTR index and GPU/CPU computation
-    for encoding and scoring. Not thread-safe due to index loading.
+    The function performs file I/O to load the XTR index and CPU-bound tensor
+    computation for encoding and scoring. Not thread-safe due to index loading.
     """
     settings = load_settings()
     paths = resolve_application_paths(settings)

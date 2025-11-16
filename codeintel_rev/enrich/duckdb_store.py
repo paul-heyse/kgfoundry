@@ -70,7 +70,24 @@ class _DuckDBModule(Protocol):
 
     def connect(
         self, database: str | None = ..., *args: object, **kwargs: object
-    ) -> DuckDBConnection: ...
+    ) -> DuckDBConnection:
+        """Create a DuckDB connection to the specified database.
+
+        Parameters
+        ----------
+        database : str | None, optional
+            Path to database file. If None, creates an in-memory database.
+        *args : object
+            Additional positional arguments passed to duckdb.connect().
+        **kwargs : object
+            Additional keyword arguments passed to duckdb.connect().
+
+        Returns
+        -------
+        DuckDBConnection
+            DuckDB connection object ready for query execution.
+        """
+        ...
 
 
 @dataclass(slots=True, frozen=True)

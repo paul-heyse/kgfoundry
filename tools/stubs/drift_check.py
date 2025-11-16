@@ -7,12 +7,8 @@ import importlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from tools import get_logger
-
 if TYPE_CHECKING:
     from collections.abc import Iterable
-
-LOGGER = get_logger(__name__)
 
 
 @dataclass(slots=True, frozen=True)
@@ -123,16 +119,10 @@ def run() -> int:
     failures: list[DriftResult] = []
     for spec in MODULE_SPECS:
         result = _inspect_module(spec)
-        if result.error:
-            LOGGER.error("[ERROR] %s: %s", spec.name, result.error)
-        else:
-            LOGGER.info("[INFO] %s", spec.name)
-            LOGGER.info(_format_section("missing", result.missing))
-            LOGGER.info(_format_section("unexpected", result.unexpected))
         if result.has_drift:
             failures.append(result)
     if failures:
-        LOGGER.error("Stub drift detected:")
+        lines = ["Stub drift detected:"]
         for failure in failures:
             parts = []
             if failure.missing:
@@ -142,8 +132,8 @@ def run() -> int:
             if failure.error:
                 parts.append(f"error: {failure.error}")
             detail = "; ".join(parts)
-            LOGGER.error("  - %s: %s", failure.module, detail)
-        return 1
+            lines.append(f"  - {failure.module}: {detail}")
+        raise SystemExit("\n".join(lines))
     return 0
 
 

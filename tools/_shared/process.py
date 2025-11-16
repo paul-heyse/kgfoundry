@@ -19,6 +19,7 @@ from functools import lru_cache
 from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
+
 from tools._shared.metrics import ToolRunObservation, observe_tool_run
 from tools._shared.problem_details import (
     tool_digest_mismatch_problem_details,

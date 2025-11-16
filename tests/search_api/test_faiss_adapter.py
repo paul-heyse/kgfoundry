@@ -358,6 +358,8 @@ def test_wrap_faiss_module_adapts_legacy_surface(dimension: int, tmp_path: Path)
     vectors = np.ones((2, dimension), dtype=np.float32)
     adapted.normalize_l2(vectors)
     assertions.expect_true(legacy.normalize_vectors is not None, reason="should be same object")
+    if legacy.normalize_vectors is None:  # pragma: no cover - defensive
+        pytest.fail("legacy.normalize_vectors should be set")
     assertions.expect_equal(legacy.normalize_vectors.shape, vectors.shape)
 
     factory_index = adapted.index_factory(dimension, "Flat", adapted.metric_l2)

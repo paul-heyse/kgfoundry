@@ -122,7 +122,7 @@ def _gather_chunk_vectors(
     -----
     Time complexity O(N * T * D) where N is chunk count, T is average tokens per
     chunk, and D is embedding dimension. Space complexity O(N * T * D) for all
-    buffers. The function performs I/O to read chunks from catalog and GPU/CPU
+    buffers. The function performs I/O to read chunks from catalog and CPU-bound
     computation for encoding. Thread-safe if index encoder is thread-safe.
     Dimension mismatches are logged as warnings but processing continues.
     """
@@ -246,7 +246,7 @@ def build_xtr_index(settings: Settings | None = None) -> XTRBuildSummary:
     -----
     Time complexity O(N * T * D) where N is chunk count, T is average tokens per
     chunk, and D is embedding dimension. Space complexity O(N * T * D) for buffers
-    and memmap files. The function performs database I/O, GPU/CPU encoding computation,
+    and memmap files. The function performs database I/O, CPU-bound encoding computation,
     and file I/O. Not thread-safe due to catalog and file system operations.
     The function creates the XTR directory if it doesn't exist.
     """
@@ -307,7 +307,7 @@ def build_xtr_index(settings: Settings | None = None) -> XTRBuildSummary:
 
 def main() -> None:
     """Entry point allowing ``python -m codeintel_rev.indexing.xtr_build``."""
-    summary = build_xtr_index()
+    build_xtr_index()
 
 
 if __name__ == "__main__":  # pragma: no cover - manual execution entry point

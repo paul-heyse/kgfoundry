@@ -48,7 +48,7 @@ def test_xtr_open_disabled_feature(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         lambda _settings: _paths(tmp_path),
     )
     result = RUNNER.invoke(APP, [])
-    assertions.expect_equal(result.exit_code, 0, result.stderr or result.stdout)
+    assertions.expect_equal(result.exit_code, 0, reason=result.stderr or result.stdout)
     payload = json.loads(result.stdout.strip())
     assertions.expect_equal(payload, {"ready": False, "limits": ["xtr disabled"]})
 
@@ -65,7 +65,7 @@ def test_xtr_open_missing_artifacts(monkeypatch: pytest.MonkeyPatch, tmp_path: P
         lambda _settings: _paths(missing_root),
     )
     result = RUNNER.invoke(APP, [])
-    assertions.expect_equal(result.exit_code, 1, result.stderr or result.stdout)
+    assertions.expect_equal(result.exit_code, 1, reason=result.stderr or result.stdout)
     problem = json.loads(result.stderr.strip())
     assertions.expect_equal(problem["status"], 503)
     assertions.expect_equal(problem["title"], "XTR artifacts unavailable")
@@ -96,7 +96,7 @@ def test_xtr_open_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
 
     monkeypatch.setattr("codeintel_rev.ops.runtime.xtr_open.XTRIndex", _StubIndex)
     result = RUNNER.invoke(APP, ["--root", str(root)])
-    assertions.expect_equal(result.exit_code, 0, result.stderr or result.stdout)
+    assertions.expect_equal(result.exit_code, 0, reason=result.stderr or result.stdout)
     payload = json.loads(result.stdout.strip())
     assertions.expect_true(payload["ready"], reason="ready should be True")
     assertions.expect_equal(payload["limits"], [])
@@ -129,6 +129,6 @@ def test_xtr_open_reports_corruption(monkeypatch: pytest.MonkeyPatch, tmp_path: 
 
     monkeypatch.setattr("codeintel_rev.ops.runtime.xtr_open.XTRIndex", _ExplodingIndex)
     result = RUNNER.invoke(APP, [])
-    assertions.expect_equal(result.exit_code, 1, result.stderr or result.stdout)
+    assertions.expect_equal(result.exit_code, 1, reason=result.stderr or result.stdout)
     problem = json.loads(result.stderr.strip())
     assertions.expect_equal(problem["title"], "Failed to open XTR artifacts")

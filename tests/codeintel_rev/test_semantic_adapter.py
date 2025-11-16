@@ -458,17 +458,23 @@ async def test_semantic_search_limit_truncates_to_max_results() -> None:
 
     assertions.expect_equal(faiss_manager.last_k, 3)
     limits = result.get("limits")
-    assertions.expect_true(limits is not None, reason="should have limits")
+    assertions.expect_true(isinstance(limits, list), reason="should have limits")
+    if not isinstance(limits, list):  # pragma: no cover - defensive
+        pytest.fail("limits should be a list")
     assertions.expect_true(
-        any("exceeds max_results" in message for message in cast("list[str]", limits)),
+        any("exceeds max_results" in message for message in limits),
         reason="should warn about exceeding max_results",
     )
     method = result.get("method")
-    assertions.expect_true(method is not None, reason="should have method")
+    assertions.expect_true(isinstance(method, dict), reason="should have method")
+    if not isinstance(method, dict):  # pragma: no cover - defensive
+        pytest.fail("method should be present")
     coverage = method.get("coverage")
-    assertions.expect_true(coverage is not None, reason="should have coverage")
-    assertions.expect_in("/3 results", cast("str", coverage))
-    assertions.expect_in("requested 10", cast("str", coverage))
+    assertions.expect_true(isinstance(coverage, str), reason="should have coverage")
+    if not isinstance(coverage, str):  # pragma: no cover - defensive
+        pytest.fail("coverage should be a string")
+    assertions.expect_in("/3 results", coverage)
+    assertions.expect_in("requested 10", coverage)
 
 
 @pytest.mark.asyncio
@@ -494,17 +500,23 @@ async def test_semantic_search_limit_enforces_minimum() -> None:
 
     assertions.expect_equal(faiss_manager.last_k, 1)
     limits = result.get("limits")
-    assertions.expect_true(limits is not None, reason="should have limits")
+    assertions.expect_true(isinstance(limits, list), reason="should have limits")
+    if not isinstance(limits, list):  # pragma: no cover - defensive
+        pytest.fail("limits should be a list")
     assertions.expect_true(
-        any("not positive" in message for message in cast("list[str]", limits)),
+        any("not positive" in message for message in limits),
         reason="should warn about non-positive limit",
     )
     method = result.get("method")
-    assertions.expect_true(method is not None, reason="should have method")
+    assertions.expect_true(isinstance(method, dict), reason="should have method")
+    if not isinstance(method, dict):  # pragma: no cover - defensive
+        pytest.fail("method should be present")
     coverage = method.get("coverage")
-    assertions.expect_true(coverage is not None, reason="should have coverage")
-    assertions.expect_in("/1 results", cast("str", coverage))
-    assertions.expect_in("requested 0", cast("str", coverage))
+    assertions.expect_true(isinstance(coverage, str), reason="should have coverage")
+    if not isinstance(coverage, str):  # pragma: no cover - defensive
+        pytest.fail("coverage should be a string")
+    assertions.expect_in("/1 results", coverage)
+    assertions.expect_in("requested 0", coverage)
 
 
 @pytest.mark.asyncio
@@ -586,7 +598,9 @@ async def test_semantic_search_with_scope_filters() -> None:
         result = await semantic_search(cast("ApplicationContext", context), "function", limit=10)
 
     findings = result.get("findings")
-    assertions.expect_true(findings is not None, reason="should have findings")
+    assertions.expect_true(isinstance(findings, list), reason="should have findings")
+    if not isinstance(findings, list):  # pragma: no cover - defensive
+        pytest.fail("findings should be a list")
     assertions.expect_equal(len(findings), 2)  # Only Python files
 
     # Verify all results are Python files
@@ -649,7 +663,9 @@ async def test_semantic_search_no_scope() -> None:
         result = await semantic_search(cast("ApplicationContext", context), "function", limit=10)
 
     findings = result.get("findings")
-    assertions.expect_true(findings is not None, reason="should have findings")
+    assertions.expect_true(isinstance(findings, list), reason="should have findings")
+    if not isinstance(findings, list):  # pragma: no cover - defensive
+        pytest.fail("findings should be a list")
     assertions.expect_equal(len(findings), 2)  # All files returned
 
     # Verify both file types are present
@@ -717,25 +733,37 @@ async def test_semantic_search_hybrid_merges_channels() -> None:
         result = await semantic_search(cast("ApplicationContext", context), "hybrid query", limit=2)
 
     answer = result.get("answer")
-    assertions.expect_true(answer is not None, reason="should have answer")
+    assertions.expect_true(isinstance(answer, str), reason="should have answer")
+    if not isinstance(answer, str):  # pragma: no cover - defensive
+        pytest.fail("answer should be a string")
     assertions.expect_true(
         answer.startswith("Found 2 hybrid"), reason="answer should start with Found 2 hybrid"
     )
     limits = result.get("limits")
-    assertions.expect_true(limits is not None, reason="should have limits")
-    assertions.expect_in("bm25 warmed up", cast("list[str]", limits))
+    assertions.expect_true(isinstance(limits, list), reason="should have limits")
+    if not isinstance(limits, list):  # pragma: no cover - defensive
+        pytest.fail("limits should be a list")
+    assertions.expect_in("bm25 warmed up", limits)
     findings = result.get("findings")
-    assertions.expect_true(findings is not None, reason="should have findings")
+    assertions.expect_true(isinstance(findings, list), reason="should have findings")
+    if not isinstance(findings, list):  # pragma: no cover - defensive
+        pytest.fail("findings should be a list")
     assertions.expect_equal(findings[0].get("chunk_id"), 101)
     why_message = findings[0].get("why")
-    assertions.expect_true(why_message is not None, reason="should have why message")
-    assertions.expect_in("Hybrid RRF", cast("str", why_message))
-    assertions.expect_in("bm25", cast("str", why_message))
+    assertions.expect_true(isinstance(why_message, str), reason="should have why message")
+    if not isinstance(why_message, str):  # pragma: no cover - defensive
+        pytest.fail("why message should be a string")
+    assertions.expect_in("Hybrid RRF", why_message)
+    assertions.expect_in("bm25", why_message)
     method = result.get("method")
-    assertions.expect_true(method is not None, reason="should have method")
+    assertions.expect_true(isinstance(method, dict), reason="should have method")
+    if not isinstance(method, dict):  # pragma: no cover - defensive
+        pytest.fail("method should be a dict")
     retrieval = method.get("retrieval")
-    assertions.expect_true(retrieval is not None, reason="should have retrieval")
-    retrieval_set = set(cast("list[str]", retrieval))
+    assertions.expect_true(isinstance(retrieval, list), reason="should have retrieval")
+    if not isinstance(retrieval, list):  # pragma: no cover - defensive
+        pytest.fail("retrieval should be a list")
+    retrieval_set = set(retrieval)
     missing_channels = {"semantic", "faiss", "bm25", "splade"} - retrieval_set
     assertions.expect_false(bool(missing_channels), reason="all channels should be present")
 
@@ -762,8 +790,9 @@ async def test_semantic_search_faiss_not_ready() -> None:
         ),
     ):
         result = await semantic_search(cast("ApplicationContext", context), "query", limit=10)
-    limits = result.get("limits") or []
-    joined_limits = " ".join(cast("list[str]", limits))
+    raw_limits = result.get("limits")
+    limit_list = raw_limits if isinstance(raw_limits, list) else []
+    joined_limits = " ".join(limit_list)
     assertions.expect_in("faiss_fallback", joined_limits)
     assertions.expect_equal(result.get("findings"), [])
 
@@ -819,9 +848,10 @@ async def test_semantic_search_faiss_search_error() -> None:
         ),
     ):
         result = await semantic_search(cast("ApplicationContext", context), "query", limit=10)
-    limits = result.get("limits") or []
+    raw_limits = result.get("limits")
+    limit_list = raw_limits if isinstance(raw_limits, list) else []
     assertions.expect_true(
-        any("faiss_fallback" in entry for entry in cast("list[str]", limits)),
+        any("faiss_fallback" in entry for entry in limit_list),
         reason="should have faiss_fallback in limits",
     )
     assertions.expect_equal(result.get("findings"), [])

@@ -18,7 +18,7 @@ from __future__ import annotations
 from contextlib import AbstractContextManager
 from pathlib import Path
 from time import perf_counter
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import duckdb
 import pytest
@@ -26,6 +26,9 @@ from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.duckdb_manager import DuckDBConfig, DuckDBManager
 
 from tests._helpers import assertions
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from pytest_benchmark.fixture import BenchmarkFixture
 
 # Number of chunks to create for benchmark
 # Reduced from 100K to 10K for faster fixture setup while still providing meaningful benchmarks
@@ -207,7 +210,7 @@ def benchmark_catalog(tmp_path_factory: pytest.TempPathFactory) -> DuckDBCatalog
 @pytest.mark.benchmark
 def test_scope_baseline_query_by_ids(
     benchmark_catalog: DuckDBCatalog,
-    benchmark: pytest.BenchmarkFixture,
+    benchmark: BenchmarkFixture,
 ) -> None:
     """Benchmark baseline query_by_ids (no filtering)."""
     chunk_ids = list(range(1, QUERY_CHUNK_COUNT + 1))
@@ -223,7 +226,7 @@ def test_scope_baseline_query_by_ids(
 @pytest.mark.benchmark
 def test_language_filter_performance(
     benchmark_catalog: DuckDBCatalog,
-    benchmark: pytest.BenchmarkFixture,
+    benchmark: BenchmarkFixture,
 ) -> None:
     """Benchmark query_by_filters with language filter."""
     chunk_ids = list(range(1, QUERY_CHUNK_COUNT + 1))
@@ -239,7 +242,7 @@ def test_language_filter_performance(
 @pytest.mark.benchmark
 def test_path_glob_filter_performance(
     benchmark_catalog: DuckDBCatalog,
-    benchmark: pytest.BenchmarkFixture,
+    benchmark: BenchmarkFixture,
 ) -> None:
     """Benchmark query_by_filters with path glob pattern."""
     chunk_ids = list(range(1, QUERY_CHUNK_COUNT + 1))
@@ -255,7 +258,7 @@ def test_path_glob_filter_performance(
 @pytest.mark.benchmark
 def test_combined_filters_performance(
     benchmark_catalog: DuckDBCatalog,
-    benchmark: pytest.BenchmarkFixture,
+    benchmark: BenchmarkFixture,
 ) -> None:
     """Benchmark query_by_filters with combined language and path filters."""
     chunk_ids = list(range(1, QUERY_CHUNK_COUNT + 1))
@@ -280,7 +283,7 @@ def test_combined_filters_performance(
 @pytest.mark.benchmark
 def test_complex_glob_filter_performance(
     benchmark_catalog: DuckDBCatalog,
-    benchmark: pytest.BenchmarkFixture,
+    benchmark: BenchmarkFixture,
 ) -> None:
     """Benchmark query_by_filters with complex glob pattern."""
     chunk_ids = list(range(1, QUERY_CHUNK_COUNT + 1))

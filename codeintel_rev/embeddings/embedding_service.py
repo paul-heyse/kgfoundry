@@ -527,15 +527,15 @@ class _ProviderBase(EmbeddingProvider):
         This method performs cleanup operations to release provider resources,
         including stopping the background batch executor (if configured) and
         calling the implementation-specific cleanup hook. The method should be
-        called when the provider is no longer needed to free memory, GPU
-        resources, and background threads.
+        called when the provider is no longer needed to free memory and tear
+        down background threads.
 
         Notes
         -----
         This method stops the background batch executor if one was created,
         which drains pending jobs and stops the worker thread. It then calls
         the implementation-specific _close_impl() hook for provider-specific
-        cleanup (e.g., releasing model weights, clearing GPU cache). The method
+        cleanup (e.g., releasing model weights, clearing local caches). The method
         is idempotent and safe to call multiple times. After calling close(),
         the provider should not be used for further embedding operations.
         Thread-safe if executor and implementation cleanup are thread-safe.
@@ -681,6 +681,11 @@ def get_embedding_provider(
         provider initialization exceptions with context. Provider-specific
         exceptions are re-raised directly when fallback is disabled so callers
         can inspect CUDA/model-loading failures without losing stack context.
+    Exception
+        Re-raised when vLLM provider initialization fails and fallback is
+        disabled. Allows underlying provider exceptions (e.g., CUDA errors,
+        import errors, model loading failures) to propagate with full stack
+        context for debugging.
 
     Notes
     -----
@@ -713,7 +718,7 @@ def get_embedding_provider(
 
 
 class HFEmbeddingProvider(_ProviderBase):
-    """CPU/GPU fallback using Hugging Face transformers."""
+    """Hugging Face transformers fallback provider."""
 
     def __init__(self, *, embeddings: EmbeddingsConfig, index: IndexConfig) -> None:
         torch_mod = cast("Any", gate_import("torch", "Hugging Face embedding provider"))

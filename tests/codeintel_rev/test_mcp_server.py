@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from http import HTTPStatus
 from pathlib import Path
 from unittest.mock import patch
 
@@ -12,7 +13,6 @@ from codeintel_rev.app.main import app
 from fastapi.testclient import TestClient
 
 from tests._helpers import assertions
-from tests._helpers.constants import HTTPStatus
 
 
 @pytest.fixture

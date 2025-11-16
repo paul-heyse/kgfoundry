@@ -24,12 +24,9 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, TypedDict, cast
 
 from kgfoundry_common.errors import ConfigurationError
-from tools._shared.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
-
-LOGGER = get_logger(__name__)
 
 # Public exports for static type checkers and consumers.
 __all__ = (
@@ -352,8 +349,7 @@ def check_file(file_path: Path) -> tuple[SuppressionViolation, ...]:
     """
     try:
         content = file_path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError) as exc:
-        LOGGER.warning("Could not read %s", file_path, exc_info=exc)
+    except (OSError, UnicodeDecodeError):
         return ()
 
     lines = content.splitlines()
@@ -487,8 +483,34 @@ def _extract_guard_report(error: ConfigurationError) -> SuppressionGuardReport |
         context = cast("SuppressionGuardContext", dict(error.context))
         return SuppressionGuardReport.from_context(context)
     except (KeyError, TypeError, ValueError):
-        LOGGER.exception("Failed to parse suppression guard context")
         return None
+
+
+def _format_violation_summary(report: SuppressionGuardReport) -> str:
+    """Return a human-readable summary of suppression violations."""
+    lines = [
+        f"❌ Found {report.violation_count} suppression(s) without TICKET: tags",
+        "",
+    ]
+    cwd = Path.cwd()
+    for file_report in report.files:
+        file_path = file_report.path
+        try:
+            rel_path = file_path.relative_to(cwd)
+        except ValueError:
+            rel_path = file_path
+        lines.append(f"{rel_path}:")
+        for violation in file_report.violations:
+            preview = violation.line_preview or ""
+            lines.append(f"  Line {violation.line_number}: {preview}")
+        lines.append("")
+    lines.extend(
+        [
+            "Fix: Add TICKET: <ticket-id> to each suppression line.",
+            "Example: # type-ignore[misc]  # TICKET: ABC-123  # numpy dtype contains Any",
+        ]
+    )
+    return "\n".join(lines).strip()
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -506,54 +528,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     arguments = list(argv if argv is not None else sys.argv[1:])
     if not arguments:
-        LOGGER.error("Usage: python tools/check_new_suppressions.py <directories...>")
-        return 1
+        raise SystemExit("Usage: python tools/check_new_suppressions.py <directories...>")
 
     try:
         directories = resolve_target_directories(arguments)
-    except ConfigurationError:
-        LOGGER.exception("Failed to resolve suppression guard target directories")
-        return 1
+    except ConfigurationError as exc:
+        raise SystemExit(str(exc)) from exc
 
     try:
         run_suppression_guard(directories)
     except ConfigurationError as error:
         report = _extract_guard_report(error)
         if report is None:
-            LOGGER.exception("❌ Found suppressions without TICKET: tags")
-            return 1
-    else:
-        LOGGER.info("✅ All suppressions include TICKET: tags")
-        return 0
+            raise SystemExit(str(error)) from error
+        message = _format_violation_summary(report)
+        raise SystemExit(message)
 
-    LOGGER.error(
-        "❌ Found suppressions without TICKET: tags",
-        extra={"violation_count": report.violation_count},
-    )
-
-    cwd = Path.cwd()
-    for file_report in report.files:
-        file_path = file_report.path
-        try:
-            rel_path = file_path.relative_to(cwd)
-        except ValueError:
-            rel_path = file_path
-        LOGGER.error("%s:", rel_path, extra={"path": str(rel_path)})
-        for violation in file_report.violations:
-            LOGGER.error(
-                "  Line %s: %s",
-                violation.line_number,
-                violation.line_preview,
-                extra={
-                    "path": str(rel_path),
-                    "line": violation.line_number,
-                    "line_preview": violation.line_preview,
-                },
-            )
-
-    LOGGER.error("Fix: Add TICKET: <ticket-id> to each suppression line.")
-    LOGGER.error("Example: # type-ignore[misc]  # TICKET: ABC-123  # numpy dtype contains Any")
-    return 1
+    return 0
 
 
 if __name__ == "__main__":

@@ -83,7 +83,7 @@ class InprocessVLLMEmbedder:
     config : VLLMConfig
         Fully populated vLLM configuration. The ``run.mode`` field must be
         ``"inprocess"`` to avoid HTTP calls. Contains model path, pooling type,
-        normalization settings, and GPU memory configuration.
+        normalization settings, and memory configuration for the embedding server.
 
     Examples
     --------

@@ -36,8 +36,9 @@ def test_lru_cache_evicts_least_recently_used() -> None:
 
     cache.set("c", 3)  # should evict "b"
 
-    assertions.expect_in("a", cache)
-    assertions.expect_in("c", cache)
+    snapshot = cache.snapshot()
+    assertions.expect_in("a", snapshot)
+    assertions.expect_in("c", snapshot)
     assertions.expect_equal(cache.get("b"), None)
     assertions.expect_equal(cache.snapshot(), {"a": 1, "c": 3})
 

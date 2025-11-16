@@ -88,6 +88,8 @@ def test_report_from_context_validates_counts(tmp_path: Path) -> None:
 
     context = cast("StubParityContext | None", excinfo.value.context)
     assertions.expect_true(context is not None, reason="context should not be None")
+    if context is None:  # pragma: no cover - defensive
+        pytest.fail("context should not be None")
     report = StubParityReport.from_context(context)
     mutated_context: StubParityContext = build_stub_parity_context(report)
     mutated_context["issue_count"] = 0

@@ -198,6 +198,8 @@ def test_ensure_struct_views_materializes(tmp_path: Path) -> None:
             )
             row = connection.table(table_name).aggregate("count(*) AS row_count").fetchone()
             assertions.expect_true(row is not None, reason=f"{table_name} should have rows")
+            if row is None:  # pragma: no cover - defensive for type checkers
+                pytest.fail(f"{table_name} should have rows")
             assertions.expect_equal(row[0], 1)
 
 
@@ -782,6 +784,8 @@ def test_query_by_filters_uses_query_builder(
     assertions.expect_true(
         isinstance(options, DuckDBQueryOptions), reason="options should be DuckDBQueryOptions"
     )
+    if not isinstance(options, DuckDBQueryOptions):  # pragma: no cover - defensive
+        pytest.fail("options should be DuckDBQueryOptions")
     assertions.expect_true(options.preserve_order, reason="preserve_order should be True")
     assertions.expect_equal(options.select_columns, ("c.*",))
     assertions.expect_equal(options.include_globs, None)

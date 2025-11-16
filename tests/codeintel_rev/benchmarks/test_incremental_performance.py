@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
@@ -20,6 +21,9 @@ from codeintel_rev.io.faiss_manager import FAISSManager
 
 from tests._helpers import assertions, constants
 from tests.conftest import HAS_FAISS_SUPPORT
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from pytest_benchmark.fixture import BenchmarkFixture
 
 # Use modern numpy random generator
 _rng = np.random.default_rng(42)
@@ -58,7 +62,7 @@ def tmp_index_path(tmp_path: Path) -> Path:
 
 @pytest.mark.benchmark
 def test_incremental_update_speed(
-    benchmark: pytest.BenchmarkFixture,
+    benchmark: BenchmarkFixture,
     tmp_index_path: Path,
 ) -> None:
     """Benchmark incremental update speed for adding new chunks.
@@ -115,7 +119,7 @@ def test_incremental_update_speed(
 
 @pytest.mark.benchmark
 def test_full_rebuild_vs_incremental(
-    benchmark: pytest.BenchmarkFixture,
+    benchmark: BenchmarkFixture,
     tmp_index_path: Path,
 ) -> None:
     """Compare full rebuild time vs incremental update time.
@@ -185,7 +189,7 @@ def test_full_rebuild_vs_incremental(
 
 @pytest.mark.benchmark
 def test_merge_indexes_performance(
-    benchmark: pytest.BenchmarkFixture,
+    benchmark: BenchmarkFixture,
     tmp_index_path: Path,
 ) -> None:
     """Benchmark merge_indexes performance.
@@ -238,7 +242,7 @@ def test_merge_indexes_performance(
 
 @pytest.mark.benchmark
 def test_dual_index_search_performance(
-    benchmark: pytest.BenchmarkFixture,
+    benchmark: BenchmarkFixture,
     tmp_index_path: Path,
 ) -> None:
     """Benchmark dual-index search performance.

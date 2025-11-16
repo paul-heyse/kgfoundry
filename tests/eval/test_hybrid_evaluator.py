@@ -43,5 +43,7 @@ def test_pool_writer_sources(tmp_path: Path) -> None:
     assertions.expect_true(
         isinstance(second_reason, Mapping), reason="second_reason should be Mapping"
     )
+    if not isinstance(first_reason, Mapping) or not isinstance(second_reason, Mapping):
+        pytest.fail("reasons should be mappings")
     assertions.expect_sequence_equal(first_reason["matched_symbols"], ["foo"])
     assertions.expect_sequence_equal(second_reason["matched_symbols"], [])

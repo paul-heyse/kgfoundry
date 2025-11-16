@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from codeintel_rev.enrich.scip_reader import Document, SCIPIndex, SymbolInfo
 from codeintel_rev.enrich.stubs_overlay import (
     OverlayInputs,
@@ -71,6 +72,8 @@ def test_generate_overlay_creates_stub_with_reexports(tmp_path: Path) -> None:
 
     assertions.expect_true(result.created, reason="overlay should be created")
     assertions.expect_true(result.pyi_path is not None, reason="pyi_path should be set")
+    if result.pyi_path is None:  # pragma: no cover - defensive
+        pytest.fail("pyi_path should be set when overlay is created.")
     assertions.expect_true(result.pyi_path.exists(), reason="pyi_path should exist")
     assertions.expect_true(
         result.pyi_path.is_relative_to(repo_root / "stubs"), reason="pyi_path should be in stubs"

@@ -9,6 +9,7 @@ import textwrap
 from pathlib import Path
 
 import duckdb
+import pytest
 from codeintel_rev.enrich.ast_indexer import (
     collect_ast_nodes_from_tree,
     compute_ast_metrics,
@@ -75,6 +76,8 @@ def test_ast_collection_and_duckdb_join(tmp_path: Path) -> None:
         con.execute("CREATE TABLE ast_nodes AS SELECT * FROM read_parquet(?)", [nodes_path])
         result = con.execute("SELECT COUNT(*) FROM ast_nodes JOIN modules USING(path);").fetchone()
         assertions.expect_true(result is not None, reason="query should return a result")
+        if result is None:  # pragma: no cover - defensive
+            pytest.fail("query should return a result")
         joined = result[0]
     finally:
         con.close()

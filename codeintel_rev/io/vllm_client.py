@@ -258,9 +258,9 @@ class VLLMClient:
         -----
         Time complexity O(N * T) where N is batch size and T is average token count per
         text, plus network latency for HTTP mode. Space complexity O(N * embedding_dim)
-        for the result matrix. The method performs network I/O in HTTP mode or GPU
-        computation in local mode. Thread-safe if the underlying HTTP client or local
-        engine is thread-safe. Empty batches return shape (0, embedding_dim).
+        for the result matrix. The method performs network I/O in HTTP mode or local
+        computation in in-process mode. Thread-safe if the underlying HTTP client or
+        local engine is thread-safe. Empty batches return shape (0, embedding_dim).
         """
         np_module = _get_numpy()
         if not texts:
@@ -403,8 +403,9 @@ class VLLMClient:
         Time complexity O(N * T) where N is batch size and T is average token count per
         text, plus network latency for HTTP mode. Space complexity O(N * embedding_dim)
         for the result matrix. The method performs async network I/O in HTTP mode or
-        async GPU computation in local mode. Thread-safe if the underlying async HTTP
-        client or local engine is thread-safe. Empty batches return shape (0, embedding_dim).
+        async local computation in in-process mode. Thread-safe if the underlying async
+        HTTP client or local engine is thread-safe. Empty batches return shape
+        (0, embedding_dim).
         """
         np_module = _get_numpy()
         if not texts:

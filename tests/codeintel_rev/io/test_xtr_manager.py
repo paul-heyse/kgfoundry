@@ -49,6 +49,8 @@ def test_xtr_index_open_and_metadata(tmp_path: Path) -> None:
     assertions.expect_true(index.ready)
     meta = index.metadata()
     assertions.expect_true(meta is not None, reason="Metadata should be available after open().")
+    if meta is None:  # pragma: no cover - defensive for type checkers
+        pytest.fail("Metadata should be available after open().")
     assertions.expect_sequence_equal(meta["chunk_ids"], [1, 2])
     assertions.expect_sequence_equal(meta["offsets"], [0, constants.BATCH_SIZES.small])
 

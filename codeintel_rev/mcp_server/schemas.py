@@ -453,6 +453,10 @@ class AnswerEnvelope(TypedDict, total=False):
         Telemetry metadata describing the request/session identifiers. Contains
         ``run_id`` (trace identifier) and ``session_id`` when available, enabling
         correlation with traces and run reports.
+    results : dict[str, object]
+        Structured summary metrics about the result set (e.g., {"count": 15}).
+        Provides lightweight aggregate information for UI summaries without
+        having to inspect the full findings list.
     trace_id : str
         Trace identifier associated with the request (observability removed).
     span_id : str
@@ -482,6 +486,7 @@ class AnswerEnvelope(TypedDict, total=False):
     limits: list[str]
     next_steps: list[str]
     telemetry: dict[str, str]
+    results: dict[str, object]
     trace_id: str
     span_id: str
     run_id: str

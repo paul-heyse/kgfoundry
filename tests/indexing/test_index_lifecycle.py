@@ -39,6 +39,8 @@ def test_prepare_and_publish(tmp_path: Path) -> None:
     assertions.expect_equal(manager.current_version(), "v1")
     resolved = manager.read_assets()
     assertions.expect_true(resolved is not None, reason="resolved assets should exist")
+    if resolved is None:  # pragma: no cover - defensive
+        pytest.fail("resolved assets should exist")
     assertions.expect_true(resolved.faiss_index.exists(), reason="faiss_index should exist")
     assertions.expect_equal((manager.base_dir / "CURRENT").read_text().strip(), "v1")
 

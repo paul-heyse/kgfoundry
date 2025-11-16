@@ -219,8 +219,8 @@ class ApplicationContext:
         vLLM embedding service client with persistent HTTP connection pool.
         Shared across all requests for efficiency.
     faiss_manager : FAISSManager
-        FAISS index manager that handles CPU and GPU indexes. GPU resources are
-        lazily initialized on first search or optionally pre-loaded at startup.
+        FAISS index manager backed by CPU indexes kept in host memory. Indexes can
+        be pre-loaded at startup to minimize cold-start cost.
 
     Examples
     --------
@@ -262,7 +262,6 @@ class ApplicationContext:
     faiss_manager: FAISSManager
     _faiss_lock: Lock = field(default_factory=Lock, init=False)
     _faiss_loaded: bool = field(default=False, init=False)
-    _faiss_gpu_attempted: bool = field(default=False, init=False)
 
     @classmethod
     def create(cls) -> ApplicationContext:
@@ -323,7 +322,6 @@ class ApplicationContext:
             index_path=paths.faiss_index,
             vec_dim=settings.index.vec_dim,
             nlist=settings.index.faiss_nlist,
-            use_cuvs=settings.index.use_cuvs,
         )
 
         LOGGER.info(
@@ -343,11 +341,10 @@ class ApplicationContext:
         )
 
     def ensure_faiss_ready(self) -> tuple[bool, list[str], str | None]:
-        """Load FAISS index (once) and attempt GPU clone.
+        """Load FAISS index (once) and cache the result.
 
         This method is thread-safe and idempotent. On first call, it loads the
         CPU index from disk. On subsequent calls, it returns cached state.
-        GPU cloning is attempted once (if not already done during pre-loading).
 
         The method is typically called from semantic search adapter on first
         search request (lazy loading) or optionally during application startup
@@ -359,9 +356,9 @@ class ApplicationContext:
             Three-element tuple:
             - ready (bool): True if FAISS index is available for searching
             - limits (list[str]): Warning messages about degraded mode (e.g.,
-              "GPU unavailable", "Index not found"). Empty list if fully ready.
-            - error (str | None): Error message if index loading failed, None
-              if successful or already loaded.
+              "Index not found"). Empty list if fully ready.
+            - error (str | None): Error message if index loading failed, None if
+              successful or already loaded.
 
         Examples
         --------
@@ -380,9 +377,8 @@ class ApplicationContext:
         index even under concurrent requests. Subsequent calls skip loading
         and immediately return the cached state.
 
-        GPU initialization failures are non-fatal - the method returns ready=True
-        with a warning in the limits list. Semantic search will fall back to
-        CPU index automatically.
+        Semantic search always runs against the CPU index; degraded states only
+        occur when the index is missing or fails to load.
         """
         limits: list[str] = []
 
@@ -396,21 +392,6 @@ class ApplicationContext:
                 except (FileNotFoundError, RuntimeError) as exc:
                     return False, limits, f"FAISS index load failed: {exc}"
                 self._faiss_loaded = True
-
-            if self.faiss_manager.gpu_index is None and not self._faiss_gpu_attempted:
-                self._faiss_gpu_attempted = True
-                try:
-                    gpu_enabled = self.faiss_manager.clone_to_gpu()
-                except RuntimeError as exc:
-                    limits.append(str(exc))
-                    gpu_enabled = False
-                if not gpu_enabled and self.faiss_manager.gpu_disabled_reason:
-                    limits.append(self.faiss_manager.gpu_disabled_reason)
-            elif (
-                self.faiss_manager.gpu_disabled_reason
-                and limits.count(self.faiss_manager.gpu_disabled_reason) == 0
-            ):
-                limits.append(self.faiss_manager.gpu_disabled_reason)
 
         return True, limits, None
 

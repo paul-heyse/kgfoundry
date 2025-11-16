@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import Mock
 
 import pytest
@@ -18,6 +19,9 @@ from codeintel_rev.mcp_server.adapters import files as files_adapter
 from codeintel_rev.mcp_server.adapters import history as history_adapter
 
 from tests._helpers import assertions
+
+if TYPE_CHECKING:
+    from pytest_benchmark.fixture import BenchmarkFixture
 
 pytestmark = pytest.mark.skipif(
     not os.getenv("RUN_BENCHMARKS"),
@@ -127,7 +131,7 @@ class _AsyncGitClientStub:
 
 @pytest.mark.benchmark
 def test_list_paths_single_request(
-    benchmark: pytest.BenchmarkFixture,
+    benchmark: BenchmarkFixture,
     mock_context: Mock,
 ) -> None:
     """Benchmark single list_paths request latency.
@@ -147,7 +151,7 @@ def test_list_paths_single_request(
 
 @pytest.mark.benchmark
 def test_list_paths_concurrent_100(
-    benchmark: pytest.BenchmarkFixture,
+    benchmark: BenchmarkFixture,
     mock_context: Mock,
 ) -> None:
     """Benchmark 100 concurrent list_paths requests.
@@ -179,7 +183,7 @@ def test_list_paths_concurrent_100(
 
 @pytest.mark.benchmark
 def test_blame_range_single_request(
-    benchmark: pytest.BenchmarkFixture,
+    benchmark: BenchmarkFixture,
     mock_context: Mock,
 ) -> None:
     """Benchmark single blame_range request latency.
@@ -206,7 +210,7 @@ def test_blame_range_single_request(
 
 @pytest.mark.benchmark
 def test_blame_range_concurrent_50(
-    benchmark: pytest.BenchmarkFixture,
+    benchmark: BenchmarkFixture,
     mock_context: Mock,
 ) -> None:
     """Benchmark 50 concurrent blame_range requests.
@@ -239,7 +243,7 @@ def test_blame_range_concurrent_50(
 
 @pytest.mark.benchmark
 def test_mixed_concurrent_benchmark(
-    benchmark: pytest.BenchmarkFixture,
+    benchmark: BenchmarkFixture,
     mock_context: Mock,
 ) -> None:
     """Benchmark mixed concurrent operations (list_paths + blame_range).

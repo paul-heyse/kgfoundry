@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.io.duckdb_catalog import StructureAnnotations
+from codeintel_rev.io.hybrid_search import HybridSearchOptions
 from codeintel_rev.mcp_server.adapters import semantic_pro
 from codeintel_rev.retrieval.types import HybridResultDoc, HybridSearchResult
 
@@ -85,7 +86,7 @@ class _FakeCatalog:
 class _FakeHybridEngine:
     def __init__(self) -> None:
         self.search_calls = 0
-        self.last_options: semantic_pro.HybridOptions | None = None
+        self.last_options: HybridSearchOptions | None = None
 
     def search(
         self,
@@ -93,7 +94,7 @@ class _FakeHybridEngine:
         *,
         semantic_hits: list[tuple[int, float]],
         limit: int,
-        options: semantic_pro.HybridOptions | None = None,
+        options: HybridSearchOptions | None = None,
     ) -> HybridSearchResult:
         self.search_calls += 1
         self.last_options = options
@@ -253,8 +254,13 @@ def test_semantic_pro_produces_findings(tmp_path: Path) -> None:
     assertions.expect_in("findings", envelope)
     findings = cast("list[dict[str, object]]", envelope["findings"])
     assertions.expect_true(findings)
-    explanations = cast("dict[str, object]", findings[0].get("explanations"))
-    assertions.expect_sequence_equal(explanations["matched_symbols"], ["fake.symbol"])
+    explanation_payload = findings[0].get("explanations")
+    assertions.expect_true(
+        isinstance(explanation_payload, dict), reason="explanations should be dict"
+    )
+    if not isinstance(explanation_payload, dict):  # pragma: no cover - defensive
+        pytest.fail("explanations should be dict")
+    assertions.expect_sequence_equal(explanation_payload["matched_symbols"], ["fake.symbol"])
 
 
 def test_semantic_pro_rerank_skips_without_capability(tmp_path: Path) -> None:
@@ -270,7 +276,9 @@ def test_semantic_pro_rerank_skips_without_capability(tmp_path: Path) -> None:
     )
     method = envelope.get("method")
     assertions.expect_true(method is not None)
-    rerank = method.get("rerank") if method else None
+    if not isinstance(method, dict):  # pragma: no cover - defensive
+        pytest.fail("method should be present")
+    rerank = method.get("rerank")
     assertions.expect_true(rerank is not None)
     rerank_meta = cast("dict[str, object]", rerank)
     assertions.expect_false(rerank_meta["enabled"])
@@ -292,22 +300,28 @@ def test_semantic_pro_rerank_reorders_when_ready(tmp_path: Path) -> None:
     )
     method = envelope.get("method")
     assertions.expect_true(method is not None)
-    rerank_meta = method.get("rerank") if method else None
+    if not isinstance(method, dict):  # pragma: no cover - defensive
+        pytest.fail("method should be present")
+    rerank_meta = method.get("rerank")
     assertions.expect_true(rerank_meta is not None)
     rerank_meta_dict = cast("dict[str, object]", rerank_meta)
     assertions.expect_true(bool(rerank_meta_dict["enabled"]))
     reordered = rerank_meta_dict.get("reordered")
     assertions.expect_true(isinstance(reordered, int) and reordered >= 1)
     findings_payload = envelope.get("findings")
-    assertions.expect_true(findings_payload, reason="expected at least one finding")
+    assertions.expect_true(isinstance(findings_payload, list), reason="expected findings list")
+    if not isinstance(findings_payload, list):  # pragma: no cover - defensive
+        pytest.fail("findings should be a list")
     first_finding = findings_payload[0]
     assertions.expect_equal(first_finding.get("chunk_id"), EXPECTED_CHUNK_ID)
     assertions.expect_in("why", first_finding)
     method_details = envelope.get("method")
-    assertions.expect_true(method_details is not None)
-    if method_details:
-        assertions.expect_sequence_equal(method_details.get("retrieval"), ["semantic"])
-        assertions.expect_true(method_details.get("stages"))
+    assertions.expect_true(isinstance(method_details, dict))
+    if not isinstance(method_details, dict):  # pragma: no cover - defensive
+        pytest.fail("method should be a dict")
+    method_details_dict = cast("dict[str, object]", method_details)
+    assertions.expect_sequence_equal(method_details_dict.get("retrieval"), ["semantic"])
+    assertions.expect_true(method_details_dict.get("stages"))
 
 
 def test_semantic_pro_requires_coderank_enabled(tmp_path: Path) -> None:

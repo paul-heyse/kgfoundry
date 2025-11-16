@@ -64,6 +64,8 @@ def test_resolve_polars_frame_factory_prefers_legacy_helper() -> None:
     payload = [{"src_path": "a.py", "dst_path": "b.py"}]
 
     assertions.expect_true(factory is not None, reason="factory should exist")
+    if factory is None:  # pragma: no cover - defensive
+        pytest.fail("factory should exist")
     frame = factory(payload)
     assertions.expect_true(isinstance(frame, _DummyFrame), reason="frame should be _DummyFrame")
     assertions.expect_sequence_equal(polars.calls, [payload])
@@ -77,6 +79,8 @@ def test_resolve_polars_frame_factory_supports_dataframe_constructor() -> None:
     payload = [{"src_path": "a.py", "dst_path": "b.py"}]
 
     assertions.expect_true(factory is not None, reason="factory should exist")
+    if factory is None:  # pragma: no cover - defensive
+        pytest.fail("factory should exist")
     frame = factory(payload)
     assertions.expect_true(isinstance(frame, _DummyFrame), reason="frame should be _DummyFrame")
     assertions.expect_sequence_equal(polars.calls, [payload])

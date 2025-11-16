@@ -32,10 +32,14 @@ def test_duckdb_manager_configures_pragmas(tmp_path: Path) -> None:
     ) as conn:
         threads_row = conn.execute("SELECT current_setting('threads')").fetchone()
         assertions.expect_true(threads_row is not None)
+        if threads_row is None:  # pragma: no cover - defensive
+            pytest.fail("threads_row should not be None")
         assertions.expect_equal(int(threads_row[0]), thread_count)
 
         cache_row = conn.execute("SELECT current_setting('enable_object_cache')").fetchone()
         assertions.expect_true(cache_row is not None)
+        if cache_row is None:  # pragma: no cover - defensive
+            pytest.fail("cache_row should not be None")
         assertions.expect_true(str(cache_row[0]).lower() in {"true", "1"})
 
 
@@ -153,5 +157,9 @@ def test_connection_pool_reuses_connections(
 
     manager.close()
 
-    assertions.expect_true(created <= manager.config.pool_size)
-    assertions.expect_true(manager.connections_created <= manager.config.pool_size)
+    pool_size = manager.config.pool_size
+    assertions.expect_true(pool_size is not None)
+    if pool_size is None:  # pragma: no cover - defensive
+        pytest.fail("Pool size must be configured for this test.")
+    assertions.expect_true(created <= pool_size)
+    assertions.expect_true(manager.connections_created <= pool_size)

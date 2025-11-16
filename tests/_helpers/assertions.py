@@ -9,9 +9,9 @@ from typing import Any
 import pytest
 
 
-def expect_true(condition: bool, *, reason: str | None = None) -> None:
-    """Fail the current test when ``condition`` evaluates to ``False``."""
-    if condition:
+def expect_true(condition: object, *, reason: str | None = None) -> None:
+    """Fail the current test when ``bool(condition)`` evaluates to ``False``."""
+    if bool(condition):
         return
     message = "Expected condition to evaluate to True."
     if reason:
@@ -19,9 +19,9 @@ def expect_true(condition: bool, *, reason: str | None = None) -> None:
     pytest.fail(message, pytrace=False)
 
 
-def expect_false(condition: bool, *, reason: str | None = None) -> None:
-    """Fail the current test when ``condition`` evaluates to ``True``."""
-    if not condition:
+def expect_false(condition: object, *, reason: str | None = None) -> None:
+    """Fail the current test when ``bool(condition)`` evaluates to ``True``."""
+    if not bool(condition):
         return
     message = "Expected condition to evaluate to False."
     if reason:

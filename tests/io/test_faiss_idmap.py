@@ -48,6 +48,8 @@ def test_export_idmap_round_trip(tmp_path: Path) -> None:
     assertions.expect_true(
         isinstance(timestamps[0], datetime), reason="timestamp should be datetime"
     )
+    if not timestamps:  # pragma: no cover - defensive
+        pytest.fail("timestamp column should be populated")
     assertions.expect_true(
         timestamps[0].tzinfo is not None, reason="timestamp should be timezone-aware"
     )
@@ -101,6 +103,8 @@ def test_duckdb_join_with_idmap(tmp_path: Path) -> None:
     )
     row = conn.execute("SELECT COUNT(*) FROM v_faiss_join WHERE faiss_row IS NOT NULL").fetchone()
     assertions.expect_true(row is not None, reason="query should return a result")
+    if row is None:  # pragma: no cover - defensive
+        pytest.fail("query should return a result")
     assertions.expect_equal(row[0], len(ids))
 
 

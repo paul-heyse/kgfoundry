@@ -51,6 +51,8 @@ def test_ensure_faiss_idmap_view_registers_join(tmp_path: Path) -> None:
     )
     count = conn.execute("SELECT COUNT(*) FROM v_faiss_join").fetchone()
     assertions.expect_true(count is not None, reason="query should return a result")
+    if count is None:  # pragma: no cover - defensive
+        pytest.fail("query should return a result")
     assertions.expect_equal(count[0], 2)
 
 

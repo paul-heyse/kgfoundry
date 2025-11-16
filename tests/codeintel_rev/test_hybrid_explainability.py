@@ -46,4 +46,6 @@ def test_hybrid_engine_records_method_metadata(monkeypatch: pytest.MonkeyPatch, 
         ),
     )
     assertions.expect_true(result.method is not None, reason="result should have method metadata")
+    if result.method is None:  # pragma: no cover - defensive
+        pytest.fail("result should have method metadata")
     assertions.expect_in("coverage", result.method)

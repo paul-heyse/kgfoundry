@@ -22,9 +22,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, TypedDict, cast
 
 from kgfoundry_common.errors import ConfigurationError
-from tools._shared.logging import get_logger
-
-LOGGER = get_logger(__name__)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -246,9 +243,9 @@ def get_module_exports(module_name: str) -> set[str]:
     """
     try:
         module = importlib.import_module(module_name)
-    except ImportError:
-        LOGGER.exception("Could not import %s", module_name)
-        return set()
+    except ImportError as exc:
+        message = f"Could not import runtime module {module_name}"
+        raise ConfigurationError(message) from exc
 
     # Use __all__ if available, otherwise use dir() filtering
     all_attr: object = getattr(module, "__all__", None)
@@ -319,9 +316,9 @@ def get_stub_exports(stub_path: Path) -> set[str]:
 
     try:
         tree = ast.parse(stub_path.read_text(encoding="utf-8"))
-    except SyntaxError:
-        LOGGER.exception("Could not parse %s", stub_path)
-        return set()
+    except SyntaxError as exc:
+        message = f"Could not parse stub file {stub_path}"
+        raise ConfigurationError(message) from exc
 
     exports = set()
 
@@ -483,8 +480,30 @@ def _extract_stub_parity_report(error: ConfigurationError) -> StubParityReport |
         context = cast("StubParityContext", dict(error.context))
         return StubParityReport.from_context(context)
     except (KeyError, TypeError, ValueError):
-        LOGGER.exception("Failed to parse stub parity context")
         return None
+
+
+def _format_stub_parity_summary(report: StubParityReport) -> str:
+    """Return a human-readable summary of stub parity issues."""
+    lines = [
+        f"FAILED: {report.error_count} stub parity issue(s) across {report.issue_count} module(s)",
+        "",
+    ]
+    for issue in report.issues:
+        lines.append(f"Module: {issue.module}")
+        lines.append(f"Stub: {issue.stub_path}")
+        if issue.missing_symbols:
+            missing = ", ".join(sorted(issue.missing_symbols))
+            lines.append(f"  Missing symbols: {missing}")
+        if issue.extra_symbols:
+            extra = ", ".join(sorted(issue.extra_symbols))
+            lines.append(f"  Extra symbols: {extra}")
+        if issue.any_usages:
+            lines.append("  Any usages:")
+            for line_number, preview in issue.any_usages:
+                lines.append(f"    Line {line_number}: {preview}")
+        lines.append("")
+    return "\n".join(lines).strip()
 
 
 def _normalize_issues(
@@ -525,35 +544,10 @@ def main() -> int:
     except ConfigurationError as error:
         extracted_report = _extract_stub_parity_report(error)
         if extracted_report is None:
-            LOGGER.exception("FAILED: Stub parity issues detected")
-            return 1
+            raise SystemExit(str(error)) from error
+        message = _format_stub_parity_summary(extracted_report)
+        raise SystemExit(message)
 
-        issues_payload = [
-            {
-                "module": issue.module,
-                "stub_path": str(issue.stub_path),
-                "missing_symbols": list(issue.missing_symbols),
-                "extra_symbols": list(issue.extra_symbols),
-                "any_usages": [
-                    {"line": line_number, "preview": preview}
-                    for line_number, preview in issue.any_usages
-                ],
-            }
-            for issue in extracted_report.issues
-        ]
-
-        LOGGER.exception(
-            "FAILED: %s stub parity issue(s) found",
-            extracted_report.error_count,
-            extra={
-                "error_count": extracted_report.error_count,
-                "issue_count": extracted_report.issue_count,
-                "issues": issues_payload,
-            },
-        )
-        return 1
-
-    LOGGER.info("SUCCESS: All checks passed")
     return 0
 
 

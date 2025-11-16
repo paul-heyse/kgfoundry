@@ -138,6 +138,8 @@ def test_update_index_skips_primary_duplicates(tmp_index_path: Path) -> None:
     assertions.expect_true(
         manager.secondary_index is not None, reason="secondary index should exist"
     )
+    if manager.secondary_index is None:  # pragma: no cover - defensive
+        pytest.fail("secondary index should exist")
     assertions.expect_equal(manager.secondary_index.ntotal, 2)
     assertions.expect_equal(manager.incremental_ids, {6, 7})
 
@@ -238,6 +240,8 @@ def _add_duplicate_to_secondary(
     assertions.expect_true(
         manager.secondary_index is not None, reason="secondary index should exist"
     )
+    if manager.secondary_index is None:  # pragma: no cover - defensive
+        pytest.fail("secondary index should exist before adding duplicates")
     manager.secondary_index.add_with_ids(duplicate_norm, np.array([duplicate_id], dtype=np.int64))
     manager.incremental_ids.add(duplicate_id)
     return duplicate_id, duplicate_vector
@@ -486,6 +490,8 @@ def test_merge_indexes_combines_vectors(tmp_index_path: Path) -> None:
 
     # Verify primary index now has all vectors (80 total)
     assertions.expect_true(manager.cpu_index is not None, reason="cpu index should exist")
+    if manager.cpu_index is None:  # pragma: no cover - defensive
+        pytest.fail("cpu index should exist after merge")
     assertions.expect_equal(manager.cpu_index.ntotal, 80)
 
 
@@ -512,6 +518,8 @@ def test_merge_indexes_no_secondary(tmp_index_path: Path) -> None:
 
     # Primary should be unchanged
     assertions.expect_true(manager.cpu_index is not None, reason="cpu index should exist")
+    if manager.cpu_index is None:  # pragma: no cover - defensive
+        pytest.fail("cpu index should exist after merge")
     assertions.expect_equal(manager.cpu_index.ntotal, 50)
 
 
@@ -558,6 +566,8 @@ def test_incremental_workflow_end_to_end(
     assertions.expect_true(
         manager.secondary_index is not None, reason="secondary index should exist"
     )
+    if manager.secondary_index is None:  # pragma: no cover - defensive
+        pytest.fail("secondary index should exist")
     assertions.expect_equal(len(manager.incremental_ids), secondary_size)
 
     # Step 3: Search with dual-index
@@ -571,6 +581,8 @@ def test_incremental_workflow_end_to_end(
     # Verify merge completed
     assertions.expect_equal(manager.secondary_index, None)
     assertions.expect_true(manager.cpu_index is not None, reason="cpu index should exist")
+    if manager.cpu_index is None:  # pragma: no cover - defensive
+        pytest.fail("cpu index should exist after merge")
     assertions.expect_equal(manager.cpu_index.ntotal, primary_size + secondary_size)
 
     # Step 5: Search after merge (should still work, now only primary)
@@ -611,6 +623,8 @@ def test_save_load_secondary_index(tmp_index_path: Path) -> None:
     assertions.expect_true(
         manager2.secondary_index is not None, reason="secondary index should be restored"
     )
+    if manager2.secondary_index is None:  # pragma: no cover - defensive
+        pytest.fail("secondary index should be restored")
     assertions.expect_equal(len(manager2.incremental_ids), 20)
     assertions.expect_equal(manager2.incremental_ids, set(range(50, 70)))
 

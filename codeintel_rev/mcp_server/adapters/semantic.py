@@ -268,70 +268,64 @@ def _semantic_search_sync(
     scope: ScopeIn | None,
 ) -> AnswerEnvelope:
     start_time = perf_counter()
-    try:
-        artifacts = _execute_semantic_pipeline(
-            _SemanticPipelineRequest(
-                context=context,
-                scope=scope,
-                limit=limit,
-                query=query,
-            )
+    artifacts = _execute_semantic_pipeline(
+        _SemanticPipelineRequest(
+            context=context,
+            scope=scope,
+            limit=limit,
+            query=query,
         )
-        method_payload = (
-            dict(artifacts.hybrid_result.method) if artifacts.hybrid_result.method else {}
-        )
-        stage_entries: list[dict[str, object]] = []
-        if method_payload:
-            existing_stages = method_payload.get("stages")
-            if isinstance(existing_stages, list):
-                stage_entries.extend(stage for stage in existing_stages if isinstance(stage, dict))
-        stage_entries.append(
-            {
-                "name": "hydrate.duckdb",
-                "status": "run" if artifacts.hydrate_exc is None else "error",
-                "duration_ms": artifacts.hydrate_duration_ms,
-                "output": {"rows": len(artifacts.findings)},
-            }
-        )
-        method_payload["stages"] = stage_entries
+    )
+    method_payload = dict(artifacts.hybrid_result.method) if artifacts.hybrid_result.method else {}
+    stage_entries: list[dict[str, object]] = []
+    if method_payload:
+        existing_stages = method_payload.get("stages")
+        if isinstance(existing_stages, list):
+            stage_entries.extend(stage for stage in existing_stages if isinstance(stage, dict))
+    stage_entries.append(
+        {
+            "name": "hydrate.duckdb",
+            "status": "run" if artifacts.hydrate_exc is None else "error",
+            "duration_ms": artifacts.hydrate_duration_ms,
+            "output": {"rows": len(artifacts.findings)},
+        }
+    )
+    method_payload["stages"] = stage_entries
 
-        _annotate_hybrid_contributions(
-            artifacts.findings,
-            artifacts.hybrid_result.contribution_map,
-            context.settings.index.rrf_k,
-        )
+    _annotate_hybrid_contributions(
+        artifacts.findings,
+        artifacts.hybrid_result.contribution_map,
+        context.settings.index.rrf_k,
+    )
 
-        extras = _build_response_extras(
-            _MethodContext(
-                findings_count=len(artifacts.findings),
-                requested_limit=limit,
-                effective_limit=artifacts.plan.effective_limit,
-                start_time=start_time,
-                retrieval_channels=artifacts.hybrid_result.retrieval_channels,
-                hybrid_method=cast("MethodInfo", method_payload) if method_payload else None,
-            ),
-            artifacts.limits_metadata,
-            scope,
-        )
+    extras = _build_response_extras(
+        _MethodContext(
+            findings_count=len(artifacts.findings),
+            requested_limit=limit,
+            effective_limit=artifacts.plan.effective_limit,
+            start_time=start_time,
+            retrieval_channels=artifacts.hybrid_result.retrieval_channels,
+            hybrid_method=cast("MethodInfo", method_payload) if method_payload else None,
+        ),
+        artifacts.limits_metadata,
+        scope,
+    )
 
-        answer_message = (
-            f"Found {len(artifacts.findings)} hybrid results for: {query}"
-            if any(
-                channel in {"bm25", "splade"}
-                for channel in artifacts.hybrid_result.retrieval_channels
-            )
-            else f"Found {len(artifacts.findings)} semantically similar code chunks for: {query}"
+    answer_message = (
+        f"Found {len(artifacts.findings)} hybrid results for: {query}"
+        if any(
+            channel in {"bm25", "splade"}
+            for channel in artifacts.hybrid_result.retrieval_channels
         )
+        else f"Found {len(artifacts.findings)} semantically similar code chunks for: {query}"
+    )
 
-        envelope = _make_envelope(
-            findings=artifacts.findings,
-            answer=answer_message,
-            confidence=0.85 if artifacts.findings else 0.0,
-            extras=extras,
-        )
-    except Exception:
-        raise
-    return envelope
+    return _make_envelope(
+        findings=artifacts.findings,
+        answer=answer_message,
+        confidence=0.85 if artifacts.findings else 0.0,
+        extras=extras,
+    )
 
 
 def _execute_semantic_pipeline(request: _SemanticPipelineRequest) -> _SemanticPipelineResult:
@@ -399,7 +393,6 @@ def _run_faiss_stage(
         )
     )
     if search_exc is not None:
-        warning = f"FAISS unavailable, falling back to sparse channels ({search_exc})"
         limits_metadata.append("faiss_fallback:unavailable")
         return _FaissStageResult([], [], search_exc)
     threshold = float(request.context.settings.index.semantic_min_score or 0.0)

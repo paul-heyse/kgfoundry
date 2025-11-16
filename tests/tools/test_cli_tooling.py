@@ -113,7 +113,10 @@ def test_load_cli_tooling_context_missing_augment(tmp_path: Path) -> None:
     assertions.expect_true(
         _has_problem_details(excinfo.value), reason="should have problem details"
     )
-    problem = excinfo.value.problem
+    error = excinfo.value
+    if not isinstance(error, cli_tooling.CLIConfigError):  # pragma: no cover - defensive
+        pytest.fail("Expected CLIConfigError")
+    problem = error.problem
     assertions.expect_equal(problem["status"], 404)
     assertions.expect_equal(problem["type"], "https://kgfoundry.dev/problems/cli-config")
 
@@ -141,7 +144,10 @@ def test_load_cli_tooling_context_missing_interface(tmp_path: Path) -> None:
     assertions.expect_true(
         _has_problem_details(excinfo.value), reason="should have problem details"
     )
-    problem = excinfo.value.problem
+    error = excinfo.value
+    if not isinstance(error, cli_tooling.CLIConfigError):  # pragma: no cover - defensive
+        pytest.fail("Expected CLIConfigError")
+    problem = error.problem
     assertions.expect_equal(problem["status"], 422)
     detail = problem.get("detail")
     assertions.expect_true(isinstance(detail, str), reason="detail should be str")

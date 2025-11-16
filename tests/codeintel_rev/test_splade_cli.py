@@ -192,6 +192,8 @@ def test_encode_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     assertions.expect_true(bool(stub.calls), reason="Expected encode_corpus to be invoked")
     _, options = stub.calls[0]
     assertions.expect_true(options is not None, reason="options should not be None")
+    if options is None:  # pragma: no cover - defensive
+        pytest.fail("options should not be None")
     assertions.expect_equal(options.batch_size, 16)
     metadata_path = stub.tmp_path / "vectors" / "vectors_metadata.json"
     assertions.expect_true(metadata_path.exists(), reason="metadata_path should exist")
@@ -228,6 +230,8 @@ def test_build_index_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
     assertions.expect_true(
         isinstance(options, SpladeBuildOptions), reason="options should be SpladeBuildOptions"
     )
+    if not isinstance(options, SpladeBuildOptions):  # pragma: no cover - defensive
+        pytest.fail("options should be SpladeBuildOptions")
     assertions.expect_equal(options.vectors_dir, vectors_dir)
     assertions.expect_equal(options.threads, 12)
     assertions.expect_equal(options.max_clause_count, 8192)

@@ -104,7 +104,8 @@ def _get_all_installed_packages_via_subprocess() -> dict[str, str]:
         ]
         stdout = run_subprocess(cmd, timeout=10, cwd=REPO_ROOT)
         packages = json.loads(stdout)
-    except (json.JSONDecodeError, OSError, RuntimeError) as exc:
+    except (json.JSONDecodeError, OSError, RuntimeError):
+        return packages
     return packages
 
 
@@ -204,7 +205,8 @@ def _extract_imports_from_file(py_file: Path) -> list[str]:
             elif isinstance(node, ast.ImportFrom) and node.module:
                 mod = node.module.split(".")[0]
                 imports.append(mod.lower())
-    except (OSError, SyntaxError, UnicodeDecodeError) as exc:
+    except (OSError, SyntaxError, UnicodeDecodeError):
+        return []
     return imports
 
 
@@ -312,7 +314,8 @@ def get_full_dependency_tree() -> set[str]:
             elif match := re.search(r"([a-zA-Z0-9_-]+)==", line):
                 pkg_name = match.group(1).lower().replace("-", "_")
                 all_packages.add(pkg_name)
-    except (OSError, RuntimeError) as exc:
+    except (OSError, RuntimeError):
+        return all_packages
     return all_packages
 
 
@@ -396,7 +399,7 @@ def check_package_has_typed(package_name: str) -> bool:
     # Fallback: check if package is in stdlib
     try:
         spec = importlib.util.find_spec(package_name)
-    except (ImportError, ValueError) as exc:
+    except (ImportError, ValueError):
         return False
     else:
         # Likely stdlib if origin exists and is not in site-packages
@@ -569,8 +572,6 @@ def _check_packages_for_typed(
         if pkg in stdlib_modules:
             continue
         checked += 1
-        if checked % _PROGRESS_INTERVAL == 0:
-
         if check_package_has_typed(pkg):
             packages_with_typed.add(pkg)
         else:

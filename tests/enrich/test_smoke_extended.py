@@ -147,6 +147,8 @@ def _assert_duckdb_ingest(
     with duckdb.connect(str(db_path)) as con:
         result_row = con.execute("SELECT COUNT(*) FROM modules").fetchone()
     assertions.expect_true(result_row is not None, reason="query should return a result")
+    if result_row is None:  # pragma: no cover - defensive
+        pytest.fail("query should return a result")
     (count,) = result_row
     assertions.expect_equal(count, expected_count)
 

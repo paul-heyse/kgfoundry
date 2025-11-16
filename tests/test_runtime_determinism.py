@@ -56,7 +56,8 @@ class TestPostponedAnnotations:
         assertions.expect_true(
             source_file is not None, reason=f"{module_name} module has no __file__ attribute"
         )
-
+        if source_file is None:  # pragma: no cover - defensive
+            pytest.fail(f"{module_name} module has no __file__ attribute")
         content = Path(source_file).read_text(encoding="utf-8")
         assertions.expect_in(
             "from __future__ import annotations",
@@ -134,7 +135,8 @@ class TestTypeOnlyImportGuarding:
 
         source_file = module.__file__
         assertions.expect_true(source_file is not None, reason="module should have __file__")
-
+        if source_file is None:  # pragma: no cover - defensive
+            pytest.fail("module should have __file__")
         content = Path(source_file).read_text(encoding="utf-8")
         # Verify TYPE_CHECKING is imported and used
         assertions.expect_in("from typing import", content)
@@ -146,7 +148,8 @@ class TestTypeOnlyImportGuarding:
 
         source_file = module.__file__
         assertions.expect_true(source_file is not None, reason="module should have __file__")
-
+        if source_file is None:  # pragma: no cover - defensive
+            pytest.fail("module should have __file__")
         content = Path(source_file).read_text(encoding="utf-8")
         # Verify numpy is only imported inside TYPE_CHECKING block
         lines = content.split("\n")

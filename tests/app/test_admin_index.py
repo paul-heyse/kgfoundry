@@ -42,7 +42,8 @@ def test_admin_tuning_updates_context(tmp_path, monkeypatch) -> None:
             isinstance(ctx.factory_adjuster, DefaultFactoryAdjuster),
             reason="should be DefaultFactoryAdjuster",
         )
-        assertions.expect_equal(ctx.factory_adjuster.faiss_nprobe, 64)
+        adjuster = cast("DefaultFactoryAdjuster", ctx.factory_adjuster)
+        assertions.expect_equal(adjuster.faiss_nprobe, 64)
 
 
 def test_admin_faiss_runtime_status_endpoint(tmp_path, monkeypatch) -> None:

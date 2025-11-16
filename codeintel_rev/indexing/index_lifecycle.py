@@ -184,10 +184,8 @@ def _attrs_from_meta(meta_path: Path) -> dict[str, object]:
         attrs["faiss_parameters"] = parameter_space
     vector_count = payload.get("vector_count")
     if isinstance(vector_count, (int, float, str)):
-        try:
+        with contextlib.suppress(TypeError, ValueError):
             attrs["faiss_vector_count"] = int(vector_count)
-        except (TypeError, ValueError):
-            pass
     default_parameters = payload.get("default_parameters")
     if default_parameters:
         attrs["faiss_default_parameters"] = default_parameters
@@ -363,6 +361,20 @@ class IndexLifecycleManager:
             return None
         manifest_path = self._resolve_manifest_path(active_dir)
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest_attrs = payload.get("attrs")
+        attrs_map = manifest_attrs if isinstance(manifest_attrs, Mapping) else {}
+        idmap_override = attrs_map.get("faiss_idmap_path")
+        profile_override = attrs_map.get("faiss_tuning_profile_path")
+        idmap_name = (
+            str(idmap_override)
+            if isinstance(idmap_override, str) and idmap_override.strip()
+            else IDMAP_FILE
+        )
+        profile_name = (
+            str(profile_override)
+            if isinstance(profile_override, str) and profile_override.strip()
+            else PROFILE_FILE
+        )
         assets = IndexAssets(
             faiss_index=active_dir / "faiss.index",
             duckdb_path=active_dir / "catalog.duckdb",
@@ -370,8 +382,8 @@ class IndexLifecycleManager:
             bm25_dir=self._maybe_dir(active_dir / "bm25"),
             splade_dir=self._maybe_dir(active_dir / "splade"),
             xtr_dir=self._maybe_dir(active_dir / "xtr"),
-            faiss_idmap=self._locate_sidecar(active_dir, IDMAP_FILE, _LEGACY_IDMAP_FILES),
-            tuning_profile=self._locate_sidecar(active_dir, PROFILE_FILE, _LEGACY_PROFILE_FILES),
+            faiss_idmap=self._locate_sidecar(active_dir, idmap_name, _LEGACY_IDMAP_FILES),
+            tuning_profile=self._locate_sidecar(active_dir, profile_name, _LEGACY_PROFILE_FILES),
         )
         assets.ensure_exists()
         return assets

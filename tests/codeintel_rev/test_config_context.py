@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import cast
 
 import duckdb
 import pytest
@@ -229,4 +230,5 @@ def test_build_factory_adjuster_from_settings(
     context = ApplicationContext.create()
     assertions.expect_true(isinstance(context.factory_adjuster, DefaultFactoryAdjuster))
     expected = getattr(context.settings.index, "faiss_nprobe", None)
-    assertions.expect_equal(context.factory_adjuster.faiss_nprobe, expected)
+    adjuster = cast("DefaultFactoryAdjuster", context.factory_adjuster)
+    assertions.expect_equal(adjuster.faiss_nprobe, expected)

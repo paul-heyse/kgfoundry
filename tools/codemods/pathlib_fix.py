@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, cast
 
 import libcst as cst
 
-from tools._libcst_mixins import CallTransformerMixin, WithTransformerMixin
+from tools._libcst_mixins import WithTransformerMixin
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -116,7 +116,7 @@ def _path_join_expression(arguments: Sequence[cst.Arg]) -> cst.BaseExpression | 
     return result
 
 
-class PathlibTransformer(CallTransformerMixin, WithTransformerMixin, cst.CSTTransformer):
+class PathlibTransformer(WithTransformerMixin, cst.CSTTransformer):
     """Apply pathlib conversions to common ``os.path`` call sites.
 
     Initializes transformer with change tracking.
@@ -146,7 +146,7 @@ class PathlibTransformer(CallTransformerMixin, WithTransformerMixin, cst.CSTTran
                     self.needs_pathlib_import = True
         return True
 
-    def leave_call(self, original_node: cst.Call, updated_node: cst.Call) -> cst.BaseExpression:
+    def leave_Call(self, original_node: cst.Call, updated_node: cst.Call) -> cst.BaseExpression:
         """Apply call rewrites when exiting a Call node.
 
         Parameters

@@ -105,7 +105,8 @@ def _extract_imports_from_file(py_file: Path) -> list[str]:
             elif isinstance(node, ast.ImportFrom) and node.module:
                 mod = node.module.split(".")[0]
                 imports.append(mod.lower())
-    except (OSError, SyntaxError, UnicodeDecodeError) as exc:
+    except (OSError, SyntaxError, UnicodeDecodeError):
+        return []
     return imports
 
 
@@ -375,8 +376,6 @@ def main() -> int:
     int
         Exit code (0 for success, non-zero for failure).
     """
-
-
     # Gather data
     types_packages = get_types_packages()
     runtime_deps = get_runtime_dependencies()

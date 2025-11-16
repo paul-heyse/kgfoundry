@@ -57,6 +57,8 @@ def test_index_file_smoke(tmp_path: Path) -> None:
         assertions.expect_in(required, kinds)
     module_node = next(node for node in nodes if node.kind == "Module")
     assertions.expect_true(module_node.doc is not None, reason="module_node should have doc")
+    if module_node.doc is None:  # pragma: no cover - defensive
+        pytest.fail("module_node should have doc")
     module_doc = module_node.doc.get("module", "")
     assertions.expect_true(
         module_doc.startswith("Top-level"), reason="module doc should start with Top-level"
@@ -65,6 +67,8 @@ def test_index_file_smoke(tmp_path: Path) -> None:
         node for node in nodes if node.kind == "FunctionDef" and node.name == "helper"
     )
     assertions.expect_true(helper_node.doc is not None, reason="helper_node should have doc")
+    if helper_node.doc is None:  # pragma: no cover - defensive
+        pytest.fail("helper_node should have doc")
     assertions.expect_in("def_", helper_node.doc)
     assertions.expect_in("Sum incoming", helper_node.doc["def_"])
 
@@ -141,6 +145,8 @@ def test_stitching_links_module_and_scip(tmp_path: Path) -> None:
     stitched, counters = stitch_nodes(nodes, module_lookup=module_lookup, scip_resolver=resolver)
     updated = next(node for node in stitched if node.kind == "FunctionDef" and node.name == "add")
     assertions.expect_true(updated.stitch is not None, reason="stitch should be set")
+    if updated.stitch is None:  # pragma: no cover - defensive
+        pytest.fail("stitch should be set")
     assertions.expect_equal(updated.stitch.module_id, "module::pkg.sample")
     assertions.expect_true(
         updated.stitch.scip_symbol is not None, reason="scip_symbol should be set"
@@ -171,4 +177,6 @@ def test_schema_payload_contains_required_fields(tmp_path: Path) -> None:
         assertions.expect_in(key, payload)
     span = payload.get("span")
     assertions.expect_true(isinstance(span, dict), reason="span should be dict")
+    if not isinstance(span, dict):  # pragma: no cover - defensive
+        pytest.fail("span should be dict")
     assertions.expect_true(isinstance(span.get("start"), list), reason="start should be list")

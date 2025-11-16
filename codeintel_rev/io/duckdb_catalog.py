@@ -12,6 +12,7 @@ import hashlib
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
+import logging
 from pathlib import Path
 from threading import Lock
 from typing import TYPE_CHECKING, Any, ClassVar, Self, TypedDict, Unpack, cast
@@ -36,6 +37,7 @@ else:
     duckdb = cast("duckdb", LazyModule("duckdb", "DuckDB catalog operations"))
     np = cast("np", LazyModule("numpy", "DuckDB catalog embeddings"))
 
+LOGGER = logging.getLogger(__name__)
 
 @dataclass(slots=True, frozen=True)
 class IdMapMeta:

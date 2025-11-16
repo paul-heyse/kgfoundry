@@ -227,6 +227,8 @@ class TestImportFunctionsParametrized:
             remediation = _expect_mapping(context.get("remediation"), "remediation")
             install = remediation.get("install")
             assertions.expect_true(isinstance(install, str), reason="install should be str")
+            if not isinstance(install, str):  # pragma: no cover - defensive
+                pytest.fail("install should be a string")
             assertions.expect_true(
                 "pip install kgfoundry[docs]" in install, reason="install should mention docs extra"
             )

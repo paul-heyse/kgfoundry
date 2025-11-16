@@ -146,6 +146,15 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
     dispatch : DispatchFunction | None, optional
         Optional custom dispatch function for the middleware. If None, uses the
         default dispatch from BaseHTTPMiddleware. Defaults to None.
+    capability_attr : str, optional
+        Attribute name on request.state to store capability stamp. Used to track
+        capability changes across requests. Defaults to "capability_stamp".
+    session_header : str, optional
+        HTTP header name for session ID. Extracted from request headers or
+        auto-generated if missing. Defaults to "X-Session-ID".
+    run_header : str, optional
+        HTTP header name for run ID. Extracted from request headers or
+        auto-generated if missing. Defaults to "X-Run-ID".
 
     Notes
     -----
