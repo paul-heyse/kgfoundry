@@ -14,6 +14,7 @@ from codeintel_rev.mcp_server.schemas import ScopeIn
 
 from kgfoundry_common.errors import VectorSearchError
 from kgfoundry_common.subprocess_utils import SubprocessError, SubprocessTimeoutError
+from tests._helpers import assertions
 
 
 @pytest.fixture
@@ -117,12 +118,15 @@ def test_search_text_scope_include_and_exclude(mock_context: Mock) -> None:
 
         cmd = mock_run.call_args.args[0]
         iglob_values = [cmd[i + 1] for i, arg in enumerate(cmd) if arg == "--iglob"]
-        assert "src/**/*.py" in iglob_values
-        assert "!src/**/tests/**" in iglob_values
+        assertions.expect_in("src/**/*.py", iglob_values)
+        assertions.expect_in("!src/**/tests/**", iglob_values)
         sentinel_index = cmd.index("--")
-        assert cmd[sentinel_index + 1] == "main"
-        assert cmd[sentinel_index + 2 :] == ["."]
-        assert result["matches"][0]["path"].endswith("src/main.py")
+        assertions.expect_equal(cmd[sentinel_index + 1], "main")
+        assertions.expect_sequence_equal(cmd[sentinel_index + 2 :], ["."])
+        assertions.expect_true(
+            result["matches"][0]["path"].endswith("src/main.py"),
+            reason="path should end with src/main.py",
+        )
 
 
 def test_search_text_explicit_paths_override_scope(mock_context: Mock) -> None:
@@ -155,10 +159,17 @@ def test_search_text_explicit_paths_override_scope(mock_context: Mock) -> None:
 
         cmd = mock_run.call_args.args[0]
         iglob_values = [cmd[i + 1] for i, arg in enumerate(cmd) if arg == "--iglob"]
-        assert "src/**" not in iglob_values
-        assert "!**/*.pyc" in iglob_values
-        assert cmd[-1].startswith("tests")
-        assert result["matches"][0]["path"].endswith("tests/test_main.py")
+        assertions.expect_false(
+            "src/**" in iglob_values, reason="scope include should be suppressed"
+        )
+        assertions.expect_in("!**/*.pyc", iglob_values)
+        assertions.expect_true(
+            cmd[-1].startswith("tests"), reason="last arg should start with tests"
+        )
+        assertions.expect_true(
+            result["matches"][0]["path"].endswith("tests/test_main.py"),
+            reason="path should end with tests/test_main.py",
+        )
 
 
 def test_search_text_explicit_globs_override_scope(mock_context: Mock) -> None:
@@ -192,11 +203,18 @@ def test_search_text_explicit_globs_override_scope(mock_context: Mock) -> None:
 
         cmd = mock_run.call_args.args[0]
         iglob_values = [cmd[i + 1] for i, arg in enumerate(cmd) if arg == "--iglob"]
-        assert "tests/**/*.py" in iglob_values
-        assert "!tests/**/fixtures/**" in iglob_values
-        assert "src/**" not in iglob_values
-        assert "!**/*.pyc" not in iglob_values
-        assert result["matches"][0]["path"].endswith("tests/integration/case.py")
+        assertions.expect_in("tests/**/*.py", iglob_values)
+        assertions.expect_in("!tests/**/fixtures/**", iglob_values)
+        assertions.expect_false(
+            "src/**" in iglob_values, reason="scope include should be overridden"
+        )
+        assertions.expect_false(
+            "!**/*.pyc" in iglob_values, reason="scope exclude should be overridden"
+        )
+        assertions.expect_true(
+            result["matches"][0]["path"].endswith("tests/integration/case.py"),
+            reason="path should end with tests/integration/case.py",
+        )
 
 
 # ==================== Error Handling Tests ====================

@@ -16,6 +16,7 @@ import numpy as np
 import pytest
 from codeintel_rev.io.faiss_manager import FAISSManager
 
+from tests._helpers import assertions
 from tests.conftest import FAISS_MODULE, HAS_FAISS_SUPPORT
 
 if not HAS_FAISS_SUPPORT:  # pragma: no cover - dependency-gated
@@ -23,7 +24,10 @@ if not HAS_FAISS_SUPPORT:  # pragma: no cover - dependency-gated
         reason="FAISS bindings unavailable on this host",
     )
 else:
-    assert FAISS_MODULE is not None
+    assertions.expect_true(
+        FAISS_MODULE is not None,
+        reason="FAISS_MODULE should be available when HAS_FAISS_SUPPORT is True",
+    )
     faiss_module: Any = FAISS_MODULE
 
 # Use modern numpy random generator
@@ -62,8 +66,8 @@ def test_update_index_creates_secondary(tmp_index_path: Path) -> None:
     manager = FAISSManager(index_path=tmp_index_path, vec_dim=vec_dim)
 
     # Secondary index should not exist initially
-    assert manager.secondary_index is None
-    assert len(manager.incremental_ids) == 0
+    assertions.expect_equal(manager.secondary_index, None)
+    assertions.expect_equal(len(manager.incremental_ids), 0)
 
     # Generate test vectors
     new_vectors = _rng.normal(0.5, 0.15, (10, vec_dim)).astype(np.float32)
@@ -74,9 +78,13 @@ def test_update_index_creates_secondary(tmp_index_path: Path) -> None:
     manager.update_index(new_vectors, new_ids)
 
     # Verify secondary index was created
-    assert manager.secondary_index is not None
-    assert len(manager.incremental_ids) == 10
-    assert manager.incremental_ids == {100, 101, 102, 103, 104, 105, 106, 107, 108, 109}
+    assertions.expect_true(
+        manager.secondary_index is not None, reason="secondary index should be created"
+    )
+    assertions.expect_equal(len(manager.incremental_ids), 10)
+    assertions.expect_equal(
+        manager.incremental_ids, {100, 101, 102, 103, 104, 105, 106, 107, 108, 109}
+    )
 
 
 def test_update_index_skips_duplicates(tmp_index_path: Path) -> None:
@@ -96,7 +104,7 @@ def test_update_index_skips_duplicates(tmp_index_path: Path) -> None:
     ids1 = np.array([10, 11, 12, 13, 14], dtype=np.int64)
     manager.update_index(vectors1, ids1)
 
-    assert len(manager.incremental_ids) == 5
+    assertions.expect_equal(len(manager.incremental_ids), 5)
 
     # Second batch with duplicates
     vectors2 = _rng.normal(0.5, 0.15, (7, vec_dim)).astype(np.float32)
@@ -106,8 +114,8 @@ def test_update_index_skips_duplicates(tmp_index_path: Path) -> None:
     manager.update_index(vectors2, ids2)
 
     # Should have 5 original + 4 new = 9 total
-    assert len(manager.incremental_ids) == 9
-    assert manager.incremental_ids == {10, 11, 12, 13, 14, 15, 16, 17, 18}
+    assertions.expect_equal(len(manager.incremental_ids), 9)
+    assertions.expect_equal(manager.incremental_ids, {10, 11, 12, 13, 14, 15, 16, 17, 18})
 
 
 def test_update_index_skips_primary_duplicates(tmp_index_path: Path) -> None:
@@ -127,9 +135,11 @@ def test_update_index_skips_primary_duplicates(tmp_index_path: Path) -> None:
 
     manager.update_index(update_vectors, update_ids)
 
-    assert manager.secondary_index is not None
-    assert manager.secondary_index.ntotal == 2
-    assert manager.incremental_ids == {6, 7}
+    assertions.expect_true(
+        manager.secondary_index is not None, reason="secondary index should exist"
+    )
+    assertions.expect_equal(manager.secondary_index.ntotal, 2)
+    assertions.expect_equal(manager.incremental_ids, {6, 7})
 
 
 def test_dual_index_search(tmp_index_path: Path) -> None:
@@ -163,7 +173,7 @@ def test_dual_index_search(tmp_index_path: Path) -> None:
     _distances, result_ids = manager.search(query, k=10)
 
     # Verify we got results
-    assert len(result_ids[0]) == 10
+    assertions.expect_equal(len(result_ids[0]), 10)
 
     # Verify results include IDs from both primary and secondary
     # (exact composition depends on similarity, but should have some from each)
@@ -172,7 +182,10 @@ def test_dual_index_search(tmp_index_path: Path) -> None:
     secondary_result_count = sum(1 for rid in result_id_set if rid >= 100)
 
     # Should have results from both (exact counts depend on similarity)
-    assert primary_result_count > 0 or secondary_result_count > 0
+    assertions.expect_true(
+        primary_result_count > 0 or secondary_result_count > 0,
+        reason="should have results from at least one index",
+    )
 
 
 def _setup_primary_index(manager: FAISSManager, vec_dim: int) -> tuple[np.ndarray, np.ndarray]:
@@ -222,7 +235,9 @@ def _add_duplicate_to_secondary(
     )
     duplicate_norm = duplicate_vector.copy()
     faiss_module.normalize_L2(duplicate_norm)
-    assert manager.secondary_index is not None
+    assertions.expect_true(
+        manager.secondary_index is not None, reason="secondary index should exist"
+    )
     manager.secondary_index.add_with_ids(duplicate_norm, np.array([duplicate_id], dtype=np.int64))
     manager.incremental_ids.add(duplicate_id)
     return duplicate_id, duplicate_vector
@@ -249,12 +264,12 @@ def _verify_duplicate_in_results(
     tuple[np.ndarray, np.ndarray]
         Primary and secondary indices where duplicate appears.
     """
-    assert duplicate_id in primary_ids_result[0]
-    assert duplicate_id in secondary_ids_result[0]
+    assertions.expect_in(duplicate_id, primary_ids_result[0])
+    assertions.expect_in(duplicate_id, secondary_ids_result[0])
     primary_idx = np.where(primary_ids_result[0] == duplicate_id)[0]
     secondary_idx = np.where(secondary_ids_result[0] == duplicate_id)[0]
-    assert primary_idx.size == 1
-    assert secondary_idx.size == 1
+    assertions.expect_equal(primary_idx.size, 1)
+    assertions.expect_equal(secondary_idx.size, 1)
     return primary_idx, secondary_idx
 
 
@@ -354,7 +369,9 @@ def _verify_merged_search_deduplication(
     """
     merged_dists, merged_ids = manager.search(query, k=3)
     valid_ids = [rid for rid in merged_ids[0] if rid >= 0]
-    assert len(valid_ids) == len(set(valid_ids))
+    assertions.expect_equal(
+        len(valid_ids), len(set(valid_ids)), reason="merged results should be deduplicated"
+    )
     return merged_dists, merged_ids
 
 
@@ -392,8 +409,11 @@ def _verify_merged_distance(
 ) -> None:
     """Verify merged search distance matches expected."""
     merged_idx = np.where(merged_ids[0] == duplicate_id)[0]
-    assert merged_idx.size == 1
-    assert np.isclose(float(merged_dists[0, merged_idx[0]]), expected_distance)
+    assertions.expect_equal(merged_idx.size, 1)
+    assertions.expect_true(
+        np.isclose(float(merged_dists[0, merged_idx[0]]), expected_distance),
+        reason="merged distance should match expected",
+    )
 
 
 def test_merged_search_results_are_unique(tmp_index_path: Path) -> None:
@@ -452,19 +472,21 @@ def test_merge_indexes_combines_vectors(tmp_index_path: Path) -> None:
     manager.update_index(secondary_vectors, secondary_ids)
 
     # Verify secondary exists before merge
-    assert manager.secondary_index is not None
-    assert len(manager.incremental_ids) == 30
+    assertions.expect_true(
+        manager.secondary_index is not None, reason="secondary index should exist before merge"
+    )
+    assertions.expect_equal(len(manager.incremental_ids), 30)
 
     # Merge indexes
     manager.merge_indexes()
 
     # Verify secondary is cleared
-    assert manager.secondary_index is None
-    assert len(manager.incremental_ids) == 0
+    assertions.expect_equal(manager.secondary_index, None)
+    assertions.expect_equal(len(manager.incremental_ids), 0)
 
     # Verify primary index now has all vectors (80 total)
-    assert manager.cpu_index is not None
-    assert manager.cpu_index.ntotal == 80
+    assertions.expect_true(manager.cpu_index is not None, reason="cpu index should exist")
+    assertions.expect_equal(manager.cpu_index.ntotal, 80)
 
 
 def test_merge_indexes_no_secondary(tmp_index_path: Path) -> None:
@@ -489,8 +511,8 @@ def test_merge_indexes_no_secondary(tmp_index_path: Path) -> None:
     manager.merge_indexes()
 
     # Primary should be unchanged
-    assert manager.cpu_index is not None
-    assert manager.cpu_index.ntotal == 50
+    assertions.expect_true(manager.cpu_index is not None, reason="cpu index should exist")
+    assertions.expect_equal(manager.cpu_index.ntotal, 50)
 
 
 @pytest.mark.parametrize(
@@ -533,25 +555,27 @@ def test_incremental_workflow_end_to_end(
     manager.update_index(secondary_vectors, secondary_ids)
 
     # Verify dual-index state
-    assert manager.secondary_index is not None
-    assert len(manager.incremental_ids) == secondary_size
+    assertions.expect_true(
+        manager.secondary_index is not None, reason="secondary index should exist"
+    )
+    assertions.expect_equal(len(manager.incremental_ids), secondary_size)
 
     # Step 3: Search with dual-index
     query = secondary_vectors[0].copy().reshape(1, -1)
     _distances, result_ids = manager.search(query, k=10)
-    assert len(result_ids[0]) == 10
+    assertions.expect_equal(len(result_ids[0]), 10)
 
     # Step 4: Merge secondary into primary
     manager.merge_indexes()
 
     # Verify merge completed
-    assert manager.secondary_index is None
-    assert manager.cpu_index is not None
-    assert manager.cpu_index.ntotal == primary_size + secondary_size
+    assertions.expect_equal(manager.secondary_index, None)
+    assertions.expect_true(manager.cpu_index is not None, reason="cpu index should exist")
+    assertions.expect_equal(manager.cpu_index.ntotal, primary_size + secondary_size)
 
     # Step 5: Search after merge (should still work, now only primary)
     _distances2, result_ids2 = manager.search(query, k=10)
-    assert len(result_ids2[0]) == 10
+    assertions.expect_equal(len(result_ids2[0]), 10)
 
 
 def test_save_load_secondary_index(tmp_index_path: Path) -> None:
@@ -584,11 +608,13 @@ def test_save_load_secondary_index(tmp_index_path: Path) -> None:
     manager2.load_secondary_index()
 
     # Verify secondary index was restored
-    assert manager2.secondary_index is not None
-    assert len(manager2.incremental_ids) == 20
-    assert manager2.incremental_ids == set(range(50, 70))
+    assertions.expect_true(
+        manager2.secondary_index is not None, reason="secondary index should be restored"
+    )
+    assertions.expect_equal(len(manager2.incremental_ids), 20)
+    assertions.expect_equal(manager2.incremental_ids, set(range(50, 70)))
 
     # Verify search works with loaded indexes
     query = secondary_vectors[0].copy().reshape(1, -1)
     _distances, result_ids = manager2.search(query, k=10)
-    assert len(result_ids[0]) == 10
+    assertions.expect_equal(len(result_ids[0]), 10)

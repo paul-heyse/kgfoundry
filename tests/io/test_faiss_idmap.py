@@ -14,6 +14,8 @@ import pyarrow.parquet as pq
 import pytest
 from codeintel_rev.io.faiss_manager import FAISSManager, FAISSRuntimeOptions
 
+from tests._helpers import assertions
+
 
 def test_export_idmap_round_trip(tmp_path: Path) -> None:
     """Exported ID map reflects the chunk IDs added to the index."""
@@ -30,17 +32,25 @@ def test_export_idmap_round_trip(tmp_path: Path) -> None:
     manager.load_cpu_index()
     out_path = tmp_path / "faiss_idmap.parquet"
     rows = manager.export_idmap(out_path)
-    assert rows == 32
+    assertions.expect_equal(rows, 32)
 
     table = pq.read_table(out_path)
-    assert set(table.column_names) == {"faiss_row", "external_id", "index_name", "ts"}
-    assert table.num_rows == 32
-    assert table.column("external_id").to_pylist()[:5] == [0, 1, 2, 3, 4]
+    assertions.expect_equal(
+        set(table.column_names), {"faiss_row", "external_id", "index_name", "ts"}
+    )
+    assertions.expect_equal(table.num_rows, 32)
+    assertions.expect_sequence_equal(table.column("external_id").to_pylist()[:5], [0, 1, 2, 3, 4])
     index_names = table.column("index_name").to_pylist()
-    assert all(name == "index.faiss" for name in index_names)
+    assertions.expect_true(
+        all(name == "index.faiss" for name in index_names), reason="all index names should match"
+    )
     timestamps = table.column("ts").to_pylist()
-    assert isinstance(timestamps[0], datetime)
-    assert timestamps[0].tzinfo is not None
+    assertions.expect_true(
+        isinstance(timestamps[0], datetime), reason="timestamp should be datetime"
+    )
+    assertions.expect_true(
+        timestamps[0].tzinfo is not None, reason="timestamp should be timezone-aware"
+    )
 
 
 def test_duckdb_join_with_idmap(tmp_path: Path) -> None:
@@ -90,8 +100,8 @@ def test_duckdb_join_with_idmap(tmp_path: Path) -> None:
         """
     )
     row = conn.execute("SELECT COUNT(*) FROM v_faiss_join WHERE faiss_row IS NOT NULL").fetchone()
-    assert row is not None
-    assert row[0] == len(ids)
+    assertions.expect_true(row is not None, reason="query should return a result")
+    assertions.expect_equal(row[0], len(ids))
 
 
 def test_load_cpu_index_applies_tuning_profile(tmp_path: Path) -> None:
@@ -114,9 +124,9 @@ def test_load_cpu_index_applies_tuning_profile(tmp_path: Path) -> None:
 
     runtime = reloaded.runtime.get_runtime_tuning()
     active = cast("Mapping[str, object]", runtime["active"])
-    assert active["nprobe"] == 12
-    assert active["efSearch"] == 64
-    assert reloaded.refine_k_factor == pytest.approx(1.25)
+    assertions.expect_equal(active["nprobe"], 12)
+    assertions.expect_equal(active["efSearch"], 64)
+    assertions.expect_almost_equal(reloaded.refine_k_factor, 1.25)
 
 
 def _meta_path(manager: FAISSManager) -> Path:
@@ -131,12 +141,12 @@ def test_build_index_writes_meta_snapshot(tmp_path: Path) -> None:
     manager.build_index(vectors)
 
     meta_file = _meta_path(manager)
-    assert meta_file.exists()
+    assertions.expect_true(meta_file.exists(), reason="meta file should exist")
     payload = cast("dict[str, Any]", json.loads(meta_file.read_text()))
-    assert payload["vec_dim"] == vec_dim
-    assert payload["vector_count"] == len(vectors)
-    assert payload["runtime_overrides"] == {}
-    assert payload["default_parameters"]["nprobe"] == manager.default_nprobe
+    assertions.expect_equal(payload["vec_dim"], vec_dim)
+    assertions.expect_equal(payload["vector_count"], len(vectors))
+    assertions.expect_mapping_equal(cast("dict[str, object]", payload["runtime_overrides"]), {})
+    assertions.expect_equal(payload["default_parameters"]["nprobe"], manager.default_nprobe)
 
 
 def test_set_search_parameters_updates_overrides(tmp_path: Path) -> None:
@@ -153,17 +163,21 @@ def test_set_search_parameters_updates_overrides(tmp_path: Path) -> None:
 
     tuning = manager.runtime.set_search_parameters("nprobe=12,k_factor=1.5")
     overrides = cast("Mapping[str, float]", tuning["overrides"])
-    assert overrides["nprobe"] == 12
-    assert overrides["k_factor"] == pytest.approx(1.5)
+    assertions.expect_equal(overrides["nprobe"], 12)
+    assertions.expect_almost_equal(overrides["k_factor"], 1.5)
 
     meta = cast("dict[str, Any]", json.loads(_meta_path(manager).read_text()))
     runtime_overrides = cast("dict[str, Any]", meta["runtime_overrides"])
-    assert runtime_overrides["nprobe"] == 12
-    assert "parameter_space" in meta
-    assert "nprobe=12" in meta["parameter_space"]
+    assertions.expect_equal(runtime_overrides["nprobe"], 12)
+    assertions.expect_true("parameter_space" in meta, reason="meta should have parameter_space")
+    assertions.expect_true(
+        "nprobe=12" in cast("str", meta["parameter_space"]),
+        reason="parameter_space should contain nprobe",
+    )
 
 
 def test_set_search_parameters_rejects_unknown_keys(tmp_path: Path) -> None:
+    """Test that unknown parameter keys are rejected."""
     vec_dim = 8
     vectors = np.random.RandomState(9).randn(64, vec_dim).astype(np.float32)
     manager = FAISSManager(index_path=tmp_path / "index.faiss", vec_dim=vec_dim, use_cuvs=False)

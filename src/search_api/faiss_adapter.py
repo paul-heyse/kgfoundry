@@ -1,4 +1,4 @@
-"""FAISS adapter with typed GPU fallbacks and DuckDB integration."""
+"""FAISS adapter with typed CPU fallbacks and DuckDB integration."""
 
 # [nav:section public-api]
 
@@ -20,11 +20,6 @@ from kgfoundry_common.numpy_typing import (
 )
 from kgfoundry_common.typing import gate_import
 from registry.duckdb_helpers import fetch_all, fetch_one
-from search_api.faiss_gpu import (
-    clone_index_to_gpu,
-    configure_search_parameters,
-    detect_gpu_context,
-)
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     import numpy as np
@@ -35,9 +30,6 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
         FloatMatrix,
         FloatVector,
         IntVector,
-    )
-    from search_api.faiss_gpu import (
-        GpuContext,
     )
     from search_api.types import FaissIndexProtocol, FaissModuleProtocol
 
@@ -144,67 +136,55 @@ def _as_optional_str(value: object) -> str:
 
 MIN_FACTORY_DIMENSION: Final[int] = 64
 
-LoadLibraryFn = Callable[..., None]
 
+def _configure_search_parameters(
+    module: FaissModuleProtocol,
+    index: FaissIndexProtocol,
+    *,
+    nprobe: int,
+    ef_search: int | None,
+    quantizer_ef_search: int | None,
+) -> None:
+    """Apply FAISS ParameterSpace configuration for CPU indexes.
 
-def _load_libcuvs() -> LoadLibraryFn | None:
-    """Attempt to load cuVS library loader function for GPU acceleration.
-
-    Extended Summary
-    ----------------
-    Tries to import cuVS library modules (libcuvs or libcuvs_cu13) and extract
-    the load_library function. cuVS provides GPU-accelerated vector search
-    operations that can be used as a drop-in replacement for FAISS GPU
-    operations. This function enables optional GPU acceleration when cuVS is
-    available, falling back gracefully to CPU/FAISS when it is not.
-
-    Returns
-    -------
-    LoadLibraryFn | None
-        Callable load_library function if cuVS module is found and provides it,
-        None otherwise. The function can be called to initialize cuVS runtime.
-
-    Notes
-    -----
-    Time O(1) amortized after first call (uses lru_cache). Side effects: may
-    attempt to import optional modules. This function is called at module load
-    time to detect cuVS availability. Failures are logged at debug level and
-    do not prevent FAISS adapter from functioning (falls back to CPU/FAISS).
-
-    Examples
-    --------
-    >>> loader = _load_libcuvs()
-    >>> if loader is not None:
-    ...     loader()  # Initialize cuVS runtime
+    Parameters
+    ----------
+    module : FaissModuleProtocol
+        FAISS module providing ``ParameterSpace`` helpers.
+    index : FaissIndexProtocol
+        Index to configure.
+    nprobe : int
+        IVF search parameter controlling recall/latency trade-offs.
+    ef_search : int | None, optional
+        HNSW ef_search parameter for controlling recall/latency trade-offs.
+        If None, uses index defaults.
+    quantizer_ef_search : int | None, optional
+        HNSW quantizer ef_search parameter for IVF-HNSW indexes.
+        If None, uses index defaults.
     """
-    module_names = ("libcuvs", "libcuvs_cu13")
-    module = None
-    for name in module_names:
-        try:
-            module = importlib.import_module(name)
-        except (
-            ImportError,
-            ModuleNotFoundError,
-        ):  # pragma: no cover - optional dependency
-            continue
-        except (RuntimeError, OSError):  # pragma: no cover - optional dependency
-            continue
-        else:
-            break
+    params_ctor_raw = cast("object | None", getattr(module, "ParameterSpace", None))
+    if params_ctor_raw is None:
+        return
 
-    if module is None:
-        return None
+    params_ctor = cast("Callable[[], object]", params_ctor_raw)
+    params = params_ctor()
+    setter_raw = cast("object | None", getattr(params, "set_index_parameter", None))
+    if setter_raw is None:
+        return
 
-    if hasattr(module, "load_library"):
-        candidate: object = module.load_library
-        if callable(candidate):
-            return cast("LoadLibraryFn", candidate)
-    return None
-
-
-_typed_load_cuvs = _load_libcuvs()
-if _typed_load_cuvs is not None:  # pragma: no cover - optional dependency
-    _typed_load_cuvs()
+    setter = cast("Callable[[FaissIndexProtocol, str, object], None]", setter_raw)
+    try:
+        setter(index, "nprobe", nprobe)
+        if ef_search is not None:
+            setter(index, "efSearch", ef_search)
+        if quantizer_ef_search is not None:
+            setter(index, "quantizer_efSearch", quantizer_ef_search)
+    except (
+        AttributeError,
+        RuntimeError,
+        ValueError,
+    ):
+        return
 
 
 def _load_faiss_module() -> FaissModuleProtocol | None:
@@ -269,42 +249,40 @@ class FaissAdapterConfig:
     factory: str = "OPQ64,IVF8192,PQ64"
     metric: str = "ip"
     nprobe: int = 64
-    use_gpu: bool = True
-    use_cuvs: bool = True
-    gpu_devices: Sequence[int] | None = None
+    ef_search: int | None = None
+    quantizer_ef_search: int | None = None
 
 
 # [nav:anchor FaissAdapter]
 class FaissAdapter:
-    """Build FAISS indexes with optional GPU acceleration and CPU fallback.
+    """Build FAISS indexes with CPU execution and graceful fallback.
 
     Extended Summary
     ----------------
     Provides a typed interface for building and querying FAISS vector indexes
-    with support for GPU acceleration (via FAISS GPU or cuVS) and graceful
-    CPU fallback. Loads vectors from DuckDB catalog, builds indexes using
-    configurable factory strings (e.g., "OPQ64,IVF8192,PQ64"), and provides
-    search operations with ID mapping. Supports both modern config-based API
-    and legacy keyword arguments for backward compatibility.
+    on CPU-only environments with graceful fallback to NumPy search when the
+    FAISS module is unavailable. Loads vectors from DuckDB catalog, builds
+    indexes using configurable factory strings (e.g., "OPQ64,IVF8192,PQ64"),
+    and provides search operations with ID mapping. Supports both modern
+    config-based API and legacy keyword arguments for backward compatibility.
 
     Parameters
     ----------
     db_path : str
         Path to DuckDB database file containing vectors dataset and metadata.
     config : FaissAdapterConfig | None, optional
-        Configuration object with factory, metric, nprobe, GPU settings.
+        Configuration object with factory, metric, and nprobe settings.
         If None, uses default config or legacy_options. Defaults to None.
     **legacy_options : object
         Legacy keyword arguments for backward compatibility. Valid keys:
-        factory (str), metric (str), nprobe (int), use_gpu (bool),
-        use_cuvs (bool), gpu_devices (Sequence[int] | None). Cannot be used
-        together with config parameter.
+        factory (str), metric (str), nprobe (int). Cannot be used together
+        with config parameter.
 
     Notes
     -----
     Time O(1) for initialization. The index is not built until build() is called.
-    GPU acceleration requires FAISS GPU or cuVS libraries and appropriate CUDA
-    runtime. Falls back to CPU/NumPy search if GPU libraries are unavailable.
+    Runtime automatically falls back to pure NumPy search when FAISS libraries
+    are unavailable.
     Configuration validation ensures factory/metric compatibility and prevents
     mixing config and legacy_options.
 
@@ -321,9 +299,8 @@ class FaissAdapter:
         "factory",
         "metric",
         "nprobe",
-        "use_gpu",
-        "use_cuvs",
-        "gpu_devices",
+        "ef_search",
+        "quantizer_ef_search",
     }
 
     def __init__(
@@ -338,17 +315,14 @@ class FaissAdapter:
         self.factory = resolved_config.factory
         self.metric = resolved_config.metric
         self.nprobe = resolved_config.nprobe
-        self.use_gpu = resolved_config.use_gpu
-        self.use_cuvs = resolved_config.use_cuvs
-        devices = resolved_config.gpu_devices or (0,)
-        self._gpu_devices = tuple(int(device) for device in devices)
+        self.ef_search = resolved_config.ef_search
+        self.quantizer_ef_search = resolved_config.quantizer_ef_search
 
         self.index: FaissIndexProtocol | None = None
         self.idmap: list[str] | None = None
         self.vecs: DenseVecs | None = None
 
         self._cpu_matrix: FloatMatrix | None = None
-        self._gpu_context: GpuContext | None = None
 
     @property
     def cpu_matrix(self) -> FloatMatrix | None:
@@ -439,7 +413,7 @@ class FaissAdapter:
         Extended Summary
         ----------------
         Checks that all keys in legacy_options are valid configuration fields
-        (factory, metric, nprobe, use_gpu, use_cuvs, gpu_devices). Raises
+        (factory, metric, nprobe). Raises
         TypeError if any unexpected keys are found.
 
         Parameters
@@ -479,8 +453,7 @@ class FaissAdapter:
         ----------
         legacy_options : dict[str, object]
             Legacy keyword arguments dictionary. Expected keys: factory (str),
-            metric (str), nprobe (int), use_gpu (bool), use_cuvs (bool),
-            gpu_devices (Sequence[int] | None).
+            metric (str), nprobe (int).
 
         Returns
         -------
@@ -492,8 +465,8 @@ class FaissAdapter:
         Time O(n) where n is the number of fields. Type coercion ensures type
         safety while allowing flexible input types (e.g., int/float for nprobe).
         Missing fields use defaults from FaissAdapterConfig(). TypeError may be
-        raised by helper methods (_coerce_str, _coerce_int, _coerce_bool,
-        _coerce_gpu_devices) if field values cannot be coerced to expected types.
+        raised by helper methods (_coerce_str, _coerce_int)
+        if field values cannot be coerced to expected types.
         """
         base = FaissAdapterConfig()
         options = {
@@ -502,17 +475,20 @@ class FaissAdapter:
         factory = cls._coerce_str(options.get("factory", base.factory), "factory")
         metric = cls._coerce_str(options.get("metric", base.metric), "metric")
         nprobe = cls._coerce_int(options.get("nprobe", base.nprobe), "nprobe")
-        use_gpu = cls._coerce_bool(options.get("use_gpu", base.use_gpu), "use_gpu")
-        use_cuvs = cls._coerce_bool(options.get("use_cuvs", base.use_cuvs), "use_cuvs")
-        gpu_devices_option = options.get("gpu_devices", base.gpu_devices)
-        gpu_devices = cls._coerce_gpu_devices(gpu_devices_option)
+        ef_search = cls._coerce_optional_int(
+            options.get("ef_search", base.ef_search),
+            "ef_search",
+        )
+        quantizer_ef_search = cls._coerce_optional_int(
+            options.get("quantizer_ef_search", base.quantizer_ef_search),
+            "quantizer_ef_search",
+        )
         return FaissAdapterConfig(
             factory=factory,
             metric=metric,
             nprobe=nprobe,
-            use_gpu=use_gpu,
-            use_cuvs=use_cuvs,
-            gpu_devices=gpu_devices,
+            ef_search=ef_search,
+            quantizer_ef_search=quantizer_ef_search,
         )
 
     @staticmethod
@@ -608,99 +584,29 @@ class FaissAdapter:
         raise TypeError(message)
 
     @staticmethod
-    def _coerce_bool(value: object, name: str) -> bool:
-        """Coerce value to boolean with validation.
-
-        Extended Summary
-        ----------------
-        Validates that value is a boolean and returns it unchanged. Raises
-        TypeError if value is not a boolean, providing a clear error message
-        with the field name.
+    def _coerce_optional_int(value: object | None, name: str) -> int | None:
+        """Coerce optional integer configuration values.
 
         Parameters
         ----------
-        value : object
-            Value to coerce. Must be a boolean.
+        value : object | None
+            Value to coerce to integer, or None to return None.
         name : str
-            Field name for error messages (e.g., "use_gpu", "use_cuvs").
+            Name of the configuration parameter (for error messages).
 
         Returns
         -------
-        bool
-            Boolean value unchanged.
-
-        Raises
-        ------
-        TypeError
-            If value is not a boolean.
+        int | None
+            Coerced integer value, or None if input was None.
 
         Notes
         -----
-        Time O(1). This method provides strict type validation for boolean
-        configuration fields, ensuring type safety in config construction.
-
-        Examples
-        --------
-        >>> FaissAdapter._coerce_bool(True, "use_gpu")
-        True
-        >>> FaissAdapter._coerce_bool(1, "use_gpu")
-        Traceback (most recent call last):
-            ...
-        TypeError: use_gpu must be a boolean
-        """
-        if isinstance(value, bool):
-            return value
-        message = f"{name} must be a boolean"
-        raise TypeError(message)
-
-    @staticmethod
-    def _coerce_gpu_devices(value: object) -> tuple[int, ...] | None:
-        """Coerce value to GPU device tuple or None.
-
-        Extended Summary
-        ----------------
-        Validates and converts value to a tuple of GPU device IDs. Returns None
-        if value is None. Converts sequence elements to integers. Raises TypeError
-        if value is not None and not a sequence.
-
-        Parameters
-        ----------
-        value : object
-            Value to coerce. May be None, sequence of integers, or other types.
-
-        Returns
-        -------
-        tuple[int, ...] | None
-            Tuple of GPU device IDs, or None if value is None.
-
-        Raises
-        ------
-        TypeError
-            If value is not None and not a sequence, or if sequence elements
-            cannot be converted to integers.
-
-        Notes
-        -----
-        Time O(n) where n is the length of the sequence. This method handles
-        GPU device specification for multi-GPU setups, converting various input
-        formats (list, tuple, etc.) to a consistent tuple[int, ...] type.
-
-        Examples
-        --------
-        >>> FaissAdapter._coerce_gpu_devices([0, 1])
-        (0, 1)
-        >>> FaissAdapter._coerce_gpu_devices(None)
-        >>> FaissAdapter._coerce_gpu_devices("invalid")
-        Traceback (most recent call last):
-            ...
-        TypeError: gpu_devices must be a sequence of integers or None
+        TypeError may be raised by _coerce_int if value is not None and cannot
+        be coerced to an integer.
         """
         if value is None:
             return None
-        if not isinstance(value, Sequence):
-            message = "gpu_devices must be a sequence of integers or None"
-            raise TypeError(message)
-        return tuple(int(device) for device in value)
+        return FaissAdapter._coerce_int(value, name)
 
     def build(self) -> None:
         """Build or rebuild the FAISS index from persisted vectors.
@@ -739,22 +645,13 @@ class FaissAdapter:
             id_array = cast("IntVector", np.arange(len(vectors.ids), dtype=np.int64))
             cpu_index.add_with_ids(vectors.matrix, id_array)
 
-            gpu_context = None
             index: FaissIndexProtocol = cpu_index
-            if self.use_gpu:
-                gpu_context = detect_gpu_context(
-                    faiss_module,
-                    use_cuvs=self.use_cuvs,
-                    device_ids=self._gpu_devices,
-                )
-                if gpu_context is not None:
-                    index = clone_index_to_gpu(cpu_index, gpu_context)
-
-            configure_search_parameters(
+            _configure_search_parameters(
                 faiss_module,
                 index,
                 nprobe=self.nprobe,
-                gpu_enabled=gpu_context is not None,
+                ef_search=self.ef_search,
+                quantizer_ef_search=self.quantizer_ef_search,
             )
         except Exception as exc:  # pragma: no cover - defensive
             msg = f"Failed to build FAISS index: {exc}"
@@ -765,7 +662,6 @@ class FaissAdapter:
             raise IndexBuildError(msg)
 
         self.index = index
-        self._gpu_context = gpu_context
 
     def load_or_build(self, cpu_index_path: str | None = None) -> None:
         """Load an existing CPU index or fall back to rebuilding from vectors.
@@ -796,32 +692,23 @@ class FaissAdapter:
                     self.idmap = vectors.ids
                     self._cpu_matrix = vectors.matrix
 
-                    gpu_context = None
-                    if self.use_gpu:
-                        gpu_context = detect_gpu_context(
-                            faiss_module,
-                            use_cuvs=self.use_cuvs,
-                            device_ids=self._gpu_devices,
-                        )
-                        if gpu_context is not None:
-                            cpu_index = clone_index_to_gpu(cpu_index, gpu_context)
                 except (
                     RuntimeError,
                     OSError,
                     ValueError,
                 ):  # pragma: no cover - defensive fallback
-                    continue
+                    pass
                 else:
-                    configure_search_parameters(
+                    _configure_search_parameters(
                         faiss_module,
                         cpu_index,
                         nprobe=self.nprobe,
-                        gpu_enabled=gpu_context is not None,
+                        ef_search=self.ef_search,
+                        quantizer_ef_search=self.quantizer_ef_search,
                     )
 
                     if _is_faiss_index(cpu_index):
                         self.index = cpu_index
-                        self._gpu_context = gpu_context
                         return
 
         self.build()

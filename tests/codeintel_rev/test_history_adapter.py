@@ -15,6 +15,8 @@ from codeintel_rev.errors import GitOperationError, PathNotFoundError
 from codeintel_rev.io.path_utils import PathOutsideRepositoryError
 from codeintel_rev.mcp_server.adapters.history import blame_range, file_history
 
+from tests._helpers import assertions
+
 pytestmark = pytest.mark.asyncio
 
 
@@ -78,9 +80,9 @@ async def test_blame_range_success(mock_context: Mock) -> None:
 
     result = await blame_range(mock_context, "src/main.py", 1, 2)
 
-    assert "blame" in result
-    assert len(result["blame"]) == 1
-    assert result["blame"][0]["line"] == 1
+    assertions.expect_in("blame", result)
+    assertions.expect_equal(len(result["blame"]), 1)
+    assertions.expect_equal(result["blame"][0]["line"], 1)
 
 
 async def test_blame_range_path_outside_repository(mock_context: Mock) -> None:
@@ -105,8 +107,8 @@ async def test_blame_range_git_command_error(mock_context: Mock) -> None:
         await blame_range(mock_context, "src/main.py", 1, 10)
 
     exc = exc_info.value
-    assert exc.context["path"] == "src/main.py"
-    assert exc.context["git_command"] == "blame"
+    assertions.expect_equal(exc.context["path"], "src/main.py")
+    assertions.expect_equal(exc.context["git_command"], "blame")
 
 
 async def test_file_history_success(mock_context: Mock) -> None:
@@ -124,9 +126,9 @@ async def test_file_history_success(mock_context: Mock) -> None:
 
     result = await file_history(mock_context, "src/main.py", limit=10)
 
-    assert "commits" in result
-    assert len(result["commits"]) == 1
-    assert result["commits"][0]["sha"] == "abc123"
+    assertions.expect_in("commits", result)
+    assertions.expect_equal(len(result["commits"]), 1)
+    assertions.expect_equal(result["commits"][0]["sha"], "abc123")
 
 
 async def test_file_history_path_outside_repository(mock_context: Mock) -> None:
@@ -151,5 +153,5 @@ async def test_file_history_git_command_error(mock_context: Mock) -> None:
         await file_history(mock_context, "src/main.py", limit=10)
 
     exc = exc_info.value
-    assert exc.context["path"] == "src/main.py"
-    assert exc.context["git_command"] == "log"
+    assertions.expect_equal(exc.context["path"], "src/main.py")
+    assertions.expect_equal(exc.context["git_command"], "log")

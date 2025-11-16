@@ -14,6 +14,8 @@ from codeintel_rev import graph_builder, uses_builder
 from codeintel_rev.polars_support import resolve_polars_frame_factory
 from codeintel_rev.typing import PolarsDataFrame, PolarsModule
 
+from tests._helpers import assertions
+
 
 class _DummyFrame(PolarsDataFrame):
     """Lightweight stand-in for a polars DataFrame."""
@@ -61,10 +63,10 @@ def test_resolve_polars_frame_factory_prefers_legacy_helper() -> None:
     factory = resolve_polars_frame_factory(cast("PolarsModule", polars))
     payload = [{"src_path": "a.py", "dst_path": "b.py"}]
 
-    assert factory is not None
+    assertions.expect_true(factory is not None, reason="factory should exist")
     frame = factory(payload)
-    assert isinstance(frame, _DummyFrame)
-    assert polars.calls == [payload]
+    assertions.expect_true(isinstance(frame, _DummyFrame), reason="frame should be _DummyFrame")
+    assertions.expect_sequence_equal(polars.calls, [payload])
 
 
 def test_resolve_polars_frame_factory_supports_dataframe_constructor() -> None:
@@ -74,15 +76,15 @@ def test_resolve_polars_frame_factory_supports_dataframe_constructor() -> None:
     factory = resolve_polars_frame_factory(cast("PolarsModule", polars))
     payload = [{"src_path": "a.py", "dst_path": "b.py"}]
 
-    assert factory is not None
+    assertions.expect_true(factory is not None, reason="factory should exist")
     frame = factory(payload)
-    assert isinstance(frame, _DummyFrame)
-    assert polars.calls == [payload]
+    assertions.expect_true(isinstance(frame, _DummyFrame), reason="frame should be _DummyFrame")
+    assertions.expect_sequence_equal(polars.calls, [payload])
 
 
 def test_resolve_polars_frame_factory_returns_none_without_entry_points() -> None:
     """Helper should return ``None`` when neither API surface exists."""
-    assert resolve_polars_frame_factory(cast("PolarsModule", object())) is None
+    assertions.expect_equal(resolve_polars_frame_factory(cast("PolarsModule", object())), None)
 
 
 def test_write_import_graph_supports_dataframe_only_polars(
@@ -103,8 +105,8 @@ def test_write_import_graph_supports_dataframe_only_polars(
 
     graph_builder.write_import_graph(graph, target)
 
-    assert target.exists()
-    assert polars.calls[0] == [{"src_path": "a.py", "dst_path": "b.py"}]
+    assertions.expect_true(target.exists(), reason="target file should exist")
+    assertions.expect_sequence_equal(polars.calls[0], [{"src_path": "a.py", "dst_path": "b.py"}])
 
 
 def test_write_use_graph_supports_dataframe_only_polars(
@@ -124,5 +126,7 @@ def test_write_use_graph_supports_dataframe_only_polars(
 
     uses_builder.write_use_graph(use_graph, target)
 
-    assert target.exists()
-    assert polars.calls[0] == [{"def_path": "a.py", "use_path": "b.py", "symbol": "sym"}]
+    assertions.expect_true(target.exists(), reason="target file should exist")
+    assertions.expect_sequence_equal(
+        polars.calls[0], [{"def_path": "a.py", "use_path": "b.py", "symbol": "sym"}]
+    )

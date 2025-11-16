@@ -5,8 +5,6 @@
     "BM25IndexProtocol",
     "FaissIndexProtocol",
     "FaissModuleProtocol",
-    "GpuClonerOptionsProtocol",
-    "GpuResourcesProtocol",
     "IndexArray",
     "SpladeEncoderProtocol",
     "VectorArray",
@@ -28,8 +26,6 @@
         "BM25IndexProtocol",
         "FaissIndexProtocol",
         "FaissModuleProtocol",
-        "GpuClonerOptionsProtocol",
-        "GpuResourcesProtocol",
         "IndexArray",
         "SpladeEncoderProtocol",
         "VectorArray",
@@ -61,16 +57,6 @@
       "stability": "stable"
     },
     "FaissModuleProtocol": {
-      "owner": "@search-api",
-      "since": "0.1.0",
-      "stability": "stable"
-    },
-    "GpuClonerOptionsProtocol": {
-      "owner": "@search-api",
-      "since": "0.1.0",
-      "stability": "stable"
-    },
-    "GpuResourcesProtocol": {
       "owner": "@search-api",
       "since": "0.1.0",
       "stability": "stable"

@@ -53,6 +53,7 @@ __all__ = [
 ]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
+
 @lru_cache(maxsize=1)
 def _duckdb_module() -> ModuleType:
     """Return duckdb module resolved lazily to respect typing gates.

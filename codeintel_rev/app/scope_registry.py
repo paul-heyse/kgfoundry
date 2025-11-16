@@ -57,12 +57,8 @@ from copy import deepcopy
 from threading import RLock
 from typing import TYPE_CHECKING
 
-from kgfoundry_common.logging import get_logger
-
 if TYPE_CHECKING:
     from codeintel_rev.mcp_server.schemas import ScopeIn
-
-LOGGER = get_logger(__name__)
 
 
 class ScopeRegistry:
@@ -120,7 +116,6 @@ class ScopeRegistry:
     def __init__(self) -> None:
         self._scopes: dict[str, tuple[ScopeIn, float]] = {}
         self._lock = RLock()
-        LOGGER.info("Initialized ScopeRegistry")
 
     def set_scope(self, session_id: str, scope: ScopeIn) -> None:
         """Store scope for session.
@@ -152,15 +147,6 @@ class ScopeRegistry:
         with self._lock:
             immutable_scope: ScopeIn = deepcopy(scope)
             self._scopes[session_id] = (immutable_scope, timestamp)
-
-        LOGGER.info(
-            "Set scope for session",
-            extra={
-                "session_id": session_id,
-                "scope_fields": list(immutable_scope.keys()),
-                "timestamp": timestamp,
-            },
-        )
 
     def get_scope(self, session_id: str) -> ScopeIn | None:
         """Retrieve scope for session.
@@ -198,10 +184,6 @@ class ScopeRegistry:
         with self._lock:
             entry = self._scopes.get(session_id)
             if entry is None:
-                LOGGER.debug(
-                    "Scope not found for session",
-                    extra={"session_id": session_id},
-                )
                 return None
 
             scope, _old_timestamp = entry
@@ -212,13 +194,6 @@ class ScopeRegistry:
             # Cast is safe because scope is ScopeIn from _scopes dict
             scope_copy: ScopeIn = deepcopy(scope)
 
-            LOGGER.debug(
-                "Retrieved scope for session",
-                extra={
-                    "session_id": session_id,
-                    "scope_fields": list(scope_copy.keys()),
-                },
-            )
             return scope_copy
 
     def clear_scope(self, session_id: str) -> None:
@@ -250,15 +225,6 @@ class ScopeRegistry:
         with self._lock:
             if session_id in self._scopes:
                 del self._scopes[session_id]
-                LOGGER.info(
-                    "Cleared scope for session",
-                    extra={"session_id": session_id},
-                )
-            else:
-                LOGGER.debug(
-                    "Attempted to clear nonexistent session",
-                    extra={"session_id": session_id},
-                )
 
     def prune_expired(self, max_age_seconds: int) -> int:
         """Remove sessions inactive for longer than max_age_seconds.
@@ -319,21 +285,6 @@ class ScopeRegistry:
                 del self._scopes[session_id]
                 pruned_count += 1
             remaining_sessions = len(self._scopes)
-
-        if pruned_count > 0:
-            LOGGER.info(
-                "Pruned expired sessions",
-                extra={
-                    "pruned_count": pruned_count,
-                    "max_age_seconds": max_age_seconds,
-                    "remaining_sessions": remaining_sessions,
-                },
-            )
-        else:
-            LOGGER.debug(
-                "No expired sessions to prune",
-                extra={"max_age_seconds": max_age_seconds},
-            )
 
         return pruned_count
 

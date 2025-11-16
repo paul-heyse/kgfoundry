@@ -8,7 +8,6 @@ from __future__ import annotations
 import asyncio
 from functools import lru_cache
 from importlib import import_module
-from time import perf_counter
 from types import ModuleType
 from typing import TYPE_CHECKING, cast
 
@@ -16,7 +15,6 @@ import msgspec
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.typing import NDArrayF32, gate_import
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -27,8 +25,6 @@ if TYPE_CHECKING:
     from codeintel_rev.io.vllm_engine import InprocessVLLMEmbedder
 else:
     httpx = cast("httpx", LazyModule("httpx", "vLLM HTTP client"))
-
-LOGGER = get_logger(__name__)
 
 
 @lru_cache(maxsize=1)
@@ -222,10 +218,6 @@ class VLLMClient:
         engine_module = import_module("codeintel_rev.io.vllm_engine")
         engine_cls = engine_module.InprocessVLLMEmbedder
         self._local_engine = engine_cls(self.config)
-        LOGGER.debug(
-            "Initialized VLLMClient in in-process mode",
-            extra={"model": self.config.model},
-        )
 
     def _initialize_http_client(self) -> None:
         self._client = httpx.Client(
@@ -234,16 +226,6 @@ class VLLMClient:
                 max_connections=100,
                 max_keepalive_connections=20,
             ),
-        )
-        LOGGER.debug(
-            "Initialized VLLMClient HTTP transport",
-            extra={
-                "base_url": self.config.base_url,
-                "model": self.config.model,
-                "timeout_s": self.config.timeout_s,
-                "max_connections": 100,
-                "max_keepalive_connections": 20,
-            },
         )
 
     def embed_batch(self, texts: Sequence[str]) -> NDArrayF32:
@@ -272,15 +254,6 @@ class VLLMClient:
             embedding_dim matches the configured model's output dimensionality. Dtype is
             float32. Each row corresponds to the embedding of the corresponding input text.
 
-        Raises
-        ------
-        Exception
-            Exceptions from the embedding operation are caught and re-raised unchanged.
-            Common exceptions include network errors (HTTP mode), model loading errors
-            (local mode), timeout errors, and encoding/decoding errors. Transport
-            exceptions from HTTPX or the in-process engine propagate unchanged so callers
-            can apply their own retry or problem-details handling.
-
         Notes
         -----
         Time complexity O(N * T) where N is batch size and T is average token count per
@@ -296,47 +269,13 @@ class VLLMClient:
                 dtype=np_module.float32,
             )
 
-        mode = self._mode
-        batch_size = len(texts)
-        start = perf_counter()
-        try:
-            if self._local_engine is not None:
-                vectors = self._local_engine.embed_batch(texts)
-            else:
-                vectors = self._embed_batch_http(texts)
-        except Exception as exc:
-            LOGGER.warning(
-                "Batch embedding failed",
-                extra={
-                    "mode": mode,
-                    "batch_size": batch_size,
-                    "model": self.config.model,
-                    "error": str(exc),
-                },
-            )
-            raise
-
-        elapsed_ms = int(1000 * (perf_counter() - start))
-        LOGGER.debug(
-            "Batch embedding completed",
-            extra={
-                "batch_size": len(texts),
-                "vectors_shape": vectors.shape,
-                "model": self.config.model,
-                "mode": self._mode,
-                "duration_ms": elapsed_ms,
-            },
-        )
-        return vectors
+        if self._local_engine is not None:
+            return self._local_engine.embed_batch(texts)
+        return self._embed_batch_http(texts)
 
     def _embed_batch_http(self, texts: Sequence[str]) -> NDArrayF32:
         request = EmbeddingRequest(input=list(texts), model=self.config.model)
         payload = self._encoder.encode(request)
-
-        LOGGER.debug(
-            "Embedding batch",
-            extra={"batch_size": len(texts), "model": self.config.model},
-        )
 
         client = self._require_http_client()
         response = client.post(
@@ -481,11 +420,6 @@ class VLLMClient:
         request = EmbeddingRequest(input=list(texts), model=self.config.model)
         payload = self._encoder.encode(request)
 
-        LOGGER.debug(
-            "Embedding batch (async)",
-            extra={"batch_size": len(texts), "model": self.config.model},
-        )
-
         response = await async_client.post(
             f"{self.config.base_url}/embeddings",
             content=payload,
@@ -501,20 +435,10 @@ class VLLMClient:
             dtype=np_module.float32,
         )
 
-        LOGGER.debug(
-            "Batch embedding completed (async)",
-            extra={
-                "batch_size": len(texts),
-                "vectors_shape": vectors.shape,
-                "model": self.config.model,
-            },
-        )
-
         return vectors
 
     def close(self) -> None:
         """Close HTTP clients, async clients, and the local engine."""
-        LOGGER.debug("Closing VLLMClient resources", extra={"mode": self._mode})
         if self._client is not None:
             self._client.close()
             self._client = None
@@ -534,7 +458,6 @@ class VLLMClient:
         if self._local_engine is not None:
             self._local_engine.close()
             self._local_engine = None
-        LOGGER.debug("VLLMClient resources closed")
 
     async def aclose(self) -> None:
         """Asynchronously release all clients/engines."""
@@ -547,7 +470,6 @@ class VLLMClient:
         if self._local_engine is not None:
             self._local_engine.close()
             self._local_engine = None
-        LOGGER.debug("VLLMClient resources closed (async)")
 
     async def _embed_batch_async_local(self, texts: Sequence[str]) -> NDArrayF32:
         if self._local_engine is None:
@@ -568,13 +490,6 @@ class VLLMClient:
                     max_connections=100,
                     max_keepalive_connections=20,
                 ),
-            )
-            LOGGER.debug(
-                "Initialized async HTTP client for VLLMClient",
-                extra={
-                    "base_url": self.config.base_url,
-                    "model": self.config.model,
-                },
             )
         return self._async_client
 

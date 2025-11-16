@@ -427,9 +427,9 @@ def search(req: SearchRequest, _: AuthDependency = None) -> SearchResponse:
     ------
     VectorSearchError
         Returns Problem Details JSON (RFC 9457) on errors such as missing
-        indexes, invalid queries, or backend failures.
-    RuntimeError
-        Raised if the search operation completes without producing a response.
+        indexes, invalid queries, or backend failures. Wraps RuntimeError,
+        ValueError, AttributeError, and OSError exceptions from underlying
+        search operations.
 
     Examples
     --------
@@ -464,7 +464,18 @@ def search(req: SearchRequest, _: AuthDependency = None) -> SearchResponse:
         )
 
         def sort_key(item: tuple[str, float]) -> float:
-            """Sort key function for ranking results."""
+            """Sort key function for ranking results.
+
+            Parameters
+            ----------
+            item : tuple[str, float]
+                Tuple containing (chunk_id, score) pair.
+
+            Returns
+            -------
+            float
+                Score value used for sorting (higher scores rank first).
+            """
             return item[1]
 
         top = sorted(boosted.items(), key=sort_key, reverse=True)[: req.k]

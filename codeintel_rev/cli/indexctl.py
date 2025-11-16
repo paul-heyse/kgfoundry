@@ -43,14 +43,12 @@ from codeintel_rev.io.parquet_store import (
 )
 from codeintel_rev.io.xtr_manager import XTRIndex
 from codeintel_rev.typing import NDArrayF32
-from kgfoundry_common.logging import get_logger
 
 try:  # pragma: no cover - optional dependency
     import pyarrow.parquet as pyarrow_parquet
 except ModuleNotFoundError:  # pragma: no cover - optional dependency
     pyarrow_parquet = None
 
-LOGGER = get_logger(__name__)
 app = typer.Typer(help="Manage versioned FAISS/DuckDB/SCIP assets.", no_args_is_help=True)
 DEFAULT_XTR_ORACLE = False
 embeddings_app = typer.Typer(help="Embedding lifecycle commands.", no_args_is_help=True)
@@ -224,7 +222,6 @@ def _parse_extras(extras: list[str]) -> dict[str, Path]:
     parsed: dict[str, Path] = {}
     for entry in extras:
         if "=" not in entry:
-            LOGGER.warning("Ignoring malformed --extra entry", extra={"entry": entry})
             continue
         key, value = entry.split("=", maxsplit=1)
         parsed[key.strip().lower()] = Path(value).expanduser().resolve()
@@ -236,15 +233,10 @@ def _parse_sidecars(entries: list[str]) -> dict[str, Path]:
     allowed = {"faiss_idmap", "tuning"}
     for entry in entries:
         if "=" not in entry:
-            LOGGER.warning("Ignoring malformed --sidecar entry", extra={"entry": entry})
             continue
         key, value = entry.split("=", maxsplit=1)
         normalized = key.strip().lower()
         if normalized not in allowed:
-            LOGGER.warning(
-                "Ignoring unsupported sidecar entry",
-                extra={"entry": entry, "allowed": sorted(allowed)},
-            )
             continue
         parsed[normalized] = Path(value).expanduser().resolve()
     return parsed
@@ -270,7 +262,6 @@ def _load_manifest(path: Path) -> dict[str, object]:
     except FileNotFoundError:
         return {}
     except json.JSONDecodeError:
-        LOGGER.warning("Malformed manifest file ignored", extra={"path": str(path)})
         return {}
 
 
@@ -622,9 +613,7 @@ def _write_embedding_meta(
     try:
         manager.write_embedding_metadata(payload, version=version)
     except RuntimeLifecycleError:
-        LOGGER.debug(
-            "No version directory available for embedding metadata", extra={"version": version}
-        )
+        pass
 
 
 @embeddings_app.command("build")
@@ -846,11 +835,9 @@ def _load_xtr_index(settings: Settings) -> XTRIndex | None:
     index = XTRIndex(root=root, config=settings.xtr)
     try:
         index.open()
-    except (OSError, RuntimeError, ValueError) as exc:  # pragma: no cover - defensive logging
-        LOGGER.warning("Failed to open XTR index", extra={"root": str(root), "error": str(exc)})
+    except (OSError, RuntimeError, ValueError):  # pragma: no cover - defensive logging
         return None
     if not index.ready:
-        LOGGER.warning("XTR index not ready", extra={"root": str(root)})
         return None
     return index
 
@@ -1240,11 +1227,8 @@ def eval_command(
     report = evaluator.run(config)
     try:
         catalog.ensure_pool_views(pool_path)
-    except (OSError, RuntimeError, ValueError) as exc:  # pragma: no cover - defensive logging
-        LOGGER.warning(
-            "Unable to expose pool coverage views",
-            extra={"pool_path": str(pool_path), "error": str(exc)},
-        )
+    except (OSError, RuntimeError, ValueError):  # pragma: no cover - defensive logging
+        pass
     typer.echo(json.dumps(report.__dict__, indent=2))
 
 

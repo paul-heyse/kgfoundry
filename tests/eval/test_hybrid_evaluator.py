@@ -9,6 +9,8 @@ import pyarrow.parquet as pq
 from codeintel_rev.eval.pool_writer import write_pool
 from codeintel_rev.retrieval.types import SearchPoolRow
 
+from tests._helpers import assertions
+
 
 def test_pool_writer_sources(tmp_path: Path) -> None:
     """Pool writer records sources and scores in Parquet format."""
@@ -26,14 +28,20 @@ def test_pool_writer_sources(tmp_path: Path) -> None:
     ]
     out = tmp_path / "pool.parquet"
     total = write_pool(rows, out)
-    assert total == 3
+    assertions.expect_equal(total, 3)
     table = pq.read_table(out)
-    assert set(table.column_names) == {"query_id", "channel", "rank", "chunk_id", "score", "reason"}
-    assert table.num_rows == 3
+    assertions.expect_equal(
+        set(table.column_names), {"query_id", "channel", "rank", "chunk_id", "score", "reason"}
+    )
+    assertions.expect_equal(table.num_rows, 3)
     reason_payloads = table.column("reason").to_pylist()
     first_reason = reason_payloads[0]
     second_reason = reason_payloads[1]
-    assert isinstance(first_reason, Mapping)
-    assert isinstance(second_reason, Mapping)
-    assert first_reason["matched_symbols"] == ["foo"]
-    assert second_reason["matched_symbols"] == []
+    assertions.expect_true(
+        isinstance(first_reason, Mapping), reason="first_reason should be Mapping"
+    )
+    assertions.expect_true(
+        isinstance(second_reason, Mapping), reason="second_reason should be Mapping"
+    )
+    assertions.expect_sequence_equal(first_reason["matched_symbols"], ["foo"])
+    assertions.expect_sequence_equal(second_reason["matched_symbols"], [])

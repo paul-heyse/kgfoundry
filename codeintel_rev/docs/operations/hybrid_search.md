@@ -7,7 +7,7 @@ Overview
 This runbook captures the day-to-day operational workflow for keeping the hybrid
 retrieval stack healthy. The stack combines three retrieval channels:
 
-* **FAISS** – dense GPU/CPU search over chunk embeddings.
+* **FAISS** – dense CPU search over chunk embeddings (ParameterSpace tuning).
 * **BM25** – classic lexical search built from JsonCollection corpora.
 * **SPLADE v3** – learned sparse search using ONNX-exported Sentence-Transformers.
 
@@ -108,8 +108,8 @@ Observability
 Semantic Pro Budgets & Gating
 -----------------------------
 
-The semantic_pro adapter adds a GPU-centric CodeRank → WARP → reranker pipeline
-with explicit latency budgets. Tune the following environment variables to
+The semantic_pro adapter adds a CodeRank → WARP → reranker pipeline with explicit
+latency budgets. Tune the following environment variables to
 balance quality vs. responsiveness:
 
 * ``CODERANK_TOP_K`` – Stage-A fanout before hybrid fusion (default 200).

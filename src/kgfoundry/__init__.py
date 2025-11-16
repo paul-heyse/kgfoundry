@@ -28,7 +28,6 @@ _ALIASES: dict[str, str] = {
     "registry": "kgfoundry.registry",
     "search_api": "kgfoundry.search_api",
     "search_client": "kgfoundry.search_client",
-    "vectorstore_faiss": "kgfoundry.vectorstore_faiss",
 }
 
 __all__ = [
@@ -44,7 +43,6 @@ __all__ = [
     "registry",
     "search_api",
     "search_client",
-    "vectorstore_faiss",
 ]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
@@ -82,7 +80,6 @@ if _TYPE_CHECKING:
     registry: ModuleType = _import_module("kgfoundry.registry")
     search_api: ModuleType = _import_module("kgfoundry.search_api")
     search_client: ModuleType = _import_module("kgfoundry.search_client")
-    vectorstore_faiss: ModuleType = _import_module("kgfoundry.vectorstore_faiss")
 
 del _TYPE_CHECKING
 

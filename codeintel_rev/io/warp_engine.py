@@ -7,12 +7,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol, cast
 
 from codeintel_rev.typing import gate_import
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     from types import ModuleType
 
-LOGGER = get_logger(__name__)
 _RESULT_FIELDS_MIN = 2
 
 
@@ -157,10 +155,6 @@ class WarpEngine:
         except Exception as exc:
             msg = f"Failed to initialize WARP executor: {exc}"
             raise WarpUnavailableError(msg) from exc
-        LOGGER.info(
-            "Initialized WARP executor",
-            extra={"index_dir": str(self.index_dir), "device": self.device},
-        )
         return self._executor
 
 

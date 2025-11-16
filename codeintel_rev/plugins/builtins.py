@@ -10,9 +10,6 @@ from codeintel_rev.io.hybrid_search import BM25Rm3Config, BM25SearchProvider, Sp
 from codeintel_rev.plugins.channels import Channel, ChannelContext, ChannelError
 from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
 from codeintel_rev.retrieval.types import SearchHit
-from kgfoundry_common.logging import get_logger
-
-LOGGER = get_logger(__name__)
 
 __all__ = ["bm25_factory", "splade_factory"]
 
@@ -200,10 +197,6 @@ class _BM25Channel(Channel):
             except (OSError, RuntimeError, ValueError, ImportError) as exc:
                 self._provider_error = f"BM25 initialization failed: {exc}"
                 self._skip_reason = _classify_skip_reason(exc)
-                LOGGER.warning(
-                    "bm25.channel.init_failed",
-                    extra={"reason": self._skip_reason, "error": repr(exc)},
-                )
                 return None
             self._provider = provider
             self._provider_error = None
@@ -305,10 +298,6 @@ class _SpladeChannel(Channel):
             except (OSError, RuntimeError, ValueError, ImportError) as exc:
                 self._provider_error = f"SPLADE initialization failed: {exc}"
                 self._skip_reason = _classify_skip_reason(exc)
-                LOGGER.warning(
-                    "splade.channel.init_failed",
-                    extra={"reason": self._skip_reason, "error": repr(exc)},
-                )
                 return None
             self._provider = provider
             self._provider_error = None

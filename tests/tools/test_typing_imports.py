@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from tests._helpers import assertions
 from tests.helpers import load_module
 
 TOOLS_DIRS = [
@@ -37,8 +38,10 @@ class TestToolsTypingImports:
 
                 source = py_file.read_text(encoding="utf-8")
 
-                assert "from __future__ import annotations" in source, (
-                    f"{py_file.name} missing `from __future__ import annotations`"
+                assertions.expect_in(
+                    "from __future__ import annotations",
+                    source,
+                    reason=f"{py_file.name} missing `from __future__ import annotations`",
                 )
 
     def test_no_unguarded_heavy_imports_in_tools(self) -> None:
@@ -67,9 +70,12 @@ class TestToolsTypingImports:
                     )
                 ]
 
-                assert not unguarded, (
-                    f"Found unguarded heavy imports in {py_file.name}: {unguarded}. "
-                    "Use TYPE_CHECKING blocks or gate_import() helper."
+                assertions.expect_false(
+                    bool(unguarded),
+                    reason=(
+                        f"Found unguarded heavy imports in {py_file.name}: {unguarded}. "
+                        "Use TYPE_CHECKING blocks or gate_import() helper."
+                    ),
                 )
 
     def test_typing_facades_used_in_tools(self) -> None:
@@ -164,7 +170,9 @@ class TestToolsTypingFacade:
 
         expected_attrs = ["gate_import", "TYPE_CHECKING"]
         for attr in expected_attrs:
-            assert hasattr(module, attr), f"tools.typing should provide {attr} helper"
+            assertions.expect_true(
+                hasattr(module, attr), reason=f"tools.typing should provide {attr} helper"
+            )
 
     def test_tools_typing_re_exports_common_typing(self) -> None:
         """Verify tools.typing re-exports from kgfoundry_common.typing."""
@@ -173,9 +181,13 @@ class TestToolsTypingFacade:
 
         # Verify some key symbols are exported
         for symbol in ["NavMap", "ProblemDetails"]:
-            assert hasattr(tools_typing, symbol), f"tools.typing should re-export {symbol}"
-            assert getattr(tools_typing, symbol) == getattr(common_typing, symbol), (
-                f"tools.typing.{symbol} should be identical to kgfoundry_common.typing.{symbol}"
+            assertions.expect_true(
+                hasattr(tools_typing, symbol), reason=f"tools.typing should re-export {symbol}"
+            )
+            assertions.expect_equal(
+                getattr(tools_typing, symbol),
+                getattr(common_typing, symbol),
+                reason=f"tools.typing.{symbol} should be identical to kgfoundry_common.typing.{symbol}",
             )
 
 
@@ -204,9 +216,11 @@ def test_tools_no_private_cache_imports() -> None:
             source = py_file.read_text(encoding="utf-8")
 
             # Check for direct imports from private _cache module
-            assert "from _cache import" not in source, (
-                f"{py_file.name} should not import from private _cache module"
+            assertions.expect_false(
+                "from _cache import" in source,
+                reason=f"{py_file.name} should not import from private _cache module",
             )
-            assert "from docs._cache import" not in source, (
-                f"{py_file.name} should not import from docs._cache module"
+            assertions.expect_false(
+                "from docs._cache import" in source,
+                reason=f"{py_file.name} should not import from docs._cache module",
             )

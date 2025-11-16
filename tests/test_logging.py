@@ -15,6 +15,7 @@ from kgfoundry_common.logging import (
     set_correlation_id,
     with_fields,
 )
+from tests._helpers import assertions
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -107,10 +108,10 @@ def test_format_with_structured_fields() -> None:
     status = expect_str(parsed, "status")
     level = expect_str(parsed, "level")
 
-    assert message == "Test message"
-    assert operation == "test_op"
-    assert status == "success"
-    assert level == "INFO"
+    assertions.expect_equal(message, "Test message")
+    assertions.expect_equal(operation, "test_op")
+    assertions.expect_equal(status, "success")
+    assertions.expect_equal(level, "INFO")
 
 
 def test_correlation_id_from_context() -> None:
@@ -133,7 +134,7 @@ def test_correlation_id_from_context() -> None:
         formatted = formatter.format(record)
         parsed = parse_log_record(formatted)
         correlation_value = expect_str(parsed, "correlation_id")
-        assert correlation_value == "req-123"
+        assertions.expect_equal(correlation_value, "req-123")
     finally:
         set_correlation_id(None)
 
@@ -143,7 +144,10 @@ def test_get_logger_attaches_null_handler() -> None:
     logger: LoggerAdapter = get_logger("test.module")
     # Get the underlying logger
     base_logger = logger.logger
-    assert any(isinstance(h, logging.NullHandler) for h in base_logger.handlers)
+    assertions.expect_true(
+        any(isinstance(h, logging.NullHandler) for h in base_logger.handlers),
+        reason="get_logger should attach NullHandler",
+    )
 
 
 def test_log_success_method(caplog: LogCaptureFixture) -> None:
@@ -157,10 +161,10 @@ def test_log_success_method(caplog: LogCaptureFixture) -> None:
         duration_ms=1234.5,
     )
 
-    assert len(caplog.records) == 1
+    assertions.expect_equal(len(caplog.records), 1)
     record = caplog.records[0]
-    assert cast("str", getattr(record, "status", None)) == "success"
-    assert cast("str", getattr(record, "operation", None)) == "build_index"
+    assertions.expect_equal(cast("str", getattr(record, "status", None)), "success")
+    assertions.expect_equal(cast("str", getattr(record, "operation", None)), "build_index")
 
 
 def test_log_failure_method(caplog: LogCaptureFixture) -> None:
@@ -175,10 +179,10 @@ def test_log_failure_method(caplog: LogCaptureFixture) -> None:
         operation="save_data",
     )
 
-    assert len(caplog.records) == 1
+    assertions.expect_equal(len(caplog.records), 1)
     record = caplog.records[0]
-    assert cast("str", getattr(record, "status", None)) == "error"
-    assert cast("str", getattr(record, "operation", None)) == "save_data"
+    assertions.expect_equal(cast("str", getattr(record, "status", None)), "error")
+    assertions.expect_equal(cast("str", getattr(record, "operation", None)), "save_data")
 
 
 def test_log_io_method(caplog: LogCaptureFixture) -> None:
@@ -194,9 +198,9 @@ def test_log_io_method(caplog: LogCaptureFixture) -> None:
         output_bytes=2048,
     )
 
-    assert len(caplog.records) == 1
+    assertions.expect_equal(len(caplog.records), 1)
     record = caplog.records[0]
-    assert cast("float", getattr(record, "duration_ms", None)) == 500.0
+    assertions.expect_equal(cast("float", getattr(record, "duration_ms", None)), 500.0)
 
 
 STATUS_CASES: Final[tuple[tuple[int, str], ...]] = (
@@ -213,32 +217,32 @@ def test_status_inferred_from_level(caplog: LogCaptureFixture) -> None:
         caplog.clear()
         caplog.set_level(log_level)
         logger.log(log_level, "Test message")
-        assert len(caplog.records) == 1
+        assertions.expect_equal(len(caplog.records), 1)
         record = caplog.records[0]
-        assert cast("str", getattr(record, "status", None)) == expected_status
+        assertions.expect_equal(cast("str", getattr(record, "status", None)), expected_status)
 
 
 def test_correlation_context_sets_and_clears_id() -> None:
     """Test that CorrelationContext sets and clears correlation ID."""
-    assert get_correlation_id() is None
+    assertions.expect_equal(get_correlation_id(), None)
 
     with CorrelationContext(correlation_id="req-456"):
-        assert get_correlation_id() == "req-456"
+        assertions.expect_equal(get_correlation_id(), "req-456")
 
-    assert get_correlation_id() is None
+    assertions.expect_equal(get_correlation_id(), None)
 
 
 def test_correlation_context_nesting() -> None:
     """Test that CorrelationContext nesting works correctly."""
     with CorrelationContext(correlation_id="outer"):
-        assert get_correlation_id() == "outer"
+        assertions.expect_equal(get_correlation_id(), "outer")
 
         with CorrelationContext(correlation_id="inner"):
-            assert get_correlation_id() == "inner"
+            assertions.expect_equal(get_correlation_id(), "inner")
 
-        assert get_correlation_id() == "outer"
+        assertions.expect_equal(get_correlation_id(), "outer")
 
-    assert get_correlation_id() is None
+    assertions.expect_equal(get_correlation_id(), None)
 
 
 def test_with_fields_context_manager(caplog: LogCaptureFixture) -> None:
@@ -249,10 +253,10 @@ def test_with_fields_context_manager(caplog: LogCaptureFixture) -> None:
     with with_fields(logger, correlation_id="req789", operation="search") as adapter:
         adapter.info("Inside context")
 
-    assert len(caplog.records) == 1
+    assertions.expect_equal(len(caplog.records), 1)
     record = caplog.records[0]
-    assert cast("str", getattr(record, "correlation_id", None)) == "req789"
-    assert cast("str", getattr(record, "operation", None)) == "search"
+    assertions.expect_equal(cast("str", getattr(record, "correlation_id", None)), "req789")
+    assertions.expect_equal(cast("str", getattr(record, "operation", None)), "search")
 
 
 def test_correlation_id_propagates_through_logger(
@@ -266,7 +270,9 @@ def test_correlation_id_propagates_through_logger(
     try:
         logger.info("Test message")
         record = caplog.records[0]
-        assert cast("str", getattr(record, "correlation_id", None)) == "req-prop-123"
+        assertions.expect_equal(
+            cast("str", getattr(record, "correlation_id", None)), "req-prop-123"
+        )
     finally:
         set_correlation_id(None)
 
@@ -279,5 +285,5 @@ def test_adapter_merges_extra_fields(caplog: LogCaptureFixture) -> None:
     logger.info("Test", extra={"service": "api", "endpoint": "/search"})
 
     record = caplog.records[0]
-    assert cast("str", getattr(record, "service", None)) == "api"
-    assert cast("str", getattr(record, "endpoint", None)) == "/search"
+    assertions.expect_equal(cast("str", getattr(record, "service", None)), "api")
+    assertions.expect_equal(cast("str", getattr(record, "endpoint", None)), "/search")

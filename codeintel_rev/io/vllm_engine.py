@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING, Any, cast
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.runtime import RuntimeCell
 from codeintel_rev.typing import NDArrayF32
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     import numpy as np
@@ -44,8 +43,6 @@ else:  # pragma: no cover - runtime imports
         vllm_config = cast("Any", LazyModule("vllm.config", "in-process vLLM config"))
         vllm_inputs = cast("Any", LazyModule("vllm.inputs", "in-process vLLM prompts"))
 
-LOGGER = get_logger(__name__)
-
 
 class _InprocessVLLMRuntime:
     """Mutable runtime backing the frozen embedder."""
@@ -63,8 +60,8 @@ class _InprocessVLLMRuntime:
             if callable(shutdown):
                 try:
                     shutdown()
-                except (RuntimeError, OSError, ValueError) as exc:
-                    LOGGER.warning("vLLM engine shutdown failed: %s", exc, exc_info=True)
+                except (RuntimeError, OSError, ValueError):
+                    pass
         self.engine = None
         self.tokenizer = None
 
@@ -109,14 +106,6 @@ class InprocessVLLMEmbedder:
     def __post_init__(self) -> None:
         """Initialize tokenizer and vLLM engine."""
         os.environ.setdefault("VLLM_ATTENTION_BACKEND", "FLASHINFER")
-        LOGGER.info(
-            "Prepared in-process vLLM embedder configuration",
-            extra={
-                "model": self.config.model,
-                "pooling": self.config.pooling_type,
-                "normalize": self.config.normalize,
-            },
-        )
 
     def embed_batch(self, texts: Sequence[str]) -> NDArrayF32:
         """Return embeddings for ``texts`` (shape ``[N, dim]``).
@@ -195,13 +184,7 @@ class InprocessVLLMEmbedder:
             dtype=np.float32,
         )
         if vectors.shape[1] != self.config.embedding_dim:
-            LOGGER.warning(
-                "vLLM embedding dimension mismatch",
-                extra={
-                    "expected": self.config.embedding_dim,
-                    "observed": vectors.shape[1],
-                },
-            )
+            pass
         return vectors, total_tokens
 
     def close(self) -> None:  # pragma: no cover - best-effort cleanup
@@ -235,14 +218,6 @@ class InprocessVLLMEmbedder:
         runtime = _InprocessVLLMRuntime()
         runtime.tokenizer = self._load_tokenizer()
         runtime.engine = self._load_engine()
-        LOGGER.info(
-            "Initialized in-process vLLM runtime",
-            extra={
-                "model": self.config.model,
-                "pooling": self.config.pooling_type,
-                "normalize": self.config.normalize,
-            },
-        )
         return runtime
 
     def _runtime(self) -> _InprocessVLLMRuntime:

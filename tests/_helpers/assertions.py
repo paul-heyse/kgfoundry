@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
-
-import math
 
 import pytest
 
@@ -86,7 +85,9 @@ def expect_sequence_equal(
     ]
     if not mismatches:
         return
-    mismatch_lines = ", ".join(f"[{idx}] got={got!r} want={want!r}" for idx, got, want in mismatches)
+    mismatch_lines = ", ".join(
+        f"[{idx}] got={got!r} want={want!r}" for idx, got, want in mismatches
+    )
     message = f"Sequence contents differ: {mismatch_lines}."
     if reason:
         message = f"{message} Reason: {reason}"
@@ -117,7 +118,9 @@ def expect_mapping_equal(
     if value_mismatches:
         fragments.append(
             "mismatched values: "
-            + ", ".join(f"{key!r} -> got {got!r}, want {want!r}" for key, got, want in value_mismatches),
+            + ", ".join(
+                f"{key!r} -> got {got!r}, want {want!r}" for key, got, want in value_mismatches
+            ),
         )
     message = "Mapping contents differ: " + "; ".join(fragments) + "."
     if reason:

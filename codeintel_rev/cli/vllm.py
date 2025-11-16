@@ -8,9 +8,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import logging
 import os
-import shlex
 import signal
 import sys
 import tempfile
@@ -21,7 +19,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
-from kgfoundry_common.logging import get_logger
 from kgfoundry_common.subprocess_utils import spawn_background_process
 
 try:
@@ -42,8 +39,6 @@ DEFAULT_HF_CACHE: Final[Path] = Path(
     or (Path.home() / ".cache" / "huggingface")
 )
 HTTP_OK: Final[int] = 200
-
-LOGGER = get_logger(__name__)
 
 
 @dataclass(slots=True, frozen=True)
@@ -169,19 +164,11 @@ def cmd_serve_http(args: argparse.Namespace) -> int:
     argv = _build_server_argv(options)
     env = _env_for_cache(cache_root, offline=not args.online)
 
-    if args.print_cmd:
-        quoted = " ".join(shlex.quote(token) for token in argv)
-        LOGGER.info("Launching vLLM via: %s", quoted)
-
     proc = spawn_background_process(argv, env=env, start_new_session=True)
     args.pid_file.parent.mkdir(parents=True, exist_ok=True)
     args.pid_file.write_text(str(proc.pid), encoding="utf-8")
-    LOGGER.info("Spawned vLLM PID %s -> %s", proc.pid, base_url)
-
     if not args.no_wait:
-        LOGGER.info("Waiting up to %ss for readiness.", args.timeout)
         _wait_until_ready(base_url, args.timeout)
-        LOGGER.info("vLLM server ready at %s", base_url)
 
     return 0
 
@@ -214,30 +201,24 @@ def cmd_shutdown(args: argparse.Namespace) -> int:
         is missing, unreadable, or the process did not exit within the timeout.
     """
     if not args.pid_file.exists():
-        LOGGER.error("PID file not found: %s", args.pid_file)
         return 1
     try:
         pid = int(args.pid_file.read_text(encoding="utf-8").strip())
     except (OSError, ValueError):
-        LOGGER.exception("Failed to read PID file %s", args.pid_file)
         return 1
 
-    LOGGER.info("Sending SIGTERM to PID %s", pid)
     with suppress(ProcessLookupError):
         os.kill(pid, signal.SIGTERM)
     stopped = _wait_for_exit(pid, args.timeout)
     if not stopped and args.force:
-        LOGGER.warning("SIGTERM skipped; sending SIGKILL.")
         with suppress(ProcessLookupError):
             os.kill(pid, signal.SIGKILL)
         stopped = _wait_for_exit(pid, args.timeout / 2)
 
     if not stopped:
-        LOGGER.error("Process %s did not exit; rerun with --force.", pid)
         return 1
 
     args.pid_file.unlink(missing_ok=True)
-    LOGGER.info("vLLM server stopped and PID file removed.")
     return 0
 
 
@@ -269,7 +250,6 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--max-num-batched-tokens", type=int, default=4096)
     serve.add_argument("--pid-file", type=Path, default=DEFAULT_PID_FILE)
     serve.add_argument("--timeout", type=float, default=60.0, help="Seconds to wait for readiness.")
-    serve.add_argument("--print-cmd", action="store_true", help="Echo server command.")
     serve.add_argument("--no-wait", action="store_true", help="Do not block for readiness.")
     serve.set_defaults(func=cmd_serve_http)
 
@@ -295,13 +275,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     int
         Exit code returned by the selected subcommand (serve-http or shutdown).
     """
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = build_parser()
     args = parser.parse_args(argv)
     try:
         return args.func(args)
     except (RuntimeError, TimeoutError, OSError):  # pragma: no cover - CLI wrapper
-        LOGGER.exception("vLLM CLI failed")
         return 1
 
 

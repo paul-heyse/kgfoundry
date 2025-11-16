@@ -6,6 +6,8 @@ from pathlib import Path
 
 from codeintel_rev.enrich.scip_reader import SCIPIndex
 
+from tests._helpers import assertions
+
 
 def test_scip_reader_loads_documents(tmp_path: Path) -> None:
     payload = {
@@ -24,12 +26,12 @@ def test_scip_reader_loads_documents(tmp_path: Path) -> None:
     scip_path.write_text(json.dumps(payload), encoding="utf-8")
 
     index = SCIPIndex.load(scip_path)
-    assert index.documents
+    assertions.expect_true(bool(index.documents), reason="index should have documents")
     document = index.by_file()["pkg/demo.py"]
-    assert document.path == "pkg/demo.py"
+    assertions.expect_equal(document.path, "pkg/demo.py")
     occurrences = document.occurrences
-    assert occurrences
-    assert occurrences[0].symbol == "pkg.demo.func"
+    assertions.expect_true(bool(occurrences), reason="document should have occurrences")
+    assertions.expect_equal(occurrences[0].symbol, "pkg.demo.func")
     symbol_map = index.symbol_to_files()
-    assert symbol_map["pkg.demo.func"] == ["pkg/demo.py"]
-    assert index.external_symbols["pkg.external.helper"].kind == "function"
+    assertions.expect_sequence_equal(symbol_map["pkg.demo.func"], ["pkg/demo.py"])
+    assertions.expect_equal(index.external_symbols["pkg.external.helper"].kind, "function")

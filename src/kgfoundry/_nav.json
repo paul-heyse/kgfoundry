@@ -18,7 +18,6 @@
     "orchestration": {"owner": "@kgfoundry-core", "stability": "experimental", "since": "0.0.0"},
     "registry": {"owner": "@kgfoundry-core", "stability": "experimental", "since": "0.0.0"},
     "search_api": {"owner": "@kgfoundry-core", "stability": "experimental", "since": "0.0.0"},
-    "search_client": {"owner": "@kgfoundry-core", "stability": "experimental", "since": "0.0.0"},
-    "vectorstore_faiss": {"owner": "@kgfoundry-core", "stability": "experimental", "since": "0.0.0"}
+    "search_client": {"owner": "@kgfoundry-core", "stability": "experimental", "since": "0.0.0"}
   }
 }

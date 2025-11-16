@@ -9,6 +9,7 @@ from kgfoundry_common.navmap_loader import (
     clear_navmap_caches,
     load_nav_metadata,
 )
+from tests._helpers import assertions
 
 
 @pytest.fixture(autouse=True)
@@ -34,16 +35,22 @@ def _symbol_names(sections: object) -> set[str]:
 
 def test_cli_nav_metadata_derives_from_cli_contracts() -> None:
     metadata = load_nav_metadata("download.cli", ("app", "harvest"))
-    assert isinstance(metadata, NavMetadataModel)
-    assert metadata.module_meta.owner == "@data-platform"
-    assert metadata.symbols["harvest"].handler is not None
+    assertions.expect_true(
+        isinstance(metadata, NavMetadataModel), reason="metadata should be NavMetadataModel"
+    )
+    assertions.expect_equal(metadata.module_meta.owner, "@data-platform")
+    assertions.expect_true(
+        metadata.symbols["harvest"].handler is not None, reason="harvest handler should be set"
+    )
     # Sections should reflect CLI tag groups and include harvest symbol.
     section_symbol_names = _symbol_names(metadata["sections"])
-    assert "harvest" in section_symbol_names
+    assertions.expect_in("harvest", section_symbol_names)
 
 
 def test_sidecar_metadata_validates() -> None:
     metadata = load_nav_metadata("registry.helper", ("DuckDBRegistryHelper",))
-    assert isinstance(metadata, NavMetadataModel)
-    assert metadata.module_meta.owner == "@registry"
-    assert "DuckDBRegistryHelper" in metadata.symbols
+    assertions.expect_true(
+        isinstance(metadata, NavMetadataModel), reason="metadata should be NavMetadataModel"
+    )
+    assertions.expect_equal(metadata.module_meta.owner, "@registry")
+    assertions.expect_in("DuckDBRegistryHelper", metadata.symbols)

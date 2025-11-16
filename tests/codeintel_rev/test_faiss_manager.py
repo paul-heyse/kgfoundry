@@ -7,6 +7,7 @@ from typing import Any, cast
 import pytest
 from codeintel_rev.io.faiss_manager import FAISSManager
 
+from tests._helpers import assertions
 from tests.conftest import FAISS_MODULE, HAS_FAISS_SUPPORT
 
 if not HAS_FAISS_SUPPORT:  # pragma: no cover - dependency-gated
@@ -20,76 +21,41 @@ if FAISS_MODULE is None:  # pragma: no cover - dependency-gated
 faiss_module: Any = FAISS_MODULE
 
 
-class _SentinelGpuIndex:
-    pass
-
-
 @pytest.fixture
-def faiss_manager(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FAISSManager:
+def faiss_manager(tmp_path: Path) -> FAISSManager:
     manager = FAISSManager(index_path=tmp_path / "index.faiss", use_cuvs=False)
     # Use a lightweight flat index stub for type stability
     manager.cpu_index = faiss_module.IndexFlatIP(2)
-
-    class DummyGpuClonerOptions:
-        def __init__(self) -> None:
-            self.useFloat16 = False
-            self.use_cuvs = False
-
-    monkeypatch.setattr(faiss_module, "GpuClonerOptions", DummyGpuClonerOptions, raising=False)
     return manager
 
 
-def test_clone_to_gpu_success(monkeypatch: pytest.MonkeyPatch, faiss_manager: FAISSManager) -> None:
-    """GPU cloning succeeds when FAISS GPU helpers work."""
-    gpu_resources = object()
-    gpu_index = _SentinelGpuIndex()
-
-    monkeypatch.setattr(faiss_module, "StandardGpuResources", lambda: gpu_resources, raising=False)
-
-    def fake_index_cpu_to_gpu(
-        resources: object, device: int, cpu_index: object, options: object
-    ) -> object:
-        assert resources is gpu_resources
-        assert cpu_index is faiss_manager.cpu_index
-        assert device == 0
-        assert isinstance(options, faiss_module.GpuClonerOptions)
-        return gpu_index
-
-    monkeypatch.setattr(faiss_module, "index_cpu_to_gpu", fake_index_cpu_to_gpu, raising=False)
-
+def test_clone_to_gpu_is_noop(faiss_manager: FAISSManager) -> None:
+    """GPU cloning now returns False and records CPU-only reason."""
     success = faiss_manager.clone_to_gpu()
 
-    assert success is True
-    assert faiss_manager.gpu_index is gpu_index
-    assert faiss_manager.gpu_resources is gpu_resources
-    assert faiss_manager.gpu_disabled_reason is None
+    assertions.expect_false(success, reason="clone_to_gpu should be disabled")
+    assertions.expect_equal(faiss_manager.gpu_index, None)
+    assertions.expect_equal(faiss_manager.gpu_resources, None)
+    assertions.expect_equal(faiss_manager.gpu_disabled_reason, "GPU acceleration removed")
 
 
-def test_clone_to_gpu_falls_back(
-    monkeypatch: pytest.MonkeyPatch, faiss_manager: FAISSManager
-) -> None:
-    """GPU cloning failure is logged and returns False without raising."""
+def test_clone_to_gpu_is_idempotent(faiss_manager: FAISSManager) -> None:
+    """Calling clone_to_gpu multiple times keeps state consistent."""
+    first = faiss_manager.clone_to_gpu()
+    second = faiss_manager.clone_to_gpu()
 
-    def failing_resources() -> None:
-        msg = "CUDA unavailable"
-        raise RuntimeError(msg)
-
-    monkeypatch.setattr(faiss_module, "StandardGpuResources", failing_resources, raising=False)
-
-    success = faiss_manager.clone_to_gpu()
-
-    assert success is False
-    assert faiss_manager.gpu_index is None
-    assert faiss_manager.gpu_resources is None
-    assert faiss_manager.gpu_disabled_reason is not None
-    assert "CUDA unavailable" in faiss_manager.gpu_disabled_reason
+    assertions.expect_false(first)
+    assertions.expect_false(second)
+    assertions.expect_equal(faiss_manager.gpu_index, None)
+    assertions.expect_equal(faiss_manager.gpu_resources, None)
+    assertions.expect_equal(faiss_manager.gpu_disabled_reason, "GPU acceleration removed")
 
 
 def test_runtime_tuning_apply_and_reset(faiss_manager: FAISSManager) -> None:
     """Runtime tuning overrides surface through describe API."""
     snapshot = faiss_manager.runtime.get_runtime_tuning()
     snapshot_overrides = cast("Mapping[str, object]", snapshot["overrides"])
-    assert snapshot_overrides == {}
+    assertions.expect_mapping_equal(snapshot_overrides, {})
 
     updated = faiss_manager.runtime.apply_runtime_tuning(
         nprobe=32,
@@ -98,11 +64,11 @@ def test_runtime_tuning_apply_and_reset(faiss_manager: FAISSManager) -> None:
     )
     updated_overrides = cast("Mapping[str, object]", updated["overrides"])
     updated_active = cast("Mapping[str, object]", updated["active"])
-    assert updated_overrides["nprobe"] == 32
-    assert updated_active["nprobe"] == 32
-    assert updated_active["efSearch"] == 64
-    assert updated_active["k_factor"] == pytest.approx(1.5)
+    assertions.expect_equal(updated_overrides["nprobe"], 32)
+    assertions.expect_equal(updated_active["nprobe"], 32)
+    assertions.expect_equal(updated_active["efSearch"], 64)
+    assertions.expect_almost_equal(cast("float", updated_active["k_factor"]), 1.5)
 
     reset = faiss_manager.runtime.reset_runtime_tuning()
     reset_overrides = cast("Mapping[str, object]", reset["overrides"])
-    assert reset_overrides == {}
+    assertions.expect_mapping_equal(reset_overrides, {})

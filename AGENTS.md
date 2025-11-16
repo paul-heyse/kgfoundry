@@ -11,7 +11,7 @@
 4. [Code Formatting & Style (Ruff is canonical)](#code-formatting--style-ruff-is-canonical)
 5. [Type Checking (pyright strict, pyrefly sharp)](#type-checking-pyright-strict-pyrefly-sharp)
 6. [Docstrings (NumPy style; enforced; runnable)](#docstrings-numpy-style-enforced-runnable)
-7. [Testing Standards (markers, coverage, GPU hygiene)](#testing-standards-markers-coverage-gpu-hygiene)
+7. [Testing Standards (markers & coverage)](#testing-standards-markers--coverage)
 8. [Data Contracts (JSON Schema 2020‑12 / OpenAPI 3.2)](#data-contracts-json-schema-2020-12--openapi-32)
 9. [Link Policy for Remote Editors](#link-policy-for-remote-editors)
 10. [Agent Catalog & STDIO API (session‑scoped, no daemon)](#agent-catalog--stdio-api-sessionscoped-no-daemon)
@@ -49,7 +49,7 @@
   uv run pyright --warnings --pythonversion=3.13
   uv run pyrefly check
   uv run vulture src tools stubs --min-confidence 90
-  SKIP_GPU_WARMUP=1 uv run pytest -q    # unset on CUDA-capable hosts
+  uv run pytest -q
   # If OpenAPI changed: lint spec (e.g., spectral lint openapi.yaml)
 
   ```
@@ -188,7 +188,6 @@ For all code blocks that you make edits to, please check for pyright, pyrefly, a
 | --- | --- | --- | --- |
 | Minimal | `pip install codeintel-rev[minimal]` | FastAPI, msgspec, uvicorn | Baseline HTTP + serialization stack. |
 | Full CPU | `pip install codeintel-rev[all]` | Minimal + FAISS CPU + DuckDB + SPLADE + XTR | Matches CI "full" job; safest default on CPU hosts. |
-| GPU | `pip install codeintel-rev[all,faiss-gpu]` | Full CPU + FAISS GPU bindings | Requires CUDA 12.x toolchain; pairs with `uv sync --extra gpu`. |
 | Targeted | `pip install codeintel-rev[faiss-cpu]`, etc. | Individual extras (`faiss-cpu`, `duckdb`, `splade`, `xtr`) | Use when trimming runtime images to feature-specific subsets. |
 
 `src/kgfoundry_common/typing/heavy_deps.py` is the single source of truth for heavy modules and install hints; the `gate_import()` helper and typing-gates checker both pull from this registry.
@@ -376,19 +375,18 @@ This pattern keeps `python -c "import codeintel_rev"` working on minimal hosts w
 
 ---
 
-## Testing Standards (markers, coverage, GPU hygiene)
+## Testing Standards (markers & coverage)
 
 - **Markers:**
-  - `@pytest.mark.integration` — network/services/resources
-  - `@pytest.mark.gpu` — requires GPU libraries
-  - `@pytest.mark.benchmark` — performance, non‑gating
+- `@pytest.mark.integration` — network/services/resources
+- `@pytest.mark.benchmark` — performance, non-gating
 - **Conventions:**
   - Parametrize edge cases with `@pytest.mark.parametrize`
   - No reliance on test order or realtime; use fixed seeds
-  - GPU tests are **skipped by default** in CI unless explicitly enabled
+- Entire suite runs on CPU; GPU markers have been removed
 - **Coverage (local whenever core paths change):**
   ```bash
-  SKIP_GPU_WARMUP=1 uv run pytest -q --cov=src --cov-report=xml:coverage.xml --cov-report=html:htmlcov
+  uv run pytest -q --cov=src --cov-report=xml:coverage.xml --cov-report=html:htmlcov
   ```
 
 ---
@@ -483,7 +481,7 @@ Example `PATH_MAP`:
 [ ] uv run ruff format && uv run ruff check --fix
 [ ] uv run pyright --warnings --pythonversion=3.13
 [ ] uv run pyrefly check
-[ ] SKIP_GPU_WARMUP=1 uv run pytest -q
+[ ] uv run pytest -q
 [ ] python tools/check_new_suppressions.py src
 [ ] python tools/check_imports.py
 [ ] uv run pip-audit
@@ -508,7 +506,7 @@ uv run pyright --warnings --pythonversion=3.13
 uv run pyrefly check
 
 # Tests (incl. doctests/xdoctest via pytest.ini)
-SKIP_GPU_WARMUP=1 uv run pytest -q
+uv run pytest -q
 
 
 # Architectural boundaries & suppression guard
@@ -526,8 +524,6 @@ codeintel indexctl status --root indexes
 codeintel indexctl stage --version v1 --faiss path/to/faiss --duckdb path/to/catalog.duckdb --scip path/to/index.scip
 codeintel indexctl publish --version v1
 ```
-
-> **Note:** Drop `SKIP_GPU_WARMUP=1` on CUDA-capable hosts or CI jobs that require GPU warm-up coverage.
 
 **Problem Details Reference:**
 - Example: `schema/examples/problem_details/search-missing-index.json`

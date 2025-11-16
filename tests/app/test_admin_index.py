@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from http import HTTPStatus
 from typing import cast
 from unittest.mock import MagicMock
 
@@ -10,6 +11,7 @@ from codeintel_rev.runtime.factory_adjustment import DefaultFactoryAdjuster
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from tests._helpers import assertions
 from tests.app._context_factory import build_application_context
 
 
@@ -35,9 +37,12 @@ def test_admin_tuning_updates_context(tmp_path, monkeypatch) -> None:
             "/admin/index/tuning",
             json={"faiss_nprobe": 64},
         )
-        assert resp.status_code == 200
-        assert isinstance(ctx.factory_adjuster, DefaultFactoryAdjuster)
-        assert ctx.factory_adjuster.faiss_nprobe == 64
+        assertions.expect_equal(resp.status_code, HTTPStatus.OK)
+        assertions.expect_true(
+            isinstance(ctx.factory_adjuster, DefaultFactoryAdjuster),
+            reason="should be DefaultFactoryAdjuster",
+        )
+        assertions.expect_equal(ctx.factory_adjuster.faiss_nprobe, 64)
 
 
 def test_admin_faiss_runtime_status_endpoint(tmp_path, monkeypatch) -> None:
@@ -56,8 +61,8 @@ def test_admin_faiss_runtime_status_endpoint(tmp_path, monkeypatch) -> None:
     app.include_router(index_admin.router)
     with TestClient(app) as client:
         resp = client.get("/admin/index/tuning/faiss")
-        assert resp.status_code == 200
-        assert resp.json()["active"]["nprobe"] == 32
+        assertions.expect_equal(resp.status_code, HTTPStatus.OK)
+        assertions.expect_equal(resp.json()["active"]["nprobe"], 32)
 
 
 def test_admin_faiss_runtime_session_override(tmp_path, monkeypatch) -> None:
@@ -73,9 +78,9 @@ def test_admin_faiss_runtime_session_override(tmp_path, monkeypatch) -> None:
             "/admin/index/tuning/faiss",
             json={"session_id": "abc", "nprobe": 48},
         )
-        assert resp.status_code == 200
-        assert resp.json()["faiss_tuning"]["nprobe"] == 48
-        assert stub.data["abc"]["faiss_tuning"]["nprobe"] == 48
+        assertions.expect_equal(resp.status_code, HTTPStatus.OK)
+        assertions.expect_equal(resp.json()["faiss_tuning"]["nprobe"], 48)
+        assertions.expect_equal(stub.data["abc"]["faiss_tuning"]["nprobe"], 48)
 
 
 def test_admin_faiss_runtime_reset_session(tmp_path, monkeypatch) -> None:
@@ -89,5 +94,7 @@ def test_admin_faiss_runtime_reset_session(tmp_path, monkeypatch) -> None:
     app.include_router(index_admin.router)
     with TestClient(app) as client:
         resp = client.delete("/admin/index/tuning/faiss", params={"session_id": "abc"})
-        assert resp.status_code == 200
-        assert "faiss_tuning" not in stub.data["abc"]
+        assertions.expect_equal(resp.status_code, HTTPStatus.OK)
+        assertions.expect_false(
+            "faiss_tuning" in stub.data["abc"], reason="faiss_tuning should be removed"
+        )

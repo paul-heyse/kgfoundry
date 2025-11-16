@@ -9,6 +9,8 @@ import pytest
 from codeintel_rev.app import config_context
 from codeintel_rev.mcp_server import service_context
 
+from tests._helpers import assertions
+
 
 class RecordingFAISSManager:
     """Stub FAISS manager capturing constructor arguments."""
@@ -27,11 +29,7 @@ class RecordingFAISSManager:
         self.nlist = nlist
         self.use_cuvs = use_cuvs
         self.cpu_index = None
-        self.gpu_index = None
-        self.gpu_resources = None
-        self.gpu_disabled_reason = None
         self.load_calls = 0
-        self.clone_calls = 0
         self.runtime = runtime
 
     def load_cpu_index(self) -> None:
@@ -47,17 +45,6 @@ class RecordingFAISSManager:
             Static compile option payload for assertions.
         """
         return {"arch": "stub"}
-
-    def clone_to_gpu(self) -> bool:
-        """Record GPU clone attempts and report disabled GPU.
-
-        Returns
-        -------
-        bool
-            Always returns False to indicate GPU is disabled.
-        """
-        self.clone_calls += 1
-        return False
 
 
 class RecordingDuckDBCatalog:
@@ -121,29 +108,34 @@ def test_service_context_resolves_paths(tmp_path: Path, monkeypatch: pytest.Monk
         catalog = cast("RecordingDuckDBCatalog", catalog_obj)
         _assert_catalog(catalog, expected_duckdb_path, expected_vectors_dir)
 
-    assert catalog.closed is True
+    assertions.expect_true(catalog.closed, reason="catalog should be closed")
 
     service_context.reset_service_context()
 
 
 def _assert_faiss_manager(manager: object, expected_path: Path) -> None:
-    assert isinstance(manager, RecordingFAISSManager)
-    assert manager.index_path == expected_path
+    assertions.expect_true(
+        isinstance(manager, RecordingFAISSManager), reason="manager should be RecordingFAISSManager"
+    )
+    if isinstance(manager, RecordingFAISSManager):
+        assertions.expect_equal(manager.index_path, expected_path)
 
 
 def _assert_faiss_ready(context: Any) -> None:
     ready, limits, error = context.ensure_faiss_ready()
-    assert ready is True
-    assert limits == []
-    assert error is None
-    assert context.faiss_manager.load_calls == 1
-    assert context.faiss_manager.clone_calls == 1
+    assertions.expect_true(ready, reason="faiss should be ready")
+    assertions.expect_equal(limits, [])
+    assertions.expect_equal(error, None)
+    assertions.expect_equal(context.faiss_manager.load_calls, 1)
 
 
 def _assert_catalog(
     catalog: RecordingDuckDBCatalog, expected_db: Path, expected_vectors: Path
 ) -> None:
-    assert isinstance(catalog, RecordingDuckDBCatalog)
-    assert catalog.db_path == expected_db
-    assert catalog.vectors_dir == expected_vectors
-    assert catalog.open_called is True
+    assertions.expect_true(
+        isinstance(catalog, RecordingDuckDBCatalog),
+        reason="catalog should be RecordingDuckDBCatalog",
+    )
+    assertions.expect_equal(catalog.db_path, expected_db)
+    assertions.expect_equal(catalog.vectors_dir, expected_vectors)
+    assertions.expect_true(catalog.open_called, reason="catalog.open should have been called")

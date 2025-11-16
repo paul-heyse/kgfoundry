@@ -17,6 +17,8 @@ from codeintel_rev.enrich.scip_reader import Document, Occurrence, SCIPIndex, Sy
 from codeintel_rev.enrich.validators import ModuleRecordModel
 from codeintel_rev.typedness import FileTypeSignals
 
+from tests._helpers import assertions
+
 
 def _scan_inputs(
     tmp_path: Path, *, signals: dict[str, FileTypeSignals] | None = None
@@ -34,6 +36,7 @@ def _scan_inputs(
 
 
 def test_module_record_behaves_like_mapping() -> None:
+    """Verify ModuleRecord behaves like a mapping with dict-like access."""
     record = ModuleRecord(
         path="pkg/demo.py",
         repo_path="pkg/demo.py",
@@ -43,12 +46,13 @@ def test_module_record_behaves_like_mapping() -> None:
     record["fan_in"] = 2
     record.tags = ["cli", "alpha"]
     payload = record.as_json_row()
-    assert payload["fan_in"] == 2
-    assert payload["path"] == "pkg/demo.py"
-    assert payload["tags"] == ["alpha", "cli"]
+    assertions.expect_equal(payload["fan_in"], 2)
+    assertions.expect_equal(payload["path"], "pkg/demo.py")
+    assertions.expect_sequence_equal(payload["tags"], ["alpha", "cli"])
 
 
 def test_build_module_row_captures_docstring_and_types(tmp_path: Path) -> None:
+    """Verify module row building captures docstrings and type error counts."""
     repo = tmp_path / "repo"
     repo.mkdir()
     module = repo / "pkg"
@@ -59,22 +63,27 @@ def test_build_module_row_captures_docstring_and_types(tmp_path: Path) -> None:
         repo, signals={"pkg/alpha.py": FileTypeSignals(pyrefly_errors=1, pyright_errors=3)}
     )
     record, edges = _BUILD_MODULE_ROW(file_path, repo, inputs)
-    assert isinstance(record, ModuleRecord)
-    assert record["docstring"] == "Alpha."
-    assert record["type_error_count"] == 3
-    assert edges == []
+    assertions.expect_true(isinstance(record, ModuleRecord), reason="record should be ModuleRecord")
+    assertions.expect_equal(record["docstring"], "Alpha.")
+    assertions.expect_equal(record["type_error_count"], 3)
+    assertions.expect_sequence_equal(edges, [])
 
 
 def test_outline_nodes_for_python() -> None:
+    """Verify outline node extraction works for Python code."""
     pytest.importorskip("tree_sitter_python")
     code = "class Foo:\n    def bar(self):\n        return 1\n"
     nodes = _OUTLINE_NODES_FOR("pkg/foo.py", code)
     if not nodes:
         pytest.skip("Tree-sitter outline unavailable")
-    assert any(node["kind"] == "class_definition" for node in nodes)
+    assertions.expect_true(
+        any(node["kind"] == "class_definition" for node in nodes),
+        reason="should have class_definition node",
+    )
 
 
 def test_scip_index_groupings() -> None:
+    """Verify SCIP index provides file and symbol grouping methods."""
     index = SCIPIndex(
         documents=[
             Document(
@@ -84,20 +93,22 @@ def test_scip_index_groupings() -> None:
             )
         ]
     )
-    assert index.by_file()["pkg/demo.py"].path == "pkg/demo.py"
-    assert index.symbol_to_files()["sym::demo"] == ["pkg/demo.py"]
-    assert index.file_symbol_kinds()["pkg/demo.py"]["sym::demo"] == "function"
+    assertions.expect_equal(index.by_file()["pkg/demo.py"].path, "pkg/demo.py")
+    assertions.expect_sequence_equal(index.symbol_to_files()["sym::demo"], ["pkg/demo.py"])
+    assertions.expect_equal(index.file_symbol_kinds()["pkg/demo.py"]["sym::demo"], "function")
 
 
 def test_type_error_count_prefers_max(tmp_path: Path) -> None:
+    """Verify type error count prefers maximum of pyrefly and pyright errors."""
     inputs = _scan_inputs(
         tmp_path,
         signals={"pkg/demo.py": FileTypeSignals(pyrefly_errors=1, pyright_errors=4)},
     )
-    assert _TYPE_ERROR_COUNT("pkg/demo.py", inputs) == 4
+    assertions.expect_equal(_TYPE_ERROR_COUNT("pkg/demo.py", inputs), 4)
 
 
 def test_apply_tagging_assigns_cli_tag() -> None:
+    """Verify tagging rules assign CLI tag based on imports."""
     record = ModuleRecord(
         path="pkg/app.py",
         repo_path="pkg/app.py",
@@ -109,11 +120,12 @@ def test_apply_tagging_assigns_cli_tag() -> None:
     ]
     _APPLY_TAGGING([record], {"cli": {"any_import": ["typer"], "reason": "cli detected"}})
     tags = record.get("tags")
-    assert isinstance(tags, list)
-    assert "cli" in tags
+    assertions.expect_true(isinstance(tags, list), reason="tags should be list")
+    assertions.expect_in("cli", tags)
 
 
 def test_write_markdown_module_emits_sections(tmp_path: Path) -> None:
+    """Verify markdown module writer emits all expected sections."""
     row: dict[str, Any] = {
         "path": "pkg/app.py",
         "docstring": "Demo module.",
@@ -133,25 +145,27 @@ def test_write_markdown_module_emits_sections(tmp_path: Path) -> None:
     target = tmp_path / "module.md"
     write_markdown_module(target, row)
     content = target.read_text(encoding="utf-8")
-    assert "pkg.utils" in content
-    assert "run" in content
-    assert "cli" in content
+    assertions.expect_in("pkg.utils", content)
+    assertions.expect_in("run", content)
+    assertions.expect_in("cli", content)
 
 
 def test_module_record_validator_accepts_payload() -> None:
+    """Verify ModuleRecordModel validates payloads correctly."""
     payload = {"path": "pkg/app.py", "docstring": "Doc"}
     validated = ModuleRecordModel.model_validate(payload)
-    assert validated.path == "pkg/app.py"
+    assertions.expect_equal(validated.path, "pkg/app.py")
 
 
 def test_duckdb_store_ingest_roundtrip(tmp_path: Path) -> None:
+    """Verify DuckDB ingestion round-trip for module records."""
     pytest.importorskip("duckdb")
     jsonl_path = tmp_path / "modules.jsonl"
     row = {"path": "pkg/app.py", "docstring": "demo"}
     jsonl_path.write_text(json.dumps(row), encoding="utf-8")
     conn = DuckConn(db_path=tmp_path / "enrich.duckdb")
     count = ingest_modules_jsonl(conn, jsonl_path)
-    assert count == 1
+    assertions.expect_equal(count, 1)
 
 
 _BUILD_MODULE_ROW_ATTR = "_build_module_row"

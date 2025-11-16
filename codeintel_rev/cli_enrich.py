@@ -121,7 +121,8 @@ def _stage_span(stage: str, **start_meta: object) -> Iterator[dict[str, object]]
     Raises
     ------
     Exception
-        Any exception raised within the context manager is logged and re-raised.
+        Any exception raised within the context manager is logged and re-raised
+        unchanged.
     """
     start = time.perf_counter()
     LOGGER.debug("stage=%s event=start %s", stage, _format_stage_meta(start_meta))

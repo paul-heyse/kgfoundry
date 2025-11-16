@@ -7,9 +7,6 @@ from importlib.metadata import EntryPoint, entry_points
 from typing import cast
 
 from codeintel_rev.plugins.channels import Channel, ChannelContext
-from kgfoundry_common.logging import get_logger
-
-LOGGER = get_logger(__name__)
 
 __all__ = ["ChannelRegistry"]
 
@@ -59,11 +56,7 @@ class ChannelRegistry:
                 continue
             try:
                 channel = factory(context)
-            except _FACTORY_ERRORS as exc:  # pragma: no cover - defensive logging
-                LOGGER.warning(
-                    "channel.factory.failed",
-                    extra={"entry_point": entry_point.name, "error": repr(exc)},
-                )
+            except _FACTORY_ERRORS:  # pragma: no cover - defensive logging
                 continue
             discovered.append(channel)
         return cls(discovered)
@@ -168,10 +161,6 @@ def _load_factory(entry_point: EntryPoint) -> Callable[[ChannelContext], Channel
     """
     try:
         factory = entry_point.load()
-    except _FACTORY_ERRORS as exc:  # pragma: no cover - defensive logging
-        LOGGER.warning(
-            "channel.entry_point.load_failed",
-            extra={"entry_point": entry_point.name, "error": repr(exc)},
-        )
+    except _FACTORY_ERRORS:  # pragma: no cover - defensive logging
         return None
     return factory

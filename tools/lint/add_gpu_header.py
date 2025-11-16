@@ -45,7 +45,6 @@ GPU_MODULE_HEADS: set[str] = {
 }
 
 GPU_MODULE_FULL: set[str] = {
-    "kgfoundry.vectorstore_faiss.gpu",
     "kgfoundry.search_api.faiss_adapter",
     "kgfoundry_common.faiss",
 }

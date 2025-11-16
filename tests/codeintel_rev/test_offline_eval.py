@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import cast
 
 import numpy as np
-import pytest
 from codeintel_rev.config.settings import EvalConfig, PathsConfig, load_settings
 from codeintel_rev.evaluation.offline_recall import OfflineRecallEvaluator
 from codeintel_rev.io.duckdb_manager import DuckDBManager
@@ -13,6 +12,8 @@ from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.symbol_catalog import SymbolCatalog, SymbolDefRow
 from codeintel_rev.io.vllm_client import VLLMClient
 from msgspec import structs
+
+from tests._helpers import assertions
 
 
 class _StubFAISSManager:
@@ -40,7 +41,7 @@ class _StubVLLMClient:
         self._dim = dim
 
     def embed_single(self, text: str) -> list[float]:
-        assert text
+        assertions.expect_true(bool(text), reason="text should be non-empty")
         return [0.0] * self._dim
 
 
@@ -110,8 +111,8 @@ def test_offline_eval_synthesizes_queries(tmp_path: Path) -> None:
         duckdb_manager=duckdb_manager,
     )
     result = evaluator.run()
-    assert result["queries"] == 1
+    assertions.expect_equal(result["queries"], 1)
     summary = cast("Mapping[int, float]", result["summary"])
-    assert summary[5] == pytest.approx(1.0)
+    assertions.expect_almost_equal(summary[5], 1.0)
     summary_path = tmp_path / "artifacts" / "summary.json"
-    assert summary_path.exists()
+    assertions.expect_true(summary_path.exists(), reason="summary_path should exist")

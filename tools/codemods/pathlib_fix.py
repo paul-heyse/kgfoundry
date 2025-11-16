@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING, cast
 
 import libcst as cst
 
+from tools._libcst_mixins import CallTransformerMixin, WithTransformerMixin
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -114,7 +116,7 @@ def _path_join_expression(arguments: Sequence[cst.Arg]) -> cst.BaseExpression | 
     return result
 
 
-class PathlibTransformer(cst.CSTTransformer):
+class PathlibTransformer(CallTransformerMixin, WithTransformerMixin, cst.CSTTransformer):
     """Apply pathlib conversions to common ``os.path`` call sites.
 
     Initializes transformer with change tracking.
@@ -178,11 +180,6 @@ class PathlibTransformer(cst.CSTTransformer):
             Potentially transformed with statement node.
         """
         return self._transform_with(original_node, updated_node)
-
-    # LibCST visitor pattern requires these aliases to match AST node names
-    # These are public API methods that must match the visitor interface
-    leave_Call = leave_call  # lint-ignore[N815] Required by LibCST visitor pattern
-    leave_With = leave_with  # lint-ignore[N815] Required by LibCST visitor pattern
 
     def _transform_makedirs(self, node: cst.Call) -> cst.BaseExpression | None:
         if not (

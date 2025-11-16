@@ -11,7 +11,7 @@ import signal
 import threading
 import traceback
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager, suppress
 from importlib.metadata import PackageNotFoundError, version
 from time import perf_counter
@@ -29,7 +29,7 @@ from starlette.types import ASGIApp
 
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.app.config_context import ApplicationContext
-from codeintel_rev.app.gpu_warmup import warmup_gpu
+from codeintel_rev.app.faiss_health import check_faiss_health
 from codeintel_rev.app.middleware import SessionScopeMiddleware
 from codeintel_rev.app.readiness import ReadinessProbe
 from codeintel_rev.app.routers import index_admin
@@ -37,10 +37,7 @@ from codeintel_rev.app.server_settings import get_server_settings
 from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.mcp_server.server import app_context, build_http_app
 from codeintel_rev.runtime.cells import RuntimeCellObserver
-from kgfoundry_common.errors import ConfigurationError
-from kgfoundry_common.logging import get_logger
 
-LOGGER = get_logger(__name__)
 SERVER_SETTINGS = get_server_settings()
 try:
     _DIST_VERSION = version("kgfoundry")
@@ -133,18 +130,6 @@ def _client_address(request: Request) -> str:
 
 def _log_request_summary(request: Request, *, status_code: int, duration_ms: int) -> None:
     """Emit a structured log describing a completed HTTP request."""
-    LOGGER.info(
-        "http.request",
-        extra={
-            "request_id": getattr(request.state, "request_id", None),
-            "method": request.method,
-            "path": request.url.path,
-            "status_code": status_code,
-            "duration_ms": duration_ms,
-            "http_version": request.scope.get("http_version", "1.1"),
-            "client_addr": _client_address(request),
-        },
-    )
 
 
 def _stream_log_extra(
@@ -201,20 +186,9 @@ def _preload_faiss_index(context: ApplicationContext) -> bool:
     """
     try:
         context.faiss_manager.load_cpu_index()
-        LOGGER.info("FAISS CPU index loaded successfully")
-
-        # Attempt GPU clone if available
-        gpu_enabled = context.faiss_manager.clone_to_gpu()
-        if gpu_enabled:
-            LOGGER.info("FAISS GPU acceleration enabled")
-        else:
-            reason = context.faiss_manager.gpu_disabled_reason or "Unknown"
-            LOGGER.warning("FAISS GPU acceleration unavailable: %s", reason)
-    except (FileNotFoundError, RuntimeError) as exc:
-        LOGGER.warning("FAISS index pre-load failed: %s", exc)
+    except (FileNotFoundError, RuntimeError):
         return False
-    else:
-        return True
+    return True
 
 
 def _env_flag(name: str) -> bool:
@@ -248,68 +222,39 @@ def _resolve_proxy_trusted_hops() -> int:
     try:
         hops = int(raw_value)
     except ValueError:
-        LOGGER.warning(
-            "Invalid PROXY_TRUSTED_HOPS value; falling back to server settings",
-            extra={"proxy_trusted_hops": raw_value},
-        )
         return SERVER_SETTINGS.proxy_trusted_hops
     return max(0, hops)
-
-
-def _log_gpu_warmup(status: Mapping[str, object]) -> None:
-    """Log the GPU warmup status summary.
-
-    Parameters
-    ----------
-    status : Mapping[str, object]
-        Warmup status payload emitted by :func:`warmup_gpu`.
-
-    """
-    overall = status.get("overall_status")
-    if overall == "ready":
-        LOGGER.info("GPU warmup successful - GPU acceleration available")
-    elif overall == "degraded":
-        LOGGER.warning(
-            "GPU warmup partial - some GPU features unavailable: %s",
-            status.get("details"),
-        )
-    else:
-        LOGGER.info("GPU warmup indicates GPU unavailable - continuing with CPU-only mode")
 
 
 async def _preload_faiss_if_configured(context: ApplicationContext) -> None:
     """Preload FAISS indexes when configured to do so."""
     if not context.settings.index.faiss_preload:
         return
-    LOGGER.info("Pre-loading FAISS index during startup")
     preload_success = await asyncio.to_thread(_preload_faiss_index, context)
     if not preload_success:
-        LOGGER.warning("FAISS index pre-load failed; will lazy-load on first search")
+        return
 
 
 def _preload_xtr_if_configured(context: ApplicationContext) -> None:
     """Preload XTR runtime when toggle is enabled."""
     if not _env_flag("XTR_PRELOAD"):
         return
-    LOGGER.info("Pre-loading XTR index during startup")
     try:
         index = context.get_xtr_index()
     except (RuntimeError, OSError, ValueError, RuntimeUnavailableError):
-        LOGGER.warning("XTR preload failed; continuing lazily", exc_info=True)
         return
     if index is None or not getattr(index, "ready", False):
-        LOGGER.warning("XTR preload requested but index unavailable")
+        return
 
 
 def _preload_hybrid_if_configured(context: ApplicationContext) -> None:
     """Preload HybridSearchEngine when toggle is enabled."""
     if not _env_flag("HYBRID_PRELOAD"):
         return
-    LOGGER.info("Pre-loading HybridSearchEngine during startup")
     try:
         context.get_hybrid_engine()
     except (RuntimeError, OSError, ValueError, RuntimeUnavailableError):
-        LOGGER.warning("Hybrid preload failed; continuing lazily", exc_info=True)
+        return
 
 
 async def _initialize_context(
@@ -322,7 +267,7 @@ async def _initialize_context(
     Extended Summary
     ----------------
     This function orchestrates the application startup sequence by creating the
-    ApplicationContext, performing GPU warmup, initializing the readiness probe,
+    ApplicationContext, running FAISS CPU health checks, initializing the readiness probe,
     and optionally pre-loading FAISS, XTR, and hybrid search runtimes. It stores
     the context and readiness probe in the FastAPI app.state for access by request
     handlers. This function is called once during application startup from the
@@ -352,7 +297,7 @@ async def _initialize_context(
 
     Notes
     -----
-    Time complexity depends on runtime pre-loading configuration. GPU warmup and
+    Time complexity depends on runtime pre-loading configuration. The FAISS health check and
     optional pre-loading operations may take several seconds. The function performs
     I/O operations (filesystem access, network requests for readiness checks) and
     may allocate GPU resources. Thread-safe if called from a single async context
@@ -378,15 +323,13 @@ async def _initialize_context(
         else:  # pragma: no cover - defensive
             raise
     app.state.context = context
-    warmup_status = warmup_gpu()
-    _log_gpu_warmup(warmup_status)
+    check_faiss_health()
     readiness = ReadinessProbe(context)
     await readiness.initialize()
     app.state.readiness = readiness
     await _preload_faiss_if_configured(context)
     _preload_xtr_if_configured(context)
     _preload_hybrid_if_configured(context)
-    LOGGER.info("Application initialization complete")
     return context, readiness
 
 
@@ -395,7 +338,6 @@ async def _shutdown_context(
     readiness: ReadinessProbe | None,
 ) -> None:
     """Shut down mutable runtimes and readiness probes."""
-    LOGGER.info("Starting application shutdown")
     if context is not None:
         with suppress(Exception):
             context.close_all_runtimes()
@@ -403,13 +345,12 @@ async def _shutdown_context(
             try:
                 await context.scope_store.close()
             except (RuntimeError, OSError, ValueError):
-                LOGGER.warning("Scope store shutdown failed", exc_info=True)
+                pass
     if readiness is not None:
         try:
             await readiness.shutdown()
         except (RuntimeError, OSError, ValueError):
-            LOGGER.warning("Readiness shutdown failed", exc_info=True)
-    LOGGER.info("Application shutdown complete")
+            pass
 
 
 @asynccontextmanager
@@ -432,13 +373,6 @@ async def lifespan(
     None
         Control to the FastAPI application after successful initialization.
 
-    Raises
-    ------
-    ConfigurationError
-        If configuration is invalid or required resources are missing.
-        FastAPI will fail to start, preventing broken deployment. The exception
-        includes RFC 9457 Problem Details with context fields for debugging.
-
     Notes
     -----
     Startup sequence:
@@ -455,7 +389,6 @@ async def lifespan(
     2. Clear readiness state
     3. Explicitly close any open resources
     """
-    LOGGER.info("Starting application initialization")
     context: ApplicationContext | None = None
     readiness: ReadinessProbe | None = None
 
@@ -475,24 +408,16 @@ async def lifespan(
                 signum: int, frame: FrameType | None
             ) -> None:  # pragma: no cover - signal path
                 _ = (signum, frame)
-                LOGGER.info("SIGHUP received - reloading index-backed runtimes")
                 try:
                     if context is None:
-                        LOGGER.warning("SIGHUP received before context initialization")
                         return
                     context.reload_indices()
                 except (RuntimeError, OSError, ValueError):
-                    LOGGER.warning("signal.hup.reload_failed", exc_info=True)
+                    pass
 
             signal.signal(signal.SIGHUP, _handle_hup)
             hup_handler_installed = True
         yield
-    except ConfigurationError as exc:
-        LOGGER.exception(
-            "Application startup failed due to configuration error",
-            extra={"error_code": exc.code.value, "context": exc.context},
-        )
-        raise
     finally:
         if (
             hup_handler_installed
@@ -580,12 +505,6 @@ async def set_mcp_context(
     -------
     Response
         Response from the next handler.
-
-    Raises
-    ------
-    Exception
-        Propagated from `call_next()` if the downstream handler raises any
-        exception.
 
     Notes
     -----
@@ -771,9 +690,6 @@ async def _stream_with_logging(
     asyncio.CancelledError
         Re-raised if the source iterator is cancelled, after logging cancellation.
     """
-    LOGGER.info(
-        "stream.lifecycle", extra=_stream_log_extra(request, stream_name=stream_name, stage="open")
-    )
     try:
         async for chunk in source:
             if isinstance(chunk, (bytes, bytearray)):
@@ -782,27 +698,9 @@ async def _stream_with_logging(
                 byte_count = len(chunk.encode("utf-8"))
             else:  # pragma: no cover - defensive path
                 byte_count = 0
-            LOGGER.info(
-                "stream.lifecycle",
-                extra=_stream_log_extra(
-                    request,
-                    stream_name=stream_name,
-                    stage="flush",
-                    chunk_bytes=byte_count,
-                ),
-            )
             yield chunk
     except asyncio.CancelledError:
-        LOGGER.info(
-            "stream.lifecycle",
-            extra=_stream_log_extra(request, stream_name=stream_name, stage="cancelled"),
-        )
         raise
-    finally:
-        LOGGER.info(
-            "stream.lifecycle",
-            extra=_stream_log_extra(request, stream_name=stream_name, stage="closed"),
-        )
 
 
 @app.get("/sse")
@@ -909,16 +807,6 @@ def unhandled_exception_handler(request: Request, exc: Exception) -> JSONRespons
     """
     request_id = getattr(request.state, "request_id", None)
     stacktrace = "".join(traceback.format_exception(exc.__class__, exc, exc.__traceback__))
-    LOGGER.error(
-        "http.unhandled_exception",
-        extra={
-            "request_id": request_id,
-            "path": request.url.path,
-            "method": request.method,
-            "client_addr": _client_address(request),
-            "stacktrace": stacktrace,
-        },
-    )
     payload: dict[str, object] = {
         "ok": False,
         "error": {"type": exc.__class__.__name__, "message": str(exc)},

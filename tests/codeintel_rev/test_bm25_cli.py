@@ -16,7 +16,11 @@ from codeintel_rev.io.bm25_manager import (
 from tools import Paths
 from typer.testing import CliRunner
 
+from tests._helpers import assertions, constants
+
 runner = CliRunner()
+DOC_COUNT = constants.BATCH_SIZES.minimal
+THREAD_OVERRIDE = constants.BATCH_SIZES.medium
 
 
 class _StubBM25Manager:
@@ -41,12 +45,12 @@ class _StubBM25Manager:
         json_dir.mkdir(parents=True, exist_ok=True)
         metadata_path = json_dir / "metadata.json"
         metadata_path.write_text(
-            json.dumps({"doc_count": 2, "digest": "digest123"}),
+            json.dumps({"doc_count": DOC_COUNT, "digest": "digest123"}),
             encoding="utf-8",
         )
         self.last_corpus_metadata_path = metadata_path
         return BM25CorpusSummary(
-            doc_count=2,
+            doc_count=DOC_COUNT,
             output_dir=str(json_dir),
             digest="digest123",
             corpus_metadata_path=str(metadata_path),
@@ -57,15 +61,19 @@ class _StubBM25Manager:
         index_dir = self.tmp_path / "bm25_index"
         index_dir.mkdir(parents=True, exist_ok=True)
         metadata_path = index_dir / "metadata.json"
-        metadata_path.write_text(json.dumps({"doc_count": 2}), encoding="utf-8")
+        metadata_path.write_text(json.dumps({"doc_count": DOC_COUNT}), encoding="utf-8")
         self.last_index_metadata_path = metadata_path
         return BM25IndexMetadata(
-            doc_count=2,
+            doc_count=DOC_COUNT,
             built_at="2025-01-01T00:00:00Z",
             corpus_digest="digest123",
             corpus_source="corpus.jsonl",
             pyserini_version="stub",
-            threads=(options.threads if options and options.threads is not None else 2),
+            threads=(
+                options.threads
+                if options and options.threads is not None
+                else constants.BATCH_SIZES.minimal
+            ),
             index_dir=str(index_dir),
             index_size_bytes=128,
             generator="test",
@@ -97,11 +105,12 @@ def test_prepare_corpus_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> 
 
     result = runner.invoke(root_app, ["bm25", "prepare-corpus", str(source)])
 
-    assert result.exit_code == 0
-    assert "Prepared 2 documents" in result.stdout
-    assert stub.prepare_calls == [(source, None, True)]
-    assert stub.last_corpus_metadata_path is not None
-    assert stub.last_corpus_metadata_path.exists()
+    assertions.expect_equal(result.exit_code, 0)
+    assertions.expect_in("Prepared 2 documents", result.stdout)
+    assertions.expect_sequence_equal(stub.prepare_calls, [(source, None, True)])
+    assertions.expect_true(stub.last_corpus_metadata_path is not None)
+    if stub.last_corpus_metadata_path:
+        assertions.expect_true(stub.last_corpus_metadata_path.exists())
 
 
 def test_build_index_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -121,17 +130,18 @@ def test_build_index_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
             "--json-dir",
             str(json_dir),
             "--threads",
-            "4",
+            str(THREAD_OVERRIDE),
         ],
     )
 
-    assert result.exit_code == 0
-    assert "Built index" in result.stdout
-    assert stub.build_calls, "Expected build_index to be invoked"
+    assertions.expect_equal(result.exit_code, 0)
+    assertions.expect_in("Built index", result.stdout)
+    assertions.expect_true(bool(stub.build_calls))
 
     options = stub.build_calls[0]
-    assert isinstance(options, BM25BuildOptions)
-    assert options.json_dir == json_dir
-    assert options.threads == 4
-    assert stub.last_index_metadata_path is not None
-    assert stub.last_index_metadata_path.exists()
+    assertions.expect_true(isinstance(options, BM25BuildOptions))
+    assertions.expect_equal(options.json_dir, json_dir)
+    assertions.expect_equal(options.threads, THREAD_OVERRIDE)
+    assertions.expect_true(stub.last_index_metadata_path is not None)
+    if stub.last_index_metadata_path:
+        assertions.expect_true(stub.last_index_metadata_path.exists())

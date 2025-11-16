@@ -21,6 +21,8 @@ from codeintel_rev.io.splade_manager import (
 from tools import Paths
 from typer.testing import CliRunner
 
+from tests._helpers import assertions
+
 runner = CliRunner()
 
 
@@ -157,12 +159,12 @@ def test_export_onnx_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
         ],
     )
 
-    assert result.exit_code == 0
-    assert "Exported ONNX artifact" in result.stdout
-    assert stub.calls, "Expected export_onnx to be invoked"
+    assertions.expect_equal(result.exit_code, 0)
+    assertions.expect_in("Exported ONNX artifact", result.stdout)
+    assertions.expect_true(bool(stub.calls), reason="Expected export_onnx to be invoked")
     call = stub.calls[0]
-    assert call.model_id == "naver/splade-v3"
-    assert call.quantization_config == "avx512"
+    assertions.expect_equal(call.model_id, "naver/splade-v3")
+    assertions.expect_equal(call.quantization_config, "avx512")
 
 
 def test_encode_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -185,14 +187,14 @@ def test_encode_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         ],
     )
 
-    assert result.exit_code == 0
-    assert "Encoded corpus" in result.stdout
-    assert stub.calls, "Expected encode_corpus to be invoked"
+    assertions.expect_equal(result.exit_code, 0)
+    assertions.expect_in("Encoded corpus", result.stdout)
+    assertions.expect_true(bool(stub.calls), reason="Expected encode_corpus to be invoked")
     _, options = stub.calls[0]
-    assert options is not None
-    assert options.batch_size == 16
+    assertions.expect_true(options is not None, reason="options should not be None")
+    assertions.expect_equal(options.batch_size, 16)
     metadata_path = stub.tmp_path / "vectors" / "vectors_metadata.json"
-    assert metadata_path.exists()
+    assertions.expect_true(metadata_path.exists(), reason="metadata_path should exist")
 
 
 def test_build_index_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -219,15 +221,17 @@ def test_build_index_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
         ],
     )
 
-    assert result.exit_code == 0
-    assert "Built impact index" in result.stdout
-    assert stub.calls, "Expected build_index to be invoked"
+    assertions.expect_equal(result.exit_code, 0)
+    assertions.expect_in("Built impact index", result.stdout)
+    assertions.expect_true(bool(stub.calls), reason="Expected build_index to be invoked")
     options = stub.calls[0]
-    assert isinstance(options, SpladeBuildOptions)
-    assert options.vectors_dir == vectors_dir
-    assert options.threads == 12
-    assert options.max_clause_count == 8192
-    assert not options.overwrite
+    assertions.expect_true(
+        isinstance(options, SpladeBuildOptions), reason="options should be SpladeBuildOptions"
+    )
+    assertions.expect_equal(options.vectors_dir, vectors_dir)
+    assertions.expect_equal(options.threads, 12)
+    assertions.expect_equal(options.max_clause_count, 8192)
+    assertions.expect_false(options.overwrite, reason="overwrite should be False")
 
 
 def test_bench_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -250,12 +254,14 @@ def test_bench_cli(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         ],
     )
 
-    assert result.exit_code == 0
-    assert "Benchmark latency" in result.stdout
-    assert stub.benchmark_calls, "Expected benchmark_queries to be invoked"
+    assertions.expect_equal(result.exit_code, 0)
+    assertions.expect_in("Benchmark latency", result.stdout)
+    assertions.expect_true(
+        bool(stub.benchmark_calls), reason="Expected benchmark_queries to be invoked"
+    )
     queries, options = stub.benchmark_calls[0]
-    assert queries == ["solar incentives"]
-    assert options.measure_iterations == 5
-    assert options.warmup_iterations == 2
-    assert options.provider is None
-    assert options.onnx_file is None
+    assertions.expect_sequence_equal(queries, ["solar incentives"])
+    assertions.expect_equal(options.measure_iterations, 5)
+    assertions.expect_equal(options.warmup_iterations, 2)
+    assertions.expect_equal(options.provider, None)
+    assertions.expect_equal(options.onnx_file, None)

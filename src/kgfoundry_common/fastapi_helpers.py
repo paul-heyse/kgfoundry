@@ -95,8 +95,25 @@ def typed_dependency[**P, T](
     """
 
     async def _instrumented(*args: P.args, **kwargs: P.kwargs) -> T:
-        """Instrumented dependency wrapper with timeout enforcement."""
+        """Instrumented dependency wrapper with timeout enforcement.
 
+        Parameters
+        ----------
+        *args : P.args
+            Positional arguments passed to the wrapped dependency.
+        **kwargs : P.kwargs
+            Keyword arguments passed to the wrapped dependency.
+
+        Returns
+        -------
+        T
+            Return value from the wrapped dependency function.
+
+        Raises
+        ------
+        TimeoutError
+            If the dependency execution exceeds the configured timeout.
+        """
         try:
             return await _await_with_timeout(
                 dependency(*args, **kwargs),
@@ -184,8 +201,25 @@ def typed_middleware(
             request: StarletteRequest,
             call_next: Callable[[StarletteRequest], t.Awaitable[Response]],
         ) -> Response:
-            """Dispatch request through middleware with timeout enforcement."""
+            """Dispatch request through middleware with timeout enforcement.
 
+            Parameters
+            ----------
+            request : StarletteRequest
+                Incoming HTTP request.
+            call_next : Callable[[StarletteRequest], t.Awaitable[Response]]
+                Next middleware or route handler in the chain.
+
+            Returns
+            -------
+            Response
+                HTTP response from the next handler.
+
+            Raises
+            ------
+            TimeoutError
+                If the middleware execution exceeds the configured timeout.
+            """
             try:
                 return await _await_with_timeout(
                     self._delegate.dispatch(request, call_next),

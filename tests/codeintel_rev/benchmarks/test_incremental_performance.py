@@ -18,6 +18,7 @@ import numpy as np
 import pytest
 from codeintel_rev.io.faiss_manager import FAISSManager
 
+from tests._helpers import assertions, constants
 from tests.conftest import HAS_FAISS_SUPPORT
 
 # Use modern numpy random generator
@@ -56,7 +57,10 @@ def tmp_index_path(tmp_path: Path) -> Path:
 
 
 @pytest.mark.benchmark
-def test_incremental_update_speed(benchmark, tmp_index_path: Path) -> None:
+def test_incremental_update_speed(
+    benchmark: pytest.BenchmarkFixture,
+    tmp_index_path: Path,
+) -> None:
     """Benchmark incremental update speed for adding new chunks.
 
     Measures the time to add new vectors to a secondary index vs full rebuild.
@@ -98,15 +102,22 @@ def test_incremental_update_speed(benchmark, tmp_index_path: Path) -> None:
 
     # Verify incremental update completes quickly (<60s for 100 vectors)
     avg_time = result.stats.mean
-    assert avg_time < 60.0, f"Incremental update took {avg_time:.2f}s (target: <60s)"
-
-    print(f"\nIncremental update benchmark ({new_size} vectors):")
-    print(f"  Average time: {avg_time:.2f}s")
-    print("  Expected: <60s (orders of magnitude faster than full rebuild)")
+    assertions.expect_true(
+        avg_time < constants.TIMEOUTS.incremental_regression,
+        reason=(
+            f"Incremental update took {avg_time:.2f}s "
+            f"(target: <{constants.TIMEOUTS.incremental_regression}s)"
+        ),
+    )
+    benchmark.extra_info["incremental_avg_time"] = avg_time
+    benchmark.extra_info["incremental_vector_count"] = new_size
 
 
 @pytest.mark.benchmark
-def test_full_rebuild_vs_incremental(benchmark, tmp_index_path: Path) -> None:
+def test_full_rebuild_vs_incremental(
+    benchmark: pytest.BenchmarkFixture,
+    tmp_index_path: Path,
+) -> None:
     """Compare full rebuild time vs incremental update time.
 
     Demonstrates that incremental updates are much faster than rebuilding
@@ -158,20 +169,25 @@ def test_full_rebuild_vs_incremental(benchmark, tmp_index_path: Path) -> None:
     incremental_time = incremental_result.stats.mean
     speedup = rebuild_time / incremental_time if incremental_time > 0 else float("inf")
 
-    print(f"\nFull rebuild vs incremental update ({new_size} new vectors):")
-    print(f"  Full rebuild: {rebuild_time:.2f}s")
-    print(f"  Incremental: {incremental_time:.2f}s")
-    print(f"  Speedup: {speedup:.1f}x")
+    benchmark.extra_info["rebuild_time_seconds"] = rebuild_time
+    benchmark.extra_info["incremental_time_seconds"] = incremental_time
+    benchmark.extra_info["rebuild_speedup"] = speedup
 
     # Incremental should be faster (at least 2x, often much more)
-    assert incremental_time < rebuild_time, (
-        f"Incremental update ({incremental_time:.2f}s) should be faster than "
-        f"full rebuild ({rebuild_time:.2f}s)"
+    assertions.expect_true(
+        incremental_time < rebuild_time,
+        reason=(
+            f"Incremental update ({incremental_time:.2f}s) should be faster than full rebuild "
+            f"({rebuild_time:.2f}s)"
+        ),
     )
 
 
 @pytest.mark.benchmark
-def test_merge_indexes_performance(benchmark, tmp_index_path: Path) -> None:
+def test_merge_indexes_performance(
+    benchmark: pytest.BenchmarkFixture,
+    tmp_index_path: Path,
+) -> None:
     """Benchmark merge_indexes performance.
 
     Measures the time to merge secondary index into primary. This operation
@@ -216,13 +232,15 @@ def test_merge_indexes_performance(benchmark, tmp_index_path: Path) -> None:
     result = benchmark.pedantic(merge_indexes, rounds=3, iterations=1)
 
     avg_time = result.stats.mean
-    print(f"\nMerge indexes benchmark ({secondary_size} vectors):")
-    print(f"  Average time: {avg_time:.2f}s")
-    print("  Note: Merge is expensive but faster than full rebuild")
+    benchmark.extra_info["merge_avg_time_seconds"] = avg_time
+    benchmark.extra_info["merge_secondary_vectors"] = secondary_size
 
 
 @pytest.mark.benchmark
-def test_dual_index_search_performance(benchmark, tmp_index_path: Path) -> None:
+def test_dual_index_search_performance(
+    benchmark: pytest.BenchmarkFixture,
+    tmp_index_path: Path,
+) -> None:
     """Benchmark dual-index search performance.
 
     Measures search latency when both primary and secondary indexes exist.
@@ -265,6 +283,4 @@ def test_dual_index_search_performance(benchmark, tmp_index_path: Path) -> None:
     result = benchmark.pedantic(dual_index_search, rounds=10, iterations=1)
 
     avg_time = result.stats.mean
-    print("\nDual-index search benchmark:")
-    print(f"  Average latency: {avg_time * 1000:.2f}ms")
-    print("  Expected: Minimal overhead vs single-index search")
+    benchmark.extra_info["dual_index_latency_ms"] = avg_time * 1000

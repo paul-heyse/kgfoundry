@@ -1,9 +1,13 @@
+"""Tests for MCP tools contract compliance."""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
 
 from codeintel_rev.mcp_server.registry import McpDeps
 from codeintel_rev.mcp_server.testing import InProcessMCP
+
+from tests._helpers import assertions
 
 
 class _CatalogStub:
@@ -34,15 +38,19 @@ class _CatalogStub:
 
 
 def test_tools_list_contract() -> None:
+    """Verify tools_list returns expected tools with correct schemas."""
     harness = InProcessMCP(McpDeps(catalog=_CatalogStub()))
     tools = harness.tools_list()
     names = {tool["name"] for tool in tools}
-    assert {"search", "fetch"}.issubset(names)
-    assert tools[0]["inputSchema"]["type"] == "object"
-    assert tools[1]["inputSchema"]["properties"]["objectIds"]["type"] == "array"
+    assertions.expect_true(
+        {"search", "fetch"}.issubset(names), reason="should have search and fetch tools"
+    )
+    assertions.expect_equal(tools[0]["inputSchema"]["type"], "object")
+    assertions.expect_equal(tools[1]["inputSchema"]["properties"]["objectIds"]["type"], "array")
 
 
 def test_search_fetch_roundtrip() -> None:
+    """Verify search and fetch tools work together for round-trip retrieval."""
     catalog = _CatalogStub()
     harness = InProcessMCP(
         McpDeps(
@@ -52,10 +60,10 @@ def test_search_fetch_roundtrip() -> None:
     )
     search = harness.tools_call("search", {"query": "add numbers", "top_k": 2})
     results = search["structuredContent"]["results"]
-    assert len(results) == 2
+    assertions.expect_equal(len(results), 2)
     first_id = results[0]["id"]
     fetch = harness.tools_call("fetch", {"objectIds": [first_id], "max_tokens": 512})
     objects = fetch["structuredContent"]["objects"]
-    assert len(objects) == 1
-    assert objects[0]["id"] == first_id
-    assert "def" in objects[0]["content"]
+    assertions.expect_equal(len(objects), 1)
+    assertions.expect_equal(objects[0]["id"], first_id)
+    assertions.expect_in("def", objects[0]["content"])

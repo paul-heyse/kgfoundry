@@ -8,12 +8,9 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from codeintel_rev.typing import gate_import
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     from transformers import AutoModelForCausalLM, PreTrainedTokenizerBase
-
-LOGGER = get_logger(__name__)
 
 _PROMPT_TEMPLATE = """You rank code snippets for the given QUERY.
 Return ONLY a JSON list of chunk IDs ordered best-to-worst. Example: [12, 5, 9]
@@ -104,10 +101,8 @@ class CodeRankListwiseReranker:
         decoded = tokenizer.decode(output_ids[0], skip_special_tokens=True)
         ordered_ids = self._parse_rankings(decoded, {cid for cid, _ in candidates})
         if ordered_ids:
-            # Keep original IDs for any candidates missing from model output
             missing = [cid for cid, _ in candidates if cid not in ordered_ids]
             return ordered_ids + missing
-        LOGGER.warning("CodeRankLLM returned no JSON list; falling back to original order.")
         return [cid for cid, _ in candidates]
 
     def _ensure_model(self) -> tuple[PreTrainedTokenizerBase, AutoModelForCausalLM]:
@@ -133,10 +128,6 @@ class CodeRankListwiseReranker:
             model.eval()
             pair = (tokenizer, cast("AutoModelForCausalLM", model))
             self._CACHE[cache_key] = pair
-            LOGGER.info(
-                "Loaded CodeRankLLM",
-                extra={"model_id": self.model_id, "device": self.device},
-            )
             return pair
 
     @staticmethod
@@ -158,7 +149,6 @@ class CodeRankListwiseReranker:
         try:
             parsed = json.loads(json_payload)
         except json.JSONDecodeError:
-            LOGGER.warning("Failed to parse CodeRankLLM JSON output.", extra={"output": snippet})
             return []
         if not isinstance(parsed, list):
             return []

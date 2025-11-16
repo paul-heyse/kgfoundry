@@ -1,14 +1,13 @@
-"""FAISS manager for GPU-accelerated vector search.
+"""FAISS manager for CPU vector search.
 
-Manages adaptive FAISS indexes (Flat, IVFFlat, or IVF-PQ) with cuVS acceleration,
-CPU persistence, and GPU cloning. Index type is automatically selected based on
+Manages adaptive FAISS indexes (Flat, IVFFlat, or IVF-PQ) with CPU persistence.
+Index type is automatically selected based on
 corpus size for optimal performance.
 """
 
 from __future__ import annotations
 
 # ruff: noqa: SLF001
-import importlib
 import json
 import math
 from collections.abc import Callable, Mapping, Sequence
@@ -143,22 +142,6 @@ def _faiss_module() -> ModuleType:
         Cached FAISS module instance.
     """
     return _FAISS_PROXY.module()
-
-
-def _has_faiss_gpu_support() -> bool:
-    """Return ``True`` when FAISS exposes GPU bindings, otherwise ``False``.
-
-    Returns
-    -------
-    bool
-        ``True`` when GPU capabilities are available, otherwise ``False``.
-    """
-    try:
-        module = _faiss_module()
-    except ImportError:
-        return False
-    required_attrs = ("StandardGpuResources", "GpuClonerOptions", "index_cpu_to_gpu")
-    return all(hasattr(module, attr) for attr in required_attrs)
 
 
 def apply_parameters(index: FaissIndex, param_str: str) -> None:
@@ -416,7 +399,7 @@ class FAISSRuntimeOptions:
     hnsw_ef_construction: int = 200
     hnsw_ef_search: int = 128
     refine_k_factor: float = 2.0
-    use_gpu: bool = True
+    use_gpu: bool = False
     gpu_clone_mode: str = "replicate"
     autotune_on_start: bool = False
     enable_range_search: bool = False
@@ -662,7 +645,7 @@ class _FAISSIdMapMixin:
 class FAISSManager(
     _FAISSIdMapMixin
 ):  # lint-ignore[PLR0904]: manager orchestrates multiple subsystems
-    """FAISS index manager with adaptive indexing, GPU support, and incremental updates.
+    """FAISS index manager with adaptive indexing and incremental updates.
 
     Uses a dual-index architecture for fast incremental updates.
 
@@ -709,11 +692,11 @@ class FAISSManager(
         calculation yields smaller value). For adaptive indexing, this parameter
         is typically overridden by dynamic nlist calculation.
     use_cuvs : bool
-        Enable cuVS acceleration.
+        Deprecated flag retained for compatibility. Ignored in CPU-only builds.
     runtime : FAISSRuntimeOptions | None, optional
-        Runtime configuration overrides for FAISS index behavior, including
-        GPU settings, quantization parameters, and search tuning. If None,
-        uses default options from `FAISSRuntimeOptions()`.
+        Runtime configuration overrides for FAISS index behavior. GPU-related
+        options are ignored; only CPU parameters (nprobe, PQ shape, etc.) are
+        applied. If None, uses default options from ``FAISSRuntimeOptions()``.
     """
 
     def __init__(
@@ -740,7 +723,11 @@ class FAISSManager(
         self.hnsw_ef_construction = opts.hnsw_ef_construction
         self.hnsw_ef_search = opts.hnsw_ef_search
         self.refine_k_factor = opts.refine_k_factor
-        self.use_gpu = opts.use_gpu
+        if opts.use_gpu:
+            LOGGER.debug("Ignoring deprecated use_gpu option; CPU-only mode active")
+        if use_cuvs:
+            LOGGER.debug("Ignoring deprecated use_cuvs option; CPU-only mode active")
+        self.use_gpu = False
         self.gpu_clone_mode = opts.gpu_clone_mode
         self.autotune_on_start = opts.autotune_on_start
         self.enable_range_search = opts.enable_range_search
@@ -858,7 +845,6 @@ class FAISSManager(
             extra=_log_extra(
                 n_vectors=n_vectors,
                 cpu_index_bytes=mem_est["cpu_index_bytes"],
-                gpu_index_bytes=mem_est["gpu_index_bytes"],
                 total_bytes=mem_est["total_bytes"],
             ),
         )
@@ -877,9 +863,9 @@ class FAISSManager(
     def estimate_memory_usage(self, n_vectors: int) -> dict[str, int]:
         """Estimate memory usage in bytes for a given number of vectors.
 
-        Provides memory estimates for CPU and GPU indexes based on the adaptive
-        index type that would be selected for the given corpus size. This is useful
-        for capacity planning and resource allocation.
+        Provides memory estimates for CPU indexes based on the adaptive index
+        type that would be selected for the given corpus size. This is useful for
+        capacity planning and resource allocation.
 
         Parameters
         ----------
@@ -891,8 +877,7 @@ class FAISSManager(
         dict[str, int]
             Dictionary with memory estimates in bytes:
             - ``cpu_index_bytes``: Estimated CPU index memory usage
-            - ``gpu_index_bytes``: Estimated GPU index memory usage (includes ~20% overhead)
-            - ``total_bytes``: Total estimated memory (CPU + GPU)
+            - ``total_bytes``: Total estimated memory (CPU)
 
         Examples
         --------
@@ -908,7 +893,6 @@ class FAISSManager(
         Memory estimates are approximate and may vary based on:
         - Actual index type selected (flat vs IVFFlat vs IVF-PQ)
         - FAISS internal overhead
-        - GPU memory fragmentation
         - Operating system memory management
 
         Estimates are typically within ±20% of actual usage for most workloads.
@@ -929,13 +913,9 @@ class FAISSManager(
             nlist = max(nlist, 1024)
             cpu_mem = (nlist * vec_size) + (n_vectors * 64)  # 64 bytes per vector for PQ
 
-        # GPU has ~20% overhead for memory management and buffers
-        gpu_mem = int(cpu_mem * 1.2)
-
         return {
             "cpu_index_bytes": cpu_mem,
-            "gpu_index_bytes": gpu_mem,
-            "total_bytes": cpu_mem + gpu_mem,
+            "total_bytes": cpu_mem,
         }
 
     def add_vectors(self, vectors: NDArrayF32, ids: NDArrayI64) -> None:
@@ -1286,8 +1266,8 @@ class FAISSManager(
         index can be loaded later with load_cpu_index() to avoid rebuilding.
         The parent directory is created if it doesn't exist.
 
-        The saved index includes all vectors and IDs that have been added. This
-        is the CPU version - GPU indexes are cloned on-demand and not persisted.
+        The saved index includes all vectors and IDs that have been added. Only
+        CPU indexes are persisted; GPU acceleration is no longer supported.
 
         Raises
         ------
@@ -1316,8 +1296,7 @@ class FAISSManager(
         faster for large indexes. Optionally exports the ID map and writes tuning
         profile files for debugging and performance analysis.
 
-        After loading, you can call clone_to_gpu() to create a GPU version for
-        faster search, or use search() directly with the CPU index.
+        After loading, the manager is ready for CPU-based search immediately.
 
         Parameters
         ----------
@@ -1447,95 +1426,29 @@ class FAISSManager(
         )
 
     def clone_to_gpu(self, device: int = 0) -> bool:
-        """Clone CPU index to GPU for accelerated search.
+        """Return False; GPU acceleration is deprecated and disabled.
 
-        Creates a GPU-resident copy of the CPU index for faster search operations.
-        The GPU index uses the same structure (IVF-PQ) but runs on GPU hardware
-        for 10-100x speedup on large indexes.
-
-        If cuVS acceleration is enabled (use_cuvs=True), the function attempts to
-        use optimized cuVS kernels. If cuVS is unavailable, it falls back to
-        standard FAISS GPU operations.
-
-        The GPU index is kept in memory alongside the CPU index. Both can be
-        used for search, but GPU is preferred when available.
+        GPU acceleration was removed from the manager; this method now logs that
+        the build is CPU-only and always returns ``False``.
 
         Parameters
         ----------
         device : int, optional
-            CUDA device ID to use (default: 0). Use device 0 for single-GPU systems.
-            For multi-GPU, specify the device ID (0, 1, 2, etc.).
+            Deprecated CUDA device identifier; retained for compatibility.
 
         Returns
         -------
         bool
-            ``True`` when GPU acceleration is available. ``False`` when GPU
-            initialization fails and the manager falls back to the CPU index.
-
-        Raises
-        ------
-        RuntimeError
-            If the CPU index has not been loaded yet. Call load_cpu_index() or
-            build_index() first.
+            Always ``False``. GPU acceleration is no longer available.
         """
-        if not self.use_gpu:
-            self.gpu_disabled_reason = "GPU usage disabled by configuration"
-            LOGGER.info(
-                "Skipping GPU clone; disabled via configuration",
-                extra=_log_extra(device=device, reason=self.gpu_disabled_reason),
-            )
-            return False
-
-        try:
-            cpu_index = self._require_cpu_index()
-        except RuntimeError as exc:
-            msg = "Cannot clone index to GPU before building or loading it."
-            raise RuntimeError(msg) from exc
-
-        self.gpu_disabled_reason = None
-
-        if not _has_faiss_gpu_support():
-            self.gpu_disabled_reason = "FAISS GPU symbols unavailable - running in CPU mode"
-            LOGGER.info(
-                "Skipping GPU clone; FAISS GPU symbols unavailable",
-                extra=_log_extra(reason=self.gpu_disabled_reason, device=device),
-            )
-            return False
-
-        try:
-            # Initialize GPU resources
-            self.gpu_resources = faiss.StandardGpuResources()
-
-            # Configure cloner options
-            co = faiss.GpuClonerOptions()
-            co.useFloat16 = False
-
-            # Try with cuVS if enabled
-            co.use_cuvs = False
-            if self.use_cuvs:
-                try:
-                    self._try_load_cuvs()
-                except (ImportError, RuntimeError, AttributeError) as exc:
-                    LOGGER.warning(
-                        "cuVS acceleration unavailable",
-                        extra=_log_extra(reason=str(exc)),
-                    )
-                else:
-                    co.use_cuvs = True
-
-            self.gpu_index = faiss.index_cpu_to_gpu(self.gpu_resources, device, cpu_index, co)
-        except (RuntimeError, ValueError, OSError, AttributeError) as exc:
-            self.gpu_resources = None
-            self.gpu_index = None
-            self.gpu_disabled_reason = f"FAISS GPU disabled - using CPU: {exc}"
-            LOGGER.warning(
-                "FAISS GPU initialization failed; continuing with CPU index",
-                extra=_log_extra(reason=str(exc), device=device),
-                exc_info=True,
-            )
-            return False
-
-        return True
+        self.gpu_disabled_reason = "GPU acceleration removed"
+        self.gpu_resources = None
+        self.gpu_index = None
+        LOGGER.info(
+            "Skipping GPU clone; CPU-only configuration in effect",
+            extra=_log_extra(device=device, reason=self.gpu_disabled_reason),
+        )
+        return False
 
     def search(
         self,
@@ -1553,10 +1466,9 @@ class FAISSManager(
         the primary and secondary indexes, then merges results by score to return
         the top-k most similar vectors overall.
 
-        The function automatically uses the GPU index if available (faster),
-        otherwise falls back to CPU. The nprobe parameter controls the trade-off
-        between search speed and recall - higher values search more cells and
-        improve recall but slow down search.
+        The nprobe parameter controls the trade-off between search speed and
+        recall—higher values search more cells and improve recall but slow down
+        search.
 
         Parameters
         ----------
@@ -1594,9 +1506,9 @@ class FAISSManager(
         Raises
         ------
         VectorSearchError
-            If the FAISS search fails on CPU or GPU (e.g., index unavailable,
-            GPU failure, invalid parameters). The error contains context about
-            the index path and GPU usage for observability.
+            If the FAISS search fails (e.g., index unavailable or invalid parameters).
+            The error contains context about the index path and runtime settings
+            for observability.
 
         Notes
         -----
@@ -1778,7 +1690,7 @@ class FAISSManager(
         -------
         _SearchPlan
             Search plan containing normalized queries, effective k, search_k (with
-            k_factor applied), and execution parameters (nprobe, ef_search, GPU flag).
+            k_factor applied), and execution parameters (nprobe, ef_search, legacy flags).
             The plan is ready for use in FAISS search execution.
 
         Notes
@@ -1922,7 +1834,8 @@ class FAISSManager(
             Typically larger than final k to improve recall after merging.
         params : _SearchExecutionParams
             Runtime parameters describing IVF/HNSW traversal (nprobe, ef_search,
-            quantizer efSearch) and whether GPU search is used.
+            quantizer efSearch). The legacy GPU flag is retained for compatibility
+            but always ``False``.
 
         Returns
         -------
@@ -2352,35 +2265,6 @@ class FAISSManager(
                 raise RuntimeError(msg) from exc
 
         return vectors, ids
-
-    @staticmethod
-    def _try_load_cuvs() -> None:
-        """Load cuVS acceleration library if available.
-
-        Raises
-        ------
-        ImportError
-            If the optional pylibcuvs package is not installed.
-        RuntimeError
-            If the cuVS shared library cannot be loaded.
-        """
-        try:
-            pylibcuvs = importlib.import_module("pylibcuvs")
-        except ImportError as exc:  # pragma: no cover - optional dependency
-            msg = "pylibcuvs is required for cuVS acceleration"
-            raise ImportError(msg) from exc
-
-        try:
-            load_library = pylibcuvs.load_library
-        except AttributeError as exc:  # pragma: no cover - unexpected signature
-            msg = "pylibcuvs does not expose load_library()"
-            raise RuntimeError(msg) from exc
-
-        try:
-            load_library()
-        except OSError as exc:  # pragma: no cover - shared object load failures
-            msg = "Failed to load cuVS shared libraries"
-            raise RuntimeError(msg) from exc
 
     def _require_cpu_index(self) -> _faiss.Index:
         """Return the CPU index if initialized.
@@ -3436,20 +3320,18 @@ class FAISSManager(
             return index
 
     def _active_index(self) -> _faiss.Index:
-        """Return the best available search index.
+        """Return the active CPU search index.
 
         Returns
         -------
         _faiss.Index
-            GPU-backed index when available, otherwise the CPU index.
+            The CPU index ready for search.
 
         Raises
         ------
         RuntimeError
-            If neither CPU nor GPU indexes are available.
+            If the CPU index has not been built or loaded.
         """
-        if self.gpu_index is not None:
-            return self.gpu_index
         if self.cpu_index is not None:
             return self.cpu_index
         msg = "No index available"

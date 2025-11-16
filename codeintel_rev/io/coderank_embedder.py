@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any, ClassVar, Protocol, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.typing import NDArrayF32, gate_import
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     import numpy as np
@@ -50,9 +49,6 @@ class SupportsCodeRankSettings(Protocol):
     def batch_size(self) -> int:
         """Batch size used when encoding queries."""
         ...
-
-
-LOGGER = get_logger(__name__)
 
 
 class CodeRankEmbedder:
@@ -168,9 +164,5 @@ class CodeRankEmbedder:
                 device=self.device,
             )
             model = cast("SentenceTransformer", model_instance)
-            LOGGER.info(
-                "Loaded CodeRank model",
-                extra={"model_id": self.model_id, "device": self.device},
-            )
             self._MODEL_CACHE[cache_key] = model
             return model

@@ -8,6 +8,8 @@ import pytest
 from codeintel_rev.config.settings import VLLMConfig, VLLMRunMode
 from codeintel_rev.io.vllm_client import VLLMClient
 
+from tests._helpers import assertions
+
 
 def test_embed_batch_empty_uses_configured_dimension() -> None:
     """Empty batches should produce arrays with the configured embedding width."""
@@ -23,8 +25,8 @@ def test_embed_batch_empty_uses_configured_dimension() -> None:
             result = client.embed_batch([])
         finally:
             client.close()
-        assert result.shape == (0, config.embedding_dim)
-        assert result.dtype == np.float32
+        assertions.expect_equal(result.shape, (0, config.embedding_dim))
+        assertions.expect_equal(result.dtype, np.float32)
         mock_post.assert_not_called()
 
 
@@ -45,8 +47,8 @@ def test_embed_chunks_empty_uses_configured_dimension(
 
         result = client.embed_chunks([], batch_size=4)
 
-        assert result.shape == (0, config.embedding_dim)
-        assert result.dtype == np.float32
+        assertions.expect_equal(result.shape, (0, config.embedding_dim))
+        assertions.expect_equal(result.dtype, np.float32)
         mock_embed_batch.assert_not_called()
     finally:
         client.close()
@@ -71,8 +73,8 @@ async def test_embed_batch_async_empty_uses_configured_dimension(
     finally:
         client.close()
 
-    assert result.shape == (0, config.embedding_dim)
-    assert result.dtype == np.float32
+    assertions.expect_equal(result.shape, (0, config.embedding_dim))
+    assertions.expect_equal(result.dtype, np.float32)
     async_client_mock.assert_not_called()
 
 

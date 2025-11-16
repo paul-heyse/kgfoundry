@@ -491,7 +491,6 @@ known-first-party = [
     "registry",
     "search_api",
     "search_client",
-    "vectorstore_faiss",
 ]
 
 [tool.ruff.lint.flake8-tidy-imports]

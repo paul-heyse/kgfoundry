@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from http import HTTPStatus
 
 import httpx
 import pytest
@@ -8,6 +9,8 @@ from codeintel_rev.app import main as app_main
 from codeintel_rev.app.capabilities import Capabilities
 from fastapi import FastAPI
 from starlette.routing import Mount
+
+from tests._helpers import assertions
 
 
 @pytest.mark.asyncio
@@ -21,11 +24,13 @@ async def test_readyz_reports_all_checks(networking_test_app: FastAPI) -> None:
             timeout=httpx.Timeout(5.0),
         ) as client:
             response = await client.get("/readyz")
-            assert response.status_code == 200
+            assertions.expect_equal(response.status_code, HTTPStatus.OK)
             payload = response.json()
-            assert payload["ready"] is True
-            assert "faiss" in payload["checks"]
-            assert payload["checks"]["faiss"]["healthy"] is True
+            assertions.expect_true(payload["ready"], reason="readyz should report ready")
+            assertions.expect_in("faiss", payload["checks"])
+            assertions.expect_true(
+                payload["checks"]["faiss"]["healthy"], reason="faiss check should be healthy"
+            )
     finally:
         await transport.aclose()
 
@@ -43,17 +48,24 @@ async def test_capz_refreshes_capability_snapshot(
             timeout=httpx.Timeout(5.0),
         ) as client:
             baseline = await client.get("/capz")
-            assert baseline.status_code == 200
+            assertions.expect_equal(baseline.status_code, HTTPStatus.OK)
             body = baseline.json()
-            assert body["faiss_index_present"] is True
+            assertions.expect_true(
+                body["faiss_index_present"], reason="baseline should show faiss index present"
+            )
             stamp = body["stamp"]
 
             refreshed = await client.get("/capz", params={"refresh": "true"})
-            assert refreshed.status_code == 200
+            assertions.expect_equal(refreshed.status_code, HTTPStatus.OK)
             refreshed_body = refreshed.json()
-            assert refreshed_body["faiss_index_present"] is False
-            assert refreshed_body["versions_available"] == 2
-            assert refreshed_body["stamp"] != stamp
+            assertions.expect_false(
+                refreshed_body["faiss_index_present"],
+                reason="refreshed should show faiss index absent",
+            )
+            assertions.expect_equal(refreshed_body["versions_available"], 2)
+            assertions.expect_true(
+                refreshed_body["stamp"] != stamp, reason="stamp should change after refresh"
+            )
     finally:
         await transport.aclose()
 
@@ -99,4 +111,7 @@ async def test_main_mounts_mcp_sub_application(monkeypatch: pytest.MonkeyPatch) 
 
     async with app_main.app.router.lifespan_context(app_main.app):
         mounts = [route for route in app_main.app.router.routes if isinstance(route, Mount)]
-        assert any(mount.path == "/mcp" for mount in mounts)
+        assertions.expect_true(
+            any(mount.path == "/mcp" for mount in mounts),
+            reason="should mount MCP sub-application under /mcp",
+        )

@@ -7,7 +7,7 @@ Examples
 --------
 >>> from kgfoundry_common.sequence_guards import first_or_error
 >>> devices = (0, 1, 2)
->>> device = first_or_error(devices, context="gpu_device_selection")
+>>> device = first_or_error(devices, context="device_selection")
 >>> device
 0
 
@@ -15,7 +15,7 @@ When sequence is empty, raises a Problem Details error:
 
 >>> from kgfoundry_common.sequence_guards import first_or_error
 >>> try:
-...     first_or_error((), context="gpu_device_selection")
+...     first_or_error((), context="device_selection")
 ... except Exception as e:
 ...     assert "empty" in str(e).lower()
 """
@@ -64,7 +64,7 @@ def first_or_error[T](
         The sequence from which to extract the first element.
     context : str
         Human-readable description of why the sequence was accessed
-        (e.g., "gpu_device_selection", "parameter_extraction").
+        (e.g., "device_selection", "parameter_extraction").
     operation : str, optional
         Name of the operation being performed. Defaults to "sequence_access".
 
@@ -81,13 +81,13 @@ def first_or_error[T](
     Examples
     --------
     >>> devices = [0, 1]
-    >>> device = first_or_error(devices, context="gpu_devices")
+    >>> device = first_or_error(devices, context="faiss_devices")
     >>> device
     0
 
     >>> empty = []
     >>> try:
-    ...     first_or_error(empty, context="gpu_devices")
+    ...     first_or_error(empty, context="faiss_devices")
     ... except Exception as e:
     ...     assert "empty" in str(e).lower()
     """
@@ -127,7 +127,7 @@ def first_or_error_multi_device[T](
 ) -> T:
     """Access first element for multi-device scenarios.
 
-    Specialized variant for FAISS multi-device GPU cloning that provides
+    Specialized variant for FAISS multi-shard routing that provides
     domain-specific error messages and metrics.
 
     Parameters
@@ -151,16 +151,16 @@ def first_or_error_multi_device[T](
 
     Examples
     --------
-    >>> gpu_indices = [<FaissIndex>]  # doctest: +SKIP
-    >>> index = first_or_error_multi_device(gpu_indices, context="gpu_indices")  # doctest: +SKIP
+    >>> shard_indices = [object()]  # doctest: +SKIP
+    >>> index = first_or_error_multi_device(shard_indices, context="faiss_shards")  # doctest: +SKIP
     >>> index  # doctest: +SKIP
     <FaissIndex object at ...>
     """
     if len(sequence) == 0:
-        msg = f"FAISS GPU cloning failed: {context} is empty (no devices available)"
+        msg = f"FAISS device routing failed: {context} is empty (no shards available)"
         problem = build_problem_details(
             problem_type="https://kgfoundry.dev/problems/faiss-multi-device-empty",
-            title="Multi-device GPU cloning failed",
+            title="Multi-device routing failed",
             status=503,
             detail=msg,
             instance=f"urn:operation:{operation}:{context}",
@@ -169,7 +169,7 @@ def first_or_error_multi_device[T](
                 "operation": operation,
                 "device_count": 0,
                 "remediation": (
-                    "Ensure GPU resources are available and FAISS is compiled with GPU support"
+                    "Ensure FAISS shards are provisioned and configuration includes at least one shard"
                 ),
             },
         )

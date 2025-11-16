@@ -9,6 +9,8 @@ from codeintel_rev.evaluation.scip_coverage import SCIPCoverageEvaluator
 from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.symbol_catalog import SymbolCatalog, SymbolDefRow
 
+from tests._helpers import assertions
+
 
 class _StubFAISSManager:
     def search(
@@ -28,7 +30,7 @@ class _StubFAISSManager:
 
 class _StubVLLMClient:
     def embed_single(self, text: str) -> list[float]:
-        assert text
+        assertions.expect_true(bool(text), reason="text should be non-empty")
         return [0.0, 0.0]
 
 
@@ -82,6 +84,6 @@ def test_scip_coverage_reports_full_metrics(tmp_path: Path) -> None:
         vllm_client=_StubVLLMClient(),
     )
     summary = evaluator.run(k=5)
-    assert summary["chunk_coverage"] == 1.0
-    assert summary["index_coverage"] == 1.0
-    assert summary["retrieval_coverage"] == 1.0
+    assertions.expect_equal(summary["chunk_coverage"], 1.0)
+    assertions.expect_equal(summary["index_coverage"], 1.0)
+    assertions.expect_equal(summary["retrieval_coverage"], 1.0)

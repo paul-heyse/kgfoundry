@@ -8,6 +8,8 @@ import duckdb
 import numpy as np
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 
+from tests._helpers import assertions
+
 
 def _safe_sql_path(path: Path, base_path: Path) -> str:
     """Safely construct SQL path literal for DuckDB read_parquet().
@@ -115,9 +117,9 @@ def test_query_by_uri_supports_unlimited_results(tmp_path) -> None:
 
     catalog.close()
 
-    assert [row["id"] for row in limited] == [1]
-    assert [row["id"] for row in unlimited_zero] == [1, 2]
-    assert unlimited_zero == unlimited_negative
+    assertions.expect_sequence_equal([row["id"] for row in limited], [1])
+    assertions.expect_sequence_equal([row["id"] for row in unlimited_zero], [1, 2])
+    assertions.expect_equal(unlimited_zero, unlimited_negative)
 
 
 def test_get_embeddings_by_ids_skips_null_embeddings(tmp_path: Path) -> None:
@@ -139,9 +141,11 @@ def test_get_embeddings_by_ids_skips_null_embeddings(tmp_path: Path) -> None:
         )
 
     ids, results = catalog.get_embeddings_by_ids([1, 2])
-    assert ids == [1]
-    assert results.shape == (1, 2)
-    assert np.allclose(results[0], [0.1, 0.2])
+    assertions.expect_sequence_equal(ids, [1])
+    assertions.expect_equal(results.shape, (1, 2))
+    assertions.expect_true(
+        np.allclose(results[0], [0.1, 0.2]), reason="embedding should match expected values"
+    )
 
 
 def test_query_by_filters_handles_literal_percent(tmp_path: Path) -> None:
@@ -169,8 +173,8 @@ def test_query_by_filters_handles_literal_percent(tmp_path: Path) -> None:
         )
 
     results = catalog.query_by_filters([1], include_globs=["src/config%file.py"])
-    assert len(results) == 1
-    assert results[0]["uri"] == "src/config%file.py"
+    assertions.expect_equal(len(results), 1)
+    assertions.expect_equal(results[0]["uri"], "src/config%file.py")
 
 
 def test_query_by_filters_handles_literal_underscore(tmp_path: Path) -> None:
@@ -198,8 +202,8 @@ def test_query_by_filters_handles_literal_underscore(tmp_path: Path) -> None:
         )
 
     results = catalog.query_by_filters([1], include_globs=["src/config_file.py"])
-    assert len(results) == 1
-    assert results[0]["uri"] == "src/config_file.py"
+    assertions.expect_equal(len(results), 1)
+    assertions.expect_equal(results[0]["uri"], "src/config_file.py")
 
 
 def test_open_materialize_creates_table_and_index(tmp_path: Path) -> None:
@@ -210,10 +214,14 @@ def test_open_materialize_creates_table_and_index(tmp_path: Path) -> None:
 
     catalog_path = tmp_path / "catalog.duckdb"
     with DuckDBCatalog(catalog_path, vectors_dir, materialize=True) as catalog:
-        assert catalog.count_chunks() == 3
+        assertions.expect_equal(catalog.count_chunks(), 3)
 
-    assert _table_exists(catalog_path, "chunks_materialized") is True
-    assert _index_exists(catalog_path, "idx_chunks_materialized_uri") is True
+    assertions.expect_true(
+        _table_exists(catalog_path, "chunks_materialized"), reason="table should exist"
+    )
+    assertions.expect_true(
+        _index_exists(catalog_path, "idx_chunks_materialized_uri"), reason="index should exist"
+    )
 
     connection = duckdb.connect(str(catalog_path))
     try:
@@ -222,7 +230,7 @@ def test_open_materialize_creates_table_and_index(tmp_path: Path) -> None:
         connection.close()
 
     row_count = row[0] if row else 0
-    assert row_count == 3
+    assertions.expect_equal(row_count, 3)
 
 
 def test_materialize_creates_empty_table_when_parquet_missing(tmp_path: Path) -> None:
@@ -231,7 +239,11 @@ def test_materialize_creates_empty_table_when_parquet_missing(tmp_path: Path) ->
 
     catalog_path = tmp_path / "catalog.duckdb"
     with DuckDBCatalog(catalog_path, vectors_dir, materialize=True) as catalog:
-        assert catalog.count_chunks() == 0
+        assertions.expect_equal(catalog.count_chunks(), 0)
 
-    assert _table_exists(catalog_path, "chunks_materialized") is True
-    assert _index_exists(catalog_path, "idx_chunks_materialized_uri") is True
+    assertions.expect_true(
+        _table_exists(catalog_path, "chunks_materialized"), reason="table should exist"
+    )
+    assertions.expect_true(
+        _index_exists(catalog_path, "idx_chunks_materialized_uri"), reason="index should exist"
+    )

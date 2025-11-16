@@ -29,7 +29,6 @@ from codeintel_rev.mcp_server.scope_utils import (
     path_matches_glob,
 )
 from codeintel_rev.typing import NDArrayF32
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     import duckdb
@@ -37,8 +36,6 @@ if TYPE_CHECKING:
 else:
     duckdb = cast("duckdb", LazyModule("duckdb", "DuckDB catalog operations"))
     np = cast("np", LazyModule("numpy", "DuckDB catalog embeddings"))
-
-LOGGER = get_logger(__name__)
 
 
 @dataclass(slots=True, frozen=True)
@@ -49,40 +46,6 @@ class IdMapMeta:
     parquet_hash: str
     row_count: int
     refreshed: bool
-
-
-@dataclass(slots=True, frozen=True)
-class _ScopeFilterLogInfo:
-    """Container for scope filter logging inputs."""
-
-    include_globs: list[str] | None
-    exclude_globs: list[str] | None
-    languages: list[str] | None
-    requested: int | None
-
-
-def _log_extra(**kwargs: object) -> dict[str, object]:
-    """Return structured log extras for catalog events.
-
-    This function creates a structured logging payload by combining a component
-    identifier ("duckdb_catalog") with additional keyword arguments. The function
-    is used to create consistent log context for DuckDB catalog operations.
-
-    Parameters
-    ----------
-    **kwargs : object
-        Additional keyword arguments to include in the logging payload. All arguments
-        are merged into the returned dictionary with the component identifier.
-        Values must be JSON-serializable for structured logging.
-
-    Returns
-    -------
-    dict[str, object]
-        Structured logging payload dictionary containing "component": "duckdb_catalog"
-        and all provided keyword arguments. The dictionary is suitable for use with
-        Python's logging module's extra parameter.
-    """
-    return {"component": "duckdb_catalog", **kwargs}
 
 
 def _escape_identifier(expr: str) -> str:
@@ -293,22 +256,11 @@ class _DuckDBQueryMixin:
             ORDER BY ids.position
             """
         params = [list(ids)]
-        perf_start = perf_counter()
         with catalog._readonly_connection() as conn:
-            catalog._log_query(sql, params)
             relation = conn.execute(sql, params)
             rows = relation.fetchall()
             cols = [desc[0] for desc in relation.description]
         payload = [dict(zip(cols, row, strict=True)) for row in rows]
-        duration_ms = round((perf_counter() - perf_start) * 1000, 2)
-        LOGGER.debug(
-            "duckdb_catalog.hydrate_by_ids",
-            extra={
-                "requested": len(ids),
-                "returned": len(payload),
-                "duration_ms": duration_ms,
-            },
-        )
         return payload
 
     def get_structure_annotations(self, ids: Sequence[int]) -> dict[int, StructureAnnotations]:
@@ -456,11 +408,8 @@ class _DuckDBQueryMixin:
                     payload["cst_matches"] = tuple(
                         dict.fromkeys(row[0] for row in rows if row[0]),
                     )
-        except duckdb.Error as exc:  # pragma: no cover - schema may evolve
-            LOGGER.debug(
-                "Skipping CST annotations",
-                extra=_log_extra(error=str(exc)),
-            )
+        except duckdb.Error:  # pragma: no cover - schema may evolve
+            return
 
     @staticmethod
     def _coerce_annotation_payload(
@@ -643,17 +592,8 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             yield conn
 
     def _log_query(self, sql: str, params: object | None = None) -> None:
-        """Emit debug log for executed DuckDB statement when enabled."""
-        if not self._log_queries:
-            return
-        LOGGER.debug(
-            "duckdb_query",
-            extra={
-                "sql": sql.strip(),
-                "params": params,
-                "duckdb_path": str(self.db_path),
-            },
-        )
+        """Compatibility stub retained after removing catalog logging."""
+        return
 
     def _ensure_views(self, conn: duckdb.DuckDBPyConnection) -> None:
         """Create required views and tables to hydrate chunk metadata."""
@@ -692,14 +632,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             )
             self._log_query(index_sql, None)
             conn.execute(index_sql)
-            LOGGER.info(
-                "Materialized DuckDB chunks table",
-                extra={
-                    "materialized": True,
-                    "parquet_found": parquet_exists,
-                    "db_path": str(self.db_path),
-                },
-            )
             return
 
         if parquet_exists:
@@ -711,14 +643,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             sql = f"CREATE OR REPLACE VIEW chunks AS {_EMPTY_CHUNKS_SELECT}"
             self._log_query(sql, None)
             conn.execute(sql)
-        LOGGER.debug(
-            "Configured DuckDB chunks view",
-            extra={
-                "materialized": False,
-                "parquet_found": parquet_exists,
-                "db_path": str(self.db_path),
-            },
-        )
 
     def _install_optional_views(self, conn: duckdb.DuckDBPyConnection) -> None:
         modules_installed = self._install_parquet_view(
@@ -749,10 +673,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         self._log_query(sql, params)
         relation = conn.sql(sql, params=params)
         relation.create_view(view_name, replace=True)
-        LOGGER.info(
-            "Configured DuckDB view",
-            extra=_log_extra(view=view_name, source=str(source)),
-        )
         return True
 
     def _install_json_view(
@@ -768,10 +688,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         self._log_query(sql, params)
         relation = conn.sql(sql, params=params)
         relation.create_view(view_name, replace=True)
-        LOGGER.info(
-            "Configured DuckDB JSON view",
-            extra=_log_extra(view=view_name, source=str(source)),
-        )
         return True
 
     @staticmethod
@@ -789,12 +705,8 @@ class DuckDBCatalog(_DuckDBQueryMixin):
                      ) AS t(symbol)
                 """
             )
-            LOGGER.info("Configured DuckDB view", extra=_log_extra(view="v_chunk_symbols"))
-        except duckdb.Error as exc:  # pragma: no cover - defensive fallback for legacy schemas
-            LOGGER.debug(
-                "Skipping v_chunk_symbols view",
-                extra=_log_extra(error=str(exc)),
-            )
+        except duckdb.Error:  # pragma: no cover - defensive fallback for legacy schemas
+            return
 
     def _install_struct_view_if_exists(
         self,
@@ -833,24 +745,13 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         conn.execute(plan.meta_create_sql)
         row = conn.execute(plan.meta_select_sql).fetchone()
         if row and row[0] == checksum:
-            LOGGER.debug(
-                "Structured table already materialized",
-                extra=_log_extra(checksum=checksum),
-            )
             return
 
         conn.execute(plan.delete_sql)
         conn.execute(plan.insert_sql)
         conn.execute(plan.meta_delete_sql)
         conn.execute(plan.meta_insert_sql, [checksum])
-        count = conn.execute(plan.count_sql).fetchone()
-        LOGGER.info(
-            "Materialized structured table",
-            extra=_log_extra(
-                checksum=checksum,
-                rows=int(count[0]) if count and count[0] is not None else 0,
-            ),
-        )
+        conn.execute(plan.count_sql).fetchone()
 
     @staticmethod
     def _ensure_idmap_tables(conn: duckdb.DuckDBPyConnection) -> None:
@@ -906,10 +807,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             self._log_query("SELECT faiss_row, external_id FROM read_parquet(?)", params)
             relation = conn.sql("SELECT faiss_row, external_id FROM read_parquet(?)", params=params)
             relation.create_view("faiss_idmap", replace=True)
-            LOGGER.info(
-                "Configured DuckDB view",
-                extra=_log_extra(view="faiss_idmap", source=str(path)),
-            )
             return
 
         if _relation_exists(conn, "faiss_idmap_mat"):
@@ -933,10 +830,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):
                 FROM faiss_idmap_mat
                 """
             conn.execute(query_template.replace("{expr}", expr_sql))
-            LOGGER.info(
-                "Configured DuckDB view",
-                extra=_log_extra(view="faiss_idmap", source="faiss_idmap_mat"),
-            )
             return
 
         conn.execute(
@@ -1014,12 +907,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             sql = "CREATE OR REPLACE TABLE faiss_join_mat AS SELECT * FROM v_faiss_join"
             self._log_query(sql, None)
             conn.execute(sql)
-            row = conn.execute("SELECT COUNT(*) FROM faiss_join_mat").fetchone()
-            rows = int(row[0]) if row and row[0] is not None else 0
-            LOGGER.info(
-                "Materialized FAISS join table",
-                extra=_log_extra(rows=rows, table="faiss_join_mat"),
-            )
+            conn.execute("SELECT COUNT(*) FROM faiss_join_mat").fetchone()
 
     def set_idmap_path(self, path: Path) -> None:
         """Override the FAISS id map path used for view installation."""
@@ -1064,10 +952,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             self._log_query(sql, params)
             relation = conn.sql(sql, params=params)
             relation.create_view("v_faiss_pool", replace=True)
-            LOGGER.info(
-                "Configured DuckDB view",
-                extra=_log_extra(view="v_faiss_pool", source=str(pool_path)),
-            )
             try:
                 conn.execute(
                     """
@@ -1094,10 +978,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):
                     LEFT JOIN chunks ON chunks.id = pool.chunk_id
                     """
                 )
-            LOGGER.info(
-                "Configured DuckDB view",
-                extra=_log_extra(view="v_pool_coverage", source=str(pool_path)),
-            )
 
     def refresh_faiss_idmap_mat_if_changed(self, idmap_parquet: Path) -> dict[str, Any]:
         """Materialize FAISS ID map when the Parquet sidecar content changes.
@@ -1125,10 +1005,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):
                 "checksum": meta.parquet_hash,
                 "rows": meta.row_count,
             }
-        LOGGER.info(
-            "faiss_idmap_materialized",
-            extra=_log_extra(rows=stats["rows"], checksum=stats["checksum"]),
-        )
         return stats
 
     def sample_query_vectors(self, limit: int = 64) -> list[tuple[int, np.ndarray]]:
@@ -1293,14 +1169,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             )
             results = self._apply_language_filters(results, spec.language_extensions)
 
-        duration = max(perf_counter() - start_time, 0.0)
-        context = _ScopeFilterLogInfo(
-            include_globs=include_globs,
-            exclude_globs=exclude_globs,
-            languages=languages,
-            requested=len(ids),
-        )
-        self._log_scope_filter_results(context, results, duration=duration)
         return results
 
     def _build_scope_filter_spec(
@@ -1456,30 +1324,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         return filtered_results
 
     @staticmethod
-    def _log_scope_filter_results(
-        info: _ScopeFilterLogInfo,
-        results: Sequence[Mapping[str, object]],
-        *,
-        duration: float,
-    ) -> None:
-        """Emit structured logs summarizing scope filtering outcomes."""
-        returned = len(results)
-        requested = info.requested or 0
-        missing = max(0, requested - returned)
-        include_globs = info.include_globs or []
-        exclude_globs = info.exclude_globs or []
-        languages = info.languages or []
-        extras = _log_extra(
-            include_globs=include_globs,
-            exclude_globs=exclude_globs,
-            languages=languages,
-            returned=returned,
-            missing=missing,
-            duration_ms=round(duration * 1000, 2),
-        )
-        LOGGER.info("Scope filter hydration completed", extra=extras)
-
-    @staticmethod
     def _determine_filter_type(
         include_globs: list[str] | None,
         exclude_globs: list[str] | None,
@@ -1633,24 +1477,11 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             sql = "SELECT * FROM chunks WHERE uri = ? ORDER BY id LIMIT ?"
             params.append(limit)
 
-        start_time = perf_counter()
         with self._readonly_connection() as conn:
             relation = conn.execute(sql, params)
             rows = relation.fetchall()
             cols = [desc[0] for desc in relation.description]
         payload = [dict(zip(cols, row, strict=True)) for row in rows]
-        limited = bool(limit > 0 and len(payload) >= limit)
-        duration_ms = round((perf_counter() - start_time) * 1000, 2)
-        LOGGER.debug(
-            "duckdb_catalog.query_by_uri",
-            extra={
-                "uri": uri,
-                "limit": limit,
-                "rows": len(payload),
-                "duration_ms": duration_ms,
-                "limited": limited,
-            },
-        )
         return payload
 
     def get_embeddings_by_ids(self, ids: Sequence[int]) -> tuple[list[int], NDArrayF32]:
@@ -1684,7 +1515,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             dim = self._embedding_dim()
             return [], np.empty((0, dim), dtype=np.float32)
 
-        perf_start = perf_counter()
         with self.connection() as conn:
             relation = conn.execute(
                 """
@@ -1716,15 +1546,6 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             return [], np.empty((0, dim), dtype=np.float32)
 
         vectors = np.vstack(embeddings)
-        duration_ms = round((perf_counter() - perf_start) * 1000, 2)
-        LOGGER.debug(
-            "duckdb_catalog.embeddings_by_ids",
-            extra={
-                "requested": len(requested_ids),
-                "returned": len(ordered_ids),
-                "duration_ms": duration_ms,
-            },
-        )
         return ordered_ids, vectors
 
     def count_chunks(self) -> int:

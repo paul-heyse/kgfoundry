@@ -441,9 +441,8 @@ def _build_faiss_index(
     # Log memory estimate before building
     mem_est = faiss_mgr.estimate_memory_usage(n_vectors)
     logger.info(
-        "Estimated memory usage: CPU=%.2f GB, GPU=%.2f GB, Total=%.2f GB",
+        "Estimated memory usage (CPU): %.2f GB (total %.2f GB)",
         mem_est["cpu_index_bytes"] / 1e9,
-        mem_est["gpu_index_bytes"] / 1e9,
         mem_est["total_bytes"] / 1e9,
     )
 

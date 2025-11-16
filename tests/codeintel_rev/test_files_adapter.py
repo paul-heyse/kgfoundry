@@ -10,6 +10,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pytest
+from codeintel_rev.app.config_context import ResolvedPaths
 from codeintel_rev.errors import (
     FileReadError,
     InvalidLineRangeError,
@@ -19,6 +20,8 @@ from codeintel_rev.errors import (
 from codeintel_rev.io.path_utils import PathOutsideRepositoryError
 from codeintel_rev.mcp_server.adapters.files import list_paths, open_file
 from codeintel_rev.mcp_server.schemas import ScopeIn
+
+from tests._helpers import assertions
 
 
 @pytest.fixture
@@ -35,8 +38,6 @@ def mock_context(tmp_path: Path) -> Mock:
     Mock
         Mock ApplicationContext with repo_root and paths.
     """
-    from codeintel_rev.app.config_context import ResolvedPaths
-
     context = Mock()
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
@@ -91,17 +92,26 @@ async def test_list_paths_with_scope_globs(mock_context: Mock) -> None:
         result = await list_paths(mock_context, path=None, max_results=100)
 
         # Verify only Python files are returned
-        assert "items" in result
+        assertions.expect_in("items", result)
         items = result["items"]
-        assert isinstance(items, list)
-        assert len(items) > 0
+        assertions.expect_true(isinstance(items, list), reason="items should be a list")
+        assertions.expect_true(len(items) > 0, reason="should have items")
 
         # All returned files should be Python files
         paths_list = [item.get("path", "") for item in items]
-        assert all(path.endswith(".py") for path in paths_list if path)
+        assertions.expect_true(
+            all(path.endswith(".py") for path in paths_list if path),
+            reason="all paths should end with .py",
+        )
         # Should not include TypeScript or Markdown files
-        assert not any(path.endswith(".ts") for path in paths_list if path)
-        assert not any(path.endswith(".md") for path in paths_list if path)
+        assertions.expect_false(
+            any(path.endswith(".ts") for path in paths_list if path),
+            reason="should not include .ts files",
+        )
+        assertions.expect_false(
+            any(path.endswith(".md") for path in paths_list if path),
+            reason="should not include .md files",
+        )
 
 
 @pytest.mark.asyncio
@@ -127,16 +137,22 @@ async def test_list_paths_with_scope_language(mock_context: Mock) -> None:
         result = await list_paths(mock_context, path=None, max_results=100)
 
         # Verify only Python files are returned
-        assert "items" in result
+        assertions.expect_in("items", result)
         items = result["items"]
-        assert isinstance(items, list)
-        assert len(items) > 0
+        assertions.expect_true(isinstance(items, list), reason="items should be a list")
+        assertions.expect_true(len(items) > 0, reason="should have items")
 
         # All returned files should be Python files
         paths_list = [item.get("path", "") for item in items]
-        assert all(path.endswith(".py") for path in paths_list if path)
+        assertions.expect_true(
+            all(path.endswith(".py") for path in paths_list if path),
+            reason="all paths should end with .py",
+        )
     # Should not include TypeScript files
-    assert not any(path.endswith(".ts") for path in paths_list if path)
+    assertions.expect_false(
+        any(path.endswith(".ts") for path in paths_list if path),
+        reason="should not include .ts files",
+    )
 
 
 @pytest.mark.asyncio
@@ -162,13 +178,16 @@ async def test_list_paths_explicit_languages_override_scope(mock_context: Mock) 
             languages=["typescript"],
         )
 
-    assert "items" in result
+    assertions.expect_in("items", result)
     items = result["items"]
-    assert isinstance(items, list)
-    assert items
+    assertions.expect_true(isinstance(items, list), reason="items should be a list")
+    assertions.expect_true(bool(items), reason="should have items")
     paths_list = [item.get("path", "") for item in items]
-    assert all(path.endswith(".ts") for path in paths_list if path)
-    assert "src/app.ts" in paths_list
+    assertions.expect_true(
+        all(path.endswith(".ts") for path in paths_list if path),
+        reason="all paths should end with .ts",
+    )
+    assertions.expect_in("src/app.ts", paths_list)
 
 
 @pytest.mark.asyncio
@@ -201,12 +220,18 @@ async def test_list_paths_excludes_default_directories(mock_context: Mock) -> No
         response = await list_paths(mock_context)
 
     returned_paths = {item["path"] for item in response["items"]}
-    assert "src/main.py" in returned_paths
-    assert ".git/HEAD" not in returned_paths
-    assert ".venv/pyvenv.cfg" not in returned_paths
-    assert "node_modules/pkg/index.js" not in returned_paths
-    assert "src/module.pyc" not in returned_paths
-    assert "src/__pycache__/module.pyc" not in returned_paths
+    assertions.expect_in("src/main.py", returned_paths)
+    assertions.expect_false(".git/HEAD" in returned_paths, reason="should exclude .git files")
+    assertions.expect_false(
+        ".venv/pyvenv.cfg" in returned_paths, reason="should exclude .venv files"
+    )
+    assertions.expect_false(
+        "node_modules/pkg/index.js" in returned_paths, reason="should exclude node_modules"
+    )
+    assertions.expect_false("src/module.pyc" in returned_paths, reason="should exclude .pyc files")
+    assertions.expect_false(
+        "src/__pycache__/module.pyc" in returned_paths, reason="should exclude __pycache__"
+    )
 
 
 # ==================== open_file Tests ====================
@@ -216,20 +241,20 @@ def test_open_file_success(mock_context: Mock) -> None:
     """Test open_file returns file content on success."""
     result = open_file(mock_context, "README.md")
 
-    assert result["path"] == "README.md"
-    assert "content" in result
-    assert "# Documentation" in result["content"]
-    assert result["lines"] > 0
-    assert result["size"] > 0
+    assertions.expect_equal(result["path"], "README.md")
+    assertions.expect_in("content", result)
+    assertions.expect_in("# Documentation", result["content"])
+    assertions.expect_true(result["lines"] > 0, reason="lines should be positive")
+    assertions.expect_true(result["size"] > 0, reason="size should be positive")
 
 
 def test_open_file_with_line_range(mock_context: Mock) -> None:
     """Test open_file slices content by line range."""
     result = open_file(mock_context, "src/main.py", start_line=1, end_line=1)
 
-    assert result["path"] == "src/main.py"
-    assert "def main():" in result["content"]
-    assert result["lines"] == 1
+    assertions.expect_equal(result["path"], "src/main.py")
+    assertions.expect_in("def main():", result["content"])
+    assertions.expect_equal(result["lines"], 1)
 
 
 def test_open_file_path_outside_repository(mock_context: Mock) -> None:
@@ -292,9 +317,9 @@ def test_open_file_exception_context(mock_context: Mock) -> None:
         open_file(mock_context, "README.md", start_line=0, end_line=10)
 
     exc = exc_info.value
-    assert exc.context["path"] == "README.md"
-    assert exc.context["start_line"] == 0
-    assert exc.context["end_line"] == 10
+    assertions.expect_equal(exc.context["path"], "README.md")
+    assertions.expect_equal(exc.context["start_line"], 0)
+    assertions.expect_equal(exc.context["end_line"], 10)
 
 
 # ==================== list_paths Error Tests ====================

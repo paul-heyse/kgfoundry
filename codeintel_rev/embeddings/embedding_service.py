@@ -16,9 +16,7 @@ from typing import Any, Protocol, Self, cast, runtime_checkable
 from codeintel_rev.config.settings import EmbeddingsConfig, IndexConfig, Settings, VLLMConfig
 from codeintel_rev.io.vllm_engine import InprocessVLLMEmbedder
 from codeintel_rev.typing import NDArrayF32, gate_import
-from kgfoundry_common.logging import get_logger
 
-LOGGER = get_logger(__name__)
 EMBEDDING_RANK = 2
 
 
@@ -151,12 +149,6 @@ class _FailureCounter:
         exc: BaseException | None,
         _tb: TracebackType | None,
     ) -> bool:
-        if exc_type is not None:
-            LOGGER.warning(
-                "Embedding provider %s failed with %s",
-                self._provider_name,
-                exc_type.__name__,
-            )
         return False
 
 
@@ -213,7 +205,6 @@ class _BatchResultHandler:
         )
         for job in self._jobs:
             job.future.set_exception(error)
-        LOGGER.error("embedding.batch_failed", extra={"error": str(error)})
         return True
 
 
@@ -607,14 +598,6 @@ class _ProviderBase(EmbeddingProvider):
         for text in texts:
             if len(text) > max_chars:
                 trimmed = text[:max_chars]
-                LOGGER.debug(
-                    "embedding.text_trimmed",
-                    extra={
-                        "provider": self._state.provider_name,
-                        "original_len": len(text),
-                        "trimmed_len": max_chars,
-                    },
-                )
                 payload.append(trimmed)
             else:
                 payload.append(text)
@@ -695,16 +678,9 @@ def get_embedding_provider(
         For vLLM provider, falls back to HF if allow_hf_fallback is enabled.
         For HF provider, no fallback is available. Also raised when HF provider
         initialization fails and no fallback is configured. Wraps underlying
-        provider initialization exceptions with context.
-    Exception
-        When vLLM provider initialization fails and allow_hf_fallback is False,
-        the original exception from VLLMProvider initialization is re-raised
-        (not wrapped) using a bare `raise` statement. This allows callers to
-        handle provider-specific exceptions (e.g., CUDA errors, model loading
-        failures) when fallback is disabled. The exception is re-raised using
-        `raise` where the exception comes from the except block. Note: The
-        exception is re-raised using a bare `raise`, so pydoclint may flag this
-        as DOC502, but the exception is correctly propagated.
+        provider initialization exceptions with context. Provider-specific
+        exceptions are re-raised directly when fallback is disabled so callers
+        can inspect CUDA/model-loading failures without losing stack context.
 
     Notes
     -----
@@ -730,12 +706,8 @@ def get_embedding_provider(
         return VLLMProvider(
             embeddings=settings.embeddings, index=settings.index, vllm_config=settings.vllm
         )
-    except Exception as exc:
+    except Exception:
         if settings.embeddings.allow_hf_fallback:
-            LOGGER.warning(
-                "VLLM provider failed; falling back to HF",
-                extra={"error": str(exc)},
-            )
             return HFEmbeddingProvider(embeddings=settings.embeddings, index=settings.index)
         raise
 
@@ -808,10 +780,8 @@ class HFEmbeddingProvider(_ProviderBase):
         with suppress(AttributeError):  # pragma: no cover - defensive
             del self._model
         if self._device.type == "cuda":
-            try:
+            with suppress(RuntimeError):  # pragma: no cover - telemetry best effort
                 self._torch.cuda.empty_cache()
-            except RuntimeError:  # pragma: no cover - telemetry best effort
-                LOGGER.debug("torch.cuda.empty_cache failed", exc_info=True)
 
 
 EmbeddingProviderBase = _ProviderBase

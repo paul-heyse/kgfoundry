@@ -234,8 +234,7 @@ def _finish_success(context: _CommandContext, builder: CliEnvelopeBuilder) -> Cl
     envelope = builder.finish(duration_seconds=time.monotonic() - context.start)
     path = _emit_envelope(envelope, subcommand=context.subcommand)
     typer.echo(
-        f"{context.subcommand} completed in {envelope.duration_seconds:.2f}s "
-        f"(envelope: {path})"
+        f"{context.subcommand} completed in {envelope.duration_seconds:.2f}s (envelope: {path})"
     )
     return envelope
 

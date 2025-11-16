@@ -14,9 +14,6 @@ from codeintel_rev.config.settings import Settings
 from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.faiss_manager import SearchRuntimeOverrides
 from codeintel_rev.io.symbol_catalog import SymbolCatalog, SymbolDefRow
-from kgfoundry_common.logging import get_logger
-
-LOGGER = get_logger(__name__)
 
 
 class SupportsFaissSearch(Protocol):
@@ -128,7 +125,6 @@ class SCIPCoverageEvaluator:
         """
         defs = self._symbol_catalog.fetch_symbol_defs(limit=limit)
         if not defs:
-            LOGGER.warning("scip_coverage.no_symbols")
             empty_summary: CoverageSummary = {
                 "total": 0,
                 "chunk_coverage": 0.0,
@@ -163,10 +159,6 @@ class SCIPCoverageEvaluator:
         }
         resolved_output = output_dir or self._settings.eval.output_dir
         self._write_artifacts(per_symbol, summary, resolved_output)
-        LOGGER.info(
-            "scip_coverage.completed",
-            extra={"summary": summary, "output_dir": output_dir or self._settings.eval.output_dir},
-        )
         return summary
 
     def _lookup_chunk_ids(self, chunk_ids: Sequence[int]) -> set[int]:

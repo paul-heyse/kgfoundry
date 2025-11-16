@@ -37,11 +37,6 @@ def _build_argument_parser() -> argparse.ArgumentParser:
         help="Run a lightweight autotune sweep with synthetic vectors.",
     )
     parser.add_argument(
-        "--gpu",
-        action="store_true",
-        help="Attempt to clone the index to GPU and report the outcome.",
-    )
-    parser.add_argument(
         "--seed",
         type=int,
         default=13,
@@ -56,7 +51,6 @@ def _build_manager(args: argparse.Namespace) -> FAISSManager:
         index_path=args.index,
         vec_dim=args.dim,
         nlist=args.nlist,
-        use_cuvs=True,
         runtime=runtime,
     )
 
@@ -88,11 +82,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     manager.load_cpu_index()
     compile_opts = manager.get_compile_options()
     _emit(f"compile_options: {compile_opts}")
-
-    if args.gpu:
-        gpu_enabled = manager.clone_to_gpu()
-        reason = manager.gpu_disabled_reason or "enabled"
-        _emit(f"gpu_clone: {gpu_enabled} ({reason})")
 
     if args.tune:
         profile = _run_autotune(manager, args.dim, args.seed)

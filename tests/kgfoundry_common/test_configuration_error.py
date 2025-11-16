@@ -13,6 +13,7 @@ from kgfoundry_common.problem_details import (
     render_problem,
     validate_problem_details,
 )
+from tests._helpers import assertions
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -65,11 +66,17 @@ class TestConfigurationErrorWithDetails:
             field="timeout",
             issue="Must be positive",
         )
-        assert isinstance(error, ConfigurationError)
-        assert error.code == ErrorCode.CONFIGURATION_ERROR
-        assert error.http_status == 500
-        assert "timeout" in str(error.context)
-        assert "Must be positive" in str(error.context)
+        assertions.expect_true(
+            isinstance(error, ConfigurationError), reason="should be ConfigurationError"
+        )
+        assertions.expect_equal(error.code, ErrorCode.CONFIGURATION_ERROR)
+        assertions.expect_equal(error.http_status, 500)
+        assertions.expect_true(
+            "timeout" in str(error.context), reason="context should contain timeout"
+        )
+        assertions.expect_true(
+            "Must be positive" in str(error.context), reason="context should contain issue"
+        )
 
     def test_with_details_with_hint(self) -> None:
         """Test creating ConfigurationError with field, issue, and hint."""
@@ -78,9 +85,16 @@ class TestConfigurationErrorWithDetails:
             issue="Missing required env var",
             hint="Set KGFOUNDRY_API_KEY before running",
         )
-        assert "api_key" in str(error.context)
-        assert "Missing required env var" in str(error.context)
-        assert "Set KGFOUNDRY_API_KEY before running" in str(error.context)
+        assertions.expect_true(
+            "api_key" in str(error.context), reason="context should contain api_key"
+        )
+        assertions.expect_true(
+            "Missing required env var" in str(error.context), reason="context should contain issue"
+        )
+        assertions.expect_true(
+            "Set KGFOUNDRY_API_KEY before running" in str(error.context),
+            reason="context should contain hint",
+        )
 
     def test_with_details_message_format(self) -> None:
         """Test that message is properly formatted with field and issue."""
@@ -88,8 +102,10 @@ class TestConfigurationErrorWithDetails:
             field="port",
             issue="Invalid port number",
         )
-        assert "port" in error.message
-        assert "Invalid port number" in error.message
+        assertions.expect_true("port" in error.message, reason="message should contain port")
+        assertions.expect_true(
+            "Invalid port number" in error.message, reason="message should contain issue"
+        )
 
     def test_with_details_context_structure(self) -> None:
         """Test that context is properly structured with field, issue, hint."""
@@ -98,10 +114,10 @@ class TestConfigurationErrorWithDetails:
             issue="Cannot reach database",
             hint="Check network connectivity",
         )
-        assert isinstance(error.context, dict)
-        assert error.context["field"] == "db_host"
-        assert error.context["issue"] == "Cannot reach database"
-        assert error.context["hint"] == "Check network connectivity"
+        assertions.expect_true(isinstance(error.context, dict), reason="context should be dict")
+        assertions.expect_equal(error.context["field"], "db_host")
+        assertions.expect_equal(error.context["issue"], "Cannot reach database")
+        assertions.expect_equal(error.context["hint"], "Check network connectivity")
 
     def test_with_details_no_hint_not_in_context(self) -> None:
         """Test that hint key is not present when hint is None."""
@@ -109,7 +125,9 @@ class TestConfigurationErrorWithDetails:
             field="token",
             issue="Invalid format",
         )
-        assert "hint" not in error.context
+        assertions.expect_false(
+            "hint" in error.context, reason="hint should not be in context when None"
+        )
 
     def test_with_details_returns_configuration_error(self) -> None:
         """Test that with_details always returns a ConfigurationError instance."""
@@ -118,14 +136,16 @@ class TestConfigurationErrorWithDetails:
             issue="Too long",
             hint="Max 100 chars",
         )
-        assert type(error).__name__ == "ConfigurationError"
-        assert isinstance(error, ConfigurationError)
+        assertions.expect_equal(type(error).__name__, "ConfigurationError")
+        assertions.expect_true(
+            isinstance(error, ConfigurationError), reason="should be ConfigurationError"
+        )
 
     def test_with_details_keyword_only(self) -> None:
         """Test that with_details accepts only keyword parameters."""
         sig = signature(ConfigurationError.with_details)
         for parameter in sig.parameters.values():
-            assert parameter.kind.name == "KEYWORD_ONLY"
+            assertions.expect_equal(parameter.kind.name, "KEYWORD_ONLY")
 
     def test_with_details_special_characters(self) -> None:
         """Test with_details with special characters in field and issue."""
@@ -134,8 +154,13 @@ class TestConfigurationErrorWithDetails:
             issue="Invalid IPv4: must be x.x.x.x",
             hint="Use format: 192.168.1.1",
         )
-        assert "server.db.host" in str(error.context)
-        assert "Invalid IPv4: must be x.x.x.x" in str(error.context)
+        assertions.expect_true(
+            "server.db.host" in str(error.context), reason="context should contain field"
+        )
+        assertions.expect_true(
+            "Invalid IPv4: must be x.x.x.x" in str(error.context),
+            reason="context should contain issue",
+        )
 
 
 class TestBuildConfigurationProblem:
@@ -149,12 +174,16 @@ class TestBuildConfigurationProblem:
         )
         problem = build_configuration_problem(error)
         problem_dict = _as_problem_dict(problem)
-        assert isinstance(problem, dict)
-        assert problem_dict["type"] == "https://kgfoundry.dev/problems/configuration-error"
-        assert problem_dict["title"] == "Configuration Error"
-        assert problem_dict["status"] == 500
+        assertions.expect_true(isinstance(problem, dict), reason="problem should be dict")
+        assertions.expect_equal(
+            problem_dict["type"], "https://kgfoundry.dev/problems/configuration-error"
+        )
+        assertions.expect_equal(problem_dict["title"], "Configuration Error")
+        assertions.expect_equal(problem_dict["status"], 500)
         detail_value = problem_dict.get("detail", "")
-        assert "timeout" in str(detail_value)
+        assertions.expect_true(
+            "timeout" in str(detail_value), reason="detail should contain timeout"
+        )
 
     def test_build_configuration_problem_with_hint(self) -> None:
         """Test Problem Details includes hint from error context."""
@@ -165,11 +194,19 @@ class TestBuildConfigurationProblem:
         )
         problem = build_configuration_problem(error)
         problem_dict = _as_problem_dict(problem)
-        assert "extensions" in problem_dict
+        assertions.expect_true(
+            "extensions" in problem_dict, reason="problem should have extensions"
+        )
         extensions = cast("dict[str, object]", problem_dict["extensions"])
-        assert "validation" in extensions
-        assert "port" in str(extensions["validation"])
-        assert "Use 1-65535" in str(extensions["validation"])
+        assertions.expect_true(
+            "validation" in extensions, reason="extensions should have validation"
+        )
+        assertions.expect_true(
+            "port" in str(extensions["validation"]), reason="validation should contain port"
+        )
+        assertions.expect_true(
+            "Use 1-65535" in str(extensions["validation"]), reason="validation should contain hint"
+        )
 
     def test_build_configuration_problem_instance(self) -> None:
         """Test that instance is correctly set."""
@@ -179,7 +216,7 @@ class TestBuildConfigurationProblem:
         )
         problem = build_configuration_problem(error)
         problem_dict = _as_problem_dict(problem)
-        assert problem_dict["instance"] == "urn:config:validation"
+        assertions.expect_equal(problem_dict["instance"], "urn:config:validation")
 
     def test_build_configuration_problem_code(self) -> None:
         """Test that code is correctly extracted."""
@@ -189,8 +226,8 @@ class TestBuildConfigurationProblem:
         )
         problem = build_configuration_problem(error)
         problem_dict = _as_problem_dict(problem)
-        assert "code" in problem_dict
-        assert problem_dict["code"] == "configuration-error"
+        assertions.expect_true("code" in problem_dict, reason="problem should have code")
+        assertions.expect_equal(problem_dict["code"], "configuration-error")
 
     def test_build_configuration_problem_extensions(self) -> None:
         """Test that extensions contain exception type and validation details."""
@@ -200,10 +237,14 @@ class TestBuildConfigurationProblem:
         )
         problem = build_configuration_problem(error)
         problem_dict = _as_problem_dict(problem)
-        assert "extensions" in problem_dict
+        assertions.expect_true(
+            "extensions" in problem_dict, reason="problem should have extensions"
+        )
         extensions = cast("dict[str, object]", problem_dict["extensions"])
-        assert extensions["exception_type"] == "ConfigurationError"
-        assert "validation" in extensions
+        assertions.expect_equal(extensions["exception_type"], "ConfigurationError")
+        assertions.expect_true(
+            "validation" in extensions, reason="extensions should have validation"
+        )
 
     def test_build_configuration_problem_rejects_non_config_error(self) -> None:
         """Test that non-ConfigurationError raises TypeError."""
@@ -232,10 +273,16 @@ class TestBuildConfigurationProblem:
         problem = build_configuration_problem(error)
         problem_dict = _as_problem_dict(problem)
         extensions = cast("dict[str, object]", problem_dict.get("extensions", {}))
-        assert "validation" in extensions
+        assertions.expect_true(
+            "validation" in extensions, reason="extensions should have validation"
+        )
         validation_ctx = cast("dict[str, object]", extensions.get("validation"))
-        assert "field_1" in str(validation_ctx)
-        assert "field_2" in str(validation_ctx)
+        assertions.expect_true(
+            "field_1" in str(validation_ctx), reason="validation should contain field_1"
+        )
+        assertions.expect_true(
+            "field_2" in str(validation_ctx), reason="validation should contain field_2"
+        )
 
     def test_build_configuration_problem_preserves_error_message(self) -> None:
         """Test that error message is preserved in detail."""
@@ -248,7 +295,10 @@ class TestBuildConfigurationProblem:
         problem_dict = _as_problem_dict(problem)
         # The detail should contain info about the field
         detail_value = problem_dict.get("detail", "")
-        assert "email" in str(detail_value) or "email" in str(problem_dict)
+        assertions.expect_true(
+            "email" in str(detail_value) or "email" in str(problem_dict),
+            reason="problem should contain email",
+        )
 
     def test_build_configuration_problem_http_status_code(self) -> None:
         """Test that HTTP status is 500 for configuration errors."""
@@ -258,7 +308,7 @@ class TestBuildConfigurationProblem:
         )
         problem = build_configuration_problem(error)
         problem_dict = _as_problem_dict(problem)
-        assert problem_dict["status"] == 500
+        assertions.expect_equal(problem_dict["status"], 500)
 
 
 class TestConfigurationErrorIntegration:
@@ -272,9 +322,11 @@ class TestConfigurationErrorIntegration:
         )
         problem = build_configuration_problem(error)
         json_str = render_problem(problem)
-        assert isinstance(json_str, str)
-        assert "configuration-error" in json_str
-        assert "setting" in json_str
+        assertions.expect_true(isinstance(json_str, str), reason="render_problem should return str")
+        assertions.expect_true(
+            "configuration-error" in json_str, reason="json should contain error type"
+        )
+        assertions.expect_true("setting" in json_str, reason="json should contain field")
 
     def test_error_with_cause_chain(self) -> None:
         """Test ConfigurationError preserves cause chain."""
@@ -284,11 +336,15 @@ class TestConfigurationErrorIntegration:
             cause=original_error,
             context={"field": "value", "issue": "Validation"},
         )
-        assert error.__cause__ is original_error
+        assertions.expect_true(
+            error.__cause__ is original_error, reason="error should preserve cause"
+        )
         problem = build_configuration_problem(error)
         problem_dict = _as_problem_dict(problem)
         extensions = cast("dict[str, object]", problem_dict.get("extensions", {}))
-        assert "validation" in extensions
+        assertions.expect_true(
+            "validation" in extensions, reason="extensions should have validation"
+        )
 
     def test_multiple_configuration_errors_as_problems(self) -> None:
         """Test creating multiple Problem Details from different errors."""
@@ -298,8 +354,10 @@ class TestConfigurationErrorIntegration:
             ConfigurationError.with_details(field="f3", issue="i3"),
         ]
         problems = [build_configuration_problem(e) for e in errors]
-        assert len(problems) == 3
+        assertions.expect_equal(len(problems), 3)
         for problem in problems:
             problem_dict = _as_problem_dict(problem)
-            assert problem_dict["type"] == "https://kgfoundry.dev/problems/configuration-error"
-            assert problem_dict["status"] == 500
+            assertions.expect_equal(
+                problem_dict["type"], "https://kgfoundry.dev/problems/configuration-error"
+            )
+            assertions.expect_equal(problem_dict["status"], 500)

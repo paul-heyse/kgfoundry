@@ -4,6 +4,8 @@ from typing import Any
 
 from codeintel_rev.mcp_server.registry import McpDeps, call_tool
 
+from tests._helpers import assertions
+
 
 class _StubCatalog:
     def __init__(self) -> None:
@@ -25,23 +27,23 @@ class _StubCatalog:
 
 def _faiss_search(query: str, top_k: int) -> list[tuple[int, float]]:
     _ = top_k
-    assert query
+    assertions.expect_true(bool(query), reason="query should be non-empty")
     return [(1, 0.9)]
 
 
 def test_call_tool_includes_summary_for_search() -> None:
     deps = McpDeps(catalog=_StubCatalog(), faiss_search=_faiss_search)
     response = call_tool(deps, "search", {"query": "foo", "top_k": 1})
-    assert "content" in response
+    assertions.expect_in("content", response)
     summary = response["content"][0]["text"]
-    assert "search returned" in summary
-    assert "structuredContent" in response
+    assertions.expect_in("search returned", summary)
+    assertions.expect_in("structuredContent", response)
 
 
 def test_call_tool_includes_summary_for_fetch() -> None:
     deps = McpDeps(catalog=_StubCatalog())
     response = call_tool(deps, "fetch", {"objectIds": ["1"]})
-    assert "content" in response
+    assertions.expect_in("content", response)
     summary = response["content"][0]["text"]
-    assert "fetch returned" in summary
-    assert "structuredContent" in response
+    assertions.expect_in("fetch returned", summary)
+    assertions.expect_in("structuredContent", response)

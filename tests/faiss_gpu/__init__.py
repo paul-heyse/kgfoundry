@@ -1,1 +1,0 @@
-"""FAISS GPU test package."""

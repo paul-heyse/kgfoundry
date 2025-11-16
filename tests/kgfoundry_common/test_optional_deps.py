@@ -22,6 +22,7 @@ from kgfoundry_common.optional_deps import (
     safe_import_griffe,
     safe_import_sphinx,
 )
+from tests._helpers import assertions
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -40,28 +41,32 @@ class TestOptionalDependencyError:
     def test_is_artifact_dependency_error(self) -> None:
         """OptionalDependencyError extends ArtifactDependencyError."""
         err = OptionalDependencyError("test message", module_name="griffe")
-        assert isinstance(err, ArtifactDependencyError)
+        assertions.expect_true(
+            isinstance(err, ArtifactDependencyError), reason="should be ArtifactDependencyError"
+        )
 
     def test_includes_correlation_id(self) -> None:
         """OptionalDependencyError includes unique correlation ID."""
         err = OptionalDependencyError("test message", module_name="griffe")
         context: Mapping[str, Any] = _expect_mapping(err.context, "context")
         correlation_id: str | Any = context.get("correlation_id")
-        assert isinstance(correlation_id, str)
-        assert len(correlation_id) > 0
+        assertions.expect_true(
+            isinstance(correlation_id, str), reason="correlation_id should be str"
+        )
+        assertions.expect_true(len(correlation_id) > 0, reason="correlation_id should not be empty")
 
     def test_includes_module_name(self) -> None:
         """OptionalDependencyError includes the missing module name."""
         err = OptionalDependencyError("test message", module_name="griffe")
         context: Mapping[str, Any] = _expect_mapping(err.context, "context")
-        assert context.get("module_name") == "griffe"
+        assertions.expect_equal(context.get("module_name"), "griffe")
 
     def test_extra_context_preserved(self) -> None:
         """Extra context is preserved in error."""
         extra = {"install": "pip install griffe"}
         err = OptionalDependencyError("test message", module_name="griffe", extra=extra)
         context = _expect_mapping(err.context, "context")
-        assert context.get("install") == "pip install griffe"
+        assertions.expect_equal(context.get("install"), "pip install griffe")
 
     @pytest.mark.parametrize(
         ("module_name", "message"),
@@ -75,7 +80,7 @@ class TestOptionalDependencyError:
         """OptionalDependencyError works with various module names."""
         err = OptionalDependencyError(message, module_name=module_name)
         context = _expect_mapping(err.context, "context")
-        assert context.get("module_name") == module_name
+        assertions.expect_equal(context.get("module_name"), module_name)
 
 
 class TestSafeImportGriffe:
@@ -88,7 +93,7 @@ class TestSafeImportGriffe:
             mock_import.return_value = mock_griffe
 
             result = safe_import_griffe()
-            assert result is mock_griffe
+            assertions.expect_true(result is mock_griffe, reason="should return mock_griffe")
             mock_import.assert_called_once_with("griffe")
 
     def test_raises_optional_dependency_error_when_missing(self) -> None:
@@ -100,9 +105,11 @@ class TestSafeImportGriffe:
                 safe_import_griffe()
 
             err = exc_info.value
-            assert "griffe" in str(err).lower()
+            assertions.expect_true(
+                "griffe" in str(err).lower(), reason="error should mention griffe"
+            )
             context = _expect_mapping(err.context, "context")
-            assert context.get("module_name") == "griffe"
+            assertions.expect_equal(context.get("module_name"), "griffe")
 
     def test_problem_details_in_context(self) -> None:
         """safe_import_griffe includes Problem Details in error context."""
@@ -115,11 +122,11 @@ class TestSafeImportGriffe:
             err = exc_info.value
             context = _expect_mapping(err.context, "context")
             details = _expect_mapping(context.get("problem_details"), "problem_details")
-            assert (
-                details.get("type")
-                == "https://docs.kgfoundry.dev/problems/optional-dependency-missing"
+            assertions.expect_equal(
+                details.get("type"),
+                "https://docs.kgfoundry.dev/problems/optional-dependency-missing",
             )
-            assert details.get("status") == 400
+            assertions.expect_equal(details.get("status"), 400)
 
     def test_correlation_id_in_problem_details(self) -> None:
         """safe_import_griffe includes correlation ID in Problem Details."""
@@ -131,7 +138,9 @@ class TestSafeImportGriffe:
 
             err = exc_info.value
             context = _expect_mapping(err.context, "context")
-            assert "correlation_id" in context
+            assertions.expect_true(
+                "correlation_id" in context, reason="context should have correlation_id"
+            )
 
 
 class TestSafeImportAutoapi:
@@ -144,7 +153,7 @@ class TestSafeImportAutoapi:
             mock_import.return_value = mock_autoapi
 
             result = safe_import_autoapi()
-            assert result is mock_autoapi
+            assertions.expect_true(result is mock_autoapi, reason="should return mock_autoapi")
             mock_import.assert_called_once_with("autoapi")
 
     def test_raises_optional_dependency_error_when_missing(self) -> None:
@@ -156,9 +165,11 @@ class TestSafeImportAutoapi:
                 safe_import_autoapi()
 
             err = exc_info.value
-            assert "autoapi" in str(err).lower()
+            assertions.expect_true(
+                "autoapi" in str(err).lower(), reason="error should mention autoapi"
+            )
             context = _expect_mapping(err.context, "context")
-            assert context.get("module_name") == "autoapi"
+            assertions.expect_equal(context.get("module_name"), "autoapi")
 
 
 class TestSafeImportSphinx:
@@ -171,7 +182,7 @@ class TestSafeImportSphinx:
             mock_import.return_value = mock_sphinx
 
             result = safe_import_sphinx()
-            assert result is mock_sphinx
+            assertions.expect_true(result is mock_sphinx, reason="should return mock_sphinx")
             mock_import.assert_called_once_with("sphinx")
 
     def test_raises_optional_dependency_error_when_missing(self) -> None:
@@ -183,9 +194,11 @@ class TestSafeImportSphinx:
                 safe_import_sphinx()
 
             err = exc_info.value
-            assert "sphinx" in str(err).lower()
+            assertions.expect_true(
+                "sphinx" in str(err).lower(), reason="error should mention sphinx"
+            )
             context = _expect_mapping(err.context, "context")
-            assert context.get("module_name") == "sphinx"
+            assertions.expect_equal(context.get("module_name"), "sphinx")
 
 
 @pytest.mark.parametrize(
@@ -213,5 +226,7 @@ class TestImportFunctionsParametrized:
             context = _expect_mapping(err.context, "context")
             remediation = _expect_mapping(context.get("remediation"), "remediation")
             install = remediation.get("install")
-            assert isinstance(install, str)
-            assert "pip install kgfoundry[docs]" in install
+            assertions.expect_true(isinstance(install, str), reason="install should be str")
+            assertions.expect_true(
+                "pip install kgfoundry[docs]" in install, reason="install should mention docs extra"
+            )

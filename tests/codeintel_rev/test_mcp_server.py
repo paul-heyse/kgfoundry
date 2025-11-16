@@ -11,6 +11,9 @@ from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.main import app
 from fastapi.testclient import TestClient
 
+from tests._helpers import assertions
+from tests._helpers.constants import HTTPStatus
+
 
 @pytest.fixture
 def test_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
@@ -61,7 +64,7 @@ def test_set_scope_endpoint() -> None:
         # This is a basic smoke test - actual MCP protocol testing would require MCP client
         # For now, we verify the app starts and context is available
         response = client.get("/healthz")
-        assert response.status_code == 200
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
 
 
 @pytest.mark.usefixtures("test_repo")
@@ -70,10 +73,12 @@ def test_list_paths_endpoint() -> None:
     with TestClient(app) as client:
         # Verify app has context initialized
         response = client.get("/healthz")
-        assert response.status_code == 200
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
         # Context should be available in app.state
-        assert hasattr(app.state, "context")
-        assert app.state.context is not None
+        assertions.expect_true(
+            hasattr(app.state, "context"), reason="app.state should have context"
+        )
+        assertions.expect_true(app.state.context is not None, reason="context should not be None")
 
 
 @pytest.mark.usefixtures("test_repo")
@@ -82,8 +87,10 @@ def test_open_file_endpoint() -> None:
     with TestClient(app) as client:
         # Verify app has context initialized
         response = client.get("/healthz")
-        assert response.status_code == 200
-        assert hasattr(app.state, "context")
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
+        assertions.expect_true(
+            hasattr(app.state, "context"), reason="app.state should have context"
+        )
 
 
 @pytest.mark.usefixtures("test_repo")
@@ -92,8 +99,10 @@ def test_search_text_endpoint() -> None:
     with TestClient(app) as client:
         # Verify app has context initialized
         response = client.get("/healthz")
-        assert response.status_code == 200
-        assert hasattr(app.state, "context")
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
+        assertions.expect_true(
+            hasattr(app.state, "context"), reason="app.state should have context"
+        )
 
 
 @pytest.mark.usefixtures("test_repo")
@@ -102,8 +111,10 @@ def test_semantic_search_endpoint() -> None:
     with TestClient(app) as client:
         # Verify app has context initialized
         response = client.get("/healthz")
-        assert response.status_code == 200
-        assert hasattr(app.state, "context")
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
+        assertions.expect_true(
+            hasattr(app.state, "context"), reason="app.state should have context"
+        )
 
 
 @pytest.mark.usefixtures("test_repo")
@@ -112,8 +123,10 @@ def test_blame_range_endpoint() -> None:
     with TestClient(app) as client:
         # Verify app has context initialized
         response = client.get("/healthz")
-        assert response.status_code == 200
-        assert hasattr(app.state, "context")
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
+        assertions.expect_true(
+            hasattr(app.state, "context"), reason="app.state should have context"
+        )
 
 
 @pytest.mark.usefixtures("test_repo")
@@ -122,8 +135,10 @@ def test_file_history_endpoint() -> None:
     with TestClient(app) as client:
         # Verify app has context initialized
         response = client.get("/healthz")
-        assert response.status_code == 200
-        assert hasattr(app.state, "context")
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
+        assertions.expect_true(
+            hasattr(app.state, "context"), reason="app.state should have context"
+        )
 
 
 @pytest.mark.usefixtures("test_repo")
@@ -132,8 +147,10 @@ def test_file_resource_endpoint() -> None:
     with TestClient(app) as client:
         # Verify app has context initialized
         response = client.get("/healthz")
-        assert response.status_code == 200
-        assert hasattr(app.state, "context")
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
+        assertions.expect_true(
+            hasattr(app.state, "context"), reason="app.state should have context"
+        )
 
 
 def test_missing_context_raises_error() -> None:
@@ -163,7 +180,7 @@ def test_get_context_success(mock_application_context: ApplicationContext) -> No
 
     # Verify context is returned
     result = get_context()
-    assert result is mock_application_context
+    assertions.expect_true(result is mock_application_context, reason="should return mock context")
 
     # Clean up
     app_context.set(None)
@@ -177,5 +194,5 @@ def test_trace_header_emitted() -> None:
         TestClient(app, base_url="http://127.0.0.1") as client,
     ):
         response = client.get("/healthz")
-    assert response.status_code == 200, response.text
-    assert response.headers.get("X-Trace-Id") == "trace-abc123"
+    assertions.expect_equal(response.status_code, HTTPStatus.OK, reason=response.text)
+    assertions.expect_equal(response.headers.get("X-Trace-Id"), "trace-abc123")

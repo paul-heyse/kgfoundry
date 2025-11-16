@@ -7,6 +7,8 @@ from codeintel_rev.retrieval.mcp_search import (
     post_search_validate_and_fill,
 )
 
+from tests._helpers import assertions
+
 
 def _row() -> dict[str, object]:
     return {
@@ -36,12 +38,17 @@ def test_post_search_validate_and_fill_repairs_missing_fields() -> None:
 
     fixed, stats = post_search_validate_and_fill([result], hydration=hydration)
 
-    assert stats.repaired == 1
-    assert stats.dropped == 0
-    assert fixed[0].title.endswith("lines 1-1")
-    assert fixed[0].url.startswith("repo://pkg/module.py")
-    assert "def add" in fixed[0].snippet
-    assert fixed[0].metadata["lang"] == "python"
+    assertions.expect_equal(stats.repaired, 1)
+    assertions.expect_equal(stats.dropped, 0)
+    assertions.expect_true(
+        fixed[0].title.endswith("lines 1-1"), reason="title should end with lines 1-1"
+    )
+    assertions.expect_true(
+        fixed[0].url.startswith("repo://pkg/module.py"),
+        reason="url should start with repo://pkg/module.py",
+    )
+    assertions.expect_in("def add", fixed[0].snippet)
+    assertions.expect_equal(fixed[0].metadata["lang"], "python")
 
 
 def test_post_search_validate_and_fill_drops_missing_rows() -> None:
@@ -59,6 +66,6 @@ def test_post_search_validate_and_fill_drops_missing_rows() -> None:
 
     fixed, stats = post_search_validate_and_fill([result], hydration=hydration)
 
-    assert fixed == []
-    assert stats.dropped == 1
-    assert stats.inspected == 1
+    assertions.expect_equal(fixed, [])
+    assertions.expect_equal(stats.dropped, 1)
+    assertions.expect_equal(stats.inspected, 1)

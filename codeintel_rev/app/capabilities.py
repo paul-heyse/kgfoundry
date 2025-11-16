@@ -6,22 +6,17 @@ import hashlib
 import importlib
 import importlib.util
 import json
-from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
-from typing import TYPE_CHECKING, Final, cast
+from typing import TYPE_CHECKING, Final
 
-from kgfoundry_common.logging import get_logger
 from kgfoundry_common.typing.heavy_deps import EXTRAS_HINT
 
 if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
 
 from codeintel_rev.errors import RuntimeLifecycleError
-
-LOGGER = get_logger(__name__)
-
 
 __all__ = ["Capabilities"]
 
@@ -62,49 +57,7 @@ def _import_optional(module_name: str) -> ModuleType | None:
     try:
         return importlib.import_module(module_name)
     except ImportError:  # pragma: no cover - import errors are expected
-        LOGGER.debug(
-            "Optional module import failed",
-            extra={"capability_module": module_name},
-            exc_info=True,
-        )
         return None
-
-
-def _probe_faiss_gpu(module: ModuleType | None) -> tuple[bool, str | None]:
-    """Return FAISS GPU availability and optional reason for failure.
-
-    Parameters
-    ----------
-    module : ModuleType | None
-        FAISS module instance. If None, returns (False, "faiss-missing").
-
-    Returns
-    -------
-    tuple[bool, str | None]
-        Availability flag and optional reason string. Returns (True, None) if GPU
-        is available, (False, reason) otherwise. Reason codes include:
-        "faiss-missing", "gpu-symbols-missing", "no-gpu-visible", "gpu-probe-error:<class>".
-
-    Notes
-    -----
-    This helper probes FAISS GPU support by checking for required GPU symbols
-    (StandardGpuResources, GpuClonerOptions, index_cpu_to_gpu) and attempting
-    to query GPU count. Handles various failure modes gracefully without raising.
-    """
-    if module is None:
-        return False, "faiss-missing"
-    required_attrs = ("StandardGpuResources", "GpuClonerOptions", "index_cpu_to_gpu")
-    if not all(hasattr(module, attr) for attr in required_attrs):
-        return False, "gpu-symbols-missing"
-    get_num_gpus = getattr(module, "get_num_gpus", None)
-    if callable(get_num_gpus):
-        gpu_fn = cast("Callable[[], int]", get_num_gpus)
-        try:
-            if gpu_fn() > 0:
-                return True, None
-        except (OSError, RuntimeError, ValueError, TypeError) as exc:  # pragma: no cover
-            return False, f"gpu-probe-error:{exc.__class__.__name__}"
-    return False, "no-gpu-visible"
 
 
 def _path_exists(path: Path | None) -> bool:
@@ -146,8 +99,6 @@ class Capabilities:
     torch_importable: bool = False
     lucene_importable: bool = False
     onnxruntime_importable: bool = False
-    faiss_gpu_available: bool = False
-    faiss_gpu_disabled_reason: str | None = None
     active_index_version: str | None = None
     versions_available: int = 0
 
@@ -200,8 +151,6 @@ class Capabilities:
             "torch_importable": self.torch_importable,
             "lucene_importable": self.lucene_importable,
             "onnxruntime_importable": self.onnxruntime_importable,
-            "faiss_gpu_available": self.faiss_gpu_available,
-            "faiss_gpu_disabled_reason": self.faiss_gpu_disabled_reason,
             "has_semantic": self.has_semantic,
             "has_symbols": self.has_symbols,
             "active_index_version": self.active_index_version,
@@ -256,8 +205,8 @@ class Capabilities:
         -------
         Capabilities
             Snapshot computed from the context, including detected features
-            (FAISS index, DuckDB, SCIP index, vLLM client, GPU support, etc.)
-            and optional hints for missing capabilities.
+            (FAISS index, DuckDB, SCIP index, vLLM client, etc.) and optional
+            hints for missing capabilities.
 
         Notes
         -----
@@ -274,7 +223,6 @@ class Capabilities:
         torch_module = _import_optional("torch")
         lucene_module = _import_optional("pyserini.search.lucene")
         onnxruntime_module = _import_optional("onnxruntime")
-        faiss_gpu_available, faiss_gpu_reason = _probe_faiss_gpu(faiss_module)
         active_version: str | None = None
         version_count = 0
         index_manager = getattr(context, "index_manager", None)
@@ -299,11 +247,7 @@ class Capabilities:
             torch_importable=torch_module is not None,
             lucene_importable=lucene_module is not None,
             onnxruntime_importable=onnxruntime_module is not None,
-            faiss_gpu_available=faiss_gpu_available,
-            faiss_gpu_disabled_reason=faiss_gpu_reason,
             active_index_version=active_version,
             versions_available=version_count,
         )
-        payload = snapshot.model_dump()
-        LOGGER.info("capabilities.snapshot", extra={"capabilities": payload})
         return snapshot

@@ -20,6 +20,7 @@ from codeintel_rev.mcp_server.adapters.semantic import semantic_search
 from codeintel_rev.mcp_server.schemas import ScopeIn
 
 from kgfoundry_common.errors import EmbeddingError
+from tests._helpers import assertions
 
 
 class StubDuckDBCatalog:
@@ -213,25 +214,20 @@ class StubVLLMClient:
         np.ndarray
             Mock embedding vector (3584 dimensions).
         """
-        assert query
+        assertions.expect_true(bool(query), reason="query should be non-empty")
         return np.array([0.1] * 3584, dtype=np.float32)
 
 
 class _BaseStubFAISSManager:
-    """Base stub FAISS manager for testing.
+    """Base stub FAISS manager for testing CPU-only execution.
 
     Parameters
     ----------
-    should_fail_gpu : bool
-        Whether GPU cloning should fail.
     search_ids : list[int] | None, optional
         List of chunk IDs to return from search. If None, returns [123].
     """
 
-    def __init__(self, *, should_fail_gpu: bool, search_ids: list[int] | None = None) -> None:
-        self.should_fail_gpu = should_fail_gpu
-        self.gpu_disabled_reason: str | None = None
-        self.clone_invocations = 0
+    def __init__(self, *, search_ids: list[int] | None = None) -> None:
         self.last_k: int | None = None
         self.last_nprobe: int | None = None
         self.last_ef_search: int | None = None
@@ -243,21 +239,6 @@ class _BaseStubFAISSManager:
     def load_cpu_index(self) -> None:
         """Load CPU index (no-op for testing)."""
         return
-
-    def clone_to_gpu(self) -> bool:
-        """Clone to GPU (may fail based on should_fail_gpu).
-
-        Returns
-        -------
-        bool
-            True if GPU cloning succeeds, False otherwise.
-        """
-        self.clone_invocations += 1
-        if self.should_fail_gpu:
-            self.gpu_disabled_reason = "FAISS GPU disabled - using CPU: simulated failure"
-            return False
-        self.gpu_disabled_reason = None
-        return True
 
     def search(
         self,
@@ -289,8 +270,8 @@ class _BaseStubFAISSManager:
         tuple[np.ndarray, np.ndarray]
             Tuple of (distances, ids) arrays.
         """
-        assert query.shape[0] == 1  # Batch size 1
-        assert k >= 1
+        assertions.expect_equal(query.shape[0], 1, reason="Batch size should be 1")
+        assertions.expect_true(k >= 1, reason="k should be at least 1")
         self.last_k = k
         self.last_nprobe = nprobe
         self.last_ef_search = getattr(runtime, "ef_search", None)
@@ -298,7 +279,7 @@ class _BaseStubFAISSManager:
         self.last_k_factor = getattr(runtime, "k_factor", None)
         if catalog is not None:
             self._last_catalog = catalog
-        assert nprobe >= 1
+        assertions.expect_true(nprobe >= 1, reason="nprobe should be at least 1")
         # Return k results (or fewer if k > available chunks)
         # Use stored search_ids or default to [123]
         result_ids = self._search_ids[:k]
@@ -429,71 +410,8 @@ class StubContext:
 
 
 @pytest.mark.asyncio
-async def test_semantic_search_gpu_success() -> None:
-    context = StubContext(
-        faiss_manager=_BaseStubFAISSManager(should_fail_gpu=False),
-        config=StubContextConfig(limits=[], error=None),
-    )
-
-    # Mock session ID and scope (no scope for this test)
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
-            return_value="test-session-123",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
-            return_value=None,
-        ),
-    ):
-        # Cast StubContext to ApplicationContext for type checking
-        # StubContext implements the necessary interface for testing
-        result = await semantic_search(cast("ApplicationContext", context), "hello", limit=1)
-
-    assert "limits" not in result
-    findings = result.get("findings")
-    assert findings is not None
-    assert len(findings) > 0
-    location = findings[0].get("location")
-    assert location is not None
-    assert location.get("uri") == "src/module.py"
-
-
-@pytest.mark.asyncio
-async def test_semantic_search_gpu_fallback() -> None:
-    context = StubContext(
-        faiss_manager=_BaseStubFAISSManager(should_fail_gpu=True),
-        config=StubContextConfig(
-            limits=["FAISS GPU disabled - using CPU: simulated failure"], error=None
-        ),
-    )
-
-    # Mock session ID and scope (no scope for this test)
-    with (
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_session_id",
-            return_value="test-session-123",
-        ),
-        patch(
-            "codeintel_rev.mcp_server.adapters.semantic.get_effective_scope",
-            return_value=None,
-        ),
-    ):
-        result = await semantic_search(cast("ApplicationContext", context), "hello", limit=1)
-
-    limits = result.get("limits")
-    assert limits == ["FAISS GPU disabled - using CPU: simulated failure"]
-    findings = result.get("findings")
-    assert findings is not None
-    assert len(findings) > 0
-    location = findings[0].get("location")
-    assert location is not None
-    assert location.get("uri") == "src/module.py"
-
-
-@pytest.mark.asyncio
 async def test_semantic_search_applies_scope_faiss_tuning() -> None:
-    manager = _BaseStubFAISSManager(should_fail_gpu=False)
+    manager = _BaseStubFAISSManager()
     context = StubContext(
         faiss_manager=manager,
         config=StubContextConfig(limits=[], error=None),
@@ -511,15 +429,15 @@ async def test_semantic_search_applies_scope_faiss_tuning() -> None:
     ):
         result = await semantic_search(cast("ApplicationContext", context), "hello scope", limit=1)
 
-    assert result.get("findings")
-    assert manager.last_nprobe == 256
-    assert manager.last_ef_search == 96
-    assert manager.last_k_factor == pytest.approx(2.0)
+    assertions.expect_true(bool(result.get("findings")), reason="should have findings")
+    assertions.expect_equal(manager.last_nprobe, 256)
+    assertions.expect_equal(manager.last_ef_search, 96)
+    assertions.expect_almost_equal(cast("float", manager.last_k_factor), 2.0)
 
 
 @pytest.mark.asyncio
 async def test_semantic_search_limit_truncates_to_max_results() -> None:
-    faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
+    faiss_manager = _BaseStubFAISSManager()
     context = StubContext(
         faiss_manager=faiss_manager,
         config=StubContextConfig(limits=[], error=None, max_results=3),
@@ -538,21 +456,24 @@ async def test_semantic_search_limit_truncates_to_max_results() -> None:
     ):
         result = await semantic_search(cast("ApplicationContext", context), "hello", limit=10)
 
-    assert faiss_manager.last_k == 3
+    assertions.expect_equal(faiss_manager.last_k, 3)
     limits = result.get("limits")
-    assert limits is not None
-    assert any("exceeds max_results" in message for message in limits)
+    assertions.expect_true(limits is not None, reason="should have limits")
+    assertions.expect_true(
+        any("exceeds max_results" in message for message in cast("list[str]", limits)),
+        reason="should warn about exceeding max_results",
+    )
     method = result.get("method")
-    assert method is not None
+    assertions.expect_true(method is not None, reason="should have method")
     coverage = method.get("coverage")
-    assert coverage is not None
-    assert "/3 results" in coverage
-    assert "requested 10" in coverage
+    assertions.expect_true(coverage is not None, reason="should have coverage")
+    assertions.expect_in("/3 results", cast("str", coverage))
+    assertions.expect_in("requested 10", cast("str", coverage))
 
 
 @pytest.mark.asyncio
 async def test_semantic_search_limit_enforces_minimum() -> None:
-    faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
+    faiss_manager = _BaseStubFAISSManager()
     context = StubContext(
         faiss_manager=faiss_manager,
         config=StubContextConfig(limits=[], error=None, max_results=5),
@@ -571,21 +492,24 @@ async def test_semantic_search_limit_enforces_minimum() -> None:
     ):
         result = await semantic_search(cast("ApplicationContext", context), "hello", limit=0)
 
-    assert faiss_manager.last_k == 1
+    assertions.expect_equal(faiss_manager.last_k, 1)
     limits = result.get("limits")
-    assert limits is not None
-    assert any("not positive" in message for message in limits)
+    assertions.expect_true(limits is not None, reason="should have limits")
+    assertions.expect_true(
+        any("not positive" in message for message in cast("list[str]", limits)),
+        reason="should warn about non-positive limit",
+    )
     method = result.get("method")
-    assert method is not None
+    assertions.expect_true(method is not None, reason="should have method")
     coverage = method.get("coverage")
-    assert coverage is not None
-    assert "/1 results" in coverage
-    assert "requested 0" in coverage
+    assertions.expect_true(coverage is not None, reason="should have coverage")
+    assertions.expect_in("/1 results", cast("str", coverage))
+    assertions.expect_in("requested 0", cast("str", coverage))
 
 
 @pytest.mark.asyncio
 async def test_semantic_search_respects_configured_nprobe() -> None:
-    faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
+    faiss_manager = _BaseStubFAISSManager()
     context = StubContext(
         faiss_manager=faiss_manager,
         config=StubContextConfig(limits=[], error=None, max_results=5, faiss_nprobe=64),
@@ -603,7 +527,7 @@ async def test_semantic_search_respects_configured_nprobe() -> None:
     ):
         await semantic_search(cast("ApplicationContext", context), "hello", limit=1)
 
-    assert faiss_manager.last_nprobe == 64
+    assertions.expect_equal(faiss_manager.last_nprobe, 64)
 
 
 @pytest.mark.asyncio
@@ -639,7 +563,7 @@ async def test_semantic_search_with_scope_filters() -> None:
     ]
 
     # FAISS returns all three chunk IDs
-    faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False, search_ids=[123, 456, 789])
+    faiss_manager = _BaseStubFAISSManager(search_ids=[123, 456, 789])
 
     context = StubContext(
         faiss_manager=faiss_manager,
@@ -662,18 +586,20 @@ async def test_semantic_search_with_scope_filters() -> None:
         result = await semantic_search(cast("ApplicationContext", context), "function", limit=10)
 
     findings = result.get("findings")
-    assert findings is not None
-    assert len(findings) == 2  # Only Python files
+    assertions.expect_true(findings is not None, reason="should have findings")
+    assertions.expect_equal(len(findings), 2)  # Only Python files
 
     # Verify all results are Python files
     uris = [finding.get("location", {}).get("uri", "") for finding in findings]
-    assert all(uri.endswith(".py") for uri in uris)
-    assert "src/main.py" in uris
-    assert "src/utils.py" in uris
-    assert "src/app.ts" not in uris
+    assertions.expect_true(
+        all(uri.endswith(".py") for uri in uris), reason="all results should be Python files"
+    )
+    assertions.expect_in("src/main.py", uris)
+    assertions.expect_in("src/utils.py", uris)
+    assertions.expect_false("src/app.ts" in uris, reason="TypeScript files should be filtered out")
 
     # Verify scope is included in response
-    assert result.get("scope") == scope
+    assertions.expect_equal(result.get("scope"), scope)
 
 
 @pytest.mark.asyncio
@@ -702,7 +628,7 @@ async def test_semantic_search_no_scope() -> None:
     ]
 
     # FAISS returns both chunk IDs
-    faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False, search_ids=[123, 456])
+    faiss_manager = _BaseStubFAISSManager(search_ids=[123, 456])
 
     context = StubContext(
         faiss_manager=faiss_manager,
@@ -723,13 +649,13 @@ async def test_semantic_search_no_scope() -> None:
         result = await semantic_search(cast("ApplicationContext", context), "function", limit=10)
 
     findings = result.get("findings")
-    assert findings is not None
-    assert len(findings) == 2  # All files returned
+    assertions.expect_true(findings is not None, reason="should have findings")
+    assertions.expect_equal(len(findings), 2)  # All files returned
 
     # Verify both file types are present
     uris = [finding.get("location", {}).get("uri", "") for finding in findings]
-    assert "src/main.py" in uris
-    assert "src/app.ts" in uris
+    assertions.expect_in("src/main.py", uris)
+    assertions.expect_in("src/app.ts", uris)
 
     # Verify query_by_ids was called (not query_by_filters)
     # This is verified by the fact that all chunks are returned
@@ -763,7 +689,7 @@ async def test_semantic_search_hybrid_merges_channels() -> None:
                 method=None,
             )
 
-    faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False, search_ids=[101, 102])
+    faiss_manager = _BaseStubFAISSManager(search_ids=[101, 102])
     chunks = [
         {"id": 101, "uri": "src/a.py", "start_line": 0, "end_line": 2, "preview": "a"},
         {"id": 102, "uri": "src/b.py", "start_line": 5, "end_line": 9, "preview": "b"},
@@ -791,25 +717,27 @@ async def test_semantic_search_hybrid_merges_channels() -> None:
         result = await semantic_search(cast("ApplicationContext", context), "hybrid query", limit=2)
 
     answer = result.get("answer")
-    assert answer is not None
-    assert answer.startswith("Found 2 hybrid")
+    assertions.expect_true(answer is not None, reason="should have answer")
+    assertions.expect_true(
+        answer.startswith("Found 2 hybrid"), reason="answer should start with Found 2 hybrid"
+    )
     limits = result.get("limits")
-    assert limits is not None
-    assert "bm25 warmed up" in limits
+    assertions.expect_true(limits is not None, reason="should have limits")
+    assertions.expect_in("bm25 warmed up", cast("list[str]", limits))
     findings = result.get("findings")
-    assert findings is not None
-    assert findings[0].get("chunk_id") == 101
+    assertions.expect_true(findings is not None, reason="should have findings")
+    assertions.expect_equal(findings[0].get("chunk_id"), 101)
     why_message = findings[0].get("why")
-    assert why_message is not None
-    assert "Hybrid RRF" in why_message
-    assert "bm25" in why_message
+    assertions.expect_true(why_message is not None, reason="should have why message")
+    assertions.expect_in("Hybrid RRF", cast("str", why_message))
+    assertions.expect_in("bm25", cast("str", why_message))
     method = result.get("method")
-    assert method is not None
+    assertions.expect_true(method is not None, reason="should have method")
     retrieval = method.get("retrieval")
-    assert retrieval is not None
-    retrieval_set = set(retrieval)
+    assertions.expect_true(retrieval is not None, reason="should have retrieval")
+    retrieval_set = set(cast("list[str]", retrieval))
     missing_channels = {"semantic", "faiss", "bm25", "splade"} - retrieval_set
-    assert not missing_channels
+    assertions.expect_false(bool(missing_channels), reason="all channels should be present")
 
 
 # ==================== Error Handling Tests ====================
@@ -817,7 +745,7 @@ async def test_semantic_search_hybrid_merges_channels() -> None:
 
 async def test_semantic_search_faiss_not_ready() -> None:
     """Test semantic_search falls back when FAISS is not ready."""
-    faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
+    faiss_manager = _BaseStubFAISSManager()
     context = StubContext(
         faiss_manager=faiss_manager,
         config=StubContextConfig(limits=[], error="Index not built", catalog_chunks=None),
@@ -835,14 +763,14 @@ async def test_semantic_search_faiss_not_ready() -> None:
     ):
         result = await semantic_search(cast("ApplicationContext", context), "query", limit=10)
     limits = result.get("limits") or []
-    joined_limits = " ".join(limits)
-    assert "faiss_fallback" in joined_limits
-    assert result.get("findings") == []
+    joined_limits = " ".join(cast("list[str]", limits))
+    assertions.expect_in("faiss_fallback", joined_limits)
+    assertions.expect_equal(result.get("findings"), [])
 
 
 async def test_semantic_search_embedding_error() -> None:
     """Test semantic_search raises EmbeddingError when embedding fails."""
-    faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
+    faiss_manager = _BaseStubFAISSManager()
     context = StubContext(
         faiss_manager=faiss_manager,
         config=StubContextConfig(limits=[], error=None, catalog_chunks=None),
@@ -869,7 +797,7 @@ async def test_semantic_search_embedding_error() -> None:
 
 async def test_semantic_search_faiss_search_error() -> None:
     """Test semantic_search falls back when FAISS search fails."""
-    faiss_manager = _BaseStubFAISSManager(should_fail_gpu=False)
+    faiss_manager = _BaseStubFAISSManager()
     context = StubContext(
         faiss_manager=faiss_manager,
         config=StubContextConfig(limits=[], error=None, catalog_chunks=None),
@@ -892,5 +820,8 @@ async def test_semantic_search_faiss_search_error() -> None:
     ):
         result = await semantic_search(cast("ApplicationContext", context), "query", limit=10)
     limits = result.get("limits") or []
-    assert any("faiss_fallback" in entry for entry in limits)
-    assert result.get("findings") == []
+    assertions.expect_true(
+        any("faiss_fallback" in entry for entry in cast("list[str]", limits)),
+        reason="should have faiss_fallback in limits",
+    )
+    assertions.expect_equal(result.get("findings"), [])

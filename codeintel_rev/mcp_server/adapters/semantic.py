@@ -30,7 +30,6 @@ from codeintel_rev.mcp_server.schemas import (
 from codeintel_rev.mcp_server.scope_utils import get_effective_scope
 from codeintel_rev.typing import NDArrayF32
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     import httpx
@@ -43,7 +42,6 @@ else:
 
 SNIPPET_PREVIEW_CHARS = 500
 COMPONENT_NAME = "codeintel_mcp"
-LOGGER = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -273,19 +271,6 @@ def _semantic_search_sync(
 ) -> AnswerEnvelope:
     start_time = perf_counter()
     try:
-        LOGGER.debug(
-            "Semantic search with scope",
-            extra={
-                "session_id": session_id,
-                "query": query,
-                "has_scope": scope is not None,
-                "scope_languages": (
-                    cast("Sequence[str] | None", scope.get("languages")) if scope else None
-                ),
-                "scope_include_globs": scope.get("include_globs") if scope else None,
-            },
-        )
-
         artifacts = _execute_semantic_pipeline(
             _SemanticPipelineRequest(
                 context=context,
@@ -312,13 +297,6 @@ def _semantic_search_sync(
         )
         method_payload["stages"] = stage_entries
 
-        _warn_scope_filter_reduction(
-            scope,
-            artifacts.plan.scope_flags,
-            len(artifacts.findings),
-            artifacts.plan.effective_limit,
-            len(artifacts.result_ids),
-        )
         _annotate_hybrid_contributions(
             artifacts.findings,
             artifacts.hybrid_result.contribution_map,
@@ -354,7 +332,6 @@ def _semantic_search_sync(
             extras=extras,
         )
     except Exception:
-        LOGGER.exception("Semantic search failed", extra={"session_id": session_id})
         raise
     return envelope
 
@@ -425,18 +402,10 @@ def _run_faiss_stage(
     )
     if search_exc is not None:
         warning = f"FAISS unavailable, falling back to sparse channels ({search_exc})"
-        LOGGER.warning(warning, exc_info=search_exc)
         limits_metadata.append("faiss_fallback:unavailable")
         return _FaissStageResult([], [], search_exc)
     threshold = float(request.context.settings.index.semantic_min_score or 0.0)
     if threshold > 0.0 and result_scores and float(result_scores[0]) < threshold:
-        LOGGER.info(
-            "faiss.low_similarity_fallback",
-            extra={
-                "top_score": float(result_scores[0]),
-                "threshold": threshold,
-            },
-        )
         limits_metadata.append("faiss_fallback:low_score")
         return _FaissStageResult([], [], None)
     return _FaissStageResult(list(result_ids), list(result_scores), None)
@@ -590,20 +559,6 @@ def _build_semantic_search_plan(
             f"FAISS fan-out clamped to {fanout.faiss_k} (max_results={budget.max_results})."
         )
     limits_metadata.extend(tuning_warnings)
-    LOGGER.debug(
-        "Computed FAISS fan-out",
-        extra={
-            "requested_limit": requested_limit,
-            "effective_limit": budget.effective_limit,
-            "faiss_k": fanout.faiss_k,
-            "faiss_k_target": fanout.faiss_k_target,
-            "multiplier": multiplier,
-            "has_scope_filters": scope_flags.has_filters,
-            "has_include_globs": scope_flags.has_include_globs,
-            "has_exclude_globs": scope_flags.has_exclude_globs,
-            "has_languages": scope_flags.has_languages,
-        },
-    )
 
     faiss_nprobe = int(tuning_overrides.get("nprobe", context.settings.index.faiss_nprobe))
     return _SemanticSearchPlan(
@@ -719,7 +674,6 @@ def _resolve_hybrid_results(
         hybrid_engine = context.get_hybrid_engine()
     except RuntimeError as exc:  # pragma: no cover - defensive
         limits_metadata.append(f"Hybrid search unavailable: {exc}")
-        LOGGER.warning("Hybrid engine unavailable", exc_info=exc)
         return _build_hybrid_result(
             (hydration_ids, hydration_scores),
             limit=state.effective_limit,
@@ -928,44 +882,6 @@ def _ensure_hydration_success(
             "vectors_dir": str(context.paths.vectors_dir),
         },
     ) from hydrate_exc
-
-
-def _warn_scope_filter_reduction(
-    scope: ScopeIn | None,
-    scope_flags: _ScopeFilterFlags,
-    findings_count: int,
-    effective_limit: int,
-    faiss_result_count: int,
-) -> None:
-    """Log when scope filtering reduces the result set below the requested limit.
-
-    Parameters
-    ----------
-    scope : ScopeIn | None
-        Applied scope configuration.
-    scope_flags : _ScopeFilterFlags
-        Flags describing the active scope filters.
-    findings_count : int
-        Number of findings returned to the client.
-    effective_limit : int
-        Limit applied after clamping.
-    faiss_result_count : int
-        Number of results returned from FAISS prior to filtering.
-    """
-    if not (scope and scope_flags.has_filters and findings_count < effective_limit):
-        return
-
-    LOGGER.warning(
-        "Scope filtering reduced results below requested limit",
-        extra={
-            "requested_limit": effective_limit,
-            "actual_count": findings_count,
-            "faiss_results": faiss_result_count,
-            "has_include_globs": scope_flags.has_include_globs,
-            "has_exclude_globs": scope_flags.has_exclude_globs,
-            "has_languages": scope_flags.has_languages,
-        },
-    )
 
 
 def _annotate_hybrid_contributions(
@@ -1215,16 +1131,6 @@ def _hydrate_findings(
                     include_globs=include_globs,
                     exclude_globs=exclude_globs,
                     languages=languages,
-                )
-                LOGGER.debug(
-                    "Applied scope filters during DuckDB hydration",
-                    extra={
-                        "chunk_ids_count": len(valid_ids),
-                        "filtered_count": len(records),
-                        "has_include_globs": bool(include_globs),
-                        "has_exclude_globs": bool(exclude_globs),
-                        "has_languages": bool(languages),
-                    },
                 )
             else:
                 records = active_catalog.query_by_ids(valid_ids)

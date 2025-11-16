@@ -11,6 +11,7 @@ from kgfoundry_common.problem_details import (
     build_configuration_problem,
     validate_problem_details,
 )
+from tests._helpers import assertions
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -85,12 +86,14 @@ class TestConfigurationProblemSchema:
             / "problem_details"
             / "public-api-invalid-config.json"
         )
-        assert sample_path.exists(), f"Sample payload not found at {sample_path}"
+        assertions.expect_true(
+            sample_path.exists(), reason=f"Sample payload not found at {sample_path}"
+        )
 
     def test_sample_payload_is_valid_json(self) -> None:
         """Test that the sample payload is valid JSON."""
         payload = _load_sample_payload()
-        assert isinstance(payload, dict)
+        assertions.expect_true(isinstance(payload, dict), reason="payload should be dict")
 
     def test_sample_payload_validates_against_schema(self) -> None:
         """Test that the sample payload validates against the schema."""
@@ -103,26 +106,32 @@ class TestConfigurationProblemSchema:
 
         required_fields = ["type", "title", "status", "detail", "instance"]
         for field in required_fields:
-            assert field in payload, f"Required field '{field}' missing from sample"
+            assertions.expect_true(
+                field in payload, reason=f"Required field '{field}' missing from sample"
+            )
 
     def test_sample_payload_has_configuration_error_type(self) -> None:
         """Test that sample uses configuration-error problem type."""
         payload = _load_sample_payload()
 
-        assert payload["type"] == "https://kgfoundry.dev/problems/configuration-error"
-        assert payload["code"] == "configuration-error"
+        assertions.expect_equal(
+            payload["type"], "https://kgfoundry.dev/problems/configuration-error"
+        )
+        assertions.expect_equal(payload["code"], "configuration-error")
 
     def test_sample_payload_has_validation_context(self) -> None:
         """Test that sample contains validation context with field, issue, and hint."""
         payload = _load_sample_payload()
 
-        assert "extensions" in payload
+        assertions.expect_true("extensions" in payload, reason="payload should have extensions")
         extensions = cast("dict[str, object]", payload["extensions"])
-        assert "validation" in extensions
+        assertions.expect_true(
+            "validation" in extensions, reason="extensions should have validation"
+        )
         validation = cast("dict[str, object]", extensions["validation"])
-        assert "field" in validation
-        assert "issue" in validation
-        assert "hint" in validation
+        assertions.expect_true("field" in validation, reason="validation should have field")
+        assertions.expect_true("issue" in validation, reason="validation should have issue")
+        assertions.expect_true("hint" in validation, reason="validation should have hint")
 
     def test_generated_problem_matches_sample_structure(self) -> None:
         """Test that generated Problem Details matches sample structure."""
@@ -135,12 +144,16 @@ class TestConfigurationProblemSchema:
         problem_dict = _as_problem_dict(problem)
 
         # Verify structure matches sample
-        assert problem_dict["type"] == "https://kgfoundry.dev/problems/configuration-error"
-        assert problem_dict["title"] == "Configuration Error"
-        assert problem_dict["status"] == 500
-        assert problem_dict["instance"] == "urn:config:validation"
-        assert problem_dict["code"] == "configuration-error"
-        assert "extensions" in problem_dict
+        assertions.expect_equal(
+            problem_dict["type"], "https://kgfoundry.dev/problems/configuration-error"
+        )
+        assertions.expect_equal(problem_dict["title"], "Configuration Error")
+        assertions.expect_equal(problem_dict["status"], 500)
+        assertions.expect_equal(problem_dict["instance"], "urn:config:validation")
+        assertions.expect_equal(problem_dict["code"], "configuration-error")
+        assertions.expect_true(
+            "extensions" in problem_dict, reason="problem should have extensions"
+        )
 
 
 class TestConfigurationProblemSchemaParity:
@@ -175,13 +188,15 @@ class TestConfigurationProblemSchemaParity:
         generated = build_configuration_problem(error)
         generated_dict = _as_problem_dict(generated)
 
-        assert "extensions" in sample
-        assert "extensions" in generated_dict
+        assertions.expect_true("extensions" in sample, reason="sample should have extensions")
+        assertions.expect_true(
+            "extensions" in generated_dict, reason="generated should have extensions"
+        )
 
     def test_sample_http_status_is_500(self) -> None:
         """Test that sample payload has HTTP 500 status for config errors."""
         payload = _load_sample_payload()
-        assert payload["status"] == 500
+        assertions.expect_equal(payload["status"], 500)
 
     def test_generated_problem_instance_is_urn(self) -> None:
         """Test that generated problems use urn: for instance."""
@@ -193,7 +208,9 @@ class TestConfigurationProblemSchemaParity:
         problem_dict = _as_problem_dict(problem)
 
         instance = problem_dict.get("instance", "")
-        assert str(instance).startswith("urn:")
+        assertions.expect_true(
+            str(instance).startswith("urn:"), reason="instance should start with urn:"
+        )
 
 
 class TestConfigurationProblemDocumentation:
@@ -205,7 +222,7 @@ class TestConfigurationProblemDocumentation:
 
         extensions = cast("dict[str, object]", payload["extensions"])
         validation = cast("dict[str, object]", extensions["validation"])
-        assert validation["field"] == "timeout_seconds"
+        assertions.expect_equal(validation["field"], "timeout_seconds")
 
     def test_sample_payload_contains_readable_issue_description(self) -> None:
         """Test that sample payload has human-readable issue description."""
@@ -213,8 +230,10 @@ class TestConfigurationProblemDocumentation:
 
         extensions = cast("dict[str, object]", payload["extensions"])
         validation = cast("dict[str, object]", extensions["validation"])
-        assert len(cast("str", validation["issue"])) > 0
-        assert validation["issue"] == "Must be > 0"
+        assertions.expect_true(
+            len(cast("str", validation["issue"])) > 0, reason="issue should not be empty"
+        )
+        assertions.expect_equal(validation["issue"], "Must be > 0")
 
     def test_sample_payload_contains_resolution_hint(self) -> None:
         """Test that sample payload includes a hint for resolving the issue."""
@@ -222,5 +241,7 @@ class TestConfigurationProblemDocumentation:
 
         extensions = cast("dict[str, object]", payload["extensions"])
         validation = cast("dict[str, object]", extensions["validation"])
-        assert "hint" in validation
-        assert len(cast("str", validation["hint"])) > 0
+        assertions.expect_true("hint" in validation, reason="validation should have hint")
+        assertions.expect_true(
+            len(cast("str", validation["hint"])) > 0, reason="hint should not be empty"
+        )

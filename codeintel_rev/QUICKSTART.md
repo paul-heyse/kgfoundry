@@ -9,7 +9,7 @@ We've successfully built a **production-grade MCP code intelligence platform**!
 - ✅ **cAST Chunking** - Structure-aware code chunking (2200 chars)
 - ✅ **vLLM Client** - OpenAI-compatible embeddings API
 - ✅ **Vector Storage** - Arrow/Parquet + DuckDB
-- ✅ **FAISS GPU** - cuVS-accelerated similarity search
+- ✅ **FAISS CPU** - tuned ParameterSpace similarity search
 - ✅ **Hybrid Retrieval** - RRF fusion algorithm
 
 ### MCP Server & Tools
@@ -89,16 +89,16 @@ ChatGPT/Claude
      ↓
    ┌─────────┬──────────┬─────────┐
    FAISS     DuckDB     vLLM
-   (GPU)     (Parquet)  (Embeddings)
+   (CPU)     (Parquet)  (Embeddings)
 ```
 
 ## 🏆 Best-in-Class Features
 
 - **msgspec** - 10x faster serialization
 - **HTTP/3 (QUIC)** - Modern streaming protocol
-- **GPU FAISS with cuVS** - 100x faster search
+- **CPU FAISS with ParameterSpace tuning** - predictable recall/latency
 - **Arrow FixedSizeList** - Zero-copy vector operations
-- **Graceful degradation** - Works without GPU/vLLM
+- **Graceful degradation** - Works without local GPUs (vLLM optional)
 - **Type-safe** - Full pyright strict compliance
 
 ## 📂 Key Files
@@ -106,7 +106,7 @@ ChatGPT/Claude
 ```
 codeintel_rev/
 ├── config/settings.py       # msgspec configuration
-├── io/faiss_manager.py      # GPU search
+├── io/faiss_manager.py      # CPU FAISS search
 ├── io/vllm_client.py        # Embeddings
 ├── mcp_server/server.py     # FastMCP tools
 ├── mcp_server/adapters/     # Tool implementations
@@ -116,7 +116,7 @@ codeintel_rev/
 
 ## 🎖️ What Makes This Special
 
-1. **Production-Grade**: Not a prototype - real HTTP/3, OAuth 2.1, GPU acceleration
+1. **Production-Grade**: Not a prototype - real HTTP/3, OAuth 2.1, CPU-optimized FAISS
 2. **Best Practices**: Follows AGENTS.md standards throughout
 3. **Type-Safe**: Full static analysis compliance
 4. **Modular**: Easy to extend with new tools
@@ -138,4 +138,3 @@ codeintel_rev/
 **Thank you for building with us!** 🚀
 
 This has been an exciting project building a truly production-grade system. The architecture is solid, the code is clean, and everything is ready to go. We're just waiting on an upstream dependency fix!
-

@@ -11,6 +11,7 @@ import base64
 import pytest
 
 from kgfoundry_common.config import AppSettings
+from tests._helpers import assertions
 
 
 def make_settings(**overrides: object) -> AppSettings:
@@ -38,10 +39,10 @@ class TestConfigurationValidation:
         """Test that minimal valid configuration loads."""
         # Minimal config should work with defaults
         settings = make_settings()
-        assert settings.log_level == "INFO"
-        assert settings.log_format == "json"
-        assert settings.subprocess_timeout == 300
-        assert settings.request_timeout == 30
+        assertions.expect_equal(settings.log_level, "INFO")
+        assertions.expect_equal(settings.log_format, "json")
+        assertions.expect_equal(settings.subprocess_timeout, 300)
+        assertions.expect_equal(settings.request_timeout, 30)
 
     def test_log_level_validation(self) -> None:
         """Test log level validation rejects invalid values."""
@@ -51,7 +52,7 @@ class TestConfigurationValidation:
     def test_log_level_case_insensitive(self) -> None:
         """Test log level accepts any case."""
         settings = make_settings(log_level="debug")
-        assert settings.log_level == "DEBUG"
+        assertions.expect_equal(settings.log_level, "DEBUG")
 
     def test_log_format_validation(self) -> None:
         """Test log format validation rejects invalid values."""
@@ -70,7 +71,7 @@ class TestConfigurationValidation:
 
         # Valid
         settings = make_settings(subprocess_timeout=300)
-        assert settings.subprocess_timeout == 300
+        assertions.expect_equal(settings.subprocess_timeout, 300)
 
     def test_request_timeout_validation(self) -> None:
         """Test request timeout must be positive and within bounds."""
@@ -84,7 +85,7 @@ class TestConfigurationValidation:
 
         # Valid
         settings = make_settings(request_timeout=30)
-        assert settings.request_timeout == 30
+        assertions.expect_equal(settings.request_timeout, 30)
 
 
 class TestSigningKeyValidation:
@@ -93,7 +94,7 @@ class TestSigningKeyValidation:
     def test_signing_key_optional(self) -> None:
         """Test that signing key is optional."""
         settings = make_settings()
-        assert settings.signing_key is None
+        assertions.expect_equal(settings.signing_key, None)
 
     def test_signing_key_cannot_be_empty(self) -> None:
         """Test that signing key cannot be empty string."""
@@ -118,7 +119,7 @@ class TestSigningKeyValidation:
         # Create a 32-byte key (valid minimum)
         valid_key = base64.b64encode(b"x" * 32).decode()
         settings = make_settings(signing_key=valid_key)
-        assert settings.signing_key == valid_key
+        assertions.expect_equal(settings.signing_key, valid_key)
 
     @pytest.mark.parametrize(
         "timeout_value",
@@ -130,8 +131,8 @@ class TestSigningKeyValidation:
             subprocess_timeout=timeout_value,
             request_timeout=timeout_value,
         )
-        assert settings.subprocess_timeout == timeout_value
-        assert settings.request_timeout == timeout_value
+        assertions.expect_equal(settings.subprocess_timeout, timeout_value)
+        assertions.expect_equal(settings.request_timeout, timeout_value)
 
     @pytest.mark.parametrize(
         "timeout_value",
@@ -162,7 +163,10 @@ class TestConfigurationErrorMessages:
         except ValueError as exc:
             error_msg = str(exc)
             # Should mention valid options
-            assert "DEBUG" in error_msg or "INFO" in error_msg
+            assertions.expect_true(
+                "DEBUG" in error_msg or "INFO" in error_msg,
+                reason="error should mention valid options",
+            )
 
     def test_signing_key_error_message_helpful(self) -> None:
         """Test that signing key error message guides remediation."""
@@ -172,4 +176,7 @@ class TestConfigurationErrorMessages:
         except ValueError as exc:
             error_msg = str(exc)
             # Should mention length requirement
-            assert "32" in error_msg or "bytes" in error_msg
+            assertions.expect_true(
+                "32" in error_msg or "bytes" in error_msg,
+                reason="error should mention length requirement",
+            )

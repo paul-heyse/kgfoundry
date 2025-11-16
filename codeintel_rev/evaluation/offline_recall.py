@@ -15,12 +15,9 @@ from codeintel_rev.io.duckdb_manager import DuckDBManager
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.symbol_catalog import SymbolCatalog, SymbolDefRow
 from codeintel_rev.io.vllm_client import VLLMClient
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ResolvedPaths
-
-LOGGER = get_logger(__name__)
 
 
 @dataclass(slots=True, frozen=True)
@@ -99,7 +96,6 @@ class OfflineRecallEvaluator:
         if cfg.max_queries:
             queries = queries[: cfg.max_queries]
         if not queries:
-            LOGGER.warning("offline_eval.no_queries")
             return {"queries": 0, "summary": {}}
 
         per_query: list[dict[str, object]] = []
@@ -118,10 +114,6 @@ class OfflineRecallEvaluator:
         summary = {k: (aggregate[k] / count if count else 0.0) for k in k_values}
         output_root = self._resolve_output_dir(output_dir or cfg.output_dir)
         self._write_artifacts(output_root, per_query, summary)
-        LOGGER.info(
-            "offline_eval.completed",
-            extra={"queries": count, "output_dir": str(output_root), "summary": summary},
-        )
         return {"queries": count, "summary": summary}
 
     def _resolve_output_dir(self, raw: str | Path) -> Path:
@@ -137,7 +129,6 @@ class OfflineRecallEvaluator:
             return None
         path = Path(source)
         if not path.exists():
-            LOGGER.warning("offline_eval.queries_missing", extra={"path": str(path)})
             return None
         queries: list[EvalQuery] = []
         with path.open("r", encoding="utf-8") as handle:

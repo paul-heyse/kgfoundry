@@ -9,10 +9,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from kgfoundry_common.logging import get_logger
-
-LOGGER = get_logger(__name__)
-
 try:  # pragma: no cover - optional dependency
     from git import Repo as _RuntimeGitRepo
     from git.exc import GitError
@@ -90,7 +86,6 @@ def _git_churn(path: str) -> int:
     try:
         return sum(1 for _ in repo.iter_commits(paths=str(target)))
     except (GitError, OSError, ValueError):  # pragma: no cover - git failure
-        LOGGER.debug("Failed to compute churn for %s", path, exc_info=True)
         return 0
 
 
@@ -104,12 +99,10 @@ def _open_repo() -> GitRepoType | None:
         Git repository handle or ``None`` if GitPython unavailable.
     """
     if _RuntimeGitRepo is None:
-        LOGGER.debug("GitPython unavailable; churn analytics disabled.")
         return None
     try:
         return _RuntimeGitRepo(str(_repo_root()))
     except (GitError, OSError):  # pragma: no cover - repo open failure
-        LOGGER.debug("Unable to open Git repository for hotspot metrics.", exc_info=True)
         return None
 
 

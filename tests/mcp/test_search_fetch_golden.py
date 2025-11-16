@@ -21,6 +21,8 @@ from codeintel_rev.retrieval.mcp_search import (
 )
 from codeintel_rev.typing import NDArrayF32, NDArrayI64
 
+from tests._helpers import assertions
+
 
 class _StubEmbedder:
     def __init__(self, dim: int) -> None:
@@ -155,17 +157,17 @@ def test_run_search_returns_structured_results(tmp_path: Path) -> None:
         filters=SearchFilters(symbols=("foo",)),
     )
     response: SearchResponse = run_search(request=request, deps=deps)
-    assert response.top_k == 1
+    assertions.expect_equal(response.top_k, 1)
     metadata: dict[str, object] = response.results[0].metadata
-    assert cast("str", metadata["uri"]) == "codeintel_rev/a.py"
+    assertions.expect_equal(cast("str", metadata["uri"]), "codeintel_rev/a.py")
     symbols = cast("list[str]", metadata["symbols"])
-    assert symbols == ["foo"]
+    assertions.expect_sequence_equal(symbols, ["foo"])
     explain = cast("dict[str, object]", metadata["explain"])
     hit_reason = cast("list[str]", explain["hit_reason"])
-    assert hit_reason[0] == "embedding:cosine"
+    assertions.expect_equal(hit_reason[0], "embedding:cosine")
     if importlib.util.find_spec("pyarrow") is not None:
         pool_files = list(tmp_path.glob("*.parquet"))
-        assert pool_files, "pool writer should emit a parquet file"
+        assertions.expect_true(bool(pool_files), reason="pool writer should emit a parquet file")
 
 
 def test_run_fetch_hydrates_content() -> None:
@@ -177,5 +179,5 @@ def test_run_fetch_hydrates_content() -> None:
     request = FetchRequest(object_ids=(1,), max_tokens=512)
     response: FetchResponse = run_fetch(request=request, deps=deps)
     metadata: dict[str, object] = response.objects[0].metadata
-    assert cast("str", metadata["uri"]) == "codeintel_rev/a.py"
-    assert "def foo" in response.objects[0].content
+    assertions.expect_equal(cast("str", metadata["uri"]), "codeintel_rev/a.py")
+    assertions.expect_in("def foo", response.objects[0].content)

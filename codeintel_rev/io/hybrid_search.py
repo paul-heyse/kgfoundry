@@ -7,7 +7,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
-from time import perf_counter
 from typing import TYPE_CHECKING, Protocol
 
 from codeintel_rev.evaluation.hybrid_pool import Hit, HybridPoolEvaluator
@@ -149,30 +148,16 @@ class BM25SearchProvider:
             Raised when the underlying Pyserini searcher fails.
         """
         if top_k <= 0:
-            LOGGER.debug(
-                "BM25 search skipped",
-                extra={"top_k": top_k, "reason": "non_positive_top_k"},
-            )
             return []
         use_rm3 = self._should_use_rm3(query)
         if force_rm3 is not None:
             use_rm3 = force_rm3
         searcher = self._ensure_rm3_searcher() if use_rm3 else self._base_searcher
-        start = perf_counter()
         try:
             hits = searcher.search(query, k=top_k)
         except Exception as exc:
-            LOGGER.warning(
-                "BM25 search failed",
-                extra={
-                    "top_k": top_k,
-                    "rm3": use_rm3,
-                    "error": type(exc).__name__,
-                },
-            )
             msg = "BM25 search failed"
             raise RuntimeError(msg) from exc
-        duration_ms = int((perf_counter() - start) * 1000)
         results = [
             SearchHit(
                 doc_id=str(hit.docid),
@@ -183,15 +168,6 @@ class BM25SearchProvider:
             )
             for rank, hit in enumerate(hits)
         ]
-        LOGGER.debug(
-            "BM25 search completed",
-            extra={
-                "top_k": top_k,
-                "rm3": use_rm3,
-                "hits": len(results),
-                "duration_ms": duration_ms,
-            },
-        )
         return results
 
 
@@ -304,32 +280,22 @@ class SpladeSearchProvider:
             Raised when the SPLADE encoder or impact searcher fails.
         """
         if top_k <= 0:
-            LOGGER.debug("SPLADE search skipped: non-positive top_k", extra={"top_k": top_k})
             return []
         embeddings = self._encoder.encode_query([query])
         decoded = self._encoder.decode(embeddings, top_k=None)
         if not decoded or not decoded[0]:
-            LOGGER.debug("SPLADE search skipped: encoder empty", extra={"top_k": top_k})
             return []
         filtered_pairs = self._filter_pairs(decoded[0])
         if not filtered_pairs:
-            LOGGER.debug("SPLADE search skipped: filtered empty", extra={"top_k": top_k})
             return []
         bow = self._build_bow(filtered_pairs)
         if not bow:
-            LOGGER.debug("SPLADE search skipped: bow empty", extra={"top_k": top_k})
             return []
-        start = perf_counter()
         try:
             hits = self._searcher.search(bow, k=top_k)
         except Exception as exc:
-            LOGGER.debug(
-                "SPLADE search failed",
-                extra={"top_k": top_k, "error": type(exc).__name__},
-            )
             msg = "SPLADE search failed"
             raise RuntimeError(msg) from exc
-        duration_ms = int((perf_counter() - start) * 1000)
         results = [
             SearchHit(
                 doc_id=str(hit.docid),
@@ -340,10 +306,6 @@ class SpladeSearchProvider:
             )
             for rank, hit in enumerate(hits)
         ]
-        LOGGER.debug(
-            "SPLADE search completed",
-            extra={"top_k": top_k, "hits": len(results), "duration_ms": duration_ms},
-        )
         return results
 
     def _filter_pairs(self, pairs: Sequence[tuple[str, float]]) -> list[tuple[str, float]]:
@@ -507,14 +469,6 @@ class HybridSearchEngine:
         profile = analyze_query(query, gate_cfg)
         decision = decide_budgets(profile, gate_cfg)
         budget_info = describe_budget_decision(profile, decision)
-        LOGGER.debug(
-            "Query profile analyzed",
-            extra={
-                "ambiguity_score": profile.ambiguity_score,
-                "rrf_k": decision.rrf_k,
-                **budget_info,
-            },
-        )
         return decision, budget_info
 
     def _rrf_fuse(
@@ -536,29 +490,11 @@ class HybridSearchEngine:
         contributions_for_docs = {doc.doc_id: contributions.get(doc.doc_id, []) for doc in docs}
         return docs, contributions_for_docs
 
-    @staticmethod
-    def _build_debug_bundle(
-        query: str,
-        budget_info: Mapping[str, object],
-        channels: Mapping[str, Sequence[SearchHit]],
-        rrf_k: int,
-    ) -> dict[str, object]:
-        return {
-            "query": query,
-            "budget": dict(budget_info),
-            "per_channel_top": {
-                name: [{"doc_id": hit.doc_id, "score": float(hit.score)} for hit in hits[:10]]
-                for name, hits in channels.items()
-            },
-            "rrf_k": rrf_k,
-        }
-
     def _fuse_runs(self, ctx: _FusionContext) -> HybridSearchResult:
         pooler, weights_used = self._select_pooler(ctx.options)
         runs = self._apply_extra_channels(ctx.runs, ctx.options.extra_channels)
         active_channels = self._resolve_active_channels(runs)
         runtime = ctx.options.tuning or HybridSearchTuning()
-        self._record_fusion_start(runs, ctx.budget_decision.rrf_k)
         work = _FusionWork(
             runs=runs,
             warnings=ctx.warnings,
@@ -573,15 +509,7 @@ class HybridSearchEngine:
             work=work,
             pooler=pooler,
         )
-        docs, boost_count = self._apply_recency_boost_if_needed(docs)
-        if boost_count:
-            LOGGER.debug("Applied recency boost", extra={"boost_count": boost_count})
-        debug_bundle = self._build_debug_bundle(
-            ctx.query, ctx.budget_info, runs, ctx.budget_decision.rrf_k
-        )
-        LOGGER.debug(
-            "Hybrid search completed", extra={"results": len(docs), "bundle": debug_bundle}
-        )
+        docs = self._apply_recency_boost_if_needed(docs)
         self._explain_last = method
         return HybridSearchResult(
             docs=docs,
@@ -607,23 +535,6 @@ class HybridSearchEngine:
     @staticmethod
     def _resolve_active_channels(runs: Mapping[str, Sequence[SearchHit]]) -> list[str]:
         return [channel for channel, hits in runs.items() if hits] or ["semantic"]
-
-    @staticmethod
-    def _record_fusion_start(
-        runs: Mapping[str, Sequence[SearchHit]],
-        rrf_k: int,
-    ) -> None:
-        if not runs:
-            return
-        total_candidates = sum(len(hits) for hits in runs.values())
-        LOGGER.debug(
-            "Hybrid fusion starting",
-            extra={
-                "channels": list(runs.keys()),
-                "rrf_k": rrf_k,
-                "total": total_candidates,
-            },
-        )
 
     def _execute_fusion(
         self,
@@ -679,21 +590,10 @@ class HybridSearchEngine:
         limit: int,
         rrf_k: int,
     ) -> tuple[list[HybridResultDoc], dict[str, list[tuple[str, int, float]]]]:
-        start_rrf = perf_counter()
         docs, contributions_for_docs = self._rrf_fuse(
             runs,
             limit=limit,
             rrf_k=rrf_k,
-        )
-        duration = perf_counter() - start_rrf
-        LOGGER.debug(
-            "RRF fusion completed",
-            extra={
-                "rrf_k": rrf_k,
-                "returned": len(docs),
-                "duration_s": duration,
-                "channels": list(runs.keys()),
-            },
         )
         return docs, contributions_for_docs
 
@@ -707,7 +607,6 @@ class HybridSearchEngine:
         flattened = self._flatten_hits_for_pool(runs)
         contributions = self._build_contribution_map(runs)
         if not flattened:
-            LOGGER.debug("Pool fusion skipped: no flattened hits")
             return [], {}
         pooled_hits = pooler.pool(flattened, k=limit)
         docs = [
@@ -715,21 +614,21 @@ class HybridSearchEngine:
             for pooled in pooled_hits
         ]
         contributions_for_docs = {doc.doc_id: contributions.get(doc.doc_id, []) for doc in docs}
-        LOGGER.debug("Pool fusion completed", extra={"returned": len(docs)})
         return docs, contributions_for_docs
 
     def _apply_recency_boost_if_needed(
         self,
         docs: list[HybridResultDoc],
-    ) -> tuple[list[HybridResultDoc], int]:
+    ) -> list[HybridResultDoc]:
         recency_cfg = self._recency_config()
         if not recency_cfg.enabled or not docs:
-            return docs, 0
-        return apply_recency_boost(
+            return docs
+        boosted_docs, _ = apply_recency_boost(
             docs,
             recency_cfg,
             duckdb_manager=self._duckdb_manager,
         )
+        return boosted_docs
 
     def search(
         self,
@@ -796,25 +695,12 @@ class HybridSearchEngine:
         limit: int,
         options: HybridSearchOptions,
     ) -> HybridSearchResult:
-        LOGGER.debug(
-            "Starting hybrid search",
-            extra={"query_chars": len(query), "limit": int(limit)},
-        )
         gate_cfg = self._make_stage_gate_config()
         budget_decision, budget_info = self._profile_query(query, gate_cfg)
         runs, warnings = self._gather_channel_hits(
             query,
             semantic_hits,
             channel_limits=budget_decision.per_channel_depths,
-        )
-        channel_counts = {name: len(hits) for name, hits in runs.items()}
-        LOGGER.debug(
-            "Channels collected",
-            extra={
-                **{f"{name}_hits": count for name, count in channel_counts.items()},
-                "channels": list(channel_counts),
-                "warnings": warnings,
-            },
         )
         ctx = _FusionContext(
             query=query,
@@ -825,18 +711,7 @@ class HybridSearchEngine:
             budget_decision=budget_decision,
             budget_info=budget_info,
         )
-        fusion_start = perf_counter()
         result = self._fuse_runs(ctx)
-        duration_ms = round((perf_counter() - fusion_start) * 1000, 2)
-        LOGGER.debug(
-            "Fusion completed",
-            extra={
-                "documents": len(result.docs),
-                "warnings": len(result.warnings),
-                "channels": len(result.channels),
-                "duration_ms": duration_ms,
-            },
-        )
         return result
 
     def _gather_channel_hits(
@@ -884,18 +759,8 @@ class HybridSearchEngine:
         runs: dict[str, list[SearchHit]] = {}
 
         semantic_limit = channel_limits.get("semantic") if channel_limits else None
-        faiss_start = perf_counter()
         semantic_channel_hits = self._build_semantic_channel_hits(
             semantic_hits, limit=semantic_limit
-        )
-        faiss_duration = perf_counter() - faiss_start
-        LOGGER.debug(
-            "Semantic channel hits collected",
-            extra={
-                "input_hits": len(semantic_hits),
-                "output_hits": len(semantic_channel_hits),
-                "duration_ms": round(faiss_duration * 1000, 2),
-            },
         )
         if semantic_channel_hits:
             runs["semantic"] = semantic_channel_hits
@@ -942,46 +807,18 @@ class HybridSearchEngine:
     ) -> tuple[list[SearchHit], str | None]:
         disabled_reason = self._channel_disabled_reason(channel)
         if disabled_reason is not None:
-            LOGGER.debug(
-                "Channel skipped",
-                extra={"channel": channel.name, "reason": disabled_reason},
-            )
             return [], None
         missing = self._missing_capabilities(channel)
         if missing:
-            LOGGER.debug(
-                "Channel skipped: missing capabilities",
-                extra={"channel": channel.name, "missing": sorted(missing)},
-            )
             return [], None
-        start = perf_counter()
         try:
             hits = list(channel.search(query, limit))
         except ChannelError as exc:
             warning = str(exc)
-            LOGGER.debug(
-                "Channel search failed",
-                extra={
-                    "channel": channel.name,
-                    "reason": exc.reason,
-                    "error": str(exc),
-                },
-            )
             return [], warning
         except (OSError, RuntimeError, ValueError, ImportError) as exc:  # pragma: no cover
             warning = f"{channel.name} channel failed: {exc}"
-            LOGGER.warning(warning, exc_info=exc)
             return [], warning
-        duration = perf_counter() - start
-        LOGGER.debug(
-            "Channel search completed",
-            extra={
-                "channel": channel.name,
-                "hits": len(hits),
-                "limit": limit,
-                "duration_s": duration,
-            },
-        )
         return hits, None
 
     @staticmethod

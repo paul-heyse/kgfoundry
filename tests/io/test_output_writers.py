@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 from codeintel_rev.enrich.output_writers import write_jsonl, write_parquet_dataset
 
+from tests._helpers import assertions
+
 
 def test_jsonl_writer_is_deterministic(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Ensure the orjson-backed JSONL writer emits stable bytes."""
@@ -16,8 +18,8 @@ def test_jsonl_writer_is_deterministic(tmp_path: Path, monkeypatch: pytest.Monke
     first = path.read_bytes()
     write_jsonl(path, rows)
     second = path.read_bytes()
-    assert first == second
-    assert first.endswith(b"\n")
+    assertions.expect_equal(first, second)
+    assertions.expect_true(first.endswith(b"\n"), reason="jsonl should end with newline")
 
 
 def test_parquet_dataset_partitions_by_column(tmp_path: Path) -> None:
@@ -35,5 +37,5 @@ def test_parquet_dataset_partitions_by_column(tmp_path: Path) -> None:
     )
     dataset = ds.dataset(out_dir, format="parquet", partitioning="hive")
     table = dataset.to_table()
-    assert table.num_rows == 2
-    assert set(table.column("module_name").to_pylist()) == {"pkg.alpha", "pkg.beta"}
+    assertions.expect_equal(table.num_rows, 2)
+    assertions.expect_equal(set(table.column("module_name").to_pylist()), {"pkg.alpha", "pkg.beta"})

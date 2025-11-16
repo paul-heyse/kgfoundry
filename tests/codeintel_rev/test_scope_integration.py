@@ -33,6 +33,8 @@ from codeintel_rev.mcp_server.adapters import files as files_adapter
 from codeintel_rev.mcp_server.schemas import ScopeIn
 from codeintel_rev.mcp_server.scope_utils import merge_scope_filters
 
+from tests._helpers import assertions
+
 
 class _FakeRedis:
     """Simple in-memory Redis mimic for tests."""
@@ -132,8 +134,6 @@ def _build_context(repo_root: Path) -> ApplicationContext:
 
     vllm_client = MagicMock(spec=VLLMClient)
     faiss_manager = MagicMock(spec=FAISSManager)
-    faiss_manager.gpu_index = None
-    faiss_manager.gpu_disabled_reason = None
     git_client = MagicMock(spec=GitClient)
     async_git_client = AsyncMock(spec=AsyncGitClient)
 
@@ -170,7 +170,7 @@ async def test_set_scope_persists_in_store(tmp_path: Path, mock_session_id: str)
     await files_adapter.set_scope(context, scope)
 
     stored = await context.scope_store.get(mock_session_id)
-    assert stored == scope
+    assertions.expect_equal(stored, scope)
 
 
 @pytest.mark.asyncio
@@ -181,13 +181,15 @@ async def test_list_paths_honours_scope_filters(tmp_path: Path, mock_session_id:
     context = _build_context(repo_root)
 
     scope: ScopeIn = cast("ScopeIn", {"include_globs": ["src/**"], "languages": []})
-    assert session_id_var.get() == mock_session_id
+    assertions.expect_equal(session_id_var.get(), mock_session_id)
 
     await files_adapter.set_scope(context, scope)
 
     result = await files_adapter.list_paths(context, max_results=100)
     paths = {item["path"] for item in result["items"]}
-    assert all(path.startswith("src/") for path in paths), f"paths={sorted(paths)}"
+    assertions.expect_true(
+        all(path.startswith("src/") for path in paths), reason=f"paths={sorted(paths)}"
+    )
 
 
 def test_merge_scope_filters_precedence() -> None:
@@ -201,5 +203,5 @@ def test_merge_scope_filters_precedence() -> None:
     )
     explicit = {"include_globs": ["docs/**"], "languages": ["markdown"]}
     merged = merge_scope_filters(scope, explicit)
-    assert merged["include_globs"] == ["docs/**"]
-    assert merged["languages"] == ["markdown"]
+    assertions.expect_equal(merged["include_globs"], ["docs/**"])
+    assertions.expect_equal(merged["languages"], ["markdown"])

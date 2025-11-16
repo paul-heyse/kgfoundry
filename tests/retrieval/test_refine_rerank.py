@@ -9,6 +9,8 @@ import numpy as np
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.faiss_manager import FAISSManager
 
+from tests._helpers import assertions
+
 
 class _CatalogStub:
     """Minimal DuckDB catalog stub returning deterministic embeddings."""
@@ -38,9 +40,9 @@ def test_search_with_refine_returns_ordered_hits(tmp_path: Path) -> None:
     catalog = _CatalogStub({int(idx): base_vectors[idx] for idx in range(vec_dim)})
     query = base_vectors[0].reshape(1, -1)
     hits = manager.search_with_refine(query, k=2, catalog=cast("DuckDBCatalog", catalog))
-    assert hits, "search_with_refine should return at least one hit"
-    assert int(hits[0].doc_id) == 0
-    assert hits[0].rank == 0
+    assertions.expect_true(bool(hits), reason="search_with_refine should return at least one hit")
+    assertions.expect_equal(int(hits[0].doc_id), 0)
+    assertions.expect_equal(hits[0].rank, 0)
     k_factor = hits[0].explain.get("k_factor")
-    assert isinstance(k_factor, float)
-    assert k_factor >= 1.0
+    assertions.expect_true(isinstance(k_factor, float), reason="k_factor should be float")
+    assertions.expect_true(k_factor >= 1.0, reason="k_factor should be at least 1.0")

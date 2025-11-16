@@ -13,6 +13,7 @@ from kgfoundry_common.safe_pickle_v2 import (
     UnsafeSerializationError,
     create_unsigned_pickle_payload,
 )
+from tests._helpers import assertions
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -96,7 +97,7 @@ class TestSignedPickleWrapper:
             wrapper.dump(data, buffer)
             buffer.seek(0)
             loaded = wrapper.load(buffer)
-            assert loaded == data
+            assertions.expect_equal(loaded, data)
 
     def test_signature_verification_success(self, wrapper: SignedPickleWrapper) -> None:
         """Test that valid signatures pass verification."""
@@ -107,7 +108,7 @@ class TestSignedPickleWrapper:
         # Signature should be verified on load
         buffer.seek(0)
         loaded = wrapper.load(buffer)
-        assert loaded == data
+        assertions.expect_equal(loaded, data)
 
     def test_signature_verification_fails_on_tampering(
         self,
@@ -197,7 +198,10 @@ class TestSignedPickleWrapper:
         with caplog.at_level("WARNING"):
             SignedPickleWrapper(short_key)
 
-        assert any("Signing key < 32 bytes" in record.getMessage() for record in caplog.records)
+        assertions.expect_true(
+            any("Signing key < 32 bytes" in record.getMessage() for record in caplog.records),
+            reason="should log warning for short key",
+        )
 
     def test_nested_container_depth_limit(self, wrapper: SignedPickleWrapper) -> None:
         """Test that deeply nested structures are rejected."""
@@ -218,12 +222,12 @@ class TestUnsafeSerializationError:
     def test_error_with_reason(self) -> None:
         """Test that error captures reason."""
         error = UnsafeSerializationError("Test message", reason="test_reason")
-        assert error.reason == "test_reason"
+        assertions.expect_equal(error.reason, "test_reason")
 
     def test_error_without_reason(self) -> None:
         """Test that error works without reason."""
         error = UnsafeSerializationError("Test message")
-        assert error.reason is None
+        assertions.expect_equal(error.reason, None)
 
 
 class TestPickleRoundTrip:
@@ -249,11 +253,11 @@ class TestPickleRoundTrip:
 
         buffer.seek(0)
         loaded = cast("dict[str, object]", wrapper.load(buffer))
-        assert loaded == data
+        assertions.expect_equal(loaded, data)
 
         users = cast("list[dict[str, object]]", loaded["users"])
-        assert users[0]["name"] == "Alice"
+        assertions.expect_equal(users[0]["name"], "Alice")
 
         metadata = cast("dict[str, object]", loaded["metadata"])
         config = cast("dict[str, object]", metadata["config"])
-        assert config["debug"] is False
+        assertions.expect_equal(config["debug"], False)

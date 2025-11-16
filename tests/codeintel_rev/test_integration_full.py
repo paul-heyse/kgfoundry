@@ -7,12 +7,14 @@ and MCP tool endpoints with real configuration.
 from __future__ import annotations
 
 import time
+from http import HTTPStatus
 from pathlib import Path
 
 import pytest
 from codeintel_rev.app.main import app
 from fastapi.testclient import TestClient
 
+from tests._helpers import assertions
 from tests.conftest import HAS_FAISS_SUPPORT
 
 
@@ -63,8 +65,8 @@ def test_app_startup_with_valid_config() -> None:
     with TestClient(app) as client:
         # App should start without errors
         response = client.get("/healthz")
-        assert response.status_code == 200
-        assert response.json() == {"status": "ok"}
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
+        assertions.expect_equal(response.json(), {"status": "ok"})
 
 
 @pytest.mark.usefixtures("test_repo")
@@ -72,9 +74,9 @@ def test_app_healthz_endpoint() -> None:
     """Test that /healthz endpoint returns 200."""
     with TestClient(app) as client:
         response = client.get("/healthz")
-        assert response.status_code == 200
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
         data = response.json()
-        assert data["status"] == "ok"
+        assertions.expect_equal(data["status"], "ok")
 
 
 @pytest.mark.usefixtures("test_repo")
@@ -82,15 +84,21 @@ def test_app_readyz_endpoint_healthy() -> None:
     """Test that /readyz endpoint shows all checks healthy."""
     with TestClient(app) as client:
         response = client.get("/readyz")
-        assert response.status_code == 200
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
         data = response.json()
-        assert "ready" in data
-        assert "checks" in data
-        assert "active_index_version" in data
+        assertions.expect_in("ready", data)
+        assertions.expect_in("checks", data)
+        assertions.expect_in("active_index_version", data)
         # All checks should be healthy with valid config
         checks = data["checks"]
-        assert checks.get("repo_root", {}).get("healthy") is True
-        assert checks.get("data_dir", {}).get("healthy") is True
+        assertions.expect_true(
+            checks.get("repo_root", {}).get("healthy") is True,
+            reason="repo_root check should be healthy",
+        )
+        assertions.expect_true(
+            checks.get("data_dir", {}).get("healthy") is True,
+            reason="data_dir check should be healthy",
+        )
 
 
 def test_app_startup_fails_invalid_repo_root(
@@ -121,11 +129,13 @@ def test_app_startup_with_preload_disabled(
     with TestClient(app) as client:
         startup_time = time.monotonic() - start_time
         # Startup should remain responsive, but allow generous budget for cold caches.
-        assert startup_time < 10.0, f"Startup took {startup_time:.2f}s, expected < 10.0s"
+        assertions.expect_true(
+            startup_time < 10.0, reason=f"Startup took {startup_time:.2f}s, expected < 10.0s"
+        )
 
         # Health check should work
         response = client.get("/healthz")
-        assert response.status_code == 200
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
 
 
 @pytest.mark.usefixtures("test_repo")
@@ -140,34 +150,44 @@ def test_app_startup_with_preload_enabled(
     with TestClient(app) as client:
         startup_time = time.monotonic() - start_time
         # Preloading is expensive; treat this as a smoke test rather than a perf gate.
-        assert startup_time < 30.0, f"Startup took {startup_time:.2f}s, expected < 30.0s"
+        assertions.expect_true(
+            startup_time < 30.0, reason=f"Startup took {startup_time:.2f}s, expected < 30.0s"
+        )
 
         # Health check should work
         response = client.get("/healthz")
-        assert response.status_code == 200
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
 
 
 def test_context_stored_in_app_state(test_repo: Path) -> None:
     """Test that ApplicationContext is stored in app.state."""
     with TestClient(app):
         # Access app state through lifespan context
-        assert hasattr(app.state, "context")
+        assertions.expect_true(
+            hasattr(app.state, "context"), reason="app.state should have context"
+        )
         from codeintel_rev.app.config_context import ApplicationContext
 
         context = app.state.context
-        assert isinstance(context, ApplicationContext)
-        assert context.paths.repo_root == test_repo.resolve()
+        assertions.expect_true(
+            isinstance(context, ApplicationContext), reason="context should be ApplicationContext"
+        )
+        assertions.expect_equal(context.paths.repo_root, test_repo.resolve())
 
 
 @pytest.mark.usefixtures("test_repo")
 def test_readiness_probe_stored_in_app_state() -> None:
     """Test that ReadinessProbe is stored in app.state."""
     with TestClient(app):
-        assert hasattr(app.state, "readiness")
+        assertions.expect_true(
+            hasattr(app.state, "readiness"), reason="app.state should have readiness"
+        )
         from codeintel_rev.app.readiness import ReadinessProbe
 
         readiness = app.state.readiness
-        assert isinstance(readiness, ReadinessProbe)
+        assertions.expect_true(
+            isinstance(readiness, ReadinessProbe), reason="readiness should be ReadinessProbe"
+        )
 
 
 @pytest.mark.usefixtures("test_repo")
@@ -178,7 +198,7 @@ def test_mcp_tool_list_paths() -> None:
         # Note: This tests the adapter through the MCP server
         # The actual MCP protocol would use a different endpoint format
         response = client.get("/healthz")
-        assert response.status_code == 200
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
 
 
 @pytest.mark.usefixtures("test_repo")

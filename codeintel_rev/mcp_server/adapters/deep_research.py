@@ -32,9 +32,7 @@ from codeintel_rev.retrieval.mcp_search import (
     run_search,
 )
 from kgfoundry_common.errors import VectorSearchError
-from kgfoundry_common.logging import get_logger
 
-LOGGER = get_logger(__name__)
 _TRACE_SUBDIR = Path("trace/mcp_pool")
 _DEFAULT_CONCURRENCY = 8
 _DEFAULT_SEARCH_TIMEOUT_S = 20
@@ -208,17 +206,7 @@ async def search(
                 pool_dir=_pool_dir(context.paths.data_dir),
             )
             response = run_search(request=request, deps=deps)
-            payload = _serialize_search_response(response)
-            LOGGER.info(
-                "deep_research.search.completed",
-                extra={
-                    "session_id": session_id,
-                    "results": len(payload.get("results", ())),
-                    "top_k": request.top_k,
-                    "rerank": request.rerank,
-                },
-            )
-            return payload
+            return _serialize_search_response(response)
 
     async with _bounded("search", _DEFAULT_SEARCH_TIMEOUT_S):
         return await asyncio.to_thread(_work)
@@ -267,19 +255,7 @@ async def fetch(
                 settings=context.settings,
             )
             response = run_fetch(request=request, deps=deps)
-            payload = _serialize_fetch_response(response)
-            try:
-                session_id = get_session_id()
-            except RuntimeError:
-                session_id = None
-            LOGGER.info(
-                "deep_research.fetch.completed",
-                extra={
-                    "session_id": session_id,
-                    "object_count": len(payload["objects"]),
-                },
-            )
-            return payload
+            return _serialize_fetch_response(response)
 
     async with _bounded("fetch", _DEFAULT_FETCH_TIMEOUT_S):
         return await asyncio.to_thread(_work)

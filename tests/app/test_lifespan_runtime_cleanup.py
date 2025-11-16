@@ -11,6 +11,7 @@ from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.main import lifespan
 from fastapi import FastAPI
 
+from tests._helpers import assertions
 from tests.app._context_factory import build_application_context
 
 
@@ -69,13 +70,14 @@ class _FakeReadinessProbe:
 
 @pytest.mark.asyncio
 async def test_lifespan_preload_and_cleanup(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify optional runtimes preload and cleanup during lifespan."""
     fake_context = _FakeContext()
     probes: list[_FakeReadinessProbe] = []
 
     def _fake_create(_cls: type[ApplicationContext]) -> _FakeContext:
         return fake_context
 
-    def _fake_warmup() -> dict[str, object]:
+    def _fake_health() -> dict[str, object]:
         return {"overall_status": "ready", "details": {}}
 
     def _probe_factory(context: _FakeContext) -> _FakeReadinessProbe:
@@ -88,7 +90,7 @@ async def test_lifespan_preload_and_cleanup(monkeypatch: pytest.MonkeyPatch) -> 
         "create",
         classmethod(_fake_create),
     )
-    monkeypatch.setattr("codeintel_rev.app.main.warmup_gpu", _fake_warmup)
+    monkeypatch.setattr("codeintel_rev.app.main.check_faiss_health", _fake_health)
     monkeypatch.setattr("codeintel_rev.app.main.ReadinessProbe", _probe_factory)
     monkeypatch.setenv("XTR_PRELOAD", "1")
     monkeypatch.setenv("HYBRID_PRELOAD", "1")
@@ -97,18 +99,20 @@ async def test_lifespan_preload_and_cleanup(monkeypatch: pytest.MonkeyPatch) -> 
     async with lifespan(app):
         pass
 
-    assert fake_context.xtr_calls == 1
-    assert fake_context.hybrid_calls == 1
-    assert fake_context.close_calls == 1
-    assert fake_context.scope_store.close_calls == 1
-    assert probes
-    assert probes[0].shutdown_calls == 1
+    assertions.expect_equal(fake_context.xtr_calls, 1)
+    assertions.expect_equal(fake_context.hybrid_calls, 1)
+    assertions.expect_equal(fake_context.close_calls, 1)
+    assertions.expect_equal(fake_context.scope_store.close_calls, 1)
+    assertions.expect_true(bool(probes), reason="should have created probes")
+    assertions.expect_equal(probes[0].shutdown_calls, 1)
 
 
 def test_close_all_runtimes_idempotent(
     application_context: ApplicationContext,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Ensure runtime cleanup is idempotent across repeated calls."""
+
     class _Disposable:
         def __init__(self) -> None:
             self.closed = 0
@@ -129,18 +133,16 @@ def test_close_all_runtimes_idempotent(
     )
     application_context.get_hybrid_engine()
     disposable = created[0]
-    application_context.faiss_manager.gpu_index = cast("Any", object())
-    application_context.faiss_manager.secondary_gpu_index = cast("Any", object())
     application_context.faiss_manager.cpu_index = cast("Any", object())
     application_context.close_all_runtimes()
     application_context.close_all_runtimes()
 
-    assert disposable.closed == 1
+    assertions.expect_equal(disposable.closed, 1)
     replacement = application_context.get_hybrid_engine()
-    assert replacement is not disposable
-    assert application_context.faiss_manager.gpu_index is None
-    assert application_context.faiss_manager.secondary_gpu_index is None
-    assert application_context.faiss_manager.cpu_index is None
+    assertions.expect_true(
+        replacement is not disposable, reason="should create new instance after close"
+    )
+    assertions.expect_equal(application_context.faiss_manager.cpu_index, None)
 
 
 @pytest.fixture(name="_base_application_context")

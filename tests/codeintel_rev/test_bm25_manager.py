@@ -14,6 +14,10 @@ from codeintel_rev.io.bm25_manager import (
     BM25IndexMetadata,
 )
 
+from tests._helpers import assertions, constants
+
+DOC_COUNT = constants.BATCH_SIZES.minimal
+
 
 def _bootstrap_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Initialize a fake repository layout and configure environment variables.
@@ -82,16 +86,16 @@ def test_prepare_corpus_creates_json_collection(
     summary = manager.prepare_corpus(source_path)
 
     output_dir = Path(summary.output_dir)
-    assert output_dir.is_dir()
+    assertions.expect_true(output_dir.is_dir())
     doc_files = sorted(p.name for p in output_dir.glob("*.json") if p.name != "metadata.json")
-    assert doc_files == ["doc1.json", "doc2.json"]
-    assert (output_dir / "metadata.json").is_file()
+    assertions.expect_sequence_equal(doc_files, ["doc1.json", "doc2.json"])
+    assertions.expect_true((output_dir / "metadata.json").is_file())
 
     metadata_path = Path(summary.corpus_metadata_path)
     metadata = msgspec.json.decode(metadata_path.read_bytes(), type=BM25CorpusMetadata)
-    assert metadata.doc_count == 2
-    assert metadata.source_path == str(source_path.resolve())
-    assert metadata.digest == summary.digest
+    assertions.expect_equal(metadata.doc_count, DOC_COUNT)
+    assertions.expect_equal(metadata.source_path, str(source_path.resolve()))
+    assertions.expect_equal(metadata.digest, summary.digest)
 
 
 def test_prepare_corpus_detects_duplicate_ids(
@@ -140,22 +144,20 @@ def test_build_index_writes_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: 
 
     metadata = manager.build_index()
 
-    assert created_command, "Expected Pyserini command to be executed"
+    assertions.expect_true(created_command, reason="Expected Pyserini command to be executed")
     command = created_command[0]
-    assert "--collection" in command
-    assert "JsonCollection" in command
-    assert "--input" in command
-    assert summary.output_dir in command
+    for token in ("--collection", "JsonCollection", "--input", summary.output_dir):
+        assertions.expect_in(token, command)
 
     index_dir = Path(metadata.index_dir)
-    assert index_dir.is_dir()
-    assert metadata.index_size_bytes > 0
-    assert metadata.doc_count == 2
-    assert metadata.corpus_digest == summary.digest
-    assert metadata.pyserini_version == "test"
+    assertions.expect_true(index_dir.is_dir())
+    assertions.expect_true(metadata.index_size_bytes > 0)
+    assertions.expect_equal(metadata.doc_count, DOC_COUNT)
+    assertions.expect_equal(metadata.corpus_digest, summary.digest)
+    assertions.expect_equal(metadata.pyserini_version, "test")
 
     disk_metadata = msgspec.json.decode(
         (index_dir / "metadata.json").read_bytes(),
         type=BM25IndexMetadata,
     )
-    assert disk_metadata == metadata
+    assertions.expect_equal(disk_metadata, metadata)

@@ -1,3 +1,5 @@
+"""Tests for augment registry loading and validation."""
+
 from __future__ import annotations
 
 import importlib
@@ -6,6 +8,8 @@ from textwrap import dedent
 from typing import Protocol, TypeGuard
 
 import pytest
+
+from tests._helpers import assertions
 
 
 class _ProblemCarrier(Protocol):
@@ -16,6 +20,18 @@ PROBLEM_ATTR = "problem"
 
 
 def _has_problem_details(exc: BaseException) -> TypeGuard[_ProblemCarrier]:
+    """Check if exception has Problem Details attribute.
+
+    Parameters
+    ----------
+    exc : BaseException
+        Exception to check.
+
+    Returns
+    -------
+    TypeGuard[_ProblemCarrier]
+        True if exception has problem attribute.
+    """
     problem = getattr(exc, PROBLEM_ATTR, None)
     return isinstance(problem, dict)
 
@@ -28,6 +44,7 @@ def _write_yaml(path: Path, content: str) -> None:
 
 
 def test_load_tooling_metadata_success(tmp_path: Path) -> None:
+    """Verify loading tooling metadata succeeds with valid files."""
     augment_path = tmp_path / "augment.yaml"
     registry_path = tmp_path / "registry.yaml"
 
@@ -60,23 +77,28 @@ def test_load_tooling_metadata_success(tmp_path: Path) -> None:
     )
 
     override = metadata.augment.operation_override("cli.run")
-    assert override is not None
-    assert override.tags == ("cli",)
+    assertions.expect_true(override is not None, reason="override should exist")
+    assertions.expect_equal(override.tags, ("cli",))
     interface = metadata.registry.interface("orchestration-cli")
-    assert interface is not None
-    assert interface.entrypoint == "tests.fixtures.cli:app"
-    assert interface.owner == "docs"
-    assert interface.operations == {}
+    assertions.expect_true(interface is not None, reason="interface should exist")
+    assertions.expect_equal(interface.entrypoint, "tests.fixtures.cli:app")
+    assertions.expect_equal(interface.owner, "docs")
+    assertions.expect_equal(interface.operations, {})
 
     cached_metadata = facade.load_tooling_metadata(
         augment_path=augment_path,
         registry_path=registry_path,
     )
-    assert cached_metadata.augment is metadata.augment
-    assert cached_metadata.registry is metadata.registry
+    assertions.expect_true(
+        cached_metadata.augment is metadata.augment, reason="augment should be cached"
+    )
+    assertions.expect_true(
+        cached_metadata.registry is metadata.registry, reason="registry should be cached"
+    )
 
 
 def test_load_tooling_metadata_missing_augment(tmp_path: Path) -> None:
+    """Verify loading fails with Problem Details when augment file is missing."""
     registry_path = tmp_path / "registry.yaml"
     _write_yaml(registry_path, "interfaces: {}")
 
@@ -86,13 +108,16 @@ def test_load_tooling_metadata_missing_augment(tmp_path: Path) -> None:
             registry_path=registry_path,
         )
 
-    assert _has_problem_details(excinfo.value)
+    assertions.expect_true(
+        _has_problem_details(excinfo.value), reason="should have problem details"
+    )
     problem = excinfo.value.problem
-    assert problem["status"] == 404
-    assert problem["type"] == "https://kgfoundry.dev/problems/augment-registry"
+    assertions.expect_equal(problem["status"], 404)
+    assertions.expect_equal(problem["type"], "https://kgfoundry.dev/problems/augment-registry")
 
 
 def test_load_tooling_metadata_invalid_registry(tmp_path: Path) -> None:
+    """Verify loading fails with Problem Details when registry is invalid."""
     augment_path = tmp_path / "augment.yaml"
     registry_path = tmp_path / "registry.yaml"
     _write_yaml(augment_path, "operations: {}")
@@ -104,15 +129,18 @@ def test_load_tooling_metadata_invalid_registry(tmp_path: Path) -> None:
             registry_path=registry_path,
         )
 
-    assert _has_problem_details(excinfo.value)
+    assertions.expect_true(
+        _has_problem_details(excinfo.value), reason="should have problem details"
+    )
     problem = excinfo.value.problem
-    assert problem["status"] == 422
+    assertions.expect_equal(problem["status"], 422)
     detail = problem.get("detail")
-    assert isinstance(detail, str)
-    assert "interfaces" in detail
+    assertions.expect_true(isinstance(detail, str), reason="detail should be str")
+    assertions.expect_in("interfaces", detail)
 
 
 def test_render_problem_details(tmp_path: Path) -> None:
+    """Verify Problem Details rendering includes error detail."""
     registry_path = tmp_path / "registry.yaml"
     _write_yaml(registry_path, "interfaces: {}")
 
@@ -126,4 +154,4 @@ def test_render_problem_details(tmp_path: Path) -> None:
         }
     )
     rendered = facade.render_problem_details(error)
-    assert "broken" in rendered
+    assertions.expect_in("broken", rendered)

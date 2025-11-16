@@ -5,6 +5,8 @@ from __future__ import annotations
 import ast
 import pathlib
 
+from tests._helpers import assertions
+
 ROOT = pathlib.Path(__file__).resolve().parents[1] / "codeintel_rev"
 
 
@@ -24,7 +26,7 @@ def _python_files() -> list[pathlib.Path]:
     return files
 
 
-def test_no_legacy_prometheus_client_imports():
+def test_no_legacy_prometheus_client_imports() -> None:
     """Verify no files import prometheus_client or telemetry.prom."""
     banned = {"prometheus_client", "codeintel_rev.telemetry.prom"}
     offenders: list[tuple[pathlib.Path, str]] = []
@@ -40,10 +42,13 @@ def test_no_legacy_prometheus_client_imports():
                 mod = node.module or ""
                 if mod in banned:
                     offenders.append((py, mod))
-    assert not offenders, f"Legacy telemetry imports found: {offenders}"
+    assertions.expect_true(
+        not offenders,
+        reason=f"Legacy telemetry imports found: {offenders}",
+    )
 
 
-def test_no_legacy_telemetry_otel_imports():
+def test_no_legacy_telemetry_otel_imports() -> None:
     """Verify no files import telemetry.otel (observability removed)."""
     banned = {"codeintel_rev.telemetry.otel", "codeintel_rev.observability.otel"}
     offenders = []
@@ -57,4 +62,7 @@ def test_no_legacy_telemetry_otel_imports():
                 mod = node.module or ""
                 if mod in banned:
                     offenders.append((py, mod))
-    assert not offenders, f"Legacy telemetry/observability imports found: {offenders}"
+    assertions.expect_true(
+        not offenders,
+        reason=f"Legacy telemetry/observability imports found: {offenders}",
+    )

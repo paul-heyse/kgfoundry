@@ -21,6 +21,8 @@ from typing import TYPE_CHECKING, cast
 
 import libcst as cst
 
+from tools._libcst_mixins import ExceptHandlerTransformerMixin
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -68,7 +70,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> BlindExceptArgs:
     return BlindExceptArgs(targets=targets, dry_run=dry_run, log=log_path)
 
 
-class BlindExceptTransformer(cst.CSTTransformer):
+class BlindExceptTransformer(ExceptHandlerTransformerMixin, cst.CSTTransformer):
     """Rewrite blind ``except`` handlers to capture exceptions explicitly.
 
     Initializes transformer with change tracking.
@@ -78,7 +80,7 @@ class BlindExceptTransformer(cst.CSTTransformer):
         super().__init__()
         self.changes: list[str] = []
 
-    def leave_ExceptHandler(  # lint-ignore[N802] LibCST naming convention
+    def leave_except_handler(
         self,
         original_node: cst.ExceptHandler,
         updated_node: cst.ExceptHandler,

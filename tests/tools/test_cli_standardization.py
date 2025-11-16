@@ -6,6 +6,8 @@ import importlib
 
 import pytest
 
+from tests._helpers import assertions
+
 CLI_SUITES = (
     ("download.cli", "download.cli_context", None),
     ("orchestration.cli", "orchestration.cli_context", None),
@@ -37,16 +39,18 @@ def test_cli_configuration_matches_context(
         expected_interface = context.CLI_INTERFACE_ID
         expected_operation_ids = dict(context.CLI_OPERATION_IDS)
 
-    assert settings == module.CLI_SETTINGS
-    assert module.CLI_CONFIG is config
-    assert expected_command == module.CLI_COMMAND
-    assert expected_title == module.CLI_TITLE
-    assert expected_interface == module.CLI_INTERFACE_ID
-    assert expected_operation_ids == module.CLI_OPERATION_IDS
+    assertions.expect_equal(settings, module.CLI_SETTINGS)
+    assertions.expect_true(module.CLI_CONFIG is config, reason="CLI_CONFIG should be same object")
+    assertions.expect_equal(expected_command, module.CLI_COMMAND)
+    assertions.expect_equal(expected_title, module.CLI_TITLE)
+    assertions.expect_equal(expected_interface, module.CLI_INTERFACE_ID)
+    assertions.expect_equal(expected_operation_ids, module.CLI_OPERATION_IDS)
 
     expected_envelope_dir = context.REPO_ROOT / "site" / "_build" / "cli"
-    assert expected_envelope_dir == module.CLI_ENVELOPE_DIR
+    assertions.expect_equal(expected_envelope_dir, module.CLI_ENVELOPE_DIR)
 
     if definition is not None:
-        assert command_name == module.CLI_COMMAND_NAME
-        assert expected_operation_ids[module.SUBCOMMAND_BUILD_GRAPHS] == module.CLI_OPERATION_ID
+        assertions.expect_equal(command_name, module.CLI_COMMAND_NAME)
+        assertions.expect_equal(
+            expected_operation_ids[module.SUBCOMMAND_BUILD_GRAPHS], module.CLI_OPERATION_ID
+        )

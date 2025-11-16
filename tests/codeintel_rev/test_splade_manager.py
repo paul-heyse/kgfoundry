@@ -24,6 +24,7 @@ from codeintel_rev.io.splade_manager import (
 )
 
 from kgfoundry_common.subprocess_utils import SubprocessError
+from tests._helpers import assertions
 
 
 def _bootstrap_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
@@ -154,16 +155,19 @@ def test_export_onnx_writes_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: 
         ),
     )
 
-    assert summary.onnx_file.endswith("model_qint8.onnx")
+    assertions.expect_true(
+        summary.onnx_file.endswith("model_qint8.onnx"),
+        reason="onnx_file should end with model_qint8.onnx",
+    )
     metadata_path = Path(summary.metadata_path)
-    assert metadata_path.exists()
+    assertions.expect_true(metadata_path.exists(), reason="metadata_path should exist")
 
     metadata = msgspec.json.decode(metadata_path.read_bytes(), type=SpladeArtifactMetadata)
-    assert metadata.model_id == "naver/splade-v3"
-    assert metadata.provider == "CPUExecutionProvider"
-    assert metadata.quantized
-    assert metadata.optimized
-    assert metadata.quantization_config == "avx512"
+    assertions.expect_equal(metadata.model_id, "naver/splade-v3")
+    assertions.expect_equal(metadata.provider, "CPUExecutionProvider")
+    assertions.expect_true(metadata.quantized, reason="metadata should be quantized")
+    assertions.expect_true(metadata.optimized, reason="metadata should be optimized")
+    assertions.expect_equal(metadata.quantization_config, "avx512")
 
 
 def test_encode_corpus_writes_vectors(
@@ -198,16 +202,18 @@ def test_encode_corpus_writes_vectors(
     )
 
     metadata_path = Path(summary.metadata_path)
-    assert metadata_path.exists()
+    assertions.expect_true(metadata_path.exists(), reason="metadata_path should exist")
     metadata = msgspec.json.decode(metadata_path.read_bytes(), type=SpladeEncodingMetadata)
-    assert metadata.doc_count == 2
-    assert metadata.quantization == 100
+    assertions.expect_equal(metadata.doc_count, 2)
+    assertions.expect_equal(metadata.quantization, 100)
 
     shard = Path(summary.vectors_dir) / "part-00000.jsonl"
-    assert shard.exists()
+    assertions.expect_true(shard.exists(), reason="shard file should exist")
     content = json.loads(shard.read_text(encoding="utf-8").splitlines()[0])
-    assert content["id"] == "doc1"
-    assert content["vector"]["solar"] > 0
+    assertions.expect_equal(content["id"], "doc1")
+    assertions.expect_true(
+        content["vector"]["solar"] > 0, reason="solar vector value should be positive"
+    )
 
 
 def test_benchmark_queries_reports_latency(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -234,15 +240,15 @@ def test_benchmark_queries_reports_latency(monkeypatch: pytest.MonkeyPatch, tmp_
         SpladeBenchmarkOptions(warmup_iterations=1, measure_iterations=3),
     )
 
-    assert summary.query_count == 1
-    assert summary.warmup_iterations == 1
-    assert summary.measure_iterations == 3
-    assert summary.min_latency_ms == pytest.approx(5.0, rel=1e-3)
-    assert summary.max_latency_ms == pytest.approx(40.0, rel=1e-3)
-    assert summary.p50_latency_ms == pytest.approx(20.0, rel=1e-3)
-    assert summary.p95_latency_ms == pytest.approx(38.0, rel=1e-3)
-    assert summary.provider == "CPUExecutionProvider"
-    assert summary.onnx_file == "onnx/model_qint8.onnx"
+    assertions.expect_equal(summary.query_count, 1)
+    assertions.expect_equal(summary.warmup_iterations, 1)
+    assertions.expect_equal(summary.measure_iterations, 3)
+    assertions.expect_almost_equal(summary.min_latency_ms, 5.0)
+    assertions.expect_almost_equal(summary.max_latency_ms, 40.0)
+    assertions.expect_almost_equal(summary.p50_latency_ms, 20.0)
+    assertions.expect_almost_equal(summary.p95_latency_ms, 38.0)
+    assertions.expect_equal(summary.provider, "CPUExecutionProvider")
+    assertions.expect_equal(summary.onnx_file, "onnx/model_qint8.onnx")
 
 
 def test_build_index_persists_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -287,16 +293,18 @@ def test_build_index_persists_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path
         ),
     )
 
-    assert captured_commands, "Expected run_subprocess to be invoked"
-    assert metadata.doc_count == 3
-    assert metadata.pyserini_version == "test"
-    assert metadata.index_size_bytes > 0
+    assertions.expect_true(bool(captured_commands), reason="Expected run_subprocess to be invoked")
+    assertions.expect_equal(metadata.doc_count, 3)
+    assertions.expect_equal(metadata.pyserini_version, "test")
+    assertions.expect_true(
+        metadata.index_size_bytes > 0, reason="index_size_bytes should be positive"
+    )
 
     disk_metadata = msgspec.json.decode(
         (Path(metadata.index_dir) / "metadata.json").read_bytes(),
         type=SpladeIndexMetadata,
     )
-    assert disk_metadata == metadata
+    assertions.expect_equal(disk_metadata, metadata)
 
 
 def test_build_index_raises_when_subprocess_fails(

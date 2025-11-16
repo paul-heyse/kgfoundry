@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING, cast
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.typing import NDArrayF32, NDArrayI64
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     import faiss
@@ -22,8 +21,6 @@ if TYPE_CHECKING:
     from codeintel_rev.config.settings import IndexConfig
 else:
     np = cast("np", LazyModule("numpy", "FAISS dual index operations"))
-
-LOGGER = get_logger(__name__)
 
 __all__ = ["FAISSDualIndexManager", "IndexManifest"]
 _SEARCH_RESULT_RANK = 2
@@ -218,17 +215,6 @@ class FAISSDualIndexManager:
         self._reset_gpu_state()
         await self.try_gpu_clone(faiss_module)
 
-        LOGGER.info(
-            "faiss_ready",
-            extra={
-                "primary_count": int(getattr(self._primary_cpu, "ntotal", 0)),
-                "secondary_count": int(getattr(self._secondary_cpu, "ntotal", 0)),
-                "gpu_enabled": self._gpu_enabled,
-                "gpu_reason": self._gpu_disabled_reason,
-                "index_dir": str(self._index_dir),
-            },
-        )
-
         return True, self._gpu_disabled_reason
 
     def close(self) -> None:
@@ -240,7 +226,6 @@ class FAISSDualIndexManager:
         self._gpu_resources = None
         self._gpu_enabled = False
         self._gpu_disabled_reason = None
-        LOGGER.debug("faiss_dual_index_closed", extra={"index_dir": str(self._index_dir)})
 
     def search(
         self,
@@ -376,10 +361,6 @@ class FAISSDualIndexManager:
                 self._secondary_gpu = None
                 self._primary_gpu = None
                 self._gpu_disabled_reason = "GPU resources unavailable during incremental add"
-                LOGGER.warning(
-                    "faiss_gpu_incremental_disabled",
-                    extra={"reason": self._gpu_disabled_reason},
-                )
             else:
                 try:
                     cloner_options = self._build_gpu_cloner_options(faiss_module)
@@ -395,20 +376,8 @@ class FAISSDualIndexManager:
                     self._gpu_resources = None
                     self._gpu_enabled = False
                     self._gpu_disabled_reason = f"Secondary GPU clone failed: {exc}"
-                    LOGGER.warning(
-                        "faiss_gpu_incremental_clone_failed",
-                        extra={"error": str(exc)},
-                    )
 
         secondary_total = int(getattr(self._secondary_cpu, "ntotal", 0))
-        LOGGER.info(
-            "faiss_incremental_add",
-            extra={
-                "added": int(ids.size),
-                "secondary_total": secondary_total,
-                "index_dir": str(self._index_dir),
-            },
-        )
 
     def needs_compaction(self) -> bool:
         """Return ``True`` when the secondary index exceeds the compaction threshold.
@@ -444,10 +413,7 @@ class FAISSDualIndexManager:
             return importlib.import_module("faiss"), None
         except ImportError as exc:  # pragma: no cover - executed when faiss missing
             reason = "FAISS library not installed"
-            LOGGER.exception(
-                "faiss_import_failed",
-                extra={"error": str(exc), "index_dir": str(self._index_dir)},
-            )
+            _ = exc
             return None, reason
 
     async def _load_primary_index(
@@ -456,10 +422,6 @@ class FAISSDualIndexManager:
         primary_path = self._index_dir / "primary.faiss"
         if not primary_path.exists():
             reason = "Primary index not found"
-            LOGGER.error(
-                "faiss_primary_missing",
-                extra={"path": str(primary_path)},
-            )
             return None, reason
 
         try:
@@ -468,23 +430,11 @@ class FAISSDualIndexManager:
             )
         except RuntimeError as exc:
             reason = f"Failed to load primary index: {exc}"
-            LOGGER.exception(
-                "faiss_primary_load_failed",
-                extra={"path": str(primary_path), "error": str(exc)},
-            )
             return None, reason
 
         primary_dim = getattr(primary_cpu, "d", None)
         if primary_dim != self._vec_dim:
             reason = f"Dimension mismatch: index={primary_dim}, expected={self._vec_dim}"
-            LOGGER.error(
-                "faiss_dimension_mismatch",
-                extra={
-                    "path": str(primary_path),
-                    "index_dim": primary_dim,
-                    "expected_dim": self._vec_dim,
-                },
-            )
             return None, reason
 
         return primary_cpu, None
@@ -496,10 +446,7 @@ class FAISSDualIndexManager:
                 index = await asyncio.to_thread(faiss_module.read_index, str(secondary_path))
                 return self._wrap_with_idmap(index, faiss_module)
             except RuntimeError as exc:
-                LOGGER.exception(
-                    "faiss_secondary_load_failed",
-                    extra={"path": str(secondary_path), "error": str(exc)},
-                )
+                _ = exc
 
         return self._wrap_with_idmap(faiss_module.IndexFlatIP(self._vec_dim), faiss_module)
 
@@ -523,10 +470,7 @@ class FAISSDualIndexManager:
             try:
                 direct_map.set_type(faiss_module.DirectMap.Array)
             except (AttributeError, TypeError):
-                LOGGER.debug(
-                    "faiss_direct_map_set_type_failed",
-                    extra={"index": type(index).__name__},
-                )
+                pass
         make_direct_map = getattr(concrete, "make_direct_map", None)
         if callable(make_direct_map):
             with suppress(AttributeError, RuntimeError):
@@ -544,10 +488,7 @@ class FAISSDualIndexManager:
         try:
             self._manifest = IndexManifest.from_file(manifest_path)
         except (TypeError, ValueError) as exc:
-            LOGGER.warning(
-                "faiss_manifest_invalid",
-                extra={"path": str(manifest_path), "error": str(exc)},
-            )
+            _ = exc
             self._manifest = None
 
     async def try_gpu_clone(self, faiss_module: ModuleType) -> None:
@@ -576,7 +517,6 @@ class FAISSDualIndexManager:
                 return
         except RuntimeError as exc:  # pragma: no cover - defensive
             self._gpu_disabled_reason = f"CUDA check failed: {exc}"
-            LOGGER.exception("faiss_cuda_check_failed", extra={"error": str(exc)})
             return
 
         try:
@@ -597,7 +537,6 @@ class FAISSDualIndexManager:
             )
         except (AttributeError, RuntimeError) as exc:
             self._gpu_disabled_reason = f"GPU clone failed: {exc}"
-            LOGGER.exception("faiss_gpu_clone_failed", extra={"error": str(exc)})
             return
 
         self._gpu_resources = gpu_resources
@@ -605,10 +544,6 @@ class FAISSDualIndexManager:
         self._secondary_gpu = secondary_gpu
         self._gpu_enabled = True
         self._gpu_disabled_reason = None
-        LOGGER.info(
-            "faiss_gpu_clone_success",
-            extra={"use_cuvs": bool(getattr(cloner_options, "use_cuvs", False))},
-        )
 
     def _build_gpu_cloner_options(self, faiss_module: ModuleType) -> faiss.GpuClonerOptions:
         cloner_options = faiss_module.GpuClonerOptions()
@@ -617,16 +552,10 @@ class FAISSDualIndexManager:
             try:
                 cloner_options.use_cuvs = requested
             except AttributeError as exc:
-                LOGGER.warning(
-                    "faiss_gpu_cuvs_unavailable",
-                    extra={"error": str(exc)},
-                )
+                _ = exc
                 cloner_options.use_cuvs = False
         elif requested:
-            LOGGER.warning(
-                "faiss_gpu_cuvs_unavailable",
-                extra={"error": "GpuClonerOptions.use_cuvs missing"},
-            )
+            pass
         return cloner_options
 
     def _clone_index_to_gpu(
@@ -643,20 +572,13 @@ class FAISSDualIndexManager:
                 cpu_index,
                 cloner_options,
             )
-        except (AttributeError, RuntimeError) as exc:
+        except (AttributeError, RuntimeError):
             if bool(self._settings.use_cuvs) and hasattr(cloner_options, "use_cuvs"):
                 try:
                     cloner_options.use_cuvs = False
                 except AttributeError:
-                    LOGGER.warning(
-                        "faiss_gpu_clone_cuvs_reset_failed",
-                        extra={"error": str(exc)},
-                    )
+                    pass
                 else:
-                    LOGGER.warning(
-                        "faiss_gpu_clone_cuvs_fallback",
-                        extra={"error": str(exc)},
-                    )
                     return faiss_module.index_cpu_to_gpu(
                         gpu_resources,
                         0,

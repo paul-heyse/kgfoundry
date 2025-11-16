@@ -8,19 +8,20 @@ flat/IVFFlat indexes compared to fixed IVF-PQ.
   - Set environment variable: RUN_BENCHMARKS=1 pytest ...
   - Or explicitly request: pytest -m benchmark ...
 
-For GPU-required benchmarks, also ensure GPU is available or use -m "benchmark and gpu".
+Benchmarks run entirely on CPU so they can execute on any developer workstation.
 """
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import pytest
 from codeintel_rev.io.faiss_manager import FAISSManager
 
+from tests._helpers import assertions
 from tests.conftest import FAISS_MODULE, HAS_FAISS_SUPPORT
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
@@ -40,11 +41,13 @@ if not HAS_FAISS_SUPPORT:  # pragma: no cover - dependency-gated
         pytest.mark.skip(reason="FAISS bindings unavailable"),
     ]
 else:
-    assert FAISS_MODULE is not None
+    if FAISS_MODULE is None:  # pragma: no cover - defensive
+        msg = "FAISS module expected when HAS_FAISS_SUPPORT is True."
+        raise RuntimeError(msg)
     pytestmark = [_benchmark_gate]
 
 
-def _get_underlying_index(cpu_index: Any) -> Any:
+def _get_underlying_index(cpu_index: faiss.IndexIDMap2) -> faiss.Index:
     """Return the underlying FAISS index from an ID map wrapper.
 
     Parameters
@@ -57,7 +60,10 @@ def _get_underlying_index(cpu_index: Any) -> Any:
     Any
         Underlying FAISS index instance.
     """
-    assert hasattr(cpu_index, "index"), "Expected FAISS index wrapper to expose `index` attribute"
+    assertions.expect_true(
+        hasattr(cpu_index, "index"),
+        reason="Expected FAISS index wrapper to expose `index` attribute",
+    )
     index_map = cast("faiss.IndexIDMap2", cpu_index)
     return index_map.index
 
@@ -80,7 +86,10 @@ def tmp_index_path(tmp_path: Path) -> Path:
 
 
 @pytest.mark.benchmark
-def test_small_corpus_flat_vs_ivf_pq(benchmark, tmp_index_path: Path) -> None:
+def test_small_corpus_flat_vs_ivf_pq(
+    benchmark: pytest.BenchmarkFixture,
+    tmp_index_path: Path,
+) -> None:
     """Benchmark small corpus: flat index vs fixed IVF-PQ.
 
     Small corpus (<5K vectors) should use flat index which requires
@@ -110,18 +119,18 @@ def test_small_corpus_flat_vs_ivf_pq(benchmark, tmp_index_path: Path) -> None:
     # Verify flat index was used
     manager = FAISSManager(index_path=tmp_index_path, vec_dim=vec_dim)
     manager.build_index(vectors)
-    assert manager.cpu_index is not None
+    assertions.expect_true(manager.cpu_index is not None)
     cpu_index = manager.cpu_index
     underlying = _get_underlying_index(cpu_index)
-    assert underlying.__class__.__name__ == "IndexFlatIP"
-
-    print("\nSmall corpus benchmark (5K vectors):")
-    print("  Adaptive selection uses flat index (no training)")
-    print("  Expected: ≥10x faster than fixed IVF-PQ")
+    assertions.expect_equal(underlying.__class__.__name__, "IndexFlatIP")
+    benchmark.extra_info["small_corpus_index_type"] = underlying.__class__.__name__
 
 
 @pytest.mark.benchmark
-def test_medium_corpus_ivf_flat_vs_ivf_pq(benchmark, tmp_index_path: Path) -> None:
+def test_medium_corpus_ivf_flat_vs_ivf_pq(
+    benchmark: pytest.BenchmarkFixture,
+    tmp_index_path: Path,
+) -> None:
     """Benchmark medium corpus: IVFFlat vs fixed IVF-PQ.
 
     Medium corpus (5K-50K vectors) should use IVFFlat with dynamic nlist,
@@ -151,28 +160,25 @@ def test_medium_corpus_ivf_flat_vs_ivf_pq(benchmark, tmp_index_path: Path) -> No
     # Verify IVFFlat was used
     manager = FAISSManager(index_path=tmp_index_path, vec_dim=vec_dim)
     manager.build_index(vectors)
-    assert manager.cpu_index is not None
+    assertions.expect_true(manager.cpu_index is not None)
     cpu_index = manager.cpu_index
     underlying = _get_underlying_index(cpu_index)
-    assert underlying.__class__.__name__ == "IndexIVFFlat"
-
-    print("\nMedium corpus benchmark (50K vectors):")
-    print("  Adaptive selection uses IVFFlat with dynamic nlist")
-    print("  Expected: ≥2x faster than fixed IVF-PQ")
+    assertions.expect_equal(underlying.__class__.__name__, "IndexIVFFlat")
+    benchmark.extra_info["medium_corpus_index_type"] = underlying.__class__.__name__
 
 
 @pytest.mark.benchmark
-@pytest.mark.gpu
-def test_large_corpus_adaptive_vs_fixed(benchmark, tmp_index_path: Path) -> None:
+def test_large_corpus_adaptive_vs_fixed(
+    benchmark: pytest.BenchmarkFixture,
+    tmp_index_path: Path,
+) -> None:
     """Benchmark large corpus: adaptive vs fixed IVF-PQ.
 
     Large corpus (>50K vectors) should use IVF-PQ with dynamic nlist,
     providing similar performance to fixed IVF-PQ but with better
     parameter selection.
 
-    **Requires GPU** - This benchmark uses large vectors and is marked
-    with @pytest.mark.gpu. It will be skipped unless GPU is available
-    or explicitly requested.
+    Runs against large vectors on CPU; ensure RUN_BENCHMARKS=1 to execute.
 
     Parameters
     ----------
@@ -198,18 +204,18 @@ def test_large_corpus_adaptive_vs_fixed(benchmark, tmp_index_path: Path) -> None
     # Verify IVF-PQ was used
     manager = FAISSManager(index_path=tmp_index_path, vec_dim=vec_dim)
     manager.build_index(vectors)
-    assert manager.cpu_index is not None
+    assertions.expect_true(manager.cpu_index is not None)
     cpu_index = manager.cpu_index
     underlying = _get_underlying_index(cpu_index)
-    assert hasattr(underlying, "nlist")  # IVF-PQ has nlist
-
-    print("\nLarge corpus benchmark (100K vectors):")
-    print("  Adaptive selection uses IVF-PQ with dynamic nlist")
-    print("  Expected: Similar performance to fixed IVF-PQ")
+    assertions.expect_true(hasattr(underlying, "nlist"), reason="IVF-PQ exposes nlist.")
+    benchmark.extra_info["large_corpus_has_nlist"] = bool(getattr(underlying, "nlist", None))
 
 
 @pytest.mark.benchmark
-def test_training_time_scaling(benchmark, tmp_index_path: Path) -> None:
+def test_training_time_scaling(
+    benchmark: pytest.BenchmarkFixture,
+    tmp_index_path: Path,
+) -> None:
     """Benchmark training time scaling across corpus sizes.
 
     Verifies that training time scales appropriately with corpus size:
@@ -231,7 +237,7 @@ def test_training_time_scaling(benchmark, tmp_index_path: Path) -> None:
         vectors = _rng.normal(0.5, 0.15, (n_vectors, vec_dim)).astype(np.float32)
         vectors = np.clip(vectors, 0.0, 1.0)  # Ensure values are in [0, 1] range
 
-        def build_index(vectors=vectors) -> None:
+        def build_index(vectors: np.ndarray = vectors) -> None:
             """Build index for current corpus size."""
             manager = FAISSManager(index_path=tmp_index_path, vec_dim=vec_dim)
             manager.build_index(vectors)
@@ -241,7 +247,10 @@ def test_training_time_scaling(benchmark, tmp_index_path: Path) -> None:
 
         # Training should complete within target time
         avg_time = result.stats.mean
-        assert avg_time < max_time, f"Training took {avg_time:.2f}s (target: <{max_time}s)"
-
-        print(f"\nCorpus size: {n_vectors} vectors")
-        print(f"  Training time: {avg_time:.2f}s (target: <{max_time}s)")
+        assertions.expect_true(
+            avg_time < max_time,
+            reason=f"Training took {avg_time:.2f}s (target: <{max_time}s)",
+        )
+        benchmark.extra_info.setdefault("training_targets", []).append(
+            {"n_vectors": n_vectors, "avg_time": avg_time, "target": max_time},
+        )

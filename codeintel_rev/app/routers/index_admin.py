@@ -15,9 +15,7 @@ from codeintel_rev.app.scope_store import ScopeIn
 from codeintel_rev.errors import RuntimeLifecycleError
 from codeintel_rev.indexing.index_lifecycle import IndexAssets, collect_asset_attrs
 from codeintel_rev.runtime.factory_adjustment import DefaultFactoryAdjuster
-from kgfoundry_common.logging import get_logger
 
-LOGGER = get_logger(__name__)
 router = APIRouter(prefix="/admin/index", tags=["admin:index"])
 
 _ADMIN_FLAG = {"1", "true", "yes", "on"}
@@ -93,8 +91,8 @@ async def status_endpoint(
     assets_ok = False
     try:
         assets_ok = mgr.read_assets() is not None
-    except RuntimeLifecycleError as exc:  # pragma: no cover - logged + returned
-        LOGGER.warning("index.status.assets_unavailable", exc_info=exc)
+    except RuntimeLifecycleError:  # pragma: no cover - logged + returned
+        pass
     payload = {
         "current": version,
         "dir": str(mgr.current_dir()) if version else None,
@@ -348,7 +346,6 @@ async def publish_endpoint(
     except RuntimeLifecycleError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:  # pragma: no cover - defensive logging
-        LOGGER.exception("index.publish.unexpected", exc_info=exc)
         raise HTTPException(status_code=500, detail="publish-failed") from exc
     return JSONResponse(
         {

@@ -194,6 +194,7 @@ class LuceneImpactSearcherFactory(Protocol):
         """Build a searcher for ``index_dir`` using an optional query encoder."""
         ...
 
+
 __all__ = [
     "LuceneImpactIndex",
     "PureImpactIndex",

@@ -14,7 +14,6 @@ from codeintel_rev.eval.pool_writer import Channel, write_pool
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, StructureAnnotations
 from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.retrieval.types import SearchPoolRow
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     from codeintel_rev.io.xtr_manager import XTRIndex
@@ -22,9 +21,6 @@ else:  # pragma: no cover - imported lazily in CLI paths
 
     class XTRIndex:
         """Runtime placeholder for optional XTR dependency."""
-
-
-LOGGER = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -109,7 +105,6 @@ class HybridPoolEvaluator:
         sample_limit = config.max_queries if config.max_queries is not None else 64
         queries = self._catalog.sample_query_vectors(limit=sample_limit)
         if not queries:
-            LOGGER.warning("No query vectors available for evaluation.")
             empty_report = EvalReport(
                 queries=0,
                 k=config.k,
@@ -141,20 +136,6 @@ class HybridPoolEvaluator:
             xtr_records=xtr_rows,
         )
         self._write_metrics(config.metrics_path, report)
-        LOGGER.info(
-            "Hybrid evaluation completed",
-            extra={
-                "queries": report.queries,
-                "k": report.k,
-                "k_factor": report.k_factor,
-                "nprobe": report.nprobe,
-                "recall_at_k": report.recall_at_k,
-                "pool_rows": len(pool_rows),
-                "pool_path": str(config.pool_path),
-                "metrics_path": str(config.metrics_path),
-                "xtr_records": report.xtr_records,
-            },
-        )
         return report
 
     def _evaluate_queries(
@@ -225,8 +206,6 @@ class HybridPoolEvaluator:
             and getattr(self._xtr_index, "ready", False)
             else None
         )
-        if config.use_xtr_oracle and xtr_index is None:
-            LOGGER.warning("Requested XTR oracle but index is unavailable or not ready.")
         return _EvalState(
             fetch_k=fetch_k,
             search_k=search_k,

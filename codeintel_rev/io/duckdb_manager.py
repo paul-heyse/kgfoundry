@@ -12,7 +12,6 @@ from time import perf_counter
 from typing import TYPE_CHECKING, cast
 
 from codeintel_rev._lazy_imports import LazyModule
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     import duckdb
@@ -37,8 +36,7 @@ class DuckDBConfig:
         Parquet metadata across connections. Enabled by default for repeated
         catalog queries.
     log_queries : bool
-        Emit debug-level logs for every executed SQL statement. Disabled by
-        default to avoid noise in production environments.
+        Deprecated toggle retained for backwards compatibility. No effect.
     pool_size : int | None
         Maximum number of DuckDB connections to keep in the optional connection
         pool. ``None`` or ``0`` disables pooling (default). When enabled,
@@ -65,7 +63,7 @@ class _InstrumentedDuckDBConnection:
         query: duckdb.Statement | str,
         parameters: object | None = None,
     ) -> duckdb.DuckDBPyConnection:
-        """Execute a SQL query with logging.
+        """Execute a SQL query while tracking execution time.
 
         This method wraps DuckDB connection execution with logging,
         recording query execution time, SQL length, and optionally the SQL
@@ -91,24 +89,12 @@ class _InstrumentedDuckDBConnection:
         log_queries is enabled in the config, the SQL text (truncated to 5000
         characters) is included in log messages.
         """
-        sql_text = str(query)
-        sql_bytes = len(sql_text.encode("utf-8"))
         start = perf_counter()
         if parameters is not None:
             self._conn.execute(query, parameters)
         else:
             self._conn.execute(query)
-        duration_ms = round((perf_counter() - start) * 1000, 2)
-        if self._config.log_queries:
-            logger = get_logger(__name__)
-            logger.debug(
-                "DuckDB query executed",
-                extra={
-                    "duration_ms": duration_ms,
-                    "sql_bytes": sql_bytes,
-                    "sql": sql_text[:5000],
-                },
-            )
+        _ = round((perf_counter() - start) * 1000, 2)
         return cast("duckdb.DuckDBPyConnection", self)
 
     def __getattr__(self, name: str) -> object:

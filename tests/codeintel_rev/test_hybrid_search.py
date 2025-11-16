@@ -12,6 +12,8 @@ from codeintel_rev.plugins.registry import ChannelRegistry
 from codeintel_rev.retrieval.types import SearchHit
 from msgspec import structs
 
+from tests._helpers import assertions
+
 
 class _StubChannel(Channel):
     def __init__(
@@ -30,7 +32,7 @@ class _StubChannel(Channel):
 
     def search(self, query: str, limit: int) -> list[SearchHit]:
         self.calls += 1
-        assert query  # sanity check
+        assertions.expect_true(bool(query), reason="query should be non-empty")
         return list(self._hits[:limit])
 
 
@@ -91,13 +93,13 @@ def test_hybrid_search_engine_rrf_fuses_channels(monkeypatch: pytest.MonkeyPatch
     )
 
     doc_ids = [doc.doc_id for doc in result.docs]
-    assert set(doc_ids[:2]) == {"101", "102"}
-    assert result.channels == ["semantic", "bm25", "splade"]
-    assert result.warnings == []
-    assert ("semantic", 1, 0.5) in result.contributions["101"]
-    assert ("splade", 1, 4.2) in result.contributions["101"]
-    assert bm25_stub.calls == 1
-    assert splade_stub.calls == 1
+    assertions.expect_equal(set(doc_ids[:2]), {"101", "102"})
+    assertions.expect_sequence_equal(result.channels, ["semantic", "bm25", "splade"])
+    assertions.expect_equal(result.warnings, [])
+    assertions.expect_in(("semantic", 1, 0.5), result.contributions["101"])
+    assertions.expect_in(("splade", 1, 4.2), result.contributions["101"])
+    assertions.expect_equal(bm25_stub.calls, 1)
+    assertions.expect_equal(splade_stub.calls, 1)
 
 
 def test_hybrid_search_engine_respects_channel_flags(
@@ -119,11 +121,11 @@ def test_hybrid_search_engine_respects_channel_flags(
         limit=1,
     )
 
-    assert [doc.doc_id for doc in result.docs] == ["42"]
-    assert result.channels == ["semantic"]
-    assert result.warnings == []
-    assert bm25_stub.calls == 0
-    assert splade_stub.calls == 0
+    assertions.expect_sequence_equal([doc.doc_id for doc in result.docs], ["42"])
+    assertions.expect_sequence_equal(result.channels, ["semantic"])
+    assertions.expect_equal(result.warnings, [])
+    assertions.expect_equal(bm25_stub.calls, 0)
+    assertions.expect_equal(splade_stub.calls, 0)
 
 
 def test_hybrid_search_engine_accepts_extra_channels(
@@ -147,8 +149,8 @@ def test_hybrid_search_engine_accepts_extra_channels(
         ),
     )
 
-    assert result.channels == ["semantic", "warp"]
-    assert ("warp", 1, 5.0) in result.contributions["999"]
+    assertions.expect_sequence_equal(result.channels, ["semantic", "warp"])
+    assertions.expect_in(("warp", 1, 5.0), result.contributions["999"])
 
 
 def test_hybrid_channel_skips_missing_capability(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
@@ -166,8 +168,8 @@ def test_hybrid_channel_skips_missing_capability(monkeypatch: pytest.MonkeyPatch
 
     result = engine.search("query", semantic_hits=[(5, 0.1)], limit=1)
 
-    assert result.channels == ["semantic"]
-    assert splade_stub.calls == 0
+    assertions.expect_sequence_equal(result.channels, ["semantic"])
+    assertions.expect_equal(splade_stub.calls, 0)
 
 
 def test_hybrid_search_falls_back_when_faiss_unavailable(
@@ -191,9 +193,12 @@ def test_hybrid_search_falls_back_when_faiss_unavailable(
         options=HybridSearchOptions(faiss_ready=False),
     )
 
-    assert result.channels == ["bm25"]
-    assert any(msg.startswith("faiss_fallback:unavailable") for msg in result.warnings)
-    assert bm25_stub.calls == 1
+    assertions.expect_sequence_equal(result.channels, ["bm25"])
+    assertions.expect_true(
+        any(msg.startswith("faiss_fallback:unavailable") for msg in result.warnings),
+        reason="should warn about faiss fallback",
+    )
+    assertions.expect_equal(bm25_stub.calls, 1)
 
 
 def test_hybrid_search_drops_low_semantic_scores(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
@@ -210,9 +215,12 @@ def test_hybrid_search_drops_low_semantic_scores(monkeypatch: pytest.MonkeyPatch
 
     result = engine.search("query", semantic_hits=[(7, 0.2)], limit=1)
 
-    assert "semantic" not in result.channels
-    assert result.channels == ["bm25"]
-    assert any(msg.startswith("faiss_fallback:low_score") for msg in result.warnings)
+    assertions.expect_false("semantic" in result.channels, reason="semantic should be dropped")
+    assertions.expect_sequence_equal(result.channels, ["bm25"])
+    assertions.expect_true(
+        any(msg.startswith("faiss_fallback:low_score") for msg in result.warnings),
+        reason="should warn about low score",
+    )
 
 
 def test_hybrid_search_exposes_stage_metadata(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
@@ -222,15 +230,17 @@ def test_hybrid_search_exposes_stage_metadata(monkeypatch: pytest.MonkeyPatch, t
         channels=[_StubChannel("bm25", [SearchHit("1", rank=0, score=1.2, source="bm25")])],
     )
     result = engine.search("query", semantic_hits=[(1, 0.5)], limit=1)
-    assert result.method is not None
+    assertions.expect_true(result.method is not None, reason="should have method metadata")
     stages = result.method.get("stages")
-    assert stages, "expected stage metadata in method payload"
-    assert isinstance(stages, list)
+    assertions.expect_true(bool(stages), reason="expected stage metadata in method payload")
+    assertions.expect_true(isinstance(stages, list), reason="stages should be a list")
     stage_dicts: list[dict[str, object]] = [stage for stage in stages if isinstance(stage, dict)]
     stage_names: set[str] = set()
     for stage in stage_dicts:
         name = stage.get("name")
         if isinstance(name, str):
             stage_names.add(name)
-    assert "search.faiss" in stage_names
-    assert any(name.startswith("fusion.") for name in stage_names)
+    assertions.expect_in("search.faiss", stage_names)
+    assertions.expect_true(
+        any(name.startswith("fusion.") for name in stage_names), reason="should have fusion stage"
+    )

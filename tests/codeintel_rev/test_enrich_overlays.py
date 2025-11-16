@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: MIT
+"""Tests for stub overlay generation for type stubs."""
+
 from __future__ import annotations
 
 import json
@@ -11,12 +13,29 @@ from codeintel_rev.enrich.stubs_overlay import (
     generate_overlay_for_file,
 )
 
+from tests._helpers import assertions
+
 
 def _scip_symbol(module: str, name: str) -> str:
+    """Generate a SCIP symbol identifier.
+
+    Parameters
+    ----------
+    module : str
+        Module name.
+    name : str
+        Symbol name.
+
+    Returns
+    -------
+    str
+        SCIP symbol identifier.
+    """
     return f"scip-python python kgfoundry 0.0.0 `{module}`/{name}#"
 
 
 def test_generate_overlay_creates_stub_with_reexports(tmp_path: Path) -> None:
+    """Verify overlay generation creates stub files with re-exported symbols."""
     repo_root = tmp_path / "repo"
     package_root = repo_root / "codeintel_rev"
     package_root.mkdir(parents=True)
@@ -50,24 +69,29 @@ def test_generate_overlay_creates_stub_with_reexports(tmp_path: Path) -> None:
         inputs=OverlayInputs(scip=scip),
     )
 
-    assert result.created
-    assert result.pyi_path is not None
-    assert result.pyi_path.exists()
-    assert result.pyi_path.is_relative_to(repo_root / "stubs")
-    assert "codeintel_rev.deps" in result.exports_resolved
-    assert result.exports_resolved["codeintel_rev.deps"] == {"Bar", "Foo"}
+    assertions.expect_true(result.created, reason="overlay should be created")
+    assertions.expect_true(result.pyi_path is not None, reason="pyi_path should be set")
+    assertions.expect_true(result.pyi_path.exists(), reason="pyi_path should exist")
+    assertions.expect_true(
+        result.pyi_path.is_relative_to(repo_root / "stubs"), reason="pyi_path should be in stubs"
+    )
+    assertions.expect_in("codeintel_rev.deps", result.exports_resolved)
+    assertions.expect_equal(result.exports_resolved["codeintel_rev.deps"], {"Bar", "Foo"})
 
     stub_text = result.pyi_path.read_text(encoding="utf-8")
-    assert "from codeintel_rev.deps import Bar as Bar, Foo as Foo" in stub_text
-    assert "def helper(*args: Any, **kwargs: Any) -> Any" in stub_text
-    assert '__all__ = ["Bar", "Foo", "helper"]' in stub_text
+    assertions.expect_in("from codeintel_rev.deps import Bar as Bar, Foo as Foo", stub_text)
+    assertions.expect_in("def helper(*args: Any, **kwargs: Any) -> Any", stub_text)
+    assertions.expect_in('__all__ = ["Bar", "Foo", "helper"]', stub_text)
 
     sidecar_data = json.loads(result.pyi_path.with_suffix(".pyi.json").read_text(encoding="utf-8"))
-    assert sidecar_data["module"] == "codeintel_rev.public_api"
-    assert sidecar_data["exports_resolved"]["codeintel_rev.deps"] == ["Bar", "Foo"]
+    assertions.expect_equal(sidecar_data["module"], "codeintel_rev.public_api")
+    assertions.expect_sequence_equal(
+        sidecar_data["exports_resolved"]["codeintel_rev.deps"], ["Bar", "Foo"]
+    )
 
 
 def test_generate_overlay_skips_private_only_module(tmp_path: Path) -> None:
+    """Verify overlay generation skips modules with only private symbols."""
     repo_root = tmp_path / "repo"
     package_root = repo_root / "codeintel_rev"
     package_root.mkdir(parents=True)
@@ -85,11 +109,12 @@ def test_generate_overlay_skips_private_only_module(tmp_path: Path) -> None:
         inputs=OverlayInputs(),
     )
 
-    assert not result.created
-    assert result.pyi_path is None
+    assertions.expect_false(result.created, reason="private-only module should not create overlay")
+    assertions.expect_equal(result.pyi_path, None)
 
 
 def test_overlay_hub_threshold_controls_generation(tmp_path: Path) -> None:
+    """Verify export hub threshold controls when overlays are generated."""
     repo_root = tmp_path / "repo"
     package_root = repo_root / "pkg"
     package_root.mkdir(parents=True)
@@ -104,10 +129,11 @@ def test_overlay_hub_threshold_controls_generation(tmp_path: Path) -> None:
         policy=OverlayPolicy(export_hub_threshold=5),
         inputs=OverlayInputs(),
     )
-    assert result.created
+    assertions.expect_true(result.created, reason="hub with threshold should create overlay")
 
 
 def test_overlay_skips_small_export_sets(tmp_path: Path) -> None:
+    """Verify overlay generation skips modules with small export sets."""
     repo_root = tmp_path / "repo"
     package_root = repo_root / "pkg"
     package_root.mkdir(parents=True)
@@ -121,10 +147,11 @@ def test_overlay_skips_small_export_sets(tmp_path: Path) -> None:
         policy=OverlayPolicy(export_hub_threshold=3),
         inputs=OverlayInputs(),
     )
-    assert not result.created
+    assertions.expect_false(result.created, reason="small export set should not create overlay")
 
 
 def test_overlay_needed_tag_forces_generation(tmp_path: Path) -> None:
+    """Verify overlay_needed tag forces overlay generation regardless of threshold."""
     repo_root = tmp_path / "repo"
     package_root = repo_root / "pkg"
     package_root.mkdir(parents=True)
@@ -139,4 +166,4 @@ def test_overlay_needed_tag_forces_generation(tmp_path: Path) -> None:
         policy=OverlayPolicy(export_hub_threshold=100),
         inputs=OverlayInputs(overlay_tagged_paths=frozenset({rel_key})),
     )
-    assert result.created
+    assertions.expect_true(result.created, reason="tagged path should force overlay creation")

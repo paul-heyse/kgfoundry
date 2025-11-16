@@ -15,11 +15,15 @@ from codeintel_rev.io.duckdb_manager import (
     DuckDBQueryOptions,
 )
 
+from tests._helpers import assertions, constants
+
 
 def test_duckdb_manager_configures_pragmas(tmp_path: Path) -> None:
     """Connections enable object cache and apply thread configuration."""
+    thread_count = constants.BATCH_SIZES.small
     manager = DuckDBManager(
-        tmp_path / "catalog.duckdb", DuckDBConfig(threads=2, enable_object_cache=True)
+        tmp_path / "catalog.duckdb",
+        DuckDBConfig(threads=thread_count, enable_object_cache=True),
     )
 
     with cast(
@@ -27,12 +31,12 @@ def test_duckdb_manager_configures_pragmas(tmp_path: Path) -> None:
         manager.connection(),
     ) as conn:
         threads_row = conn.execute("SELECT current_setting('threads')").fetchone()
-        assert threads_row is not None
-        assert int(threads_row[0]) == 2
+        assertions.expect_true(threads_row is not None)
+        assertions.expect_equal(int(threads_row[0]), thread_count)
 
         cache_row = conn.execute("SELECT current_setting('enable_object_cache')").fetchone()
-        assert cache_row is not None
-        assert str(cache_row[0]).lower() in {"true", "1"}
+        assertions.expect_true(cache_row is not None)
+        assertions.expect_true(str(cache_row[0]).lower() in {"true", "1"})
 
 
 def test_duckdb_manager_closes_connections(tmp_path: Path) -> None:
@@ -44,7 +48,7 @@ def test_duckdb_manager_closes_connections(tmp_path: Path) -> None:
         "AbstractContextManager[duckdb.DuckDBPyConnection]",
         manager.connection(),
     ) as connection:
-        assert connection.execute("SELECT 1").fetchone() == (1,)
+        assertions.expect_equal(connection.execute("SELECT 1").fetchone(), (1,))
 
     with pytest.raises(duckdb.Error):
         connection.execute("SELECT 1")
@@ -55,9 +59,9 @@ def test_query_builder_basic() -> None:
     builder = DuckDBQueryBuilder()
     sql, params = builder.build_filter_query(chunk_ids=[1, 2, 3])
 
-    assert "id = ANY($ids)" in sql
-    assert params["ids"] == [1, 2, 3]
-    assert "include" not in "".join(params.keys())
+    assertions.expect_in("id = ANY($ids)", sql)
+    assertions.expect_sequence_equal(params["ids"], [1, 2, 3])
+    assertions.expect_true("include" not in "".join(params.keys()))
 
 
 def test_query_builder_with_filters() -> None:
@@ -70,12 +74,12 @@ def test_query_builder_with_filters() -> None:
     )
     sql, params = builder.build_filter_query(chunk_ids=[1], options=options)
 
-    assert "c.uri LIKE $include_0" in sql
-    assert params["include_0"] == "src/%/%.py"
-    assert "c.uri NOT LIKE $exclude_0" in sql
-    assert params["exclude_0"] == "tests/%"
-    assert "c.lang = ANY($languages)" in sql
-    assert params["languages"] == ["python", "typescript"]
+    assertions.expect_in("c.uri LIKE $include_0", sql)
+    assertions.expect_equal(params["include_0"], "src/%/%.py")
+    assertions.expect_in("c.uri NOT LIKE $exclude_0", sql)
+    assertions.expect_equal(params["exclude_0"], "tests/%")
+    assertions.expect_in("c.lang = ANY($languages)", sql)
+    assertions.expect_sequence_equal(params["languages"], ["python", "typescript"])
 
 
 def test_query_builder_preserve_order() -> None:
@@ -88,11 +92,11 @@ def test_query_builder_preserve_order() -> None:
     )
     sql, params = builder.build_filter_query(chunk_ids=[3, 1], options=options)
 
-    assert sql.startswith("SELECT c.*")
-    assert "JOIN UNNEST($ids) WITH ORDINALITY" in sql
-    assert "ORDER BY ids.position" in sql
-    assert "c.uri LIKE $include_0" in sql
-    assert params["ids"] == [3, 1]
+    assertions.expect_true(sql.startswith("SELECT c.*"))
+    assertions.expect_in("JOIN UNNEST($ids) WITH ORDINALITY", sql)
+    assertions.expect_in("ORDER BY ids.position", sql)
+    assertions.expect_in("c.uri LIKE $include_0", sql)
+    assertions.expect_sequence_equal(params["ids"], [3, 1])
 
 
 def test_query_builder_join_flags() -> None:
@@ -107,11 +111,11 @@ def test_query_builder_join_flags() -> None:
     )
     sql, _ = builder.build_filter_query(chunk_ids=[1], options=options)
 
-    assert "LEFT JOIN modules USING" in sql
-    assert "LEFT JOIN v_chunk_symbols" in sql
-    assert "LEFT JOIN faiss_idmap" in sql
-    assert "LEFT JOIN ast_nodes" in sql
-    assert "LEFT JOIN cst_nodes" in sql
+    assertions.expect_in("LEFT JOIN modules USING", sql)
+    assertions.expect_in("LEFT JOIN v_chunk_symbols", sql)
+    assertions.expect_in("LEFT JOIN faiss_idmap", sql)
+    assertions.expect_in("LEFT JOIN ast_nodes", sql)
+    assertions.expect_in("LEFT JOIN cst_nodes", sql)
 
 
 def test_connection_pool_reuses_connections(
@@ -143,9 +147,11 @@ def test_connection_pool_reuses_connections(
             "AbstractContextManager[duckdb.DuckDBPyConnection]",
             manager.connection(),
         ) as connection:
-            assert connection.execute("SELECT value FROM numbers").fetchone() == (1,)
+            assertions.expect_equal(
+                connection.execute("SELECT value FROM numbers").fetchone(), (1,)
+            )
 
     manager.close()
 
-    assert created <= 2
-    assert manager.connections_created <= 2
+    assertions.expect_true(created <= manager.config.pool_size)
+    assertions.expect_true(manager.connections_created <= manager.config.pool_size)

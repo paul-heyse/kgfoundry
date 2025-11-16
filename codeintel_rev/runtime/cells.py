@@ -12,11 +12,9 @@ from typing import Literal, Protocol, TypeVar, final, runtime_checkable
 from codeintel_rev.errors import RuntimeLifecycleError, RuntimeUnavailableError
 from codeintel_rev.runtime.factory_adjustment import FactoryAdjuster, NoopFactoryAdjuster
 from codeintel_rev.runtime.request_context import capability_stamp_var, session_id_var
-from kgfoundry_common.logging import get_logger
 
 T = TypeVar("T")
 
-LOGGER = get_logger(__name__)
 _SEED_ENV = "KGFOUNDRY_ALLOW_RUNTIME_SEED"
 _SEED_GUARD_MESSAGE = (
     f"RuntimeCell.seed() is restricted to tests. Set {_SEED_ENV}=1 to override explicitly."
@@ -234,18 +232,6 @@ class RuntimeCell[T]:
             Raised when generation tracking becomes inconsistent (defensive check).
             Also raised when the initialization generation is missing (should not occur
             in normal operation).
-        BaseException
-            Any exception stored in the cell from a previous initialization failure
-            is re-raised during cooldown periods. The exception is stored in
-            `_cooldown_error` (typed as Exception | None) and re-raised via the
-            `cooldown_error` variable (typed as BaseException | None) when cooldown
-            periods are active. The specific exception type depends on what was raised
-            during the previous initialization attempt (e.g., RuntimeError,
-            RuntimeUnavailableError, RuntimeLifecycleError, or any other BaseException
-            subclass). The exception is re-raised using `raise cooldown_error` where
-            `cooldown_error` is a variable containing the stored exception. Note: The
-            exception is re-raised using a variable, so pydoclint may flag this as
-            DOC503, but the exception is correctly propagated and documented.
 
         Notes
         -----
@@ -319,7 +305,7 @@ class RuntimeCell[T]:
         Parameters
         ----------
         silent : bool, optional
-            When ``True`` (default), disposal errors are logged and suppressed.
+            When ``True`` (default), disposal errors are suppressed.
             When ``False``, exceptions raised by the payload's disposal propagate.
 
         Raises
@@ -334,6 +320,12 @@ class RuntimeCell[T]:
             Any other exception raised by the payload's disposal is propagated when
             ``silent=False``. When ``silent=True`` (default), all exceptions are caught
             and logged.
+
+        Notes
+        -----
+        When ``silent`` is ``False`` the payload's ``close`` or cleanup hooks are invoked
+        without suppression so AttributeError/OSError/RuntimeError bubble up directly.
+        The default ``silent=True`` mode catches and swallows those exceptions.
         """
         with self._condition:
             current = self._value
@@ -348,10 +340,6 @@ class RuntimeCell[T]:
         start = time.monotonic()
         if current is None:
             duration_ms = (time.monotonic() - start) * 1000
-            LOGGER.debug(
-                "runtime_cell_close_noop",
-                extra={"cell_type": self._name, "status": "noop"},
-            )
             self._observer.on_close_end(
                 RuntimeCellCloseResult(
                     cell=self._name,
@@ -370,15 +358,6 @@ class RuntimeCell[T]:
                 disposer()
         except (OSError, RuntimeError, AttributeError) as exc:
             duration_ms = (time.monotonic() - start) * 1000
-            LOGGER.warning(
-                "runtime_cell_dispose_failed",
-                extra={
-                    "cell_type": self._name,
-                    "status": "error",
-                    "payload_type": type(current).__name__,
-                    "error": str(exc),
-                },
-            )
             self._observer.on_close_end(
                 RuntimeCellCloseResult(
                     cell=self._name,
@@ -394,15 +373,6 @@ class RuntimeCell[T]:
             raise
         except Exception as exc:  # pragma: no cover - defensive
             duration_ms = (time.monotonic() - start) * 1000
-            LOGGER.warning(
-                "runtime_cell_dispose_failed",
-                extra={
-                    "cell_type": self._name,
-                    "status": "error",
-                    "payload_type": type(current).__name__,
-                    "error": str(exc),
-                },
-            )
             self._observer.on_close_end(
                 RuntimeCellCloseResult(
                     cell=self._name,
@@ -418,16 +388,6 @@ class RuntimeCell[T]:
             raise
         else:
             duration_ms = (time.monotonic() - start) * 1000
-            LOGGER.debug(
-                "runtime_cell_closed",
-                extra={
-                    "cell_type": self._name,
-                    "payload_type": type(current).__name__,
-                    "duration_ms": duration_ms,
-                    "status": "ok",
-                    "close_called": close_called,
-                },
-            )
             self._observer.on_close_end(
                 RuntimeCellCloseResult(
                     cell=self._name,
@@ -566,15 +526,6 @@ class RuntimeCell[T]:
             self._value_generation = generation
             self._clear_cooldown_locked()
             self._condition.notify_all()
-        LOGGER.debug(
-            "runtime_cell_initialized",
-            extra={
-                "cell_type": self._name,
-                "payload_type": type(payload).__name__,
-                "duration_ms": duration_ms,
-                "status": "ok",
-            },
-        )
         self._observer.on_init_end(
             RuntimeCellInitResult(
                 cell=self._name,
@@ -600,15 +551,6 @@ class RuntimeCell[T]:
             self._state = "failed"
             self._last_error = exc
             self._condition.notify_all()
-        LOGGER.warning(
-            "runtime_cell_init_failed",
-            extra={
-                "cell_type": self._name,
-                "status": "error",
-                "exc_type": type(exc).__name__,
-                "error_message": str(exc),
-            },
-        )
         self._observer.on_init_end(
             RuntimeCellInitResult(
                 cell=self._name,

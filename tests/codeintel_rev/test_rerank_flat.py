@@ -7,6 +7,8 @@ import numpy as np
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.retrieval.rerank_flat import FlatReranker, exact_rerank
 
+from tests._helpers import assertions
+
 
 def test_exact_rerank_prefers_vectors_with_higher_similarity(tmp_path: Path) -> None:
     catalog_path = tmp_path / "catalog.duckdb"
@@ -30,11 +32,11 @@ def test_exact_rerank_prefers_vectors_with_higher_similarity(tmp_path: Path) -> 
 
     scores, ids = exact_rerank(catalog, queries, candidates, top_k=2)
 
-    assert ids.shape == (1, 2)
-    assert scores.shape == (1, 2)
+    assertions.expect_equal(ids.shape, (1, 2))
+    assertions.expect_equal(scores.shape, (1, 2))
     # Chunk 1 aligns best with the query vector.
-    assert ids.tolist()[0][0] == 1
-    assert ids.tolist()[0][1] == 2
+    assertions.expect_equal(ids.tolist()[0][0], 1)
+    assertions.expect_equal(ids.tolist()[0][1], 2)
 
 
 def test_flat_reranker_supports_cosine_metric(tmp_path: Path) -> None:
@@ -60,6 +62,6 @@ def test_flat_reranker_supports_cosine_metric(tmp_path: Path) -> None:
 
     scores, ids = reranker.rerank(queries, candidates, top_k=1)
 
-    assert ids.tolist() == [[20]]
+    assertions.expect_sequence_equal(ids.tolist(), [[20]])
     # Cosine similarity of perfectly aligned vectors equals 1.0.
-    assert np.isclose(scores[0][0], 1.0)
+    assertions.expect_true(np.isclose(scores[0][0], 1.0), reason="cosine similarity should be 1.0")

@@ -12,6 +12,7 @@ from kgfoundry_common.subprocess_utils import (
     SubprocessTimeoutError,
     run_subprocess,
 )
+from tests._helpers import assertions
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -23,7 +24,7 @@ class TestSubprocessExecution:
     def test_simple_command_success(self) -> None:
         """Test successful simple command execution."""
         result = run_subprocess(["echo", "hello"], timeout=5)
-        assert "hello" in result
+        assertions.expect_true("hello" in result, reason="result should contain hello")
 
     def test_command_with_output(self) -> None:
         """Test command that produces output."""
@@ -31,7 +32,7 @@ class TestSubprocessExecution:
             ["python", "-c", "print('test output')"],
             timeout=10,
         )
-        assert "test output" in result
+        assertions.expect_true("test output" in result, reason="result should contain test output")
 
     def test_command_failure_raises_error(self) -> None:
         """Test that failed command raises SubprocessError."""
@@ -40,7 +41,7 @@ class TestSubprocessExecution:
                 ["python", "-c", "import sys; sys.exit(1)"],
                 timeout=5,
             )
-        assert exc_info.value.returncode == 1
+        assertions.expect_equal(exc_info.value.returncode, 1)
 
     def test_command_with_stderr(self) -> None:
         """Test that stderr is captured in error."""
@@ -49,7 +50,9 @@ class TestSubprocessExecution:
                 ["python", "-c", "import sys; sys.stderr.write('error'); sys.exit(1)"],
                 timeout=5,
             )
-        assert exc_info.value.stderr is not None
+        assertions.expect_true(
+            exc_info.value.stderr is not None, reason="stderr should be captured"
+        )
 
     def test_timeout_enforcement(self) -> None:
         """Test that timeout is enforced."""
@@ -66,8 +69,8 @@ class TestSubprocessExecution:
                 ["sleep", "10"],
                 timeout=1,
             )
-        assert exc_info.value.timeout_seconds == 1
-        assert exc_info.value.command is not None
+        assertions.expect_equal(exc_info.value.timeout_seconds, 1)
+        assertions.expect_true(exc_info.value.command is not None, reason="command should be set")
 
     def test_invalid_timeout_too_low(self) -> None:
         """Test that timeout < 1 is rejected."""
@@ -83,16 +86,16 @@ class TestSubprocessExecution:
         """Test that boundary timeout values are accepted."""
         # Minimum valid timeout
         result = run_subprocess(["echo", "test"], timeout=1)
-        assert "test" in result
+        assertions.expect_true("test" in result, reason="result should contain test")
 
         # Maximum valid timeout
         result = run_subprocess(["echo", "test"], timeout=3600)
-        assert "test" in result
+        assertions.expect_true("test" in result, reason="result should contain test")
 
     def test_timeout_none_uses_default(self) -> None:
         """Test that None timeout uses default."""
         result = run_subprocess(["echo", "test"], timeout=None)
-        assert "test" in result
+        assertions.expect_true("test" in result, reason="result should contain test")
 
 
 class TestWorkingDirectory:
@@ -110,7 +113,7 @@ class TestWorkingDirectory:
             timeout=5,
             cwd=tmp_path,
         )
-        assert "test.txt" in result
+        assertions.expect_true("test.txt" in result, reason="result should contain test.txt")
 
     def test_cwd_resolved_to_absolute_path(self, tmp_path: Path) -> None:
         """Test that cwd is resolved to absolute path."""
@@ -121,12 +124,17 @@ class TestWorkingDirectory:
             cwd=tmp_path,
         )
         # Should contain the absolute path
-        assert str(tmp_path.resolve()) in result or str(tmp_path) in result
+        assertions.expect_true(
+            str(tmp_path.resolve()) in result or str(tmp_path) in result,
+            reason="result should contain path",
+        )
 
     def test_cwd_none_works(self) -> None:
         """Test that cwd=None (inherit parent cwd) works."""
         result = run_subprocess(["pwd"], timeout=5, cwd=None)
-        assert "/" in result  # Should output a path
+        assertions.expect_true(
+            "/" in result, reason="result should contain path"
+        )  # Should output a path
 
 
 class TestEnvironmentVariables:
@@ -140,7 +148,7 @@ class TestEnvironmentVariables:
             timeout=5,
             env=env,
         )
-        assert "test_value" in result
+        assertions.expect_true("test_value" in result, reason="result should contain test_value")
 
     def test_env_none_inherits_parent(self) -> None:
         """Test that env=None inherits parent environment."""
@@ -149,7 +157,7 @@ class TestEnvironmentVariables:
             timeout=5,
             env=None,
         )
-        assert "True" in result
+        assertions.expect_true("True" in result, reason="result should contain True")
 
     def test_env_dict_mapping(self) -> None:
         """Test that env can be any Mapping."""
@@ -159,7 +167,7 @@ class TestEnvironmentVariables:
             timeout=5,
             env=env,
         )
-        assert "value" in result
+        assertions.expect_true("value" in result, reason="result should contain value")
 
 
 class TestErrorReporting:
@@ -169,13 +177,17 @@ class TestErrorReporting:
         """Test that error message includes command."""
         with pytest.raises(SubprocessError) as exc_info:
             run_subprocess(["false"], timeout=5)
-        assert "false" in str(exc_info.value)
+        assertions.expect_true(
+            "false" in str(exc_info.value), reason="error should mention command"
+        )
 
     def test_timeout_error_message_includes_command(self) -> None:
         """Test that timeout error includes command."""
         with pytest.raises(SubprocessTimeoutError) as exc_info:
             run_subprocess(["sleep", "10"], timeout=1)
-        assert "sleep" in str(exc_info.value)
+        assertions.expect_true(
+            "sleep" in str(exc_info.value), reason="error should mention command"
+        )
 
 
 class TestComplexCommands:
@@ -192,7 +204,7 @@ class TestComplexCommands:
             ],
             timeout=5,
         )
-        assert "arg1" in result
+        assertions.expect_true("arg1" in result, reason="result should contain arg1")
 
     def test_shell_command_via_python(self) -> None:
         """Test shell-like commands via Python."""
@@ -204,7 +216,7 @@ class TestComplexCommands:
             ],
             timeout=5,
         )
-        assert "1,2,3" in result
+        assertions.expect_true("1,2,3" in result, reason="result should contain 1,2,3")
 
     @pytest.mark.parametrize(
         "value",
@@ -214,4 +226,4 @@ class TestComplexCommands:
         """Test echo command with various inputs."""
         result = run_subprocess(["echo", value], timeout=5)
         if value:
-            assert value in result
+            assertions.expect_true(value in result, reason=f"result should contain {value}")

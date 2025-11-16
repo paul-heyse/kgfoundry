@@ -1,3 +1,5 @@
+"""Tests for semantic_pro adapter behaviors."""
+
 from __future__ import annotations
 
 import asyncio
@@ -15,18 +17,29 @@ from codeintel_rev.mcp_server.adapters import semantic_pro
 from codeintel_rev.retrieval.types import HybridResultDoc, HybridSearchResult
 
 from kgfoundry_common.errors import VectorSearchError
+from tests._helpers import assertions, constants
+
+EXPECTED_CHUNK_ID = 101
 
 
 class _FakeVLLMClient:
+    def __init__(self) -> None:
+        self.embed_calls = 0
+
     def embed_batch(self, texts: list[str]) -> np.ndarray:
-        assert texts
+        self.embed_calls += 1
+        assertions.expect_true(texts, reason="semantic search must embed at least one text.")
         return np.asarray([[0.1, 0.2]], dtype=np.float32)
 
 
 class _FakeFaissManager:
+    def __init__(self) -> None:
+        self.search_calls = 0
+
     def search(self, *_: object, **__: object) -> tuple[np.ndarray, np.ndarray]:
+        self.search_calls += 1
         distances = np.asarray([[0.9, 0.8]], dtype=np.float32)
-        ids = np.asarray([[101, 102]], dtype=np.int64)
+        ids = np.asarray([[EXPECTED_CHUNK_ID, EXPECTED_CHUNK_ID + 1]], dtype=np.int64)
         return distances, ids
 
 
@@ -34,20 +47,21 @@ class _FakeCatalog:
     def __init__(self) -> None:
         self.records = [
             {
-                "id": 101,
+                "id": EXPECTED_CHUNK_ID,
                 "uri": "src/file_a.py",
                 "start_line": 1,
                 "end_line": 5,
                 "preview": "code A",
             },
             {
-                "id": 102,
+                "id": EXPECTED_CHUNK_ID + 1,
                 "uri": "src/file_b.py",
                 "start_line": 10,
                 "end_line": 20,
                 "preview": "code B",
             },
         ]
+        self.annotation_requests = 0
 
     def query_by_ids(self, ids: list[int]) -> list[dict]:
         return [record for record in self.records if record["id"] in ids]
@@ -56,6 +70,7 @@ class _FakeCatalog:
         return self.query_by_ids(ids)
 
     def get_structure_annotations(self, ids: list[int]) -> dict[int, StructureAnnotations]:
+        self.annotation_requests += 1
         annotations: dict[int, StructureAnnotations] = {}
         for chunk_id in ids:
             annotations[int(chunk_id)] = StructureAnnotations(
@@ -68,15 +83,21 @@ class _FakeCatalog:
 
 
 class _FakeHybridEngine:
+    def __init__(self) -> None:
+        self.search_calls = 0
+        self.last_options: semantic_pro.HybridOptions | None = None
+
     def search(
         self,
         query: str,
         *,
-        semantic_hits,
+        semantic_hits: list[tuple[int, float]],
         limit: int,
-        options=None,
+        options: semantic_pro.HybridOptions | None = None,
     ) -> HybridSearchResult:
-        assert query
+        self.search_calls += 1
+        self.last_options = options
+        assertions.expect_true(query)
         extra_channels = options.extra_channels if options else None
         docs = [
             HybridResultDoc(doc_id=str(cid), score=float(score)) for cid, score in semantic_hits
@@ -115,7 +136,7 @@ class _StubXTRIndex:
         topk_explanations: int = 5,
     ) -> list[tuple[int, float, None]]:
         self.calls += 1
-        assert query
+        assertions.expect_true(query)
         _ = explain
         _ = topk_explanations
         reordered = list(reversed(candidate_chunk_ids))
@@ -136,6 +157,7 @@ class _FakeContext:
         )
         self._catalog = _FakeCatalog()
         self._hybrid = _FakeHybridEngine()
+        self.faiss_requests = 0
         self.settings = SimpleNamespace(
             coderank=SimpleNamespace(
                 model_id="stub",
@@ -184,7 +206,8 @@ class _FakeContext:
         self._xtr_index = _StubXTRIndex() if xtr_ready else None
 
     def get_coderank_faiss_manager(self, vec_dim: int) -> _FakeFaissManager:
-        assert vec_dim == 2
+        assertions.expect_equal(vec_dim, constants.VECTOR_DIMS.pair)
+        self.faiss_requests += 1
         return _FakeFaissManager()
 
     def open_catalog(self) -> AbstractContextManager[_FakeCatalog]:
@@ -211,12 +234,13 @@ def _stub_scope(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_semantic_pro_produces_findings(tmp_path: Path) -> None:
+    """Semantic pro returns findings with explainability metadata."""
     context = cast("ApplicationContext", _FakeContext(tmp_path))
     envelope = asyncio.run(
         semantic_pro.semantic_search_pro(
             context=context,
             query="how to open file",
-            limit=2,
+            limit=constants.BATCH_SIZES.minimal,
             options={
                 "use_warp": False,
                 "use_reranker": False,
@@ -226,63 +250,68 @@ def test_semantic_pro_produces_findings(tmp_path: Path) -> None:
         )
     )
 
-    assert "findings" in envelope
+    assertions.expect_in("findings", envelope)
     findings = cast("list[dict[str, object]]", envelope["findings"])
-    assert findings
+    assertions.expect_true(findings)
     explanations = cast("dict[str, object]", findings[0].get("explanations"))
-    assert explanations["matched_symbols"] == ["fake.symbol"]
+    assertions.expect_sequence_equal(explanations["matched_symbols"], ["fake.symbol"])
 
 
 def test_semantic_pro_rerank_skips_without_capability(tmp_path: Path) -> None:
+    """Reranker metadata indicates capability is off."""
     context = cast("ApplicationContext", _FakeContext(tmp_path))
     envelope = asyncio.run(
         semantic_pro.semantic_search_pro(
             context=context,
             query="gateway",
-            limit=2,
+            limit=constants.BATCH_SIZES.minimal,
             options={"rerank": {"enabled": True}},
         )
     )
     method = envelope.get("method")
-    assert method is not None
-    rerank = method.get("rerank")
-    assert rerank is not None
-    assert rerank["enabled"] is False
-    assert rerank["reason"] == "capability_off"
+    assertions.expect_true(method is not None)
+    rerank = method.get("rerank") if method else None
+    assertions.expect_true(rerank is not None)
+    rerank_meta = cast("dict[str, object]", rerank)
+    assertions.expect_false(rerank_meta["enabled"])
+    assertions.expect_equal(rerank_meta["reason"], "capability_off")
 
 
 def test_semantic_pro_rerank_reorders_when_ready(tmp_path: Path) -> None:
+    """XTR-enabled reranker reorders findings."""
     context = cast("ApplicationContext", _FakeContext(tmp_path, xtr_ready=True))
     envelope = asyncio.run(
         semantic_pro.semantic_search_pro(
             context=context,
             query="gateway",
-            limit=2,
-            options={"rerank": {"enabled": True, "top_k": 2}},
+            limit=constants.BATCH_SIZES.minimal,
+            options={
+                "rerank": {"enabled": True, "top_k": constants.BATCH_SIZES.minimal},
+            },
         )
     )
     method = envelope.get("method")
-    assert method is not None
-    rerank_meta = method.get("rerank")
-    assert rerank_meta is not None
-    assert rerank_meta["enabled"] is True
-    reordered = rerank_meta.get("reordered")
-    assert isinstance(reordered, int)
-    assert reordered >= 1
+    assertions.expect_true(method is not None)
+    rerank_meta = method.get("rerank") if method else None
+    assertions.expect_true(rerank_meta is not None)
+    rerank_meta_dict = cast("dict[str, object]", rerank_meta)
+    assertions.expect_true(bool(rerank_meta_dict["enabled"]))
+    reordered = rerank_meta_dict.get("reordered")
+    assertions.expect_true(isinstance(reordered, int) and reordered >= 1)
     findings_payload = envelope.get("findings")
-    if findings_payload is None:
-        pytest.fail("findings missing from envelope")
-    assert findings_payload, "expected at least one finding"
+    assertions.expect_true(findings_payload, reason="expected at least one finding")
     first_finding = findings_payload[0]
-    assert first_finding.get("chunk_id") == 101
-    assert "why" in first_finding
+    assertions.expect_equal(first_finding.get("chunk_id"), EXPECTED_CHUNK_ID)
+    assertions.expect_in("why", first_finding)
     method_details = envelope.get("method")
-    assert method_details is not None
-    assert method_details.get("retrieval") == ["semantic"]
-    assert method_details.get("stages")
+    assertions.expect_true(method_details is not None)
+    if method_details:
+        assertions.expect_sequence_equal(method_details.get("retrieval"), ["semantic"])
+        assertions.expect_true(method_details.get("stages"))
 
 
 def test_semantic_pro_requires_coderank_enabled(tmp_path: Path) -> None:
+    """Disabling coderank raises VectorSearchError."""
     context = cast("ApplicationContext", _FakeContext(tmp_path))
     with pytest.raises(VectorSearchError):
         asyncio.run(
@@ -296,6 +325,7 @@ def test_semantic_pro_requires_coderank_enabled(tmp_path: Path) -> None:
 
 
 def test_merge_explainability_into_findings() -> None:
+    """Explainability data merges into the finding payload."""
     finding: semantic_pro.Finding = {
         "chunk_id": 1,
         "type": "usage",
@@ -313,4 +343,4 @@ def test_merge_explainability_into_findings() -> None:
     }
     explainability = [(1, {"token_matches": [{"q_index": 0, "doc_index": 2, "similarity": 0.9}]})]
     semantic_pro.merge_explainability_into_findings([finding], explainability)
-    assert "XTR alignments" in finding["why"]
+    assertions.expect_in("XTR alignments", finding["why"])

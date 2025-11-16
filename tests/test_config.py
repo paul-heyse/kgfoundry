@@ -8,6 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from kgfoundry_common.config import AppSettings, load_config
+from tests._helpers import assertions
 
 
 def test_defaults() -> None:
@@ -20,8 +21,8 @@ def test_defaults() -> None:
     load_config(reload=True)
     settings = AppSettings()
 
-    assert settings.log_level == "INFO"
-    assert settings.log_format == "json"
+    assertions.expect_equal(settings.log_level, "INFO")
+    assertions.expect_equal(settings.log_format, "json")
 
 
 def test_env_override() -> None:
@@ -31,8 +32,8 @@ def test_env_override() -> None:
 
     settings = AppSettings()
 
-    assert settings.log_level == "DEBUG"
-    assert settings.log_format == "text"
+    assertions.expect_equal(settings.log_level, "DEBUG")
+    assertions.expect_equal(settings.log_format, "text")
 
     # Cleanup
     os.environ.pop("LOG_LEVEL", None)
@@ -45,7 +46,7 @@ def test_case_insensitive() -> None:
 
     settings = AppSettings()
 
-    assert settings.log_level == "DEBUG"
+    assertions.expect_equal(settings.log_level, "DEBUG")
 
     # Cleanup
     os.environ.pop("LOG_LEVEL", None)
@@ -89,7 +90,7 @@ def test_load_config_caching() -> None:
     config2 = load_config()
 
     # Should be the same object (cached)
-    assert config1 is config2
+    assertions.expect_true(config1 is config2, reason="load_config should cache results")
 
 
 def test_load_config_reload() -> None:
@@ -98,18 +99,18 @@ def test_load_config_reload() -> None:
 
     # Load and cache
     config1 = load_config(reload=True)
-    assert config1.log_level == "INFO"
+    assertions.expect_equal(config1.log_level, "INFO")
 
     # Change env var
     os.environ["LOG_LEVEL"] = "WARNING"
 
     # Without reload, should return cached config
     config2 = load_config(reload=False)
-    assert config2.log_level == "INFO"
+    assertions.expect_equal(config2.log_level, "INFO")
 
     # With reload, should get fresh config
     config3 = load_config(reload=True)
-    assert config3.log_level == "WARNING"
+    assertions.expect_equal(config3.log_level, "WARNING")
 
     # Cleanup
     os.environ.pop("LOG_LEVEL", None)
@@ -131,7 +132,7 @@ def test_valid_log_levels(log_level: str) -> None:
 
     settings = AppSettings()
 
-    assert settings.log_level == log_level
+    assertions.expect_equal(settings.log_level, log_level)
 
     # Cleanup
     os.environ.pop("LOG_LEVEL", None)
@@ -150,7 +151,7 @@ def test_valid_log_formats(log_format: str) -> None:
 
     settings = AppSettings()
 
-    assert settings.log_format == log_format
+    assertions.expect_equal(settings.log_format, log_format)
 
     # Cleanup
     os.environ.pop("LOG_FORMAT", None)

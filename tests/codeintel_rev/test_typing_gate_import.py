@@ -35,4 +35,3 @@ def test_gate_import_missing_module_includes_extra_hint(monkeypatch: pytest.Monk
 
     message = str(excinfo.value)
     assert "pip install codeintel-rev[faiss-cpu]" in message
-    assert "pip install codeintel-rev[faiss-gpu]" in message

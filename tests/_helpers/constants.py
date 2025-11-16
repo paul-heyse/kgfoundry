@@ -22,6 +22,9 @@ class Timeouts:
 
     incremental_regression: float = 60.0
     git_history_backoff: float = 40.0
+    load_small_batch: float = 5.0
+    load_medium_batch: float = 4.0
+    load_large_batch: float = 10.0
 
 
 @dataclass(frozen=True)

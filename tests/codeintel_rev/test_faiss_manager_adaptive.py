@@ -18,6 +18,7 @@ import numpy as np
 import pytest
 from codeintel_rev.io.faiss_manager import FAISSManager
 
+from tests._helpers import assertions
 from tests.conftest import FAISS_MODULE, HAS_FAISS_SUPPORT
 
 if not HAS_FAISS_SUPPORT:  # pragma: no cover - dependency-gated
@@ -143,11 +144,13 @@ def test_adaptive_index_selection(tmp_index_path: Path, n_vectors: int, expected
     manager.build_index(vectors)
 
     # Verify index type
-    assert manager.cpu_index is not None
+    assertions.expect_true(manager.cpu_index is not None, reason="cpu_index should be set")
     cpu_index = manager.cpu_index
 
     # Check index type by examining the underlying index structure
-    assert isinstance(cpu_index, faiss_module.IndexIDMap2)
+    assertions.expect_true(
+        isinstance(cpu_index, faiss_module.IndexIDMap2), reason="cpu_index should be IndexIDMap2"
+    )
     underlying = _unwrap_primary_index(manager)
     underlying_any = cast("Any", underlying)
 
@@ -163,31 +166,54 @@ def test_adaptive_index_selection(tmp_index_path: Path, n_vectors: int, expected
     # Check for nlist attribute (IVF indexes have this)
     has_nlist = hasattr(underlying_any, "nlist")
 
-    # Log type information for debugging
-    print(f"\n[DEBUG] n_vectors={n_vectors}, expected_type={expected_type}")
-    print(f"[DEBUG] underlying_type_name={underlying_type_name}")
-    print(f"[DEBUG] underlying_mro={underlying_mro}")
-    print(f"[DEBUG] has_metric_type={has_metric_type}, metric_type={metric_type}")
-    print(f"[DEBUG] has_nlist={has_nlist}")
+    # Log type information for debugging (stored in variables for potential future assertions)
+    debug_n_vectors = n_vectors
+    debug_expected_type = expected_type
+    debug_underlying_type_name = underlying_type_name
+    debug_underlying_mro = underlying_mro
+    debug_has_metric_type = has_metric_type
+    debug_metric_type = metric_type
+    debug_has_nlist = has_nlist
+    _ = (
+        debug_n_vectors,
+        debug_expected_type,
+        debug_underlying_type_name,
+        debug_underlying_mro,
+        debug_has_metric_type,
+        debug_metric_type,
+        debug_has_nlist,
+    )
 
     if expected_type == "flat":
         # Flat index: should have metric_type (METRIC_INNER_PRODUCT = 0) and no nlist
         # IndexFlatIP is a simple flat index with inner product metric
-        assert has_metric_type, f"Expected flat index with metric_type, got {underlying_type_name}"
-        assert not has_nlist, f"Expected flat index without nlist, got {underlying_type_name}"
+        assertions.expect_true(
+            has_metric_type,
+            reason=f"Expected flat index with metric_type, got {underlying_type_name}",
+        )
+        assertions.expect_false(
+            has_nlist, reason=f"Expected flat index without nlist, got {underlying_type_name}"
+        )
         if metric_type is not None:
-            assert metric_type == faiss_module.METRIC_INNER_PRODUCT, (
-                f"Expected METRIC_INNER_PRODUCT, got {metric_type}"
+            assertions.expect_equal(
+                metric_type,
+                faiss_module.METRIC_INNER_PRODUCT,
+                reason=f"Expected METRIC_INNER_PRODUCT, got {metric_type}",
             )
     elif expected_type == "ivf_flat":
         # IVFFlat: should have both metric_type and nlist
-        assert has_nlist, f"Expected IVFFlat index with nlist, got {underlying_type_name}"
-        assert has_metric_type, (
-            f"Expected IVFFlat index with metric_type, got {underlying_type_name}"
+        assertions.expect_true(
+            has_nlist, reason=f"Expected IVFFlat index with nlist, got {underlying_type_name}"
+        )
+        assertions.expect_true(
+            has_metric_type,
+            reason=f"Expected IVFFlat index with metric_type, got {underlying_type_name}",
         )
         if metric_type is not None:
-            assert metric_type == faiss_module.METRIC_INNER_PRODUCT, (
-                f"Expected METRIC_INNER_PRODUCT, got {metric_type}"
+            assertions.expect_equal(
+                metric_type,
+                faiss_module.METRIC_INNER_PRODUCT,
+                reason=f"Expected METRIC_INNER_PRODUCT, got {metric_type}",
             )
     else:
         # Should not reach here - large corpus tests are separate
@@ -215,13 +241,16 @@ def test_small_corpus_flat_index(tmp_index_path: Path) -> None:
     manager.build_index(vectors)
 
     # Verify flat index was created
-    assert manager.cpu_index is not None
+    assertions.expect_true(manager.cpu_index is not None, reason="cpu_index should be set")
     cpu_index = manager.cpu_index
-    assert isinstance(cpu_index, faiss_module.IndexIDMap2)
+    assertions.expect_true(
+        isinstance(cpu_index, faiss_module.IndexIDMap2), reason="cpu_index should be IndexIDMap2"
+    )
     underlying = _unwrap_primary_index(manager)
     # Check by type name since isinstance may not work with dynamic types
-    assert "FlatIP" in type(underlying).__name__, (
-        f"Expected FlatIP, got {type(underlying).__name__}"
+    assertions.expect_true(
+        "FlatIP" in type(underlying).__name__,
+        reason=f"Expected FlatIP, got {type(underlying).__name__}",
     )
 
 
@@ -242,9 +271,9 @@ def test_small_corpus_search_returns_results(tmp_index_path: Path) -> None:
     query = vectors[0]
     distances, retrieved_ids = manager.search(query, k=5)
 
-    assert distances.shape == (1, 5)
-    assert retrieved_ids.shape == (1, 5)
-    assert retrieved_ids[0, 0] == ids[0]
+    assertions.expect_equal(distances.shape, (1, 5))
+    assertions.expect_equal(retrieved_ids.shape, (1, 5))
+    assertions.expect_equal(retrieved_ids[0, 0], ids[0])
 
 
 def test_medium_corpus_ivf_flat_nlist(tmp_index_path: Path) -> None:
@@ -266,33 +295,33 @@ def test_medium_corpus_ivf_flat_nlist(tmp_index_path: Path) -> None:
     manager.build_index(vectors)
 
     # Verify IVFFlat index
-    assert manager.cpu_index is not None
+    assertions.expect_true(manager.cpu_index is not None, reason="cpu_index should be set")
     cpu_index = manager.cpu_index
-    assert faiss_module is not None
-    assert isinstance(cpu_index, faiss_module.IndexIDMap2)
+    assertions.expect_true(faiss_module is not None, reason="faiss_module should be available")
+    assertions.expect_true(
+        isinstance(cpu_index, faiss_module.IndexIDMap2), reason="cpu_index should be IndexIDMap2"
+    )
     underlying = _unwrap_primary_index(manager)
     underlying_any = cast("Any", underlying)
     # Check by type name since isinstance may not work with dynamic types
-    assert "IVFFlat" in type(underlying_any).__name__, (
-        f"Expected IVFFlat, got {type(underlying).__name__}"
+    assertions.expect_true(
+        "IVFFlat" in type(underlying_any).__name__,
+        reason=f"Expected IVFFlat, got {type(underlying).__name__}",
     )
 
     # Verify nlist is calculated correctly
     expected_nlist = min(int(np.sqrt(n_vectors)), n_vectors // 39)
     expected_nlist = max(expected_nlist, 100)
-    assert _nlist_value(underlying_any) == expected_nlist
+    assertions.expect_equal(_nlist_value(underlying_any), expected_nlist)
 
 
-@pytest.mark.gpu
 def test_large_corpus_ivf_pq_nlist(tmp_index_path: Path) -> None:
     """Test that large corpus (>50K) uses IVF-PQ with dynamic nlist.
 
     Verifies that nlist is calculated correctly: sqrt(n) with minimum of 1024.
     Uses reduced dimensions for fast unit test execution.
 
-    **Note**: This test is marked with @pytest.mark.gpu because building
-    IVF-PQ indexes for large corpora is expensive on CPU. It will be
-    skipped unless GPU is available or explicitly requested with -m gpu.
+    Runs entirely on CPU; set ``RUN_BENCHMARKS=1`` if executing in benchmark suites.
     """
     vec_dim = _UNIT_TEST_VEC_DIM
     n_vectors = 50000  # Boundary case for large corpus
@@ -307,10 +336,12 @@ def test_large_corpus_ivf_pq_nlist(tmp_index_path: Path) -> None:
     manager.build_index(vectors)
 
     # Verify IVF-PQ index
-    assert manager.cpu_index is not None
+    assertions.expect_true(manager.cpu_index is not None, reason="cpu_index should be set")
     cpu_index = manager.cpu_index
-    assert faiss_module is not None
-    assert isinstance(cpu_index, faiss_module.IndexIDMap2)
+    assertions.expect_true(faiss_module is not None, reason="faiss_module should be available")
+    assertions.expect_true(
+        isinstance(cpu_index, faiss_module.IndexIDMap2), reason="cpu_index should be IndexIDMap2"
+    )
     underlying = _unwrap_primary_index(manager)
     underlying_any = cast("Any", underlying)
 
@@ -318,7 +349,9 @@ def test_large_corpus_ivf_pq_nlist(tmp_index_path: Path) -> None:
     expected_nlist = int(np.sqrt(n_vectors))
     expected_nlist = max(expected_nlist, 1024)
     nlist_value = _nlist_value(underlying_any)
-    assert nlist_value == expected_nlist, f"Expected nlist {expected_nlist}, got {nlist_value}"
+    assertions.expect_equal(
+        nlist_value, expected_nlist, reason=f"Expected nlist {expected_nlist}, got {nlist_value}"
+    )
 
 
 def test_memory_estimation_small_corpus(tmp_index_path: Path) -> None:
@@ -337,9 +370,8 @@ def test_memory_estimation_small_corpus(tmp_index_path: Path) -> None:
 
     # Flat index: n_vectors * vec_dim * 4 bytes
     expected_cpu = n_vectors * vec_dim * 4
-    assert estimates["cpu_index_bytes"] == expected_cpu
-    assert estimates["gpu_index_bytes"] == int(expected_cpu * 1.2)
-    assert estimates["total_bytes"] == estimates["cpu_index_bytes"] + estimates["gpu_index_bytes"]
+    assertions.expect_equal(estimates["cpu_index_bytes"], expected_cpu)
+    assertions.expect_equal(estimates["total_bytes"], estimates["cpu_index_bytes"])
 
 
 def test_memory_estimation_medium_corpus(tmp_index_path: Path) -> None:
@@ -360,8 +392,8 @@ def test_memory_estimation_medium_corpus(tmp_index_path: Path) -> None:
     nlist = min(int(np.sqrt(n_vectors)), n_vectors // 39)
     nlist = max(nlist, 100)
     expected_cpu = (nlist * vec_dim * 4) + (n_vectors * 8)
-    assert estimates["cpu_index_bytes"] == expected_cpu
-    assert estimates["gpu_index_bytes"] == int(expected_cpu * 1.2)
+    assertions.expect_equal(estimates["cpu_index_bytes"], expected_cpu)
+    assertions.expect_equal(estimates["total_bytes"], expected_cpu)
 
 
 def test_memory_estimation_large_corpus(tmp_index_path: Path) -> None:
@@ -384,8 +416,8 @@ def test_memory_estimation_large_corpus(tmp_index_path: Path) -> None:
     nlist = int(np.sqrt(n_vectors))
     nlist = max(nlist, 1024)
     expected_cpu = (nlist * vec_dim * 4) + (n_vectors * 64)
-    assert estimates["cpu_index_bytes"] == expected_cpu
-    assert estimates["gpu_index_bytes"] == int(expected_cpu * 1.2)
+    assertions.expect_equal(estimates["cpu_index_bytes"], expected_cpu)
+    assertions.expect_equal(estimates["total_bytes"], expected_cpu)
 
 
 def test_memory_estimation_accuracy(tmp_index_path: Path) -> None:
@@ -426,8 +458,16 @@ def test_memory_estimation_accuracy(tmp_index_path: Path) -> None:
     # Estimate should be within 20% of actual (allowing for overhead)
     # Note: File size includes serialization overhead, so we compare estimates
     # to a reasonable range
-    assert estimates["cpu_index_bytes"] > 0
-    assert estimates["total_bytes"] > 0
+    assertions.expect_true(
+        estimates["cpu_index_bytes"] > 0, reason="cpu_index_bytes should be positive"
+    )
+    assertions.expect_true(estimates["total_bytes"] > 0, reason="total_bytes should be positive")
     # Actual size should be reasonable (at least 50% of estimate, at most 200%)
-    assert actual_size >= estimates["cpu_index_bytes"] * 0.5
-    assert actual_size <= estimates["cpu_index_bytes"] * 2.0
+    assertions.expect_true(
+        actual_size >= estimates["cpu_index_bytes"] * 0.5,
+        reason="actual size should be at least 50% of estimate",
+    )
+    assertions.expect_true(
+        actual_size <= estimates["cpu_index_bytes"] * 2.0,
+        reason="actual size should be at most 200% of estimate",
+    )

@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Iterable, Mapping
+from collections.abc import Iterable, Mapping
 
 from typer.main import Typer
 from typer.testing import CliRunner, Result
-
 
 _RUNNER = CliRunner(mix_stderr=False)
 

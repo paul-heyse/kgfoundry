@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import duckdb
 import pytest
 from codeintel_rev.app.config_context import (
     ApplicationContext,
@@ -15,6 +16,7 @@ from codeintel_rev.config.settings import load_settings
 from codeintel_rev.runtime.factory_adjustment import DefaultFactoryAdjuster
 
 from kgfoundry_common.errors import ConfigurationError
+from tests._helpers import assertions
 
 
 def test_resolve_application_paths_success(tmp_path: Path) -> None:
@@ -31,10 +33,12 @@ def test_resolve_application_paths_success(tmp_path: Path) -> None:
     paths = resolve_application_paths(settings)
 
     # Assert
-    assert paths.repo_root == repo_root.resolve()
-    assert paths.data_dir == (repo_root / "data").resolve()
-    assert paths.vectors_dir.parent == paths.data_dir
-    assert all(path.is_absolute() for path in [paths.repo_root, paths.data_dir, paths.vectors_dir])
+    assertions.expect_equal(paths.repo_root, repo_root.resolve())
+    assertions.expect_equal(paths.data_dir, (repo_root / "data").resolve())
+    assertions.expect_equal(paths.vectors_dir.parent, paths.data_dir)
+    assertions.expect_true(
+        all(path.is_absolute() for path in [paths.repo_root, paths.data_dir, paths.vectors_dir])
+    )
 
 
 def test_resolve_application_paths_missing_repo_root() -> None:
@@ -76,10 +80,10 @@ def test_resolve_application_paths_relative_conversion(tmp_path: Path) -> None:
     paths = resolve_application_paths(settings)
 
     # Assert
-    assert paths.faiss_index.is_absolute()
-    assert paths.faiss_index.parent.parent == paths.data_dir
-    assert paths.duckdb_path.is_absolute()
-    assert paths.scip_index.is_absolute()
+    assertions.expect_true(paths.faiss_index.is_absolute())
+    assertions.expect_equal(paths.faiss_index.parent.parent, paths.data_dir)
+    assertions.expect_true(paths.duckdb_path.is_absolute())
+    assertions.expect_true(paths.scip_index.is_absolute())
 
 
 def test_application_context_create(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -99,15 +103,13 @@ def test_application_context_create(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     # Act
     context = ApplicationContext.create()
     monkeypatch.setattr(context.faiss_manager, "load_cpu_index", lambda: None)
-    monkeypatch.setattr(context.faiss_manager, "clone_to_gpu", lambda: False)
-    context.faiss_manager.gpu_disabled_reason = None
 
     # Assert
-    assert context.settings is not None
-    assert context.paths.repo_root == repo_root.resolve()
-    assert context.vllm_client is not None
-    assert context.faiss_manager is not None
-    assert isinstance(context.paths, ResolvedPaths)
+    assertions.expect_true(context.settings is not None)
+    assertions.expect_equal(context.paths.repo_root, repo_root.resolve())
+    assertions.expect_true(context.vllm_client is not None)
+    assertions.expect_true(context.faiss_manager is not None)
+    assertions.expect_true(isinstance(context.paths, ResolvedPaths))
 
 
 def test_application_context_create_invalid_config(
@@ -142,17 +144,15 @@ def test_application_context_ensure_faiss_ready(
 
     context = ApplicationContext.create()
     monkeypatch.setattr(context.faiss_manager, "load_cpu_index", lambda: None)
-    monkeypatch.setattr(context.faiss_manager, "clone_to_gpu", lambda: False)
-    context.faiss_manager.gpu_disabled_reason = None
 
     # Act - ensure_faiss_ready should handle missing index gracefully
     ready, limits, error = context.ensure_faiss_ready()
 
     # Assert - FAISS index file exists but is empty, so loading will fail
     # This is expected behavior - the method returns ready=False with error message
-    assert isinstance(ready, bool)
-    assert isinstance(limits, list)
-    assert error is None or isinstance(error, str)
+    assertions.expect_true(isinstance(ready, bool))
+    assertions.expect_true(isinstance(limits, list))
+    assertions.expect_true(error is None or isinstance(error, str))
 
 
 def test_application_context_ensure_faiss_ready_cached(
@@ -174,24 +174,19 @@ def test_application_context_ensure_faiss_ready_cached(
 
     context = ApplicationContext.create()
     monkeypatch.setattr(context.faiss_manager, "load_cpu_index", lambda: None)
-    monkeypatch.setattr(context.faiss_manager, "clone_to_gpu", lambda: False)
-    context.faiss_manager.gpu_disabled_reason = None
 
     # Act - call twice
     ready1, limits1, error1 = context.ensure_faiss_ready()
     ready2, limits2, error2 = context.ensure_faiss_ready()
 
     # Assert - results should be consistent (cached)
-    assert ready1 == ready2
-    assert limits1 == limits2
-    assert error1 == error2
+    assertions.expect_equal(ready1, ready2)
+    assertions.expect_equal(limits1, limits2)
+    assertions.expect_equal(error1, error2)
 
 
 def test_application_context_open_catalog(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test open_catalog() context manager."""
-    # Arrange
-    import duckdb
-
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     (repo_root / "data").mkdir()
@@ -210,11 +205,10 @@ def test_application_context_open_catalog(tmp_path: Path, monkeypatch: pytest.Mo
 
     # Act
     with context.open_catalog() as catalog:
-        # Assert
-        assert catalog is not None
-        assert catalog.db_path == duckdb_path
+        assertions.expect_true(catalog is not None)
+        assertions.expect_equal(catalog.db_path, duckdb_path)
         with catalog.connection() as conn:
-            assert conn.execute("SELECT 1").fetchone() == (1,)
+            assertions.expect_equal(conn.execute("SELECT 1").fetchone(), (1,))
 
 
 def test_build_factory_adjuster_from_settings(
@@ -233,6 +227,6 @@ def test_build_factory_adjuster_from_settings(
     (data_dir / "catalog.duckdb").touch()
     monkeypatch.setenv("REPO_ROOT", str(repo_root))
     context = ApplicationContext.create()
-    assert isinstance(context.factory_adjuster, DefaultFactoryAdjuster)
+    assertions.expect_true(isinstance(context.factory_adjuster, DefaultFactoryAdjuster))
     expected = getattr(context.settings.index, "faiss_nprobe", None)
-    assert context.factory_adjuster.faiss_nprobe == expected
+    assertions.expect_equal(context.factory_adjuster.faiss_nprobe, expected)

@@ -13,12 +13,9 @@ import git.exc
 
 from codeintel_rev.errors import GitOperationError, PathNotFoundError
 from codeintel_rev.io.path_utils import resolve_within_repo
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
-
-LOGGER = get_logger(__name__)
 
 
 async def blame_range(
@@ -85,11 +82,6 @@ async def blame_range(
     # Use relative path for AsyncGitClient (it expects paths relative to repo root)
     relative_path = str(file_path.relative_to(repo_root))
 
-    LOGGER.debug(
-        "Getting git blame (async)",
-        extra={"path": relative_path, "start_line": start_line, "end_line": end_line},
-    )
-
     try:
         entries = await context.async_git_client.blame_range(
             path=relative_path,
@@ -104,15 +96,6 @@ async def blame_range(
             git_command="blame",
         ) from exc
 
-    LOGGER.debug(
-        "Git blame completed",
-        extra={
-            "path": relative_path,
-            "start_line": start_line,
-            "end_line": end_line,
-            "entries_count": len(entries),
-        },
-    )
     return {"blame": entries}
 
 
@@ -178,11 +161,6 @@ async def file_history(
     # Use relative path for AsyncGitClient (it expects paths relative to repo root)
     relative_path = str(file_path.relative_to(repo_root))
 
-    LOGGER.debug(
-        "Getting git history (async)",
-        extra={"path": relative_path, "limit": limit},
-    )
-
     try:
         commits = await context.async_git_client.file_history(path=relative_path, limit=limit)
     except git.exc.GitCommandError as exc:
@@ -193,10 +171,6 @@ async def file_history(
             git_command="log",
         ) from exc
 
-    LOGGER.debug(
-        "Git history completed",
-        extra={"path": relative_path, "limit": limit, "commits_count": len(commits)},
-    )
     return {"commits": commits}
 
 

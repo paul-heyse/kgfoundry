@@ -11,6 +11,8 @@ from codeintel_rev.indexing.index_lifecycle import (
     collect_asset_attrs,
 )
 
+from tests._helpers import assertions
+
 
 def _make_assets(tmp_path: Path, prefix: str = "a") -> IndexAssets:
     src = tmp_path / prefix
@@ -31,14 +33,14 @@ def test_prepare_and_publish(tmp_path: Path) -> None:
     manager = IndexLifecycleManager(tmp_path / "indexes")
     assets = _make_assets(tmp_path, "v1")
     staging = manager.prepare("v1", assets)
-    assert staging.name == "v1.staging"
+    assertions.expect_equal(staging.name, "v1.staging")
     final_dir = manager.publish("v1")
-    assert final_dir.name == "v1"
-    assert manager.current_version() == "v1"
+    assertions.expect_equal(final_dir.name, "v1")
+    assertions.expect_equal(manager.current_version(), "v1")
     resolved = manager.read_assets()
-    assert resolved is not None
-    assert resolved.faiss_index.exists()
-    assert (manager.base_dir / "CURRENT").read_text().strip() == "v1"
+    assertions.expect_true(resolved is not None, reason="resolved assets should exist")
+    assertions.expect_true(resolved.faiss_index.exists(), reason="faiss_index should exist")
+    assertions.expect_equal((manager.base_dir / "CURRENT").read_text().strip(), "v1")
 
 
 def test_publish_requires_staging(tmp_path: Path) -> None:
@@ -66,9 +68,9 @@ def test_rollback_switches_pointer(tmp_path: Path) -> None:
     manager.publish("alpha")
     manager.prepare("beta", assets_v2)
     manager.publish("beta")
-    assert manager.current_version() == "beta"
+    assertions.expect_equal(manager.current_version(), "beta")
     manager.rollback("alpha")
-    assert manager.current_version() == "alpha"
+    assertions.expect_equal(manager.current_version(), "alpha")
 
 
 def test_write_attrs_updates_manifest(tmp_path: Path) -> None:
@@ -79,12 +81,12 @@ def test_write_attrs_updates_manifest(tmp_path: Path) -> None:
 
     manifest_path = manager.versions_dir / "v3" / "manifest.json"
     initial = json.loads(manifest_path.read_text())
-    assert initial["attrs"]["initial"] is True
+    assertions.expect_true(initial["attrs"]["initial"], reason="initial should be True")
 
     manager.write_attrs("v3", faiss_factory="Flat", initial=False)
     updated = json.loads(manifest_path.read_text())
-    assert updated["attrs"]["faiss_factory"] == "Flat"
-    assert updated["attrs"]["initial"] is False
+    assertions.expect_equal(updated["attrs"]["faiss_factory"], "Flat")
+    assertions.expect_false(updated["attrs"]["initial"], reason="initial should be False")
 
 
 def test_collect_asset_attrs_includes_checksums(tmp_path: Path) -> None:
@@ -101,8 +103,8 @@ def test_collect_asset_attrs_includes_checksums(tmp_path: Path) -> None:
         tuning_profile=tuning,
     )
     attrs = collect_asset_attrs(assets)
-    assert "faiss_bytes_sha256" in attrs
-    assert "duckdb_bytes_sha256" in attrs
-    assert "scip_bytes_sha256" in attrs
-    assert attrs["faiss_idmap_path"] == "faiss.idmap.parquet"
-    assert attrs["faiss_tuning_profile_path"] == "faiss.tuning.json"
+    assertions.expect_in("faiss_bytes_sha256", attrs)
+    assertions.expect_in("duckdb_bytes_sha256", attrs)
+    assertions.expect_in("scip_bytes_sha256", attrs)
+    assertions.expect_equal(attrs["faiss_idmap_path"], "faiss.idmap.parquet")
+    assertions.expect_equal(attrs["faiss_tuning_profile_path"], "faiss.tuning.json")

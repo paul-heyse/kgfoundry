@@ -2,13 +2,17 @@
 
 from __future__ import annotations
 
+from http import HTTPStatus
 from pathlib import Path
 
 import duckdb
 import pytest
+from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.app.main import app
 from fastapi.testclient import TestClient
 
+from kgfoundry_common.errors import ConfigurationError
+from tests._helpers import assertions
 from tests.conftest import HAS_FAISS_SUPPORT
 
 
@@ -54,10 +58,9 @@ def test_repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 def test_app_startup_with_valid_config() -> None:
     """Test that FastAPI app starts successfully with valid configuration."""
     with TestClient(app) as client:
-        # App should start without errors
         response = client.get("/healthz")
-        assert response.status_code == 200
-        assert response.json() == {"status": "ok"}
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
+        assertions.expect_equal(response.json(), {"status": "ok"})
 
 
 @pytest.mark.usefixtures("test_repo")
@@ -65,8 +68,8 @@ def test_app_healthz_endpoint() -> None:
     """Test that /healthz endpoint returns 200."""
     with TestClient(app) as client:
         response = client.get("/healthz")
-        assert response.status_code == 200
-        assert response.json() == {"status": "ok"}
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
+        assertions.expect_equal(response.json(), {"status": "ok"})
 
 
 @pytest.mark.usefixtures("test_repo")
@@ -74,12 +77,10 @@ def test_app_readyz_endpoint_healthy() -> None:
     """Test that /readyz endpoint shows all checks pass."""
     with TestClient(app) as client:
         response = client.get("/readyz")
-        assert response.status_code == 200
-
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
         data = response.json()
-        assert "ready" in data
-        assert "checks" in data
-        assert "active_index_version" in data
+        for key in ("ready", "checks", "active_index_version"):
+            assertions.expect_in(key, data)
         # Note: vLLM check may fail if service is not running, but that's OK
         # The important thing is that the endpoint works and returns structured data
 
@@ -94,11 +95,6 @@ def test_app_startup_fails_invalid_repo_root(
     """
     monkeypatch.setenv("REPO_ROOT", "/nonexistent/path")
     monkeypatch.setenv("VLLM_URL", "http://localhost:8001/v1")
-
-    # Verify that ApplicationContext.create() raises ConfigurationError
-    from codeintel_rev.app.config_context import ApplicationContext
-
-    from kgfoundry_common.errors import ConfigurationError
 
     with pytest.raises(ConfigurationError, match="Repository root does not exist"):
         ApplicationContext.create()
@@ -118,15 +114,13 @@ def test_app_readyz_shows_unhealthy_resources(
     # App should start (missing FAISS is not fatal unless pre-loading enabled)
     with TestClient(app) as client:
         response = client.get("/readyz")
-        assert response.status_code == 200
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
 
         data = response.json()
-        assert "ready" in data
-        assert "checks" in data
-        assert "active_index_version" in data
-        # FAISS check should be unhealthy
-        assert "faiss_index" in data["checks"]
-        assert data["checks"]["faiss_index"]["healthy"] is False
+        for key in ("ready", "checks", "active_index_version"):
+            assertions.expect_in(key, data)
+        assertions.expect_in("faiss_index", data["checks"])
+        assertions.expect_false(data["checks"]["faiss_index"]["healthy"])
 
 
 @pytest.mark.usefixtures("test_repo")
@@ -135,11 +129,10 @@ def test_app_startup_with_preload_disabled() -> None:
     # FAISS_PRELOAD defaults to False, so this should work
     with TestClient(app) as client:
         response = client.get("/healthz")
-        assert response.status_code == 200
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
 
-        # App should start quickly without loading FAISS
         response = client.get("/readyz")
-        assert response.status_code == 200
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
 
 
 @pytest.mark.usefixtures("test_repo")
@@ -154,32 +147,28 @@ def test_app_startup_with_preload_enabled(
     # Note: This may fail if FAISS index is invalid, but startup should still succeed
     with TestClient(app) as client:
         response = client.get("/healthz")
-        assert response.status_code == 200
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
 
         response = client.get("/readyz")
-        assert response.status_code == 200
+        assertions.expect_equal(response.status_code, HTTPStatus.OK)
 
 
 @pytest.mark.usefixtures("test_repo")
 def test_app_context_in_state() -> None:
     """Test that ApplicationContext is stored in app.state."""
     with TestClient(app):
-        # Access app through TestClient
-        assert hasattr(app.state, "context")
-        assert app.state.context is not None
-        assert hasattr(app.state.context, "settings")
-        assert hasattr(app.state.context, "paths")
-        assert hasattr(app.state.context, "vllm_client")
-        assert hasattr(app.state.context, "faiss_manager")
+        assertions.expect_true(hasattr(app.state, "context"))
+        assertions.expect_true(app.state.context is not None)
+        for attr in ("settings", "paths", "vllm_client", "faiss_manager"):
+            assertions.expect_true(hasattr(app.state.context, attr))
 
 
 @pytest.mark.usefixtures("test_repo")
 def test_app_readiness_in_state() -> None:
     """Test that ReadinessProbe is stored in app.state."""
     with TestClient(app):
-        assert hasattr(app.state, "readiness")
-        assert app.state.readiness is not None
-        # Verify readiness probe has snapshot method
+        assertions.expect_true(hasattr(app.state, "readiness"))
+        assertions.expect_true(app.state.readiness is not None)
         snapshot = app.state.readiness.snapshot()
-        assert isinstance(snapshot, dict)
-        assert len(snapshot) > 0
+        assertions.expect_true(isinstance(snapshot, dict))
+        assertions.expect_true(len(snapshot) > 0)

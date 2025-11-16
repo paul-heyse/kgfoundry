@@ -19,7 +19,6 @@ from codeintel_rev.mcp_server.scope_utils import (
     merge_scope_filters,
 )
 from kgfoundry_common.errors import VectorSearchError
-from kgfoundry_common.logging import get_logger
 from kgfoundry_common.subprocess_utils import (
     SubprocessError,
     SubprocessTimeoutError,
@@ -34,8 +33,6 @@ SEARCH_MAX_RESULTS = 500
 MAX_PREVIEW_CHARS = 200
 GREP_SPLIT_PARTS = 3
 COMMAND_NOT_FOUND_RETURN_CODE = 127
-COMPONENT_NAME = "codeintel_mcp"
-LOGGER = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -245,9 +242,13 @@ async def search_text(
     TypeError
         If both ``options`` and keyword ``overrides`` are provided simultaneously.
         Only one method of providing search options is allowed per call.
-    VectorSearchError
-        Raised when the underlying search operation fails (timeout, subprocess error,
-        or invalid query). The error includes context about the query and search tool.
+
+    Notes
+    -----
+    VectorSearchError may be raised by the underlying search operation (_search_text_sync)
+    when search fails (timeout, subprocess error, or invalid query). The error includes
+    context about the query and search tool. Exceptions from _search_text_sync propagate
+    through asyncio.to_thread unchanged.
     """
     session_id = get_session_id()
     scope = await get_effective_scope(context, session_id)
@@ -257,17 +258,6 @@ async def search_text(
         msg = "Cannot pass keyword overrides when options is provided"
         raise TypeError(msg)
 
-    LOGGER.info(
-        "text_search.accepted",
-        extra={
-            "session_id": session_id,
-            "query_preview": _preview_text(query),
-            "regex": options.regex,
-            "case_sensitive": options.case_sensitive,
-            "max_results": options.max_results,
-        },
-    )
-
     def _run_sync() -> dict:
         return _search_text_sync(
             context=context,
@@ -276,23 +266,7 @@ async def search_text(
             options=options,
         )
 
-    try:
-        result = await asyncio.to_thread(_run_sync)
-    except VectorSearchError as exc:
-        LOGGER.warning(
-            "text_search.failed",
-            extra={"session_id": session_id, "error": str(exc)},
-        )
-        raise
-
-    LOGGER.info(
-        "text_search.completed",
-        extra={
-            "session_id": session_id,
-            "results": result.get("total", 0),
-            "truncated": result.get("truncated", False),
-        },
-    )
+    result = await asyncio.to_thread(_run_sync)
     return result
 
 
@@ -338,30 +312,6 @@ def _search_text_sync(
     filters = _resolve_glob_filters(
         scope,
         options,
-    )
-
-    LOGGER.debug(
-        "Searching text with scope filters",
-        extra={
-            "session_id": session_id,
-            "query": query,
-            "explicit_paths": list(options.paths) if options.paths else None,
-            "explicit_include_globs": (
-                list(options.include_globs) if options.include_globs is not None else None
-            ),
-            "explicit_exclude_globs": (
-                list(options.exclude_globs) if options.exclude_globs is not None else None
-            ),
-            "scope_include_globs": (
-                cast("Sequence[str] | None", scope.get("include_globs")) if scope else None
-            ),
-            "scope_exclude_globs": (
-                cast("Sequence[str] | None", scope.get("exclude_globs")) if scope else None
-            ),
-            "effective_paths": filters.paths,
-            "effective_include_globs": filters.include_globs,
-            "effective_exclude_globs": filters.exclude_globs,
-        },
     )
 
     params = RipgrepCommandParams(

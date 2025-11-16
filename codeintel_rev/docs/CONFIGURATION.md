@@ -44,8 +44,7 @@ The configuration lifecycle follows this sequence during application startup:
 5. Optional FAISS Pre-loading
    ├─ If FAISS_PRELOAD=1:
    │  ├─ faiss_manager.load_cpu_index()
-   │  ├─ faiss_manager.clone_to_gpu()
-   │  └─ Log success or degraded mode
+   │  └─ Log success or fallback to lazy load
    │
 6. Store Context
    ├─ app.state.context = context
@@ -83,7 +82,6 @@ The configuration lifecycle follows this sequence during application startup:
 | `CHUNK_BUDGET` | Target chunk size in characters | `2200` | `2200` |
 | `FAISS_NLIST` | Number of IVF centroids | `8192` | `16384` |
 | `FAISS_NPROBE` | Number of IVF cells to probe per live search (higher = better recall, slower queries) | `128` | `256` |
-| `USE_CUVS` | Enable cuVS GPU acceleration | `1` | `0` |
 | `DUCKDB_MATERIALIZE` | Materialize chunks into DuckDB table with secondary index | `0` | `1` |
 | `MAX_RESULTS` | Maximum results per query | `1000` | `500` |
 | `QUERY_TIMEOUT_S` | Query timeout in seconds | `30.0` | `60.0` |
@@ -109,7 +107,7 @@ The configuration lifecycle follows this sequence during application startup:
 | `SPLADE_BATCH_SIZE` | Default batch size for SPLADE encoding commands | `32` | `16` |
 | `SPLADE_THREADS` | Default worker threads for SPLADE impact index builds | `8` | `12` |
 
-> **GPU warm-up tip:** On CPU-only workstations, export `SKIP_GPU_WARMUP=1` before running pytest to bypass the FAISS GPU smoke test. Drop the variable on CUDA-capable hosts so the warm-up coverage runs.
+> **CPU test tip:** Run `uv run pytest -q` locally to exercise the FAISS CPU health check. No warm-up overrides are required anymore.
 
 ### Sparse retrieval prerequisites
 
@@ -390,4 +388,3 @@ See `codeintel_rev/config/settings.py` for complete documentation of all configu
 - `docs/architecture/bm25.md` - BM25 index management architecture
 - `docs/architecture/splade.md` - SPLADE pipeline architecture
 - `docs/operations/hybrid_search.md` - Hybrid retrieval operations runbook
-

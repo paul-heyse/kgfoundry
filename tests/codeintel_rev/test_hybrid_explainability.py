@@ -11,6 +11,8 @@ from codeintel_rev.io.hybrid_search import (
 )
 from codeintel_rev.plugins.registry import ChannelRegistry
 
+from tests._helpers import assertions
+
 
 def _build_engine(monkeypatch: pytest.MonkeyPatch, tmp_path) -> HybridSearchEngine:
     monkeypatch.setenv("HYBRID_ENABLE_BM25", "0")
@@ -43,5 +45,5 @@ def test_hybrid_engine_records_method_metadata(monkeypatch: pytest.MonkeyPatch, 
             )
         ),
     )
-    assert result.method is not None
-    assert "coverage" in result.method
+    assertions.expect_true(result.method is not None, reason="result should have method metadata")
+    assertions.expect_in("coverage", result.method)

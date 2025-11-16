@@ -11,8 +11,6 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from kgfoundry_common.logging import get_logger
-
 try:  # pragma: no cover - optional dependency
     from git import Repo as _RuntimeGitRepo
     from git import exc as git_exc
@@ -29,7 +27,6 @@ else:
 
 
 GitError = git_exc.GitError if git_exc is not None else Exception
-LOGGER = get_logger(__name__)
 
 __all__ = ["FileOwnership", "OwnershipIndex", "compute_ownership"]
 
@@ -101,7 +98,6 @@ def compute_ownership(
         return OwnershipIndex(churn_windows=windows)
     repo = _try_open_repo(repo_root)
     if repo is None:
-        LOGGER.debug("GitPython unavailable; ownership analytics disabled.")
         return OwnershipIndex(churn_windows=windows)
     records = _stats_via_gitpython(
         repo=repo,

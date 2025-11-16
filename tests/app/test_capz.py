@@ -26,12 +26,7 @@ def _noop(*_: object, **__: object) -> None:
 def test_capabilities_snapshot_reports_paths(tmp_path, monkeypatch) -> None:
     ctx = build_application_context(tmp_path)
     fake_modules = {
-        "faiss": _mock_module(
-            StandardGpuResources=object(),
-            GpuClonerOptions=object(),
-            index_cpu_to_gpu=_noop,
-            get_num_gpus=lambda: 2,
-        ),
+        "faiss": _mock_module(normalize_L2=_noop),
         "duckdb": object(),
         "httpx": None,
         "torch": object(),
@@ -49,10 +44,8 @@ def test_capabilities_snapshot_reports_paths(tmp_path, monkeypatch) -> None:
     assert snapshot.vllm_client
     assert snapshot.faiss_importable is True
     assert snapshot.httpx_importable is False
-    assert snapshot.faiss_gpu_available is True
     payload = snapshot.model_dump()
     assert payload["duckdb_catalog_present"] is True
-    assert payload["faiss_gpu_disabled_reason"] is None
     assert payload["active_index_version"] is None
     assert payload["versions_available"] == 0
 
@@ -102,5 +95,5 @@ def test_capz_endpoint_refresh(tmp_path, monkeypatch) -> None:
         assert body["faiss_index_present"] is False
         assert body["active_index_version"] == "v2"
         assert body["versions_available"] == 2
-        assert body["hints"]["faiss"] == "faiss-cpu or faiss-gpu"
+        assert body["hints"]["faiss"] == "faiss-cpu"
         assert body["hints"]["duckdb"] == "duckdb"

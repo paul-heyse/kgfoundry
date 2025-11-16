@@ -48,7 +48,6 @@ class _StubLLM:
 
 @pytest.fixture(autouse=True)
 def _patch_vllm(monkeypatch: pytest.MonkeyPatch) -> None:
-
     fake_vllm = ModuleType("vllm")
     fake_config = ModuleType("vllm.config")
     fake_inputs = ModuleType("vllm.inputs")

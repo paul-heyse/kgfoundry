@@ -9,9 +9,6 @@ import sys
 from pathlib import Path
 
 from codeintel_rev.app.config_context import ApplicationContext
-from kgfoundry_common.logging import get_logger
-
-LOGGER = get_logger(__name__)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -61,6 +58,12 @@ def main(argv: list[str] | None = None) -> int:
         Exit code: 0 on success, 1 on error (e.g., evaluator disabled, missing
         context, evaluation failures).
 
+    Raises
+    ------
+    SystemExit
+        Raised when the offline recall evaluator is not available (RuntimeError
+        from get_offline_recall_evaluator is converted to SystemExit).
+
     Notes
     -----
     This tool requires an active ApplicationContext with offline recall evaluator
@@ -73,8 +76,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         evaluator = ctx.get_offline_recall_evaluator()
     except RuntimeError as exc:
-        LOGGER.exception("offline_eval.disabled", extra={"error": str(exc)})
-        return 1
+        raise SystemExit(str(exc)) from exc
     result = evaluator.run(queries_path=args.queries, output_dir=args.output)
     sys.stdout.write(json.dumps(result, indent=2) + "\n")
     return 0

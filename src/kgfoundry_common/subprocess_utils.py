@@ -571,7 +571,9 @@ def run_subprocess(
             message = str(tool_error)
         else:
             message = f"Subprocess failed with exit code {returncode}: {' '.join(cmd)}"
-        raise SubprocessError(message, command=cmd, returncode=returncode, stderr=stderr_output) from exc
+        raise SubprocessError(
+            message, command=cmd, returncode=returncode, stderr=stderr_output
+        ) from exc
     except Exception as exc:  # pragma: no cover - defensive fallback
         msg = f"Unexpected error executing subprocess: {exc}"
         raise SubprocessError(msg) from exc

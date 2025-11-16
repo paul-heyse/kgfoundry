@@ -24,9 +24,7 @@ from codeintel_rev.app.config_context import resolve_application_paths
 from codeintel_rev.config.settings import load_settings
 from codeintel_rev.errors import RuntimeUnavailableError
 from codeintel_rev.io.xtr_manager import XTRIndex
-from kgfoundry_common.logging import get_logger
 
-LOGGER = get_logger(__name__)
 APP = typer.Typer(add_completion=False, no_args_is_help=True)
 PROBLEM_INSTANCE = "/ops/runtime/xtr-open"
 _VERBOSE_DEFAULT = False
@@ -137,7 +135,6 @@ def xtr_open(
     try:
         index.open()
     except (OSError, RuntimeError, ValueError) as exc:
-        LOGGER.exception("xtr_open_failed", extra={"root": str(xtr_root)})
         _exit_with_problem(
             "Failed to open XTR artifacts",
             detail=str(exc),

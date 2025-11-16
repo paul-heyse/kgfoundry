@@ -12,6 +12,8 @@ from typing import Any, cast
 import numpy as np
 import pytest
 
+from tests._helpers import assertions
+
 sys.path.append(str(Path(__file__).resolve().parents[2] / "src"))
 
 if "codeintel_rev.io.vllm_engine" not in sys.modules:  # pragma: no cover - test shim
@@ -65,17 +67,19 @@ class _DummyProvider(EmbeddingProviderBase):
 
 
 def test_provider_normalizes_and_reports_dimension() -> None:
+    """Verify provider normalizes vectors and reports correct dimension."""
     provider = _DummyProvider()
     vectors = provider.embed_texts(["alpha", "beta"])
     provider.close()
-    assert vectors.shape == (2, 4)
+    assertions.expect_equal(vectors.shape, (2, 4))
     norms = np.linalg.norm(vectors, axis=1)
     np.testing.assert_allclose(norms, np.ones_like(norms), atol=1e-6)
-    assert provider.metadata.dimension == 4
-    assert provider.metadata.normalize is True
+    assertions.expect_equal(provider.metadata.dimension, 4)
+    assertions.expect_true(provider.metadata.normalize is True, reason="normalize should be True")
 
 
 def test_provider_raises_on_dimension_mismatch() -> None:
+    """Verify provider raises error when vector dimension doesn't match config."""
     provider = _DummyProvider(vec_dim=8)
     with pytest.raises(EmbeddingRuntimeError):
         provider.embed_texts(["only"])

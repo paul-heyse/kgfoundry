@@ -2,8 +2,8 @@
 
 These helpers delegate to the internal :mod:`kgfoundry._namespace_proxy` module while
 providing typed, documented entry points for downstream packages. They are the
-supported way to expose third-party modules (for example, ``search_client`` or
-``vectorstore_faiss``) under the ``kgfoundry`` namespace.
+supported way to expose third-party modules (for example, ``search_client``) under
+the ``kgfoundry`` namespace.
 
 Install the ``kgfoundry[tools]`` optional extra to ensure the tooling package is
 available in the current environment before importing this module.
@@ -13,6 +13,7 @@ available in the current environment before importing this module.
 
 from __future__ import annotations
 
+# ruff: noqa: TID251 - tooling bridge proxies internal namespace helper
 from typing import TYPE_CHECKING
 
 from kgfoundry._namespace_proxy import (
@@ -119,3 +120,6 @@ def namespace_getattr(module: ModuleType, name: str) -> object:
         The attribute value from the module.
     """
     return _namespace_getattr(module, name)
+
+
+NamespaceRegistry = NamespaceRegistry

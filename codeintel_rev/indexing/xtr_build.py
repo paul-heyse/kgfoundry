@@ -14,14 +14,11 @@ from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
 from codeintel_rev.io.xtr_manager import XTRIndex
 from codeintel_rev.typing import NDArrayAny
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     import numpy as np
 else:
     np = cast("np", LazyModule("numpy", "XTR build pipeline"))
-
-LOGGER = get_logger(__name__)
 
 
 @dataclass(slots=True, frozen=True)
@@ -136,15 +133,6 @@ def _gather_chunk_vectors(
     total_tokens = 0
     for chunk_id, content in _iter_chunk_text(catalog):
         vecs = index.encode_query_tokens(content)
-        if vecs.shape[1] != index.config.dim:
-            LOGGER.warning(
-                "xtr_build_dimension_mismatch",
-                extra={
-                    "chunk_id": chunk_id,
-                    "expected_dim": index.config.dim,
-                    "observed_dim": vecs.shape[1],
-                },
-            )
         buffered = vecs.astype(dtype, copy=False)
         chunk_ids.append(chunk_id)
         offsets.append(total_tokens)
@@ -307,16 +295,6 @@ def build_xtr_index(settings: Settings | None = None) -> XTRBuildSummary:
     with meta_path.open("w", encoding="utf-8") as handle:
         json.dump(meta, handle, indent=2)
 
-    LOGGER.info(
-        "xtr_build_complete",
-        extra={
-            "doc_count": len(chunk_ids),
-            "tokens": total_tokens,
-            "dim": settings.xtr.dim,
-            "dtype": dtype_label,
-            "root": str(xtr_dir),
-        },
-    )
     return XTRBuildSummary(
         chunk_count=len(chunk_ids),
         token_count=total_tokens,
@@ -330,15 +308,6 @@ def build_xtr_index(settings: Settings | None = None) -> XTRBuildSummary:
 def main() -> None:
     """Entry point allowing ``python -m codeintel_rev.indexing.xtr_build``."""
     summary = build_xtr_index()
-    LOGGER.info(
-        "xtr_build_summary",
-        extra={
-            "chunk_count": summary.chunk_count,
-            "token_count": summary.token_count,
-            "token_path": summary.token_path,
-            "meta_path": summary.meta_path,
-        },
-    )
 
 
 if __name__ == "__main__":  # pragma: no cover - manual execution entry point

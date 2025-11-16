@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from http import HTTPStatus
+
 import httpx
 import pytest
 from fastapi import FastAPI
+
+from tests._helpers import assertions
 
 
 @pytest.mark.asyncio
@@ -21,12 +25,14 @@ async def test_sse_stream_flushes_events(  # streaming must survive proxies
             ) as client,
             client.stream("GET", "/sse") as response,
         ):
-            assert response.status_code == 200
-            assert response.headers.get("x-accel-buffering") == "no"
+            assertions.expect_equal(response.status_code, HTTPStatus.OK)
+            assertions.expect_equal(response.headers.get("x-accel-buffering"), "no")
             lines = response.aiter_lines()
             first_line = await anext(lines)
             second_line = await anext(lines)
-            assert first_line == "event: ready"
-            assert second_line.startswith("data:")
+            assertions.expect_equal(first_line, "event: ready")
+            assertions.expect_true(
+                second_line.startswith("data:"), reason="second line should start with data:"
+            )
     finally:
         await transport.aclose()

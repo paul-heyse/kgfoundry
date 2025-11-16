@@ -16,15 +16,12 @@ from codeintel_rev.io.faiss_manager import SearchRuntimeOverrides
 from codeintel_rev.retrieval.types import SearchPoolRow
 from codeintel_rev.typing import NDArrayF32, NDArrayI64
 from kgfoundry_common.errors import EmbeddingError
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     from codeintel_rev.io.duckdb_catalog import StructureAnnotations
     from codeintel_rev.mcp_server.schemas import SearchFilterPayload
 
 type EmbeddingVector = Sequence[float] | NDArrayF32
-
-LOGGER = get_logger(__name__)
 
 
 class EmbeddingClient(Protocol):
@@ -414,7 +411,6 @@ def run_search(*, request: SearchRequest, deps: SearchDependencies) -> SearchRes
         final_results=results,
         rerank_enabled=request.rerank,
     )
-    _log_search_completion(request, deps, len(results), faiss_k)
     return SearchResponse(
         query_echo=request.query,
         top_k=request.top_k,
@@ -946,7 +942,7 @@ def _write_pool_rows(
     try:
         write_pool(rows, destination)
     except RuntimeError:  # pragma: no cover - optional dependency
-        LOGGER.debug("pool_writer.pyarrow_missing", extra={"path": str(destination)})
+        return
 
 
 def _build_pool_reason(annotation: StructureAnnotations | None) -> dict[str, object]:
@@ -958,26 +954,6 @@ def _build_pool_reason(annotation: StructureAnnotations | None) -> dict[str, obj
         "ast_kind": ast_kind,
         "cst_hits": cst_hits,
     }
-
-
-def _log_search_completion(
-    request: SearchRequest, deps: SearchDependencies, returned: int, fanout: int
-) -> None:
-    LOGGER.info(
-        "mcp.search.complete",
-        extra={
-            "query_chars": len(request.query),
-            "returned": returned,
-            "top_k": request.top_k,
-            "fanout": fanout,
-            "filters": request.filters.describe(),
-            "rerank": request.rerank,
-            "index_family": deps.faiss.faiss_family or "auto",
-            "faiss_runtime": dict(deps.faiss.runtime.get_runtime_tuning() or {}),
-            "session_id": deps.session_id,
-            "run_id": deps.run_id,
-        },
-    )
 
 
 def _coerce_int(value: object | None) -> int:

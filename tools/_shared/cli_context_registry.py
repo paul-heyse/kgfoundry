@@ -138,10 +138,6 @@ class CLIContextRegistry:
         CLIContextDefinition
             The registered CLI context definition.
 
-        Raises
-        ------
-        KeyError
-            If the key is not found in the registry. Raised by ``_normalise_key``.
         """
         return self._definitions[self._normalise_key(key)]
 
@@ -158,10 +154,6 @@ class CLIContextRegistry:
         CLIToolSettings
             Cached or newly created CLI tool settings.
 
-        Raises
-        ------
-        KeyError
-            If the key is not found in the registry.
         """
         key = self._normalise_key(key)
         try:
@@ -194,10 +186,6 @@ class CLIContextRegistry:
         CLIToolingContext
             Cached or newly created CLI tooling context.
 
-        Raises
-        ------
-        KeyError
-            If the key is not found in the registry.
         """
         key = self._normalise_key(key)
         try:
@@ -220,10 +208,6 @@ class CLIContextRegistry:
         AugmentMetadataModel
             Augment metadata from the CLI tooling context.
 
-        Raises
-        ------
-        KeyError
-            If the key is not found in the registry.
         """
         return self.context_for(key).augment
 
@@ -240,10 +224,6 @@ class CLIContextRegistry:
         RegistryMetadataModel
             Registry metadata from the CLI tooling context.
 
-        Raises
-        ------
-        KeyError
-            If the key is not found in the registry.
         """
         return self.context_for(key).registry
 
@@ -285,10 +265,6 @@ class CLIContextRegistry:
         ToolingMetadataModel
             Combined augment and registry metadata.
 
-        Raises
-        ------
-        KeyError
-            If the key is not found in the registry.
         """
         context = self.context_for(key)
         return ToolingMetadataModel(augment=context.augment, registry=context.registry)
@@ -316,10 +292,6 @@ class CLIContextRegistry:
         OperationOverrideModel | None
             Operation override if found, otherwise None.
 
-        Raises
-        ------
-        KeyError
-            If the key is not found in the registry.
         """
         definition = self.definition_for(key)
         operation_id = definition.operation_map.get(subcommand)
@@ -370,10 +342,6 @@ def register_cli(key: str, definition: CLIContextDefinition) -> None:
     definition : CLIContextDefinition
         CLI context metadata definition to register.
 
-    Raises
-    ------
-    ValueError
-        If the key is invalid or a conflicting definition already exists.
     """
     REGISTRY.register(key, definition)
 
@@ -391,10 +359,6 @@ def definition_for(key: str) -> CLIContextDefinition:
     CLIContextDefinition
         The registered CLI context definition.
 
-    Raises
-    ------
-    KeyError
-        If the key is not found in the registry.
     """
     return REGISTRY.definition_for(key)
 
@@ -412,10 +376,6 @@ def settings_for(key: str) -> CLIToolSettings:
     CLIToolSettings
         Cached or newly created CLI tool settings.
 
-    Raises
-    ------
-    KeyError
-        If the key is not found in the registry.
     """
     return REGISTRY.settings_for(key)
 
@@ -433,10 +393,6 @@ def context_for(key: str) -> CLIToolingContext:
     CLIToolingContext
         Cached or newly created CLI tooling context.
 
-    Raises
-    ------
-    KeyError
-        If the key is not found in the registry.
     """
     return REGISTRY.context_for(key)
 
@@ -454,10 +410,6 @@ def augment_for(key: str) -> AugmentMetadataModel:
     AugmentMetadataModel
         Augment metadata from the CLI tooling context.
 
-    Raises
-    ------
-    KeyError
-        If the key is not found in the registry.
     """
     return REGISTRY.augment_for(key)
 
@@ -475,10 +427,6 @@ def registry_for(key: str) -> RegistryMetadataModel:
     RegistryMetadataModel
         Registry metadata from the CLI tooling context.
 
-    Raises
-    ------
-    KeyError
-        If the key is not found in the registry.
     """
     return REGISTRY.registry_for(key)
 
@@ -496,10 +444,6 @@ def interface_for(key: str) -> RegistryInterfaceModel:
     RegistryInterfaceModel
         Interface metadata matching the CLI's interface ID.
 
-    Raises
-    ------
-    KeyError
-        If the key is not found or the interface ID is missing from registry.
     """
     return REGISTRY.interface_for(key)
 
@@ -517,10 +461,6 @@ def tooling_metadata_for(key: str) -> ToolingMetadataModel:
     ToolingMetadataModel
         Combined augment and registry metadata.
 
-    Raises
-    ------
-    KeyError
-        If the key is not found in the registry.
     """
     return REGISTRY.tooling_metadata_for(key)
 
@@ -547,9 +487,5 @@ def operation_override_for(
     OperationOverrideModel | None
         Operation override if found, otherwise None.
 
-    Raises
-    ------
-    KeyError
-        If the key is not found in the registry.
     """
     return REGISTRY.operation_override_for(key, subcommand=subcommand, tokens=tokens)

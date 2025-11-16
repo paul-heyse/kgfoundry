@@ -9,6 +9,8 @@ import pyarrow.parquet as pq
 from codeintel_rev.indexing.cast_chunker import Chunk
 from codeintel_rev.io.parquet_store import ParquetWriteOptions, write_chunks_parquet
 
+from tests._helpers import assertions
+
 
 def _make_chunk() -> Chunk:
     return Chunk(
@@ -43,6 +45,6 @@ def test_parquet_metadata_round_trip(tmp_path: Path) -> None:
 
     table = pq.read_table(out_path)
     schema_meta = table.schema.metadata
-    assert schema_meta is not None
+    assertions.expect_true(schema_meta is not None, reason="schema_meta should be set")
     for key, value in meta.items():
-        assert schema_meta.get(key.encode("utf-8")) == value.encode("utf-8")
+        assertions.expect_equal(schema_meta.get(key.encode("utf-8")), value.encode("utf-8"))

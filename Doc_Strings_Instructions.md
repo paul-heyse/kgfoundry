@@ -205,7 +205,7 @@ def normalize(x: list[float]) -> list[float]:
 uv run ruff format && uv run ruff check --fix
 uv run pyright --warnings --pythonversion=3.13
 uv run pyrefly check
-SKIP_GPU_WARMUP=1 uv run pytest -q
+uv run pytest -q
 make artifacts && git diff --exit-code
 ```
 

@@ -13,14 +13,11 @@ from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.config.settings import XTRConfig
 from codeintel_rev.runtime import RuntimeCell
 from codeintel_rev.typing import NDArrayF32, TorchModule, gate_import
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     import numpy as np
 else:
     np = cast("np", LazyModule("numpy", "XTR index operations"))
-
-LOGGER = get_logger(__name__)
 
 
 class XTRMetadata(TypedDict):
@@ -83,13 +80,6 @@ class XTRIndex:
         token_path = self.root / token_name
 
         if not meta_path.exists() or not token_path.exists():
-            LOGGER.debug(
-                "xtr_artifacts_missing",
-                extra={
-                    "meta_path": str(meta_path),
-                    "token_path": str(token_path),
-                },
-            )
             return
 
         with meta_path.open("r", encoding="utf-8") as handle:
@@ -102,27 +92,13 @@ class XTRIndex:
                 mode="r",
                 shape=(meta["total_tokens"], meta["dim"]),
             )
-        except ValueError as exc:
-            LOGGER.exception(
-                "xtr_memmap_failed",
-                extra={"token_path": str(token_path), "error": str(exc)},
-            )
+        except ValueError:
             raise
         state = self._ensure_state()
         state.close()
         state.meta = meta
         state.tokens = tokens
         state.chunk_lookup = self._build_chunk_lookup(meta)
-        LOGGER.info(
-            "xtr_index_opened",
-            extra={
-                "root": str(self.root),
-                "dim": meta["dim"],
-                "tokens": meta["total_tokens"],
-                "chunks": meta["doc_count"],
-                "dtype": meta["dtype"],
-            },
-        )
 
     @property
     def ready(self) -> bool:
@@ -181,14 +157,7 @@ class XTRIndex:
             vecs = torch_any.nn.functional.normalize(hidden[0], dim=-1)
             result = vecs.detach().cpu().to(torch_any.float32).numpy()
         if result.shape[1] != self.config.dim:
-            LOGGER.warning(
-                "XTR encoder dimension mismatch",
-                extra={
-                    "expected": self.config.dim,
-                    "observed": result.shape[1],
-                    "model_id": self.config.model_id,
-                },
-            )
+            pass
         return result
 
     def search(
@@ -268,15 +237,6 @@ class XTRIndex:
             limit=k,
         )
         duration_ms = round((perf_counter() - start) * 1000, 2)
-        LOGGER.debug(
-            "XTR search completed",
-            extra={
-                "duration_ms": duration_ms,
-                "k": k,
-                "results_count": len(results),
-                "model_id": self.config.model_id,
-            },
-        )
         return results
 
     def rescore(
@@ -345,23 +305,12 @@ class XTRIndex:
         materialized = [int(cid) for cid in candidate_chunk_ids]
         if not materialized or not self.ready:
             return []
-        start = perf_counter()
         query_vecs = self.encode_query_tokens(query)
         results = self.score_candidates(
             query_vecs,
             materialized,
             explain=explain,
             topk_explanations=topk_explanations,
-        )
-        duration_ms = round((perf_counter() - start) * 1000, 2)
-        LOGGER.debug(
-            "XTR rescore completed",
-            extra={
-                "duration_ms": duration_ms,
-                "candidates_count": len(materialized),
-                "results_count": len(results),
-                "model_id": self.config.model_id,
-            },
         )
         return results
 
@@ -401,7 +350,6 @@ class XTRIndex:
             if explain=False or no matches found.
         """
         if not self.ready:
-            LOGGER.debug("xtr_not_ready", extra={"root": str(self.root)})
             return []
 
         query_array = np.asarray(query_vecs, dtype=np.float32)
@@ -488,45 +436,29 @@ class XTRIndex:
         configured = (self.config.device or "cpu").strip()
         if configured.lower().startswith("cuda"):
             if not torch_module.cuda.is_available():
-                if state.device != "cpu":
-                    LOGGER.warning(
-                        "XTR requested CUDA but it is unavailable; falling back to CPU.",
-                    )
                 state.device = "cpu"
                 return torch_module.device(state.device)
 
             ordinal = self._parse_cuda_ordinal(configured)
             if ":" in configured and ordinal is None:
-                LOGGER.warning(
-                    "Invalid CUDA device specification %r; falling back to CPU.",
-                    configured,
-                )
                 state.device = "cpu"
                 return torch_module.device(state.device)
 
             device_count = torch_module.cuda.device_count()
             if ordinal is not None:
                 if device_count == 0:
-                    LOGGER.warning(
-                        "No CUDA devices available despite torch.cuda.is_available(); using CPU.",
-                    )
                     state.device = "cpu"
                     return torch_module.device(state.device)
                 if ordinal >= device_count:
                     selected = max(device_count - 1, 0)
-                    LOGGER.warning(
-                        "Requested CUDA ordinal %d >= available devices %d; using cuda:%d instead.",
-                        ordinal,
-                        device_count,
-                        selected,
-                    )
                     state.device = f"cuda:{selected}"
                 else:
                     state.device = f"cuda:{ordinal}"
-            else:
-                state.device = configured
-        else:
-            state.device = configured
+                return torch_module.device(state.device)
+            state.device = "cuda"
+            return torch_module.device(state.device)
+
+        state.device = configured
         return torch_module.device(state.device)
 
     @staticmethod

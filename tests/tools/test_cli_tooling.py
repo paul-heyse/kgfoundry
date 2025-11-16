@@ -1,3 +1,5 @@
+"""Tests for CLI tooling context loading and configuration."""
+
 from __future__ import annotations
 
 import importlib
@@ -6,6 +8,8 @@ from textwrap import dedent
 from typing import Protocol, TypeGuard
 
 import pytest
+
+from tests._helpers import assertions
 
 cli_tooling = importlib.import_module("tools._shared.cli_tooling")
 
@@ -40,6 +44,7 @@ def _write_yaml(path: Path, content: str) -> None:
 
 
 def test_load_cli_tooling_context_success(tmp_path: Path) -> None:
+    """Verify CLI tooling context loads successfully with valid configuration."""
     augment_path = tmp_path / "augment.yaml"
     registry_path = tmp_path / "registry.yaml"
 
@@ -77,17 +82,20 @@ def test_load_cli_tooling_context_success(tmp_path: Path) -> None:
 
     context = cli_tooling.load_cli_tooling_context(settings)
 
-    assert _is_cli_config(context.cli_config)
+    assertions.expect_true(_is_cli_config(context.cli_config), reason="cli_config should be valid")
     cli_config = context.cli_config
-    assert cli_config.bin_name == "kgf"
-    assert cli_config.interface_meta is not None
-    assert cli_config.interface_meta.entrypoint == "tests.fixtures.cli:app"
+    assertions.expect_equal(cli_config.bin_name, "kgf")
+    assertions.expect_true(
+        cli_config.interface_meta is not None, reason="interface_meta should be set"
+    )
+    assertions.expect_equal(cli_config.interface_meta.entrypoint, "tests.fixtures.cli:app")
     override = context.augment.operation_override("cli.run")
-    assert override is not None
-    assert override.tags == ("orchestration",)
+    assertions.expect_true(override is not None, reason="override should exist")
+    assertions.expect_equal(override.tags, ("orchestration",))
 
 
 def test_load_cli_tooling_context_missing_augment(tmp_path: Path) -> None:
+    """Verify loading fails with Problem Details when augment file is missing."""
     registry_path = tmp_path / "registry.yaml"
     _write_yaml(registry_path, "interfaces: {}")
 
@@ -102,13 +110,16 @@ def test_load_cli_tooling_context_missing_augment(tmp_path: Path) -> None:
     with pytest.raises(cli_tooling.CLIConfigError) as excinfo:
         cli_tooling.load_cli_tooling_context(settings)
 
-    assert _has_problem_details(excinfo.value)
+    assertions.expect_true(
+        _has_problem_details(excinfo.value), reason="should have problem details"
+    )
     problem = excinfo.value.problem
-    assert problem["status"] == 404
-    assert problem["type"] == "https://kgfoundry.dev/problems/cli-config"
+    assertions.expect_equal(problem["status"], 404)
+    assertions.expect_equal(problem["type"], "https://kgfoundry.dev/problems/cli-config")
 
 
 def test_load_cli_tooling_context_missing_interface(tmp_path: Path) -> None:
+    """Verify loading fails with Problem Details when interface is missing."""
     augment_path = tmp_path / "augment.yaml"
     registry_path = tmp_path / "registry.yaml"
 
@@ -127,15 +138,21 @@ def test_load_cli_tooling_context_missing_interface(tmp_path: Path) -> None:
     with pytest.raises(cli_tooling.CLIConfigError) as excinfo:
         cli_tooling.load_cli_tooling_context(settings)
 
-    assert _has_problem_details(excinfo.value)
+    assertions.expect_true(
+        _has_problem_details(excinfo.value), reason="should have problem details"
+    )
     problem = excinfo.value.problem
-    assert problem["status"] == 422
+    assertions.expect_equal(problem["status"], 422)
     detail = problem.get("detail")
-    assert isinstance(detail, str)
-    assert detail.startswith("Interface 'missing-cli'")
+    assertions.expect_true(isinstance(detail, str), reason="detail should be str")
+    assertions.expect_true(
+        detail.startswith("Interface 'missing-cli'"),
+        reason="detail should mention missing interface",
+    )
 
 
 def test_loaders_use_caching(tmp_path: Path) -> None:
+    """Verify loaders cache configuration objects for performance."""
     augment_path = tmp_path / "augment.yaml"
     registry_path = tmp_path / "registry.yaml"
 
@@ -144,8 +161,12 @@ def test_loaders_use_caching(tmp_path: Path) -> None:
 
     first_augment = cli_tooling.load_augment_config(augment_path)
     second_augment = cli_tooling.load_augment_config(augment_path)
-    assert first_augment is second_augment
+    assertions.expect_true(
+        first_augment is second_augment, reason="augment config should be cached"
+    )
 
     first_registry = cli_tooling.load_registry_context(registry_path)
     second_registry = cli_tooling.load_registry_context(registry_path)
-    assert first_registry is second_registry
+    assertions.expect_true(
+        first_registry is second_registry, reason="registry context should be cached"
+    )

@@ -1,3 +1,5 @@
+"""Tests for minimal import profile with optional dependencies."""
+
 from __future__ import annotations
 
 import importlib
@@ -9,6 +11,8 @@ from types import ModuleType
 import pytest
 from codeintel_rev.app.capabilities import Capabilities
 from codeintel_rev.mcp_server.server import build_http_app
+
+from tests._helpers import assertions
 
 
 @pytest.mark.parametrize(
@@ -57,5 +61,11 @@ def test_server_factory_omits_semantic_modules() -> None:
 
     caps = Capabilities(duckdb=True, scip_index=True)
     build_http_app(caps)
-    assert "codeintel_rev.mcp_server.server_semantic" not in sys.modules
-    assert "codeintel_rev.mcp_server.server_symbols" in sys.modules
+    assertions.expect_false(
+        "codeintel_rev.mcp_server.server_semantic" in sys.modules,
+        reason="semantic modules should not be imported when capability is absent",
+    )
+    assertions.expect_true(
+        "codeintel_rev.mcp_server.server_symbols" in sys.modules,
+        reason="symbol modules should be imported when scip_index capability is present",
+    )

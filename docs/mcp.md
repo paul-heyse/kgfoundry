@@ -56,7 +56,7 @@ Responses conform to:
   ],
   "queryEcho": "How do we warm up FAISS on startup?",
   "top_k": 12,
-  "limits": ["FAISS GPU disabled - using CPU"]
+  "limits": ["FAISS running in CPU-only mode"]
 }
 ```
 

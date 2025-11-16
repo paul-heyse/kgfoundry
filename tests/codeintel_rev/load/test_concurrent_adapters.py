@@ -18,6 +18,8 @@ from codeintel_rev.app.middleware import session_id_var
 from codeintel_rev.mcp_server.adapters import files as files_adapter
 from codeintel_rev.mcp_server.adapters import history as history_adapter
 
+from tests._helpers import assertions, constants
+
 pytestmark = pytest.mark.skipif(
     not os.getenv("RUN_BENCHMARKS"),
     reason="Load tests skipped by default. Set RUN_BENCHMARKS=1 to enable.",
@@ -71,6 +73,10 @@ def mock_context(tmp_path: Path) -> Mock:
 class _AsyncGitClientStub:
     """Async Git client stub returning deterministic blame results."""
 
+    def __init__(self) -> None:
+        self.blame_calls = 0
+        self.history_calls = 0
+
     async def blame_range(
         self,
         *,
@@ -79,6 +85,7 @@ class _AsyncGitClientStub:
         end_line: int,
     ) -> list[dict]:
         del path
+        self.blame_calls += 1
         return [
             {
                 "line": line,
@@ -92,6 +99,7 @@ class _AsyncGitClientStub:
 
     async def file_history(self, *, path: str, limit: int) -> list[dict]:
         del path
+        self.history_calls += 1
         return [
             {
                 "sha": f"{i:04x}",
@@ -142,27 +150,23 @@ async def test_concurrent_list_paths(mock_context: Mock) -> None:
 
     start_time = time.monotonic()
 
-    # Execute 100 concurrent tasks
     tasks = [list_paths_task(i) for i in range(num_concurrent)]
     results = await asyncio.gather(*tasks)
 
     end_time = time.monotonic()
     duration = end_time - start_time
 
-    # Verify all tasks completed successfully
-    assert len(results) == num_concurrent
-    assert all("items" in result for result in results)
-    assert all(isinstance(result["items"], list) for result in results)
+    assertions.expect_equal(len(results), num_concurrent)
+    assertions.expect_true(all("items" in result for result in results))
+    assertions.expect_true(all(isinstance(result["items"], list) for result in results))
 
-    # Verify reasonable performance (should complete in <5 seconds for 100 concurrent)
-    assert duration < 5.0, f"100 concurrent requests took {duration:.2f}s (expected <5s)"
-
-    # Calculate average latency per request
-    avg_latency_ms = (duration / num_concurrent) * 1000
-    print("\nLoad test results:")
-    print(f"  Concurrent requests: {num_concurrent}")
-    print(f"  Total duration: {duration:.2f}s")
-    print(f"  Average latency per request: {avg_latency_ms:.2f}ms")
+    assertions.expect_true(
+        duration < constants.TIMEOUTS.load_small_batch,
+        reason=(
+            "100 concurrent requests took "
+            f"{duration:.2f}s (expected <{constants.TIMEOUTS.load_small_batch}s)"
+        ),
+    )
 
 
 @pytest.mark.load
@@ -207,18 +211,18 @@ async def test_concurrent_blame_range(mock_context: Mock) -> None:
     end_time = time.monotonic()
     duration = end_time - start_time
 
-    # Verify all tasks completed successfully
-    assert len(results) == num_concurrent
-    assert all("blame" in result or "error" in result for result in results)
+    assertions.expect_equal(len(results), num_concurrent)
+    assertions.expect_true(all("blame" in result or "error" in result for result in results))
 
-    # Verify reasonable performance
-    assert duration < 3.0, f"50 concurrent blame operations took {duration:.2f}s (expected <3s)"
+    assertions.expect_true(
+        duration < constants.TIMEOUTS.load_medium_batch,
+        reason=(
+            f"50 concurrent blame operations took {duration:.2f}s "
+            f"(expected <{constants.TIMEOUTS.load_medium_batch}s)"
+        ),
+    )
 
-    avg_latency_ms = (duration / num_concurrent) * 1000
-    print("\nLoad test results:")
-    print(f"  Concurrent blame operations: {num_concurrent}")
-    print(f"  Total duration: {duration:.2f}s")
-    print(f"  Average latency per request: {avg_latency_ms:.2f}ms")
+    _ = (duration / num_concurrent) * 1000
 
 
 @pytest.mark.load
@@ -282,16 +286,15 @@ async def test_mixed_concurrent_operations(mock_context: Mock) -> None:
     end_time = time.monotonic()
     duration = end_time - start_time
 
-    # Verify all tasks completed
-    assert len(results) == num_list_paths + num_blame
+    assertions.expect_equal(len(results), num_list_paths + num_blame)
 
-    # Verify reasonable performance
-    assert duration < 4.0, f"100 mixed operations took {duration:.2f}s (expected <4s)"
-
-    print("\nMixed load test results:")
-    print(f"  list_paths operations: {num_list_paths}")
-    print(f"  blame_range operations: {num_blame}")
-    print(f"  Total duration: {duration:.2f}s")
+    assertions.expect_true(
+        duration < constants.TIMEOUTS.load_medium_batch,
+        reason=(
+            f"100 mixed operations took {duration:.2f}s "
+            f"(expected <{constants.TIMEOUTS.load_medium_batch}s)"
+        ),
+    )
 
 
 @pytest.mark.load
@@ -338,16 +341,13 @@ async def test_no_thread_exhaustion(mock_context: Mock) -> None:
     end_time = time.monotonic()
     duration = end_time - start_time
 
-    # Verify all tasks completed (no thread exhaustion)
-    assert len(results) == num_concurrent
-    assert all("items" in result for result in results)
+    assertions.expect_equal(len(results), num_concurrent)
+    assertions.expect_true(all("items" in result for result in results))
 
-    # Should complete without hanging (thread exhaustion would cause hangs)
-    assert duration < 10.0, (
-        f"200 concurrent requests took {duration:.2f}s (thread exhaustion suspected)"
+    assertions.expect_true(
+        duration < constants.TIMEOUTS.load_large_batch,
+        reason=(
+            f"200 concurrent requests took {duration:.2f}s "
+            f"(expected <{constants.TIMEOUTS.load_large_batch}s)"
+        ),
     )
-
-    print("\nThread exhaustion test:")
-    print(f"  Concurrent requests: {num_concurrent}")
-    print(f"  Total duration: {duration:.2f}s")
-    print("  No thread exhaustion detected")

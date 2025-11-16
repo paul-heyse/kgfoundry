@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import logging
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,9 +20,6 @@ import torch
 from sentence_transformers import SentenceTransformer
 
 from codeintel_rev.config.settings import load_settings
-from kgfoundry_common.logging import get_logger
-
-LOGGER = get_logger(__name__)
 
 
 @dataclass(slots=True)
@@ -148,10 +144,8 @@ def embed_file(job: EmbedJob) -> None:
 
     resolved_model = _resolve_model_name(job.model_name)
     resolved_device = _resolve_device(job.device_name)
-    LOGGER.info("Loading %s on %s", resolved_model, resolved_device)
     st_model = SentenceTransformer(resolved_model, device=resolved_device)
 
-    LOGGER.info("Embedding %s texts (batch=%s)", len(texts), job.batch_size)
     embeddings = st_model.encode(
         texts,
         batch_size=job.batch_size,
@@ -162,12 +156,10 @@ def embed_file(job: EmbedJob) -> None:
 
     job.output_path.parent.mkdir(parents=True, exist_ok=True)
     np.save(job.output_path, embeddings)
-    LOGGER.info("Saved embeddings to %s", job.output_path)
 
     if job.jsonl_path is not None:
         job.jsonl_path.parent.mkdir(parents=True, exist_ok=True)
         _dump_jsonl(texts, embeddings, job.jsonl_path)
-        LOGGER.info("Wrote JSONL preview to %s", job.jsonl_path)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -183,7 +175,6 @@ def main(argv: list[str] | None = None) -> int:
     int
         Exit code: 0 on success, 1 on error.
     """
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     args = _parse_args(argv)
     job = EmbedJob(
         input_path=args.input_path,
@@ -197,7 +188,6 @@ def main(argv: list[str] | None = None) -> int:
     try:
         embed_file(job)
     except (OSError, ValueError, RuntimeError):  # pragma: no cover - CLI wrapper
-        LOGGER.exception("Embedding failed")
         return 1
     return 0
 

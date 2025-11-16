@@ -648,22 +648,6 @@ def cli_run(cfg: CliRunConfig) -> Iterator[tuple[CliContext, EnvelopeBuilder]]:
         and logger) and the mutable :class:`EnvelopeBuilder` (for accumulating
         execution results and metadata).
 
-    Raises
-    ------
-    SystemExit
-        Raised with exit code ``1`` when an exception occurs inside the context
-        and ``cfg.exit_on_error`` evaluates to ``True``. The original exception
-        is chained via ``raise SystemExit(1) from error`` where ``error`` is the
-        caught exception.
-    GeneratorExit
-        Re-raised immediately if raised by user code (system-level exception).
-    KeyboardInterrupt
-        Re-raised immediately if raised by user code (system-level exception).
-    Exception
-        Any exception raised by user code inside the context is caught and
-        processed. If ``cfg.exit_on_error`` is ``False``, the exception is
-        re-raised after cleanup. If ``True``, it is converted to ``SystemExit(1)``.
-
     Notes
     -----
     Exception Handling:

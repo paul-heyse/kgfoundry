@@ -27,12 +27,9 @@ from codeintel_rev.mcp_server.scope_utils import (
     get_effective_scope,
     merge_scope_filters,
 )
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
-
-LOGGER = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -90,11 +87,6 @@ async def set_scope(context: ApplicationContext, scope: ScopeIn) -> dict:
     """
     session_id = get_session_id()
     await context.scope_store.set(session_id, scope)
-
-    LOGGER.info(
-        "Set scope for session",
-        extra={"session_id": session_id, "scope": scope},
-    )
 
     return {"effective_scope": scope, "session_id": session_id, "status": "ok"}
 
@@ -186,10 +178,6 @@ async def list_paths(context: ApplicationContext, *args: object, **kwargs: objec
         languages=languages,
         max_results=max_results,
     )
-    LOGGER.debug(
-        "Listing paths (async)",
-        extra={"path": path, "max_results": max_results},
-    )
     result = await asyncio.to_thread(
         _list_paths_sync,
         context,
@@ -199,15 +187,6 @@ async def list_paths(context: ApplicationContext, *args: object, **kwargs: objec
         filters,
     )
 
-    LOGGER.info(
-        "files.list_paths.completed",
-        extra={
-            "session_id": session_id,
-            "path": path or ".",
-            "results": result.get("total", 0),
-            "truncated": result.get("truncated", False),
-        },
-    )
     return result
 
 
@@ -325,10 +304,6 @@ def _list_paths_sync(
     if merged_languages:
         language_extensions = _collect_language_extensions(merged_languages)
         if not language_extensions:
-            LOGGER.warning(
-                "No file extensions found for requested languages",
-                extra={"languages": merged_languages},
-            )
             return {"items": [], "total": 0, "truncated": False}
 
     directory_filters = DirectoryFilters(
@@ -341,18 +316,6 @@ def _list_paths_sync(
         search_root=search_root,
         repo_root=repo_root,
         filters=directory_filters,
-    )
-
-    LOGGER.debug(
-        "Listed paths with scope filters",
-        extra={
-            "session_id": session_id,
-            "path": path,
-            "item_count": len(items),
-            "matched_count": matched_count,
-            "applied_scope": scope is not None,
-            "languages": merged_languages,
-        },
     )
 
     return {
@@ -607,10 +570,6 @@ def open_file(
         "lines": len(content.splitlines()),
         "size": len(content),
     }
-    LOGGER.info(
-        "files.open_file.completed",
-        extra={"path": path, "lines": result["lines"], "size": result["size"]},
-    )
     return result
 
 

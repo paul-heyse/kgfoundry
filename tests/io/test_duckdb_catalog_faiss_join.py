@@ -11,6 +11,8 @@ from codeintel_rev.io.duckdb_catalog import (
     refresh_faiss_idmap_materialized,
 )
 
+from tests._helpers import assertions
+
 
 def _write_chunks(path: Path) -> None:
     table = pa.table(
@@ -48,8 +50,8 @@ def test_ensure_faiss_idmap_view_registers_join(tmp_path: Path) -> None:
         chunks_parquet=str(chunks),
     )
     count = conn.execute("SELECT COUNT(*) FROM v_faiss_join").fetchone()
-    assert count is not None
-    assert count[0] == 2
+    assertions.expect_true(count is not None, reason="query should return a result")
+    assertions.expect_equal(count[0], 2)
 
 
 def test_refresh_faiss_idmap_materialized_skips_when_unchanged(tmp_path: Path) -> None:
@@ -63,13 +65,13 @@ def test_refresh_faiss_idmap_materialized_skips_when_unchanged(tmp_path: Path) -
         idmap_parquet=str(idmap),
         chunks_parquet=str(chunks),
     )
-    assert first.refreshed is True
-    assert first.row_count == 2
+    assertions.expect_true(first.refreshed, reason="first refresh should be True")
+    assertions.expect_equal(first.row_count, 2)
 
     second = refresh_faiss_idmap_materialized(
         conn,
         idmap_parquet=str(idmap),
         chunks_parquet=str(chunks),
     )
-    assert second.refreshed is False
-    assert second.row_count == first.row_count
+    assertions.expect_false(second.refreshed, reason="second refresh should be False")
+    assertions.expect_equal(second.row_count, first.row_count)

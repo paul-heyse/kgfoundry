@@ -11,9 +11,6 @@ from pathlib import Path
 from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.config.settings import load_settings
 from codeintel_rev.evaluation.scip_coverage import SCIPCoverageEvaluator
-from kgfoundry_common.logging import get_logger
-
-LOGGER = get_logger(__name__)
 
 
 def build_parser() -> argparse.ArgumentParser:

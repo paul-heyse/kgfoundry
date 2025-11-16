@@ -49,12 +49,8 @@ from typing import TYPE_CHECKING, cast
 import git
 import git.exc
 
-from kgfoundry_common.logging import get_logger
-
 if TYPE_CHECKING:
     from codeintel_rev.mcp_server.schemas import GitBlameEntry
-
-LOGGER = get_logger(__name__)
 
 
 def _string_attr(obj: object, attr: str) -> str:
@@ -193,18 +189,7 @@ class GitClient:
             try:
                 repo = git.Repo(self.repo_path, search_parent_directories=True)
                 _SET_GITCLIENT_ATTR(self, "_repo", repo)
-                LOGGER.debug(
-                    "Initialized Git repository",
-                    extra={
-                        "repo_path": str(self.repo_path),
-                        "git_dir": str(repo.git_dir),
-                    },
-                )
             except git.exc.InvalidGitRepositoryError:
-                LOGGER.exception(
-                    "Invalid Git repository",
-                    extra={"repo_path": str(self.repo_path)},
-                )
                 raise
         return cast("git.Repo", self._repo)
 
@@ -310,16 +295,8 @@ class GitClient:
             error_msg = str(exc)
             if "does not exist" in error_msg.lower() or "bad file" in error_msg.lower():
                 file_not_found_msg = f"File not found: {path}"
-                LOGGER.warning(
-                    "File not found for blame",
-                    extra={"path": path, "error": error_msg},
-                )
                 raise FileNotFoundError(file_not_found_msg) from exc
             # Other Git errors (permission denied, etc.)
-            LOGGER.exception(
-                "Git blame failed",
-                extra={"path": path},
-            )
             raise
 
         entries: list[GitBlameEntry] = []
@@ -344,15 +321,6 @@ class GitClient:
                     }
                     entries.append(entry)
 
-        LOGGER.debug(
-            "Git blame completed",
-            extra={
-                "path": path,
-                "start_line": start_line,
-                "end_line": end_line,
-                "entries_count": len(entries),
-            },
-        )
         return entries
 
     def file_history(
@@ -436,16 +404,8 @@ class GitClient:
             error_msg = str(exc)
             if "does not exist" in error_msg.lower() or "bad file" in error_msg.lower():
                 file_not_found_msg = f"File not found: {path}"
-                LOGGER.warning(
-                    "File not found for history",
-                    extra={"path": path, "error": error_msg},
-                )
                 raise FileNotFoundError(file_not_found_msg) from exc
             # Other Git errors
-            LOGGER.exception(
-                "Git log failed",
-                extra={"path": path},
-            )
             raise
 
         commits = [
@@ -460,10 +420,6 @@ class GitClient:
             for commit in cast("Iterable[object]", commits_iter)
         ]
 
-        LOGGER.debug(
-            "Git history completed",
-            extra={"path": path, "limit": limit, "commits_count": len(commits)},
-        )
         return commits
 
 

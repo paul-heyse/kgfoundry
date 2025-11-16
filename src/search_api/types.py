@@ -47,8 +47,6 @@ __all__ = [
     "BM25IndexProtocol",
     "FaissIndexProtocol",
     "FaissModuleProtocol",
-    "GpuClonerOptionsProtocol",
-    "GpuResourcesProtocol",
     "IndexArray",
     "SpladeEncoderProtocol",
     "VectorArray",
@@ -93,8 +91,8 @@ class FaissIndexProtocol(Protocol):
     """Protocol for FAISS-compatible vector indexes.
 
     This protocol defines the minimum interface required for vector search
-    operations. Implementations may support additional features (GPU acceleration,
-    quantization, etc.) but must satisfy these core methods.
+    operations. Implementations may support additional features (quantization,
+    hybrid reranking, etc.) but must satisfy these core methods.
 
     Performance expectations:
     - `add()`: O(n) where n is the number of vectors; may require training first
@@ -103,8 +101,8 @@ class FaissIndexProtocol(Protocol):
 
     Concurrency notes:
     - Index operations are not thread-safe; serialize access from multiple threads
-    - GPU indexes may block the calling thread during kernel execution
-    - For async code, run index operations in thread pools to avoid blocking
+    - Index implementations may block the calling thread during distance
+      computations; run heavy work in thread pools for async code
 
     Examples
     --------
@@ -318,64 +316,6 @@ class FaissModuleProtocol(Protocol):
 
     normalize_l2: Callable[[VectorArray], None]
     """Normalize vectors to unit length in-place."""
-
-
-# [nav:anchor GpuResourcesProtocol]
-class GpuResourcesProtocol(Protocol):
-    """Protocol for FAISS GPU resources.
-
-    Extended Summary
-    ----------------
-    This protocol describes the StandardGpuResources interface used for GPU
-    index operations. Implementations manage GPU memory and resources.
-    Constructs a GPU resources instance for managing GPU memory and
-    resources during FAISS index operations. This protocol method
-    defines the initialization contract for GPU resource implementations
-    used when cloning CPU indexes to GPU or performing GPU-accelerated
-    search operations.
-
-    Notes
-    -----
-    This is a protocol method stub. Implementations should initialize
-    GPU resources (e.g., CUDA contexts, memory pools) as needed for
-    their specific GPU backend. Time O(1) for initialization; may
-    allocate GPU memory pools.
-
-    Examples
-    --------
-    >>> from kgfoundry.search_api.types import GpuResourcesProtocol
-    >>> class MockGpuResources:
-    ...     def __init__(self) -> None:
-    ...         self.initialized = True
-    >>> resources: GpuResourcesProtocol = MockGpuResources()
-    """
-
-    def __init__(self) -> None: ...
-
-
-# [nav:anchor GpuClonerOptionsProtocol]
-class GpuClonerOptionsProtocol(Protocol):
-    """Protocol for FAISS GPU cloner options.
-
-    This protocol describes the GpuClonerOptions interface used when cloning
-    CPU indexes to GPU. The `use_cuvs` attribute controls cuVS acceleration.
-
-    Attributes
-    ----------
-    use_cuvs : bool
-        Enable cuVS acceleration for GPU operations (default: False).
-
-    Examples
-    --------
-    >>> from kgfoundry.search_api.types import GpuClonerOptionsProtocol
-    >>> class MockGpuClonerOptions:
-    ...     use_cuvs: bool = False
-    >>> options: GpuClonerOptionsProtocol = MockGpuClonerOptions()
-    >>> options.use_cuvs = True
-    """
-
-    use_cuvs: bool
-    """Enable cuVS acceleration for GPU operations (default: False)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -729,7 +669,7 @@ def _labels_or_default(labelnames: Sequence[str] | None) -> Sequence[str]:
     Extended Summary
     ----------------
     Normalizes optional label name sequences to immutable tuples for use in
-    metrics and observability contexts. This helper ensures consistent tuple
+    metrics contexts. This helper ensures consistent tuple
     types for label handling in Prometheus metrics and OpenTelemetry spans,
     avoiding None checks downstream.
 

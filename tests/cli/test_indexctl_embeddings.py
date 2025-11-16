@@ -43,6 +43,7 @@ class _StubProvider:
 @pytest.fixture
 def stub_provider(monkeypatch: pytest.MonkeyPatch) -> None:
     """Install the deterministic stub provider for the duration of a test."""
+
     def _provider_factory(_settings: object) -> _StubProvider:
         return _StubProvider()
 

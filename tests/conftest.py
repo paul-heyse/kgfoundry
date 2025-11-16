@@ -11,26 +11,25 @@ This module provides reusable fixtures for:
 from __future__ import annotations
 
 import asyncio
-import importlib.util
 import json
 import logging
-import os
 import sys
 from collections.abc import Callable
-from importlib import import_module, metadata
+from importlib import import_module
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from types import ModuleType
 from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
 
 import pytest
+from codeintel_rev.app.capabilities import Capabilities
+from codeintel_rev.app.main import capz, disable_nginx_buffering, readyz, sse_demo
 from fastapi import FastAPI
 
 import tests.bootstrap  # noqa: F401
 from tests.app._context_factory import build_application_context
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Iterator
+    from collections.abc import Callable, Iterator
 
     from _pytest.logging import LogCaptureFixture
 
@@ -39,66 +38,8 @@ if TYPE_CHECKING:
 P = ParamSpec("P")
 R = TypeVar("R")
 
-GPU_CORE_MODULES: tuple[str, ...] = (
-    "torch",
-    "torchvision",
-    "torchaudio",
-    "vllm",
-    "faiss",
-    "triton",
-    "cuvs",
-    "cuda",
-    "cupy",
-)
-
-
-def _modules_available(modules: Iterable[str]) -> bool:
-    return all(importlib.util.find_spec(module) is not None for module in modules)
-
-
-def _has_distribution(dist_name: str) -> bool:
-    """Return True when the given package distribution is installed.
-
-    Parameters
-    ----------
-    dist_name : str
-        Distribution package name to check.
-
-    Returns
-    -------
-    bool
-        True if the distribution is installed, False otherwise.
-    """
-    try:
-        metadata.version(dist_name)
-    except metadata.PackageNotFoundError:
-        return False
-    return True
-
-
-def _compute_has_gpu_stack() -> bool:
-    if not _modules_available(GPU_CORE_MODULES):
-        return False
-    if os.getenv("ALLOW_GPU_TESTS_WITHOUT_CUDA") == "1":
-        return True
-    try:
-        torch_module = import_module("torch")
-    except ImportError:  # pragma: no cover - torch optional
-        return False
-    cuda_module: object = getattr(torch_module, "cuda", None)
-    if not isinstance(cuda_module, ModuleType):
-        return False
-    raw_is_available = cast("object | None", getattr(cuda_module, "is_available", None))
-    is_available_callable = cast(
-        "Callable[[], object] | None",
-        raw_is_available if callable(raw_is_available) else None,
-    )
-    if is_available_callable is None:
-        return False
-    return bool(is_available_callable())
-
-
-HAS_GPU_STACK = _compute_has_gpu_stack()
+# GPU acceleration has been removed; keep the exported flag for compatibility.
+HAS_GPU_STACK = False
 
 
 def _faiss_runtime_available() -> bool:
@@ -121,9 +62,6 @@ def _faiss_runtime_available() -> bool:
 
 
 HAS_FAISS_SUPPORT = _faiss_runtime_available()
-# Expose GPU stack availability for tooling and test gating.
-
-# Expose GPU stack availability for tooling and test gating.
 
 if HAS_FAISS_SUPPORT:
     FAISS_MODULE = cast("Any", import_module("faiss"))
@@ -177,20 +115,18 @@ else:
 
 
 @fixture(name="networking_test_app")
-def _networking_test_app(tmp_path, monkeypatch: pytest.MonkeyPatch) -> FastAPI:
+def _networking_test_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> FastAPI:
     """Return a FastAPI app exposing readiness, capability, and SSE routes.
 
     The fixture mirrors the production routes but swaps heavy dependencies for
     lightweight stubs so HTTPX-based tests can exercise streaming and
-    capability refresh logic without touching FAISS or GPU runtimes.
+    capability refresh logic without touching heavy FAISS runtimes.
 
     Returns
     -------
     FastAPI
         Test application wired with readiness and capability endpoints.
     """
-    from codeintel_rev.app.capabilities import Capabilities
-    from codeintel_rev.app.main import capz, disable_nginx_buffering, readyz, sse_demo
 
     class _FakeReadinessResult:
         def __init__(self, *, healthy: bool = True, detail: str = "ok") -> None:
@@ -201,8 +137,12 @@ def _networking_test_app(tmp_path, monkeypatch: pytest.MonkeyPatch) -> FastAPI:
             return {"healthy": self.healthy, "detail": self._detail}
 
     class _FakeReadinessProbe:
+        def __init__(self) -> None:
+            self.refresh_calls = 0
+
         async def refresh(self) -> dict[str, _FakeReadinessResult]:
             await asyncio.sleep(0)
+            self.refresh_calls += 1
             return {"faiss": _FakeReadinessResult()}
 
     ctx = build_application_context(tmp_path)
@@ -409,139 +349,9 @@ def structured_log_asserter() -> Callable[[logging.LogRecord, set[str]], None]:
     return assert_log_has_fields
 
 
-def _torch_smoke() -> tuple[bool, str]:
-    """Perform PyTorch CUDA smoke test.
-
-    Returns
-    -------
-    tuple[bool, str]
-        (success, message)
-    """
-    import importlib.util
-
-    torch_spec = importlib.util.find_spec("torch")
-    if torch_spec is None:
-        return False, "torch module not found"
-    try:
-        torch = importlib.import_module("torch")
-    except (ImportError, ModuleNotFoundError) as exc:
-        return False, f"torch import failed: {exc}"
-
-    if not torch.cuda.is_available():
-        return False, "torch.cuda.is_available() is False"
-
-    try:
-        dev = torch.device("cuda:0")
-        # Init CUDA context and do a tiny GEMM
-        torch.cuda.init()
-        a = torch.randn(256, 256, device=dev)
-        b = torch.randn(256, 256, device=dev)
-        c = a @ b  # triggers cuBLAS
-        c.sum().item()  # materialize
-        torch.cuda.synchronize()
-    except (RuntimeError, OSError) as exc:
-        return False, f"torch CUDA smoke failed: {exc}"
-    else:
-        name = torch.cuda.get_device_name(0)
-        cap = ".".join(map(str, torch.cuda.get_device_capability(0)))
-        total = torch.cuda.get_device_properties(0).total_memory
-        msg = f"PyTorch CUDA OK: {name}, CC {cap}, total_mem={total / 1e9:.2f} GB"
-        return True, msg
-
-
-def _faiss_smoke() -> tuple[bool, str]:
-    """Perform FAISS GPU smoke test.
-
-    Returns
-    -------
-    tuple[bool, str]
-        (success, message)
-    """
-    import importlib.util
-
-    faiss_spec = importlib.util.find_spec("faiss")
-    if faiss_spec is None:
-        return False, "faiss module not found"
-    try:
-        faiss = importlib.import_module("faiss")
-        import numpy as np
-    except (ImportError, ModuleNotFoundError) as exc:
-        return False, f"faiss import failed: {exc}"
-
-    # If this is a CPU-only wheel, gracefully skip
-    if not hasattr(faiss, "StandardGpuResources"):
-        return False, "faiss built without GPU bindings (StandardGpuResources missing)"
-
-    try:
-        ngpu = faiss.get_num_gpus() if hasattr(faiss, "get_num_gpus") else 0
-        if ngpu <= 0:
-            return False, "faiss.get_num_gpus() returned 0"
-
-        res = faiss.StandardGpuResources()
-        d = 64
-        idx = faiss.GpuIndexFlatIP(res, d)
-        rs = np.random.RandomState(0)
-        xb = rs.randn(128, d).astype("float32")
-        xq = rs.randn(4, d).astype("float32")
-        # normalize for cosine-as-IP; no-op if you use L2 in your config
-        xb /= np.linalg.norm(xb, axis=1, keepdims=True) + 1e-12
-        xq /= np.linalg.norm(xq, axis=1, keepdims=True) + 1e-12
-        idx.add(xb)
-        _distances, indices = idx.search(xq, 5)
-        assert indices.shape == (4, 5)
-    except (RuntimeError, OSError, AttributeError) as exc:
-        return False, f"FAISS GPU smoke failed: {exc}"
-    else:
-        msg = f"FAISS GPU OK: {ngpu} GPU(s) visible; GpuIndexFlatIP warm-up search ran"
-        return True, msg
-
-
-@fixture(scope="session", autouse=True)
-def gpu_warmup_session() -> None:
-    """Tiny GPU warm-up & early-fail. Set REQUIRE_GPU=1 to make missing GPU a hard error.
-
-    Runs once at session start, before any tests. Performs minimal GPU operations
-    to initialize CUDA contexts, cuBLAS, and FAISS GPU resources.
-
-    If REQUIRE_GPU=1 is set, missing or unusable GPU will cause pytest to fail
-    immediately with a clear message. Otherwise, warnings are issued but tests
-    continue (allowing CPU-only test runs).
-    """
-    import warnings
-
-    if os.getenv("SKIP_GPU_WARMUP", "0") == "1":
-        print("[gpu-warmup] skipping GPU warm-up (SKIP_GPU_WARMUP=1)")
-        return
-
-    require_gpu = os.getenv("REQUIRE_GPU", "0") == "1"
-
-    torch_ok, torch_msg = _torch_smoke()
-    faiss_ok, faiss_msg = _faiss_smoke()
-
-    # Print helpful diagnostics into pytest output
-    print(f"[gpu-warmup] torch: {torch_msg}")
-    print(f"[gpu-warmup] faiss: {faiss_msg}")
-
-    if require_gpu:
-        problems = []
-        if not torch_ok:
-            problems.append(f"PyTorch GPU not usable: {torch_msg}")
-        if not faiss_ok:
-            problems.append(f"FAISS GPU not usable: {faiss_msg}")
-        if problems:
-            pytest.fail(" | ".join(problems))
-    else:
-        # No hard requirement: warn so you can still run CPU-only tests locally.
-        if not torch_ok:
-            warnings.warn(f"[gpu-warmup] {torch_msg}", stacklevel=2)
-        if not faiss_ok:
-            warnings.warn(f"[gpu-warmup] {faiss_msg}", stacklevel=2)
-
-
 __all__ = [
     "HAS_GPU_STACK",
     "caplog_records",
-    "gpu_warmup_session",
     "load_problem_details_example",
     "problem_details_loader",
     "pytest_plugins",

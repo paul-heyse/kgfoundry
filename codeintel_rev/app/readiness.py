@@ -52,7 +52,6 @@ from urllib.parse import urlparse
 
 from codeintel_rev._lazy_imports import LazyModule
 from codeintel_rev.app.config_context import ApplicationContext
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     import duckdb
@@ -61,7 +60,6 @@ else:
     duckdb = cast("duckdb", LazyModule("duckdb", "Readiness DuckDB checks"))
     httpx = cast("httpx", LazyModule("httpx", "Readiness HTTP checks"))
 
-LOGGER = get_logger(__name__)
 HTTP_HEALTH_TIMEOUT_S = 2.0
 _EMBED_BATCH_RANK = 2
 _EMBED_BATCH_MIN_ROWS = 1

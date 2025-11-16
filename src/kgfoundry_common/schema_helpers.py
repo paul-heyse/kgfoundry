@@ -49,7 +49,6 @@ __all__ = [
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
 
-
 # [nav:anchor load_schema]
 def load_schema(schema_path: Path) -> dict[str, JsonValue]:
     """Load and parse a JSON Schema file.

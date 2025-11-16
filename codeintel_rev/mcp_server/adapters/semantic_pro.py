@@ -35,7 +35,6 @@ from codeintel_rev.retrieval.types import (
     StageSignals,
 )
 from kgfoundry_common.errors import EmbeddingError, VectorSearchError
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
@@ -45,7 +44,6 @@ if TYPE_CHECKING:
 SNIPPET_PREVIEW_CHARS = 500
 COMPONENT_NAME = "codeintel_mcp"
 RERANK_STAGE_NAME = "coderank_llm"
-LOGGER = get_logger(__name__)
 
 
 class RerankOptionPayload(TypedDict, total=False):
@@ -222,10 +220,6 @@ def build_runtime_options(
         try:
             parsed_xtr_k = int(xtr_k_value)
         except (TypeError, ValueError):
-            LOGGER.warning(
-                "Ignoring non-numeric xtr_k override",
-                extra={"value": xtr_k_value},
-            )
     rerank_payload = options.get("rerank")
     rerank_runtime = None
     if isinstance(rerank_payload, dict):
@@ -367,20 +361,8 @@ def _semantic_search_pro_sync(
     run_state = _SemanticProRunState.from_limit(limit)
 
     def _finish(findings_count: int, envelope: AnswerEnvelope) -> AnswerEnvelope:
-        LOGGER.info(
-            "semantic_pro.finish",
-            extra={"limit": limit, "results": findings_count},
-        )
         return envelope
 
-    LOGGER.info(
-        "semantic_pro.start",
-        extra={
-            "limit": limit,
-            "scope_filters": bool(scope),
-            "options": _summarize_options(options),
-        },
-    )
     try:
         run_state.effective_limit = _clamp_limit(
             limit,
@@ -396,18 +378,6 @@ def _semantic_search_pro_sync(
         run_state.coderank_fanout = max(
             run_state.effective_limit,
             run_state.effective_limit * context.settings.limits.semantic_overfetch_multiplier,
-        )
-        LOGGER.debug(
-            "semantic_pro.plan",
-            extra={
-                "limit": limit,
-                "effective_limit": run_state.effective_limit,
-                "scope_filters": bool(scope),
-                "use_warp": options.use_warp,
-                "use_reranker": options.use_reranker,
-                "wide_search": bool(run_state.wide_handle),
-                "coderank_fanout": run_state.coderank_fanout,
-            },
         )
         coderank_hits = _run_coderank_stage(
             context=context,
@@ -473,10 +443,6 @@ def _semantic_search_pro_sync(
                     scope=scope,
                 ),
             )
-            LOGGER.info(
-                "semantic_pro.empty",
-                extra={"query": query, "effective_limit": run_state.effective_limit},
-            )
             return _finish(
                 0,
                 empty_envelope,
@@ -501,15 +467,6 @@ def _semantic_search_pro_sync(
             annotations=hydration_result.annotations,
         )
         merge_explainability_into_findings(findings, warp_outcome.explainability)
-        LOGGER.info(
-            "semantic_pro.results",
-            extra={
-                "query": query,
-                "results": len(findings),
-                "channels": list(fused.channels),
-                "effective_limit": run_state.effective_limit,
-            },
-        )
         success_envelope = _make_envelope(
             answer=f"Found {len(findings)} semantic_pro results for: {query}",
             findings=findings,
@@ -535,10 +492,6 @@ def _semantic_search_pro_sync(
         )
         return _finish(len(findings), success_envelope)
     except Exception:
-        LOGGER.exception(
-            "semantic_pro.failed",
-            extra={"limit": limit, "query": query},
-        )
         raise
 
 
@@ -556,10 +509,6 @@ def _run_coderank_stage(
         )
 
     try:
-        LOGGER.debug(
-            "semantic_pro.embed.start",
-            extra={"component": "retrieval", "stage": "coderank.embed"},
-        )
         query_vec = context.vllm_client.embed_batch([query])
     except Exception as exc:
         msg = f"CodeRank embedding failed: {exc}"
@@ -578,13 +527,6 @@ def _run_coderank_stage(
         raise VectorSearchError(msg, cause=exc) from exc
 
     try:
-        LOGGER.debug(
-            "semantic_pro.coderank.faiss",
-            extra={
-                "fanout": fanout,
-                "nprobe": context.settings.index.faiss_nprobe,
-            },
-        )
         distances, ids = faiss_mgr.search(
             query_vec,
             k=max(1, int(fanout)),
@@ -636,25 +578,13 @@ def _should_execute_stage_two(
     notes: list[str] = []
     if not candidates:
         notes.append("No CodeRank candidates; skipping Stage-B.")
-        LOGGER.info(
-            "semantic_pro.warp.skip",
-            extra={"reason": "no_candidates", "candidates": len(candidates)},
-        )
         return False, notes
     if not options.use_warp:
         notes.append("Stage-B disabled via request option.")
-        LOGGER.info(
-            "semantic_pro.warp.skip",
-            extra={"reason": "disabled_option"},
-        )
         return False, notes
     stage_available = context.settings.warp.enabled or context.settings.xtr.enable
     if not stage_available:
         notes.append("WARP/XTR disabled via configuration flag.")
-        LOGGER.info(
-            "semantic_pro.warp.skip",
-            extra={"reason": "disabled_config"},
-        )
         return False, notes
     signals = StageSignals(
         candidate_count=len(candidates),
@@ -671,10 +601,6 @@ def _should_execute_stage_two(
     if not decision.should_run:
         notes.append(f"Stage-B gating: {decision.reason}")
         notes.extend(decision.notes)
-        LOGGER.info(
-            "semantic_pro.warp.skip",
-            extra={"reason": decision.reason},
-        )
         return False, notes
     return True, notes
 
@@ -687,10 +613,6 @@ def _execute_stage_two(
     options: SemanticProRuntimeOptions,
     base_notes: list[str],
 ) -> WarpOutcome:
-    LOGGER.debug(
-        "semantic_pro.warp.stage_two",
-        extra={"candidates": len(candidates), "use_warp": options.use_warp},
-    )
     hits, warp_notes, explain_payload, channel = _run_warp_stage(
         context=context,
         query=query,
@@ -717,13 +639,6 @@ def _run_fusion_stage(
         request.effective_limit * context.settings.limits.semantic_overfetch_multiplier,
     )
     extra_channels = _build_extra_channels(request.warp_hits, request.warp_channel)
-    LOGGER.debug(
-        "semantic_pro.fusion",
-        extra={
-            "limit": total_limit,
-            "channels": list((extra_channels or {}).keys()) or ["semantic"],
-        },
-    )
     return engine.search(
         request.query,
         semantic_hits=request.coderank_hits,
@@ -751,19 +666,11 @@ def _maybe_apply_rerank_stage(
     }
     if not plan.enabled:
         metadata["reason"] = plan.reason or "disabled"
-        LOGGER.info(
-            "semantic_pro.rerank.skip",
-            extra={"reason": metadata["reason"]},
-        )
         return fused, metadata
 
     reranker = _resolve_reranker(context, plan.provider)
     if reranker is None:
         metadata["reason"] = "capability_off"
-        LOGGER.info(
-            "semantic_pro.rerank.skip",
-            extra={"reason": "capability_off"},
-        )
         return fused, metadata
 
     scored_docs = [
@@ -771,10 +678,6 @@ def _maybe_apply_rerank_stage(
     ]
     if not scored_docs:
         metadata["reason"] = "no_candidates"
-        LOGGER.info(
-            "semantic_pro.rerank.skip",
-            extra={"reason": "no_candidates"},
-        )
         return fused, metadata
 
     effective_top_k = min(plan.top_k, len(scored_docs))
@@ -785,14 +688,6 @@ def _maybe_apply_rerank_stage(
             "top_k": effective_top_k,
         }
     )
-    LOGGER.debug(
-        "semantic_pro.rerank.start",
-        extra={"provider": plan.provider, "top_k": effective_top_k},
-    )
-    LOGGER.debug(
-        "semantic_pro.rerank.execute",
-        extra={"provider": plan.provider, "top_k": effective_top_k},
-    )
     results = reranker.rescore(
         RerankRequest(
             query=query,
@@ -800,10 +695,6 @@ def _maybe_apply_rerank_stage(
             top_k=effective_top_k,
             explain=plan.explain,
         )
-    )
-    LOGGER.debug(
-        "semantic_pro.rerank.end",
-        extra={"provider": plan.provider, "returned": len(results)},
     )
     reordered = _reorder_docs(fused, results)
     metadata["reordered"] = reordered.changes
@@ -907,10 +798,6 @@ def _maybe_schedule_xtr_wide(
     try:
         index = context.get_xtr_index()
     except RuntimeUnavailableError as exc:
-        LOGGER.info(
-            "XTR wide-stage unavailable",
-            extra={"detail": exc.context.get("detail") if hasattr(exc, "context") else str(exc)},
-        )
         return None
     if index is None or not index.ready:
         return None
@@ -982,11 +869,7 @@ def _resolve_stage_one_outcome(plan: StageOnePlan) -> WarpOutcome:
         wide_future, wide_executor = wide_handle
         try:
             outcome = wide_future.result()
-        except (RuntimeError, ValueError, OSError) as exc:  # pragma: no cover - defensive logging
-            LOGGER.warning(
-                "XTR wide search failed; falling back to narrow mode.",
-                extra={"error": str(exc)},
-            )
+        except (RuntimeError, ValueError, OSError) as exc:  # pragma: no cover - defensive path
         else:
             outcome.notes.extend(base_notes)
             return outcome
@@ -1067,10 +950,6 @@ def _merge_rrf_weights(
         try:
             weights[channel] = float(raw_value)
         except (TypeError, ValueError):
-            LOGGER.warning(
-                "Ignoring non-numeric stage weight override",
-                extra={"channel": channel, "value": raw_value},
-            )
     return weights
 
 
@@ -1116,13 +995,6 @@ def _warp_executor_hits(
         return None, notes
 
     try:
-        LOGGER.debug(
-            "semantic_pro.warp.rerank",
-            extra={
-                "top_k": min(cfg.top_k, len(candidates)),
-                "candidates": len(candidates),
-            },
-        )
         hits = warp_engine.rerank(
             query=query,
             candidate_ids=[cid for cid, _ in candidates],
@@ -1164,10 +1036,6 @@ def _xtr_rescore_hits(
         notes.append("Insufficient candidates for XTR rescoring.")
         return [], notes, explain_payload
 
-    LOGGER.debug(
-        "semantic_pro.xtr.rescore",
-        extra={"candidates": len(candidate_ids), "top_k": limit},
-    )
     rescored = xtr_index.rescore(
         query=query,
         candidate_chunk_ids=candidate_ids,
@@ -1262,18 +1130,7 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
     options = plan.options
     ordered_ids = _dedupe_preserve_order([_safe_int(doc.doc_id) for doc in fused.docs])
     requested = len(ordered_ids)
-    LOGGER.debug(
-        "semantic_pro.hydration.start",
-        extra={
-            "requested": requested,
-            "effective_limit": effective_limit,
-        },
-    )
     try:
-        LOGGER.debug(
-            "semantic_pro.hydrate",
-            extra={"requested": requested, "effective_limit": effective_limit},
-        )
         records, annotations = _hydrate_records(
             context=context,
             chunk_ids=ordered_ids[
@@ -1282,42 +1139,15 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
             scope=plan.scope,
         )
     except (RuntimeError, OSError) as exc:
-        LOGGER.debug(
-            "semantic_pro.hydration.end",
-            extra={
-                "status": "error",
-                "error": str(exc),
-                "requested": requested,
-                "returned": 0,
-                "missing": requested,
-            },
-        )
         msg = "DuckDB hydration failed"
         raise VectorSearchError(msg, cause=exc) from exc
     else:
         returned = len(records)
-        LOGGER.debug(
-            "semantic_pro.hydration.end",
-            extra={
-                "requested": requested,
-                "returned": returned,
-                "missing": max(requested - returned, 0),
-                "effective_limit": effective_limit,
-            },
-        )
 
     rerank_decision = _rerank_gate_decision(options, context.settings.coderank_llm, records)
     if not rerank_decision.should_run:
-        LOGGER.info(
-            "semantic_pro.llm_rerank.skip",
-            extra={"reason": rerank_decision.reason, "records": len(records)},
-        )
         records = records[:effective_limit]
     else:
-        LOGGER.debug(
-            "semantic_pro.llm_rerank.execute",
-            extra={"records": len(records), "top_k": effective_limit},
-        )
         records = _maybe_rerank(
             query=plan.query,
             records=records,
@@ -1325,10 +1155,6 @@ def _hydrate_and_rerank_records(plan: HydrationPlan) -> HydrationOutcome:
             enabled=True,
         )
         records = records[:effective_limit]
-        LOGGER.info(
-            "semantic_pro.llm_rerank.complete",
-            extra={"records": len(records)},
-        )
 
     return HydrationOutcome(records=records, annotations=annotations)
 
@@ -1366,10 +1192,6 @@ def _maybe_rerank(
     try:
         ordered_ids = reranker.rerank(query, payload)
     except RuntimeError as exc:
-        LOGGER.warning(
-            "CodeRank reranker failed; continuing without rerank.",
-            extra={"error": str(exc)},
-        )
         return records
 
     by_id = {int(record["id"]): record for record in records if "id" in record}

@@ -39,6 +39,7 @@ from kgfoundry_common.navmap_loader import load_nav_metadata
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+
 def _load_cloudpickle_dumps() -> Callable[[object], bytes] | None:
     """Load cloudpickle.dumps function if available.
 

@@ -23,7 +23,7 @@ Examples
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Final
 
 from kgfoundry_common.errors import IndexBuildError
@@ -46,6 +46,7 @@ DEFAULT_NPROBE: Final[int] = 64
 VALID_METRICS: Final[set[str]] = {"ip", "l2"}
 """Valid metric types for FAISS indexes."""
 
+
 @dataclass(frozen=True, slots=True)
 # [nav:anchor FaissAdapterSettings]
 class FaissAdapterSettings:
@@ -67,12 +68,10 @@ class FaissAdapterSettings:
         Similarity metric (``"ip"`` or ``"l2"``).
     nprobe : int
         IVF search parameter ``nprobe``.
-    use_gpu : bool
-        Enable GPU acceleration flag.
-    use_cuvs : bool
-        Enable cuVS acceleration flag.
-    gpu_devices : tuple[int, ...]
-        GPU device identifiers.
+    ef_search : int | None
+        Optional HNSW ``efSearch`` override.
+    quantizer_ef_search : int | None
+        Optional ``quantizer_efSearch`` override (useful when IVF uses HNSW quantizer).
     timeout_seconds : int
         Build timeout in seconds.
 
@@ -107,21 +106,10 @@ class FaissAdapterSettings:
 
     Alias: none; name ``nprobe``.
     """
-    use_gpu: bool = True
-    """Enable GPU acceleration flag.
-
-    Alias: none; name ``use_gpu``.
-    """
-    use_cuvs: bool = True
-    """Enable cuVS acceleration flag.
-
-    Alias: none; name ``use_cuvs``.
-    """
-    gpu_devices: tuple[int, ...] = field(default_factory=lambda: (0,))
-    """GPU device identifiers.
-
-    Alias: none; name ``gpu_devices``.
-    """
+    ef_search: int | None = None
+    """Optional HNSW ``efSearch`` override."""
+    quantizer_ef_search: int | None = None
+    """Optional ``quantizer_efSearch`` override for IVF-HNSW quantizers."""
     timeout_seconds: int = DEFAULT_INDEX_TIMEOUT_SECONDS
     """Build timeout in seconds.
 
@@ -182,9 +170,8 @@ class FaissVectorstoreFactory:
                 factory=self.settings.factory,
                 metric=self.settings.metric,
                 nprobe=self.settings.nprobe,
-                use_gpu=self.settings.use_gpu,
-                use_cuvs=self.settings.use_cuvs,
-                gpu_devices=list(self.settings.gpu_devices),
+                ef_search=self.settings.ef_search,
+                quantizer_ef_search=self.settings.quantizer_ef_search,
             )
         except Exception as exc:
             msg = f"Failed to construct FAISS adapter: {exc}"
@@ -244,15 +231,12 @@ class FaissVectorstoreFactory:
         """
         adapter = self.build_adapter()
 
-        start_time = time.monotonic()
-
         try:
             adapter.load_or_build(cpu_index_path=cpu_index_path)
         except Exception as exc:
             msg = f"Failed to load or build FAISS index: {exc}"
             raise IndexBuildError(msg) from exc
 
-        elapsed = time.monotonic() - start_time
         return adapter
 
     @staticmethod

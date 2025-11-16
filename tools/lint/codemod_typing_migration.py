@@ -15,12 +15,14 @@ from typing import cast, override
 
 import libcst as cst
 
+from tools._libcst_mixins import CallTransformerMixin, ImportFromTransformerMixin
+
 logger = logging.getLogger(__name__)
 
 MIN_MODULE_PARTS = 2
 
 
-class TypingFacadeMigrator(cst.CSTTransformer):
+class TypingFacadeMigrator(ImportFromTransformerMixin, CallTransformerMixin, cst.CSTTransformer):
     """Migrate typing imports to use façades instead of private modules.
 
     Notes
@@ -139,7 +141,7 @@ class TypingFacadeMigrator(cst.CSTTransformer):
         return result
 
     @override
-    def leave_ImportFrom(
+    def leave_import_from(
         self, original_node: cst.ImportFrom, updated_node: cst.ImportFrom
     ) -> cst.ImportFrom | cst.RemovalSentinel | cst.FlattenSentinel[cst.BaseSmallStatement]:
         """Rewrite ``ImportFrom`` statements using docstring façade rules.
@@ -160,7 +162,7 @@ class TypingFacadeMigrator(cst.CSTTransformer):
         return self._transform_import_from(updated_node)
 
     @override
-    def leave_Call(self, original_node: cst.Call, updated_node: cst.Call) -> cst.Call:
+    def leave_call(self, original_node: cst.Call, updated_node: cst.Call) -> cst.Call:
         """Rewrite shim calls such as ``resolve_numpy`` to ``gate_import``.
 
         Parameters

@@ -171,9 +171,6 @@ def mock_application_context(tmp_path: Path) -> ApplicationContext:
         dtype=np.float32,
     )
     faiss_manager = MagicMock(spec=FAISSManager)
-    faiss_manager.gpu_index = None
-    faiss_manager.gpu_disabled_reason = None
-    faiss_manager.clone_to_gpu.return_value = False
     git_client = MagicMock(spec=GitClient)
     async_git_client = AsyncMock(spec=AsyncGitClient)
     async_git_client.blame_range.return_value = [

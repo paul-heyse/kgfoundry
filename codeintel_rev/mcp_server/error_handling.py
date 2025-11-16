@@ -54,7 +54,6 @@ Error envelope structure:
 from __future__ import annotations
 
 import inspect
-import traceback
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from functools import wraps
@@ -66,14 +65,10 @@ from codeintel_rev.app.config_context import ApplicationContext
 from codeintel_rev.errors import PathNotDirectoryError, PathNotFoundError
 from codeintel_rev.io.path_utils import PathOutsideRepositoryError
 from kgfoundry_common.errors import KgFoundryError
-from kgfoundry_common.logging import get_logger, with_fields
 from kgfoundry_common.problem_details import build_problem_details
 
 if TYPE_CHECKING:
     from kgfoundry_common.problem_details import ProblemDetails
-
-LOGGER = get_logger(__name__)
-COMPONENT_NAME = "codeintel_mcp"
 
 F = TypeVar("F", bound=Callable[..., object])
 
@@ -328,102 +323,13 @@ def convert_exception_to_envelope(
     problem = cast("ProblemDetails", response["problem"])
     status = cast("int", response["status"])
 
-    if isinstance(exc, KgFoundryError):
-        kg_exc = exc
-        with with_fields(
-            LOGGER,
-            component=COMPONENT_NAME,
-            operation=operation,
-            error_code=kg_exc.code.value,
-        ) as adapter:
-            adapter.log(kg_exc.log_level, kg_exc.message, extra={"context": kg_exc.context})
-    elif isinstance(exc, PathNotDirectoryError):
-        LOGGER.warning(
-            "Path not directory",
-            extra={
-                "component": COMPONENT_NAME,
-                "operation": operation,
-                "error": str(exc),
-            },
-        )
-    elif isinstance(exc, (PathNotFoundError, FileNotFoundError)):
-        LOGGER.warning(
-            "Path not found",
-            extra={
-                "component": COMPONENT_NAME,
-                "operation": operation,
-                "error": str(exc),
-            },
-        )
-    elif isinstance(exc, PathOutsideRepositoryError):
-        LOGGER.warning(
-            "Path outside repository",
-            extra={
-                "component": COMPONENT_NAME,
-                "operation": operation,
-                "error": str(exc),
-            },
-        )
-    elif isinstance(exc, UnicodeDecodeError):
-        LOGGER.warning(
-            "Encoding error",
-            extra={
-                "component": COMPONENT_NAME,
-                "operation": operation,
-                "encoding": exc.encoding,
-                "reason": exc.reason,
-            },
-        )
-    elif isinstance(exc, ValueError):
-        LOGGER.warning(
-            "Invalid parameter",
-            extra={
-                "component": COMPONENT_NAME,
-                "operation": operation,
-                "error": str(exc),
-            },
-        )
-    elif isinstance(exc, NotImplementedError):
-        LOGGER.error(
-            "Operation not implemented",
-            extra={
-                "component": COMPONENT_NAME,
-                "operation": operation,
-                "error": str(exc),
-            },
-        )
-    elif status >= HTTPStatus.INTERNAL_SERVER_ERROR:
-        LOGGER.error(
-            "Unexpected error",
-            extra={
-                "component": COMPONENT_NAME,
-                "operation": operation,
-                "exception_type": type(exc).__name__,
-            },
-        )
-
     # Build envelope: empty result fields + error + problem
-    _record_exception_event(exc, operation)
     envelope = dict(empty_result)
     detail = problem.get("detail", str(exc))
     envelope["error"] = detail
     envelope["problem"] = problem
 
     return envelope
-
-
-def _record_exception_event(exc: BaseException, operation: str) -> None:
-    """Log adapter errors with structured context."""
-    stack = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
-    LOGGER.error(
-        "adapter.exception",
-        extra={
-            "operation": operation,
-            "exception_type": type(exc).__name__,
-            "exception_message": str(exc),
-            "exception_stacktrace": stack[-2048:] if stack else None,
-        },
-    )
 
 
 def handle_adapter_errors(

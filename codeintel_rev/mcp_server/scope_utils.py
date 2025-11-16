@@ -55,13 +55,9 @@ from __future__ import annotations
 import fnmatch
 from typing import TYPE_CHECKING
 
-from kgfoundry_common.logging import get_logger
-
 if TYPE_CHECKING:
     from codeintel_rev.app.config_context import ApplicationContext
     from codeintel_rev.mcp_server.schemas import ScopeIn
-
-LOGGER = get_logger(__name__)
 
 # Language to file extension mapping
 # Exhaustive list of common programming languages
@@ -379,11 +375,6 @@ def apply_language_filter(
         extensions.update(lang_extensions)
 
     if not extensions:
-        # No known extensions for requested languages
-        LOGGER.warning(
-            "No file extensions found for requested languages",
-            extra={"languages": languages},
-        )
         return []
 
     # Filter paths by extension

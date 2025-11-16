@@ -71,7 +71,7 @@ The design aligns with AGENTS.md: explicit deps, no global state, typed config, 
 
 - File: io/faiss_manager.py
   - Defer `faiss` import to method boundaries (e.g., inside `build_index`, `load_cpu_index`, `search`) and handle ImportError with a clear Problem Details pathway so text/BM25-only deployments can run.
-  - Consider factoring GPU detection and cuVS loading into an injectable strategy for easier testing and CPU-only environments.
+  - Simplify configuration and tests to assume CPU-only execution paths to keep imports lightweight and deterministic.
 
 - File: io/faiss_dual_index.py
   - Overlaps with `FAISSManager` functionality. Consider consolidating into a single manager to avoid maintenance duplication; if kept, clearly document its intended usage and ensure it’s integrated or moved under an experimental namespace.

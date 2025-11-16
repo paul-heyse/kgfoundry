@@ -12,6 +12,8 @@ from codeintel_rev.plugins.channels import Channel, ChannelContext
 from codeintel_rev.plugins.registry import ChannelRegistry
 from codeintel_rev.retrieval.types import SearchHit
 
+from tests._helpers import assertions
+
 
 class _ToyChannel(Channel):
     name = "toy"
@@ -19,7 +21,7 @@ class _ToyChannel(Channel):
     requires = frozenset()
 
     def search(self, query: str, limit: int) -> Sequence[SearchHit]:
-        assert query
+        assertions.expect_true(bool(query), reason="query should be non-empty")
         _ = limit
         return [SearchHit(doc_id="1", rank=0, score=1.0, source="toy")]
 
@@ -35,7 +37,7 @@ class _FakeEntryPoint:
 
 def test_registry_discovers_entry_points(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_entry_points(*, group: str) -> list[_FakeEntryPoint]:
-        assert group == "codeintel_rev.channels"
+        assertions.expect_equal(group, "codeintel_rev.channels")
 
         def _factory(_: ChannelContext) -> _ToyChannel:
             return _ToyChannel()
@@ -50,5 +52,5 @@ def test_registry_discovers_entry_points(monkeypatch: pytest.MonkeyPatch) -> Non
     )
     registry = ChannelRegistry.discover(context)
     channels = registry.channels()
-    assert len(channels) == 1
-    assert channels[0].name == "toy"
+    assertions.expect_equal(len(channels), 1)
+    assertions.expect_equal(channels[0].name, "toy")

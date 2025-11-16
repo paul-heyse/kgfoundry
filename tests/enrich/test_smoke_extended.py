@@ -12,7 +12,7 @@ from typing import Any
 from codeintel_rev.cli_enrich import app
 from typer.testing import CliRunner
 
-from tests._helpers import run_process
+from tests._helpers import assertions, run_process
 
 
 def _git_env() -> dict[str, str]:
@@ -141,46 +141,65 @@ def _assert_duckdb_ingest(
         ],
         catch_exceptions=False,
     )
-    assert result.exit_code == 0, result.output
+    assertions.expect_equal(result.exit_code, 0, reason=result.output)
     import duckdb
 
     with duckdb.connect(str(db_path)) as con:
         result_row = con.execute("SELECT COUNT(*) FROM modules").fetchone()
-    assert result_row is not None
+    assertions.expect_true(result_row is not None, reason="query should return a result")
     (count,) = result_row
-    assert count == expected_count
+    assertions.expect_equal(count, expected_count)
 
 
 def _assert_artifacts(out_dir: Path, module_rows: list[dict[str, object]]) -> None:
     alpha_row = next(row for row in module_rows if str(row.get("path", "")).endswith("alpha.py"))
-    assert alpha_row["owner"] == "@alpha-owner"
-    assert alpha_row["primary_authors"]
-    assert alpha_row.get("stable_id")
-    assert str(alpha_row.get("repo_path", "")).endswith("pkg/alpha.py")
-    assert str(alpha_row.get("path", "")).endswith("alpha.py")
-    assert "recent_churn_30" in alpha_row
+    assertions.expect_equal(alpha_row["owner"], "@alpha-owner")
+    assertions.expect_true(bool(alpha_row["primary_authors"]), reason="should have primary authors")
+    assertions.expect_true(alpha_row.get("stable_id") is not None, reason="should have stable_id")
+    assertions.expect_true(
+        str(alpha_row.get("repo_path", "")).endswith("pkg/alpha.py"),
+        reason="repo_path should end with pkg/alpha.py",
+    )
+    assertions.expect_true(
+        str(alpha_row.get("path", "")).endswith("alpha.py"), reason="path should end with alpha.py"
+    )
+    assertions.expect_in("recent_churn_30", alpha_row)
 
     repo_map = json.loads((out_dir / "repo_map.json").read_text(encoding="utf-8"))
-    assert repo_map["module_count"] == len(module_rows)
-    assert repo_map["tag_counts"]
+    assertions.expect_equal(repo_map["module_count"], len(module_rows))
+    assertions.expect_true(bool(repo_map["tag_counts"]), reason="should have tag_counts")
 
     ownership_parquet = out_dir / "analytics" / "ownership.parquet"
     fallback_jsonl = ownership_parquet.with_suffix(".parquet.jsonl")
-    assert ownership_parquet.exists() or fallback_jsonl.exists()
+    assertions.expect_true(
+        ownership_parquet.exists() or fallback_jsonl.exists(),
+        reason="ownership parquet or jsonl should exist",
+    )
 
     slices_dir = out_dir / "slices"
-    assert (slices_dir / "index.parquet").exists()
+    assertions.expect_true(
+        (slices_dir / "index.parquet").exists(), reason="slices index.parquet should exist"
+    )
     dataset_dir = slices_dir / "index_dataset"
     if dataset_dir.exists():
-        assert any(dataset_dir.rglob("*.parquet"))
+        assertions.expect_true(
+            any(dataset_dir.rglob("*.parquet")), reason="should have parquet files in dataset dir"
+        )
     slices_jsonl = slices_dir / "slices.jsonl"
-    assert slices_jsonl.exists()
+    assertions.expect_true(slices_jsonl.exists(), reason="slices.jsonl should exist")
     slice_records = _read_jsonl(slices_jsonl)
-    assert any(str(record.get("path", "")).endswith("alpha.py") for record in slice_records)
+    assertions.expect_true(
+        any(str(record.get("path", "")).endswith("alpha.py") for record in slice_records),
+        reason="should have alpha.py in slice records",
+    )
 
     graphs_dir = out_dir / "graphs"
-    assert (graphs_dir / "imports.parquet").exists()
-    assert (graphs_dir / "uses.parquet").exists()
+    assertions.expect_true(
+        (graphs_dir / "imports.parquet").exists(), reason="imports.parquet should exist"
+    )
+    assertions.expect_true(
+        (graphs_dir / "uses.parquet").exists(), reason="uses.parquet should exist"
+    )
 
 
 def test_cli_enrich_emits_extended_artifacts(tmp_path: Path) -> None:
@@ -212,10 +231,10 @@ def test_cli_enrich_emits_extended_artifacts(tmp_path: Path) -> None:
         ],
         catch_exceptions=False,
     )
-    assert result.exit_code == 0, result.output
+    assertions.expect_equal(result.exit_code, 0, reason=result.output)
 
     module_rows = _read_jsonl(out_dir / "modules" / "modules.jsonl")
-    assert module_rows
+    assertions.expect_true(bool(module_rows), reason="should have module rows")
     _assert_artifacts(out_dir, module_rows)
 
     try:

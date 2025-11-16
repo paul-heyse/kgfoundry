@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-import sys
-import types
 from pathlib import Path
 from typing import Any
 
@@ -13,15 +11,22 @@ import pytest
 from codeintel_rev.config.settings import IndexConfig
 from codeintel_rev.io.faiss_dual_index import FAISSDualIndexManager, IndexManifest
 
+from tests._helpers import assertions
 from tests.conftest import FAISS_MODULE, HAS_FAISS_SUPPORT
 
 if not HAS_FAISS_SUPPORT:  # pragma: no cover - gated on FAISS availability
     pytest.skip("FAISS bindings unavailable; skipping dual-index tests", allow_module_level=True)
 
-assert FAISS_MODULE is not None
+assertions.expect_true(
+    FAISS_MODULE is not None,
+    reason="FAISS_MODULE should be available when HAS_FAISS_SUPPORT is True",
+)
 faiss_module: Any = FAISS_MODULE
 
 _rng = np.random.default_rng(1234)
+
+# Test constants
+_MIN_SIMILARITY_SCORE = 0.9
 
 
 def _sample_manifest() -> IndexManifest:
@@ -70,8 +75,8 @@ def _build_flat_index(vec_dim: int, count: int) -> Any:
 
 
 @pytest.mark.asyncio
-async def test_ensure_ready_loads_indexes_without_gpu(tmp_path: Path) -> None:
-    """Primary index loads, secondary auto-creates, and manifest is attached."""
+async def test_ensure_ready_loads_indexes_cpu_only(tmp_path: Path) -> None:
+    """Primary index loads, secondary auto-creates, and manifest is attached for CPU use."""
     vec_dim = 16
     primary = _build_flat_index(vec_dim, 8)
     faiss_module.write_index(primary, str(tmp_path / "primary.faiss"))
@@ -79,18 +84,22 @@ async def test_ensure_ready_loads_indexes_without_gpu(tmp_path: Path) -> None:
     manifest = _sample_manifest()
     manifest.to_file(tmp_path / "primary.manifest.json")
 
-    settings = IndexConfig(vec_dim=vec_dim, use_cuvs=True)
+    settings = IndexConfig(vec_dim=vec_dim, use_cuvs=False)
     manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
 
     ready, reason = await manager.ensure_ready()
 
-    assert ready is True
-    assert manager.primary_index is not None
-    assert manager.primary_index.d == vec_dim
-    assert manager.secondary_index is not None
-    assert manager.secondary_index.ntotal == 0
-    assert manager.manifest == manifest
-    assert manager.gpu_enabled is (reason is None)
+    assertions.expect_true(ready, reason="manager should be ready")
+    assertions.expect_true(manager.primary_index is not None, reason="primary index should exist")
+    if manager.primary_index is not None:
+        assertions.expect_equal(manager.primary_index.d, vec_dim)
+    assertions.expect_true(
+        manager.secondary_index is not None, reason="secondary index should exist"
+    )
+    if manager.secondary_index is not None:
+        assertions.expect_equal(manager.secondary_index.ntotal, 0)
+    assertions.expect_equal(manager.manifest, manifest)
+    assertions.expect_false(manager.gpu_enabled)
 
 
 @pytest.mark.asyncio
@@ -102,10 +111,12 @@ async def test_ensure_ready_missing_primary(tmp_path: Path) -> None:
 
     ready, reason = await manager.ensure_ready()
 
-    assert ready is False
-    assert reason == "Primary index not found"
-    assert manager.primary_index is None
-    assert manager.secondary_index is None
+    assertions.expect_false(
+        ready, reason="manager should not be ready when primary index is missing"
+    )
+    assertions.expect_equal(reason, "Primary index not found")
+    assertions.expect_equal(manager.primary_index, None)
+    assertions.expect_equal(manager.secondary_index, None)
 
 
 @pytest.mark.asyncio
@@ -120,8 +131,8 @@ async def test_ensure_ready_dimension_mismatch(tmp_path: Path) -> None:
 
     ready, reason = await manager.ensure_ready()
 
-    assert ready is False
-    assert "Dimension mismatch" in str(reason)
+    assertions.expect_false(ready, reason="manager should not be ready when dimension mismatch")
+    assertions.expect_in("Dimension mismatch", str(reason))
 
 
 def test_manifest_round_trip(tmp_path: Path) -> None:
@@ -132,7 +143,7 @@ def test_manifest_round_trip(tmp_path: Path) -> None:
 
     loaded = IndexManifest.from_file(path)
 
-    assert loaded == manifest
+    assertions.expect_equal(loaded, manifest)
 
 
 def test_manifest_optional_fields(tmp_path: Path) -> None:
@@ -156,10 +167,10 @@ def test_manifest_optional_fields(tmp_path: Path) -> None:
 
     loaded = IndexManifest.from_file(path)
 
-    assert loaded.index_type == "IVFPQ"
-    assert loaded.nlist == 4096
-    assert loaded.pq_m == 32
-    assert loaded.cuvs_version == "1.0.0"
+    assertions.expect_equal(loaded.index_type, "IVFPQ")
+    assertions.expect_equal(loaded.nlist, 4096)
+    assertions.expect_equal(loaded.pq_m, 32)
+    assertions.expect_equal(loaded.cuvs_version, "1.0.0")
 
 
 def test_manifest_invalid_payload(tmp_path: Path) -> None:
@@ -181,53 +192,6 @@ def test_manifest_missing_required_fields(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_gpu_secondary_clone_reuses_cloner_options(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """GPU cloning shares cloner options across primary and secondary indexes."""
-    vec_dim = 8
-    primary = _build_flat_index(vec_dim, 4)
-    secondary = faiss_module.IndexIDMap2(faiss_module.IndexFlatIP(vec_dim))
-
-    settings = IndexConfig(vec_dim=vec_dim, use_cuvs=True)
-    manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
-    manager.set_test_indexes(primary, secondary)
-
-    class TorchStub(types.ModuleType):
-        """Minimal torch stub exposing the cuda helper used by FAISS."""
-
-        cuda: types.SimpleNamespace
-
-        def __init__(self) -> None:
-            super().__init__("torch")
-            self.cuda = types.SimpleNamespace(is_available=lambda: True)
-
-    torch_stub = TorchStub()
-    monkeypatch.setitem(sys.modules, "torch", torch_stub)
-
-    captured: list[Any] = []
-
-    def fake_index_cpu_to_gpu(
-        _resources: Any, _device: int, _index: Any, options: Any | None = None
-    ) -> object:
-        captured.append(options)
-        return object()
-
-    monkeypatch.setattr(
-        faiss_module,
-        "index_cpu_to_gpu",
-        fake_index_cpu_to_gpu,
-        raising=False,
-    )
-
-    await manager.try_gpu_clone(faiss_module)
-
-    assert len(captured) == 2
-    assert captured[0] is captured[1]
-    assert getattr(captured[0], "use_cuvs", False) is True
-
-
-@pytest.mark.asyncio
 async def test_search_primary_only(tmp_path: Path) -> None:
     """Search returns primary results when no secondary index exists."""
     vec_dim = 8
@@ -241,15 +205,15 @@ async def test_search_primary_only(tmp_path: Path) -> None:
     settings = IndexConfig(vec_dim=vec_dim, use_cuvs=False)
     manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
     ready, _ = await manager.ensure_ready()
-    assert ready is True
+    assertions.expect_true(ready, reason="manager should be ready")
 
     query = primary_vectors[1]
     results = manager.search(query, k=3)
 
-    assert results
+    assertions.expect_true(bool(results), reason="search should return results")
     top_id, top_score = results[0]
-    assert top_id == 1
-    assert top_score > 0.9
+    assertions.expect_equal(top_id, 1)
+    assertions.expect_true(top_score > _MIN_SIMILARITY_SCORE, reason="top score should be high")
 
 
 @pytest.mark.asyncio
@@ -270,14 +234,14 @@ async def test_search_merges_secondary(tmp_path: Path) -> None:
     settings = IndexConfig(vec_dim=vec_dim, use_cuvs=False)
     manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
     ready, _ = await manager.ensure_ready()
-    assert ready is True
+    assertions.expect_true(ready, reason="manager should be ready")
 
     query = base_vectors[2]
     results = manager.search(query, k=2)
 
-    assert results
-    assert results[0][0] == 99
-    assert results[0][1] > 0.9
+    assertions.expect_true(bool(results), reason="search should return results")
+    assertions.expect_equal(results[0][0], 99)
+    assertions.expect_true(results[0][1] > _MIN_SIMILARITY_SCORE, reason="top score should be high")
 
 
 @pytest.mark.asyncio
@@ -290,7 +254,7 @@ async def test_add_incremental_persists_secondary(tmp_path: Path) -> None:
     settings = IndexConfig(vec_dim=vec_dim, use_cuvs=False)
     manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
     ready, _ = await manager.ensure_ready()
-    assert ready is True
+    assertions.expect_true(ready, reason="manager should be ready")
 
     rng = np.random.default_rng(42)
     new_vectors = rng.standard_normal((1, vec_dim)).astype(np.float32)
@@ -299,14 +263,17 @@ async def test_add_incremental_persists_secondary(tmp_path: Path) -> None:
 
     await manager.add_incremental(new_vectors, new_ids)
 
-    assert manager.secondary_index is not None
-    assert manager.secondary_index.ntotal == 1
+    assertions.expect_true(
+        manager.secondary_index is not None, reason="secondary index should exist"
+    )
+    if manager.secondary_index is not None:
+        assertions.expect_equal(manager.secondary_index.ntotal, 1)
 
     persisted = faiss_module.read_index(str(tmp_path / "secondary.faiss"))
-    assert persisted.ntotal == 1
+    assertions.expect_equal(persisted.ntotal, 1)
 
     hits = manager.search(new_vectors[0], k=1)
-    assert hits[0][0] == 9999
+    assertions.expect_equal(hits[0][0], 9999)
 
 
 @pytest.mark.asyncio
@@ -319,7 +286,7 @@ async def test_add_incremental_dimension_mismatch(tmp_path: Path) -> None:
     settings = IndexConfig(vec_dim=vec_dim, use_cuvs=False)
     manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
     ready, _ = await manager.ensure_ready()
-    assert ready is True
+    assertions.expect_true(ready, reason="manager should be ready")
 
     bad_vectors = np.ones((1, vec_dim + 1), dtype=np.float32)
     with pytest.raises(ValueError, match="Vector dimension"):
@@ -336,15 +303,21 @@ async def test_needs_compaction_threshold(tmp_path: Path) -> None:
     settings = IndexConfig(vec_dim=vec_dim, use_cuvs=False, compaction_threshold=0.05)
     manager = FAISSDualIndexManager(tmp_path, settings, vec_dim)
     ready, _ = await manager.ensure_ready()
-    assert ready is True
+    assertions.expect_true(ready, reason="manager should be ready")
 
-    assert manager.needs_compaction() is False
+    assertions.expect_false(
+        manager.needs_compaction(), reason="should not need compaction initially"
+    )
 
     base_vec = np.eye(vec_dim, dtype=np.float32)
     faiss_module.normalize_L2(base_vec)
 
     await manager.add_incremental(base_vec[0:1], np.array([10_001], dtype=np.int64))
-    assert manager.needs_compaction() is False
+    assertions.expect_false(
+        manager.needs_compaction(), reason="should not need compaction after first add"
+    )
 
     await manager.add_incremental(base_vec[1:2], np.array([10_002], dtype=np.int64))
-    assert manager.needs_compaction() is True
+    assertions.expect_true(
+        manager.needs_compaction(), reason="should need compaction after threshold exceeded"
+    )

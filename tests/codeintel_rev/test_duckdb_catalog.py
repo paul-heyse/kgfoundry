@@ -20,6 +20,8 @@ import pytest
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog, relation_exists
 from codeintel_rev.io.duckdb_manager import DuckDBQueryOptions
 
+from tests._helpers import assertions
+
 ALL_CHUNK_IDS = list(range(1, 12))
 
 
@@ -178,22 +180,25 @@ def test_ensure_struct_views_materializes(tmp_path: Path) -> None:
 
     with duckdb.connect(str(catalog_path)) as connection:
         for view_name in ("modules", "scip_occurrences", "ast_nodes", "cst_nodes"):
-            assert relation_exists(connection, view_name)
-        assert relation_exists(connection, "v_chunk_symbols")
+            assertions.expect_true(
+                relation_exists(connection, view_name), reason=f"{view_name} view should exist"
+            )
+        assertions.expect_true(
+            relation_exists(connection, "v_chunk_symbols"),
+            reason="v_chunk_symbols view should exist",
+        )
         for table_name in (
             "modules_mat",
             "scip_occurrences_mat",
             "ast_nodes_mat",
             "cst_nodes_mat",
         ):
-            assert relation_exists(connection, table_name)
-            row = (
-                connection.table(table_name)
-                .aggregate("count(*) AS row_count")
-                .fetchone()
+            assertions.expect_true(
+                relation_exists(connection, table_name), reason=f"{table_name} table should exist"
             )
-            assert row is not None
-            assert row[0] == 1
+            row = connection.table(table_name).aggregate("count(*) AS row_count").fetchone()
+            assertions.expect_true(row is not None, reason=f"{table_name} should have rows")
+            assertions.expect_equal(row[0], 1)
 
 
 def _write_single_row_parquet(path: Path, select_sql: str) -> None:
@@ -310,16 +315,19 @@ class TestQueryByFiltersIncludeGlobs:
         )
 
         uris = {r["uri"] for r in results}
-        assert uris == {
-            "src/main.py",
-            "src/utils.py",
-            "tests/test_main.py",
-            "tests/test_utils.py",
-            "src/nested/deep/file.py",
-            "lib/legacy.py",
-            "main.py",
-        }
-        assert len(results) == 7
+        assertions.expect_equal(
+            uris,
+            {
+                "src/main.py",
+                "src/utils.py",
+                "tests/test_main.py",
+                "tests/test_utils.py",
+                "src/nested/deep/file.py",
+                "lib/legacy.py",
+                "main.py",
+            },
+        )
+        assertions.expect_equal(len(results), 7)
 
     def test_include_glob_src_prefix(self, test_catalog: DuckDBCatalog) -> None:
         """Test filtering by src/ prefix pattern."""
@@ -329,15 +337,18 @@ class TestQueryByFiltersIncludeGlobs:
         )
 
         uris = {r["uri"] for r in results}
-        assert uris == {
-            "src/main.py",
-            "src/utils.py",
-            "src/app.ts",
-            "src/components/Button.tsx",
-            "src/nested/deep/file.py",
-            "src/config.json",
-        }
-        assert len(results) == 6
+        assertions.expect_equal(
+            uris,
+            {
+                "src/main.py",
+                "src/utils.py",
+                "src/app.ts",
+                "src/components/Button.tsx",
+                "src/nested/deep/file.py",
+                "src/config.json",
+            },
+        )
+        assertions.expect_equal(len(results), 6)
 
     def test_include_glob_simple_suffix(self, test_catalog: DuckDBCatalog) -> None:
         """Test filtering by simple suffix pattern."""
@@ -347,8 +358,8 @@ class TestQueryByFiltersIncludeGlobs:
         )
 
         uris = {r["uri"] for r in results}
-        assert uris == {"src/app.ts"}
-        assert len(results) == 1
+        assertions.expect_equal(uris, {"src/app.ts"})
+        assertions.expect_equal(len(results), 1)
 
     def test_include_glob_multiple_patterns(self, test_catalog: DuckDBCatalog) -> None:
         """Test filtering by multiple include patterns (OR logic)."""
@@ -358,11 +369,11 @@ class TestQueryByFiltersIncludeGlobs:
         )
 
         uris = {r["uri"] for r in results}
-        assert "src/main.py" in uris
-        assert "src/components/Button.tsx" in uris
-        assert "src/app.ts" not in uris  # .ts not .tsx
-        assert "main.py" in uris
-        assert len(results) == 8  # 7 Python + 1 TSX
+        assertions.expect_in("src/main.py", uris)
+        assertions.expect_in("src/components/Button.tsx", uris)
+        assertions.expect_false("src/app.ts" in uris, reason=".ts not .tsx")
+        assertions.expect_in("main.py", uris)
+        assertions.expect_equal(len(results), 8)  # 7 Python + 1 TSX
 
     def test_include_glob_empty_list(self, test_catalog: DuckDBCatalog) -> None:
         """Test that empty include globs means include all."""
@@ -371,9 +382,9 @@ class TestQueryByFiltersIncludeGlobs:
             include_globs=[],
         )
 
-        assert len(results) == 3
+        assertions.expect_equal(len(results), 3)
         uris = {r["uri"] for r in results}
-        assert uris == {"src/main.py", "src/utils.py", "tests/test_main.py"}
+        assertions.expect_equal(uris, {"src/main.py", "src/utils.py", "tests/test_main.py"})
 
 
 class TestQueryByFiltersExcludeGlobs:
@@ -387,11 +398,15 @@ class TestQueryByFiltersExcludeGlobs:
         )
 
         uris = {r["uri"] for r in results}
-        assert "tests/test_main.py" not in uris
-        assert "tests/test_utils.py" not in uris
-        assert "src/main.py" in uris
-        assert "main.py" in uris
-        assert len(results) == 9
+        assertions.expect_false(
+            "tests/test_main.py" in uris, reason="test files should be excluded"
+        )
+        assertions.expect_false(
+            "tests/test_utils.py" in uris, reason="test files should be excluded"
+        )
+        assertions.expect_in("src/main.py", uris)
+        assertions.expect_in("main.py", uris)
+        assertions.expect_equal(len(results), 9)
 
     def test_exclude_glob_multiple_patterns(self, test_catalog: DuckDBCatalog) -> None:
         """Test excluding multiple patterns."""
@@ -401,10 +416,16 @@ class TestQueryByFiltersExcludeGlobs:
         )
 
         uris = {r["uri"] for r in results}
-        assert "tests/test_main.py" not in uris
-        assert "tests/test_utils.py" not in uris
-        assert "docs/README.md" not in uris
-        assert len(results) == 8
+        assertions.expect_false(
+            "tests/test_main.py" in uris, reason="test files should be excluded"
+        )
+        assertions.expect_false(
+            "tests/test_utils.py" in uris, reason="test files should be excluded"
+        )
+        assertions.expect_false(
+            "docs/README.md" in uris, reason="markdown files should be excluded"
+        )
+        assertions.expect_equal(len(results), 8)
 
     def test_exclude_glob_empty_list(self, test_catalog: DuckDBCatalog) -> None:
         """Test that empty exclude globs means exclude none."""
@@ -413,7 +434,7 @@ class TestQueryByFiltersExcludeGlobs:
             exclude_globs=[],
         )
 
-        assert len(results) == 3
+        assertions.expect_equal(len(results), 3)
 
 
 class TestQueryByFiltersLanguageFilter:
@@ -427,16 +448,19 @@ class TestQueryByFiltersLanguageFilter:
         )
 
         uris = {r["uri"] for r in results}
-        assert uris == {
-            "src/main.py",
-            "src/utils.py",
-            "tests/test_main.py",
-            "tests/test_utils.py",
-            "src/nested/deep/file.py",
-            "lib/legacy.py",
-            "main.py",
-        }
-        assert len(results) == 7
+        assertions.expect_equal(
+            uris,
+            {
+                "src/main.py",
+                "src/utils.py",
+                "tests/test_main.py",
+                "tests/test_utils.py",
+                "src/nested/deep/file.py",
+                "lib/legacy.py",
+                "main.py",
+            },
+        )
+        assertions.expect_equal(len(results), 7)
 
     def test_language_filter_typescript(self, test_catalog: DuckDBCatalog) -> None:
         """Test filtering by TypeScript language."""
@@ -446,8 +470,8 @@ class TestQueryByFiltersLanguageFilter:
         )
 
         uris = {r["uri"] for r in results}
-        assert uris == {"src/app.ts", "src/components/Button.tsx"}
-        assert len(results) == 2
+        assertions.expect_equal(uris, {"src/app.ts", "src/components/Button.tsx"})
+        assertions.expect_equal(len(results), 2)
 
     def test_language_filter_multiple(self, test_catalog: DuckDBCatalog) -> None:
         """Test filtering by multiple languages."""
@@ -457,12 +481,12 @@ class TestQueryByFiltersLanguageFilter:
         )
 
         uris = {r["uri"] for r in results}
-        assert "src/main.py" in uris
-        assert "src/app.ts" in uris
-        assert "src/components/Button.tsx" in uris
-        assert "docs/README.md" not in uris
-        assert "main.py" in uris
-        assert len(results) == 9  # 7 Python + 2 TypeScript
+        assertions.expect_in("src/main.py", uris)
+        assertions.expect_in("src/app.ts", uris)
+        assertions.expect_in("src/components/Button.tsx", uris)
+        assertions.expect_false("docs/README.md" in uris, reason="markdown should not be included")
+        assertions.expect_in("main.py", uris)
+        assertions.expect_equal(len(results), 9)  # 7 Python + 2 TypeScript
 
     def test_language_filter_unknown_language(self, test_catalog: DuckDBCatalog) -> None:
         """Test filtering by unknown language returns empty."""
@@ -475,7 +499,7 @@ class TestQueryByFiltersLanguageFilter:
         )
 
         # Unknown language has no extensions, so no chunks match
-        assert len(results) == 0
+        assertions.expect_equal(len(results), 0)
 
     def test_language_filter_empty_list(self, test_catalog: DuckDBCatalog) -> None:
         """Test that empty language list means no filtering."""
@@ -484,7 +508,7 @@ class TestQueryByFiltersLanguageFilter:
             languages=[],
         )
 
-        assert len(results) == 3
+        assertions.expect_equal(len(results), 3)
 
 
 class TestQueryByFiltersCombined:
@@ -499,15 +523,20 @@ class TestQueryByFiltersCombined:
         )
 
         uris = {r["uri"] for r in results}
-        assert uris == {
-            "src/main.py",
-            "src/utils.py",
-            "src/nested/deep/file.py",
-            "lib/legacy.py",
-            "main.py",
-        }
-        assert "tests/test_main.py" not in uris
-        assert len(results) == 5
+        assertions.expect_equal(
+            uris,
+            {
+                "src/main.py",
+                "src/utils.py",
+                "src/nested/deep/file.py",
+                "lib/legacy.py",
+                "main.py",
+            },
+        )
+        assertions.expect_false(
+            "tests/test_main.py" in uris, reason="test files should be excluded"
+        )
+        assertions.expect_equal(len(results), 5)
 
     def test_include_and_language(self, test_catalog: DuckDBCatalog) -> None:
         """Test combining include globs and language filter."""
@@ -518,14 +547,17 @@ class TestQueryByFiltersCombined:
         )
 
         uris = {r["uri"] for r in results}
-        assert uris == {
-            "src/main.py",
-            "src/utils.py",
-            "src/nested/deep/file.py",
-        }
-        assert "src/app.ts" not in uris  # Not Python
-        assert "src/config.json" not in uris  # Not Python
-        assert len(results) == 3
+        assertions.expect_equal(
+            uris,
+            {
+                "src/main.py",
+                "src/utils.py",
+                "src/nested/deep/file.py",
+            },
+        )
+        assertions.expect_false("src/app.ts" in uris, reason="Not Python")
+        assertions.expect_false("src/config.json" in uris, reason="Not Python")
+        assertions.expect_equal(len(results), 3)
 
     def test_exclude_and_language(self, test_catalog: DuckDBCatalog) -> None:
         """Test combining exclude globs and language filter."""
@@ -536,15 +568,20 @@ class TestQueryByFiltersCombined:
         )
 
         uris = {r["uri"] for r in results}
-        assert uris == {
-            "src/main.py",
-            "src/utils.py",
-            "src/nested/deep/file.py",
-            "lib/legacy.py",
-            "main.py",
-        }
-        assert "tests/test_main.py" not in uris
-        assert len(results) == 5
+        assertions.expect_equal(
+            uris,
+            {
+                "src/main.py",
+                "src/utils.py",
+                "src/nested/deep/file.py",
+                "lib/legacy.py",
+                "main.py",
+            },
+        )
+        assertions.expect_false(
+            "tests/test_main.py" in uris, reason="test files should be excluded"
+        )
+        assertions.expect_equal(len(results), 5)
 
     def test_all_filters_combined(self, test_catalog: DuckDBCatalog) -> None:
         """Test combining all three filter types."""
@@ -556,12 +593,15 @@ class TestQueryByFiltersCombined:
         )
 
         uris = {r["uri"] for r in results}
-        assert uris == {
-            "src/main.py",
-            "src/utils.py",
-            "src/nested/deep/file.py",
-        }
-        assert len(results) == 3
+        assertions.expect_equal(
+            uris,
+            {
+                "src/main.py",
+                "src/utils.py",
+                "src/nested/deep/file.py",
+            },
+        )
+        assertions.expect_equal(len(results), 3)
 
 
 class TestQueryByFiltersComplexGlobs:
@@ -575,8 +615,8 @@ class TestQueryByFiltersComplexGlobs:
         )
 
         uris = {r["uri"] for r in results}
-        assert uris == {"src/nested/deep/file.py"}
-        assert len(results) == 1
+        assertions.expect_equal(uris, {"src/nested/deep/file.py"})
+        assertions.expect_equal(len(results), 1)
 
     def test_complex_glob_bracket_expression(self, test_catalog: DuckDBCatalog) -> None:
         """Test glob with bracket expression (requires Python filtering)."""
@@ -589,8 +629,8 @@ class TestQueryByFiltersComplexGlobs:
 
         # This should match src/main.py (m*) but not src/utils.py
         uris = {r["uri"] for r in results}
-        assert "src/main.py" in uris
-        assert len(results) >= 1
+        assertions.expect_in("src/main.py", uris)
+        assertions.expect_true(len(results) >= 1, reason="should match at least one file")
 
 
 class TestQueryByFiltersEdgeCases:
@@ -602,8 +642,8 @@ class TestQueryByFiltersEdgeCases:
         results_filtered = test_catalog.query_by_filters(ids)
         results_ids = test_catalog.query_by_ids(ids)
 
-        assert len(results_filtered) == len(results_ids)
-        assert {r["id"] for r in results_filtered} == {r["id"] for r in results_ids}
+        assertions.expect_equal(len(results_filtered), len(results_ids))
+        assertions.expect_equal({r["id"] for r in results_filtered}, {r["id"] for r in results_ids})
 
     def test_empty_ids(self, test_catalog: DuckDBCatalog) -> None:
         """Test that empty ID list returns empty results."""
@@ -612,7 +652,7 @@ class TestQueryByFiltersEdgeCases:
             include_globs=["**/*.py"],
         )
 
-        assert len(results) == 0
+        assertions.expect_equal(len(results), 0)
 
     def test_no_matches(self, test_catalog: DuckDBCatalog) -> None:
         """Test that filters matching no chunks return empty."""
@@ -621,7 +661,7 @@ class TestQueryByFiltersEdgeCases:
             include_globs=["**/*.java"],
         )
 
-        assert len(results) == 0
+        assertions.expect_equal(len(results), 0)
 
     def test_none_filters(self, test_catalog: DuckDBCatalog) -> None:
         """Test that None filters behave like no filters."""
@@ -634,7 +674,7 @@ class TestQueryByFiltersEdgeCases:
         )
         results_no_filters = test_catalog.query_by_filters(ids)
 
-        assert len(results_none) == len(results_no_filters)
+        assertions.expect_equal(len(results_none), len(results_no_filters))
 
     def test_preserves_id_order(self, test_catalog: DuckDBCatalog) -> None:
         """Test that results preserve input ID order."""
@@ -654,7 +694,7 @@ class TestQueryByFiltersEdgeCases:
         # ID 3: tests/test_main.py - matches
         # Expected order: [1, 8, 3] (preserving input order after filtering)
         expected_ids = [1, 8, 3]  # 10 and 5 filtered out (not .py)
-        assert result_ids == expected_ids
+        assertions.expect_sequence_equal(result_ids, expected_ids)
 
 
 class TestConcurrentAccess:
@@ -686,7 +726,7 @@ class TestConcurrentAccess:
             results = [future.result() for future in futures]
 
         for uris in results:
-            assert uris == expected_uris
+            assertions.expect_equal(uris, expected_uris)
 
     def test_query_without_explicit_open(self, tmp_path: Path) -> None:
         """query_by_filters should lazily initialize without calling open()."""
@@ -696,7 +736,7 @@ class TestConcurrentAccess:
 
         catalog = DuckDBCatalog(db_path, vectors_dir)
         result = catalog.query_by_filters([1, 2, 3], include_globs=["**/*.py"])
-        assert result == []
+        assertions.expect_equal(result, [])
 
 
 def test_query_by_filters_uses_query_builder(
@@ -733,15 +773,19 @@ def test_query_by_filters_uses_query_builder(
 
     results = test_catalog.query_by_filters([1, 2])
 
-    assert len(results) == 2
-    assert calls, "DuckDBQueryBuilder.build_filter_query should be invoked"
+    assertions.expect_equal(len(results), 2)
+    assertions.expect_true(
+        bool(calls), reason="DuckDBQueryBuilder.build_filter_query should be invoked"
+    )
     recorded = calls[0]
     options = recorded["options"]
-    assert isinstance(options, DuckDBQueryOptions)
-    assert options.preserve_order is True
-    assert options.select_columns == ("c.*",)
-    assert options.include_globs is None
-    assert options.exclude_globs is None
+    assertions.expect_true(
+        isinstance(options, DuckDBQueryOptions), reason="options should be DuckDBQueryOptions"
+    )
+    assertions.expect_true(options.preserve_order, reason="preserve_order should be True")
+    assertions.expect_equal(options.select_columns, ("c.*",))
+    assertions.expect_equal(options.include_globs, None)
+    assertions.expect_equal(options.exclude_globs, None)
 
 
 class TestQueryByFiltersParametrized:
@@ -771,7 +815,7 @@ class TestQueryByFiltersParametrized:
             include_globs=[include_glob],
         )
 
-        assert len(results) == expected_count
+        assertions.expect_equal(len(results), expected_count)
 
 
 def test_query_by_uri_supports_unlimited_results(tmp_path: Path) -> None:
@@ -796,9 +840,9 @@ def test_query_by_uri_supports_unlimited_results(tmp_path: Path) -> None:
 
     catalog.close()
 
-    assert [row["id"] for row in limited] == [1]
-    assert [row["id"] for row in unlimited_zero] == [1, 2]
-    assert unlimited_zero == unlimited_negative
+    assertions.expect_sequence_equal([row["id"] for row in limited], [1])
+    assertions.expect_sequence_equal([row["id"] for row in unlimited_zero], [1, 2])
+    assertions.expect_equal(unlimited_zero, unlimited_negative)
 
 
 def test_get_embeddings_by_ids_skips_null_embeddings(tmp_path: Path) -> None:
@@ -821,9 +865,11 @@ def test_get_embeddings_by_ids_skips_null_embeddings(tmp_path: Path) -> None:
         )
 
     ids, results = catalog.get_embeddings_by_ids([1, 2])
-    assert ids == [1]
-    assert results.shape == (1, 2)
-    assert np.allclose(results[0], [0.1, 0.2])
+    assertions.expect_sequence_equal(ids, [1])
+    assertions.expect_equal(results.shape, (1, 2))
+    assertions.expect_true(
+        np.allclose(results[0], [0.1, 0.2]), reason="embedding should match expected values"
+    )
 
 
 def test_query_by_filters_handles_literal_percent(tmp_path: Path) -> None:
@@ -852,8 +898,8 @@ def test_query_by_filters_handles_literal_percent(tmp_path: Path) -> None:
         )
 
     results = catalog.query_by_filters([1], include_globs=["src/config%file.py"])
-    assert len(results) == 1
-    assert results[0]["uri"] == "src/config%file.py"
+    assertions.expect_equal(len(results), 1)
+    assertions.expect_equal(results[0]["uri"], "src/config%file.py")
 
 
 def test_query_by_filters_handles_literal_underscore(tmp_path: Path) -> None:
@@ -882,8 +928,8 @@ def test_query_by_filters_handles_literal_underscore(tmp_path: Path) -> None:
         )
 
     results = catalog.query_by_filters([1], include_globs=["src/config_file.py"])
-    assert len(results) == 1
-    assert results[0]["uri"] == "src/config_file.py"
+    assertions.expect_equal(len(results), 1)
+    assertions.expect_equal(results[0]["uri"], "src/config_file.py")
 
 
 def test_materialize_faiss_join_builds_table(tmp_path: Path) -> None:
@@ -906,7 +952,7 @@ def test_materialize_faiss_join_builds_table(tmp_path: Path) -> None:
     with duckdb.connect(str(catalog_path)) as connection:
         row = connection.execute("SELECT COUNT(*) FROM faiss_join_mat").fetchone()
         count = row[0] if row else 0
-    assert count == 2
+    assertions.expect_equal(count, 2)
 
 
 def test_open_materialize_creates_table_and_index(tmp_path: Path) -> None:
@@ -918,10 +964,14 @@ def test_open_materialize_creates_table_and_index(tmp_path: Path) -> None:
 
     catalog_path = tmp_path / "catalog.duckdb"
     with DuckDBCatalog(catalog_path, vectors_dir, materialize=True) as catalog:
-        assert catalog.count_chunks() == 3
+        assertions.expect_equal(catalog.count_chunks(), 3)
 
-    assert _table_exists(catalog_path, "chunks_materialized") is True
-    assert _index_exists(catalog_path, "idx_chunks_materialized_uri") is True
+    assertions.expect_true(
+        _table_exists(catalog_path, "chunks_materialized"), reason="table should exist"
+    )
+    assertions.expect_true(
+        _index_exists(catalog_path, "idx_chunks_materialized_uri"), reason="index should exist"
+    )
 
     connection = duckdb.connect(str(catalog_path))
     try:
@@ -930,7 +980,7 @@ def test_open_materialize_creates_table_and_index(tmp_path: Path) -> None:
     finally:
         connection.close()
 
-    assert row_count == 3
+    assertions.expect_equal(row_count, 3)
 
 
 def test_materialize_creates_empty_table_when_parquet_missing(tmp_path: Path) -> None:
@@ -940,13 +990,18 @@ def test_materialize_creates_empty_table_when_parquet_missing(tmp_path: Path) ->
 
     catalog_path = tmp_path / "catalog.duckdb"
     with DuckDBCatalog(catalog_path, vectors_dir, materialize=True) as catalog:
-        assert catalog.count_chunks() == 0
+        assertions.expect_equal(catalog.count_chunks(), 0)
 
-    assert _table_exists(catalog_path, "chunks_materialized") is True
-    assert _index_exists(catalog_path, "idx_chunks_materialized_uri") is True
+    assertions.expect_true(
+        _table_exists(catalog_path, "chunks_materialized"), reason="table should exist"
+    )
+    assertions.expect_true(
+        _index_exists(catalog_path, "idx_chunks_materialized_uri"), reason="index should exist"
+    )
 
 
 def test_get_structure_annotations_with_ast(tmp_path: Path) -> None:
+    """Test structure annotations include AST node kinds."""
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir()
     catalog_path = tmp_path / "catalog.duckdb"
@@ -974,13 +1029,14 @@ def test_get_structure_annotations_with_ast(tmp_path: Path) -> None:
             """
         )
     info = catalog.get_structure_annotations([1])[1]
-    assert info.uri == "src/example.py"
-    assert info.symbol_hits == ("sym.A",)
-    assert info.ast_node_kinds == ("FunctionDef",)
-    assert info.cst_matches == ()
+    assertions.expect_equal(info.uri, "src/example.py")
+    assertions.expect_sequence_equal(list(info.symbol_hits), ["sym.A"])
+    assertions.expect_sequence_equal(list(info.ast_node_kinds), ["FunctionDef"])
+    assertions.expect_sequence_equal(list(info.cst_matches), [])
 
 
 def test_get_structure_annotations_without_optional_tables(tmp_path: Path) -> None:
+    """Test structure annotations work when optional tables are missing."""
     vectors_dir = tmp_path / "vectors"
     vectors_dir.mkdir()
     catalog_path = tmp_path / "catalog.duckdb"
@@ -998,28 +1054,29 @@ def test_get_structure_annotations_without_optional_tables(tmp_path: Path) -> No
             """
         )
     info = catalog.get_structure_annotations([7])[7]
-    assert info.symbol_hits == ()
-    assert info.ast_node_kinds == ()
-    assert info.cst_matches == ()
+    assertions.expect_sequence_equal(list(info.symbol_hits), [])
+    assertions.expect_sequence_equal(list(info.ast_node_kinds), [])
+    assertions.expect_sequence_equal(list(info.cst_matches), [])
 
-    @pytest.mark.parametrize(
-        ("language", "expected_count"),
-        [
-            ("python", 7),
-            ("typescript", 2),
-            ("javascript", 0),  # No .js files in test data
-            ("rust", 0),  # No .rs files in test data
-        ],
+
+@pytest.mark.parametrize(
+    ("language", "expected_count"),
+    [
+        ("python", 7),
+        ("typescript", 2),
+        ("javascript", 0),  # No .js files in test data
+        ("rust", 0),  # No .rs files in test data
+    ],
+)
+def test_language_filters(
+    test_catalog: DuckDBCatalog,
+    language: str,
+    expected_count: int,
+) -> None:
+    """Test various language filters."""
+    results = test_catalog.query_by_filters(
+        ALL_CHUNK_IDS,
+        languages=[language],
     )
-    def test_language_filters(
-        test_catalog: DuckDBCatalog,
-        language: str,
-        expected_count: int,
-    ) -> None:
-        """Test various language filters."""
-        results = test_catalog.query_by_filters(
-            ALL_CHUNK_IDS,
-            languages=[language],
-        )
 
-        assert len(results) == expected_count
+    assertions.expect_equal(len(results), expected_count)

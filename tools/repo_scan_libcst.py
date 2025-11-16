@@ -13,10 +13,16 @@ try:
     import libcst as cst
     from libcst import ParserSyntaxError
     from libcst import matchers as m
+
+    from tools._libcst_mixins import IfTransformerMixin
 except ImportError:  # pragma: no cover - optional dependency at runtime
     cst = None
     ParserSyntaxError = Exception
     m = None
+
+    class IfTransformerMixin:  # type: ignore[too-many-ancestors]
+        """Fallback mixin when LibCST is unavailable."""
+
 
 LOGGER = logging.getLogger(__name__)
 
@@ -68,7 +74,7 @@ def _resolve_relative(module_name: str, level: int, attr: str | None) -> str | N
 
 if cst is not None:
 
-    class _ImportCollector(cst.CSTVisitor):
+    class _ImportCollector(IfTransformerMixin, cst.CSTVisitor):
         """Collect imports/exports from a LibCST module."""
 
         def __init__(self, module_name: str) -> None:
@@ -268,7 +274,6 @@ if cst is not None:
             return tuple(exports)
 
     _ImportCollector.visit_If = _ImportCollector.visit_if
-    _ImportCollector.leave_If = _ImportCollector.leave_if
     _ImportCollector.visit_Import = _ImportCollector.visit_import
     _ImportCollector.visit_ImportFrom = _ImportCollector.visit_import_from
     _ImportCollector.visit_Assign = _ImportCollector.visit_assign

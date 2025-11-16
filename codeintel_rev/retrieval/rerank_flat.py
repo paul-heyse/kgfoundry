@@ -5,9 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
-from kgfoundry_common.logging import get_logger
 
-LOGGER = get_logger(__name__)
 _VECTOR_AXIS = 2
 _CANDIDATE_MATRIX_NDIM = 2
 _SIMILARITY_EPS = 1e-9
@@ -107,10 +105,6 @@ def _perform_exact_rerank(
 
     lookup, embedding_dim = _hydrate_embeddings(catalog, candidates)
     if not lookup:
-        LOGGER.warning(
-            "Exact rerank skipped: no embeddings returned for %s ids",
-            np.unique(candidates[candidates >= 0]).size,
-        )
         return _empty_result(query_mat.shape[0], min(top_k, candidates.shape[1]))
     if embedding_dim != query_mat.shape[1]:
         msg = f"Embedding dimension mismatch: {embedding_dim} != {query_mat.shape[1]}"

@@ -104,4 +104,6 @@ def test_dry_run_skips_artifact_writes(tmp_path: Path) -> None:
     )
     assertions.expect_equal(result.exit_code, 0, reason=result.output)
     assertions.expect_in("DRY RUN", result.stdout)
-    assertions.expect_false((out_dir / "modules").exists(), reason="Artifacts should not be written.")
+    assertions.expect_false(
+        (out_dir / "modules").exists(), reason="Artifacts should not be written."
+    )

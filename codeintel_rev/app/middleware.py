@@ -58,15 +58,12 @@ from starlette.middleware.base import BaseHTTPMiddleware, DispatchFunction
 from starlette.types import ASGIApp
 
 from codeintel_rev.runtime.request_context import capability_stamp_var, session_id_var
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from starlette.requests import Request
     from starlette.responses import Response
-
-LOGGER = get_logger(__name__)
 
 
 def get_session_id() -> str:
@@ -189,7 +186,6 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app: ASGIApp, dispatch: DispatchFunction | None = None) -> None:
         super().__init__(app, dispatch)
-        self._logger = LOGGER
 
     async def dispatch(  # Required instance method for BaseHTTPMiddleware
         self,
@@ -223,24 +219,10 @@ class SessionScopeMiddleware(BaseHTTPMiddleware):
         session_id = request.headers.get("X-Session-ID")
         if session_id is None:
             session_id = str(uuid.uuid4())
-            self._logger.debug(
-                "Generated session ID for request",
-                extra={"session_id": session_id, "path": request.url.path},
-            )
-        else:
-            self._logger.debug(
-                "Using client-provided session ID",
-                extra={"session_id": session_id, "path": request.url.path},
-            )
 
         run_id = request.headers.get("X-Run-ID")
         if run_id is None:
             run_id = uuid.uuid4().hex
-        else:
-            self._logger.debug(
-                "Using client-provided run ID",
-                extra={"run_id": run_id, "path": request.url.path},
-            )
 
         request.state.session_id = session_id
         request.state.run_id = run_id

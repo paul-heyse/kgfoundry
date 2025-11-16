@@ -30,9 +30,7 @@ from pathlib import Path
 from typing import Any
 
 from codeintel_rev.errors import RuntimeLifecycleError
-from kgfoundry_common.logging import get_logger
 
-LOGGER = get_logger(__name__)
 _RUNTIME = "index-lifecycle"
 MANIFEST_FILE = "manifest.json"
 IDMAP_FILE = "faiss.idmap.parquet"
@@ -189,7 +187,7 @@ def _attrs_from_meta(meta_path: Path) -> dict[str, object]:
         try:
             attrs["faiss_vector_count"] = int(vector_count)
         except (TypeError, ValueError):
-            LOGGER.warning("invalid vector_count field in %s", meta_path)
+            pass
     default_parameters = payload.get("default_parameters")
     if default_parameters:
         attrs["faiss_default_parameters"] = default_parameters
@@ -376,14 +374,6 @@ class IndexLifecycleManager:
             tuning_profile=self._locate_sidecar(active_dir, PROFILE_FILE, _LEGACY_PROFILE_FILES),
         )
         assets.ensure_exists()
-        if payload.get("version") != self.current_version():
-            LOGGER.warning(
-                "index.version_manifest_mismatch",
-                extra={
-                    "manifest_version": payload.get("version"),
-                    "current_version": self.current_version(),
-                },
-            )
         return assets
 
     def write_embedding_metadata(
@@ -496,22 +486,8 @@ class IndexLifecycleManager:
         self._copy_tree(assets.xtr_dir, staging_dir / "xtr")
         self._copy_optional_file(assets.faiss_idmap, staging_dir / IDMAP_FILE)
         self._copy_optional_file(assets.tuning_profile, staging_dir / PROFILE_FILE)
-        missing_sidecars: list[str] = []
-        if assets.faiss_idmap is None or not assets.faiss_idmap.exists():
-            missing_sidecars.append("faiss_idmap")
-        if assets.tuning_profile is None or not assets.tuning_profile.exists():
-            missing_sidecars.append("tuning_profile")
-        if missing_sidecars:
-            LOGGER.warning(
-                "index.prepare.sidecars_missing",
-                extra={"version": version, "missing": ",".join(missing_sidecars)},
-            )
         meta = VersionMeta(version=version, created_ts=time.time(), attrs=attrs or {})
         (staging_dir / MANIFEST_FILE).write_text(meta.to_json(), encoding="utf-8")
-        LOGGER.info(
-            "index.prepare.complete",
-            extra={"version": version, "dir": str(staging_dir)},
-        )
         return staging_dir
 
     def write_attrs(self, version: str, **attrs: object) -> Path:
@@ -603,10 +579,6 @@ class IndexLifecycleManager:
         staging_dir.replace(final_dir)
         self._resolve_manifest_path(final_dir)
         self._write_current_pointer(version, final_dir)
-        LOGGER.info(
-            "index.publish.complete",
-            extra={"version": version, "dir": str(final_dir)},
-        )
         return final_dir
 
     def rollback(self, version: str) -> None:
@@ -644,7 +616,6 @@ class IndexLifecycleManager:
             message = f"version not found: {candidate}"
             raise RuntimeLifecycleError(message, runtime=_RUNTIME)
         self._write_current_pointer(version, candidate)
-        LOGGER.info("index.rollback.complete", extra={"version": version})
 
     def link_lucene_assets(self, version: str, assets: LuceneAssets) -> Path:
         """Publish Lucene-only assets under ``version`` and flip CURRENT pointer.
@@ -679,10 +650,6 @@ class IndexLifecycleManager:
             shutil.copytree(src, dst)
 
         self._write_current_pointer(version, target_dir)
-        LOGGER.info(
-            "index.link_lucene_assets",
-            extra={"version": version, "assets": [name for name, _ in assets.iter_dirs()]},
-        )
         return target_dir
 
     # ------------------------------------------------------------------ internals
@@ -733,10 +700,6 @@ class IndexLifecycleManager:
         for legacy_name in _LEGACY_MANIFEST_FILES:
             legacy_path = version_dir / legacy_name
             if legacy_path.exists():
-                LOGGER.warning(
-                    "index.manifest.legacy_path",
-                    extra={"path": str(legacy_path), "preferred": MANIFEST_FILE},
-                )
                 return legacy_path
         message = f"manifest missing: {manifest_path}"
         raise RuntimeLifecycleError(message, runtime=_RUNTIME)
@@ -753,10 +716,6 @@ class IndexLifecycleManager:
         for legacy_name in legacy_names:
             legacy_candidate = base_dir / legacy_name
             if legacy_candidate.exists():
-                LOGGER.warning(
-                    "index.sidecar.legacy_path",
-                    extra={"path": str(legacy_candidate), "preferred": primary_name},
-                )
                 return legacy_candidate
         return None
 

@@ -79,7 +79,6 @@ from codeintel_rev.runtime.factory_adjustment import (
 )
 from codeintel_rev.typing import gate_import
 from kgfoundry_common.errors import ConfigurationError
-from kgfoundry_common.logging import get_logger
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -91,7 +90,6 @@ else:  # pragma: no cover - runtime only; annotations are postponed
     HybridSearchEngine = Any
     XTRIndex = Any
 
-LOGGER = get_logger(__name__)
 _RUNTIME_FAILURE_TTL_S = 15.0
 _AUTOTUNE_SAMPLE_LIMIT = 128
 _MIN_AUTOTUNE_SAMPLES = 4
@@ -197,12 +195,7 @@ def _build_faiss_manager(settings: Settings, paths: ResolvedPaths) -> FAISSManag
         runtime=runtime_opts,
     )
     try:
-        LOGGER.info(
-            "faiss.compile",
-            extra={"opts": manager.get_compile_options(), "component": "app_start"},
-        )
     except (RuntimeError, OSError, ValueError):
-        LOGGER.debug("Unable to fetch FAISS compile options at startup", exc_info=True)
     return manager
 
 
@@ -247,10 +240,6 @@ def _build_git_clients(paths: ResolvedPaths) -> tuple[GitClient, AsyncGitClient]
     """
     git_client = GitClient(repo_path=paths.repo_root)
     async_git_client = AsyncGitClient(git_client)
-    LOGGER.debug(
-        "Initialized Git clients",
-        extra={"repo_path": str(paths.repo_root)},
-    )
     return git_client, async_git_client
 
 
@@ -665,7 +654,6 @@ def resolve_application_paths(settings: Settings) -> ResolvedPaths:
                 context={"path": str(directory), "source": "resolve_application_paths"},
             ) from exc
         else:
-            LOGGER.debug("Ensured directory exists", extra={"path": str(directory)})
 
     return paths
 
@@ -676,12 +664,11 @@ T = TypeVar("T")
 class _FaissRuntimeState:
     """Runtime bookkeeping for FAISS initialization."""
 
-    __slots__ = ("gpu_attempted", "loaded", "lock")
+    __slots__ = ("loaded", "lock")
 
     def __init__(self) -> None:
         self.lock = Lock()
         self.loaded = False
-        self.gpu_attempted = False
 
 
 @dataclass(slots=True, frozen=True)
@@ -832,10 +819,6 @@ class ApplicationContext:
         self._runtime.attach_adjuster(self.factory_adjuster)
         index_root = _infer_index_root(self.paths)
         _assign_frozen(self, "index_manager", IndexLifecycleManager(index_root))
-        LOGGER.debug(
-            "Initialized index lifecycle manager",
-            extra={"index_root": str(index_root)},
-        )
 
     @classmethod
     def create(
@@ -906,7 +889,6 @@ class ApplicationContext:
         load_settings : Loads Settings from environment variables
         resolve_application_paths : Validates and resolves paths
         """
-        LOGGER.info("Loading application configuration from environment")
         settings = load_settings()
         # resolve_application_paths() raises ConfigurationError if paths are invalid
         # This exception propagates to the caller, causing application startup to fail
@@ -918,14 +900,6 @@ class ApplicationContext:
         git_client, async_git_client = _build_git_clients(paths)
         duckdb_manager = DuckDBManager(paths.duckdb_path, settings.duckdb)
 
-        LOGGER.info(
-            "Application context created",
-            extra={
-                "repo_root": str(paths.repo_root),
-                "faiss_index": str(paths.faiss_index),
-                "vllm_url": settings.vllm.base_url,
-            },
-        )
 
         observer = runtime_observer or NullRuntimeCellObserver()
 
@@ -955,20 +929,14 @@ class ApplicationContext:
 
     def reload_indices(self) -> None:
         """Close runtime cells so they reopen against the active index version."""
-        LOGGER.info("Reloading runtime cells after index lifecycle change")
         for name, cell in self._iter_runtime_cells():
             try:
                 cell.close()
             except (RuntimeError, OSError, ValueError):  # pragma: no cover - defensive logging
-                LOGGER.warning("runtime.reload_failed", extra={"cell": name}, exc_info=True)
         faiss_state = self._runtime.faiss
         with faiss_state.lock:
             faiss_state.loaded = False
-            faiss_state.gpu_attempted = False
         self.faiss_manager.cpu_index = None
-        self.faiss_manager.gpu_index = None
-        self.faiss_manager.secondary_gpu_index = None
-        self.faiss_manager.gpu_resources = None
 
     def _autotune_if_requested(self) -> None:
         """Run a quick ParameterSpace sweep when enabled and no profile exists."""
@@ -983,14 +951,8 @@ class ApplicationContext:
             with self.open_catalog() as catalog:
                 samples = catalog.sample_query_vectors(limit=_AUTOTUNE_SAMPLE_LIMIT)
         except (OSError, RuntimeError, ValueError) as exc:  # pragma: no cover - defensive
-            LOGGER.warning("Autotune skipped: unable to sample vectors", extra={"error": str(exc)})
             return
         if len(samples) < _MIN_AUTOTUNE_SAMPLES:
-            LOGGER.warning(
-                "Autotune skipped: need >=%s vectors, found %s",
-                _MIN_AUTOTUNE_SAMPLES,
-                len(samples),
-            )
             return
         vectors = np.stack([vec for _, vec in samples], dtype=np.float32)
         queries = vectors[: min(32, vectors.shape[0])]
@@ -1001,26 +963,16 @@ class ApplicationContext:
                 k=min(self.settings.index.default_k, queries.shape[0]),
             )
         except (RuntimeError, ValueError) as exc:  # pragma: no cover - defensive logging
-            LOGGER.warning(
-                "Autotune failed; continuing with default parameters",
-                extra={"error": str(exc)},
-            )
             return
-        LOGGER.info(
-            "Autotune profile created",
-            extra={"param_str": profile.get("param_str"), "recall": profile.get("recall_at_k")},
-        )
 
     def apply_factory_adjuster(self, adjuster: FactoryAdjuster) -> None:
         """Update runtime tuning knobs and reset cells to pick up changes."""
-        LOGGER.info("Applying runtime factory adjuster")
         _assign_frozen(self, "factory_adjuster", adjuster)
         self._runtime.attach_adjuster(adjuster)
         for name, cell in self._iter_runtime_cells():
             try:
                 cell.close()
             except (RuntimeError, OSError, ValueError):  # pragma: no cover - defensive
-                LOGGER.warning("runtime.adjuster.reset_failed", extra={"cell": name}, exc_info=True)
 
     def get_hybrid_engine(self) -> HybridSearchEngine:
         """Return the hybrid search engine, instantiating it lazily.
@@ -1154,19 +1106,10 @@ class ApplicationContext:
             cell.close()
             raise
         except (OSError, RuntimeError, ValueError) as exc:
-            LOGGER.warning(
-                "Failed to initialize XTR index; continuing without late interaction",
-                extra={"xtr_dir": str(self.paths.xtr_dir)},
-                exc_info=exc,
-            )
             cell.close()
             return None
         if index.ready:
             return index
-        LOGGER.warning(
-            "XTR index not ready after initialization attempt",
-            extra={"xtr_dir": str(self.paths.xtr_dir)},
-        )
         return None
 
     def _build_coderank_faiss_manager(self, *, vec_dim: int) -> FAISSManager:
@@ -1239,12 +1182,7 @@ class ApplicationContext:
         )
         manager.load_cpu_index()
         try:
-            LOGGER.info(
-                "faiss.compile",
-                extra={"opts": manager.get_compile_options(), "component": runtime},
-            )
         except (RuntimeError, OSError, ValueError):
-            LOGGER.debug("Unable to fetch FAISS compile options", exc_info=True)
         return manager
 
     def _build_xtr_index(self) -> XTRIndex:
@@ -1296,7 +1234,6 @@ class ApplicationContext:
         try:
             capabilities = Capabilities.from_context(self)
         except RuntimeLifecycleError:  # pragma: no cover - defensive logging
-            LOGGER.warning("capabilities.detect_failed", exc_info=True)
         return engine_cls(
             self.settings,
             self.paths,
@@ -1305,11 +1242,10 @@ class ApplicationContext:
         )
 
     def ensure_faiss_ready(self) -> tuple[bool, list[str], str | None]:
-        """Load FAISS index (once) and attempt GPU clone.
+        """Load FAISS index (once) in a thread-safe manner.
 
         This method is thread-safe and idempotent. On first call, it loads the
         CPU index from disk. On subsequent calls, it returns cached state.
-        GPU cloning is attempted once (if not already done during pre-loading).
 
         The method is typically called from semantic search adapter on first
         search request (lazy loading) or optionally during application startup
@@ -1321,7 +1257,7 @@ class ApplicationContext:
             Three-element tuple:
             - ready (bool): True if FAISS index is available for searching
             - limits (list[str]): Warning messages about degraded mode (e.g.,
-              "GPU unavailable", "Index not found"). Empty list if fully ready.
+              "Index not found"). Empty list if fully ready.
             - error (str | None): Error message if index loading failed, None
               if successful or already loaded.
 
@@ -1341,10 +1277,6 @@ class ApplicationContext:
         The method uses a threading.Lock to ensure only one thread loads the
         index even under concurrent requests. Subsequent calls skip loading
         and immediately return the cached state.
-
-        GPU initialization failures are non-fatal - the method returns ready=True
-        with a warning in the limits list. Semantic search will fall back to
-        CPU index automatically.
         """
         limits: list[str] = []
         runtime = self._runtime
@@ -1364,18 +1296,6 @@ class ApplicationContext:
                 except (FileNotFoundError, RuntimeError) as exc:
                     return False, limits, f"FAISS index load failed: {exc}"
                 faiss_state.loaded = True
-
-            if self.faiss_manager.gpu_index is None and not faiss_state.gpu_attempted:
-                faiss_state.gpu_attempted = True
-                try:
-                    gpu_enabled = self.faiss_manager.clone_to_gpu()
-                except RuntimeError as exc:
-                    limits.append(str(exc))
-                    gpu_enabled = False
-                if not gpu_enabled and self.faiss_manager.gpu_disabled_reason:
-                    limits.append(self.faiss_manager.gpu_disabled_reason)
-            elif self.faiss_manager.gpu_disabled_reason:
-                limits.append(self.faiss_manager.gpu_disabled_reason)
 
         limits = list(dict.fromkeys(limits))
         self._autotune_if_requested()
@@ -1514,11 +1434,9 @@ class ApplicationContext:
 
     def close_all_runtimes(self) -> None:
         """Best-effort shutdown for mutable runtimes."""
-        LOGGER.info("Closing runtime resources")
         runtime = self._runtime
         for name, cell in self._iter_runtime_cells():
             with suppress(Exception):
-                LOGGER.debug("closing_runtime_cell", extra={"cell": name})
                 cell.close()
         with suppress(Exception):
             self.vllm_client.close()
@@ -1526,8 +1444,4 @@ class ApplicationContext:
             self.duckdb_manager.close()
         with suppress(Exception):
             self.faiss_manager.cpu_index = None
-            self.faiss_manager.gpu_index = None
-            self.faiss_manager.secondary_gpu_index = None
-            self.faiss_manager.gpu_resources = None
             runtime.faiss.loaded = False
-            runtime.faiss.gpu_attempted = False

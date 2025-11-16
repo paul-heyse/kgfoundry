@@ -15,10 +15,6 @@ from codeintel_rev.io.hybrid_search import BM25Rm3Config, BM25SearchProvider
 from codeintel_rev.retrieval.rm3_heuristics import RM3Heuristics, RM3Params
 from codeintel_rev.retrieval.types import SearchHit
 
-from kgfoundry_common.logging import get_logger
-
-LOGGER = get_logger(__name__)
-
 MIN_TREC_FIELDS = 4
 
 
@@ -326,10 +322,7 @@ def _record_recall_metrics(rows: list[dict[str, object]], k_values: Sequence[int
     for k, values in per_k.items():
         if values:
             average = sum(values) / len(values)
-            LOGGER.info(
-                "Recall summary",
-                extra={"k": k, "average_recall": round(average, 4), "samples": len(values)},
-            )
+            print(f"Recall summary: k={k} average_recall={round(average, 4)} samples={len(values)}")
 
 
 def main() -> None:

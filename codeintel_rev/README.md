@@ -31,7 +31,7 @@ Production-grade MCP server for AI-assisted code review with SCIP indexing, sema
            │                    │                    │
     ┌──────▼──────┐     ┌──────▼──────┐     ┌──────▼──────┐
     │   FAISS     │     │   DuckDB    │     │    vLLM     │
-    │   (GPU)     │     │  (Parquet)  │     │ (Embeddings)│
+    │   (CPU)     │     │  (Parquet)  │     │ (Embeddings)│
     └─────────────┘     └─────────────┘     └─────────────┘
 ```
 
@@ -62,8 +62,6 @@ Example response:
   "duckdb_importable": true,
   "httpx_importable": true,
   "torch_importable": true,
-  "faiss_gpu_available": false,
-  "faiss_gpu_disabled_reason": "no-gpu-visible",
   "has_semantic": true,
   "has_symbols": true
 }
@@ -79,7 +77,7 @@ Example response:
 
 - **SCIP-based Indexing**: Uses Sourcegraph SCIP for precise symbol information
 - **cAST Chunking**: Structure-aware code chunking (2200 char budget)
-- **Semantic Search**: GPU FAISS with cuVS acceleration
+- **Semantic Search**: CPU FAISS tuned via ParameterSpace (nprobe, efSearch)
 - **Hybrid Retrieval**: RRF fusion combining FAISS, BM25, and SPLADE signals
 - **HTTP/3 Streaming**: QUIC + proper backpressure for token streams
 - **FastMCP Tools**: Full QueryScope catalog (search, symbols, history, docs)
@@ -90,7 +88,7 @@ Example response:
 ### System Requirements
 
 - Python 3.13.9
-- CUDA-capable GPU (for FAISS + vLLM)
+- CUDA-capable GPU (optional; required only when running vLLM locally)
 - Node.js 16+ (for SCIP Python indexer)
 - NGINX with QUIC support (or nginx-quic build)
 - 16GB+ RAM recommended
@@ -100,10 +98,10 @@ Example response:
 
 ```bash
 # Core dependencies (already in environment via bootstrap.sh)
-uv add msgspec httpx numpy pyarrow duckdb fastapi starlette fastmcp gitpython
+uv add msgspec httpx numpy pyarrow duckdb fastapi starlette fastmcp gitpython faiss
 
-# GPU stack (optional dependencies)
-uv add --group gpu faiss vllm torch libcuvs-cu13
+# Optional LLM stack (only if you embed with vLLM locally; requires CUDA)
+uv add vllm torch torchvision torchaudio
 
 # SCIP indexer
 npm install -g @sourcegraph/scip-python
@@ -162,7 +160,7 @@ This will:
 2. Chunk files using cAST (symbol boundaries)
 3. Embed chunks with vLLM
 4. Write Parquet with vectors
-5. Build FAISS GPU index
+5. Build FAISS CPU index
 6. Initialize DuckDB catalog
 
 ### 4a. Maintain Sparse Retrieval Artifacts
@@ -485,12 +483,10 @@ codeintel-rev/
 
 ```bash
 # Unit tests (CPU-only workstations)
-SKIP_GPU_WARMUP=1 uv run pytest tests/ -v
-
-# Drop the env var on CUDA-capable hosts to exercise the GPU warm-up.
+uv run pytest tests/ -v
 
 # With coverage
-SKIP_GPU_WARMUP=1 uv run pytest tests/ --cov=codeintel_rev --cov-report=html
+uv run pytest tests/ --cov=codeintel_rev --cov-report=html
 ```
 
 ### Quality Gates
@@ -565,7 +561,6 @@ from codeintel_rev.io.faiss_manager import FAISSManager
 manager = FAISSManager(index_path=Path("index.faiss"), vec_dim=3584)
 estimates = manager.estimate_memory_usage(n_vectors=100_000)
 print(f"CPU: {estimates['cpu_index_bytes']/1e9:.2f} GB")
-print(f"GPU: {estimates['gpu_index_bytes']/1e9:.2f} GB")
 print(f"Total: {estimates['total_bytes']/1e9:.2f} GB")
 ```
 
@@ -575,8 +570,7 @@ print(f"Total: {estimates['total_bytes']/1e9:.2f} GB")
 export FAISS_NLIST=16384  # More centroids = better recall, slower training
 export FAISS_NPROBE=256   # More probes = better recall, slower live searches
 
-# Enable cuVS acceleration (requires custom FAISS wheel)
-export USE_CUVS=1
+
 ```
 
 ### Incremental Index Updates
@@ -791,19 +785,17 @@ For workloads with bursty concurrency, start with a small pool (e.g., 8–16 con
 - Monitor concurrent request count via application metrics
 - Consider horizontal scaling if single instance is saturated
 
-### FAISS GPU fails
+### FAISS health fails
 
 ```bash
-# Check CUDA availability
-python -c "import torch; print(torch.cuda.is_available())"
+# Run the lightweight CPU smoke test
+python - <<'PY'
+from codeintel_rev.app.faiss_health import check_faiss_health
+print(check_faiss_health())
+PY
 
-# Run GPU diagnostics
-python -m codeintel_rev.mcp_server.tools.gpu_doctor --require-gpu
-
-# Fallback to CPU-only FAISS
-export USE_CUVS=0
-# Or install CPU-only FAISS
-uv add faiss-cpu
+# Reinstall FAISS CPU wheel if import fails
+uv add --reinstall faiss
 ```
 
 ### vLLM connection issues

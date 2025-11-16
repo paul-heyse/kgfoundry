@@ -15,6 +15,8 @@ from codeintel_rev.enrich.ast_indexer import (
     write_ast_parquet,
 )
 
+from tests._helpers import assertions
+
 
 def test_ast_collection_and_duckdb_join(tmp_path: Path) -> None:
     source = textwrap.dedent(
@@ -47,13 +49,15 @@ def test_ast_collection_and_duckdb_join(tmp_path: Path) -> None:
     metric_row = compute_ast_metrics(rel_path, tree)
 
     qualnames = {row.qualname for row in node_rows if row.qualname}
-    assert "Cls" in qualnames
-    assert "Cls.m" in qualnames
-    assert "f" in qualnames
+    assertions.expect_in("Cls", qualnames)
+    assertions.expect_in("Cls.m", qualnames)
+    assertions.expect_in("f", qualnames)
 
-    assert metric_row.func_count >= 2
-    assert metric_row.class_count >= 1
-    assert metric_row.cyclomatic >= 2
+    assertions.expect_true(metric_row.func_count >= 2, reason="should have at least 2 functions")
+    assertions.expect_true(metric_row.class_count >= 1, reason="should have at least 1 class")
+    assertions.expect_true(
+        metric_row.cyclomatic >= 2, reason="should have cyclomatic complexity >= 2"
+    )
 
     ast_dir = tmp_path / "out" / "ast"
     write_ast_parquet(node_rows, [metric_row], out_dir=ast_dir)
@@ -70,9 +74,9 @@ def test_ast_collection_and_duckdb_join(tmp_path: Path) -> None:
         con.execute("CREATE TABLE modules AS SELECT * FROM read_json_auto(?)", [modules_path])
         con.execute("CREATE TABLE ast_nodes AS SELECT * FROM read_parquet(?)", [nodes_path])
         result = con.execute("SELECT COUNT(*) FROM ast_nodes JOIN modules USING(path);").fetchone()
-        assert result is not None
+        assertions.expect_true(result is not None, reason="query should return a result")
         joined = result[0]
     finally:
         con.close()
 
-    assert joined > 0
+    assertions.expect_true(joined > 0, reason="should have joined rows")

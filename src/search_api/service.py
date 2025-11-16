@@ -28,6 +28,7 @@ __all__ = [
 ]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))
 
+
 # [nav:anchor rrf_fuse]
 def rrf_fuse(rankers: list[list[tuple[str, float]]], k_rrf: int = 60) -> dict[str, float]:
     """Fuse multiple ranked lists using Reciprocal Rank Fusion (RRF).

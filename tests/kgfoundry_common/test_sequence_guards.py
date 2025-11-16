@@ -18,6 +18,7 @@ import pytest
 
 from kgfoundry_common.errors import VectorSearchError
 from kgfoundry_common.sequence_guards import first_or_error, first_or_error_multi_device
+from tests._helpers import assertions
 
 
 class SequenceGuard(Protocol):
@@ -109,19 +110,19 @@ class TestFirstOrError:
         """Verify first_or_error returns first element for non-empty sequence."""
         devices = [0, 1, 2]
         result = sequence_guard(devices, context="test_devices")
-        assert result == 0
+        assertions.expect_equal(result, 0)
 
     def test_valid_tuple_returns_first_element(self, sequence_guard: SequenceGuard) -> None:
         """Verify first_or_error works with tuples."""
         devices = (10, 20, 30)
         result = sequence_guard(devices, context="test_tuple")
-        assert result == 10
+        assertions.expect_equal(result, 10)
 
     def test_single_element_sequence(self, sequence_guard: SequenceGuard) -> None:
         """Verify single-element sequence returns that element."""
         devices = [42]
         result = sequence_guard(devices, context="single_element")
-        assert result == 42
+        assertions.expect_equal(result, 42)
 
     def test_empty_list_raises_vector_search_error(self, sequence_guard: SequenceGuard) -> None:
         """Verify empty list raises VectorSearchError with Problem Details."""
@@ -129,16 +130,18 @@ class TestFirstOrError:
             sequence_guard([], context="empty_devices")
 
         error = exc_info.value
-        assert "empty" in str(error).lower()
-        assert "sequence is empty" in str(error)
+        assertions.expect_true("empty" in str(error).lower(), reason="error should mention empty")
+        assertions.expect_true(
+            "sequence is empty" in str(error), reason="error should mention sequence is empty"
+        )
 
     def test_empty_tuple_raises_vector_search_error(self, sequence_guard: SequenceGuard) -> None:
         """Verify empty tuple raises VectorSearchError."""
         with pytest.raises(VectorSearchError) as exc_info:
-            sequence_guard((), context="gpu_devices")
+            sequence_guard((), context="faiss_devices")
 
         error = exc_info.value
-        assert "empty" in str(error).lower()
+        assertions.expect_true("empty" in str(error).lower(), reason="error should mention empty")
 
     @pytest.mark.parametrize(
         "empty_seq",
@@ -162,23 +165,23 @@ class TestFirstOrError:
             sequence_guard([], context=context_str)
 
         error_msg = str(exc_info.value)
-        assert context_str in error_msg
+        assertions.expect_true(context_str in error_msg, reason="error should include context")
 
     def test_custom_operation_parameter(self, sequence_guard: SequenceGuard) -> None:
         """Verify custom operation parameter is accepted and used."""
-        operation = "custom_gpu_operation"
+        operation = "custom_operation"
         with pytest.raises(VectorSearchError) as exc_info:
-            sequence_guard([], context="gpu", operation=operation)
+            sequence_guard([], context="faiss_devices", operation=operation)
 
         # Error should be raised without issues
-        assert exc_info.value is not None
+        assertions.expect_true(exc_info.value is not None, reason="error should be raised")
 
     def test_preserves_element_type(self, sequence_guard: SequenceGuard) -> None:
         """Verify first_or_error preserves the type of returned element."""
         strings = ["hello", "world"]
         result = sequence_guard(strings, context="strings")
-        assert isinstance(result, str)
-        assert result == "hello"
+        assertions.expect_true(isinstance(result, str), reason="result should be str")
+        assertions.expect_equal(result, "hello")
 
     def test_sequence_length_check(self, sequence_guard: SequenceGuard) -> None:
         """Verify guard correctly identifies empty vs.
@@ -186,7 +189,7 @@ class TestFirstOrError:
         non-empty.
         """
         # Non-empty should work
-        assert sequence_guard([1], context="c") == 1
+        assertions.expect_equal(sequence_guard([1], context="c"), 1)
 
         # Empty should fail
         with pytest.raises(VectorSearchError):
@@ -198,9 +201,9 @@ class TestFirstOrErrorMultiDevice:
 
     def test_valid_devices_returns_first(self, multi_device_guard: MultiDeviceGuard) -> None:
         """Verify multi-device variant returns first element."""
-        gpu_indices = [0, 1, 2]
-        result = multi_device_guard(gpu_indices)
-        assert result == 0
+        shard_indices = [0, 1, 2]
+        result = multi_device_guard(shard_indices)
+        assertions.expect_equal(result, 0)
 
     def test_empty_devices_raises_error(self, multi_device_guard: MultiDeviceGuard) -> None:
         """Verify empty device list raises VectorSearchError."""
@@ -208,31 +211,32 @@ class TestFirstOrErrorMultiDevice:
             multi_device_guard([])
 
         error = exc_info.value
-        assert "FAISS GPU cloning failed" in str(error)
-        assert "empty" in str(error).lower()
+        assertions.expect_in("FAISS device routing failed", str(error))
+        assertions.expect_true("empty" in str(error).lower(), reason="error should mention empty")
 
     def test_custom_context_parameter(self, multi_device_guard: MultiDeviceGuard) -> None:
         """Verify custom context is used in error message."""
-        custom_context = "my_gpu_list"
+        custom_context = "my_device_list"
         with pytest.raises(VectorSearchError) as exc_info:
             multi_device_guard([], context=custom_context)
 
         error_msg = str(exc_info.value)
-        assert custom_context in error_msg
+        assertions.expect_true(
+            custom_context in error_msg, reason="error should include custom context"
+        )
 
     def test_single_device(self, multi_device_guard: MultiDeviceGuard) -> None:
         """Verify single device in list returns correctly."""
         result = multi_device_guard([42])
-        assert result == 42
+        assertions.expect_equal(result, 42)
 
-    def test_error_mentions_gpu_context(self, multi_device_guard: MultiDeviceGuard) -> None:
-        """Verify error specifically mentions GPU/FAISS context."""
+    def test_error_mentions_device_context(self, multi_device_guard: MultiDeviceGuard) -> None:
+        """Verify error specifically mentions FAISS device context."""
         with pytest.raises(VectorSearchError) as exc_info:
             multi_device_guard([])
 
         error_msg = str(exc_info.value)
-        # Should mention FAISS or GPU context
-        assert "FAISS" in error_msg or "GPU" in error_msg.upper()
+        assertions.expect_in("FAISS device routing failed", error_msg)
 
     @pytest.mark.parametrize(
         ("devices", "expected"),
@@ -251,7 +255,7 @@ class TestFirstOrErrorMultiDevice:
     ) -> None:
         """Verify multi-device works with various sequence types."""
         result: object = multi_device_guard(devices)
-        assert result == expected
+        assertions.expect_equal(result, expected)
 
 
 class TestErrorHandling:
@@ -271,7 +275,7 @@ class TestErrorHandling:
             sequence_guard([], context="test")
 
         # Cause should be None (raised from None)
-        assert exc_info.value.__cause__ is None
+        assertions.expect_equal(exc_info.value.__cause__, None)
 
 
 @pytest.mark.parametrize(
@@ -303,4 +307,4 @@ class TestFirstOrErrorParametrized:
             # Non-empty sequences should return first element
             result: object = sequence_guard(seq_value, context="test")
             # Verify it returned something (the first element)
-            assert result is not None
+            assertions.expect_true(result is not None, reason="result should not be None")
