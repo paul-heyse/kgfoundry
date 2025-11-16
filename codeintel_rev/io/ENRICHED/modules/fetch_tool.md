@@ -28,7 +28,7 @@ Lightweight fetch helper used by the in-process MCP harness.
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 124
+- **cycle_group**: 123
 
 ## Ownership
 

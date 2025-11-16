@@ -28,30 +28,28 @@ Example failure payload::
 - from **codeintel_rev.config.settings** import load_settings
 - from **codeintel_rev.errors** import RuntimeUnavailableError
 - from **codeintel_rev.io.xtr_manager** import XTRIndex
-- from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 29)
-- variable: `APP` (line 30)
-- variable: `PROBLEM_INSTANCE` (line 31)
-- function: `xtr_open` (line 53)
-- function: `_exit_with_problem` (line 165)
-- function: `main` (line 182)
+- variable: `APP` (line 28)
+- variable: `PROBLEM_INSTANCE` (line 29)
+- function: `xtr_open` (line 51)
+- function: `_exit_with_problem` (line 162)
+- function: `main` (line 179)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 5
-- **cycle_group**: 136
+- **cycle_group**: 134
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 
@@ -89,7 +87,7 @@ Example failure payload::
 
 - branches: 11
 - cyclomatic: 12
-- loc: 189
+- loc: 186
 
 ## Doc Coverage
 

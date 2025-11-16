@@ -9,25 +9,22 @@ Exact reranking utilities for FAISS candidates.
 ## Imports
 
 - from **__future__** import annotations
-- from **time** import perf_counter
 - from **(absolute)** import numpy
 - from **codeintel_rev.io.duckdb_catalog** import DuckDBCatalog
-- from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 12)
-- function: `_perform_exact_rerank` (line 18)
-- function: `_normalize_queries` (line 130)
-- function: `_prepare_candidate_matrix` (line 164)
-- function: `_hydrate_embeddings` (line 210)
-- function: `_build_candidate_vectors` (line 266)
-- function: `_compute_similarity` (line 335)
-- function: `_effective_top_k` (line 404)
-- function: `_select_topk` (line 454)
-- function: `_empty_result` (line 513)
-- class: `FlatReranker` (line 559)
-- function: `exact_rerank` (line 620)
+- function: `_perform_exact_rerank` (line 14)
+- function: `_normalize_queries` (line 120)
+- function: `_prepare_candidate_matrix` (line 154)
+- function: `_hydrate_embeddings` (line 200)
+- function: `_build_candidate_vectors` (line 256)
+- function: `_compute_similarity` (line 325)
+- function: `_effective_top_k` (line 394)
+- function: `_select_topk` (line 444)
+- function: `_empty_result` (line 503)
+- class: `FlatReranker` (line 549)
+- function: `exact_rerank` (line 610)
 
 ## Graph Metrics
 
@@ -40,8 +37,8 @@ Exact reranking utilities for FAISS candidates.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 8
-- recent churn 90: 8
+- recent churn 30: 10
+- recent churn 90: 10
 
 ## Usage
 
@@ -83,7 +80,7 @@ FlatReranker, exact_rerank
 
 - branches: 14
 - cyclomatic: 15
-- loc: 683
+- loc: 673
 
 ## Doc Coverage
 

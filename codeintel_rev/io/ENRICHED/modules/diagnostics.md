@@ -9,14 +9,14 @@ Diagnostics endpoints (disabled - observability removed).
 ## Imports
 
 - from **__future__** import annotations
-- from **fastapi** import APIRouter, HTTPException
+- from **fastapi** import APIRouter
 - from **fastapi.responses** import JSONResponse, PlainTextResponse
 
 ## Definitions
 
 - variable: `router` (line 8)
-- function: `get_run_report` (line 12)
-- function: `get_run_report_markdown` (line 36)
+- function: `get_run_report` (line 15)
+- function: `get_run_report_markdown` (line 37)
 
 ## Graph Metrics
 
@@ -29,8 +29,8 @@ Diagnostics endpoints (disabled - observability removed).
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 
@@ -72,7 +72,7 @@ Diagnostics endpoints (disabled - observability removed).
 
 - branches: 0
 - cyclomatic: 1
-- loc: 57
+- loc: 56
 
 ## Doc Coverage
 

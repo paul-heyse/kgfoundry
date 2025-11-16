@@ -292,6 +292,7 @@ class GitOperationError(KgFoundryError):
             cause=cause,
         )
 
+
 __all__ = [
     "FileOperationError",
     "FileReadError",

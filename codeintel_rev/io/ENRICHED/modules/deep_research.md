@@ -19,34 +19,32 @@ Adapters that expose MCP Deep-Research search/fetch semantics.
 - from **codeintel_rev.mcp_server.schemas** import FetchObject, FetchObjectMetadata, FetchStructuredContent, FetchToolArgs, SearchResultItem, SearchResultMetadata, SearchStructuredContent, SearchToolArgs
 - from **codeintel_rev.retrieval.mcp_search** import FetchDependencies, FetchRequest, FetchResponse, SearchDependencies, SearchFilters, SearchRequest, SearchResponse, run_fetch, run_search
 - from **kgfoundry_common.errors** import VectorSearchError
-- from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 37)
-- function: `_pool_dir` (line 45)
-- function: `_clamp_top_k` (line 49)
-- function: `_clamp_max_tokens` (line 54)
-- function: `_serialize_search_response` (line 59)
-- function: `_serialize_fetch_response` (line 105)
-- function: `search` (line 140)
-- function: `fetch` (line 227)
-- function: `_normalize_object_ids` (line 288)
-- function: `_bounded` (line 321)
+- function: `_pool_dir` (line 43)
+- function: `_clamp_top_k` (line 47)
+- function: `_clamp_max_tokens` (line 52)
+- function: `_serialize_search_response` (line 57)
+- function: `_serialize_fetch_response` (line 103)
+- function: `search` (line 138)
+- function: `fetch` (line 215)
+- function: `_normalize_object_ids` (line 264)
+- function: `_bounded` (line 297)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 5
-- **cycle_group**: 114
+- **cycle_group**: 113
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 
@@ -78,7 +76,7 @@ fetch, search
 
 ## Hotspot
 
-- score: 2.11
+- score: 2.10
 
 ## Side Effects
 
@@ -87,9 +85,9 @@ fetch, search
 
 ## Complexity
 
-- branches: 15
-- cyclomatic: 16
-- loc: 356
+- branches: 14
+- cyclomatic: 15
+- loc: 332
 
 ## Doc Coverage
 

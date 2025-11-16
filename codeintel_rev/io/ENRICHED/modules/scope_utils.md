@@ -59,21 +59,18 @@ codeintel_rev.app.middleware : get_session_id for retrieving session ID
 
 - from **__future__** import annotations
 - from **(absolute)** import fnmatch
-- from **time** import perf_counter
 - from **typing** import TYPE_CHECKING
-- from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.app.config_context** import ApplicationContext
 - from **codeintel_rev.mcp_server.schemas** import ScopeIn
 
 ## Definitions
 
-- variable: `LOGGER` (line 65)
-- variable: `LANGUAGE_EXTENSIONS` (line 69)
-- function: `get_effective_scope` (line 108)
-- function: `merge_scope_filters` (line 152)
-- function: `apply_path_filters` (line 227)
-- function: `apply_language_filter` (line 316)
-- function: `path_matches_glob` (line 409)
+- variable: `LANGUAGE_EXTENSIONS` (line 64)
+- function: `get_effective_scope` (line 103)
+- function: `merge_scope_filters` (line 147)
+- function: `apply_path_filters` (line 222)
+- function: `apply_language_filter` (line 311)
+- function: `path_matches_glob` (line 393)
 
 ## Graph Metrics
 
@@ -86,8 +83,8 @@ codeintel_rev.app.middleware : get_session_id for retrieving session ID
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 9
-- recent churn 90: 9
+- recent churn 30: 11
+- recent churn 90: 11
 
 ## Usage
 
@@ -129,7 +126,7 @@ LANGUAGE_EXTENSIONS, apply_language_filter, apply_path_filters, get_effective_sc
 
 - branches: 16
 - cyclomatic: 17
-- loc: 478
+- loc: 462
 
 ## Doc Coverage
 

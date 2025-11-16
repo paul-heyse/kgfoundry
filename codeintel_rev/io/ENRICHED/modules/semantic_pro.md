@@ -29,82 +29,80 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 - from **codeintel_rev.retrieval.gating** import StageGateConfig, should_run_secondary_stage
 - from **codeintel_rev.retrieval.types** import HybridResultDoc, HybridSearchResult, SearchHit, StageDecision, StageSignals
 - from **kgfoundry_common.errors** import EmbeddingError, VectorSearchError
-- from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.app.config_context** import ApplicationContext
 - from **codeintel_rev.config.settings** import CodeRankLLMConfig, RerankConfig, XTRConfig
 - from **codeintel_rev.io.xtr_manager** import XTRIndex
 
 ## Definitions
 
-- variable: `SNIPPET_PREVIEW_CHARS` (line 45)
-- variable: `COMPONENT_NAME` (line 46)
-- variable: `RERANK_STAGE_NAME` (line 47)
-- variable: `LOGGER` (line 48)
-- class: `RerankOptionPayload` (line 51)
-- class: `SemanticProOptions` (line 60)
-- class: `RerankRuntimeOptions` (line 73)
-- class: `RerankPlan` (line 83)
-- class: `SemanticProRuntimeOptions` (line 94)
-- variable: `WideSearchHandle` (line 106)
-- class: `StageOnePlan` (line 110)
-- class: `HydrationPlan` (line 121)
-- class: `HydrationOutcome` (line 133)
-- class: `_SemanticProRunState` (line 141)
-- function: `build_runtime_options` (line 167)
-- function: `_summarize_options` (line 249)
-- function: `semantic_search_pro` (line 262)
-- function: `_semantic_search_pro_sync` (line 355)
-- function: `_run_coderank_stage` (line 545)
-- function: `_maybe_run_warp` (line 607)
-- function: `_should_execute_stage_two` (line 630)
-- function: `_execute_stage_two` (line 682)
-- function: `_run_fusion_stage` (line 709)
-- function: `_maybe_apply_rerank_stage` (line 739)
-- class: `_RerankOutcome` (line 814)
-- function: `_reorder_docs` (line 819)
-- function: `_build_rerank_plan` (line 861)
-- function: `_resolve_reranker` (line 882)
-- function: `_maybe_schedule_xtr_wide` (line 897)
-- function: `_resolve_stage_one_outcome` (line 930)
-- function: `_run_xtr_wide_stage` (line 1005)
-- function: `_calculate_xtr_k` (line 1026)
-- function: `_build_extra_channels` (line 1033)
-- function: `_safe_int` (line 1053)
-- function: `_merge_rrf_weights` (line 1061)
-- function: `_run_warp_stage` (line 1077)
-- function: `_warp_executor_hits` (line 1100)
-- function: `_xtr_rescore_hits` (line 1139)
-- function: `_hydrate_records` (line 1182)
-- function: `_hydrate_and_rerank_records` (line 1214)
-- function: `_maybe_rerank` (line 1336)
-- function: `_rerank_gate_decision` (line 1381)
-- function: `_build_findings` (line 1398)
-- function: `_structure_explanations` (line 1440)
-- function: `merge_explainability_into_findings` (line 1470)
-- function: `_build_method_explainability` (line 1535)
-- function: `_build_method` (line 1602)
-- function: `_assemble_extras` (line 1639)
-- function: `_make_envelope` (line 1703)
-- function: `_clamp_limit` (line 1719)
-- function: `_coerce_positive_int` (line 1730)
-- function: `_dedupe_preserve_order` (line 1740)
-- class: `WarpOutcome` (line 1752)
-- class: `FusionRequest` (line 1762)
-- class: `MethodContext` (line 1776)
+- variable: `SNIPPET_PREVIEW_CHARS` (line 44)
+- variable: `COMPONENT_NAME` (line 45)
+- variable: `RERANK_STAGE_NAME` (line 46)
+- class: `RerankOptionPayload` (line 49)
+- class: `SemanticProOptions` (line 58)
+- class: `RerankRuntimeOptions` (line 71)
+- class: `RerankPlan` (line 81)
+- class: `SemanticProRuntimeOptions` (line 92)
+- variable: `WideSearchHandle` (line 104)
+- class: `StageOnePlan` (line 108)
+- class: `HydrationPlan` (line 119)
+- class: `HydrationOutcome` (line 131)
+- class: `_SemanticProRunState` (line 140)
+- function: `build_runtime_options` (line 166)
+- function: `_summarize_options` (line 245)
+- function: `semantic_search_pro` (line 258)
+- function: `_semantic_search_pro_sync` (line 351)
+- function: `_run_coderank_stage` (line 488)
+- function: `_maybe_run_warp` (line 539)
+- function: `_should_execute_stage_two` (line 562)
+- function: `_execute_stage_two` (line 598)
+- function: `_run_fusion_stage` (line 621)
+- function: `_maybe_apply_rerank_stage` (line 644)
+- class: `_RerankOutcome` (line 695)
+- function: `_reorder_docs` (line 700)
+- function: `_build_rerank_plan` (line 742)
+- function: `_resolve_reranker` (line 763)
+- function: `_maybe_schedule_xtr_wide` (line 778)
+- function: `_resolve_stage_one_outcome` (line 807)
+- function: `_run_xtr_wide_stage` (line 879)
+- function: `_calculate_xtr_k` (line 900)
+- function: `_build_extra_channels` (line 907)
+- function: `_safe_int` (line 927)
+- function: `_merge_rrf_weights` (line 935)
+- function: `_run_warp_stage` (line 948)
+- function: `_warp_executor_hits` (line 971)
+- function: `_xtr_rescore_hits` (line 1003)
+- function: `_hydrate_records` (line 1042)
+- function: `_hydrate_and_rerank_records` (line 1074)
+- function: `_maybe_rerank` (line 1164)
+- function: `_rerank_gate_decision` (line 1205)
+- function: `_build_findings` (line 1222)
+- function: `_structure_explanations` (line 1264)
+- function: `merge_explainability_into_findings` (line 1294)
+- function: `_build_method_explainability` (line 1359)
+- function: `_build_method` (line 1426)
+- function: `_assemble_extras` (line 1463)
+- function: `_make_envelope` (line 1533)
+- function: `_clamp_limit` (line 1549)
+- function: `_coerce_positive_int` (line 1560)
+- function: `_dedupe_preserve_order` (line 1570)
+- class: `WarpOutcome` (line 1582)
+- class: `FusionRequest` (line 1592)
+- class: `MethodContext` (line 1606)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 16
-- **cycle_group**: 120
+- **cycle_group**: 119
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 21
-- recent churn 90: 21
+- recent churn 30: 24
+- recent churn 90: 24
 
 ## Usage
 
@@ -132,7 +130,7 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 
 ## Hotspot
 
-- score: 3.18
+- score: 3.17
 
 ## Side Effects
 
@@ -141,9 +139,9 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 
 ## Complexity
 
-- branches: 147
-- cyclomatic: 148
-- loc: 1788
+- branches: 144
+- cyclomatic: 145
+- loc: 1618
 
 ## Doc Coverage
 

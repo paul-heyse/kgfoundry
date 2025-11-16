@@ -15,7 +15,7 @@ Utilities for loading enrichment artifacts into DuckDB.
 - from **collections.abc** import Sequence
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
-- from **typing** import TYPE_CHECKING, Any
+- from **typing** import TYPE_CHECKING, Any, Protocol, cast
 - from **codeintel_rev.typing** import gate_import
 - from **(absolute)** import duckdb
 
@@ -23,29 +23,30 @@ Utilities for loading enrichment artifacts into DuckDB.
 
 - variable: `DuckDBConnection` (line 63)
 - variable: `DuckDBConnection` (line 65)
-- class: `DuckConn` (line 69)
-- function: `_duckdb` (line 75)
-- function: `ensure_schema` (line 86)
-- function: `ingest_modules_jsonl` (line 130)
-- function: `_load_json_rows` (line 160)
-- function: `_coerce_value` (line 178)
-- function: `_apply_pragmas` (line 187)
-- function: `_ingest_via_native_json` (line 200)
-- function: `_ingest_via_python` (line 231)
+- class: `_DuckDBModule` (line 68)
+- class: `DuckConn` (line 94)
+- function: `_duckdb` (line 100)
+- function: `ensure_schema` (line 112)
+- function: `ingest_modules_jsonl` (line 156)
+- function: `_load_json_rows` (line 186)
+- function: `_coerce_value` (line 204)
+- function: `_apply_pragmas` (line 213)
+- function: `_ingest_via_native_json` (line 226)
+- function: `_ingest_via_python` (line 257)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 86
+- **cycle_group**: 78
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 3
-- recent churn 90: 3
+- recent churn 30: 5
+- recent churn 90: 5
 
 ## Usage
 
@@ -83,7 +84,7 @@ DuckConn, ensure_schema, ingest_modules_jsonl
 
 ## Hotspot
 
-- score: 1.98
+- score: 2.00
 
 ## Side Effects
 
@@ -92,12 +93,13 @@ DuckConn, ensure_schema, ingest_modules_jsonl
 
 ## Complexity
 
-- branches: 25
-- cyclomatic: 26
-- loc: 249
+- branches: 27
+- cyclomatic: 28
+- loc: 275
 
 ## Doc Coverage
 
+- `_DuckDBModule` (class): summary=yes, examples=no — Protocol describing the subset of duckdb module APIs we rely on.
 - `DuckConn` (class): summary=yes, examples=no — Connection metadata for enrichment DuckDB ingestion.
 - `_duckdb` (function): summary=yes, params=ok, examples=no — Import duckdb on demand to keep it optional at runtime.
 - `ensure_schema` (function): summary=yes, params=mismatch, examples=no — Create the ``modules`` table if it does not already exist.

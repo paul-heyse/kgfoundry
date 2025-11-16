@@ -29,7 +29,7 @@ class SequenceGuard(Protocol):
         sequence: Sequence[object],
         *,
         context: str,
-        operation: str | None = None,
+        operation: str = "sequence_access",
     ) -> object:
         """Guard sequence with context.
 
@@ -49,7 +49,6 @@ class SequenceGuard(Protocol):
         """
 
 
-
 class MultiDeviceGuard(Protocol):
     """Protocol describing the multi-device guard callable contract."""
 
@@ -57,8 +56,8 @@ class MultiDeviceGuard(Protocol):
         self,
         sequence: Sequence[object],
         *,
-        context: str | None = None,
-        operation: str | None = None,
+        context: str,
+        operation: str = "multi_device_access",
     ) -> object:
         """Guard sequence for multi-device context.
 
@@ -76,7 +75,6 @@ class MultiDeviceGuard(Protocol):
         object
             First element of sequence.
         """
-
 
 
 @pytest.fixture(name="sequence_guard")
@@ -202,17 +200,20 @@ def test_sequence_length_check(sequence_guard: SequenceGuard) -> None:
         sequence_guard([], context="c")
 
 
+DEFAULT_DEVICE_CONTEXT = "device_selection_test"
+
+
 def test_valid_devices_returns_first(multi_device_guard: MultiDeviceGuard) -> None:
     """Verify multi-device variant returns first element."""
     shard_indices = [0, 1, 2]
-    result = multi_device_guard(shard_indices)
+    result = multi_device_guard(shard_indices, context=DEFAULT_DEVICE_CONTEXT, operation="device")
     assertions.expect_equal(result, 0)
 
 
 def test_empty_devices_raises_error(multi_device_guard: MultiDeviceGuard) -> None:
     """Verify empty device list raises VectorSearchError."""
     with pytest.raises(VectorSearchError) as exc_info:
-        multi_device_guard([])
+        multi_device_guard([], context=DEFAULT_DEVICE_CONTEXT, operation="device")
 
     error = exc_info.value
     assertions.expect_in("FAISS device routing failed", str(error))
@@ -223,7 +224,7 @@ def test_custom_context_parameter(multi_device_guard: MultiDeviceGuard) -> None:
     """Verify custom context is used in error message."""
     custom_context = "my_device_list"
     with pytest.raises(VectorSearchError) as exc_info:
-        multi_device_guard([], context=custom_context)
+        multi_device_guard([], context=custom_context, operation="device")
 
     error_msg = str(exc_info.value)
     assertions.expect_true(
@@ -233,14 +234,14 @@ def test_custom_context_parameter(multi_device_guard: MultiDeviceGuard) -> None:
 
 def test_single_device(multi_device_guard: MultiDeviceGuard) -> None:
     """Verify single device in list returns correctly."""
-    result = multi_device_guard([42])
+    result = multi_device_guard([42], context=DEFAULT_DEVICE_CONTEXT, operation="device")
     assertions.expect_equal(result, 42)
 
 
 def test_error_mentions_device_context(multi_device_guard: MultiDeviceGuard) -> None:
     """Verify error specifically mentions FAISS device context."""
     with pytest.raises(VectorSearchError) as exc_info:
-        multi_device_guard([])
+        multi_device_guard([], context=DEFAULT_DEVICE_CONTEXT, operation="device")
 
     error_msg = str(exc_info.value)
     assertions.expect_in("FAISS device routing failed", error_msg)
@@ -261,7 +262,11 @@ def test_various_valid_sequences(
     expected: object,
 ) -> None:
     """Verify multi-device works with various sequence types."""
-    result: object = multi_device_guard(devices)
+    result: object = multi_device_guard(
+        devices,
+        context=DEFAULT_DEVICE_CONTEXT,
+        operation="device",
+    )
     assertions.expect_equal(result, expected)
 
 

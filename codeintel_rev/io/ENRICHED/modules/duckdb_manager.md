@@ -18,31 +18,30 @@ Thread-safe DuckDB connection manager.
 - from **time** import perf_counter
 - from **typing** import TYPE_CHECKING, cast
 - from **codeintel_rev._lazy_imports** import LazyModule
-- from **kgfoundry_common.logging** import get_logger
 - from **(absolute)** import duckdb
 
 ## Definitions
 
-- variable: `duckdb` (line 20)
-- class: `DuckDBConfig` (line 26)
-- class: `_InstrumentedDuckDBConnection` (line 54)
-- class: `DuckDBManager` (line 143)
-- class: `DuckDBQueryOptions` (line 281)
-- class: `DuckDBQueryBuilder` (line 296)
+- variable: `duckdb` (line 19)
+- class: `DuckDBConfig` (line 25)
+- class: `_InstrumentedDuckDBConnection` (line 52)
+- class: `DuckDBManager` (line 129)
+- class: `DuckDBQueryOptions` (line 267)
+- class: `DuckDBQueryBuilder` (line 282)
 
 ## Graph Metrics
 
 - **fan_in**: 10
 - **fan_out**: 2
-- **cycle_group**: 12
+- **cycle_group**: 9
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 10
-- recent churn 90: 10
+- recent churn 30: 11
+- recent churn 90: 11
 
 ## Usage
 
@@ -83,9 +82,9 @@ DuckDBConfig, DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 
 ## Complexity
 
-- branches: 51
-- cyclomatic: 52
-- loc: 488
+- branches: 50
+- cyclomatic: 51
+- loc: 474
 
 ## Doc Coverage
 

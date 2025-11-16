@@ -25,7 +25,7 @@ class _StubFaissManager:
         nprobe: int | None = None,
         runtime: object | None = None,
     ) -> tuple[np.ndarray, np.ndarray]:
-        del query, nprobe, runtime
+        del self, query, nprobe, runtime
         result_k = max(1, int(k or 1))
         ids = np.full((1, result_k), 101, dtype=np.int64)
         distances = np.full((1, result_k), 0.9, dtype=np.float32)
@@ -36,6 +36,7 @@ class _StubVLLMClient:
     """Stub satisfying SupportsEmbedSingle."""
 
     def embed_single(self, text: str) -> list[float]:
+        del self
         assertions.expect_true(bool(text), reason="text should be non-empty")
         return [0.0, 0.0]
 

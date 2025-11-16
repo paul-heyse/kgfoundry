@@ -14,17 +14,15 @@ Pooled wrapper around the CodeRank embedding SentenceTransformer.
 - from **typing** import TYPE_CHECKING, Any, ClassVar, Protocol, cast
 - from **codeintel_rev._lazy_imports** import LazyModule
 - from **codeintel_rev.typing** import NDArrayF32, gate_import
-- from **kgfoundry_common.logging** import get_logger
 - from **(absolute)** import numpy
 - from **sentence_transformers** import SentenceTransformer
 
 ## Definitions
 
-- variable: `np` (line 17)
-- variable: `SentenceTransformer` (line 18)
-- class: `SupportsCodeRankSettings` (line 21)
-- variable: `LOGGER` (line 55)
-- class: `CodeRankEmbedder` (line 58)
+- variable: `np` (line 16)
+- variable: `SentenceTransformer` (line 17)
+- class: `SupportsCodeRankSettings` (line 20)
+- class: `CodeRankEmbedder` (line 54)
 
 ## Graph Metrics
 
@@ -37,8 +35,8 @@ Pooled wrapper around the CodeRank embedding SentenceTransformer.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 
@@ -76,7 +74,7 @@ Pooled wrapper around the CodeRank embedding SentenceTransformer.
 
 - branches: 8
 - cyclomatic: 9
-- loc: 177
+- loc: 169
 
 ## Doc Coverage
 

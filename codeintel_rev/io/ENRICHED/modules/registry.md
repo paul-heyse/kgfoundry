@@ -13,14 +13,12 @@ Entry-point driven registry for retrieval channels.
 - from **importlib.metadata** import EntryPoint, entry_points
 - from **typing** import cast
 - from **codeintel_rev.plugins.channels** import Channel, ChannelContext
-- from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 12)
-- class: `ChannelRegistry` (line 19)
-- function: `_iter_entry_points` (line 113)
-- function: `_load_factory` (line 140)
+- class: `ChannelRegistry` (line 16)
+- function: `_iter_entry_points` (line 106)
+- function: `_load_factory` (line 133)
 
 ## Graph Metrics
 
@@ -33,8 +31,8 @@ Entry-point driven registry for retrieval channels.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 
@@ -76,7 +74,7 @@ ChannelRegistry
 
 - branches: 8
 - cyclomatic: 9
-- loc: 178
+- loc: 167
 
 ## Doc Coverage
 

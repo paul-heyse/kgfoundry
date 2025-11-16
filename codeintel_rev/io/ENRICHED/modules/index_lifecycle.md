@@ -35,39 +35,37 @@ through stable paths such as ``.../current/faiss.index`` and reload when
 - from **pathlib** import Path
 - from **typing** import Any
 - from **codeintel_rev.errors** import RuntimeLifecycleError
-- from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 35)
-- variable: `MANIFEST_FILE` (line 37)
-- variable: `IDMAP_FILE` (line 38)
-- variable: `PROFILE_FILE` (line 39)
-- class: `LuceneAssets` (line 46)
-- function: `link_current_lucene` (line 66)
-- class: `IndexAssets` (line 79)
-- function: `_file_checksum` (line 121)
-- function: `_read_json` (line 131)
-- function: `collect_asset_attrs` (line 138)
-- function: `_attrs_from_meta` (line 176)
-- function: `_attrs_from_idmap` (line 199)
-- function: `_attrs_from_tuning` (line 208)
-- class: `VersionMeta` (line 233)
-- class: `IndexLifecycleManager` (line 258)
+- variable: `MANIFEST_FILE` (line 35)
+- variable: `IDMAP_FILE` (line 36)
+- variable: `PROFILE_FILE` (line 37)
+- class: `LuceneAssets` (line 44)
+- function: `link_current_lucene` (line 64)
+- class: `IndexAssets` (line 77)
+- function: `_file_checksum` (line 119)
+- function: `_read_json` (line 129)
+- function: `collect_asset_attrs` (line 136)
+- function: `_attrs_from_meta` (line 174)
+- function: `_attrs_from_idmap` (line 195)
+- function: `_attrs_from_tuning` (line 204)
+- class: `VersionMeta` (line 229)
+- class: `IndexLifecycleManager` (line 254)
 
 ## Graph Metrics
 
 - **fan_in**: 5
 - **fan_out**: 2
-- **cycle_group**: 11
+- **cycle_group**: 23
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 11
-- recent churn 90: 11
+- recent churn 30: 13
+- recent churn 90: 13
 
 ## Usage
 
@@ -99,7 +97,7 @@ IndexAssets, IndexLifecycleManager, LuceneAssets, VersionMeta, collect_asset_att
 
 ## Hotspot
 
-- score: 2.67
+- score: 2.66
 
 ## Side Effects
 
@@ -107,9 +105,9 @@ IndexAssets, IndexLifecycleManager, LuceneAssets, VersionMeta, collect_asset_att
 
 ## Complexity
 
-- branches: 71
-- cyclomatic: 72
-- loc: 772
+- branches: 70
+- cyclomatic: 71
+- loc: 743
 
 ## Doc Coverage
 

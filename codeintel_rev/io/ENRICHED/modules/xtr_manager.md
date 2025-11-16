@@ -13,36 +13,33 @@ Token-level XTR index manager with late-interaction scoring utilities.
 - from **collections.abc** import Iterable
 - from **dataclasses** import dataclass, field
 - from **pathlib** import Path
-- from **time** import perf_counter
 - from **typing** import TYPE_CHECKING, Any, Literal, TypedDict, cast
 - from **codeintel_rev._lazy_imports** import LazyModule
 - from **codeintel_rev.config.settings** import XTRConfig
 - from **codeintel_rev.runtime** import RuntimeCell
 - from **codeintel_rev.typing** import NDArrayF32, TorchModule, gate_import
-- from **kgfoundry_common.logging** import get_logger
 - from **(absolute)** import numpy
 
 ## Definitions
 
-- variable: `np` (line 21)
-- variable: `LOGGER` (line 23)
-- class: `XTRMetadata` (line 26)
-- class: `_XTRIndexRuntime` (line 38)
-- class: `XTRIndex` (line 62)
+- variable: `np` (line 19)
+- class: `XTRMetadata` (line 22)
+- class: `_XTRIndexRuntime` (line 34)
+- class: `XTRIndex` (line 58)
 
 ## Graph Metrics
 
 - **fan_in**: 8
 - **fan_out**: 4
-- **cycle_group**: 25
+- **cycle_group**: 11
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 11
-- recent churn 90: 11
+- recent churn 30: 14
+- recent churn 90: 14
 
 ## Usage
 
@@ -78,9 +75,9 @@ Token-level XTR index manager with late-interaction scoring utilities.
 
 ## Complexity
 
-- branches: 46
-- cyclomatic: 47
-- loc: 642
+- branches: 45
+- cyclomatic: 46
+- loc: 571
 
 ## Doc Coverage
 

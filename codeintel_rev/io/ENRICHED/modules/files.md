@@ -23,42 +23,40 @@ Provides file listing, reading, and scope configuration.
 - from **codeintel_rev.io.path_utils** import PathOutsideRepositoryError, resolve_within_repo
 - from **codeintel_rev.mcp_server.schemas** import ScopeIn
 - from **codeintel_rev.mcp_server.scope_utils** import LANGUAGE_EXTENSIONS, get_effective_scope, merge_scope_filters
-- from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.app.config_context** import ApplicationContext
 
 ## Definitions
 
-- variable: `LOGGER` (line 35)
-- class: `FileListFilters` (line 39)
-- class: `DirectoryFilters` (line 49)
-- function: `set_scope` (line 58)
-- function: `list_paths` (line 102)
-- function: `_normalize_list_paths_arguments` (line 214)
-- function: `_list_paths_sync` (line 246)
-- function: `_collect_filtered_paths` (line 365)
-- function: `_prune_directories` (line 430)
-- function: `_create_file_entry` (line 452)
-- function: `open_file` (line 509)
-- function: `_resolve_search_root` (line 620)
-- function: `_matches_any` (line 667)
-- function: `_relative_path_str` (line 672)
-- function: `_safe_stat` (line 684)
-- function: `_collect_language_extensions` (line 691)
-- function: `_matches_language` (line 710)
+- class: `FileListFilters` (line 36)
+- class: `DirectoryFilters` (line 46)
+- function: `set_scope` (line 55)
+- function: `list_paths` (line 94)
+- function: `_normalize_list_paths_arguments` (line 190)
+- function: `_list_paths_sync` (line 222)
+- function: `_collect_filtered_paths` (line 322)
+- function: `_prune_directories` (line 387)
+- function: `_create_file_entry` (line 409)
+- function: `open_file` (line 466)
+- function: `_resolve_search_root` (line 572)
+- function: `_matches_any` (line 619)
+- function: `_relative_path_str` (line 624)
+- function: `_safe_stat` (line 636)
+- function: `_collect_language_extensions` (line 643)
+- function: `_matches_language` (line 662)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 7
-- **cycle_group**: 115
+- **cycle_group**: 114
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 22
-- recent churn 90: 22
+- recent churn 30: 24
+- recent churn 90: 24
 
 ## Usage
 
@@ -99,9 +97,9 @@ list_paths, open_file, set_scope
 
 ## Complexity
 
-- branches: 50
-- cyclomatic: 51
-- loc: 728
+- branches: 49
+- cyclomatic: 50
+- loc: 680
 
 ## Doc Coverage
 

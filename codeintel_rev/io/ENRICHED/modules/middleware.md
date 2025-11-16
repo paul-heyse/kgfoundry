@@ -62,31 +62,29 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 - from **starlette.middleware.base** import BaseHTTPMiddleware, DispatchFunction
 - from **starlette.types** import ASGIApp
 - from **codeintel_rev.runtime.request_context** import capability_stamp_var, session_id_var
-- from **kgfoundry_common.logging** import get_logger
 - from **collections.abc** import Awaitable, Callable
 - from **starlette.requests** import Request
 - from **starlette.responses** import Response
 
 ## Definitions
 
-- variable: `LOGGER` (line 69)
-- function: `get_session_id` (line 72)
-- function: `get_capability_stamp` (line 123)
-- class: `SessionScopeMiddleware` (line 135)
+- function: `get_session_id` (line 69)
+- function: `get_capability_stamp` (line 120)
+- class: `SessionScopeMiddleware` (line 132)
 
 ## Graph Metrics
 
 - **fan_in**: 6
 - **fan_out**: 2
-- **cycle_group**: 33
+- **cycle_group**: 37
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 17
-- recent churn 90: 17
+- recent churn 30: 20
+- recent churn 90: 20
 
 ## Usage
 
@@ -126,13 +124,13 @@ SessionScopeMiddleware, capability_stamp_var, get_capability_stamp, get_session_
 
 ## Side Effects
 
-- none detected
+- network
 
 ## Complexity
 
 - branches: 5
 - cyclomatic: 6
-- loc: 269
+- loc: 271
 
 ## Doc Coverage
 

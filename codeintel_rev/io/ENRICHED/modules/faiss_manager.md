@@ -3,20 +3,20 @@
 ## Docstring
 
 ```
-FAISS manager for GPU-accelerated vector search.
+FAISS manager for CPU vector search.
 
-Manages adaptive FAISS indexes (Flat, IVFFlat, or IVF-PQ) with cuVS acceleration,
-CPU persistence, and GPU cloning. Index type is automatically selected based on
+Manages adaptive FAISS indexes (Flat, IVFFlat, or IVF-PQ) with CPU persistence.
+Index type is automatically selected based on
 corpus size for optimal performance.
 ```
 
 ## Imports
 
 - from **__future__** import annotations
-- from **(absolute)** import importlib
 - from **(absolute)** import json
 - from **(absolute)** import math
 - from **collections.abc** import Callable, Mapping, Sequence
+- from **contextlib** import suppress
 - from **dataclasses** import dataclass
 - from **datetime** import UTC, datetime
 - from **numbers** import Integral, Real
@@ -32,7 +32,6 @@ corpus size for optimal performance.
 - from **codeintel_rev.retrieval.types** import SearchHit
 - from **codeintel_rev.typing** import NDArrayF32, NDArrayI64, gate_import
 - from **kgfoundry_common.errors** import VectorSearchError
-- from **kgfoundry_common.logging** import get_logger
 - from **(absolute)** import faiss
 - from **(absolute)** import numpy
 - from **(absolute)** import pyarrow
@@ -40,39 +39,37 @@ corpus size for optimal performance.
 
 ## Definitions
 
-- variable: `FaissIndex` (line 37)
-- variable: `np` (line 39)
-- variable: `FaissIndex` (line 40)
-- variable: `pa` (line 46)
-- variable: `pq` (line 47)
-- variable: `LOGGER` (line 49)
-- variable: `logger` (line 50)
-- function: `_run_index_search` (line 54)
-- class: `_LazyFaissProxy` (line 90)
-- variable: `faiss` (line 134)
-- function: `_faiss_module` (line 137)
-- function: `_has_faiss_gpu_support` (line 148)
-- function: `apply_parameters` (line 164)
-- function: `_log_extra` (line 221)
-- class: `FAISSRuntimeOptions` (line 239)
-- class: `SearchRuntimeOverrides` (line 260)
-- class: `RefineSearchConfig` (line 269)
-- class: `_TuningOverrides` (line 278)
-- class: `_SearchExecutionParams` (line 289)
-- class: `_SearchPlan` (line 299)
-- class: `_FAISSIdMapMixin` (line 308)
-- class: `FAISSManager` (line 495)
-- class: `AutoTuner` (line 3441)
-- function: `_coerce_to_int` (line 3551)
-- function: `_configure_direct_map` (line 3574)
-- function: `_set_direct_map_type` (line 3582)
-- function: `_wrap_bool_contains` (line 3625)
-- function: `_wrap_index_contains` (line 3661)
-- function: `_coerce_optional_int` (line 3699)
-- function: `_coerce_optional_float` (line 3733)
-- function: `_parse_tuning_overrides` (line 3767)
-- function: `_persist_tuning_profile` (line 3793)
-- function: `_get_compile_options` (line 3805)
+- variable: `FaissIndex` (line 36)
+- variable: `np` (line 38)
+- variable: `FaissIndex` (line 39)
+- variable: `pa` (line 45)
+- variable: `pq` (line 46)
+- function: `_run_index_search` (line 51)
+- class: `_LazyFaissProxy` (line 87)
+- variable: `faiss` (line 131)
+- function: `_faiss_module` (line 134)
+- function: `apply_parameters` (line 145)
+- class: `FAISSRuntimeController` (line 195)
+- function: `_log_extra` (line 369)
+- class: `FAISSRuntimeOptions` (line 387)
+- class: `SearchRuntimeOverrides` (line 406)
+- class: `RefineSearchConfig` (line 415)
+- class: `_TuningOverrides` (line 424)
+- class: `_SearchExecutionParams` (line 435)
+- class: `_SearchPlan` (line 444)
+- class: `_FAISSIdMapMixin` (line 453)
+- class: `FAISSManager` (line 632)
+- class: `AutoTuner` (line 3083)
+- function: `_coerce_to_int` (line 3193)
+- function: `_configure_direct_map` (line 3216)
+- function: `_set_direct_map_type` (line 3224)
+- function: `_wrap_bool_contains` (line 3261)
+- function: `_wrap_index_contains` (line 3297)
+- function: `_coerce_optional_int` (line 3335)
+- function: `_coerce_optional_float` (line 3369)
+- function: `_parse_tuning_overrides` (line 3403)
+- function: `_persist_tuning_profile` (line 3429)
+- function: `_get_compile_options` (line 3438)
 
 ## Graph Metrics
 
@@ -95,11 +92,11 @@ corpus size for optimal performance.
 
 ## Declared Exports (__all__)
 
-AutoTuner, FAISSManager, apply_parameters
+AutoTuner, FAISSManager, FAISSRuntimeController, apply_parameters
 
 ## Doc Health
 
-- **summary**: FAISS manager for GPU-accelerated vector search.
+- **summary**: FAISS manager for CPU vector search.
 - has summary: yes
 - param parity: yes
 - examples present: no
@@ -118,7 +115,7 @@ AutoTuner, FAISSManager, apply_parameters
 
 ## Hotspot
 
-- score: 3.29
+- score: 3.27
 
 ## Side Effects
 
@@ -126,17 +123,17 @@ AutoTuner, FAISSManager, apply_parameters
 
 ## Complexity
 
-- branches: 249
-- cyclomatic: 250
-- loc: 3821
+- branches: 231
+- cyclomatic: 232
+- loc: 3454
 
 ## Doc Coverage
 
 - `_run_index_search` (function): summary=yes, params=ok, examples=no — Execute FAISS search and coerce results into typed NumPy arrays.
 - `_LazyFaissProxy` (class): summary=yes, examples=no — Deferred FAISS module loader to avoid import-time side effects.
 - `_faiss_module` (function): summary=yes, params=ok, examples=no — Return the lazily imported FAISS module.
-- `_has_faiss_gpu_support` (function): summary=yes, params=ok, examples=no — Return ``True`` when FAISS exposes GPU bindings, otherwise ``False``.
 - `apply_parameters` (function): summary=yes, params=ok, examples=no — Apply a FAISS ParameterSpace string to ``index``.
+- `FAISSRuntimeController` (class): summary=yes, examples=no — Encapsulate runtime tuning operations for :class:`FAISSManager`.
 - `_log_extra` (function): summary=yes, params=mismatch, examples=no — Build structured logging extras for FAISS manager events.
 - `FAISSRuntimeOptions` (class): summary=yes, examples=no — Runtime tuning options passed to :class:`FAISSManager`.
 - `SearchRuntimeOverrides` (class): summary=yes, examples=no — Per-search overrides for HNSW/quantizer parameters.

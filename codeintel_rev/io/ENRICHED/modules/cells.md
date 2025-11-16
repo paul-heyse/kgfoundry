@@ -18,35 +18,33 @@ Thread-safe runtime cell primitive for mutable subsystems.
 - from **codeintel_rev.errors** import RuntimeLifecycleError, RuntimeUnavailableError
 - from **codeintel_rev.runtime.factory_adjustment** import FactoryAdjuster, NoopFactoryAdjuster
 - from **codeintel_rev.runtime.request_context** import capability_stamp_var, session_id_var
-- from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `T` (line 17)
-- variable: `LOGGER` (line 19)
-- variable: `InitStatus` (line 25)
-- variable: `CloseStatus` (line 26)
-- class: `RuntimeCellCloseResult` (line 30)
-- class: `RuntimeCellInitContext` (line 42)
-- class: `RuntimeCellInitResult` (line 50)
-- function: `_seed_allowed` (line 62)
-- class: `RuntimeCellObserver` (line 69)
-- class: `NullRuntimeCellObserver` (line 88)
-- class: `RuntimeCell` (line 115)
+- variable: `T` (line 16)
+- variable: `InitStatus` (line 23)
+- variable: `CloseStatus` (line 24)
+- class: `RuntimeCellCloseResult` (line 28)
+- class: `RuntimeCellInitContext` (line 40)
+- class: `RuntimeCellInitResult` (line 48)
+- function: `_seed_allowed` (line 60)
+- class: `RuntimeCellObserver` (line 67)
+- class: `NullRuntimeCellObserver` (line 86)
+- class: `RuntimeCell` (line 113)
 
 ## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 4
-- **cycle_group**: 9
+- **cycle_group**: 7
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 13
-- recent churn 90: 13
+- recent churn 30: 18
+- recent churn 90: 18
 
 ## Usage
 
@@ -92,7 +90,7 @@ cooldown_error
 
 - branches: 44
 - cyclomatic: 45
-- loc: 633
+- loc: 595
 
 ## Doc Coverage
 

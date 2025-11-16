@@ -14,9 +14,7 @@ Usage:
 
 - from **__future__** import annotations
 - from **(absolute)** import argparse
-- from **(absolute)** import logging
 - from **(absolute)** import os
-- from **(absolute)** import shlex
 - from **(absolute)** import signal
 - from **(absolute)** import sys
 - from **(absolute)** import tempfile
@@ -26,32 +24,30 @@ Usage:
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
 - from **typing** import Final
-- from **kgfoundry_common.logging** import get_logger
 - from **kgfoundry_common.subprocess_utils** import spawn_background_process
 - from **(absolute)** import httpx
 
 ## Definitions
 
-- variable: `httpx` (line 30)
-- variable: `DEFAULT_HOST` (line 32)
-- variable: `DEFAULT_PORT` (line 33)
-- variable: `DEFAULT_MODEL` (line 34)
-- variable: `DEFAULT_PID_FILE` (line 35)
-- variable: `DEFAULT_BASE_URL` (line 38)
-- variable: `DEFAULT_HF_CACHE` (line 39)
-- variable: `HTTP_OK` (line 44)
-- variable: `LOGGER` (line 46)
-- class: `ServerLaunchOptions` (line 50)
-- function: `_infer_host_port` (line 62)
-- function: `_health_url` (line 74)
-- function: `_build_server_argv` (line 80)
-- function: `_env_for_cache` (line 106)
-- function: `_wait_until_ready` (line 116)
-- function: `cmd_serve_http` (line 135)
-- function: `_wait_for_exit` (line 189)
-- function: `cmd_shutdown` (line 200)
-- function: `build_parser` (line 244)
-- function: `main` (line 285)
+- variable: `httpx` (line 27)
+- variable: `DEFAULT_HOST` (line 29)
+- variable: `DEFAULT_PORT` (line 30)
+- variable: `DEFAULT_MODEL` (line 31)
+- variable: `DEFAULT_PID_FILE` (line 32)
+- variable: `DEFAULT_BASE_URL` (line 35)
+- variable: `DEFAULT_HF_CACHE` (line 36)
+- variable: `HTTP_OK` (line 41)
+- class: `ServerLaunchOptions` (line 45)
+- function: `_infer_host_port` (line 57)
+- function: `_health_url` (line 69)
+- function: `_build_server_argv` (line 75)
+- function: `_env_for_cache` (line 103)
+- function: `_wait_until_ready` (line 113)
+- function: `cmd_serve_http` (line 132)
+- function: `_wait_for_exit` (line 178)
+- function: `cmd_shutdown` (line 189)
+- function: `build_parser` (line 227)
+- function: `main` (line 277)
 
 ## Graph Metrics
 
@@ -64,8 +60,8 @@ Usage:
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 5
+- recent churn 90: 5
 
 ## Usage
 
@@ -102,9 +98,9 @@ Usage:
 
 ## Complexity
 
-- branches: 37
-- cyclomatic: 38
-- loc: 310
+- branches: 36
+- cyclomatic: 37
+- loc: 300
 
 ## Doc Coverage
 

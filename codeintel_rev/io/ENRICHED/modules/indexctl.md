@@ -14,6 +14,7 @@ Typer CLI for managing index lifecycle operations.
 - from **(absolute)** import os
 - from **(absolute)** import uuid
 - from **collections.abc** import Callable, Mapping, Sequence
+- from **contextlib** import suppress
 - from **dataclasses** import dataclass
 - from **datetime** import UTC, datetime
 - from **functools** import lru_cache
@@ -35,90 +36,88 @@ Typer CLI for managing index lifecycle operations.
 - from **codeintel_rev.io.parquet_store** import ParquetWriteOptions, extract_embeddings, read_chunks_parquet, write_chunks_parquet
 - from **codeintel_rev.io.xtr_manager** import XTRIndex
 - from **codeintel_rev.typing** import NDArrayF32
-- from **kgfoundry_common.logging** import get_logger
 - from **(absolute)** import pyarrow.parquet
 
 ## Definitions
 
 - variable: `pyarrow_parquet` (line 51)
-- variable: `LOGGER` (line 53)
-- variable: `app` (line 54)
-- variable: `DEFAULT_XTR_ORACLE` (line 55)
-- variable: `embeddings_app` (line 56)
-- function: `_get_settings` (line 61)
-- variable: `RootOption` (line 72)
-- variable: `ExtraOption` (line 73)
-- variable: `VersionArg` (line 81)
-- variable: `PathArg` (line 82)
-- variable: `QueriesArg` (line 83)
-- variable: `IndexOption` (line 87)
-- variable: `AssetsArg` (line 88)
-- variable: `SidecarOption` (line 96)
-- variable: `VersionOption` (line 104)
-- variable: `ParquetOption` (line 108)
-- variable: `OutputOption` (line 111)
-- variable: `ChunkBatchOption` (line 112)
-- variable: `SampleOption` (line 116)
-- variable: `EpsilonOption` (line 117)
-- variable: `SweepMode` (line 121)
-- class: `SearchCommandParams` (line 136)
-- variable: `SWEEP_OPTION` (line 148)
-- variable: `IdMapOption` (line 153)
-- variable: `DuckOption` (line 154)
-- variable: `OutOption` (line 155)
-- variable: `ParamSpaceArg` (line 156)
-- variable: `EvalTopKOption` (line 160)
-- variable: `EvalKFactorOption` (line 164)
-- variable: `EvalNProbeOption` (line 168)
-- variable: `EvalXtrOracleOption` (line 172)
-- function: `global_options` (line 182)
-- function: `_default_root` (line 187)
-- function: `_resolve_root` (line 194)
-- function: `_manager` (line 200)
-- function: `_build_assets` (line 205)
-- function: `_parse_extras` (line 223)
-- function: `_parse_sidecars` (line 234)
-- function: `_resolve_version_dir` (line 253)
-- function: `_manifest_path_for` (line 263)
-- function: `_load_manifest` (line 267)
-- function: `_write_manifest` (line 277)
-- class: `_EmbeddingBuildContext` (line 282)
-- function: `_build_context` (line 292)
-- function: `_resolve_duck_path` (line 320)
-- function: `_resolve_output_path` (line 337)
-- function: `_parquet_meta` (line 357)
-- function: `_build_embedding_manifest` (line 370)
-- function: `_compute_chunk_checksum` (line 396)
-- function: `_collect_chunks_and_embeddings` (line 411)
-- function: `_deterministic_sample` (line 458)
-- function: `_evaluate_drift` (line 492)
-- function: `_execute_embeddings_build` (line 517)
-- function: `_run_embedding_validation` (line 579)
-- function: `_write_embedding_meta` (line 616)
-- function: `embeddings_build_command` (line 631)
-- function: `embeddings_validate_command` (line 656)
-- function: `_parse_tune_overrides` (line 718)
-- function: `_faiss_manager` (line 758)
-- function: `_duckdb_catalog` (line 772)
-- function: `_duckdb_embedding_dim` (line 786)
-- function: `_count_idmap_rows` (line 812)
-- function: `_load_xtr_index` (line 842)
-- function: `_eval_paths` (line 858)
-- function: `status_command` (line 868)
-- function: `stage_command` (line 878)
-- function: `publish_command` (line 935)
-- function: `rollback_command` (line 945)
-- function: `list_command` (line 955)
-- function: `health_command` (line 967)
-- function: `export_idmap_command` (line 1026)
-- function: `materialize_join_command` (line 1047)
-- function: `tune_command` (line 1063)
-- function: `tune_params_command` (line 1133)
-- function: `show_profile_command` (line 1175)
-- function: `_write_tuning_audit` (line 1181)
-- function: `_run_autotune` (line 1192)
-- function: `eval_command` (line 1218)
-- function: `_execute_search` (line 1251)
+- variable: `app` (line 53)
+- variable: `DEFAULT_XTR_ORACLE` (line 54)
+- variable: `embeddings_app` (line 55)
+- function: `_get_settings` (line 60)
+- variable: `RootOption` (line 71)
+- variable: `ExtraOption` (line 72)
+- variable: `VersionArg` (line 80)
+- variable: `PathArg` (line 81)
+- variable: `QueriesArg` (line 82)
+- variable: `IndexOption` (line 86)
+- variable: `AssetsArg` (line 87)
+- variable: `SidecarOption` (line 95)
+- variable: `VersionOption` (line 103)
+- variable: `ParquetOption` (line 107)
+- variable: `OutputOption` (line 110)
+- variable: `ChunkBatchOption` (line 111)
+- variable: `SampleOption` (line 115)
+- variable: `EpsilonOption` (line 116)
+- variable: `SweepMode` (line 120)
+- class: `SearchCommandParams` (line 135)
+- variable: `SWEEP_OPTION` (line 147)
+- variable: `IdMapOption` (line 152)
+- variable: `DuckOption` (line 153)
+- variable: `OutOption` (line 154)
+- variable: `ParamSpaceArg` (line 155)
+- variable: `EvalTopKOption` (line 159)
+- variable: `EvalKFactorOption` (line 163)
+- variable: `EvalNProbeOption` (line 167)
+- variable: `EvalXtrOracleOption` (line 171)
+- function: `global_options` (line 181)
+- function: `_default_root` (line 186)
+- function: `_resolve_root` (line 193)
+- function: `_manager` (line 199)
+- function: `_build_assets` (line 204)
+- function: `_parse_extras` (line 222)
+- function: `_parse_sidecars` (line 232)
+- function: `_resolve_version_dir` (line 246)
+- function: `_manifest_path_for` (line 256)
+- function: `_load_manifest` (line 260)
+- function: `_write_manifest` (line 269)
+- class: `_EmbeddingBuildContext` (line 274)
+- function: `_build_context` (line 284)
+- function: `_resolve_duck_path` (line 312)
+- function: `_resolve_output_path` (line 329)
+- function: `_parquet_meta` (line 349)
+- function: `_build_embedding_manifest` (line 362)
+- function: `_compute_chunk_checksum` (line 388)
+- function: `_collect_chunks_and_embeddings` (line 403)
+- function: `_deterministic_sample` (line 450)
+- function: `_evaluate_drift` (line 484)
+- function: `_execute_embeddings_build` (line 509)
+- function: `_run_embedding_validation` (line 571)
+- function: `_write_embedding_meta` (line 608)
+- function: `embeddings_build_command` (line 619)
+- function: `embeddings_validate_command` (line 644)
+- function: `_parse_tune_overrides` (line 706)
+- function: `_faiss_manager` (line 746)
+- function: `_duckdb_catalog` (line 759)
+- function: `_duckdb_embedding_dim` (line 773)
+- function: `_count_idmap_rows` (line 799)
+- function: `_load_xtr_index` (line 829)
+- function: `_eval_paths` (line 843)
+- function: `status_command` (line 853)
+- function: `stage_command` (line 863)
+- function: `publish_command` (line 920)
+- function: `rollback_command` (line 930)
+- function: `list_command` (line 940)
+- function: `health_command` (line 952)
+- function: `export_idmap_command` (line 1011)
+- function: `materialize_join_command` (line 1032)
+- function: `tune_command` (line 1048)
+- function: `tune_params_command` (line 1118)
+- function: `show_profile_command` (line 1160)
+- function: `_write_tuning_audit` (line 1166)
+- function: `_run_autotune` (line 1177)
+- function: `eval_command` (line 1203)
+- function: `_execute_search` (line 1231)
 
 ## Graph Metrics
 
@@ -131,8 +130,8 @@ Typer CLI for managing index lifecycle operations.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 14
-- recent churn 90: 14
+- recent churn 30: 18
+- recent churn 90: 18
 
 ## Usage
 
@@ -171,7 +170,7 @@ Typer CLI for managing index lifecycle operations.
 
 - branches: 103
 - cyclomatic: 104
-- loc: 1330
+- loc: 1310
 
 ## Doc Coverage
 

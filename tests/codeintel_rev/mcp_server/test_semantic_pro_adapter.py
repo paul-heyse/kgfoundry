@@ -324,9 +324,7 @@ def test_semantic_pro_rerank_reorders_when_ready(tmp_path: Path) -> None:
         pytest.fail("method should be a dict")
     method_details_dict = cast("dict[str, object]", method_details)
     retrieval_methods = method_details_dict.get("retrieval")
-    assertions.expect_true(
-        isinstance(retrieval_methods, list), reason="retrieval metadata missing"
-    )
+    assertions.expect_true(isinstance(retrieval_methods, list), reason="retrieval metadata missing")
     if not isinstance(retrieval_methods, list):  # pragma: no cover - defensive
         pytest.fail("retrieval metadata missing")
     assertions.expect_sequence_equal(retrieval_methods, ["semantic"])

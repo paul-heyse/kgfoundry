@@ -58,13 +58,13 @@ The FAISS index type is automatically selected based on corpus size:
 - function: `_embed_chunks` (line 327)
 - function: `_write_parquet` (line 357)
 - function: `_build_faiss_index` (line 400)
-- function: `_load_embeddings_from_artifacts` (line 461)
-- function: `_update_faiss_index_incremental` (line 507)
-- function: `_runtime_options_from_index` (line 616)
-- function: `_resolve_nlist` (line 667)
-- function: `_run_offline_evaluation` (line 685)
-- function: `_initialize_duckdb` (line 720)
-- function: `_write_symbols` (line 751)
+- function: `_load_embeddings_from_artifacts` (line 459)
+- function: `_update_faiss_index_incremental` (line 505)
+- function: `_runtime_options_from_index` (line 613)
+- function: `_resolve_nlist` (line 662)
+- function: `_run_offline_evaluation` (line 680)
+- function: `_initialize_duckdb` (line 714)
+- function: `_write_symbols` (line 745)
 
 ## Graph Metrics
 
@@ -77,8 +77,8 @@ The FAISS index type is automatically selected based on corpus size:
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 22
-- recent churn 90: 22
+- recent churn 30: 24
+- recent churn 90: 24
 
 ## Usage
 
@@ -116,7 +116,7 @@ The FAISS index type is automatically selected based on corpus size:
 
 - branches: 50
 - cyclomatic: 51
-- loc: 822
+- loc: 816
 
 ## Doc Coverage
 

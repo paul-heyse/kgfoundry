@@ -3,7 +3,7 @@
 ## Docstring
 
 ```
-Semantic search adapter using FAISS GPU and DuckDB.
+Semantic search adapter using FAISS and DuckDB.
 
 Implements semantic code search by embedding queries and searching
 the FAISS index, then hydrating results from DuckDB.
@@ -29,70 +29,67 @@ the FAISS index, then hydrating results from DuckDB.
 - from **codeintel_rev.mcp_server.scope_utils** import get_effective_scope
 - from **codeintel_rev.typing** import NDArrayF32
 - from **kgfoundry_common.errors** import EmbeddingError, VectorSearchError
-- from **kgfoundry_common.logging** import get_logger
 - from **(absolute)** import httpx
 - from **(absolute)** import numpy
 - from **codeintel_rev.app.config_context** import ApplicationContext
 
 ## Definitions
 
-- variable: `httpx` (line 41)
-- variable: `np` (line 42)
-- variable: `SNIPPET_PREVIEW_CHARS` (line 44)
-- variable: `COMPONENT_NAME` (line 45)
-- variable: `LOGGER` (line 46)
-- class: `_ScopeFilterFlags` (line 50)
-- class: `_FaissFanout` (line 85)
-- class: `_HybridSearchState` (line 93)
-- class: `_HybridResult` (line 106)
-- class: `_SemanticPipelineResult` (line 117)
-- class: `_FaissStageResult` (line 128)
-- class: `_HydrationOutcome` (line 137)
-- class: `_SemanticPipelineRequest` (line 146)
-- class: `_SearchBudget` (line 154)
-- class: `_SemanticSearchPlan` (line 164)
-- class: `_MethodContext` (line 177)
-- class: `_FaissSearchRequest` (line 189)
-- function: `semantic_search` (line 200)
-- function: `_semantic_search_sync` (line 267)
-- function: `_execute_semantic_pipeline` (line 362)
-- function: `_run_faiss_stage` (line 407)
-- function: `_run_hydration_stage` (line 445)
-- function: `_clamp_result_limit` (line 484)
-- function: `_build_search_budget` (line 513)
-- function: `_build_semantic_search_plan` (line 552)
-- function: `_calculate_faiss_fanout` (line 620)
-- function: `_overfetch_bonus` (line 657)
-- function: `_resolve_hybrid_results` (line 688)
-- function: `_build_hybrid_result` (line 790)
-- function: `_embed_query_or_raise` (line 830)
-- function: `_run_faiss_search_or_raise` (line 866)
-- function: `_ensure_hydration_success` (line 902)
-- function: `_warn_scope_filter_reduction` (line 933)
-- function: `_annotate_hybrid_contributions` (line 971)
-- function: `_embed_query` (line 1002)
-- function: `_run_faiss_search` (line 1026)
-- function: `_normalize_scope_faiss_tuning` (line 1075)
-- function: `_hydrate_findings` (line 1140)
-- function: `_structure_explanations` (line 1268)
-- function: `_build_method` (line 1300)
-- function: `_make_envelope` (line 1337)
-- function: `_success_extras` (line 1386)
-- function: `_build_response_extras` (line 1410)
+- variable: `httpx` (line 40)
+- variable: `np` (line 41)
+- variable: `SNIPPET_PREVIEW_CHARS` (line 43)
+- variable: `COMPONENT_NAME` (line 44)
+- class: `_ScopeFilterFlags` (line 48)
+- class: `_FaissFanout` (line 83)
+- class: `_HybridSearchState` (line 91)
+- class: `_HybridResult` (line 104)
+- class: `_SemanticPipelineResult` (line 115)
+- class: `_FaissStageResult` (line 126)
+- class: `_HydrationOutcome` (line 135)
+- class: `_SemanticPipelineRequest` (line 144)
+- class: `_SearchBudget` (line 152)
+- class: `_SemanticSearchPlan` (line 162)
+- class: `_MethodContext` (line 175)
+- class: `_FaissSearchRequest` (line 187)
+- function: `semantic_search` (line 198)
+- function: `_semantic_search_sync` (line 264)
+- function: `_execute_semantic_pipeline` (line 330)
+- function: `_run_faiss_stage` (line 375)
+- function: `_run_hydration_stage` (line 404)
+- function: `_clamp_result_limit` (line 443)
+- function: `_build_search_budget` (line 472)
+- function: `_build_semantic_search_plan` (line 511)
+- function: `_calculate_faiss_fanout` (line 565)
+- function: `_overfetch_bonus` (line 602)
+- function: `_resolve_hybrid_results` (line 633)
+- function: `_build_hybrid_result` (line 734)
+- function: `_embed_query_or_raise` (line 774)
+- function: `_run_faiss_search_or_raise` (line 810)
+- function: `_ensure_hydration_success` (line 846)
+- function: `_annotate_hybrid_contributions` (line 877)
+- function: `_embed_query` (line 908)
+- function: `_run_faiss_search` (line 932)
+- function: `_normalize_scope_faiss_tuning` (line 981)
+- function: `_hydrate_findings` (line 1046)
+- function: `_structure_explanations` (line 1164)
+- function: `_build_method` (line 1196)
+- function: `_make_envelope` (line 1233)
+- function: `_success_extras` (line 1282)
+- function: `_build_response_extras` (line 1306)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 11
-- **cycle_group**: 117
+- **cycle_group**: 116
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 46
-- recent churn 90: 46
+- recent churn 30: 50
+- recent churn 90: 50
 
 ## Usage
 
@@ -105,7 +102,7 @@ semantic_search
 
 ## Doc Health
 
-- **summary**: Semantic search adapter using FAISS GPU and DuckDB.
+- **summary**: Semantic search adapter using FAISS and DuckDB.
 - has summary: yes
 - param parity: yes
 - examples present: yes
@@ -124,7 +121,7 @@ semantic_search
 
 ## Hotspot
 
-- score: 2.90
+- score: 2.88
 
 ## Side Effects
 
@@ -134,9 +131,9 @@ semantic_search
 
 ## Complexity
 
-- branches: 92
-- cyclomatic: 93
-- loc: 1458
+- branches: 86
+- cyclomatic: 87
+- loc: 1354
 
 ## Doc Coverage
 

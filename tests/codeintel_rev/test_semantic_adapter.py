@@ -10,7 +10,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Self, cast
+from typing import TYPE_CHECKING, Self, TypedDict, cast
 from unittest.mock import patch
 
 import numpy as np
@@ -31,6 +31,27 @@ from tests._helpers import assertions
 _DEFAULT_CHUNK_ID = 123
 
 
+class ChunkRow(TypedDict, total=False):
+    """Typed chunk row used by the stub catalog."""
+
+    id: int
+    uri: str
+    start_line: int
+    end_line: int
+    preview: str
+
+
+def _clone_chunk(chunk: ChunkRow) -> ChunkRow:
+    """Return a shallow copy of a chunk row with typed metadata.
+
+    Returns
+    -------
+    ChunkRow
+        New mapping that may be mutated without affecting the input.
+    """
+    return cast("ChunkRow", dict(chunk))
+
+
 class StubDuckDBCatalog:
     """Stub DuckDB catalog for testing.
 
@@ -40,7 +61,7 @@ class StubDuckDBCatalog:
         Database path (unused in stub).
     _vectors_dir : Path | None
         Vectors directory (unused in stub).
-    chunks : list[dict[str, object]] | None, optional
+    chunks : list[ChunkRow] | None, optional
         List of chunks to return. If None, uses default chunk.
     """
 
@@ -49,20 +70,22 @@ class StubDuckDBCatalog:
         _db_path: Path | None,
         _vectors_dir: Path | None,
         *,
-        chunks: list[dict[str, object]] | None = None,
+        chunks: list[ChunkRow] | None = None,
     ) -> None:
         if chunks is None:
-            default_chunk: dict[str, object] = {
+            default_chunk: ChunkRow = {
                 "id": _DEFAULT_CHUNK_ID,
                 "uri": "src/module.py",
                 "start_line": 0,
                 "end_line": 0,
                 "preview": "code snippet",
             }
-            self._chunks: list[dict[str, object]] = [default_chunk]
+            self._chunks: list[ChunkRow] = [default_chunk]
         else:
-            self._chunks = [dict(chunk) for chunk in chunks]
-        self._chunk: dict[str, object] = dict(self._chunks[0]) if self._chunks else {}
+            self._chunks = [_clone_chunk(chunk) for chunk in chunks]
+        self._chunk: ChunkRow = (
+            _clone_chunk(self._chunks[0]) if self._chunks else cast("ChunkRow", {})
+        )
 
     def __enter__(self) -> Self:
         """Enter context manager.
@@ -98,17 +121,17 @@ class StubDuckDBCatalog:
         """
         return False
 
-    def get_chunk_by_id(self, chunk_id: int) -> dict[str, object] | None:
+    def get_chunk_by_id(self, chunk_id: int) -> ChunkRow | None:
         """Get chunk by ID.
 
         Returns
         -------
-        dict[str, object] | None
+        ChunkRow | None
             Chunk dictionary if ID matches, None otherwise.
         """
         return self._chunk if chunk_id == _DEFAULT_CHUNK_ID else None
 
-    def query_by_ids(self, chunk_ids: list[int]) -> list[dict[str, object]]:
+    def query_by_ids(self, chunk_ids: list[int]) -> list[ChunkRow]:
         """Query chunks by IDs.
 
         Parameters
@@ -118,10 +141,10 @@ class StubDuckDBCatalog:
 
         Returns
         -------
-        list[dict[str, object]]
+        list[ChunkRow]
             List of chunks matching the IDs.
         """
-        return [dict(chunk) for chunk in self._chunks if chunk.get("id") in chunk_ids]
+        return [_clone_chunk(chunk) for chunk in self._chunks if chunk.get("id") in chunk_ids]
 
     def query_by_filters(
         self,
@@ -130,7 +153,7 @@ class StubDuckDBCatalog:
         include_globs: list[str] | None = None,
         exclude_globs: list[str] | None = None,
         languages: list[str] | None = None,
-    ) -> list[dict[str, object]]:
+    ) -> list[ChunkRow]:
         """Query chunks by IDs with filters.
 
         Parameters
@@ -146,48 +169,67 @@ class StubDuckDBCatalog:
 
         Returns
         -------
-        list[dict[str, object]]
+        list[ChunkRow]
             Filtered list of chunks.
         """
-        filtered = [dict(chunk) for chunk in self._chunks if chunk.get("id") in chunk_ids]
+        filtered = [_clone_chunk(chunk) for chunk in self._chunks if chunk.get("id") in chunk_ids]
+        filtered = self._filter_languages(filtered, languages)
+        filtered = self._filter_includes(filtered, include_globs)
+        return self._filter_excludes(filtered, exclude_globs)
 
-        # Apply language filter
-        if languages:
-            extensions = []
-            language_exts = {
-                "python": [".py", ".pyi"],
-                "typescript": [".ts", ".tsx"],
-                "javascript": [".js", ".jsx"],
-            }
-            for lang in languages:
-                extensions.extend(language_exts.get(lang.lower(), []))
-            if extensions:
-                filtered_chunks: list[dict[str, object]] = []
-                for chunk in filtered:
-                    uri = chunk.get("uri")
-                    if isinstance(uri, str) and any(uri.endswith(ext) for ext in extensions):
-                        filtered_chunks.append(chunk)
-                filtered = filtered_chunks
+    @staticmethod
+    def _filter_languages(
+        chunks: list[ChunkRow],
+        languages: list[str] | None,
+    ) -> list[ChunkRow]:
+        if not languages:
+            return chunks
+        language_exts = {
+            "python": (".py", ".pyi"),
+            "typescript": (".ts", ".tsx"),
+            "javascript": (".js", ".jsx"),
+        }
+        extensions = [ext for lang in languages for ext in language_exts.get(lang.lower(), ())]
+        if not extensions:
+            return chunks
+        suffixes = tuple(extensions)
+        return [
+            chunk
+            for chunk in chunks
+            if (uri := chunk.get("uri")) is not None
+            and isinstance(uri, str)
+            and uri.endswith(suffixes)
+        ]
 
-        # Apply include globs
-        if include_globs:
-            filtered_chunks = []
-            for chunk in filtered:
-                uri = chunk.get("uri")
-                if isinstance(uri, str) and any(fnmatch.fnmatch(uri, pattern) for pattern in include_globs):
-                    filtered_chunks.append(chunk)
-            filtered = filtered_chunks
+    @staticmethod
+    def _filter_includes(
+        chunks: list[ChunkRow],
+        include_globs: list[str] | None,
+    ) -> list[ChunkRow]:
+        if not include_globs:
+            return chunks
+        return [
+            chunk
+            for chunk in chunks
+            if (uri := chunk.get("uri")) is not None
+            and isinstance(uri, str)
+            and any(fnmatch.fnmatch(uri, pattern) for pattern in include_globs)
+        ]
 
-        # Apply exclude globs
-        if exclude_globs:
-            filtered_chunks = []
-            for chunk in filtered:
-                uri = chunk.get("uri")
-                if isinstance(uri, str) and not any(fnmatch.fnmatch(uri, pattern) for pattern in exclude_globs):
-                    filtered_chunks.append(chunk)
-            filtered = filtered_chunks
-
-        return filtered
+    @staticmethod
+    def _filter_excludes(
+        chunks: list[ChunkRow],
+        exclude_globs: list[str] | None,
+    ) -> list[ChunkRow]:
+        if not exclude_globs:
+            return chunks
+        return [
+            chunk
+            for chunk in chunks
+            if (uri := chunk.get("uri")) is not None
+            and isinstance(uri, str)
+            and not any(fnmatch.fnmatch(uri, pattern) for pattern in exclude_globs)
+        ]
 
     def get_structure_annotations(self, ids: Sequence[int]) -> dict[int, StructureAnnotations]:
         """Get structure annotations for chunk IDs.
@@ -371,7 +413,9 @@ class _DefaultStubHybridEngine:
         limit: int,
         options: HybridSearchOptions | None = None,
     ) -> SimpleNamespace:
-        return _default_stub_hybrid_search(query, semantic_hits=semantic_hits, limit=limit, options=options)
+        return _default_stub_hybrid_search(
+            query, semantic_hits=semantic_hits, limit=limit, options=options
+        )
 
 
 @dataclass(frozen=True)
@@ -382,7 +426,7 @@ class StubContextConfig:
     error: str | None = None
     max_results: int = 5
     semantic_overfetch_multiplier: int = 2
-    catalog_chunks: list[dict[str, object]] | None = None
+    catalog_chunks: list[ChunkRow] | None = None
     faiss_nprobe: int = 128
     hybrid_engine: object | None = None
     enable_bm25_channel: bool = True
@@ -617,7 +661,7 @@ async def test_semantic_search_with_scope_filters() -> None:
     matching those languages are returned.
     """
     # Create catalog with mixed file types
-    catalog_chunks: list[dict[str, object]] = [
+    catalog_chunks: list[ChunkRow] = [
         {
             "id": _DEFAULT_CHUNK_ID,
             "uri": "src/main.py",
@@ -691,7 +735,7 @@ async def test_semantic_search_no_scope() -> None:
     (no filtering applied).
     """
     # Create catalog with mixed file types
-    catalog_chunks: list[dict[str, object]] = [
+    catalog_chunks: list[ChunkRow] = [
         {
             "id": _DEFAULT_CHUNK_ID,
             "uri": "src/main.py",
@@ -747,6 +791,7 @@ async def test_semantic_search_no_scope() -> None:
 @pytest.mark.asyncio
 async def test_semantic_search_hybrid_merges_channels() -> None:
     """Test that semantic search merges channels when hybrid search is enabled."""
+
     class _HybridStub:
         @staticmethod
         def search(
@@ -774,7 +819,7 @@ async def test_semantic_search_hybrid_merges_channels() -> None:
             )
 
     faiss_manager = _BaseStubFAISSManager(search_ids=[101, 102])
-    chunks: list[dict[str, object]] = [
+    chunks: list[ChunkRow] = [
         {"id": 101, "uri": "src/a.py", "start_line": 0, "end_line": 2, "preview": "a"},
         {"id": 102, "uri": "src/b.py", "start_line": 5, "end_line": 9, "preview": "b"},
     ]

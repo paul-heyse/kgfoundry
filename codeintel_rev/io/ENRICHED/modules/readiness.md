@@ -57,18 +57,16 @@ codeintel_rev.app.main : FastAPI application with /readyz endpoint
 - from **urllib.parse** import urlparse
 - from **codeintel_rev._lazy_imports** import LazyModule
 - from **codeintel_rev.app.config_context** import ApplicationContext
-- from **kgfoundry_common.logging** import get_logger
 - from **(absolute)** import duckdb
 - from **(absolute)** import httpx
 
 ## Definitions
 
-- variable: `duckdb` (line 61)
-- variable: `httpx` (line 62)
-- variable: `LOGGER` (line 64)
-- variable: `HTTP_HEALTH_TIMEOUT_S` (line 65)
-- class: `CheckResult` (line 71)
-- class: `ReadinessProbe` (line 109)
+- variable: `duckdb` (line 60)
+- variable: `httpx` (line 61)
+- variable: `HTTP_HEALTH_TIMEOUT_S` (line 63)
+- class: `CheckResult` (line 69)
+- class: `ReadinessProbe` (line 107)
 
 ## Graph Metrics
 
@@ -81,8 +79,8 @@ codeintel_rev.app.main : FastAPI application with /readyz endpoint
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 13
-- recent churn 90: 13
+- recent churn 30: 14
+- recent churn 90: 14
 
 ## Usage
 
@@ -127,7 +125,7 @@ codeintel_rev.app.main : FastAPI application with /readyz endpoint
 
 - branches: 35
 - cyclomatic: 36
-- loc: 628
+- loc: 626
 
 ## Doc Coverage
 

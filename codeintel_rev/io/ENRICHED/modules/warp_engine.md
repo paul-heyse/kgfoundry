@@ -13,32 +13,30 @@ Adapter for the optional WARP/XTR late interaction executor.
 - from **pathlib** import Path
 - from **typing** import TYPE_CHECKING, Protocol, cast
 - from **codeintel_rev.typing** import gate_import
-- from **kgfoundry_common.logging** import get_logger
 - from **types** import ModuleType
 
 ## Definitions
 
-- variable: `LOGGER` (line 15)
-- class: `WarpExecutorProtocol` (line 19)
-- variable: `WarpExecutorFactory` (line 33)
-- class: `WarpUnavailableError` (line 36)
-- class: `WarpEngine` (line 40)
-- function: `_safe_int` (line 167)
-- function: `_safe_float` (line 191)
+- class: `WarpExecutorProtocol` (line 17)
+- variable: `WarpExecutorFactory` (line 31)
+- class: `WarpUnavailableError` (line 34)
+- class: `WarpEngine` (line 38)
+- function: `_safe_int` (line 161)
+- function: `_safe_float` (line 185)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 111
+- **cycle_group**: 110
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 9
-- recent churn 90: 9
+- recent churn 30: 10
+- recent churn 90: 10
 
 ## Usage
 
@@ -76,7 +74,7 @@ Adapter for the optional WARP/XTR late interaction executor.
 
 - branches: 15
 - cyclomatic: 16
-- loc: 213
+- loc: 207
 
 ## Doc Coverage
 

@@ -36,7 +36,8 @@ class _StubEmbedder:
 
 
 class _StubFaissRuntime(VectorRuntime):
-    def get_runtime_tuning(self) -> Mapping[str, object]:
+    @staticmethod
+    def get_runtime_tuning() -> Mapping[str, object]:
         """Stub get_runtime_tuning method.
 
         Returns

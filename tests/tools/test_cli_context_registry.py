@@ -9,9 +9,8 @@ from typing import cast
 from uuid import uuid4
 
 import pytest
-from tools import CLIToolingContext
+from tools import AugmentMetadataModel, CLIToolingContext, OperationOverrideModel
 from tools import cli_context_registry as registry_module
-from tools._shared.augment_registry import AugmentMetadataModel, OperationOverrideModel
 from tools.cli_context_registry import (
     CLIContextDefinition,
     context_for,

@@ -19,7 +19,7 @@ Helpers for lazily importing heavy optional dependencies.
 
 ## Graph Metrics
 
-- **fan_in**: 15
+- **fan_in**: 12
 - **fan_out**: 1
 - **cycle_group**: 2
 
@@ -57,7 +57,7 @@ Helpers for lazily importing heavy optional dependencies.
 
 ## Hotspot
 
-- score: 2.10
+- score: 2.02
 
 ## Side Effects
 

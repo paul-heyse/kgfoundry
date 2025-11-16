@@ -20,19 +20,17 @@ Utilities for building and verifying XTR token indexes.
 - from **codeintel_rev.io.duckdb_catalog** import DuckDBCatalog
 - from **codeintel_rev.io.xtr_manager** import XTRIndex
 - from **codeintel_rev.typing** import NDArrayAny
-- from **kgfoundry_common.logging** import get_logger
 - from **(absolute)** import numpy
 
 ## Definitions
 
-- variable: `np` (line 22)
-- variable: `LOGGER` (line 24)
-- class: `XTRBuildSummary` (line 28)
-- function: `_iter_chunk_text` (line 39)
-- function: `_gather_chunk_vectors` (line 86)
-- function: `_write_token_matrix` (line 157)
-- function: `build_xtr_index` (line 227)
-- function: `main` (line 330)
+- variable: `np` (line 21)
+- class: `XTRBuildSummary` (line 25)
+- function: `_iter_chunk_text` (line 36)
+- function: `_gather_chunk_vectors` (line 83)
+- function: `_write_token_matrix` (line 145)
+- function: `build_xtr_index` (line 215)
+- function: `main` (line 308)
 
 ## Graph Metrics
 
@@ -45,8 +43,8 @@ Utilities for building and verifying XTR token indexes.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 
@@ -74,7 +72,7 @@ Utilities for building and verifying XTR token indexes.
 
 ## Hotspot
 
-- score: 2.28
+- score: 2.26
 
 ## Side Effects
 
@@ -82,9 +80,9 @@ Utilities for building and verifying XTR token indexes.
 
 ## Complexity
 
-- branches: 18
-- cyclomatic: 19
-- loc: 346
+- branches: 17
+- cyclomatic: 18
+- loc: 315
 
 ## Doc Coverage
 

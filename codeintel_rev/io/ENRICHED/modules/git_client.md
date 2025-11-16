@@ -53,34 +53,32 @@ GitPython documentation : https://gitpython.readthedocs.io/
 - from **typing** import TYPE_CHECKING, cast
 - from **(absolute)** import git
 - from **(absolute)** import git.exc
-- from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.mcp_server.schemas** import GitBlameEntry
 
 ## Definitions
 
-- variable: `LOGGER` (line 57)
-- function: `_string_attr` (line 60)
-- function: `_commit_iso_date` (line 65)
-- function: `_author_field` (line 75)
-- function: `_short_sha` (line 83)
-- function: `_normalize_line_numbers` (line 88)
-- function: `_coerce_blame_tuple` (line 101)
-- class: `GitClient` (line 116)
-- class: `AsyncGitClient` (line 470)
+- function: `_string_attr` (line 56)
+- function: `_commit_iso_date` (line 61)
+- function: `_author_field` (line 71)
+- function: `_short_sha` (line 79)
+- function: `_normalize_line_numbers` (line 84)
+- function: `_coerce_blame_tuple` (line 97)
+- class: `GitClient` (line 112)
+- class: `AsyncGitClient` (line 425)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 5
+- **cycle_group**: 21
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 12
-- recent churn 90: 12
+- recent churn 30: 14
+- recent churn 90: 14
 
 ## Usage
 
@@ -123,7 +121,7 @@ AsyncGitClient, GitClient
 
 - branches: 25
 - cyclomatic: 26
-- loc: 596
+- loc: 551
 
 ## Doc Coverage
 

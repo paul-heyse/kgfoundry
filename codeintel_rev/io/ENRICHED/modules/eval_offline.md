@@ -14,13 +14,11 @@ Command-line entry point for offline FAISS recall evaluation.
 - from **(absolute)** import sys
 - from **pathlib** import Path
 - from **codeintel_rev.app.config_context** import ApplicationContext
-- from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 14)
-- function: `build_parser` (line 17)
-- function: `main` (line 41)
+- function: `build_parser` (line 14)
+- function: `main` (line 38)
 
 ## Graph Metrics
 
@@ -33,8 +31,8 @@ Command-line entry point for offline FAISS recall evaluation.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 1
-- recent churn 90: 1
+- recent churn 30: 2
+- recent churn 90: 2
 
 ## Usage
 
@@ -72,7 +70,7 @@ Command-line entry point for offline FAISS recall evaluation.
 
 - branches: 2
 - cyclomatic: 3
-- loc: 85
+- loc: 87
 
 ## Doc Coverage
 

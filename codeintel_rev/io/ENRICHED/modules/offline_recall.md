@@ -20,14 +20,12 @@ Offline recall evaluator leveraging FAISS + DuckDB catalogs.
 - from **codeintel_rev.io.faiss_manager** import FAISSManager
 - from **codeintel_rev.io.symbol_catalog** import SymbolCatalog, SymbolDefRow
 - from **codeintel_rev.io.vllm_client** import VLLMClient
-- from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.app.config_context** import ResolvedPaths
 
 ## Definitions
 
-- variable: `LOGGER` (line 23)
-- class: `EvalQuery` (line 27)
-- class: `OfflineRecallEvaluator` (line 36)
+- class: `EvalQuery` (line 24)
+- class: `OfflineRecallEvaluator` (line 33)
 
 ## Graph Metrics
 
@@ -40,8 +38,8 @@ Offline recall evaluator leveraging FAISS + DuckDB catalogs.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 5
+- recent churn 90: 5
 
 ## Usage
 
@@ -79,7 +77,7 @@ Offline recall evaluator leveraging FAISS + DuckDB catalogs.
 
 - branches: 24
 - cyclomatic: 25
-- loc: 245
+- loc: 236
 
 ## Doc Coverage
 

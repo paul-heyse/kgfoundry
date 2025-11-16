@@ -11,12 +11,12 @@ In-process vLLM embedding engine for Stage-0 retrieval.
 - from **__future__** import annotations
 - from **(absolute)** import os
 - from **collections.abc** import Sequence
+- from **contextlib** import suppress
 - from **dataclasses** import dataclass, field
 - from **typing** import TYPE_CHECKING, Any, cast
 - from **codeintel_rev._lazy_imports** import LazyModule
 - from **codeintel_rev.runtime** import RuntimeCell
 - from **codeintel_rev.typing** import NDArrayF32
-- from **kgfoundry_common.logging** import get_logger
 - from **(absolute)** import numpy
 - from **(absolute)** import transformers
 - from **(absolute)** import vllm
@@ -40,23 +40,22 @@ In-process vLLM embedding engine for Stage-0 retrieval.
 - variable: `vllm` (line 43)
 - variable: `vllm_config` (line 44)
 - variable: `vllm_inputs` (line 45)
-- variable: `LOGGER` (line 47)
-- class: `_InprocessVLLMRuntime` (line 50)
-- class: `InprocessVLLMEmbedder` (line 73)
+- class: `_InprocessVLLMRuntime` (line 48)
+- class: `InprocessVLLMEmbedder` (line 69)
 
 ## Graph Metrics
 
 - **fan_in**: 2
 - **fan_out**: 4
-- **cycle_group**: 14
+- **cycle_group**: 18
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 10
-- recent churn 90: 10
+- recent churn 30: 13
+- recent churn 90: 13
 
 ## Usage
 
@@ -98,7 +97,7 @@ InprocessVLLMEmbedder
 
 - branches: 14
 - cyclomatic: 15
-- loc: 257
+- loc: 231
 
 ## Doc Coverage
 

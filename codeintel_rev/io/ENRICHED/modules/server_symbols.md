@@ -23,15 +23,15 @@ Symbol MCP tool registrations (pure move from server.py).
 
 - **fan_in**: 0
 - **fan_out**: 3
-- **cycle_group**: 129
+- **cycle_group**: 128
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 5
+- recent churn 90: 5
 
 ## Usage
 

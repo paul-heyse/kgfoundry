@@ -7,7 +7,7 @@ CLI modules, including download, orchestration, and optional codeintel modules.
 from __future__ import annotations
 
 import importlib
-from typing import Any, cast
+from typing import Any, Protocol, cast
 
 import pytest
 from src.download import cli_context as download_context
@@ -22,6 +22,11 @@ except ImportError:
     codeintel_context = None
 else:
     codeintel_context = cast("Any", codeintel_module)
+
+
+class _CliModuleInfo(Protocol):
+    CLI_INTERFACE_ID: str
+    CLI_TITLE: str
 
 
 def _assert_settings(module: object, settings: CLIToolSettings) -> None:
@@ -39,8 +44,9 @@ def _assert_settings(module: object, settings: CLIToolSettings) -> None:
     )
     if not hasattr(module, "CLI_INTERFACE_ID") or not hasattr(module, "CLI_TITLE"):
         pytest.fail("module must define CLI interface metadata")
-    interface_id = module.CLI_INTERFACE_ID
-    title = module.CLI_TITLE
+    module_info = cast("_CliModuleInfo", module)
+    interface_id = module_info.CLI_INTERFACE_ID
+    title = module_info.CLI_TITLE
     assertions.expect_equal(settings.interface_id, interface_id)
     assertions.expect_equal(settings.title, title)
 

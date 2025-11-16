@@ -14,27 +14,25 @@ Listwise reranking using the CodeRankLLM checkpoint.
 - from **collections.abc** import Sequence
 - from **typing** import TYPE_CHECKING, Any, ClassVar, cast
 - from **codeintel_rev.typing** import gate_import
-- from **kgfoundry_common.logging** import get_logger
 - from **transformers** import AutoModelForCausalLM, PreTrainedTokenizerBase
 
 ## Definitions
 
-- variable: `LOGGER` (line 16)
-- class: `CodeRankListwiseReranker` (line 33)
+- class: `CodeRankListwiseReranker` (line 30)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 107
+- **cycle_group**: 106
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 8
+- recent churn 90: 8
 
 ## Usage
 
@@ -72,7 +70,7 @@ Listwise reranking using the CodeRankLLM checkpoint.
 
 - branches: 20
 - cyclomatic: 21
-- loc: 174
+- loc: 164
 
 ## Doc Coverage
 

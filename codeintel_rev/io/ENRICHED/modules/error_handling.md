@@ -60,7 +60,6 @@ Error envelope structure:
 
 - from **__future__** import annotations
 - from **(absolute)** import inspect
-- from **(absolute)** import traceback
 - from **collections.abc** import Awaitable, Callable, Mapping
 - from **dataclasses** import dataclass
 - from **functools** import wraps
@@ -71,36 +70,32 @@ Error envelope structure:
 - from **codeintel_rev.errors** import PathNotDirectoryError, PathNotFoundError
 - from **codeintel_rev.io.path_utils** import PathOutsideRepositoryError
 - from **kgfoundry_common.errors** import KgFoundryError
-- from **kgfoundry_common.logging** import get_logger, with_fields
 - from **kgfoundry_common.problem_details** import build_problem_details
 - from **kgfoundry_common.problem_details** import ProblemDetails
 
 ## Definitions
 
-- variable: `LOGGER` (line 75)
-- variable: `COMPONENT_NAME` (line 76)
-- variable: `F` (line 78)
-- class: `ProblemMapping` (line 114)
-- variable: `EXCEPTION_TO_ERROR_CODE` (line 155)
-- function: `format_error_response` (line 171)
-- function: `convert_exception_to_envelope` (line 229)
-- function: `_record_exception_event` (line 415)
-- function: `handle_adapter_errors` (line 429)
-- function: `_extract_context_from_args` (line 707)
+- variable: `F` (line 73)
+- class: `ProblemMapping` (line 109)
+- variable: `EXCEPTION_TO_ERROR_CODE` (line 150)
+- function: `format_error_response` (line 166)
+- function: `convert_exception_to_envelope` (line 224)
+- function: `handle_adapter_errors` (line 334)
+- function: `_extract_context_from_args` (line 612)
 
 ## Graph Metrics
 
 - **fan_in**: 3
 - **fan_out**: 4
-- **cycle_group**: 35
+- **cycle_group**: 34
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 16
-- recent churn 90: 16
+- recent churn 30: 18
+- recent churn 90: 18
 
 ## Usage
 
@@ -132,7 +127,7 @@ EXCEPTION_TO_ERROR_CODE, convert_exception_to_envelope, format_error_response, h
 
 ## Hotspot
 
-- score: 2.36
+- score: 2.21
 
 ## Side Effects
 
@@ -140,16 +135,15 @@ EXCEPTION_TO_ERROR_CODE, convert_exception_to_envelope, format_error_response, h
 
 ## Complexity
 
-- branches: 24
-- cyclomatic: 25
-- loc: 729
+- branches: 14
+- cyclomatic: 15
+- loc: 634
 
 ## Doc Coverage
 
 - `ProblemMapping` (class): summary=yes, examples=no — Mapping from exception type to RFC 9457 Problem Details metadata.
 - `format_error_response` (function): summary=yes, params=ok, examples=no — Return Problem Details payload for the provided exception.
 - `convert_exception_to_envelope` (function): summary=yes, params=ok, examples=yes — Convert exception to unified error envelope with Problem Details.
-- `_record_exception_event` (function): summary=yes, params=mismatch, examples=no — Log adapter errors with structured context.
 - `handle_adapter_errors` (function): summary=yes, params=ok, examples=yes — Convert adapter exceptions to unified error envelopes.
 - `_extract_context_from_args` (function): summary=no, examples=no
 

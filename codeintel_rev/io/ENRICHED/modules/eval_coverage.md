@@ -16,13 +16,11 @@ Command-line entry point for SCIP function coverage evaluation.
 - from **codeintel_rev.app.config_context** import ApplicationContext
 - from **codeintel_rev.config.settings** import load_settings
 - from **codeintel_rev.evaluation.scip_coverage** import SCIPCoverageEvaluator
-- from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 16)
-- function: `build_parser` (line 19)
-- function: `main` (line 46)
+- function: `build_parser` (line 16)
+- function: `main` (line 43)
 
 ## Graph Metrics
 
@@ -35,8 +33,8 @@ Command-line entry point for SCIP function coverage evaluation.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 
@@ -74,7 +72,7 @@ Command-line entry point for SCIP function coverage evaluation.
 
 - branches: 1
 - cyclomatic: 2
-- loc: 95
+- loc: 92
 
 ## Doc Coverage
 

@@ -29,59 +29,59 @@ All configuration loaded from environment variables with sensible defaults.
 - function: `_parse_int_list` (line 99)
 - function: `_optional_int` (line 145)
 - function: `_build_vllm_config` (line 182)
-- function: `_build_embeddings_config` (line 210)
-- function: `_build_xtr_config` (line 247)
-- function: `_build_rerank_config` (line 263)
-- class: `CodeRankConfig` (line 274)
-- class: `WarpConfig` (line 313)
-- class: `XTRConfig` (line 340)
-- class: `RerankConfig` (line 353)
-- class: `EvalConfig` (line 362)
-- class: `CodeRankLLMConfig` (line 374)
-- class: `VLLMRunMode` (line 386)
-- class: `VLLMConfig` (line 392)
-- class: `EmbeddingsConfig` (line 460)
-- class: `BM25Config` (line 512)
-- class: `PRFConfig` (line 529)
-- class: `SpladeConfig` (line 541)
-- class: `PathsConfig` (line 609)
-- class: `IndexConfig` (line 682)
-- class: `ServerLimits` (line 756)
-- class: `RedisConfig` (line 802)
-- class: `Settings` (line 823)
-- function: `load_settings` (line 893)
-- function: `_build_paths_config` (line 1131)
-- function: `_load_rrf_weights` (line 1152)
-- function: `_load_hybrid_prefetch` (line 1173)
-- function: `_load_hybrid_weights_override` (line 1194)
-- function: `_build_prf_config` (line 1213)
-- function: `_load_hybrid_channel_settings` (line 1225)
-- function: `_build_index_config` (line 1234)
-- function: `_build_server_limits` (line 1274)
-- function: `_build_redis_config` (line 1284)
-- function: `_build_duckdb_config` (line 1298)
-- function: `_build_eval_config` (line 1314)
-- function: `_resolve_bm25_analyzer` (line 1326)
-- function: `_resolve_splade_analyzer` (line 1333)
-- function: `_build_bm25_config` (line 1340)
-- function: `_build_splade_config` (line 1371)
-- function: `_build_coderank_config` (line 1394)
-- function: `_build_warp_config` (line 1412)
-- function: `_build_coderank_llm_config` (line 1423)
+- function: `_build_embeddings_config` (line 211)
+- function: `_build_xtr_config` (line 248)
+- function: `_build_rerank_config` (line 264)
+- class: `CodeRankConfig` (line 275)
+- class: `WarpConfig` (line 314)
+- class: `XTRConfig` (line 341)
+- class: `RerankConfig` (line 354)
+- class: `EvalConfig` (line 363)
+- class: `CodeRankLLMConfig` (line 375)
+- class: `VLLMRunMode` (line 387)
+- class: `VLLMConfig` (line 393)
+- class: `EmbeddingsConfig` (line 462)
+- class: `BM25Config` (line 514)
+- class: `PRFConfig` (line 531)
+- class: `SpladeConfig` (line 543)
+- class: `PathsConfig` (line 611)
+- class: `IndexConfig` (line 684)
+- class: `ServerLimits` (line 754)
+- class: `RedisConfig` (line 800)
+- class: `Settings` (line 821)
+- function: `load_settings` (line 891)
+- function: `_build_paths_config` (line 1127)
+- function: `_load_rrf_weights` (line 1148)
+- function: `_load_hybrid_prefetch` (line 1169)
+- function: `_load_hybrid_weights_override` (line 1190)
+- function: `_build_prf_config` (line 1209)
+- function: `_load_hybrid_channel_settings` (line 1221)
+- function: `_build_index_config` (line 1230)
+- function: `_build_server_limits` (line 1269)
+- function: `_build_redis_config` (line 1279)
+- function: `_build_duckdb_config` (line 1293)
+- function: `_build_eval_config` (line 1309)
+- function: `_resolve_bm25_analyzer` (line 1321)
+- function: `_resolve_splade_analyzer` (line 1328)
+- function: `_build_bm25_config` (line 1335)
+- function: `_build_splade_config` (line 1366)
+- function: `_build_coderank_config` (line 1389)
+- function: `_build_warp_config` (line 1407)
+- function: `_build_coderank_llm_config` (line 1418)
 
 ## Graph Metrics
 
-- **fan_in**: 25
+- **fan_in**: 24
 - **fan_out**: 2
-- **cycle_group**: 13
+- **cycle_group**: 10
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 29
-- recent churn 90: 29
+- recent churn 30: 33
+- recent churn 90: 33
 
 ## Usage
 
@@ -113,7 +113,7 @@ BM25Config, CodeRankConfig, CodeRankLLMConfig, EmbeddingsConfig, IndexConfig, PR
 
 ## Hotspot
 
-- score: 3.05
+- score: 3.03
 
 ## Side Effects
 
@@ -123,7 +123,7 @@ BM25Config, CodeRankConfig, CodeRankLLMConfig, EmbeddingsConfig, IndexConfig, PR
 
 - branches: 47
 - cyclomatic: 48
-- loc: 1454
+- loc: 1449
 
 ## Doc Coverage
 

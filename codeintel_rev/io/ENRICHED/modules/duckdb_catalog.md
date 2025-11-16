@@ -13,43 +13,41 @@ chunk retrieval and joins.
 
 - from **__future__** import annotations
 - from **(absolute)** import hashlib
+- from **(absolute)** import logging
 - from **collections.abc** import Callable, Iterator, Mapping, Sequence
 - from **contextlib** import contextmanager
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
 - from **threading** import Lock
-- from **time** import perf_counter
 - from **typing** import TYPE_CHECKING, Any, ClassVar, Self, TypedDict, Unpack, cast
 - from **codeintel_rev._lazy_imports** import LazyModule
 - from **codeintel_rev.io.duckdb_manager** import DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 - from **codeintel_rev.io.parquet_store** import extract_embeddings
 - from **codeintel_rev.mcp_server.scope_utils** import LANGUAGE_EXTENSIONS, path_matches_glob
 - from **codeintel_rev.typing** import NDArrayF32
-- from **kgfoundry_common.logging** import get_logger
 - from **(absolute)** import duckdb
 - from **(absolute)** import numpy
 
 ## Definitions
 
-- variable: `duckdb` (line 38)
-- variable: `np` (line 39)
-- variable: `LOGGER` (line 41)
-- class: `IdMapMeta` (line 45)
-- class: `_ScopeFilterLogInfo` (line 55)
-- function: `_log_extra` (line 64)
-- function: `_escape_identifier` (line 88)
-- class: `_ScopeFilterSpec` (line 142)
-- class: `StructureAnnotations` (line 159)
-- class: `DuckDBCatalogOptions` (line 169)
-- class: `_DuckDBQueryMixin` (line 178)
-- class: `_LegacyOptions` (line 409)
-- class: `DuckDBCatalog` (line 416)
-- function: `_relation_exists` (line 1697)
-- function: `relation_exists` (line 1731)
-- function: `_file_checksum` (line 1749)
-- function: `_parquet_hash` (line 1771)
-- function: `ensure_faiss_idmap_view` (line 1799)
-- function: `refresh_faiss_idmap_materialized` (line 1846)
+- variable: `duckdb` (line 37)
+- variable: `np` (line 38)
+- variable: `LOGGER` (line 40)
+- class: `IdMapMeta` (line 44)
+- function: `_escape_identifier` (line 53)
+- class: `_ScopeFilterSpec` (line 107)
+- class: `StructureAnnotations` (line 124)
+- class: `_StructMaterializationPlan` (line 134)
+- class: `DuckDBCatalogOptions` (line 212)
+- class: `_DuckDBQueryMixin` (line 221)
+- class: `_LegacyOptions` (line 438)
+- class: `DuckDBCatalog` (line 445)
+- function: `_relation_exists` (line 1608)
+- function: `relation_exists` (line 1642)
+- function: `_file_checksum` (line 1660)
+- function: `_parquet_hash` (line 1682)
+- function: `ensure_faiss_idmap_view` (line 1710)
+- function: `refresh_faiss_idmap_materialized` (line 1757)
 
 ## Graph Metrics
 
@@ -62,8 +60,8 @@ chunk retrieval and joins.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 49
-- recent churn 90: 49
+- recent churn 30: 50
+- recent churn 90: 50
 
 ## Usage
 
@@ -95,7 +93,7 @@ DuckDBCatalog, IdMapMeta, StructureAnnotations, ensure_faiss_idmap_view, refresh
 
 ## Hotspot
 
-- score: 3.22
+- score: 3.19
 
 ## Side Effects
 
@@ -104,22 +102,22 @@ DuckDBCatalog, IdMapMeta, StructureAnnotations, ensure_faiss_idmap_view, refresh
 
 ## Complexity
 
-- branches: 170
-- cyclomatic: 171
-- loc: 1945
+- branches: 150
+- cyclomatic: 151
+- loc: 1856
 
 ## Doc Coverage
 
 - `IdMapMeta` (class): summary=yes, examples=no — Metadata describing a materialized FAISS ID map join.
-- `_ScopeFilterLogInfo` (class): summary=yes, examples=no — Container for scope filter logging inputs.
-- `_log_extra` (function): summary=yes, params=mismatch, examples=no — Return structured log extras for catalog events.
 - `_escape_identifier` (function): summary=yes, params=ok, examples=no — Return a DuckDB-escaped identifier string.
 - `_ScopeFilterSpec` (class): summary=yes, examples=no — Structured scope filter metadata used during scoped queries.
 - `StructureAnnotations` (class): summary=yes, examples=no — Structure-aware metadata joined onto explainability pools.
+- `_StructMaterializationPlan` (class): summary=yes, examples=no — Precomputed SQL statements for struct table materialization.
 - `DuckDBCatalogOptions` (class): summary=yes, examples=no — Optional configuration bundle for DuckDB catalog instantiation.
 - `_DuckDBQueryMixin` (class): summary=yes, examples=no — Chunk-level query helpers shared by :class:`DuckDBCatalog`.
 - `_LegacyOptions` (class): summary=no, examples=no
 - `DuckDBCatalog` (class): summary=yes, examples=no — DuckDB catalog for querying chunks.
+- `_relation_exists` (function): summary=yes, params=ok, examples=no — Return True when a table or view with ``name`` exists in the main schema.
 
 ## Tags
 

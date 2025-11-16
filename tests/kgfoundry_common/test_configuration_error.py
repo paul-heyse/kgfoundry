@@ -60,19 +60,17 @@ def _as_problem_mapping(problem: ProblemDetails) -> Mapping[str, JsonValue]:
 def test_with_details_minimal() -> None:
     """Test creating ConfigurationError with field and issue."""
     error = ConfigurationError.with_details(
-    field="timeout",
-    issue="Must be positive",
+        field="timeout",
+        issue="Must be positive",
     )
     assertions.expect_true(
-    isinstance(error, ConfigurationError), reason="should be ConfigurationError"
+        isinstance(error, ConfigurationError), reason="should be ConfigurationError"
     )
     assertions.expect_equal(error.code, ErrorCode.CONFIGURATION_ERROR)
     assertions.expect_equal(error.http_status, 500)
+    assertions.expect_true("timeout" in str(error.context), reason="context should contain timeout")
     assertions.expect_true(
-    "timeout" in str(error.context), reason="context should contain timeout"
-    )
-    assertions.expect_true(
-    "Must be positive" in str(error.context), reason="context should contain issue"
+        "Must be positive" in str(error.context), reason="context should contain issue"
     )
 
 
@@ -83,9 +81,7 @@ def test_with_details_with_hint() -> None:
         issue="Missing required env var",
         hint="Set KGFOUNDRY_API_KEY before running",
     )
-    assertions.expect_true(
-        "api_key" in str(error.context), reason="context should contain api_key"
-    )
+    assertions.expect_true("api_key" in str(error.context), reason="context should contain api_key")
     assertions.expect_true(
         "Missing required env var" in str(error.context), reason="context should contain issue"
     )
@@ -117,7 +113,7 @@ def test_with_details_context_structure() -> None:
     assertions.expect_true(isinstance(error.context, dict), reason="context should be dict")
     assertions.expect_equal(error.context["field"], "db_host")
     assertions.expect_equal(error.context["issue"], "Cannot reach database")
-    assertions.expect_equal(error.context["hint"], "Check network connectivity"        )
+    assertions.expect_equal(error.context["hint"], "Check network connectivity")
 
 
 def test_with_details_no_hint_not_in_context() -> None:
@@ -182,9 +178,7 @@ def test_build_configuration_problem_basic() -> None:
     assertions.expect_equal(problem_dict["title"], "Configuration Error")
     assertions.expect_equal(problem_dict["status"], 500)
     detail_value = problem_dict.get("detail", "")
-    assertions.expect_true(
-        "timeout" in str(detail_value), reason="detail should contain timeout"
-    )
+    assertions.expect_true("timeout" in str(detail_value), reason="detail should contain timeout")
 
 
 def test_build_configuration_problem_with_hint() -> None:
@@ -196,13 +190,9 @@ def test_build_configuration_problem_with_hint() -> None:
     )
     problem = build_configuration_problem(error)
     problem_dict = _as_problem_dict(problem)
-    assertions.expect_true(
-        "extensions" in problem_dict, reason="problem should have extensions"
-    )
+    assertions.expect_true("extensions" in problem_dict, reason="problem should have extensions")
     extensions = cast("dict[str, object]", problem_dict["extensions"])
-    assertions.expect_true(
-        "validation" in extensions, reason="extensions should have validation"
-    )
+    assertions.expect_true("validation" in extensions, reason="extensions should have validation")
     assertions.expect_true(
         "port" in str(extensions["validation"]), reason="validation should contain port"
     )
@@ -219,7 +209,7 @@ def test_build_configuration_problem_instance() -> None:
     )
     problem = build_configuration_problem(error)
     problem_dict = _as_problem_dict(problem)
-    assertions.expect_equal(problem_dict["instance"], "urn:config:validation"        )
+    assertions.expect_equal(problem_dict["instance"], "urn:config:validation")
 
 
 def test_build_configuration_problem_code() -> None:
@@ -231,7 +221,7 @@ def test_build_configuration_problem_code() -> None:
     problem = build_configuration_problem(error)
     problem_dict = _as_problem_dict(problem)
     assertions.expect_true("code" in problem_dict, reason="problem should have code")
-    assertions.expect_equal(problem_dict["code"], "configuration-error"        )
+    assertions.expect_equal(problem_dict["code"], "configuration-error")
 
 
 def test_build_configuration_problem_extensions() -> None:
@@ -242,21 +232,17 @@ def test_build_configuration_problem_extensions() -> None:
     )
     problem = build_configuration_problem(error)
     problem_dict = _as_problem_dict(problem)
-    assertions.expect_true(
-        "extensions" in problem_dict, reason="problem should have extensions"
-    )
+    assertions.expect_true("extensions" in problem_dict, reason="problem should have extensions")
     extensions = cast("dict[str, object]", problem_dict["extensions"])
     assertions.expect_equal(extensions["exception_type"], "ConfigurationError")
-    assertions.expect_true(
-        "validation" in extensions, reason="extensions should have validation"
-    )
+    assertions.expect_true("validation" in extensions, reason="extensions should have validation")
 
 
 def test_build_configuration_problem_rejects_non_config_error() -> None:
     """Test that non-ConfigurationError raises TypeError."""
     regular_error = ValueError("some error")
     with pytest.raises(TypeError, match="expected ConfigurationError"):
-        build_configuration_problem(regular_error        )
+        build_configuration_problem(regular_error)
 
 
 def test_build_configuration_problem_validates_against_schema() -> None:
@@ -266,7 +252,7 @@ def test_build_configuration_problem_validates_against_schema() -> None:
         issue="Schema validation failed",
     )
     problem = build_configuration_problem(error)
-    validate_problem_details(_as_problem_mapping(problem)        )
+    validate_problem_details(_as_problem_mapping(problem))
 
 
 def test_build_configuration_problem_multiple_fields() -> None:
@@ -281,9 +267,7 @@ def test_build_configuration_problem_multiple_fields() -> None:
     problem = build_configuration_problem(error)
     problem_dict = _as_problem_dict(problem)
     extensions = cast("dict[str, object]", problem_dict.get("extensions", {}))
-    assertions.expect_true(
-        "validation" in extensions, reason="extensions should have validation"
-    )
+    assertions.expect_true("validation" in extensions, reason="extensions should have validation")
     validation_ctx = cast("dict[str, object]", extensions.get("validation"))
     assertions.expect_true(
         "field_1" in str(validation_ctx), reason="validation should contain field_1"
@@ -302,7 +286,7 @@ def test_build_configuration_problem_preserves_error_message() -> None:
     )
     problem = build_configuration_problem(error)
     problem_dict = _as_problem_dict(problem)
-        # The detail should contain info about the field
+    # The detail should contain info about the field
     detail_value = problem_dict.get("detail", "")
     assertions.expect_true(
         "email" in str(detail_value) or "email" in str(problem_dict),
@@ -318,7 +302,7 @@ def test_build_configuration_problem_http_status_code() -> None:
     )
     problem = build_configuration_problem(error)
     problem_dict = _as_problem_dict(problem)
-    assertions.expect_equal(problem_dict["status"], 500        )
+    assertions.expect_equal(problem_dict["status"], 500)
 
 
 def test_problem_details_render() -> None:
@@ -333,7 +317,7 @@ def test_problem_details_render() -> None:
     assertions.expect_true(
         "configuration-error" in json_str, reason="json should contain error type"
     )
-    assertions.expect_true("setting" in json_str, reason="json should contain field"        )
+    assertions.expect_true("setting" in json_str, reason="json should contain field")
 
 
 def test_error_with_cause_chain() -> None:
@@ -344,15 +328,11 @@ def test_error_with_cause_chain() -> None:
         cause=original_error,
         context={"field": "value", "issue": "Validation"},
     )
-    assertions.expect_true(
-        error.__cause__ is original_error, reason="error should preserve cause"
-    )
+    assertions.expect_true(error.__cause__ is original_error, reason="error should preserve cause")
     problem = build_configuration_problem(error)
     problem_dict = _as_problem_dict(problem)
     extensions = cast("dict[str, object]", problem_dict.get("extensions", {}))
-    assertions.expect_true(
-        "validation" in extensions, reason="extensions should have validation"
-    )
+    assertions.expect_true("validation" in extensions, reason="extensions should have validation")
 
 
 def test_multiple_configuration_errors_as_problems() -> None:

@@ -166,7 +166,9 @@ def test_dual_index_search(tmp_index_path: Path) -> None:
     # Add vectors to secondary index
     secondary_vectors = _rng.normal(0.5, 0.15, (20, vec_dim)).astype(np.float32)
     secondary_vectors = np.clip(secondary_vectors, 0.0, 1.0)
-    secondary_ids = np.arange(_PRIMARY_ID_THRESHOLD, _PRIMARY_ID_THRESHOLD + 20, dtype=np.int64)  # IDs 100-119
+    secondary_ids = np.arange(
+        _PRIMARY_ID_THRESHOLD, _PRIMARY_ID_THRESHOLD + 20, dtype=np.int64
+    )  # IDs 100-119
     manager.update_index(secondary_vectors, secondary_ids)
 
     # Create a query vector (similar to one in secondary index)

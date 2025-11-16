@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 import os
-from typing import TYPE_CHECKING, ParamSpec, TypeVar, cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -15,40 +15,11 @@ from kgfoundry_common.safe_pickle_v2 import (
 )
 from tests._helpers import assertions
 
-P = ParamSpec("P")
-R = TypeVar("R")
-
-
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from collections.abc import Callable
-
+    from _pytest.fixtures import FixtureFunctionMarker
     from _pytest.logging import LogCaptureFixture
 
-    def fixture(
-        *args: object,
-        **kwargs: object,
-    ) -> Callable[[Callable[P, R]], Callable[P, R]]:
-        """Create a pytest fixture.
-
-        Parameters
-        ----------
-        *args : object
-            Positional arguments forwarded to :func:`pytest.fixture`.
-        **kwargs : object
-            Keyword arguments forwarded to :func:`pytest.fixture`.
-
-        Returns
-        -------
-        Callable[[Callable[P, R]], Callable[P, R]]
-            Decorator function that converts ``fn`` into a fixture.
-        """
-        def decorator(func: Callable[P, R]) -> Callable[P, R]:
-            return func
-
-        return decorator
-
-    ...
-
+    fixture = cast("FixtureFunctionMarker", pytest.fixture)
 else:  # pragma: no cover - pytest provides runtime decorator
     fixture = pytest.fixture
 

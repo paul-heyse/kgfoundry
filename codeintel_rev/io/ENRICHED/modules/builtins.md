@@ -16,31 +16,29 @@ Built-in retrieval channel implementations (BM25, SPLADE).
 - from **codeintel_rev.plugins.channels** import Channel, ChannelContext, ChannelError
 - from **codeintel_rev.retrieval.rm3_heuristics** import RM3Heuristics, RM3Params
 - from **codeintel_rev.retrieval.types** import SearchHit
-- from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 15)
-- function: `bm25_factory` (line 20)
-- function: `splade_factory` (line 52)
-- class: `_BM25Channel` (line 85)
-- class: `_SpladeChannel` (line 214)
-- function: `_resolve_path` (line 319)
-- function: `_classify_skip_reason` (line 326)
+- function: `bm25_factory` (line 17)
+- function: `splade_factory` (line 49)
+- class: `_BM25Channel` (line 82)
+- class: `_SpladeChannel` (line 207)
+- function: `_resolve_path` (line 308)
+- function: `_classify_skip_reason` (line 315)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 4
-- **cycle_group**: 140
+- **cycle_group**: 138
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 
@@ -82,7 +80,7 @@ bm25_factory, splade_factory
 
 - branches: 26
 - cyclomatic: 27
-- loc: 333
+- loc: 322
 
 ## Doc Coverage
 

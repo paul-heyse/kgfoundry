@@ -14,34 +14,32 @@ Hotspot scoring utilities.
 - from **functools** import lru_cache
 - from **pathlib** import Path
 - from **typing** import TYPE_CHECKING, Any
-- from **kgfoundry_common.logging** import get_logger
 - from **git** import Repo
 - from **git.exc** import GitError
 - from **git** import Repo
 
 ## Definitions
 
-- variable: `LOGGER` (line 14)
-- variable: `GitError` (line 21)
-- variable: `GitRepoType` (line 26)
-- function: `compute_hotspot_score` (line 29)
-- function: `_git_churn` (line 63)
-- function: `_open_repo` (line 98)
-- function: `_repo_root` (line 117)
+- variable: `GitError` (line 17)
+- variable: `GitRepoType` (line 22)
+- function: `compute_hotspot_score` (line 25)
+- function: `_git_churn` (line 59)
+- function: `_open_repo` (line 93)
+- function: `_repo_root` (line 110)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 78
+- **cycle_group**: 68
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 8
-- recent churn 90: 8
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 
@@ -79,7 +77,7 @@ Hotspot scoring utilities.
 
 - branches: 14
 - cyclomatic: 15
-- loc: 126
+- loc: 119
 
 ## Doc Coverage
 

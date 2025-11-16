@@ -30,28 +30,28 @@ Implements full MCP tool catalog for code intelligence.
 - function: `get_context` (line 33)
 - function: `set_scope` (line 61)
 - function: `list_paths` (line 83)
-- function: `open_file` (line 131)
-- function: `search_text` (line 168)
-- function: `blame_range` (line 219)
-- function: `file_history` (line 253)
-- function: `report_latest_run` (line 280)
-- function: `file_resource` (line 296)
-- function: `prompt_code_review` (line 320)
-- function: `build_http_app` (line 336)
+- function: `open_file` (line 130)
+- function: `search_text` (line 167)
+- function: `blame_range` (line 218)
+- function: `file_history` (line 252)
+- function: `report_latest_run` (line 279)
+- function: `file_resource` (line 295)
+- function: `prompt_code_review` (line 319)
+- function: `build_http_app` (line 335)
 
 ## Graph Metrics
 
 - **fan_in**: 3
 - **fan_out**: 5
-- **cycle_group**: 37
+- **cycle_group**: 36
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 15
-- recent churn 90: 15
+- recent churn 30: 16
+- recent churn 90: 16
 
 ## Usage
 
@@ -83,7 +83,7 @@ app_context, build_http_app, get_context, mcp
 
 ## Hotspot
 
-- score: 2.08
+- score: 1.96
 
 ## Side Effects
 
@@ -91,9 +91,9 @@ app_context, build_http_app, get_context, mcp
 
 ## Complexity
 
-- branches: 7
-- cyclomatic: 8
-- loc: 375
+- branches: 4
+- cyclomatic: 5
+- loc: 374
 
 ## Doc Coverage
 

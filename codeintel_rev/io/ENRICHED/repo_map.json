@@ -1,11 +1,11 @@
 {
   "root": "/home/paul/kgfoundry/codeintel_rev",
   "repo_root": "/home/paul/kgfoundry",
-  "module_count": 155,
+  "module_count": 153,
   "symbol_edge_count": 0,
-  "coverage_records": 155,
-  "config_files": 221,
-  "generated_at": "2025-11-16T05:26:40+00:00",
+  "coverage_records": 153,
+  "config_files": 222,
+  "generated_at": "2025-11-16T20:34:47+00:00",
   "tags": {
     "low-coverage": [
       "__init__.py",
@@ -13,7 +13,7 @@
       "app/__init__.py",
       "app/capabilities.py",
       "app/config_context.py",
-      "app/gpu_warmup.py",
+      "app/faiss_health.py",
       "app/main.py",
       "app/middleware.py",
       "app/readiness.py",
@@ -90,7 +90,6 @@
       "io/coderank_embedder.py",
       "io/duckdb_catalog.py",
       "io/duckdb_manager.py",
-      "io/faiss_dual_index.py",
       "io/faiss_manager.py",
       "io/git_client.py",
       "io/hybrid_search.py",
@@ -127,7 +126,6 @@
       "mcp_server/service_context.py",
       "mcp_server/testing.py",
       "mcp_server/tools/__init__.py",
-      "mcp_server/tools/gpu_doctor.py",
       "mcp_server/types.py",
       "module_utils.py",
       "ops/__init__.py",
@@ -167,7 +165,7 @@
     "public-api": [
       "app/capabilities.py",
       "app/config_context.py",
-      "app/gpu_warmup.py",
+      "app/faiss_health.py",
       "app/main.py",
       "app/middleware.py",
       "app/routers/__init__.py",
@@ -203,7 +201,6 @@
       "io/bm25_manager.py",
       "io/duckdb_catalog.py",
       "io/duckdb_manager.py",
-      "io/faiss_dual_index.py",
       "io/faiss_manager.py",
       "io/git_client.py",
       "io/hybrid_search.py",
@@ -265,8 +262,8 @@
     ]
   },
   "tag_counts": {
-    "low-coverage": 155,
-    "public-api": 78,
+    "low-coverage": 153,
+    "public-api": 77,
     "fastapi": 3,
     "pydantic": 2,
     "reexport-hub": 8

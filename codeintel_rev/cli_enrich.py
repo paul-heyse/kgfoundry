@@ -6,6 +6,7 @@ from __future__ import annotations
 import ast
 import json
 import logging
+import sys
 import time
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
@@ -364,6 +365,72 @@ Global options (pass after the command, e.g. `codeintel-enrich all --root src --
   --tags-yaml PATH      Optional tagging rules YAML.
   --dry-run             Compute artifacts without writing to disk.
 """
+
+_GLOBAL_VALUE_FLAGS = {
+    "--root",
+    "--scip",
+    "--out",
+    "--pyrefly-json",
+    "--tags-yaml",
+    "--coverage-xml",
+    "--only",
+    "--max-file-bytes",
+    "--history-window-days",
+    "--commits-window",
+    "--slices-filter",
+}
+_GLOBAL_BOOL_FLAGS = {
+    "--owners",
+    "--no-owners",
+    "--emit-slices",
+    "--no-emit-slices",
+}
+_GLOBAL_MIN_ARG_COUNT = 3
+
+
+def normalize_global_cli_args(argv: Sequence[str]) -> list[str]:
+    """Return arguments with known global options positioned before the command.
+
+    Parameters
+    ----------
+    argv : Sequence[str]
+        Command-line arguments to normalize. Should include the script name as the
+        first element, followed by global flags and the command.
+
+    Returns
+    -------
+    list[str]
+        Normalized argv sequence ready for Typer consumption.
+    """
+    if len(argv) < _GLOBAL_MIN_ARG_COUNT:
+        return list(argv)
+    script, *rest = argv
+    globals_segment: list[str] = []
+    remaining: list[str] = []
+    idx = 0
+    while idx < len(rest):
+        token = rest[idx]
+        flag, eq, _inline = token.partition("=")
+        if flag in _GLOBAL_VALUE_FLAGS:
+            if eq:
+                globals_segment.append(token)
+                idx += 1
+                continue
+            if idx + 1 < len(rest):
+                globals_segment.extend([flag, rest[idx + 1]])
+                idx += 2
+                continue
+            remaining.append(token)
+            idx += 1
+            continue
+        if flag in _GLOBAL_BOOL_FLAGS:
+            globals_segment.append(token)
+            idx += 1
+            continue
+        remaining.append(token)
+        idx += 1
+    return [script, *globals_segment, *remaining]
+
 
 app = typer.Typer(add_completion=True, help=GLOBAL_OPTIONS_HELP)
 
@@ -2355,5 +2422,11 @@ def _write_tag_index(out: Path, tag_index: Mapping[str, list[str]]) -> None:
     )
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Entry point ensuring global options are parsed regardless of position."""
+    sys.argv = normalize_global_cli_args(tuple(sys.argv))
     app()
+
+
+if __name__ == "__main__":
+    main()

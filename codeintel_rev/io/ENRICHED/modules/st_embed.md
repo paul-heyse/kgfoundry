@@ -15,7 +15,6 @@ Invoke via:
 - from **__future__** import annotations
 - from **(absolute)** import argparse
 - from **(absolute)** import json
-- from **(absolute)** import logging
 - from **collections.abc** import Iterable
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
@@ -23,19 +22,17 @@ Invoke via:
 - from **(absolute)** import torch
 - from **sentence_transformers** import SentenceTransformer
 - from **codeintel_rev.config.settings** import load_settings
-- from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 26)
-- class: `EmbedJob` (line 30)
-- function: `_resolve_model_name` (line 42)
-- function: `_resolve_device` (line 51)
-- function: `_read_texts` (line 61)
-- function: `_dump_jsonl` (line 71)
-- function: `_parse_args` (line 77)
-- function: `embed_file` (line 121)
-- function: `main` (line 173)
+- class: `EmbedJob` (line 26)
+- function: `_resolve_model_name` (line 38)
+- function: `_resolve_device` (line 47)
+- function: `_read_texts` (line 57)
+- function: `_dump_jsonl` (line 67)
+- function: `_parse_args` (line 73)
+- function: `embed_file` (line 117)
+- function: `main` (line 165)
 
 ## Graph Metrics
 
@@ -48,8 +45,8 @@ Invoke via:
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 4
+- recent churn 90: 4
 
 ## Usage
 
@@ -87,7 +84,7 @@ Invoke via:
 
 - branches: 14
 - cyclomatic: 15
-- loc: 207
+- loc: 197
 
 ## Doc Coverage
 

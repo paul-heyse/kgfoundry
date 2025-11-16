@@ -58,7 +58,7 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 - from **pathlib** import Path
 - from **threading** import Lock
 - from **types** import ModuleType
-- from **typing** import TYPE_CHECKING, Any, Protocol, TypeVar, cast
+- from **typing** import TYPE_CHECKING, Any, TypeVar, cast
 - from **(absolute)** import numpy
 - from **codeintel_rev.app.capabilities** import Capabilities
 - from **codeintel_rev.app.scope_store** import ScopeStore
@@ -75,7 +75,6 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 - from **codeintel_rev.runtime.factory_adjustment** import DefaultFactoryAdjuster, FactoryAdjuster, NoopFactoryAdjuster
 - from **codeintel_rev.typing** import gate_import
 - from **kgfoundry_common.errors** import ConfigurationError
-- from **kgfoundry_common.logging** import get_logger
 - from **collections.abc** import Iterator
 - from **codeintel_rev.app.scope_store** import SupportsAsyncRedis
 - from **codeintel_rev.io.hybrid_search** import HybridSearchEngine
@@ -83,30 +82,28 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 
 ## Definitions
 
-- variable: `HybridSearchEngine` (line 91)
-- variable: `XTRIndex` (line 92)
-- variable: `LOGGER` (line 94)
-- class: `_RetrievalMetrics` (line 100)
-- function: `_infer_index_root` (line 138)
-- function: `_build_factory_adjuster` (line 168)
-- function: `_build_faiss_manager` (line 201)
-- function: `_build_scope_store` (line 244)
-- function: `_build_git_clients` (line 270)
-- function: `_assign_frozen` (line 295)
-- function: `_faiss_module` (line 300)
-- function: `_import_faiss_manager_cls` (line 316)
-- function: `_import_faiss_runtime_opts_cls` (line 328)
-- function: `_faiss_runtime_options_from_index` (line 340)
-- function: `_import_hybrid_engine_cls` (line 381)
-- function: `_import_xtr_index_cls` (line 398)
-- function: `_require_dependency` (line 415)
-- function: `_ensure_path_exists` (line 474)
-- class: `ResolvedPaths` (line 534)
-- function: `resolve_application_paths` (line 593)
-- variable: `T` (line 708)
-- class: `_FaissRuntimeState` (line 711)
-- class: `_ContextRuntimeState` (line 723)
-- class: `ApplicationContext` (line 763)
+- variable: `HybridSearchEngine` (line 90)
+- variable: `XTRIndex` (line 91)
+- function: `_infer_index_root` (line 101)
+- function: `_build_factory_adjuster` (line 131)
+- function: `_build_faiss_manager` (line 164)
+- function: `_build_scope_store` (line 198)
+- function: `_build_git_clients` (line 224)
+- function: `_assign_frozen` (line 245)
+- function: `_faiss_module` (line 250)
+- function: `_import_faiss_manager_cls` (line 266)
+- function: `_import_faiss_runtime_opts_cls` (line 278)
+- function: `_faiss_runtime_options_from_index` (line 290)
+- function: `_import_hybrid_engine_cls` (line 330)
+- function: `_import_xtr_index_cls` (line 347)
+- function: `_require_dependency` (line 364)
+- function: `_ensure_path_exists` (line 423)
+- class: `ResolvedPaths` (line 483)
+- function: `resolve_application_paths` (line 542)
+- variable: `T` (line 654)
+- class: `_FaissRuntimeState` (line 657)
+- class: `_ContextRuntimeState` (line 668)
+- class: `ApplicationContext` (line 708)
 
 ## Graph Metrics
 
@@ -119,8 +116,8 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 37
-- recent churn 90: 37
+- recent churn 30: 43
+- recent churn 90: 43
 
 ## Usage
 
@@ -156,7 +153,7 @@ ApplicationContext, ResolvedPaths, resolve_application_paths
 
 ## Hotspot
 
-- score: 3.30
+- score: 3.27
 
 ## Side Effects
 
@@ -165,13 +162,12 @@ ApplicationContext, ResolvedPaths, resolve_application_paths
 
 ## Complexity
 
-- branches: 69
-- cyclomatic: 70
-- loc: 1569
+- branches: 61
+- cyclomatic: 62
+- loc: 1437
 
 ## Doc Coverage
 
-- `_RetrievalMetrics` (class): summary=yes, examples=no — Protocol defining the interface for retrieval metrics collection.
 - `_infer_index_root` (function): summary=yes, params=ok, examples=no — Return the directory that stores versioned index assets.
 - `_build_factory_adjuster` (function): summary=yes, params=ok, examples=no — Return a DefaultFactoryAdjuster derived from settings.
 - `_build_faiss_manager` (function): summary=yes, params=ok, examples=no — Construct and log the FAISS manager for the main index.
@@ -181,6 +177,7 @@ ApplicationContext, ResolvedPaths, resolve_application_paths
 - `_faiss_module` (function): summary=yes, params=ok, examples=no — Return the cached FAISS manager module.
 - `_import_faiss_manager_cls` (function): summary=yes, params=ok, examples=no — Import ``FAISSManager`` lazily to keep module import costs low.
 - `_import_faiss_runtime_opts_cls` (function): summary=yes, params=ok, examples=no — Return the FAISS runtime options dataclass.
+- `_faiss_runtime_options_from_index` (function): summary=yes, params=ok, examples=no — Materialize FAISS runtime options from the structured index config.
 
 ## Tags
 

@@ -16,42 +16,40 @@ Ownership, churn, and bus-factor analytics sourced from Git history.
 - from **fnmatch** import fnmatch
 - from **pathlib** import Path
 - from **typing** import TYPE_CHECKING
-- from **kgfoundry_common.logging** import get_logger
 - from **git** import Repo
 - from **git** import exc
 - from **git** import Repo
 
 ## Definitions
 
-- variable: `git_exc` (line 21)
-- class: `GitRepo` (line 27)
-- variable: `GitError` (line 31)
-- variable: `LOGGER` (line 32)
-- class: `FileOwnership` (line 38)
-- class: `OwnershipIndex` (line 49)
-- function: `compute_ownership` (line 56)
-- function: `_normalize_windows` (line 116)
-- function: `_try_open_repo` (line 123)
-- function: `_stats_via_gitpython` (line 132)
-- function: `_author_name` (line 171)
-- function: `_top_k` (line 179)
-- function: `_bus_factor` (line 184)
-- function: `_codeowners_lookup` (line 191)
-- function: `_glob_like_match` (line 211)
+- variable: `git_exc` (line 19)
+- class: `GitRepo` (line 25)
+- variable: `GitError` (line 29)
+- class: `FileOwnership` (line 35)
+- class: `OwnershipIndex` (line 46)
+- function: `compute_ownership` (line 53)
+- function: `_normalize_windows` (line 112)
+- function: `_try_open_repo` (line 119)
+- function: `_stats_via_gitpython` (line 128)
+- function: `_author_name` (line 167)
+- function: `_top_k` (line 175)
+- function: `_bus_factor` (line 180)
+- function: `_codeowners_lookup` (line 187)
+- function: `_glob_like_match` (line 207)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 82
+- **cycle_group**: 66
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 
@@ -99,7 +97,7 @@ FileOwnership, OwnershipIndex, compute_ownership
 
 - branches: 31
 - cyclomatic: 32
-- loc: 218
+- loc: 214
 
 ## Doc Coverage
 

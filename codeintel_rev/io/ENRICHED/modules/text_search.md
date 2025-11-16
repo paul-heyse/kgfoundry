@@ -21,46 +21,43 @@ Fast text search with regex support.
 - from **codeintel_rev.mcp_server.schemas** import Match, ScopeIn
 - from **codeintel_rev.mcp_server.scope_utils** import get_effective_scope, merge_scope_filters
 - from **kgfoundry_common.errors** import VectorSearchError
-- from **kgfoundry_common.logging** import get_logger
 - from **kgfoundry_common.subprocess_utils** import SubprocessError, SubprocessTimeoutError, run_subprocess
 - from **codeintel_rev.app.config_context** import ApplicationContext
 
 ## Definitions
 
-- variable: `SEARCH_TIMEOUT_SECONDS` (line 32)
-- variable: `SEARCH_MAX_RESULTS` (line 33)
-- variable: `MAX_PREVIEW_CHARS` (line 34)
-- variable: `GREP_SPLIT_PARTS` (line 35)
-- variable: `COMMAND_NOT_FOUND_RETURN_CODE` (line 36)
-- variable: `COMPONENT_NAME` (line 37)
-- variable: `LOGGER` (line 38)
-- class: `TextSearchOptions` (line 42)
-- class: `_ResolvedFilters` (line 118)
-- function: `_bool_override` (line 126)
-- function: `_sequence_override` (line 153)
-- function: `_int_override` (line 186)
-- function: `search_text` (line 213)
-- function: `_resolve_glob_filters` (line 299)
-- function: `_search_text_sync` (line 328)
-- function: `_fallback_grep` (line 420)
-- class: `RipgrepCommandParams` (line 513)
-- function: `_build_ripgrep_command` (line 525)
-- function: `_parse_ripgrep_output` (line 565)
-- function: `_preview_text` (line 632)
+- variable: `SEARCH_TIMEOUT_SECONDS` (line 31)
+- variable: `SEARCH_MAX_RESULTS` (line 32)
+- variable: `MAX_PREVIEW_CHARS` (line 33)
+- variable: `GREP_SPLIT_PARTS` (line 34)
+- variable: `COMMAND_NOT_FOUND_RETURN_CODE` (line 35)
+- class: `TextSearchOptions` (line 39)
+- class: `_ResolvedFilters` (line 115)
+- function: `_bool_override` (line 123)
+- function: `_sequence_override` (line 150)
+- function: `_int_override` (line 183)
+- function: `search_text` (line 210)
+- function: `_resolve_glob_filters` (line 271)
+- function: `_search_text_sync` (line 300)
+- function: `_fallback_grep` (line 366)
+- class: `RipgrepCommandParams` (line 458)
+- function: `_build_ripgrep_command` (line 470)
+- function: `_parse_ripgrep_output` (line 510)
+- function: `_preview_text` (line 577)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 5
-- **cycle_group**: 121
+- **cycle_group**: 120
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 30
-- recent churn 90: 30
+- recent churn 30: 33
+- recent churn 90: 33
 
 ## Usage
 
@@ -92,7 +89,7 @@ search_text
 
 ## Hotspot
 
-- score: 2.48
+- score: 2.44
 
 ## Side Effects
 
@@ -101,9 +98,9 @@ search_text
 
 ## Complexity
 
-- branches: 56
-- cyclomatic: 57
-- loc: 658
+- branches: 49
+- cyclomatic: 50
+- loc: 603
 
 ## Doc Coverage
 

@@ -9,6 +9,7 @@ Semantic MCP tool registrations (pure move from server.py).
 ## Imports
 
 - from **__future__** import annotations
+- from **(absolute)** import asyncio
 - from **typing** import Any
 - from **codeintel_rev.mcp_server.adapters** import deep_research
 - from **codeintel_rev.mcp_server.adapters** import semantic
@@ -19,25 +20,25 @@ Semantic MCP tool registrations (pure move from server.py).
 
 ## Definitions
 
-- function: `deep_research_search` (line 27)
-- function: `deep_research_fetch` (line 83)
-- function: `semantic_search` (line 125)
-- function: `semantic_search_pro` (line 171)
-- function: `telemetry_run_report` (line 227)
+- function: `deep_research_search` (line 28)
+- function: `deep_research_fetch` (line 84)
+- function: `semantic_search` (line 126)
+- function: `semantic_search_pro` (line 172)
+- function: `telemetry_run_report` (line 228)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 5
-- **cycle_group**: 128
+- **cycle_group**: 127
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 9
-- recent churn 90: 9
+- recent churn 30: 11
+- recent churn 90: 11
 
 ## Usage
 
@@ -69,13 +70,13 @@ Semantic MCP tool registrations (pure move from server.py).
 
 ## Side Effects
 
-- none detected
+- subprocess
 
 ## Complexity
 
 - branches: 4
 - cyclomatic: 5
-- loc: 248
+- loc: 250
 
 ## Doc Coverage
 

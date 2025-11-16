@@ -11,6 +11,7 @@ Admin endpoints for staging, publishing, and rolling back index versions.
 - from **__future__** import annotations
 - from **(absolute)** import os
 - from **collections.abc** import Mapping
+- from **contextlib** import suppress
 - from **pathlib** import Path
 - from **typing** import TypedDict, cast
 - from **fastapi** import APIRouter, Depends, HTTPException, Query, Request
@@ -20,25 +21,23 @@ Admin endpoints for staging, publishing, and rolling back index versions.
 - from **codeintel_rev.errors** import RuntimeLifecycleError
 - from **codeintel_rev.indexing.index_lifecycle** import IndexAssets, collect_asset_attrs
 - from **codeintel_rev.runtime.factory_adjustment** import DefaultFactoryAdjuster
-- from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 20)
-- variable: `router` (line 21)
-- function: `_require_admin` (line 26)
-- function: `_context` (line 32)
-- function: `_persist_session_tuning` (line 39)
-- function: `status_endpoint` (line 55)
-- class: `PublishBody` (line 107)
-- class: `TuningBody` (line 170)
-- class: `FaissRuntimeTuningBody` (line 219)
-- function: `publish_endpoint` (line 271)
-- function: `rollback_endpoint` (line 364)
-- function: `tuning_endpoint` (line 417)
-- function: `faiss_runtime_status` (line 473)
-- function: `faiss_runtime_tuning_endpoint` (line 511)
-- function: `faiss_runtime_reset_endpoint` (line 590)
+- variable: `router` (line 20)
+- function: `_require_admin` (line 25)
+- function: `_context` (line 31)
+- function: `_persist_session_tuning` (line 38)
+- function: `status_endpoint` (line 54)
+- class: `PublishBody` (line 104)
+- class: `TuningBody` (line 167)
+- class: `FaissRuntimeTuningBody` (line 211)
+- function: `publish_endpoint` (line 263)
+- function: `rollback_endpoint` (line 355)
+- function: `tuning_endpoint` (line 408)
+- function: `faiss_runtime_status` (line 462)
+- function: `faiss_runtime_tuning_endpoint` (line 500)
+- function: `faiss_runtime_reset_endpoint` (line 579)
 
 ## Graph Metrics
 
@@ -51,8 +50,8 @@ Admin endpoints for staging, publishing, and rolling back index versions.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 11
-- recent churn 90: 11
+- recent churn 30: 15
+- recent churn 90: 15
 
 ## Usage
 
@@ -98,7 +97,7 @@ router
 
 - branches: 18
 - cyclomatic: 19
-- loc: 640
+- loc: 629
 
 ## Doc Coverage
 

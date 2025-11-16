@@ -25,7 +25,7 @@ Resolve exports and re-exports for module records.
 
 - **fan_in**: 1
 - **fan_out**: 2
-- **cycle_group**: 67
+- **cycle_group**: 80
 
 ## Ownership
 

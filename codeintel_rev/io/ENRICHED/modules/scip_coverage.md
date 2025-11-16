@@ -19,16 +19,14 @@ SCIP symbol coverage evaluator.
 - from **codeintel_rev.io.duckdb_manager** import DuckDBManager
 - from **codeintel_rev.io.faiss_manager** import SearchRuntimeOverrides
 - from **codeintel_rev.io.symbol_catalog** import SymbolCatalog, SymbolDefRow
-- from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 19)
-- class: `SupportsFaissSearch` (line 22)
-- class: `SupportsEmbedSingle` (line 37)
-- class: `CoverageResult` (line 46)
-- class: `CoverageSummary` (line 56)
-- class: `SCIPCoverageEvaluator` (line 66)
+- class: `SupportsFaissSearch` (line 19)
+- class: `SupportsEmbedSingle` (line 34)
+- class: `CoverageResult` (line 43)
+- class: `CoverageSummary` (line 53)
+- class: `SCIPCoverageEvaluator` (line 63)
 
 ## Graph Metrics
 
@@ -41,8 +39,8 @@ SCIP symbol coverage evaluator.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 5
-- recent churn 90: 5
+- recent churn 30: 6
+- recent churn 90: 6
 
 ## Usage
 
@@ -70,7 +68,7 @@ SCIP symbol coverage evaluator.
 
 ## Hotspot
 
-- score: 2.21
+- score: 2.19
 
 ## Side Effects
 
@@ -78,9 +76,9 @@ SCIP symbol coverage evaluator.
 
 ## Complexity
 
-- branches: 17
-- cyclomatic: 18
-- loc: 249
+- branches: 16
+- cyclomatic: 17
+- loc: 241
 
 ## Doc Coverage
 

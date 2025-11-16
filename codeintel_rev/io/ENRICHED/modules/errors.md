@@ -52,23 +52,24 @@ Raising Git operation error:
 - class: `GitOperationError` (line 274)
 - class: `RuntimeLifecycleError` (line 353)
 - class: `RuntimeUnavailableError` (line 372)
-- class: `VectorIndexStateError` (line 395)
-- class: `VectorIndexIncompatibleError` (line 417)
-- class: `CatalogJoinError` (line 439)
+- class: `RequestContextError` (line 395)
+- class: `VectorIndexStateError` (line 444)
+- class: `VectorIndexIncompatibleError` (line 466)
+- class: `CatalogJoinError` (line 488)
 
 ## Graph Metrics
 
 - **fan_in**: 14
 - **fan_out**: 0
-- **cycle_group**: 7
+- **cycle_group**: 4
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 
@@ -77,7 +78,7 @@ Raising Git operation error:
 
 ## Declared Exports (__all__)
 
-FileOperationError, FileReadError, GitOperationError, InvalidLineRangeError, PathNotDirectoryError, PathNotFoundError, RuntimeLifecycleError, RuntimeUnavailableError
+FileOperationError, FileReadError, GitOperationError, InvalidLineRangeError, PathNotDirectoryError, PathNotFoundError, RequestContextError, RuntimeLifecycleError, RuntimeUnavailableError
 
 ## Doc Health
 
@@ -110,7 +111,7 @@ FileOperationError, FileReadError, GitOperationError, InvalidLineRangeError, Pat
 
 - branches: 8
 - cyclomatic: 9
-- loc: 484
+- loc: 534
 
 ## Doc Coverage
 
@@ -123,7 +124,7 @@ FileOperationError, FileReadError, GitOperationError, InvalidLineRangeError, Pat
 - `GitOperationError` (class): summary=yes, examples=yes — Base exception for Git operation errors.
 - `RuntimeLifecycleError` (class): summary=yes, examples=no — Raised when a runtime fails to initialize or shut down.
 - `RuntimeUnavailableError` (class): summary=yes, examples=no — Raised when a runtime dependency is missing or disabled.
-- `VectorIndexStateError` (class): summary=yes, examples=no — Raised when a FAISS index is missing or not ready.
+- `RequestContextError` (class): summary=yes, examples=no — Raised when HTTP request context injection fails.
 
 ## Tags
 

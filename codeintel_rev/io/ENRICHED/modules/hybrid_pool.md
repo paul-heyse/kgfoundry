@@ -12,29 +12,28 @@ Feature-normalized hybrid pooling utilities.
 - from **(absolute)** import math
 - from **collections.abc** import Iterable, Mapping, Sequence
 - from **dataclasses** import dataclass
-- from **time** import perf_counter
 
 ## Definitions
 
-- class: `Hit` (line 21)
-- class: `PooledHit` (line 31)
-- function: `_minmax_norm` (line 40)
-- function: `_softmax_norm` (line 51)
-- class: `HybridPoolEvaluator` (line 60)
+- class: `Hit` (line 20)
+- class: `PooledHit` (line 30)
+- function: `_minmax_norm` (line 39)
+- function: `_softmax_norm` (line 50)
+- class: `HybridPoolEvaluator` (line 59)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 0
-- **cycle_group**: 18
+- **cycle_group**: 24
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- recent churn 30: 3
+- recent churn 90: 3
 
 ## Usage
 
@@ -76,7 +75,7 @@ Hit, HybridPoolEvaluator, PooledHit
 
 - branches: 11
 - cyclomatic: 12
-- loc: 143
+- loc: 142
 
 ## Doc Coverage
 

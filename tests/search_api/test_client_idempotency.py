@@ -15,13 +15,12 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
+from kgfoundry_common.types import JsonValue
 from tests._helpers import assertions
 
 # Test constants for HTTP status codes
 _HTTP_STATUS_SERVER_ERROR_THRESHOLD = 500
 _HTTP_STATUS_TOO_MANY_REQUESTS = 429
-
-from kgfoundry_common.types import JsonValue
 
 if TYPE_CHECKING:
     from _pytest.logging import LogCaptureFixture

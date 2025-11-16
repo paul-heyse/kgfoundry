@@ -159,9 +159,7 @@ def test_stitching_links_module_and_scip(tmp_path: Path) -> None:
     scip_symbol = updated.stitch.scip_symbol
     if scip_symbol is None:  # pragma: no cover - defensive
         pytest.fail("scip_symbol should be set")
-    assertions.expect_true(
-        scip_symbol.endswith("add#"), reason="scip_symbol should end with add#"
-    )
+    assertions.expect_true(scip_symbol.endswith("add#"), reason="scip_symbol should end with add#")
     assertions.expect_true(counters.module_matches >= 1, reason="should have module matches")
     assertions.expect_true(counters.scip_matches >= 1, reason="should have scip matches")
 

@@ -33,21 +33,18 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 - class: `TorchCudaAPI` (line 97)
 - class: `TorchTensor` (line 194)
 - class: `TorchModule` (line 243)
-- class: `FaissStandardGpuResources` (line 261)
-- class: `FaissGpuClonerOptions` (line 265)
-- class: `FaissIndex` (line 273)
-- class: `FaissGpuIndexFlatIP` (line 279)
-- class: `FaissModule` (line 291)
-- class: `NumpyRandomState` (line 330)
-- class: `NumpyRandomNamespace` (line 351)
-- class: `NumpyLinalgNamespace` (line 375)
-- class: `NumpyModule` (line 400)
-- class: `PolarsDataFrame` (line 407)
-- class: `PolarsModule` (line 428)
+- class: `FaissIndex` (line 261)
+- class: `FaissModule` (line 267)
+- class: `NumpyRandomState` (line 296)
+- class: `NumpyRandomNamespace` (line 317)
+- class: `NumpyLinalgNamespace` (line 341)
+- class: `NumpyModule` (line 366)
+- class: `PolarsDataFrame` (line 373)
+- class: `PolarsModule` (line 394)
 
 ## Graph Metrics
 
-- **fan_in**: 96
+- **fan_in**: 94
 - **fan_out**: 0
 - **cycle_group**: 1
 
@@ -56,8 +53,8 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 14
-- recent churn 90: 14
+- recent churn 30: 15
+- recent churn 90: 15
 
 ## Usage
 
@@ -89,7 +86,7 @@ FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, Polars
 
 ## Hotspot
 
-- score: 2.71
+- score: 2.70
 
 ## Side Effects
 
@@ -99,7 +96,7 @@ FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, Polars
 
 - branches: 1
 - cyclomatic: 2
-- loc: 454
+- loc: 420
 
 ## Doc Coverage
 
@@ -108,11 +105,11 @@ FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, Polars
 - `TorchCudaAPI` (class): summary=yes, examples=no — Minimal CUDA API surface used throughout the codebase.
 - `TorchTensor` (class): summary=yes, examples=no — Tensor operations invoked inside diagnostics.
 - `TorchModule` (class): summary=yes, examples=no — Subset of torch's module-level API we rely on.
-- `FaissStandardGpuResources` (class): summary=yes, examples=no — GPU resource handle for FAISS.
-- `FaissGpuClonerOptions` (class): summary=yes, examples=no — Options controlling FAISS GPU cloning behavior.
 - `FaissIndex` (class): summary=yes, examples=no — Minimal FAISS index surface used in diagnostics.
-- `FaissGpuIndexFlatIP` (class): summary=yes, examples=no — GPU FAISS index used for smoke testing.
 - `FaissModule` (class): summary=yes, examples=no — Subset of the FAISS module accessed via gate_import.
+- `NumpyRandomState` (class): summary=yes, examples=no — Random state wrapper for numpy.random.
+- `NumpyRandomNamespace` (class): summary=yes, examples=no — Namespace for numpy.random helpers.
+- `NumpyLinalgNamespace` (class): summary=yes, examples=no — Namespace for numpy.linalg helpers.
 
 ## Tags
 

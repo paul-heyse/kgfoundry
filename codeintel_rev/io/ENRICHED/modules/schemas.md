@@ -35,27 +35,27 @@ TypedDict provides automatic JSON Schema generation for FastMCP tools.
 - class: `FetchObject` (line 372)
 - class: `FetchStructuredContent` (line 382)
 - class: `AnswerEnvelope` (line 388)
-- class: `SymbolInfo` (line 492)
-- class: `GitBlameEntry` (line 523)
-- class: `OpenFileResponse` (line 556)
-- class: `ListPathsResponse` (line 580)
-- class: `BlameRangeResponse` (line 601)
-- class: `FileHistoryResponse` (line 616)
-- class: `SearchTextResponse` (line 631)
+- class: `SymbolInfo` (line 497)
+- class: `GitBlameEntry` (line 528)
+- class: `OpenFileResponse` (line 561)
+- class: `ListPathsResponse` (line 585)
+- class: `BlameRangeResponse` (line 606)
+- class: `FileHistoryResponse` (line 621)
+- class: `SearchTextResponse` (line 636)
 
 ## Graph Metrics
 
 - **fan_in**: 13
 - **fan_out**: 1
-- **cycle_group**: 4
+- **cycle_group**: 12
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 14
-- recent churn 90: 14
+- recent churn 30: 16
+- recent churn 90: 16
 
 ## Usage
 
@@ -97,7 +97,7 @@ AnswerEnvelope, BaseErrorFields, BlameRangeResponse, FetchObject, FetchObjectMet
 
 - branches: 0
 - cyclomatic: 1
-- loc: 678
+- loc: 683
 
 ## Doc Coverage
 

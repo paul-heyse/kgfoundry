@@ -36,8 +36,8 @@ async def test_get_effective_scope_valid_session_id_with_scope(
     result = await get_effective_scope(mock_application_context, session_id)
 
     # Assert
-    assert result is not None
-    assertions.expect_equal(dict(result), dict(scope))
+    assertions.expect_true(result is not None, reason="scope should be present")
+    assertions.expect_equal(dict(result or {}), dict(scope))
 
 
 @pytest.mark.asyncio

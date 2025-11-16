@@ -22,29 +22,27 @@ Embedding provider abstractions for chunk ingestion and runtime services.
 - from **codeintel_rev.config.settings** import EmbeddingsConfig, IndexConfig, Settings, VLLMConfig
 - from **codeintel_rev.io.vllm_engine** import InprocessVLLMEmbedder
 - from **codeintel_rev.typing** import NDArrayF32, gate_import
-- from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 21)
-- variable: `EMBEDDING_RANK` (line 22)
-- class: `EmbeddingRuntimeError` (line 25)
-- class: `EmbeddingConfigError` (line 29)
-- class: `EmbeddingMetadata` (line 34)
-- class: `EmbeddingProvider` (line 63)
-- function: `_numpy` (line 90)
-- function: `_l2_normalize` (line 101)
-- class: `_ExecutorJob` (line 134)
-- class: `_FailureCounter` (line 139)
-- class: `_BatchResultHandler` (line 163)
-- class: `_QueueSentinel` (line 220)
-- class: `_BoundedBatchExecutor` (line 224)
-- class: `_ProviderState` (line 339)
-- class: `_ProviderBase` (line 351)
-- class: `VLLMProvider` (line 631)
-- function: `get_embedding_provider` (line 656)
-- class: `HFEmbeddingProvider` (line 743)
-- variable: `EmbeddingProviderBase` (line 817)
+- variable: `EMBEDDING_RANK` (line 20)
+- class: `EmbeddingRuntimeError` (line 23)
+- class: `EmbeddingConfigError` (line 27)
+- class: `EmbeddingMetadata` (line 32)
+- class: `EmbeddingProvider` (line 61)
+- function: `_numpy` (line 88)
+- function: `_l2_normalize` (line 99)
+- class: `_ExecutorJob` (line 132)
+- class: `_FailureCounter` (line 137)
+- class: `_BatchResultHandler` (line 155)
+- class: `_QueueSentinel` (line 211)
+- class: `_BoundedBatchExecutor` (line 215)
+- class: `_ProviderState` (line 330)
+- class: `_ProviderBase` (line 342)
+- class: `VLLMProvider` (line 614)
+- function: `get_embedding_provider` (line 639)
+- class: `HFEmbeddingProvider` (line 728)
+- variable: `EmbeddingProviderBase` (line 800)
 
 ## Graph Metrics
 
@@ -57,8 +55,8 @@ Embedding provider abstractions for chunk ingestion and runtime services.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 11
+- recent churn 90: 11
 
 ## Usage
 
@@ -104,7 +102,7 @@ NotImplementedError
 
 - branches: 62
 - cyclomatic: 63
-- loc: 818
+- loc: 801
 
 ## Doc Coverage
 

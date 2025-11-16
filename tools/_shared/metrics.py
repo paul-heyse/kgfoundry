@@ -122,15 +122,6 @@ def observe_tool_run(
         Call ``observation.success()`` or ``observation.failure(reason)`` to record
         the outcome before the context exits.
 
-    Raises
-    ------
-    Exception
-        Any exception raised by the subprocess execution or timeout handling is
-        re-raised after recording error status and metrics. Common exception types
-        include subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError,
-        PermissionError, and OSError. The specific exception type depends on what
-        the tool raises.
-
     Notes
     -----
     Performance & Side Effects:
@@ -138,14 +129,11 @@ def observe_tool_run(
         depends on the subprocess. No I/O during context entry; metrics are emitted
         on context exit. Thread-safe for concurrent subprocess observations.
 
-    Exception Re-raising:
-        Any exception raised during tool execution is caught using ``except Exception``,
-        error status and metrics are updated, and then the exception is re-raised via
-        ``raise`` to preserve the original exception type and stack trace. Common
-        exception types include subprocess.CalledProcessError (non-zero exit code),
-        subprocess.TimeoutExpired (timeout exceeded), FileNotFoundError (executable not
-        found), PermissionError (execution denied), and OSError (system-level errors).
-        The specific exception type depends on what the tool raises.
+    Exception Propagation:
+        Exceptions raised while running the tool are recorded (``observation.failure``)
+        and then propagated unchanged. Callers will observe the original exception
+        type (e.g., subprocess.CalledProcessError, subprocess.TimeoutExpired,
+        FileNotFoundError, PermissionError, OSError).
 
     See Also
     --------

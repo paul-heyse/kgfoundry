@@ -185,9 +185,7 @@ async def test_scope_operations(mock_application_context: ApplicationContext) ->
     )
 
 
-def test_path_escape_rejected_by_file_adapter(
-    mock_application_context: ApplicationContext
-) -> None:
+def test_path_escape_rejected_by_file_adapter(mock_application_context: ApplicationContext) -> None:
     """Adapters should reject attempts to escape the repository root."""
     with pytest.raises(PathOutsideRepositoryError) as excinfo:
         files_adapter.open_file(mock_application_context, "../etc/passwd")

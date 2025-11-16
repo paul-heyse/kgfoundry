@@ -62,13 +62,11 @@ codeintel_rev.mcp_server.scope_utils : Scope merging and filtering utilities
 - from **copy** import deepcopy
 - from **threading** import RLock
 - from **typing** import TYPE_CHECKING
-- from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.mcp_server.schemas** import ScopeIn
 
 ## Definitions
 
-- variable: `LOGGER` (line 65)
-- class: `ScopeRegistry` (line 68)
+- class: `ScopeRegistry` (line 64)
 
 ## Graph Metrics
 
@@ -81,8 +79,8 @@ codeintel_rev.mcp_server.scope_utils : Scope merging and filtering utilities
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 10
-- recent churn 90: 10
+- recent churn 30: 13
+- recent churn 90: 13
 
 ## Usage
 
@@ -118,7 +116,7 @@ ScopeRegistry
 
 ## Hotspot
 
-- score: 1.73
+- score: 1.71
 
 ## Side Effects
 
@@ -126,9 +124,9 @@ ScopeRegistry
 
 ## Complexity
 
-- branches: 10
-- cyclomatic: 11
-- loc: 367
+- branches: 9
+- cyclomatic: 10
+- loc: 316
 
 ## Doc Coverage
 
