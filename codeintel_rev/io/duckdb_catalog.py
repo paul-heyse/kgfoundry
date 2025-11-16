@@ -165,6 +165,84 @@ class StructureAnnotations:
     cst_matches: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class _StructMaterializationPlan:
+    """Precomputed SQL statements for struct table materialization."""
+
+    create_sql: str
+    meta_create_sql: str
+    meta_select_sql: str
+    delete_sql: str
+    insert_sql: str
+    meta_delete_sql: str
+    meta_insert_sql: str
+    count_sql: str
+
+
+_STRUCT_MATERIALIZATION_PLANS: dict[str, _StructMaterializationPlan] = {
+    "modules_mat": _StructMaterializationPlan(
+        create_sql="CREATE TABLE IF NOT EXISTS modules_mat AS SELECT * FROM modules LIMIT 0",
+        meta_create_sql="""
+        CREATE TABLE IF NOT EXISTS modules_mat_meta (
+            checksum   TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        meta_select_sql="SELECT checksum FROM modules_mat_meta LIMIT 1",
+        delete_sql="DELETE FROM modules_mat",
+        insert_sql="INSERT INTO modules_mat SELECT * FROM modules",
+        meta_delete_sql="DELETE FROM modules_mat_meta",
+        meta_insert_sql="INSERT INTO modules_mat_meta(checksum, updated_at) VALUES (?, CURRENT_TIMESTAMP)",
+        count_sql="SELECT COUNT(*) FROM modules_mat",
+    ),
+    "scip_occurrences_mat": _StructMaterializationPlan(
+        create_sql="CREATE TABLE IF NOT EXISTS scip_occurrences_mat AS SELECT * FROM scip_occurrences LIMIT 0",
+        meta_create_sql="""
+        CREATE TABLE IF NOT EXISTS scip_occurrences_mat_meta (
+            checksum   TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        meta_select_sql="SELECT checksum FROM scip_occurrences_mat_meta LIMIT 1",
+        delete_sql="DELETE FROM scip_occurrences_mat",
+        insert_sql="INSERT INTO scip_occurrences_mat SELECT * FROM scip_occurrences",
+        meta_delete_sql="DELETE FROM scip_occurrences_mat_meta",
+        meta_insert_sql="INSERT INTO scip_occurrences_mat_meta(checksum, updated_at) VALUES (?, CURRENT_TIMESTAMP)",
+        count_sql="SELECT COUNT(*) FROM scip_occurrences_mat",
+    ),
+    "ast_nodes_mat": _StructMaterializationPlan(
+        create_sql="CREATE TABLE IF NOT EXISTS ast_nodes_mat AS SELECT * FROM ast_nodes LIMIT 0",
+        meta_create_sql="""
+        CREATE TABLE IF NOT EXISTS ast_nodes_mat_meta (
+            checksum   TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        meta_select_sql="SELECT checksum FROM ast_nodes_mat_meta LIMIT 1",
+        delete_sql="DELETE FROM ast_nodes_mat",
+        insert_sql="INSERT INTO ast_nodes_mat SELECT * FROM ast_nodes",
+        meta_delete_sql="DELETE FROM ast_nodes_mat_meta",
+        meta_insert_sql="INSERT INTO ast_nodes_mat_meta(checksum, updated_at) VALUES (?, CURRENT_TIMESTAMP)",
+        count_sql="SELECT COUNT(*) FROM ast_nodes_mat",
+    ),
+    "cst_nodes_mat": _StructMaterializationPlan(
+        create_sql="CREATE TABLE IF NOT EXISTS cst_nodes_mat AS SELECT * FROM cst_nodes LIMIT 0",
+        meta_create_sql="""
+        CREATE TABLE IF NOT EXISTS cst_nodes_mat_meta (
+            checksum   TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
+        meta_select_sql="SELECT checksum FROM cst_nodes_mat_meta LIMIT 1",
+        delete_sql="DELETE FROM cst_nodes_mat",
+        insert_sql="INSERT INTO cst_nodes_mat SELECT * FROM cst_nodes",
+        meta_delete_sql="DELETE FROM cst_nodes_mat_meta",
+        meta_insert_sql="INSERT INTO cst_nodes_mat_meta(checksum, updated_at) VALUES (?, CURRENT_TIMESTAMP)",
+        count_sql="SELECT COUNT(*) FROM cst_nodes_mat",
+    ),
+}
+
+
 @dataclass(slots=True, frozen=True)
 class DuckDBCatalogOptions:
     """Optional configuration bundle for DuckDB catalog instantiation."""
@@ -718,45 +796,57 @@ class DuckDBCatalog(_DuckDBQueryMixin):
                 extra=_log_extra(error=str(exc)),
             )
 
-    @staticmethod
-    def _materialize_if_changed(
+    def _install_struct_view_if_exists(
+        self,
         conn: duckdb.DuckDBPyConnection,
         *,
-        table: str,
-        source: str,
-        checksum_table: str,
+        view_name: str,
+        source: Path | None,
+    ) -> None:
+        if source and source.exists():
+            self._install_parquet_view(conn, view_name, source)
+
+    def _materialize_struct_table_if_exists(
+        self,
+        conn: duckdb.DuckDBPyConnection,
+        *,
+        plan_key: str,
+        asset_path: Path | None,
+    ) -> None:
+        if asset_path and asset_path.exists():
+            plan = _STRUCT_MATERIALIZATION_PLANS[plan_key]
+            self._materialize_struct_table(
+                conn,
+                plan=plan,
+                checksum=_file_checksum(asset_path),
+            )
+
+    @staticmethod
+    def _materialize_struct_table(
+        conn: duckdb.DuckDBPyConnection,
+        *,
+        plan: _StructMaterializationPlan,
         checksum: str,
     ) -> None:
-        """Materialize ``source`` into ``table`` when ``checksum`` differs."""
-        conn.execute(f"CREATE TABLE IF NOT EXISTS {table} AS {source} LIMIT 0")
-        conn.execute(
-            f"""
-            CREATE TABLE IF NOT EXISTS {checksum_table} (
-                checksum   TEXT,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-            """
-        )
-        row = conn.execute(f"SELECT checksum FROM {checksum_table} LIMIT 1").fetchone()
+        """Materialize a struct table using a precomputed SQL plan."""
+        conn.execute(plan.create_sql)
+        conn.execute(plan.meta_create_sql)
+        row = conn.execute(plan.meta_select_sql).fetchone()
         if row and row[0] == checksum:
             LOGGER.debug(
                 "Structured table already materialized",
-                extra=_log_extra(table=table, checksum=checksum),
+                extra=_log_extra(checksum=checksum),
             )
             return
 
-        conn.execute(f"DELETE FROM {table}")
-        conn.execute(f"INSERT INTO {table} {source}")
-        conn.execute(f"DELETE FROM {checksum_table}")
-        conn.execute(
-            f"INSERT INTO {checksum_table}(checksum, updated_at) VALUES (?, CURRENT_TIMESTAMP)",
-            [checksum],
-        )
-        count = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+        conn.execute(plan.delete_sql)
+        conn.execute(plan.insert_sql)
+        conn.execute(plan.meta_delete_sql)
+        conn.execute(plan.meta_insert_sql, [checksum])
+        count = conn.execute(plan.count_sql).fetchone()
         LOGGER.info(
             "Materialized structured table",
             extra=_log_extra(
-                table=table,
                 checksum=checksum,
                 rows=int(count[0]) if count and count[0] is not None else 0,
             ),
@@ -886,52 +976,34 @@ class DuckDBCatalog(_DuckDBQueryMixin):
         ast_path = _resolve(ast_nodes_parquet)
         cst_path = _resolve(cst_nodes_parquet)
 
+        view_specs = (
+            ("modules", modules_path),
+            ("scip_occurrences", scip_path),
+            ("ast_nodes", ast_path),
+            ("cst_nodes", cst_path),
+        )
+
         with self.connection() as conn:
-            if modules_path and modules_path.exists():
-                self._install_parquet_view(conn, "modules", modules_path)
-            if scip_path and scip_path.exists():
-                self._install_parquet_view(conn, "scip_occurrences", scip_path)
-            if ast_path and ast_path.exists():
-                self._install_parquet_view(conn, "ast_nodes", ast_path)
-            if cst_path and cst_path.exists():
-                self._install_parquet_view(conn, "cst_nodes", cst_path)
+            for view_name, path in view_specs:
+                self._install_struct_view_if_exists(conn, view_name=view_name, source=path)
             self._install_chunk_symbols_view(conn)
 
         if not materialize:
             return
 
+        materialize_specs = (
+            ("modules_mat", modules_path),
+            ("scip_occurrences_mat", scip_path),
+            ("ast_nodes_mat", ast_path),
+            ("cst_nodes_mat", cst_path),
+        )
+
         with self.connection() as conn:
-            if modules_path and modules_path.exists():
-                self._materialize_if_changed(
+            for plan_key, asset_path in materialize_specs:
+                self._materialize_struct_table_if_exists(
                     conn,
-                    table="modules_mat",
-                    source="SELECT * FROM modules",
-                    checksum_table="modules_mat_meta",
-                    checksum=_file_checksum(modules_path),
-                )
-            if scip_path and scip_path.exists():
-                self._materialize_if_changed(
-                    conn,
-                    table="scip_occurrences_mat",
-                    source="SELECT * FROM scip_occurrences",
-                    checksum_table="scip_occurrences_mat_meta",
-                    checksum=_file_checksum(scip_path),
-                )
-            if ast_path and ast_path.exists():
-                self._materialize_if_changed(
-                    conn,
-                    table="ast_nodes_mat",
-                    source="SELECT * FROM ast_nodes",
-                    checksum_table="ast_nodes_mat_meta",
-                    checksum=_file_checksum(ast_path),
-                )
-            if cst_path and cst_path.exists():
-                self._materialize_if_changed(
-                    conn,
-                    table="cst_nodes_mat",
-                    source="SELECT * FROM cst_nodes",
-                    checksum_table="cst_nodes_mat_meta",
-                    checksum=_file_checksum(cst_path),
+                    plan_key=plan_key,
+                    asset_path=asset_path,
                 )
 
     def materialize_faiss_join(self) -> None:
@@ -1502,7 +1574,7 @@ class DuckDBCatalog(_DuckDBQueryMixin):
             return None
         return results[0]
 
-    def get_symbols_for_chunk(self, chunk_id: int) -> list[str]:
+    def _get_symbols_for_chunk(self, chunk_id: int) -> list[str]:
         """Return all symbols associated with a chunk.
 
         Parameters

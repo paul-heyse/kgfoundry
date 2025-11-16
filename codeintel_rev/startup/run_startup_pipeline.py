@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Run the SCIP → chunk → embed → FAISS pipeline and summarize artifacts.
 
 This script is a thin orchestrator around ``codeintel_rev.bin.index_all`` that
@@ -10,20 +9,22 @@ are already exported (e.g., ``REPO_ROOT``, ``SCIP_INDEX``, ``VLLM_URL``).
 from __future__ import annotations
 
 import argparse
-import subprocess
+import logging
 import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-SRC_ROOT = REPO_ROOT / "src"
-sys.path.insert(0, str(REPO_ROOT))
-if SRC_ROOT.is_dir():
-    sys.path.insert(0, str(SRC_ROOT))
-
 from codeintel_rev.app.config_context import resolve_application_paths
 from codeintel_rev.config.settings import Settings, load_settings
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
+from kgfoundry_common.logging import get_logger
+from kgfoundry_common.subprocess_utils import (
+    SubprocessError,
+    SubprocessTimeoutError,
+    run_subprocess,
+)
+
+LOGGER = get_logger(__name__)
 
 
 def _run_index_pipeline(args: Sequence[str]) -> None:
@@ -37,50 +38,84 @@ def _run_index_pipeline(args: Sequence[str]) -> None:
 
     Raises
     ------
-    RuntimeError
-        Raised when the index_all subprocess exits with a non-zero return code.
-        The error message includes the exit code for debugging.
+    SubprocessTimeoutError
+        Raised when the indexing subprocess exceeds the configured timeout.
+    SubprocessError
+        Raised when the indexing subprocess exits with a non-zero status.
     """
     cmd = [sys.executable, "-m", "codeintel_rev.bin.index_all", *args]
-    completed = subprocess.run(cmd, check=False)
-    if completed.returncode != 0:
-        raise RuntimeError(f"index_all failed with exit code {completed.returncode}")
+    LOGGER.info("Executing index pipeline: %s", " ".join(cmd))
+    try:
+        run_subprocess(cmd)
+    except SubprocessTimeoutError:
+        LOGGER.exception("Index pipeline timed out.")
+        raise
+    except SubprocessError:
+        LOGGER.exception("Index pipeline failed.")
+        raise
 
 
 def _summarize_artifacts(settings: Settings) -> None:
-    """Print chunk counts, embedding dimensions, and FAISS file locations."""
+    """Print chunk counts, embedding dimensions, and FAISS file locations.
+
+    Parameters
+    ----------
+    settings : Settings
+        Application settings containing paths and configuration for DuckDB
+        and FAISS artifacts.
+
+    Raises
+    ------
+    OSError
+        Raised when DuckDB tables or Parquet files cannot be read.
+    RuntimeError
+        Propagated from DuckDBCatalog when hydration fails.
+    """
     paths = resolve_application_paths(settings)
     vectors_dir = paths.vectors_dir
     duckdb_path = paths.duckdb_path
 
-    with DuckDBCatalog(
-        duckdb_path,
-        vectors_dir,
-        repo_root=paths.repo_root,
-        materialize=settings.index.duckdb_materialize,
-    ) as catalog:
-        chunk_count = catalog.count_chunks()
-        head_ids = list(range(min(5, chunk_count)))
-        vec_dim = None
-        if head_ids:
-            _, vectors = catalog.get_embeddings_by_ids(head_ids)
-            if vectors.size:
-                vec_dim = vectors.shape[1]
+    try:
+        with DuckDBCatalog(
+            duckdb_path,
+            vectors_dir,
+            repo_root=paths.repo_root,
+            materialize=settings.index.duckdb_materialize,
+        ) as catalog:
+            chunk_count = catalog.count_chunks()
+            head_ids = list(range(min(5, chunk_count)))
+            vec_dim = None
+            if head_ids:
+                _, vectors = catalog.get_embeddings_by_ids(head_ids)
+                if vectors.size:
+                    vec_dim = vectors.shape[1]
+    except (OSError, RuntimeError):
+        LOGGER.exception("Failed to load DuckDB metadata for summary.")
+        raise
 
     faiss_index = Path(paths.faiss_index)
     faiss_idmap = Path(paths.faiss_idmap_path)
 
-    print("Artifacts summary")
-    print(f"  DuckDB catalog : {duckdb_path}")
-    print(f"  Chunk count    : {chunk_count}")
-    print(f"  Embedding dim  : {vec_dim}")
-    print(f"  Parquet dir    : {vectors_dir}")
-    print(f"  FAISS index    : {faiss_index} (exists={faiss_index.exists()})")
-    print(f"  FAISS ID map   : {faiss_idmap} (exists={faiss_idmap.exists()})")
+    LOGGER.info("Artifacts summary")
+    LOGGER.info("  DuckDB catalog : %s", duckdb_path)
+    LOGGER.info("  Chunk count    : %s", chunk_count)
+    LOGGER.info("  Embedding dim  : %s", vec_dim)
+    LOGGER.info("  Parquet dir    : %s", vectors_dir)
+    LOGGER.info("  FAISS index    : %s (exists=%s)", faiss_index, faiss_index.exists())
+    LOGGER.info("  FAISS ID map   : %s (exists=%s)", faiss_idmap, faiss_idmap.exists())
 
 
 def main() -> None:
-    """Entry point for the startup pipeline runner."""
+    """Entry point for the startup pipeline runner.
+
+    Raises
+    ------
+    RuntimeError
+        Propagated from the indexing pipeline if execution fails.
+    OSError
+        Propagated from the indexing pipeline or artifact summarization if
+        file operations fail.
+    """
     parser = argparse.ArgumentParser(
         description="Run SCIP→chunk→embedding→FAISS pipeline and print a summary."
     )
@@ -112,6 +147,7 @@ def main() -> None:
         help="Forwarded to index_all to run only part of the pipeline.",
     )
     cli_args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     forwarded: list[str] = []
     if cli_args.incremental:
@@ -124,7 +160,11 @@ def main() -> None:
         forwarded.extend(["--phase", cli_args.phase])
 
     settings = load_settings()
-    _run_index_pipeline(forwarded)
+    try:
+        _run_index_pipeline(forwarded)
+    except (RuntimeError, OSError):  # pragma: no cover - CLI wrapper
+        LOGGER.exception("Index pipeline failed")
+        raise
 
     if not cli_args.skip_summary:
         _summarize_artifacts(settings)

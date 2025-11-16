@@ -17,9 +17,6 @@ Token-level XTR index manager with late-interaction scoring utilities.
 - from **typing** import TYPE_CHECKING, Any, Literal, TypedDict, cast
 - from **codeintel_rev._lazy_imports** import LazyModule
 - from **codeintel_rev.config.settings** import XTRConfig
-- from **codeintel_rev.metrics.registry** import XTR_SEARCH_LATENCY_SECONDS
-- from **codeintel_rev.observability.otel** import as_span
-- from **codeintel_rev.observability.semantic_conventions** import Attrs
 - from **codeintel_rev.runtime** import RuntimeCell
 - from **codeintel_rev.typing** import NDArrayF32, TorchModule, gate_import
 - from **kgfoundry_common.logging** import get_logger
@@ -27,25 +24,25 @@ Token-level XTR index manager with late-interaction scoring utilities.
 
 ## Definitions
 
-- variable: `np` (line 24)
-- variable: `LOGGER` (line 26)
-- class: `XTRMetadata` (line 29)
-- class: `_XTRIndexRuntime` (line 41)
-- class: `XTRIndex` (line 65)
+- variable: `np` (line 21)
+- variable: `LOGGER` (line 23)
+- class: `XTRMetadata` (line 26)
+- class: `_XTRIndexRuntime` (line 38)
+- class: `XTRIndex` (line 62)
 
 ## Graph Metrics
 
 - **fan_in**: 8
-- **fan_out**: 7
-- **cycle_group**: 40
+- **fan_out**: 4
+- **cycle_group**: 25
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 10
-- recent churn 90: 10
+- recent churn 30: 11
+- recent churn 90: 11
 
 ## Usage
 
@@ -73,7 +70,7 @@ Token-level XTR index manager with late-interaction scoring utilities.
 
 ## Hotspot
 
-- score: 2.83
+- score: 2.73
 
 ## Side Effects
 
@@ -81,9 +78,9 @@ Token-level XTR index manager with late-interaction scoring utilities.
 
 ## Complexity
 
-- branches: 48
-- cyclomatic: 49
-- loc: 641
+- branches: 46
+- cyclomatic: 47
+- loc: 642
 
 ## Doc Coverage
 

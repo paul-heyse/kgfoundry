@@ -16,36 +16,40 @@ Invoke via:
 - from **(absolute)** import argparse
 - from **(absolute)** import json
 - from **(absolute)** import logging
-- from **(absolute)** import sys
+- from **collections.abc** import Iterable
+- from **dataclasses** import dataclass
 - from **pathlib** import Path
-- from **typing** import Iterable
 - from **(absolute)** import numpy
 - from **(absolute)** import torch
 - from **sentence_transformers** import SentenceTransformer
 - from **codeintel_rev.config.settings** import load_settings
+- from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 25)
-- function: `_resolve_model_name` (line 28)
-- function: `_resolve_device` (line 37)
-- function: `_read_texts` (line 47)
-- function: `_dump_jsonl` (line 57)
-- function: `_parse_args` (line 63)
-- function: `embed_file` (line 107)
-- function: `main` (line 146)
+- variable: `LOGGER` (line 26)
+- class: `EmbedJob` (line 30)
+- function: `_resolve_model_name` (line 42)
+- function: `_resolve_device` (line 51)
+- function: `_read_texts` (line 61)
+- function: `_dump_jsonl` (line 71)
+- function: `_parse_args` (line 77)
+- function: `embed_file` (line 121)
+- function: `main` (line 173)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 2
-- **cycle_group**: 80
+- **fan_out**: 1
+- **cycle_group**: 60
 
 ## Ownership
 
-- bus factor: 0.00
-- recent churn 30: 0
-- recent churn 90: 0
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 2
+- recent churn 90: 2
 
 ## Usage
 
@@ -56,7 +60,7 @@ Invoke via:
 
 - **summary**: Standalone sentence-transformers embedding helper.
 - has summary: yes
-- param parity: no
+- param parity: yes
 - examples present: no
 
 ## Typedness
@@ -73,7 +77,7 @@ Invoke via:
 
 ## Hotspot
 
-- score: 1.82
+- score: 1.66
 
 ## Side Effects
 
@@ -83,17 +87,18 @@ Invoke via:
 
 - branches: 14
 - cyclomatic: 15
-- loc: 167
+- loc: 207
 
 ## Doc Coverage
 
+- `EmbedJob` (class): summary=yes, examples=no — Configuration bundle for an embedding run.
 - `_resolve_model_name` (function): summary=no, examples=no
 - `_resolve_device` (function): summary=no, examples=no
 - `_read_texts` (function): summary=no, examples=no
 - `_dump_jsonl` (function): summary=no, examples=no
 - `_parse_args` (function): summary=no, examples=no
-- `embed_file` (function): summary=no, examples=no
-- `main` (function): summary=no, examples=no
+- `embed_file` (function): summary=yes, params=ok, examples=no — Generate embeddings for text file using SentenceTransformer.
+- `main` (function): summary=yes, params=ok, examples=no — Run the SentenceTransformer embedding CLI.
 
 ## Tags
 

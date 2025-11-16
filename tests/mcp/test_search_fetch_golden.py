@@ -142,7 +142,6 @@ def test_run_search_returns_structured_results(tmp_path: Path) -> None:
         run_id="run",
         limits=[],
         pool_dir=tmp_path,
-        timeline=None,
     )
     request = SearchRequest(
         query="foo",
@@ -169,7 +168,6 @@ def test_run_fetch_hydrates_content() -> None:
     deps = FetchDependencies(
         catalog=catalog,
         settings=_StubSettings(),
-        timeline=None,
     )
     request = FetchRequest(object_ids=(1,), max_tokens=512)
     response: FetchResponse = run_fetch(request=request, deps=deps)

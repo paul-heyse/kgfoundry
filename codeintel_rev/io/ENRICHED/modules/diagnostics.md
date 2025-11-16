@@ -3,7 +3,7 @@
 ## Docstring
 
 ```
-Diagnostics endpoints for runtime execution ledger reports.
+Diagnostics endpoints (disabled - observability removed).
 ```
 
 ## Imports
@@ -11,25 +11,26 @@ Diagnostics endpoints for runtime execution ledger reports.
 - from **__future__** import annotations
 - from **fastapi** import APIRouter, HTTPException
 - from **fastapi.responses** import JSONResponse, PlainTextResponse
-- from **codeintel_rev.observability** import execution_ledger
 
 ## Definitions
 
-- variable: `router` (line 10)
-- function: `get_run_report` (line 14)
-- function: `get_run_report_markdown` (line 35)
+- variable: `router` (line 8)
+- function: `get_run_report` (line 12)
+- function: `get_run_report_markdown` (line 36)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 1
-- **cycle_group**: 60
+- **fan_out**: 0
+- **cycle_group**: 39
 
 ## Ownership
 
-- bus factor: 0.00
-- recent churn 30: 0
-- recent churn 90: 0
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 2
+- recent churn 90: 2
 
 ## Usage
 
@@ -38,9 +39,9 @@ Diagnostics endpoints for runtime execution ledger reports.
 
 ## Doc Health
 
-- **summary**: Diagnostics endpoints for runtime execution ledger reports.
+- **summary**: Diagnostics endpoints (disabled - observability removed).
 - has summary: yes
-- param parity: no
+- param parity: yes
 - examples present: no
 
 ## Typedness
@@ -61,7 +62,7 @@ Diagnostics endpoints for runtime execution ledger reports.
 
 ## Hotspot
 
-- score: 1.24
+- score: 0.76
 
 ## Side Effects
 
@@ -69,14 +70,14 @@ Diagnostics endpoints for runtime execution ledger reports.
 
 ## Complexity
 
-- branches: 2
-- cyclomatic: 3
-- loc: 54
+- branches: 0
+- cyclomatic: 1
+- loc: 57
 
 ## Doc Coverage
 
-- `get_run_report` (function): summary=yes, params=mismatch, examples=no — Return the execution ledger report for ``run_id`` as JSON.
-- `get_run_report_markdown` (function): summary=yes, params=mismatch, examples=no — Return execution ledger report rendered as Markdown.
+- `get_run_report` (function): summary=yes, params=ok, examples=no — Diagnostics endpoint disabled - observability removed.
+- `get_run_report_markdown` (function): summary=yes, params=ok, examples=no — Diagnostics endpoint disabled - observability removed.
 
 ## Tags
 

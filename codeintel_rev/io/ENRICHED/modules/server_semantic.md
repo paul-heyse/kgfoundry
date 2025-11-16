@@ -9,43 +9,35 @@ Semantic MCP tool registrations (pure move from server.py).
 ## Imports
 
 - from **__future__** import annotations
-- from **(absolute)** import asyncio
 - from **typing** import Any
-- from **codeintel_rev.app.config_context** import ApplicationContext
 - from **codeintel_rev.mcp_server.adapters** import deep_research
 - from **codeintel_rev.mcp_server.adapters** import semantic
 - from **codeintel_rev.mcp_server.adapters** import semantic_pro
 - from **codeintel_rev.mcp_server.error_handling** import handle_adapter_errors
 - from **codeintel_rev.mcp_server.schemas** import AnswerEnvelope, FetchStructuredContent, FetchToolArgs, SearchFilterPayload, SearchStructuredContent, SearchToolArgs
 - from **codeintel_rev.mcp_server.server** import get_context, mcp
-- from **codeintel_rev.mcp_server.telemetry** import tool_operation_scope
-- from **codeintel_rev.observability.otel** import current_trace_id
-- from **codeintel_rev.telemetry.context** import current_session
-- from **codeintel_rev.telemetry.reporter** import build_report
-- from **codeintel_rev.telemetry.reporter** import report_to_json
 
 ## Definitions
 
-- function: `deep_research_search` (line 34)
-- function: `deep_research_fetch` (line 96)
-- function: `semantic_search` (line 143)
-- function: `semantic_search_pro` (line 194)
-- function: `telemetry_run_report` (line 255)
-- function: `_render_run_report` (line 293)
+- function: `deep_research_search` (line 27)
+- function: `deep_research_fetch` (line 83)
+- function: `semantic_search` (line 125)
+- function: `semantic_search_pro` (line 171)
+- function: `telemetry_run_report` (line 227)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 10
-- **cycle_group**: 151
+- **fan_out**: 5
+- **cycle_group**: 128
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 8
-- recent churn 90: 8
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 
@@ -73,17 +65,17 @@ Semantic MCP tool registrations (pure move from server.py).
 
 ## Hotspot
 
-- score: 2.34
+- score: 1.80
 
 ## Side Effects
 
-- subprocess
+- none detected
 
 ## Complexity
 
-- branches: 14
-- cyclomatic: 15
-- loc: 309
+- branches: 4
+- cyclomatic: 5
+- loc: 248
 
 ## Doc Coverage
 
@@ -91,8 +83,7 @@ Semantic MCP tool registrations (pure move from server.py).
 - `deep_research_fetch` (function): summary=yes, params=ok, examples=no — Hydrate chunk ids produced by :func:`deep_research_search`.
 - `semantic_search` (function): summary=yes, params=ok, examples=no — Semantic code search using embeddings.
 - `semantic_search_pro` (function): summary=yes, params=ok, examples=no — Two-stage semantic retrieval with optional late interaction and reranker.
-- `telemetry_run_report` (function): summary=yes, params=ok, examples=no — Return the latest run report for the active or requested session.
-- `_render_run_report` (function): summary=no, examples=no
+- `telemetry_run_report` (function): summary=yes, params=ok, examples=no — Return placeholder data because legacy run reports have been removed.
 
 ## Tags
 

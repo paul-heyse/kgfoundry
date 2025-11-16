@@ -18,88 +18,81 @@ Deep-Research compatible search/fetch orchestration helpers.
 - from **(absolute)** import numpy
 - from **codeintel_rev.eval.pool_writer** import write_pool
 - from **codeintel_rev.io.faiss_manager** import SearchRuntimeOverrides
-- from **codeintel_rev.metrics.registry** import MCP_FETCH_LATENCY_SECONDS, MCP_SEARCH_ANN_LATENCY_MS, MCP_SEARCH_HYDRATION_LATENCY_MS, MCP_SEARCH_LATENCY_SECONDS, MCP_SEARCH_POSTFILTER_DENSITY, MCP_SEARCH_RERANK_LATENCY_MS
-- from **codeintel_rev.observability.otel** import record_span_event
-- from **codeintel_rev.observability.semantic_conventions** import Attrs, to_label_str
 - from **codeintel_rev.retrieval.types** import SearchPoolRow
-- from **codeintel_rev.telemetry.decorators** import span_context
 - from **codeintel_rev.typing** import NDArrayF32, NDArrayI64
 - from **kgfoundry_common.errors** import EmbeddingError
 - from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.io.duckdb_catalog** import StructureAnnotations
 - from **codeintel_rev.mcp_server.schemas** import SearchFilterPayload
-- from **codeintel_rev.observability.timeline** import Timeline
 
 ## Definitions
 
-- variable: `LOGGER` (line 39)
-- class: `EmbeddingClient` (line 42)
-- class: `IndexConfigLike` (line 50)
-- class: `LimitsConfigLike` (line 80)
-- class: `SearchSettings` (line 114)
-- class: `CatalogLike` (line 128)
-- class: `VectorIndex` (line 151)
-- class: `SearchFilters` (line 176)
-- class: `SearchRequest` (line 261)
-- class: `SearchResult` (line 271)
-- class: `SearchResponse` (line 284)
-- class: `HydrationPayload` (line 294)
-- class: `_StageDurations` (line 302)
-- class: `SearchDependencies` (line 311)
-- class: `FetchRequest` (line 326)
-- class: `FetchObjectResult` (line 334)
-- class: `FetchResponse` (line 345)
-- class: `FetchDependencies` (line 352)
-- function: `run_search` (line 360)
-- function: `run_fetch` (line 458)
-- function: `_normalize_str_list` (line 524)
-- function: `_build_search_attrs` (line 530)
-- function: `_embed_with_metrics` (line 566)
-- function: `_run_ann_search` (line 596)
-- function: `_hydrate_with_metrics` (line 640)
-- function: `_rerank_with_metrics` (line 685)
-- function: `_compose_limits` (line 735)
-- function: `_embed_query` (line 767)
-- function: `_compute_fanout` (line 789)
-- function: `_build_runtime_overrides` (line 798)
-- function: `_flatten_ids` (line 825)
-- function: `_flatten_scores` (line 831)
-- function: `_hydrate_chunks` (line 837)
-- function: `_build_results` (line 861)
-- function: `_matches_symbols` (line 893)
-- function: `_build_metadata` (line 900)
-- function: `_build_hit_reasons` (line 925)
-- function: `_build_title` (line 947)
-- function: `_build_url` (line 954)
-- function: `_build_snippet` (line 961)
-- function: `_truncate_content` (line 969)
-- function: `_build_fetch_metadata` (line 977)
-- function: `_build_ann_snapshot` (line 988)
-- function: `_write_pool_rows` (line 1005)
-- function: `_build_pool_reason` (line 1058)
-- function: `_record_postfilter_density` (line 1069)
-- function: `_log_search_completion` (line 1076)
-- function: `_coerce_int` (line 1096)
-- function: `_string_sequence` (line 1111)
-- function: `_repair_single_result` (line 1117)
-- function: `_resolve_snippet` (line 1132)
-- function: `_merge_metadata` (line 1142)
-- class: `_RepairStats` (line 1172)
-- function: `post_search_validate_and_fill` (line 1180)
+- variable: `LOGGER` (line 27)
+- class: `EmbeddingClient` (line 30)
+- class: `IndexConfigLike` (line 38)
+- class: `LimitsConfigLike` (line 68)
+- class: `SearchSettings` (line 102)
+- class: `CatalogLike` (line 116)
+- class: `VectorIndex` (line 139)
+- class: `SearchFilters` (line 164)
+- class: `SearchRequest` (line 249)
+- class: `SearchResult` (line 259)
+- class: `SearchResponse` (line 272)
+- class: `HydrationPayload` (line 282)
+- class: `_StageDurations` (line 290)
+- class: `SearchDependencies` (line 299)
+- class: `FetchRequest` (line 313)
+- class: `FetchObjectResult` (line 321)
+- class: `FetchResponse` (line 332)
+- class: `FetchDependencies` (line 339)
+- function: `run_search` (line 346)
+- function: `run_fetch` (line 419)
+- function: `_normalize_str_list` (line 475)
+- function: `_embed_with_metrics` (line 481)
+- function: `_run_ann_search` (line 500)
+- function: `_hydrate_with_metrics` (line 535)
+- function: `_rerank_with_metrics` (line 570)
+- function: `_compose_limits` (line 612)
+- function: `_embed_query` (line 644)
+- function: `_compute_fanout` (line 657)
+- function: `_build_runtime_overrides` (line 666)
+- function: `_flatten_ids` (line 693)
+- function: `_flatten_scores` (line 699)
+- function: `_hydrate_chunks` (line 705)
+- function: `_build_results` (line 729)
+- function: `_matches_symbols` (line 761)
+- function: `_build_metadata` (line 768)
+- function: `_build_hit_reasons` (line 793)
+- function: `_build_title` (line 815)
+- function: `_build_url` (line 822)
+- function: `_build_snippet` (line 829)
+- function: `_truncate_content` (line 837)
+- function: `_build_fetch_metadata` (line 845)
+- function: `_build_ann_snapshot` (line 856)
+- function: `_write_pool_rows` (line 893)
+- function: `_build_pool_reason` (line 946)
+- function: `_log_search_completion` (line 957)
+- function: `_coerce_int` (line 977)
+- function: `_string_sequence` (line 992)
+- function: `_repair_single_result` (line 998)
+- function: `_resolve_snippet` (line 1013)
+- function: `_merge_metadata` (line 1023)
+- class: `_RepairStats` (line 1053)
+- function: `post_search_validate_and_fill` (line 1061)
 
 ## Graph Metrics
 
 - **fan_in**: 1
-- **fan_out**: 11
-- **cycle_group**: 135
+- **fan_out**: 6
+- **cycle_group**: 113
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 
@@ -131,7 +124,7 @@ FetchDependencies, FetchObjectResult, FetchRequest, FetchResponse, SearchDepende
 
 ## Hotspot
 
-- score: 3.01
+- score: 2.78
 
 ## Side Effects
 
@@ -139,9 +132,9 @@ FetchDependencies, FetchObjectResult, FetchRequest, FetchResponse, SearchDepende
 
 ## Complexity
 
-- branches: 119
-- cyclomatic: 120
-- loc: 1239
+- branches: 106
+- cyclomatic: 107
+- loc: 1120
 
 ## Doc Coverage
 

@@ -24,9 +24,9 @@ can exchange session metadata without introducing circular imports between the
 
 ## Graph Metrics
 
-- **fan_in**: 3
+- **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 11
+- **cycle_group**: 8
 
 ## Ownership
 
@@ -66,7 +66,7 @@ capability_stamp_var, session_id_var
 
 ## Hotspot
 
-- score: 1.40
+- score: 1.31
 
 ## Side Effects
 

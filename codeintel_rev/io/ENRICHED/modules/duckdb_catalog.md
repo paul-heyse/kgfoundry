@@ -14,7 +14,7 @@ chunk retrieval and joins.
 - from **__future__** import annotations
 - from **(absolute)** import hashlib
 - from **collections.abc** import Callable, Iterator, Mapping, Sequence
-- from **contextlib** import contextmanager, suppress
+- from **contextlib** import contextmanager
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
 - from **threading** import Lock
@@ -24,13 +24,6 @@ chunk retrieval and joins.
 - from **codeintel_rev.io.duckdb_manager** import DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 - from **codeintel_rev.io.parquet_store** import extract_embeddings
 - from **codeintel_rev.mcp_server.scope_utils** import LANGUAGE_EXTENSIONS, path_matches_glob
-- from **codeintel_rev.observability.execution_ledger** import step
-- from **codeintel_rev.observability.otel** import record_span_event
-- from **codeintel_rev.observability.semantic_conventions** import Attrs
-- from **codeintel_rev.observability.timeline** import Timeline, current_timeline
-- from **codeintel_rev.telemetry.decorators** import span_context
-- from **codeintel_rev.telemetry.otel_metrics** import build_histogram
-- from **codeintel_rev.telemetry.steps** import StepEvent, emit_step
 - from **codeintel_rev.typing** import NDArrayF32
 - from **kgfoundry_common.logging** import get_logger
 - from **(absolute)** import duckdb
@@ -38,39 +31,39 @@ chunk retrieval and joins.
 
 ## Definitions
 
-- variable: `duckdb` (line 45)
-- variable: `np` (line 46)
-- variable: `LOGGER` (line 48)
-- class: `IdMapMeta` (line 52)
-- class: `_ScopeFilterLogInfo` (line 62)
-- function: `_log_extra` (line 71)
-- function: `_escape_identifier` (line 95)
-- class: `_ScopeFilterSpec` (line 165)
-- class: `StructureAnnotations` (line 182)
-- class: `DuckDBCatalogOptions` (line 192)
-- class: `_DuckDBQueryMixin` (line 201)
-- class: `_LegacyOptions` (line 485)
-- class: `DuckDBCatalog` (line 492)
-- function: `_relation_exists` (line 1877)
-- function: `relation_exists` (line 1911)
-- function: `_file_checksum` (line 1929)
-- function: `_parquet_hash` (line 1951)
-- function: `ensure_faiss_idmap_view` (line 1979)
-- function: `refresh_faiss_idmap_materialized` (line 2026)
+- variable: `duckdb` (line 38)
+- variable: `np` (line 39)
+- variable: `LOGGER` (line 41)
+- class: `IdMapMeta` (line 45)
+- class: `_ScopeFilterLogInfo` (line 55)
+- function: `_log_extra` (line 64)
+- function: `_escape_identifier` (line 88)
+- class: `_ScopeFilterSpec` (line 142)
+- class: `StructureAnnotations` (line 159)
+- class: `DuckDBCatalogOptions` (line 169)
+- class: `_DuckDBQueryMixin` (line 178)
+- class: `_LegacyOptions` (line 409)
+- class: `DuckDBCatalog` (line 416)
+- function: `_relation_exists` (line 1697)
+- function: `relation_exists` (line 1731)
+- function: `_file_checksum` (line 1749)
+- function: `_parquet_hash` (line 1771)
+- function: `ensure_faiss_idmap_view` (line 1799)
+- function: `refresh_faiss_idmap_materialized` (line 1846)
 
 ## Graph Metrics
 
 - **fan_in**: 11
-- **fan_out**: 12
-- **cycle_group**: 42
+- **fan_out**: 5
+- **cycle_group**: 28
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 47
-- recent churn 90: 47
+- recent churn 30: 49
+- recent churn 90: 49
 
 ## Usage
 
@@ -102,7 +95,7 @@ DuckDBCatalog, IdMapMeta, StructureAnnotations, ensure_faiss_idmap_view, refresh
 
 ## Hotspot
 
-- score: 3.39
+- score: 3.22
 
 ## Side Effects
 
@@ -111,9 +104,9 @@ DuckDBCatalog, IdMapMeta, StructureAnnotations, ensure_faiss_idmap_view, refresh
 
 ## Complexity
 
-- branches: 188
-- cyclomatic: 189
-- loc: 2126
+- branches: 170
+- cyclomatic: 171
+- loc: 1945
 
 ## Doc Coverage
 

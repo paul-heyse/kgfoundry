@@ -26,33 +26,33 @@ Targeted overlay generation with opt-in activation.
 - class: `OverlayRenderContext` (line 54)
 - class: `OverlayDecisionInputs` (line 66)
 - function: `_should_generate_overlay` (line 75)
-- function: `generate_overlay_for_file` (line 94)
-- function: `activate_overlays` (line 217)
-- function: `deactivate_all` (line 266)
-- function: `_overlay_path` (line 304)
-- function: `_normalized_module_key` (line 328)
-- function: `_module_name_from_path` (line 348)
-- function: `_collect_star_reexports` (line 372)
-- function: `_extract_simple_name` (line 403)
-- function: `_build_overlay_text` (line 430)
-- function: `_render_star_exports` (line 477)
-- function: `_render_public_defs` (line 502)
-- function: `_collect_import_reexports` (line 533)
-- function: `_is_windows` (line 564)
+- function: `generate_overlay_for_file` (line 99)
+- function: `activate_overlays` (line 222)
+- function: `deactivate_all` (line 271)
+- function: `_overlay_path` (line 309)
+- function: `_normalized_module_key` (line 333)
+- function: `_module_name_from_path` (line 353)
+- function: `_collect_star_reexports` (line 377)
+- function: `_extract_simple_name` (line 408)
+- function: `_build_overlay_text` (line 435)
+- function: `_render_star_exports` (line 482)
+- function: `_render_public_defs` (line 507)
+- function: `_collect_import_reexports` (line 538)
+- function: `_is_windows` (line 569)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 3
-- **cycle_group**: 104
+- **cycle_group**: 70
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 14
-- recent churn 90: 14
+- recent churn 30: 15
+- recent churn 90: 15
 
 ## Usage
 
@@ -96,7 +96,7 @@ Targeted overlay generation with opt-in activation.
 
 - branches: 72
 - cyclomatic: 73
-- loc: 573
+- loc: 578
 
 ## Doc Coverage
 

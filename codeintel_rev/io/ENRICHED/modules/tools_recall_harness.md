@@ -63,7 +63,7 @@ Notes
 
 - **fan_in**: 0
 - **fan_out**: 0
-- **cycle_group**: 162
+- **cycle_group**: 138
 
 ## Ownership
 
@@ -113,41 +113,31 @@ Notes
 - patches/Supporting Documentation/HyperCorn.md
 - patches/Supporting Documentation/nginx.md
 - patches/AST_CST_SCIP_data_pipeline_hardening.md
-- patches/OpenTelemetry_ExtensionPhase2.md
 - patches/CST_Data_Build.md
 - patches/SCIP+CST+AST pipeline hardening.md
 - patches/MCP_through_search_hardening_phase3.md
-- patches/OpenTelemetry_ExtensionPhase4.md
 - patches/Typing_gating_follow_small_architecture_changes.md
 - patches/FAISS_detailed_implementation_plan.md
 - patches/Enrich_Expansion.md
-- patches/OpenTelemetry_ExtensionPhase2addon.md
-- patches/OpenTelemetry_Reconfig_for_efficient_libraries_phase2.md
 - patches/Front_End_Hardening_Phase2.md
 - patches/Enrich_Extension.md
 - patches/Startup - Chunking through Embedding and Storage.md
-- patches/Telemetry_Execution_Ledger.md
 - patches/Networking_Implementation.md
 - patches/FAISS-Hardening.md
 - patches/Type_Gating_Factory_Scope_phase2.md
 - patches/BM25+SPLADEv3_Implementation.md
-- patches/OpenTelemetry_ExtensionPhase1.md
 - patches/Type_Gating_Factory_Scope.md
 - patches/MCP_through_search_hardening_phase2.md
 - patches/DuckDB_data_expansion_FAISS.md
 - patches/Type_Gating_Followup.md
-- patches/OpenTelemetry_Reconfig_for_efficient_libraries.md
 - patches/Cli_enrich_fix.md
 - patches/AST_Data_Build.md
 - patches/audit_closeout.md
 - patches/MCP_through_search_hardening.md
 - patches/Index Lifecycle Manager and Concurrency.md
 - patches/MCP_schema_implementation.md
-- patches/OpenTelemetry_ExtensionPhase0.md
 - patches/FAISS Implementation Phase 2 rev.md
 - patches/warp_technical_overview.md
-- patches/OpenTelemetry_ExtensionPhase3.md
-- patches/Telemetry_Implementation.md
 - patches/vllm scope.md
 - patches/Enrich_scope_addendum.md
 - patches/FAISS-Phase2-Refinements.md

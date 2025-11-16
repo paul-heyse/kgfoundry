@@ -53,7 +53,6 @@ codeintel_rev.app.middleware : get_session_id for retrieving session ID
 from __future__ import annotations
 
 import fnmatch
-from time import perf_counter
 from typing import TYPE_CHECKING
 
 from kgfoundry_common.logging import get_logger
@@ -370,9 +369,6 @@ def apply_language_filter(
     if not languages:
         return paths  # No filtering needed
 
-    # Measure filtering duration
-    start_time = perf_counter()
-
     # Normalize language names to lowercase
     normalized_languages = [lang.lower() for lang in languages]
 
@@ -399,9 +395,6 @@ def apply_language_filter(
             if path_lower.endswith(ext.lower()):
                 filtered.append(path)
                 break  # Path matches, no need to check other extensions
-
-    # Record filtering duration
-    duration = perf_counter() - start_time
 
     return filtered
 

@@ -28,14 +28,15 @@ FAISS dual-index utilities and metadata helpers.
 
 - variable: `np` (line 24)
 - variable: `LOGGER` (line 26)
-- class: `IndexManifest` (line 32)
-- class: `FAISSDualIndexManager` (line 89)
+- function: `_run_index_search` (line 31)
+- class: `IndexManifest` (line 68)
+- class: `FAISSDualIndexManager` (line 125)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 3
-- **cycle_group**: 128
+- **cycle_group**: 106
 
 ## Ownership
 
@@ -75,7 +76,7 @@ FAISSDualIndexManager, IndexManifest
 
 ## Hotspot
 
-- score: 2.38
+- score: 2.39
 
 ## Side Effects
 
@@ -84,12 +85,13 @@ FAISSDualIndexManager, IndexManifest
 
 ## Complexity
 
-- branches: 70
-- cyclomatic: 71
-- loc: 645
+- branches: 72
+- cyclomatic: 73
+- loc: 681
 
 ## Doc Coverage
 
+- `_run_index_search` (function): summary=yes, params=ok, examples=no — Execute FAISS search and coerce outputs into typed NumPy arrays.
 - `IndexManifest` (class): summary=yes, examples=no — Persisted metadata for FAISS dual-index deployments.
 - `FAISSDualIndexManager` (class): summary=yes, examples=no — Manage dual FAISS indexes with CPU/GPU coordination.
 

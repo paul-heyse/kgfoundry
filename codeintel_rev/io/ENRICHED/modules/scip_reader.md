@@ -38,15 +38,15 @@ with precise ranges for chunking and code intelligence.
 
 - **fan_in**: 2
 - **fan_out**: 1
-- **cycle_group**: 34
+- **cycle_group**: 22
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 6
-- recent churn 90: 6
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 

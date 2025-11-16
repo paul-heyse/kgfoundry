@@ -15,33 +15,36 @@ are already exported (e.g., ``REPO_ROOT``, ``SCIP_INDEX``, ``VLLM_URL``).
 
 - from **__future__** import annotations
 - from **(absolute)** import argparse
-- from **(absolute)** import subprocess
+- from **(absolute)** import logging
 - from **(absolute)** import sys
+- from **collections.abc** import Sequence
 - from **pathlib** import Path
-- from **typing** import Sequence
 - from **codeintel_rev.app.config_context** import resolve_application_paths
 - from **codeintel_rev.config.settings** import Settings, load_settings
 - from **codeintel_rev.io.duckdb_catalog** import DuckDBCatalog
+- from **kgfoundry_common.logging** import get_logger
+- from **kgfoundry_common.subprocess_utils** import SubprocessError, SubprocessTimeoutError, run_subprocess
 
 ## Definitions
 
-- variable: `REPO_ROOT` (line 18)
-- variable: `SRC_ROOT` (line 19)
-- function: `_run_index_pipeline` (line 29)
-- function: `_summarize_artifacts` (line 37)
-- function: `main` (line 69)
+- variable: `LOGGER` (line 27)
+- function: `_run_index_pipeline` (line 30)
+- function: `_summarize_artifacts` (line 58)
+- function: `main` (line 108)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 4
-- **cycle_group**: 168
+- **fan_out**: 3
+- **cycle_group**: 145
 
 ## Ownership
 
-- bus factor: 0.00
-- recent churn 30: 0
-- recent churn 90: 0
+- owner: paul-heyse
+- primary authors: paul-heyse
+- bus factor: 1.00
+- recent churn 30: 2
+- recent churn 90: 2
 
 ## Usage
 
@@ -74,23 +77,22 @@ are already exported (e.g., ``REPO_ROOT``, ``SCIP_INDEX``, ``VLLM_URL``).
 
 ## Hotspot
 
-- score: 1.96
+- score: 1.89
 
 ## Side Effects
 
 - filesystem
-- subprocess
 
 ## Complexity
 
-- branches: 11
-- cyclomatic: 12
-- loc: 122
+- branches: 12
+- cyclomatic: 13
+- loc: 175
 
 ## Doc Coverage
 
-- `_run_index_pipeline` (function): summary=yes, params=mismatch, examples=no — Invoke the existing indexing pipeline module with the requested flags.
-- `_summarize_artifacts` (function): summary=yes, params=mismatch, examples=no — Print chunk counts, embedding dimensions, and FAISS file locations.
+- `_run_index_pipeline` (function): summary=yes, params=ok, examples=no — Invoke the existing indexing pipeline module with the requested flags.
+- `_summarize_artifacts` (function): summary=yes, params=ok, examples=no — Print chunk counts, embedding dimensions, and FAISS file locations.
 - `main` (function): summary=yes, params=ok, examples=no — Entry point for the startup pipeline runner.
 
 ## Tags

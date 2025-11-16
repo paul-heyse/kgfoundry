@@ -218,7 +218,7 @@ def warmup_gpu() -> dict[str, bool | str]:
 
     # Step 4: Test FAISS GPU resource initialization
     if faiss_gpu_available:
-        faiss_test_passed, _faiss_test_msg, scratch_bytes = _test_faiss_gpu_resources()
+        faiss_test_passed, _faiss_test_msg, _scratch_bytes = _test_faiss_gpu_resources()
         results["faiss_gpu_test"] = faiss_test_passed
         # scratch_bytes available but not recorded (observability removed)
 

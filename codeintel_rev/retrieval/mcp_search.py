@@ -370,7 +370,6 @@ def run_search(*, request: SearchRequest, deps: SearchDependencies) -> SearchRes
         (original query), top_k (requested results), results (ranked SearchResult objects
         with chunk metadata and scores), and limits (resource limits applied during search).
     """
-    start = perf_counter()
     faiss_k = _compute_fanout(request.top_k, request.filters, deps.settings.limits)
     durations = _StageDurations()
     query_vector = _embed_with_metrics(request, deps)
@@ -399,7 +398,6 @@ def run_search(*, request: SearchRequest, deps: SearchDependencies) -> SearchRes
         source_label=f"faiss_{deps.faiss.faiss_family or 'auto'}",
     )
     limits = _compose_limits(deps.limits, results, repair_stats)
-    total_duration = max(perf_counter() - start, 0.0)
     _write_pool_rows(
         deps=deps,
         annotations=hydration_bundle.annotations,
@@ -493,8 +491,7 @@ def _embed_with_metrics(request: SearchRequest, deps: SearchDependencies) -> NDA
     NDArrayF32
         Normalized query embedding reshaped to ``(1, vec_dim)``.
     """
-    vector = _embed_query(deps.embedder, request.query, deps.settings.index.vec_dim)
-    return vector
+    return _embed_query(deps.embedder, request.query, deps.settings.index.vec_dim)
 
 
 def _run_ann_search(
@@ -881,7 +878,7 @@ def _build_ann_snapshot(
     """
     if not ranked_ids or not scores or not hydrated_rows:
         return []
-    hydrated_ids = {int(chunk_id) for chunk_id in hydrated_rows.keys()}
+    hydrated_ids = {int(chunk_id) for chunk_id in hydrated_rows}
     snapshot: list[tuple[int, float]] = []
     for chunk_id, score in zip(ranked_ids, scores, strict=True):
         normalized = int(chunk_id)

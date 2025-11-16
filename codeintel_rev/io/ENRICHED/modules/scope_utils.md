@@ -61,34 +61,33 @@ codeintel_rev.app.middleware : get_session_id for retrieving session ID
 - from **(absolute)** import fnmatch
 - from **time** import perf_counter
 - from **typing** import TYPE_CHECKING
-- from **codeintel_rev.telemetry.otel_metrics** import build_histogram
 - from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.app.config_context** import ApplicationContext
 - from **codeintel_rev.mcp_server.schemas** import ScopeIn
 
 ## Definitions
 
-- variable: `LOGGER` (line 66)
-- variable: `LANGUAGE_EXTENSIONS` (line 77)
-- function: `get_effective_scope` (line 116)
-- function: `merge_scope_filters` (line 160)
-- function: `apply_path_filters` (line 235)
-- function: `apply_language_filter` (line 324)
-- function: `path_matches_glob` (line 418)
+- variable: `LOGGER` (line 65)
+- variable: `LANGUAGE_EXTENSIONS` (line 69)
+- function: `get_effective_scope` (line 108)
+- function: `merge_scope_filters` (line 152)
+- function: `apply_path_filters` (line 227)
+- function: `apply_language_filter` (line 316)
+- function: `path_matches_glob` (line 409)
 
 ## Graph Metrics
 
 - **fan_in**: 5
-- **fan_out**: 4
-- **cycle_group**: 42
+- **fan_out**: 3
+- **cycle_group**: 28
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 8
-- recent churn 90: 8
+- recent churn 30: 9
+- recent churn 90: 9
 
 ## Usage
 
@@ -120,7 +119,7 @@ LANGUAGE_EXTENSIONS, apply_language_filter, apply_path_filters, get_effective_sc
 
 ## Hotspot
 
-- score: 2.33
+- score: 2.29
 
 ## Side Effects
 
@@ -130,7 +129,7 @@ LANGUAGE_EXTENSIONS, apply_language_filter, apply_path_filters, get_effective_sc
 
 - branches: 16
 - cyclomatic: 17
-- loc: 487
+- loc: 478
 
 ## Doc Coverage
 

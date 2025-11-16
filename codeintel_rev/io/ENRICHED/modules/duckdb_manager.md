@@ -10,7 +10,7 @@ Thread-safe DuckDB connection manager.
 
 - from **__future__** import annotations
 - from **collections.abc** import Iterator, Sequence
-- from **contextlib** import contextmanager, nullcontext, suppress
+- from **contextlib** import contextmanager, suppress
 - from **dataclasses** import dataclass
 - from **pathlib** import Path
 - from **queue** import Empty, Full, LifoQueue
@@ -18,34 +18,31 @@ Thread-safe DuckDB connection manager.
 - from **time** import perf_counter
 - from **typing** import TYPE_CHECKING, cast
 - from **codeintel_rev._lazy_imports** import LazyModule
-- from **codeintel_rev.metrics.registry** import DUCKDB_EXECUTE_SECONDS
-- from **codeintel_rev.observability.otel** import as_span, record_span_event
-- from **codeintel_rev.observability.semantic_conventions** import Attrs
-- from **codeintel_rev.observability.timeline** import current_timeline
+- from **kgfoundry_common.logging** import get_logger
 - from **(absolute)** import duckdb
 
 ## Definitions
 
-- variable: `duckdb` (line 23)
-- class: `DuckDBConfig` (line 29)
-- class: `_InstrumentedDuckDBConnection` (line 57)
-- class: `DuckDBManager` (line 175)
-- class: `DuckDBQueryOptions` (line 313)
-- class: `DuckDBQueryBuilder` (line 328)
+- variable: `duckdb` (line 20)
+- class: `DuckDBConfig` (line 26)
+- class: `_InstrumentedDuckDBConnection` (line 54)
+- class: `DuckDBManager` (line 143)
+- class: `DuckDBQueryOptions` (line 281)
+- class: `DuckDBQueryBuilder` (line 296)
 
 ## Graph Metrics
 
 - **fan_in**: 10
-- **fan_out**: 6
-- **cycle_group**: 17
+- **fan_out**: 2
+- **cycle_group**: 12
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 9
-- recent churn 90: 9
+- recent churn 30: 10
+- recent churn 90: 10
 
 ## Usage
 
@@ -77,7 +74,7 @@ DuckDBConfig, DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 
 ## Hotspot
 
-- score: 2.89
+- score: 2.76
 
 ## Side Effects
 
@@ -86,9 +83,9 @@ DuckDBConfig, DuckDBManager, DuckDBQueryBuilder, DuckDBQueryOptions
 
 ## Complexity
 
-- branches: 54
-- cyclomatic: 55
-- loc: 520
+- branches: 51
+- cyclomatic: 52
+- loc: 488
 
 ## Doc Coverage
 

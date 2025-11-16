@@ -73,15 +73,15 @@ All configuration loaded from environment variables with sensible defaults.
 
 - **fan_in**: 25
 - **fan_out**: 2
-- **cycle_group**: 18
+- **cycle_group**: 13
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 28
-- recent churn 90: 28
+- recent churn 30: 29
+- recent churn 90: 29
 
 ## Usage
 

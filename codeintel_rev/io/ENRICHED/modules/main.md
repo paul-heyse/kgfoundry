@@ -22,10 +22,10 @@ Provides health/readiness endpoints, CORS, and streaming support.
 - from **importlib.metadata** import PackageNotFoundError, version
 - from **time** import perf_counter
 - from **types** import FrameType
-- from **typing** import Any, cast
+- from **typing** import cast
 - from **fastapi** import FastAPI, HTTPException, Request
 - from **fastapi.middleware.cors** import CORSMiddleware
-- from **fastapi.responses** import JSONResponse, PlainTextResponse, StreamingResponse
+- from **fastapi.responses** import JSONResponse, StreamingResponse
 - from **hypercorn.middleware** import ProxyFixMiddleware
 - from **hypercorn.typing** import ASGIFramework
 - from **starlette.middleware.trustedhost** import TrustedHostMiddleware
@@ -36,79 +36,62 @@ Provides health/readiness endpoints, CORS, and streaming support.
 - from **codeintel_rev.app.gpu_warmup** import warmup_gpu
 - from **codeintel_rev.app.middleware** import SessionScopeMiddleware
 - from **codeintel_rev.app.readiness** import ReadinessProbe
-- from **codeintel_rev.app.routers** import diagnostics, index_admin
+- from **codeintel_rev.app.routers** import index_admin
 - from **codeintel_rev.app.server_settings** import get_server_settings
 - from **codeintel_rev.errors** import RuntimeUnavailableError
 - from **codeintel_rev.mcp_server.server** import app_context, build_http_app
-- from **codeintel_rev.observability** import execution_ledger
-- from **codeintel_rev.observability.otel** import as_span, current_trace_id, init_all_telemetry, set_current_span_attrs
-- from **codeintel_rev.observability.runtime_observer** import TimelineRuntimeObserver
-- from **codeintel_rev.observability.semantic_conventions** import Attrs
-- from **codeintel_rev.observability.timeline** import bind_timeline, new_timeline
 - from **codeintel_rev.runtime.cells** import RuntimeCellObserver
-- from **codeintel_rev.telemetry.context** import current_run_id
-- from **codeintel_rev.telemetry.logging** import install_structured_logging
-- from **codeintel_rev.telemetry.reporter** import build_report
-- from **codeintel_rev.telemetry.reporter** import build_run_report_v2, render_markdown, render_markdown_v2, render_mermaid, report_to_json
 - from **kgfoundry_common.errors** import ConfigurationError
 - from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 65)
-- variable: `SERVER_SETTINGS` (line 66)
-- function: `request_identity` (line 77)
-- function: `_sse_keepalive_interval` (line 98)
-- function: `_sse_keepalive_budget` (line 116)
-- function: `_client_address` (line 136)
-- function: `_log_request_summary` (line 158)
-- function: `_stream_log_extra` (line 174)
-- function: `_preload_faiss_index` (line 213)
-- function: `_env_flag` (line 244)
-- function: `_resolve_proxy_trusted_hops` (line 261)
-- function: `_log_gpu_warmup` (line 283)
-- function: `_preload_faiss_if_configured` (line 304)
-- function: `_preload_xtr_if_configured` (line 314)
-- function: `_preload_hybrid_if_configured` (line 328)
-- function: `_initialize_context` (line 339)
-- function: `_shutdown_context` (line 427)
-- function: `lifespan` (line 450)
-- variable: `app` (line 545)
-- function: `_log_execution_ledger_state` (line 552)
-- function: `observability_run_report` (line 602)
-- function: `get_run_report` (line 639)
-- function: `get_run_report_markdown` (line 681)
-- function: `get_run_report_mermaid` (line 724)
-- function: `get_run_report_v2` (line 756)
-- function: `get_run_report_markdown_v2` (line 776)
-- function: `get_run_report_mermaid_v2` (line 798)
-- function: `inject_request_id` (line 820)
-- function: `set_mcp_context` (line 847)
-- function: `disable_nginx_buffering` (line 926)
-- function: `healthz` (line 962)
-- function: `readyz` (line 974)
-- function: `capz` (line 1009)
-- function: `_stream_with_logging` (line 1051)
-- function: `sse_demo` (line 1113)
-- function: `http_exception_handler_with_request_id` (line 1166)
-- function: `unhandled_exception_handler` (line 1198)
-- variable: `proxy_wrapped` (line 1239)
-- variable: `asgi` (line 1244)
-- variable: `asgi` (line 1246)
+- variable: `LOGGER` (line 43)
+- variable: `SERVER_SETTINGS` (line 44)
+- function: `request_identity` (line 53)
+- function: `_sse_keepalive_interval` (line 74)
+- function: `_sse_keepalive_budget` (line 92)
+- function: `_client_address` (line 112)
+- function: `_log_request_summary` (line 134)
+- function: `_stream_log_extra` (line 150)
+- function: `_preload_faiss_index` (line 189)
+- function: `_env_flag` (line 220)
+- function: `_resolve_proxy_trusted_hops` (line 237)
+- function: `_log_gpu_warmup` (line 259)
+- function: `_preload_faiss_if_configured` (line 280)
+- function: `_preload_xtr_if_configured` (line 290)
+- function: `_preload_hybrid_if_configured` (line 304)
+- function: `_initialize_context` (line 315)
+- function: `_shutdown_context` (line 393)
+- function: `lifespan` (line 416)
+- variable: `app` (line 508)
+- function: `inject_request_id` (line 536)
+- function: `set_mcp_context` (line 563)
+- function: `disable_nginx_buffering` (line 622)
+- function: `healthz` (line 658)
+- function: `readyz` (line 670)
+- function: `capz` (line 705)
+- function: `_stream_with_logging` (line 747)
+- function: `sse_demo` (line 809)
+- function: `http_exception_handler_with_request_id` (line 862)
+- function: `unhandled_exception_handler` (line 894)
+- variable: `proxy_wrapped` (line 935)
+- variable: `asgi` (line 940)
+- variable: `asgi` (line 942)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 19
-- **cycle_group**: 59
+- **fan_out**: 11
+- **cycle_group**: 38
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 36
-- recent churn 90: 36
+- recent churn 30: 38
+- recent churn 90: 38
 
 ## Usage
 
@@ -144,7 +127,7 @@ app, asgi
 
 ## Hotspot
 
-- score: 3.10
+- score: 2.82
 
 ## Side Effects
 
@@ -153,9 +136,9 @@ app, asgi
 
 ## Complexity
 
-- branches: 89
-- cyclomatic: 90
-- loc: 1250
+- branches: 69
+- cyclomatic: 70
+- loc: 946
 
 ## Doc Coverage
 

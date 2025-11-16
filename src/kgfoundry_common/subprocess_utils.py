@@ -80,6 +80,7 @@ class _TextProcess(Protocol):
     stdin: io.TextIOBase | None
     stdout: io.TextIOBase | None
     stderr: io.TextIOBase | None
+    pid: int
 
     def poll(self) -> int | None:
         """Check if process has terminated.
@@ -622,6 +623,7 @@ def spawn_text_process(
     *,
     cwd: Path | None = None,
     env: Mapping[str, str] | None = None,
+    start_new_session: bool = False,
 ) -> TextProcess:
     """Spawn a long-lived subprocess with hardened command checks.
 
@@ -637,6 +639,9 @@ def spawn_text_process(
         Working directory for the process.
     env : Mapping[str, str] | None, optional
         Environment variables.
+    start_new_session : bool, optional
+        When True, spawns the subprocess in a new session to isolate it
+        from the parent process group. Defaults to False.
 
     Returns
     -------
@@ -653,9 +658,7 @@ def spawn_text_process(
         msg = "Command must contain at least one argument"
         _raise_tool_execution_error(tools_surface, msg, command=[])
 
-    get_runner = tools_surface.get_process_runner
-    runner = get_runner()
-
+    runner = tools_surface.get_process_runner()
     executable = runner.allowlist.resolve(command[0], command)
     final_command = (str(executable), *command[1:])
     sanitised_env = runner.environment.build(env)
@@ -668,6 +671,54 @@ def spawn_text_process(
         text=True,
         cwd=str(cwd) if cwd else None,
         env=dict(sanitised_env),
+        start_new_session=start_new_session,
+    )
+
+
+def spawn_background_process(
+    command: Sequence[str],
+    *,
+    cwd: Path | None = None,
+    env: Mapping[str, str] | None = None,
+    start_new_session: bool = False,
+) -> TextProcess:
+    """Spawn a subprocess inheriting stdio for background services.
+
+    Parameters
+    ----------
+    command : Sequence[str]
+        Command and arguments to execute.
+    cwd : Path | None, optional
+        Working directory.
+    env : Mapping[str, str] | None, optional
+        Environment variables.
+    start_new_session : bool, optional
+        When True, detaches the process into its own session.
+
+    Returns
+    -------
+    TextProcess
+        Process handle with pid/poll/wait accessors.
+    """
+    tools_surface = _load_tools_surface()
+    if not command:
+        msg = "Command must contain at least one argument"
+        _raise_tool_execution_error(tools_surface, msg, command=[])
+
+    runner = tools_surface.get_process_runner()
+    executable = runner.allowlist.resolve(command[0], command)
+    final_command = (str(executable), *command[1:])
+    sanitised_env = runner.environment.build(env)
+
+    return _Popen(
+        final_command,
+        stdin=None,
+        stdout=None,
+        stderr=None,
+        text=False,
+        cwd=str(cwd) if cwd else None,
+        env=dict(sanitised_env),
+        start_new_session=start_new_session,
     )
 
 
@@ -677,6 +728,7 @@ __all__ = [
     "TextProcess",
     "TimeoutExpired",
     "run_subprocess",
+    "spawn_background_process",
     "spawn_text_process",
 ]
 __navmap__ = load_nav_metadata(__name__, tuple(__all__))

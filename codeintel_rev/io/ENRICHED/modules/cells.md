@@ -16,30 +16,29 @@ Thread-safe runtime cell primitive for mutable subsystems.
 - from **threading** import Condition, RLock
 - from **typing** import Literal, Protocol, TypeVar, final, runtime_checkable
 - from **codeintel_rev.errors** import RuntimeLifecycleError, RuntimeUnavailableError
-- from **codeintel_rev.observability.timeline** import Timeline, current_timeline
 - from **codeintel_rev.runtime.factory_adjustment** import FactoryAdjuster, NoopFactoryAdjuster
 - from **codeintel_rev.runtime.request_context** import capability_stamp_var, session_id_var
 - from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `T` (line 18)
-- variable: `LOGGER` (line 20)
-- variable: `InitStatus` (line 26)
-- variable: `CloseStatus` (line 27)
-- class: `RuntimeCellCloseResult` (line 31)
-- class: `RuntimeCellInitContext` (line 43)
-- class: `RuntimeCellInitResult` (line 52)
-- function: `_seed_allowed` (line 64)
-- class: `RuntimeCellObserver` (line 71)
-- class: `NullRuntimeCellObserver` (line 90)
-- class: `RuntimeCell` (line 117)
+- variable: `T` (line 17)
+- variable: `LOGGER` (line 19)
+- variable: `InitStatus` (line 25)
+- variable: `CloseStatus` (line 26)
+- class: `RuntimeCellCloseResult` (line 30)
+- class: `RuntimeCellInitContext` (line 42)
+- class: `RuntimeCellInitResult` (line 50)
+- function: `_seed_allowed` (line 62)
+- class: `RuntimeCellObserver` (line 69)
+- class: `NullRuntimeCellObserver` (line 88)
+- class: `RuntimeCell` (line 115)
 
 ## Graph Metrics
 
-- **fan_in**: 3
-- **fan_out**: 5
-- **cycle_group**: 30
+- **fan_in**: 2
+- **fan_out**: 4
+- **cycle_group**: 9
 
 ## Ownership
 
@@ -79,7 +78,7 @@ NullRuntimeCellObserver, RuntimeCell, RuntimeCellCloseResult, RuntimeCellInitCon
 
 ## Hotspot
 
-- score: 2.58
+- score: 2.47
 
 ## Side Effects
 
@@ -91,9 +90,9 @@ cooldown_error
 
 ## Complexity
 
-- branches: 45
-- cyclomatic: 46
-- loc: 637
+- branches: 44
+- cyclomatic: 45
+- loc: 633
 
 ## Doc Coverage
 

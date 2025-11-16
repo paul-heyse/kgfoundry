@@ -474,8 +474,6 @@ class VLLMClient:
                 dtype=np_module.float32,
             )
 
-        mode = "local" if self._local_engine is not None else "http"
-
         if self._local_engine is not None:
             return await self._embed_batch_async_local(texts)
 

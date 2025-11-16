@@ -8,31 +8,61 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import shlex
 import signal
-import subprocess
 import sys
+import tempfile
 import time
 from collections.abc import Sequence
 from contextlib import suppress
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Final
 
-DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 8001
-DEFAULT_MODEL = "nomic-ai/nomic-embed-code"
-DEFAULT_PID_FILE = Path(os.environ.get("VLLM_PID_FILE", "/tmp/vllm-http.pid"))
-DEFAULT_BASE_URL = "http://127.0.0.1:8001/v1"
-DEFAULT_HF_CACHE = Path(
+from kgfoundry_common.logging import get_logger
+from kgfoundry_common.subprocess_utils import spawn_background_process
+
+try:
+    import httpx
+except ImportError:
+    httpx = None
+
+DEFAULT_HOST: Final[str] = "127.0.0.1"
+DEFAULT_PORT: Final[int] = 8001
+DEFAULT_MODEL: Final[str] = "nomic-ai/nomic-embed-code"
+DEFAULT_PID_FILE: Final[Path] = Path(
+    os.environ.get("VLLM_PID_FILE") or Path(tempfile.gettempdir()) / "vllm-http.pid"
+)
+DEFAULT_BASE_URL: Final[str] = "http://127.0.0.1:8001/v1"
+DEFAULT_HF_CACHE: Final[Path] = Path(
     os.environ.get("HF_HOME")
     or os.environ.get("HUGGINGFACE_HUB_CACHE")
-    or "/home/paul/.cache/huggingface"
+    or (Path.home() / ".cache" / "huggingface")
 )
+HTTP_OK: Final[int] = 200
+
+LOGGER = get_logger(__name__)
+
+
+@dataclass(slots=True, frozen=True)
+class ServerLaunchOptions:
+    """Configuration for launching a vLLM HTTP server."""
+
+    model: str
+    host: str
+    port: int
+    served_model_name: str | None
+    tensor_parallel_size: int | None
+    gpu_memory_utilization: float | None
+    max_num_batched_tokens: int | None
 
 
 def _infer_host_port(base_url: str) -> tuple[str, int]:
     if "://" not in base_url:
-        raise ValueError(f"Invalid base URL: {base_url}")
+        msg = f"Invalid base URL: {base_url}"
+        raise ValueError(msg)
     _, rest = base_url.split("://", 1)
     host_port = rest.split("/", 1)[0]
     if ":" in host_port:
@@ -47,42 +77,33 @@ def _health_url(base_url: str) -> str:
     return base_url.rstrip("/") + "/v1/health"
 
 
-def _build_server_argv(
-    *,
-    model: str,
-    host: str,
-    port: int,
-    served_model_name: str | None,
-    tensor_parallel_size: int | None,
-    gpu_memory_utilization: float | None,
-    max_num_batched_tokens: int | None,
-) -> list[str]:
+def _build_server_argv(options: ServerLaunchOptions) -> list[str]:
     argv = [
         sys.executable,
         "-m",
         "vllm.entrypoints.openai.api_server",
         "--model",
-        model,
+        options.model,
         "--host",
-        host,
+        options.host,
         "--port",
-        str(port),
+        str(options.port),
         "--task",
         "embed",
         "--trust-remote-code",
     ]
-    if tensor_parallel_size and tensor_parallel_size > 1:
-        argv += ["--tensor-parallel-size", str(tensor_parallel_size)]
-    if gpu_memory_utilization:
-        argv += ["--gpu-memory-utilization", str(gpu_memory_utilization)]
-    if max_num_batched_tokens:
-        argv += ["--max-num-batched-tokens", str(max_num_batched_tokens)]
-    if served_model_name:
-        argv += ["--served-model-name", served_model_name]
+    if options.tensor_parallel_size and options.tensor_parallel_size > 1:
+        argv += ["--tensor-parallel-size", str(options.tensor_parallel_size)]
+    if options.gpu_memory_utilization:
+        argv += ["--gpu-memory-utilization", str(options.gpu_memory_utilization)]
+    if options.max_num_batched_tokens:
+        argv += ["--max-num-batched-tokens", str(options.max_num_batched_tokens)]
+    if options.served_model_name:
+        argv += ["--served-model-name", options.served_model_name]
     return argv
 
 
-def _env_for_cache(cache_root: Path, offline: bool) -> dict[str, str]:
+def _env_for_cache(cache_root: Path, *, offline: bool) -> dict[str, str]:
     env = os.environ.copy()
     env["HF_HOME"] = str(cache_root)
     env["HUGGINGFACE_HUB_CACHE"] = str(cache_root)
@@ -93,22 +114,22 @@ def _env_for_cache(cache_root: Path, offline: bool) -> dict[str, str]:
 
 
 def _wait_until_ready(base_url: str, timeout_s: float) -> None:
-    try:
-        import httpx
-    except ImportError as exc:  # pragma: no cover - runtime guard
-        raise RuntimeError("httpx is required for readiness checks (pip install httpx).") from exc
+    if httpx is None:  # pragma: no cover - dependency guard
+        msg = "httpx is required for readiness checks (pip install httpx)."
+        raise RuntimeError(msg)
     url = _health_url(base_url)
     deadline = time.time() + timeout_s
     last_err: Exception | None = None
     while time.time() < deadline:
         try:
             resp = httpx.get(url, timeout=5.0)
-            if resp.status_code == 200:
+            if resp.status_code == HTTP_OK:
                 return
-        except Exception as exc:
+        except (httpx.HTTPError, OSError) as exc:
             last_err = exc
         time.sleep(0.5)
-    raise TimeoutError(f"Server did not become healthy at {url}: {last_err}")
+    msg = f"Server did not become healthy at {url}: {last_err}"
+    raise TimeoutError(msg)
 
 
 def cmd_serve_http(args: argparse.Namespace) -> int:
@@ -127,13 +148,16 @@ def cmd_serve_http(args: argparse.Namespace) -> int:
         the server as a subprocess and optionally waits for it to become
         healthy before returning.
     """
-    base_url = args.base_url or DEFAULT_BASE_URL
-    host, port = _infer_host_port(base_url)
+    configured_base = args.base_url or DEFAULT_BASE_URL
+    inferred_host, inferred_port = _infer_host_port(configured_base)
+    host = args.host or inferred_host
+    port = args.port or inferred_port
+    base_url = configured_base if args.base_url else f"http://{host}:{port}/v1"
     model = args.model or DEFAULT_MODEL
     cache_root = Path(args.hf_cache or DEFAULT_HF_CACHE)
     cache_root.mkdir(parents=True, exist_ok=True)
 
-    argv = _build_server_argv(
+    options = ServerLaunchOptions(
         model=model,
         host=host,
         port=port,
@@ -142,19 +166,22 @@ def cmd_serve_http(args: argparse.Namespace) -> int:
         gpu_memory_utilization=args.gpu_memory_utilization,
         max_num_batched_tokens=args.max_num_batched_tokens,
     )
-    env = _env_for_cache(cache_root, not args.online)
+    argv = _build_server_argv(options)
+    env = _env_for_cache(cache_root, offline=not args.online)
 
     if args.print_cmd:
-        print("[serve-http] Launching:", " ".join(shlex.quote(x) for x in argv), file=sys.stderr)
+        quoted = " ".join(shlex.quote(token) for token in argv)
+        LOGGER.info("Launching vLLM via: %s", quoted)
 
-    proc = subprocess.Popen(argv, env=env, start_new_session=True)
+    proc = spawn_background_process(argv, env=env, start_new_session=True)
     args.pid_file.parent.mkdir(parents=True, exist_ok=True)
     args.pid_file.write_text(str(proc.pid), encoding="utf-8")
-    print(f"[serve-http] PID {proc.pid} -> {base_url}", file=sys.stderr)
+    LOGGER.info("Spawned vLLM PID %s -> %s", proc.pid, base_url)
 
     if not args.no_wait:
+        LOGGER.info("Waiting up to %ss for readiness.", args.timeout)
         _wait_until_ready(base_url, args.timeout)
-        print("[serve-http] Ready", file=sys.stderr)
+        LOGGER.info("vLLM server ready at %s", base_url)
 
     return 0
 
@@ -187,30 +214,30 @@ def cmd_shutdown(args: argparse.Namespace) -> int:
         is missing, unreadable, or the process did not exit within the timeout.
     """
     if not args.pid_file.exists():
-        print(f"[shutdown] PID file not found: {args.pid_file}", file=sys.stderr)
+        LOGGER.error("PID file not found: %s", args.pid_file)
         return 1
     try:
         pid = int(args.pid_file.read_text(encoding="utf-8").strip())
-    except (OSError, ValueError) as exc:
-        print(f"[shutdown] Failed to read PID file: {exc}", file=sys.stderr)
+    except (OSError, ValueError):
+        LOGGER.exception("Failed to read PID file %s", args.pid_file)
         return 1
 
-    print(f"[shutdown] Sending SIGTERM to {pid}", file=sys.stderr)
+    LOGGER.info("Sending SIGTERM to PID %s", pid)
     with suppress(ProcessLookupError):
         os.kill(pid, signal.SIGTERM)
     stopped = _wait_for_exit(pid, args.timeout)
     if not stopped and args.force:
-        print("[shutdown] Forcing SIGKILL", file=sys.stderr)
+        LOGGER.warning("SIGTERM skipped; sending SIGKILL.")
         with suppress(ProcessLookupError):
             os.kill(pid, signal.SIGKILL)
         stopped = _wait_for_exit(pid, args.timeout / 2)
 
     if not stopped:
-        print("[shutdown] Process did not exit; use --force to send SIGKILL.", file=sys.stderr)
+        LOGGER.error("Process %s did not exit; rerun with --force.", pid)
         return 1
 
     args.pid_file.unlink(missing_ok=True)
-    print("[shutdown] Server stopped", file=sys.stderr)
+    LOGGER.info("vLLM server stopped and PID file removed.")
     return 0
 
 
@@ -268,9 +295,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     int
         Exit code returned by the selected subcommand (serve-http or shutdown).
     """
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = build_parser()
     args = parser.parse_args(argv)
-    return args.func(args)
+    try:
+        return args.func(args)
+    except (RuntimeError, TimeoutError, OSError):  # pragma: no cover - CLI wrapper
+        LOGGER.exception("vLLM CLI failed")
+        return 1
 
 
 if __name__ == "__main__":

@@ -10,7 +10,6 @@ from threading import Condition, RLock
 from typing import Literal, Protocol, TypeVar, final, runtime_checkable
 
 from codeintel_rev.errors import RuntimeLifecycleError, RuntimeUnavailableError
-from codeintel_rev.observability.timeline import Timeline, current_timeline
 from codeintel_rev.runtime.factory_adjustment import FactoryAdjuster, NoopFactoryAdjuster
 from codeintel_rev.runtime.request_context import capability_stamp_var, session_id_var
 from kgfoundry_common.logging import get_logger
@@ -45,7 +44,6 @@ class RuntimeCellInitContext:
 
     session_id: str | None
     capability_stamp: str | None
-    timeline: Timeline | None
 
 
 @dataclass(slots=True, frozen=True)
@@ -485,13 +483,11 @@ class RuntimeCell[T]:
     def _capture_init_context() -> RuntimeCellInitContext | None:
         session_id = session_id_var.get()
         capability_stamp = capability_stamp_var.get()
-        timeline = current_timeline()
-        if session_id is None and capability_stamp is None and timeline is None:
+        if session_id is None and capability_stamp is None:
             return None
         return RuntimeCellInitContext(
             session_id=session_id,
             capability_stamp=capability_stamp,
-            timeline=timeline,
         )
 
     def _next_generation_locked(self) -> int:

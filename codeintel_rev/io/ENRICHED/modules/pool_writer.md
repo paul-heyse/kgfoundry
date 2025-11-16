@@ -9,7 +9,7 @@ Lightweight Parquet writer for evaluator pools.
 ## Imports
 
 - from **__future__** import annotations
-- from **collections.abc** import Iterable
+- from **collections.abc** import Iterable, Sequence
 - from **pathlib** import Path
 - from **types** import ModuleType
 - from **typing** import TYPE_CHECKING, Literal, cast
@@ -28,22 +28,23 @@ Lightweight Parquet writer for evaluator pools.
 - variable: `pa` (line 25)
 - variable: `pq` (line 26)
 - variable: `Channel` (line 28)
-- function: `_empty_table` (line 40)
-- function: `write_pool` (line 87)
+- function: `_coerce_str_sequence` (line 40)
+- function: `_empty_table` (line 64)
+- function: `write_pool` (line 111)
 
 ## Graph Metrics
 
 - **fan_in**: 3
 - **fan_out**: 2
-- **cycle_group**: 76
+- **cycle_group**: 56
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 11
-- recent churn 90: 11
+- recent churn 30: 12
+- recent churn 90: 12
 
 ## Usage
 
@@ -75,7 +76,7 @@ Channel, SearchPoolRow, write_pool
 
 ## Hotspot
 
-- score: 2.08
+- score: 2.13
 
 ## Side Effects
 
@@ -83,12 +84,13 @@ Channel, SearchPoolRow, write_pool
 
 ## Complexity
 
-- branches: 13
-- cyclomatic: 14
-- loc: 169
+- branches: 16
+- cyclomatic: 17
+- loc: 193
 
 ## Doc Coverage
 
+- `_coerce_str_sequence` (function): summary=yes, params=ok, examples=no — Return a normalized list of strings for any iterable payload.
 - `_empty_table` (function): summary=yes, params=ok, examples=no — Return an empty evaluator table with the expected schema.
 - `write_pool` (function): summary=yes, params=ok, examples=no — Write `(query_id, channel, rank, chunk_id, score, uri, ...)` rows to Parquet.
 

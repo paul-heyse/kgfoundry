@@ -5,7 +5,6 @@ from __future__ import annotations
 import math
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from time import perf_counter
 
 _SOURCE_ALIAS = {
     "semantic": "faiss",
@@ -107,7 +106,6 @@ class HybridPoolEvaluator:
         still receive weighted scores. Time complexity: O(n * m) where n is the
         number of hits and m is the number of channels.
         """
-        start = perf_counter()
         by_source: dict[str, list[Hit]] = {}
         meta_by_doc: dict[str, dict[str, object]] = {}
         for hit in hits:
@@ -137,8 +135,7 @@ class HybridPoolEvaluator:
             )
 
         blended.sort(key=lambda hit: hit.blended_score, reverse=True)
-        top_hits = blended[:k]
-        return top_hits
+        return blended[:k]
 
 
 __all__ = ["Hit", "HybridPoolEvaluator", "PooledHit"]

@@ -18,36 +18,32 @@ Capability snapshot helpers for conditional tool registration and /capz.
 - from **pathlib** import Path
 - from **types** import ModuleType
 - from **typing** import TYPE_CHECKING, Final, cast
-- from **codeintel_rev.telemetry.otel_metrics** import GaugeLike, build_gauge
 - from **kgfoundry_common.logging** import get_logger
 - from **kgfoundry_common.typing.heavy_deps** import EXTRAS_HINT
 - from **codeintel_rev.app.config_context** import ApplicationContext
 - from **codeintel_rev.errors** import RuntimeLifecycleError
-- from **codeintel_rev.observability.otel** import as_span, set_current_span_attrs
 
 ## Definitions
 
-- variable: `LOGGER` (line 25)
-- function: `_build_capability_gauge` (line 28)
-- function: `_import_optional` (line 90)
-- function: `_probe_faiss_gpu` (line 125)
-- function: `_path_exists` (line 162)
-- function: `_record_metrics` (line 184)
-- class: `Capabilities` (line 191)
+- variable: `LOGGER` (line 23)
+- function: `_import_optional` (line 38)
+- function: `_probe_faiss_gpu` (line 73)
+- function: `_path_exists` (line 110)
+- class: `Capabilities` (line 133)
 
 ## Graph Metrics
 
-- **fan_in**: 6
-- **fan_out**: 5
-- **cycle_group**: 42
+- **fan_in**: 5
+- **fan_out**: 3
+- **cycle_group**: 28
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 9
-- recent churn 90: 9
+- recent churn 30: 10
+- recent churn 90: 10
 
 ## Usage
 
@@ -83,7 +79,7 @@ Capabilities
 
 ## Hotspot
 
-- score: 2.53
+- score: 2.37
 
 ## Side Effects
 
@@ -91,17 +87,15 @@ Capabilities
 
 ## Complexity
 
-- branches: 25
-- cyclomatic: 26
-- loc: 382
+- branches: 21
+- cyclomatic: 22
+- loc: 310
 
 ## Doc Coverage
 
-- `_build_capability_gauge` (function): summary=no, examples=no
 - `_import_optional` (function): summary=yes, params=ok, examples=no — Return imported module when available, otherwise ``None``.
 - `_probe_faiss_gpu` (function): summary=yes, params=ok, examples=no — Return FAISS GPU availability and optional reason for failure.
 - `_path_exists` (function): summary=yes, params=ok, examples=no — Return True when ``path`` is populated and exists on the filesystem.
-- `_record_metrics` (function): summary=yes, params=mismatch, examples=no — Update Prometheus gauges with the latest capability snapshot.
 - `Capabilities` (class): summary=yes, examples=no — Capability snapshot used for MCP tool gating and the /capz endpoint.
 
 ## Tags

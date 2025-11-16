@@ -21,7 +21,7 @@ Small in-process harness for exercising MCP tools without FastMCP.
 
 - **fan_in**: 0
 - **fan_out**: 2
-- **cycle_group**: 154
+- **cycle_group**: 131
 
 ## Ownership
 

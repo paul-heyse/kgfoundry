@@ -21,45 +21,44 @@ Embedding provider abstractions for chunk ingestion and runtime services.
 - from **typing** import Any, Protocol, Self, cast, runtime_checkable
 - from **codeintel_rev.config.settings** import EmbeddingsConfig, IndexConfig, Settings, VLLMConfig
 - from **codeintel_rev.io.vllm_engine** import InprocessVLLMEmbedder
-- from **codeintel_rev.telemetry.otel_metrics** import build_counter, build_gauge, build_histogram
 - from **codeintel_rev.typing** import NDArrayF32, gate_import
 - from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 22)
-- variable: `EMBEDDING_RANK` (line 23)
-- class: `EmbeddingRuntimeError` (line 52)
-- class: `EmbeddingConfigError` (line 56)
-- class: `EmbeddingMetadata` (line 61)
-- class: `EmbeddingProvider` (line 90)
-- function: `_numpy` (line 117)
-- function: `_l2_normalize` (line 128)
-- class: `_ExecutorJob` (line 161)
-- class: `_FailureCounter` (line 166)
-- class: `_BatchResultHandler` (line 187)
-- class: `_QueueSentinel` (line 244)
-- class: `_BoundedBatchExecutor` (line 248)
-- class: `_ProviderState` (line 363)
-- class: `_ProviderBase` (line 375)
-- class: `VLLMProvider` (line 693)
-- function: `get_embedding_provider` (line 718)
-- class: `HFEmbeddingProvider` (line 805)
-- variable: `EmbeddingProviderBase` (line 881)
+- variable: `LOGGER` (line 21)
+- variable: `EMBEDDING_RANK` (line 22)
+- class: `EmbeddingRuntimeError` (line 25)
+- class: `EmbeddingConfigError` (line 29)
+- class: `EmbeddingMetadata` (line 34)
+- class: `EmbeddingProvider` (line 63)
+- function: `_numpy` (line 90)
+- function: `_l2_normalize` (line 101)
+- class: `_ExecutorJob` (line 134)
+- class: `_FailureCounter` (line 139)
+- class: `_BatchResultHandler` (line 163)
+- class: `_QueueSentinel` (line 220)
+- class: `_BoundedBatchExecutor` (line 224)
+- class: `_ProviderState` (line 339)
+- class: `_ProviderBase` (line 351)
+- class: `VLLMProvider` (line 631)
+- function: `get_embedding_provider` (line 656)
+- class: `HFEmbeddingProvider` (line 743)
+- variable: `EmbeddingProviderBase` (line 817)
 
 ## Graph Metrics
 
 - **fan_in**: 1
-- **fan_out**: 4
-- **cycle_group**: 69
+- **fan_out**: 3
+- **cycle_group**: 47
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 5
-- recent churn 90: 5
+- recent churn 30: 7
+- recent churn 90: 7
 
 ## Usage
 
@@ -91,7 +90,7 @@ Embedding provider abstractions for chunk ingestion and runtime services.
 
 ## Hotspot
 
-- score: 2.52
+- score: 2.44
 
 ## Side Effects
 
@@ -103,9 +102,9 @@ NotImplementedError
 
 ## Complexity
 
-- branches: 64
-- cyclomatic: 65
-- loc: 882
+- branches: 62
+- cyclomatic: 63
+- loc: 818
 
 ## Doc Coverage
 

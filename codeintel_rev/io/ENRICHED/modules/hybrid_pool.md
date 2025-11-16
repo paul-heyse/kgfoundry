@@ -13,29 +13,28 @@ Feature-normalized hybrid pooling utilities.
 - from **collections.abc** import Iterable, Mapping, Sequence
 - from **dataclasses** import dataclass
 - from **time** import perf_counter
-- from **codeintel_rev.metrics.registry** import HITS_ABOVE_THRESH, HYBRID_LAST_MS, HYBRID_RETRIEVE_TOTAL, POOL_SHARE_BM25, POOL_SHARE_FAISS, POOL_SHARE_SPLADE, POOL_SHARE_XTR, RECALL_EST_AT_K
 
 ## Definitions
 
-- class: `Hit` (line 32)
-- class: `PooledHit` (line 42)
-- function: `_minmax_norm` (line 51)
-- function: `_softmax_norm` (line 62)
-- class: `HybridPoolEvaluator` (line 71)
+- class: `Hit` (line 21)
+- class: `PooledHit` (line 31)
+- function: `_minmax_norm` (line 40)
+- function: `_softmax_norm` (line 51)
+- class: `HybridPoolEvaluator` (line 60)
 
 ## Graph Metrics
 
 - **fan_in**: 1
-- **fan_out**: 1
-- **cycle_group**: 22
+- **fan_out**: 0
+- **cycle_group**: 18
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 1
-- recent churn 90: 1
+- recent churn 30: 2
+- recent churn 90: 2
 
 ## Usage
 
@@ -67,7 +66,7 @@ Hit, HybridPoolEvaluator, PooledHit
 
 ## Hotspot
 
-- score: 1.82
+- score: 1.59
 
 ## Side Effects
 
@@ -75,9 +74,9 @@ Hit, HybridPoolEvaluator, PooledHit
 
 ## Complexity
 
-- branches: 14
-- cyclomatic: 15
-- loc: 177
+- branches: 11
+- cyclomatic: 12
+- loc: 143
 
 ## Doc Coverage
 

@@ -48,7 +48,7 @@ In-process vLLM embedding engine for Stage-0 retrieval.
 
 - **fan_in**: 2
 - **fan_out**: 4
-- **cycle_group**: 33
+- **cycle_group**: 14
 
 ## Ownership
 

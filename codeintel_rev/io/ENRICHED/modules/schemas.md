@@ -47,15 +47,15 @@ TypedDict provides automatic JSON Schema generation for FastMCP tools.
 
 - **fan_in**: 13
 - **fan_out**: 1
-- **cycle_group**: 31
+- **cycle_group**: 4
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 12
-- recent churn 90: 12
+- recent churn 30: 14
+- recent churn 90: 14
 
 ## Usage
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -30,5 +31,9 @@ def test_pool_writer_sources(tmp_path: Path) -> None:
     assert set(table.column_names) == {"query_id", "channel", "rank", "chunk_id", "score", "reason"}
     assert table.num_rows == 3
     reason_payloads = table.column("reason").to_pylist()
-    assert reason_payloads[0]["matched_symbols"] == ["foo"]
-    assert reason_payloads[1]["matched_symbols"] == []
+    first_reason = reason_payloads[0]
+    second_reason = reason_payloads[1]
+    assert isinstance(first_reason, Mapping)
+    assert isinstance(second_reason, Mapping)
+    assert first_reason["matched_symbols"] == ["foo"]
+    assert second_reason["matched_symbols"] == []

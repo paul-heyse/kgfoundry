@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from time import perf_counter
-
 import numpy as np
 
 from codeintel_rev.io.duckdb_catalog import DuckDBCatalog
@@ -102,10 +100,8 @@ def _perform_exact_rerank(
         msg = "top_k must be positive for rerank operations"
         raise ValueError(msg)
 
-    start = perf_counter()
     query_mat = _normalize_queries(queries)
     candidates = _prepare_candidate_matrix(candidate_ids, query_mat.shape[0])
-    candidate_total = int(np.size(candidates))
     if not np.any(candidates >= 0):
         return _empty_result(query_mat.shape[0], min(top_k, candidates.shape[1]))
 

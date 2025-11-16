@@ -27,17 +27,17 @@ Shared retrieval dataclasses for multi-stage pipelines.
 
 ## Graph Metrics
 
-- **fan_in**: 14
+- **fan_in**: 13
 - **fan_out**: 0
-- **cycle_group**: 23
+- **cycle_group**: 16
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 5
+- recent churn 90: 5
 
 ## Usage
 
@@ -69,7 +69,7 @@ ChunkId, Distance, FactoryString, FaissRow, HybridResultDoc, HybridSearchResult,
 
 ## Hotspot
 
-- score: 2.05
+- score: 2.02
 
 ## Side Effects
 

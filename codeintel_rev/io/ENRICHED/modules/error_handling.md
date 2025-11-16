@@ -70,11 +70,6 @@ Error envelope structure:
 - from **codeintel_rev.app.config_context** import ApplicationContext
 - from **codeintel_rev.errors** import PathNotDirectoryError, PathNotFoundError
 - from **codeintel_rev.io.path_utils** import PathOutsideRepositoryError
-- from **codeintel_rev.observability.otel** import current_trace_id, record_span_event
-- from **codeintel_rev.observability.runpack** import make_runpack
-- from **codeintel_rev.observability.timeline** import current_timeline
-- from **codeintel_rev.telemetry.context** import current_run_id
-- from **codeintel_rev.telemetry.steps** import StepEvent, emit_step
 - from **kgfoundry_common.errors** import KgFoundryError
 - from **kgfoundry_common.logging** import get_logger, with_fields
 - from **kgfoundry_common.problem_details** import build_problem_details
@@ -82,31 +77,30 @@ Error envelope structure:
 
 ## Definitions
 
-- variable: `LOGGER` (line 80)
-- variable: `COMPONENT_NAME` (line 81)
-- variable: `F` (line 83)
-- class: `ProblemMapping` (line 119)
-- variable: `EXCEPTION_TO_ERROR_CODE` (line 160)
-- function: `format_error_response` (line 176)
-- function: `convert_exception_to_envelope` (line 234)
-- function: `_record_exception_event` (line 420)
-- function: `handle_adapter_errors` (line 447)
-- function: `_extract_context_from_args` (line 739)
-- function: `_maybe_attach_runpack` (line 763)
+- variable: `LOGGER` (line 75)
+- variable: `COMPONENT_NAME` (line 76)
+- variable: `F` (line 78)
+- class: `ProblemMapping` (line 114)
+- variable: `EXCEPTION_TO_ERROR_CODE` (line 155)
+- function: `format_error_response` (line 171)
+- function: `convert_exception_to_envelope` (line 229)
+- function: `_record_exception_event` (line 415)
+- function: `handle_adapter_errors` (line 429)
+- function: `_extract_context_from_args` (line 707)
 
 ## Graph Metrics
 
 - **fan_in**: 3
-- **fan_out**: 9
-- **cycle_group**: 50
+- **fan_out**: 4
+- **cycle_group**: 35
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 15
-- recent churn 90: 15
+- recent churn 30: 16
+- recent churn 90: 16
 
 ## Usage
 
@@ -138,7 +132,7 @@ EXCEPTION_TO_ERROR_CODE, convert_exception_to_envelope, format_error_response, h
 
 ## Hotspot
 
-- score: 2.62
+- score: 2.36
 
 ## Side Effects
 
@@ -146,19 +140,18 @@ EXCEPTION_TO_ERROR_CODE, convert_exception_to_envelope, format_error_response, h
 
 ## Complexity
 
-- branches: 31
-- cyclomatic: 32
-- loc: 791
+- branches: 24
+- cyclomatic: 25
+- loc: 729
 
 ## Doc Coverage
 
 - `ProblemMapping` (class): summary=yes, examples=no — Mapping from exception type to RFC 9457 Problem Details metadata.
 - `format_error_response` (function): summary=yes, params=ok, examples=no — Return Problem Details payload for the provided exception.
 - `convert_exception_to_envelope` (function): summary=yes, params=ok, examples=yes — Convert exception to unified error envelope with Problem Details.
-- `_record_exception_event` (function): summary=yes, params=mismatch, examples=no — Emit an OpenTelemetry exception event for adapter errors.
+- `_record_exception_event` (function): summary=yes, params=mismatch, examples=no — Log adapter errors with structured context.
 - `handle_adapter_errors` (function): summary=yes, params=ok, examples=yes — Convert adapter exceptions to unified error envelopes.
 - `_extract_context_from_args` (function): summary=no, examples=no
-- `_maybe_attach_runpack` (function): summary=no, examples=no
 
 ## Tags
 

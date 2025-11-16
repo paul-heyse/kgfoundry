@@ -188,7 +188,8 @@ def test_ensure_struct_views_materializes(tmp_path: Path) -> None:
         ):
             assert relation_exists(connection, table_name)
             row = connection.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
-            assert row is not None and row[0] == 1
+            assert row is not None
+            assert row[0] == 1
 
 
 def _write_single_row_parquet(path: Path, select_sql: str) -> None:

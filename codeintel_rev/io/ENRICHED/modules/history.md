@@ -17,30 +17,28 @@ better performance (50-80ms latency reduction) and reliability.
 - from **(absolute)** import git.exc
 - from **codeintel_rev.errors** import GitOperationError, PathNotFoundError
 - from **codeintel_rev.io.path_utils** import resolve_within_repo
-- from **codeintel_rev.observability.execution_ledger** import record
-- from **codeintel_rev.observability.execution_ledger** import step
 - from **kgfoundry_common.logging** import get_logger
 - from **codeintel_rev.app.config_context** import ApplicationContext
 
 ## Definitions
 
-- variable: `LOGGER` (line 27)
-- function: `blame_range` (line 30)
-- function: `file_history` (line 144)
+- variable: `LOGGER` (line 21)
+- function: `blame_range` (line 24)
+- function: `file_history` (line 119)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 5
-- **cycle_group**: 138
+- **fan_out**: 4
+- **cycle_group**: 116
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 11
-- recent churn 90: 11
+- recent churn 30: 13
+- recent churn 90: 13
 
 ## Usage
 
@@ -72,7 +70,7 @@ blame_range, file_history
 
 ## Hotspot
 
-- score: 1.98
+- score: 1.77
 
 ## Side Effects
 
@@ -80,9 +78,9 @@ blame_range, file_history
 
 ## Complexity
 
-- branches: 9
-- cyclomatic: 10
-- loc: 248
+- branches: 5
+- cyclomatic: 6
+- loc: 204
 
 ## Doc Coverage
 

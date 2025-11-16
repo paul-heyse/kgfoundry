@@ -60,7 +60,6 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 - from **types** import ModuleType
 - from **typing** import TYPE_CHECKING, Any, Protocol, TypeVar, cast
 - from **(absolute)** import numpy
-- from **(absolute)** import codeintel_rev.observability.metrics
 - from **codeintel_rev.app.capabilities** import Capabilities
 - from **codeintel_rev.app.scope_store** import ScopeStore
 - from **codeintel_rev.config.settings** import IndexConfig, Settings, load_settings
@@ -84,45 +83,44 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 
 ## Definitions
 
-- variable: `HybridSearchEngine` (line 92)
-- variable: `XTRIndex` (line 93)
-- variable: `LOGGER` (line 95)
-- class: `_RetrievalMetrics` (line 101)
-- variable: `retrieval_metrics` (line 136)
-- function: `_infer_index_root` (line 141)
-- function: `_build_factory_adjuster` (line 171)
-- function: `_build_faiss_manager` (line 204)
-- function: `_build_scope_store` (line 247)
-- function: `_build_git_clients` (line 273)
-- function: `_assign_frozen` (line 298)
-- function: `_faiss_module` (line 303)
-- function: `_import_faiss_manager_cls` (line 319)
-- function: `_import_faiss_runtime_opts_cls` (line 331)
-- function: `_faiss_runtime_options_from_index` (line 343)
-- function: `_import_hybrid_engine_cls` (line 384)
-- function: `_import_xtr_index_cls` (line 401)
-- function: `_require_dependency` (line 418)
-- function: `_ensure_path_exists` (line 477)
-- class: `ResolvedPaths` (line 537)
-- function: `resolve_application_paths` (line 596)
-- variable: `T` (line 711)
-- class: `_FaissRuntimeState` (line 714)
-- class: `_ContextRuntimeState` (line 726)
-- class: `ApplicationContext` (line 766)
+- variable: `HybridSearchEngine` (line 91)
+- variable: `XTRIndex` (line 92)
+- variable: `LOGGER` (line 94)
+- class: `_RetrievalMetrics` (line 100)
+- function: `_infer_index_root` (line 138)
+- function: `_build_factory_adjuster` (line 168)
+- function: `_build_faiss_manager` (line 201)
+- function: `_build_scope_store` (line 244)
+- function: `_build_git_clients` (line 270)
+- function: `_assign_frozen` (line 295)
+- function: `_faiss_module` (line 300)
+- function: `_import_faiss_manager_cls` (line 316)
+- function: `_import_faiss_runtime_opts_cls` (line 328)
+- function: `_faiss_runtime_options_from_index` (line 340)
+- function: `_import_hybrid_engine_cls` (line 381)
+- function: `_import_xtr_index_cls` (line 398)
+- function: `_require_dependency` (line 415)
+- function: `_ensure_path_exists` (line 474)
+- class: `ResolvedPaths` (line 534)
+- function: `resolve_application_paths` (line 593)
+- variable: `T` (line 708)
+- class: `_FaissRuntimeState` (line 711)
+- class: `_ContextRuntimeState` (line 723)
+- class: `ApplicationContext` (line 763)
 
 ## Graph Metrics
 
-- **fan_in**: 27
-- **fan_out**: 17
-- **cycle_group**: 42
+- **fan_in**: 23
+- **fan_out**: 16
+- **cycle_group**: 28
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 36
-- recent churn 90: 36
+- recent churn 30: 37
+- recent churn 90: 37
 
 ## Usage
 
@@ -158,7 +156,7 @@ ApplicationContext, ResolvedPaths, resolve_application_paths
 
 ## Hotspot
 
-- score: 3.35
+- score: 3.30
 
 ## Side Effects
 
@@ -167,9 +165,9 @@ ApplicationContext, ResolvedPaths, resolve_application_paths
 
 ## Complexity
 
-- branches: 70
-- cyclomatic: 71
-- loc: 1583
+- branches: 69
+- cyclomatic: 70
+- loc: 1569
 
 ## Doc Coverage
 

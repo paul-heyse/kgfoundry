@@ -52,7 +52,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
 from types import ModuleType
-from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import numpy as np
 
@@ -95,41 +95,6 @@ LOGGER = get_logger(__name__)
 _RUNTIME_FAILURE_TTL_S = 15.0
 _AUTOTUNE_SAMPLE_LIMIT = 128
 _MIN_AUTOTUNE_SAMPLES = 4
-
-
-class _RetrievalMetrics(Protocol):
-    """Protocol defining the interface for retrieval metrics collection.
-
-    This protocol describes the methods that retrieval metrics implementations
-    must provide for tracking index version information. Used for type checking
-    and dependency injection in application context initialization.
-    """
-
-    def set_index_version(self, name: str, version: str | None) -> None:
-        """Set the active version for a named index.
-
-        This method records the active version of an index (FAISS, DuckDB, etc.)
-        for metrics and observability purposes. The version information is used
-        to track index lifecycle changes and correlate metrics with specific
-        index versions.
-
-        Parameters
-        ----------
-        name : str
-            Name of the index (e.g., "faiss", "duckdb", "splade"). Used to
-            identify which index the version applies to.
-        version : str | None
-            Version identifier for the index (e.g., "v1.2.3", "2024-01-15").
-            If None, indicates that the index version is unknown or not available.
-
-        Notes
-        -----
-        This method is called during application context initialization when
-        indexes are loaded. The version information is stored in metrics for
-        later querying and analysis. Time complexity: O(1) for setting the
-        version. The method performs no I/O operations and should be thread-safe.
-        """
-        ...
 
 
 __all__ = ["ApplicationContext", "ResolvedPaths", "resolve_application_paths"]
@@ -871,7 +836,6 @@ class ApplicationContext:
             "Initialized index lifecycle manager",
             extra={"index_root": str(index_root)},
         )
-        self._update_index_version_metrics()
 
     @classmethod
     def create(

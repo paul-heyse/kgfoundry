@@ -1,34 +1,22 @@
-# telemetry/__init__.py
+# startup/__init__.py
 
 ## Docstring
 
 ```
-Phase-0 telemetry helpers (tracing, metrics, logging, run reports).
+Startup orchestration helpers for bootstrapping vector indexes.
 ```
-
-## Imports
-
-- from **__future__** import annotations
-- from **(absolute)** import importlib
-- from **types** import ModuleType
-
-## Definitions
-
-- function: `__getattr__` (line 37)
 
 ## Graph Metrics
 
-- **fan_in**: 1
+- **fan_in**: 0
 - **fan_out**: 0
-- **cycle_group**: 25
+- **cycle_group**: 144
 
 ## Ownership
 
-- owner: paul-heyse
-- primary authors: paul-heyse
-- bus factor: 1.00
-- recent churn 30: 2
-- recent churn 90: 2
+- bus factor: 0.00
+- recent churn 30: 0
+- recent churn 90: 0
 
 ## Usage
 
@@ -37,7 +25,7 @@ Phase-0 telemetry helpers (tracing, metrics, logging, run reports).
 
 ## Doc Health
 
-- **summary**: Phase-0 telemetry helpers (tracing, metrics, logging, run reports).
+- **summary**: Startup orchestration helpers for bootstrapping vector indexes.
 - has summary: yes
 - param parity: yes
 - examples present: no
@@ -54,9 +42,14 @@ Phase-0 telemetry helpers (tracing, metrics, logging, run reports).
 - lines covered: 0.00%
 - defs covered: 0.00%
 
+## Config References
+
+- startup/vllm_expected_operations.md
+- startup/vllm.md
+
 ## Hotspot
 
-- score: 1.24
+- score: 0.76
 
 ## Side Effects
 
@@ -64,13 +57,9 @@ Phase-0 telemetry helpers (tracing, metrics, logging, run reports).
 
 ## Complexity
 
-- branches: 2
-- cyclomatic: 3
-- loc: 46
-
-## Doc Coverage
-
-- `__getattr__` (function): summary=no, examples=no
+- branches: 0
+- cyclomatic: 1
+- loc: 2
 
 ## Tags
 

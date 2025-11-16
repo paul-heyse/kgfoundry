@@ -18,15 +18,8 @@ Fast text search with regex support.
 - from **pathlib** import Path
 - from **typing** import TYPE_CHECKING, cast
 - from **codeintel_rev.app.middleware** import get_session_id
-- from **codeintel_rev.mcp_server.common.observability** import Observation, observe_duration
 - from **codeintel_rev.mcp_server.schemas** import Match, ScopeIn
 - from **codeintel_rev.mcp_server.scope_utils** import get_effective_scope, merge_scope_filters
-- from **codeintel_rev.observability.execution_ledger** import record
-- from **codeintel_rev.observability.execution_ledger** import step
-- from **codeintel_rev.observability.otel** import record_span_event
-- from **codeintel_rev.observability.semantic_conventions** import Attrs, to_label_str
-- from **codeintel_rev.telemetry.context** import current_run_id
-- from **codeintel_rev.telemetry.decorators** import span_context
 - from **kgfoundry_common.errors** import VectorSearchError
 - from **kgfoundry_common.logging** import get_logger
 - from **kgfoundry_common.subprocess_utils** import SubprocessError, SubprocessTimeoutError, run_subprocess
@@ -34,41 +27,40 @@ Fast text search with regex support.
 
 ## Definitions
 
-- variable: `SEARCH_TIMEOUT_SECONDS` (line 43)
-- variable: `SEARCH_MAX_RESULTS` (line 44)
-- variable: `MAX_PREVIEW_CHARS` (line 45)
-- variable: `GREP_SPLIT_PARTS` (line 46)
-- variable: `COMMAND_NOT_FOUND_RETURN_CODE` (line 47)
-- variable: `COMPONENT_NAME` (line 48)
-- variable: `LOGGER` (line 49)
-- class: `TextSearchOptions` (line 53)
-- class: `_ResolvedFilters` (line 129)
-- function: `_bool_override` (line 137)
-- function: `_sequence_override` (line 164)
-- function: `_int_override` (line 197)
-- function: `search_text` (line 224)
-- function: `_resolve_glob_filters` (line 313)
-- function: `_search_text_sync` (line 342)
-- function: `_fallback_grep` (line 487)
-- class: `RipgrepCommandParams` (line 621)
-- function: `_build_ripgrep_command` (line 633)
-- function: `_parse_ripgrep_output` (line 673)
-- function: `_preview_text` (line 740)
-- function: `_clean_attrs` (line 765)
+- variable: `SEARCH_TIMEOUT_SECONDS` (line 32)
+- variable: `SEARCH_MAX_RESULTS` (line 33)
+- variable: `MAX_PREVIEW_CHARS` (line 34)
+- variable: `GREP_SPLIT_PARTS` (line 35)
+- variable: `COMMAND_NOT_FOUND_RETURN_CODE` (line 36)
+- variable: `COMPONENT_NAME` (line 37)
+- variable: `LOGGER` (line 38)
+- class: `TextSearchOptions` (line 42)
+- class: `_ResolvedFilters` (line 118)
+- function: `_bool_override` (line 126)
+- function: `_sequence_override` (line 153)
+- function: `_int_override` (line 186)
+- function: `search_text` (line 213)
+- function: `_resolve_glob_filters` (line 299)
+- function: `_search_text_sync` (line 328)
+- function: `_fallback_grep` (line 420)
+- class: `RipgrepCommandParams` (line 513)
+- function: `_build_ripgrep_command` (line 525)
+- function: `_parse_ripgrep_output` (line 565)
+- function: `_preview_text` (line 632)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 11
-- **cycle_group**: 144
+- **fan_out**: 5
+- **cycle_group**: 121
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 28
-- recent churn 90: 28
+- recent churn 30: 30
+- recent churn 90: 30
 
 ## Usage
 
@@ -100,7 +92,7 @@ search_text
 
 ## Hotspot
 
-- score: 2.81
+- score: 2.48
 
 ## Side Effects
 
@@ -109,9 +101,9 @@ search_text
 
 ## Complexity
 
-- branches: 66
-- cyclomatic: 67
-- loc: 785
+- branches: 56
+- cyclomatic: 57
+- loc: 658
 
 ## Doc Coverage
 

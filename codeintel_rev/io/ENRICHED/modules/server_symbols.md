@@ -12,27 +12,26 @@ Symbol MCP tool registrations (pure move from server.py).
 - from **codeintel_rev.mcp_server.error_handling** import handle_adapter_errors
 - from **codeintel_rev.mcp_server.schemas** import Location, SymbolInfo
 - from **codeintel_rev.mcp_server.server** import get_context, mcp
-- from **codeintel_rev.mcp_server.telemetry** import tool_operation_scope
 
 ## Definitions
 
-- function: `symbol_search` (line 16)
-- function: `definition_at` (line 108)
-- function: `references_at` (line 189)
+- function: `symbol_search` (line 15)
+- function: `definition_at` (line 101)
+- function: `references_at` (line 181)
 
 ## Graph Metrics
 
 - **fan_in**: 0
-- **fan_out**: 4
-- **cycle_group**: 152
+- **fan_out**: 3
+- **cycle_group**: 129
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 3
-- recent churn 90: 3
+- recent churn 30: 4
+- recent churn 90: 4
 
 ## Usage
 
@@ -60,7 +59,7 @@ Symbol MCP tool registrations (pure move from server.py).
 
 ## Hotspot
 
-- score: 2.06
+- score: 1.91
 
 ## Side Effects
 
@@ -68,9 +67,9 @@ Symbol MCP tool registrations (pure move from server.py).
 
 ## Complexity
 
-- branches: 16
-- cyclomatic: 17
-- loc: 263
+- branches: 13
+- cyclomatic: 14
+- loc: 254
 
 ## Doc Coverage
 

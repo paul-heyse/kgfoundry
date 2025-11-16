@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from types import ModuleType
 from typing import TYPE_CHECKING, Literal, cast
@@ -35,6 +35,30 @@ Channel = Literal[
     "xtr",
     "xtr_oracle",
 ]
+
+
+def _coerce_str_sequence(candidate: object) -> list[str] | None:
+    """Return a normalized list of strings for any iterable payload.
+
+    Parameters
+    ----------
+    candidate : object
+        Input to normalize. Can be None, a string, a Sequence, or any Iterable.
+
+    Returns
+    -------
+    list[str] | None
+        Normalized list of strings, or None if candidate is None.
+    """
+    if candidate is None:
+        return None
+    if isinstance(candidate, str):
+        return [candidate]
+    if isinstance(candidate, Sequence):
+        return [str(item) for item in candidate]
+    if isinstance(candidate, Iterable):
+        return [str(item) for item in candidate]
+    return [str(candidate)]
 
 
 def _empty_table() -> pa.Table:
@@ -124,12 +148,12 @@ def write_pool(rows: Iterable[SearchPoolRow], out_path: Path, *, overwrite: bool
     cst_hits: list[list[str] | None] = []
     for row in materialized:
         reason = dict(row.reason or {})
-        symbols = reason.get("matched_symbols")
-        cst = reason.get("cst_hits")
-        matched_symbols.append([str(item) for item in symbols] if symbols else [])
+        symbols = _coerce_str_sequence(reason.get("matched_symbols"))
+        cst = _coerce_str_sequence(reason.get("cst_hits"))
+        matched_symbols.append(symbols or [])
         ast_value = reason.get("ast_kind")
         ast_kinds.append(str(ast_value) if ast_value else None)
-        cst_hits.append([str(item) for item in cst] if cst else None)
+        cst_hits.append(cst)
 
     reason_struct = pa.StructArray.from_arrays(
         [

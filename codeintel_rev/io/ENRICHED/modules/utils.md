@@ -21,7 +21,7 @@ Helpers for working with msgspec-based settings structs.
 
 - **fan_in**: 0
 - **fan_out**: 1
-- **cycle_group**: 113
+- **cycle_group**: 92
 
 ## Ownership
 

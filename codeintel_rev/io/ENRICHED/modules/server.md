@@ -22,38 +22,36 @@ Implements full MCP tool catalog for code intelligence.
 - from **codeintel_rev.mcp_server.adapters** import text_search
 - from **codeintel_rev.mcp_server.error_handling** import handle_adapter_errors
 - from **codeintel_rev.mcp_server.schemas** import ScopeIn
-- from **codeintel_rev.mcp_server.telemetry** import tool_operation_scope
-- from **codeintel_rev.observability.reporting** import latest_run_report
 
 ## Definitions
 
-- variable: `mcp` (line 25)
-- variable: `app_context` (line 30)
-- function: `get_context` (line 35)
-- function: `set_scope` (line 63)
-- function: `list_paths` (line 86)
-- function: `open_file` (line 139)
-- function: `search_text` (line 180)
-- function: `blame_range` (line 238)
-- function: `file_history` (line 278)
-- function: `report_latest_run` (line 310)
-- function: `file_resource` (line 338)
-- function: `prompt_code_review` (line 362)
-- function: `build_http_app` (line 378)
+- variable: `mcp` (line 23)
+- variable: `app_context` (line 28)
+- function: `get_context` (line 33)
+- function: `set_scope` (line 61)
+- function: `list_paths` (line 83)
+- function: `open_file` (line 131)
+- function: `search_text` (line 168)
+- function: `blame_range` (line 219)
+- function: `file_history` (line 253)
+- function: `report_latest_run` (line 280)
+- function: `file_resource` (line 296)
+- function: `prompt_code_review` (line 320)
+- function: `build_http_app` (line 336)
 
 ## Graph Metrics
 
 - **fan_in**: 3
-- **fan_out**: 7
-- **cycle_group**: 54
+- **fan_out**: 5
+- **cycle_group**: 37
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 14
-- recent churn 90: 14
+- recent churn 30: 15
+- recent churn 90: 15
 
 ## Usage
 
@@ -85,7 +83,7 @@ app_context, build_http_app, get_context, mcp
 
 ## Hotspot
 
-- score: 2.36
+- score: 2.08
 
 ## Side Effects
 
@@ -93,9 +91,9 @@ app_context, build_http_app, get_context, mcp
 
 ## Complexity
 
-- branches: 15
-- cyclomatic: 16
-- loc: 417
+- branches: 7
+- cyclomatic: 8
+- loc: 375
 
 ## Doc Coverage
 
@@ -106,7 +104,7 @@ app_context, build_http_app, get_context, mcp
 - `search_text` (function): summary=yes, params=ok, examples=no — Fast text search (ripgrep-like).
 - `blame_range` (function): summary=yes, params=ok, examples=no — Git blame for line range (async).
 - `file_history` (function): summary=yes, params=ok, examples=no — Get file commit history (async).
-- `report_latest_run` (function): summary=yes, params=ok, examples=no — Return metadata about the most recent run report artifact.
+- `report_latest_run` (function): summary=yes, params=ok, examples=no — Return metadata about recent run reports (disabled in the simplified runtime).
 - `file_resource` (function): summary=yes, params=ok, examples=no — Serve file content as resource.
 - `prompt_code_review` (function): summary=yes, params=ok, examples=no — Code review prompt template.
 

@@ -318,6 +318,7 @@ class ScopeRegistry:
             for session_id in expired_sessions:
                 del self._scopes[session_id]
                 pruned_count += 1
+            remaining_sessions = len(self._scopes)
 
         if pruned_count > 0:
             LOGGER.info(
@@ -325,7 +326,7 @@ class ScopeRegistry:
                 extra={
                     "pruned_count": pruned_count,
                     "max_age_seconds": max_age_seconds,
-                    "remaining_sessions": session_count,
+                    "remaining_sessions": remaining_sessions,
                 },
             )
         else:

@@ -26,6 +26,43 @@ else:
 LOGGER = get_logger(__name__)
 
 __all__ = ["FAISSDualIndexManager", "IndexManifest"]
+_SEARCH_RESULT_RANK = 2
+
+
+def _run_index_search(
+    index: faiss.Index,
+    query: NDArrayF32,
+    fetch: int,
+) -> tuple[NDArrayF32, NDArrayI64]:
+    """Execute FAISS search and coerce outputs into typed NumPy arrays.
+
+    Parameters
+    ----------
+    index : faiss.Index
+        FAISS index instance to search.
+    query : NDArrayF32
+        Query vectors with shape (n_queries, vec_dim).
+    fetch : int
+        Number of nearest neighbors to retrieve per query.
+
+    Returns
+    -------
+    tuple[NDArrayF32, NDArrayI64]
+        Tuple of (distances, ids) arrays, both with shape (n_queries, fetch).
+
+    Raises
+    ------
+    RuntimeError
+        If FAISS search returns arrays that are not 2-dimensional.
+    """
+    raw_output = index.search(query, fetch)
+    distances, ids = cast("tuple[object, object]", raw_output)
+    dist_array = np.asarray(distances, dtype=np.float32)
+    id_array = np.asarray(ids, dtype=np.int64)
+    if dist_array.ndim != _SEARCH_RESULT_RANK or id_array.ndim != _SEARCH_RESULT_RANK:
+        msg = "FAISS search must return 2-D arrays"
+        raise RuntimeError(msg)
+    return dist_array, id_array
 
 
 @dataclass(slots=True, frozen=True)
@@ -260,10 +297,10 @@ class FAISSDualIndexManager:
 
         if hasattr(primary_index, "nprobe"):
             primary_index.nprobe = nprobe_effective
-        distances_p, ids_p = primary_index.search(query_norm, fetch)
+        distances_p, ids_p = _run_index_search(primary_index, query_norm, fetch)
 
         if secondary_index is not None and getattr(secondary_index, "ntotal", 0) > 0:
-            distances_s, ids_s = secondary_index.search(query_norm, fetch)
+            distances_s, ids_s = _run_index_search(secondary_index, query_norm, fetch)
         else:
             distances_s = np.empty((1, 0), dtype=np.float32)
             ids_s = np.empty((1, 0), dtype=np.int64)

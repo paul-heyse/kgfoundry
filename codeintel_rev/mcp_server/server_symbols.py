@@ -5,7 +5,6 @@ from __future__ import annotations
 from codeintel_rev.mcp_server.error_handling import handle_adapter_errors
 from codeintel_rev.mcp_server.schemas import Location, SymbolInfo
 from codeintel_rev.mcp_server.server import get_context, mcp
-from codeintel_rev.mcp_server.telemetry import tool_operation_scope
 
 
 @mcp.tool()

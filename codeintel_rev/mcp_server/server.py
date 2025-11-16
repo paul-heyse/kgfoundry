@@ -112,7 +112,6 @@ async def list_paths(
         empty result fields and Problem Details.
     """
     context = get_context()
-    filters_present = bool(path or include_globs or exclude_globs or languages)
     return await files_adapter.list_paths(
         context,
         path=path,

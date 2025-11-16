@@ -548,6 +548,7 @@ runtime-evaluated-base-classes = [
 "tools/codemods/pathlib_fix.py" = ["N815"]
 # Typer callbacks/options require extensive parameter lists; splitting would break CLI UX.
 "codeintel_rev/cli_enrich.py" = ["PLR0913", "PLR0914", "PLR0917", "DOC502"]  # Exception re-raised via bare `raise` after logging; correctly documented in Raises section
+"codeintel_rev/app/routers/diagnostics.py" = ["DOC202"]  # Functions have return annotations but always raise; Returns section required by pydoclint DOC201/DOC203
 # New: Façade modules are allowed to import from private sources (controlled re-export)
 "src/kgfoundry_common/typing/__init__.py" = []  # Canonical typing façade
 "tools/typing/__init__.py" = []  # Tooling typing façade

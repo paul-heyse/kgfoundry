@@ -57,21 +57,11 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 ## Imports
 
 - from **__future__** import annotations
-- from **(absolute)** import time
 - from **(absolute)** import uuid
-- from **datetime** import UTC, datetime
-- from **pathlib** import Path
 - from **typing** import TYPE_CHECKING
 - from **starlette.middleware.base** import BaseHTTPMiddleware, DispatchFunction
 - from **starlette.types** import ASGIApp
-- from **codeintel_rev.observability.ledger** import RunLedger, dated_run_dir
-- from **codeintel_rev.observability.otel** import current_trace_id, set_current_span_attrs
-- from **codeintel_rev.observability.runtime_observer** import bind_run_ledger
-- from **codeintel_rev.observability.semantic_conventions** import Attrs
-- from **codeintel_rev.observability.timeline** import bind_timeline, new_timeline
 - from **codeintel_rev.runtime.request_context** import capability_stamp_var, session_id_var
-- from **codeintel_rev.telemetry.context** import telemetry_context
-- from **codeintel_rev.telemetry.reporter** import start_run
 - from **kgfoundry_common.logging** import get_logger
 - from **collections.abc** import Awaitable, Callable
 - from **starlette.requests** import Request
@@ -79,24 +69,24 @@ codeintel_rev.mcp_server.scope_utils : Utilities for retrieving and merging scop
 
 ## Definitions
 
-- variable: `LOGGER` (line 79)
-- function: `get_session_id` (line 82)
-- function: `get_capability_stamp` (line 133)
-- class: `SessionScopeMiddleware` (line 145)
+- variable: `LOGGER` (line 69)
+- function: `get_session_id` (line 72)
+- function: `get_capability_stamp` (line 123)
+- class: `SessionScopeMiddleware` (line 135)
 
 ## Graph Metrics
 
 - **fan_in**: 6
-- **fan_out**: 9
-- **cycle_group**: 52
+- **fan_out**: 2
+- **cycle_group**: 33
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 16
-- recent churn 90: 16
+- recent churn 30: 17
+- recent churn 90: 17
 
 ## Usage
 
@@ -132,17 +122,17 @@ SessionScopeMiddleware, capability_stamp_var, get_capability_stamp, get_session_
 
 ## Hotspot
 
-- score: 2.40
+- score: 2.01
 
 ## Side Effects
 
-- filesystem
+- none detected
 
 ## Complexity
 
-- branches: 10
-- cyclomatic: 11
-- loc: 332
+- branches: 5
+- cyclomatic: 6
+- loc: 269
 
 ## Doc Coverage
 

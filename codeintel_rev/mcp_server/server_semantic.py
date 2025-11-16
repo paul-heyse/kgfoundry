@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from codeintel_rev.mcp_server.adapters import deep_research as deep_research_adapter
@@ -244,4 +245,5 @@ async def telemetry_run_report(
         that legacy run reports are no longer available.
     """
     _ = (session_id, run_id)
+    await asyncio.sleep(0)
     return {"error": "run_reports_unavailable"}

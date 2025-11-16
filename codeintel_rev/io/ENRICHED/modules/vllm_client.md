@@ -12,7 +12,6 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 
 - from **__future__** import annotations
 - from **(absolute)** import asyncio
-- from **contextlib** import nullcontext
 - from **functools** import lru_cache
 - from **importlib** import import_module
 - from **time** import perf_counter
@@ -20,13 +19,6 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 - from **typing** import TYPE_CHECKING, cast
 - from **(absolute)** import msgspec
 - from **codeintel_rev._lazy_imports** import LazyModule
-- from **codeintel_rev.metrics.registry** import EMBED_BATCH_SIZE, EMBED_LATENCY_SECONDS
-- from **codeintel_rev.observability.execution_ledger** import step
-- from **codeintel_rev.observability.otel** import record_span_event
-- from **codeintel_rev.observability.semantic_conventions** import Attrs
-- from **codeintel_rev.observability.timeline** import current_timeline
-- from **codeintel_rev.telemetry.decorators** import span_context
-- from **codeintel_rev.telemetry.steps** import StepEvent, emit_step
 - from **codeintel_rev.typing** import NDArrayF32, gate_import
 - from **kgfoundry_common.logging** import get_logger
 - from **collections.abc** import Sequence
@@ -36,27 +28,27 @@ OpenAI-compatible /v1/embeddings endpoint with batching support.
 
 ## Definitions
 
-- variable: `httpx` (line 37)
-- variable: `LOGGER` (line 39)
-- function: `_get_numpy` (line 43)
-- class: `EmbeddingRequest` (line 79)
-- class: `EmbeddingData` (line 107)
-- class: `EmbeddingResponse` (line 132)
-- class: `VLLMClient` (line 163)
+- variable: `httpx` (line 29)
+- variable: `LOGGER` (line 31)
+- function: `_get_numpy` (line 35)
+- class: `EmbeddingRequest` (line 71)
+- class: `EmbeddingData` (line 99)
+- class: `EmbeddingResponse` (line 124)
+- class: `VLLMClient` (line 155)
 
 ## Graph Metrics
 
 - **fan_in**: 4
-- **fan_out**: 11
-- **cycle_group**: 42
+- **fan_out**: 4
+- **cycle_group**: 15
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 29
-- recent churn 90: 29
+- recent churn 30: 31
+- recent churn 90: 31
 
 ## Usage
 
@@ -88,7 +80,7 @@ EmbeddingData, EmbeddingRequest, EmbeddingResponse, VLLMClient
 
 ## Hotspot
 
-- score: 2.74
+- score: 2.44
 
 ## Side Effects
 
@@ -97,9 +89,9 @@ EmbeddingData, EmbeddingRequest, EmbeddingResponse, VLLMClient
 
 ## Complexity
 
-- branches: 35
-- cyclomatic: 36
-- loc: 685
+- branches: 27
+- cyclomatic: 28
+- loc: 596
 
 ## Doc Coverage
 

@@ -12,40 +12,36 @@ Exact reranking utilities for FAISS candidates.
 - from **time** import perf_counter
 - from **(absolute)** import numpy
 - from **codeintel_rev.io.duckdb_catalog** import DuckDBCatalog
-- from **codeintel_rev.observability.semantic_conventions** import Attrs
-- from **codeintel_rev.telemetry.decorators** import span_context
-- from **codeintel_rev.telemetry.otel_metrics** import build_histogram
 - from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 15)
-- variable: `RERANK_LATENCY_MS` (line 20)
-- function: `_perform_exact_rerank` (line 27)
-- function: `_normalize_queries` (line 153)
-- function: `_prepare_candidate_matrix` (line 187)
-- function: `_hydrate_embeddings` (line 233)
-- function: `_build_candidate_vectors` (line 289)
-- function: `_compute_similarity` (line 358)
-- function: `_effective_top_k` (line 427)
-- function: `_select_topk` (line 477)
-- function: `_empty_result` (line 536)
-- class: `FlatReranker` (line 582)
-- function: `exact_rerank` (line 643)
+- variable: `LOGGER` (line 12)
+- function: `_perform_exact_rerank` (line 18)
+- function: `_normalize_queries` (line 130)
+- function: `_prepare_candidate_matrix` (line 164)
+- function: `_hydrate_embeddings` (line 210)
+- function: `_build_candidate_vectors` (line 266)
+- function: `_compute_similarity` (line 335)
+- function: `_effective_top_k` (line 404)
+- function: `_select_topk` (line 454)
+- function: `_empty_result` (line 513)
+- class: `FlatReranker` (line 559)
+- function: `exact_rerank` (line 620)
 
 ## Graph Metrics
 
 - **fan_in**: 1
-- **fan_out**: 4
-- **cycle_group**: 42
+- **fan_out**: 1
+- **cycle_group**: 28
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 7
-- recent churn 90: 7
+- recent churn 30: 8
+- recent churn 90: 8
 
 ## Usage
 
@@ -77,7 +73,7 @@ FlatReranker, exact_rerank
 
 ## Hotspot
 
-- score: 2.11
+- score: 1.82
 
 ## Side Effects
 
@@ -85,9 +81,9 @@ FlatReranker, exact_rerank
 
 ## Complexity
 
-- branches: 15
-- cyclomatic: 16
-- loc: 706
+- branches: 14
+- cyclomatic: 15
+- loc: 683
 
 ## Doc Coverage
 

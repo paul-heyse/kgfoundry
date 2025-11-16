@@ -409,12 +409,11 @@ def _search_text_sync(
         ) from exc
 
     matches, truncated = _parse_ripgrep_output(stdout, repo_root, options.max_results)
-    result = {
+    return {
         "matches": matches,
         "total": len(matches),
         "truncated": truncated,
     }
-    return result
 
 
 def _fallback_grep(
@@ -501,12 +500,11 @@ def _fallback_grep(
             matches.append(match)
         except (ValueError, IndexError):
             continue
-    result = {
+    return {
         "matches": matches,
         "total": len(matches),
         "truncated": len(matches) >= max_results,
     }
-    return result
 
 
 @dataclass(slots=True, frozen=True)

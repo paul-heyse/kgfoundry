@@ -9,7 +9,7 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from codeintel_rev.typing import gate_import
 
@@ -65,6 +65,14 @@ else:  # pragma: no cover - runtime duckdb import is optional
     DuckDBConnection = Any
 
 
+class _DuckDBModule(Protocol):
+    """Protocol describing the subset of duckdb module APIs we rely on."""
+
+    def connect(
+        self, database: str | None = ..., *args: object, **kwargs: object
+    ) -> DuckDBConnection: ...
+
+
 @dataclass(slots=True, frozen=True)
 class DuckConn:
     """Connection metadata for enrichment DuckDB ingestion."""
@@ -72,22 +80,23 @@ class DuckConn:
     db_path: Path
 
 
-def _duckdb() -> object:
+def _duckdb() -> _DuckDBModule:
     """Import duckdb on demand to keep it optional at runtime.
 
     Returns
     -------
-    object
+    _DuckDBModule
         DuckDB module ready for connections.
     """
-    return gate_import("duckdb", purpose="enrichment analytics")
+    module = gate_import("duckdb", purpose="enrichment analytics")
+    return cast("_DuckDBModule", module)
 
 
 def ensure_schema(conn: DuckConn) -> None:
     """Create the ``modules`` table if it does not already exist."""
-    duckdb = _duckdb()
+    duckdb_module = _duckdb()
     conn.db_path.parent.mkdir(parents=True, exist_ok=True)
-    with duckdb.connect(str(conn.db_path)) as con:  # type: ignore[reportAttributeAccessIssue]
+    with duckdb_module.connect(str(conn.db_path)) as con:
         con.execute(
             """
             CREATE TABLE IF NOT EXISTS modules (
@@ -145,16 +154,16 @@ def ingest_modules_jsonl(conn: DuckConn, modules_jsonl: Path) -> int:
     int
         Total number of rows now present in the ``modules`` table.
     """
-    duckdb = _duckdb()
+    duckdb_module = _duckdb()
     ensure_schema(conn)
-    with duckdb.connect(str(conn.db_path)) as con:  # type: ignore[reportAttributeAccessIssue]
+    with duckdb_module.connect(str(conn.db_path)) as con:
         _apply_pragmas(con)
         if _USE_NATIVE_JSON:
             _ingest_via_native_json(con, modules_jsonl)
         else:
             _ingest_via_python(con, modules_jsonl)
-        (count,) = con.execute("SELECT COUNT(*) FROM modules").fetchone()
-    return int(count)
+        row = con.execute("SELECT COUNT(*) FROM modules").fetchone()
+    return int(row[0]) if row and row[0] is not None else 0
 
 
 def _load_json_rows(path: Path) -> list[dict[str, object]]:

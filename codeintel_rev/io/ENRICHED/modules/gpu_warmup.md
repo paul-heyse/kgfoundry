@@ -15,33 +15,32 @@ GPU is reachable and functional before expensive operations begin.
 - from **functools** import lru_cache
 - from **typing** import SupportsInt, cast
 - from **codeintel_rev._lazy_imports** import LazyModule
-- from **codeintel_rev.metrics.registry** import GPU_AVAILABLE, GPU_TEMP_SCRATCH_BYTES
 - from **codeintel_rev.typing** import FaissModule, NumpyModule, TorchModule, gate_import
 - from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 17)
-- variable: `np` (line 25)
-- function: `_check_cuda_availability` (line 28)
-- function: `_check_faiss_gpu_support` (line 64)
-- function: `_test_torch_gpu_operations` (line 97)
-- function: `_test_faiss_gpu_resources` (line 123)
-- function: `warmup_gpu` (line 155)
+- variable: `LOGGER` (line 16)
+- variable: `np` (line 24)
+- function: `_check_cuda_availability` (line 27)
+- function: `_check_faiss_gpu_support` (line 63)
+- function: `_test_torch_gpu_operations` (line 96)
+- function: `_test_faiss_gpu_resources` (line 122)
+- function: `warmup_gpu` (line 154)
 
 ## Graph Metrics
 
 - **fan_in**: 1
-- **fan_out**: 3
-- **cycle_group**: 43
+- **fan_out**: 2
+- **cycle_group**: 29
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 18
-- recent churn 90: 18
+- recent churn 30: 19
+- recent churn 90: 19
 
 ## Usage
 
@@ -77,7 +76,7 @@ warmup_gpu
 
 ## Hotspot
 
-- score: 2.12
+- score: 2.00
 
 ## Side Effects
 
@@ -85,9 +84,9 @@ warmup_gpu
 
 ## Complexity
 
-- branches: 20
-- cyclomatic: 21
-- loc: 255
+- branches: 18
+- cyclomatic: 19
+- loc: 252
 
 ## Doc Coverage
 

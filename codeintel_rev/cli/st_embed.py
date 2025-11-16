@@ -13,6 +13,7 @@ import argparse
 import json
 import logging
 from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
@@ -20,8 +21,22 @@ import torch
 from sentence_transformers import SentenceTransformer
 
 from codeintel_rev.config.settings import load_settings
+from kgfoundry_common.logging import get_logger
 
-LOGGER = logging.getLogger("codeintel.st_embed")
+LOGGER = get_logger(__name__)
+
+
+@dataclass(slots=True)
+class EmbedJob:
+    """Configuration bundle for an embedding run."""
+
+    input_path: Path
+    output_path: Path
+    model_name: str | None
+    batch_size: int
+    device_name: str | None
+    normalize: bool
+    jsonl_path: Path | None
 
 
 def _resolve_model_name(cli_value: str | None) -> str:
@@ -55,7 +70,7 @@ def _read_texts(path: Path) -> list[str]:
 
 def _dump_jsonl(texts: Iterable[str], embeddings: np.ndarray, path: Path) -> None:
     with path.open("w", encoding="utf-8") as handle:
-        for text, vector in zip(texts, embeddings.tolist()):
+        for text, vector in zip(texts, embeddings.tolist(), strict=False):
             handle.write(json.dumps({"text": text, "embedding": vector}) + "\n")
 
 
@@ -103,74 +118,56 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def embed_file(
-    *,
-    input_path: Path,
-    output_path: Path,
-    model_name: str | None,
-    batch_size: int,
-    device_name: str | None,
-    normalize: bool,
-    jsonl_path: Path | None,
-) -> None:
+def embed_file(job: EmbedJob) -> None:
     """Generate embeddings for text file using SentenceTransformer.
 
     Parameters
     ----------
-    input_path : Path
-        Path to input text file. Each line is treated as a separate text
+    job : EmbedJob
+        Embedding configuration bundle containing:
+
+        - input_path: Path to input text file. Each line is treated as a separate text
         to embed. Empty lines are skipped.
-    output_path : Path
-        Path where embeddings will be saved as a NumPy array (.npy format).
+        - output_path: Destination for the NumPy .npy embeddings array.
         The parent directory is created if it doesn't exist.
-    model_name : str | None
-        Optional SentenceTransformer model name or path. If None, uses the
-        default model from _resolve_model_name().
-    batch_size : int
-        Batch size for embedding generation. Larger batches improve throughput
-        but require more memory.
-    device_name : str | None
-        Optional device name ("cpu", "cuda", etc.). If None, auto-detected
-        based on CUDA availability.
-    normalize : bool
-        Whether to L2-normalize embeddings. Normalized embeddings are suitable
-        for cosine similarity calculations.
-    jsonl_path : Path | None
-        Optional path to write a JSONL preview file containing text-embedding
-        pairs. Useful for inspection and debugging.
+        - model_name: Optional SentenceTransformer identifier (defaults to settings).
+        - batch_size: Batch size for encode() calls.
+        - device_name: Optional device override ("cpu", "cuda", etc.).
+        - normalize: Whether to L2-normalize embeddings.
+        - jsonl_path: Optional JSONL preview file path.
 
     Raises
     ------
     ValueError
         Raised when the input file contains no non-empty lines.
     """
-    texts = _read_texts(input_path)
+    texts = _read_texts(job.input_path)
     if not texts:
-        msg = f"No non-empty lines found in {input_path}"
+        msg = f"No non-empty lines found in {job.input_path}"
         raise ValueError(msg)
 
-    resolved_model = _resolve_model_name(model_name)
-    resolved_device = _resolve_device(device_name)
+    resolved_model = _resolve_model_name(job.model_name)
+    resolved_device = _resolve_device(job.device_name)
     LOGGER.info("Loading %s on %s", resolved_model, resolved_device)
     st_model = SentenceTransformer(resolved_model, device=resolved_device)
 
-    LOGGER.info("Embedding %s texts (batch=%s)", len(texts), batch_size)
+    LOGGER.info("Embedding %s texts (batch=%s)", len(texts), job.batch_size)
     embeddings = st_model.encode(
         texts,
-        batch_size=batch_size,
+        batch_size=job.batch_size,
         convert_to_numpy=True,
-        normalize_embeddings=normalize,
+        normalize_embeddings=job.normalize,
         show_progress_bar=True,
     ).astype(np.float32, copy=False)
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    np.save(output_path, embeddings)
-    LOGGER.info("Saved embeddings to %s", output_path)
+    job.output_path.parent.mkdir(parents=True, exist_ok=True)
+    np.save(job.output_path, embeddings)
+    LOGGER.info("Saved embeddings to %s", job.output_path)
 
-    if jsonl_path is not None:
-        jsonl_path.parent.mkdir(parents=True, exist_ok=True)
-        _dump_jsonl(texts, embeddings, jsonl_path)
-        LOGGER.info("Wrote JSONL preview to %s", jsonl_path)
+    if job.jsonl_path is not None:
+        job.jsonl_path.parent.mkdir(parents=True, exist_ok=True)
+        _dump_jsonl(texts, embeddings, job.jsonl_path)
+        LOGGER.info("Wrote JSONL preview to %s", job.jsonl_path)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -188,18 +185,19 @@ def main(argv: list[str] | None = None) -> int:
     """
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     args = _parse_args(argv)
+    job = EmbedJob(
+        input_path=args.input_path,
+        output_path=args.output,
+        model_name=args.model,
+        batch_size=args.batch_size,
+        device_name=args.device,
+        normalize=not args.no_normalize,
+        jsonl_path=args.jsonl,
+    )
     try:
-        embed_file(
-            input_path=args.input_path,
-            output_path=args.output,
-            model_name=args.model,
-            batch_size=args.batch_size,
-            device_name=args.device,
-            normalize=not args.no_normalize,
-            jsonl_path=args.jsonl,
-        )
-    except Exception as exc:  # pragma: no cover - CLI wrapper
-        LOGGER.error("Embedding failed: %s", exc)
+        embed_file(job)
+    except (OSError, ValueError, RuntimeError):  # pragma: no cover - CLI wrapper
+        LOGGER.exception("Embedding failed")
         return 1
     return 0
 

@@ -19,31 +19,30 @@ SCIP symbol coverage evaluator.
 - from **codeintel_rev.io.duckdb_manager** import DuckDBManager
 - from **codeintel_rev.io.faiss_manager** import SearchRuntimeOverrides
 - from **codeintel_rev.io.symbol_catalog** import SymbolCatalog, SymbolDefRow
-- from **codeintel_rev.metrics.registry** import SCIP_CHUNK_COVERAGE_RATIO, SCIP_INDEX_COVERAGE_RATIO, SCIP_RETRIEVAL_COVERAGE_RATIO
 - from **kgfoundry_common.logging** import get_logger
 
 ## Definitions
 
-- variable: `LOGGER` (line 24)
-- class: `SupportsFaissSearch` (line 27)
-- class: `SupportsEmbedSingle` (line 42)
-- class: `CoverageResult` (line 51)
-- class: `CoverageSummary` (line 61)
-- class: `SCIPCoverageEvaluator` (line 71)
+- variable: `LOGGER` (line 19)
+- class: `SupportsFaissSearch` (line 22)
+- class: `SupportsEmbedSingle` (line 37)
+- class: `CoverageResult` (line 46)
+- class: `CoverageSummary` (line 56)
+- class: `SCIPCoverageEvaluator` (line 66)
 
 ## Graph Metrics
 
 - **fan_in**: 1
-- **fan_out**: 6
-- **cycle_group**: 66
+- **fan_out**: 5
+- **cycle_group**: 44
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 5
+- recent churn 90: 5
 
 ## Usage
 
@@ -71,7 +70,7 @@ SCIP symbol coverage evaluator.
 
 ## Hotspot
 
-- score: 2.26
+- score: 2.21
 
 ## Side Effects
 
@@ -81,7 +80,7 @@ SCIP symbol coverage evaluator.
 
 - branches: 17
 - cyclomatic: 18
-- loc: 261
+- loc: 249
 
 ## Doc Coverage
 

@@ -59,26 +59,26 @@ The FAISS index type is automatically selected based on corpus size:
 - function: `_write_parquet` (line 357)
 - function: `_build_faiss_index` (line 400)
 - function: `_load_embeddings_from_artifacts` (line 461)
-- function: `_update_faiss_index_incremental` (line 486)
-- function: `_runtime_options_from_index` (line 595)
-- function: `_resolve_nlist` (line 646)
-- function: `_run_offline_evaluation` (line 664)
-- function: `_initialize_duckdb` (line 699)
-- function: `_write_symbols` (line 730)
+- function: `_update_faiss_index_incremental` (line 507)
+- function: `_runtime_options_from_index` (line 616)
+- function: `_resolve_nlist` (line 667)
+- function: `_run_offline_evaluation` (line 685)
+- function: `_initialize_duckdb` (line 720)
+- function: `_write_symbols` (line 751)
 
 ## Graph Metrics
 
 - **fan_in**: 0
 - **fan_out**: 13
-- **cycle_group**: 71
+- **cycle_group**: 49
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 20
-- recent churn 90: 20
+- recent churn 30: 22
+- recent churn 90: 22
 
 ## Usage
 
@@ -116,7 +116,7 @@ The FAISS index type is automatically selected based on corpus size:
 
 - branches: 50
 - cyclomatic: 51
-- loc: 801
+- loc: 822
 
 ## Doc Coverage
 
@@ -129,7 +129,7 @@ The FAISS index type is automatically selected based on corpus size:
 - `_embed_chunks` (function): summary=yes, params=ok, examples=no — Generate embeddings for the supplied chunks using vLLM.
 - `_write_parquet` (function): summary=yes, params=ok, examples=no — Persist chunk metadata and embeddings to Parquet.
 - `_build_faiss_index` (function): summary=yes, params=ok, examples=no — Train and persist the FAISS index with adaptive type selection.
-- `_load_embeddings_from_artifacts` (function): summary=yes, params=mismatch, examples=no — Load stored embeddings from Parquet artifacts for FAISS-only runs.
+- `_load_embeddings_from_artifacts` (function): summary=yes, params=ok, examples=no — Load stored embeddings from Parquet artifacts for FAISS-only runs.
 
 ## Tags
 

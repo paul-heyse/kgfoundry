@@ -152,7 +152,11 @@ class _FailureCounter:
         _tb: TracebackType | None,
     ) -> bool:
         if exc_type is not None:
-            reason = exc_type.__name__
+            LOGGER.warning(
+                "Embedding provider %s failed with %s",
+                self._provider_name,
+                exc_type.__name__,
+            )
         return False
 
 
@@ -556,11 +560,8 @@ class _ProviderBase(EmbeddingProvider):
             np = _numpy()
             return np.zeros((0, self._state.index.vec_dim), dtype=np.float32)
         with self._inflight_guard(), _FailureCounter(self._state.provider_name):
-            start = time.perf_counter()
-            batch, token_count = self._run_inference(texts)
-            duration = time.perf_counter() - start
-        vectors = self._post_process(batch)
-        return vectors
+            batch, _token_count = self._run_inference(texts)
+        return self._post_process(batch)
 
     def _post_process(self, vectors: NDArrayF32) -> NDArrayF32:
         np = _numpy()
