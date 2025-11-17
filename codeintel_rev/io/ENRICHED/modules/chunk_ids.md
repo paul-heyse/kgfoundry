@@ -19,7 +19,7 @@ Deterministic chunk identifier helpers.
 
 - **fan_in**: 1
 - **fan_out**: 0
-- **cycle_group**: 15
+- **cycle_group**: 9
 
 ## Ownership
 

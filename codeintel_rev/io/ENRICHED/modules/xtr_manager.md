@@ -31,7 +31,7 @@ Token-level XTR index manager with late-interaction scoring utilities.
 
 - **fan_in**: 8
 - **fan_out**: 4
-- **cycle_group**: 11
+- **cycle_group**: 24
 
 ## Ownership
 

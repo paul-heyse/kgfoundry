@@ -11,7 +11,7 @@ import os
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, SupportsIndex, cast
+from typing import TYPE_CHECKING, cast
 
 from codeintel_rev.app.middleware import get_session_id
 from codeintel_rev.errors import (
@@ -198,10 +198,7 @@ def _normalize_list_paths_arguments(
     include_globs = kwargs.pop("include_globs", positions[1])
     exclude_globs = kwargs.pop("exclude_globs", positions[2])
     languages = kwargs.pop("languages", positions[3])
-    max_value = cast(
-        "SupportsIndex | str | None",
-        kwargs.pop("max_results", kwargs.pop("max", positions[4])),
-    )
+    max_value = cast("int | str | None", kwargs.pop("max_results", kwargs.pop("max", positions[4])))
 
     max_results = 1000 if max_value is None else int(max_value)
 

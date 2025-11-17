@@ -65,30 +65,30 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 - function: `_maybe_schedule_xtr_wide` (line 778)
 - function: `_resolve_stage_one_outcome` (line 807)
 - function: `_run_xtr_wide_stage` (line 879)
-- function: `_calculate_xtr_k` (line 900)
-- function: `_build_extra_channels` (line 907)
-- function: `_safe_int` (line 927)
-- function: `_merge_rrf_weights` (line 935)
-- function: `_run_warp_stage` (line 948)
-- function: `_warp_executor_hits` (line 971)
-- function: `_xtr_rescore_hits` (line 1003)
-- function: `_hydrate_records` (line 1042)
-- function: `_hydrate_and_rerank_records` (line 1074)
-- function: `_maybe_rerank` (line 1164)
-- function: `_rerank_gate_decision` (line 1205)
-- function: `_build_findings` (line 1222)
-- function: `_structure_explanations` (line 1264)
-- function: `merge_explainability_into_findings` (line 1294)
-- function: `_build_method_explainability` (line 1359)
-- function: `_build_method` (line 1426)
-- function: `_assemble_extras` (line 1463)
-- function: `_make_envelope` (line 1533)
-- function: `_clamp_limit` (line 1549)
-- function: `_coerce_positive_int` (line 1560)
-- function: `_dedupe_preserve_order` (line 1570)
-- class: `WarpOutcome` (line 1582)
-- class: `FusionRequest` (line 1592)
-- class: `MethodContext` (line 1606)
+- function: `_calculate_xtr_k` (line 901)
+- function: `_build_extra_channels` (line 908)
+- function: `_safe_int` (line 928)
+- function: `_merge_rrf_weights` (line 936)
+- function: `_run_warp_stage` (line 949)
+- function: `_warp_executor_hits` (line 972)
+- function: `_xtr_rescore_hits` (line 1004)
+- function: `_hydrate_records` (line 1043)
+- function: `_hydrate_and_rerank_records` (line 1075)
+- function: `_maybe_rerank` (line 1165)
+- function: `_rerank_gate_decision` (line 1206)
+- function: `_build_findings` (line 1223)
+- function: `_structure_explanations` (line 1265)
+- function: `merge_explainability_into_findings` (line 1295)
+- function: `_build_method_explainability` (line 1360)
+- function: `_build_method` (line 1427)
+- function: `_assemble_extras` (line 1464)
+- function: `_make_envelope` (line 1534)
+- function: `_clamp_limit` (line 1550)
+- function: `_coerce_positive_int` (line 1561)
+- function: `_dedupe_preserve_order` (line 1571)
+- class: `WarpOutcome` (line 1583)
+- class: `FusionRequest` (line 1593)
+- class: `MethodContext` (line 1607)
 
 ## Graph Metrics
 
@@ -101,8 +101,8 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 24
-- recent churn 90: 24
+- recent churn 30: 25
+- recent churn 90: 25
 
 ## Usage
 
@@ -141,7 +141,7 @@ Two-stage semantic search (CodeRank → optional WARP → optional reranker).
 
 - branches: 144
 - cyclomatic: 145
-- loc: 1618
+- loc: 1619
 
 ## Doc Coverage
 

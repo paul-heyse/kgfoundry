@@ -38,9 +38,9 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 - class: `NumpyRandomState` (line 296)
 - class: `NumpyRandomNamespace` (line 317)
 - class: `NumpyLinalgNamespace` (line 341)
-- class: `NumpyModule` (line 366)
-- class: `PolarsDataFrame` (line 373)
-- class: `PolarsModule` (line 394)
+- class: `NumpyModule` (line 368)
+- class: `PolarsDataFrame` (line 375)
+- class: `PolarsModule` (line 396)
 
 ## Graph Metrics
 
@@ -53,8 +53,8 @@ lint/type tooling (PR-E) and runtime helpers share the same source of truth.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 15
-- recent churn 90: 15
+- recent churn 30: 17
+- recent churn 90: 17
 
 ## Usage
 
@@ -92,11 +92,15 @@ FaissModule, HEAVY_DEPS, NDArrayAny, NDArrayF32, NDArrayI64, NumpyModule, Polars
 
 - filesystem
 
+## Raises
+
+NotImplementedError
+
 ## Complexity
 
 - branches: 1
 - cyclomatic: 2
-- loc: 420
+- loc: 422
 
 ## Doc Coverage
 

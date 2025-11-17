@@ -31,7 +31,7 @@ Hotspot scoring utilities.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 68
+- **cycle_group**: 71
 
 ## Ownership
 

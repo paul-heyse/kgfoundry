@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 import os
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -16,12 +16,13 @@ from kgfoundry_common.safe_pickle_v2 import (
 from tests._helpers import assertions
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from _pytest.fixtures import FixtureFunctionMarker
-    from _pytest.logging import LogCaptureFixture
+    from _pytest.logging import LogCaptureFixture as _LogCaptureFixture
 
-    fixture = cast("FixtureFunctionMarker", pytest.fixture)
-else:  # pragma: no cover - pytest provides runtime decorator
-    fixture = pytest.fixture
+    LogCaptureFixture = _LogCaptureFixture
+else:  # pragma: no cover - runtime only; pytest supplies caplog fixture
+    LogCaptureFixture = Any
+
+fixture = pytest.fixture
 
 
 @fixture

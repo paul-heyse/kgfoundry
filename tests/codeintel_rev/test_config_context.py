@@ -20,6 +20,11 @@ from kgfoundry_common.errors import ConfigurationError
 from tests._helpers import assertions
 
 
+def _noop_load_cpu_index(*_: object, **__: object) -> None:
+    """Test helper that simulates successful FAISS loading."""
+    return
+
+
 def test_resolve_application_paths_success(tmp_path: Path) -> None:
     """Test successful path resolution with valid repo root."""
     # Arrange
@@ -106,7 +111,7 @@ def test_application_context_create(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(
         context.faiss_manager,
         "load_cpu_index",
-        lambda *args, **kwargs: None,
+        _noop_load_cpu_index,
     )
 
     # Assert
@@ -151,7 +156,7 @@ def test_application_context_ensure_faiss_ready(
     monkeypatch.setattr(
         context.faiss_manager,
         "load_cpu_index",
-        lambda *args, **kwargs: None,
+        _noop_load_cpu_index,
     )
 
     # Act - ensure_faiss_ready should handle missing index gracefully
@@ -185,7 +190,7 @@ def test_application_context_ensure_faiss_ready_cached(
     monkeypatch.setattr(
         context.faiss_manager,
         "load_cpu_index",
-        lambda *args, **kwargs: None,
+        _noop_load_cpu_index,
     )
 
     # Act - call twice

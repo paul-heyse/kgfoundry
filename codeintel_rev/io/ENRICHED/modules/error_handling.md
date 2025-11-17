@@ -60,6 +60,7 @@ Error envelope structure:
 
 - from **__future__** import annotations
 - from **(absolute)** import inspect
+- from **(absolute)** import logging
 - from **collections.abc** import Awaitable, Callable, Mapping
 - from **dataclasses** import dataclass
 - from **functools** import wraps
@@ -75,27 +76,29 @@ Error envelope structure:
 
 ## Definitions
 
-- variable: `F` (line 73)
-- class: `ProblemMapping` (line 109)
-- variable: `EXCEPTION_TO_ERROR_CODE` (line 150)
-- function: `format_error_response` (line 166)
-- function: `convert_exception_to_envelope` (line 224)
-- function: `handle_adapter_errors` (line 334)
-- function: `_extract_context_from_args` (line 612)
+- variable: `F` (line 74)
+- variable: `LOGGER` (line 76)
+- class: `ProblemMapping` (line 112)
+- variable: `EXCEPTION_TO_ERROR_CODE` (line 153)
+- function: `format_error_response` (line 169)
+- function: `convert_exception_to_envelope` (line 227)
+- function: `_log_exception` (line 339)
+- function: `handle_adapter_errors` (line 372)
+- function: `_extract_context_from_args` (line 650)
 
 ## Graph Metrics
 
 - **fan_in**: 3
 - **fan_out**: 4
-- **cycle_group**: 34
+- **cycle_group**: 32
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 18
-- recent churn 90: 18
+- recent churn 30: 19
+- recent churn 90: 19
 
 ## Usage
 
@@ -127,7 +130,7 @@ EXCEPTION_TO_ERROR_CODE, convert_exception_to_envelope, format_error_response, h
 
 ## Hotspot
 
-- score: 2.21
+- score: 2.29
 
 ## Side Effects
 
@@ -135,15 +138,16 @@ EXCEPTION_TO_ERROR_CODE, convert_exception_to_envelope, format_error_response, h
 
 ## Complexity
 
-- branches: 14
-- cyclomatic: 15
-- loc: 634
+- branches: 19
+- cyclomatic: 20
+- loc: 672
 
 ## Doc Coverage
 
 - `ProblemMapping` (class): summary=yes, examples=no — Mapping from exception type to RFC 9457 Problem Details metadata.
 - `format_error_response` (function): summary=yes, params=ok, examples=no — Return Problem Details payload for the provided exception.
 - `convert_exception_to_envelope` (function): summary=yes, params=ok, examples=yes — Convert exception to unified error envelope with Problem Details.
+- `_log_exception` (function): summary=yes, params=mismatch, examples=no — Emit structured logs for adapter exceptions.
 - `handle_adapter_errors` (function): summary=yes, params=ok, examples=yes — Convert adapter exceptions to unified error envelopes.
 - `_extract_context_from_args` (function): summary=no, examples=no
 

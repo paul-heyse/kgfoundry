@@ -24,7 +24,7 @@ echo "==> Generating SCIP index..."
 )
 
 echo "==> Running enrichment pipeline (LibCST + AST + analytics)..."
-uv run python -m codeintel_rev.cli_enrich \
+uv run python -m codeintel_rev.cli.enrich_pipeline \
   all \
   --root codeintel_rev \
   --scip "$SCIP_JSON" \

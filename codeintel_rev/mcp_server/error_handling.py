@@ -341,11 +341,12 @@ def _log_exception(exc: BaseException, operation: str, problem: ProblemDetails) 
     detail = problem.get("detail", str(exc))
     if isinstance(exc, KgFoundryError):
         code_value = getattr(exc.code, "value", exc.code)
+        exc_info = exc if exc.log_level >= logging.ERROR else None
         LOGGER.log(
             exc.log_level,
             detail,
             extra={"operation": operation, "error_code": code_value},
-            exc_info=exc.log_level >= logging.ERROR,
+            exc_info=exc_info,
         )
         return
     if isinstance(exc, UnicodeDecodeError):
@@ -364,7 +365,7 @@ def _log_exception(exc: BaseException, operation: str, problem: ProblemDetails) 
     LOGGER.error(
         detail,
         extra={"operation": operation, "exception_type": type(exc).__name__},
-        exc_info=True,
+        exc_info=exc,
     )
 
 

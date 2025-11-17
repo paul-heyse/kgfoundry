@@ -37,22 +37,22 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 - function: `_exception_name` (line 300)
 - function: `_infer_side_effects` (line 330)
 - class: `_IndexVisitor` (line 379)
-- function: `index_module` (line 1134)
-- function: `_lineno` (line 1181)
+- function: `index_module` (line 1132)
+- function: `_lineno` (line 1179)
 
 ## Graph Metrics
 
 - **fan_in**: 4
 - **fan_out**: 1
-- **cycle_group**: 73
+- **cycle_group**: 70
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 15
-- recent churn 90: 15
+- recent churn 30: 16
+- recent churn 90: 16
 
 ## Usage
 
@@ -98,7 +98,7 @@ LibCST-powered index utilities (imports, defs, exports, docstrings).
 
 - branches: 136
 - cyclomatic: 137
-- loc: 1202
+- loc: 1200
 
 ## Doc Coverage
 

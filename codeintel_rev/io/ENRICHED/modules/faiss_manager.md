@@ -39,37 +39,38 @@ corpus size for optimal performance.
 
 ## Definitions
 
-- variable: `FaissIndex` (line 36)
-- variable: `np` (line 38)
-- variable: `FaissIndex` (line 39)
-- variable: `pa` (line 45)
-- variable: `pq` (line 46)
-- function: `_run_index_search` (line 51)
-- class: `_LazyFaissProxy` (line 87)
-- variable: `faiss` (line 131)
-- function: `_faiss_module` (line 134)
-- function: `apply_parameters` (line 145)
-- class: `FAISSRuntimeController` (line 195)
-- function: `_log_extra` (line 369)
-- class: `FAISSRuntimeOptions` (line 387)
-- class: `SearchRuntimeOverrides` (line 406)
-- class: `RefineSearchConfig` (line 415)
-- class: `_TuningOverrides` (line 424)
-- class: `_SearchExecutionParams` (line 435)
-- class: `_SearchPlan` (line 444)
-- class: `_FAISSIdMapMixin` (line 453)
-- class: `FAISSManager` (line 632)
-- class: `AutoTuner` (line 3083)
-- function: `_coerce_to_int` (line 3193)
-- function: `_configure_direct_map` (line 3216)
-- function: `_set_direct_map_type` (line 3224)
-- function: `_wrap_bool_contains` (line 3261)
-- function: `_wrap_index_contains` (line 3297)
-- function: `_coerce_optional_int` (line 3335)
-- function: `_coerce_optional_float` (line 3369)
-- function: `_parse_tuning_overrides` (line 3403)
-- function: `_persist_tuning_profile` (line 3429)
-- function: `_get_compile_options` (line 3438)
+- variable: `FaissIndex` (line 35)
+- variable: `np` (line 37)
+- variable: `FaissIndex` (line 38)
+- variable: `pa` (line 44)
+- variable: `pq` (line 45)
+- function: `_run_index_search` (line 50)
+- class: `_LazyFaissProxy` (line 86)
+- variable: `faiss` (line 130)
+- function: `_faiss_module` (line 133)
+- function: `apply_parameters` (line 144)
+- class: `FAISSRuntimeController` (line 194)
+- function: `_log_extra` (line 368)
+- class: `FAISSRuntimeOptions` (line 386)
+- class: `SearchRuntimeOverrides` (line 405)
+- class: `RefineSearchConfig` (line 414)
+- class: `SecondaryUpdateSnapshot` (line 423)
+- class: `_TuningOverrides` (line 433)
+- class: `_SearchExecutionParams` (line 444)
+- class: `_SearchPlan` (line 453)
+- class: `_FAISSIdMapMixin` (line 462)
+- class: `FAISSManager` (line 641)
+- class: `AutoTuner` (line 3214)
+- function: `_coerce_to_int` (line 3312)
+- function: `_configure_direct_map` (line 3335)
+- function: `_set_direct_map_type` (line 3343)
+- function: `_wrap_bool_contains` (line 3380)
+- function: `_wrap_index_contains` (line 3416)
+- function: `_coerce_optional_int` (line 3454)
+- function: `_coerce_optional_float` (line 3488)
+- function: `_parse_tuning_overrides` (line 3522)
+- function: `_persist_tuning_profile` (line 3548)
+- function: `_get_compile_options` (line 3557)
 
 ## Graph Metrics
 
@@ -125,7 +126,7 @@ AutoTuner, FAISSManager, FAISSRuntimeController, apply_parameters
 
 - branches: 231
 - cyclomatic: 232
-- loc: 3454
+- loc: 3573
 
 ## Doc Coverage
 
@@ -138,7 +139,7 @@ AutoTuner, FAISSManager, FAISSRuntimeController, apply_parameters
 - `FAISSRuntimeOptions` (class): summary=yes, examples=no — Runtime tuning options passed to :class:`FAISSManager`.
 - `SearchRuntimeOverrides` (class): summary=yes, examples=no — Per-search overrides for HNSW/quantizer parameters.
 - `RefineSearchConfig` (class): summary=yes, examples=no — Configuration bundle for refine searches.
-- `_TuningOverrides` (class): summary=yes, examples=no — Normalized tuning overrides extracted from a profile payload.
+- `SecondaryUpdateSnapshot` (class): summary=yes, examples=no — Metadata recorded for the most recent secondary index refresh.
 
 ## Tags
 

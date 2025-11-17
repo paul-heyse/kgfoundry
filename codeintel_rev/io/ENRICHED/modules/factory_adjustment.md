@@ -26,15 +26,15 @@ Factory adjustment hooks for RuntimeCell initialization.
 
 - **fan_in**: 4
 - **fan_out**: 1
-- **cycle_group**: 5
+- **cycle_group**: 19
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 4
-- recent churn 90: 4
+- recent churn 30: 5
+- recent churn 90: 5
 
 ## Usage
 

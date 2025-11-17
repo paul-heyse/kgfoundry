@@ -33,15 +33,15 @@ Writers and helpers that persist CST datasets to disk.
 
 - **fan_in**: 1
 - **fan_out**: 4
-- **cycle_group**: 96
+- **cycle_group**: 97
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 3
-- recent churn 90: 3
+- recent churn 30: 4
+- recent churn 90: 4
 
 ## Usage
 

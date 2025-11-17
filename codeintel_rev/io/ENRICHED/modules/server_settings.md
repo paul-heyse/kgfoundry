@@ -23,21 +23,21 @@ and when exporting the Hypercorn-facing ASGI callable.
 ## Definitions
 
 - class: `ServerSettings` (line 19)
-- function: `get_server_settings` (line 106)
+- function: `get_server_settings` (line 108)
 
 ## Graph Metrics
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 32
+- **cycle_group**: 36
 
 ## Ownership
 
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 3
-- recent churn 90: 3
+- recent churn 30: 4
+- recent churn 90: 4
 
 ## Usage
 
@@ -83,7 +83,7 @@ ServerSettings, get_server_settings
 
 - branches: 0
 - cyclomatic: 1
-- loc: 121
+- loc: 123
 
 ## Doc Coverage
 

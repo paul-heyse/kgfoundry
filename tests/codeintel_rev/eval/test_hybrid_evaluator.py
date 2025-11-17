@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import pyarrow.parquet as pq
@@ -15,6 +15,9 @@ from codeintel_rev.io.faiss_manager import FAISSManager
 from codeintel_rev.io.xtr_manager import XTRIndex
 
 from tests._helpers import assertions, constants
+
+if TYPE_CHECKING:
+    import pyarrow as pa
 
 
 class _FakeCatalog:
@@ -138,7 +141,8 @@ def test_hybrid_evaluator_writes_metrics(tmp_path: Path) -> None:
     ]
     assertions.expect_sequence_equal(sorted(set(channel_values)), ["faiss", "oracle"])
     assertions.expect_in("reason", table.column_names)
-    reason_struct = table.column("reason").combine_chunks()
+    reason_column = table.column("reason")
+    reason_struct = cast("pa.StructArray", reason_column.combine_chunks())
     matched_symbol_values = reason_struct.field("matched_symbols").to_pylist()
     assertions.expect_true(
         all(isinstance(val, list) for val in matched_symbol_values),

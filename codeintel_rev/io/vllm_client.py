@@ -42,7 +42,18 @@ def _use_stub_client() -> bool:
 
 
 def _module_available(module_name: str) -> bool:
-    """Return ``True`` when ``module_name`` can be imported."""
+    """Return ``True`` when ``module_name`` can be imported.
+
+    Parameters
+    ----------
+    module_name : str
+        Name of the module to check for availability.
+
+    Returns
+    -------
+    bool
+        ``True`` if the module spec can be resolved, ``False`` otherwise.
+    """
     return importlib.util.find_spec(module_name) is not None
 
 

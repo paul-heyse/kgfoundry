@@ -60,7 +60,9 @@ def invoke(
         concurrent test invocations (Typer runner handles isolation).
     """
     arg_list = list(args)
-    normalizer_obj = getattr(app, "__kgf_normalize_args__", None)
+    normalizer_obj = getattr(app, "argv_normalizer", None)
+    if normalizer_obj is None:
+        normalizer_obj = getattr(app, "__kgf_normalize_args__", None)
     if normalizer_obj is not None and callable(normalizer_obj):
         normalizer = cast("_ArgNormalizer", normalizer_obj)
         normalized = normalizer(["cli", *arg_list])

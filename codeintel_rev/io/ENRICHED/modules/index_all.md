@@ -39,7 +39,7 @@ The FAISS index type is automatically selected based on corpus size:
 - from **codeintel_rev.io.faiss_manager** import FAISSManager, FAISSRuntimeOptions
 - from **codeintel_rev.io.parquet_store** import ParquetWriteOptions, extract_embeddings, read_chunks_parquet, write_chunks_parquet
 - from **codeintel_rev.io.symbol_catalog** import SymbolCatalog, SymbolDefRow, SymbolOccurrenceRow
-- from **codeintel_rev.io.vllm_client** import VLLMClient
+- from **codeintel_rev.io.vllm_client** import build_vllm_client
 - from **codeintel_rev.typing** import NDArrayF32
 - from **(absolute)** import numpy
 
@@ -77,8 +77,8 @@ The FAISS index type is automatically selected based on corpus size:
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 24
-- recent churn 90: 24
+- recent churn 30: 25
+- recent churn 90: 25
 
 ## Usage
 

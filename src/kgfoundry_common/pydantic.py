@@ -39,11 +39,11 @@ if TYPE_CHECKING:
             """Validate ``obj`` using the underlying Pydantic implementation."""
             raise NotImplementedError
 
-        def model_dump(self, **model_dump_kwargs: object) -> dict[str, object]:
+        def model_dump(self, **_model_dump_kwargs: object) -> dict[str, object]:
             """Return the dictionary representation produced by Pydantic."""
             raise NotImplementedError
 
-        def model_dump_json(self, **model_dump_json_kwargs: object) -> str:
+        def model_dump_json(self, **_model_dump_json_kwargs: object) -> str:
             """Return the JSON representation produced by Pydantic."""
             raise NotImplementedError
 

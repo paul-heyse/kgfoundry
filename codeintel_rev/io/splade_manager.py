@@ -69,6 +69,10 @@ if TYPE_CHECKING:
             ------
             NotImplementedError
                 This is a protocol stub method that must be implemented by concrete classes.
+                When implemented, returns Sequence[object] sparse vector embeddings for the
+                input documents. The exact type depends on the encoder implementation
+                (typically numpy arrays or PyTorch tensors). Each embedding represents one
+                input document and can be decoded into token-weight pairs using decode().
 
             Notes
             -----

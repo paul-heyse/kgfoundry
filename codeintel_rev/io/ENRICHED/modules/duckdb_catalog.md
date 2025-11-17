@@ -30,24 +30,24 @@ chunk retrieval and joins.
 
 ## Definitions
 
-- variable: `duckdb` (line 37)
-- variable: `np` (line 38)
-- variable: `LOGGER` (line 40)
-- class: `IdMapMeta` (line 44)
-- function: `_escape_identifier` (line 53)
-- class: `_ScopeFilterSpec` (line 107)
-- class: `StructureAnnotations` (line 124)
-- class: `_StructMaterializationPlan` (line 134)
-- class: `DuckDBCatalogOptions` (line 212)
-- class: `_DuckDBQueryMixin` (line 221)
-- class: `_LegacyOptions` (line 438)
-- class: `DuckDBCatalog` (line 445)
-- function: `_relation_exists` (line 1608)
-- function: `relation_exists` (line 1642)
-- function: `_file_checksum` (line 1660)
-- function: `_parquet_hash` (line 1682)
-- function: `ensure_faiss_idmap_view` (line 1710)
-- function: `refresh_faiss_idmap_materialized` (line 1757)
+- variable: `duckdb` (line 35)
+- variable: `np` (line 36)
+- variable: `LOGGER` (line 38)
+- class: `IdMapMeta` (line 42)
+- function: `_escape_identifier` (line 51)
+- class: `_ScopeFilterSpec` (line 105)
+- class: `StructureAnnotations` (line 122)
+- class: `_StructMaterializationPlan` (line 132)
+- class: `DuckDBCatalogOptions` (line 210)
+- class: `_DuckDBQueryMixin` (line 219)
+- class: `_LegacyOptions` (line 433)
+- class: `DuckDBCatalog` (line 440)
+- function: `_relation_exists` (line 1630)
+- function: `relation_exists` (line 1664)
+- function: `_file_checksum` (line 1682)
+- function: `_parquet_hash` (line 1704)
+- function: `ensure_faiss_idmap_view` (line 1732)
+- function: `refresh_faiss_idmap_materialized` (line 1776)
 
 ## Graph Metrics
 
@@ -102,9 +102,9 @@ DuckDBCatalog, IdMapMeta, StructureAnnotations, ensure_faiss_idmap_view, refresh
 
 ## Complexity
 
-- branches: 150
-- cyclomatic: 151
-- loc: 1856
+- branches: 151
+- cyclomatic: 152
+- loc: 1875
 
 ## Doc Coverage
 

@@ -265,6 +265,9 @@ docs-symbol-delta = "docs.toolchain:symbol_delta"
 tools-build-navmap = "tools.cli:build_navmap"
 docs-serve-mkdocs = "tools.mkdocs_suite.serve:main"
 codeintel-enrich = "codeintel_rev.cli_enrich:main"
+codeintel-enrich-pipeline = "codeintel_rev.cli.enrich_pipeline:main"
+codeintel-enrich-analytics = "codeintel_rev.cli.enrich_analytics:main"
+codeintel-enrich-overlays = "codeintel_rev.cli.enrich_overlays:main"
 codeintel = "codeintel_rev.cli:main"
 codeintel-cst = "codeintel_rev.cst_build.cst_cli:main"
 
@@ -470,7 +473,7 @@ runtime-evaluated-base-classes = [
 
 [tool.ruff.lint.per-file-ignores]
 # Typer CLI wiring intentionally accepts many arguments/positionals.
-"codeintel_rev/cli_enrich.py" = ["PLR0913", "PLR0917"]
+
 
 [tool.ruff.lint.isort]
 known-first-party = [
@@ -507,7 +510,7 @@ min_confidence = 90
 
 # Where to scan by default. (You can add "tests" too, but that can be noisy.)
 # Include the whitelist module so intentionally referenced names stay marked as used.
-paths = ["src", "tools", "stubs", "vulture_whitelist.py"]
+paths = ["src", "codeintel_rev", "docs", "tools", "stubs", "vulture_whitelist.py", "bin"]
 
 # Keep this aligned with your Ruff excludes.
 exclude = [

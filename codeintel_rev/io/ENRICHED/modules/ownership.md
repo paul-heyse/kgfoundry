@@ -41,7 +41,7 @@ Ownership, churn, and bus-factor analytics sourced from Git history.
 
 - **fan_in**: 1
 - **fan_out**: 1
-- **cycle_group**: 66
+- **cycle_group**: 73
 
 ## Ownership
 

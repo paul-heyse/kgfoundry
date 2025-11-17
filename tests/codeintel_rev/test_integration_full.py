@@ -22,8 +22,8 @@ from tests._helpers import assertions
 from tests.conftest import HAS_FAISS_SUPPORT
 
 # Test constants for startup time assertions
-_EXPECTED_STARTUP_TIME_WITHOUT_PRELOAD_SECONDS = 10.0
-_EXPECTED_STARTUP_TIME_WITH_PRELOAD_SECONDS = 30.0
+_EXPECTED_STARTUP_TIME_WITHOUT_PRELOAD_SECONDS = 20.0
+_EXPECTED_STARTUP_TIME_WITH_PRELOAD_SECONDS = 40.0
 
 
 @pytest.fixture

@@ -70,7 +70,7 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 - from **codeintel_rev.io.duckdb_manager** import DuckDBManager
 - from **codeintel_rev.io.faiss_manager** import FAISSManager, FAISSRuntimeOptions
 - from **codeintel_rev.io.git_client** import AsyncGitClient, GitClient
-- from **codeintel_rev.io.vllm_client** import VLLMClient
+- from **codeintel_rev.io.vllm_client** import VLLMClient, build_vllm_client
 - from **codeintel_rev.runtime** import NullRuntimeCellObserver, RuntimeCell, RuntimeCellObserver
 - from **codeintel_rev.runtime.factory_adjustment** import DefaultFactoryAdjuster, FactoryAdjuster, NoopFactoryAdjuster
 - from **codeintel_rev.typing** import gate_import
@@ -116,8 +116,8 @@ codeintel_rev.config.settings : Settings dataclasses and environment loading
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 43
-- recent churn 90: 43
+- recent churn 30: 44
+- recent churn 90: 44
 
 ## Usage
 

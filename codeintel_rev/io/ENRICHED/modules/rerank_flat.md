@@ -20,11 +20,11 @@ Exact reranking utilities for FAISS candidates.
 - function: `_hydrate_embeddings` (line 200)
 - function: `_build_candidate_vectors` (line 256)
 - function: `_compute_similarity` (line 325)
-- function: `_effective_top_k` (line 394)
-- function: `_select_topk` (line 444)
-- function: `_empty_result` (line 503)
-- class: `FlatReranker` (line 549)
-- function: `exact_rerank` (line 610)
+- function: `_effective_top_k` (line 396)
+- function: `_select_topk` (line 446)
+- function: `_empty_result` (line 505)
+- class: `FlatReranker` (line 551)
+- function: `exact_rerank` (line 612)
 
 ## Graph Metrics
 
@@ -37,8 +37,8 @@ Exact reranking utilities for FAISS candidates.
 - owner: paul-heyse
 - primary authors: paul-heyse
 - bus factor: 1.00
-- recent churn 30: 10
-- recent churn 90: 10
+- recent churn 30: 11
+- recent churn 90: 11
 
 ## Usage
 
@@ -80,7 +80,7 @@ FlatReranker, exact_rerank
 
 - branches: 14
 - cyclomatic: 15
-- loc: 673
+- loc: 675
 
 ## Doc Coverage
 
